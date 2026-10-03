@@ -4804,7 +4804,7 @@ textarea::placeholder {
 /* Match the G3 Shop application */
 :root {
   color: #0c0c0c;
-  background: #f4f6f7;
+  background: var(--g3-page);
   --panel: #fefefe;
   --panel-2: #eef1f3;
   --line: rgba(121, 138, 146, 0.3);
@@ -4816,7 +4816,7 @@ textarea::placeholder {
 
 body {
   color: #0c0c0c;
-  background: #f4f6f7;
+  background: var(--g3-page);
 }
 
 aside {
@@ -4903,7 +4903,7 @@ aside nav button.active {
 .app-shell > main {
   min-height: calc(100vh - 56px);
   margin: 0;
-  background: #f4f6f7;
+  background: var(--g3-page);
 }
 
 .page {
@@ -5135,7 +5135,7 @@ textarea:focus {
 
 .auth-screen {
   color: #0c0c0c;
-  background: #f4f6f7;
+  background: var(--g3-page);
 }
 
 .auth-screen p {
@@ -5606,7 +5606,7 @@ textarea:focus {
 /* Final Shop parity overrides */
 :root {
   color: #0c0c0c;
-  background: #f4f6f7;
+  background: var(--g3-page);
   --panel: #fefefe;
   --panel-2: #eef1f3;
   --line: rgba(121, 138, 146, 0.3);
@@ -5617,7 +5617,7 @@ textarea:focus {
 body,
 .app-shell > main {
   color: #0c0c0c;
-  background: #f4f6f7;
+  background: var(--g3-page);
 }
 
 .app-shell aside {
@@ -5851,7 +5851,7 @@ textarea {
 
 .auth-screen {
   color: #0c0c0c;
-  background: #f4f6f7;
+  background: var(--g3-page);
 }
 
 @media (max-width: 760px) {
@@ -5957,7 +5957,7 @@ textarea {
 html[data-theme="dark"] {
   color-scheme: dark;
   color: #f4f4f5;
-  background: #171717;
+  background: var(--g3-page);
   --panel: #262626;
   --panel-2: #303030;
   --line: #454545;
@@ -5968,7 +5968,7 @@ html[data-theme="dark"] body,
 html[data-theme="dark"] .app-shell > main,
 html[data-theme="dark"] .auth-screen {
   color: #f4f4f5;
-  background: #171717;
+  background: var(--g3-page);
 }
 
 html[data-theme="dark"] .app-shell aside,
@@ -6559,14 +6559,14 @@ body.scouting-workspace-open {
     max(32px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left));
   overflow-y: auto;
   overscroll-behavior: contain;
-  background: #f4f6f7;
+  background: var(--g3-page);
 }
 
 html[data-theme="dark"] .app-shell .page.scouting-forms-fullscreen {
   width: 100%;
   padding: max(24px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right))
     max(32px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left));
-  background: #171717;
+  background: var(--g3-page);
 }
 
 .scouting-fullscreen-toggle {

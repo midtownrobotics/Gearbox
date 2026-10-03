@@ -64,7 +64,7 @@ export function HomePage() {
   });
 
   return (
-    <main className="min-h-screen bg-mist">
+    <main className="min-h-screen bg-page">
       <div className="max-w-5xl mx-auto px-6 py-10 space-y-10">
         <div>
           <p className="text-sm text-steel-dark">{today}</p>

@@ -165,7 +165,7 @@ export function PartDetailPage() {
 
   if (!partNumber) {
     return (
-      <main className="min-h-screen bg-mist">
+      <main className="min-h-screen bg-page">
         <div className="max-w-4xl mx-auto px-6 py-8">
           <ErrorBanner message="Part number is required. Use ?p=PART_NUMBER in the URL." />
         </div>
@@ -177,7 +177,7 @@ export function PartDetailPage() {
 
   if (error) {
     return (
-      <main className="min-h-screen bg-mist">
+      <main className="min-h-screen bg-page">
         <div className="max-w-4xl mx-auto px-6 py-8">
           <ErrorBanner message={error} />
         </div>
@@ -187,7 +187,7 @@ export function PartDetailPage() {
 
   if (definitions.length === 0) {
     return (
-      <main className="min-h-screen bg-mist">
+      <main className="min-h-screen bg-page">
         <div className="max-w-4xl mx-auto px-6 py-8 space-y-5">
           <h1 className="font-display text-4xl text-ink">Part: {partNumber}</h1>
           <div className="bg-paper border border-steel/30 rounded-xl p-6">
@@ -238,7 +238,7 @@ export function PartDetailPage() {
 
   if (!activeDef) {
     return (
-      <main className="min-h-screen bg-mist">
+      <main className="min-h-screen bg-page">
         <div className="max-w-4xl mx-auto px-6 py-8 space-y-5">
           <h1 className="font-display text-4xl text-ink">Part: {partNumber}</h1>
           <div className="bg-paper border border-steel/30 rounded-xl p-6">
@@ -252,7 +252,7 @@ export function PartDetailPage() {
   const activeInstances = instances.filter((i) => i.partDefinitionId === activeDef.id);
 
   return (
-    <main className="min-h-screen bg-mist">
+    <main className="min-h-screen bg-page">
       <div className="max-w-4xl mx-auto px-6 py-8 space-y-5">
         <h1 className="font-display text-4xl text-ink">Part: {partNumber}</h1>
 

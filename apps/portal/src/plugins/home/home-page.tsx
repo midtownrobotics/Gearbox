@@ -41,7 +41,7 @@ const APPS: App[] = [
     tile: skillsIcon,
   },
   {
-    label: "Strategy",
+    label: "Scouting",
     href: "https://scouting.g3robotics.com",
     tile: scoutingIcon,
   },
@@ -109,7 +109,7 @@ export function HomePage() {
 
   if (authState === "checking") {
     return (
-      <main className="min-h-screen bg-gray-100 flex items-center justify-center px-6">
+      <main className="min-h-screen bg-page flex items-center justify-center px-6">
         <div className="text-center">
           <div className="animate-pulse">
             <p className="text-red-600 font-semibold text-lg tracking-widest uppercase">
@@ -123,7 +123,7 @@ export function HomePage() {
 
   if (authState === "unauthenticated") {
     return (
-      <main className="min-h-screen bg-gray-100 flex items-center justify-center px-6">
+      <main className="min-h-screen bg-page flex items-center justify-center px-6">
         <div className="max-w-md w-full space-y-6 text-center">
           <div>
             <p className="text-red-600 font-semibold text-lg tracking-widest uppercase mb-2">
@@ -155,7 +155,7 @@ export function HomePage() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-100 px-6 py-12">
+    <main className="min-h-screen bg-page px-6 py-12">
       <div className="max-w-2xl mx-auto">
         <div className="mb-10">
           <p className="text-red-600 text-sm font-semibold uppercase tracking-widest mb-1">

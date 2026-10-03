@@ -3,6 +3,5 @@
 
 html,
 body {
-  background-color: var(--color-gray-100);
   overscroll-behavior: none;
 }

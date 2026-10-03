@@ -103,7 +103,7 @@ export function PartViewerPage() {
 
   if (!partNumber) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-100 p-4">
+      <div className="flex items-center justify-center min-h-screen bg-page p-4">
         <div className="bg-white rounded-lg shadow-lg p-8 max-w-md w-full text-center">
           <div className="text-red-600 text-4xl mb-4">⚠️</div>
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Missing Part Number</h1>
@@ -117,7 +117,7 @@ export function PartViewerPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-100 p-4">
+      <div className="flex items-center justify-center min-h-screen bg-page p-4">
         <div className="bg-white rounded-lg shadow-lg p-8 max-w-md w-full text-center">
           <div className="animate-spin text-primary-600 text-4xl mb-4">⏳</div>
           <h1 className="text-xl font-bold text-gray-900 mb-2">Loading Drawing</h1>
