@@ -19,6 +19,11 @@ type App = {
   external?: boolean;
 } & ({ tile: string } | { icon?: IconType; logoSrc?: string });
 
+/** Match13's mark: its number, in the tiles' white. */
+const Thirteen: IconType = () => (
+  <span className="block font-display text-[38px] leading-none tracking-wide">13</span>
+);
+
 const APPS: App[] = [
   {
     label: "G3ID",
@@ -76,6 +81,12 @@ const APPS: App[] = [
     label: "Statbotics",
     href: "https://www.statbotics.io/team/1648",
     icon: FaChartLine,
+    external: true,
+  },
+  {
+    label: "Match13",
+    href: "https://www.match13.com/team/1648",
+    icon: Thirteen,
     external: true,
   },
   {
