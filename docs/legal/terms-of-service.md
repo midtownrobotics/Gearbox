@@ -143,7 +143,7 @@ We may update these terms. We will post the new version with its date and show m
 
 ## 19. Contact
 
-If you have questions about this policy, you may contact us by email at contact@frcgearbox.com.
+If you have questions about these terms, you may contact us by email at contact@frcgearbox.com.
 
 ## Annex A: Data processing addendum
 
