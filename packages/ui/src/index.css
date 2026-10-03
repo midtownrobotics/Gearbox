@@ -1,5 +1,6 @@
 /* packages/ui/src/index.css */
 @import url("https://fonts.googleapis.com/css2?family=Ubuntu:ital,wght@0,300;0,400;0,500;0,700;1,300;1,400;1,500;1,700&display=swap");
+@import "./colors.css";
 @import "./nav-bar.css";
 @import "./theme.css";
 
@@ -8,6 +9,14 @@
   src: url("./fonts/agency-fb.ttf") format("truetype");
   font-weight: normal;
   font-style: normal;
+}
+
+/* The shared scheme (colors.css) as Tailwind colors; they follow light/dark by themselves. */
+@theme inline {
+  --color-page: var(--g3-page);
+  --color-surface: var(--g3-surface);
+  --color-inset: var(--g3-inset);
+  --color-line: var(--g3-line);
 }
 
 @theme {

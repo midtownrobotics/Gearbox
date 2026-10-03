@@ -297,7 +297,7 @@ export function BatteriesPage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-gray-100 flex items-center justify-center">
+      <main className="min-h-screen bg-page flex items-center justify-center">
         <p className="text-gray-600">Loading…</p>
       </main>
     );
@@ -311,7 +311,7 @@ export function BatteriesPage() {
     .sort((a, b) => a.stateSince - b.stateSince)[0];
 
   return (
-    <main className="min-h-screen bg-gray-100 text-gray-900">
+    <main className="min-h-screen bg-page text-gray-900">
       <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
         <div className="flex items-center justify-between gap-3 border-b border-gray-200 pb-4">
           <h1 className="text-3xl font-bold tracking-tight">Batteries</h1>

@@ -19,6 +19,11 @@ type App = {
   external?: boolean;
 } & ({ tile: string } | { icon?: IconType; logoSrc?: string });
 
+/** Match13's mark: its number, in the tiles' white. */
+const Thirteen: IconType = () => (
+  <span className="block font-display text-[38px] leading-none tracking-wide">13</span>
+);
+
 const APPS: App[] = [
   {
     label: "G3ID",
@@ -41,7 +46,7 @@ const APPS: App[] = [
     tile: skillsIcon,
   },
   {
-    label: "Strategy",
+    label: "Scouting",
     href: "https://scouting.g3robotics.com",
     tile: scoutingIcon,
   },
@@ -79,6 +84,12 @@ const APPS: App[] = [
     external: true,
   },
   {
+    label: "Match13",
+    href: "https://www.match13.com/team/1648",
+    icon: Thirteen,
+    external: true,
+  },
+  {
     label: "GitHub",
     href: "https://github.com/midtownrobotics",
     icon: FaGithub,
@@ -109,7 +120,7 @@ export function HomePage() {
 
   if (authState === "checking") {
     return (
-      <main className="min-h-screen bg-gray-100 flex items-center justify-center px-6">
+      <main className="min-h-screen bg-page flex items-center justify-center px-6">
         <div className="text-center">
           <div className="animate-pulse">
             <p className="text-red-600 font-semibold text-lg tracking-widest uppercase">
@@ -123,7 +134,7 @@ export function HomePage() {
 
   if (authState === "unauthenticated") {
     return (
-      <main className="min-h-screen bg-gray-100 flex items-center justify-center px-6">
+      <main className="min-h-screen bg-page flex items-center justify-center px-6">
         <div className="max-w-md w-full space-y-6 text-center">
           <div>
             <p className="text-red-600 font-semibold text-lg tracking-widest uppercase mb-2">
@@ -155,7 +166,7 @@ export function HomePage() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-100 px-6 py-12">
+    <main className="min-h-screen bg-page px-6 py-12">
       <div className="max-w-2xl mx-auto">
         <div className="mb-10">
           <p className="text-red-600 text-sm font-semibold uppercase tracking-widest mb-1">

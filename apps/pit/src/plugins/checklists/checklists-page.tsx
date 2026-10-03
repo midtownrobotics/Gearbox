@@ -63,14 +63,14 @@ export function ChecklistsPage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-gray-100 flex items-center justify-center">
+      <main className="min-h-screen bg-page flex items-center justify-center">
         <p className="text-gray-600">Loading…</p>
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-gray-100 text-gray-900">
+    <main className="min-h-screen bg-page text-gray-900">
       <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold tracking-tight">Checklists</h1>

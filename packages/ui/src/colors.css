@@ -1,0 +1,30 @@
+/* The G3 color scheme every app shares (G3 Strategy's), light and dark. Plain CSS variables so
+   apps without the shared Tailwind theme (G3 Strategy) can use them too; Tailwind apps also get
+   bg-page, bg-surface, bg-inset and border-line (see index.css). */
+:root {
+  /* Behind everything. */
+  --g3-page: #f4f6f7;
+  /* Cards, panels and the top bar. */
+  --g3-surface: #ffffff;
+  /* Wells inside a surface: inputs' backgrounds, image placeholders, hover rows. */
+  --g3-inset: #eef1f3;
+  --g3-line: #dde2e5;
+  --g3-text: #0c0c0c;
+  --g3-muted: #57646c;
+  --g3-accent: #a71433;
+}
+
+html[data-theme="dark"] {
+  --g3-page: #171717;
+  --g3-surface: #262626;
+  --g3-inset: #1e1e1e;
+  --g3-line: #3a3a3a;
+  --g3-text: #f4f4f5;
+  --g3-muted: #a3a3a3;
+  --g3-accent: #e8677c;
+}
+
+html,
+body {
+  background-color: var(--g3-page);
+}

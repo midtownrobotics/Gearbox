@@ -6,8 +6,7 @@
 
 html[data-theme="dark"] {
   color-scheme: dark;
-  color: #f4f4f5;
-  background: #171717;
+  color: var(--g3-text);
 
   /* Brand tints (error banners, selected rows) as dark tints; dark brand text as light text. */
   --color-primary-50: #2c1519;
@@ -24,15 +23,14 @@ html[data-theme="dark"] {
 }
 
 html[data-theme="dark"] body {
-  color: #f4f4f5;
-  background: #171717;
+  color: var(--g3-text);
 }
 
 /* Cards and panels. `white` itself stays white so white text on colored buttons still works. */
 html[data-theme="dark"] .bg-white,
 html[data-theme="dark"] .bg-paper,
 html[data-theme="dark"] .hover\:bg-white:hover {
-  background-color: #262626;
+  background-color: var(--g3-surface);
 }
 html[data-theme="dark"] .bg-white\/95 {
   background-color: rgb(38 38 38 / 0.95);

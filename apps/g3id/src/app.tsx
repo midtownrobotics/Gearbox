@@ -10,7 +10,7 @@ function AppContent() {
   const hideNavBar = location.pathname.startsWith("/kiosk/");
 
   return (
-    <div className="flex flex-col min-h-screen bg-secondary-50">
+    <div className="flex flex-col min-h-screen bg-page">
       {!hideNavBar && <NavBar items={navItems} />}
       <RedirectInfo />
       <div className="flex flex-col flex-1">

@@ -95,7 +95,7 @@ export function AdminPage() {
   if (loading) return <PageLoading />;
 
   return (
-    <main className="min-h-screen bg-mist">
+    <main className="min-h-screen bg-page">
       <div className="max-w-4xl mx-auto px-6 py-8 space-y-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h1 className="font-display text-4xl text-ink">Admin</h1>

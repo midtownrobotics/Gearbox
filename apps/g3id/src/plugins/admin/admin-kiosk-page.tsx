@@ -1,6 +1,5 @@
 import { Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import { api } from "../../lib/api";
 
 type ActivationCode = {
@@ -95,27 +94,6 @@ export function AdminKioskPage() {
 
   return (
     <main className="flex-1 px-6 py-8 max-w-2xl mx-auto w-full">
-      <div className="mb-6 flex gap-4 border-b border-secondary-200">
-        <Link
-          to="/admin/users"
-          className="py-2 px-4 text-secondary-600 hover:text-secondary-900 transition-colors"
-        >
-          Users
-        </Link>
-        <Link
-          to="/admin/kiosk"
-          className="py-2 px-4 text-secondary-900 font-medium border-b-2 border-primary-500"
-        >
-          Kiosk Devices
-        </Link>
-        <Link
-          to="/admin/attendance"
-          className="py-2 px-4 text-secondary-600 hover:text-secondary-900 transition-colors"
-        >
-          Attendance Summary
-        </Link>
-      </div>
-
       <h1 className="text-3xl font-bold text-secondary-900 mb-8">Kiosk Management</h1>
 
       <div className="space-y-8">

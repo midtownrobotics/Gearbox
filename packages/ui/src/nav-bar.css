@@ -1,14 +1,16 @@
+@import "./colors.css";
+
 /* The shared top bar (components/app-nav-bar.tsx), from G3 Strategy's. Plain CSS so it renders
    the same in every app, Tailwind or not. */
 
 .g3-nav,
 .g3-nav-drawer {
-  --g3-nav-bg: #fefefe;
-  --g3-nav-line: rgba(121, 138, 146, 0.25);
+  --g3-nav-bg: var(--g3-surface);
+  --g3-nav-line: var(--g3-line);
   --g3-nav-text: #57646c;
   --g3-nav-strong: #0c0c0c;
-  --g3-nav-accent: #a71433;
-  --g3-nav-control: #fefefe;
+  --g3-nav-accent: var(--g3-accent);
+  --g3-nav-control: var(--g3-surface);
   --g3-nav-control-line: rgba(121, 138, 146, 0.35);
   --g3-nav-muted: #8a979d;
   font-family: "Ubuntu", sans-serif;
@@ -16,11 +18,8 @@
 
 html[data-theme="dark"] .g3-nav,
 html[data-theme="dark"] .g3-nav-drawer {
-  --g3-nav-bg: #262626;
-  --g3-nav-line: #454545;
   --g3-nav-text: #c4c4c4;
   --g3-nav-strong: #ffffff;
-  --g3-nav-accent: #e8677c;
   --g3-nav-control: #303030;
   --g3-nav-control-line: #555555;
   --g3-nav-muted: #8a8a8a;

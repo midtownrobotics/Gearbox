@@ -1,6 +1,6 @@
 export function PageLoading() {
   return (
-    <main className="min-h-screen bg-mist flex items-center justify-center">
+    <main className="min-h-screen bg-page flex items-center justify-center">
       <p className="text-steel">Loading…</p>
     </main>
   );

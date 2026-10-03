@@ -178,7 +178,7 @@ export function ChecklistDetailPage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-gray-100 flex items-center justify-center">
+      <main className="min-h-screen bg-page flex items-center justify-center">
         <p className="text-gray-600">Loading…</p>
       </main>
     );
@@ -186,7 +186,7 @@ export function ChecklistDetailPage() {
 
   if (notFound || !list) {
     return (
-      <main className="min-h-screen bg-gray-100 flex flex-col items-center justify-center gap-4">
+      <main className="min-h-screen bg-page flex flex-col items-center justify-center gap-4">
         <p className="text-gray-600">Checklist not found.</p>
         <button
           type="button"
@@ -202,7 +202,7 @@ export function ChecklistDetailPage() {
   const sortedItems = [...items].sort((a, b) => a.index - b.index);
 
   return (
-    <main className="min-h-screen bg-gray-100 text-gray-900">
+    <main className="min-h-screen bg-page text-gray-900">
       <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
         <button
           type="button"

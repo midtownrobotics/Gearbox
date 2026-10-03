@@ -2,7 +2,7 @@ import { OnShapeIcon } from "@g3/ui";
 import { GraduationCap, Loader2, Shield, ShieldOff } from "lucide-react";
 import { useEffect, useState } from "react";
 import { FaGithub, FaGoogle, FaKey, FaSlack, FaSteam } from "react-icons/fa";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { api } from "../../lib/api";
 
 type Identity = { provider: string; createdAt: number };
@@ -304,27 +304,6 @@ export function AdminUsersPage() {
 
   return (
     <main className="flex-1 px-4 py-8 max-w-2xl mx-auto w-full">
-      <div className="mb-6 flex gap-4 border-b border-secondary-200">
-        <Link
-          to="/admin/users"
-          className="py-2 px-4 text-secondary-900 font-medium border-b-2 border-primary-500"
-        >
-          Users
-        </Link>
-        <Link
-          to="/admin/kiosk"
-          className="py-2 px-4 text-secondary-600 hover:text-secondary-900 transition-colors"
-        >
-          Kiosk Devices
-        </Link>
-        <Link
-          to="/admin/attendance"
-          className="py-2 px-4 text-secondary-600 hover:text-secondary-900 transition-colors"
-        >
-          Attendance Summary
-        </Link>
-      </div>
-
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-secondary-900">Users</h1>
         <button

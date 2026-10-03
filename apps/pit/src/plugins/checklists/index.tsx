@@ -12,7 +12,7 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
 
   if (!isOnline) {
     return (
-      <main className="min-h-screen bg-gray-100 flex items-center justify-center">
+      <main className="min-h-screen bg-page flex items-center justify-center">
         <p className="text-gray-400">You must be online to use the editor.</p>
       </main>
     );
@@ -20,7 +20,7 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-gray-100 flex items-center justify-center">
+      <main className="min-h-screen bg-page flex items-center justify-center">
         <p className="text-gray-400">Loading…</p>
       </main>
     );
@@ -29,7 +29,7 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
   if (!user) {
     const loginUrl = `${import.meta.env.VITE_G3ID_URL ?? "https://g3id.g3robotics.com"}/login?redirect=${encodeURIComponent(window.location.href)}`;
     return (
-      <main className="min-h-screen bg-gray-100 flex flex-col items-center justify-center gap-4">
+      <main className="min-h-screen bg-page flex flex-col items-center justify-center gap-4">
         <p className="text-gray-900 text-lg font-semibold">Sign in to use the Editor</p>
         <a
           href={loginUrl}

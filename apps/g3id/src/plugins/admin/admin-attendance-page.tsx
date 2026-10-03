@@ -1,6 +1,5 @@
 import { Loader2, LogOut, Minus, Plus, Search, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
 
 // The attendance worker lives on its own subdomain (api.attendance.g3robotics.com)
 // but shares the g3id session cookie (set on the root .g3robotics.com domain), so
@@ -161,27 +160,6 @@ export function AdminAttendancePage() {
 
   return (
     <main className="flex-1 px-4 py-8 max-w-3xl mx-auto w-full">
-      <div className="mb-6 flex gap-4 border-b border-secondary-200">
-        <Link
-          to="/admin/users"
-          className="py-2 px-4 text-secondary-600 hover:text-secondary-900 transition-colors"
-        >
-          Users
-        </Link>
-        <Link
-          to="/admin/kiosk"
-          className="py-2 px-4 text-secondary-600 hover:text-secondary-900 transition-colors"
-        >
-          Kiosk Devices
-        </Link>
-        <Link
-          to="/admin/attendance"
-          className="py-2 px-4 text-secondary-900 font-medium border-b-2 border-primary-500"
-        >
-          Attendance Summary
-        </Link>
-      </div>
-
       <div className="flex items-baseline justify-between mb-8">
         <h1 className="text-3xl font-bold text-secondary-900">Attendance Summary</h1>
         <span className="text-sm text-secondary-600">Total Hours {year}</span>
