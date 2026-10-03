@@ -1,6 +1,7 @@
 import type { Plugin } from "../../shared/plugin-types";
 import { DashboardPage } from "./dashboard-page";
 import { EmailLoginPage } from "./email-login-page";
+import { LeaderboardPage } from "./leaderboard-page";
 import { LoginPage } from "./login-page";
 import { OAuthErrorPage } from "./oauth-error-page";
 import { PendingPage } from "./pending-page";
@@ -17,11 +18,13 @@ export const authPlugin: Plugin = {
     { path: "/signup", element: <SignupPage /> },
     { path: "/signup/pending", element: <PendingPage /> },
     { path: "/dashboard", element: <DashboardPage /> },
+    { path: "/leaderboard", element: <LeaderboardPage /> },
     { path: "/", element: <DashboardPage /> },
   ],
   navItems: [
     { label: "Dash", to: "/", order: 0 },
-    { label: "Log in", to: "/login", order: 1 },
-    { label: "Sign up", to: "/signup", order: 2 },
+    { label: "Leaderboard", to: "/leaderboard", order: 1 },
+    { label: "Log in", to: "/login", order: 2, audience: "signed-out" },
+    { label: "Sign up", to: "/signup", order: 3, audience: "signed-out" },
   ],
 };
