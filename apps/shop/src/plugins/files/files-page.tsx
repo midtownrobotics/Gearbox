@@ -1,3 +1,4 @@
+import { site } from "@g3/site-config";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../../shared/api";
 import { getErrorMessage } from "../../shared/api-error";
@@ -117,8 +118,7 @@ export function FilesPage() {
   async function handleTestPrint() {
     setTestPrinting(true);
     try {
-      const testContent =
-        "G3 Robotics Shop - Test Print\n\nIf you're seeing this, the printer is working!";
+      const testContent = `${site.team.name} Shop - Test Print\n\nIf you're seeing this, the printer is working!`;
       const encoder = new TextEncoder();
       const testBuffer = encoder.encode(testContent);
 

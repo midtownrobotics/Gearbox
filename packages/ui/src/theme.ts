@@ -1,6 +1,7 @@
+import { site } from "@g3/site-config";
 import { useEffect, useSyncExternalStore } from "react";
 
-// One light/dark setting for every G3 app. It lives in a cookie on .g3robotics.com, which every
+// One light/dark setting for every app. It lives in a cookie on the team's domain, which every
 // app's subdomain can read (localStorage is per subdomain). On localhost, cookies are shared
 // across ports, so dev servers share it too. With no cookie, the system setting decides.
 
@@ -35,7 +36,7 @@ function applyTheme(theme: Theme) {
 export function setTheme(theme: Theme) {
   const host = window.location.hostname;
   const domain =
-    host === "g3robotics.com" || host.endsWith(".g3robotics.com") ? "; domain=.g3robotics.com" : "";
+    host === site.domain || host.endsWith(`.${site.domain}`) ? `; domain=.${site.domain}` : "";
   const secure = window.location.protocol === "https:" ? "; secure" : "";
   document.cookie = `${COOKIE}=${theme}; path=/; max-age=31536000; samesite=lax${domain}${secure}`;
   applyTheme(theme);

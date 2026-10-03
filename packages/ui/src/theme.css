@@ -1,5 +1,5 @@
 /* Light/dark mode shared by every G3 app. The theme is `html[data-theme]`, set before first paint
-   by each app's index.html from the `g3_theme` cookie (shared across *.g3robotics.com), so
+   by each app's index.html from the `g3_theme` cookie (shared across the team's subdomains), so
    switching in one app switches them all. Apps are styled light; this file and the generated
    theme-palette.css restyle them in dark mode without touching their classes. */
 @import "./theme-palette.css";

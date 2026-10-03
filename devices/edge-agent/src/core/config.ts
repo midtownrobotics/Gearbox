@@ -1,5 +1,5 @@
 export interface AgentConfig {
-  /** Base URL of workers/edge, e.g. https://api.edge.g3robotics.com */
+  /** Base URL of workers/edge, e.g. https://api.edge.<domain> */
   workerUrl: string;
   /** Shared key; must match EDGE_AGENT_KEY on the worker. */
   agentKey: string;

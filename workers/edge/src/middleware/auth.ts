@@ -4,38 +4,6 @@ import { createEdgeDb } from "../db";
 import { edgeStatus, netSettings } from "../db/schema";
 import type { AppEnv } from "../types";
 
-async function loadUser(c: {
-  env: AppEnv["Bindings"];
-  req: { header(name: string): string | undefined };
-}) {
-  const res = await c.env.G3ID.fetch(
-    new Request("http://g3id/auth/me?includeIdentities=false", {
-      headers: { cookie: c.req.header("Cookie") ?? "" },
-    }),
-  );
-  if (!res.ok) return null;
-  return (await res.json()) as { id: string; displayName: string; isAdmin: boolean };
-}
-
-export const requireAuth = createMiddleware<AppEnv>(async (c, next) => {
-  const user = await loadUser(c);
-  if (!user) return c.json({ error: "Unauthorized." }, 401);
-  c.set("userId", user.id);
-  c.set("userDisplayName", user.displayName);
-  c.set("userIsAdmin", user.isAdmin);
-  await next();
-});
-
-export const requireAdmin = createMiddleware<AppEnv>(async (c, next) => {
-  const user = await loadUser(c);
-  if (!user) return c.json({ error: "Unauthorized." }, 401);
-  if (!user.isAdmin) return c.json({ error: "Admin access required." }, 403);
-  c.set("userId", user.id);
-  c.set("userDisplayName", user.displayName);
-  c.set("userIsAdmin", user.isAdmin);
-  await next();
-});
-
 async function sha256(value: string) {
   return new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)));
 }

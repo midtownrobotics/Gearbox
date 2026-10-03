@@ -1,9 +1,9 @@
+import { requireAuth } from "@g3/auth";
 import { and, asc, eq, gt, inArray, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
 import { createShopDb } from "../db";
 import { actions, partInstanceProcesses } from "../db/schema";
-import { requireAuth } from "../middleware/auth";
 import type { AppEnv } from "../types";
 import { recordAction } from "./actions";
 

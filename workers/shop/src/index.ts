@@ -1,10 +1,11 @@
 import type { MessageBatch } from "@cloudflare/workers-types";
-import { sendMessage } from "@g3/slack";
+import { requireAuth } from "@g3/auth";
+import { corsOrigin } from "@g3/site-config";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import packageJson from "../package.json";
 import { createShopDb } from "./db";
 import { type BOMQueueMessage, processBOMQueue } from "./lib/bom-queue-consumer";
-import { requireAuth } from "./middleware/auth";
 import { actionsRouter } from "./routes/actions";
 import { adminPartsRouter } from "./routes/admin-parts";
 import { drawingsRouter } from "./routes/drawings";
@@ -32,13 +33,7 @@ base.onError((err, c) => {
 base.use(
   "*",
   cors({
-    origin: (origin) => {
-      if (!origin) return null;
-      if (origin === "https://g3robotics.com") return origin;
-      if (origin.endsWith(".g3robotics.com")) return origin;
-      if (origin.startsWith("http://localhost:")) return origin;
-      return null;
-    },
+    origin: corsOrigin,
     allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowHeaders: ["Content-Type", "Authorization"],
     credentials: true,
@@ -46,7 +41,7 @@ base.use(
 );
 
 const app = base
-  .get("/health", (c) => c.json({ status: "ok", service: "shop", version: "v1.2.3" }))
+  .get("/health", (c) => c.json({ status: "ok", service: "shop", version: packageJson.version }))
   .get("/me", requireAuth, (c) =>
     c.json({
       userId: c.get("userId"),
@@ -101,11 +96,7 @@ const app = base
   .route("/staging-batches", stagingBatchesRouter)
   .route("/actions", actionsRouter)
   .route("/kiosk-presence", kioskPresenceRouter)
-  .route("/admin", adminPartsRouter)
-  .get("/slack-test", async (c) => {
-    c.executionCtx.waitUntil(sendMessage("C09QYMTSGKT", "test but now from shop sw worker", c.env));
-    return c.text("200", 200);
-  });
+  .route("/admin", adminPartsRouter);
 
 export type ShopApp = typeof app;
 

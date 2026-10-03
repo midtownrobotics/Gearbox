@@ -1,3 +1,5 @@
+import type { G3AuthVariables } from "@g3/auth";
+
 export type AppEnv = {
   Bindings: {
     FRONTEND_URL: string;
@@ -9,10 +11,5 @@ export type AppEnv = {
     PIT_DB: D1Database;
     G3ID: Fetcher;
   };
-  Variables: {
-    userId: string;
-    userDisplayName: string;
-    userIsAdmin: boolean;
-    userEmail: string;
-  };
+  Variables: G3AuthVariables;
 };

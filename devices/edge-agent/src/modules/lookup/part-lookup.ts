@@ -21,6 +21,7 @@
  */
 
 import { brotliDecompressSync, gunzipSync, inflateRawSync, inflateSync } from "node:zlib";
+import { site } from "@g3/site-config";
 import type { ClientHeaders, PartLookup, PartVariant } from "@g3/worker-edge/lookup-types";
 
 export type { PartLookup };
@@ -105,7 +106,7 @@ export class LookupError extends Error {
 // Shopify rate-limits requests that claim to be Chrome but don't act like it
 // (429), so only Amazon (which blocks non-browser agents) gets browser headers:
 // the requester's own, falling back to a generic Chrome.
-const HONEST_UA = "G3RoboticsPartLookup/0.1 (+https://g3robotics.com)";
+const HONEST_UA = `${site.team.name.replace(/\s+/g, "")}PartLookup/0.1 (+https://${site.domain})`;
 const FALLBACK_BROWSER_UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36";
 const FALLBACK_LANGUAGE = "en-US,en;q=0.9";

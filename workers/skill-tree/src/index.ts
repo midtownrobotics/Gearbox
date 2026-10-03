@@ -1,10 +1,12 @@
+import { requireAuth, requireOAuthSession } from "@g3/auth";
+import { corsOrigin } from "@g3/site-config";
 import { eq, notInArray } from "drizzle-orm";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { validator } from "hono/validator";
+import packageJson from "../package.json";
 import { createDb } from "./db";
 import { skillMentors, skillProgress, skillSiteMentors } from "./db/schema";
-import { requireAuth, requireOAuthSession } from "./middleware/auth";
 import type { AppEnv } from "./types";
 
 const VALID_STATUSES = ["not-started", "in-progress", "complete"] as const;
@@ -21,15 +23,7 @@ base.onError((err, c) => {
 base.use(
   "*",
   cors({
-    origin: (origin) => {
-      if (!origin) return null;
-      if (origin === "https://g3robotics.com") return origin;
-      if (origin.endsWith(".g3robotics.com")) return origin;
-      if (origin.startsWith("http://localhost:")) return origin;
-      if (origin.startsWith("http://127.0.0.1:")) return origin;
-      if (origin.endsWith(".pages.dev")) return origin;
-      return null;
-    },
+    origin: corsOrigin,
     allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allowHeaders: ["Content-Type", "Authorization"],
     credentials: true,
@@ -68,7 +62,9 @@ const skillUpdateValidator = validator(
 );
 
 const app = base
-  .get("/health", (c) => c.json({ status: "ok", service: "skill-tree" }))
+  .get("/health", (c) =>
+    c.json({ status: "ok", service: "skill-tree", version: packageJson.version }),
+  )
 
   // Current user — also self-registers their profile so they appear in the
   // student list, promotes G3ID admins to mentors, and mirrors the G3ID

@@ -1,6 +1,6 @@
+import { requireAdmin } from "@g3/auth";
 import { type Context, Hono } from "hono";
 import { AgentError, agentFetch } from "../../lib/agent";
-import { requireAdmin } from "../../middleware/auth";
 import type { AppEnv } from "../../types";
 import {
   MAX_SWITCH_SOUND_BYTES,

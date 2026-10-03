@@ -1,7 +1,9 @@
+import { requireAuth } from "@g3/auth";
+import { corsOrigin } from "@g3/site-config";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import packageJson from "../package.json";
 import { Firestore } from "./firestore";
-import { requireAuth } from "./middleware/auth";
 import { currentWindow, validateToken } from "./token";
 import type { AppEnv } from "./types";
 
@@ -21,15 +23,7 @@ base.onError((err, c) => {
 base.use(
   "*",
   cors({
-    origin: (origin) => {
-      if (!origin) return null;
-      if (origin === "https://g3robotics.com") return origin;
-      if (origin.endsWith(".g3robotics.com")) return origin;
-      if (origin.startsWith("http://localhost:")) return origin;
-      if (origin.startsWith("http://127.0.0.1:")) return origin;
-      if (origin.endsWith(".pages.dev")) return origin;
-      return null;
-    },
+    origin: corsOrigin,
     allowMethods: ["GET", "POST", "DELETE", "OPTIONS"],
     allowHeaders: ["Content-Type", "Authorization"],
     credentials: true,
@@ -223,7 +217,9 @@ async function attendanceSummaries(fs: Firestore, year: string) {
 }
 
 const app = base
-  .get("/health", (c) => c.json({ status: "ok", service: "attendance" }))
+  .get("/health", (c) =>
+    c.json({ status: "ok", service: "attendance", version: packageJson.version }),
+  )
 
   // Who am I — used by the scanned page to show "Sign in as <name>".
   .get("/me", requireAuth, (c) =>

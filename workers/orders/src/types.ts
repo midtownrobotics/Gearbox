@@ -1,3 +1,5 @@
+import type { G3AuthVariables } from "@g3/auth";
+
 export type AppEnv = {
   Bindings: {
     FRONTEND_URL: string;
@@ -10,11 +12,5 @@ export type AppEnv = {
     /** Approval DMs are skipped when unset. */
     SLACK_BOT_TOKEN?: string;
   };
-  Variables: {
-    userId: string;
-    userDisplayName: string;
-    userIsMentor: boolean;
-    /** The user's linked Slack account, if any. */
-    userSlackId: string | null;
-  };
+  Variables: G3AuthVariables;
 };

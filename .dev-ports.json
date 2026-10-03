@@ -17,7 +17,7 @@
     },
     "portal": {
       "port": 5178,
-      "name": "G3 Gearbox (Portal)",
+      "name": "Gearbox (Portal)",
       "url": "http://localhost:5178"
     },
     "skill-tree": {

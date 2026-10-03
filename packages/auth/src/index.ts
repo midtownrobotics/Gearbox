@@ -21,3 +21,14 @@ export async function resolveUserId(
   }
   return null;
 }
+
+export {
+  type G3AuthEnv,
+  type G3AuthVariables,
+  hasMentorAccess,
+  requireAdmin,
+  requireAuth,
+  requireAuthWithIdentities,
+  requireMentor,
+  requireOAuthSession,
+} from "./g3id";

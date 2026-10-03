@@ -1,3 +1,4 @@
+import { site } from "@g3/site-config";
 import { OnShapeIcon } from "@g3/ui";
 import { Loader2, Shield } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -351,8 +352,10 @@ export function DashboardPage() {
                 <div className="rounded-lg bg-secondary-50 border border-secondary-200 px-4 py-3 space-y-2">
                   <p className="text-xs text-secondary-600 text-center">
                     DM this code to the {""}
-                    <span className="text-primary-500 font-medium">"G3 Bot" user in Slack</span>, or
-                    run <span className="font-mono text-primary-500">/link {slackCode}</span>
+                    <span className="text-primary-500 font-medium">
+                      "{site.slackBotName}" user in Slack
+                    </span>
+                    , or run <span className="font-mono text-primary-500">/link {slackCode}</span>
                   </p>
                   <p className="font-mono text-3xl font-bold text-secondary-900 text-center tracking-widest">
                     {slackCode}

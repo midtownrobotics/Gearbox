@@ -11,6 +11,10 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260517.1",
+    "hono": "catalog:",
     "typescript": "^5.8.0"
+  },
+  "peerDependencies": {
+    "hono": "catalog:"
   }
 }

@@ -1,10 +1,12 @@
+import { appUrl, wordmark } from "@g3/site-config";
+import { versionLabel } from "@g3/site-config/versions";
 import { AppNavBar, activePath, linkWith } from "@g3/ui";
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { g3id } from "../lib/api";
 import type { PluginNavItem } from "./plugin-types";
 
-const G3ID_LOGIN = `https://g3id.g3robotics.com/login?redirect=${encodeURIComponent(typeof window !== "undefined" ? window.location.href : "")}`;
+const G3ID_LOGIN = `${appUrl("id")}/login?redirect=${encodeURIComponent(typeof window !== "undefined" ? window.location.href : "")}`;
 
 const routerLink = linkWith(Link);
 
@@ -35,7 +37,8 @@ export function NavBar({ items }: { items: PluginNavItem[] }) {
   );
   return (
     <AppNavBar
-      title="G3 GEARBOX"
+      version={versionLabel("Gearbox")}
+      title={wordmark("Gearbox")}
       link={routerLink}
       allApps={false}
       items={shown.map((item) => ({
@@ -46,7 +49,7 @@ export function NavBar({ items }: { items: PluginNavItem[] }) {
       }))}
       actions={
         me === undefined ? null : me ? (
-          <a className="g3-nav-text-link" href="https://g3id.g3robotics.com/">
+          <a className="g3-nav-text-link" href={`${appUrl("id")}/`}>
             Hello, {me.displayName}!
           </a>
         ) : (

@@ -5,7 +5,7 @@ import { createDb } from "../db";
 import { coreUserIdentities, coreUserPins, coreUsers, kioskDevices } from "../db/schema";
 import { deleteCookieOptions } from "../lib/cookie";
 import { regeneratePinForUser } from "../lib/pin";
-import { deleteSession } from "../lib/session";
+import { deleteSession, isPinSession } from "../lib/session";
 import { requireAuth } from "../middleware/auth";
 import type { AppEnv } from "../types";
 
@@ -118,17 +118,7 @@ export const authRouter = new Hono<AppEnv>()
     let isKiosk = false;
 
     if (sessionId) {
-      const sessionData = await c.env.SESSIONS.get(sessionId);
-      if (sessionData) {
-        try {
-          const parsed = JSON.parse(sessionData) as { sessionType?: string };
-          if (parsed.sessionType === "pin") {
-            isKiosk = true;
-          }
-        } catch {
-          // Continue with logout
-        }
-      }
+      isKiosk = await isPinSession(sessionId, c.env);
       await deleteSession(sessionId, c.env);
     }
 
@@ -140,18 +130,8 @@ export const authRouter = new Hono<AppEnv>()
     const sessionId = getCookie(c, "g3_session");
     const db = createDb(c.env.DB);
 
-    if (sessionId) {
-      const sessionData = await c.env.SESSIONS.get(sessionId);
-      if (sessionData) {
-        try {
-          const parsed = JSON.parse(sessionData) as { sessionType?: string };
-          if (parsed.sessionType === "pin") {
-            return c.json({ error: "PIN sessions cannot view PINs." }, 403);
-          }
-        } catch {
-          // Continue
-        }
-      }
+    if (await isPinSession(sessionId, c.env)) {
+      return c.json({ error: "PIN sessions cannot view PINs." }, 403);
     }
 
     const userPin = await db
@@ -170,18 +150,8 @@ export const authRouter = new Hono<AppEnv>()
     const userId = c.get("userId") as string;
     const sessionId = getCookie(c, "g3_session");
 
-    if (sessionId) {
-      const sessionData = await c.env.SESSIONS.get(sessionId);
-      if (sessionData) {
-        try {
-          const parsed = JSON.parse(sessionData) as { sessionType?: string };
-          if (parsed.sessionType === "pin") {
-            return c.json({ error: "PIN sessions cannot regenerate PINs." }, 403);
-          }
-        } catch {
-          // Continue
-        }
-      }
+    if (await isPinSession(sessionId, c.env)) {
+      return c.json({ error: "PIN sessions cannot regenerate PINs." }, 403);
     }
 
     const newPin = await regeneratePinForUser(userId, c.env);

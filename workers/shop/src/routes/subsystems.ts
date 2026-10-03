@@ -1,7 +1,7 @@
+import { requireAuth } from "@g3/auth";
 import { Hono } from "hono";
 import { createShopDb } from "../db";
 import { subsystems } from "../db/schema";
-import { requireAuth } from "../middleware/auth";
 import type { AppEnv } from "../types";
 
 export const subsystemsRouter = new Hono<AppEnv>()

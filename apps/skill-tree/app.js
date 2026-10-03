@@ -1,4 +1,5 @@
 /* FRC Skill Trees — application logic */
+import { apiUrl, appUrl } from '@g3/site-config';
 import { TREES } from './data/trees.js';
 import {
   auth, db,
@@ -9,8 +10,8 @@ import {
 
 // API URLs
 const isDev=window.location.hostname==='localhost'||window.location.hostname==='127.0.0.1';
-const G3ID_API=localStorage.getItem('g3id_api')||(isDev?'http://localhost:8787':'https://api.g3id.g3robotics.com');
-const SKILL_TREE_API=localStorage.getItem('skill_tree_api')||(isDev?'http://localhost:8790':'https://api.skilltree.g3robotics.com');
+const G3ID_API=localStorage.getItem('g3id_api')||(isDev?'http://localhost:8787':apiUrl('id'));
+const SKILL_TREE_API=localStorage.getItem('skill_tree_api')||(isDev?'http://localhost:8790':apiUrl('skillTree'));
 
 // ═══════════════════════════════════════════════════════
 // LAYOUT ENGINE
@@ -446,7 +447,7 @@ async function initApp(user) {
 function doLogin() {
   console.log('doLogin called');
   try {
-    const g3idBase = window.location.hostname === 'localhost' ? 'http://localhost:5173' : 'https://g3id.g3robotics.com';
+    const g3idBase = window.location.hostname === 'localhost' ? 'http://localhost:5173' : appUrl('id');
     const returnUrl = encodeURIComponent(window.location.href);
     const redirectUrl = g3idBase + '/login?redirect=' + returnUrl;
     console.log('Redirecting to:', redirectUrl);
@@ -460,7 +461,7 @@ function doLogout() {
   if (unsubStudents) { unsubStudents(); unsubStudents = null; }
   students = {}; displayNames = {}; cur = null; userRole = 'student'; currentUser = null;
   closePanel();
-  const g3idBase = window.location.hostname === 'localhost' ? 'http://localhost:5173' : 'https://g3id.g3robotics.com';
+  const g3idBase = window.location.hostname === 'localhost' ? 'http://localhost:5173' : appUrl('id');
   window.location.href = g3idBase + '/logout';
 }
 

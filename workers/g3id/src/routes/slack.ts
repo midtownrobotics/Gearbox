@@ -1,3 +1,4 @@
+import { apiUrl } from "@g3/site-config";
 import { sendDM, verifySlackSignature } from "@g3/slack";
 import { and, eq } from "drizzle-orm";
 import { Hono } from "hono";
@@ -76,7 +77,7 @@ export const slackRouter = new Hono<AppEnv>()
         // For successful sign-ins, add a direct link to complete auth from browser
         let message = result.message;
         if (result.success && result.token && record.type === "signin") {
-          let completeUrl = `https://api.g3id.g3robotics.com/auth/slack/complete?token=${result.token}`;
+          let completeUrl = `${apiUrl("id")}/auth/slack/complete?token=${result.token}`;
           if (result.redirectUrl) {
             completeUrl += `&redirect=${encodeURIComponent(result.redirectUrl)}`;
           }

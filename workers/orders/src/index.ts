@@ -1,6 +1,9 @@
+import { hasMentorAccess, requireAuth } from "@g3/auth";
+import { corsOrigin } from "@g3/site-config";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { canEditCatalog, requireAuth } from "./middleware/auth";
+import packageJson from "../package.json";
+import { canEditCatalog } from "./middleware/auth";
 import { catalogRouter } from "./routes/catalog";
 import { categoriesRouter } from "./routes/categories";
 import { categoryRulesRouter, settingsRouter, suggestRouter } from "./routes/fast-entry";
@@ -23,13 +26,7 @@ base.onError((err, c) => {
 base.use(
   "*",
   cors({
-    origin: (origin) => {
-      if (!origin) return null;
-      if (origin === "https://g3robotics.com") return origin;
-      if (origin.endsWith(".g3robotics.com")) return origin;
-      if (origin.startsWith("http://localhost:")) return origin;
-      return null;
-    },
+    origin: corsOrigin,
     allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allowHeaders: ["Content-Type"],
     credentials: true,
@@ -37,7 +34,7 @@ base.use(
 );
 
 const app = base
-  .get("/health", (c) => c.json({ status: "ok", service: "orders", version: "v0.1.0" }))
+  .get("/health", (c) => c.json({ status: "ok", service: "orders", version: packageJson.version }))
   .get("/me", requireAuth, async (c) => {
     // Remembered so mentors can find people to mark trusted on the Settings page.
     await c.env.ORDERS_DB.prepare(
@@ -49,7 +46,7 @@ const app = base
     return c.json({
       userId: c.get("userId"),
       displayName: c.get("userDisplayName"),
-      isMentor: c.get("userIsMentor"),
+      isMentor: hasMentorAccess(c),
       canEditCatalog: await canEditCatalog(c),
     });
   })

@@ -1,3 +1,4 @@
+import { appTitle } from "@g3/site-config";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { api, getErrorMessage } from "../../shared/api";
@@ -84,9 +85,9 @@ export function OverviewPage() {
             ))}
             <li
               className="py-2 flex items-center gap-3 text-secondary-500"
-              title="Product pages the edge box fetched for G3 Orders part lookups (each link is cached for 7 days)."
+              title={`Product pages the edge box fetched for ${appTitle("Orders")} part lookups (each link is cached for 7 days).`}
             >
-              <span className="italic">Part lookups (G3 Orders)</span>
+              <span className="italic">Part lookups ({appTitle("Orders")})</span>
               <ShareBar share={(data.lookups.dl + data.lookups.ul) / Math.max(1, used)} />
               <span className="text-sm tabular-nums w-20 text-right">
                 {formatBytes(data.lookups.dl + data.lookups.ul)}

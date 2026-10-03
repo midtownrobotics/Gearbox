@@ -1,3 +1,5 @@
+import type { G3AuthVariables } from "@g3/auth";
+
 export type AppEnv = {
   Bindings: {
     FRONTEND_URL: string;
@@ -6,10 +8,5 @@ export type AppEnv = {
     FIREBASE_PRIVATE_KEY: string;
     G3ID: Fetcher;
   };
-  Variables: {
-    userId: string;
-    userDisplayName: string;
-    userEmail: string;
-    userIsAdmin: boolean;
-  };
+  Variables: G3AuthVariables;
 };

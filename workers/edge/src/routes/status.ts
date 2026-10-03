@@ -1,8 +1,8 @@
+import { requireAuth } from "@g3/auth";
 import { eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { createEdgeDb } from "../db";
 import { edgeStatus, netSettings } from "../db/schema";
-import { requireAuth } from "../middleware/auth";
 import { probeTunnel } from "../modules/network/control";
 import type { AppEnv } from "../types";
 

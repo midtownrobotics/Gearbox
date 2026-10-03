@@ -1,3 +1,4 @@
+import { requireAuth, requireMentor } from "@g3/auth";
 import { desc, eq, like, or } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
@@ -15,7 +16,6 @@ import { productKey } from "../lib/catalog";
 import { guessCatalogCategory, matchesKeyword } from "../lib/category-guess";
 import { DEFAULT_TEMPLATE, applyTemplate } from "../lib/naming";
 import { vendorKey, vendorName } from "../lib/vendors";
-import { requireAuth, requireMentor } from "../middleware/auth";
 import type { AppEnv } from "../types";
 
 const TEMPLATE_KEY = "naming_template";

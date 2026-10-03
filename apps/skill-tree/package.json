@@ -1,7 +1,7 @@
 {
   "name": "@g3/skill-tree",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -10,6 +10,7 @@
     "test": "exit 0"
   },
   "devDependencies": {
+    "@g3/site-config": "workspace:*",
     "vite": "^6.0.5"
   }
 }

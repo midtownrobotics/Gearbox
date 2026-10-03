@@ -1,3 +1,4 @@
+import { requireAuth, requireMentor } from "@g3/auth";
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
@@ -5,7 +6,6 @@ import { type OrdersDb, createOrdersDb } from "../db";
 import { budgetCategories, categoryBudgets, orderRequests, vendorOrders } from "../db/schema";
 import { lineTotal, spentByCategory } from "../lib/accounting";
 import { fiscalYearOf } from "../lib/fiscal";
-import { requireAuth, requireMentor } from "../middleware/auth";
 import type { AppEnv } from "../types";
 
 type CategoryInput = {

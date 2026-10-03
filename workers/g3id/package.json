@@ -1,6 +1,6 @@
 {
   "name": "@g3/worker-g3id",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "exports": {
     ".": "./src/index.ts"
@@ -10,19 +10,24 @@
     "deploy": "wrangler deploy",
     "typecheck": "tsc --noEmit",
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
-    "db:migrate:remote": "wrangler d1 migrations apply DB --env production --remote"
+    "db:migrate:remote": "wrangler d1 migrations apply DB --env production --remote",
+    "test": "vitest run"
   },
   "dependencies": {
     "@g3/auth": "workspace:*",
+    "@g3/site-config": "workspace:*",
     "@g3/slack": "workspace:*",
     "@paralleldrive/cuid2": "^2.2.2",
     "drizzle-orm": "^0.44.0",
-    "hono": "^4.7.0"
+    "hono": "catalog:"
   },
   "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "catalog:",
     "@cloudflare/workers-types": "^4.20250516.0",
+    "@g3/testing": "workspace:*",
     "drizzle-kit": "^0.31.0",
     "typescript": "^5.8.0",
+    "vitest": "catalog:",
     "wrangler": "^4.129.0"
   }
 }

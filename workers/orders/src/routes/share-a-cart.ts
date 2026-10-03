@@ -1,3 +1,5 @@
+import { requireAuth, requireMentor } from "@g3/auth";
+import { site } from "@g3/site-config";
 import { and, eq, inArray } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
@@ -14,7 +16,6 @@ import {
   startConnect,
 } from "../lib/share-a-cart";
 import { vendorKey } from "../lib/vendors";
-import { requireAuth, requireMentor } from "../middleware/auth";
 import type { AppEnv } from "../types";
 
 const callbackUrl = (env: AppEnv["Bindings"]) => `${env.PUBLIC_API_URL}/share-a-cart/callback`;
@@ -158,7 +159,7 @@ export const shareACartRouter = new Hono<AppEnv>()
       const day = new Date().toLocaleDateString("en-US", { timeZone: "America/New_York" });
       const cart = await saveCart(db, {
         vendor: sacVendor,
-        title: `G3 Robotics – ${vendor} order (${day})`,
+        title: `${site.team.name} – ${vendor} order (${day})`,
         items,
       });
       return c.json({ ...cart, added: items.length, skipped });

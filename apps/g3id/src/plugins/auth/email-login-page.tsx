@@ -1,3 +1,4 @@
+import { site } from "@g3/site-config";
 import { Loader2 } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
@@ -55,7 +56,7 @@ export function EmailLoginPage() {
               type="email"
               autoComplete="email"
               className="w-full rounded-lg bg-white border border-secondary-300 px-4 py-2.5 text-secondary-900 text-sm placeholder-secondary-400 focus:outline-none focus:border-primary-500"
-              placeholder="you@g3robotics.com"
+              placeholder={`you@${site.domain}`}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               disabled={loading}

@@ -1,3 +1,4 @@
+import { requireAdmin } from "@g3/auth";
 import { and, count, eq, isNull } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import { Hono } from "hono";
@@ -12,7 +13,6 @@ import {
   netSettings,
 } from "../../db/schema";
 import { writeAudit } from "../../lib/audit";
-import { requireAdmin } from "../../middleware/auth";
 import type { AppEnv } from "../../types";
 import { clientName } from "./common";
 import {

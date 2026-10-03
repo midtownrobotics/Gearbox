@@ -1,9 +1,10 @@
+import { requireMentor } from "@g3/auth";
+import { appTitle } from "@g3/site-config";
 import { asc, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
 import { createOrdersDb } from "../db";
 import { appUsers } from "../db/schema";
-import { requireMentor } from "../middleware/auth";
 import type { AppEnv } from "../types";
 
 const trustedValidator = validator("json", (value, c): { trusted: boolean } => {
@@ -37,6 +38,6 @@ export const trustedRouter = new Hono<AppEnv>()
       .where(eq(appUsers.id, c.req.param("id")))
       .returning()
       .get();
-    if (!row) return c.json({ error: "That person hasn't opened G3 Orders yet." }, 404);
+    if (!row) return c.json({ error: `That person hasn't opened ${appTitle("Orders")} yet.` }, 404);
     return c.json({ ...row, trusted: row.trusted === 1 });
   });

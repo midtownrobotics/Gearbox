@@ -1,7 +1,7 @@
+import { requireAuth } from "@g3/auth";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
 import { AgentError, agentFetch } from "../../lib/agent";
-import { requireAuth } from "../../middleware/auth";
 import type { AppEnv } from "../../types";
 import type { ClientHeaders, LookupRequest, PartLookup } from "./types";
 

@@ -1,3 +1,5 @@
+import type { G3AuthVariables } from "@g3/auth";
+
 export type AppEnv = {
   Bindings: {
     FRONTEND_URL: string;
@@ -16,13 +18,5 @@ export type AppEnv = {
     DRAWINGS: R2Bucket;
     BOM_QUEUE: Queue;
   };
-  Variables: {
-    userId: string;
-    userDisplayName: string;
-    userIsAdmin: boolean;
-    userEmail: string;
-    sessionType: "oauth" | "pin";
-    kioskDeviceId: number | null;
-    kioskDeviceName: string | null;
-  };
+  Variables: G3AuthVariables;
 };

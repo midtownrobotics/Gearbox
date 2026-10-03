@@ -86,6 +86,21 @@ Design brief: `docs/edge.md`. On-site Orange Pi 5 (hostname `orangepi5`, login u
 - Lists (`/lists`, `workers/orders/src/routes/lists.ts`, migration `0014_part_lists.sql`): named groups of requests (`part_lists` + `part_list_items`; a request can be on several lists). Anyone logged in makes lists and adds/removes requests; only the creator or a mentor renames, archives or deletes one (requests are never touched). Each list reports counts per status (awaiting approval → approved → ordered → arrived; denied/cancelled left out of progress) and cost. Parts get onto a list by `POST /requests` with `listId` (New Request's List picker, preset by `/new?list=`; the Catalog passes `?list=` through to its Request buttons), `POST /lists/:id/items` (Add existing requests), or a request page's Lists card. The list page's fuzzy find (`apps/orders/src/plugins/lists/search.ts`) reuses the catalog's MiniSearch tokenizer, so sizes, typos, SKUs, people and statuses all match.
 - Lookup errors: the agent answers 422 when a vendor's site blocks or fails (never 502, which `agentFetch` reads as "box unreachable"); orders shows "This site isn't supported for automatic lookup".
 
+### Versions and releases
+
+- **App versions**: SemVer, one per app, shared by its page and its worker (Changesets `fixed` groups in `.changeset/config.json`; the edge agent has its own). The worker's `package.json` is the source: `/health` returns it (`import packageJson from "../package.json"`), and apps get it through `siteConfig()` as `appVersion` / `versionLabel()` from `@g3/site-config/versions` (shown in the navbar's tooltip and drawer). Never hard-code a version.
+- **Platform version**: CalVer `YEAR.MONTH.N` in the root `package.json`; each release and the app versions in it are listed in `RELEASES.md`.
+- **Branches**: work merges into `main`; `public` is the released (and deployed) branch.
+- **Every PR into main that changes an app adds a changeset** (`pnpm changeset`: pick the app, patch/minor/major, a summary for users; `--empty` when nothing should be released). CI fails a PR without one. Shared packages (`packages/*`) are ignored by Changesets; record their changes against the affected apps.
+- **Releasing**: merge `main` into `public`. `.github/workflows/release.yml` then applies the changesets on `public` (`pnpm release:version`: versions, CHANGELOG.md files, platform CalVer, RELEASES.md), commits "Release <platform>", tags `v<platform>` and each app's version (`pnpm release:tag`), and merges `public` back into `main`. GitHub Actions must be allowed to push to both branches.
+
+### Site config (team, domain)
+
+- Everything team-specific lives in `packages/site-config/src/site.ts` (`@g3/site-config`): team number, name and short name ("G3"), the domain, each app's web/API subdomain, public links, the Slack bot's name. **Never hard-code the domain, team number or "G3" branding**: use `appUrl("shop")`, `apiUrl("orders")`, `allAppsUrl`, `wordmark("Shop")` ("G3 SHOP"), `appTitle("Shop")` ("G3 Shop"), `idName` ("G3ID"), `teamLinks`, `teamKey` ("frc1648"), `site.team.*`. Internal names (`@g3/*` packages, `g3_session`/`g3_theme` cookies, `--g3-*` CSS, `G3ID` binding, database names) stay as they are.
+- CORS for every worker is `cors({ origin: corsOrigin })`: https on the domain and its subdomains, plus localhost. No `*.pages.dev`.
+- Apps: `siteConfig()` from `@g3/site-config/vite` in each `vite.config` fills `%SITE_SHORT_NAME%`, `%SITE_TEAM_NAME%`, `%SITE_TEAM_NUMBER%`, `%SITE_ID_NAME%`, `%SITE_ALL_APPS_URL%`, `%SITE_APP_URL%` in `index.html`, and sets production API URLs (`productionEnv`), so there are no `.env.production` files; `.env.development` still points dev at localhost.
+- Files that can't import it (`wrangler.toml` production URLs, routes, OAuth redirect URIs, `TEAM_NUMBER`; the edge env examples) are written by `pnpm configure` (`scripts/configure.ts`); CI runs `pnpm configure --check`.
+
 ### Shared navbar and light/dark mode
 
 - Every app's top bar is `AppNavBar` from `@g3/ui` (`packages/ui/src/components/app-nav-bar.tsx`, styled by its own plain CSS in `nav-bar.css` so it renders the same in G3 Strategy, which doesn't use the shared Tailwind theme). Each app's `shared/nav-bar.tsx` is a thin wrapper: it filters pages by permission, marks the current one (`activePath`: the most specific link covering the URL), and passes react-router links via `linkWith(Link)`. Pages go in a drawer below 768px.
@@ -182,6 +197,13 @@ pnpm -r --if-present typecheck  # Ensure TypeScript passes
 pnpm -r --if-present test    # Run available tests
 ```
 
+**Worker tests** (`pnpm --filter @g3/worker-orders test`, or `pnpm test` for everything; CI runs them on every PR):
+- Every worker has `vitest.config.mts` (`.mts`: the Workers test pool needs ESM) built by `workerTestConfig` from `packages/testing` (`@g3/testing`). Tests run inside the Workers runtime via `@cloudflare/vitest-pool-workers` (pinned in the pnpm catalog: Vitest 4.1.x only) against local D1/KV/R2 from the worker's wrangler config, with its D1 migrations applied before each test file (`packages/testing/src/setup.ts`). No Cloudflare account or secrets: `remoteBindings` is off, and tests must not rely on `.dev.vars`.
+- Storage is per test file, shared by the tests in a file, so each test makes its own records (random URLs, generated PINs) instead of assuming an empty database.
+- Other workers are stubbed: `G3ID` is a stub that answers `/auth/me` for the user in a test cookie (never admin/mentor for a `pin` session, like the real one), and other services (e.g. `EDGE`) can be `offlineService`. In tests, `callAs(student, "/path", { method, body })` / `jsonAs(...)` from `@g3/testing/worker` sign requests in as the users in `@g3/testing/users` (`student`, `otherStudent`, `mentor`, `admin`, `kioskAdmin`).
+- G3ID itself is tested for real (`workers/g3id/test`): users and sessions are seeded with its own helpers (`createUser`, `sessionCookie`, `createUserWithPin`, `activateKiosk`).
+- Attendance's records are in Firestore, which tests don't reach; only its auth and kiosk-code checks are covered.
+
 **Test Slack locally:**
 - Sign-in codes generated and stored in D1
 - Frontend polls `/auth/slack/status` every 2s
@@ -271,7 +293,8 @@ Workers deployed via Wrangler:
 
 ## Key Files to Know
 
-- `workers/g3id/src/middleware/auth.ts` — All auth middleware (requireAuth, requireAdmin, requireKioskToken)
+- `workers/g3id/src/middleware/auth.ts` — G3ID's own auth middleware (requireAuth, requireAdmin, requireKioskToken)
+- `packages/auth/src/g3id.ts` — Sign-in for every other worker (`@g3/auth`: requireAuth, requireAdmin, requireMentor, requireOAuthSession, `G3AuthVariables`); app-specific checks (Edge's agent key, Orders' catalog editors, Scouting's local bypass) stay in that worker's `middleware/auth.ts`
 - `workers/g3id/src/routes/auth/slack.ts` — Slack OAuth flow endpoints
 - `workers/g3id/src/routes/slack.ts` — Slack slash commands and events
 - `workers/g3id/src/lib/slack-code.ts` — Core Slack authentication logic

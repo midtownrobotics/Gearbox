@@ -1,3 +1,4 @@
+import { requireAdmin, requireAuth } from "@g3/auth";
 import { desc, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
@@ -5,7 +6,7 @@ import { createEdgeDb } from "../../db";
 import { netClients, netSettings } from "../../db/schema";
 import { writeAudit } from "../../lib/audit";
 import { DAY, billingCycle } from "../../lib/time";
-import { requireAdmin, requireAgent, requireAuth } from "../../middleware/auth";
+import { requireAgent } from "../../middleware/auth";
 import { type AppEnv, WAN_KEY } from "../../types";
 import { LOOKUP_USAGE_KEY } from "../lookup/types";
 import { clientName, getSettings } from "./common";

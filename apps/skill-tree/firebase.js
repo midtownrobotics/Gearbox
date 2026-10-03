@@ -11,15 +11,16 @@
  * Firestore's realtime onSnapshot is emulated by polling.
  */
 
+import { apiUrl, appUrl } from "@g3/site-config";
 const isLocal =
   location.hostname === "localhost" || location.hostname === "127.0.0.1";
 
 // G3ID API (login/logout + session validation via the worker's service binding)
 // and the G3ID web app (the hosted login page we redirect unauthenticated
 // users to). The skill-tree worker serves the app's data.
-const G3ID_API = isLocal ? "http://localhost:8787" : "https://api.g3id.g3robotics.com";
-const G3ID_WEB = isLocal ? "http://localhost:5173" : "https://g3id.g3robotics.com";
-const API_URL = isLocal ? "http://localhost:8790" : "https://api.skilltree.g3robotics.com";
+const G3ID_API = isLocal ? "http://localhost:8787" : apiUrl("id");
+const G3ID_WEB = isLocal ? "http://localhost:5173" : appUrl("id");
+const API_URL = isLocal ? "http://localhost:8790" : apiUrl("skillTree");
 
 const POLL_INTERVAL_MS = 4000;
 

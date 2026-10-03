@@ -1,3 +1,4 @@
+import { hasMentorAccess, requireAuth, requireMentor } from "@g3/auth";
 import { and, asc, desc, eq, gte, inArray, isNotNull, lt } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
@@ -15,7 +16,6 @@ import { csvDate, csvMoney, csvRow } from "../lib/csv";
 import { fiscalLabel, fiscalRange, fiscalYearOf } from "../lib/fiscal";
 import { importSheet } from "../lib/sheet-import";
 import { vendorName } from "../lib/vendors";
-import { requireAuth, requireMentor } from "../middleware/auth";
 import type { AppEnv } from "../types";
 import { describeChanges } from "./requests";
 
@@ -197,7 +197,7 @@ export const ordersRouter = new Hono<AppEnv>()
   .post("/receive", requireAuth, receiveValidator, async (c) => {
     const { ids } = c.req.valid("json");
     const db = createOrdersDb(c.env.ORDERS_DB);
-    const isMentor = c.get("userIsMentor");
+    const isMentor = hasMentorAccess(c);
     const userId = c.get("userId");
     const rows = await db
       .select({

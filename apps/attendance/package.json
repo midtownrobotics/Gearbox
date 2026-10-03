@@ -1,7 +1,7 @@
 {
   "name": "@g3/attendance",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -16,6 +16,7 @@
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
+    "@g3/site-config": "workspace:*",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.3.4",

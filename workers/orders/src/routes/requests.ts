@@ -1,3 +1,4 @@
+import { hasMentorAccess, requireAuth, requireAuthWithIdentities } from "@g3/auth";
 import { sendDM } from "@g3/slack";
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { Hono } from "hono";
@@ -17,7 +18,6 @@ import { type CatalogChoice, catalogItemFor } from "../lib/catalog";
 import { addToList } from "../lib/lists";
 import { formatCents } from "../lib/money";
 import { vendorName } from "../lib/vendors";
-import { requireAuth } from "../middleware/auth";
 import type { AppEnv } from "../types";
 
 type RequestFields = {
@@ -286,7 +286,7 @@ export const requestsRouter = new Hono<AppEnv>()
       .all();
     return c.json({ ...row.request, categoryName: row.categoryName, events });
   })
-  .post("/", requireAuth, requestValidator(false), async (c) => {
+  .post("/", requireAuthWithIdentities, requestValidator(false), async (c) => {
     const {
       catalogItemId: picked,
       catalogCategory,
@@ -342,7 +342,7 @@ export const requestsRouter = new Hono<AppEnv>()
     const db = createOrdersDb(c.env.ORDERS_DB);
     const current = await db.select().from(orderRequests).where(eq(orderRequests.id, id)).get();
     if (!current) return c.json({ error: "Request not found." }, 404);
-    if (current.requesterId !== c.get("userId") && !c.get("userIsMentor")) {
+    if (current.requesterId !== c.get("userId") && !hasMentorAccess(c)) {
       return c.json({ error: "Only the requester or a mentor can edit this." }, 403);
     }
     if (current.status !== "requested") {
@@ -406,7 +406,7 @@ export const requestsRouter = new Hono<AppEnv>()
 
     const current = await selectRequests(db).where(eq(orderRequests.id, id)).get();
     if (!current) return c.json({ error: "Request not found." }, 404);
-    const isMentor = c.get("userIsMentor");
+    const isMentor = hasMentorAccess(c);
     const isRequester = current.request.requesterId === c.get("userId");
     if (rule.who === "mentor" ? !isMentor : !(isMentor || isRequester)) {
       return c.json(

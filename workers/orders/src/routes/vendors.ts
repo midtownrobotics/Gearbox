@@ -1,3 +1,4 @@
+import { hasMentorAccess, requireAuth, requireMentor } from "@g3/auth";
 import { and, eq, gte, lt } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
@@ -5,7 +6,6 @@ import { createOrdersDb } from "../db";
 import { CREDIT_KINDS, orderRequests, vendorCredits, vendorOrders, vendors } from "../db/schema";
 import { fiscalRange, fiscalYearOf } from "../lib/fiscal";
 import { vendorKey } from "../lib/vendors";
-import { requireAuth, requireMentor } from "../middleware/auth";
 import type { AppEnv } from "../types";
 
 type Profile = Partial<
@@ -130,7 +130,7 @@ export const vendorsRouter = new Hono<AppEnv>()
         .where(and(gte(vendorOrders.placedAt, from), lt(vendorOrders.placedAt, to)))
         .all(),
     ]);
-    const mentor = c.get("userIsMentor");
+    const mentor = hasMentorAccess(c);
     const names = new Map<string, string>();
     for (const r of requests)
       if (!names.has(vendorKey(r.vendor))) names.set(vendorKey(r.vendor), r.vendor.trim());

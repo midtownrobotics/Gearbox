@@ -1,6 +1,6 @@
 {
   "name": "@g3/worker-scouting",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "exports": {
     ".": "./src/index.ts"
@@ -11,15 +11,21 @@
     "deploy": "wrangler deploy --env production",
     "typecheck": "tsc --noEmit",
     "db:migrate:local": "wrangler d1 migrations apply SCOUTING_DB --config wrangler.local.toml --local",
-    "db:migrate:remote": "wrangler d1 migrations apply SCOUTING_DB --env production --remote"
+    "db:migrate:remote": "wrangler d1 migrations apply SCOUTING_DB --env production --remote",
+    "test": "vitest run"
   },
   "dependencies": {
+    "@g3/auth": "workspace:*",
+    "@g3/site-config": "workspace:*",
     "@g3/slack": "workspace:*",
-    "hono": "^4.7.0"
+    "hono": "catalog:"
   },
   "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "catalog:",
     "@cloudflare/workers-types": "^4.20250516.0",
+    "@g3/testing": "workspace:*",
     "typescript": "^5.8.0",
+    "vitest": "catalog:",
     "wrangler": "^4.14.0"
   }
 }

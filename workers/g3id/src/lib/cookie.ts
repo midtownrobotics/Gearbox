@@ -2,7 +2,7 @@ function cookieDomain(frontendUrl: string): string | undefined {
   try {
     const { hostname } = new URL(frontendUrl);
     if (hostname === "localhost") return "localhost";
-    // For subdomains like g3id.g3robotics.com, share the cookie across all subdomains
+    // For subdomains like g3id.<domain>, share the cookie across all of the domain's subdomains
     const parts = hostname.split(".");
     if (parts.length >= 2) return parts.slice(-2).join(".");
   } catch {}
