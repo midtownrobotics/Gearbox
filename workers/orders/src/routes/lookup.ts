@@ -1,3 +1,4 @@
+import { requireAuth } from "@g3/auth";
 import {
   CLIENT_HEADER_NAMES,
   type ClientHeaders,
@@ -8,7 +9,6 @@ import { Hono } from "hono";
 import { validator } from "hono/validator";
 import { createOrdersDb } from "../db";
 import { lookupCache } from "../db/schema";
-import { requireAuth } from "../middleware/auth";
 import type { AppEnv } from "../types";
 
 const CACHE_MS = 7 * 24 * 60 * 60 * 1000;

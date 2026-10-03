@@ -278,7 +278,8 @@ Workers deployed via Wrangler:
 
 ## Key Files to Know
 
-- `workers/g3id/src/middleware/auth.ts` — All auth middleware (requireAuth, requireAdmin, requireKioskToken)
+- `workers/g3id/src/middleware/auth.ts` — G3ID's own auth middleware (requireAuth, requireAdmin, requireKioskToken)
+- `packages/auth/src/g3id.ts` — Sign-in for every other worker (`@g3/auth`: requireAuth, requireAdmin, requireMentor, requireOAuthSession, `G3AuthVariables`); app-specific checks (Edge's agent key, Orders' catalog editors, Scouting's local bypass) stay in that worker's `middleware/auth.ts`
 - `workers/g3id/src/routes/auth/slack.ts` — Slack OAuth flow endpoints
 - `workers/g3id/src/routes/slack.ts` — Slack slash commands and events
 - `workers/g3id/src/lib/slack-code.ts` — Core Slack authentication logic

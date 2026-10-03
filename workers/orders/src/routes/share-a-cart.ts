@@ -1,3 +1,4 @@
+import { requireAuth, requireMentor } from "@g3/auth";
 import { and, eq, inArray } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
@@ -14,7 +15,6 @@ import {
   startConnect,
 } from "../lib/share-a-cart";
 import { vendorKey } from "../lib/vendors";
-import { requireAuth, requireMentor } from "../middleware/auth";
 import type { AppEnv } from "../types";
 
 const callbackUrl = (env: AppEnv["Bindings"]) => `${env.PUBLIC_API_URL}/share-a-cart/callback`;

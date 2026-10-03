@@ -1,3 +1,4 @@
+import { requireAuth } from "@g3/auth";
 import { asc, eq, inArray } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
@@ -5,7 +6,7 @@ import { type OrdersDb, createOrdersDb } from "../db";
 import { catalogCategories, catalogFamilies, catalogItems, orderRequests } from "../db/schema";
 import { catalogKey, linkKindOf } from "../lib/catalog";
 import { vendorName } from "../lib/vendors";
-import { requireAuth, requireCatalogEditor } from "../middleware/auth";
+import { requireCatalogEditor } from "../middleware/auth";
 import type { AppEnv } from "../types";
 
 type ItemFields = {
@@ -142,7 +143,7 @@ export const catalogRouter = new Hono<AppEnv>()
   .get("/categories", requireAuth, async (c) => {
     return c.json(await categoryNames(createOrdersDb(c.env.ORDERS_DB)));
   })
-  .post("/categories", requireCatalogEditor, nameValidator, async (c) => {
+  .post("/categories", requireAuth, requireCatalogEditor, nameValidator, async (c) => {
     const { name } = c.req.valid("json");
     const db = createOrdersDb(c.env.ORDERS_DB);
     const existing = (await categoryNames(db)).find((n) => n.toLowerCase() === name.toLowerCase());
@@ -167,7 +168,7 @@ export const catalogRouter = new Hono<AppEnv>()
       .where(inArray(catalogItems.id, ids));
     return c.json(rows.map(parsed));
   })
-  .post("/items", requireCatalogEditor, itemValidator(false), async (c) => {
+  .post("/items", requireAuth, requireCatalogEditor, itemValidator(false), async (c) => {
     const body = c.req.valid("json") as ItemFields;
     const db = createOrdersDb(c.env.ORDERS_DB);
     if (!(await categoryNames(db)).includes(body.category)) return c.json(NO_CATEGORY, 400);
@@ -189,7 +190,7 @@ export const catalogRouter = new Hono<AppEnv>()
       .get();
     return c.json(parsed(row), 201);
   })
-  .patch("/items/:id", requireCatalogEditor, itemValidator(true), async (c) => {
+  .patch("/items/:id", requireAuth, requireCatalogEditor, itemValidator(true), async (c) => {
     const id = Number(c.req.param("id"));
     const { options, ...body } = c.req.valid("json");
     if (Object.keys(body).length === 0 && options === undefined) {
@@ -218,7 +219,7 @@ export const catalogRouter = new Hono<AppEnv>()
     return c.json(parsed(row));
   })
   /** Deleting an item keeps the requests for it (they just stop pointing at the catalog). */
-  .delete("/items/:id", requireCatalogEditor, async (c) => {
+  .delete("/items/:id", requireAuth, requireCatalogEditor, async (c) => {
     const id = Number(c.req.param("id"));
     const db = createOrdersDb(c.env.ORDERS_DB);
     const [, deleted] = await db.batch([

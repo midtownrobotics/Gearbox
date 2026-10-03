@@ -1,9 +1,9 @@
+import { requireMentor } from "@g3/auth";
 import { asc, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
 import { createOrdersDb } from "../db";
 import { appUsers } from "../db/schema";
-import { requireMentor } from "../middleware/auth";
 import type { AppEnv } from "../types";
 
 const trustedValidator = validator("json", (value, c): { trusted: boolean } => {

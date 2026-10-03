@@ -9,6 +9,9 @@ catalogs:
     '@cloudflare/vitest-pool-workers':
       specifier: 0.22.0
       version: 0.22.0
+    hono:
+      specifier: 4.12.19
+      version: 4.12.19
     vitest:
       specifier: 4.1.11
       version: 4.1.11
@@ -442,6 +445,9 @@ importers:
       '@cloudflare/workers-types':
         specifier: ^4.20260517.1
         version: 4.20260517.1
+      hono:
+        specifier: 'catalog:'
+        version: 4.12.19
       typescript:
         specifier: ^5.8.0
         version: 5.9.3
@@ -487,8 +493,11 @@ importers:
 
   workers/attendance:
     dependencies:
+      '@g3/auth':
+        specifier: workspace:*
+        version: link:../../packages/auth
       hono:
-        specifier: ^4.7.0
+        specifier: 'catalog:'
         version: 4.12.19
     devDependencies:
       '@cloudflare/vitest-pool-workers':
@@ -512,11 +521,14 @@ importers:
 
   workers/edge:
     dependencies:
+      '@g3/auth':
+        specifier: workspace:*
+        version: link:../../packages/auth
       drizzle-orm:
         specifier: ^0.44.0
         version: 0.44.7(@cloudflare/workers-types@4.20260702.1)(bun-types@1.4.2)
       hono:
-        specifier: 4.12.19
+        specifier: 'catalog:'
         version: 4.12.19
     devDependencies:
       '@cloudflare/vitest-pool-workers':
@@ -553,7 +565,7 @@ importers:
         specifier: ^0.44.0
         version: 0.44.7(@cloudflare/workers-types@4.20260517.1)(bun-types@1.4.2)
       hono:
-        specifier: ^4.7.0
+        specifier: 'catalog:'
         version: 4.12.19
     devDependencies:
       '@cloudflare/vitest-pool-workers':
@@ -580,6 +592,9 @@ importers:
 
   workers/orders:
     dependencies:
+      '@g3/auth':
+        specifier: workspace:*
+        version: link:../../packages/auth
       '@g3/slack':
         specifier: workspace:*
         version: link:../../packages/slack
@@ -587,7 +602,7 @@ importers:
         specifier: ^0.44.0
         version: 0.44.7(@cloudflare/workers-types@4.20260702.1)(bun-types@1.4.2)
       hono:
-        specifier: 4.12.19
+        specifier: 'catalog:'
         version: 4.12.19
     devDependencies:
       '@cloudflare/vitest-pool-workers':
@@ -621,7 +636,7 @@ importers:
         specifier: ^0.44.0
         version: 0.44.7(@cloudflare/workers-types@4.20260517.1)(bun-types@1.4.2)
       hono:
-        specifier: ^4.7.0
+        specifier: 'catalog:'
         version: 4.12.19
     devDependencies:
       '@cloudflare/vitest-pool-workers':
@@ -648,11 +663,14 @@ importers:
 
   workers/scouting:
     dependencies:
+      '@g3/auth':
+        specifier: workspace:*
+        version: link:../../packages/auth
       '@g3/slack':
         specifier: workspace:*
         version: link:../../packages/slack
       hono:
-        specifier: ^4.7.0
+        specifier: 'catalog:'
         version: 4.12.19
     devDependencies:
       '@cloudflare/vitest-pool-workers':
@@ -686,7 +704,7 @@ importers:
         specifier: ^0.44.0
         version: 0.44.7(@cloudflare/workers-types@4.20260702.1)(bun-types@1.4.2)
       hono:
-        specifier: 4.12.19
+        specifier: 'catalog:'
         version: 4.12.19
       pdf-lib:
         specifier: ^1.17.1
@@ -723,7 +741,7 @@ importers:
         specifier: ^0.44.0
         version: 0.44.7(@cloudflare/workers-types@4.20260517.1)(bun-types@1.4.2)
       hono:
-        specifier: ^4.7.0
+        specifier: 'catalog:'
         version: 4.12.19
     devDependencies:
       '@cloudflare/vitest-pool-workers':

@@ -18,7 +18,7 @@
     "@g3/auth": "workspace:*",
     "@g3/slack": "workspace:*",
     "drizzle-orm": "^0.44.0",
-    "hono": "4.12.19",
+    "hono": "catalog:",
     "pdf-lib": "^1.17.1"
   },
   "devDependencies": {

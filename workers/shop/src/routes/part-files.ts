@@ -1,10 +1,10 @@
+import { requireAuth } from "@g3/auth";
 import { type SQLWrapper, and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
 import { Hono } from "hono";
 import { createMiddleware } from "hono/factory";
 import { validator } from "hono/validator";
 import { createShopDb } from "../db";
 import { files, partDefinitions, partInstanceFiles, partInstances } from "../db/schema";
-import { requireAuth } from "../middleware/auth";
 import type { AppEnv } from "../types";
 
 // Cloudflare rejects request bodies over 100 MB before they reach the worker anyway.

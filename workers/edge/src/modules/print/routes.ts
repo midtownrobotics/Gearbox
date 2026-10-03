@@ -1,7 +1,7 @@
+import { requireAdmin, requireAuth } from "@g3/auth";
 import { type Context, Hono } from "hono";
 import { validator } from "hono/validator";
 import { AgentError, agentFetch } from "../../lib/agent";
-import { requireAdmin, requireAuth } from "../../middleware/auth";
 import type { AppEnv } from "../../types";
 import {
   type DiscoveredPrinter,

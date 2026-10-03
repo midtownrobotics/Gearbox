@@ -1,3 +1,4 @@
+import { hasMentorAccess, requireAuth } from "@g3/auth";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
@@ -11,7 +12,6 @@ import {
   partLists,
 } from "../db/schema";
 import { addToList } from "../lib/lists";
-import { requireAuth } from "../middleware/auth";
 import type { AppEnv } from "../types";
 
 type ListFields = { name: string; description: string | null; isArchived: boolean };
@@ -207,7 +207,7 @@ export const listsRouter = new Hono<AppEnv>()
     const db = createOrdersDb(c.env.ORDERS_DB);
     const found = await ownedList(db, id, {
       id: c.get("userId"),
-      isMentor: c.get("userIsMentor"),
+      isMentor: hasMentorAccess(c),
     });
     if ("error" in found) return c.json({ error: found.error }, found.status);
     const { isArchived, ...rest } = body;
@@ -228,7 +228,7 @@ export const listsRouter = new Hono<AppEnv>()
     const db = createOrdersDb(c.env.ORDERS_DB);
     const found = await ownedList(db, id, {
       id: c.get("userId"),
-      isMentor: c.get("userIsMentor"),
+      isMentor: hasMentorAccess(c),
     });
     if ("error" in found) return c.json({ error: found.error }, found.status);
     await db.batch([

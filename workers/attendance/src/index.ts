@@ -1,7 +1,7 @@
+import { requireAuth } from "@g3/auth";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { Firestore } from "./firestore";
-import { requireAuth } from "./middleware/auth";
 import { currentWindow, validateToken } from "./token";
 import type { AppEnv } from "./types";
 

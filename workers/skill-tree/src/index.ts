@@ -1,10 +1,10 @@
+import { requireAuth, requireOAuthSession } from "@g3/auth";
 import { eq, notInArray } from "drizzle-orm";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { validator } from "hono/validator";
 import { createDb } from "./db";
 import { skillMentors, skillProgress, skillSiteMentors } from "./db/schema";
-import { requireAuth, requireOAuthSession } from "./middleware/auth";
 import type { AppEnv } from "./types";
 
 const VALID_STATUSES = ["not-started", "in-progress", "complete"] as const;

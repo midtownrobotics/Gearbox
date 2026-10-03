@@ -1,9 +1,9 @@
+import { requireAdmin } from "@g3/auth";
 import { eq, inArray } from "drizzle-orm";
 import { Hono } from "hono";
 import { type EdgeDb, createEdgeDb } from "../../db";
 import { netClients } from "../../db/schema";
 import { billingCycle } from "../../lib/time";
-import { requireAdmin } from "../../middleware/auth";
 import type { AppEnv } from "../../types";
 import { clientName, getSettings } from "./common";
 import { clientSites, siteClients, siteDaily, topSites } from "./sites";

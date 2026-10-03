@@ -1,5 +1,5 @@
+import { requireAuth } from "@g3/auth";
 import { type Context, Hono } from "hono";
-import { requireAuth } from "../middleware/auth";
 import type { AppEnv } from "../types";
 
 /**

@@ -1,10 +1,10 @@
+import { requireAuth } from "@g3/auth";
 import { and, asc, eq, inArray, ne, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
 import { createShopDb } from "../db";
 import { partDefinitionProcessBlueprints, partDefinitions, processes } from "../db/schema";
 import { fileStepError } from "../lib/process-rules";
-import { requireAuth } from "../middleware/auth";
 import type { AppEnv } from "../types";
 
 const updatePartValidator = validator(

@@ -17,7 +17,7 @@
   "dependencies": {
     "@g3/auth": "workspace:*",
     "drizzle-orm": "^0.44.0",
-    "hono": "^4.7.0"
+    "hono": "catalog:"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "catalog:",

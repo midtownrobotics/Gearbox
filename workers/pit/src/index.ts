@@ -1,10 +1,10 @@
+import { requireAdmin, requireAuth } from "@g3/auth";
 import { eq, inArray, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { validator } from "hono/validator";
 import { createDb } from "./db";
 import { batteries, checklistIssues, checklistItems, checklistLists, settings } from "./db/schema";
-import { requireAdmin, requireAuth } from "./middleware/auth";
 import type { AppEnv } from "./types";
 
 const base = new Hono<AppEnv>();

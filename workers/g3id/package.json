@@ -18,7 +18,7 @@
     "@g3/slack": "workspace:*",
     "@paralleldrive/cuid2": "^2.2.2",
     "drizzle-orm": "^0.44.0",
-    "hono": "^4.7.0"
+    "hono": "catalog:"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "catalog:",

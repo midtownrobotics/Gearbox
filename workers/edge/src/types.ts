@@ -1,3 +1,5 @@
+import type { G3AuthVariables } from "@g3/auth";
+
 export type AppEnv = {
   Bindings: {
     FRONTEND_URL: string;
@@ -13,11 +15,7 @@ export type AppEnv = {
     LOOKUP_AGENT_URL?: string;
     LOOKUP_AGENT_KEY?: string;
   };
-  Variables: {
-    userId: string;
-    userDisplayName: string;
-    userIsAdmin: boolean;
-  };
+  Variables: G3AuthVariables;
 };
 
 /** Pseudo-client key for total WAN bytes (what the carrier bills). */

@@ -1,6 +1,7 @@
+import { hasMentorAccess, requireAuth } from "@g3/auth";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { canEditCatalog, requireAuth } from "./middleware/auth";
+import { canEditCatalog } from "./middleware/auth";
 import { catalogRouter } from "./routes/catalog";
 import { categoriesRouter } from "./routes/categories";
 import { categoryRulesRouter, settingsRouter, suggestRouter } from "./routes/fast-entry";
@@ -49,7 +50,7 @@ const app = base
     return c.json({
       userId: c.get("userId"),
       displayName: c.get("userDisplayName"),
-      isMentor: c.get("userIsMentor"),
+      isMentor: hasMentorAccess(c),
       canEditCatalog: await canEditCatalog(c),
     });
   })

@@ -1,3 +1,4 @@
+import { requireAdmin, requireAuth } from "@g3/auth";
 import { sendMessage } from "@g3/slack";
 import { eq, inArray } from "drizzle-orm";
 import { Hono } from "hono";
@@ -11,7 +12,6 @@ import {
 } from "../lib/daily-summary";
 import { exportDrawingAsPDF, storeDrawingInR2 } from "../lib/onshape-export";
 import { registerOnShapeWebhook, unregisterOnShapeWebhooks } from "../lib/onshape-webhook";
-import { requireAdmin, requireAuth } from "../middleware/auth";
 import type { AppEnv } from "../types";
 
 const RELEASE_CHANNEL_KEY = "slack_release_channel_id";

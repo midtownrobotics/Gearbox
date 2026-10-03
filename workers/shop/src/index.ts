@@ -1,9 +1,9 @@
 import type { MessageBatch } from "@cloudflare/workers-types";
+import { requireAuth } from "@g3/auth";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { createShopDb } from "./db";
 import { type BOMQueueMessage, processBOMQueue } from "./lib/bom-queue-consumer";
-import { requireAuth } from "./middleware/auth";
 import { actionsRouter } from "./routes/actions";
 import { adminPartsRouter } from "./routes/admin-parts";
 import { drawingsRouter } from "./routes/drawings";

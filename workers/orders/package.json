@@ -18,9 +18,10 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@g3/auth": "workspace:*",
     "@g3/slack": "workspace:*",
     "drizzle-orm": "^0.44.0",
-    "hono": "4.12.19"
+    "hono": "catalog:"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "catalog:",

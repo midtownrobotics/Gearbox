@@ -1,3 +1,4 @@
+import { requireAuth } from "@g3/auth";
 import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
@@ -9,7 +10,6 @@ import {
   partInstanceProcesses,
   stagingBatches,
 } from "../db/schema";
-import { requireAuth } from "../middleware/auth";
 import type { AppEnv } from "../types";
 
 type ShopDb = ReturnType<typeof createShopDb>;

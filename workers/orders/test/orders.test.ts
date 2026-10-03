@@ -1,10 +1,10 @@
-import { admin, kioskAdmin, mentor, otherStudent, student } from "@g3/testing/users";
+import { admin, kioskAdmin, mentor, otherStudent, student, testUser } from "@g3/testing/users";
 import { call, callAs, jsonAs } from "@g3/testing/worker";
 import { describe, expect, it } from "vitest";
 
 // G3 Orders: anyone requests parts, mentors (and site admins, never kiosk PIN sessions) approve.
 
-type Request = { id: number; status: string; requesterId: string };
+type Request = { id: number; status: string; requesterId: string; requesterSlackId: string | null };
 
 async function newCategory(name: string) {
   return jsonAs<{ id: number }>(mentor, "/categories", { method: "POST", body: { name } }, 201);
@@ -105,6 +105,18 @@ describe("requests", () => {
     const mine = await jsonAs<{ title: string }[]>(student, "/requests?mine=true");
     expect(mine.map((r) => r.title)).toContain("Mine");
     expect(mine.map((r) => r.title)).not.toContain("Theirs");
+  });
+
+  it("saves the requester's Slack account, for the approval DM", async () => {
+    const { id: categoryId } = await newCategory("Slack");
+    const onSlack = testUser({
+      id: "student-slack",
+      identities: [{ provider: "slack", providerId: "U123" }],
+    });
+    const request = await newRequest(categoryId, "With Slack", onSlack);
+    expect(request).toMatchObject({ requesterSlackId: "U123" });
+    const without = await newRequest(categoryId, "Without Slack");
+    expect(without).toMatchObject({ requesterSlackId: null });
   });
 
   it("rejects incomplete requests", async () => {

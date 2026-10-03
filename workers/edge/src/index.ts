@@ -1,6 +1,7 @@
+import { requireAuth } from "@g3/auth";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { requireAgent, requireAuth } from "./middleware/auth";
+import { requireAgent } from "./middleware/auth";
 import { lookupRouter } from "./modules/lookup/routes";
 import { networkAgentRouter, networkRouter, networkScheduled } from "./modules/network";
 import { printRouter } from "./modules/print/routes";
