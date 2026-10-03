@@ -6,8 +6,7 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "noEmit": true,
-    "types": ["@cloudflare/workers-types", "@cloudflare/vitest-pool-workers/types", "@types/node"],
-    "allowImportingTsExtensions": true
+    "types": ["@cloudflare/workers-types", "@cloudflare/vitest-pool-workers/types", "@types/node"]
   },
   "include": ["src"]
 }

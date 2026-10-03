@@ -1,3 +1,5 @@
+# Production URLs, route patterns and TEAM_NUMBER here are written by `pnpm configure` from
+# packages/site-config/src/site.ts. Change them there, not here.
 name = "pit"
 main = "src/index.ts"
 compatibility_date = "2026-05-17"

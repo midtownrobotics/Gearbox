@@ -1,3 +1,4 @@
+import { appTitle } from "@g3/site-config";
 import { useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { buildInstanceRows, machineMood, matchMachineProcess } from "../../shared/derive";
@@ -74,8 +75,8 @@ export function HomePage() {
           </h1>
           <p className="text-steel-dark mt-2">
             {kiosk.active && kiosk.machineName
-              ? `${kiosk.machineName} kiosk — G3 Shop production tracking.`
-              : "G3 Shop — production tracking and management."}
+              ? `${kiosk.machineName} kiosk — ${appTitle("Shop")} production tracking.`
+              : `${appTitle("Shop")} — production tracking and management.`}
           </p>
         </div>
 

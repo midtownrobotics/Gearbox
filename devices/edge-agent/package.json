@@ -10,6 +10,7 @@
     "test": "bun test"
   },
   "dependencies": {
+    "@g3/site-config": "workspace:*",
     "hono": "4.12.19",
     "tldts": "^7.4.16"
   },

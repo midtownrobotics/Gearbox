@@ -29,6 +29,10 @@ jobs:
 
       - run: pnpm typecheck
 
+      # wrangler.toml production values must match packages/site-config/src/site.ts.
+      - name: Site config is applied
+        run: pnpm configure --check
+
       - name: Build Scouting page
         run: pnpm --filter @g3/scouting build
 

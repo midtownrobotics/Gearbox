@@ -1,3 +1,4 @@
+import { site } from "@g3/site-config";
 import {
   BarChart3,
   ChevronDown,
@@ -39,7 +40,8 @@ type TeamMatch = {
   blueTeams: string[];
   redScore: number;
   blueScore: number;
-  relationTo1648: "with" | "against" | "none";
+  /** Whether this team played with or against our team. */
+  relationToTeam: "with" | "against" | "none";
   played: boolean;
 };
 type TeamComment = {
@@ -601,11 +603,13 @@ export function Analysis({ initialReportId }: { initialReportId?: string | null 
       ) : tab === "matches" ? (
         <div className="match-history">
           {teamMatches.map((match) => (
-            <article key={match.key} className={match.relationTo1648 !== "none" ? "g3-match" : ""}>
+            <article key={match.key} className={match.relationToTeam !== "none" ? "g3-match" : ""}>
               <header>
                 <strong>{match.label}</strong>
-                {match.relationTo1648 !== "none" && (
-                  <span>Played {match.relationTo1648} Team 1648</span>
+                {match.relationToTeam !== "none" && (
+                  <span>
+                    Played {match.relationToTeam} Team {site.team.number}
+                  </span>
                 )}
               </header>
               <div className="match-score">

@@ -14,5 +14,8 @@
   "devDependencies": {
     "@types/react": "^19.0.0",
     "react": "^19.0.0"
+  },
+  "dependencies": {
+    "@g3/site-config": "workspace:*"
   }
 }

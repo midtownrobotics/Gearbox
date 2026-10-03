@@ -1,3 +1,4 @@
+import { corsOrigin } from "@g3/site-config";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { adminRouter } from "./routes/admin";
@@ -25,14 +26,7 @@ base.onError((err, c) => {
 base.use(
   "*",
   cors({
-    origin: (origin) => {
-      if (!origin) return null;
-      if (origin === "https://g3robotics.com") return origin;
-      if (origin.endsWith(".g3robotics.com")) return origin;
-      if (origin.startsWith("http://localhost:")) return origin;
-      if (origin.endsWith(".pages.dev")) return origin;
-      return null;
-    },
+    origin: corsOrigin,
     allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowHeaders: ["Content-Type", "Authorization", "x-kiosk-token"],
     credentials: true,

@@ -1,5 +1,6 @@
 import type { MessageBatch } from "@cloudflare/workers-types";
 import { requireAuth } from "@g3/auth";
+import { corsOrigin } from "@g3/site-config";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { createShopDb } from "./db";
@@ -31,13 +32,7 @@ base.onError((err, c) => {
 base.use(
   "*",
   cors({
-    origin: (origin) => {
-      if (!origin) return null;
-      if (origin === "https://g3robotics.com") return origin;
-      if (origin.endsWith(".g3robotics.com")) return origin;
-      if (origin.startsWith("http://localhost:")) return origin;
-      return null;
-    },
+    origin: corsOrigin,
     allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowHeaders: ["Content-Type", "Authorization"],
     credentials: true,

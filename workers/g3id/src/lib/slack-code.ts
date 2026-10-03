@@ -1,3 +1,4 @@
+import { appUrl, idName } from "@g3/site-config";
 import { getUserInfo } from "@g3/slack";
 import { and, eq } from "drizzle-orm";
 import { createDb } from "../db";
@@ -100,9 +101,12 @@ export async function handleSlackCode(opts: {
     if (existingIdentity) {
       if (existingIdentity.userId === userId) {
         await updateStatus("linked");
-        return { success: true, message: "✅ Your Slack account is already linked to your G3ID." };
+        return {
+          success: true,
+          message: `✅ Your Slack account is already linked to your ${idName}.`,
+        };
       }
-      const msg = "This Slack account is already linked to a different G3ID account.";
+      const msg = `This Slack account is already linked to a different ${idName} account.`;
       await updateStatus("failed", msg);
       return { success: false, message: `❌ ${msg}` };
     }
@@ -118,7 +122,7 @@ export async function handleSlackCode(opts: {
     });
 
     await updateStatus("linked");
-    return { success: true, message: "✅ Slack account linked successfully to your G3ID." };
+    return { success: true, message: `✅ Slack account linked successfully to your ${idName}.` };
   }
 
   // --- Sign-in / sign-up flow ---
@@ -160,8 +164,7 @@ export async function handleSlackCode(opts: {
   const slackUser = await getUserInfo(slackUserId, env);
 
   if (!slackUser.email) {
-    const msg =
-      "Your Slack account has no email. Please sign up at g3id.g3robotics.com with email first, then link Slack from your account settings.";
+    const msg = `Your Slack account has no email. Please sign up at ${new URL(appUrl("id")).host} with email first, then link Slack from your account settings.`;
     await updateStatus("failed", msg);
     return { success: false, message: `❌ ${msg}` };
   }

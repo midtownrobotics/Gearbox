@@ -1,3 +1,4 @@
+import { appTitle, appUrl, idName, site, teamLinks } from "@g3/site-config";
 import { useEffect, useState } from "react";
 import type { IconType } from "react-icons";
 import { FaChartLine, FaGithub, FaInstagram, FaSlack, FaTrophy } from "react-icons/fa";
@@ -11,7 +12,7 @@ import skillsIcon from "../../assets/app-icons/skills.svg";
 import g3Logo from "../../assets/g3.png";
 import { g3id } from "../../lib/api";
 
-// G3 apps show their own app icon. Other links are drawn to match it: a black tile with a white
+// The team's apps show their own app icon. Other links are drawn to match it: a black tile with a white
 // symbol, and a burgundy ↗ for sites outside G3. (`bg-black` isn't touched by dark mode.)
 type App = {
   label: string;
@@ -26,78 +27,78 @@ const Thirteen: IconType = () => (
 
 const APPS: App[] = [
   {
-    label: "G3ID",
-    href: "https://g3id.g3robotics.com",
+    label: idName,
+    href: appUrl("id"),
     tile: idIcon,
   },
   {
     label: "Shop",
-    href: "https://shop.g3robotics.com",
+    href: appUrl("shop"),
     tile: shopIcon,
   },
   {
     label: "Pit",
-    href: "https://pit.g3robotics.com",
+    href: appUrl("pit"),
     tile: pitIcon,
   },
   {
     label: "Skill Tree",
-    href: "https://skilltree.g3robotics.com",
+    href: appUrl("skillTree"),
     tile: skillsIcon,
   },
   {
     label: "Scouting",
-    href: "https://scouting.g3robotics.com",
+    href: appUrl("scouting"),
     tile: scoutingIcon,
   },
   {
     label: "Orders",
-    href: "https://orders.g3robotics.com",
+    href: appUrl("orders"),
     tile: ordersIcon,
   },
   {
     label: "Edge",
-    href: "https://edge.g3robotics.com",
+    href: appUrl("edge"),
     tile: edgeIcon,
   },
   {
     label: "Public Site",
-    href: "https://www.g3robotics.com",
+    href: site.publicSiteUrl,
     logoSrc: g3Logo,
   },
   {
     label: "Slack",
-    href: "https://g3robotics.slack.com",
+    href: site.links.slack,
     icon: FaSlack,
     external: true,
   },
   {
     label: "The Blue Alliance",
-    href: "https://www.thebluealliance.com/team/1648",
+    href: teamLinks.blueAlliance,
     icon: FaTrophy,
     external: true,
   },
   {
     label: "Statbotics",
-    href: "https://www.statbotics.io/team/1648",
+    href: teamLinks.statbotics,
     icon: FaChartLine,
     external: true,
   },
   {
     label: "Match13",
-    href: "https://www.match13.com/team/1648",
+    href: teamLinks.match13,
     icon: Thirteen,
     external: true,
   },
   {
     label: "GitHub",
-    href: "https://github.com/midtownrobotics",
+    href: site.links.github,
     icon: FaGithub,
     external: true,
   },
   {
     label: "Instagram",
-    href: "https://www.instagram.com/g3robotics1648/",
+    href: site.links.instagram,
     icon: FaInstagram,
     external: true,
   },
@@ -138,21 +139,21 @@ export function HomePage() {
         <div className="max-w-md w-full space-y-6 text-center">
           <div>
             <p className="text-red-600 font-semibold text-lg tracking-widest uppercase mb-2">
-              FRC Team 1648
+              FRC Team {site.team.number}
             </p>
-            <h1 className="text-4xl font-bold text-gray-900 mb-2">G3 Gearbox</h1>
+            <h1 className="text-4xl font-bold text-gray-900 mb-2">{appTitle("Gearbox")}</h1>
             <p className="text-gray-600">FIRST Robotics Competition</p>
           </div>
 
           <div className="space-y-3 pt-6">
             <a
-              href={`https://g3id.g3robotics.com/login?redirect=${encodeURIComponent(window.location.href)}`}
+              href={`${appUrl("id")}/login?redirect=${encodeURIComponent(window.location.href)}`}
               className="block w-full px-6 py-3 rounded-lg bg-red-600 hover:bg-red-700 text-white font-semibold transition-colors"
             >
               Sign In
             </a>
             <a
-              href="https://g3robotics.com"
+              href={site.publicSiteUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="block w-full px-6 py-3 rounded-lg bg-gray-300 hover:bg-gray-400 text-gray-900 font-semibold transition-colors"
@@ -170,13 +171,13 @@ export function HomePage() {
       <div className="max-w-2xl mx-auto">
         <div className="mb-10">
           <p className="text-red-600 text-sm font-semibold uppercase tracking-widest mb-1">
-            Team 1648
+            Team {site.team.number}
           </p>
-          <h1 className="text-4xl font-bold text-gray-900">G3 Gearbox</h1>
+          <h1 className="text-4xl font-bold text-gray-900">{appTitle("Gearbox")}</h1>
         </div>
 
         <div className="grid grid-cols-4 sm:grid-cols-5 gap-x-4 gap-y-8">
-          {APPS.map((app) => {
+          {APPS.filter((app) => app.href).map((app) => {
             return (
               <a
                 key={app.label}

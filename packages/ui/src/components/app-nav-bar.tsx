@@ -1,3 +1,4 @@
+import { allAppsUrl } from "@g3/site-config";
 import { type ComponentType, type ReactNode, useEffect, useState } from "react";
 import { useTheme } from "../theme";
 
@@ -26,7 +27,8 @@ export type AppNavLink = (props: {
   children: ReactNode;
 }) => ReactNode;
 
-export const ALL_APPS_URL = "https://gearbox.g3robotics.com";
+/** The app list (from @g3/site-config). */
+export const ALL_APPS_URL = allAppsUrl;
 
 /** An AppNavLink from a router's link component, e.g. `linkWith(Link)` for react-router. */
 export function linkWith(
@@ -71,7 +73,7 @@ export function AppNavBar({
   actions,
   allApps = true,
 }: {
-  /** The app's wordmark, e.g. "G3 SHOP". */
+  /** The app's wordmark, e.g. wordmark("Shop") from @g3/site-config. */
   title: string;
   /** The app's icon (its tab icon, e.g. "/favicon.svg"), shown before the wordmark. */
   icon?: string;

@@ -27,8 +27,15 @@ import sys
 import time
 import urllib.parse
 import urllib.request
+from pathlib import Path
 
-UA = "G3RoboticsCatalog/0.1 (+https://g3robotics.com)"
+def _site_value(key):
+    """A value from packages/site-config/src/site.ts (the team's name and domain live there)."""
+    text = (Path(__file__).resolve().parents[3] / "packages/site-config/src/site.ts").read_text()
+    return re.search(rf'{key}: "([^"]+)"', text).group(1)
+
+
+UA = f"{_site_value('name').replace(' ', '')}Catalog/0.1 (+https://{_site_value('domain')})"
 
 SHOPIFY = {
     "West Coast Products": "wcproducts.com",

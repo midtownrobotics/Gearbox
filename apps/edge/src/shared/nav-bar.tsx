@@ -1,3 +1,4 @@
+import { wordmark } from "@g3/site-config";
 import { AppNavBar, activePath, linkWith } from "@g3/ui";
 import { Link, useLocation } from "react-router-dom";
 import { useAuthUser } from "./auth";
@@ -17,7 +18,7 @@ export function NavBar({ items }: { items: PluginNavItem[] }) {
   return (
     <AppNavBar
       icon="/favicon.svg"
-      title="G3 EDGE"
+      title={wordmark("Edge")}
       link={routerLink}
       items={shown.map((item) => ({
         key: item.to,

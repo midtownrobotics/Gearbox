@@ -1,3 +1,4 @@
+import { appUrl } from "@g3/site-config";
 import { useIsOnline } from "@g3/ui";
 import { useNavigate } from "react-router-dom";
 import type { Plugin } from "../../shared/plugin-types";
@@ -27,7 +28,7 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
   }
 
   if (!user) {
-    const loginUrl = `${import.meta.env.VITE_G3ID_URL ?? "https://g3id.g3robotics.com"}/login?redirect=${encodeURIComponent(window.location.href)}`;
+    const loginUrl = `${import.meta.env.VITE_G3ID_URL ?? appUrl("id")}/login?redirect=${encodeURIComponent(window.location.href)}`;
     return (
       <main className="min-h-screen bg-page flex flex-col items-center justify-center gap-4">
         <p className="text-gray-900 text-lg font-semibold">Sign in to use the Editor</p>

@@ -1,3 +1,4 @@
+import { corsOrigin, idName, teamKey as ourTeamKey, site } from "@g3/site-config";
 import { sendDM } from "@g3/slack";
 import { type Context, Hono } from "hono";
 import { cors } from "hono/cors";
@@ -63,12 +64,7 @@ app.onError((error, c) => {
 app.use(
   "*",
   cors({
-    origin: (origin) => {
-      if (!origin) return null;
-      if (origin.endsWith(".g3robotics.com")) return origin;
-      if (origin.startsWith("http://localhost:")) return origin;
-      return null;
-    },
+    origin: corsOrigin,
     allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowHeaders: ["Content-Type"],
     credentials: true,
@@ -297,7 +293,7 @@ async function getStatboticsMatches(eventKey: string) {
   const url = `https://api.statbotics.io/v3/matches?event=${encodeURIComponent(eventKey)}&limit=500`;
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     const response = await fetch(url, {
-      headers: { Accept: "application/json", "User-Agent": "G3-Strategy/1.0" },
+      headers: { Accept: "application/json", "User-Agent": `${site.team.shortName}-Strategy/1.0` },
     });
     if (response.ok) {
       const body = (await response.json()) as unknown;
@@ -322,7 +318,7 @@ function localDemoGameMatches(): GameMatch[] {
   const now = Date.now();
   return [
     {
-      redTeams: ["1648", "1771", "2974"],
+      redTeams: [String(site.team.number), "1771", "2974"],
       blueTeams: ["4910", "6829", "8736"],
       redScore: 142.4,
       blueScore: 135.1,
@@ -343,7 +339,7 @@ function localDemoGameMatches(): GameMatch[] {
       redWinProbability: 0.53,
     },
     {
-      redTeams: ["1648", "4188", "6829"],
+      redTeams: [String(site.team.number), "4188", "6829"],
       blueTeams: ["1771", "4910", "5900"],
       redScore: 146.9,
       blueScore: 141.3,
@@ -970,7 +966,7 @@ app.get("/event-context", requireAuth, async (c) => {
   if (config?.schedule_mode !== "manual")
     await persistAutomaticMatch(c, config?.current_match_number, current);
   const teamSchedule = matches.filter((match) =>
-    [...match.alliances.red.team_keys, ...match.alliances.blue.team_keys].includes("frc1648"),
+    [...match.alliances.red.team_keys, ...match.alliances.blue.team_keys].includes(ourTeamKey),
   );
   const nextTeamMatch = current
     ? teamSchedule.find((match) => matchOrder(match) >= matchOrder(current))
@@ -1083,7 +1079,7 @@ app.put("/event-context", requireAuth, async (c) => {
   const nexusEventKey = text(body.nexusEventKey, 30).toLowerCase() || eventKey;
   const nexusApiKey = text(body.nexusApiKey, 300);
   if ((tbaAuthKey || nexusApiKey) && !c.get("userIsAdmin"))
-    return c.json({ error: "Only a G3ID admin can update API keys." }, 403);
+    return c.json({ error: `Only a ${idName} admin can update API keys.` }, 403);
   if (activeConfig?.schedule_mode !== "manual" && eventKey && !/^\d{4}[a-z0-9]+$/.test(eventKey))
     return c.json({ error: "Enter a valid TBA event key, such as 2026gadal." }, 400);
   const tbaConfigChanged =
@@ -1359,9 +1355,9 @@ app.post("/manual-schedule/extract", requireAuth, async (c) => {
 
   const prompt = `Read this FRC match schedule photo or screenshot. Transcribe every visible practice, qualification, or playoff match.
 The page may be angled, rotated, wrinkled, dim, or contain tables side by side. Side-by-side blocks continue the schedule. Ignore rankings, page numbers, and sponsor text.
-Copy the six team cells in their exact printed LEFT-TO-RIGHT order. Set "o" to "blue-red" when the headers show Blue 1-3 before Red 1-3, otherwise set it to "red-blue". Keep the match-number column separate: match 6 followed by team 1648 means 1648, never 61648. Never guess an unreadable digit.
+Copy the six team cells in their exact printed LEFT-TO-RIGHT order. Set "o" to "blue-red" when the headers show Blue 1-3 before Red 1-3, otherwise set it to "red-blue". Keep the match-number column separate: match 6 followed by team ${site.team.number} means ${site.team.number}, never 6${site.team.number}. Never guess an unreadable digit.
 Inspect each row digit-by-digit. Always include every visible match row and use null only for an individual team cell that truly cannot be read; never omit the entire row.
-Return ONLY compact JSON: {"matches":[{"n":1,"t":null,"o":"red-blue","a":[1648,1771,4910,2974,6829,8736]}]}. No names, markdown, or explanations.`;
+Return ONLY compact JSON: {"matches":[{"n":1,"t":null,"o":"red-blue","a":[${site.team.number},1771,4910,2974,6829,8736]}]}. No names, markdown, or explanations.`;
   const visionOutput = async (result: unknown) => {
     const modelResult = result as {
       response?: string;
@@ -1413,7 +1409,7 @@ Return ONLY compact JSON: {"matches":[{"n":1,"t":null,"o":"red-blue","a":[1648,1
   >();
   const combinedTeams = new Map<string, string>();
   const warnings: string[] = [];
-  const knownTeamNumbers = new Set<string>(["1648"]);
+  const knownTeamNumbers = new Set<string>([String(site.team.number)]);
   const cachedTeams = await c.env.SCOUTING_DB.prepare(
     "SELECT teams_json FROM tba_team_cache ORDER BY expires_at DESC LIMIT 20",
   ).all<{ teams_json: string }>();
@@ -1571,7 +1567,7 @@ The first pass produced these partial Red-then-Blue cells: ${schedule.matches
                   `${match.matchNumber}=[${match.teams.map((team) => team || "?").join(",")}]`,
               )
               .join("; ")}.
-Use the printed grid and column headers to fill the question marks and verify the other digits. Keep the match number separate from team numbers. Return ONLY JSON: {"matches":[{"n":1,"red":[1648,1771,4910],"blue":[2974,6829,8736]}]}. Return only the requested rows, exactly six teams per row.`,
+Use the printed grid and column headers to fill the question marks and verify the other digits. Keep the match number separate from team numbers. Return ONLY JSON: {"matches":[{"n":1,"red":[${site.team.number},1771,4910],"blue":[2974,6829,8736]}]}. Return only the requested rows, exactly six teams per row.`,
             384,
           );
           const recoveryOutput = await visionOutput(recovery);
@@ -2575,12 +2571,12 @@ app.get("/strategy-admins", requireAuth, async (c) => {
 
 app.post("/strategy-admins", requireAuth, async (c) => {
   if (!c.get("userIsAdmin"))
-    return c.json({ error: "Only a G3ID admin can assign Strategy leads." }, 403);
+    return c.json({ error: `Only a ${idName} admin can assign Strategy leads.` }, 403);
   const body = await c.req.json<{ userId?: unknown }>();
   const userId = text(body.userId, 200);
   const users = await getG3IdUsers(c);
   const user = users?.find((candidate) => candidate.id === userId && candidate.status === "active");
-  if (!user) return c.json({ error: "Select an active G3ID account." }, 400);
+  if (!user) return c.json({ error: `Select an active ${idName} account.` }, 400);
   await c.env.SCOUTING_DB.prepare(
     "INSERT OR REPLACE INTO strategy_admins (user_id, email, display_name, granted_by, created_at) VALUES (?, ?, ?, ?, ?)",
   )
@@ -2591,7 +2587,7 @@ app.post("/strategy-admins", requireAuth, async (c) => {
 
 app.delete("/strategy-admins/:userId", requireAuth, async (c) => {
   if (!c.get("userIsAdmin"))
-    return c.json({ error: "Only a G3ID admin can remove Strategy leads." }, 403);
+    return c.json({ error: `Only a ${idName} admin can remove Strategy leads.` }, 403);
   await c.env.SCOUTING_DB.prepare("DELETE FROM strategy_admins WHERE user_id = ?")
     .bind(c.req.param("userId"))
     .run();
@@ -2639,9 +2635,9 @@ app.get("/analysis", requireAuth, async (c) => {
         )
         .map((match) => {
           const alliance = match.alliances.red.team_keys.includes(teamKey) ? "red" : "blue";
-          const partner = match.alliances[alliance].team_keys.includes("frc1648");
+          const partner = match.alliances[alliance].team_keys.includes(ourTeamKey);
           const opponent =
-            match.alliances[alliance === "red" ? "blue" : "red"].team_keys.includes("frc1648");
+            match.alliances[alliance === "red" ? "blue" : "red"].team_keys.includes(ourTeamKey);
           return {
             ...publicMatch(match),
             alliance,
@@ -2649,7 +2645,7 @@ app.get("/analysis", requireAuth, async (c) => {
             blueTeams: match.alliances.blue.team_keys.map((key) => key.replace(/^frc/, "")),
             redScore: match.alliances.red.score,
             blueScore: match.alliances.blue.score,
-            relationTo1648: partner ? "with" : opponent ? "against" : "none",
+            relationToTeam: partner ? "with" : opponent ? "against" : "none",
             played: match.alliances.red.score >= 0 && match.alliances.blue.score >= 0,
           };
         });
@@ -2761,7 +2757,7 @@ app.delete("/analysis/reports/:id/permanent", requireAuth, async (c) => {
 app.get("/field-map-publisher-options", requireAuth, async (c) => {
   if (!c.get("userIsAdmin")) return c.json({ error: "Admin access required." }, 403);
   const users = await getG3IdUsers(c);
-  if (!users) return c.json({ error: "Could not load G3ID accounts." }, 502);
+  if (!users) return c.json({ error: `Could not load ${idName} accounts.` }, 502);
   return c.json({
     users: users
       .filter((user) => user.status === "active")
@@ -2774,11 +2770,11 @@ app.post("/field-map-publishers", requireAuth, async (c) => {
   if (!c.get("userIsAdmin")) return c.json({ error: "Admin access required." }, 403);
   const body = await c.req.json<{ userId?: unknown }>();
   const userId = text(body.userId, 200);
-  if (!userId) return c.json({ error: "Select a G3ID account." }, 400);
+  if (!userId) return c.json({ error: `Select a ${idName} account.` }, 400);
   const users = await getG3IdUsers(c);
-  if (!users) return c.json({ error: "Could not validate the G3ID account." }, 502);
+  if (!users) return c.json({ error: `Could not validate the ${idName} account.` }, 502);
   const user = users.find((candidate) => candidate.id === userId && candidate.status === "active");
-  if (!user) return c.json({ error: "Select an active G3ID account." }, 400);
+  if (!user) return c.json({ error: `Select an active ${idName} account.` }, 400);
   const email = user.email.toLowerCase();
   await c.env.SCOUTING_DB.prepare(
     "INSERT OR IGNORE INTO field_map_publishers (email, granted_by, created_at) VALUES (?, ?, ?)",
@@ -3219,7 +3215,7 @@ app.post("/service-helpers", requireAuth, async (c) => {
   const body = await c.req.json<Record<string, unknown>>();
   const users = await getG3IdUsers(c);
   const user = users?.find((item) => item.id === text(body.userId, 200));
-  if (!user) return c.json({ error: "Select an active G3ID user." }, 400);
+  if (!user) return c.json({ error: `Select an active ${idName} user.` }, 400);
   await c.env.SCOUTING_DB.prepare(
     "INSERT OR REPLACE INTO service_helpers (user_id, display_name, email, slack_user_id, skills_json, approved_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
   )

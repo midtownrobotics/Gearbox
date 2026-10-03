@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@g3/auth": "workspace:*",
+    "@g3/site-config": "workspace:*",
     "@g3/slack": "workspace:*",
     "@paralleldrive/cuid2": "^2.2.2",
     "drizzle-orm": "^0.44.0",

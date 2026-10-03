@@ -1,3 +1,4 @@
+import { wordmark } from "@g3/site-config";
 import { AppNavBar, activePath, linkWith } from "@g3/ui";
 import { Link, useLocation } from "react-router-dom";
 import type { PluginNavItem } from "./plugin-types";
@@ -21,7 +22,7 @@ export function NavBar({ items }: { items: PluginNavItem[] }) {
   return (
     <AppNavBar
       icon="/favicon.svg"
-      title="G3 PIT"
+      title={wordmark("Pit")}
       link={routerLink}
       items={shown.map((item) => ({
         key: item.to,

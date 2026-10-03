@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@g3/auth": "workspace:*",
+    "@g3/site-config": "workspace:*",
     "@g3/slack": "workspace:*",
     "drizzle-orm": "^0.44.0",
     "hono": "catalog:",

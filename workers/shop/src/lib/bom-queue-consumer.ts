@@ -1,3 +1,4 @@
+import { appUrl } from "@g3/site-config";
 import { sendMessage } from "@g3/slack";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
@@ -120,10 +121,10 @@ async function processSingleBOMJob(
           return `
   • *${part.partNumber}*${part.name ? ` - "${part.name}"` : ""}${part.quantity ? ` (x${part.quantity})` : ""}
     ${part.revision ? `• Revision: ${part.revision}` : ""}
-    • <https://shop.g3robotics.com/part?p=${part.partNumber}|Shop SW Link>${partLink}${drawingLink}
+    • <${appUrl("shop")}/part?p=${part.partNumber}|Shop SW Link>${partLink}${drawingLink}
           `;
         }),
-        "\nClick <https://shop.g3robotics.com/ingest|here> to assign production processes.",
+        `\nClick <${appUrl("shop")}/ingest|here> to assign production processes.`,
       ].join("\n");
 
       console.log(`[BOM Queue Job] [${Date.now() - jobStartTime}ms] Sending Slack message`);

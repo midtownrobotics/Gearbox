@@ -1,3 +1,4 @@
+import { allAppsUrl as ALL_APPS_URL } from "@g3/site-config";
 import { useEffect, useState } from "react";
 import { API, redirectToLogin } from "../utils/auth";
 import type { PageType } from "../utils/token";
@@ -21,7 +22,6 @@ type Status =
     }
   | { kind: "error"; message: string };
 
-const ALL_APPS_URL = "https://gearbox.g3robotics.com";
 const REDIRECT_SECONDS = 5;
 
 function tokenValid(w: string): boolean {

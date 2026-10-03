@@ -1,3 +1,4 @@
+import { idName, site, wordmark } from "@g3/site-config";
 import { AppNavBar } from "@g3/ui";
 import {
   ArrowRight,
@@ -1107,9 +1108,9 @@ function FieldMaps({ user }: { user: User }) {
               required
               value={publisherUserId}
               onChange={(event) => setPublisherUserId(event.target.value)}
-              aria-label="G3ID account"
+              aria-label={`${idName} account`}
             >
-              <option value="">Select a G3ID account</option>
+              <option value="">Select a {idName} account</option>
               {publisherOptions
                 .filter(
                   (account) => !publishers.some((publisher) => publisher.email === account.email),
@@ -1343,12 +1344,12 @@ function AutoLibrary() {
                 className="team-number-input"
                 inputMode="numeric"
                 pattern="[0-9]+"
-                title="Enter a team number using digits only, such as 1648."
+                title={`Enter a team number using digits only, such as ${site.team.number}.`}
                 value={form.team}
                 onChange={(e) => setForm({ ...form, team: e.target.value })}
                 onInput={clearInputError}
                 onInvalid={showTeamNumberError}
-                placeholder="1648"
+                placeholder={String(site.team.number)}
               />
             </label>
             <div className="wide auto-route-input">
@@ -1810,7 +1811,7 @@ function RobotLibrary() {
                 pattern="[0-9]+"
                 value={teamName}
                 onChange={(event) => setTeamName(event.target.value)}
-                placeholder="1648"
+                placeholder={String(site.team.number)}
               />
             </label>
             <label className="wide">
@@ -1992,10 +1993,10 @@ export function App() {
         <div className="auth-mark">
           <G3Logo size={38} />
         </div>
-        <h1>Scouting starts with G3ID</h1>
+        <h1>Scouting starts with {idName}</h1>
         <p>Sign in with your team account to open shared tier lists, field maps, and autos.</p>
         <a href={`${G3ID_URL}/login?redirect=${encodeURIComponent(returnTo)}`}>
-          <LogIn size={18} /> Sign in with G3ID
+          <LogIn size={18} /> Sign in with {idName}
         </a>
       </div>
     );
@@ -2020,7 +2021,7 @@ export function App() {
   return (
     <div className="app-shell">
       <AppNavBar
-        title="G3 STRATEGY"
+        title={wordmark("Strategy")}
         icon="/favicon.svg"
         homeHref="#"
         link={({ href, children, ...props }) => (

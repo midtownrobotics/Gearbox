@@ -1,4 +1,5 @@
 import { requireAuth, requireOAuthSession } from "@g3/auth";
+import { corsOrigin } from "@g3/site-config";
 import { eq, notInArray } from "drizzle-orm";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
@@ -21,15 +22,7 @@ base.onError((err, c) => {
 base.use(
   "*",
   cors({
-    origin: (origin) => {
-      if (!origin) return null;
-      if (origin === "https://g3robotics.com") return origin;
-      if (origin.endsWith(".g3robotics.com")) return origin;
-      if (origin.startsWith("http://localhost:")) return origin;
-      if (origin.startsWith("http://127.0.0.1:")) return origin;
-      if (origin.endsWith(".pages.dev")) return origin;
-      return null;
-    },
+    origin: corsOrigin,
     allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allowHeaders: ["Content-Type", "Authorization"],
     credentials: true,

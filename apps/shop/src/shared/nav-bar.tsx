@@ -1,3 +1,4 @@
+import { wordmark } from "@g3/site-config";
 import { AppNavBar, activePath, linkWith } from "@g3/ui";
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
@@ -32,7 +33,7 @@ export function NavBar({ items }: { items: PluginNavItem[] }) {
   return (
     <AppNavBar
       icon="/favicon.svg"
-      title="G3 SHOP"
+      title={wordmark("Shop")}
       homeHref={logoHref}
       link={routerLink}
       allApps={!kiosk.active}

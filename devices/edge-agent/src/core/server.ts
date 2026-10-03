@@ -6,7 +6,7 @@ import { AGENT_VERSION } from "./version";
 /**
  * Local HTTP API, bound to 127.0.0.1. The tunnel (cloudflared) forwards
  * POST /sync and the module routes (e.g. /print/*) from
- * edge-agent.g3robotics.com; /health is local-only. Everything but /health
+ * the edge-agent subdomain; /health is local-only. Everything but /health
  * requires the shared key.
  */
 export function startServer(

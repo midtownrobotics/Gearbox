@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@g3/auth": "workspace:*",
+    "@g3/site-config": "workspace:*",
     "hono": "catalog:"
   },
   "devDependencies": {

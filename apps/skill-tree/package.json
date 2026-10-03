@@ -10,6 +10,7 @@
     "test": "exit 0"
   },
   "devDependencies": {
+    "@g3/site-config": "workspace:*",
     "vite": "^6.0.5"
   }
 }

@@ -21,6 +21,7 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250516.0",
+    "@g3/site-config": "workspace:*",
     "@g3/ui": "workspace:*",
     "@g3/worker-pit": "workspace:*",
     "@tailwindcss/vite": "^4.0.0",

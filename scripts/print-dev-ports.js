@@ -4,6 +4,7 @@ import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { site } from "../packages/site-config/src/site.ts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const configPath = path.join(__dirname, "..", ".dev-ports.json");
@@ -48,7 +49,7 @@ async function waitForServers(config, timeout = 60000) {
 
 function printServerInfo(config) {
   console.log(`\n${"=".repeat(60)}`);
-  console.log("  G3 Robotics Development Servers");
+  console.log(`  ${site.team.name} Development Servers`);
   console.log(`${"=".repeat(60)}\n`);
 
   console.log("📱 Apps:");
@@ -70,7 +71,7 @@ async function main() {
   try {
     const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
 
-    console.log("🚀 Starting G3 Robotics development servers...\n");
+    console.log(`🚀 Starting ${site.team.name} development servers...\n`);
 
     // Start the dev servers in background
     const devProcess = spawn("pnpm", ["-r", "--parallel", "--no-bail", "--if-present", "dev"], {
