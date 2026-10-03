@@ -4,6 +4,7 @@ import { eq, inArray, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { validator } from "hono/validator";
+import packageJson from "../package.json";
 import { createDb } from "./db";
 import { batteries, checklistIssues, checklistItems, checklistLists, settings } from "./db/schema";
 import type { AppEnv } from "./types";
@@ -181,7 +182,7 @@ const listSelect = {
 };
 
 const app = base
-  .get("/health", (c) => c.json({ status: "ok", service: "pit" }))
+  .get("/health", (c) => c.json({ status: "ok", service: "pit", version: packageJson.version }))
 
   .get("/me", requireAuth, (c) =>
     c.json({

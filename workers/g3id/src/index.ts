@@ -1,6 +1,7 @@
 import { corsOrigin } from "@g3/site-config";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import packageJson from "../package.json";
 import { adminRouter } from "./routes/admin";
 import { authRouter } from "./routes/auth";
 import { emailAuthRouter } from "./routes/auth/email";
@@ -34,7 +35,7 @@ base.use(
 );
 
 const app = base
-  .get("/health", (c) => c.json({ status: "ok", service: "g3id" }))
+  .get("/health", (c) => c.json({ status: "ok", service: "g3id", version: packageJson.version }))
   .route("/auth", authRouter)
   .route("/auth", emailAuthRouter)
   .route("/auth", githubAuthRouter)

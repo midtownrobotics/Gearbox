@@ -2,6 +2,7 @@ import { requireAuth } from "@g3/auth";
 import { corsOrigin } from "@g3/site-config";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import packageJson from "../package.json";
 import { requireAgent } from "./middleware/auth";
 import { lookupRouter } from "./modules/lookup/routes";
 import { networkAgentRouter, networkRouter, networkScheduled } from "./modules/network";
@@ -28,7 +29,7 @@ base.use(
 );
 
 const app = base
-  .get("/health", (c) => c.json({ status: "ok", service: "edge", version: "v0.1.0" }))
+  .get("/health", (c) => c.json({ status: "ok", service: "edge", version: packageJson.version }))
   .get("/me", requireAuth, (c) =>
     c.json({
       userId: c.get("userId"),

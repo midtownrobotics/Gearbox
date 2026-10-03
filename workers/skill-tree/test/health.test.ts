@@ -4,5 +4,9 @@ import { expect, it } from "vitest";
 it("answers /health", async () => {
   const res = await call("/health");
   expect(res.status).toBe(200);
-  expect(await res.json()).toMatchObject({ status: "ok", service: "skill-tree" });
+  expect(await res.json()).toMatchObject({
+    status: "ok",
+    version: expect.stringMatching(/^\d+\.\d+\.\d+$/),
+    service: "skill-tree",
+  });
 });

@@ -1,0 +1,28 @@
+{
+  "$schema": "https://unpkg.com/@changesets/config@3.0.0/schema.json",
+  "changelog": "@changesets/cli/changelog",
+  "commit": false,
+  "access": "restricted",
+  "baseBranch": "main",
+  "privatePackages": { "version": true, "tag": true },
+  "updateInternalDependencies": "patch",
+  "fixed": [
+    ["@g3/g3id", "@g3/worker-g3id"],
+    ["@g3/shop", "@g3/worker-shop"],
+    ["@g3/pit", "@g3/worker-pit"],
+    ["@g3/orders", "@g3/worker-orders"],
+    ["@g3/edge", "@g3/worker-edge"],
+    ["@g3/scouting", "@g3/worker-scouting"],
+    ["@g3/skill-tree", "@g3/worker-skill-tree"],
+    ["@g3/attendance", "@g3/worker-attendance"]
+  ],
+  "ignore": [
+    "@g3/admin",
+    "@g3/api",
+    "@g3/auth",
+    "@g3/site-config",
+    "@g3/slack",
+    "@g3/testing",
+    "@g3/ui"
+  ]
+}

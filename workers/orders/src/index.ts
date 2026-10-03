@@ -2,6 +2,7 @@ import { hasMentorAccess, requireAuth } from "@g3/auth";
 import { corsOrigin } from "@g3/site-config";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import packageJson from "../package.json";
 import { canEditCatalog } from "./middleware/auth";
 import { catalogRouter } from "./routes/catalog";
 import { categoriesRouter } from "./routes/categories";
@@ -33,7 +34,7 @@ base.use(
 );
 
 const app = base
-  .get("/health", (c) => c.json({ status: "ok", service: "orders", version: "v0.1.0" }))
+  .get("/health", (c) => c.json({ status: "ok", service: "orders", version: packageJson.version }))
   .get("/me", requireAuth, async (c) => {
     // Remembered so mentors can find people to mark trusted on the Settings page.
     await c.env.ORDERS_DB.prepare(

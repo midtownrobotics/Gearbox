@@ -1,6 +1,6 @@
 {
   "name": "@g3/worker-shop",
-  "version": "0.1.0",
+  "version": "1.2.3",
   "private": true,
   "exports": {
     ".": "./src/index.ts",

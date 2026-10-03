@@ -1,4 +1,5 @@
 import { idName, site, wordmark } from "@g3/site-config";
+import { versionLabel } from "@g3/site-config/versions";
 import { AppNavBar } from "@g3/ui";
 import {
   ArrowRight,
@@ -2022,6 +2023,7 @@ export function App() {
     <div className="app-shell">
       <AppNavBar
         title={wordmark("Strategy")}
+        version={versionLabel("Strategy")}
         icon="/favicon.svg"
         homeHref="#"
         link={({ href, children, ...props }) => (

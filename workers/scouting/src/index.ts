@@ -2,6 +2,7 @@ import { corsOrigin, idName, teamKey as ourTeamKey, site } from "@g3/site-config
 import { sendDM } from "@g3/slack";
 import { type Context, Hono } from "hono";
 import { cors } from "hono/cors";
+import packageJson from "../package.json";
 import { requireAuth } from "./middleware/auth";
 import type { AppEnv } from "./types";
 
@@ -569,7 +570,9 @@ async function withTimeout<T>(promise: Promise<T>, milliseconds: number, label: 
   }
 }
 
-app.get("/health", (c) => c.json({ status: "ok", service: "scouting" }));
+app.get("/health", (c) =>
+  c.json({ status: "ok", service: "scouting", version: packageJson.version }),
+);
 async function isStrategyAdmin(c: Context<AppEnv>) {
   if (c.get("userIsAdmin")) return true;
   const row = await c.env.SCOUTING_DB.prepare(

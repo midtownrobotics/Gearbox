@@ -1,0 +1,70 @@
+name: release
+
+# main is where work lands; public is what's released (and deployed). Merging main into public
+# makes a release: this applies the pending changesets on public (versions, changelogs, platform
+# CalVer, RELEASES.md), commits and tags it, then merges public back into main so main has the
+# new versions and the used changesets are gone there too. See RELEASES.md.
+#
+# Pushes made here with GITHUB_TOKEN don't start other workflows, so this doesn't loop. If main
+# or public is protected, allow GitHub Actions to push to them.
+
+on:
+  push:
+    branches: [public]
+
+concurrency: release
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: public
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Apply changesets
+        run: pnpm release:version
+
+      - name: Commit the release
+        id: commit
+        run: |
+          if git diff --quiet; then
+            echo "No changesets to release."
+          else
+            git add -A
+            git commit -m "Release $(node -p 'require("./package.json").version')"
+            git push origin public
+            echo "released=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Tag it
+        run: pnpm release:tag --push
+
+      - name: Merge public back into main
+        if: steps.commit.outputs.released == 'true'
+        run: |
+          version=$(node -p 'require("./package.json").version')
+          git fetch origin main
+          git checkout -B main origin/main
+          git merge public -m "Merge release $version into main"
+          git push origin main

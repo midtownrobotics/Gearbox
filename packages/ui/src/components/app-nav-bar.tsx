@@ -22,6 +22,7 @@ export type AppNavItem = {
 export type AppNavLink = (props: {
   href: string;
   className: string;
+  title?: string;
   onClick?: () => void;
   "aria-current"?: "page";
   children: ReactNode;
@@ -35,6 +36,7 @@ export function linkWith(
   Link: ComponentType<{
     to: string;
     className: string;
+    title?: string;
     onClick?: () => void;
     "aria-current"?: "page";
     children: ReactNode;
@@ -72,6 +74,7 @@ export function AppNavBar({
   link = plainLink,
   actions,
   allApps = true,
+  version,
 }: {
   /** The app's wordmark, e.g. wordmark("Shop") from @g3/site-config. */
   title: string;
@@ -84,6 +87,8 @@ export function AppNavBar({
   actions?: ReactNode;
   /** Show the All Apps link. */
   allApps?: boolean;
+  /** "Orders 1.4.0 · platform 2026.10.0": on the wordmark's tooltip and in the drawer. */
+  version?: string;
 }) {
   const [open, setOpen] = useState(false);
   // With no pages there's nothing for a menu; the bar keeps its controls on phones too.
@@ -147,6 +152,7 @@ export function AppNavBar({
       {link({
         href: homeHref,
         className: "g3-nav-wordmark",
+        title: version,
         onClick: () => setOpen(false),
         children: (
           <>
@@ -228,6 +234,7 @@ export function AppNavBar({
                 All Apps
               </a>
             )}
+            {version && <span className="g3-nav-version">{version}</span>}
           </div>
         </div>
       )}

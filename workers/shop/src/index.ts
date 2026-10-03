@@ -3,6 +3,7 @@ import { requireAuth } from "@g3/auth";
 import { corsOrigin } from "@g3/site-config";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import packageJson from "../package.json";
 import { createShopDb } from "./db";
 import { type BOMQueueMessage, processBOMQueue } from "./lib/bom-queue-consumer";
 import { actionsRouter } from "./routes/actions";
@@ -40,7 +41,7 @@ base.use(
 );
 
 const app = base
-  .get("/health", (c) => c.json({ status: "ok", service: "shop", version: "v1.2.3" }))
+  .get("/health", (c) => c.json({ status: "ok", service: "shop", version: packageJson.version }))
   .get("/me", requireAuth, (c) =>
     c.json({
       userId: c.get("userId"),

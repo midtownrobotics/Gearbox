@@ -325,6 +325,11 @@ html[data-theme="dark"] .g3-nav-drawer {
   border-top: 1px solid var(--g3-nav-line);
 }
 
+.g3-nav-version {
+  color: var(--g3-nav-muted);
+  font-size: 12px;
+}
+
 .g3-nav-scrim {
   position: fixed;
   inset: 0;

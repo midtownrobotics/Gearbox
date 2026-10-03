@@ -1,4 +1,5 @@
 import { wordmark } from "@g3/site-config";
+import { versionLabel } from "@g3/site-config/versions";
 import { AppNavBar, activePath, linkWith } from "@g3/ui";
 import { Link, useLocation } from "react-router-dom";
 import type { PluginNavItem } from "./plugin-types";
@@ -21,6 +22,7 @@ export function NavBar({ items }: { items: PluginNavItem[] }) {
   );
   return (
     <AppNavBar
+      version={versionLabel("Pit")}
       icon="/favicon.svg"
       title={wordmark("Pit")}
       link={routerLink}

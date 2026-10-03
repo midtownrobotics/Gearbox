@@ -4,6 +4,7 @@ import { eq, notInArray } from "drizzle-orm";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { validator } from "hono/validator";
+import packageJson from "../package.json";
 import { createDb } from "./db";
 import { skillMentors, skillProgress, skillSiteMentors } from "./db/schema";
 import type { AppEnv } from "./types";
@@ -61,7 +62,9 @@ const skillUpdateValidator = validator(
 );
 
 const app = base
-  .get("/health", (c) => c.json({ status: "ok", service: "skill-tree" }))
+  .get("/health", (c) =>
+    c.json({ status: "ok", service: "skill-tree", version: packageJson.version }),
+  )
 
   // Current user — also self-registers their profile so they appear in the
   // student list, promotes G3ID admins to mentors, and mirrors the G3ID
