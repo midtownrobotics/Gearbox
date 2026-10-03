@@ -3,10 +3,13 @@ name: release
 # main is where work lands; public is what's released (and deployed). Merging main into public
 # makes a release: this applies the pending changesets on public (versions, changelogs, platform
 # CalVer, RELEASES.md), commits and tags it, then merges public back into main so main has the
-# new versions and the used changesets are gone there too. See RELEASES.md.
+# new versions and the used changesets are gone there too. (A real merge, not a cherry-pick, so
+# main and public share history and the next main → public merge stays clean. It's the only merge
+# commit on main; the deploy key bypasses main's linear-history rule for it.) See RELEASES.md.
 #
-# Pushes made here with GITHUB_TOKEN don't start other workflows, so this doesn't loop. If main
-# or public is protected, allow GitHub Actions to push to them.
+# Pushes go through a deploy key (secret RELEASE_DEPLOY_KEY) that's on the bypass list of the
+# main and public rulesets, since both only accept changes through pull requests. Its push to
+# public starts this workflow again, which then finds nothing to release.
 
 on:
   push:
@@ -25,6 +28,7 @@ jobs:
         with:
           ref: public
           fetch-depth: 0
+          ssh-key: ${{ secrets.RELEASE_DEPLOY_KEY }}
 
       - uses: pnpm/action-setup@v4
         with:
@@ -66,5 +70,5 @@ jobs:
           version=$(node -p 'require("./package.json").version')
           git fetch origin main
           git checkout -B main origin/main
-          git merge public -m "Merge release $version into main"
+          git merge --no-ff public -m "Merge release $version into main"
           git push origin main

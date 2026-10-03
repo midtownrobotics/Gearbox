@@ -1,0 +1,57 @@
+name: release-pr
+
+# Keeps one PR open from main into public, titled with what merging it would release
+# ("Release 2026.10.4: Orders 1.2.0, Pit 1.0.1") and listing the changes. Nothing is applied
+# here; merging the PR runs release.yml on public, which applies and tags the release.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency: release-pr
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  release-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Work out the next release
+        id: preview
+        run: pnpm release:preview --github-output "$GITHUB_OUTPUT"
+
+      - name: Open or update the release PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TITLE: ${{ steps.preview.outputs.title }}
+          BODY: ${{ steps.preview.outputs.body }}
+        run: |
+          git fetch origin public
+          if [ -z "$(git log --oneline origin/public..origin/main)" ]; then
+            echo "public already has everything on main; no release PR needed."
+            exit 0
+          fi
+          number=$(gh pr list --base public --head main --state open --json number --jq '.[0].number')
+          if [ -n "$number" ]; then
+            gh pr edit "$number" --title "$TITLE" --body "$BODY"
+          else
+            gh pr create --base public --head main --title "$TITLE" --body "$BODY"
+          fi
