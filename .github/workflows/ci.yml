@@ -35,4 +35,10 @@ jobs:
       - name: Build Scouting worker
         run: pnpm --filter @g3/worker-scouting build
 
-      - run: pnpm test
+      # Each worker's tests run in the Workers runtime against local D1/KV/R2, with other
+      # workers stubbed (packages/testing). No Cloudflare account or secrets needed.
+      - name: Worker tests
+        run: pnpm --filter "./workers/*" --if-present test
+
+      - name: Other tests
+        run: pnpm -r --filter "!./workers/*" --if-present test

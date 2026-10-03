@@ -8,14 +8,18 @@
   "scripts": {
     "dev": "wrangler dev --port 8791 --inspector-port 9233",
     "deploy": "wrangler deploy",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "hono": "^4.7.0"
   },
   "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "catalog:",
     "@cloudflare/workers-types": "^4.20250516.0",
+    "@g3/testing": "workspace:*",
     "typescript": "^5.8.0",
+    "vitest": "catalog:",
     "wrangler": "^4.14.0"
   }
 }

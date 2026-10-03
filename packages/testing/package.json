@@ -1,0 +1,24 @@
+{
+  "name": "@g3/testing",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    "./config": "./src/config.ts",
+    "./users": "./src/users.ts",
+    "./setup": "./src/setup.ts",
+    "./worker": "./src/worker.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@cloudflare/vitest-pool-workers": "catalog:",
+    "vitest": "catalog:"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250516.0",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.8.0"
+  }
+}

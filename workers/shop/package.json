@@ -11,7 +11,8 @@
     "deploy": "wrangler deploy",
     "typecheck": "tsc --noEmit",
     "db:migrate:local": "wrangler d1 migrations apply SHOP_DB --local",
-    "db:migrate:remote": "wrangler d1 migrations apply SHOP_DB --env production --remote"
+    "db:migrate:remote": "wrangler d1 migrations apply SHOP_DB --env production --remote",
+    "test": "vitest run"
   },
   "dependencies": {
     "@g3/auth": "workspace:*",
@@ -21,9 +22,12 @@
     "pdf-lib": "^1.17.1"
   },
   "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "catalog:",
     "@cloudflare/workers-types": "^4.20250516.0",
+    "@g3/testing": "workspace:*",
     "drizzle-kit": "^0.31.0",
     "typescript": "^5.8.0",
+    "vitest": "catalog:",
     "wrangler": "^4.110.0"
   }
 }

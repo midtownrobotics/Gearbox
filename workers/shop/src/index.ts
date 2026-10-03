@@ -1,5 +1,4 @@
 import type { MessageBatch } from "@cloudflare/workers-types";
-import { sendMessage } from "@g3/slack";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { createShopDb } from "./db";
@@ -101,11 +100,7 @@ const app = base
   .route("/staging-batches", stagingBatchesRouter)
   .route("/actions", actionsRouter)
   .route("/kiosk-presence", kioskPresenceRouter)
-  .route("/admin", adminPartsRouter)
-  .get("/slack-test", async (c) => {
-    c.executionCtx.waitUntil(sendMessage("C09QYMTSGKT", "test but now from shop sw worker", c.env));
-    return c.text("200", 200);
-  });
+  .route("/admin", adminPartsRouter);
 
 export type ShopApp = typeof app;
 

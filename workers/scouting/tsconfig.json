@@ -3,9 +3,9 @@
   "compilerOptions": {
     "moduleResolution": "bundler",
     "module": "ESNext",
-    "types": ["@cloudflare/workers-types"],
+    "types": ["@cloudflare/workers-types", "@cloudflare/vitest-pool-workers/types"],
     "lib": ["ES2022", "WebWorker"],
     "noEmit": true
   },
-  "include": ["src"]
+  "include": ["src", "test"]
 }
