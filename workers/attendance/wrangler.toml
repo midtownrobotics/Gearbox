@@ -8,14 +8,17 @@ compatibility_date = "2026-05-17"
 binding = "G3ID"
 service = "g3id"
 
+[[d1_databases]]
+binding = "ATTENDANCE_DB"
+database_name = "g3-attendance-local"
+database_id = "00000000-0000-0000-0000-000000000004"
+migrations_dir = "src/db/migrations"
+
 [triggers]
 crons = ["0 * * * *"]
 
 [vars]
 FRONTEND_URL = "http://localhost:5181"
-FIREBASE_PROJECT_ID = "g3-attendance"
-# FIREBASE_CLIENT_EMAIL and FIREBASE_PRIVATE_KEY are secrets — set in `.dev.vars`
-# locally and via `wrangler secret put` in production.
 
 [env.production]
 name = "attendance-production"
@@ -23,6 +26,12 @@ name = "attendance-production"
 [[env.production.services]]
 binding = "G3ID"
 service = "g3id-production"
+
+[[env.production.d1_databases]]
+binding = "ATTENDANCE_DB"
+database_name = "g3-attendance-prod"
+database_id = "427e6c07-083a-4c2d-bc66-9f4f524340e2"
+migrations_dir = "src/db/migrations"
 
 [[env.production.routes]]
 pattern = "api.attendance.g3robotics.com"
@@ -33,4 +42,3 @@ crons = ["0 * * * *"]
 
 [env.production.vars]
 FRONTEND_URL = "https://signin.attendance.g3robotics.com"
-FIREBASE_PROJECT_ID = "g3-attendance"
