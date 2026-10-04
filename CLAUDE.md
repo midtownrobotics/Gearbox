@@ -18,6 +18,20 @@ pnpm biome check --write   # Fix formatting/linting before commit
 pnpm -r --if-present typecheck  # Ensure no type errors
 ```
 
+## Platform Roadmap (read this first)
+
+These apps are being turned from one team's tools into a hosted platform that many teams share. The plan of record is `docs/roadmap/roadmap.md`. **Before changing code, read its Progress section and the phase your change touches**, so the change moves toward the plan instead of away from it.
+
+**Rules that follow from the roadmap:**
+- **No new team-specific values in code, config or migrations**: team name, number, domain, Slack channel IDs, time zone, currency, event keys. Read them from `@g3/site-config` (see "Site config" below), which becomes per-team data in Phase 2.
+- **No new single-team assumptions in schemas**: no `CHECK (id = 1)` settings rows, and no key that is unique across the whole table when it should be unique per team (a vendor key, a setting name, a PIN). New tables for a team's data should be easy to scope with a `team_id` later (Phase 3).
+- **Sign-in and roles only through `@g3/auth`**. App workers don't read the session cookie themselves; in Phase 2 a gateway hands them the user and team.
+- **Core apps must not depend on Edge.** Edge is G3's own single-team app. Orders part lookup and Shop printing treat it as an optional provider and must keep working (by hand) without it.
+- **Hosting and deploy changes need the owners' yes first**: a new Cloudflare product, a paid add-on, a new vendor or a new domain. The roadmap's "Hosting and stack decisions" section lists what is already confirmed; ask before going beyond it.
+- **Features that change what data is collected, how long it's kept or who can see it** must match the drafts in `docs/legal/` (Terms of Service, Privacy Policy). Update the draft in the same PR, or say in the PR that it needs a decision.
+
+**Keep the roadmap current.** When a change completes or advances a step, update `docs/roadmap/roadmap.md` in the same PR: the step's Status, the Progress table, and a row in "What landed". If a change makes part of the plan wrong, fix the plan there and say so in the PR description. A roadmap-only change takes an empty changeset.
+
 ## Repository Structure
 
 **Monorepo using pnpm workspaces:**
@@ -217,7 +231,7 @@ pnpm -r --if-present test    # Run available tests
 - Storage is per test file, shared by the tests in a file, so each test makes its own records (random URLs, generated PINs) instead of assuming an empty database.
 - Other workers are stubbed: `G3ID` is a stub that answers `/auth/me` for the user in a test cookie (never admin/mentor for a `pin` session, like the real one), and other services (e.g. `EDGE`) can be `offlineService`. In tests, `callAs(student, "/path", { method, body })` / `jsonAs(...)` from `@g3/testing/worker` sign requests in as the users in `@g3/testing/users` (`student`, `otherStudent`, `mentor`, `admin`, `kioskAdmin`).
 - G3ID itself is tested for real (`workers/g3id/test`): users and sessions are seeded with its own helpers (`createUser`, `sessionCookie`, `createUserWithPin`, `activateKiosk`).
-- Attendance's records are in Firestore, which tests don't reach; only its auth and kiosk-code checks are covered.
+- Attendance's records are in its own D1 database (`ATTENDANCE_DB`); `workers/attendance/test/attendance-d1.test.ts` covers sign-in/out, hours, auto-closed sessions and admin actions against it.
 
 **Test Slack locally:**
 - Sign-in codes generated and stored in D1
@@ -308,6 +322,8 @@ Workers deployed via Wrangler:
 
 ## Key Files to Know
 
+- `docs/roadmap/roadmap.md` — The multi-team platform roadmap: phases, each step's status, confirmed hosting decisions, open questions
+- `docs/legal/` — Draft Terms of Service and Privacy Policy for the hosted platform (not in force)
 - `workers/g3id/src/middleware/auth.ts` — G3ID's own auth middleware (requireAuth, requireAdmin, requireKioskToken)
 - `packages/auth/src/g3id.ts` — Sign-in for every other worker (`@g3/auth`: requireAuth, requireAdmin, requireMentor, requireOAuthSession, `G3AuthVariables`); app-specific checks (Edge's agent key, Orders' catalog editors, Scouting's local bypass) stay in that worker's `middleware/auth.ts`
 - `workers/g3id/src/routes/auth/slack.ts` — Slack OAuth flow endpoints
