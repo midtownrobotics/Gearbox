@@ -37,7 +37,7 @@ export function NavBar({ items }: { items: PluginNavItem[] }) {
   );
   return (
     <AppNavBar
-      version={versionLabel("Gearbox")}
+      version={versionLabel("Portal")}
       title={wordmark("Gearbox")}
       link={routerLink}
       allApps={false}
