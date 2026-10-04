@@ -2,6 +2,7 @@
   "name": "g3-web-apps",
   "private": true,
   "version": "2026.10.0",
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "dev": "node scripts/print-dev-ports.js",
