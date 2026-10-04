@@ -7,12 +7,12 @@
   },
   "scripts": {
     "dev": "wrangler dev",
-    "deploy": "pnpm --filter @g3/g3id build && wrangler deploy --env production",
+    "deploy": "wrangler deploy --env production",
     "typecheck": "tsc --noEmit",
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
     "db:migrate:remote": "wrangler d1 migrations apply DB --env production --remote",
     "test": "vitest run",
-    "build": "pnpm --filter @g3/g3id build && wrangler deploy --env production --dry-run"
+    "build": "wrangler deploy --env production --dry-run"
   },
   "dependencies": {
     "@g3/auth": "workspace:*",

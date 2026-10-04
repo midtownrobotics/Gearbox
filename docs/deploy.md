@@ -14,14 +14,14 @@ browser ──> *.<domain> ──> gateway ──(service binding)──> orders
 
 ```bash
 pnpm run deploy                               # every app worker, then the gateway
-pnpm --filter @g3/worker-orders run deploy    # one app: builds apps/orders, then deploys
+pnpm --filter @g3/worker-orders run deploy    # one app: builds apps/orders, then deploys it
 ```
 
-Each app worker's `deploy` builds its app first, since the worker uploads `apps/<app>/dist` with it. Deploy with `--env production` only (the scripts do). If your Cloudflare login can see several accounts, set `CLOUDFLARE_ACCOUNT_ID` first.
+Each app worker uploads `apps/<app>/dist` with it, so its `wrangler.toml` has a production build command (`[env.production.build]`) that builds the app first, whoever runs `wrangler deploy --env production` or `wrangler versions upload --env production`. Deploy with `--env production` only (the scripts do). If your Cloudflare login can see several accounts, set `CLOUDFLARE_ACCOUNT_ID` first.
 
 Apply D1 migrations before deploying a worker that needs them (`pnpm db:migrate:remote`).
 
-If Cloudflare deploys a worker from Git (Workers Builds), set its deploy command to `pnpm run deploy` in the worker's directory (root directory `workers/<app>`), so the app is built before the upload.
+Cloudflare's Git builds (Workers Builds) need no extra setup: their `wrangler deploy` / `wrangler versions upload --env production` runs the same build command. Leave their build command empty.
 
 ## Switching over from Pages and per-app API domains (once)
 

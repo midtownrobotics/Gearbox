@@ -7,8 +7,8 @@
   },
   "scripts": {
     "dev": "wrangler dev --port 8789 --inspector-port 9231",
-    "build": "pnpm --filter @g3/pit build && wrangler deploy --env production --dry-run",
-    "deploy": "pnpm --filter @g3/pit build && wrangler deploy --env production",
+    "build": "wrangler deploy --env production --dry-run",
+    "deploy": "wrangler deploy --env production",
     "typecheck": "tsc --noEmit",
     "db:migrate:local": "wrangler d1 migrations apply PIT_DB --local",
     "db:migrate:remote": "wrangler d1 migrations apply PIT_DB --env production --remote",
