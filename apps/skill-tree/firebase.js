@@ -20,7 +20,7 @@ const isLocal =
 // users to). The skill-tree worker serves the app's data.
 const G3ID_API = isLocal ? "http://localhost:8787" : apiUrl("id");
 const G3ID_WEB = isLocal ? "http://localhost:5173" : appUrl("id");
-const API_URL = isLocal ? "http://localhost:8790" : apiUrl("skillTree");
+const API_URL = isLocal ? "http://localhost:8790" : "/api";
 
 const POLL_INTERVAL_MS = 4000;
 

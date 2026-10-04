@@ -1,4 +1,5 @@
 import { corsOrigin, idName, teamKey as ourTeamKey, site } from "@g3/site-config";
+import { withApiPrefix } from "@g3/site-config/worker";
 import { sendDM } from "@g3/slack";
 import { type Context, Hono } from "hono";
 import { cors } from "hono/cors";
@@ -2555,7 +2556,7 @@ async function getG3IdUsers(c: Context<AppEnv>) {
     ];
   }
   const response = await c.env.G3ID.fetch(
-    new Request("http://g3id/users", {
+    new Request("http://g3id/api/users", {
       headers: { cookie: c.req.header("Cookie") ?? "" },
     }),
   );
@@ -3247,7 +3248,7 @@ const worker = new Hono<AppEnv>().route("/scouting", app);
 
 export type ScoutingApp = typeof worker;
 export default {
-  fetch: worker.fetch,
+  fetch: withApiPrefix(worker.fetch),
   scheduled: (_event: ScheduledController, env: AppEnv["Bindings"], ctx: ExecutionContext) => {
     ctx.waitUntil(settleConfiguredGame(env));
   },

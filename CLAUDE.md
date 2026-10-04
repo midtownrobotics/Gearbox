@@ -18,12 +18,26 @@ pnpm biome check --write   # Fix formatting/linting before commit
 pnpm -r --if-present typecheck  # Ensure no type errors
 ```
 
+## Platform Roadmap (read this first)
+
+These apps are being turned from one team's tools into a hosted platform that many teams share. The plan of record is `docs/roadmap/roadmap.md`. **Before changing code, read its Progress section and the phase your change touches**, so the change moves toward the plan instead of away from it.
+
+**Rules that follow from the roadmap:**
+- **No new team-specific values in code, config or migrations**: team name, number, domain, Slack channel IDs, time zone, currency, event keys. Read them from `@g3/site-config` (see "Site config" below), which becomes per-team data in Phase 2.
+- **No new single-team assumptions in schemas**: no `CHECK (id = 1)` settings rows, and no key that is unique across the whole table when it should be unique per team (a vendor key, a setting name, a PIN). New tables for a team's data should be easy to scope with a `team_id` later (Phase 3).
+- **Sign-in and roles only through `@g3/auth`**. App workers don't read the session cookie themselves; in Phase 2 a gateway hands them the user and team.
+- **Core apps must not depend on Edge.** Edge is G3's own single-team app. Orders part lookup and Shop printing treat it as an optional provider and must keep working (by hand) without it.
+- **Hosting and deploy changes need the owners' yes first**: a new Cloudflare product, a paid add-on, a new vendor or a new domain. The roadmap's "Hosting and stack decisions" section lists what is already confirmed; ask before going beyond it.
+- **Features that change what data is collected, how long it's kept or who can see it** must match the drafts in `docs/legal/` (Terms of Service, Privacy Policy). Update the draft in the same PR, or say in the PR that it needs a decision.
+
+**Keep the roadmap current.** When a change completes or advances a step, update `docs/roadmap/roadmap.md` in the same PR: the step's Status, the Progress table, and a row in "What landed". If a change makes part of the plan wrong, fix the plan there and say so in the PR description. A roadmap-only change takes an empty changeset.
+
 ## Repository Structure
 
 **Monorepo using pnpm workspaces:**
 
 - `apps/` — React frontends (g3id, portal, shop, pit, attendance, scouting, edge, orders)
-- `workers/` — Cloudflare Workers backends (g3id, shop, pit, skill-tree, attendance, scouting, edge, orders)
+- `workers/` — Cloudflare Workers: one per app (g3id, portal, shop, pit, skill-tree, attendance, scouting, edge, orders), each serving its app's page and its API at `/api`, plus `gateway`, which routes `*.<domain>` to them
 - `packages/` — Shared libraries (auth, ui, slack)
 - `devices/` — Software that runs on physical hardware (edge-agent: Bun, compiled to an arm64 binary)
 - `infra/edge/` — Hand-applied system config for the shop edge box
@@ -53,6 +67,12 @@ pnpm -r --if-present typecheck  # Ensure no type errors
 - Color system centralized in `packages/ui/src/index.css` using Tailwind v4 `@theme` block
 - Primary color: #A32035 (burgundy), Secondary: neutral grays (#f8f8f8–#1a1a1a)
 - Navbar updates auth state on every route change (useLocation dependency)
+
+**Attendance Worker** (`workers/attendance/`)
+- Attendance members, sessions, manual adjustments, and yearly totals live in its own Cloudflare D1 database, bound as `ATTENDANCE_DB`.
+- G3ID provides session identity and attendance leaderboard eligibility. The API serves the attendance kiosk and the G3ID admin summary/leaderboard.
+- The schema is in `src/db/migrations/`. Apply migrations and import existing attendance records before deploying a worker that reads D1. Production D1 is `g3-attendance-prod`.
+- Run `pnpm --filter @g3/worker-attendance test` for Cloudflare runtime tests against a local migrated D1 database.
 
 ### G3 Edge (shop network box)
 
@@ -92,14 +112,30 @@ Design brief: `docs/edge.md`. On-site Orange Pi 5 (hostname `orangepi5`, login u
 - **Platform version**: CalVer `YEAR.MONTH.N` in the root `package.json`; each release and the app versions in it are listed in `RELEASES.md`.
 - **Branches**: work merges into `main`; `public` is the released (and deployed) branch.
 - **Every PR into main that changes an app adds a changeset** (`pnpm changeset`: pick the app, patch/minor/major, a summary for users; `--empty` when nothing should be released). CI fails a PR without one. Shared packages (`packages/*`) are ignored by Changesets; record their changes against the affected apps.
+- **Agents: write the changeset file yourself** (`pnpm changeset` is interactive). When a commit changes an app, add `.changeset/<short-name>.md` in the same commit:
+  ```md
+  ---
+  "@g3/worker-orders": minor
+  ---
+
+  One line for the app's users: what changed for them.
+  ```
+  List each changed app once, by its worker package (`@g3/worker-<app>`, including `@g3/worker-portal`; the edge agent is `@g3/edge-agent`), with the bump from `.changeset/README.md`: **patch** for fixes and small tweaks, **minor** for new features that break nothing, **major** when users or deployers must act (a migration to run first, a removed page, a changed API). For changes that release nothing (docs, CI, tooling only), use an empty header (`---` then `---`). Say which bump you chose and why when you report the commit, so a person can check it; `pnpm release:preview` shows the resulting versions.
 - **Releasing**: `.github/workflows/release-pr.yml` keeps one `main` → `public` PR open, titled with the next release (`pnpm release:preview`, which runs the release in a throwaway worktree). Merging it (merge commit only) runs `.github/workflows/release.yml` on `public`: applies the changesets (`pnpm release:version`: versions, CHANGELOG.md files, platform CalVer, RELEASES.md), commits "Release <platform>", tags `v<platform>` and each app's version (`pnpm release:tag`), and merges `public` back into `main`. It pushes with the `RELEASE_DEPLOY_KEY` deploy key, which is on both rulesets' bypass lists.
+
+### Hosting: one worker per app, one gateway
+
+- Each app is one worker: in production it serves the built app (`[env.production.assets]` → `apps/<app>/dist`, single-page-app fallback) and its Hono API at `/api` on the app's own address. Only `/api/*` runs worker code (`run_worker_first`); each worker's default export is wrapped in `withApiPrefix()` (`@g3/site-config/worker`), which drops `/api` so routes stay written as `/requests`, like in dev where Vite's proxy drops it. Apps call `"/api"` (same origin) in production and dev; cross-app calls use `apiUrl("<app>")` (`https://<app>.<domain>/api`).
+- **Workers call each other at `/api` too** (`http://g3id/api/auth/me`, `http://edge/api/lookup`): in production, anything outside `/api/*` would get the app's page.
+- `workers/gateway` owns `*.<domain>/*` and forwards each hostname to its app's worker through a service binding; it also answers each app's old `api.<app>.<domain>` address as that app's `/api` (Slack, Onshape's webhook and the edge box may still use them), and passes other hostnames (`www`, the edge tunnel) through. Portal has a tiny worker (`workers/portal`) just to serve its page.
+- Deploy with `pnpm run deploy` (all) or `pnpm --filter @g3/worker-<app> run deploy` (`wrangler deploy --env production`; `[env.production.build]` in its `wrangler.toml` builds the app first, also in Cloudflare's Git builds). No Cloudflare Pages. See `docs/deploy.md`, including the one-time switch-over.
 
 ### Site config (team, domain)
 
-- Everything team-specific lives in `packages/site-config/src/site.ts` (`@g3/site-config`): team number, name and short name ("G3"), the domain, each app's web/API subdomain, public links, the Slack bot's name. **Never hard-code the domain, team number or "G3" branding**: use `appUrl("shop")`, `apiUrl("orders")`, `allAppsUrl`, `wordmark("Shop")` ("G3 SHOP"), `appTitle("Shop")` ("G3 Shop"), `idName` ("G3ID"), `teamLinks`, `teamKey` ("frc1648"), `site.team.*`. Internal names (`@g3/*` packages, `g3_session`/`g3_theme` cookies, `--g3-*` CSS, `G3ID` binding, database names) stay as they are.
+- Everything team-specific lives in `packages/site-config/src/site.ts` (`@g3/site-config`): team number, name and short name ("G3"), the domain, each app's subdomain (and old API subdomain), public links, the Slack bot's name. **Never hard-code the domain, team number or "G3" branding**: use `appUrl("shop")`, `apiUrl("orders")` (`https://orders.<domain>/api`), `allAppsUrl`, `wordmark("Shop")` ("G3 SHOP"), `appTitle("Shop")` ("G3 Shop"), `idName` ("G3ID"), `teamLinks`, `teamKey` ("frc1648"), `site.team.*`. Internal names (`@g3/*` packages, `g3_session`/`g3_theme` cookies, `--g3-*` CSS, `G3ID` binding, database names) stay as they are.
 - CORS for every worker is `cors({ origin: corsOrigin })`: https on the domain and its subdomains, plus localhost. No `*.pages.dev`.
 - Apps: `siteConfig()` from `@g3/site-config/vite` in each `vite.config` fills `%SITE_SHORT_NAME%`, `%SITE_TEAM_NAME%`, `%SITE_TEAM_NUMBER%`, `%SITE_ID_NAME%`, `%SITE_ALL_APPS_URL%`, `%SITE_APP_URL%` in `index.html`, and sets production API URLs (`productionEnv`), so there are no `.env.production` files; `.env.development` still points dev at localhost.
-- Files that can't import it (`wrangler.toml` production URLs, routes, OAuth redirect URIs, `TEAM_NUMBER`; the edge env examples) are written by `pnpm configure` (`scripts/configure.ts`); CI runs `pnpm configure --check`.
+- Files that can't import it (`wrangler.toml` production URLs, the gateway's route, OAuth redirect URIs, `TEAM_NUMBER`; the edge env examples) are written by `pnpm configure` (`scripts/configure.ts`); CI runs `pnpm configure --check`.
 
 ### Shared navbar and light/dark mode
 
@@ -202,7 +238,7 @@ pnpm -r --if-present test    # Run available tests
 - Storage is per test file, shared by the tests in a file, so each test makes its own records (random URLs, generated PINs) instead of assuming an empty database.
 - Other workers are stubbed: `G3ID` is a stub that answers `/auth/me` for the user in a test cookie (never admin/mentor for a `pin` session, like the real one), and other services (e.g. `EDGE`) can be `offlineService`. In tests, `callAs(student, "/path", { method, body })` / `jsonAs(...)` from `@g3/testing/worker` sign requests in as the users in `@g3/testing/users` (`student`, `otherStudent`, `mentor`, `admin`, `kioskAdmin`).
 - G3ID itself is tested for real (`workers/g3id/test`): users and sessions are seeded with its own helpers (`createUser`, `sessionCookie`, `createUserWithPin`, `activateKiosk`).
-- Attendance's records are in Firestore, which tests don't reach; only its auth and kiosk-code checks are covered.
+- Attendance's records are in its own D1 database (`ATTENDANCE_DB`); `workers/attendance/test/attendance-d1.test.ts` covers sign-in/out, hours, auto-closed sessions and admin actions against it.
 
 **Test Slack locally:**
 - Sign-in codes generated and stored in D1
@@ -286,13 +322,12 @@ killall -9 workerd wrangler node
 
 ## Deployment
 
-Workers deployed via Wrangler:
-- `wrangler deploy` in each worker directory
-- D1 database migrations run on deploy (see `wrangler.toml` in worker directories)
-- Frontend apps deployed to Cloudflare Pages (via GitHub Actions)
+See `docs/deploy.md`. In short: `pnpm run deploy` builds each app and deploys its worker (`--env production`), then the gateway. Apply D1 migrations first (`pnpm db:migrate:remote`). No Cloudflare Pages.
 
 ## Key Files to Know
 
+- `docs/roadmap/roadmap.md` — The multi-team platform roadmap: phases, each step's status, confirmed hosting decisions, open questions
+- `docs/legal/` — Draft Terms of Service and Privacy Policy for the hosted platform (not in force)
 - `workers/g3id/src/middleware/auth.ts` — G3ID's own auth middleware (requireAuth, requireAdmin, requireKioskToken)
 - `packages/auth/src/g3id.ts` — Sign-in for every other worker (`@g3/auth`: requireAuth, requireAdmin, requireMentor, requireOAuthSession, `G3AuthVariables`); app-specific checks (Edge's agent key, Orders' catalog editors, Scouting's local bypass) stay in that worker's `middleware/auth.ts`
 - `workers/g3id/src/routes/auth/slack.ts` — Slack OAuth flow endpoints

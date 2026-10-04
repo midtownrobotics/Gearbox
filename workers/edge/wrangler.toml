@@ -40,10 +40,18 @@ database_name = "g3-edge-prod"
 database_id = "0ba12f11-3577-472f-9998-81017319bd51"
 migrations_dir = "src/db/migrations"
 
-[[env.production.routes]]
-pattern = "api.edge.g3robotics.com"
-custom_domain = true
 
 [env.production.vars]
 FRONTEND_URL = "https://edge.g3robotics.com"
 EDGE_AGENT_URL = "https://edge-agent.g3robotics.com"
+
+# The app's page, served by this worker in production; only /api/* runs the worker code, and
+# other paths fall back to index.html for the app's router. Wrangler builds the page before
+# every production deploy or upload (Cloudflare's Git builds too).
+[env.production.build]
+command = "pnpm --filter @g3/edge build"
+
+[env.production.assets]
+directory = "../../apps/edge/dist"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]

@@ -16,7 +16,7 @@ import { join } from "node:path";
 /** Each app's name and the package.json that holds its version (page and worker share it). */
 export const APPS: [name: string, packageJson: string][] = [
   ["G3ID", "workers/g3id/package.json"],
-  ["Gearbox", "apps/portal/package.json"],
+  ["Portal", "workers/portal/package.json"],
   ["Shop", "workers/shop/package.json"],
   ["Pit", "workers/pit/package.json"],
   ["Orders", "workers/orders/package.json"],

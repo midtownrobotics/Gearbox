@@ -2,8 +2,7 @@ import { admin, kioskAdmin, student } from "@g3/testing/users";
 import { call, callAs, jsonAs } from "@g3/testing/worker";
 import { describe, expect, it } from "vitest";
 
-// G3 Attendance. Records live in Google Firestore, which these tests don't reach: they cover
-// sign-in, roles and the kiosk code checks that happen before any Firestore call.
+// Auth and kiosk checks that happen before attendance records are read.
 
 describe("sign-in and roles", () => {
   it("needs a G3ID session", async () => {

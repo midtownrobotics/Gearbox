@@ -8,11 +8,12 @@
   },
   "scripts": {
     "dev": "wrangler dev --port 8788 --inspector-port 9230",
-    "deploy": "wrangler deploy",
+    "deploy": "wrangler deploy --env production",
     "typecheck": "tsc --noEmit",
     "db:migrate:local": "wrangler d1 migrations apply SHOP_DB --local",
     "db:migrate:remote": "wrangler d1 migrations apply SHOP_DB --env production --remote",
-    "test": "vitest run"
+    "test": "vitest run",
+    "build": "wrangler deploy --env production --dry-run"
   },
   "dependencies": {
     "@g3/auth": "workspace:*",

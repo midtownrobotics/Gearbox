@@ -43,7 +43,7 @@ export type G3AuthEnv = {
 
 async function loadUser(c: Context<G3AuthEnv>, identities: boolean) {
   const res = await c.env.G3ID.fetch(
-    new Request(`http://g3id/auth/me${identities ? "" : "?includeIdentities=false"}`, {
+    new Request(`http://g3id/api/auth/me${identities ? "" : "?includeIdentities=false"}`, {
       headers: { cookie: c.req.header("Cookie") ?? "" },
     }),
   );

@@ -7,9 +7,10 @@
   },
   "scripts": {
     "dev": "wrangler dev --port 8791 --inspector-port 9233",
-    "deploy": "wrangler deploy",
+    "deploy": "wrangler deploy --env production",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "build": "wrangler deploy --env production --dry-run"
   },
   "dependencies": {
     "@g3/auth": "workspace:*",

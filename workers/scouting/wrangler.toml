@@ -31,9 +31,6 @@ LOCAL_AUTH_BYPASS = "false"
 # Configure SLACK_BOT_TOKEN as a Wrangler secret using the same token as G3ID.
 # Configure TBA_AUTH_KEY as a Wrangler secret for event schedules.
 
-[[routes]]
-pattern = "api.scouting.g3robotics.com"
-custom_domain = true
 
 # Keep a named production environment for Cloudflare Builds configurations
 # that invoke `wrangler deploy --env production`.
@@ -60,10 +57,18 @@ migrations_dir = "src/db/migrations"
 binding = "FIELD_MAPS"
 bucket_name = "g3-scouting"
 
-[[env.production.routes]]
-pattern = "api.scouting.g3robotics.com"
-custom_domain = true
 
 [env.production.vars]
 FRONTEND_URL = "https://scouting.g3robotics.com"
 LOCAL_AUTH_BYPASS = "false"
+
+# The app's page, served by this worker in production; only /api/* runs the worker code, and
+# other paths fall back to index.html for the app's router. Wrangler builds the page before
+# every production deploy or upload (Cloudflare's Git builds too).
+[env.production.build]
+command = "pnpm --filter @g3/scouting build"
+
+[env.production.assets]
+directory = "../../apps/scouting/dist"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]

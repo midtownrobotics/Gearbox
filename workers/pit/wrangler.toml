@@ -46,3 +46,14 @@ FRONTEND_URL = "https://pit.g3robotics.com"
 TEAM_NUMBER = "1648"
 EVENT_KEY = "2026gacmp"
 # TBA_AUTH_KEY and NEXUS_API_KEY are secrets — set via `wrangler secret put <NAME> --env production`
+
+# The app's page, served by this worker in production; only /api/* runs the worker code, and
+# other paths fall back to index.html for the app's router. Wrangler builds the page before
+# every production deploy or upload (Cloudflare's Git builds too).
+[env.production.build]
+command = "pnpm --filter @g3/pit build"
+
+[env.production.assets]
+directory = "../../apps/pit/dist"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]

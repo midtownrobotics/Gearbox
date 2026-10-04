@@ -7,3 +7,9 @@ it("answers /health", async () => {
   expect(res.status).toBe(200);
   expect(await res.json()).toEqual({ status: "ok", service: "g3id", version: packageJson.version });
 });
+
+it("answers the same at /api/health, its production address", async () => {
+  const res = await g3id("/api/health");
+  expect(res.status).toBe(200);
+  expect(await res.json()).toMatchObject({ status: "ok" });
+});

@@ -17,7 +17,7 @@ import {
 const root = join(import.meta.dirname, "..");
 const check = process.argv.includes("--check");
 
-/** Each worker and the app it serves. */
+/** Each app worker with production URLs to fill, and its app. */
 const WORKERS: Record<string, Exclude<AppName, "portal">> = {
   attendance: "attendance",
   edge: "edge",
@@ -38,16 +38,15 @@ const httpsVar = (key: string, value: (m: RegExpMatchArray) => string): Rule => 
 ];
 
 function wranglerRules(app: Exclude<AppName, "portal">): Rule[] {
-  const apiHost = new URL(apiUrl(app)).host;
   return [
     httpsVar("FRONTEND_URL", () => appUrl(app)),
+    // Orders' Share-A-Cart OAuth callbacks.
     httpsVar("PUBLIC_API_URL", () => apiUrl(app)),
     httpsVar("EDGE_AGENT_URL", () => edgeAgentUrl),
     httpsVar(
       "(GOOGLE|GITHUB|STEAM|ONSHAPE)_REDIRECT_URI",
       (m) => `${apiUrl("id")}/auth/${m[2].toLowerCase()}/callback`,
     ),
-    [/^(pattern = )"[^"]*"/gm, (m) => `${m[1]}"${apiHost}"`],
     [/^(TEAM_NUMBER = )"[^"]*"/gm, (m) => `${m[1]}"${site.team.number}"`],
   ];
 }
@@ -56,6 +55,14 @@ const FILES: [path: string, rules: Rule[]][] = [
   ...Object.entries(WORKERS).map(
     ([dir, app]) => [`workers/${dir}/wrangler.toml`, wranglerRules(app)] as [string, Rule[]],
   ),
+  [
+    // The gateway worker answers every subdomain.
+    "workers/gateway/wrangler.toml",
+    [
+      [/^(pattern = )"[^"]*"/gm, (m) => `${m[1]}"*.${site.domain}/*"`],
+      [/^(zone_name = )"[^"]*"/gm, (m) => `${m[1]}"${site.domain}"`],
+    ],
+  ],
   [
     "workers/edge/.dev.vars.example",
     [[/^(#?LOOKUP_AGENT_URL=)https:\/\/\S*/gm, (m) => `${m[1]}${edgeAgentUrl}`]],
