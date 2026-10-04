@@ -1,0 +1,20 @@
+{
+  "name": "@g3/worker-portal",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "deploy": "pnpm --filter @g3/portal build && wrangler deploy --env production",
+    "build": "pnpm --filter @g3/portal build && wrangler deploy --env production --dry-run",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "catalog:",
+    "@cloudflare/workers-types": "^4.20250516.0",
+    "@g3/testing": "workspace:*",
+    "typescript": "^5.8.0",
+    "vitest": "catalog:",
+    "wrangler": "^4.129.0"
+  }
+}

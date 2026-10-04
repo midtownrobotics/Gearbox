@@ -381,7 +381,7 @@ export const adminPartsRouter = new Hono<AppEnv>()
       const ids = stats.byUser.slice(0, 3).map((u) => u.userId);
       if (ids.length > 0) {
         const res = await c.env.G3ID.fetch(
-          new Request(`http://g3id/auth/users?ids=${encodeURIComponent(ids.join(","))}`, {
+          new Request(`http://g3id/api/auth/users?ids=${encodeURIComponent(ids.join(","))}`, {
             headers: { cookie: c.req.header("Cookie") ?? "" },
           }),
         );

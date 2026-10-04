@@ -1,5 +1,6 @@
 import { hasMentorAccess, requireAuth } from "@g3/auth";
 import { corsOrigin } from "@g3/site-config";
+import { withApiPrefix } from "@g3/site-config/worker";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import packageJson from "../package.json";
@@ -66,4 +67,4 @@ const app = base
 export type OrdersApp = typeof app;
 export type { ImportSummary } from "./lib/sheet-import";
 
-export default { fetch: app.fetch };
+export default { fetch: withApiPrefix(app.fetch) };

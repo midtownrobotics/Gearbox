@@ -1,4 +1,4 @@
-import { apiUrl, appUrl } from "@g3/site-config";
+import { appUrl } from "@g3/site-config";
 import { siteConfig } from "@g3/site-config/vite";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
@@ -8,7 +8,7 @@ export default defineConfig({
   plugins: [
     siteConfig({
       app: "edge",
-      productionEnv: { VITE_API_BASE_URL: apiUrl("edge"), VITE_G3ID_URL: appUrl("id") },
+      productionEnv: { VITE_API_BASE_URL: "/api", VITE_G3ID_URL: appUrl("id") },
     }),
     react(),
     tailwindcss(),

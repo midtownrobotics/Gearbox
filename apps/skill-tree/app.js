@@ -11,7 +11,7 @@ import {
 // API URLs
 const isDev=window.location.hostname==='localhost'||window.location.hostname==='127.0.0.1';
 const G3ID_API=localStorage.getItem('g3id_api')||(isDev?'http://localhost:8787':apiUrl('id'));
-const SKILL_TREE_API=localStorage.getItem('skill_tree_api')||(isDev?'http://localhost:8790':apiUrl('skillTree'));
+const SKILL_TREE_API=localStorage.getItem('skill_tree_api')||(isDev?'http://localhost:8790':'/api');
 
 // ═══════════════════════════════════════════════════════
 // LAYOUT ENGINE

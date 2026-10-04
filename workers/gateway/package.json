@@ -1,0 +1,23 @@
+{
+  "name": "@g3/worker-gateway",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "deploy": "wrangler deploy --env production",
+    "build": "wrangler deploy --env production --dry-run",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@g3/site-config": "workspace:*"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "catalog:",
+    "@cloudflare/workers-types": "^4.20250516.0",
+    "@g3/testing": "workspace:*",
+    "typescript": "^5.8.0",
+    "vitest": "catalog:",
+    "wrangler": "^4.129.0"
+  }
+}

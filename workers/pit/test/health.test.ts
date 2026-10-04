@@ -10,3 +10,9 @@ it("answers /health", async () => {
     service: "pit",
   });
 });
+
+it("answers the same at /api/health, its production address", async () => {
+  const res = await call("/api/health");
+  expect(res.status).toBe(200);
+  expect(await res.json()).toMatchObject({ status: "ok" });
+});

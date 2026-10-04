@@ -1,4 +1,5 @@
 import { corsOrigin } from "@g3/site-config";
+import { withApiPrefix } from "@g3/site-config/worker";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import packageJson from "../package.json";
@@ -51,4 +52,4 @@ const app = base
   .route("/slack", slackRouter);
 
 export type G3IDApp = typeof app;
-export default app;
+export default { fetch: withApiPrefix(app.fetch) };

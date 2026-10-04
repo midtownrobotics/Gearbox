@@ -1,5 +1,6 @@
 import { requireAdmin, requireAuth } from "@g3/auth";
 import { corsOrigin } from "@g3/site-config";
+import { withApiPrefix } from "@g3/site-config/worker";
 import { eq, inArray, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
@@ -797,4 +798,4 @@ const app = base
   });
 
 export type PitApp = typeof app;
-export default app;
+export default { fetch: withApiPrefix(app.fetch) };

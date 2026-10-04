@@ -51,14 +51,14 @@ id = "d36a0313dd774bf78bacd76250ec085a"
 [env.production.vars]
 ENVIRONMENT = "production"
 GOOGLE_CLIENT_ID = "26070176131-lom1rtgi2tmahrd12md7452oieha1vbl.apps.googleusercontent.com"
-GOOGLE_REDIRECT_URI = "https://api.g3id.g3robotics.com/auth/google/callback"
+GOOGLE_REDIRECT_URI = "https://g3id.g3robotics.com/api/auth/google/callback"
 GITHUB_CLIENT_ID = "Iv23lii4BhJtKBycp2yB"
-GITHUB_REDIRECT_URI = "https://api.g3id.g3robotics.com/auth/github/callback"
+GITHUB_REDIRECT_URI = "https://g3id.g3robotics.com/api/auth/github/callback"
 SLACK_TEAM_ID = "T04LF3F0D"
 SLACK_APP_ID = "A08M9C82LEL"
-STEAM_REDIRECT_URI = "https://api.g3id.g3robotics.com/auth/steam/callback"
+STEAM_REDIRECT_URI = "https://g3id.g3robotics.com/api/auth/steam/callback"
 ONSHAPE_CLIENT_ID = "NREWPL5DFDUCQEIYYGYZ643CMR3FTTSUMI2XDWQ="
-ONSHAPE_REDIRECT_URI = "https://api.g3id.g3robotics.com/auth/onshape/callback"
+ONSHAPE_REDIRECT_URI = "https://g3id.g3robotics.com/api/auth/onshape/callback"
 FRONTEND_URL = "https://g3id.g3robotics.com"
 
 [observability]
@@ -75,3 +75,11 @@ invocation_logs = true
 enabled = false
 persist = true
 head_sampling_rate = 1
+
+# The app's page, served by this worker in production; only /api/* runs the worker code (the
+# rest is the built app, with unknown paths falling back to index.html for the app's router).
+# Build it first: `pnpm run deploy` does.
+[env.production.assets]
+directory = "../../apps/g3id/dist"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]

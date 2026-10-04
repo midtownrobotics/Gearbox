@@ -16,7 +16,8 @@
     "changeset": "changeset",
     "release:version": "node scripts/release-version.ts",
     "release:tag": "node scripts/release-tag.ts",
-    "release:preview": "node scripts/release-preview.ts"
+    "release:preview": "node scripts/release-preview.ts",
+    "deploy": "pnpm --filter \"./workers/*\" --filter \"!@g3/worker-gateway\" --if-present run deploy && pnpm --filter @g3/worker-gateway run deploy"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
