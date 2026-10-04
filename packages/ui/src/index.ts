@@ -13,3 +13,4 @@ export {
   ThemeToggle,
 } from "./components/app-nav-bar";
 export { readTheme, setTheme, type Theme, useTheme } from "./theme";
+export { refreshTeamUiSettings, useTeamUiSettings } from "./team-ui";

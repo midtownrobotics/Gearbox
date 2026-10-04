@@ -3,6 +3,7 @@ import { site } from "./site.ts";
 // Everything apps and workers need from site.ts, already put together.
 
 export { site };
+export { defaultTeamUiSettings, type TeamUiColors, type TeamUiSettings } from "./team-ui.ts";
 
 export type AppName = keyof typeof site.apps;
 

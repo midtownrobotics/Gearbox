@@ -6,6 +6,7 @@ import { useEffect, useSyncExternalStore } from "react";
 // across ports, so dev servers share it too. With no cookie, the system setting decides.
 
 export type Theme = "light" | "dark";
+let defaultTheme: Theme | "system" = "system";
 
 const COOKIE = "g3_theme";
 const listeners = new Set<() => void>();
@@ -17,7 +18,13 @@ function systemTheme(): Theme {
 /** The saved theme, or the system's when none is saved. */
 export function readTheme(): Theme {
   const saved = document.cookie.match(/(?:^|;\s*)g3_theme=(light|dark)/)?.[1];
-  return (saved as Theme | undefined) ?? systemTheme();
+  return (saved as Theme | undefined) ?? (defaultTheme === "system" ? systemTheme() : defaultTheme);
+}
+
+/** Team choice applies only when the member has not saved a personal preference. */
+export function setDefaultTheme(theme: Theme | "system") {
+  defaultTheme = theme;
+  applyTheme(readTheme());
 }
 
 function applyTheme(theme: Theme) {
@@ -25,6 +32,7 @@ function applyTheme(theme: Theme) {
   if (root.dataset.theme === theme) return;
   root.dataset.theme = theme;
   root.style.colorScheme = theme;
+  window.dispatchEvent(new Event("g3-theme-changed"));
   // The browser's own bar matches the app's top bar.
   document
     .querySelector('meta[name="theme-color"]')
