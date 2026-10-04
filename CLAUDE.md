@@ -54,6 +54,12 @@ pnpm -r --if-present typecheck  # Ensure no type errors
 - Primary color: #A32035 (burgundy), Secondary: neutral grays (#f8f8f8–#1a1a1a)
 - Navbar updates auth state on every route change (useLocation dependency)
 
+**Attendance Worker** (`workers/attendance/`)
+- Attendance members, sessions, manual adjustments, and yearly totals live in its own Cloudflare D1 database, bound as `ATTENDANCE_DB`.
+- G3ID provides session identity and attendance leaderboard eligibility. The API serves the attendance kiosk and the G3ID admin summary/leaderboard.
+- The schema is in `src/db/migrations/`. Apply migrations and import existing attendance records before deploying a worker that reads D1. Production D1 is `g3-attendance-prod`.
+- Run `pnpm --filter @g3/worker-attendance test` for Cloudflare runtime tests against a local migrated D1 database.
+
 ### G3 Edge (shop network box)
 
 Design brief: `docs/edge.md`. On-site Orange Pi 5 (hostname `orangepi5`, login user `g3`) routes the shop LAN through a 50 GB/month cellular hotspot.

@@ -1,3 +1,3 @@
 import { workerTestConfig } from "@g3/testing/config";
 
-export default workerTestConfig();
+export default workerTestConfig({ d1: "ATTENDANCE_DB" });
