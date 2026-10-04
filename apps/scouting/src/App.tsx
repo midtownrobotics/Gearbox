@@ -33,7 +33,8 @@ import {
   useState,
 } from "react";
 import { Analysis } from "./Analysis";
-import { Sportsbook } from "./Game";
+import { type EngagementSettings, EngagementSettingsPanel } from "./EngagementSettings";
+import { MatchPredictions } from "./Game";
 import { Operations } from "./Operations";
 import { ScoutingAdminPage, ScoutingForms } from "./ScoutingForms";
 import { API_URL, G3ID_URL, api } from "./api";
@@ -49,7 +50,7 @@ import { type ParsedTrajectory, parseTrajectoryFile, trajectoryToPng } from "./t
 
 type Page =
   | "forms"
-  | "sportsbook"
+  | "predictions"
   | "admin"
   | "analysis"
   | "service"
@@ -64,6 +65,7 @@ type User = {
   isAdmin: boolean;
   isG3IdAdmin: boolean;
   isHelper: boolean;
+  engagement: EngagementSettings;
 };
 type Tier = { id: string; name: string; color: string; items: string[] };
 type TierList = {
@@ -1961,6 +1963,12 @@ export function App() {
       .then(setUser)
       .catch(() => setUser(null))
       .finally(() => setLoading(false));
+    const refresh = () =>
+      api<User>("/me")
+        .then(setUser)
+        .catch(() => setUser(null));
+    window.addEventListener("focus", refresh);
+    return () => window.removeEventListener("focus", refresh);
   }, []);
 
   useEffect(() => {
@@ -2005,20 +2013,28 @@ export function App() {
 
   const adminNav = [
     { id: "forms" as const, label: "Scouting Forms" },
-    { id: "sportsbook" as const, label: "Sportsbook" },
+    {
+      id: "predictions" as const,
+      label: user.engagement.predictionsEnabled ? "Match Predictions" : "Scouting Points",
+    },
     { id: "admin" as const, label: "Admin" },
     { id: "analysis" as const, label: "Analysis" },
     { id: "service" as const, label: "Service Tickets" },
     { id: "other" as const, label: "Other Tools" },
   ];
-  const nav = user.isAdmin
+  const navItems = user.isAdmin
     ? adminNav
     : [
         { id: "forms" as const, label: "Scouting Forms" },
-        { id: "sportsbook" as const, label: "Sportsbook" },
+        {
+          id: "predictions" as const,
+          label: user.engagement.predictionsEnabled ? "Match Predictions" : "Scouting Points",
+        },
         ...(user.isHelper ? [{ id: "service" as const, label: "Service Tickets" }] : []),
       ];
 
+  const nav = navItems.filter((item) => item.id !== "predictions" || user.engagement.enabled);
+  const visiblePage = page === "predictions" && !user.engagement.enabled ? "forms" : page;
   return (
     <div className="app-shell">
       <AppNavBar
@@ -2043,19 +2059,27 @@ export function App() {
           key: id,
           label,
           onSelect: () => setPage(id),
-          active: page === id || (id === "other" && ["autos", "tiers", "maps"].includes(page)),
+          active:
+            visiblePage === id ||
+            (id === "other" && ["autos", "tiers", "maps"].includes(visiblePage)),
         }))}
       />
       <main>
         <AnnouncementBanner />
-        {page === "forms" && (
+        {visiblePage === "forms" && (
           <ScoutingForms
             isAdmin={user.isAdmin}
             canManageServiceCrew={user.isAdmin || user.isHelper}
           />
         )}
-        {page === "sportsbook" && <Sportsbook />}
-        {page === "admin" && user.isAdmin && (
+        {visiblePage === "predictions" && <MatchPredictions />}
+        {visiblePage === "admin" && user.isG3IdAdmin && (
+          <EngagementSettingsPanel
+            settings={user.engagement}
+            onSaved={(engagement) => setUser({ ...user, engagement })}
+          />
+        )}
+        {visiblePage === "admin" && user.isAdmin && (
           <ScoutingAdminPage
             isG3IdAdmin={user.isG3IdAdmin}
             onOpenSubmission={(submissionId) => {
@@ -2064,12 +2088,14 @@ export function App() {
             }}
           />
         )}
-        {page === "other" && <OtherTools go={setPage} />}
-        {page === "tiers" && <TierLists />}
-        {page === "maps" && <FieldMaps user={user} />}
-        {page === "autos" && <AutoLibrary />}
-        {page === "analysis" && user.isAdmin && <Analysis initialReportId={analysisReportId} />}
-        {page === "service" && (user.isAdmin || user.isHelper) && <Operations />}
+        {visiblePage === "other" && <OtherTools go={setPage} />}
+        {visiblePage === "tiers" && <TierLists />}
+        {visiblePage === "maps" && <FieldMaps user={user} />}
+        {visiblePage === "autos" && <AutoLibrary />}
+        {visiblePage === "analysis" && user.isAdmin && (
+          <Analysis initialReportId={analysisReportId} />
+        )}
+        {visiblePage === "service" && (user.isAdmin || user.isHelper) && <Operations />}
       </main>
     </div>
   );
