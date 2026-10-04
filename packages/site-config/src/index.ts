@@ -31,8 +31,9 @@ export const appTitle = (app: string) => `${site.team.shortName} ${app}`;
 /** The sign-in service's name, as people see it ("G3ID"). */
 export const idName = `${site.team.shortName}ID`;
 
-/** The team's pages on FRC stats sites. */
+/** The team's pages on FIRST's event site and FRC stats sites. */
 export const teamLinks = {
+  frcEvents: `https://frc-events.firstinspires.org/team/${site.team.number}`,
   blueAlliance: `https://www.thebluealliance.com/team/${site.team.number}`,
   statbotics: `https://www.statbotics.io/team/${site.team.number}`,
   match13: `https://www.match13.com/team/${site.team.number}`,
