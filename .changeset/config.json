@@ -21,8 +21,6 @@
     ["@g3/portal", "@g3/worker-portal"]
   ],
   "ignore": [
-    "@g3/admin",
-    "@g3/api",
     "@g3/auth",
     "@g3/site-config",
     "@g3/slack",
