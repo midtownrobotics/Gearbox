@@ -23,7 +23,7 @@ Versioning starts here.
 | App | Version |
 | --- | --- |
 | G3ID | 1.0.0 |
-| Gearbox | 1.0.0 |
+| Portal | 1.0.0 |
 | Shop | 1.2.3 |
 | Pit | 1.0.0 |
 | Orders | 1.0.0 |
