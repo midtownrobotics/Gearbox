@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "deploy": "pnpm --filter @g3/portal build && wrangler deploy --env production",
-    "build": "pnpm --filter @g3/portal build && wrangler deploy --env production --dry-run",
+    "deploy": "wrangler deploy --env production",
+    "build": "wrangler deploy --env production --dry-run",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
