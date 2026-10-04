@@ -1,7 +1,7 @@
 import { appTitle, appUrl, idName, site, teamLinks } from "@g3/site-config";
 import { useEffect, useState } from "react";
 import type { IconType } from "react-icons";
-import { FaChartLine, FaGithub, FaInstagram, FaSlack, FaTrophy } from "react-icons/fa";
+import { FaGithub, FaInstagram, FaSlack } from "react-icons/fa";
 import edgeIcon from "../../assets/app-icons/edge.svg";
 import idIcon from "../../assets/app-icons/id.svg";
 import ordersIcon from "../../assets/app-icons/orders.svg";
@@ -11,6 +11,7 @@ import shopIcon from "../../assets/app-icons/shop.svg";
 import skillsIcon from "../../assets/app-icons/skills.svg";
 import g3Logo from "../../assets/g3.png";
 import { g3id } from "../../lib/api";
+import { BlueAllianceIcon, FirstIcon, Match13Icon, StatboticsIcon } from "./link-icons";
 
 // The team's apps show their own app icon. Other links are drawn to match it: a black tile with a white
 // symbol, and a burgundy ↗ for sites outside G3. (`bg-black` isn't touched by dark mode.)
@@ -19,11 +20,6 @@ type App = {
   href: string;
   external?: boolean;
 } & ({ tile: string } | { icon?: IconType; logoSrc?: string });
-
-/** Match13's mark: its number, in the tiles' white. */
-const Thirteen: IconType = () => (
-  <span className="block font-display text-[38px] leading-none tracking-wide">13</span>
-);
 
 const APPS: App[] = [
   {
@@ -73,24 +69,6 @@ const APPS: App[] = [
     external: true,
   },
   {
-    label: "The Blue Alliance",
-    href: teamLinks.blueAlliance,
-    icon: FaTrophy,
-    external: true,
-  },
-  {
-    label: "Statbotics",
-    href: teamLinks.statbotics,
-    icon: FaChartLine,
-    external: true,
-  },
-  {
-    label: "Match13",
-    href: teamLinks.match13,
-    icon: Thirteen,
-    external: true,
-  },
-  {
     label: "GitHub",
     href: site.links.github,
     icon: FaGithub,
@@ -100,6 +78,30 @@ const APPS: App[] = [
     label: "Instagram",
     href: site.links.instagram,
     icon: FaInstagram,
+    external: true,
+  },
+  {
+    label: "FRC-Events",
+    href: teamLinks.frcEvents,
+    icon: FirstIcon,
+    external: true,
+  },
+  {
+    label: "The Blue Alliance",
+    href: teamLinks.blueAlliance,
+    icon: BlueAllianceIcon,
+    external: true,
+  },
+  {
+    label: "Statbotics",
+    href: teamLinks.statbotics,
+    icon: StatboticsIcon,
+    external: true,
+  },
+  {
+    label: "match13",
+    href: teamLinks.match13,
+    icon: Match13Icon,
     external: true,
   },
 ];
