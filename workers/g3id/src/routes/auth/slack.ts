@@ -6,6 +6,7 @@ import { coreSlackLinkCodes } from "../../db/schema";
 import { sessionCookieOptions } from "../../lib/cookie";
 import { newId } from "../../lib/id";
 import { sanitizeRedirect } from "../../lib/redirect";
+import { currentTeamId, teamOfUser } from "../../lib/team";
 import { requireAuth } from "../../middleware/auth";
 import type { AppEnv } from "../../types";
 
@@ -26,20 +27,20 @@ export const slackAuthRouter = new Hono<AppEnv>()
     const code = generateCode();
     const token = generateToken();
     const now = Math.floor(Date.now() / 1000);
+    const db = createDb(c.env.DB);
 
-    await createDb(c.env.DB)
-      .insert(coreSlackLinkCodes)
-      .values({
-        id: newId(),
-        userId: null,
-        code,
-        type: "signin",
-        pollingToken: token,
-        redirectUrl: redirect || null,
-        expiresAt: now + 900,
-        used: 0,
-        createdAt: now,
-      });
+    await db.insert(coreSlackLinkCodes).values({
+      id: newId(),
+      teamId: currentTeamId(),
+      userId: null,
+      code,
+      type: "signin",
+      pollingToken: token,
+      redirectUrl: redirect || null,
+      expiresAt: now + 900,
+      used: 0,
+      createdAt: now,
+    });
 
     const redirectParam = redirect ? `&redirect=${encodeURIComponent(redirect)}` : "";
     return c.redirect(
@@ -48,23 +49,23 @@ export const slackAuthRouter = new Hono<AppEnv>()
   })
   // Link initiation — user must already be signed in, returns JSON code + token
   .get("/slack/link", requireAuth, async (c) => {
-    const userId = c.get("userId");
+    const userId = c.get("userId") as string;
     const code = generateCode();
     const token = generateToken();
     const now = Math.floor(Date.now() / 1000);
+    const db = createDb(c.env.DB);
 
-    await createDb(c.env.DB)
-      .insert(coreSlackLinkCodes)
-      .values({
-        id: newId(),
-        userId,
-        code,
-        type: "link",
-        pollingToken: token,
-        expiresAt: now + 900,
-        used: 0,
-        createdAt: now,
-      });
+    await db.insert(coreSlackLinkCodes).values({
+      id: newId(),
+      teamId: await teamOfUser(db, userId),
+      userId,
+      code,
+      type: "link",
+      pollingToken: token,
+      expiresAt: now + 900,
+      used: 0,
+      createdAt: now,
+    });
 
     return c.json({ code, token });
   })

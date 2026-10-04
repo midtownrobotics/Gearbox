@@ -11,6 +11,7 @@ import {
   kioskActivationCodes,
   kioskDevices,
 } from "../db/schema";
+import { teamOfUser } from "../lib/team";
 import { requireAdmin } from "../middleware/auth";
 import type { AppEnv } from "../types";
 
@@ -297,6 +298,7 @@ export const adminRouter = new Hono<AppEnv>()
     const db = createDb(c.env.DB);
 
     await db.insert(kioskActivationCodes).values({
+      teamId: await teamOfUser(db, userId),
       code,
       createdBy: userId,
       deviceName,

@@ -9,10 +9,24 @@ import {
   unique,
 } from "drizzle-orm/sqlite-core";
 
+// Teams (migration 0013). Every account belongs to exactly one team; there is no memberships
+// table, and roles stay on the user (isAdmin, isMentor, status).
+export const teams = sqliteTable("teams", {
+  /** The team's key, "frc" + its number (`teamKey` in @g3/site-config). */
+  id: text("id").primaryKey(),
+  teamNumber: integer("team_number").notNull().unique(),
+  name: text("name").notNull(),
+  createdAt: integer("created_at").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+});
+
 export const coreUsers = sqliteTable(
   "core_users",
   {
     id: text("id").primaryKey(),
+    teamId: text("team_id")
+      .notNull()
+      .references((): AnySQLiteColumn => teams.id),
     email: text("email").notNull().unique(),
     displayName: text("display_name").notNull(),
     status: text("status").notNull(),
@@ -29,6 +43,7 @@ export const coreUsers = sqliteTable(
       "core_users_status_check",
       sql`${table.status} IN ('pending', 'active', 'rejected', 'merged')`,
     ),
+    index("core_users_team_id_idx").on(table.teamId),
   ],
 );
 
@@ -73,6 +88,9 @@ export const coreSlackLinkCodes = sqliteTable(
   "core_slack_link_codes",
   {
     id: text("id").primaryKey(),
+    teamId: text("team_id")
+      .notNull()
+      .references(() => teams.id),
     userId: text("user_id").references(() => coreUsers.id), // null for signin codes
     code: text("code").notNull().unique(),
     type: text("type").notNull(),
@@ -94,19 +112,30 @@ export const coreSlackLinkCodes = sqliteTable(
   ],
 );
 
-export const coreUserPins = sqliteTable("core_user_pins", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  userId: text("user_id")
-    .notNull()
-    .unique()
-    .references(() => coreUsers.id),
-  pin: text("pin").notNull().unique(),
-  createdAt: integer("created_at").notNull(),
-  updatedAt: integer("updated_at").notNull(),
-});
+/** Kiosk PINs, unique within a team. */
+export const coreUserPins = sqliteTable(
+  "core_user_pins",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    teamId: text("team_id")
+      .notNull()
+      .references(() => teams.id),
+    userId: text("user_id")
+      .notNull()
+      .unique()
+      .references(() => coreUsers.id),
+    pin: text("pin").notNull(),
+    createdAt: integer("created_at").notNull(),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (table) => [unique().on(table.teamId, table.pin)],
+);
 
 export const kioskDevices = sqliteTable("kiosk_devices", {
   id: integer("id").primaryKey({ autoIncrement: true }),
+  teamId: text("team_id")
+    .notNull()
+    .references(() => teams.id),
   name: text("name").notNull(),
   token: text("token").notNull().unique(),
   createdBy: text("created_by")
@@ -119,6 +148,9 @@ export const kioskDevices = sqliteTable("kiosk_devices", {
 
 export const kioskActivationCodes = sqliteTable("kiosk_activation_codes", {
   id: integer("id").primaryKey({ autoIncrement: true }),
+  teamId: text("team_id")
+    .notNull()
+    .references(() => teams.id),
   code: text("code").notNull().unique(),
   createdBy: text("created_by")
     .notNull()

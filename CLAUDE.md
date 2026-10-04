@@ -155,11 +155,12 @@ All colors defined in `packages/ui/src/index.css` `@theme` block:
 ### Database Schema
 
 Key tables in D1:
-- `core_users` — user accounts with status (pending/active/rejected)
+- `teams` — each team, keyed by `frc<number>` (`teamKey`). Until the gateway reads the team from the hostname, every request is for the team in site.ts (`currentTeamId()` in `workers/g3id/src/lib/team.ts`)
+- `core_users` — user accounts with status (pending/active/rejected); **each belongs to exactly one team** (`team_id`, no memberships table; roles stay as `is_admin`/`is_mentor`)
 - `core_user_identities` — linked auth providers per user
 - `core_sessions` — active sessions (deprecated in favor of KV)
-- `core_user_pins` — 3-digit PINs for kiosk login
-- `kiosk_devices` — registered shop devices with tokens
+- `core_user_pins` — 3-digit PINs for kiosk login, unique within a team; a kiosk signs in only its own team's members
+- `kiosk_devices` — registered shop devices with tokens, in the activating admin's team
 - `kiosk_activation_codes` — 6-digit codes for device activation (30-min expiry)
 - `core_slack_link_codes` — Slack auth codes with polling status
 

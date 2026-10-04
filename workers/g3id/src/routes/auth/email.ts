@@ -7,6 +7,7 @@ import { sessionCookieOptions } from "../../lib/cookie";
 import { newId } from "../../lib/id";
 import { hashPassword, verifyPassword } from "../../lib/password";
 import { createSession } from "../../lib/session";
+import { currentTeamId, teamOfUser } from "../../lib/team";
 import { requireAuth } from "../../middleware/auth";
 import type { AppEnv } from "../../types";
 
@@ -55,6 +56,7 @@ export const emailAuthRouter = new Hono<AppEnv>()
           await db.batch([
             db.insert(coreUsers).values({
               id: userId,
+              teamId: currentTeamId(),
               email: "admin@localhost",
               displayName: "Admin",
               status: "active",
@@ -201,6 +203,7 @@ export const emailAuthRouter = new Hono<AppEnv>()
     await db.batch([
       db.insert(coreUsers).values({
         id: newUserId,
+        teamId: await teamOfUser(db, userId),
         email,
         displayName,
         status: "active",

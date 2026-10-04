@@ -24,5 +24,7 @@ export type AppEnv = {
   Variables: {
     userId?: string;
     kioskDeviceId?: number;
+    /** The team of the kiosk the request came from (requireKioskToken). */
+    kioskTeamId?: string;
   };
 };

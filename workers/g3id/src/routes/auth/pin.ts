@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { setCookie } from "hono/cookie";
 import { createDb } from "../../db";
@@ -21,11 +21,12 @@ export const pinAuthRouter = new Hono<AppEnv>().post("/pin", requireKioskToken, 
     return c.json({ error: "PIN is required." }, 400);
   }
 
+  // PINs are unique within a team, and a kiosk signs in only its own team's members.
   const db = createDb(c.env.DB);
   const userPin = await db
     .select({ userId: coreUserPins.userId })
     .from(coreUserPins)
-    .where(eq(coreUserPins.pin, pin))
+    .where(and(eq(coreUserPins.teamId, c.get("kioskTeamId") as string), eq(coreUserPins.pin, pin)))
     .get();
 
   if (!userPin) {

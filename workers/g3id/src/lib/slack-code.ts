@@ -189,6 +189,7 @@ export async function handleSlackCode(opts: {
   await db.batch([
     db.insert(coreUsers).values({
       id: userId,
+      teamId: record.teamId,
       email,
       displayName: slackUser.displayName,
       status: "pending",

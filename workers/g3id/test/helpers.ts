@@ -6,6 +6,7 @@ import { newId } from "../src/lib/id";
 import { hashPassword } from "../src/lib/password";
 import { generatePinForUser, generateUniquePin } from "../src/lib/pin";
 import { createSession } from "../src/lib/session";
+import { currentTeamId } from "../src/lib/team";
 import type { AppEnv } from "../src/types";
 
 // G3ID's tests run the real worker against its own D1 and KV. These seed users straight into the
@@ -40,6 +41,8 @@ type NewUser = {
   status?: "active" | "pending" | "rejected";
   isAdmin?: boolean;
   isMentor?: boolean;
+  /** The user's team; G3's (the team in site.ts) by default. */
+  teamId?: string;
 };
 
 export async function createUser(user: NewUser = {}): Promise<string> {
@@ -48,6 +51,7 @@ export async function createUser(user: NewUser = {}): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
   await db.insert(coreUsers).values({
     id,
+    teamId: user.teamId ?? currentTeamId(),
     email: user.email ?? `${id}@test.g3`,
     displayName: user.displayName ?? "Test User",
     status: user.status ?? "active",
@@ -75,8 +79,21 @@ export async function createUserWithPin(user: NewUser = {}): Promise<{ id: strin
   return { id, pin: await generatePinForUser(id, testEnv) };
 }
 
-/** A PIN nobody has. */
-export const unusedPin = () => generateUniquePin(testEnv);
+/** A PIN nobody in the team has (G3's team by default). */
+export const unusedPin = async (teamId?: string) =>
+  generateUniquePin(teamId ?? currentTeamId(), testEnv);
+
+/** A second team, for tests that check teams are kept apart. */
+export async function createTeam(): Promise<string> {
+  const now = Math.floor(Date.now() / 1000);
+  const number = 10000 + (crypto.getRandomValues(new Uint32Array(1))[0] % 1_000_000);
+  await testEnv.DB.prepare(
+    "INSERT INTO teams (id, team_number, name, created_at, updated_at) VALUES (?, ?, 'Other Team', ?, ?)",
+  )
+    .bind(`frc${number}`, number, now, now)
+    .run();
+  return `frc${number}`;
+}
 
 /** A signed-in browser session for the user, as its Cookie header. */
 export async function sessionCookie(userId: string): Promise<string> {
