@@ -1,4 +1,11 @@
-import { appUrl, idName, site, teamLinks } from "@g3/site-config";
+import {
+  type TeamUiLinkKey,
+  appUrl,
+  defaultTeamUiSettings,
+  idName,
+  site,
+  teamLinks,
+} from "@g3/site-config";
 import { useTeamUiSettings } from "@g3/ui";
 import { useEffect, useState } from "react";
 import type { IconType } from "react-icons";
@@ -20,6 +27,7 @@ type App = {
   label: string;
   href: string;
   external?: boolean;
+  linkKey?: TeamUiLinkKey;
 } & ({ tile: string } | { icon?: IconType; logoSrc?: string });
 
 const APPS: App[] = [
@@ -60,47 +68,55 @@ const APPS: App[] = [
   },
   {
     label: "Public Site",
+    linkKey: "publicSite",
     href: site.publicSiteUrl,
     logoSrc: g3Logo,
   },
   {
     label: "Slack",
+    linkKey: "slack",
     href: site.links.slack,
     icon: FaSlack,
     external: true,
   },
   {
     label: "GitHub",
+    linkKey: "github",
     href: site.links.github,
     icon: FaGithub,
     external: true,
   },
   {
     label: "Instagram",
+    linkKey: "instagram",
     href: site.links.instagram,
     icon: FaInstagram,
     external: true,
   },
   {
     label: "FRC-Events",
+    linkKey: "frcEvents",
     href: teamLinks.frcEvents,
     icon: FirstIcon,
     external: true,
   },
   {
     label: "The Blue Alliance",
+    linkKey: "blueAlliance",
     href: teamLinks.blueAlliance,
     icon: BlueAllianceIcon,
     external: true,
   },
   {
     label: "Statbotics",
+    linkKey: "statbotics",
     href: teamLinks.statbotics,
     icon: StatboticsIcon,
     external: true,
   },
   {
     label: "match13",
+    linkKey: "match13",
     href: teamLinks.match13,
     icon: Match13Icon,
     external: true,
@@ -114,15 +130,12 @@ export function HomePage() {
   const [authState, setAuthState] = useState<AuthState>("checking");
   const apps = APPS.map((app) => {
     if (app.label === idName) return { ...app, label: `${teamUi.shortName}ID` };
-    if (app.label === "Public Site")
-      return { ...app, href: teamUi.links.publicSite, logoSrc: teamUi.logoUrl || g3Logo };
-    const links: Record<string, string> = {
-      Slack: teamUi.links.slack,
-      GitHub: teamUi.links.github,
-      Instagram: teamUi.links.instagram,
+    if (!app.linkKey) return app;
+    return {
+      ...app,
+      href: teamUi.links[app.linkKey] ?? defaultTeamUiSettings.links[app.linkKey],
+      ...(app.linkKey === "publicSite" ? { logoSrc: teamUi.logoUrl || g3Logo } : {}),
     };
-    const link = links[app.label];
-    return link === undefined ? app : { ...app, href: link };
   });
 
   useEffect(() => {
@@ -168,7 +181,7 @@ export function HomePage() {
             >
               Sign In
             </a>
-            {teamUi.links.publicSite && (
+            {teamUi.links.publicSite && !teamUi.hiddenLinks?.includes("publicSite") && (
               <a
                 href={teamUi.links.publicSite}
                 target="_blank"
@@ -196,7 +209,9 @@ export function HomePage() {
 
         <div className="grid grid-cols-4 sm:grid-cols-5 gap-x-4 gap-y-8">
           {apps
-            .filter((app) => app.href)
+            .filter(
+              (app) => app.href && (!app.linkKey || !teamUi.hiddenLinks?.includes(app.linkKey)),
+            )
             .map((app) => {
               return (
                 <a

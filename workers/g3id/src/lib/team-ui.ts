@@ -56,6 +56,13 @@ export function isTeamUiSettings(value: unknown): value is TeamUiSettings {
     hex.test(value.primaryColor) &&
     isColors(value.light) &&
     isColors(value.dark) &&
+    Array.isArray(value.hiddenLinks) &&
+    new Set(value.hiddenLinks).size === value.hiddenLinks.length &&
+    value.hiddenLinks.every(
+      (key) =>
+        typeof key === "string" &&
+        Object.prototype.hasOwnProperty.call(defaultTeamUiSettings.links, key),
+    ) &&
     Object.values(value.links).every(isLink)
   );
 }
@@ -64,7 +71,15 @@ export function readTeamUiSettings(json: string | undefined): TeamUiSettings {
   if (!json) return defaultTeamUiSettings;
   try {
     const value: unknown = JSON.parse(json);
-    return isTeamUiSettings(value) ? value : defaultTeamUiSettings;
+    if (!isRecord(value) || !isRecord(value.links)) return defaultTeamUiSettings;
+    // Add new defaults to older stored records without losing their branding or empty links.
+    // Writes still require the full current schema, and unknown keys remain invalid.
+    const settings = {
+      ...value,
+      links: { ...defaultTeamUiSettings.links, ...value.links },
+      hiddenLinks: "hiddenLinks" in value ? value.hiddenLinks : [],
+    };
+    return isTeamUiSettings(settings) ? settings : defaultTeamUiSettings;
   } catch {
     return defaultTeamUiSettings;
   }

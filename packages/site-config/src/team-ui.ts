@@ -1,4 +1,18 @@
 import { site } from "./site.ts";
+import { teamLinks } from "./team-links.ts";
+
+export const teamUiLinkLabels = {
+  publicSite: "Public site",
+  slack: "Slack",
+  github: "GitHub",
+  instagram: "Instagram",
+  frcEvents: "FRC-Events",
+  blueAlliance: "The Blue Alliance",
+  statbotics: "Statbotics",
+  match13: "match13",
+} as const;
+
+export type TeamUiLinkKey = keyof typeof teamUiLinkLabels;
 
 /** Editable presentation settings. Deployment identity (team number, hosts, OAuth) stays in site.ts. */
 export type TeamUiSettings = {
@@ -10,12 +24,8 @@ export type TeamUiSettings = {
   primaryColor: string;
   light: TeamUiColors;
   dark: TeamUiColors;
-  links: {
-    publicSite: string;
-    slack: string;
-    github: string;
-    instagram: string;
-  };
+  links: Record<TeamUiLinkKey, string>;
+  hiddenLinks: TeamUiLinkKey[];
 };
 
 export type TeamUiColors = {
@@ -58,5 +68,7 @@ export const defaultTeamUiSettings: TeamUiSettings = {
     slack: site.links.slack,
     github: site.links.github,
     instagram: site.links.instagram,
+    ...teamLinks,
   },
+  hiddenLinks: [],
 };

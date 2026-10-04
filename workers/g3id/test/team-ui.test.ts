@@ -1,4 +1,4 @@
-import { defaultTeamUiSettings } from "@g3/site-config";
+import { defaultTeamUiSettings, teamKey, teamLinks } from "@g3/site-config";
 import { describe, expect, it } from "vitest";
 import { createDb } from "../src/db";
 import { teamUiSettings } from "../src/db/schema";
@@ -42,6 +42,9 @@ describe("team UI settings", () => {
       { ...base, primaryColor: "red" },
       { ...base, links: { ...base.links, github: "javascript:alert(1)" } },
       { ...base, unexpected: true },
+      { ...base, links: { ...base.links, frcEvents: "javascript:alert(1)" } },
+      { ...base, hiddenLinks: ["unknown"] },
+      { ...base, hiddenLinks: ["github", "github"] },
     ]) {
       expect(
         (await g3id("/admin/team/ui", { method: "PUT", cookie: admin, body: invalid })).status,
@@ -60,5 +63,66 @@ describe("team UI settings", () => {
         updatedAt: Math.floor(Date.now() / 1000),
       });
     expect(await (await g3id("/team/ui")).json()).toEqual(before);
+  });
+
+  it("saves new portal URLs, preserves hidden URLs, accepts removed links, and restores all defaults", async () => {
+    const admin = await sessionCookie(await createUser({ isAdmin: true }));
+    const settings = {
+      ...defaultTeamUiSettings,
+      primaryColor: "#112233",
+      hiddenLinks: ["blueAlliance", "publicSite"],
+      links: {
+        ...defaultTeamUiSettings.links,
+        frcEvents: "https://frc-events.firstinspires.org/team/254",
+        blueAlliance: "https://www.thebluealliance.com/team/254",
+        statbotics: "https://www.statbotics.io/team/254",
+        match13: "",
+      },
+    };
+    expect(
+      (await g3id("/admin/team/ui", { method: "PUT", cookie: admin, body: settings })).status,
+    ).toBe(200);
+    expect(await (await g3id("/team/ui")).json()).toEqual(settings);
+    expect(
+      (await g3id("/admin/team/ui", { method: "PUT", cookie: admin, body: defaultTeamUiSettings }))
+        .status,
+    ).toBe(200);
+    expect(await (await g3id("/team/ui")).json()).toEqual(defaultTeamUiSettings);
+  });
+
+  it("adds new links to older stored settings without resetting branding or restoring removed links", async () => {
+    const { hiddenLinks: _hidden, links, ...appearance } = defaultTeamUiSettings;
+    const legacy = {
+      ...appearance,
+      name: "Existing team",
+      primaryColor: "#123456",
+      light: { ...appearance.light, text: "#abcdef" },
+      links: {
+        publicSite: links.publicSite,
+        slack: links.slack,
+        github: "",
+        instagram: links.instagram,
+      },
+    };
+    await createDb(testEnv.DB)
+      .insert(teamUiSettings)
+      .values({
+        teamId: teamKey,
+        settingsJson: JSON.stringify(legacy),
+        updatedAt: Math.floor(Date.now() / 1000),
+      })
+      .onConflictDoUpdate({
+        target: teamUiSettings.teamId,
+        set: { settingsJson: JSON.stringify(legacy) },
+      });
+    expect(await (await g3id("/team/ui")).json()).toEqual({
+      ...legacy,
+      links: { ...legacy.links, ...teamLinks },
+      hiddenLinks: [],
+    });
+    const admin = await sessionCookie(await createUser({ isAdmin: true }));
+    expect(await (await g3id("/admin/team/ui", { cookie: admin })).json()).toMatchObject({
+      settings: { ...legacy, links: { ...legacy.links, ...teamLinks }, hiddenLinks: [] },
+    });
   });
 });

@@ -1,4 +1,10 @@
-import { type TeamUiColors, type TeamUiSettings, defaultTeamUiSettings } from "@g3/site-config";
+import {
+  type TeamUiColors,
+  type TeamUiLinkKey,
+  type TeamUiSettings,
+  defaultTeamUiSettings,
+  teamUiLinkLabels,
+} from "@g3/site-config";
 import { refreshTeamUiSettings } from "@g3/ui";
 import { useEffect, useState } from "react";
 import { api } from "../../lib/api";
@@ -8,8 +14,8 @@ const colorLabels: Record<keyof TeamUiColors, string> = {
   surface: "Cards and navigation",
   inset: "Inset backgrounds",
   line: "Borders",
-  text: "Main text",
-  muted: "Muted text",
+  text: "Shared UI text",
+  muted: "Shared UI muted text",
   accent: "Accent",
 };
 
@@ -44,6 +50,12 @@ export function AdminTeamUiPage() {
 
   function updateColor(mode: "light" | "dark", key: keyof TeamUiColors, value: string) {
     update(mode, { ...settings[mode], [key]: value });
+  }
+
+  function reset() {
+    setSettings(structuredClone(defaultTeamUiSettings));
+    setError("");
+    setMessage("Defaults restored in this form. Save team appearance to apply them.");
   }
 
   async function save(event: React.FormEvent) {
@@ -156,23 +168,48 @@ export function AdminTeamUiPage() {
 
         <section className="rounded-lg border border-line bg-surface p-5">
           <h2 className="mb-4 text-xl font-semibold">Links</h2>
+          <p className="mb-4 text-sm text-secondary-600">
+            Edit the links shown on the portal. Hide a link to keep its URL for later, or remove it
+            to clear its URL. Empty links are omitted. Hiding the public site also hides its link on
+            the portal sign-in screen.
+          </p>
           <div className="grid gap-4 sm:grid-cols-2">
-            {(["publicSite", "slack", "github", "instagram"] as const).map((key) => (
-              <TextField
-                key={key}
-                label={
-                  {
-                    publicSite: "Public site",
-                    slack: "Slack",
-                    github: "GitHub",
-                    instagram: "Instagram",
-                  }[key]
-                }
-                value={settings.links[key]}
-                onChange={(value) => update("links", { ...settings.links, [key]: value })}
-                type="url"
-                placeholder="https://…"
-              />
+            {(Object.keys(teamUiLinkLabels) as TeamUiLinkKey[]).map((key) => (
+              <div key={key} className="space-y-2">
+                <TextField
+                  label={teamUiLinkLabels[key]}
+                  value={settings.links[key]}
+                  onChange={(value) => update("links", { ...settings.links, [key]: value })}
+                  type="url"
+                  placeholder="https://…"
+                />
+                <div className="flex items-center justify-between gap-3 text-sm">
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={settings.hiddenLinks.includes(key)}
+                      onChange={(event) =>
+                        update(
+                          "hiddenLinks",
+                          event.target.checked
+                            ? [...settings.hiddenLinks, key]
+                            : settings.hiddenLinks.filter((link) => link !== key),
+                        )
+                      }
+                    />
+                    Hide {teamUiLinkLabels[key]}
+                  </label>
+                  <button
+                    type="button"
+                    disabled={!settings.links[key] || saving}
+                    className="text-primary-700 underline disabled:opacity-50"
+                    onClick={() => update("links", { ...settings.links, [key]: "" })}
+                    aria-label={`Remove ${teamUiLinkLabels[key]} link`}
+                  >
+                    Remove link
+                  </button>
+                </div>
+              </div>
             ))}
           </div>
         </section>
@@ -182,6 +219,11 @@ export function AdminTeamUiPage() {
             <h2 className="mb-4 text-xl font-semibold">
               {mode === "light" ? "Light" : "Dark"} palette
             </h2>
+            <p className="mb-4 text-sm text-secondary-600">
+              Text and muted text colors affect shared UI elements such as the navbar and components
+              that use the shared colors. Most text inside individual apps uses its own colors and
+              will not change.
+            </p>
             <div className="grid gap-4 sm:grid-cols-2">
               {(Object.keys(colorLabels) as (keyof TeamUiColors)[]).map((key) => (
                 <ColorField
@@ -195,13 +237,23 @@ export function AdminTeamUiPage() {
           </section>
         ))}
 
-        <button
-          type="submit"
-          disabled={saving}
-          className="rounded-md bg-primary-600 px-5 py-3 font-semibold text-white disabled:opacity-50"
-        >
-          {saving ? "Saving…" : "Save team appearance"}
-        </button>
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="submit"
+            disabled={saving}
+            className="rounded-md bg-primary-600 px-5 py-3 font-semibold text-white disabled:opacity-50"
+          >
+            {saving ? "Saving…" : "Save team appearance"}
+          </button>
+          <button
+            type="button"
+            disabled={saving}
+            onClick={reset}
+            className="rounded-md border border-line bg-surface px-5 py-3 font-semibold text-secondary-900 disabled:opacity-50"
+          >
+            Reset to defaults
+          </button>
+        </div>
       </form>
     </main>
   );
