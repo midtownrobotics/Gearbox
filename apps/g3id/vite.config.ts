@@ -9,7 +9,7 @@ export default defineConfig({
     siteConfig({
       app: "id",
       productionEnv: {
-        VITE_API_BASE_URL: apiUrl("id"),
+        VITE_API_BASE_URL: "/api",
         VITE_ATTENDANCE_API_URL: apiUrl("attendance"),
       },
     }),

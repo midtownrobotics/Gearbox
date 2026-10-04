@@ -23,7 +23,7 @@ pnpm -r --if-present typecheck  # Ensure no type errors
 **Monorepo using pnpm workspaces:**
 
 - `apps/` — React frontends (g3id, portal, shop, pit, attendance, scouting, edge, orders)
-- `workers/` — Cloudflare Workers backends (g3id, shop, pit, skill-tree, attendance, scouting, edge, orders)
+- `workers/` — Cloudflare Workers: one per app (g3id, portal, shop, pit, skill-tree, attendance, scouting, edge, orders), each serving its app's page and its API at `/api`, plus `gateway`, which routes `*.<domain>` to them
 - `packages/` — Shared libraries (auth, ui, slack)
 - `devices/` — Software that runs on physical hardware (edge-agent: Bun, compiled to an arm64 binary)
 - `infra/edge/` — Hand-applied system config for the shop edge box
@@ -106,15 +106,22 @@ Design brief: `docs/edge.md`. On-site Orange Pi 5 (hostname `orangepi5`, login u
 
   One line for the app's users: what changed for them.
   ```
-  List each changed app once, by its worker package (`@g3/worker-<app>`; Portal is `@g3/portal`, the edge agent `@g3/edge-agent`), with the bump from `.changeset/README.md`: **patch** for fixes and small tweaks, **minor** for new features that break nothing, **major** when users or deployers must act (a migration to run first, a removed page, a changed API). For changes that release nothing (docs, CI, tooling only), use an empty header (`---` then `---`). Say which bump you chose and why when you report the commit, so a person can check it; `pnpm release:preview` shows the resulting versions.
+  List each changed app once, by its worker package (`@g3/worker-<app>`, including `@g3/worker-portal`; the edge agent is `@g3/edge-agent`), with the bump from `.changeset/README.md`: **patch** for fixes and small tweaks, **minor** for new features that break nothing, **major** when users or deployers must act (a migration to run first, a removed page, a changed API). For changes that release nothing (docs, CI, tooling only), use an empty header (`---` then `---`). Say which bump you chose and why when you report the commit, so a person can check it; `pnpm release:preview` shows the resulting versions.
 - **Releasing**: `.github/workflows/release-pr.yml` keeps one `main` → `public` PR open, titled with the next release (`pnpm release:preview`, which runs the release in a throwaway worktree). Merging it (merge commit only) runs `.github/workflows/release.yml` on `public`: applies the changesets (`pnpm release:version`: versions, CHANGELOG.md files, platform CalVer, RELEASES.md), commits "Release <platform>", tags `v<platform>` and each app's version (`pnpm release:tag`), and merges `public` back into `main`. It pushes with the `RELEASE_DEPLOY_KEY` deploy key, which is on both rulesets' bypass lists.
+
+### Hosting: one worker per app, one gateway
+
+- Each app is one worker: in production it serves the built app (`[env.production.assets]` → `apps/<app>/dist`, single-page-app fallback) and its Hono API at `/api` on the app's own address. Only `/api/*` runs worker code (`run_worker_first`); each worker's default export is wrapped in `withApiPrefix()` (`@g3/site-config/worker`), which drops `/api` so routes stay written as `/requests`, like in dev where Vite's proxy drops it. Apps call `"/api"` (same origin) in production and dev; cross-app calls use `apiUrl("<app>")` (`https://<app>.<domain>/api`).
+- **Workers call each other at `/api` too** (`http://g3id/api/auth/me`, `http://edge/api/lookup`): in production, anything outside `/api/*` would get the app's page.
+- `workers/gateway` owns `*.<domain>/*` and forwards each hostname to its app's worker through a service binding; it also answers each app's old `api.<app>.<domain>` address as that app's `/api` (Slack, Onshape's webhook and the edge box may still use them), and passes other hostnames (`www`, the edge tunnel) through. Portal has a tiny worker (`workers/portal`) just to serve its page.
+- Deploy with `pnpm run deploy` (all) or `pnpm --filter @g3/worker-<app> run deploy` (builds the app, then `wrangler deploy --env production`). No Cloudflare Pages. See `docs/deploy.md`, including the one-time switch-over.
 
 ### Site config (team, domain)
 
-- Everything team-specific lives in `packages/site-config/src/site.ts` (`@g3/site-config`): team number, name and short name ("G3"), the domain, each app's web/API subdomain, public links, the Slack bot's name. **Never hard-code the domain, team number or "G3" branding**: use `appUrl("shop")`, `apiUrl("orders")`, `allAppsUrl`, `wordmark("Shop")` ("G3 SHOP"), `appTitle("Shop")` ("G3 Shop"), `idName` ("G3ID"), `teamLinks`, `teamKey` ("frc1648"), `site.team.*`. Internal names (`@g3/*` packages, `g3_session`/`g3_theme` cookies, `--g3-*` CSS, `G3ID` binding, database names) stay as they are.
+- Everything team-specific lives in `packages/site-config/src/site.ts` (`@g3/site-config`): team number, name and short name ("G3"), the domain, each app's subdomain (and old API subdomain), public links, the Slack bot's name. **Never hard-code the domain, team number or "G3" branding**: use `appUrl("shop")`, `apiUrl("orders")` (`https://orders.<domain>/api`), `allAppsUrl`, `wordmark("Shop")` ("G3 SHOP"), `appTitle("Shop")` ("G3 Shop"), `idName` ("G3ID"), `teamLinks`, `teamKey` ("frc1648"), `site.team.*`. Internal names (`@g3/*` packages, `g3_session`/`g3_theme` cookies, `--g3-*` CSS, `G3ID` binding, database names) stay as they are.
 - CORS for every worker is `cors({ origin: corsOrigin })`: https on the domain and its subdomains, plus localhost. No `*.pages.dev`.
 - Apps: `siteConfig()` from `@g3/site-config/vite` in each `vite.config` fills `%SITE_SHORT_NAME%`, `%SITE_TEAM_NAME%`, `%SITE_TEAM_NUMBER%`, `%SITE_ID_NAME%`, `%SITE_ALL_APPS_URL%`, `%SITE_APP_URL%` in `index.html`, and sets production API URLs (`productionEnv`), so there are no `.env.production` files; `.env.development` still points dev at localhost.
-- Files that can't import it (`wrangler.toml` production URLs, routes, OAuth redirect URIs, `TEAM_NUMBER`; the edge env examples) are written by `pnpm configure` (`scripts/configure.ts`); CI runs `pnpm configure --check`.
+- Files that can't import it (`wrangler.toml` production URLs, the gateway's route, OAuth redirect URIs, `TEAM_NUMBER`; the edge env examples) are written by `pnpm configure` (`scripts/configure.ts`); CI runs `pnpm configure --check`.
 
 ### Shared navbar and light/dark mode
 
@@ -301,10 +308,7 @@ killall -9 workerd wrangler node
 
 ## Deployment
 
-Workers deployed via Wrangler:
-- `wrangler deploy` in each worker directory
-- D1 database migrations run on deploy (see `wrangler.toml` in worker directories)
-- Frontend apps deployed to Cloudflare Pages (via GitHub Actions)
+See `docs/deploy.md`. In short: `pnpm run deploy` builds each app and deploys its worker (`--env production`), then the gateway. Apply D1 migrations first (`pnpm db:migrate:remote`). No Cloudflare Pages.
 
 ## Key Files to Know
 

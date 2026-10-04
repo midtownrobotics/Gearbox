@@ -40,10 +40,15 @@ database_name = "g3-edge-prod"
 database_id = "0ba12f11-3577-472f-9998-81017319bd51"
 migrations_dir = "src/db/migrations"
 
-[[env.production.routes]]
-pattern = "api.edge.g3robotics.com"
-custom_domain = true
 
 [env.production.vars]
 FRONTEND_URL = "https://edge.g3robotics.com"
 EDGE_AGENT_URL = "https://edge-agent.g3robotics.com"
+
+# The app's page, served by this worker in production; only /api/* runs the worker code (the
+# rest is the built app, with unknown paths falling back to index.html for the app's router).
+# Build it first: `pnpm run deploy` does.
+[env.production.assets]
+directory = "../../apps/edge/dist"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]

@@ -1,0 +1,52 @@
+# Production URLs, route patterns and TEAM_NUMBER here are written by `pnpm configure` from
+# packages/site-config/src/site.ts. Change them there, not here.
+#
+# The one worker on every subdomain: routes each request to its app's worker by hostname
+# (src/index.ts). Deploy it after the app workers it binds to.
+name = "gateway"
+main = "src/index.ts"
+compatibility_date = "2026-05-17"
+
+[env.production]
+name = "gateway-production"
+
+# Every subdomain. Needs a proxied wildcard DNS record (* → AAAA 100::) for names without their own.
+[[env.production.routes]]
+pattern = "*.g3robotics.com/*"
+zone_name = "g3robotics.com"
+
+[[env.production.services]]
+binding = "G3ID"
+service = "g3id-production"
+
+[[env.production.services]]
+binding = "PORTAL"
+service = "portal-production"
+
+[[env.production.services]]
+binding = "SHOP"
+service = "shop-production"
+
+[[env.production.services]]
+binding = "PIT"
+service = "pit-production"
+
+[[env.production.services]]
+binding = "ORDERS"
+service = "orders-production"
+
+[[env.production.services]]
+binding = "EDGE"
+service = "edge-production"
+
+[[env.production.services]]
+binding = "SCOUTING"
+service = "scouting-production"
+
+[[env.production.services]]
+binding = "SKILL_TREE"
+service = "skill-tree-production"
+
+[[env.production.services]]
+binding = "ATTENDANCE"
+service = "attendance-production"

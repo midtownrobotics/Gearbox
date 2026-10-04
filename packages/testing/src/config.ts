@@ -20,6 +20,8 @@ export type WorkerTestOptions = {
   vars?: Record<string, string>;
   /** Other service bindings to stub, by binding name. G3ID is always the G3ID stub. */
   services?: Record<string, ServiceStub>;
+  /** Answers the worker's own outbound fetch() calls (to the internet), instead of the network. */
+  outbound?: ServiceStub;
 };
 
 const json = (body: unknown, status = 200) =>
@@ -34,6 +36,8 @@ const json = (body: unknown, status = 200) =>
  */
 export const g3idStub: ServiceStub = (request) => {
   const url = new URL(request.url);
+  // Workers call G3ID at /api (http://g3id/api/auth/me), like its public address.
+  url.pathname = url.pathname.replace(/^\/api(?=\/)/, "");
   const user = userFromCookie(request.headers.get("Cookie") ?? "");
   if (url.pathname === "/auth/me") {
     if (!user) return json({ error: "Unauthorized." }, 401);
@@ -92,6 +96,7 @@ export function workerTestConfig(options: WorkerTestOptions = {}) {
               TEST_MIGRATIONS: migrations,
             },
             serviceBindings: { G3ID: g3idStub, ...options.services },
+            ...(options.outbound ? { outboundService: options.outbound } : {}),
           },
         }),
       ],

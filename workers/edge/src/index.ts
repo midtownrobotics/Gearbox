@@ -1,5 +1,6 @@
 import { requireAuth } from "@g3/auth";
 import { corsOrigin } from "@g3/site-config";
+import { withApiPrefix } from "@g3/site-config/worker";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import packageJson from "../package.json";
@@ -51,7 +52,7 @@ const app = base
 export type EdgeApp = typeof app;
 
 export default {
-  fetch: app.fetch,
+  fetch: withApiPrefix(app.fetch),
   async scheduled(_controller: ScheduledController, env: AppEnv["Bindings"]) {
     await networkScheduled(env);
   },

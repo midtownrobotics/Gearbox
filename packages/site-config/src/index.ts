@@ -11,9 +11,9 @@ export function appUrl(app: AppName): string {
   return `https://${site.apps[app].web}.${site.domain}`;
 }
 
-/** An app's API (its worker), e.g. https://api.shop.g3robotics.com. */
-export function apiUrl(app: Exclude<AppName, "portal">): string {
-  return `https://${site.apps[app].api}.${site.domain}`;
+/** An app's API (its worker, at /api on the app's own address), e.g. https://shop.g3robotics.com/api. */
+export function apiUrl(app: AppName): string {
+  return `${appUrl(app)}/api`;
 }
 
 /** The app list every app links back to. */

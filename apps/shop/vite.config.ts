@@ -1,4 +1,4 @@
-import { apiUrl, appTitle, appUrl, site } from "@g3/site-config";
+import { appTitle, appUrl, site } from "@g3/site-config";
 import { siteConfig } from "@g3/site-config/vite";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
@@ -9,7 +9,7 @@ export default defineConfig({
   plugins: [
     siteConfig({
       app: "shop",
-      productionEnv: { VITE_API_BASE_URL: apiUrl("shop"), VITE_G3ID_URL: appUrl("id") },
+      productionEnv: { VITE_API_BASE_URL: "/api", VITE_G3ID_URL: appUrl("id") },
     }),
 
     react(),
@@ -54,9 +54,8 @@ export default defineConfig({
         runtimeCaching: [
           {
             // Dev: same-origin /api/* via Vite proxy
-            // Prod: the API (apiUrl("shop"))
-            urlPattern: ({ url }) =>
-              url.pathname.startsWith("/api/") || url.hostname === new URL(apiUrl("shop")).hostname,
+            // Prod: the same, the API is at /api on the app's own address
+            urlPattern: ({ url }) => url.pathname.startsWith("/api/"),
             handler: "NetworkFirst",
             options: {
               cacheName: "api-cache",

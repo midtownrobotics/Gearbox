@@ -16,7 +16,7 @@ async function sendToPrinter(
   try {
     const query = new URLSearchParams({ title, sides: "one-sided", color: "monochrome" });
     const res = await c.env.EDGE.fetch(
-      new Request(`http://edge/print/jobs?${query}`, {
+      new Request(`http://edge/api/print/jobs?${query}`, {
         method: "POST",
         headers: { cookie: c.req.header("Cookie") ?? "", "content-type": contentType },
         body,

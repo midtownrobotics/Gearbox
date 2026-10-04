@@ -43,7 +43,7 @@ async function relay<T>(c: Ctx, path: string, init?: Parameters<typeof agentFetc
 async function userNames(c: Ctx, ids: string[]) {
   if (ids.length === 0) return new Map<string, string>();
   const res = await c.env.G3ID.fetch(
-    new Request(`http://g3id/auth/users?ids=${encodeURIComponent(ids.join(","))}`, {
+    new Request(`http://g3id/api/auth/users?ids=${encodeURIComponent(ids.join(","))}`, {
       headers: { cookie: c.req.header("Cookie") ?? "" },
     }),
   );

@@ -16,8 +16,9 @@ export const site = {
   domain: "g3robotics.com",
 
   /**
-   * Each app's subdomains: `web` for its page, `api` for its worker. Change these only if your DNS
-   * uses different names.
+   * Each app's subdomain (`web`): the app and its API (at /api) are served there by the gateway
+   * worker. `api` is the app's older, separate API hostname, which the gateway still answers so
+   * services set up with it (sign-in callbacks, Slack, webhooks) keep working; null for none.
    */
   apps: {
     id: { web: "g3id", api: "api.g3id" },

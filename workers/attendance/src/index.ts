@@ -1,5 +1,6 @@
 import { requireAuth } from "@g3/auth";
 import { corsOrigin } from "@g3/site-config";
+import { withApiPrefix } from "@g3/site-config/worker";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import packageJson from "../package.json";
@@ -350,7 +351,7 @@ const app = base
   .get("/leaderboard", requireAuth, async (c) => {
     await autoSignOut(c.env);
     const eligibilityResponse = await c.env.G3ID.fetch(
-      new Request("http://g3id/users/attendance-eligible", {
+      new Request("http://g3id/api/users/attendance-eligible", {
         headers: { cookie: c.req.header("Cookie") ?? "" },
       }),
     );
@@ -421,7 +422,7 @@ async function autoSignOut(env: AppEnv["Bindings"]) {
 export type AttendanceApp = typeof app;
 
 export default {
-  fetch: app.fetch,
+  fetch: withApiPrefix(app.fetch),
   scheduled: (_event: ScheduledController, env: AppEnv["Bindings"], ctx: ExecutionContext) => {
     ctx.waitUntil(autoSignOut(env));
   },

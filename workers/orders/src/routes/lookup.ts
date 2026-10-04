@@ -57,7 +57,7 @@ export const lookupRouter = new Hono<AppEnv>().get("/", requireAuth, urlValidato
     if (value) client[key as keyof ClientHeaders] = value;
   }
   const res = await c.env.EDGE.fetch(
-    new Request("http://edge/lookup", {
+    new Request("http://edge/api/lookup", {
       method: "POST",
       headers: { cookie: c.req.header("Cookie") ?? "", "Content-Type": "application/json" },
       body: JSON.stringify({ url, client }),
