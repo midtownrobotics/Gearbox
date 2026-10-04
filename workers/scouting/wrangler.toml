@@ -62,9 +62,12 @@ bucket_name = "g3-scouting"
 FRONTEND_URL = "https://scouting.g3robotics.com"
 LOCAL_AUTH_BYPASS = "false"
 
-# The app's page, served by this worker in production; only /api/* runs the worker code (the
-# rest is the built app, with unknown paths falling back to index.html for the app's router).
-# Build it first: `pnpm run deploy` does.
+# The app's page, served by this worker in production; only /api/* runs the worker code, and
+# other paths fall back to index.html for the app's router. Wrangler builds the page before
+# every production deploy or upload (Cloudflare's Git builds too).
+[env.production.build]
+command = "pnpm --filter @g3/scouting build"
+
 [env.production.assets]
 directory = "../../apps/scouting/dist"
 not_found_handling = "single-page-application"

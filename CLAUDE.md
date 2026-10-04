@@ -128,7 +128,7 @@ Design brief: `docs/edge.md`. On-site Orange Pi 5 (hostname `orangepi5`, login u
 - Each app is one worker: in production it serves the built app (`[env.production.assets]` → `apps/<app>/dist`, single-page-app fallback) and its Hono API at `/api` on the app's own address. Only `/api/*` runs worker code (`run_worker_first`); each worker's default export is wrapped in `withApiPrefix()` (`@g3/site-config/worker`), which drops `/api` so routes stay written as `/requests`, like in dev where Vite's proxy drops it. Apps call `"/api"` (same origin) in production and dev; cross-app calls use `apiUrl("<app>")` (`https://<app>.<domain>/api`).
 - **Workers call each other at `/api` too** (`http://g3id/api/auth/me`, `http://edge/api/lookup`): in production, anything outside `/api/*` would get the app's page.
 - `workers/gateway` owns `*.<domain>/*` and forwards each hostname to its app's worker through a service binding; it also answers each app's old `api.<app>.<domain>` address as that app's `/api` (Slack, Onshape's webhook and the edge box may still use them), and passes other hostnames (`www`, the edge tunnel) through. Portal has a tiny worker (`workers/portal`) just to serve its page.
-- Deploy with `pnpm run deploy` (all) or `pnpm --filter @g3/worker-<app> run deploy` (builds the app, then `wrangler deploy --env production`). No Cloudflare Pages. See `docs/deploy.md`, including the one-time switch-over.
+- Deploy with `pnpm run deploy` (all) or `pnpm --filter @g3/worker-<app> run deploy` (`wrangler deploy --env production`; `[env.production.build]` in its `wrangler.toml` builds the app first, also in Cloudflare's Git builds). No Cloudflare Pages. See `docs/deploy.md`, including the one-time switch-over.
 
 ### Site config (team, domain)
 

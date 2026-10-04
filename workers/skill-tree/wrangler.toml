@@ -43,9 +43,12 @@ migrations_dir = "src/db/migrations"
 [env.production.vars]
 FRONTEND_URL = "https://skilltree.g3robotics.com"
 
-# The app's page, served by this worker in production; only /api/* runs the worker code (the
-# rest is the built app, with unknown paths falling back to index.html for the app's router).
-# Build it first: `pnpm run deploy` does.
+# The app's page, served by this worker in production; only /api/* runs the worker code, and
+# other paths fall back to index.html for the app's router. Wrangler builds the page before
+# every production deploy or upload (Cloudflare's Git builds too).
+[env.production.build]
+command = "pnpm --filter @g3/skill-tree build"
+
 [env.production.assets]
 directory = "../../apps/skill-tree/dist"
 not_found_handling = "single-page-application"
