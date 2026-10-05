@@ -8,10 +8,6 @@ compatibility_date = "2026-05-17"
 binding = "G3ID"
 service = "g3id"
 
-[[kv_namespaces]]
-binding = "SESSIONS"
-id = "c27ba19a75fb4eb6b93f9d2d47de6c0f"
-
 [[d1_databases]]
 binding = "SKILL_DB"
 database_name = "g3-skill-tree-local"
@@ -27,10 +23,6 @@ name = "skill-tree-production"
 [[env.production.services]]
 binding = "G3ID"
 service = "g3id-production"
-
-[[env.production.kv_namespaces]]
-binding = "SESSIONS"
-id = "db4457ce43c9468eb9ec5a049afa65b1"
 
 # NOTE: create the prod DB with `wrangler d1 create g3-skill-tree-prod`
 # and paste its database_id below before deploying.
