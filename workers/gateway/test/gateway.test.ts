@@ -1,6 +1,7 @@
 import { exports } from "cloudflare:workers";
 import { site } from "@g3/site-config";
 import { describe, expect, it } from "vitest";
+import { toHttps } from "../src/index";
 
 const gateway = (url: string, init?: RequestInit) => exports.default.fetch(new Request(url, init));
 type Echo = {
@@ -170,8 +171,34 @@ describe("requests from other pages", () => {
     expect((await from("https://evil.example")).status).toBe(403);
   });
 
+  it("says why: another team's page, or a page that isn't ours", async () => {
+    expect(await (await from(`https://orders.${site.domain}`)).json()).toEqual({
+      error: "Requests from another team's pages aren't allowed.",
+    });
+    expect(await (await from(`http://${site.platformDomain}`)).json()).toEqual({
+      error: "Requests from this page aren't allowed.",
+    });
+  });
+
   it("doesn't check pages, only /api", async () => {
     expect((await from("https://evil.example", `${team("254-orders")}/`, "GET")).status).toBe(200);
+  });
+});
+
+describe("https", () => {
+  // The test runner hands the worker every request as https, so toHttps is tested on its own; in
+  // production the worker sees the scheme the visitor used.
+  it("sends http to https, keeping the path and query", () => {
+    for (const url of [
+      `http://${site.platformDomain}/signup?id=1`,
+      `http://${site.apps.orders.web}.${site.domain}/api/requests`,
+      `http://254-orders.${site.platformDomain}/lists`,
+    ]) {
+      const res = toHttps(new URL(url));
+      expect(res?.status).toBe(308);
+      expect(res?.headers.get("Location")).toBe(url.replace("http://", "https://"));
+    }
+    expect(toHttps(new URL(`https://${site.platformDomain}/signup`))).toBeNull();
   });
 });
 

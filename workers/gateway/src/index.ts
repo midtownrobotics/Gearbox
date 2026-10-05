@@ -173,6 +173,17 @@ function withoutSessionCookie(cookie: string): string {
     .join("; ");
 }
 
+/**
+ * Every app is https only. A page opened over http would send an http Origin, which no app's API
+ * accepts, so an http request goes to https first (308 keeps the method and body). Null for https.
+ */
+export function toHttps(url: URL): Response | null {
+  if (url.protocol !== "http:") return null;
+  const secure = new URL(url);
+  secure.protocol = "https:";
+  return Response.redirect(secure.toString(), 308);
+}
+
 const json = (status: number, error: string) => Response.json({ error }, { status });
 
 export default {
@@ -189,6 +200,9 @@ export default {
       }
     }
     if (target === "unknown app") return json(404, "No such app.");
+
+    const insecure = toHttps(url);
+    if (insecure) return insecure;
 
     const { team } = target;
     if (team !== null && team !== teamKey) {
@@ -207,7 +221,12 @@ export default {
     if (isApi) {
       const origin = request.headers.get("Origin");
       if (origin && !originAllowed(origin, team)) {
-        return json(403, "Requests from another team's pages aren't allowed.");
+        return json(
+          403,
+          isAllowedOrigin(origin)
+            ? "Requests from another team's pages aren't allowed."
+            : "Requests from this page aren't allowed.",
+        );
       }
 
       const cookie = request.headers.get("Cookie") ?? "";
