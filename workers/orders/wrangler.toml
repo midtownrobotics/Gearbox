@@ -28,6 +28,8 @@ PUBLIC_API_URL = "http://localhost:5184/api"
 
 [env.production]
 name = "orders-production"
+# No workers.dev address: the gateway is the only way in, so its identity headers can be trusted.
+workers_dev = false
 
 [[env.production.services]]
 binding = "G3ID"

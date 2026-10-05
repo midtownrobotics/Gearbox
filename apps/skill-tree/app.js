@@ -1,5 +1,5 @@
 /* FRC Skill Trees — application logic */
-import { apiUrl, appUrl } from '@g3/site-config';
+import { apiPath, appUrl } from '@g3/site-config';
 import { TREES } from './data/trees.js';
 import {
   auth, db,
@@ -10,7 +10,7 @@ import {
 
 // API URLs
 const isDev=window.location.hostname==='localhost'||window.location.hostname==='127.0.0.1';
-const G3ID_API=localStorage.getItem('g3id_api')||(isDev?'http://localhost:8787':apiUrl('id'));
+const G3ID_API=localStorage.getItem('g3id_api')||apiPath('id');
 const SKILL_TREE_API=localStorage.getItem('skill_tree_api')||(isDev?'http://localhost:8790':'/api');
 
 // ═══════════════════════════════════════════════════════

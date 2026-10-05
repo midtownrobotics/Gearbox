@@ -1,0 +1,33 @@
+{
+  "name": "@g3/worker-platform",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "dev": "wrangler dev --port 8795 --inspector-port 9237",
+    "build": "wrangler deploy --env production --dry-run",
+    "deploy": "wrangler deploy --env production",
+    "typecheck": "tsc --noEmit",
+    "db:migrate:local": "wrangler d1 migrations apply PLATFORM_DB --local",
+    "db:migrate:remote": "wrangler d1 migrations apply PLATFORM_DB --env production --remote",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@g3/auth": "workspace:*",
+    "@g3/site-config": "workspace:*",
+    "@g3/slack": "workspace:*",
+    "drizzle-orm": "^0.44.0",
+    "hono": "catalog:"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "catalog:",
+    "@cloudflare/workers-types": "^4.20250516.0",
+    "@g3/testing": "workspace:*",
+    "typescript": "^5.8.0",
+    "vitest": "catalog:",
+    "wrangler": "^4.129.0"
+  }
+}

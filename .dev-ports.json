@@ -44,6 +44,11 @@
       "port": 5184,
       "name": "Orders",
       "url": "http://localhost:5184"
+    },
+    "platform": {
+      "port": 5185,
+      "name": "Platform (sign-up)",
+      "url": "http://localhost:5185"
     }
   },
   "workers": {
@@ -94,6 +99,12 @@
       "inspectorPort": 9236,
       "name": "Orders Worker",
       "url": "http://localhost:8794"
+    },
+    "platform": {
+      "port": 8795,
+      "inspectorPort": 9237,
+      "name": "Platform Worker",
+      "url": "http://localhost:8795"
     }
   }
 }

@@ -2,6 +2,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import { Hono } from "hono";
 import { createDb } from "../db";
 import { coreUserIdentities, coreUserPins, coreUsers } from "../db/schema";
+import { teamOfUser } from "../lib/team";
 import { requireAdmin, requireAuth } from "../middleware/auth";
 import type { AppEnv } from "../types";
 
@@ -70,10 +71,12 @@ export const usersRouter = new Hono<AppEnv>()
     const pin = c.req.param("pin");
     const db = createDb(c.env.DB);
 
+    // PINs are unique only within a team: look in the caller's.
+    const teamId = await teamOfUser(db, c.get("userId") as string);
     const userPin = await db
       .select({ userId: coreUserPins.userId })
       .from(coreUserPins)
-      .where(eq(coreUserPins.pin, pin))
+      .where(and(eq(coreUserPins.teamId, teamId), eq(coreUserPins.pin, pin)))
       .get();
 
     if (!userPin) {

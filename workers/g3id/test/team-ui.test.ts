@@ -2,8 +2,7 @@ import { defaultTeamUiSettings, teamKey, teamLinks } from "@g3/site-config";
 import { describe, expect, it } from "vitest";
 import { createDb } from "../src/db";
 import { teamUiSettings } from "../src/db/schema";
-import { testEnv } from "./helpers";
-import { createUser, g3id, sessionCookie } from "./helpers";
+import { createTeam, createUser, g3id, sessionCookie, testEnv } from "./helpers";
 
 describe("team UI settings", () => {
   it("serves current team defaults publicly", async () => {
@@ -63,6 +62,24 @@ describe("team UI settings", () => {
         updatedAt: Math.floor(Date.now() / 1000),
       });
     expect(await (await g3id("/team/ui")).json()).toEqual(before);
+  });
+
+  it("keeps each team's appearance to itself", async () => {
+    const otherTeam = await createTeam();
+    const theirAdmin = await sessionCookie(await createUser({ teamId: otherTeam, isAdmin: true }));
+    const ours = await (await g3id("/team/ui")).json();
+    const theirs = { ...defaultTeamUiSettings, name: "Their team", primaryColor: "#654321" };
+    expect(
+      (await g3id("/admin/team/ui", { method: "PUT", cookie: theirAdmin, body: theirs })).status,
+    ).toBe(200);
+    // Their pages (the gateway's X-Team-Id) get theirs; ours are unchanged.
+    expect(await (await g3id("/team/ui", { headers: { "X-Team-Id": otherTeam } })).json()).toEqual(
+      theirs,
+    );
+    expect(await (await g3id("/team/ui")).json()).toEqual(ours);
+    expect(await (await g3id("/admin/team/ui", { cookie: theirAdmin })).json()).toMatchObject({
+      settings: theirs,
+    });
   });
 
   it("saves new portal URLs, preserves hidden URLs, accepts removed links, and restores all defaults", async () => {

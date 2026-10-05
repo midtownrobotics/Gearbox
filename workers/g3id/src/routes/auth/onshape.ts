@@ -4,6 +4,7 @@ import { Hono } from "hono";
 import { getCookie } from "hono/cookie";
 import { createDb } from "../../db";
 import { coreUserIdentities } from "../../db/schema";
+import { providerRedirectUri, teamFrontend, teamOfUser } from "../../lib/team";
 import { requireAuth } from "../../middleware/auth";
 import type { AppEnv } from "../../types";
 
@@ -44,9 +45,10 @@ router.get("/onshape", requireAuth, async (c) => {
     expirationTtl: 600, // 10 minutes
   });
 
+  const team = await teamOfUser(createDb(c.env.DB), userId as string);
   const params = new URLSearchParams({
     client_id: c.env.ONSHAPE_CLIENT_ID,
-    redirect_uri: c.env.ONSHAPE_REDIRECT_URI,
+    redirect_uri: providerRedirectUri(c.env, "onshape", team),
     response_type: "code",
     state,
     scope: "OAuth2Read",
@@ -83,7 +85,11 @@ router.get("/onshape/callback", async (c) => {
       code,
       client_id: c.env.ONSHAPE_CLIENT_ID,
       client_secret: c.env.ONSHAPE_CLIENT_SECRET,
-      redirect_uri: c.env.ONSHAPE_REDIRECT_URI,
+      redirect_uri: providerRedirectUri(
+        c.env,
+        "onshape",
+        await teamOfUser(createDb(c.env.DB), userId),
+      ),
       grant_type: "authorization_code",
     }).toString(),
   });
@@ -178,7 +184,9 @@ router.get("/onshape/callback", async (c) => {
       .run();
   }
 
-  return c.redirect(`${c.env.FRONTEND_URL}/?linked=onshape`);
+  // Back to the user's own team's G3ID (the callback itself is on the platform's id.<domain>).
+  const team = await teamOfUser(createDb(c.env.DB), userId);
+  return c.redirect(`${teamFrontend(c.env, team)}/?linked=onshape`);
 });
 
 router.delete("/onshape", requireAuth, async (c) => {

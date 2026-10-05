@@ -1,4 +1,3 @@
-import { apiUrl } from "@g3/site-config";
 import { siteConfig } from "@g3/site-config/vite";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
@@ -8,10 +7,7 @@ export default defineConfig({
   plugins: [
     siteConfig({
       app: "id",
-      productionEnv: {
-        VITE_API_BASE_URL: "/api",
-        VITE_ATTENDANCE_API_URL: apiUrl("attendance"),
-      },
+      productionEnv: { VITE_API_BASE_URL: "/api" },
     }),
     react(),
     tailwindcss(),
