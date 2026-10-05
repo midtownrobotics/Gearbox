@@ -13,8 +13,9 @@ import type { AppEnv } from "../types";
 
 type NewTeam = { id: string; teamNumber: number; name: string };
 
-/** Tables that carry a team (migrations 0013, 0014). */
+/** Tables that carry a team (migrations 0012, 0013, 0014). */
 const TEAM_TABLES = [
+  "team_ui_settings",
   "core_users",
   "core_user_pins",
   "kiosk_devices",
@@ -28,6 +29,7 @@ const MEMBERS = "(SELECT id FROM core_users WHERE team_id = ?1)";
 const MEMBER_ROWS = `user_id IN ${MEMBERS}`;
 /** Deleting a team, in order: each row goes before the rows it points at. */
 const DELETE_TEAM = [
+  "DELETE FROM team_ui_settings WHERE team_id = ?1",
   `DELETE FROM core_sessions WHERE ${MEMBER_ROWS}`,
   `DELETE FROM core_user_identities WHERE ${MEMBER_ROWS}`,
   `DELETE FROM core_user_pins WHERE team_id = ?1 OR ${MEMBER_ROWS}`,

@@ -20,6 +20,14 @@ export const teams = sqliteTable("teams", {
   updatedAt: integer("updated_at").notNull(),
 });
 
+/** One presentation record per team; the current deployment reads only its configured team key. */
+export const teamUiSettings = sqliteTable("team_ui_settings", {
+  teamId: text("team_id").primaryKey(),
+  settingsJson: text("settings_json").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+  updatedBy: text("updated_by").references(() => coreUsers.id, { onDelete: "set null" }),
+});
+
 export const coreUsers = sqliteTable(
   "core_users",
   {

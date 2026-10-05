@@ -13,6 +13,14 @@ const one = <T>(sql: string, ...binds: unknown[]) =>
     .bind(...binds)
     .first<T>();
 
+/** A team's appearance settings (team_ui_settings, migration 0012), last edited by `userId`. */
+const setAppearance = (teamId: string, userId: string) =>
+  testEnv.DB.prepare(
+    "INSERT INTO team_ui_settings (team_id, settings_json, updated_at, updated_by) VALUES (?, '{}', 1, ?)",
+  )
+    .bind(teamId, userId)
+    .run();
+
 const freeNumber = () => 1_100_000 + (crypto.getRandomValues(new Uint32Array(1))[0] % 1_000_000);
 
 describe("operator tools in G3ID", () => {
@@ -27,9 +35,10 @@ describe("operator tools in G3ID", () => {
     expect(members).toEqual([expect.objectContaining({ id, isAdmin: true, status: "active" })]);
   });
 
-  it("deletes a team with its accounts, sessions and PINs", async () => {
+  it("deletes a team with its accounts, sessions, PINs and appearance", async () => {
     const team = await createTeam();
     const { id } = await createUserWithPin({ teamId: team });
+    await setAppearance(team, id);
     const cookie = await sessionCookie(id);
     const keep = await createUser();
 
@@ -41,6 +50,7 @@ describe("operator tools in G3ID", () => {
     expect(await one("SELECT id FROM core_users WHERE id = ?", id)).toBeNull();
     expect(await one("SELECT id FROM core_user_pins WHERE user_id = ?", id)).toBeNull();
     expect(await one("SELECT id FROM core_sessions WHERE user_id = ?", id)).toBeNull();
+    expect(await one("SELECT team_id FROM team_ui_settings WHERE team_id = ?", team)).toBeNull();
     expect((await g3id("/auth/me", { cookie })).status).toBe(401);
     expect(await one("SELECT id FROM core_users WHERE id = ?", keep)).not.toBeNull();
   });
@@ -54,9 +64,10 @@ describe("operator tools in G3ID", () => {
     expect(res.status).toBe(409);
   });
 
-  it("renumbers a team, keeping its accounts and PINs", async () => {
+  it("renumbers a team, keeping its accounts, PINs and appearance", async () => {
     const team = await createTeam();
     const { id } = await createUserWithPin({ teamId: team });
+    await setAppearance(team, id);
     const cookie = await sessionCookie(id);
     const number = freeNumber();
 
@@ -75,6 +86,9 @@ describe("operator tools in G3ID", () => {
     expect(await one("SELECT team_id FROM core_user_pins WHERE user_id = ?", id)).toEqual({
       team_id: `frc${number}`,
     });
+    expect(
+      await one("SELECT updated_by FROM team_ui_settings WHERE team_id = ?", `frc${number}`),
+    ).toEqual({ updated_by: id });
     // Still signed in.
     expect(await (await g3id("/auth/me", { cookie })).json()).toMatchObject({
       teamId: `frc${number}`,

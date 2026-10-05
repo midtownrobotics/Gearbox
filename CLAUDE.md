@@ -74,6 +74,14 @@ These apps are being turned from one team's tools into a hosted platform that ma
 - The schema is in `src/db/migrations/`. Apply migrations and import existing attendance records before deploying a worker that reads D1. Production D1 is `g3-attendance-prod`.
 - Run `pnpm --filter @g3/worker-attendance test` for Cloudflare runtime tests against a local migrated D1 database.
 
+### Optional Scouting engagement
+
+- Scouting points and match predictions are off by default. Identity admins configure them on Scouting's Admin page; Strategy leads and kiosk PIN sessions cannot change these controls.
+- `workers/scouting/src/engagement.ts` reads team-keyed D1 settings. `/scouting/me` includes the settings; `/scouting/engagement-settings` reads them and accepts admin-only PUT updates. Predictions, combined picks and team standings have separate switches, and the points label defaults to "Scout Points".
+- The master switch gates `/game`, point awards on scouting submissions, and scheduled prediction result processing. Disabling predictions alone also pauses result processing. Existing balances and picks are preserved; existing combined picks still resolve when predictions resume even if new combinations are disabled.
+- Apply migration `0032_engagement_settings.sql` before deploying this code. Existing game table names and API payload keys are retained for compatibility. The team key currently comes from site config and must move to verified team context during the tenancy migration.
+- `workers/scouting/test/engagement.test.ts` covers defaults, admin permissions, API gates, standings visibility and scouting awards.
+
 ### G3 Edge (shop network box)
 
 Design brief: `docs/edge.md`. On-site Orange Pi 5 (hostname `orangepi5`, login user `g3`) routes the shop LAN through a 50 GB/month cellular hotspot.
@@ -147,6 +155,13 @@ Design brief: `docs/edge.md`. On-site Orange Pi 5 (hostname `orangepi5`, login u
 - CORS for every worker is `cors({ origin: corsOrigin })`: https on the domain and its subdomains, plus localhost. No `*.pages.dev`.
 - Apps: `siteConfig()` from `@g3/site-config/vite` in each `vite.config` fills `%SITE_SHORT_NAME%`, `%SITE_TEAM_NAME%`, `%SITE_TEAM_NUMBER%`, `%SITE_ID_NAME%`, `%SITE_ALL_APPS_URL%`, `%SITE_APP_URL%` in `index.html`, and sets production API URLs (`productionEnv`), so there are no `.env.production` files; `.env.development` still points dev at localhost.
 - Files that can't import it (`wrangler.toml` production URLs, the gateway's route, OAuth redirect URIs, `TEAM_NUMBER`; the edge env examples) are written by `pnpm configure` (`scripts/configure.ts`); CI runs `pnpm configure --check`.
+
+### Editable team appearance
+
+- Identity admins edit appearance at the Team Appearance admin page. `TeamUiSettings` and defaults live in `packages/site-config/src/team-ui.ts`; the team-keyed D1 record is read by public `/team/ui` and edited through admin-only `/admin/team/ui`.
+- Shared UI loads colors, logo, display font and team names at runtime. Text and muted-text colors affect the navbar and components using `--g3-text` / `--g3-muted`; they do not replace every app's text classes. The editor explains this limit.
+- Portal resource links (public site, Slack, GitHub, Instagram, FRC-Events, The Blue Alliance, Statbotics and match13) have editable HTTPS URLs and `hiddenLinks` controls. Hiding preserves the URL; removing clears it. Empty or hidden links are omitted, including the public-site link on the portal sign-in screen.
+- Reset to defaults restores the editor form; Save applies it. Stored settings from older versions gain new link defaults without resetting their branding or restoring explicitly empty links. Current writes require the full schema.
 
 ### Shared navbar and light/dark mode
 

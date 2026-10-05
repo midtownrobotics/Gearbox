@@ -1,4 +1,4 @@
-import { idName, teamAppUrl } from "@g3/site-config";
+import { defaultTeamUiSettings, idName, teamAppUrl } from "@g3/site-config";
 import { sendDM } from "@g3/slack";
 import { and, desc, eq, gt, isNull, or } from "drizzle-orm";
 import { Hono } from "hono";
@@ -10,14 +10,45 @@ import {
   coreUsers,
   kioskActivationCodes,
   kioskDevices,
+  teamUiSettings,
 } from "../db/schema";
 import { removeInstallation, slackForTeam } from "../lib/slack-install";
 import { teamOfUser } from "../lib/team";
+import { isTeamUiSettings, readTeamUiSettings } from "../lib/team-ui";
 import { requireAdmin } from "../middleware/auth";
 import type { AppEnv } from "../types";
 
 export const adminRouter = new Hono<AppEnv>()
   .use("*", requireAdmin)
+  // The admin's own team's appearance.
+  .get("/team/ui", async (c) => {
+    const db = createDb(c.env.DB);
+    const team = await teamOfUser(db, c.get("userId") as string);
+    const row = await db.select().from(teamUiSettings).where(eq(teamUiSettings.teamId, team)).get();
+    return c.json({
+      settings: row ? readTeamUiSettings(row.settingsJson) : defaultTeamUiSettings,
+      updatedAt: row?.updatedAt ?? null,
+    });
+  })
+  .put("/team/ui", async (c) => {
+    const body: unknown = await c.req.json().catch(() => null);
+    if (!isTeamUiSettings(body)) return c.json({ error: "Invalid team UI settings." }, 400);
+    const now = Math.floor(Date.now() / 1000);
+    const db = createDb(c.env.DB);
+    await db
+      .insert(teamUiSettings)
+      .values({
+        teamId: await teamOfUser(db, c.get("userId") as string),
+        settingsJson: JSON.stringify(body),
+        updatedAt: now,
+        updatedBy: c.get("userId"),
+      })
+      .onConflictDoUpdate({
+        target: teamUiSettings.teamId,
+        set: { settingsJson: JSON.stringify(body), updatedAt: now, updatedBy: c.get("userId") },
+      });
+    return c.json({ settings: body, updatedAt: now });
+  })
   .get("/users", async (c) => {
     const db = createDb(c.env.DB);
 

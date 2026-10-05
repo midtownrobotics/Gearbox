@@ -25,6 +25,10 @@ VALUES ('frc1648', 1648, 'G3 Robotics', unixepoch(), unixepoch());
 
 -- Users
 
+-- Dropping core_users deletes its rows first, which clears team_ui_settings.updated_by
+-- (ON DELETE SET NULL, migration 0012). Kept aside here and put back once the users are.
+CREATE TABLE team_ui_settings_editors AS SELECT team_id, updated_by FROM team_ui_settings;
+
 CREATE TABLE core_users_old AS SELECT * FROM core_users;
 DROP TABLE core_users;
 
@@ -51,6 +55,11 @@ FROM core_users_old;
 
 DROP TABLE core_users_old;
 CREATE INDEX core_users_team_id_idx ON core_users(team_id);
+
+UPDATE team_ui_settings
+SET updated_by = (SELECT updated_by FROM team_ui_settings_editors e
+                  WHERE e.team_id = team_ui_settings.team_id);
+DROP TABLE team_ui_settings_editors;
 
 -- Kiosk PINs: unique within a team
 
