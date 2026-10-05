@@ -5,11 +5,6 @@ import KioskPage from "./pages/KioskPage";
 import { API, type Me, redirectToLogin } from "./utils/auth";
 import type { PageType } from "./utils/token";
 
-// signin.attendance.* shows the SIGN IN kiosk; signout.attendance.* the SIGN OUT one.
-function hostPageType(): PageType {
-  return window.location.hostname.includes("signout") ? "signout" : "signin";
-}
-
 // The kiosk display (QR + live code) is admin-only. Members never need it — they
 // just scan it. Non-admins are redirected to G3ID; logged-in non-admins are denied.
 function KioskGate({ types }: { types: PageType[] }) {
@@ -58,21 +53,28 @@ function KioskGate({ types }: { types: PageType[] }) {
   );
 }
 
+// The kiosk displays, by path: /signin and /signout show one QR code, /kiosk both side by side.
+const KIOSKS: Record<string, PageType[]> = {
+  "/signin": ["signin"],
+  "/signout": ["signout"],
+  "/kiosk": ["signin", "signout"],
+};
+
 export default function App() {
   const params = new URLSearchParams(window.location.search);
   const action = params.get("action") as PageType | null;
   const w = params.get("w");
-
-  // Fixed side-by-side kiosk view available on both attendance sites.
-  if (window.location.pathname === "/display") {
-    return <KioskGate types={["signin", "signout"]} />;
-  }
 
   // Member scanned the kiosk QR → confirm sign-in/out as their G3ID identity.
   if (action && w) {
     return <ConfirmPage action={action} w={w} />;
   }
 
-  // Default: the (admin-gated) kiosk QR display.
-  return <KioskGate types={[hostPageType()]} />;
+  const path = window.location.pathname.replace(/\/+$/, "") || "/";
+  const types = KIOSKS[path];
+  if (types) return <KioskGate key={path} types={types} />;
+
+  // Anything else (the bare address included) opens the combined kiosk.
+  window.history.replaceState(null, "", "/kiosk");
+  return <KioskGate key="/kiosk" types={KIOSKS["/kiosk"]} />;
 }

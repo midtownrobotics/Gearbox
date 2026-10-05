@@ -35,7 +35,7 @@ export const site = {
     edge: { web: "edge", api: "api.edge" },
     scouting: { web: "scouting", api: "api.scouting" },
     skillTree: { web: "skilltree", api: "api.skilltree" },
-    attendance: { web: "signin.attendance", api: "api.attendance" },
+    attendance: { web: "attendance", api: "api.attendance" },
   },
 
   /** The shop edge box's tunnel hostname (<subdomain>.<domain>), if you run one. */
