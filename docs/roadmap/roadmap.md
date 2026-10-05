@@ -37,14 +37,14 @@ Three release points sit between phases: G3 moves to its frcgearbox.com addresse
 
 ## Progress
 
-As of 5 October 2026, five of the six Phase 0 steps are done on `main`, the new site config has delivered part of Phase 1 early, and Phase 2 has started: G3ID has teams, and each app is served by its own Worker behind a gateway. Phases 3 to 6 have not started; Scouting engagement controls provide early groundwork for optional plugins in Phase 4.
+As of 5 October 2026, five of the six Phase 0 steps are done on `main`, the new site config has delivered part of Phase 1 early, and Phase 2 has started: G3ID has teams, and each app is served by its own Worker behind a gateway. Skill Tree has done the parts of Phase 3 that don't need teams yet, and Scouting engagement controls provide early groundwork for optional plugins in Phase 4. The rest of Phases 3 to 6 has not started.
 
 | Phase | Status | What is left |
 | --- | --- | --- |
 | 0. Groundwork | In progress | The deploy workflow with a staging environment (0.2) |
 | 1. Remove G3 from the platform | In progress | Three page texts that still say G3 (1.1); remaining app-specific branding and text colors (1.3, 1.4); Scouting's G3-specific names (1.6); the README (1.7) |
 | 2. Tenancy core | In progress | Local development (2.9), team context per request (2.10) |
-| 3. Team-scoped apps | Not started | All of it |
+| 3. Team-scoped apps | Started early, Skill Tree only | Skill Tree's team column, scoped access and isolation test, which wait for team context per request (2.10). All of it for the other apps |
 | 4. App library and dashboard | Not started | All of it |
 | 5. Live demo | Not started | All of it |
 | 6. Creators' portal | Not started | All of it |
@@ -70,6 +70,7 @@ As of 5 October 2026, five of the six Phase 0 steps are done on `main`, the new 
 | Shared navbar, light and dark mode, one color scheme | Groundwork for 1.3 | [#126](https://github.com/midtownrobotics/Gearbox/pull/126), [#127](https://github.com/midtownrobotics/Gearbox/pull/127) |
 | Optional Scouting engagement with configurable points label, predictions, combined picks and standings; neutral prediction language | Part of 1.6; groundwork for 4.1 and 4.5 | [#143](https://github.com/midtownrobotics/Gearbox/pull/143) |
 | Editable team appearance, reset to defaults, and editable/hidden portal resource links | Part of 1.3 and 1.4 | [#134](https://github.com/midtownrobotics/Gearbox/pull/134) |
+| Skill Tree rebuilt on the shared app pattern: a React frontend in place of the Firebase-shaped shim, the shared navbar, palette, fonts and dark mode, and mentors taken from G3ID roles. Its trees are now a team's own content: a tree set that is loaded from a file (the default set on first use) and edited in the app. Its student list is G3ID's accounts. Earlier progress was cleared | Phase 3 for Skill Tree: tenancy sheet, settings out of code, frontend rewrite, and a stand-in for its seed hook (4.3). Part of 1.3 | [#144](https://github.com/midtownrobotics/Gearbox/pull/144) |
 
 ### What this changed in the plan
 
@@ -79,6 +80,9 @@ As of 5 October 2026, five of the six Phase 0 steps are done on `main`, the new 
 - **Releases shape deploys.** `main` deploys to staging and `public` to production (0.2). An approved variant goes live with the next release (Phase 6).
 - **Operator tools live in the platform, not G3ID.** The operator flag, the console's API and its log are the platform Worker's, with the console in the platform app at `admin.<domain>` (step 2.8). G3ID only carries out what touches its accounts, through internal routes.
 - **Changesets apply to everyone.** A variant's pull request needs one, like any other change to an app (6.4).
+- **One app-level role list is gone before Phase 2.** Skill Tree kept its own list of mentors. It now uses the mentor and admin roles from sign-in, so step 2.2 has one less place to map roles from. Scouting's strategy admins are the list still left.
+- **App content is loaded, not migrated.** Skill Tree's default trees are a file that goes through the same loader as a team's own file, the first time the app is opened. No migration holds content. That first-use load is what the seed hook (4.3) replaces, and it is the pattern for the other apps' starter data.
+- **Apps need the team's members with their roles.** Skill Tree's students are G3ID's accounts that aren't mentors, but G3ID's list of accounts carries no roles, so Skill Tree works out who the mentors are from sign-ins. The member list that apps read should include each member's role. This is added to the platform SDK's list in Phase 3.
 
 ## Where the codebase started
 
@@ -239,7 +243,7 @@ After Phase 1 the platform is named Gearbox and "G3" appears only in G3's own br
 | --- | --- | --- | --- |
 | 1.1 | Every name a user sees comes from the team's config: team name, short name, number, app titles and the sign-in app's name. Three page texts still say G3: the G3ID sign-up page, Orders settings and Shop admin. Internal names stay as they are: `@g3/*` packages, the `G3ID` binding, and cookie and database names | `packages/site-config/src/site.ts` and its helpers | In progress |
 | 1.2 | Rename the session cookie. Dropped: `g3_session` is an internal name and keeps it. Only its domain changes, in step 2.5 |  | Dropped |
-| 1.3 | Theme from data: keep the `primary-*` and `secondary-*` class names, but set their CSS variables when the page loads from the team's brand. The shared `--g3-*` color variables added for dark mode are the place to do it. The platform default becomes a neutral Gearbox palette | `packages/ui/src/index.css`, `packages/ui/src/colors.css`, team appearance settings | In progress: editable shared palette and brand color; app-specific text still uses its own colors |
+| 1.3 | Theme from data: keep the `primary-*` and `secondary-*` class names, but set their CSS variables when the page loads from the team's brand. The shared `--g3-*` color variables added for dark mode are the place to do it. The platform default becomes a neutral Gearbox palette | `packages/ui/src/index.css`, `packages/ui/src/colors.css`, team appearance settings | In progress: editable shared palette and brand color; Skill Tree now uses the shared palette, fonts and navbar; app-specific text elsewhere still uses its own colors |
 | 1.4 | Hold the team's brand in one config file until Phase 2 gives it a table. Name, short name, number, links and the Slack bot's name are there. Appearance, logo URL, display font and portal links now live in an editable team-keyed D1 record (`team_ui_settings`) with reset and link visibility controls. Remaining app-specific branding still needs to adopt those settings | `packages/site-config/src/site.ts`, `packages/ui`, `apps/portal`, `apps/scouting` | In progress |
 | 1.5 | Titles, nav bars and meta descriptions read the team name | `siteConfig()` in each app's `vite.config`, `AppNavBar` in `packages/ui` | Done |
 | 1.6 | Rename G3-specific names in features: `relationTo1648` to `relationToTeam`, the `g3-match` class, and "BoyleBucks" becomes a label the team sets | `apps/scouting`, `workers/scouting` | In progress: configurable points label and optional engagement controls done; match identifiers remain |
@@ -288,7 +292,7 @@ After Phase 3 every app serves any number of teams from one deployment, and noth
 
 | Order | App | Tables | Settings to pull out | Notes |
 | --- | --- | --- | --- | --- |
-| 1 | Skill Tree | 3 | Tree content, from `data/trees.js` into rows. Today's trees become the default template | Smallest app, so it proves the pattern. Rewrite the frontend off the Firebase-shaped shim |
+| 1 | Skill Tree | 8 | Done early: the trees are a tree set that a team loads from a file and edits in the app. The default set is `workers/skill-tree/content/default-trees.json`, loaded on first use by a stand-in for the seed hook in step 4.3 | Smallest app, so it proves the pattern. Done early: the frontend is rewritten off the Firebase-shaped shim, and the tenancy sheet is settled (all eight tables are team data, rooted at `tree_sets`, and none has a key that is unique across teams). Left for after Phase 2: the team on `tree_sets`, scoped access, the isolation test, and taking mentors from the member list in place of what sign-ins reveal |
 | 2 | Pit | 5 | Team number and event key, from `wrangler.toml` | Team number comes from the team profile |
 | 3 | Orders | 17 | Fiscal-year start month, time zone and currency (New York time and US dollars are fixed in code today), Share-A-Cart account, Slack token | Budgets, categories, vendors, naming template and keyword rules are already rows. The seeded catalog becomes shared reference data; a team's own parts and prices are team data |
 | 4 | Shop | 17 | Slack channel IDs, Onshape credentials | Processes and subsystems are already rows. Drawings in R2 and the BOM queue need the team. Onshape webhooks must map a company to a team |
@@ -301,7 +305,7 @@ Core apps must not depend on Edge. Orders part lookup and Shop printing become o
 
 ### Shared pieces built once
 
-- **Platform SDK** (`packages/platform`): reads the gateway's identity headers, exposes the team-scoped database helper, typed team settings, and role checks.
+- **Platform SDK** (`packages/platform`): reads the gateway's identity headers, exposes the team-scoped database helper, typed team settings, role checks, and the team's members with their roles (Skill Tree's student list and Attendance's eligible list both need it).
 - **Tenancy lint in CI:** rejects a query on a team table that skips the helper, and any raw `prepare` call outside it.
 - **Isolation test harness:** one reusable test, built on packages/testing, that every app, and later every variant, must pass.
 
