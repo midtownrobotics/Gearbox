@@ -39,10 +39,21 @@ The app workers' old `api.<app>` custom domains send requests straight to the wo
 5. **Deploy the gateway:** `pnpm --filter @g3/worker-gateway run deploy`.
 6. **Check:** sign in with each provider; open each app; `https://<app>.<domain>/api/health` and `https://api.<app>.<domain>/health` both answer with the app's version.
 
+## The platform and frcgearbox.com (once)
+
+The platform Worker serves `frcgearbox.com` (team sign-up) and every other team's addresses (`<number>-<app>.frcgearbox.com`). G3 stays on its own domain.
+
+1. **Zone and DNS:** add `frcgearbox.com` to the Cloudflare account, with proxied records for the domain itself and a wildcard: `@` and `*` → AAAA `100::`.
+2. **Database:** `wrangler d1 create gearbox-platform-prod`, paste its ID into `workers/platform/wrangler.toml`, and apply its migrations (`pnpm --filter @g3/worker-platform db:migrate:remote`).
+3. **Slack app:** add the redirect URLs `https://frcgearbox.com/api/signup/slack/callback` and `https://id.frcgearbox.com/api/slack/oauth/callback`. Set `SLACK_CLIENT_ID` in `workers/platform/wrangler.toml` and the `SLACK_CLIENT_SECRET` secret on the platform Worker (the same values as G3ID's).
+4. **Sign-in providers:** add `https://id.frcgearbox.com/api/auth/<provider>/callback` for Google, GitHub and Onshape (other teams' sign-ins call back there).
+5. **Deploy** G3ID, then the platform Worker, then the gateway (it binds to the platform).
+
 Later, move outside services to the new addresses one at a time, then drop the old ones:
 
 - **Sign-in providers:** remove the old `api.g3id.<domain>` callback URLs.
-- **Slack app:** change the slash command and event URLs to `https://g3id.<domain>/api/slack/...`.
+- **Slack app:** change the slash command and event URLs to `https://id.<domain>/api/slack/...` (`/commands/signin`, `/commands/link`, `/events`).
+- **Slack for other teams:** in the Slack app's settings, turn on distribution (Manage Distribution), add the redirect URL `https://id.<domain>/api/slack/oauth/callback`, give the bot the scopes `commands, chat:write, im:write, im:history, users:read, users:read.email`, and subscribe to the `app_uninstalled` and `tokens_revoked` events. Then set G3ID's secrets `SLACK_CLIENT_ID`, `SLACK_CLIENT_SECRET` (Basic Information → App Credentials) and `SECRETS_KEY` (`openssl rand -base64 32`; keep it, since it decrypts the stored tokens). Team admins connect their workspace on G3ID's Admin → Slack page; G3 can keep its current settings.
 - **Onshape webhook:** re-register it from Shop's admin page (it registers at the new address).
 - **Edge box:** set `EDGE_WORKER_URL=https://edge.<domain>/api` in `/etc/g3-edge/agent.env` and restart the agent.
 

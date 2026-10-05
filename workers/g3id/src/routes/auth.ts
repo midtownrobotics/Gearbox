@@ -6,6 +6,8 @@ import { coreUserIdentities, coreUserPins, coreUsers, kioskDevices } from "../db
 import { deleteCookieOptions } from "../lib/cookie";
 import { regeneratePinForUser } from "../lib/pin";
 import { deleteSession, isPinSession } from "../lib/session";
+import { slackForTeam } from "../lib/slack-install";
+import { requestTeamId } from "../lib/team";
 import { requireAuth } from "../middleware/auth";
 import type { AppEnv } from "../types";
 
@@ -123,7 +125,7 @@ export const authRouter = new Hono<AppEnv>()
       await deleteSession(sessionId, c.env);
     }
 
-    deleteCookie(c, "g3_session", deleteCookieOptions(c.env.FRONTEND_URL));
+    deleteCookie(c, "g3_session", deleteCookieOptions(c.req.url));
     return c.json({ ok: true, isKiosk });
   })
   .get("/pin/me", requireAuth, async (c) => {
@@ -198,9 +200,11 @@ export const authRouter = new Hono<AppEnv>()
 
     return c.json({ ok: true });
   })
-  .get("/slack/bot", (c) => {
+  // For the Slack sign-in page's "Open Slack" button: the bot in this team's workspace.
+  .get("/slack/bot", async (c) => {
+    const teamSlack = await slackForTeam(c.env, requestTeamId(c));
     return c.json({
       appId: c.env.SLACK_APP_ID,
-      teamId: c.env.SLACK_TEAM_ID,
+      teamId: teamSlack?.workspaceId ?? null,
     });
   });

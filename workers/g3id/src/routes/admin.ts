@@ -11,6 +11,7 @@ import {
   kioskActivationCodes,
   kioskDevices,
 } from "../db/schema";
+import { removeInstallation, slackForTeam } from "../lib/slack-install";
 import { teamOfUser } from "../lib/team";
 import { requireAdmin } from "../middleware/auth";
 import type { AppEnv } from "../types";
@@ -69,11 +70,12 @@ export const adminRouter = new Hono<AppEnv>()
       .from(coreUserIdentities)
       .where(and(eq(coreUserIdentities.userId, id), eq(coreUserIdentities.provider, "slack")));
 
-    if (slackIdentity?.providerId) {
+    const teamSlack = await slackForTeam(c.env, user.teamId);
+    if (slackIdentity?.providerId && teamSlack) {
       await sendDM(
         slackIdentity.providerId,
         `✅ Your ${idName} account has been approved! Click <${teamAppUrl(user.teamId, "id")}/login|here> to go to the login page and *sign in with Slack*. Yes, you will have to repeat the code sending process.`,
-        c.env,
+        teamSlack.slack,
       );
     }
 
@@ -307,6 +309,23 @@ export const adminRouter = new Hono<AppEnv>()
     });
 
     return c.json({ code, expiresAt });
+  })
+  // The team's Slack workspace, which an admin connects with /slack/install.
+  .get("/slack", async (c) => {
+    const team = await teamOfUser(createDb(c.env.DB), c.get("userId") as string);
+    const teamSlack = await slackForTeam(c.env, team);
+    return c.json({
+      connected: teamSlack !== null,
+      workspaceId: teamSlack?.workspaceId ?? null,
+      workspaceName: teamSlack?.workspaceName ?? null,
+      fromSettings: teamSlack?.fromSettings ?? false,
+      canConnect: Boolean(c.env.SLACK_CLIENT_ID && c.env.SECRETS_KEY),
+    });
+  })
+  .delete("/slack", async (c) => {
+    const team = await teamOfUser(createDb(c.env.DB), c.get("userId") as string);
+    await removeInstallation(c.env, { teamId: team });
+    return c.json({ ok: true });
   })
   .get("/kiosk/devices", async (c) => {
     const db = createDb(c.env.DB);

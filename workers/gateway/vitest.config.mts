@@ -17,7 +17,7 @@ const echo = (app: string) => (request: Request) => {
   });
 };
 
-// G3ID knows two teams, and a session for a member of each (an admin of 1648, a student of 254).
+// Two teams, and G3ID knows a session for a member of each (an admin of 1648, a student of 254).
 const teams = ["frc1648", "frc254"];
 const sessions: Record<string, object> = {
   ours: { id: "u-ours", teamId: "frc1648", sessionType: "oauth", isAdmin: true, isMentor: false },
@@ -32,13 +32,18 @@ const g3id = (request: Request) => {
     const me = sessions[session];
     return me ? Response.json(me) : Response.json({ error: "Unauthorized." }, { status: 401 });
   }
-  const team = url.pathname.match(/^\/api\/teams\/(.+)$/)?.[1];
+  return echo("G3ID")(request);
+};
+
+// The platform knows which teams exist.
+const platform = (request: Request) => {
+  const team = new URL(request.url).pathname.match(/^\/api\/teams\/(.+)$/)?.[1];
   if (team !== undefined) {
     return teams.includes(team)
       ? Response.json({ id: team })
       : Response.json({ error: "No such team." }, { status: 404 });
   }
-  return echo("G3ID")(request);
+  return echo("PLATFORM")(request);
 };
 
 export default workerTestConfig({
@@ -57,5 +62,6 @@ export default workerTestConfig({
       ),
     ),
     G3ID: g3id,
+    PLATFORM: platform,
   },
 });

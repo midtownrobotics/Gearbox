@@ -160,3 +160,19 @@ export const kioskActivationCodes = sqliteTable("kiosk_activation_codes", {
   used: integer("used").notNull().default(0),
   createdAt: integer("created_at").notNull(),
 });
+
+/** Each team's Slack workspace (migration 0014). */
+export const slackInstallations = sqliteTable("slack_installations", {
+  teamId: text("team_id")
+    .primaryKey()
+    .references(() => teams.id),
+  /** The workspace's ID (T...), which slash commands and events arrive with. */
+  slackTeamId: text("slack_team_id").notNull().unique(),
+  slackTeamName: text("slack_team_name"),
+  botUserId: text("bot_user_id"),
+  /** Encrypted with SECRETS_KEY (lib/secret-box.ts). */
+  botTokenEncrypted: text("bot_token_encrypted").notNull(),
+  installedBy: text("installed_by").references(() => coreUsers.id),
+  createdAt: integer("created_at").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+});

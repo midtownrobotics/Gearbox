@@ -25,9 +25,9 @@ export function apiPath(app: AppName): string {
   return `/api/~${app}`;
 }
 
-// Teams. The team in this file uses the app addresses above. Every team also has its own, by FRC
-// number: <number>-<app>.<domain> for an app and <number>.<domain> for its home (Portal). The
-// gateway (workers/gateway) answers them all.
+// Teams. The team in this file uses the app addresses above, on its own domain. Every other team
+// has its addresses on the platform's domain, by FRC number: <number>-<app>.<platform domain> for
+// an app and <number>.<platform domain> for its home (Portal). The gateway answers them all.
 
 /** Each app's name in team addresses. Portal is the team's home, at <number>.<domain>. */
 export const TEAM_HOST_APPS = {
@@ -46,7 +46,7 @@ export function teamAppUrl(teamId: string, app: AppName): string {
   if (teamId === teamKey) return appUrl(app);
   const number = teamId.replace(/^frc/, "");
   const host = app === "portal" ? number : `${number}-${TEAM_HOST_APPS[app]}`;
-  return `https://${host}.${site.domain}`;
+  return `https://${host}.${site.platformDomain}`;
 }
 
 /** The team a hostname belongs to (its key, "frc<number>"), or null for any other hostname. */
@@ -56,16 +56,24 @@ export function teamOfHost(hostname: string): string | null {
       return teamKey;
     }
   }
-  if (!hostname.endsWith(`.${site.domain}`)) return null;
-  const number = hostname.slice(0, -site.domain.length - 1).match(/^([1-9]\d*)(?:-|$)/)?.[1];
+  if (!hostname.endsWith(`.${site.platformDomain}`)) return null;
+  const label = hostname.slice(0, -site.platformDomain.length - 1);
+  const number = label.match(/^([1-9]\d*)(?:-|$)/)?.[1];
   return number ? `frc${number}` : null;
 }
 
+/** The platform's public site and team sign-up. */
+export const platformUrl = `https://${site.platformDomain}`;
+
 /**
- * Where sign-in providers (Google, GitHub, Steam, Onshape) send people back: G3ID's API on the
- * platform's id.<domain> host, one address for every team. The team travels in the sign-in's state.
+ * Where sign-in providers (Google, GitHub, Steam, Onshape) send people back: G3ID's API on an
+ * id.<domain> host, one per domain, so the session cookie lands on the team's own domain. This
+ * file's team uses id.<domain>; every other team id.<platform domain>. The team travels in the
+ * sign-in's state.
  */
-export const signInCallbackApiUrl = `https://id.${site.domain}/api`;
+export function signInCallbackApiUrl(teamId: string): string {
+  return `https://id.${teamId === teamKey ? site.domain : site.platformDomain}/api`;
+}
 
 /** The app list every app links back to. */
 export const allAppsUrl = appUrl("portal");
@@ -94,13 +102,15 @@ export const teamLinks = {
 export const teamKey = `frc${site.team.number}`;
 
 /**
- * CORS: which browser origins may call the workers with credentials. The team's own domain and
- * its subdomains over https, and localhost for development. Nothing else (no *.pages.dev
+ * CORS: which browser origins may call the workers with credentials. The team's own domain, the
+ * platform's, and their subdomains over https, and localhost for development. Nothing else (no *.pages.dev
  * previews: anyone can publish one).
  */
 export function isAllowedOrigin(origin: string): boolean {
-  if (origin === `https://${site.domain}`) return true;
-  if (origin.startsWith("https://") && origin.endsWith(`.${site.domain}`)) return true;
+  for (const domain of [site.domain, site.platformDomain]) {
+    if (origin === `https://${domain}`) return true;
+    if (origin.startsWith("https://") && origin.endsWith(`.${domain}`)) return true;
+  }
   return /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
 }
 

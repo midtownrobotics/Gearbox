@@ -6,6 +6,44 @@ import { coreSlackLinkCodes, coreUserIdentities, coreUsers } from "../db/schema"
 import type { AppEnv } from "../types";
 import { newId } from "./id";
 import { createSession } from "./session";
+import { slackForTeam, teamForWorkspace } from "./slack-install";
+
+export function generateCode(): string {
+  return (crypto.getRandomValues(new Uint32Array(1))[0] % 10000).toString().padStart(4, "0");
+}
+
+export function generateToken(): string {
+  return Array.from(crypto.getRandomValues(new Uint8Array(16)))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+/**
+ * A code someone sends to the team's Slack bot to sign in (or, for a team with no members yet, to
+ * become its first admin), and the token their page polls with. Valid for 15 minutes.
+ */
+export async function createSigninCode(
+  db: ReturnType<typeof createDb>,
+  teamId: string,
+  redirect: string | null,
+): Promise<{ code: string; token: string }> {
+  const code = generateCode();
+  const token = generateToken();
+  const now = Math.floor(Date.now() / 1000);
+  await db.insert(coreSlackLinkCodes).values({
+    id: newId(),
+    teamId,
+    userId: null,
+    code,
+    type: "signin",
+    pollingToken: token,
+    redirectUrl: redirect,
+    expiresAt: now + 900,
+    used: 0,
+    createdAt: now,
+  });
+  return { code, token };
+}
 
 type HandleResult = {
   success: boolean;
@@ -23,8 +61,10 @@ export async function handleSlackCode(opts: {
 }): Promise<HandleResult> {
   const { code, slackUserId, workspaceId, type, env } = opts;
 
-  if (workspaceId !== env.SLACK_TEAM_ID) {
-    return { success: false, message: "This Slack workspace is not authorized." };
+  // The team whose Slack this came from; a code only works from its own team's workspace.
+  const workspaceTeam = await teamForWorkspace(env, workspaceId);
+  if (!workspaceTeam) {
+    return { success: false, message: "This Slack workspace isn't connected to a team." };
   }
 
   // Rate limit: 5 attempts per 15 minutes per Slack user
@@ -63,6 +103,12 @@ export async function handleSlackCode(opts: {
 
   if (!record || record.used || record.expiresAt < now) {
     return { success: false, message: "❌ Invalid or expired code. Please try again." };
+  }
+  if (record.teamId !== workspaceTeam) {
+    return {
+      success: false,
+      message: "❌ This code is for another team. Send it in your own team's Slack.",
+    };
   }
 
   // Mark used immediately to prevent races
@@ -167,7 +213,10 @@ export async function handleSlackCode(opts: {
   }
 
   // No Slack identity found — attempt sign-up
-  const slackUser = await getUserInfo(slackUserId, env);
+  const teamSlack = await slackForTeam(env, workspaceTeam);
+  const slackUser = teamSlack
+    ? await getUserInfo(slackUserId, teamSlack.slack)
+    : { email: null, displayName: "Unknown" };
 
   if (!slackUser.email) {
     const msg = `Your Slack account has no email. Please sign up at ${new URL(teamAppUrl(record.teamId, "id")).host} with email first, then link Slack from your account settings.`;
@@ -190,6 +239,15 @@ export async function handleSlackCode(opts: {
     return { success: false, message: `❌ ${msg}` };
   }
 
+  // A team's first member is the person who signed it up (the platform's sign-up ends with this
+  // code): they start active, as its admin. Everyone after them waits for an admin's approval.
+  const firstMember = !(await db
+    .select({ id: coreUsers.id })
+    .from(coreUsers)
+    .where(eq(coreUsers.teamId, record.teamId))
+    .limit(1)
+    .get());
+
   const ts = Math.floor(Date.now() / 1000);
   const userId = newId();
   await db.batch([
@@ -198,7 +256,8 @@ export async function handleSlackCode(opts: {
       teamId: record.teamId,
       email,
       displayName: slackUser.displayName,
-      status: "pending",
+      status: firstMember ? "active" : "pending",
+      isAdmin: firstMember ? 1 : 0,
       createdAt: ts,
       updatedAt: ts,
     }),
@@ -211,6 +270,18 @@ export async function handleSlackCode(opts: {
       updatedAt: ts,
     }),
   ]);
+
+  if (firstMember) {
+    const sessionId = await createSession(userId, env);
+    await db.update(coreSlackLinkCodes).set({ userId }).where(eq(coreSlackLinkCodes.id, record.id));
+    await updateStatus("success", undefined, sessionId);
+    return {
+      success: true,
+      token: record.pollingToken,
+      redirectUrl: record.redirectUrl,
+      message: "✅ Your team is set up, and you're its first admin.",
+    };
+  }
 
   await updateStatus("signup_pending");
   return { success: true, message: "✅ Account created! Your account is pending admin approval." };

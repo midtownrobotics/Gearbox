@@ -11,10 +11,23 @@ compatibility_date = "2026-05-17"
 name = "gateway-production"
 workers_dev = false
 
-# Every subdomain. Needs a proxied wildcard DNS record (* → AAAA 100::) for names without their own.
+# Every subdomain of both domains, and the platform's own domain. Each needs proxied DNS: a
+# wildcard (* → AAAA 100::) for names without their own record, and the platform domain itself.
 [[env.production.routes]]
-pattern = "*.g3robotics.com/*"
-zone_name = "g3robotics.com"
+pattern = "*.g3robotics.com/*" # site
+zone_name = "g3robotics.com" # site
+
+[[env.production.routes]]
+pattern = "*.frcgearbox.com/*" # platform subdomains
+zone_name = "frcgearbox.com" # platform subdomains
+
+[[env.production.routes]]
+pattern = "frcgearbox.com/*" # platform
+zone_name = "frcgearbox.com" # platform
+
+[[env.production.services]]
+binding = "PLATFORM"
+service = "platform-production"
 
 [[env.production.services]]
 binding = "G3ID"

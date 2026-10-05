@@ -9,13 +9,13 @@ import { newId } from "../../lib/id";
 import { decodeState, encodeState } from "../../lib/oauth-state";
 import { sanitizeRedirect } from "../../lib/redirect";
 import { createSession } from "../../lib/session";
-import { requestTeamId, teamFrontend, teamOfUser } from "../../lib/team";
+import { providerRedirectUri, requestTeamId, teamFrontend, teamOfUser } from "../../lib/team";
 import type { AppEnv } from "../../types";
 
-function buildGoogleUrl(env: AppEnv["Bindings"], state: string): string {
+function buildGoogleUrl(env: AppEnv["Bindings"], state: string, redirectUri: string): string {
   const params = new URLSearchParams({
     client_id: env.GOOGLE_CLIENT_ID,
-    redirect_uri: env.GOOGLE_REDIRECT_URI,
+    redirect_uri: redirectUri,
     response_type: "code",
     scope: "openid email profile",
     state,
@@ -44,7 +44,7 @@ export const googleAuthRouter = new Hono<AppEnv>()
     const team = requestTeamId(c);
     const redirect = sanitizeRedirect(c.req.query("redirect"), team);
     const state = await generateState(c.env, encodeState({ team, redirect, linkUserId: null }));
-    return c.redirect(buildGoogleUrl(c.env, state));
+    return c.redirect(buildGoogleUrl(c.env, state, providerRedirectUri(c.env, "google", team)));
   })
   // Link initiation — user must already be signed in
   .get("/google/link", async (c) => {
@@ -57,7 +57,7 @@ export const googleAuthRouter = new Hono<AppEnv>()
       c.env,
       encodeState({ team, redirect: null, linkUserId: userId }),
     );
-    return c.redirect(buildGoogleUrl(c.env, state));
+    return c.redirect(buildGoogleUrl(c.env, state, providerRedirectUri(c.env, "google", team)));
   })
   // Shared callback
   .get("/google/callback", async (c) => {
@@ -91,7 +91,7 @@ export const googleAuthRouter = new Hono<AppEnv>()
         code,
         client_id: c.env.GOOGLE_CLIENT_ID,
         client_secret: c.env.GOOGLE_CLIENT_SECRET,
-        redirect_uri: c.env.GOOGLE_REDIRECT_URI,
+        redirect_uri: providerRedirectUri(c.env, "google", st.team),
         grant_type: "authorization_code",
       }),
     });
@@ -182,7 +182,7 @@ export const googleAuthRouter = new Hono<AppEnv>()
       }
 
       const sessionId = await createSession(user.id, c.env);
-      setCookie(c, "g3_session", sessionId, sessionCookieOptions(c.env.FRONTEND_URL));
+      setCookie(c, "g3_session", sessionId, sessionCookieOptions(c.req.url));
       return c.redirect(redirectTo ?? app("/dashboard"));
     }
 

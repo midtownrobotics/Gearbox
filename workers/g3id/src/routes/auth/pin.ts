@@ -51,7 +51,7 @@ export const pinAuthRouter = new Hono<AppEnv>().post("/pin", requireKioskToken, 
     { expirationTtl: 7 * 24 * 60 * 60 },
   );
 
-  setCookie(c, "g3_session", sessionId, sessionCookieOptions(c.env.FRONTEND_URL));
+  setCookie(c, "g3_session", sessionId, sessionCookieOptions(c.req.url));
 
   return c.json({ success: true });
 });

@@ -177,7 +177,9 @@ describe("signing in to a team", () => {
     const number = otherTeam.slice(3);
     const res = await asTeam(otherTeam, "/auth/slack/initiate?redirect=https://evil.example/");
     expect(res.headers.get("Location")).toMatch(
-      new RegExp(`^https://${number}-id\\.${site.domain.replace(".", "\\.")}/login/slack\\?`),
+      new RegExp(
+        `^https://${number}-id\\.${site.platformDomain.replace(".", "\\.")}/login/slack\\?`,
+      ),
     );
     const token = new URL(res.headers.get("Location") as string).searchParams.get("token");
     const code = await one<{ team_id: string; redirect_url: string | null }>(
@@ -190,9 +192,13 @@ describe("signing in to a team", () => {
 
   it("keeps the team and return address in a provider sign-in's state", async () => {
     const otherTeam = await createTeam();
-    const back = `https://${otherTeam.slice(3)}-orders.${site.domain}/`;
+    const back = `https://${otherTeam.slice(3)}-orders.${site.platformDomain}/`;
     const res = await asTeam(otherTeam, `/auth/google?redirect=${encodeURIComponent(back)}`);
     const google = new URL(res.headers.get("Location") as string);
+    // Back on the platform's id host, so the session cookie lands on the team's domain.
+    expect(google.searchParams.get("redirect_uri")).toBe(
+      `https://id.${site.platformDomain}/api/auth/google/callback`,
+    );
     const state = await testEnv.RATE_LIMIT.get(`oauth_state:${google.searchParams.get("state")}`);
     expect(JSON.parse(state as string)).toEqual({
       team: otherTeam,
@@ -205,7 +211,7 @@ describe("signing in to a team", () => {
     const otherTeam = await createTeam();
     const number = otherTeam.slice(3);
     const ours = `https://orders.${site.domain}/lists`;
-    const theirs = `https://${number}-orders.${site.domain}/lists`;
+    const theirs = `https://${number}-orders.${site.platformDomain}/lists`;
     const redirectOf = async (team: string, redirect: string) => {
       const res = await asTeam(
         team,

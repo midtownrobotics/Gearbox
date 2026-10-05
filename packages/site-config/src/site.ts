@@ -16,6 +16,12 @@ export const site = {
   domain: "g3robotics.com",
 
   /**
+   * The platform's domain: its public site and team sign-up at the domain itself, and every other
+   * team's apps at <number>-<app>.<platform domain> (this file's team keeps `domain` above).
+   */
+  platformDomain: "frcgearbox.com",
+
+  /**
    * Each app's subdomain (`web`): the app and its API (at /api) are served there by the gateway
    * worker. `api` is the app's older, separate API hostname, which the gateway still answers so
    * services set up with it (sign-in callbacks, Slack, webhooks) keep working; null for none.
@@ -43,6 +49,15 @@ export const site = {
     slack: "https://g3robotics.slack.com",
     github: "https://github.com/midtownrobotics",
     instagram: "https://www.instagram.com/g3robotics1648/",
+  },
+
+  /** The platform's source code (MIT licensed). */
+  sourceUrl: "https://github.com/midtownrobotics/Gearbox",
+
+  /** The platform's terms of service and privacy policy, which a team accepts when it signs up. */
+  legal: {
+    terms: "https://github.com/midtownrobotics/Gearbox/blob/main/docs/legal/terms-of-service.md",
+    privacy: "https://github.com/midtownrobotics/Gearbox/blob/main/docs/legal/privacy-policy.md",
   },
 
   /** The platform's donation page, linked in the footer of every team's sign-in page. */

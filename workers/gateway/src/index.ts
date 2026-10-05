@@ -1,21 +1,24 @@
 import { type AppName, TEAM_HOST_APPS, isAllowedOrigin, site, teamKey } from "@g3/site-config";
 
-// The one worker on *.<domain>/*: works out the team and app from the hostname and sends the
-// request to that app's worker. Each app's worker serves the app's page and its API at /api (see
-// @g3/site-config/worker).
-//   <app>.<domain>/...           → the app, for the team in site.ts (G3's addresses today)
-//   api.<app>.<domain>/...       → the app's /api/..., for the team in site.ts (the older API
-//                                  addresses, which Slack, webhooks and the edge box may still use)
-//   <number>.<domain>/...        → that team's home (Portal)
-//   <number>-<app>.<domain>/...  → the app, for team <number>
-//   <any of those>/api/~<app>/... → another app's /api/..., for the same team: how one app's page
-//                                  calls another's API (`apiPath` in @g3/site-config)
-//   id.<domain>/...              → G3ID, for no team: where sign-in providers call back
-//                                  (`signInCallbackApiUrl`); the team is in the sign-in's state
-//   anything else                → passed on to wherever its DNS points (www, the edge box's tunnel)
+// The one worker on *.<domain>/* and the platform's domain: works out the team and app from the
+// hostname and sends the request to that app's worker. Each app's worker serves the app's page and
+// its API at /api (see @g3/site-config/worker). <domain> is site.ts's `domain` (the team in site.ts,
+// G3 today) and <platform> its `platformDomain` (every other team, and the platform itself).
+//   <app>.<domain>/...             → the app, for the team in site.ts
+//   api.<app>.<domain>/...         → the app's /api/..., for the team in site.ts (the older API
+//                                    addresses, which Slack, webhooks and the edge box may still use)
+//   <platform>/, www.<platform>/   → the platform worker: public site and team sign-up
+//   <number>.<platform>/...        → that team's home (Portal)
+//   <number>-<app>.<platform>/...  → the app, for team <number>
+//   <any of those>/api/~<app>/...  → another app's /api/..., for the same team: how one app's page
+//                                    calls another's API (`apiPath` in @g3/site-config)
+//   id.<domain>/, id.<platform>/   → G3ID, for no team: where sign-in providers call back
+//                                    (`signInCallbackApiUrl`); the team is in the sign-in's state
+//   anything else                  → passed on to wherever its DNS points (www, the edge box's tunnel)
+// /api/internal/... is for workers only (over service bindings) and never answered here.
 //
 // On the way it keeps teams apart (roadmap step 2.3):
-// - A team-number host only answers for a team that exists in G3ID.
+// - A team-number host only answers for a team the platform has (signed up and active).
 // - A session belonging to another team's member is dropped: the app sees a signed-out request.
 // - An /api request from another team's page (its Origin) is refused. Every app's CORS allows the
 //   whole domain, so without this one team's page could call another team's API with a member's
@@ -24,10 +27,14 @@ import { type AppName, TEAM_HOST_APPS, isAllowedOrigin, site, teamKey } from "@g
 //   sent are removed first. Apps don't rely on them yet; production app workers have no
 //   workers.dev address, so these headers can only come from here.
 
-export type Env = Record<(typeof BINDINGS)[AppName], Fetcher>;
+/** An app, or the platform itself. */
+type Worker = AppName | "platform";
 
-/** The service binding for each app's worker (wrangler.toml). */
+export type Env = Record<(typeof BINDINGS)[Worker], Fetcher>;
+
+/** The service binding for each worker (wrangler.toml). */
 const BINDINGS = {
+  platform: "PLATFORM",
   id: "G3ID",
   portal: "PORTAL",
   shop: "SHOP",
@@ -37,7 +44,7 @@ const BINDINGS = {
   scouting: "SCOUTING",
   skillTree: "SKILL_TREE",
   attendance: "ATTENDANCE",
-} as const satisfies Record<AppName, string>;
+} as const satisfies Record<Worker, string>;
 
 /** Headers only the gateway sets. */
 export const IDENTITY_HEADERS = {
@@ -52,11 +59,14 @@ export const IDENTITY_HEADERS = {
 } as const;
 
 /** `team` is null on platform hosts, which serve every team. */
-type Route = { app: AppName; team: string | null; oldApi: boolean };
+type Route = { app: Worker; team: string | null; oldApi: boolean };
 
 /** Platform hosts: the same for every team. */
 const PLATFORM_ROUTES = new Map<string, Route>([
+  [site.platformDomain, { app: "platform", team: null, oldApi: false }],
+  [`www.${site.platformDomain}`, { app: "platform", team: null, oldApi: false }],
   [`id.${site.domain}`, { app: "id", team: null, oldApi: false }],
+  [`id.${site.platformDomain}`, { app: "id", team: null, oldApi: false }],
 ]);
 
 /** The hostnames for the team in site.ts: each app's address, and its older API address. */
@@ -82,8 +92,9 @@ const TEAM_HOST_APP = new Map<string, AppName>(
 export function route(hostname: string): Route | "unknown app" | null {
   const known = SITE_ROUTES.get(hostname) ?? PLATFORM_ROUTES.get(hostname);
   if (known) return known;
-  if (!hostname.endsWith(`.${site.domain}`)) return null;
-  const match = hostname.slice(0, -site.domain.length - 1).match(/^([1-9]\d*)(?:-(.+))?$/);
+  if (!hostname.endsWith(`.${site.platformDomain}`)) return null;
+  const label = hostname.slice(0, -site.platformDomain.length - 1);
+  const match = label.match(/^([1-9]\d*)(?:-(.+))?$/);
   if (!match) return null;
   const app = match[2] === undefined ? "portal" : TEAM_HOST_APP.get(match[2]);
   if (!app) return "unknown app";
@@ -101,7 +112,7 @@ function originAllowed(origin: string, team: string | null): boolean {
   return from !== "unknown app" && (from.team === null || from.team === team);
 }
 
-// Lookups through G3ID, remembered for a minute in this isolate: a team never disappears in a
+// Lookups through the platform and G3ID, remembered for a minute in this isolate: a team never disappears in a
 // minute, and a session's team never changes (an account belongs to one team). A session signed
 // out in that minute still gets identity headers; apps still check the session with G3ID
 // themselves, and must not trust the headers alone until that's handled (roadmap Phase 3).
@@ -169,7 +180,7 @@ export default {
     const { team } = target;
     if (team !== null && team !== teamKey) {
       const exists = await teamExists(team, async () => {
-        const res = await env.G3ID.fetch(`http://g3id/api/teams/${team}`);
+        const res = await env.PLATFORM.fetch(`http://platform/api/teams/${team}`);
         return res.ok;
       });
       if (!exists) return json(404, "No such team.");
@@ -204,14 +215,17 @@ export default {
       }
     }
 
-    let app = target.app;
+    let app: Worker = target.app;
     const other = target.oldApi ? null : url.pathname.match(/^\/api\/~([A-Za-z]+)(\/.*)?$/);
     if (other) {
       if (!(other[1] in BINDINGS)) return json(404, "No such app.");
-      app = other[1] as AppName;
+      app = other[1] as Worker;
       url.pathname = `/api${other[2] ?? "/"}`;
     }
     if (target.oldApi) url.pathname = `/api${url.pathname}`;
+    if (url.pathname === "/api/internal" || url.pathname.startsWith("/api/internal/")) {
+      return json(404, "Not found.");
+    }
     return env[BINDINGS[app]].fetch(new Request(url.toString(), new Request(request, { headers })));
   },
 };

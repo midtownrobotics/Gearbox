@@ -8,7 +8,7 @@ import { sessionCookieOptions } from "../../lib/cookie";
 import { decodeState, encodeState } from "../../lib/oauth-state";
 import { sanitizeRedirect } from "../../lib/redirect";
 import { createSession } from "../../lib/session";
-import { requestTeamId, teamFrontend, teamOfUser } from "../../lib/team";
+import { providerRedirectUri, requestTeamId, teamFrontend, teamOfUser } from "../../lib/team";
 import type { AppEnv } from "../../types";
 
 const STEAM_OPENID_URL = "https://steamcommunity.com/openid/login";
@@ -41,7 +41,7 @@ export const steamAuthRouter = new Hono<AppEnv>()
     const team = requestTeamId(c);
     const redirect = sanitizeRedirect(c.req.query("redirect"), team);
     const state = await generateState(c.env, encodeState({ team, redirect, linkUserId: null }));
-    return c.redirect(buildSteamUrl(c.env.STEAM_REDIRECT_URI, state));
+    return c.redirect(buildSteamUrl(providerRedirectUri(c.env, "steam", team), state));
   })
   // Link initiation — user must already be signed in
   .get("/steam/link", async (c) => {
@@ -54,7 +54,7 @@ export const steamAuthRouter = new Hono<AppEnv>()
       c.env,
       encodeState({ team, redirect: null, linkUserId: userId }),
     );
-    return c.redirect(buildSteamUrl(c.env.STEAM_REDIRECT_URI, state));
+    return c.redirect(buildSteamUrl(providerRedirectUri(c.env, "steam", team), state));
   })
   // Shared callback
   .get("/steam/callback", async (c) => {
@@ -178,6 +178,6 @@ export const steamAuthRouter = new Hono<AppEnv>()
     }
 
     const sessionId = await createSession(user.id, c.env);
-    setCookie(c, "g3_session", sessionId, sessionCookieOptions(c.env.FRONTEND_URL));
+    setCookie(c, "g3_session", sessionId, sessionCookieOptions(c.req.url));
     return c.redirect(redirectTo ?? app("/dashboard"));
   });

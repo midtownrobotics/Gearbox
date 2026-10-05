@@ -72,7 +72,7 @@ describe("gateway", () => {
 // Teams: G3ID (stubbed in vitest.config.mts) knows teams 1648 and 254, and sessions "ours" (an admin
 // of 1648), "theirs" (a member of 254) and "kiosk" (a 254 kiosk PIN session).
 const ours = site.team.number;
-const team = (host: string) => `https://${host}.${site.domain}`;
+const team = (host: string) => `https://${host}.${site.platformDomain}`;
 
 describe("team addresses", () => {
   it("sends <number>-<app> to the app and <number> to the team's home, for that team", async () => {
@@ -208,5 +208,41 @@ describe("the platform's sign-in callback host", () => {
       user: null,
       cookie: "g3_session=theirs",
     });
+  });
+});
+
+describe("the platform", () => {
+  it("serves the platform's own domain, and www, from the platform worker", async () => {
+    expect(await routed(`https://${site.platformDomain}/signup`)).toMatchObject({
+      app: "PLATFORM",
+      path: "/signup",
+      team: null,
+    });
+    expect((await routed(`https://www.${site.platformDomain}/`)).app).toBe("PLATFORM");
+  });
+
+  it("answers id.<platform> for sign-in callbacks too", async () => {
+    expect(
+      await routed(`https://id.${site.platformDomain}/api/auth/google/callback`),
+    ).toMatchObject({
+      app: "G3ID",
+      team: null,
+    });
+  });
+
+  it("only uses team-number addresses on the platform's domain", async () => {
+    const res = await gateway(`https://254-orders.${site.domain}/`);
+    expect(await res.json()).toMatchObject({ app: "origin" });
+  });
+
+  it("never answers workers' internal routes", async () => {
+    for (const url of [
+      `https://${site.apps.id.web}.${site.domain}/api/internal/teams`,
+      `https://api.g3id.${site.domain}/internal/teams`,
+      `${team("254")}/api/~id/internal/teams`,
+      `https://${site.platformDomain}/api/internal/x`,
+    ]) {
+      expect((await gateway(url, { method: "POST" })).status).toBe(404);
+    }
   });
 });

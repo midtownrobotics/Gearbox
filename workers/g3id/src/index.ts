@@ -12,6 +12,7 @@ import { onshapeAuthRouter } from "./routes/auth/onshape";
 import { pinAuthRouter } from "./routes/auth/pin";
 import { slackAuthRouter } from "./routes/auth/slack";
 import { steamAuthRouter } from "./routes/auth/steam";
+import { internalRouter } from "./routes/internal";
 import { kioskRouter } from "./routes/kiosk";
 import { onshapeRouter } from "./routes/onshape";
 import { slackRouter } from "./routes/slack";
@@ -49,6 +50,7 @@ const app = base
   .route("/admin", adminRouter)
   .route("/users", usersRouter)
   .route("/teams", teamsRouter)
+  .route("/internal", internalRouter)
   .route("/onshape", onshapeRouter)
   .route("/", kioskRouter)
   .route("/slack", slackRouter);

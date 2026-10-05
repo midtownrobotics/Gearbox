@@ -1,4 +1,4 @@
-import { teamAppUrl, teamKey } from "@g3/site-config";
+import { signInCallbackApiUrl, teamAppUrl, teamKey } from "@g3/site-config";
 import { eq } from "drizzle-orm";
 import type { Context } from "hono";
 import type { Db } from "../db";
@@ -20,6 +20,28 @@ export const siteTeamId = teamKey;
 /** A team's G3ID page, where its members sign in: FRONTEND_URL for the site's team. */
 export function teamFrontend(env: AppEnv["Bindings"], teamId: string): string {
   return teamId === teamKey ? env.FRONTEND_URL : teamAppUrl(teamId, "id");
+}
+
+/**
+ * Where a sign-in provider sends a team's members back: id.<domain> for the site's team (its
+ * `*_REDIRECT_URI` setting, localhost in dev), id.<platform domain> for every other team, so the
+ * session cookie is set on the team's own domain. Each must be registered with the provider.
+ */
+export function providerRedirectUri(
+  env: AppEnv["Bindings"],
+  provider: "google" | "github" | "steam" | "onshape",
+  teamId: string,
+): string {
+  if (teamId === teamKey) {
+    const settings = {
+      google: env.GOOGLE_REDIRECT_URI,
+      github: env.GITHUB_REDIRECT_URI,
+      steam: env.STEAM_REDIRECT_URI,
+      onshape: env.ONSHAPE_REDIRECT_URI,
+    };
+    return settings[provider];
+  }
+  return `${signInCallbackApiUrl(teamId)}/auth/${provider}/callback`;
 }
 
 /** The team a user belongs to. */

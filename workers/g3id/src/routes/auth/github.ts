@@ -9,13 +9,13 @@ import { newId } from "../../lib/id";
 import { decodeState, encodeState } from "../../lib/oauth-state";
 import { sanitizeRedirect } from "../../lib/redirect";
 import { createSession } from "../../lib/session";
-import { requestTeamId, teamFrontend, teamOfUser } from "../../lib/team";
+import { providerRedirectUri, requestTeamId, teamFrontend, teamOfUser } from "../../lib/team";
 import type { AppEnv } from "../../types";
 
-function buildGithubUrl(env: AppEnv["Bindings"], state: string): string {
+function buildGithubUrl(env: AppEnv["Bindings"], state: string, redirectUri: string): string {
   const params = new URLSearchParams({
     client_id: env.GITHUB_CLIENT_ID,
-    redirect_uri: env.GITHUB_REDIRECT_URI,
+    redirect_uri: redirectUri,
     scope: "read:user user:email",
     state,
   });
@@ -150,7 +150,7 @@ export const githubAuthRouter = new Hono<AppEnv>()
     const team = requestTeamId(c);
     const redirect = sanitizeRedirect(c.req.query("redirect"), team);
     const state = await generateState(c.env, encodeState({ team, redirect, linkUserId: null }));
-    return c.redirect(buildGithubUrl(c.env, state));
+    return c.redirect(buildGithubUrl(c.env, state, providerRedirectUri(c.env, "github", team)));
   })
   // Link initiation — user must already be signed in
   .get("/github/link", async (c) => {
@@ -163,7 +163,7 @@ export const githubAuthRouter = new Hono<AppEnv>()
       c.env,
       encodeState({ team, redirect: null, linkUserId: userId }),
     );
-    return c.redirect(buildGithubUrl(c.env, state));
+    return c.redirect(buildGithubUrl(c.env, state, providerRedirectUri(c.env, "github", team)));
   })
   // Shared callback
   .get("/github/callback", async (c) => {
@@ -199,7 +199,7 @@ export const githubAuthRouter = new Hono<AppEnv>()
         client_id: c.env.GITHUB_CLIENT_ID,
         client_secret: c.env.GITHUB_CLIENT_SECRET,
         code,
-        redirect_uri: c.env.GITHUB_REDIRECT_URI,
+        redirect_uri: providerRedirectUri(c.env, "github", st.team),
       }),
     });
 
@@ -311,7 +311,7 @@ export const githubAuthRouter = new Hono<AppEnv>()
       }
 
       const sessionId = await createSession(user.id, c.env);
-      setCookie(c, "g3_session", sessionId, sessionCookieOptions(c.env.FRONTEND_URL));
+      setCookie(c, "g3_session", sessionId, sessionCookieOptions(c.req.url));
       return c.redirect(redirectTo ?? app("/dashboard"));
     }
 

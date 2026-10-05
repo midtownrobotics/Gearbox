@@ -13,6 +13,7 @@ import {
   edgeAgentUrl,
   signInCallbackApiUrl,
   site,
+  teamKey,
 } from "../packages/site-config/src/index.ts";
 
 const root = join(import.meta.dirname, "..");
@@ -47,7 +48,7 @@ function wranglerRules(app: Exclude<AppName, "portal">): Rule[] {
     httpsVar(
       "(GOOGLE|GITHUB|STEAM|ONSHAPE)_REDIRECT_URI",
       // One address for every team: the platform's id.<domain> host.
-      (m) => `${signInCallbackApiUrl}/auth/${m[2].toLowerCase()}/callback`,
+      (m) => `${signInCallbackApiUrl(teamKey)}/auth/${m[2].toLowerCase()}/callback`,
     ),
     [/^(TEAM_NUMBER = )"[^"]*"/gm, (m) => `${m[1]}"${site.team.number}"`],
   ];
@@ -61,8 +62,15 @@ const FILES: [path: string, rules: Rule[]][] = [
     // The gateway worker answers every subdomain.
     "workers/gateway/wrangler.toml",
     [
-      [/^(pattern = )"[^"]*"/gm, (m) => `${m[1]}"*.${site.domain}/*"`],
-      [/^(zone_name = )"[^"]*"/gm, (m) => `${m[1]}"${site.domain}"`],
+      // Each route line says which domain it's for.
+      [/^(pattern = )"[^"]*"( # site)$/gm, (m) => `${m[1]}"*.${site.domain}/*"${m[2]}`],
+      [/^(zone_name = )"[^"]*"( # site)$/gm, (m) => `${m[1]}"${site.domain}"${m[2]}`],
+      [
+        /^(pattern = )"[^"]*"( # platform subdomains)$/gm,
+        (m) => `${m[1]}"*.${site.platformDomain}/*"${m[2]}`,
+      ],
+      [/^(pattern = )"[^"]*"( # platform)$/gm, (m) => `${m[1]}"${site.platformDomain}/*"${m[2]}`],
+      [/^(zone_name = )"[^"]*"( # platform.*)$/gm, (m) => `${m[1]}"${site.platformDomain}"${m[2]}`],
     ],
   ],
   [

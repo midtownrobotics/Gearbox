@@ -121,7 +121,7 @@ export const emailAuthRouter = new Hono<AppEnv>()
     }
 
     const sessionId = await createSession(user.id as string, c.env);
-    setCookie(c, "g3_session", sessionId, sessionCookieOptions(c.env.FRONTEND_URL));
+    setCookie(c, "g3_session", sessionId, sessionCookieOptions(c.req.url));
 
     return c.json({ ok: true });
   })
