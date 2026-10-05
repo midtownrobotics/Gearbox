@@ -66,6 +66,17 @@ export function teamOfHost(hostname: string): string | null {
 export const platformUrl = `https://${site.platformDomain}`;
 
 /**
+ * The platform operators' console (roadmap 2.8), served by the platform worker at admin.<domain>
+ * on both domains: an operator opens it on their own team's domain, where their session cookie is.
+ */
+export const CONSOLE_HOSTS = [`admin.${site.domain}`, `admin.${site.platformDomain}`] as const;
+
+/** The console's address for an operator on `teamId`: on the same domain as their team's pages. */
+export function consoleUrl(teamId: string): string {
+  return `https://admin.${teamId === teamKey ? site.domain : site.platformDomain}`;
+}
+
+/**
  * Where sign-in providers (Google, GitHub, Steam, Onshape) send people back: G3ID's API on an
  * id.<domain> host, one per domain, so the session cookie lands on the team's own domain. This
  * file's team uses id.<domain>; every other team id.<platform domain>. The team travels in the

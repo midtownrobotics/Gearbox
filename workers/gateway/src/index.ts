@@ -1,4 +1,11 @@
-import { type AppName, TEAM_HOST_APPS, isAllowedOrigin, site, teamKey } from "@g3/site-config";
+import {
+  type AppName,
+  CONSOLE_HOSTS,
+  TEAM_HOST_APPS,
+  isAllowedOrigin,
+  site,
+  teamKey,
+} from "@g3/site-config";
 
 // The one worker on *.<domain>/* and the platform's domain: works out the team and app from the
 // hostname and sends the request to that app's worker. Each app's worker serves the app's page and
@@ -8,6 +15,8 @@ import { type AppName, TEAM_HOST_APPS, isAllowedOrigin, site, teamKey } from "@g
 //   api.<app>.<domain>/...         → the app's /api/..., for the team in site.ts (the older API
 //                                    addresses, which Slack, webhooks and the edge box may still use)
 //   <platform>/, www.<platform>/   → the platform worker: public site and team sign-up
+//   admin.<domain>/, admin.<platform>/ → the platform worker: the operators' console (on both
+//                                    domains, so it gets an operator's session cookie on either)
 //   <number>.<platform>/...        → that team's home (Portal)
 //   <number>-<app>.<platform>/...  → the app, for team <number>
 //   <any of those>/api/~<app>/...  → another app's /api/..., for the same team: how one app's page
@@ -65,6 +74,10 @@ type Route = { app: Worker; team: string | null; oldApi: boolean };
 const PLATFORM_ROUTES = new Map<string, Route>([
   [site.platformDomain, { app: "platform", team: null, oldApi: false }],
   [`www.${site.platformDomain}`, { app: "platform", team: null, oldApi: false }],
+  ...CONSOLE_HOSTS.map((host): [string, Route] => [
+    host,
+    { app: "platform", team: null, oldApi: false },
+  ]),
   [`id.${site.domain}`, { app: "id", team: null, oldApi: false }],
   [`id.${site.platformDomain}`, { app: "id", team: null, oldApi: false }],
 ]);

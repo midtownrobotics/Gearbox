@@ -1,3 +1,5 @@
+import type { G3AuthVariables } from "@g3/auth";
+
 export type AppEnv = {
   Bindings: {
     PLATFORM_DB: D1Database;
@@ -6,4 +8,6 @@ export type AppEnv = {
     SLACK_CLIENT_ID: string;
     SLACK_CLIENT_SECRET?: string;
   };
+  /** The signed-in user, on the operators' console (`requireAuth` from @g3/auth). */
+  Variables: G3AuthVariables;
 };

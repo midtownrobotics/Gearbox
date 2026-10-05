@@ -207,27 +207,36 @@ describe("signing in to a team", () => {
     });
   });
 
+  /** Where a Slack sign-in for `team` would send someone back to afterwards. */
+  const redirectOf = async (team: string, redirect: string) => {
+    const res = await asTeam(team, `/auth/slack/initiate?redirect=${encodeURIComponent(redirect)}`);
+    const token = new URL(res.headers.get("Location") as string).searchParams.get("token");
+    return (
+      await one<{ redirect_url: string | null }>(
+        "SELECT redirect_url FROM core_slack_link_codes WHERE polling_token = ?",
+        token,
+      )
+    )?.redirect_url;
+  };
+
   it("only lets a sign-in return to its own team's pages", async () => {
     const otherTeam = await createTeam();
     const number = otherTeam.slice(3);
     const ours = `https://orders.${site.domain}/lists`;
     const theirs = `https://${number}-orders.${site.platformDomain}/lists`;
-    const redirectOf = async (team: string, redirect: string) => {
-      const res = await asTeam(
-        team,
-        `/auth/slack/initiate?redirect=${encodeURIComponent(redirect)}`,
-      );
-      const token = new URL(res.headers.get("Location") as string).searchParams.get("token");
-      return (
-        await one<{ redirect_url: string | null }>(
-          "SELECT redirect_url FROM core_slack_link_codes WHERE polling_token = ?",
-          token,
-        )
-      )?.redirect_url;
-    };
     expect(await redirectOf(otherTeam, theirs)).toBe(theirs);
     expect(await redirectOf(otherTeam, ours)).toBeNull();
     expect(await redirectOf(teamKey, ours)).toBe(ours);
     expect(await redirectOf(teamKey, theirs)).toBeNull();
+  });
+
+  it("lets an operator return to the console on their team's domain", async () => {
+    const otherTeam = await createTeam();
+    const siteConsole = `https://admin.${site.domain}/console`;
+    const platformConsole = `https://admin.${site.platformDomain}/console`;
+    expect(await redirectOf(teamKey, siteConsole)).toBe(siteConsole);
+    expect(await redirectOf(otherTeam, platformConsole)).toBe(platformConsole);
+    // Not the other domain's: the session cookie wouldn't be there.
+    expect(await redirectOf(teamKey, platformConsole)).toBeNull();
   });
 });

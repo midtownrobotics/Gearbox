@@ -49,6 +49,19 @@ The platform Worker serves `frcgearbox.com` (team sign-up) and every other team'
 4. **Sign-in providers:** add `https://id.frcgearbox.com/api/auth/<provider>/callback` for Google, GitHub and Onshape (other teams' sign-ins call back there).
 5. **Deploy** G3ID, then the platform Worker, then the gateway (it binds to the platform).
 
+## The operators' console (once)
+
+Platform operators manage teams at `admin.<domain>` (G3's operators, whose session cookie is on G3's domain) and `admin.frcgearbox.com` (anyone else's). The gateway sends both to the platform Worker, which serves the console at `/console`.
+
+1. **DNS:** both names are covered by the wildcard records. If `admin.<domain>` has a record of its own (from the old admin app), delete it.
+2. **Database:** apply the platform's migrations (`pnpm --filter @g3/worker-platform db:migrate:remote`) before deploying its Worker.
+3. **The first operator:** open the console, sign in, and copy the account id it shows. Then:
+   ```bash
+   pnpm --filter @g3/worker-platform exec wrangler d1 execute PLATFORM_DB --env production --remote \
+     --command "INSERT INTO operators (user_id, created_at) VALUES ('<account id>', unixepoch())"
+   ```
+   Operators add each other on the console's Operators page after that.
+
 Later, move outside services to the new addresses one at a time, then drop the old ones:
 
 - **Sign-in providers:** remove the old `api.g3id.<domain>` callback URLs.

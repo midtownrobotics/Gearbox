@@ -1,6 +1,6 @@
 # Multi-Team Platform Roadmap
 
-Status as of 4 October 2026. This file is the plan of record: when a change completes or advances a step, update the step's Status, the Progress table and "What landed" in the same pull request.
+Status as of 5 October 2026. This file is the plan of record: when a change completes or advances a step, update the step's Status, the Progress table and "What landed" in the same pull request.
 
 ## Summary
 
@@ -37,13 +37,13 @@ Three release points sit between phases: G3 moves to its frcgearbox.com addresse
 
 ## Progress
 
-As of 4 October 2026, five of the six Phase 0 steps are done on `main`, the new site config has delivered part of Phase 1 early, and Phase 2 has started: G3ID has teams, and each app is served by its own Worker behind a gateway. Phases 3 to 6 have not started.
+As of 5 October 2026, five of the six Phase 0 steps are done on `main`, the new site config has delivered part of Phase 1 early, and Phase 2 has started: G3ID has teams, and each app is served by its own Worker behind a gateway. Phases 3 to 6 have not started.
 
 | Phase | Status | What is left |
 | --- | --- | --- |
 | 0. Groundwork | In progress | The deploy workflow with a staging environment (0.2) |
 | 1. Remove G3 from the platform | In progress | Three page texts that still say G3 (1.1); theme, logo and font from the team's config (1.3, 1.4); Scouting's G3-specific names (1.6); the README (1.7) |
-| 2. Tenancy core | In progress | Operator tools (2.8), local development (2.9), team context per request (2.10) |
+| 2. Tenancy core | In progress | Local development (2.9), team context per request (2.10) |
 | 3. Team-scoped apps | Not started | All of it |
 | 4. App library and dashboard | Not started | All of it |
 | 5. Live demo | Not started | All of it |
@@ -65,6 +65,7 @@ As of 4 October 2026, five of the six Phase 0 steps are done on `main`, the new 
 | Sign-in per team on `<number>-id`, with provider callbacks on `id.<domain>` and the team in the sign-in's state | 2.5 | [#142](https://github.com/midtownrobotics/Gearbox/pull/142) |
 | Slack per team: workspaces connected from G3ID's admin page, tokens encrypted, commands and events routed by workspace | 2.6 | [#142](https://github.com/midtownrobotics/Gearbox/pull/142) |
 | Team sign-up on the platform Worker: details, Slack, and the founder's code; the team registry; other teams' addresses on frcgearbox.com | 2.7 | [#142](https://github.com/midtownrobotics/Gearbox/pull/142) |
+| Operators' console on the platform Worker at `admin.<domain>`: an operator flag kept by the platform, teams and number reports, and tools to hand over, renumber, suspend or delete a team, with a 12-month access log | 2.8 | This pull request |
 | A version per app, changelogs, and a `main` to `public` release flow | Part of 0.2 | [#128](https://github.com/midtownrobotics/Gearbox/pull/128), [#129](https://github.com/midtownrobotics/Gearbox/pull/129) |
 | Shared navbar, light and dark mode, one color scheme | Groundwork for 1.3 | [#126](https://github.com/midtownrobotics/Gearbox/pull/126), [#127](https://github.com/midtownrobotics/Gearbox/pull/127) |
 
@@ -74,6 +75,7 @@ As of 4 October 2026, five of the six Phase 0 steps are done on `main`, the new 
 - **One team per account.** A user belongs to exactly one team, held as `team_id` on the user row. There is no memberships table, and `is_admin`, `is_mentor` and `status` stay on the user as they are today (steps 2.1, 2.2).
 - **The site config is the bridge to team records.** It is compiled into each app today, so one build serves one team. Step 2.10 replaces it with team context resolved on each request.
 - **Releases shape deploys.** `main` deploys to staging and `public` to production (0.2). An approved variant goes live with the next release (Phase 6).
+- **Operator tools live in the platform, not G3ID.** The operator flag, the console's API and its log are the platform Worker's, with the console in the platform app at `admin.<domain>` (step 2.8). G3ID only carries out what touches its accounts, through internal routes.
 - **Changesets apply to everyone.** A variant's pull request needs one, like any other change to an app (6.4).
 
 ## Where the codebase started
@@ -153,7 +155,7 @@ App Workers have no public address, so the gateway is the only way in. It asks t
 | `<number>-<app>.frcgearbox.com` | One app for one team. Pages and `/api` share the origin, so CORS is no longer needed |
 | `id.frcgearbox.com` | OAuth callbacks (and Slack endpoints, 2.6). One fixed host, because providers need a registered callback address; the team travels in the sign-in's state |
 | `creators.frcgearbox.com` | Creators' portal |
-| `admin.frcgearbox.com` | Your team's console: review queue, teams, app library |
+| `admin.frcgearbox.com` | Your team's console: review queue, teams, app library. Served by the platform Worker; until G3's cutover also at `admin.g3robotics.com`, where G3's operators' session cookie is |
 
 A team's address is its FRC team number, and no two teams can share a number. The first hyphen always separates team from app: `1648-skill-tree` is team 1648, app `skill-tree`. A hostname that starts with a digit is a team; platform addresses (`www`, `id`, `creators`, `admin`, `demo`) are words, so teams need no slugs and no reserved list. In G3ID a team's id is its key, `frc<number>`.
 
@@ -161,7 +163,7 @@ A team's address is its FRC team number, and no two teams can share a number. Th
 
 - **Each account belongs to one team.** The user row carries `team_id`, and roles stay where they are: `is_admin`, `is_mentor` and `status` (pending, active, rejected) on the user. A team's owner is recorded when team sign-up (2.7) is built. There is no memberships table. Emails and linked sign-ins stay unique across the platform, so someone who helps two teams needs a second account with a different email and sign-in.
 - **Each team owns its sign-in environment:** which sign-in methods are allowed, how people join (invite link, its Slack workspace, admin approval), its Slack connection, its kiosks and PINs.
-- **Platform operators are separate.** A flag for your team that no team role implies.
+- **Platform operators are separate.** A flag the platform Worker keeps on G3ID accounts (its `operators` table), which no team role implies.
 - **App code never sees the session cookie.** The gateway reads it, removes it, and passes verified identity (user, team, role, session type) to the app Worker over a service binding. App Workers have no public address of their own.
 - **Kiosk PIN sessions belong to one team** and are refused on any other team's hosts.
 
@@ -258,7 +260,7 @@ After Phase 2 a second team can be created on staging, sign in on its own brande
 | 2.5 | Sign-in per team, with G3ID kept as the sign-in app: each team signs in at `<number>-id.frcgearbox.com/login`, which shows the team's number and name. OAuth callbacks land on `id.frcgearbox.com` with the team and return address in the sign-in's state (kept server-side in KV, or signed for GitHub), and only that team's members are signed in, by every method (Google, GitHub, Steam, Slack codes, email, kiosk PIN). The redirect check accepts only pages of the team being signed in to. The page footer carries a small donation link, one address set for the whole platform (`site.donationUrl`). The session cookie keeps its name (`g3_session`) and moves to the frcgearbox.com domain with `site.ts` | `workers/g3id/src/routes/auth/*`, `lib/redirect.ts`, `lib/oauth-state.ts`, `apps/g3id` login page | Done |
 | 2.6 | Slack per team: one Slack app, made installable by any workspace; a team admin connects the team's workspace from G3ID (Admin → Slack, calling back on `id.<domain>`). Each team's workspace ID and bot token are stored in `slack_installations`, the token encrypted with the `SECRETS_KEY` secret. Slash commands and events find the team by workspace, a sign-in code only works from its own team's workspace, and the bot replies with that workspace's token. Removing the app from a workspace forgets it. G3 keeps its existing settings (`SLACK_BOT_TOKEN`, `SLACK_TEAM_ID`) until it connects through the admin page. Orders', Shop's and Scouting's own Slack messages stay on G3's token until Phase 3 | `routes/slack.ts`, `lib/slack-code.ts`, `lib/slack-install.ts`, G3ID's Admin → Slack page | Done |
 | 2.7 | Team sign-up on `frcgearbox.com`, served by a new platform Worker that keeps the team registry (number, name, country, time zone, status, founder): the founder enters the team number, name, country and time zone and accepts the terms, then adds the Slack bot to the team's workspace, then sends the bot a code from that workspace. That makes them the team's first admin, with Slack as their sign-in, and signs them in on the team's own address. Members join through the team's Slack, so nobody signs up on other providers. Sign-up is refused when another team already holds that number. Other teams' addresses are on frcgearbox.com; G3 keeps g3robotics.com | `workers/platform`, `apps/platform`, `workers/g3id/src/routes/internal.ts` | Done |
-| 2.8 | Platform-operator flag, with tools to delete a team, change its team number or transfer its ownership when a number was claimed wrongly. These live in the shell of `admin.frcgearbox.com` | `workers/g3id`, new console app | Not started |
+| 2.8 | Platform-operator flag, with tools to delete a team, change its team number or transfer its ownership when a number was claimed wrongly. Built in the platform Worker and app, not G3ID: the `operators` table flags G3ID accounts (no team role implies it), and the console at `admin.<domain>/console` lists teams and number reports, hands a team to another member, renumbers it, suspends or reactivates it, and deletes it. G3ID does its part through internal routes (members, delete, renumber, owner). Every action and each look at a team's members goes in `operator_actions`, kept 12 months. The site's own team can't be deleted, renumbered or suspended. When Phase 3 scopes app data, deleting and renumbering must reach each app's rows too | `workers/platform/src/console.ts`, `apps/platform/src/console`, `workers/g3id/src/routes/internal.ts` | Done |
 | 2.9 | Local development: the gateway on one port with `<number>-<app>.localhost` hostnames. Update `.dev-ports.json` and the port printer | `scripts/` | Not started |
 | 2.10 | Replace the build-time site config with team context resolved on each request. The values in `site.ts` become G3's team and brand rows. `appUrl`, `wordmark` and the other helpers read the team the gateway resolved. `pnpm configure` and the `%SITE_*%` placeholders in `index.html` go away, so one build serves every team | `packages/site-config`, `scripts/configure.ts`, each app's `vite.config` | Not started |
 
@@ -541,7 +543,7 @@ The risk that matters most is one team seeing another team's data. Most of the s
 | Student data | Most members are minors, and other teams will hold their data on your platform | Terms and a privacy policy before the first outside team joins; export and delete per team from Phase 4 |
 | Demo abuse | The demo accepts writes from anyone | Side-effect guard, upload caps, rate limits, scheduled reset |
 | Plan limits | Staging doubles the database and Worker counts | Settled: the account is on Workers Paid, and its limits leave room |
-| Wrong team-number claims | Anyone can claim a number that no team holds yet, including one that is not theirs | Sign-up warns that a falsely registered team may be permanently deleted with its data; anyone can report a number at `frcgearbox.com/report`, leaving an email to follow up (stored for operators, listed in the console from 2.8); operators can delete, renumber or transfer a team; the terms require a truthful claim; every operator action is logged |
+| Wrong team-number claims | Anyone can claim a number that no team holds yet, including one that is not theirs | Sign-up warns that a falsely registered team may be permanently deleted with its data; anyone can report a number at `frcgearbox.com/report`, leaving an email to follow up (stored for operators and listed in their console); operators can suspend, delete, renumber or transfer a team; the terms require a truthful claim; every operator action is logged |
 | Hosting single-team apps | Your organization runs and maintains code that serves only one other team | The same review bar as any variant; you may decline; every entry names a maintainer |
 
 ### Open questions

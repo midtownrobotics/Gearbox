@@ -221,6 +221,16 @@ describe("the platform", () => {
     expect((await routed(`https://www.${site.platformDomain}/`)).app).toBe("PLATFORM");
   });
 
+  it("serves the operators' console on admin.<domain> and admin.<platform>, for no team", async () => {
+    for (const domain of [site.domain, site.platformDomain]) {
+      expect(
+        await routed(`https://admin.${domain}/api/console/me`, {
+          headers: { Cookie: "g3_session=theirs" },
+        }),
+      ).toMatchObject({ app: "PLATFORM", team: null, user: null, cookie: "g3_session=theirs" });
+    }
+  });
+
   it("answers id.<platform> for sign-in callbacks too", async () => {
     expect(
       await routed(`https://id.${site.platformDomain}/api/auth/google/callback`),

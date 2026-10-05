@@ -800,6 +800,9 @@ importers:
 
   workers/platform:
     dependencies:
+      '@g3/auth':
+        specifier: workspace:*
+        version: link:../../packages/auth
       '@g3/site-config':
         specifier: workspace:*
         version: link:../../packages/site-config

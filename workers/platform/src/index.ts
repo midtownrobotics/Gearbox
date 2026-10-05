@@ -2,14 +2,15 @@ import { platformUrl, teamAppUrl } from "@g3/site-config";
 import { withApiPrefix } from "@g3/site-config/worker";
 import { SLACK_BOT_SCOPES } from "@g3/slack";
 import { and, count, eq } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/d1";
 import { Hono } from "hono";
 import packageJson from "../package.json";
-import * as schema from "./db/schema";
+import { consoleRouter } from "./console";
 import { numberReports, teams } from "./db/schema";
+import { db, g3id, now } from "./lib";
 import type { AppEnv } from "./types";
 
-// The platform: team sign-up (roadmap 2.7), and the team registry the gateway asks about.
+// The platform: team sign-up (roadmap 2.7), the team registry the gateway asks about, and the
+// operators' console at /console (roadmap 2.8, src/console.ts).
 //
 // Signing a team up, all on the platform's site:
 //   1. POST /signup: the team's number, name, country, time zone, and the terms. A pending team.
@@ -28,8 +29,6 @@ app.onError((err, c) => {
   console.error(err);
   return c.json({ error: "Something went wrong on our end. Please try again." }, 500);
 });
-const db = (env: AppEnv["Bindings"]) => drizzle(env.PLATFORM_DB, { schema });
-const now = () => Math.floor(Date.now() / 1000);
 
 /** A pending sign-up older than this gives its team number back. */
 const SIGNUP_EXPIRES_S = 60 * 60;
@@ -38,17 +37,6 @@ const SLACK_REDIRECT_URI = `${platformUrl}/api/signup/slack/callback`;
 
 /** Open reports kept per team number; more than this and new ones are turned away. */
 const MAX_OPEN_REPORTS = 20;
-
-/** G3ID's internal routes, over the service binding. */
-function g3id(env: AppEnv["Bindings"], path: string, init?: { method: string; body: unknown }) {
-  return env.G3ID.fetch(
-    new Request(`http://g3id/api/internal${path}`, {
-      method: init?.method ?? "GET",
-      headers: { "Content-Type": "application/json" },
-      body: init ? JSON.stringify(init.body) : undefined,
-    }),
-  );
-}
 
 function validTimeZone(timeZone: string): boolean {
   try {
@@ -294,7 +282,12 @@ const routes = app
       // The founder's account exists and is signed in: the team is live.
       await db(c.env)
         .update(teams)
-        .set({ status: "active", founderUserId: code.userId, updatedAt: now() })
+        .set({
+          status: "active",
+          founderUserId: code.userId,
+          ownerUserId: code.userId,
+          updatedAt: now(),
+        })
         .where(and(eq(teams.id, team.id), eq(teams.status, "pending")));
       const home = `${teamAppUrl(team.id, "portal")}/`;
       return c.json({
@@ -308,7 +301,8 @@ const routes = app
     }
     if (code.status === "pending") return c.json({ status: "pending" as const });
     return c.json({ status: "expired" as const });
-  });
+  })
+  .route("/console", consoleRouter);
 
 export type PlatformApp = typeof routes;
 export default { fetch: withApiPrefix(app.fetch) };
