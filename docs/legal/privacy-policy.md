@@ -39,7 +39,7 @@ We collect only what the apps need to work.
 | Shop | Parts, production steps, who did them, drawings and files | Members, mentors and Onshape, if connected |
 | Pit | Checklists, issues and battery records | Members |
 | Skill Tree | Each member's progress on skills and who signed it off | Members and mentors |
-| Scouting | Match and pit observations, notes on other teams, robot photos, schedules | Members |
+| Scouting | Match and pit observations, notes on other teams, robot photos, schedules; when engagement is enabled, point balances and awards, match picks and their results | Members and optional scouting activities |
 | Uploaded files | Whatever your team uploads | Members |
 | Technical logs | Internet address, browser type, the page requested and the time | Recorded automatically by our hosting provider |
 | Team record | Team name, FRC team number, country, branding, which apps are on, and acceptance of our terms | The team owner |
@@ -77,6 +77,8 @@ We count teams and the apps they use so we can plan capacity. Those counts do no
 
 Some things are public by design: your team's name, number and branding on its sign-in page, and the apps your team has submitted to the library.
 
+Scouting engagement is off by default. An admin can enable points and match predictions and can separately enable team points standings. Standings show members' names, balances, points earned and points used to signed-in teammates. A member's prediction history is shown only to that member through the activity page. Disabling activities pauses new awards and prediction result processing and keeps existing balances and history under the same retention rules as other team data.
+
 ## 6. Other services involved
 
 | Service | What it does for Gearbox | When it receives information |
@@ -85,7 +87,7 @@ Some things are public by design: your team's name, number and branding on its s
 | Google, GitHub, Steam | Sign-in | Only if you choose to sign in with or link that service |
 | Slack | Sign-in and team notifications | Only if your team connects its Slack workspace |
 | Onshape | Part and drawing data for Shop | Only if your team connects Onshape |
-| The Blue Alliance, Nexus | Public event and match schedules for Pit and Scouting | Team and event numbers only |
+| The Blue Alliance, Nexus, Statbotics | Public event and match schedules and predictions for Pit and Scouting | Team and event numbers only |
 | Share-A-Cart | Building vendor carts in Orders | Only if your team connects it; it receives the items in a cart |
 | Cloudflare Workers AI | Reading a photographed match schedule in Scouting | Only when a member uses that feature; it receives the photo |
 

@@ -37,7 +37,7 @@ Three release points sit between phases: G3 moves to its frcgearbox.com addresse
 
 ## Progress
 
-As of 4 October 2026, four of the six Phase 0 steps are done on `main`, and the new site config has delivered part of Phase 1 early. Phases 2 to 6 have not started.
+As of 4 October 2026, four of the six Phase 0 steps are done on `main`, and the new site config has delivered part of Phase 1 early. Phases 2 to 6 have not started; Scouting engagement controls provide early groundwork for optional plugins in Phase 4.
 
 | Phase | Status | What is left |
 | --- | --- | --- |
@@ -60,6 +60,7 @@ As of 4 October 2026, four of the six Phase 0 steps are done on `main`, and the 
 | MIT license, and draft terms and privacy policy in `docs/legal/` | Part of 0.6 | [#132](https://github.com/midtownrobotics/Gearbox/pull/132) |
 | A version per app, changelogs, and a `main` to `public` release flow | Part of 0.2 | [#128](https://github.com/midtownrobotics/Gearbox/pull/128), [#129](https://github.com/midtownrobotics/Gearbox/pull/129) |
 | Shared navbar, light and dark mode, one color scheme | Groundwork for 1.3 | [#126](https://github.com/midtownrobotics/Gearbox/pull/126), [#127](https://github.com/midtownrobotics/Gearbox/pull/127) |
+| Optional Scouting engagement with configurable points label, predictions, combined picks and standings; neutral prediction language | Part of 1.6; groundwork for 4.1 and 4.5 | This change |
 | Editable team appearance, reset to defaults, and editable/hidden portal resource links | Part of 1.3 and 1.4 | [#134](https://github.com/midtownrobotics/Gearbox/pull/134) |
 
 ### What this changed in the plan
@@ -231,7 +232,7 @@ After Phase 1 the platform is named Gearbox and "G3" appears only in G3's own br
 | 1.3 | Theme from data: keep the `primary-*` and `secondary-*` class names, but set their CSS variables when the page loads from the team's brand. The shared `--g3-*` color variables added for dark mode are the place to do it. The platform default becomes a neutral Gearbox palette | `packages/ui/src/index.css`, `packages/ui/src/colors.css`, team appearance settings | In progress: editable shared palette and brand color; app-specific text still uses its own colors |
 | 1.4 | Hold the team's brand in one config file until Phase 2 gives it a table. Name, short name, number, links and the Slack bot's name are there. Appearance, logo URL, display font and portal links now live in an editable team-keyed D1 record with reset and link visibility controls. Remaining app-specific branding still needs to adopt those settings | `packages/site-config/src/site.ts`, `packages/ui`, `apps/portal`, `apps/scouting` | In progress |
 | 1.5 | Titles, nav bars and meta descriptions read the team name | `siteConfig()` in each app's `vite.config`, `AppNavBar` in `packages/ui` | Done |
-| 1.6 | Rename G3-specific names in features: `relationTo1648` to `relationToTeam`, the `g3-match` class, and "BoyleBucks" becomes a label the team sets | `apps/scouting`, `workers/scouting` | Not started |
+| 1.6 | Rename G3-specific names in features: `relationTo1648` to `relationToTeam`, the `g3-match` class, and "BoyleBucks" becomes a label the team sets | `apps/scouting`, `workers/scouting` | In progress: configurable points label and optional engagement controls done; match identifiers remain |
 | 1.7 | Rewrite `README.md` for the platform. `CLAUDE.md` now points every session at this roadmap | repo root | In progress |
 
 **Leave alone for now.** Names on the edge box (`g3-edge-agent`, `/var/lib/g3-edge`, the nftables table `inet g3`) stay as they are, because Edge is G3's own app and not part of base Gearbox. Cloudflare resource names such as `g3-orders-prod` and `g3-bucket` are never shown to users and can stay.
@@ -282,7 +283,7 @@ After Phase 3 every app serves any number of teams from one deployment, and noth
 | 3 | Orders | 17 | Fiscal-year start month, time zone and currency (New York time and US dollars are fixed in code today), Share-A-Cart account, Slack token | Budgets, categories, vendors, naming template and keyword rules are already rows. The seeded catalog becomes shared reference data; a team's own parts and prices are team data |
 | 4 | Shop | 17 | Slack channel IDs, Onshape credentials | Processes and subsystems are already rows. Drawings in R2 and the BOM queue need the team. Onshape webhooks must map a company to a team |
 | 5 | Attendance | 3 | Sign-in code rules | Built on D1 with `team_id` added to the tables created in step 0.5 |
-| 6 | Scouting | About 30 | "Our team" number, game currency label; strategy admins become a role | First split the 3,255-line worker into modules and put its 151 raw SQL calls behind query helpers |
+| 6 | Scouting | About 30 | "Our team" number; engagement settings already use team-keyed rows, to move into the platform settings schema; strategy admins become a role | First split the 3,255-line worker into modules and put its 151 raw SQL calls behind query helpers |
 | 7 | Portal | 0 | The app list and team links | Becomes the team home, built from subscriptions and brand links |
 | 8 | Edge | 11 | None. Its settings stay G3's own | A single-team app run only for G3. It moves behind the gateway and takes identity from the platform SDK. Its tables need no team column |
 
@@ -309,6 +310,8 @@ After Phase 4 a team admin turns apps on and off and edits the team's settings, 
 | 4.5 | Team dashboard at `<team>.frcgearbox.com/admin`: Apps, Branding, Members and roles, Sign-in methods, Integrations, Kiosks, Settings per app (forms generated from each schema), Audit log | new dashboard app; takes over the admin pages of `apps/g3id` |
 | 4.6 | The gateway enforces subscriptions from a cached team snapshot that is refreshed on every change | `workers/gateway` |
 | 4.7 | Team home lists the subscribed apps and the team's links | replaces the hardcoded list in `apps/portal` |
+
+**Optional Scouting engagement.** Scouting admins can configure the module in the app today. It is off by default; combined picks and team standings require separate opt-ins. The default points name is "Scout Points". Disabling the module pauses new awards, predictions and result processing while keeping balances and history. Disabling predictions alone leaves scouting points available and pauses prediction result processing. Existing combined picks resume processing when predictions are enabled even if new combinations are disabled. The settings row uses the team key from site config until verified request-level team context exists; this is not complete multi-team data isolation. Phase 4 moves these controls into the platform settings schema and dashboard.
 
 **What "subscribe" means here.** Subscribing is free and switches an app on or off for a team. Gearbox takes no payments. The only money link is the donation link on the sign-in page.
 

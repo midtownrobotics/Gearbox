@@ -74,6 +74,14 @@ These apps are being turned from one team's tools into a hosted platform that ma
 - The schema is in `src/db/migrations/`. Apply migrations and import existing attendance records before deploying a worker that reads D1. Production D1 is `g3-attendance-prod`.
 - Run `pnpm --filter @g3/worker-attendance test` for Cloudflare runtime tests against a local migrated D1 database.
 
+### Optional Scouting engagement
+
+- Scouting points and match predictions are off by default. Identity admins configure them on Scouting's Admin page; Strategy leads and kiosk PIN sessions cannot change these controls.
+- `workers/scouting/src/engagement.ts` reads team-keyed D1 settings. `/scouting/me` includes the settings; `/scouting/engagement-settings` reads them and accepts admin-only PUT updates. Predictions, combined picks and team standings have separate switches, and the points label defaults to "Scout Points".
+- The master switch gates `/game`, point awards on scouting submissions, and scheduled prediction result processing. Disabling predictions alone also pauses result processing. Existing balances and picks are preserved; existing combined picks still resolve when predictions resume even if new combinations are disabled.
+- Apply migration `0032_engagement_settings.sql` before deploying this code. Existing game table names and API payload keys are retained for compatibility. The team key currently comes from site config and must move to verified team context during the tenancy migration.
+- `workers/scouting/test/engagement.test.ts` covers defaults, admin permissions, API gates, standings visibility and scouting awards.
+
 ### G3 Edge (shop network box)
 
 Design brief: `docs/edge.md`. On-site Orange Pi 5 (hostname `orangepi5`, login user `g3`) routes the shop LAN through a 50 GB/month cellular hotspot.
