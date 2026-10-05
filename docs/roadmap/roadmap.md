@@ -42,7 +42,7 @@ As of 4 October 2026, four of the six Phase 0 steps are done on `main`, and the 
 | Phase | Status | What is left |
 | --- | --- | --- |
 | 0. Groundwork | In progress | The deploy workflow with a staging environment (0.2), and deleting the two stub packages (0.6) |
-| 1. Remove G3 from the platform | In progress | Three page texts that still say G3 (1.1); theme, logo and font from the team's config (1.3, 1.4); Remaining Scouting match identifiers (1.6); the README (1.7) |
+| 1. Remove G3 from the platform | In progress | Three page texts that still say G3 (1.1); remaining app-specific branding and text colors (1.3, 1.4); Scouting's G3-specific names (1.6); the README (1.7) |
 | 2. Tenancy core | Not started | All of it |
 | 3. Team-scoped apps | Not started | All of it |
 | 4. App library and dashboard | Not started | All of it |
@@ -61,6 +61,7 @@ As of 4 October 2026, four of the six Phase 0 steps are done on `main`, and the 
 | A version per app, changelogs, and a `main` to `public` release flow | Part of 0.2 | [#128](https://github.com/midtownrobotics/Gearbox/pull/128), [#129](https://github.com/midtownrobotics/Gearbox/pull/129) |
 | Shared navbar, light and dark mode, one color scheme | Groundwork for 1.3 | [#126](https://github.com/midtownrobotics/Gearbox/pull/126), [#127](https://github.com/midtownrobotics/Gearbox/pull/127) |
 | Optional Scouting engagement with configurable points label, predictions, combined picks and standings; neutral prediction language | Part of 1.6; groundwork for 4.1 and 4.5 | This change |
+| Editable team appearance, reset to defaults, and editable/hidden portal resource links | Part of 1.3 and 1.4 | [#134](https://github.com/midtownrobotics/Gearbox/pull/134) |
 
 ### What this changed in the plan
 
@@ -228,8 +229,8 @@ After Phase 1 the platform is named Gearbox and "G3" appears only in G3's own br
 | --- | --- | --- | --- |
 | 1.1 | Every name a user sees comes from the team's config: team name, short name, number, app titles and the sign-in app's name. Three page texts still say G3: the G3ID sign-up page, Orders settings and Shop admin. Internal names stay as they are: `@g3/*` packages, the `G3ID` binding, and cookie and database names | `packages/site-config/src/site.ts` and its helpers | In progress |
 | 1.2 | Rename the session cookie. Dropped as a step of its own: the cookie takes its new name and domain in step 2.5, when sign-in moves to frcgearbox.com |  | Dropped |
-| 1.3 | Theme from data: keep the `primary-*` and `secondary-*` class names, but set their CSS variables when the page loads from the team's brand. The shared `--g3-*` color variables added for dark mode are the place to do it. The platform default becomes a neutral Gearbox palette | `packages/ui/src/index.css`, `packages/ui/src/colors.css` | Not started |
-| 1.4 | Hold the team's brand in one config file until Phase 2 gives it a table. Name, short name, number, links and the Slack bot's name are there. Still to move: the logo `g3.png`, the burgundy palette and the Agency FB font | `packages/site-config/src/site.ts`, `packages/ui`, `apps/portal`, `apps/scouting` | In progress |
+| 1.3 | Theme from data: keep the `primary-*` and `secondary-*` class names, but set their CSS variables when the page loads from the team's brand. The shared `--g3-*` color variables added for dark mode are the place to do it. The platform default becomes a neutral Gearbox palette | `packages/ui/src/index.css`, `packages/ui/src/colors.css`, team appearance settings | In progress: editable shared palette and brand color; app-specific text still uses its own colors |
+| 1.4 | Hold the team's brand in one config file until Phase 2 gives it a table. Name, short name, number, links and the Slack bot's name are there. Appearance, logo URL, display font and portal links now live in an editable team-keyed D1 record with reset and link visibility controls. Remaining app-specific branding still needs to adopt those settings | `packages/site-config/src/site.ts`, `packages/ui`, `apps/portal`, `apps/scouting` | In progress |
 | 1.5 | Titles, nav bars and meta descriptions read the team name | `siteConfig()` in each app's `vite.config`, `AppNavBar` in `packages/ui` | Done |
 | 1.6 | Rename G3-specific names in features: `relationTo1648` to `relationToTeam`, the `g3-match` class, and "BoyleBucks" becomes a label the team sets | `apps/scouting`, `workers/scouting` | In progress: configurable points label and optional engagement controls done; match identifiers remain |
 | 1.7 | Rewrite `README.md` for the platform. `CLAUDE.md` now points every session at this roadmap | repo root | In progress |

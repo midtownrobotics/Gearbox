@@ -1,4 +1,12 @@
-import { appTitle, appUrl, idName, site, teamLinks } from "@g3/site-config";
+import {
+  type TeamUiLinkKey,
+  appUrl,
+  defaultTeamUiSettings,
+  idName,
+  site,
+  teamLinks,
+} from "@g3/site-config";
+import { useTeamUiSettings } from "@g3/ui";
 import { useEffect, useState } from "react";
 import type { IconType } from "react-icons";
 import { FaGithub, FaInstagram, FaSlack } from "react-icons/fa";
@@ -19,6 +27,7 @@ type App = {
   label: string;
   href: string;
   external?: boolean;
+  linkKey?: TeamUiLinkKey;
 } & ({ tile: string } | { icon?: IconType; logoSrc?: string });
 
 const APPS: App[] = [
@@ -59,47 +68,55 @@ const APPS: App[] = [
   },
   {
     label: "Public Site",
+    linkKey: "publicSite",
     href: site.publicSiteUrl,
     logoSrc: g3Logo,
   },
   {
     label: "Slack",
+    linkKey: "slack",
     href: site.links.slack,
     icon: FaSlack,
     external: true,
   },
   {
     label: "GitHub",
+    linkKey: "github",
     href: site.links.github,
     icon: FaGithub,
     external: true,
   },
   {
     label: "Instagram",
+    linkKey: "instagram",
     href: site.links.instagram,
     icon: FaInstagram,
     external: true,
   },
   {
     label: "FRC-Events",
+    linkKey: "frcEvents",
     href: teamLinks.frcEvents,
     icon: FirstIcon,
     external: true,
   },
   {
     label: "The Blue Alliance",
+    linkKey: "blueAlliance",
     href: teamLinks.blueAlliance,
     icon: BlueAllianceIcon,
     external: true,
   },
   {
     label: "Statbotics",
+    linkKey: "statbotics",
     href: teamLinks.statbotics,
     icon: StatboticsIcon,
     external: true,
   },
   {
     label: "match13",
+    linkKey: "match13",
     href: teamLinks.match13,
     icon: Match13Icon,
     external: true,
@@ -109,7 +126,17 @@ const APPS: App[] = [
 type AuthState = "checking" | "authenticated" | "unauthenticated";
 
 export function HomePage() {
+  const teamUi = useTeamUiSettings();
   const [authState, setAuthState] = useState<AuthState>("checking");
+  const apps = APPS.map((app) => {
+    if (app.label === idName) return { ...app, label: `${teamUi.shortName}ID` };
+    if (!app.linkKey) return app;
+    return {
+      ...app,
+      href: teamUi.links[app.linkKey] ?? defaultTeamUiSettings.links[app.linkKey],
+      ...(app.linkKey === "publicSite" ? { logoSrc: teamUi.logoUrl || g3Logo } : {}),
+    };
+  });
 
   useEffect(() => {
     g3id.auth.me.$get().then(async (res) => {
@@ -143,7 +170,7 @@ export function HomePage() {
             <p className="text-red-600 font-semibold text-lg tracking-widest uppercase mb-2">
               FRC Team {site.team.number}
             </p>
-            <h1 className="text-4xl font-bold text-gray-900 mb-2">{appTitle("Gearbox")}</h1>
+            <h1 className="text-4xl font-bold text-gray-900 mb-2">{teamUi.shortName} Gearbox</h1>
             <p className="text-gray-600">FIRST Robotics Competition</p>
           </div>
 
@@ -154,14 +181,16 @@ export function HomePage() {
             >
               Sign In
             </a>
-            <a
-              href={site.publicSiteUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block w-full px-6 py-3 rounded-lg bg-gray-300 hover:bg-gray-400 text-gray-900 font-semibold transition-colors"
-            >
-              Not a member? Visit public site
-            </a>
+            {teamUi.links.publicSite && !teamUi.hiddenLinks?.includes("publicSite") && (
+              <a
+                href={teamUi.links.publicSite}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block w-full px-6 py-3 rounded-lg bg-gray-300 hover:bg-gray-400 text-gray-900 font-semibold transition-colors"
+              >
+                Not a member? Visit public site
+              </a>
+            )}
           </div>
         </div>
       </main>
@@ -175,50 +204,54 @@ export function HomePage() {
           <p className="text-red-600 text-sm font-semibold uppercase tracking-widest mb-1">
             Team {site.team.number}
           </p>
-          <h1 className="text-4xl font-bold text-gray-900">{appTitle("Gearbox")}</h1>
+          <h1 className="text-4xl font-bold text-gray-900">{teamUi.shortName} Gearbox</h1>
         </div>
 
         <div className="grid grid-cols-4 sm:grid-cols-5 gap-x-4 gap-y-8">
-          {APPS.filter((app) => app.href).map((app) => {
-            return (
-              <a
-                key={app.label}
-                href={app.href}
-                target={app.external ? "_blank" : undefined}
-                rel={app.external ? "noopener noreferrer" : undefined}
-                className="flex flex-col items-center gap-2 group"
-              >
-                {"tile" in app ? (
-                  <img
-                    src={app.tile}
-                    alt=""
-                    className="w-16 h-16 shadow-lg rounded-[14px] transition-transform duration-150 group-hover:scale-110"
-                  />
-                ) : (
-                  <div className="relative w-16 h-16 rounded-[14px] bg-black flex items-center justify-center shadow-lg transition-transform duration-150 group-hover:scale-110">
-                    {app.logoSrc ? (
-                      <img src={app.logoSrc} alt="" className="w-11 h-11 object-contain" />
-                    ) : app.icon ? (
-                      <span className="text-white text-[34px]">
-                        <app.icon />
-                      </span>
-                    ) : null}
-                    {app.external && (
-                      <span
-                        className="absolute top-1.5 right-2 text-[11px] font-bold leading-none text-[#A32035]"
-                        aria-hidden
-                      >
-                        ↗
-                      </span>
-                    )}
-                  </div>
-                )}
-                <span className="text-xs text-center leading-tight transition-colors text-gray-600 group-hover:text-gray-900">
-                  {app.label}
-                </span>
-              </a>
-            );
-          })}
+          {apps
+            .filter(
+              (app) => app.href && (!app.linkKey || !teamUi.hiddenLinks?.includes(app.linkKey)),
+            )
+            .map((app) => {
+              return (
+                <a
+                  key={app.label}
+                  href={app.href}
+                  target={app.external ? "_blank" : undefined}
+                  rel={app.external ? "noopener noreferrer" : undefined}
+                  className="flex flex-col items-center gap-2 group"
+                >
+                  {"tile" in app ? (
+                    <img
+                      src={app.tile}
+                      alt=""
+                      className="w-16 h-16 shadow-lg rounded-[14px] transition-transform duration-150 group-hover:scale-110"
+                    />
+                  ) : (
+                    <div className="relative w-16 h-16 rounded-[14px] bg-black flex items-center justify-center shadow-lg transition-transform duration-150 group-hover:scale-110">
+                      {app.logoSrc ? (
+                        <img src={app.logoSrc} alt="" className="w-11 h-11 object-contain" />
+                      ) : app.icon ? (
+                        <span className="text-white text-[34px]">
+                          <app.icon />
+                        </span>
+                      ) : null}
+                      {app.external && (
+                        <span
+                          className="absolute top-1.5 right-2 text-[11px] font-bold leading-none text-[#A32035]"
+                          aria-hidden
+                        >
+                          ↗
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  <span className="text-xs text-center leading-tight transition-colors text-gray-600 group-hover:text-gray-900">
+                    {app.label}
+                  </span>
+                </a>
+              );
+            })}
         </div>
       </div>
     </main>

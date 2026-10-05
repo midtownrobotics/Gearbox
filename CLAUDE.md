@@ -145,6 +145,13 @@ Design brief: `docs/edge.md`. On-site Orange Pi 5 (hostname `orangepi5`, login u
 - Apps: `siteConfig()` from `@g3/site-config/vite` in each `vite.config` fills `%SITE_SHORT_NAME%`, `%SITE_TEAM_NAME%`, `%SITE_TEAM_NUMBER%`, `%SITE_ID_NAME%`, `%SITE_ALL_APPS_URL%`, `%SITE_APP_URL%` in `index.html`, and sets production API URLs (`productionEnv`), so there are no `.env.production` files; `.env.development` still points dev at localhost.
 - Files that can't import it (`wrangler.toml` production URLs, the gateway's route, OAuth redirect URIs, `TEAM_NUMBER`; the edge env examples) are written by `pnpm configure` (`scripts/configure.ts`); CI runs `pnpm configure --check`.
 
+### Editable team appearance
+
+- Identity admins edit appearance at the Team Appearance admin page. `TeamUiSettings` and defaults live in `packages/site-config/src/team-ui.ts`; the team-keyed D1 record is read by public `/team/ui` and edited through admin-only `/admin/team/ui`.
+- Shared UI loads colors, logo, display font and team names at runtime. Text and muted-text colors affect the navbar and components using `--g3-text` / `--g3-muted`; they do not replace every app's text classes. The editor explains this limit.
+- Portal resource links (public site, Slack, GitHub, Instagram, FRC-Events, The Blue Alliance, Statbotics and match13) have editable HTTPS URLs and `hiddenLinks` controls. Hiding preserves the URL; removing clears it. Empty or hidden links are omitted, including the public-site link on the portal sign-in screen.
+- Reset to defaults restores the editor form; Save applies it. Stored settings from older versions gain new link defaults without resetting their branding or restoring explicitly empty links. Current writes require the full schema.
+
 ### Shared navbar and light/dark mode
 
 - Every app's top bar is `AppNavBar` from `@g3/ui` (`packages/ui/src/components/app-nav-bar.tsx`, styled by its own plain CSS in `nav-bar.css` so it renders the same in G3 Strategy, which doesn't use the shared Tailwind theme). Each app's `shared/nav-bar.tsx` is a thin wrapper: it filters pages by permission, marks the current one (`activePath`: the most specific link covering the URL), and passes react-router links via `linkWith(Link)`. Pages go in a drawer below 768px.
