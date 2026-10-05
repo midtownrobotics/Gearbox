@@ -1,14 +1,25 @@
-import { teamKey } from "@g3/site-config";
+import { teamAppUrl, teamKey } from "@g3/site-config";
 import { eq } from "drizzle-orm";
+import type { Context } from "hono";
 import type { Db } from "../db";
 import { coreUsers } from "../db/schema";
+import type { AppEnv } from "../types";
 
-/**
- * The team this request is for: until the gateway reads the team from the hostname (roadmap step
- * 2.3), the team in site.ts.
- */
-export function currentTeamId(): string {
-  return teamKey;
+// Which team a request is for. Each team signs in on its own G3ID address, <number>-id.<domain>;
+// the gateway reads the team from the hostname and passes it as X-Team-Id (removing any a client
+// sent). Without it (local dev, tests, G3's own addresses) it's the team in site.ts.
+
+/** The team this request is for. */
+export function requestTeamId(c: Context<AppEnv>): string {
+  return c.req.header("X-Team-Id") ?? teamKey;
+}
+
+/** The team in site.ts. */
+export const siteTeamId = teamKey;
+
+/** A team's G3ID page, where its members sign in: FRONTEND_URL for the site's team. */
+export function teamFrontend(env: AppEnv["Bindings"], teamId: string): string {
+  return teamId === teamKey ? env.FRONTEND_URL : teamAppUrl(teamId, "id");
 }
 
 /** The team a user belongs to. */

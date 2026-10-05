@@ -18,6 +18,7 @@ export const authRouter = new Hono<AppEnv>()
     const user = await db
       .select({
         id: coreUsers.id,
+        teamId: coreUsers.teamId,
         email: coreUsers.email,
         displayName: coreUsers.displayName,
         status: coreUsers.status,

@@ -45,6 +45,9 @@ export const site = {
     instagram: "https://www.instagram.com/g3robotics1648/",
   },
 
+  /** The platform's donation page, linked in the footer of every team's sign-in page. */
+  donationUrl: "https://www.g3robotics.com/checkout/donate?donatePageId=5adbd61a352f53992db2d729",
+
   /** Your Slack app's display name, which G3ID's sign-in asks people to message. */
   slackBotName: "G3 Bot",
 } as const;

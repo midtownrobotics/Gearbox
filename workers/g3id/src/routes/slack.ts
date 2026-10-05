@@ -1,4 +1,4 @@
-import { apiUrl } from "@g3/site-config";
+import { teamAppUrl } from "@g3/site-config";
 import { sendDM, verifySlackSignature } from "@g3/slack";
 import { and, eq } from "drizzle-orm";
 import { Hono } from "hono";
@@ -56,7 +56,7 @@ export const slackRouter = new Hono<AppEnv>()
         // Look up the code to discover its type before calling handleSlackCode
         const db = createDb(c.env.DB);
         const record = await db
-          .select({ type: coreSlackLinkCodes.type })
+          .select({ type: coreSlackLinkCodes.type, teamId: coreSlackLinkCodes.teamId })
           .from(coreSlackLinkCodes)
           .where(and(eq(coreSlackLinkCodes.code, code), eq(coreSlackLinkCodes.used, 0)))
           .get();
@@ -77,7 +77,8 @@ export const slackRouter = new Hono<AppEnv>()
         // For successful sign-ins, add a direct link to complete auth from browser
         let message = result.message;
         if (result.success && result.token && record.type === "signin") {
-          let completeUrl = `${apiUrl("id")}/auth/slack/complete?token=${result.token}`;
+          // The code's team's own G3ID address, where its sign-in started.
+          let completeUrl = `${teamAppUrl(record.teamId, "id")}/api/auth/slack/complete?token=${result.token}`;
           if (result.redirectUrl) {
             completeUrl += `&redirect=${encodeURIComponent(result.redirectUrl)}`;
           }

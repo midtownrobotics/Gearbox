@@ -1,6 +1,6 @@
 import { site, teamKey } from "@g3/site-config";
 import { describe, expect, it } from "vitest";
-import { currentTeamId } from "../src/lib/team";
+import { siteTeamId } from "../src/lib/team";
 import {
   activateKiosk,
   cookieFrom,
@@ -27,7 +27,7 @@ describe("teams", () => {
       teamKey,
     );
     expect(team?.team_number).toBe(site.team.number);
-    expect(currentTeamId()).toBe(teamKey);
+    expect(siteTeamId).toBe(teamKey);
 
     const userId = await createUser();
     const user = await one<{ team_id: string }>(
@@ -38,9 +38,11 @@ describe("teams", () => {
   });
 
   it("gives Slack sign-in codes the site's team and link codes the user's team", async () => {
-    await g3id("/auth/slack/initiate");
+    const initiate = await g3id("/auth/slack/initiate", { redirect: "manual" });
+    const token = new URL(initiate.headers.get("Location") as string).searchParams.get("token");
     const signin = await one<{ team_id: string }>(
-      "SELECT team_id FROM core_slack_link_codes WHERE type = 'signin' ORDER BY created_at DESC LIMIT 1",
+      "SELECT team_id FROM core_slack_link_codes WHERE polling_token = ?",
+      token,
     );
     expect(signin?.team_id).toBe(teamKey);
 
@@ -104,5 +106,122 @@ describe("kiosks and PINs per team", () => {
       .run();
     const ourKiosk = await activateKiosk(await sessionCookie(await createUser({ isAdmin: true })));
     expect((await signInWithPin(theirs.pin, ourKiosk)).status).toBe(400);
+  });
+});
+
+describe("team lookups", () => {
+  it("answers whether a team exists, for the gateway", async () => {
+    const res = await g3id(`/teams/${teamKey}`);
+    expect(await res.json()).toEqual({
+      id: teamKey,
+      teamNumber: site.team.number,
+      name: site.team.name,
+    });
+    expect((await g3id("/teams/frc999999")).status).toBe(404);
+  });
+
+  it("reports the signed-in user's team", async () => {
+    const otherTeam = await createTeam();
+    const cookie = await sessionCookie(await createUser({ teamId: otherTeam }));
+    expect(await (await g3id("/auth/me", { cookie })).json()).toMatchObject({ teamId: otherTeam });
+  });
+});
+
+describe("looking up a member by PIN", () => {
+  it("only finds members of the caller's own team", async () => {
+    const otherTeam = await createTeam();
+    const theirs = await createUserWithPin({ teamId: otherTeam });
+    await testEnv.DB.prepare("DELETE FROM core_user_pins WHERE team_id != ? AND pin = ?")
+      .bind(otherTeam, theirs.pin)
+      .run();
+    const ours = await sessionCookie(await createUser());
+    const colleague = await sessionCookie(await createUser({ teamId: otherTeam }));
+
+    expect((await g3id(`/users/by-pin/${theirs.pin}`, { cookie: ours })).status).toBe(404);
+    const found = await g3id(`/users/by-pin/${theirs.pin}`, { cookie: colleague });
+    expect(await found.json()).toMatchObject({ id: theirs.id });
+  });
+});
+
+describe("signing in to a team", () => {
+  const asTeam = (team: string, path: string, init: Parameters<typeof g3id>[1] = {}) =>
+    // "manual": see the sign-in's redirect instead of following it back into the worker.
+    g3id(path, { redirect: "manual", ...init, headers: { "X-Team-Id": team, ...init.headers } });
+
+  it("tells the sign-in page which team it's for", async () => {
+    const otherTeam = await createTeam();
+    expect(await (await asTeam(otherTeam, "/teams/current")).json()).toMatchObject({
+      id: otherTeam,
+    });
+    expect(await (await g3id("/teams/current")).json()).toMatchObject({ id: teamKey });
+  });
+
+  it("signs a member in by email only on their own team's address", async () => {
+    const otherTeam = await createTeam();
+    const email = `${crypto.randomUUID()}@test.g3`;
+    await createUser({ teamId: otherTeam, email, password: "correct-horse" });
+    const login = (team: string) =>
+      asTeam(team, "/auth/login/email", {
+        method: "POST",
+        body: { email, password: "correct-horse" },
+      });
+
+    expect((await login(teamKey)).status).toBe(403);
+    const ok = await login(otherTeam);
+    expect(ok.status).toBe(200);
+    expect(cookieFrom(ok)).not.toBeNull();
+  });
+
+  it("starts a Slack sign-in for the address's team and sends it back there", async () => {
+    const otherTeam = await createTeam();
+    const number = otherTeam.slice(3);
+    const res = await asTeam(otherTeam, "/auth/slack/initiate?redirect=https://evil.example/");
+    expect(res.headers.get("Location")).toMatch(
+      new RegExp(`^https://${number}-id\\.${site.domain.replace(".", "\\.")}/login/slack\\?`),
+    );
+    const token = new URL(res.headers.get("Location") as string).searchParams.get("token");
+    const code = await one<{ team_id: string; redirect_url: string | null }>(
+      "SELECT team_id, redirect_url FROM core_slack_link_codes WHERE polling_token = ?",
+      token,
+    );
+    // The team's code, and no redirect to a page outside the team.
+    expect(code).toEqual({ team_id: otherTeam, redirect_url: null });
+  });
+
+  it("keeps the team and return address in a provider sign-in's state", async () => {
+    const otherTeam = await createTeam();
+    const back = `https://${otherTeam.slice(3)}-orders.${site.domain}/`;
+    const res = await asTeam(otherTeam, `/auth/google?redirect=${encodeURIComponent(back)}`);
+    const google = new URL(res.headers.get("Location") as string);
+    const state = await testEnv.RATE_LIMIT.get(`oauth_state:${google.searchParams.get("state")}`);
+    expect(JSON.parse(state as string)).toEqual({
+      team: otherTeam,
+      redirect: back,
+      linkUserId: null,
+    });
+  });
+
+  it("only lets a sign-in return to its own team's pages", async () => {
+    const otherTeam = await createTeam();
+    const number = otherTeam.slice(3);
+    const ours = `https://orders.${site.domain}/lists`;
+    const theirs = `https://${number}-orders.${site.domain}/lists`;
+    const redirectOf = async (team: string, redirect: string) => {
+      const res = await asTeam(
+        team,
+        `/auth/slack/initiate?redirect=${encodeURIComponent(redirect)}`,
+      );
+      const token = new URL(res.headers.get("Location") as string).searchParams.get("token");
+      return (
+        await one<{ redirect_url: string | null }>(
+          "SELECT redirect_url FROM core_slack_link_codes WHERE polling_token = ?",
+          token,
+        )
+      )?.redirect_url;
+    };
+    expect(await redirectOf(otherTeam, theirs)).toBe(theirs);
+    expect(await redirectOf(otherTeam, ours)).toBeNull();
+    expect(await redirectOf(teamKey, ours)).toBe(ours);
+    expect(await redirectOf(teamKey, theirs)).toBeNull();
   });
 });

@@ -4,6 +4,8 @@ compatibility_date = "2026-05-17"
 
 [env.production]
 name = "portal-production"
+# No workers.dev address: the gateway is the only way in, so its identity headers can be trusted.
+workers_dev = false
 
 # The app's page, served by this worker in production; only /api/* runs the worker code, and
 # other paths fall back to index.html for the app's router. Wrangler builds the page before

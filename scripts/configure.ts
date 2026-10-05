@@ -11,6 +11,7 @@ import {
   apiUrl,
   appUrl,
   edgeAgentUrl,
+  signInCallbackApiUrl,
   site,
 } from "../packages/site-config/src/index.ts";
 
@@ -45,7 +46,8 @@ function wranglerRules(app: Exclude<AppName, "portal">): Rule[] {
     httpsVar("EDGE_AGENT_URL", () => edgeAgentUrl),
     httpsVar(
       "(GOOGLE|GITHUB|STEAM|ONSHAPE)_REDIRECT_URI",
-      (m) => `${apiUrl("id")}/auth/${m[2].toLowerCase()}/callback`,
+      // One address for every team: the platform's id.<domain> host.
+      (m) => `${signInCallbackApiUrl}/auth/${m[2].toLowerCase()}/callback`,
     ),
     [/^(TEAM_NUMBER = )"[^"]*"/gm, (m) => `${m[1]}"${site.team.number}"`],
   ];

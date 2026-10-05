@@ -36,6 +36,8 @@ LOCAL_AUTH_BYPASS = "false"
 # that invoke `wrangler deploy --env production`.
 [env.production]
 name = "scouting-production"
+# No workers.dev address: the gateway is the only way in, so its identity headers can be trusted.
+workers_dev = false
 
 [env.production.triggers]
 crons = ["*/5 * * * *"]

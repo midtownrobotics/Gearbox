@@ -1,4 +1,4 @@
-import { appUrl, idName } from "@g3/site-config";
+import { idName, teamAppUrl } from "@g3/site-config";
 import { sendDM } from "@g3/slack";
 import { and, desc, eq, gt, isNull, or } from "drizzle-orm";
 import { Hono } from "hono";
@@ -51,7 +51,7 @@ export const adminRouter = new Hono<AppEnv>()
     const db = createDb(c.env.DB);
 
     const user = await db
-      .select({ id: coreUsers.id, status: coreUsers.status })
+      .select({ id: coreUsers.id, teamId: coreUsers.teamId, status: coreUsers.status })
       .from(coreUsers)
       .where(eq(coreUsers.id, id))
       .get();
@@ -72,7 +72,7 @@ export const adminRouter = new Hono<AppEnv>()
     if (slackIdentity?.providerId) {
       await sendDM(
         slackIdentity.providerId,
-        `✅ Your ${idName} account has been approved! Click <${appUrl("id")}/login|here> to go to the login page and *sign in with Slack*. Yes, you will have to repeat the code sending process.`,
+        `✅ Your ${idName} account has been approved! Click <${teamAppUrl(user.teamId, "id")}/login|here> to go to the login page and *sign in with Slack*. Yes, you will have to repeat the code sending process.`,
         c.env,
       );
     }

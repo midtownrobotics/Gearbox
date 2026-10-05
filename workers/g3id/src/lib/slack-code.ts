@@ -1,4 +1,4 @@
-import { appUrl, idName } from "@g3/site-config";
+import { idName, teamAppUrl } from "@g3/site-config";
 import { getUserInfo } from "@g3/slack";
 import { and, eq } from "drizzle-orm";
 import { createDb } from "../db";
@@ -136,10 +136,16 @@ export async function handleSlackCode(opts: {
 
   if (identity) {
     const user = await db
-      .select({ id: coreUsers.id, status: coreUsers.status })
+      .select({ id: coreUsers.id, teamId: coreUsers.teamId, status: coreUsers.status })
       .from(coreUsers)
       .where(eq(coreUsers.id, identity.userId))
       .get();
+
+    if (user && user.teamId !== record.teamId) {
+      const msg = "This account belongs to another team. Sign in on your own team's page.";
+      await updateStatus("failed", msg);
+      return { success: false, message: `❌ ${msg}` };
+    }
 
     if (!user || user.status !== "active") {
       const msg =
@@ -164,7 +170,7 @@ export async function handleSlackCode(opts: {
   const slackUser = await getUserInfo(slackUserId, env);
 
   if (!slackUser.email) {
-    const msg = `Your Slack account has no email. Please sign up at ${new URL(appUrl("id")).host} with email first, then link Slack from your account settings.`;
+    const msg = `Your Slack account has no email. Please sign up at ${new URL(teamAppUrl(record.teamId, "id")).host} with email first, then link Slack from your account settings.`;
     await updateStatus("failed", msg);
     return { success: false, message: `❌ ${msg}` };
   }

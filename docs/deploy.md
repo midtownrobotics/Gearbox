@@ -8,7 +8,8 @@ browser ──> *.<domain> ──> gateway ──(service binding)──> orders
 ```
 
 - The gateway also answers each app's **old API address** (`api.orders.<domain>/x` → the app's `/api/x`), so services set up with it keep working: Slack's commands and events, Onshape's webhook, the edge box. Hostnames that aren't apps (`www`, the edge box's tunnel) pass through untouched.
-- An app worker's own code only runs for `/api/*` (`run_worker_first` in its `wrangler.toml`); everything else is static files, with unknown paths falling back to `index.html` for the app's router. Workers call each other through service bindings at `/api` too (`http://g3id/api/auth/me`).
+- Teams have their own addresses too: `<number>-<app>.<domain>` and `<number>.<domain>` (the team's home). The gateway keeps each team's sessions and API calls to its own hosts and tells the app the team and user in `X-Team-Id` / `X-User-*` headers. App workers have no workers.dev address in production (`workers_dev = false`), so those headers can only come from the gateway.
+- An app worker's own code only runs for `/api/*` (`run_worker_first` in its `wrangler.toml`); everything else is static files, with unknown paths falling back to `index.html` for the app's router. Workers call each other through service bindings at `/api` too (`http://g3id/api/auth/me`). A page calls another app's API at `/api/~<app>/…` on its own address (`apiPath` in `@g3/site-config`), which the gateway sends to that app for the same team.
 
 ## Deploying a change
 
@@ -28,7 +29,7 @@ Cloudflare's Git builds (Workers Builds) need no extra setup: their `wrangler de
 The app workers' old `api.<app>` custom domains send requests straight to the worker, without the `/api` the gateway adds, so they must go when the new workers go live. Do this at a quiet time; the apps are down for the few minutes between steps 3 and 5.
 
 1. **Sign-in providers:** sign-in callbacks are now on the new addresses, so add them to each provider before deploying (keep the old ones until the switch is done):
-   - Google, GitHub, Onshape: `https://g3id.<domain>/api/auth/<provider>/callback` (`google`, `github`, `onshape`). Steam needs no change: it accepts any return address.
+   - Google, GitHub, Onshape: `https://id.<domain>/api/auth/<provider>/callback` (`google`, `github`, `onshape`). Every team's sign-in calls back there; the team travels in the sign-in's state. Steam needs no change: it accepts any return address.
    - Share-A-Cart: Orders now calls back on `https://orders.<domain>/api/share-a-cart/callback`; reconnect it once on Orders' Settings page after the switch.
 2. **DNS:** make sure there's a proxied wildcard record for the domain: `*` → AAAA `100::` (proxied, orange cloud). Hostnames with their own records (`www`, the edge box's tunnel) keep them.
 3. **Deploy the app workers:** `pnpm --filter "./workers/*" --filter "!@g3/worker-gateway" run deploy`.

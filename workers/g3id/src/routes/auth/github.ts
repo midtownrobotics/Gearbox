@@ -6,8 +6,10 @@ import { createDb } from "../../db";
 import { coreUserIdentities, coreUsers } from "../../db/schema";
 import { sessionCookieOptions } from "../../lib/cookie";
 import { newId } from "../../lib/id";
+import { decodeState, encodeState } from "../../lib/oauth-state";
 import { sanitizeRedirect } from "../../lib/redirect";
 import { createSession } from "../../lib/session";
+import { requestTeamId, teamFrontend, teamOfUser } from "../../lib/team";
 import type { AppEnv } from "../../types";
 
 function buildGithubUrl(env: AppEnv["Bindings"], state: string): string {
@@ -145,9 +147,9 @@ async function getGithubUser(
 export const githubAuthRouter = new Hono<AppEnv>()
   // Sign-in initiation
   .get("/github", async (c) => {
-    const redirect = sanitizeRedirect(c.req.query("redirect"));
-    const stateValue = redirect ? `signin:${redirect}` : "signin";
-    const state = await generateState(c.env, stateValue);
+    const team = requestTeamId(c);
+    const redirect = sanitizeRedirect(c.req.query("redirect"), team);
+    const state = await generateState(c.env, encodeState({ team, redirect, linkUserId: null }));
     return c.redirect(buildGithubUrl(c.env, state));
   })
   // Link initiation — user must already be signed in
@@ -156,12 +158,18 @@ export const githubAuthRouter = new Hono<AppEnv>()
     const userId = await resolveUserId(c.req.header("Cookie") ?? "", c.env);
     if (!userId) return c.redirect(app("/login"));
 
-    const state = await generateState(c.env, `link:${userId}`);
+    const team = await teamOfUser(createDb(c.env.DB), userId);
+    const state = await generateState(
+      c.env,
+      encodeState({ team, redirect: null, linkUserId: userId }),
+    );
     return c.redirect(buildGithubUrl(c.env, state));
   })
   // Shared callback
   .get("/github/callback", async (c) => {
-    const app = (path: string) => `${c.env.FRONTEND_URL}${path}`;
+    // Until the state says which team this is, errors go to the site team's page.
+    let frontend = c.env.FRONTEND_URL;
+    const app = (path: string) => `${frontend}${path}`;
     const oauthError = c.req.query("error");
     const code = c.req.query("code");
     const state = c.req.query("state");
@@ -174,9 +182,11 @@ export const githubAuthRouter = new Hono<AppEnv>()
     const stateValue = await verifyState(c.env, state);
     if (!stateValue) return err("This sign-in link has expired. Please try again.");
 
-    const isLink = stateValue.startsWith("link:");
-    const linkUserId = isLink ? stateValue.slice(5) : null;
-    const redirectTo = !isLink && stateValue.startsWith("signin:") ? stateValue.slice(7) : null;
+    const st = decodeState(stateValue);
+    frontend = teamFrontend(c.env, st.team);
+    const linkUserId = st.linkUserId;
+    const isLink = linkUserId !== null;
+    const redirectTo = st.redirect?.startsWith("/") ? app(st.redirect) : st.redirect;
 
     // Exchange code for access token
     const tokenRes = await fetch("https://github.com/login/oauth/access_token", {
@@ -283,10 +293,14 @@ export const githubAuthRouter = new Hono<AppEnv>()
 
     if (identity) {
       const user = await db
-        .select({ id: coreUsers.id, status: coreUsers.status })
+        .select({ id: coreUsers.id, teamId: coreUsers.teamId, status: coreUsers.status })
         .from(coreUsers)
         .where(eq(coreUsers.id, identity.userId))
         .get();
+
+      if (user && user.teamId !== st.team) {
+        return err("This account belongs to another team. Sign in on your own team's page.");
+      }
 
       if (!user || user.status !== "active") {
         const message =

@@ -9,6 +9,7 @@ compatibility_date = "2026-05-17"
 
 [env.production]
 name = "gateway-production"
+workers_dev = false
 
 # Every subdomain. Needs a proxied wildcard DNS record (* → AAAA 100::) for names without their own.
 [[env.production.routes]]

@@ -4,6 +4,7 @@ import { Hono } from "hono";
 import { getCookie } from "hono/cookie";
 import { createDb } from "../../db";
 import { coreUserIdentities } from "../../db/schema";
+import { teamFrontend, teamOfUser } from "../../lib/team";
 import { requireAuth } from "../../middleware/auth";
 import type { AppEnv } from "../../types";
 
@@ -178,7 +179,9 @@ router.get("/onshape/callback", async (c) => {
       .run();
   }
 
-  return c.redirect(`${c.env.FRONTEND_URL}/?linked=onshape`);
+  // Back to the user's own team's G3ID (the callback itself is on the platform's id.<domain>).
+  const team = await teamOfUser(createDb(c.env.DB), userId);
+  return c.redirect(`${teamFrontend(c.env, team)}/?linked=onshape`);
 });
 
 router.delete("/onshape", requireAuth, async (c) => {

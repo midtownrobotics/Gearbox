@@ -6,7 +6,7 @@ import { coreSlackLinkCodes } from "../../db/schema";
 import { sessionCookieOptions } from "../../lib/cookie";
 import { newId } from "../../lib/id";
 import { sanitizeRedirect } from "../../lib/redirect";
-import { currentTeamId, teamOfUser } from "../../lib/team";
+import { requestTeamId, teamFrontend, teamOfUser } from "../../lib/team";
 import { requireAuth } from "../../middleware/auth";
 import type { AppEnv } from "../../types";
 
@@ -23,7 +23,8 @@ function generateToken(): string {
 export const slackAuthRouter = new Hono<AppEnv>()
   // Sign-in initiation — generates code, redirects to /login/slack
   .get("/slack/initiate", async (c) => {
-    const redirect = sanitizeRedirect(c.req.query("redirect"));
+    const team = requestTeamId(c);
+    const redirect = sanitizeRedirect(c.req.query("redirect"), team);
     const code = generateCode();
     const token = generateToken();
     const now = Math.floor(Date.now() / 1000);
@@ -31,7 +32,7 @@ export const slackAuthRouter = new Hono<AppEnv>()
 
     await db.insert(coreSlackLinkCodes).values({
       id: newId(),
-      teamId: currentTeamId(),
+      teamId: team,
       userId: null,
       code,
       type: "signin",
@@ -44,7 +45,7 @@ export const slackAuthRouter = new Hono<AppEnv>()
 
     const redirectParam = redirect ? `&redirect=${encodeURIComponent(redirect)}` : "";
     return c.redirect(
-      `${c.env.FRONTEND_URL}/login/slack?token=${token}&code=${code}${redirectParam}`,
+      `${teamFrontend(c.env, team)}/login/slack?token=${token}&code=${code}${redirectParam}`,
     );
   })
   // Link initiation — user must already be signed in, returns JSON code + token
@@ -107,7 +108,6 @@ export const slackAuthRouter = new Hono<AppEnv>()
   // Complete — from Slack link, set cookie and redirect (only for successful sign-ins)
   .get("/slack/complete", async (c) => {
     const token = c.req.query("token");
-    const redirect = sanitizeRedirect(c.req.query("redirect"));
 
     if (!token) {
       return c.text("Invalid or missing token", 400);
@@ -127,8 +127,9 @@ export const slackAuthRouter = new Hono<AppEnv>()
     // Set the session cookie
     setCookie(c, "g3_session", record.sessionId, sessionCookieOptions(c.env.FRONTEND_URL));
 
-    // Redirect to the original URL or home
-    const redirectUrl = redirect || `${c.env.FRONTEND_URL}/`;
+    // Redirect to the original URL (one of the code's team's pages) or that team's G3ID
+    const redirect = sanitizeRedirect(c.req.query("redirect"), record.teamId);
+    const redirectUrl = redirect || `${teamFrontend(c.env, record.teamId)}/`;
     return c.redirect(redirectUrl);
   })
   // Cancel — expire the code so it cannot be redeemed

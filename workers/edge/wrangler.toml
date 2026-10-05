@@ -26,6 +26,8 @@ EDGE_AGENT_URL = "http://localhost:8700"
 
 [env.production]
 name = "edge-production"
+# No workers.dev address: the gateway is the only way in, so its identity headers can be trusted.
+workers_dev = false
 
 [env.production.triggers]
 crons = ["30 8 * * *"]

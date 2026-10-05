@@ -6,7 +6,7 @@ import { newId } from "../src/lib/id";
 import { hashPassword } from "../src/lib/password";
 import { generatePinForUser, generateUniquePin } from "../src/lib/pin";
 import { createSession } from "../src/lib/session";
-import { currentTeamId } from "../src/lib/team";
+import { siteTeamId } from "../src/lib/team";
 import type { AppEnv } from "../src/types";
 
 // G3ID's tests run the real worker against its own D1 and KV. These seed users straight into the
@@ -51,7 +51,7 @@ export async function createUser(user: NewUser = {}): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
   await db.insert(coreUsers).values({
     id,
-    teamId: user.teamId ?? currentTeamId(),
+    teamId: user.teamId ?? siteTeamId,
     email: user.email ?? `${id}@test.g3`,
     displayName: user.displayName ?? "Test User",
     status: user.status ?? "active",
@@ -81,7 +81,7 @@ export async function createUserWithPin(user: NewUser = {}): Promise<{ id: strin
 
 /** A PIN nobody in the team has (G3's team by default). */
 export const unusedPin = async (teamId?: string) =>
-  generateUniquePin(teamId ?? currentTeamId(), testEnv);
+  generateUniquePin(teamId ?? siteTeamId, testEnv);
 
 /** A second team, for tests that check teams are kept apart. */
 export async function createTeam(): Promise<string> {

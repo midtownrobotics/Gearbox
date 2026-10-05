@@ -1,19 +1,17 @@
-import { site } from "@g3/site-config";
+import { teamOfHost } from "@g3/site-config";
 
-export function sanitizeRedirect(redirect: string | undefined | null): string | null {
+/**
+ * Where a sign-in may send someone afterwards: a page of the team they're signing in to, a path
+ * on G3ID's own page, or localhost (dev). Anything else (another team's pages, other sites) is
+ * dropped.
+ */
+export function sanitizeRedirect(redirect: string | undefined | null, team: string): string | null {
   if (!redirect) return null;
+  if (redirect.startsWith("/") && !redirect.startsWith("//")) return redirect;
   try {
-    const url = new URL(redirect);
-    const { hostname } = url;
-    if (
-      hostname === site.domain ||
-      hostname.endsWith(`.${site.domain}`) ||
-      hostname === "localhost"
-    ) {
-      return redirect;
-    }
-  } catch {
-    if (redirect.startsWith("/")) return redirect;
-  }
+    const { hostname, protocol } = new URL(redirect);
+    if (hostname === "localhost") return redirect;
+    if (protocol === "https:" && teamOfHost(hostname) === team) return redirect;
+  } catch {}
   return null;
 }

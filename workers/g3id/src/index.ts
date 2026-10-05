@@ -15,6 +15,7 @@ import { steamAuthRouter } from "./routes/auth/steam";
 import { kioskRouter } from "./routes/kiosk";
 import { onshapeRouter } from "./routes/onshape";
 import { slackRouter } from "./routes/slack";
+import { teamsRouter } from "./routes/teams";
 import { usersRouter } from "./routes/users";
 import type { AppEnv } from "./types";
 
@@ -47,6 +48,7 @@ const app = base
   .route("/auth", steamAuthRouter)
   .route("/admin", adminRouter)
   .route("/users", usersRouter)
+  .route("/teams", teamsRouter)
   .route("/onshape", onshapeRouter)
   .route("/", kioskRouter)
   .route("/slack", slackRouter);
