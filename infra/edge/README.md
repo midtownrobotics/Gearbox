@@ -340,6 +340,32 @@ Run steps 6 and 7 again with a new version number. The previous version stays in
 sudo ln -sfn versions/<old> /opt/g3-edge/current && sudo systemctl restart g3-edge-agent
 ```
 
+### Upgrade from Windows (PowerShell)
+
+Run these commands from the repo root in PowerShell while connected to the shop LAN. Install Bun, Node.js (which includes Corepack), and the Windows OpenSSH client first if they are not available. Open a new PowerShell window after installing them so `bun`, `corepack`, `ssh`, and `scp` are on `PATH`.
+
+The first command builds a Linux ARM64 binary on Windows; it does not deploy anything by itself. `corepack pnpm` avoids requiring a separate global pnpm installation.
+
+```powershell
+corepack pnpm --filter @g3/edge-agent run build
+ssh g3@192.168.50.1 'mkdir -p ~/edge-infra'
+scp -r infra/edge/. g3@192.168.50.1:~/edge-infra/
+scp devices/edge-agent/dist/g3-edge-agent g3@192.168.50.1:~/edge-infra/g3-edge-agent
+ssh -t g3@192.168.50.1 'cd ~/edge-infra && sudo ./install-agent.sh ./g3-edge-agent 0.5.0'
+```
+
+Use the version in `devices/edge-agent/package.json` as the install label. Reusing a label replaces that version's binary; use a unique suffix such as `-<short-git-commit>` when the old binary must remain available for rollback.
+
+Then verify the deployment from PowerShell:
+
+```powershell
+ssh g3@192.168.50.1 'systemctl is-active g3-edge-agent && curl -fsS http://127.0.0.1:8700/health && echo && readlink -f /opt/g3-edge/current'
+```
+
+`scp` replaces `rsync` on Windows. It copies the whole `infra/edge` folder, including any local files; do not apply network configuration files unless you are following the separate network-config steps above. SSH and `sudo` can each ask for the Orange Pi password. Enter it only in your terminal. A failed login means the transfer or install has not happened.
+
+After confirming the new agent is healthy, the legacy collector can be removed with the commands in [Removing the old collector](#removing-the-old-collector). Do not remove `/var/lib/g3-edge`: it contains the current agent database and buffered usage.
+
 ## Removing the old collector
 
 `install-agent.sh` disables `g3-usage.timer` if it's enabled. The agent replaces it, so the old files can be removed:

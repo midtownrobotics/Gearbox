@@ -242,6 +242,7 @@ Workers deployed via Wrangler:
 - `wrangler deploy` in each worker directory
 - D1 database migrations run on deploy (see `wrangler.toml` in worker directories)
 - Frontend apps deployed to Cloudflare Pages (via GitHub Actions)
+- Edge-agent upgrades are documented in `infra/edge/README.md`; use its PowerShell steps when deploying from Windows.
 
 ## Key Files to Know
 
