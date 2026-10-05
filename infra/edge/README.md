@@ -272,22 +272,26 @@ A 75 ms debounce prevents contact bounce from playing duplicates; closing the do
 next opening. If the agent starts while the door is already open, it records that initial state
 without playing a startup sound.
 
-1. Ensure wiringOP's `gpio` command, ALSA's `aplay`, and BlueALSA are installed. The Orange Pi
-   images normally include wiringOP; `aplay` is provided by `alsa-utils`. BlueALSA must provide
-   the `bluealsa` ALSA PCM and its system service must be running.
+1. Ensure wiringOP's `gpio` command and ALSA's `aplay` are installed. The Orange Pi images
+   normally include wiringOP; `aplay` is provided by `alsa-utils`. Connect powered speakers
+   to the Orange Pi 5's 3.5 mm audio jack.
 2. Run `install-agent.sh`. It installs `prepare-switch-gpio.sh`, gives the `g3-edge` service user
    GPIO read and audio-device access, and creates writable `/srv/g3-sounds` storage.
-3. Pair, trust, and connect the speaker using `bluetoothctl`. By default, the agent sends A2DP
-   audio to BlueALSA's most recently connected speaker. For a fixed speaker, set this in
-   `/etc/g3-edge/agent.env` and restart the agent:
+3. The default ALSA device is the Orange Pi 5's ES8388 analog audio jack. Check that the card
+   appears with `aplay -l`. If your image gives it a different card ID, set
+   `EDGE_SWITCH_AUDIO_DEVICE` in `/etc/g3-edge/agent.env` to the matching `plughw:CARD=...,DEV=0`
+   value and restart the agent. For the usual card ID, add this line to that file:
+
+   ```dotenv
+   EDGE_SWITCH_AUDIO_DEVICE=plughw:CARD=rockchipes8388,DEV=0
+   ```
 
    ```bash
-   EDGE_SWITCH_AUDIO_DEVICE=bluealsa:DEV=AA:BB:CC:DD:EE:FF,PROFILE=a2dp
    sudo systemctl restart g3-edge-agent
    ```
 
-   Verify the same path outside the app with
-   `sudo -u g3-edge aplay -q -D 'bluealsa:DEV=AA:BB:CC:DD:EE:FF,PROFILE=a2dp' test.wav`.
+   Verify the same output outside the app with
+   `sudo -u g3-edge aplay -q -D 'plughw:CARD=rockchipes8388,DEV=0' test.wav`.
 4. In the Edge web app, open **Edge Box → Door Sounds** as an admin. Upload RIFF/WAVE files up to
    10 MB, then use **Test on Orange Pi** to confirm the selected audio output. Uploaded files join
    the door-opening rotation immediately and survive agent upgrades.

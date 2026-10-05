@@ -28,7 +28,7 @@ export interface AgentConfig {
   /** WAV files played in rotation whenever the switch changes from on to off. */
   switchSounds: string[];
   switchAudioPlayer: string;
-  /** ALSA PCM target; defaults to the most recently connected BlueALSA A2DP device. */
+  /** ALSA PCM target; defaults to the Orange Pi 5 analog headphone jack. */
   switchAudioDevice: string;
   /** Directory managed by the switch module for uploaded WAV files. */
   switchSoundDir: string;
@@ -75,7 +75,7 @@ export function loadConfig(): AgentConfig {
       .map((path) => path.trim())
       .filter(Boolean),
     switchAudioPlayer: process.env.EDGE_SWITCH_AUDIO_PLAYER ?? "aplay",
-    switchAudioDevice: process.env.EDGE_SWITCH_AUDIO_DEVICE ?? "bluealsa",
+    switchAudioDevice: process.env.EDGE_SWITCH_AUDIO_DEVICE ?? "plughw:CARD=rockchipes8388,DEV=0",
     switchSoundDir: process.env.EDGE_SWITCH_SOUND_DIR ?? "/srv/g3-sounds",
     switchGpioValuePath: process.env.EDGE_SWITCH_GPIO_VALUE_PATH ?? "/sys/class/gpio/gpio92/value",
   };
