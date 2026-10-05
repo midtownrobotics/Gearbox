@@ -46,7 +46,7 @@ describe("kiosk devices", () => {
   it("rejects expired codes and unknown tokens", async () => {
     const adminId = await createUser({ isAdmin: true });
     await testEnv.DB.prepare(
-      "INSERT INTO kiosk_activation_codes (code, created_by, device_name, expires_at, created_at) VALUES ('111111', ?, 'Old', 1, 0)",
+      "INSERT INTO kiosk_activation_codes (team_id, code, created_by, device_name, expires_at, created_at) SELECT team_id, '111111', id, 'Old', 1, 0 FROM core_users WHERE id = ?",
     )
       .bind(adminId)
       .run();

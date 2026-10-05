@@ -1,7 +1,7 @@
 import {
   type TeamUiColors,
   type TeamUiSettings,
-  apiUrl,
+  apiPath,
   defaultTeamUiSettings,
   site,
 } from "@g3/site-config";
@@ -58,8 +58,10 @@ function applySettings() {
 export function refreshTeamUiSettings(force = false): Promise<void> {
   if (pending) return force ? pending.then(() => refreshTeamUiSettings(true)) : pending;
   const local = ["localhost", "127.0.0.1"].includes(window.location.hostname);
+  // In production, G3ID's API on the page's own address, which the gateway answers for the page's
+  // team (so each team gets its own appearance).
   const endpoint =
-    import.meta.env.VITE_G3ID_API_URL ?? (local ? "http://localhost:8787" : apiUrl("id"));
+    import.meta.env.VITE_G3ID_API_URL ?? (local ? "http://localhost:8787" : apiPath("id"));
   pending = fetch(`${endpoint}/team/ui`, { cache: force ? "no-store" : "default" })
     .then(async (response) => {
       if (!response.ok) return;

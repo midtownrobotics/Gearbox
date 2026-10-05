@@ -36,8 +36,8 @@ These apps are being turned from one team's tools into a hosted platform that ma
 
 **Monorepo using pnpm workspaces:**
 
-- `apps/` — React frontends (g3id, portal, shop, pit, skill-tree, attendance, scouting, edge, orders)
-- `workers/` — Cloudflare Workers: one per app (g3id, portal, shop, pit, skill-tree, attendance, scouting, edge, orders), each serving its app's page and its API at `/api`, plus `gateway`, which routes `*.<domain>` to them
+- `apps/` — React frontends (g3id, portal, shop, pit, skill-tree, attendance, scouting, edge, orders, platform)
+- `workers/` — Cloudflare Workers: one per app (g3id, portal, shop, pit, skill-tree, attendance, scouting, edge, orders, platform), each serving its app's page and its API at `/api`, plus `gateway`, which routes `*.<domain>` to them
 - `packages/` — Shared libraries (auth, ui, slack)
 - `devices/` — Software that runs on physical hardware (edge-agent: Bun, compiled to an arm64 binary)
 - `infra/edge/` — Hand-applied system config for the shop edge box
@@ -144,14 +144,25 @@ Design brief: `docs/edge.md`. On-site Orange Pi 5 (hostname `orangepi5`, login u
 
 ### Hosting: one worker per app, one gateway
 
-- Each app is one worker: in production it serves the built app (`[env.production.assets]` → `apps/<app>/dist`, single-page-app fallback) and its Hono API at `/api` on the app's own address. Only `/api/*` runs worker code (`run_worker_first`); each worker's default export is wrapped in `withApiPrefix()` (`@g3/site-config/worker`), which drops `/api` so routes stay written as `/requests`, like in dev where Vite's proxy drops it. Apps call `"/api"` (same origin) in production and dev; cross-app calls use `apiUrl("<app>")` (`https://<app>.<domain>/api`).
+- Each app is one worker: in production it serves the built app (`[env.production.assets]` → `apps/<app>/dist`, single-page-app fallback) and its Hono API at `/api` on the app's own address. Only `/api/*` runs worker code (`run_worker_first`); each worker's default export is wrapped in `withApiPrefix()` (`@g3/site-config/worker`), which drops `/api` so routes stay written as `/requests`, like in dev where Vite's proxy drops it. Apps call `"/api"` (same origin) in production and dev; a page calls another app's API at `apiPath("<app>")` (`/api/~<app>` on its own address: the gateway sends it to that app for the same team, and in dev the `siteConfig()` Vite plugin proxies it to the app's local worker). `apiUrl("<app>")` (`https://<app>.<domain>/api`) is only for addresses outside services call, like webhooks.
 - **Workers call each other at `/api` too** (`http://g3id/api/auth/me`, `http://edge/api/lookup`): in production, anything outside `/api/*` would get the app's page.
 - `workers/gateway` owns `*.<domain>/*` and forwards each hostname to its app's worker through a service binding; it also answers each app's old `api.<app>.<domain>` address as that app's `/api` (Slack, Onshape's webhook and the edge box may still use them), and passes other hostnames (`www`, the edge tunnel) through. Portal has a tiny worker (`workers/portal`) just to serve its page.
+- **Teams in the gateway** (`workers/gateway/src/index.ts`): `<app>.<domain>` and `api.<app>.<domain>` are the site's team; `<number>-<app>.<domain>` is that team's app and `<number>.<domain>` its home (Portal), 404 unless G3ID knows the team (`GET /teams/:id`). For `/api` requests it drops a session that belongs to another team's member (the app sees a signed-out request), refuses an Origin from another team's host, and sets `X-Team-Id`, `X-User-Id`, `X-Session-Type`, `X-User-Roles` after removing any a client sent. Apps don't use those headers yet (Phase 3); production app workers have `workers_dev = false`, so the gateway is the only way in.
+- **Sign-in per team** (G3ID stays the sign-in app): each team signs in on its own G3ID, `<number>-id.<domain>` (the site's team: `g3id.<domain>`). G3ID reads the team from the gateway's `X-Team-Id` (`requestTeamId()`, `workers/g3id/src/lib/team.ts`; the site's team without it) and sends members back to `teamFrontend()`. Google, GitHub, Steam and Onshape all call back on the platform host `id.<domain>` (`signInCallbackApiUrl`; the gateway gives it no team), with the team, return address and any account being linked in the sign-in's state (`lib/oauth-state.ts`). Every sign-in method (providers, Slack codes, email, kiosk PIN) only signs in that team's members, and `sanitizeRedirect(url, team)` only allows that team's pages. Cross-team links in Slack DMs use `teamAppUrl(team, "id")`.
 - Deploy with `pnpm run deploy` (all) or `pnpm --filter @g3/worker-<app> run deploy` (`wrangler deploy --env production`; `[env.production.build]` in its `wrangler.toml` builds the app first, also in Cloudflare's Git builds). No Cloudflare Pages. See `docs/deploy.md`, including the one-time switch-over.
+
+### Platform (team sign-up)
+
+- `workers/platform` + `apps/platform` on the platform's domain (`site.platformDomain`, frcgearbox.com; the gateway sends the bare domain and `www` there). Its D1 (`PLATFORM_DB`) holds the **team registry**: number, name, country, time zone, status (`pending` → `active`), founder. The gateway asks it (`GET /teams/:id`, active teams only) before answering a team's addresses. G3ID keeps accounts, sessions, Slack connections and sign-in codes, plus a copy of each team's id/number/name for its foreign keys.
+- Sign-up (`/signup`): team details and the terms → "Add to Slack" (Slack calls back on `<platform>/api/signup/slack/callback`; the platform hands the team and the bot token to G3ID) → a code the founder DMs to the bot. A team with no members makes its first Slack sign-up an active admin (`lib/slack-code.ts`), so the founder is its first admin; the platform then marks the team active and sends them to G3ID's `/auth/slack/complete` on the team's own address, which sets the cookie there. Members join through the team's Slack. No accounts on other providers are needed.
+- **False registrations:** the sign-up form warns that a team found to be falsely registered may be permanently deleted with its data. Anyone can report a number at `/report` (`POST /reports`: team number, email, optional name, message), stored in `number_reports` (at most 20 open per number) for an operator to follow up by email; the operators' console lists them.
+- The platform reaches G3ID through `/api/internal/*` (teams, Slack installations, sign-up codes; for the console: a team's members, accounts by id, delete, renumber, hand over), over the service binding only: the gateway never answers `/api/internal`.
+- **Operators' console** (roadmap 2.8): `workers/platform/src/console.ts` (`/console/*`) + `apps/platform/src/console/`, at `admin.<domain>` and `admin.<platform>` (`CONSOLE_HOSTS`, `consoleUrl(team)`; the gateway sends both to the platform, for no team). Operators are G3ID accounts listed in the platform's `operators` table, never implied by a team role and never on a kiosk session; they sign in through their own team's G3ID, which may send them back to the console on that team's domain (`sanitizeRedirect`). Console changes must come from a console Origin. Tools: list teams and number reports, hand a team to another member (`teams.owner_user_id`; they become admin), renumber it (every G3ID row moves to the new `frc<number>` id), suspend/reactivate, delete it (all its G3ID accounts, sessions, kiosks, Slack). The site's team can't be deleted, renumbered or suspended. Every action, and each look at a team's members, goes in `operator_actions` with the operator's reason; rows older than 12 months are dropped (privacy policy's operator access log). The first operator is added by hand (`docs/deploy.md`).
+- Other teams' addresses are on the platform domain (`<number>-<app>.<platform>`, `<number>.<platform>`); the site's team (G3) keeps its own domain. Sign-in providers call back on `id.<the team's domain>` (`signInCallbackApiUrl(team)`, `providerRedirectUri()` in G3ID), and the session cookie is set for the domain the request came in on.
 
 ### Site config (team, domain)
 
-- Everything team-specific lives in `packages/site-config/src/site.ts` (`@g3/site-config`): team number, name and short name ("G3"), the domain, each app's subdomain (and old API subdomain), public links, the Slack bot's name. **Never hard-code the domain, team number or "G3" branding**: use `appUrl("shop")`, `apiUrl("orders")` (`https://orders.<domain>/api`), `allAppsUrl`, `wordmark("Shop")` ("G3 SHOP"), `appTitle("Shop")` ("G3 Shop"), `idName` ("G3ID"), `teamLinks`, `teamKey` ("frc1648"), `site.team.*`. Internal names (`@g3/*` packages, `g3_session`/`g3_theme` cookies, `--g3-*` CSS, `G3ID` binding, database names) stay as they are.
+- Everything team-specific lives in `packages/site-config/src/site.ts` (`@g3/site-config`): team number, name and short name ("G3"), the domain, the platform's domain (`platformDomain`), each app's subdomain (and old API subdomain), public links, the Slack bot's name. **Never hard-code the domain, team number or "G3" branding**: use `appUrl("shop")`, `apiUrl("orders")` (`https://orders.<domain>/api`), `allAppsUrl`, `wordmark("Shop")` ("G3 SHOP"), `appTitle("Shop")` ("G3 Shop"), `idName` ("G3ID"), `teamLinks`, `teamKey` ("frc1648"), `site.team.*`. Internal names (`@g3/*` packages, `g3_session`/`g3_theme` cookies, `--g3-*` CSS, `G3ID` binding, database names) stay as they are.
 - CORS for every worker is `cors({ origin: corsOrigin })`: https on the domain and its subdomains, plus localhost. No `*.pages.dev`.
 - Apps: `siteConfig()` from `@g3/site-config/vite` in each `vite.config` fills `%SITE_SHORT_NAME%`, `%SITE_TEAM_NAME%`, `%SITE_TEAM_NUMBER%`, `%SITE_ID_NAME%`, `%SITE_ALL_APPS_URL%`, `%SITE_APP_URL%` in `index.html`, and sets production API URLs (`productionEnv`), so there are no `.env.production` files; `.env.development` still points dev at localhost.
 - Files that can't import it (`wrangler.toml` production URLs, the gateway's route, OAuth redirect URIs, `TEAM_NUMBER`; the edge env examples) are written by `pnpm configure` (`scripts/configure.ts`); CI runs `pnpm configure --check`.
@@ -181,11 +192,12 @@ All colors defined in `packages/ui/src/index.css` `@theme` block:
 ### Database Schema
 
 Key tables in D1:
-- `core_users` — user accounts with status (pending/active/rejected)
+- `teams` — each team, keyed by `frc<number>` (`teamKey`). G3ID doesn't read the gateway's `X-Team-Id` yet (sign-in per team is roadmap 2.5), so the rows it creates are for the team in site.ts (`currentTeamId()` in `workers/g3id/src/lib/team.ts`)
+- `core_users` — user accounts with status (pending/active/rejected); **each belongs to exactly one team** (`team_id`, no memberships table; roles stay as `is_admin`/`is_mentor`)
 - `core_user_identities` — linked auth providers per user
 - `core_sessions` — active sessions (deprecated in favor of KV)
-- `core_user_pins` — 3-digit PINs for kiosk login
-- `kiosk_devices` — registered shop devices with tokens
+- `core_user_pins` — 3-digit PINs for kiosk login, unique within a team; a kiosk signs in only its own team's members
+- `kiosk_devices` — registered shop devices with tokens, in the activating admin's team
 - `kiosk_activation_codes` — 6-digit codes for device activation (30-min expiry)
 - `core_slack_link_codes` — Slack auth codes with polling status
 
@@ -207,6 +219,8 @@ Routes:
 - `GET /auth/slack/status` — Poll for completion (frontend calls every 2s)
 
 Rate limiting: 5 attempts per 15 minutes per Slack user (via KV).
+
+**Slack per team:** one Slack app, installed into each team's workspace by a team admin (G3ID Admin → Slack: `GET /slack/install`, Slack calls back on `id.<domain>/api/slack/oauth/callback`). `slack_installations` holds each team's workspace ID and bot token, encrypted with the `SECRETS_KEY` secret (`lib/secret-box.ts`). `lib/slack-install.ts`: `slackForTeam(env, team)` gives the workspace and a `{ SLACK_BOT_TOKEN }` for `@g3/slack`; `teamForWorkspace(env, workspaceId)` routes slash commands and events. A sign-in code only works from its own team's workspace. The site's team falls back to the `SLACK_BOT_TOKEN` / `SLACK_TEAM_ID` settings until it connects. Other workers' Slack messages (Orders, Shop, Scouting) still use their own `SLACK_BOT_TOKEN` (G3's) until Phase 3.
 
 ### Kiosk System (Shop Devices)
 
@@ -291,6 +305,7 @@ Apps:
 - `apps/scouting` → 5182
 - `apps/edge` → 5183
 - `apps/orders` → 5184
+- `apps/platform` → 5185
 
 Workers (Wrangler):
 - `workers/g3id` → 8787 (inspector: 9229)
@@ -301,6 +316,7 @@ Workers (Wrangler):
 - `workers/scouting` → 8792 (inspector: 9234)
 - `workers/edge` → 8793 (inspector: 9235)
 - `workers/orders` → 8794 (inspector: 9236)
+- `workers/platform` → 8795 (inspector: 9237)
 - `devices/edge-agent` (mock) → 8700
 
 **Starting dev servers:**

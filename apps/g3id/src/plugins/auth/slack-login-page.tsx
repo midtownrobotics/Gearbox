@@ -13,7 +13,8 @@ type PollStatus =
 
 type BotInfo = {
   appId: string;
-  teamId: string;
+  /** The team's Slack workspace; null if the team hasn't connected one. */
+  teamId: string | null;
 };
 
 export function SlackLoginPage() {
@@ -116,7 +117,7 @@ export function SlackLoginPage() {
   function handleOpenSlack() {
     navigator.clipboard.writeText(formattedCode);
 
-    if (botInfo) {
+    if (botInfo?.teamId) {
       const slackUrl = `slack://app?team=${botInfo.teamId}&id=${botInfo.appId}&tab=messages`;
       window.location.href = slackUrl;
     }

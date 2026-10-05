@@ -22,6 +22,8 @@ FRONTEND_URL = "http://localhost:5181"
 
 [env.production]
 name = "attendance-production"
+# No workers.dev address: the gateway is the only way in, so its identity headers can be trusted.
+workers_dev = false
 
 [[env.production.services]]
 binding = "G3ID"

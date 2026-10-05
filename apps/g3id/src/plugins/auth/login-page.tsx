@@ -1,5 +1,8 @@
+import { site } from "@g3/site-config";
+import { useEffect, useState } from "react";
 import { FaGithub, FaGoogle, FaSlack, FaSteam } from "react-icons/fa";
 import { Link, useSearchParams } from "react-router-dom";
+import { api } from "../../lib/api";
 
 const apiBase = import.meta.env.VITE_API_BASE_URL ?? "";
 
@@ -10,13 +13,24 @@ export function LoginPage() {
 
   const rp = redirect ? `?redirect=${encodeURIComponent(redirect)}` : "";
 
+  // Each team signs in on its own address; this is the team this one is for.
+  const [team, setTeam] = useState<{ name: string; teamNumber: number } | null>(null);
+  useEffect(() => {
+    api.teams.current
+      .$get()
+      .then((res) => (res.ok ? res.json() : null))
+      .then(setTeam)
+      .catch(() => {});
+  }, []);
+
   return (
     <main className="flex-1 flex items-center justify-center px-4 bg-secondary-50">
       <div className="w-full max-w-sm space-y-6">
         <div className="text-center">
-          <h1 className="text-5xl font-bold text-secondary-900">
-            Welcome to <span className="text-primary-500">G3</span>ID
-          </h1>
+          <p className="h-5 text-sm font-semibold uppercase tracking-widest text-primary-500">
+            {team && `Team ${team.teamNumber}`}
+          </p>
+          <h1 className="mt-1 min-h-12 text-4xl font-bold text-secondary-900">{team?.name}</h1>
           <p className="mt-2 text-secondary-600 text-sm">Sign in with your account</p>
         </div>
         {error && <p className="text-sm text-primary-500 text-center">{error}</p>}
@@ -57,6 +71,18 @@ export function LoginPage() {
           <Link to="/signup" className="text-primary-500 hover:text-primary-600 transition-colors">
             Sign up
           </Link>
+        </p>
+
+        <p className="pt-6 text-center text-xs text-secondary-400">
+          Gearbox is free and run by volunteers.{" "}
+          <a
+            href={site.donationUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline hover:text-primary-500 transition-colors"
+          >
+            Donate
+          </a>
         </p>
       </div>
     </main>

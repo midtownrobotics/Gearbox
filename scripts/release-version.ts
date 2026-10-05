@@ -17,6 +17,7 @@ import { join } from "node:path";
 export const APPS: [name: string, packageJson: string][] = [
   ["G3ID", "workers/g3id/package.json"],
   ["Portal", "workers/portal/package.json"],
+  ["Platform", "workers/platform/package.json"],
   ["Shop", "workers/shop/package.json"],
   ["Pit", "workers/pit/package.json"],
   ["Orders", "workers/orders/package.json"],

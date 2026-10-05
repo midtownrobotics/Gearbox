@@ -18,11 +18,10 @@
     ["@g3/scouting", "@g3/worker-scouting"],
     ["@g3/skill-tree", "@g3/worker-skill-tree"],
     ["@g3/attendance", "@g3/worker-attendance"],
-    ["@g3/portal", "@g3/worker-portal"]
+    ["@g3/portal", "@g3/worker-portal"],
+    ["@g3/platform", "@g3/worker-platform"]
   ],
   "ignore": [
-    "@g3/admin",
-    "@g3/api",
     "@g3/auth",
     "@g3/site-config",
     "@g3/slack",

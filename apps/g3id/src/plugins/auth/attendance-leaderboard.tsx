@@ -1,7 +1,8 @@
+import { apiPath } from "@g3/site-config";
 import { Loader2, Trophy } from "lucide-react";
 import { useEffect, useState } from "react";
 
-const ATTENDANCE_API_URL = import.meta.env.VITE_ATTENDANCE_API_URL ?? "";
+const ATTENDANCE_API_URL = apiPath("attendance");
 
 type AttendanceLeaderboardData = {
   year: string;

@@ -1,6 +1,7 @@
 import type { Plugin } from "../../shared/plugin-types";
 import { AdminAttendancePage } from "./admin-attendance-page";
 import { AdminKioskPage } from "./admin-kiosk-page";
+import { AdminSlackPage } from "./admin-slack-page";
 import { AdminTeamUiPage } from "./admin-team-ui-page";
 import { AdminUsersPage } from "./admin-users-page";
 
@@ -10,6 +11,7 @@ export const adminPlugin: Plugin = {
     { path: "/admin/users", element: <AdminUsersPage /> },
     { path: "/admin/kiosk", element: <AdminKioskPage /> },
     { path: "/admin/attendance", element: <AdminAttendancePage /> },
+    { path: "/admin/slack", element: <AdminSlackPage /> },
     { path: "/admin/team-ui", element: <AdminTeamUiPage /> },
   ],
   navItems: [
@@ -23,5 +25,6 @@ export const adminPlugin: Plugin = {
       audience: "admin",
       group: "Admin",
     },
+    { label: "Slack", to: "/admin/slack", order: 14, audience: "admin", group: "Admin" },
   ],
 };

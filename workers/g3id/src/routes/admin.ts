@@ -1,4 +1,4 @@
-import { appUrl, defaultTeamUiSettings, idName, teamKey } from "@g3/site-config";
+import { defaultTeamUiSettings, idName, teamAppUrl } from "@g3/site-config";
 import { sendDM } from "@g3/slack";
 import { and, desc, eq, gt, isNull, or } from "drizzle-orm";
 import { Hono } from "hono";
@@ -12,18 +12,19 @@ import {
   kioskDevices,
   teamUiSettings,
 } from "../db/schema";
+import { removeInstallation, slackForTeam } from "../lib/slack-install";
+import { teamOfUser } from "../lib/team";
 import { isTeamUiSettings, readTeamUiSettings } from "../lib/team-ui";
 import { requireAdmin } from "../middleware/auth";
 import type { AppEnv } from "../types";
 
 export const adminRouter = new Hono<AppEnv>()
   .use("*", requireAdmin)
+  // The admin's own team's appearance.
   .get("/team/ui", async (c) => {
-    const row = await createDb(c.env.DB)
-      .select()
-      .from(teamUiSettings)
-      .where(eq(teamUiSettings.teamId, teamKey))
-      .get();
+    const db = createDb(c.env.DB);
+    const team = await teamOfUser(db, c.get("userId") as string);
+    const row = await db.select().from(teamUiSettings).where(eq(teamUiSettings.teamId, team)).get();
     return c.json({
       settings: row ? readTeamUiSettings(row.settingsJson) : defaultTeamUiSettings,
       updatedAt: row?.updatedAt ?? null,
@@ -33,10 +34,11 @@ export const adminRouter = new Hono<AppEnv>()
     const body: unknown = await c.req.json().catch(() => null);
     if (!isTeamUiSettings(body)) return c.json({ error: "Invalid team UI settings." }, 400);
     const now = Math.floor(Date.now() / 1000);
-    await createDb(c.env.DB)
+    const db = createDb(c.env.DB);
+    await db
       .insert(teamUiSettings)
       .values({
-        teamId: teamKey,
+        teamId: await teamOfUser(db, c.get("userId") as string),
         settingsJson: JSON.stringify(body),
         updatedAt: now,
         updatedBy: c.get("userId"),
@@ -81,7 +83,7 @@ export const adminRouter = new Hono<AppEnv>()
     const db = createDb(c.env.DB);
 
     const user = await db
-      .select({ id: coreUsers.id, status: coreUsers.status })
+      .select({ id: coreUsers.id, teamId: coreUsers.teamId, status: coreUsers.status })
       .from(coreUsers)
       .where(eq(coreUsers.id, id))
       .get();
@@ -99,11 +101,12 @@ export const adminRouter = new Hono<AppEnv>()
       .from(coreUserIdentities)
       .where(and(eq(coreUserIdentities.userId, id), eq(coreUserIdentities.provider, "slack")));
 
-    if (slackIdentity?.providerId) {
+    const teamSlack = await slackForTeam(c.env, user.teamId);
+    if (slackIdentity?.providerId && teamSlack) {
       await sendDM(
         slackIdentity.providerId,
-        `✅ Your ${idName} account has been approved! Click <${appUrl("id")}/login|here> to go to the login page and *sign in with Slack*. Yes, you will have to repeat the code sending process.`,
-        c.env,
+        `✅ Your ${idName} account has been approved! Click <${teamAppUrl(user.teamId, "id")}/login|here> to go to the login page and *sign in with Slack*. Yes, you will have to repeat the code sending process.`,
+        teamSlack.slack,
       );
     }
 
@@ -328,6 +331,7 @@ export const adminRouter = new Hono<AppEnv>()
     const db = createDb(c.env.DB);
 
     await db.insert(kioskActivationCodes).values({
+      teamId: await teamOfUser(db, userId),
       code,
       createdBy: userId,
       deviceName,
@@ -336,6 +340,23 @@ export const adminRouter = new Hono<AppEnv>()
     });
 
     return c.json({ code, expiresAt });
+  })
+  // The team's Slack workspace, which an admin connects with /slack/install.
+  .get("/slack", async (c) => {
+    const team = await teamOfUser(createDb(c.env.DB), c.get("userId") as string);
+    const teamSlack = await slackForTeam(c.env, team);
+    return c.json({
+      connected: teamSlack !== null,
+      workspaceId: teamSlack?.workspaceId ?? null,
+      workspaceName: teamSlack?.workspaceName ?? null,
+      fromSettings: teamSlack?.fromSettings ?? false,
+      canConnect: Boolean(c.env.SLACK_CLIENT_ID && c.env.SECRETS_KEY),
+    });
+  })
+  .delete("/slack", async (c) => {
+    const team = await teamOfUser(createDb(c.env.DB), c.get("userId") as string);
+    await removeInstallation(c.env, { teamId: team });
+    return c.json({ ok: true });
   })
   .get("/kiosk/devices", async (c) => {
     const db = createDb(c.env.DB);

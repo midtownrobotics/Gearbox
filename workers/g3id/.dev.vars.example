@@ -4,6 +4,11 @@ GITHUB_CLIENT_SECRET=
 
 SLACK_BOT_TOKEN=
 SLACK_SIGNING_SECRET=
+# Installing the Slack app into a team's workspace (Admin → Slack), and the key that encrypts
+# the stored bot tokens (`openssl rand -base64 32`).
+SLACK_CLIENT_ID=
+SLACK_CLIENT_SECRET=
+SECRETS_KEY=
 
 STEAM_API_KEY=
 

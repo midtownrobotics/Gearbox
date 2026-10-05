@@ -1,3 +1,4 @@
+import { apiPath } from "@g3/site-config";
 import { Loader2, LogOut, Minus, Plus, Search, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
@@ -5,7 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 // but shares the g3id session cookie (set on the team's root domain), so
 // a plain fetch with credentials works the same way api.ts's typed client does for
 // g3id's own routes.
-const ATTENDANCE_API_URL = import.meta.env.VITE_ATTENDANCE_API_URL ?? "";
+const ATTENDANCE_API_URL = apiPath("attendance");
 
 type MemberSummary = {
   id: string;
