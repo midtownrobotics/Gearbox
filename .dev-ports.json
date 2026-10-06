@@ -105,6 +105,12 @@
       "inspectorPort": 9237,
       "name": "Platform Worker",
       "url": "http://localhost:8795"
+    },
+    "gateway": {
+      "port": 8796,
+      "inspectorPort": 9238,
+      "name": "Gateway (team addresses)",
+      "url": "http://localhost:8796"
     }
   }
 }

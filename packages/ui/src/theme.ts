@@ -1,4 +1,4 @@
-import { site } from "@g3/site-config";
+import { DEV_DOMAIN, site } from "@g3/site-config";
 import { useEffect, useSyncExternalStore } from "react";
 
 // One light/dark setting for every app. It lives in a cookie on the team's domain, which every
@@ -42,9 +42,13 @@ function applyTheme(theme: Theme) {
 
 /** Saves the theme for every G3 app and applies it here. */
 export function setTheme(theme: Theme) {
+  // Shared by every app on the domain this page is on: the site's, the platform's, or in dev the
+  // gateway's (gearbox.localhost) or plain localhost.
   const host = window.location.hostname;
-  const domain =
-    host === site.domain || host.endsWith(`.${site.domain}`) ? `; domain=.${site.domain}` : "";
+  const shared = [site.domain, site.platformDomain, DEV_DOMAIN, "localhost"].find(
+    (d) => host === d || host.endsWith(`.${d}`),
+  );
+  const domain = shared ? `; domain=${shared}` : "";
   const secure = window.location.protocol === "https:" ? "; secure" : "";
   document.cookie = `${COOKIE}=${theme}; path=/; max-age=31536000; samesite=lax${domain}${secure}`;
   applyTheme(theme);

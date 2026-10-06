@@ -19,6 +19,9 @@ database_id = "00000000-0000-0000-0000-000000000009"
 migrations_dir = "src/db/migrations"
 
 [vars]
+# Local dev: the platform and teams' addresses go through the dev gateway
+# (http://gearbox.localhost:8796, http://<number>-<app>.gearbox.localhost:8796).
+LOCAL_GATEWAY_URL = "http://localhost:8796"
 # The Slack app's client ID (the same app as G3ID's). Secret: SLACK_CLIENT_SECRET.
 SLACK_CLIENT_ID = "4695117013.8723416088496"
 

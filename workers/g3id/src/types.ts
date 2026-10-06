@@ -24,6 +24,8 @@ export type AppEnv = {
     ONSHAPE_CLIENT_SECRET: string;
     ONSHAPE_REDIRECT_URI: string;
     FRONTEND_URL: string;
+    /** Local dev only: the dev gateway (http://localhost:8796), for other teams' addresses. */
+    LOCAL_GATEWAY_URL?: string;
     ENVIRONMENT?: string;
   };
   Variables: {

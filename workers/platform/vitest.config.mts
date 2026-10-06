@@ -96,7 +96,12 @@ const slack = async (request: Request) => {
 
 export default workerTestConfig({
   d1: "PLATFORM_DB",
-  vars: { SLACK_CLIENT_ID: "test-client", SLACK_CLIENT_SECRET: "test-secret" },
+  // Production addresses, not the dev gateway's.
+  vars: {
+    SLACK_CLIENT_ID: "test-client",
+    SLACK_CLIENT_SECRET: "test-secret",
+    LOCAL_GATEWAY_URL: "",
+  },
   services: { G3ID: g3id },
   outbound: slack,
 });
