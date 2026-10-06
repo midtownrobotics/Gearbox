@@ -12,6 +12,7 @@ import {
 } from "../db/schema";
 import { chargesByCategory, lineTotal, orderFees } from "../lib/accounting";
 import { recordPrices } from "../lib/catalog";
+import { inChunks } from "../lib/chunks";
 import { csvDate, csvMoney, csvRow } from "../lib/csv";
 import { fiscalLabel, fiscalRange, fiscalYearOf } from "../lib/fiscal";
 import { importSheet } from "../lib/sheet-import";
@@ -119,20 +120,25 @@ export const ordersRouter = new Hono<AppEnv>()
    */
   .get("/receiving", requireAuth, async (c) => {
     const db = createOrdersDb(c.env.ORDERS_DB);
-    const lines = await db
-      .select()
-      .from(orderRequests)
-      .where(
-        and(
-          isNotNull(orderRequests.orderId),
-          inArray(orderRequests.status, ["ordered", "received"]),
-        ),
-      )
-      .all();
-    const orderIds = [...new Set(lines.map((l) => l.orderId as number))];
-    if (orderIds.length === 0) return c.json({ open: [], recent: [] });
+    // Lines on a placed order. The orders and receipts below are picked by subquery, not by a list
+    // of ids: a team's history has far more lines than D1 binds in one statement (lib/chunks.ts).
+    const onOrder = and(
+      isNotNull(orderRequests.orderId),
+      inArray(orderRequests.status, ["ordered", "received"]),
+    );
+    const lines = await db.select().from(orderRequests).where(onOrder).all();
+    if (lines.length === 0) return c.json({ open: [], recent: [] });
     const [orders, receipts] = await Promise.all([
-      db.select().from(vendorOrders).where(inArray(vendorOrders.id, orderIds)).all(),
+      db
+        .select()
+        .from(vendorOrders)
+        .where(
+          inArray(
+            vendorOrders.id,
+            db.select({ id: orderRequests.orderId }).from(orderRequests).where(onOrder),
+          ),
+        )
+        .all(),
       db
         .select()
         .from(requestEvents)
@@ -141,7 +147,7 @@ export const ordersRouter = new Hono<AppEnv>()
             eq(requestEvents.action, "received"),
             inArray(
               requestEvents.requestId,
-              lines.map((l) => l.id),
+              db.select({ id: orderRequests.id }).from(orderRequests).where(onOrder),
             ),
           ),
         )
@@ -199,27 +205,31 @@ export const ordersRouter = new Hono<AppEnv>()
     const db = createOrdersDb(c.env.ORDERS_DB);
     const isMentor = hasMentorAccess(c);
     const userId = c.get("userId");
-    const rows = await db
-      .select({
-        id: orderRequests.id,
-        requesterId: orderRequests.requesterId,
-        status: orderRequests.status,
-      })
-      .from(orderRequests)
-      .where(inArray(orderRequests.id, ids))
-      .all();
+    const rows = await inChunks(ids, (chunk) =>
+      db
+        .select({
+          id: orderRequests.id,
+          requesterId: orderRequests.requesterId,
+          status: orderRequests.status,
+        })
+        .from(orderRequests)
+        .where(inArray(orderRequests.id, chunk))
+        .all(),
+    );
     const allowed = rows
       .filter((r) => r.status === "ordered" && (isMentor || r.requesterId === userId))
       .map((r) => r.id);
     if (allowed.length === 0)
       return c.json({ error: "None of those items are on order and yours to receive." }, 409);
     const now = Date.now();
-    const received = await db
-      .update(orderRequests)
-      .set({ status: "received", updatedAt: now })
-      .where(and(inArray(orderRequests.id, allowed), eq(orderRequests.status, "ordered")))
-      .returning({ id: orderRequests.id })
-      .all();
+    const received = await inChunks(allowed, (chunk) =>
+      db
+        .update(orderRequests)
+        .set({ status: "received", updatedAt: now })
+        .where(and(inArray(orderRequests.id, chunk), eq(orderRequests.status, "ordered")))
+        .returning({ id: orderRequests.id })
+        .all(),
+    );
     for (let i = 0; i < received.length; i += 15) {
       await db.insert(requestEvents).values(
         received.slice(i, i + 15).map((r) => ({
@@ -279,11 +289,13 @@ export const ordersRouter = new Hono<AppEnv>()
     const body = c.req.valid("json");
     const db = createOrdersDb(c.env.ORDERS_DB);
     const ids = body.lines.map((l) => l.requestId);
-    const approved = await db
-      .select()
-      .from(orderRequests)
-      .where(and(inArray(orderRequests.id, ids), eq(orderRequests.status, "approved")))
-      .all();
+    const approved = await inChunks(ids, (chunk) =>
+      db
+        .select()
+        .from(orderRequests)
+        .where(and(inArray(orderRequests.id, chunk), eq(orderRequests.status, "approved")))
+        .all(),
+    );
     if (approved.length === 0) {
       return c.json(
         { error: "None of those requests are approved and waiting to be ordered." },

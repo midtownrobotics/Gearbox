@@ -310,7 +310,26 @@ function VendorOrder({
     }
   }
 
+  /** McMaster-Carr takes a pasted list of "part number,quantity" lines on its order page. */
+  const isMcMaster = /mcmaster/i.test(group.vendor);
+
   async function copyList() {
+    if (isMcMaster) {
+      const missing = group.items.filter((r) => !r.sku);
+      const text = group.items
+        .filter((r) => r.sku)
+        .map((r) => `${r.sku},${edits[r.id]?.quantity ?? r.quantity}`)
+        .join("\n");
+      await navigator.clipboard.writeText(text);
+      if (missing.length > 0) {
+        setError(
+          `Left out (no McMaster part number): ${missing.map((r) => r.title).join(", ")}. Add those by hand.`,
+        );
+      }
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+      return;
+    }
     const text = group.items
       .map((r) => {
         const e = edits[r.id];
@@ -391,7 +410,16 @@ function VendorOrder({
           {!shareACart && cart.links.length > 0 && cart.manual > 0 && (
             <span className="text-xs text-secondary-500">+{cart.manual} by hand</span>
           )}
-          <Button variant="secondary" onClick={copyList} className="!py-1.5">
+          <Button
+            variant="secondary"
+            onClick={copyList}
+            className="!py-1.5"
+            title={
+              isMcMaster
+                ? 'Copies "part number,quantity" lines to paste into McMaster\'s order page'
+                : undefined
+            }
+          >
             {copied ? "Copied ✓" : "Copy list"}
           </Button>
         </div>
