@@ -1,5 +1,5 @@
 import { requireAuth } from "@g3/auth";
-import { asc, eq, inArray } from "drizzle-orm";
+import { asc, count, eq, inArray } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
 import { type OrdersDb, createOrdersDb } from "../db";
@@ -153,6 +153,61 @@ export const catalogRouter = new Hono<AppEnv>()
       .values({ name, createdBy: c.get("userDisplayName"), createdAt: Date.now() });
     return c.json({ name }, 201);
   })
+  /**
+   * Removing a category. Its parts (and part families) move to `moveTo` first, in the same batch,
+   * so no part is ever left in a category that's gone; a category with no parts needs no `moveTo`.
+   */
+  .delete(
+    "/categories",
+    requireAuth,
+    requireCatalogEditor,
+    validator("json", (value, c): { name: string; moveTo: string | null } => {
+      const v = (value ?? {}) as { name?: unknown; moveTo?: unknown };
+      if (typeof v.name !== "string" || !v.name.trim()) {
+        return c.json({ error: "Say which category to remove." }, 400) as never;
+      }
+      const moveTo = typeof v.moveTo === "string" && v.moveTo.trim() ? v.moveTo.trim() : null;
+      return { name: v.name.trim(), moveTo };
+    }),
+    async (c) => {
+      const { name, moveTo } = c.req.valid("json");
+      const db = createOrdersDb(c.env.ORDERS_DB);
+      const names = await categoryNames(db);
+      if (!names.includes(name)) return c.json({ error: `There's no category “${name}”.` }, 404);
+      const [{ parts }] = await db
+        .select({ parts: count() })
+        .from(catalogItems)
+        .where(eq(catalogItems.category, name));
+      const [{ families }] = await db
+        .select({ families: count() })
+        .from(catalogFamilies)
+        .where(eq(catalogFamilies.category, name));
+      if (parts + families > 0) {
+        if (!moveTo) {
+          return c.json(
+            { error: `“${name}” has ${parts} parts. Pick the category to move them to.` },
+            400,
+          );
+        }
+        if (moveTo === name) return c.json({ error: "Move them to a different category." }, 400);
+        if (!names.includes(moveTo)) return c.json(NO_CATEGORY, 400);
+      }
+      const now = Date.now();
+      const user = c.get("userDisplayName");
+      await db.batch([
+        db
+          .update(catalogItems)
+          .set({ category: moveTo ?? name, updatedBy: user, updatedAt: now })
+          .where(eq(catalogItems.category, name)),
+        db
+          .update(catalogFamilies)
+          .set({ category: moveTo ?? name })
+          .where(eq(catalogFamilies.category, name)),
+        db.delete(catalogCategories).where(eq(catalogCategories.name, name)),
+      ]);
+      return c.json({ moved: parts, to: parts + families > 0 ? moveTo : null });
+    },
+  )
   /** Some items by id (?ids=1,2,3), for requesting them. */
   .get("/items", requireAuth, async (c) => {
     const ids = (c.req.query("ids") ?? "")

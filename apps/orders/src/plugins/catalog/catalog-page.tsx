@@ -41,6 +41,7 @@ export function CatalogPage() {
   const [limit, setLimit] = useState(PAGE);
   const [adding, setAdding] = useState(false);
   const [newCategory, setNewCategory] = useState(false);
+  const [removingCategory, setRemovingCategory] = useState(false);
   const { canEditCatalog } = useAuthUser();
   // Opened from a list (?list=…): parts requested from here go on it.
   const [params] = useSearchParams();
@@ -113,6 +114,9 @@ export function CatalogPage() {
             <Button variant="secondary" onClick={() => setNewCategory(true)}>
               New category
             </Button>
+            <Button variant="secondary" onClick={() => setRemovingCategory(true)}>
+              Remove category
+            </Button>
             <Button variant="secondary" onClick={() => setAdding(true)}>
               Add part
             </Button>
@@ -134,6 +138,19 @@ export function CatalogPage() {
           onDone={(name) => {
             setNewCategory(false);
             if (name) reload();
+          }}
+        />
+      )}
+      {removingCategory && data && (
+        <RemoveCategory
+          categories={data.categories}
+          items={data.items}
+          onDone={(removed) => {
+            setRemovingCategory(false);
+            if (removed) {
+              if (category === removed) setCategory(null);
+              reload();
+            }
           }}
         />
       )}
@@ -501,6 +518,103 @@ function NewCategory({ onDone }: { onDone: (name: string | null) => void }) {
         <Button variant="secondary" onClick={() => onDone(null)}>
           Cancel
         </Button>
+      </form>
+      {error && <ErrorBanner message={error} />}
+    </Card>
+  );
+}
+
+/**
+ * Removing a category (mentors and trusted students). Its parts move to another category first;
+ * nothing is deleted but the category's name.
+ */
+function RemoveCategory({
+  categories,
+  items,
+  onDone,
+}: {
+  categories: string[];
+  items: CatalogItem[];
+  onDone: (removed: string | null) => void;
+}) {
+  const [name, setName] = useState("");
+  const [moveTo, setMoveTo] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const counts = useMemo(() => {
+    const n = new Map<string, number>();
+    for (const i of items) n.set(i.category, (n.get(i.category) ?? 0) + 1);
+    return n;
+  }, [items]);
+  const parts = name ? (counts.get(name) ?? 0) : 0;
+
+  async function remove(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    const res = await api.catalog.categories.$delete({
+      json: { name, moveTo: parts > 0 ? moveTo : null },
+    });
+    setBusy(false);
+    if (!res.ok) return setError(await getErrorMessage(res));
+    onDone(name);
+  }
+
+  return (
+    <Card title="Remove category" className="!p-4">
+      <form onSubmit={remove} className="space-y-3">
+        <div className="flex flex-wrap gap-2">
+          <select
+            className={`${inputClass} !w-auto`}
+            value={name}
+            onChange={(e) => {
+              setName(e.target.value);
+              if (moveTo === e.target.value) setMoveTo("");
+            }}
+            aria-label="Category to remove"
+          >
+            <option value="">Category to remove…</option>
+            {categories.map((c) => (
+              <option key={c} value={c}>
+                {c} ({counts.get(c) ?? 0})
+              </option>
+            ))}
+          </select>
+          {parts > 0 && (
+            <select
+              className={`${inputClass} !w-auto`}
+              value={moveTo}
+              onChange={(e) => setMoveTo(e.target.value)}
+              aria-label="Move its parts to"
+            >
+              <option value="">Move its parts to…</option>
+              {categories
+                .filter((c) => c !== name)
+                .map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+            </select>
+          )}
+        </div>
+        {name && (
+          <p className="text-sm text-secondary-600">
+            {parts === 0
+              ? `“${name}” has no parts. It will just be removed.`
+              : moveTo
+                ? `${parts} part${parts === 1 ? "" : "s"} will move from “${name}” to “${moveTo}”, then “${name}” is removed.`
+                : `“${name}” has ${parts} part${parts === 1 ? "" : "s"}. Pick where they go.`}
+          </p>
+        )}
+        <div className="flex gap-2">
+          <Button type="submit" disabled={busy || !name || (parts > 0 && !moveTo)}>
+            {busy ? "Removing…" : parts > 0 ? "Move parts and remove" : "Remove category"}
+          </Button>
+          <Button variant="secondary" onClick={() => onDone(null)}>
+            Cancel
+          </Button>
+        </div>
       </form>
       {error && <ErrorBanner message={error} />}
     </Card>
