@@ -7,6 +7,52 @@ name = "gateway"
 main = "src/index.ts"
 compatibility_date = "2026-05-17"
 
+# Local dev (`pnpm dev`): one port for everything, with gearbox.localhost standing for the
+# platform's domain (http://gearbox.localhost:8796, http://<number>-<app>.gearbox.localhost:8796). Each binding reaches that
+# worker's own `wrangler dev`; pages come from the apps' Vite dev servers.
+[vars]
+LOCAL_DEV = "true"
+
+[[services]]
+binding = "PLATFORM"
+service = "platform"
+
+[[services]]
+binding = "G3ID"
+service = "g3id"
+
+[[services]]
+binding = "PORTAL"
+service = "portal"
+
+[[services]]
+binding = "SHOP"
+service = "shop"
+
+[[services]]
+binding = "PIT"
+service = "pit"
+
+[[services]]
+binding = "ORDERS"
+service = "orders"
+
+[[services]]
+binding = "EDGE"
+service = "edge"
+
+[[services]]
+binding = "SCOUTING"
+service = "scouting"
+
+[[services]]
+binding = "SKILL_TREE"
+service = "skill-tree"
+
+[[services]]
+binding = "ATTENDANCE"
+service = "attendance"
+
 [env.production]
 name = "gateway-production"
 workers_dev = false

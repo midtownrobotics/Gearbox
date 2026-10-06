@@ -1,19 +1,21 @@
 import {
   type AppName,
   CONSOLE_HOSTS,
+  DEV_DOMAIN,
   TEAM_HOST_APPS,
   isAllowedOrigin,
   site,
   teamKey,
 } from "@g3/site-config";
+import devPorts from "../../../.dev-ports.json";
 
 // The one worker on *.<domain>/* and the platform's domain: works out the team and app from the
 // hostname and sends the request to that app's worker. Each app's worker serves the app's page and
 // its API at /api (see @g3/site-config/worker). <domain> is site.ts's `domain` (the team in site.ts,
 // G3 today) and <platform> its `platformDomain` (every other team, and the platform itself).
 //   <app>.<domain>/...             → the app, for the team in site.ts
-//   api.<app>.<domain>/...         → the app's /api/..., for the team in site.ts (the older API
-//                                    addresses, which Slack, webhooks and the edge box may still use)
+//   api.<app>.<domain>/...         → 410 Gone, naming the app's address: the older API addresses,
+//                                    retired (roadmap 2.4)
 //   <platform>/, www.<platform>/   → the platform worker: public site and team sign-up
 //   admin.<domain>/, admin.<platform>/ → the platform worker: the operators' console (on both
 //                                    domains, so it gets an operator's session cookie on either)
@@ -25,6 +27,11 @@ import {
 //                                    (`signInCallbackApiUrl`); the team is in the sign-in's state
 //   anything else                  → passed on to wherever its DNS points (www, the edge box's tunnel)
 // /api/internal/... is for workers only (over service bindings) and never answered here.
+//
+// Local dev (roadmap 2.9; `LOCAL_DEV` in wrangler.toml's dev settings, `pnpm dev`): the gateway
+// runs on one port (8796), with gearbox.localhost standing for the platform's domain:
+// gearbox.localhost:8796 is the platform, 254-orders.gearbox.localhost:8796 team 254's Orders,
+// 1648-id.gearbox.localhost:8796 this team's G3ID. /api goes to each app's local worker, pages to its Vite dev server (.dev-ports.json).
 //
 // On the way it keeps teams apart (roadmap step 2.3):
 // - A team-number host only answers for a team the platform has (signed up and active).
@@ -39,7 +46,10 @@ import {
 /** An app, or the platform itself. */
 type Worker = AppName | "platform";
 
-export type Env = Record<(typeof BINDINGS)[Worker], Fetcher>;
+export type Env = Record<(typeof BINDINGS)[Worker], Fetcher> & {
+  /** "true" in local dev (see above). */
+  LOCAL_DEV?: string;
+};
 
 /** The service binding for each worker (wrangler.toml). */
 const BINDINGS = {
@@ -68,31 +78,33 @@ export const IDENTITY_HEADERS = {
 } as const;
 
 /** `team` is null on platform hosts, which serve every team. */
-type Route = { app: Worker; team: string | null; oldApi: boolean };
+type Route = { app: Worker; team: string | null };
 
 /** Platform hosts: the same for every team. */
 const PLATFORM_ROUTES = new Map<string, Route>([
-  [site.platformDomain, { app: "platform", team: null, oldApi: false }],
-  [`www.${site.platformDomain}`, { app: "platform", team: null, oldApi: false }],
-  ...CONSOLE_HOSTS.map((host): [string, Route] => [
-    host,
-    { app: "platform", team: null, oldApi: false },
-  ]),
-  [`id.${site.domain}`, { app: "id", team: null, oldApi: false }],
-  [`id.${site.platformDomain}`, { app: "id", team: null, oldApi: false }],
+  [site.platformDomain, { app: "platform", team: null }],
+  [`www.${site.platformDomain}`, { app: "platform", team: null }],
+  ...CONSOLE_HOSTS.map((host): [string, Route] => [host, { app: "platform", team: null }]),
+  [`id.${site.domain}`, { app: "id", team: null }],
+  [`id.${site.platformDomain}`, { app: "id", team: null }],
 ]);
 
-/** The hostnames for the team in site.ts: each app's address, and its older API address. */
+/** The hostnames for the team in site.ts: each app's address. */
 const SITE_ROUTES = new Map<string, Route>(
-  (Object.keys(site.apps) as AppName[]).flatMap((app) => {
-    const { web, api } = site.apps[app];
-    const routes: [string, Route][] = [
-      [`${web}.${site.domain}`, { app, team: teamKey, oldApi: false }],
-    ];
-    if (api) routes.push([`${api}.${site.domain}`, { app, team: teamKey, oldApi: true }]);
-    return routes;
-  }),
+  (Object.keys(site.apps) as AppName[]).map((app) => [
+    `${site.apps[app].web}.${site.domain}`,
+    { app, team: teamKey },
+  ]),
 );
+
+/**
+ * An app's retired API address (api.<app>.<domain>, before each app's API moved to /api on its own
+ * address): the address to use instead, or null.
+ */
+export function retiredApiHost(hostname: string): string | null {
+  const match = hostname.match(/^api\.(.+)$/);
+  return match && SITE_ROUTES.has(match[1]) ? `https://${match[1]}/api` : null;
+}
 
 const TEAM_HOST_APP = new Map<string, AppName>(
   Object.entries(TEAM_HOST_APPS).map(([app, host]) => [host, app as AppName]),
@@ -111,16 +123,19 @@ export function route(hostname: string): Route | "unknown app" | null {
   if (!match) return null;
   const app = match[2] === undefined ? "portal" : TEAM_HOST_APP.get(match[2]);
   if (!app) return "unknown app";
-  return { app, team: `frc${match[1]}`, oldApi: false };
+  return { app, team: `frc${match[1]}` };
 }
 
 /**
  * Whether a page at `origin` may call a team's API: one of the team's own pages, or a page of no
  * team (www, the platform's hosts, localhost). A platform host's API takes any of the domain's.
  */
-function originAllowed(origin: string, team: string | null): boolean {
-  if (!isAllowedOrigin(origin)) return false;
-  const from = route(new URL(origin).hostname);
+function originAllowed(origin: string, team: string | null, local: boolean): boolean {
+  // A page on the dev gateway is checked as the platform address it stands for.
+  const stands = local ? fromLocalHost(new URL(origin).hostname) : null;
+  const checked = stands ? `https://${stands}` : origin;
+  if (!isAllowedOrigin(checked)) return false;
+  const from = route(new URL(checked).hostname);
   if (team === null || from === null) return true;
   return from !== "unknown app" && (from.team === null || from.team === team);
 }
@@ -186,11 +201,51 @@ export function toHttps(url: URL): Response | null {
 
 const json = (status: number, error: string) => Response.json({ error }, { status });
 
+/**
+ * Local dev: the platform address a dev hostname stands for, or null. gearbox.localhost stands for
+ * the platform's domain (and so does plain localhost).
+ */
+export function fromLocalHost(hostname: string): string | null {
+  if (hostname === DEV_DOMAIN || hostname === "localhost") return site.platformDomain;
+  if (hostname.endsWith(`.${DEV_DOMAIN}`)) {
+    return `${hostname.slice(0, -DEV_DOMAIN.length - 1)}.${site.platformDomain}`;
+  }
+  return null;
+}
+
+/** Local dev: each app's Vite dev server, which serves its pages (.dev-ports.json). */
+const DEV_APPS: Record<Worker, keyof typeof devPorts.apps> = {
+  platform: "platform",
+  id: "g3id",
+  portal: "portal",
+  shop: "shop",
+  pit: "pit",
+  orders: "orders",
+  edge: "edge",
+  scouting: "scouting",
+  skillTree: "skill-tree",
+  attendance: "attendance",
+};
+
+function devPage(request: Request, url: URL, app: Worker): Promise<Response> {
+  const page = new URL(`${url.pathname}${url.search}`, devPorts.apps[DEV_APPS[app]].url);
+  return fetch(new Request(page.toString(), request));
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
-    const target = route(url.hostname);
+    const localHost = env.LOCAL_DEV === "true" ? fromLocalHost(url.hostname) : null;
+    const local = localHost !== null;
+    const target = route(localHost ?? url.hostname);
     if (target === null) {
+      const moved = retiredApiHost(url.hostname);
+      if (moved) {
+        return Response.json(
+          { error: `This address was retired. Use ${moved} instead.`, use: moved },
+          { status: 410 },
+        );
+      }
       // Not an app: let the request go where its DNS record points (a worker's own route doesn't
       // run again for its subrequests). If nothing is behind it, Cloudflare answers with an error.
       try {
@@ -201,7 +256,7 @@ export default {
     }
     if (target === "unknown app") return json(404, "No such app.");
 
-    const insecure = toHttps(url);
+    const insecure = local ? null : toHttps(url);
     if (insecure) return insecure;
 
     const { team } = target;
@@ -213,14 +268,14 @@ export default {
       if (!exists) return json(404, "No such team.");
     }
 
-    const isApi = target.oldApi || url.pathname === "/api" || url.pathname.startsWith("/api/");
+    const isApi = url.pathname === "/api" || url.pathname.startsWith("/api/");
     const headers = new Headers(request.headers);
     for (const name of Object.values(IDENTITY_HEADERS)) headers.delete(name);
     if (team !== null) headers.set(IDENTITY_HEADERS.team, team);
 
     if (isApi) {
       const origin = request.headers.get("Origin");
-      if (origin && !originAllowed(origin, team)) {
+      if (origin && !originAllowed(origin, team, local)) {
         return json(
           403,
           isAllowedOrigin(origin)
@@ -247,14 +302,16 @@ export default {
       }
     }
 
+    // Local dev: pages come from the app's Vite dev server (workers only serve them in production).
+    if (local && !isApi) return devPage(request, url, target.app);
+
     let app: Worker = target.app;
-    const other = target.oldApi ? null : url.pathname.match(/^\/api\/~([A-Za-z]+)(\/.*)?$/);
+    const other = url.pathname.match(/^\/api\/~([A-Za-z]+)(\/.*)?$/);
     if (other) {
       if (!(other[1] in BINDINGS)) return json(404, "No such app.");
       app = other[1] as Worker;
       url.pathname = `/api${other[2] ?? "/"}`;
     }
-    if (target.oldApi) url.pathname = `/api${url.pathname}`;
     if (url.pathname === "/api/internal" || url.pathname.startsWith("/api/internal/")) {
       return json(404, "Not found.");
     }

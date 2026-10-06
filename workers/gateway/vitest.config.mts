@@ -53,7 +53,7 @@ export default workerTestConfig({
     // Cloudflare's answer when a hostname has nothing behind it.
     if (url.hostname.startsWith("dead."))
       return new Response("Origin unreachable", { status: 530 });
-    return Response.json({ app: "origin", host: url.hostname, path: url.pathname });
+    return Response.json({ app: "origin", host: url.hostname, port: url.port, path: url.pathname });
   },
   services: {
     ...Object.fromEntries(
