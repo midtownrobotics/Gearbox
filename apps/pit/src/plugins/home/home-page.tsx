@@ -1,4 +1,4 @@
-import { appTitle } from "@g3/site-config";
+import { useTeamNames } from "@g3/ui";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
@@ -121,6 +121,7 @@ const TILES: Tile[] = [
 ];
 
 export function HomePage() {
+  const names = useTeamNames();
   const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
@@ -138,7 +139,7 @@ export function HomePage() {
       <div className="max-w-3xl mx-auto px-4 py-12 sm:py-16 space-y-10">
         <div className="text-center space-y-3">
           <h1 className="text-5xl sm:text-6xl font-bold tracking-tight">
-            {appTitle("Pit")} Software
+            {names.appTitle("Pit")} Software
           </h1>
           <p className="text-red-400 font-semibold text-lg tracking-widest uppercase">
             Pit Management and Operations

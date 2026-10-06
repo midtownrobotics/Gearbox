@@ -1,6 +1,6 @@
 import { appUrl } from "@g3/site-config";
 export const API = (import.meta.env.VITE_API_URL as string) || "/api";
-export const G3ID_WEB = (import.meta.env.VITE_G3ID_WEB as string) || appUrl("id");
+export const G3ID_WEB = appUrl("id");
 
 export type Me = {
   id: string;

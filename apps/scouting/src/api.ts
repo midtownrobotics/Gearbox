@@ -1,7 +1,7 @@
 import { appUrl } from "@g3/site-config";
 const API_ORIGIN = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
 export const API_URL = `${API_ORIGIN}/scouting`;
-export const G3ID_URL = import.meta.env.VITE_G3ID_URL ?? appUrl("id");
+export const G3ID_URL = appUrl("id");
 const inflightGets = new Map<string, Promise<unknown>>();
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {

@@ -1,4 +1,12 @@
-import { type TeamUiColors, type TeamUiSettings, defaultTeamUiSettings } from "@g3/site-config";
+import {
+  type TeamUiColors,
+  type TeamUiSettings,
+  defaultTeamUiSettings,
+  teamUiDefaults,
+} from "@g3/site-config";
+import { eq } from "drizzle-orm";
+import type { Db } from "../db";
+import { teamUiSettings, teams } from "../db/schema";
 
 const hex = /^#[0-9a-fA-F]{6}$/;
 const fields: (keyof TeamUiColors)[] = [
@@ -67,20 +75,49 @@ export function isTeamUiSettings(value: unknown): value is TeamUiSettings {
   );
 }
 
-export function readTeamUiSettings(json: string | undefined): TeamUiSettings {
-  if (!json) return defaultTeamUiSettings;
+/**
+ * A stored record, with `defaults` (the team's, teamUiDefaults) filling links added since it was
+ * saved, without losing its branding or its explicitly empty links. Writes still need the full
+ * current schema, and unknown keys stay invalid.
+ */
+export function readTeamUiSettings(
+  json: string | undefined,
+  defaults: TeamUiSettings = defaultTeamUiSettings,
+): TeamUiSettings {
+  if (!json) return defaults;
   try {
     const value: unknown = JSON.parse(json);
-    if (!isRecord(value) || !isRecord(value.links)) return defaultTeamUiSettings;
-    // Add new defaults to older stored records without losing their branding or empty links.
-    // Writes still require the full current schema, and unknown keys remain invalid.
+    if (!isRecord(value) || !isRecord(value.links)) return defaults;
     const settings = {
       ...value,
-      links: { ...defaultTeamUiSettings.links, ...value.links },
+      links: { ...defaults.links, ...value.links },
       hiddenLinks: "hiddenLinks" in value ? value.hiddenLinks : [],
     };
-    return isTeamUiSettings(settings) ? settings : defaultTeamUiSettings;
+    return isTeamUiSettings(settings) ? settings : defaults;
   } catch {
-    return defaultTeamUiSettings;
+    return defaults;
   }
+}
+
+/** A team's appearance: what its admins saved, or its defaults (its own name and number). */
+export async function loadTeamUi(db: Db, teamId: string) {
+  const [row, team] = await Promise.all([
+    db
+      .select({ settingsJson: teamUiSettings.settingsJson, updatedAt: teamUiSettings.updatedAt })
+      .from(teamUiSettings)
+      .where(eq(teamUiSettings.teamId, teamId))
+      .get(),
+    db.select({ name: teams.name }).from(teams).where(eq(teams.id, teamId)).get(),
+  ]);
+  const defaults = teamUiDefaults(teamId, team?.name);
+  return {
+    settings: row ? readTeamUiSettings(row.settingsJson, defaults) : defaults,
+    defaults,
+    updatedAt: row?.updatedAt ?? null,
+  };
+}
+
+/** The team's name for its sign-in app ("G3ID"), from its appearance: for messages it's sent. */
+export async function teamIdName(db: Db, teamId: string): Promise<string> {
+  return `${(await loadTeamUi(db, teamId)).settings.shortName}ID`;
 }

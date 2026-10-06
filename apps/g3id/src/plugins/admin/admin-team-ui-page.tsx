@@ -2,7 +2,8 @@ import {
   type TeamUiColors,
   type TeamUiLinkKey,
   type TeamUiSettings,
-  defaultTeamUiSettings,
+  pageTeamId,
+  teamUiDefaults,
   teamUiLinkLabels,
 } from "@g3/site-config";
 import { refreshTeamUiSettings } from "@g3/ui";
@@ -23,7 +24,9 @@ const fieldClass =
   "w-full rounded-md border border-line bg-surface px-3 py-2 text-secondary-900 focus:outline-none focus:ring-2 focus:ring-primary-500";
 
 export function AdminTeamUiPage() {
-  const [settings, setSettings] = useState<TeamUiSettings>(defaultTeamUiSettings);
+  const [settings, setSettings] = useState<TeamUiSettings>(() => teamUiDefaults(pageTeamId));
+  // The team's own defaults (its name and number), from G3ID: what "Reset to defaults" restores.
+  const [defaults, setDefaults] = useState<TeamUiSettings>(() => teamUiDefaults(pageTeamId));
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -36,6 +39,7 @@ export function AdminTeamUiPage() {
         if (!response.ok) throw new Error("Could not load team settings.");
         const data = await response.json();
         setSettings(data.settings);
+        setDefaults(data.defaults);
       })
       .catch((reason) =>
         setError(reason instanceof Error ? reason.message : "Could not load team settings."),
@@ -53,7 +57,7 @@ export function AdminTeamUiPage() {
   }
 
   function reset() {
-    setSettings(structuredClone(defaultTeamUiSettings));
+    setSettings(structuredClone(defaults));
     setError("");
     setMessage("Defaults restored in this form. Save team appearance to apply them.");
   }

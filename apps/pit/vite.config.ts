@@ -1,4 +1,3 @@
-import { appTitle, appUrl, site } from "@g3/site-config";
 import { siteConfig } from "@g3/site-config/vite";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
@@ -9,7 +8,7 @@ export default defineConfig({
   plugins: [
     siteConfig({
       app: "pit",
-      productionEnv: { VITE_API_BASE_URL: "/api", VITE_G3ID_URL: appUrl("id") },
+      productionEnv: { VITE_API_BASE_URL: "/api" },
     }),
 
     react(),
@@ -18,9 +17,10 @@ export default defineConfig({
       registerType: "autoUpdate",
       includeAssets: ["favicon.ico", "favicon.svg", "apple-touch-icon.png"],
       manifest: {
-        name: appTitle("Pit"),
-        short_name: appTitle("Pit"),
-        description: `${site.team.name} pit management and operations`,
+        // One build serves every team, so the installed app is just "Pit".
+        name: "Pit",
+        short_name: "Pit",
+        description: "Pit management and operations",
         theme_color: "#111827",
         background_color: "#030712",
         display: "standalone",

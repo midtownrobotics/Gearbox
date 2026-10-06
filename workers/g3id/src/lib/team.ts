@@ -1,4 +1,4 @@
-import { signInCallbackApiUrl, teamAppUrl, teamKey } from "@g3/site-config";
+import { type AppName, signInCallbackApiUrl, teamAppUrlVia, teamKey } from "@g3/site-config";
 import { eq } from "drizzle-orm";
 import type { Context } from "hono";
 import type { Db } from "../db";
@@ -17,9 +17,18 @@ export function requestTeamId(c: Context<AppEnv>): string {
 /** The team in site.ts. */
 export const siteTeamId = teamKey;
 
-/** A team's G3ID page, where its members sign in: FRONTEND_URL for the site's team. */
+/**
+ * A team's G3ID page, where its members sign in: FRONTEND_URL for the site's team, other teams'
+ * own addresses, and in local dev every team's through the dev gateway.
+ */
 export function teamFrontend(env: AppEnv["Bindings"], teamId: string): string {
-  return teamId === teamKey ? env.FRONTEND_URL : teamAppUrl(teamId, "id");
+  if (teamId === teamKey && !env.LOCAL_GATEWAY_URL) return env.FRONTEND_URL;
+  return teamAppUrlVia(env.LOCAL_GATEWAY_URL, teamId, "id");
+}
+
+/** A team's address for an app, through the dev gateway in local dev (links in Slack messages). */
+export function teamUrl(env: AppEnv["Bindings"], teamId: string, app: AppName): string {
+  return teamAppUrlVia(env.LOCAL_GATEWAY_URL, teamId, app);
 }
 
 /**

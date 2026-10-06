@@ -1,3 +1,4 @@
+import { appUrl } from "@g3/site-config";
 import type { OrdersApp } from "@g3/worker-orders";
 import { hc } from "hono/client";
 
@@ -6,7 +7,8 @@ export const api = hc<OrdersApp>(import.meta.env.VITE_API_BASE_URL ?? "", {
 });
 
 export function g3idUrl(): string {
-  return import.meta.env.VITE_G3ID_URL || "http://localhost:5173";
+  // The page's team's G3ID (the dev gateway's in dev).
+  return appUrl("id");
 }
 
 /** Send the user to g3id login, returning here afterwards. */

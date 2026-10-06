@@ -1,4 +1,4 @@
-import { appTitle } from "@g3/site-config";
+import { useTeamNames } from "@g3/ui";
 import { useEffect, useState } from "react";
 import { api } from "../../shared/api";
 import { useBatteryCache } from "../../shared/battery-cache-context";
@@ -565,6 +565,7 @@ function ChecklistSection({
 // ── Root ───────────────────────────────────────────────────────────────────
 
 export function PitMonitorPage() {
+  const names = useTeamNames();
   const { isFullscreen, setFullscreen } = useFullscreen();
   const { setBatteries: setCachedBatteries } = useBatteryCache();
   const [batteries, setBatteries] = useState<Battery[]>([]);
@@ -656,7 +657,7 @@ export function PitMonitorPage() {
       <div className="px-6 py-5 space-y-5">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-gray-200 pb-4">
-          <h1 className="text-2xl font-black tracking-tight">{appTitle("Pit")} Monitor</h1>
+          <h1 className="text-2xl font-black tracking-tight">{names.appTitle("Pit")} Monitor</h1>
           <div className="flex items-center gap-4">
             {lastUpdated && (
               <p className="text-xs text-gray-600">Updated {lastUpdated.toLocaleTimeString()}</p>

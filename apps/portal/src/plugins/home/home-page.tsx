@@ -1,15 +1,8 @@
-import {
-  type TeamUiLinkKey,
-  appUrl,
-  defaultTeamUiSettings,
-  idName,
-  site,
-  teamLinks,
-} from "@g3/site-config";
-import { useTeamUiSettings } from "@g3/ui";
+import { type TeamUiLinkKey, appUrl, pageTeamId, pageTeamNumber, teamKey } from "@g3/site-config";
+import { useTeamNames, useTeamUiSettings } from "@g3/ui";
 import { useEffect, useState } from "react";
 import type { IconType } from "react-icons";
-import { FaGithub, FaInstagram, FaSlack } from "react-icons/fa";
+import { FaGithub, FaGlobe, FaInstagram, FaSlack } from "react-icons/fa";
 import edgeIcon from "../../assets/app-icons/edge.svg";
 import idIcon from "../../assets/app-icons/id.svg";
 import ordersIcon from "../../assets/app-icons/orders.svg";
@@ -32,7 +25,8 @@ type App = {
 
 const APPS: App[] = [
   {
-    label: idName,
+    // The sign-in app: named after the team ("G3ID") below.
+    label: "ID",
     href: appUrl("id"),
     tile: idIcon,
   },
@@ -69,72 +63,80 @@ const APPS: App[] = [
   {
     label: "Public Site",
     linkKey: "publicSite",
-    href: site.publicSiteUrl,
+    href: "",
     logoSrc: g3Logo,
   },
   {
     label: "Slack",
     linkKey: "slack",
-    href: site.links.slack,
+    href: "",
     icon: FaSlack,
     external: true,
   },
   {
     label: "GitHub",
     linkKey: "github",
-    href: site.links.github,
+    href: "",
     icon: FaGithub,
     external: true,
   },
   {
     label: "Instagram",
     linkKey: "instagram",
-    href: site.links.instagram,
+    href: "",
     icon: FaInstagram,
     external: true,
   },
   {
     label: "FRC-Events",
     linkKey: "frcEvents",
-    href: teamLinks.frcEvents,
+    href: "",
     icon: FirstIcon,
     external: true,
   },
   {
     label: "The Blue Alliance",
     linkKey: "blueAlliance",
-    href: teamLinks.blueAlliance,
+    href: "",
     icon: BlueAllianceIcon,
     external: true,
   },
   {
     label: "Statbotics",
     linkKey: "statbotics",
-    href: teamLinks.statbotics,
+    href: "",
     icon: StatboticsIcon,
     external: true,
   },
   {
     label: "match13",
     linkKey: "match13",
-    href: teamLinks.match13,
+    href: "",
     icon: Match13Icon,
     external: true,
   },
 ];
 
+/** The public site's tile: the team's logo, G3's for the site team, or a globe. */
+function publicSiteMark(logoUrl: string): { logoSrc?: string; icon?: IconType } {
+  const logo = logoUrl || (pageTeamId === teamKey ? g3Logo : "");
+  return logo ? { logoSrc: logo } : { logoSrc: undefined, icon: FaGlobe };
+}
+
 type AuthState = "checking" | "authenticated" | "unauthenticated";
 
 export function HomePage() {
   const teamUi = useTeamUiSettings();
+  const names = useTeamNames();
   const [authState, setAuthState] = useState<AuthState>("checking");
   const apps = APPS.map((app) => {
-    if (app.label === idName) return { ...app, label: `${teamUi.shortName}ID` };
+    if (app.label === "ID") return { ...app, label: names.idName };
     if (!app.linkKey) return app;
     return {
       ...app,
-      href: teamUi.links[app.linkKey] ?? defaultTeamUiSettings.links[app.linkKey],
-      ...(app.linkKey === "publicSite" ? { logoSrc: teamUi.logoUrl || g3Logo } : {}),
+      // The team's own links (Team Appearance); a link it hasn't set is left out.
+      href: teamUi.links[app.linkKey] ?? "",
+      ...(app.linkKey === "publicSite" ? publicSiteMark(teamUi.logoUrl) : {}),
     };
   });
 
@@ -168,7 +170,7 @@ export function HomePage() {
         <div className="max-w-md w-full space-y-6 text-center">
           <div>
             <p className="text-red-600 font-semibold text-lg tracking-widest uppercase mb-2">
-              FRC Team {site.team.number}
+              FRC Team {pageTeamNumber}
             </p>
             <h1 className="text-4xl font-bold text-gray-900 mb-2">{teamUi.shortName} Gearbox</h1>
             <p className="text-gray-600">FIRST Robotics Competition</p>
@@ -202,7 +204,7 @@ export function HomePage() {
       <div className="max-w-2xl mx-auto">
         <div className="mb-10">
           <p className="text-red-600 text-sm font-semibold uppercase tracking-widest mb-1">
-            Team {site.team.number}
+            Team {pageTeamNumber}
           </p>
           <h1 className="text-4xl font-bold text-gray-900">{teamUi.shortName} Gearbox</h1>
         </div>

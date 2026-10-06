@@ -1,3 +1,4 @@
+import { useTeamNames, useTeamUiSettings } from "@g3/ui";
 import { useEffect, useState } from "react";
 import "./index.css";
 import ConfirmPage from "./pages/ConfirmPage";
@@ -8,6 +9,7 @@ import type { PageType } from "./utils/token";
 // The kiosk display (QR + live code) is admin-only. Members never need it — they
 // just scan it. Non-admins are redirected to G3ID; logged-in non-admins are denied.
 function KioskGate({ types }: { types: PageType[] }) {
+  const names = useTeamNames();
   const [state, setState] = useState<"loading" | "ok" | "denied">("loading");
 
   useEffect(() => {
@@ -44,7 +46,7 @@ function KioskGate({ types }: { types: PageType[] }) {
           <>
             <p className="kiosk-gate__title">ADMIN ACCESS REQUIRED</p>
             <p className="kiosk-gate__text">
-              Sign in with an admin G3ID account to run this kiosk.
+              Sign in with an admin {names.idName} account to run this kiosk.
             </p>
           </>
         )}
@@ -61,6 +63,8 @@ const KIOSKS: Record<string, PageType[]> = {
 };
 
 export default function App() {
+  // The team's appearance and name (its tab title too), from its Team Appearance settings.
+  useTeamUiSettings();
   const params = new URLSearchParams(window.location.search);
   const action = params.get("action") as PageType | null;
   const w = params.get("w");
