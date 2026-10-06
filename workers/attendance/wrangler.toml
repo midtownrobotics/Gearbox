@@ -40,7 +40,7 @@ migrations_dir = "src/db/migrations"
 crons = ["0 * * * *"]
 
 [env.production.vars]
-FRONTEND_URL = "https://attendance.g3robotics.com"
+FRONTEND_URL = "https://1648-attendance.frcgearbox.com"
 
 # The app's page, served by this worker in production; only /api/* runs the worker code, and
 # other paths fall back to index.html for the app's router. Wrangler builds the page before

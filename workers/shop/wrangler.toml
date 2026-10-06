@@ -72,7 +72,7 @@ queue = "bom-fetch-jobs"
 queue = "bom-fetch-jobs"
 
 [env.production.vars]
-FRONTEND_URL = "https://shop.g3robotics.com"
+FRONTEND_URL = "https://1648-shop.frcgearbox.com"
 
 [observability.logs]
 enabled = true

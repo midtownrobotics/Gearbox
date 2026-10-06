@@ -222,7 +222,7 @@ describe("signing in to a team", () => {
   it("only lets a sign-in return to its own team's pages", async () => {
     const otherTeam = await createTeam();
     const number = otherTeam.slice(3);
-    const ours = `https://orders.${site.domain}/lists`;
+    const ours = `https://${site.team.number}-orders.${site.platformDomain}/lists`;
     const theirs = `https://${number}-orders.${site.platformDomain}/lists`;
     expect(await redirectOf(otherTeam, theirs)).toBe(theirs);
     expect(await redirectOf(otherTeam, ours)).toBeNull();
@@ -230,13 +230,12 @@ describe("signing in to a team", () => {
     expect(await redirectOf(teamKey, theirs)).toBeNull();
   });
 
-  it("lets an operator return to the console on their team's domain", async () => {
+  it("lets an operator return to the console, on the platform's domain", async () => {
     const otherTeam = await createTeam();
-    const siteConsole = `https://admin.${site.domain}/console`;
     const platformConsole = `https://admin.${site.platformDomain}/console`;
-    expect(await redirectOf(teamKey, siteConsole)).toBe(siteConsole);
+    expect(await redirectOf(teamKey, platformConsole)).toBe(platformConsole);
     expect(await redirectOf(otherTeam, platformConsole)).toBe(platformConsole);
-    // Not the other domain's: the session cookie wouldn't be there.
-    expect(await redirectOf(teamKey, platformConsole)).toBeNull();
+    // G3's old console address is retired.
+    expect(await redirectOf(teamKey, `https://admin.${site.domain}/console`)).toBeNull();
   });
 });

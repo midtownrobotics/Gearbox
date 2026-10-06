@@ -12,16 +12,19 @@ export const site = {
     shortName: "G3",
   },
 
-  /** The domain the apps run under: each app at <subdomain>.<domain>. */
+  /**
+   * The team's own domain: its public website and the edge box's tunnel. Its apps used to run here
+   * (<web>.<domain>, below); those addresses are retired, and the gateway answers them 410 Gone.
+   */
   domain: "g3robotics.com",
 
   /**
-   * The platform's domain: its public site and team sign-up at the domain itself, and every other
-   * team's apps at <number>-<app>.<platform domain> (this file's team keeps `domain` above).
+   * The platform's domain: its public site and team sign-up at the domain itself, and every team's
+   * apps at <number>-<app>.<platform domain>, this file's team included (1648-orders.frcgearbox.com).
    */
   platformDomain: "frcgearbox.com",
 
-  /** Each app's subdomain (`web`): the gateway serves the app's page there, and its API at /api. */
+  /** Each app, and its old, retired subdomain on `domain` (`web`). */
   apps: {
     id: { web: "g3id" },
     portal: { web: "gearbox" },

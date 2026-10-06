@@ -98,22 +98,20 @@ export function teamAppUrl(teamId: string, app: AppName): string {
 }
 
 /**
- * A team's address for an app, or, given the local dev gateway (`LOCAL_GATEWAY_URL` in a worker),
- * the same address through it: http://<number>-<app>.gearbox.localhost:8796, the site's team too.
+ * A team's address for an app on the platform's domain (https://1648-orders.frcgearbox.com), or,
+ * given the local dev gateway (`LOCAL_GATEWAY_URL` in a worker), the same address through it:
+ * http://1648-orders.gearbox.localhost:8796.
  */
 export function teamAppUrlVia(gateway: string | undefined, teamId: string, app: AppName): string {
   const number = teamId.replace(/^frc/, "");
   const host = app === "portal" ? number : `${number}-${TEAM_HOST_APPS[app]}`;
   if (gateway) return onGateway(gateway, host);
-  if (teamId === teamKey) return `https://${site.apps[app].web}.${site.domain}`;
   return `https://${host}.${site.platformDomain}`;
 }
 
 /** The team a hostname belongs to (its key, "frc<number>"), or null for any other hostname. */
 export function teamOfHost(hostname: string): string | null {
-  for (const { web } of Object.values(site.apps)) {
-    if (hostname === `${web}.${site.domain}`) return teamKey;
-  }
+  // Plain localhost (each app on its own dev port) is the site's team.
   if (hostname === "localhost") return teamKey;
   // A team address on the platform's domain, or the dev gateway's (gearbox.localhost) for it.
   const parent = [site.platformDomain, DEV_DOMAIN].find((d) => hostname.endsWith(`.${d}`));
@@ -127,25 +125,24 @@ export function teamOfHost(hostname: string): string | null {
 export const platformUrl = platformUrlVia(localGateway);
 
 /**
- * The platform operators' console (roadmap 2.8), served by the platform worker at admin.<domain>
- * on both domains: an operator opens it on their own team's domain, where their session cookie is.
+ * The platform operators' console (roadmap 2.8), served by the platform worker at
+ * admin.<platform domain>, where every operator's session cookie is.
  */
-export const CONSOLE_HOSTS = [`admin.${site.domain}`, `admin.${site.platformDomain}`] as const;
+export const CONSOLE_HOSTS = [`admin.${site.platformDomain}`] as const;
 
-/** The console's address for an operator on `teamId`: on the same domain as their team's pages. */
-export function consoleUrl(teamId: string): string {
+/** The console's address (`teamId`, the operator's team, no longer changes it). */
+export function consoleUrl(_teamId?: string): string {
   if (localGateway) return onGateway(localGateway, "admin");
-  return `https://admin.${teamId === teamKey ? site.domain : site.platformDomain}`;
+  return `https://admin.${site.platformDomain}`;
 }
 
 /**
- * Where sign-in providers (Google, GitHub, Steam, Onshape) send people back: G3ID's API on an
- * id.<domain> host, one per domain, so the session cookie lands on the team's own domain. This
- * file's team uses id.<domain>; every other team id.<platform domain>. The team travels in the
- * sign-in's state.
+ * Where sign-in providers (Google, GitHub, Steam, Onshape) send people back: G3ID's API on the
+ * platform's id.<platform domain> host, one address for every team. The team travels in the
+ * sign-in's state. (`teamId` no longer changes it.)
  */
-export function signInCallbackApiUrl(teamId: string): string {
-  return `https://id.${teamId === teamKey ? site.domain : site.platformDomain}/api`;
+export function signInCallbackApiUrl(_teamId?: string): string {
+  return `https://id.${site.platformDomain}/api`;
 }
 
 /** The app list every app links back to. */
@@ -166,14 +163,17 @@ export const idName = `${site.team.shortName}ID`;
 export { teamLinks, teamLinksFor } from "./team-links.ts";
 
 /**
- * CORS: which browser origins may call the workers with credentials. The team's own domain, the
- * platform's, and their subdomains over https, and localhost for development. Nothing else (no *.pages.dev
- * previews: anyone can publish one).
+ * CORS: which browser origins may call the workers with credentials. The platform's domain and its
+ * subdomains over https, and localhost for development. Nothing else (no *.pages.dev previews:
+ * anyone can publish one).
  */
 export function isAllowedOrigin(origin: string): boolean {
-  for (const domain of [site.domain, site.platformDomain]) {
-    if (origin === `https://${domain}`) return true;
-    if (origin.startsWith("https://") && origin.endsWith(`.${domain}`)) return true;
+  const domain = site.platformDomain;
+  if (
+    origin === `https://${domain}` ||
+    (origin.startsWith("https://") && origin.endsWith(`.${domain}`))
+  ) {
+    return true;
   }
   return /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
 }

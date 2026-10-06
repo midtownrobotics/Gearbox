@@ -5,26 +5,26 @@ import {
   TEAM_HOST_APPS,
   isAllowedOrigin,
   site,
+  teamAppUrl,
   teamKey,
 } from "@g3/site-config";
 import devPorts from "../../../.dev-ports.json";
 
-// The one worker on *.<domain>/* and the platform's domain: works out the team and app from the
-// hostname and sends the request to that app's worker. Each app's worker serves the app's page and
-// its API at /api (see @g3/site-config/worker). <domain> is site.ts's `domain` (the team in site.ts,
-// G3 today) and <platform> its `platformDomain` (every other team, and the platform itself).
-//   <app>.<domain>/...             → the app, for the team in site.ts
-//   api.<app>.<domain>/...         → 410 Gone, naming the app's address: the older API addresses,
-//                                    retired (roadmap 2.4)
+// The one worker on the platform's domain (and *.<domain>, the site team's own, for its retired
+// addresses): works out the team and app from the hostname and sends the request to that app's
+// worker. Each app's worker serves the app's page and its API at /api (see
+// @g3/site-config/worker). <platform> is site.ts's `platformDomain`, where every team's apps are,
+// G3's included; <domain> its `domain`, G3's own (its public website and the edge box's tunnel).
 //   <platform>/, www.<platform>/   → the platform worker: public site and team sign-up
-//   admin.<domain>/, admin.<platform>/ → the platform worker: the operators' console (on both
-//                                    domains, so it gets an operator's session cookie on either)
+//   admin.<platform>/              → the platform worker: the operators' console
 //   <number>.<platform>/...        → that team's home (Portal)
 //   <number>-<app>.<platform>/...  → the app, for team <number>
 //   <any of those>/api/~<app>/...  → another app's /api/..., for the same team: how one app's page
 //                                    calls another's API (`apiPath` in @g3/site-config)
-//   id.<domain>/, id.<platform>/   → G3ID, for no team: where sign-in providers call back
+//   id.<platform>/                 → G3ID, for no team: where sign-in providers call back
 //                                    (`signInCallbackApiUrl`); the team is in the sign-in's state
+//   <app>.<domain>, api.<app>.<domain>, id.<domain>, admin.<domain>
+//                                  → 410 Gone, naming the new address: G3's old addresses, retired
 //   anything else                  → passed on to wherever its DNS points (www, the edge box's tunnel)
 // /api/internal/... is for workers only (over service bindings) and never answered here.
 //
@@ -85,25 +85,42 @@ const PLATFORM_ROUTES = new Map<string, Route>([
   [site.platformDomain, { app: "platform", team: null }],
   [`www.${site.platformDomain}`, { app: "platform", team: null }],
   ...CONSOLE_HOSTS.map((host): [string, Route] => [host, { app: "platform", team: null }]),
-  [`id.${site.domain}`, { app: "id", team: null }],
   [`id.${site.platformDomain}`, { app: "id", team: null }],
 ]);
 
-/** The hostnames for the team in site.ts: each app's address. */
-const SITE_ROUTES = new Map<string, Route>(
-  (Object.keys(site.apps) as AppName[]).map((app) => [
-    `${site.apps[app].web}.${site.domain}`,
-    { app, team: teamKey },
-  ]),
-);
-
 /**
- * An app's retired API address (api.<app>.<domain>, before each app's API moved to /api on its own
- * address): the address to use instead, or null.
+ * G3's old addresses on its own domain, retired when it moved to the platform's: each app's
+ * (<web>.<domain>) and its older API address (api.<web>.<domain>), and the sign-in callback and
+ * console hosts. Each maps to the address to use instead.
  */
-export function retiredApiHost(hostname: string): string | null {
-  const match = hostname.match(/^api\.(.+)$/);
-  return match && SITE_ROUTES.has(match[1]) ? `https://${match[1]}/api` : null;
+const RETIRED_HOSTS = new Map<string, string>([
+  ...(Object.keys(site.apps) as AppName[]).flatMap((app): [string, string][] => [
+    [`${site.apps[app].web}.${site.domain}`, teamAppUrl(teamKey, app)],
+    [`api.${site.apps[app].web}.${site.domain}`, `${teamAppUrl(teamKey, app)}/api`],
+  ]),
+  [`id.${site.domain}`, `https://id.${site.platformDomain}`],
+  [`admin.${site.domain}`, `https://admin.${site.platformDomain}`],
+]);
+
+/** A retired address's replacement (see RETIRED_HOSTS), or null. */
+export function retiredHost(hostname: string): string | null {
+  return RETIRED_HOSTS.get(hostname) ?? null;
+}
+
+/** 410 Gone for a retired address: a short page naming the new one (JSON for API calls). */
+function gone(request: Request, moved: string): Response {
+  const accept = request.headers.get("Accept") ?? "";
+  if (!accept.includes("text/html")) {
+    return Response.json(
+      { error: `This address was retired. Use ${moved} instead.`, use: moved },
+      { status: 410 },
+    );
+  }
+  const page = `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>This address has moved</title><body style="font-family:system-ui,sans-serif;max-width:32rem;margin:15vh auto;padding:0 1rem;line-height:1.5"><h1>This address has moved</h1><p>It no longer works. Use <a href="${moved}">${moved}</a> instead, and update your bookmarks.</p></body>`;
+  return new Response(page, {
+    status: 410,
+    headers: { "Content-Type": "text/html; charset=utf-8" },
+  });
 }
 
 const TEAM_HOST_APP = new Map<string, AppName>(
@@ -115,7 +132,7 @@ const TEAM_HOST_APP = new Map<string, AppName>(
  * hostname that isn't an app at all.
  */
 export function route(hostname: string): Route | "unknown app" | null {
-  const known = SITE_ROUTES.get(hostname) ?? PLATFORM_ROUTES.get(hostname);
+  const known = PLATFORM_ROUTES.get(hostname);
   if (known) return known;
   if (!hostname.endsWith(`.${site.platformDomain}`)) return null;
   const label = hostname.slice(0, -site.platformDomain.length - 1);
@@ -239,13 +256,8 @@ export default {
     const local = localHost !== null;
     const target = route(localHost ?? url.hostname);
     if (target === null) {
-      const moved = retiredApiHost(url.hostname);
-      if (moved) {
-        return Response.json(
-          { error: `This address was retired. Use ${moved} instead.`, use: moved },
-          { status: 410 },
-        );
-      }
+      const moved = retiredHost(url.hostname);
+      if (moved) return gone(request, moved);
       // Not an app: let the request go where its DNS record points (a worker's own route doesn't
       // run again for its subrequests). If nothing is behind it, Cloudflare answers with an error.
       try {
