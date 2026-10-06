@@ -104,7 +104,6 @@ export type TeamDetail = {
     teamNumber: number;
     name: string;
     country: string;
-    timeZone: string;
     status: TeamStatus;
     slackWorkspaceName: string | null;
     founder: { id: string; name: string } | null;

@@ -235,7 +235,6 @@ export const consoleRouter = new Hono<AppEnv>()
         teamNumber: team.teamNumber,
         name: team.name,
         country: team.country,
-        timeZone: team.timeZone,
         status: team.status,
         slackWorkspaceName: team.slackWorkspaceName,
         founder: team.founderUserId && { id: team.founderUserId, name: name(team.founderUserId) },

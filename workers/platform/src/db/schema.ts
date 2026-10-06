@@ -8,8 +8,6 @@ export const teams = sqliteTable("teams", {
   name: text("name").notNull(),
   /** ISO 3166-1 alpha-2. */
   country: text("country").notNull(),
-  /** IANA time zone. */
-  timeZone: text("time_zone").notNull(),
   status: text("status", { enum: ["pending", "active", "suspended"] }).notNull(),
   founderUserId: text("founder_user_id"),
   /** Who owns the team: its founder, until an operator hands it over (migration 0003). */
