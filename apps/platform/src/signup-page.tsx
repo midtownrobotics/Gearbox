@@ -130,20 +130,11 @@ export function SignupPage() {
 
 function TeamForm({ onError }: { onError: (error: string | null) => void }) {
   const navigate = useNavigate();
-  const browserZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const zones = useMemo(
-    () =>
-      (Intl as unknown as { supportedValuesOf(key: "timeZone"): string[] }).supportedValuesOf(
-        "timeZone",
-      ),
-    [],
-  );
   const countryName = useMemo(() => new Intl.DisplayNames(undefined, { type: "region" }), []);
   const [form, setForm] = useState({
     teamNumber: "",
     name: "",
     country: "US",
-    timeZone: browserZone,
     acceptTerms: false,
   });
   const [busy, setBusy] = useState(false);
@@ -192,7 +183,7 @@ function TeamForm({ onError }: { onError: (error: string | null) => void }) {
           className={field}
         />
       </label>
-      <div className="grid grid-cols-2 gap-3">
+      <div>
         <label className="block space-y-1">
           <span className="text-sm font-medium text-secondary-700">Country</span>
           <select
@@ -203,20 +194,6 @@ function TeamForm({ onError }: { onError: (error: string | null) => void }) {
             {COUNTRIES.map((code) => (
               <option key={code} value={code}>
                 {countryName.of(code)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="block space-y-1">
-          <span className="text-sm font-medium text-secondary-700">Time zone</span>
-          <select
-            value={form.timeZone}
-            onChange={(e) => set({ timeZone: e.target.value })}
-            className={field}
-          >
-            {zones.map((zone) => (
-              <option key={zone} value={zone}>
-                {zone.replace(/_/g, " ")}
               </option>
             ))}
           </select>
@@ -319,8 +296,8 @@ function ConnectSlack({ signupId }: { signupId: string }) {
     <div className="space-y-4">
       <h2 className="text-lg font-semibold text-secondary-900">Connect your team's Slack</h2>
       <p className="text-sm text-secondary-600">
-        Your team signs in with Slack: members send a code to the bot to sign in, and the apps
-        message them there. Add the bot to your team's workspace to continue.
+        Your team signs in with Slack: members send a code to {site.slackBotName} to sign in, and
+        the apps message them there. Add {site.slackBotName} to your team's workspace to continue.
       </p>
       <a
         href={`/api/signup/${signupId}/slack`}
@@ -395,8 +372,9 @@ function SendCode({
     <div className="space-y-4">
       <h2 className="text-lg font-semibold text-secondary-900">Confirm it's you</h2>
       <p className="text-sm text-secondary-600">
-        Send this code to the bot in {workspace ? <strong>{workspace}</strong> : "your Slack"}: open
-        a direct message with it and paste the code. You'll be your team's first admin.
+        Send this code to {site.slackBotName} in{" "}
+        {workspace ? <strong>{workspace}</strong> : "your Slack"}: open a direct message with it and
+        paste the code. You'll be your team's first admin.
       </p>
       {code ? (
         <p className="rounded-lg bg-inset py-4 text-center font-mono text-4xl tracking-[0.3em] text-secondary-900">

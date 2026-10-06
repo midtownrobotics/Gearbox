@@ -1,4 +1,3 @@
-import { idName } from "@g3/site-config";
 import { eq } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import type { Context } from "hono";
@@ -18,7 +17,7 @@ import { chunks } from "./input";
 
 export type Student = { userId: string; name: string };
 
-export const ROSTER_UNAVAILABLE = `Couldn't load the list of members from ${idName}.`;
+export const ROSTER_UNAVAILABLE = "Couldn't load the list of members.";
 
 const fromG3id = (c: Context<AppEnv>, path: string) =>
   c.env.G3ID.fetch(

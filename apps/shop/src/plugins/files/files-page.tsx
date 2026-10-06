@@ -1,4 +1,4 @@
-import { site } from "@g3/site-config";
+import { useTeamNames } from "@g3/ui";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../../shared/api";
 import { getErrorMessage } from "../../shared/api-error";
@@ -23,6 +23,7 @@ type Drawing = {
 };
 
 export function FilesPage() {
+  const names = useTeamNames();
   const user = useAuthUser();
   const [drawings, setDrawings] = useState<Drawing[]>([]);
   const [search, setSearch] = useState("");
@@ -118,7 +119,7 @@ export function FilesPage() {
   async function handleTestPrint() {
     setTestPrinting(true);
     try {
-      const testContent = `${site.team.name} Shop - Test Print\n\nIf you're seeing this, the printer is working!`;
+      const testContent = `${names.name} Shop - Test Print\n\nIf you're seeing this, the printer is working!`;
       const encoder = new TextEncoder();
       const testBuffer = encoder.encode(testContent);
 

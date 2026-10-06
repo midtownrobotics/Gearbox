@@ -60,15 +60,15 @@ const APPS: App[] = [
 const STEPS = [
   {
     title: "Tell us your team",
-    body: "Your FRC number, name, country and time zone. One team per number.",
+    body: "Your FRC number, name and country. One team per number.",
   },
   {
-    title: "Add the bot to your Slack",
-    body: "One click installs the Gearbox bot in your team's workspace. It's how everyone signs in.",
+    title: `Add ${site.slackBotName} to your Slack`,
+    body: `One click installs ${site.slackBotName} in your team's workspace. It's how everyone signs in.`,
   },
   {
     title: "Send it a code",
-    body: "DM the bot the code on screen. You're your team's first admin, and your apps are live.",
+    body: `DM ${site.slackBotName} the code on screen. You're your team's first admin, and your apps are live.`,
   },
 ];
 
@@ -85,7 +85,7 @@ const FEATURES = [
 const FAQ = [
   {
     q: "What does it cost?",
-    a: "Nothing. Gearbox is run by volunteers, and donations help keep the servers on.",
+    a: "Nothing. Gearbox is free, and run by volunteers.",
   },
   {
     q: "Do our members need new accounts?",

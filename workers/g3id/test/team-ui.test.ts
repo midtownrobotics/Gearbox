@@ -1,4 +1,4 @@
-import { defaultTeamUiSettings, teamKey, teamLinks } from "@g3/site-config";
+import { defaultTeamUiSettings, teamKey, teamLinks, teamUiDefaults } from "@g3/site-config";
 import { describe, expect, it } from "vitest";
 import { createDb } from "../src/db";
 import { teamUiSettings } from "../src/db/schema";
@@ -62,6 +62,31 @@ describe("team UI settings", () => {
         updatedAt: Math.floor(Date.now() / 1000),
       });
     expect(await (await g3id("/team/ui")).json()).toEqual(before);
+  });
+
+  it("gives a team that hasn't saved any its own name, number and links, not the site team's", async () => {
+    const otherTeam = await createTeam();
+    const number = Number(otherTeam.slice(3));
+    const theirs = (await (
+      await g3id("/team/ui", { headers: { "X-Team-Id": otherTeam } })
+    ).json()) as typeof defaultTeamUiSettings;
+    expect(theirs).toMatchObject({
+      name: "Other Team",
+      shortName: String(number),
+      links: {
+        publicSite: "",
+        slack: "",
+        blueAlliance: `https://www.thebluealliance.com/team/${number}`,
+      },
+    });
+    expect(theirs).toEqual(teamUiDefaults(otherTeam, "Other Team"));
+
+    // Their editor resets to these defaults, too.
+    const theirAdmin = await sessionCookie(await createUser({ teamId: otherTeam, isAdmin: true }));
+    expect(await (await g3id("/admin/team/ui", { cookie: theirAdmin })).json()).toMatchObject({
+      settings: theirs,
+      defaults: theirs,
+    });
   });
 
   it("keeps each team's appearance to itself", async () => {

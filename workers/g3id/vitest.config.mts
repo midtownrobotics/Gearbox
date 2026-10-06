@@ -40,6 +40,8 @@ export default workerTestConfig({
     SLACK_SIGNING_SECRET: "test-signing-secret",
     SLACK_BOT_TOKEN: "xoxb-site",
     SECRETS_KEY: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+    // Production addresses for other teams, not the dev gateway's.
+    LOCAL_GATEWAY_URL: "",
   },
   outbound: slack,
 });

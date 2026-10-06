@@ -3,12 +3,17 @@ import {
   type TeamUiSettings,
   apiPath,
   defaultTeamUiSettings,
-  site,
+  pageTeamId,
+  pageTeamNumber,
+  teamUiDefaults,
 } from "@g3/site-config";
 import { useEffect, useSyncExternalStore } from "react";
 import { setDefaultTheme } from "./theme";
 
-let current: TeamUiSettings = defaultTeamUiSettings;
+// The page's team's appearance (roadmap 2.10): its defaults until G3ID's /team/ui answers, so a team
+// never sees another team's name first.
+const initial = teamUiDefaults(pageTeamId);
+let current: TeamUiSettings = initial;
 let loadedAt = 0;
 let pending: Promise<void> | null = null;
 let originalTitle: string | null = null;
@@ -47,11 +52,11 @@ function applySettings() {
           : `color-mix(in srgb, ${base}, black ${blends[i]}%)`;
     root.style.setProperty(`--color-primary-${steps[i]}`, shade);
   }
+  // index.html's title is the app's own name ("Orders"; "ID" for the sign-in app); the team's
+  // short name goes in front: "G3 Orders", "G3ID".
   originalTitle ??= document.title;
-  document.title = originalTitle.replace(
-    new RegExp(`^${site.team.shortName}(?=\\b|ID)`, "i"),
-    current.shortName,
-  );
+  document.title =
+    originalTitle === "ID" ? `${current.shortName}ID` : `${current.shortName} ${originalTitle}`;
 }
 
 /** Refreshes the public settings after a save or after a minute away from this tab. */
@@ -90,7 +95,7 @@ export function useTeamUiSettings(): TeamUiSettings {
   const settings = useSyncExternalStore(
     subscribe,
     () => current,
-    () => defaultTeamUiSettings,
+    () => initial,
   );
   useEffect(() => {
     const refresh = () => {
@@ -108,4 +113,26 @@ export function useTeamUiSettings(): TeamUiSettings {
     };
   }, []);
   return settings;
+}
+
+/**
+ * The page's team's names, for text a team sees (roadmap 2.10): from its Team Appearance settings,
+ * and its number from the page's address. Use these, not site-config's build-time wordmark,
+ * appTitle, idName and site.team, which only know the site's team.
+ */
+export function useTeamNames() {
+  const settings = useTeamUiSettings();
+  const { name, shortName } = settings;
+  return {
+    name,
+    shortName,
+    number: pageTeamNumber,
+    /** "G3 SHOP". */
+    wordmark: (app: string) => `${shortName} ${app}`.toUpperCase(),
+    /** "G3 Shop". */
+    appTitle: (app: string) => `${shortName} ${app}`,
+    /** The sign-in app's name: "G3ID". */
+    idName: `${shortName}ID`,
+    links: settings.links,
+  };
 }

@@ -1,4 +1,4 @@
-import { platformUrl, teamAppUrl } from "@g3/site-config";
+import { platformUrl, platformUrlVia, teamAppUrlVia } from "@g3/site-config";
 import { withApiPrefix } from "@g3/site-config/worker";
 import { SLACK_BOT_SCOPES } from "@g3/slack";
 import { and, count, eq } from "drizzle-orm";
@@ -13,7 +13,7 @@ import type { AppEnv } from "./types";
 // operators' console at /console (roadmap 2.8, src/console.ts).
 //
 // Signing a team up, all on the platform's site:
-//   1. POST /signup: the team's number, name, country, time zone, and the terms. A pending team.
+//   1. POST /signup: the team's number, name, country, and the terms. A pending team.
 //   2. GET /signup/:id/slack: "Add to Slack" installs the bot into the team's workspace; Slack
 //      sends the founder back to /signup/slack/callback. G3ID gets the team and its workspace.
 //   3. POST /signup/:id/code: a code (from G3ID) the founder sends to the bot from that workspace.
@@ -35,17 +35,11 @@ const SIGNUP_EXPIRES_S = 60 * 60;
 
 const SLACK_REDIRECT_URI = `${platformUrl}/api/signup/slack/callback`;
 
+/** The platform's own address: through the dev gateway in local dev. */
+const site = (env: AppEnv["Bindings"]) => platformUrlVia(env.LOCAL_GATEWAY_URL || undefined);
+
 /** Open reports kept per team number; more than this and new ones are turned away. */
 const MAX_OPEN_REPORTS = 20;
-
-function validTimeZone(timeZone: string): boolean {
-  try {
-    new Intl.DateTimeFormat("en-US", { timeZone });
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 async function signupFor(env: AppEnv["Bindings"], signupId: string) {
   return db(env).select().from(teams).where(eq(teams.signupId, signupId)).get();
@@ -75,20 +69,17 @@ const routes = app
       teamNumber?: unknown;
       name?: unknown;
       country?: unknown;
-      timeZone?: unknown;
       acceptTerms?: unknown;
     }>();
     const teamNumber = Number(body.teamNumber);
     const name = typeof body.name === "string" ? body.name.trim() : "";
     const country = typeof body.country === "string" ? body.country.trim().toUpperCase() : "";
-    const timeZone = typeof body.timeZone === "string" ? body.timeZone : "";
 
     if (!Number.isInteger(teamNumber) || teamNumber < 1 || teamNumber > 99999) {
       return c.json({ error: "Enter your FRC team number." }, 400);
     }
     if (!name || name.length > 80) return c.json({ error: "Enter your team's name." }, 400);
     if (!/^[A-Z]{2}$/.test(country)) return c.json({ error: "Choose your country." }, 400);
-    if (!validTimeZone(timeZone)) return c.json({ error: "Choose your time zone." }, 400);
     if (body.acceptTerms !== true) {
       return c.json({ error: "Accept the terms of service and privacy policy to continue." }, 400);
     }
@@ -108,7 +99,6 @@ const routes = app
       teamNumber,
       name,
       country,
-      timeZone,
       status: "pending" as const,
       slackWorkspaceId: null,
       slackWorkspaceName: null,
@@ -136,7 +126,7 @@ const routes = app
   // Step 2: install the Slack app into the team's workspace.
   .get("/signup/:signupId/slack", async (c) => {
     const team = await signupFor(c.env, c.req.param("signupId"));
-    if (!team || team.status !== "pending") return c.redirect(`${platformUrl}/signup`);
+    if (!team || team.status !== "pending") return c.redirect(`${site(c.env)}/signup`);
     const params = new URLSearchParams({
       client_id: c.env.SLACK_CLIENT_ID,
       scope: SLACK_BOT_SCOPES,
@@ -149,7 +139,7 @@ const routes = app
     const signupId = c.req.query("state") ?? "";
     const back = (error?: string) =>
       c.redirect(
-        `${platformUrl}/signup?id=${encodeURIComponent(signupId)}${error ? `&error=${encodeURIComponent(error)}` : ""}`,
+        `${site(c.env)}/signup?id=${encodeURIComponent(signupId)}${error ? `&error=${encodeURIComponent(error)}` : ""}`,
       );
     const team = await signupFor(c.env, signupId);
     if (!team || team.status !== "pending") return back();
@@ -262,7 +252,10 @@ const routes = app
     if (!team || step(team) !== "code") return c.json({ error: "Connect Slack first." }, 409);
     const res = await g3id(c.env, "/signup-codes", {
       method: "POST",
-      body: { teamId: team.id, redirect: `${teamAppUrl(team.id, "portal")}/` },
+      body: {
+        teamId: team.id,
+        redirect: `${teamAppUrlVia(c.env.LOCAL_GATEWAY_URL, team.id, "portal")}/`,
+      },
     });
     const { code, token } = (await res.json()) as { code: string; token: string };
     await db(c.env)
@@ -289,11 +282,11 @@ const routes = app
           updatedAt: now(),
         })
         .where(and(eq(teams.id, team.id), eq(teams.status, "pending")));
-      const home = `${teamAppUrl(team.id, "portal")}/`;
+      const home = `${teamAppUrlVia(c.env.LOCAL_GATEWAY_URL, team.id, "portal")}/`;
       return c.json({
         status: "done" as const,
         // G3ID sets the session cookie on the team's own domain, then opens the team's home.
-        signInUrl: `${teamAppUrl(team.id, "id")}/api/auth/slack/complete?token=${token}&redirect=${encodeURIComponent(home)}`,
+        signInUrl: `${teamAppUrlVia(c.env.LOCAL_GATEWAY_URL, team.id, "id")}/api/auth/slack/complete?token=${token}&redirect=${encodeURIComponent(home)}`,
       });
     }
     if (code.status === "failed") {

@@ -22,7 +22,6 @@ const details = (teamNumber: number) => ({
   teamNumber,
   name: "The Testers",
   country: "us",
-  timeZone: "America/Chicago",
   acceptTerms: true,
 });
 
@@ -83,7 +82,6 @@ describe("signing a team up", () => {
       status: "active",
       founder_user_id: "u-founder",
       country: "US",
-      time_zone: "America/Chicago",
     });
     expect(await (await call(`/teams/frc${number}`)).json()).toMatchObject({ teamNumber: number });
   });
@@ -93,7 +91,6 @@ describe("signing a team up", () => {
       { teamNumber: 0 },
       { name: "" },
       { country: "USA" },
-      { timeZone: "Mars/Olympus" },
       { acceptTerms: false },
     ]) {
       const res = await call("/signup", {

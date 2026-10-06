@@ -21,21 +21,17 @@ export const site = {
    */
   platformDomain: "frcgearbox.com",
 
-  /**
-   * Each app's subdomain (`web`): the app and its API (at /api) are served there by the gateway
-   * worker. `api` is the app's older, separate API hostname, which the gateway still answers so
-   * services set up with it (sign-in callbacks, Slack, webhooks) keep working; null for none.
-   */
+  /** Each app's subdomain (`web`): the gateway serves the app's page there, and its API at /api. */
   apps: {
-    id: { web: "g3id", api: "api.g3id" },
-    portal: { web: "gearbox", api: null },
-    shop: { web: "shop", api: "api.shop" },
-    pit: { web: "pit", api: "api.pit" },
-    orders: { web: "orders", api: "api.orders" },
-    edge: { web: "edge", api: "api.edge" },
-    scouting: { web: "scouting", api: "api.scouting" },
-    skillTree: { web: "skilltree", api: "api.skilltree" },
-    attendance: { web: "attendance", api: "api.attendance" },
+    id: { web: "g3id" },
+    portal: { web: "gearbox" },
+    shop: { web: "shop" },
+    pit: { web: "pit" },
+    orders: { web: "orders" },
+    edge: { web: "edge" },
+    scouting: { web: "scouting" },
+    skillTree: { web: "skilltree" },
+    attendance: { web: "attendance" },
   },
 
   /** The shop edge box's tunnel hostname (<subdomain>.<domain>), if you run one. */
@@ -60,9 +56,9 @@ export const site = {
     privacy: "https://github.com/midtownrobotics/Gearbox/blob/main/docs/legal/privacy-policy.md",
   },
 
-  /** The platform's donation page, linked in the footer of every team's sign-in page. */
-  donationUrl: "https://www.g3robotics.com/checkout/donate?donatePageId=5adbd61a352f53992db2d729",
-
-  /** Your Slack app's display name, which G3ID's sign-in asks people to message. */
-  slackBotName: "G3 Bot",
+  /**
+   * The Slack app's display name (one app, installed into every team's workspace), which sign-in
+   * and sign-up ask people to message. Keep it the same as the app's name in Slack's settings.
+   */
+  slackBotName: "Gearbot",
 } as const;

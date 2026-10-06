@@ -7,8 +7,8 @@ browser ──> *.<domain> ──> gateway ──(service binding)──> orders
                                                                         └─> anything else → the built app (apps/orders/dist)
 ```
 
-- The gateway also answers each app's **old API address** (`api.orders.<domain>/x` → the app's `/api/x`), so services set up with it keep working: Slack's commands and events, Onshape's webhook, the edge box. Hostnames that aren't apps (`www`, the edge box's tunnel) pass through untouched.
-- Teams have their own addresses too: `<number>-<app>.<domain>` and `<number>.<domain>` (the team's home). The gateway keeps each team's sessions and API calls to its own hosts and tells the app the team and user in `X-Team-Id` / `X-User-*` headers. App workers have no workers.dev address in production (`workers_dev = false`), so those headers can only come from the gateway.
+- Each app's **old API address** (`api.orders.<domain>`) is retired: the gateway answers it with `410 Gone` and the address to use instead (`https://orders.<domain>/api`). Hostnames that aren't apps (`www`, the edge box's tunnel) pass through untouched.
+- Other teams have their own addresses on the platform's domain: `<number>-<app>.frcgearbox.com` and `<number>.frcgearbox.com` (the team's home). The gateway keeps each team's sessions and API calls to its own hosts and tells the app the team and user in `X-Team-Id` / `X-User-*` headers. App workers have no workers.dev address in production (`workers_dev = false`), so those headers can only come from the gateway.
 - An app worker's own code only runs for `/api/*` (`run_worker_first` in its `wrangler.toml`); everything else is static files, with unknown paths falling back to `index.html` for the app's router. Workers call each other through service bindings at `/api` too (`http://g3id/api/auth/me`). A page calls another app's API at `/api/~<app>/…` on its own address (`apiPath` in `@g3/site-config`), which the gateway sends to that app for the same team.
 
 ## Deploying a change
@@ -22,7 +22,7 @@ Each app worker uploads `apps/<app>/dist` with it, so its `wrangler.toml` has a 
 
 Apply D1 migrations before deploying a worker that needs them (`pnpm db:migrate:remote`).
 
-Cloudflare's Git builds (Workers Builds) need no extra setup: their `wrangler deploy` / `wrangler versions upload --env production` runs the same build command. Leave their build command empty.
+**Production deploys itself:** Cloudflare's Git integration (Workers Builds) deploys each Worker when the `public` branch changes, which happens when the release PR is merged. So anything that must happen before a deploy (a migration, a setting, an outside service moved) must happen before that merge. The builds need no extra setup: their `wrangler deploy` / `wrangler versions upload --env production` runs the same build command. Leave their build command empty.
 
 ## Switching over from Pages and per-app API domains (once)
 
@@ -37,7 +37,7 @@ The app workers' old `api.<app>` custom domains send requests straight to the wo
    - Workers & Pages → each app worker → Settings → Domains & Routes: remove its `api.<app>.<domain>` custom domain.
    - Each Cloudflare Pages project: remove its custom domain (`orders.<domain>`, ...). Delete the projects once everything works.
 5. **Deploy the gateway:** `pnpm --filter @g3/worker-gateway run deploy`.
-6. **Check:** sign in with each provider; open each app; `https://<app>.<domain>/api/health` and `https://api.<app>.<domain>/health` both answer with the app's version.
+6. **Check:** sign in with each provider; open each app; `https://<app>.<domain>/api/health` answers with the app's version.
 
 ## The platform and frcgearbox.com (once)
 
@@ -62,12 +62,17 @@ Platform operators manage teams at `admin.<domain>` (G3's operators, whose sessi
    ```
    Operators add each other on the console's Operators page after that.
 
-Later, move outside services to the new addresses one at a time, then drop the old ones:
+## Retiring the old `api.<app>` addresses (before the release that includes it)
 
-- **Sign-in providers:** remove the old `api.g3id.<domain>` callback URLs.
-- **Slack app:** change the slash command and event URLs to `https://id.<domain>/api/slack/...` (`/commands/signin`, `/commands/link`, `/events`).
-- **Slack for other teams:** in the Slack app's settings, turn on distribution (Manage Distribution), add the redirect URL `https://id.<domain>/api/slack/oauth/callback`, give the bot the scopes `commands, chat:write, im:write, im:history, users:read, users:read.email`, and subscribe to the `app_uninstalled` and `tokens_revoked` events. Then set G3ID's secrets `SLACK_CLIENT_ID`, `SLACK_CLIENT_SECRET` (Basic Information → App Credentials) and `SECRETS_KEY` (`openssl rand -base64 32`; keep it, since it decrypts the stored tokens). Team admins connect their workspace on G3ID's Admin → Slack page; G3 can keep its current settings.
-- **Onshape webhook:** re-register it from Shop's admin page (it registers at the new address).
-- **Edge box:** set `EDGE_WORKER_URL=https://edge.<domain>/api` in `/etc/g3-edge/agent.env` and restart the agent.
+The gateway stops answering `api.<app>.<domain>` (it says `410 Gone`). Move everything outside the repo that still calls them **before merging the release PR**, since that merge deploys it:
 
-When nothing uses an `api.<app>` address anymore, set its `api` to `null` in `site.ts`.
+- **Slack app:** change the slash command and event URLs to `https://id.<domain>/api/slack/...` (`/commands/signin`, `/commands/link`, `/events`). Slack verifies the events URL when you save it.
+- **Onshape webhook:** save the Onshape settings on Shop's admin page once; it registers the webhook at `https://shop.<domain>/api/onshape/events`.
+- **Edge box:** set `EDGE_WORKER_URL=https://edge.<domain>/api` in `/etc/g3-edge/agent.env` and restart the agent (`sudo systemctl restart g3-edge-agent`).
+- **Sign-in providers:** remove the old `api.g3id.<domain>` callback URLs (they've been on `id.<domain>` since the switch-over).
+- **Anything else** (a bookmark, a script, a kiosk) gets a `410` naming its new address, so it's easy to spot in the gateway's logs.
+
+## Other outside services
+
+- **Slack for other teams:** in the Slack app's settings, set its display name to **Gearbot** (`slackBotName` in `site.ts`), turn on distribution (Manage Distribution), add the redirect URL `https://id.<domain>/api/slack/oauth/callback`, give the bot the scopes `commands, chat:write, im:write, im:history, users:read, users:read.email`, and subscribe to the `app_uninstalled` and `tokens_revoked` events. Then set G3ID's secrets `SLACK_CLIENT_ID`, `SLACK_CLIENT_SECRET` (Basic Information → App Credentials) and `SECRETS_KEY` (`openssl rand -base64 32`; keep it, since it decrypts the stored tokens). Team admins connect their workspace on G3ID's Admin → Slack page; G3 can keep its current settings.
+

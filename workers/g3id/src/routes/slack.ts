@@ -1,4 +1,4 @@
-import { signInCallbackApiUrl, teamAppUrl } from "@g3/site-config";
+import { signInCallbackApiUrl } from "@g3/site-config";
 import { SLACK_BOT_SCOPES, sendDM, verifySlackSignature } from "@g3/slack";
 import { and, eq } from "drizzle-orm";
 import { Hono } from "hono";
@@ -11,7 +11,7 @@ import {
   slackForTeam,
   teamForWorkspace,
 } from "../lib/slack-install";
-import { siteTeamId, teamFrontend, teamOfUser } from "../lib/team";
+import { siteTeamId, teamFrontend, teamOfUser, teamUrl } from "../lib/team";
 import { requireAdmin } from "../middleware/auth";
 import type { AppEnv } from "../types";
 
@@ -183,7 +183,7 @@ export const slackRouter = new Hono<AppEnv>()
         let message = result.message;
         if (result.success && result.token && record.type === "signin") {
           // The code's team's own G3ID address, where its sign-in started.
-          let completeUrl = `${teamAppUrl(record.teamId, "id")}/api/auth/slack/complete?token=${result.token}`;
+          let completeUrl = `${teamUrl(c.env, record.teamId, "id")}/api/auth/slack/complete?token=${result.token}`;
           if (result.redirectUrl) {
             completeUrl += `&redirect=${encodeURIComponent(result.redirectUrl)}`;
           }

@@ -11,7 +11,7 @@ export function sanitizeRedirect(redirect: string | undefined | null, team: stri
   if (redirect.startsWith("/") && !redirect.startsWith("//")) return redirect;
   try {
     const { hostname, protocol } = new URL(redirect);
-    if (hostname === "localhost") return redirect;
+    if (hostname === "localhost" || hostname.endsWith(".localhost")) return redirect;
     if (protocol === "https:" && teamOfHost(hostname) === team) return redirect;
     if (protocol === "https:" && hostname === new URL(consoleUrl(team)).hostname) return redirect;
   } catch {}

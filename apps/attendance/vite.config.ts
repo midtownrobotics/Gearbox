@@ -1,4 +1,3 @@
-import { appUrl } from "@g3/site-config";
 import { siteConfig } from "@g3/site-config/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
@@ -7,7 +6,7 @@ export default defineConfig({
   plugins: [
     siteConfig({
       app: "attendance",
-      productionEnv: { VITE_API_URL: "/api", VITE_G3ID_WEB: appUrl("id") },
+      productionEnv: { VITE_API_URL: "/api" },
     }),
     react(),
   ],

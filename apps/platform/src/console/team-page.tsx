@@ -38,9 +38,7 @@ export function TeamPage() {
           <Field label="Owner">{team.owner?.name ?? "—"}</Field>
           <Field label="Founder">{team.founder?.name ?? "—"}</Field>
           <Field label="Slack workspace">{team.slackWorkspaceName ?? "—"}</Field>
-          <Field label="Country, time zone">
-            {team.country}, {team.timeZone}
-          </Field>
+          <Field label="Country">{team.country}</Field>
           <Field label="Signed up">{formatTime(team.createdAt)}</Field>
           <Field label="Terms accepted">{formatTime(team.termsAcceptedAt)}</Field>
         </dl>

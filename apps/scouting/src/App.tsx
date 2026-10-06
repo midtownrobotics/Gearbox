@@ -1,6 +1,6 @@
-import { idName, site, wordmark } from "@g3/site-config";
+import { pageTeamId, pageTeamNumber, teamKey } from "@g3/site-config";
 import { versionLabel } from "@g3/site-config/versions";
-import { AppNavBar } from "@g3/ui";
+import { AppNavBar, useTeamNames, useTeamUiSettings } from "@g3/ui";
 import {
   ArrowRight,
   Camera,
@@ -146,11 +146,15 @@ function AnnouncementBanner() {
   );
 }
 
-function G3Logo({ size = 20, className = "" }: { size?: number; className?: string }) {
+/** The team's logo (Team Appearance); G3's own on the site team's pages, otherwise none. */
+function TeamLogo({ size = 20, className = "" }: { size?: number; className?: string }) {
+  const { logoUrl } = useTeamUiSettings();
+  const src = logoUrl || (pageTeamId === teamKey ? "/g3.png" : "");
+  if (!src) return null;
   return (
     <img
       className={`g3-icon ${className}`}
-      src="/g3.png"
+      src={src}
       alt=""
       aria-hidden="true"
       width={size}
@@ -994,6 +998,7 @@ function MapCanvas({
 }
 
 function FieldMaps({ user }: { user: User }) {
+  const names = useTeamNames();
   const [maps, setMaps] = useState<FieldMap[]>([]);
   const [editingMap, setEditingMap] = useState<FieldMap | null>(null);
   const [canShare, setCanShare] = useState(false);
@@ -1111,9 +1116,9 @@ function FieldMaps({ user }: { user: User }) {
               required
               value={publisherUserId}
               onChange={(event) => setPublisherUserId(event.target.value)}
-              aria-label={`${idName} account`}
+              aria-label={`${names.idName} account`}
             >
-              <option value="">Select a {idName} account</option>
+              <option value="">Select a {names.idName} account</option>
               {publisherOptions
                 .filter(
                   (account) => !publishers.some((publisher) => publisher.email === account.email),
@@ -1347,12 +1352,12 @@ function AutoLibrary() {
                 className="team-number-input"
                 inputMode="numeric"
                 pattern="[0-9]+"
-                title={`Enter a team number using digits only, such as ${site.team.number}.`}
+                title={`Enter a team number using digits only, such as ${pageTeamNumber}.`}
                 value={form.team}
                 onChange={(e) => setForm({ ...form, team: e.target.value })}
                 onInput={clearInputError}
                 onInvalid={showTeamNumberError}
-                placeholder={String(site.team.number)}
+                placeholder={String(pageTeamNumber)}
               />
             </label>
             <div className="wide auto-route-input">
@@ -1434,7 +1439,7 @@ function AutoLibrary() {
                 )}
                 <header>
                   <span className="auto-icon">
-                    <G3Logo size={24} />
+                    <TeamLogo size={24} />
                   </span>
                   <div>
                     <span>{auto.team ? `Team ${auto.team}` : "Unassigned team"}</span>
@@ -1814,7 +1819,7 @@ function RobotLibrary() {
                 pattern="[0-9]+"
                 value={teamName}
                 onChange={(event) => setTeamName(event.target.value)}
-                placeholder={String(site.team.number)}
+                placeholder={String(pageTeamNumber)}
               />
             </label>
             <label className="wide">
@@ -1954,6 +1959,7 @@ function RobotLibrary() {
 void RobotLibrary;
 
 export function App() {
+  const names = useTeamNames();
   const [page, setPage] = useState<Page>("forms");
   const [analysisReportId, setAnalysisReportId] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
@@ -2000,12 +2006,12 @@ export function App() {
     return (
       <div className="auth-screen">
         <div className="auth-mark">
-          <G3Logo size={38} />
+          <TeamLogo size={38} />
         </div>
-        <h1>Scouting starts with {idName}</h1>
+        <h1>Scouting starts with {names.idName}</h1>
         <p>Sign in with your team account to open shared tier lists, field maps, and autos.</p>
         <a href={`${G3ID_URL}/login?redirect=${encodeURIComponent(returnTo)}`}>
-          <LogIn size={18} /> Sign in with {idName}
+          <LogIn size={18} /> Sign in with {names.idName}
         </a>
       </div>
     );
@@ -2038,7 +2044,7 @@ export function App() {
   return (
     <div className="app-shell">
       <AppNavBar
-        title={wordmark("Strategy")}
+        title={names.wordmark("Strategy")}
         version={versionLabel("Strategy")}
         icon="/favicon.svg"
         homeHref="#"

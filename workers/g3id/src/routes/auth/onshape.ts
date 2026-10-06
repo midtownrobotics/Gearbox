@@ -1,4 +1,3 @@
-import { idName } from "@g3/site-config";
 import { and, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { getCookie } from "hono/cookie";
@@ -135,7 +134,7 @@ router.get("/onshape/callback", async (c) => {
   if (existingIdentity) {
     return c.json(
       {
-        error: `This OnShape account is already linked to another ${idName} account`,
+        error: "This Onshape account is already linked to another account.",
       },
       400,
     );

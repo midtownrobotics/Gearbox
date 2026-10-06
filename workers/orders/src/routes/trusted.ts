@@ -1,5 +1,4 @@
 import { requireMentor } from "@g3/auth";
-import { appTitle } from "@g3/site-config";
 import { asc, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
@@ -38,6 +37,6 @@ export const trustedRouter = new Hono<AppEnv>()
       .where(eq(appUsers.id, c.req.param("id")))
       .returning()
       .get();
-    if (!row) return c.json({ error: `That person hasn't opened ${appTitle("Orders")} yet.` }, 404);
+    if (!row) return c.json({ error: "That person hasn't opened Orders yet." }, 404);
     return c.json({ ...row, trusted: row.trusted === 1 });
   });

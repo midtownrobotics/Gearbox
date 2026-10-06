@@ -1,9 +1,14 @@
+import { DEV_DOMAIN } from "@g3/site-config";
+
 // The session cookie is shared by every subdomain of the domain the request came in on: the site
 // team's own domain, or the platform's for every other team (the gateway keeps each team's
 // sessions to its own hosts).
 function cookieDomain(requestUrl: string): string | undefined {
   try {
     const { hostname } = new URL(requestUrl);
+    // Local dev: the dev gateway's addresses (<number>-<app>.gearbox.localhost) share
+    // gearbox.localhost; plain localhost keeps its own (browsers won't share "localhost" itself).
+    if (hostname === DEV_DOMAIN || hostname.endsWith(`.${DEV_DOMAIN}`)) return DEV_DOMAIN;
     if (hostname === "localhost") return "localhost";
     // For subdomains like g3id.<domain>, share the cookie across all of the domain's subdomains
     const parts = hostname.split(".");

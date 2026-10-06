@@ -1,4 +1,3 @@
-import { site } from "@g3/site-config";
 import { eq, like } from "drizzle-orm";
 import type { OrdersDb } from "../db";
 import { appSettings } from "../db/schema";
@@ -62,7 +61,7 @@ async function client(db: OrdersDb, redirectUri: string): Promise<Client> {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      client_name: `${site.team.name} Orders`,
+      client_name: "Gearbox Orders",
       redirect_uris: [redirectUri],
       grant_types: ["authorization_code", "refresh_token"],
       response_types: ["code"],

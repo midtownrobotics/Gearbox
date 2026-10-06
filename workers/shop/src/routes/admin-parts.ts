@@ -281,11 +281,13 @@ export const adminPartsRouter = new Hono<AppEnv>()
         }
       }
 
-      // Unregister old webhook and register new one
+      // Replace our webhook: drop it from the old document (if it changed) and from this one, so
+      // saving re-registers it at the current address instead of adding a second one.
       if (oldDocId && oldDocId !== body.documentId.trim()) {
         console.log("[OnShape Config] Document ID changed, updating webhook registration");
         await unregisterOnShapeWebhooks(oldDocId, c.env);
       }
+      await unregisterOnShapeWebhooks(body.documentId.trim(), c.env);
 
       try {
         await registerOnShapeWebhook(body.documentId.trim(), c.env);

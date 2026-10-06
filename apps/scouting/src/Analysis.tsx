@@ -1,4 +1,4 @@
-import { site } from "@g3/site-config";
+import { pageTeamNumber } from "@g3/site-config";
 import {
   BarChart3,
   ChevronDown,
@@ -603,12 +603,15 @@ export function Analysis({ initialReportId }: { initialReportId?: string | null 
       ) : tab === "matches" ? (
         <div className="match-history">
           {teamMatches.map((match) => (
-            <article key={match.key} className={match.relationToTeam !== "none" ? "g3-match" : ""}>
+            <article
+              key={match.key}
+              className={match.relationToTeam !== "none" ? "team-match" : ""}
+            >
               <header>
                 <strong>{match.label}</strong>
                 {match.relationToTeam !== "none" && (
                   <span>
-                    Played {match.relationToTeam} Team {site.team.number}
+                    Played {match.relationToTeam} Team {pageTeamNumber}
                   </span>
                 )}
               </header>

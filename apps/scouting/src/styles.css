@@ -1977,7 +1977,7 @@ textarea:focus {
   background: var(--surface, white);
 }
 
-.match-history article.g3-match {
+.match-history article.team-match {
   border-color: rgba(167, 20, 51, 0.55);
   box-shadow: inset 4px 0 #a71433;
 }
@@ -5194,7 +5194,7 @@ textarea:focus {
   --panel-2: #454545;
   --line: #5a5a5a;
   --muted: #c0c0c0;
-  --coral: #a32035;
+  --coral: var(--color-primary-500, #a32035);
   --blue: #c85a6b;
   --mint: #e8a5af;
   background: #1a1a1a;
@@ -5274,7 +5274,7 @@ aside {
   --panel-2: #454545;
   --line: #5a5a5a;
   --muted: #c0c0c0;
-  --coral: #a32035;
+  --coral: var(--color-primary-500, #a32035);
   --blue: #c85a6b;
   --mint: #e8a5af;
   background: #1a1a1a;
@@ -5378,7 +5378,7 @@ aside nav button.active svg {
   width: 30px;
   height: 30px;
   color: white;
-  background: #a32035;
+  background: var(--color-primary-500, #a32035);
 }
 
 .user-card small {
@@ -5410,7 +5410,7 @@ aside nav button.active svg {
 
 .primary-button,
 .auth-screen a {
-  background: #a32035;
+  background: var(--color-primary-500, #a32035);
 }
 
 .primary-button:hover,
@@ -5545,7 +5545,7 @@ textarea:focus {
 }
 
 .auth-mark {
-  background: #a32035;
+  background: var(--color-primary-500, #a32035);
   box-shadow: none;
 }
 

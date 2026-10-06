@@ -32,17 +32,13 @@ describe("gateway", () => {
     );
   });
 
-  it("answers the old api.<app> addresses at the app's /api", async () => {
-    expect(
-      await routed(`https://api.g3id.${site.domain}/auth/google/callback?code=abc`),
-    ).toMatchObject({
-      app: "G3ID",
-      host: `api.g3id.${site.domain}`,
-      path: "/api/auth/google/callback?code=abc",
-    });
-    expect((await routed(`https://api.scouting.${site.domain}/scouting/me`)).path).toBe(
-      "/api/scouting/me",
-    );
+  it("answers the retired api.<app> addresses with the app's address to use instead", async () => {
+    const res = await gateway(`https://api.g3id.${site.domain}/auth/google/callback?code=abc`);
+    expect(res.status).toBe(410);
+    expect(await res.json()).toMatchObject({ use: `https://g3id.${site.domain}/api` });
+    expect((await gateway(`https://api.scouting.${site.domain}/scouting/me`)).status).toBe(410);
+    // A hostname that merely starts with "api." still goes where its DNS points.
+    expect(await routed(`https://api.example.${site.domain}/x`)).toMatchObject({ app: "origin" });
   });
 
   it("keeps the method, headers and body", async () => {
@@ -56,7 +52,7 @@ describe("gateway", () => {
 
   it("passes other hostnames (the public site, the edge box's tunnel) on unchanged", async () => {
     for (const host of [`www.${site.domain}`, `edge-agent.${site.domain}`]) {
-      expect(await routed(`https://${host}/print/printers`)).toEqual({
+      expect(await routed(`https://${host}/print/printers`)).toMatchObject({
         app: "origin",
         host,
         path: "/print/printers",
@@ -95,7 +91,6 @@ describe("team addresses", () => {
 
   it("gives the site's own addresses its team", async () => {
     expect((await routed(`https://shop.${site.domain}/`)).team).toBe(`frc${ours}`);
-    expect((await routed(`https://api.shop.${site.domain}/parts`)).team).toBe(`frc${ours}`);
   });
 
   it("answers 404 for a team or app that doesn't exist", async () => {
@@ -275,11 +270,58 @@ describe("the platform", () => {
   it("never answers workers' internal routes", async () => {
     for (const url of [
       `https://${site.apps.id.web}.${site.domain}/api/internal/teams`,
-      `https://api.g3id.${site.domain}/internal/teams`,
       `${team("254")}/api/~id/internal/teams`,
       `https://${site.platformDomain}/api/internal/x`,
     ]) {
       expect((await gateway(url, { method: "POST" })).status).toBe(404);
     }
+  });
+});
+
+describe("local dev (gearbox.localhost on the gateway's dev port)", () => {
+  const dev = (host: string, path = "/", init?: RequestInit) =>
+    gateway(`http://${host}:8796${path}`, init);
+  const body = async (res: Response) => (await res.json()) as Echo & { port: string };
+
+  it("serves the platform and team pages from the apps' Vite dev servers", async () => {
+    expect(await body(await dev("gearbox.localhost", "/signup"))).toMatchObject({
+      app: "origin",
+      host: "localhost",
+      port: "5185",
+      path: "/signup",
+    });
+    expect(await body(await dev(`${ours}-id.gearbox.localhost`, "/login"))).toMatchObject({
+      port: "5173",
+      path: "/login",
+    });
+    expect(await body(await dev("254-orders.gearbox.localhost", "/lists"))).toMatchObject({
+      port: "5184",
+    });
+    // Plain localhost is the platform too.
+    expect(await body(await dev("localhost", "/"))).toMatchObject({ port: "5185" });
+  });
+
+  it("sends /api to the app's worker, for the team the address names", async () => {
+    expect(await body(await dev("254-orders.gearbox.localhost", "/api/requests"))).toMatchObject({
+      app: "ORDERS",
+      path: "/api/requests",
+      team: "frc254",
+    });
+    expect(await body(await dev(`${ours}-shop.gearbox.localhost`, "/api/parts"))).toMatchObject({
+      app: "SHOP",
+      team: `frc${ours}`,
+    });
+    expect((await dev("999-orders.gearbox.localhost", "/api/x")).status).toBe(404);
+  });
+
+  it("stays on http and checks Origins as the addresses they stand for", async () => {
+    expect((await dev("254-orders.gearbox.localhost")).status).not.toBe(308);
+    const from = (origin: string) =>
+      dev("254-orders.gearbox.localhost", "/api/requests", {
+        method: "POST",
+        headers: { Origin: origin },
+      });
+    expect((await from("http://254-shop.gearbox.localhost:8796")).status).toBe(200);
+    expect((await from(`http://${ours}-orders.gearbox.localhost:8796`)).status).toBe(403);
   });
 });

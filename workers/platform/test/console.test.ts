@@ -34,9 +34,9 @@ const newNumber = () => 20000 + (crypto.getRandomValues(new Uint32Array(1))[0] %
 async function createTeam(status = "active"): Promise<{ id: string; number: number }> {
   const number = newNumber();
   await testEnv.PLATFORM_DB.prepare(
-    `INSERT INTO teams (id, team_number, name, country, time_zone, status, founder_user_id,
+    `INSERT INTO teams (id, team_number, name, country, status, founder_user_id,
        owner_user_id, created_at, updated_at)
-     VALUES (?1, ?2, 'Claimed Team', 'US', 'America/Chicago', ?3, 'u-founder', 'u-founder', 1, 1)`,
+     VALUES (?1, ?2, 'Claimed Team', 'US', ?3, 'u-founder', 'u-founder', 1, 1)`,
   )
     .bind(`frc${number}`, number, status)
     .run();
@@ -173,7 +173,6 @@ describe("teams", () => {
           teamNumber: number,
           name: "The Real Team",
           country: "US",
-          timeZone: "America/Chicago",
           acceptTerms: true,
         }),
       }),

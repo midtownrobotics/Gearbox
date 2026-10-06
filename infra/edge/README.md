@@ -57,7 +57,7 @@ Do these in order. Steps 1–5 are from a dev machine logged in to Cloudflare (`
    openssl rand -hex 32
    pnpm --filter @g3/worker-edge exec wrangler secret put EDGE_AGENT_KEY --env production
    ```
-4. **Worker.** Deploy it; this also sets up `api.edge.g3robotics.com`. Check it with `curl https://api.edge.g3robotics.com/health`.
+4. **Worker.** Deploy it (see `docs/deploy.md`); it answers at `https://edge.g3robotics.com/api`. Check it with `curl https://edge.g3robotics.com/api/health`.
    ```bash
    pnpm --filter @g3/worker-edge run deploy
    ```

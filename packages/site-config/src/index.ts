@@ -5,6 +5,7 @@ import { site } from "./site.ts";
 export { site };
 export {
   defaultTeamUiSettings,
+  teamUiDefaults,
   teamUiLinkLabels,
   type TeamUiColors,
   type TeamUiSettings,
@@ -13,9 +14,52 @@ export {
 
 export type AppName = keyof typeof site.apps;
 
-/** An app's page, e.g. https://shop.g3robotics.com. */
+/** The Blue Alliance's key for the team ("frc1648"). */
+export const teamKey = `frc${site.team.number}`;
+
+declare const __G3_LOCAL_GATEWAY__: string | undefined;
+
+/**
+ * Local dev: the dev gateway (http://localhost:8796, roadmap 2.9), set for pages by the
+ * siteConfig() Vite plugin in dev. Every address below then goes through it
+ * (http://1648-orders.gearbox.localhost:8796), so links stay on your machine. Undefined in production
+ * builds and in workers, which get it as LOCAL_GATEWAY_URL and pass it to teamAppUrlVia.
+ */
+export const localGateway: string | undefined =
+  typeof __G3_LOCAL_GATEWAY__ === "string" ? __G3_LOCAL_GATEWAY__ : undefined;
+
+/**
+ * Local dev: the domain that stands for the platform's on the dev gateway. A name under
+ * localhost, so it resolves to your machine, but not localhost itself: browsers won't share a
+ * cookie for "localhost" across its subdomains, and they do for gearbox.localhost.
+ */
+export const DEV_DOMAIN = "gearbox.localhost";
+
+/** `host` on the dev gateway: http://<host>.gearbox.localhost:8796 (the domain itself for ""). */
+function onGateway(gateway: string, host: string): string {
+  const { protocol, port } = new URL(gateway);
+  return `${protocol}//${host ? `${host}.` : ""}${DEV_DOMAIN}${port ? `:${port}` : ""}`;
+}
+
+/** The platform's address, or given the dev gateway, its address there (http://gearbox.localhost:8796). */
+export function platformUrlVia(gateway: string | undefined): string {
+  return gateway ? onGateway(gateway, "") : `https://${site.platformDomain}`;
+}
+
+/**
+ * The team the current page is for, from its address (roadmap 2.10): the site team's own addresses
+ * and plain localhost are the site team, <number>-<app>.<platform domain> (or, in dev,
+ * .gearbox.localhost) is team <number>. Outside a browser (workers, builds), the site team.
+ */
+const pageHost = (globalThis as { location?: { hostname: string } }).location?.hostname;
+export const pageTeamId: string = (pageHost ? teamOfHost(pageHost) : null) ?? teamKey;
+
+/** The page's team's FRC number. */
+export const pageTeamNumber = Number(pageTeamId.replace(/^frc/, ""));
+
+/** An app's page for the page's team, e.g. https://shop.g3robotics.com (or through the dev gateway). */
 export function appUrl(app: AppName): string {
-  return `https://${site.apps[app].web}.${site.domain}`;
+  return teamAppUrlVia(localGateway, pageTeamId, app);
 }
 
 /** An app's API (its worker, at /api on the app's own address), e.g. https://shop.g3robotics.com/api. */
@@ -50,27 +94,37 @@ export const TEAM_HOST_APPS = {
 
 /** A team's address for an app. The site's own team keeps the app addresses above. */
 export function teamAppUrl(teamId: string, app: AppName): string {
-  if (teamId === teamKey) return appUrl(app);
+  return teamAppUrlVia(localGateway, teamId, app);
+}
+
+/**
+ * A team's address for an app, or, given the local dev gateway (`LOCAL_GATEWAY_URL` in a worker),
+ * the same address through it: http://<number>-<app>.gearbox.localhost:8796, the site's team too.
+ */
+export function teamAppUrlVia(gateway: string | undefined, teamId: string, app: AppName): string {
   const number = teamId.replace(/^frc/, "");
   const host = app === "portal" ? number : `${number}-${TEAM_HOST_APPS[app]}`;
+  if (gateway) return onGateway(gateway, host);
+  if (teamId === teamKey) return `https://${site.apps[app].web}.${site.domain}`;
   return `https://${host}.${site.platformDomain}`;
 }
 
 /** The team a hostname belongs to (its key, "frc<number>"), or null for any other hostname. */
 export function teamOfHost(hostname: string): string | null {
-  for (const { web, api } of Object.values(site.apps)) {
-    if (hostname === `${web}.${site.domain}` || (api && hostname === `${api}.${site.domain}`)) {
-      return teamKey;
-    }
+  for (const { web } of Object.values(site.apps)) {
+    if (hostname === `${web}.${site.domain}`) return teamKey;
   }
-  if (!hostname.endsWith(`.${site.platformDomain}`)) return null;
-  const label = hostname.slice(0, -site.platformDomain.length - 1);
+  if (hostname === "localhost") return teamKey;
+  // A team address on the platform's domain, or the dev gateway's (gearbox.localhost) for it.
+  const parent = [site.platformDomain, DEV_DOMAIN].find((d) => hostname.endsWith(`.${d}`));
+  if (!parent) return null;
+  const label = hostname.slice(0, -parent.length - 1);
   const number = label.match(/^([1-9]\d*)(?:-|$)/)?.[1];
   return number ? `frc${number}` : null;
 }
 
 /** The platform's public site and team sign-up. */
-export const platformUrl = `https://${site.platformDomain}`;
+export const platformUrl = platformUrlVia(localGateway);
 
 /**
  * The platform operators' console (roadmap 2.8), served by the platform worker at admin.<domain>
@@ -80,6 +134,7 @@ export const CONSOLE_HOSTS = [`admin.${site.domain}`, `admin.${site.platformDoma
 
 /** The console's address for an operator on `teamId`: on the same domain as their team's pages. */
 export function consoleUrl(teamId: string): string {
+  if (localGateway) return onGateway(localGateway, "admin");
   return `https://admin.${teamId === teamKey ? site.domain : site.platformDomain}`;
 }
 
@@ -108,10 +163,7 @@ export const appTitle = (app: string) => `${site.team.shortName} ${app}`;
 /** The sign-in service's name, as people see it ("G3ID"). */
 export const idName = `${site.team.shortName}ID`;
 
-export { teamLinks } from "./team-links.ts";
-
-/** The Blue Alliance's key for the team ("frc1648"). */
-export const teamKey = `frc${site.team.number}`;
+export { teamLinks, teamLinksFor } from "./team-links.ts";
 
 /**
  * CORS: which browser origins may call the workers with credentials. The team's own domain, the

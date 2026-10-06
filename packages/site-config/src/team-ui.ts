@@ -1,5 +1,5 @@
 import { site } from "./site.ts";
-import { teamLinks } from "./team-links.ts";
+import { teamLinks, teamLinksFor } from "./team-links.ts";
 
 export const teamUiLinkLabels = {
   publicSite: "Public site",
@@ -14,7 +14,10 @@ export const teamUiLinkLabels = {
 
 export type TeamUiLinkKey = keyof typeof teamUiLinkLabels;
 
-/** Editable presentation settings. Deployment identity (team number, hosts, OAuth) stays in site.ts. */
+/**
+ * A team's editable appearance (G3ID's Team Appearance page), loaded by every page at runtime for
+ * the team its address is for. Identity (the team's number, its addresses) comes from the address.
+ */
 export type TeamUiSettings = {
   name: string;
   shortName: string;
@@ -72,3 +75,19 @@ export const defaultTeamUiSettings: TeamUiSettings = {
   },
   hiddenLinks: [],
 };
+
+/**
+ * A team's appearance before its admins change anything: the site team's from site.ts (above), and
+ * for any other team its own name, its number as the short name ("254 SHOP"), the FRC links for its
+ * number, and the shared colours. `name` is the team's registered name, when known.
+ */
+export function teamUiDefaults(teamId: string, name?: string): TeamUiSettings {
+  if (teamId === `frc${site.team.number}`) return defaultTeamUiSettings;
+  const number = Number(teamId.replace(/^frc/, ""));
+  return {
+    ...defaultTeamUiSettings,
+    name: name ?? `Team ${number}`,
+    shortName: String(number),
+    links: { publicSite: "", slack: "", github: "", instagram: "", ...teamLinksFor(number) },
+  };
+}
