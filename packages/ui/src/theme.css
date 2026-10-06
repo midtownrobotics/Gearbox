@@ -1,0 +1,79 @@
+/* Light/dark mode shared by every G3 app. The theme is `html[data-theme]`, set before first paint
+   by each app's index.html from the `g3_theme` cookie (shared across the team's subdomains), so
+   switching in one app switches them all. Apps are styled light; this file and the generated
+   theme-palette.css restyle them in dark mode without touching their classes. */
+@import "./theme-palette.css";
+
+html[data-theme="dark"] {
+  color-scheme: dark;
+  color: var(--g3-text);
+
+  /* Brand tints (error banners, selected rows) as dark tints; dark brand text as light text. */
+  --color-primary-50: #2c1519;
+  --color-primary-100: #3a1a20;
+  --color-primary-200: #5a2430;
+  --color-primary-300: #7d2d3d;
+
+  /* G3 Shop's own palette. */
+  --color-ink: #f4f4f5;
+  --color-mist: #171717;
+  --color-steel-dark: #b6c1c6;
+  --color-steel-tint: #1e1e1e;
+  --color-crimson-tint: #3a1a20;
+}
+
+html[data-theme="dark"] body {
+  color: var(--g3-text);
+}
+
+/* Cards and panels. `white` itself stays white so white text on colored buttons still works. */
+html[data-theme="dark"] .bg-white,
+html[data-theme="dark"] .bg-paper,
+html[data-theme="dark"] .hover\:bg-white:hover {
+  background-color: var(--g3-surface);
+}
+html[data-theme="dark"] .bg-white\/95 {
+  background-color: rgb(38 38 38 / 0.95);
+}
+html[data-theme="dark"] .bg-white\/90 {
+  background-color: rgb(38 38 38 / 0.9);
+}
+html[data-theme="dark"] .bg-white\/80 {
+  background-color: rgb(38 38 38 / 0.8);
+}
+
+/* Dark text that was readable on white: lighter on dark surfaces. */
+html[data-theme="dark"] :is(.text-primary-500, .text-primary-600, .text-crimson),
+html[data-theme="dark"]
+  :is(.hover\:text-primary-500, .hover\:text-primary-600, .hover\:text-crimson):hover {
+  color: #e8677c;
+}
+html[data-theme="dark"] :is(.text-primary-700, .hover\:text-primary-700:hover) {
+  color: #f0a3b0;
+}
+html[data-theme="dark"] :is(.text-primary-800, .text-primary-900) {
+  color: #f8d3d9;
+}
+
+/* Near-black fills (selected chips, tooltips) turn near-white in dark mode, so their white text
+   turns dark. */
+html[data-theme="dark"]
+  :is(
+    .bg-secondary-700,
+    .bg-secondary-800,
+    .bg-secondary-900,
+    .bg-gray-700,
+    .bg-gray-800,
+    .bg-gray-900,
+    .bg-slate-800,
+    .bg-slate-900,
+    .bg-neutral-800,
+    .bg-neutral-900,
+    .bg-ink
+  ):is(.text-white, .text-paper) {
+  color: #171717;
+}
+
+html[data-theme="dark"] :is(input, select, textarea) {
+  color-scheme: dark;
+}

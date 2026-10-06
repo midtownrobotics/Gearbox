@@ -1,3 +1,4 @@
+import { useTeamNames } from "@g3/ui";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../../shared/api";
 import { getErrorMessage } from "../../shared/api-error";
@@ -22,6 +23,7 @@ type Drawing = {
 };
 
 export function FilesPage() {
+  const names = useTeamNames();
   const user = useAuthUser();
   const [drawings, setDrawings] = useState<Drawing[]>([]);
   const [search, setSearch] = useState("");
@@ -117,8 +119,7 @@ export function FilesPage() {
   async function handleTestPrint() {
     setTestPrinting(true);
     try {
-      const testContent =
-        "G3 Robotics Shop - Test Print\n\nIf you're seeing this, the printer is working!";
+      const testContent = `${names.name} Shop - Test Print\n\nIf you're seeing this, the printer is working!`;
       const encoder = new TextEncoder();
       const testBuffer = encoder.encode(testContent);
 
@@ -170,7 +171,7 @@ export function FilesPage() {
   const totalSize = drawings.reduce((sum, d) => sum + (d.fileSize || 0), 0);
 
   return (
-    <main className="min-h-screen bg-mist">
+    <main className="min-h-screen bg-page">
       <div className="max-w-full mx-auto px-6 py-8 space-y-5">
         <div className="flex items-center justify-between">
           <h1 className="font-display text-4xl text-ink">Files</h1>

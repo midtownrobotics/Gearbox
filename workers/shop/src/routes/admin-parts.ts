@@ -1,3 +1,4 @@
+import { requireAdmin, requireAuth } from "@g3/auth";
 import { sendMessage } from "@g3/slack";
 import { eq, inArray } from "drizzle-orm";
 import { Hono } from "hono";
@@ -11,7 +12,6 @@ import {
 } from "../lib/daily-summary";
 import { exportDrawingAsPDF, storeDrawingInR2 } from "../lib/onshape-export";
 import { registerOnShapeWebhook, unregisterOnShapeWebhooks } from "../lib/onshape-webhook";
-import { requireAdmin, requireAuth } from "../middleware/auth";
 import type { AppEnv } from "../types";
 
 const RELEASE_CHANNEL_KEY = "slack_release_channel_id";
@@ -281,11 +281,13 @@ export const adminPartsRouter = new Hono<AppEnv>()
         }
       }
 
-      // Unregister old webhook and register new one
+      // Replace our webhook: drop it from the old document (if it changed) and from this one, so
+      // saving re-registers it at the current address instead of adding a second one.
       if (oldDocId && oldDocId !== body.documentId.trim()) {
         console.log("[OnShape Config] Document ID changed, updating webhook registration");
         await unregisterOnShapeWebhooks(oldDocId, c.env);
       }
+      await unregisterOnShapeWebhooks(body.documentId.trim(), c.env);
 
       try {
         await registerOnShapeWebhook(body.documentId.trim(), c.env);
@@ -304,93 +306,6 @@ export const adminPartsRouter = new Hono<AppEnv>()
     } catch (err) {
       return c.json({ error: err instanceof Error ? err.message : "Failed to update config" }, 500);
     }
-  })
-  .get("/seed-test-parts", requireAuth, async (c) => {
-    const db = createShopDb(c.env.SHOP_DB);
-
-    // Clear existing onshapeParts
-    await db.delete(schema.onshapeParts);
-
-    const testParts = [
-      {
-        entityId: "4c962b683afb610b63d1a054",
-        partDrawingEntityId: "51596d90191a55399895169d",
-        onshapeReleaseId: "65f6368c45ffd946381a6638",
-        releaseId: null,
-        partNumber: "1648-26-P-0475",
-        versionId: "78963be1e83bad7857f14f95",
-        quantity: 2,
-        revision: "A",
-        name: "Main Shaft Assembly",
-        description: "Primary drive shaft for the drivetrain",
-      },
-      {
-        entityId: "afcc70bb4a69714fec574c78",
-        partDrawingEntityId: null,
-        onshapeReleaseId: "65f6368c45ffd946381a6638",
-        releaseId: null,
-        partNumber: "1648-26-P-0518",
-        versionId: "78963be1e83bad7857f14f95",
-        quantity: 4,
-        revision: "B",
-        name: "Bearing Mount Plate",
-        description: "Mounts bearings to the frame",
-      },
-      {
-        entityId: "4c962b683afb610b63d1a054",
-        partDrawingEntityId: "51596d90191a55399895169d",
-        onshapeReleaseId: "08bf1a10144fee2eb7a25b01",
-        releaseId: null,
-        partNumber: "1648-26-P-0475",
-        versionId: "d612752ee89b974a66c8de06",
-        quantity: 2,
-        revision: "C",
-        name: "Main Shaft Assembly",
-        description: "Updated drive shaft with improved tolerances",
-      },
-      {
-        entityId: "afcc70bb4a69714fec574c78",
-        partDrawingEntityId: null,
-        onshapeReleaseId: "08bf1a10144fee2eb7a25b01",
-        releaseId: null,
-        partNumber: "1648-26-P-0518",
-        versionId: "d612752ee89b974a66c8de06",
-        quantity: 4,
-        revision: "A",
-        name: "Bearing Mount Plate",
-        description: "Updated mounting plate design",
-      },
-      {
-        entityId: "4c962b683afb610b63d1a054",
-        partDrawingEntityId: "51596d90191a55399895169d",
-        onshapeReleaseId: "69e7a461bccdc595ecad5cc8",
-        releaseId: null,
-        partNumber: "1648-26-P-0475",
-        versionId: "21887b33ecbae4838890a78b",
-        quantity: 2,
-        revision: "D",
-        name: "Main Shaft Assembly",
-        description: "Final production revision",
-      },
-      {
-        entityId: "afcc70bb4a69714fec574c78",
-        partDrawingEntityId: null,
-        onshapeReleaseId: "69e7a461bccdc595ecad5cc8",
-        releaseId: null,
-        partNumber: "1648-26-P-0518",
-        versionId: "21887b33ecbae4838890a78b",
-        quantity: 4,
-        revision: "B",
-        name: "Bearing Mount Plate",
-        description: "Final production version",
-      },
-    ];
-
-    for (const part of testParts) {
-      await db.insert(schema.onshapeParts).values({ ...part, createdAt: Date.now() });
-    }
-
-    return c.json({ success: true, inserted: testParts.length });
   })
   .get("/slack/config", requireAdmin, async (c) => {
     const db = createShopDb(c.env.SHOP_DB);
@@ -468,7 +383,7 @@ export const adminPartsRouter = new Hono<AppEnv>()
       const ids = stats.byUser.slice(0, 3).map((u) => u.userId);
       if (ids.length > 0) {
         const res = await c.env.G3ID.fetch(
-          new Request(`http://g3id/auth/users?ids=${encodeURIComponent(ids.join(","))}`, {
+          new Request(`http://g3id/api/auth/users?ids=${encodeURIComponent(ids.join(","))}`, {
             headers: { cookie: c.req.header("Cookie") ?? "" },
           }),
         );
@@ -489,41 +404,6 @@ export const adminPartsRouter = new Hono<AppEnv>()
       return c.json({ error: `Couldn't post to Slack: ${reason}.${hint}` }, 502);
     }
     return c.json({ text, channel });
-  })
-  .post("/dev/test-drawing/:partNumber/:revision", async (c) => {
-    try {
-      const partNumber = c.req.param("partNumber");
-      const revision = c.req.param("revision");
-      const formData = await c.req.formData();
-      const file = formData.get("file") as unknown;
-
-      if (!file || typeof file !== "object" || !("arrayBuffer" in file)) {
-        return c.json({ error: "Missing file" }, 400);
-      }
-
-      const fileObj = file as File;
-      if (!fileObj.type.includes("pdf")) {
-        return c.json({ error: "Only PDF files are supported" }, 400);
-      }
-
-      const r2Key = `drawings/${partNumber}/${revision}/drawing.pdf`;
-      const arrayBuffer = await fileObj.arrayBuffer();
-      await c.env.DRAWINGS.put(r2Key, arrayBuffer, {
-        httpMetadata: { contentType: "application/pdf" },
-      });
-
-      return c.json({
-        success: true,
-        r2Key,
-        size: arrayBuffer.byteLength,
-      });
-    } catch (err) {
-      console.error("[Dev Test Drawing Error]", err);
-      return c.json(
-        { error: err instanceof Error ? err.message : "Failed to upload test drawing" },
-        500,
-      );
-    }
   })
   .delete("/obsolete-instances", requireAdmin, async (c) => {
     try {

@@ -1,0 +1,10 @@
+@import "@g3/ui/index.css";
+@import "tailwindcss";
+
+/* Budget meter: an ordinal blue ramp (darkest = money already spent). Validated as ordinal steps
+   on a light surface; the lightest step is the lightest that stays visible. */
+@theme {
+  --color-meter-spent: #184f95;
+  --color-meter-committed: #3987e5;
+  --color-meter-pending: #86b6ef;
+}

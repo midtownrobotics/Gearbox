@@ -1,7 +1,6 @@
 import { sql } from "drizzle-orm";
 import type { EdgeDb } from "../../db";
 import { netClients, netUsage } from "../../db/schema";
-import { WAN_KEY } from "../../types";
 
 export const BUCKET_SECONDS = 300;
 export const MAX_SAMPLES_PER_BATCH = 2000;
@@ -79,8 +78,9 @@ export async function ingestUsage(db: EdgeDb, batch: UsageBatch) {
     );
   }
 
+  // Keys starting with "_" are pseudo-clients ("_wan" totals, "_lookup" part lookups), not devices.
   const clientRows = [...lastSeen]
-    .filter(([mac]) => mac !== WAN_KEY)
+    .filter(([mac]) => !mac.startsWith("_"))
     .map(([mac, seenAt]) => ({
       mac,
       hostname: clientInfo.get(mac)?.hostname ?? null,

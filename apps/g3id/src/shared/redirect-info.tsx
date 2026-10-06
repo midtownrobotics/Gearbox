@@ -11,10 +11,10 @@ export function RedirectInfo() {
   const appName = subdomain.charAt(0).toUpperCase() + subdomain.slice(1);
 
   return (
-    <div className="bg-gray-500 text-white px-6 py-1 text-center">
+    <div className="bg-secondary-100 text-secondary-900 px-6 py-1 text-center">
       <span>
         Logging into{" "}
-        <a className="text-blue-300 underline" href={redirect}>
+        <a className="text-blue-700 underline" href={redirect}>
           {appName}
         </a>{" "}
         Software

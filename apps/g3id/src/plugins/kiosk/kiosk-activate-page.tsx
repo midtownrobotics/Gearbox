@@ -57,18 +57,18 @@ export function KioskActivatePage() {
   }
 
   return (
-    <div className="min-h-screen bg-secondary-900 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-page flex items-center justify-center px-4">
       <div className="w-full max-w-md space-y-8">
         <div className="text-center">
-          <h1 className="text-4xl font-bold text-white mb-2">Activate Kiosk</h1>
-          <p className="text-secondary-200">Enter the 6-digit code from your admin</p>
+          <h1 className="text-4xl font-bold text-secondary-900 mb-2">Activate Kiosk</h1>
+          <p className="text-secondary-600">Enter the 6-digit code from your admin</p>
         </div>
 
         <form onSubmit={handleActivate} className="space-y-6">
           <div>
             <label
               htmlFor="activation-code"
-              className="block text-sm font-medium text-gray-200 mb-2"
+              className="block text-sm font-medium text-secondary-700 mb-2"
             >
               Activation Code
             </label>
@@ -80,11 +80,11 @@ export function KioskActivatePage() {
               placeholder="000000"
               value={code}
               onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-              className="w-full px-4 py-3 text-center text-2xl tracking-widest rounded-lg bg-secondary-700 border border-gray-600 text-white placeholder-gray-500 focus:outline-none focus:border-primary-400"
+              className="w-full px-4 py-3 text-center text-2xl tracking-widest rounded-lg bg-white border border-secondary-300 text-secondary-900 placeholder-secondary-400 focus:outline-none focus:border-primary-500"
             />
           </div>
 
-          {error && <p className="text-primary-400 text-center text-sm">{error}</p>}
+          {error && <p className="text-primary-500 text-center text-sm">{error}</p>}
 
           <button
             type="submit"
@@ -96,7 +96,7 @@ export function KioskActivatePage() {
 
           <Link
             to="/"
-            className="block text-center py-3 px-4 rounded-lg bg-secondary-700 hover:bg-secondary-600 text-white font-semibold transition-colors"
+            className="block text-center py-3 px-4 rounded-lg bg-white border border-secondary-300 hover:bg-secondary-50 text-secondary-900 font-semibold transition-colors"
           >
             Cancel
           </Link>

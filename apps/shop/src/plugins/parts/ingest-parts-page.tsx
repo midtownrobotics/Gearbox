@@ -431,7 +431,7 @@ export function IngestPartsPage() {
 
   if (error) {
     return (
-      <main className="min-h-screen bg-mist">
+      <main className="min-h-screen bg-page">
         <div className="max-w-full mx-auto px-6 py-8 space-y-5">
           <h1 className="font-display text-4xl text-ink">Ingest Parts</h1>
           <ErrorBanner message={error} />
@@ -442,7 +442,7 @@ export function IngestPartsPage() {
 
   if (!pendingData || pendingData.parts.length === 0) {
     return (
-      <main className="min-h-screen bg-mist">
+      <main className="min-h-screen bg-page">
         <div className="max-w-full mx-auto px-6 py-8 space-y-5">
           <h1 className="font-display text-4xl text-ink">Ingest Parts</h1>
           <div className="bg-paper border border-steel/30 rounded-xl p-6">
@@ -456,7 +456,7 @@ export function IngestPartsPage() {
   // If currentIndex is null, show list view; otherwise show detail view
   if (currentIndex === null) {
     return (
-      <main className="min-h-screen bg-mist">
+      <main className="min-h-screen bg-page">
         <div className="max-w-full mx-auto px-6 py-8 space-y-5">
           <h1 className="font-display text-4xl text-ink">Ingest Parts</h1>
 
@@ -822,7 +822,7 @@ export function IngestPartsPage() {
   if (!currentPart) return null;
 
   return (
-    <main className="min-h-screen bg-mist">
+    <main className="min-h-screen bg-page">
       <div className="max-w-2xl mx-auto px-6 py-8 space-y-5">
         <button
           type="button"

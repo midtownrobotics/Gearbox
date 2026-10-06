@@ -7,9 +7,9 @@ export function PendingPage() {
     <main className="flex-1 flex items-center justify-center px-4">
       <div className="w-full max-w-sm space-y-6 text-center">
         <div>
-          <h1 className="text-3xl font-bold text-white">Account pending:</h1>
-          <h1 className="text-3xl font-bold text-white">PLEASE READ THIS!</h1>
-          <p className="mt-4 text-secondary-200 text-sm leading-relaxed space-y-3">
+          <h1 className="text-3xl font-bold text-secondary-900">Account pending:</h1>
+          <h1 className="text-3xl font-bold text-secondary-900">PLEASE READ THIS!</h1>
+          <p className="mt-4 text-secondary-600 text-sm leading-relaxed space-y-3">
             <span className="block">
               Your account is awaiting admin approval. Once your account has been approved by an
               admin, you will receive a Slack message.

@@ -1,3 +1,4 @@
+import { useTeamNames } from "@g3/ui";
 import { useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { buildInstanceRows, machineMood, matchMachineProcess } from "../../shared/derive";
@@ -20,6 +21,7 @@ function greeting(): string {
 }
 
 export function HomePage() {
+  const names = useTeamNames();
   const navigate = useNavigate();
   const user = useAuthUser();
   const kiosk = useKiosk();
@@ -64,7 +66,7 @@ export function HomePage() {
   });
 
   return (
-    <main className="min-h-screen bg-mist">
+    <main className="min-h-screen bg-page">
       <div className="max-w-5xl mx-auto px-6 py-10 space-y-10">
         <div>
           <p className="text-sm text-steel-dark">{today}</p>
@@ -74,8 +76,8 @@ export function HomePage() {
           </h1>
           <p className="text-steel-dark mt-2">
             {kiosk.active && kiosk.machineName
-              ? `${kiosk.machineName} kiosk — G3 Shop production tracking.`
-              : "G3 Shop — production tracking and management."}
+              ? `${kiosk.machineName} kiosk — ${names.appTitle("Shop")} production tracking.`
+              : `${names.appTitle("Shop")} — production tracking and management.`}
           </p>
         </div>
 

@@ -1,9 +1,9 @@
+import { requireAuth } from "@g3/auth";
 import { eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
 import { createShopDb } from "../db";
 import { PROCESS_TYPES, type ProcessType, processes } from "../db/schema";
-import { requireAuth } from "../middleware/auth";
 import type { AppEnv } from "../types";
 
 const isProcessType = (v: unknown): v is ProcessType =>

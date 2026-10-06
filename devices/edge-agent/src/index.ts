@@ -5,6 +5,7 @@ import { startServer } from "./core/server";
 import { AGENT_VERSION } from "./core/version";
 import { type SyncState, createWorkerClient } from "./core/worker-client";
 import { createDriveModule } from "./modules/drive";
+import { createLookupModule } from "./modules/lookup";
 import { createNetworkModule } from "./modules/network";
 import { createPrintModule } from "./modules/print";
 import { createSwitchModule } from "./modules/switch";
@@ -25,6 +26,7 @@ const modules: EdgeModule[] = [
   createNetworkModule(ctx),
   createPrintModule(ctx),
   createDriveModule(ctx),
+  createLookupModule(ctx),
 ];
 
 for (const m of modules) await m.start();

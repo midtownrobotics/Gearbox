@@ -187,7 +187,7 @@ table inet acct {
 - Drop-in replacement for the old shoppi-print server on the same box. The Shop SW's `POST /print?title=` is unchanged; the shop worker now forwards to the edge worker through a service binding and forces one-sided black and white on the default printer.
 - **No caching or storage**: the edge worker streams the file through the tunnel straight to the agent, which pipes it to `lp`. There's no R2 and no job table. If the box is unreachable, the request fails immediately (503).
 - CUPS on the box is the source of truth for printers and the queue. The Edge UI (**Print**) lets anyone print a file with options (copies, sides, color, paper, pages) and see the queue; admins find printers (DNS-SD via `lpinfo`), add them driverless (`lpadmin -m everywhere`), set the default, send a test page, resume, and remove.
-- The agent's module routes are behind the shared key; the tunnel forwards only `^/(print|switch|sync)`.
+- The agent's module routes are behind the shared key; the tunnel forwards only `^/(print|lookup|switch|sync)`.
 
 ### Shop drive (as built)
 

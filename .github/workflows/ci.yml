@@ -3,13 +3,16 @@ name: ci
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, public]
 
 jobs:
   lint-and-test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Full history, so changeset status can compare with main.
+          fetch-depth: 0
 
       - uses: pnpm/action-setup@v4
         with:
@@ -17,7 +20,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: pnpm
 
       # devices/edge-agent runs its tests with `bun test`.
@@ -29,10 +32,26 @@ jobs:
 
       - run: pnpm typecheck
 
+      # wrangler.toml production values must match packages/site-config/src/site.ts.
+      - name: Site config is applied
+        run: pnpm configure --check
+
+      # A PR into main that changes an app needs a changeset (pnpm changeset). Not for main → public:
+      # that's a release, which uses them up.
+      - name: Changesets
+        if: github.event_name == 'pull_request' && github.base_ref == 'main'
+        run: pnpm changeset status --since=origin/${{ github.base_ref }}
+
       - name: Build Scouting page
         run: pnpm --filter @g3/scouting build
 
       - name: Build Scouting worker
         run: pnpm --filter @g3/worker-scouting build
 
-      - run: pnpm test
+      # Each worker's tests run in the Workers runtime against local D1/KV/R2, with other
+      # workers stubbed (packages/testing). No Cloudflare account or secrets needed.
+      - name: Worker tests
+        run: pnpm --filter "./workers/*" --if-present test
+
+      - name: Other tests
+        run: pnpm -r --filter "!./workers/*" --if-present test

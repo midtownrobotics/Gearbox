@@ -1,3 +1,5 @@
+# Production URLs, route patterns and TEAM_NUMBER here are written by `pnpm configure` from
+# packages/site-config/src/site.ts. Change them there, not here.
 name = "skill-tree"
 main = "src/index.ts"
 compatibility_date = "2026-05-17"
@@ -5,10 +7,6 @@ compatibility_date = "2026-05-17"
 [[services]]
 binding = "G3ID"
 service = "g3id"
-
-[[kv_namespaces]]
-binding = "SESSIONS"
-id = "c27ba19a75fb4eb6b93f9d2d47de6c0f"
 
 [[d1_databases]]
 binding = "SKILL_DB"
@@ -21,14 +19,12 @@ FRONTEND_URL = "http://localhost:5180"
 
 [env.production]
 name = "skill-tree-production"
+# No workers.dev address: the gateway is the only way in, so its identity headers can be trusted.
+workers_dev = false
 
 [[env.production.services]]
 binding = "G3ID"
 service = "g3id-production"
-
-[[env.production.kv_namespaces]]
-binding = "SESSIONS"
-id = "db4457ce43c9468eb9ec5a049afa65b1"
 
 # NOTE: create the prod DB with `wrangler d1 create g3-skill-tree-prod`
 # and paste its database_id below before deploying.
@@ -39,4 +35,15 @@ database_id = "a8a17637-93f3-4fcd-b04a-91181b993673"
 migrations_dir = "src/db/migrations"
 
 [env.production.vars]
-FRONTEND_URL = "https://skilltree.g3robotics.com"
+FRONTEND_URL = "https://1648-skill-tree.frcgearbox.com"
+
+# The app's page, served by this worker in production; only /api/* runs the worker code, and
+# other paths fall back to index.html for the app's router. Wrangler builds the page before
+# every production deploy or upload (Cloudflare's Git builds too).
+[env.production.build]
+command = "pnpm --filter @g3/skill-tree build"
+
+[env.production.assets]
+directory = "../../apps/skill-tree/dist"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]

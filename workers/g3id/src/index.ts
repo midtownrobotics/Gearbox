@@ -1,5 +1,8 @@
+import { corsOrigin } from "@g3/site-config";
+import { withApiPrefix } from "@g3/site-config/worker";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import packageJson from "../package.json";
 import { adminRouter } from "./routes/admin";
 import { authRouter } from "./routes/auth";
 import { emailAuthRouter } from "./routes/auth/email";
@@ -9,9 +12,12 @@ import { onshapeAuthRouter } from "./routes/auth/onshape";
 import { pinAuthRouter } from "./routes/auth/pin";
 import { slackAuthRouter } from "./routes/auth/slack";
 import { steamAuthRouter } from "./routes/auth/steam";
+import { internalRouter } from "./routes/internal";
 import { kioskRouter } from "./routes/kiosk";
 import { onshapeRouter } from "./routes/onshape";
 import { slackRouter } from "./routes/slack";
+import { teamUiRouter } from "./routes/team-ui";
+import { teamsRouter } from "./routes/teams";
 import { usersRouter } from "./routes/users";
 import type { AppEnv } from "./types";
 
@@ -25,14 +31,7 @@ base.onError((err, c) => {
 base.use(
   "*",
   cors({
-    origin: (origin) => {
-      if (!origin) return null;
-      if (origin === "https://g3robotics.com") return origin;
-      if (origin.endsWith(".g3robotics.com")) return origin;
-      if (origin.startsWith("http://localhost:")) return origin;
-      if (origin.endsWith(".pages.dev")) return origin;
-      return null;
-    },
+    origin: corsOrigin,
     allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowHeaders: ["Content-Type", "Authorization", "x-kiosk-token"],
     credentials: true,
@@ -40,7 +39,7 @@ base.use(
 );
 
 const app = base
-  .get("/health", (c) => c.json({ status: "ok", service: "g3id" }))
+  .get("/health", (c) => c.json({ status: "ok", service: "g3id", version: packageJson.version }))
   .route("/auth", authRouter)
   .route("/auth", emailAuthRouter)
   .route("/auth", githubAuthRouter)
@@ -50,10 +49,13 @@ const app = base
   .route("/auth", slackAuthRouter)
   .route("/auth", steamAuthRouter)
   .route("/admin", adminRouter)
+  .route("/team/ui", teamUiRouter)
   .route("/users", usersRouter)
+  .route("/teams", teamsRouter)
+  .route("/internal", internalRouter)
   .route("/onshape", onshapeRouter)
   .route("/", kioskRouter)
   .route("/slack", slackRouter);
 
 export type G3IDApp = typeof app;
-export default app;
+export default { fetch: withApiPrefix(app.fetch) };

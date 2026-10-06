@@ -44,14 +44,14 @@ CREATE INDEX game_bets_user_idx
 CREATE INDEX game_bets_open_idx
   ON game_bets(event_key, status, match_key);
 
+-- No CASE ... END in this trigger: D1's remote statement splitter would end it at the first
+-- "END;" ("incomplete input").
 CREATE TRIGGER game_bets_require_funds
 BEFORE INSERT ON game_bets
 BEGIN
-  SELECT CASE
-    WHEN COALESCE(
-      (SELECT balance FROM boylebucks_accounts WHERE user_id = NEW.user_id),
-      -1
-    ) < NEW.stake
-    THEN RAISE(ABORT, 'insufficient BoyleBucks')
-  END;
+  SELECT RAISE(ABORT, 'insufficient BoyleBucks')
+  WHERE COALESCE(
+    (SELECT balance FROM boylebucks_accounts WHERE user_id = NEW.user_id),
+    -1
+  ) < NEW.stake;
 END;

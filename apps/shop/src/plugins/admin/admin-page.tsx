@@ -1,3 +1,4 @@
+import { useTeamNames } from "@g3/ui";
 import { useEffect, useState } from "react";
 import { api } from "../../shared/api";
 import { getErrorMessage } from "../../shared/api-error";
@@ -95,7 +96,7 @@ export function AdminPage() {
   if (loading) return <PageLoading />;
 
   return (
-    <main className="min-h-screen bg-mist">
+    <main className="min-h-screen bg-page">
       <div className="max-w-4xl mx-auto px-6 py-8 space-y-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h1 className="font-display text-4xl text-ink">Admin</h1>
@@ -185,6 +186,7 @@ export function AdminPage() {
 }
 
 function KioskModeSettings() {
+  const names = useTeamNames();
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -192,9 +194,9 @@ function KioskModeSettings() {
     <div className="space-y-3 max-w-xl">
       <p className="text-sm text-steel-dark">
         Kiosk mode turns this device into a shared shop-floor station. It logs out the current
-        account, sends the device through G3ID kiosk activation, and users then sign in with their
-        3-digit PIN. Name the kiosk after a machine (e.g. a process like “Mill”) and the app will
-        auto-open that machine's queue and show machine-specific stats.
+        account, sends the device through {names.idName} kiosk activation, and users then sign in
+        with their 3-digit PIN. Name the kiosk after a machine (e.g. a process like “Mill”) and the
+        app will auto-open that machine's queue and show machine-specific stats.
       </p>
       {confirming ? (
         <div className="flex flex-wrap items-center gap-2">

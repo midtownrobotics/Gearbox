@@ -1,3 +1,5 @@
+import type { G3AuthVariables } from "@g3/auth";
+
 export type AppEnv = {
   Bindings: {
     FRONTEND_URL: string;
@@ -10,10 +12,5 @@ export type AppEnv = {
     NEXUS_API_KEY?: string;
     AI: Ai;
   };
-  Variables: {
-    userId: string;
-    userDisplayName: string;
-    userEmail: string;
-    userIsAdmin: boolean;
-  };
+  Variables: G3AuthVariables;
 };

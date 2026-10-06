@@ -1,3 +1,4 @@
+import { siteConfig } from "@g3/site-config/vite";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
@@ -5,15 +6,21 @@ import { VitePWA } from "vite-plugin-pwa";
 
 export default defineConfig({
   plugins: [
+    siteConfig({
+      app: "pit",
+      productionEnv: { VITE_API_BASE_URL: "/api" },
+    }),
+
     react(),
     tailwindcss(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["favicon.png", "apple-touch-icon.png"],
+      includeAssets: ["favicon.ico", "favicon.svg", "apple-touch-icon.png"],
       manifest: {
-        name: "G3 Pit",
-        short_name: "G3 Pit",
-        description: "G3 Robotics pit management and operations",
+        // One build serves every team, so the installed app is just "Pit".
+        name: "Pit",
+        short_name: "Pit",
+        description: "Pit management and operations",
         theme_color: "#111827",
         background_color: "#030712",
         display: "standalone",
@@ -32,10 +39,10 @@ export default defineConfig({
             type: "image/png",
           },
           {
-            src: "pwa-512x512.png",
+            src: "icon-512-maskable.png",
             sizes: "512x512",
             type: "image/png",
-            purpose: "any maskable",
+            purpose: "maskable",
           },
         ],
       },
@@ -47,9 +54,8 @@ export default defineConfig({
         runtimeCaching: [
           {
             // Dev: same-origin /api/* via Vite proxy
-            // Prod: https://api.pit.g3robotics.com/*
-            urlPattern: ({ url }) =>
-              url.pathname.startsWith("/api/") || url.hostname === "api.pit.g3robotics.com",
+            // Prod: the same, the API is at /api on the app's own address
+            urlPattern: ({ url }) => url.pathname.startsWith("/api/"),
             handler: "NetworkFirst",
             options: {
               cacheName: "api-cache",

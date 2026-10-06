@@ -78,8 +78,8 @@ export function KioskRemovePage() {
     return (
       <main className="flex-1 px-6 py-8 max-w-lg mx-auto w-full flex items-center justify-center">
         <div className="text-center space-y-4">
-          <Loader2 size={48} className="text-primary-400 mx-auto animate-spin" />
-          <p className="text-white text-lg font-semibold">Checking credentials...</p>
+          <Loader2 size={48} className="text-primary-500 mx-auto animate-spin" />
+          <p className="text-secondary-900 text-lg font-semibold">Checking credentials...</p>
         </div>
       </main>
     );
@@ -88,11 +88,11 @@ export function KioskRemovePage() {
   if (status === "error") {
     return (
       <main className="flex-1 px-6 py-8 max-w-lg mx-auto w-full flex items-center justify-center">
-        <div className="bg-secondary-700 border border-secondary-600 rounded-lg p-8 space-y-6 w-full text-center">
+        <div className="bg-white border border-secondary-200 rounded-lg p-8 space-y-6 w-full text-center">
           <div className="space-y-2">
-            <AlertCircle size={48} className="text-primary-400 mx-auto" />
-            <h1 className="text-2xl font-bold text-white">Admin Access Required</h1>
-            <p className="text-secondary-200">{error}</p>
+            <AlertCircle size={48} className="text-primary-500 mx-auto" />
+            <h1 className="text-2xl font-bold text-secondary-900">Admin Access Required</h1>
+            <p className="text-secondary-600">{error}</p>
           </div>
 
           {needsLogin && (
@@ -107,7 +107,7 @@ export function KioskRemovePage() {
 
               <Link
                 to="/kiosk/login"
-                className="block text-sm text-secondary-400 hover:text-secondary-300 transition-colors"
+                className="block text-sm text-secondary-400 hover:text-secondary-800 transition-colors"
               >
                 Cancel
               </Link>
@@ -117,7 +117,7 @@ export function KioskRemovePage() {
           {!needsLogin && (
             <Link
               to="/kiosk/login"
-              className="block w-full py-3 px-4 rounded-lg bg-secondary-600 hover:bg-secondary-500 text-white font-semibold transition-colors"
+              className="block w-full py-3 px-4 rounded-lg bg-secondary-100 hover:bg-secondary-200 text-secondary-900 font-semibold transition-colors"
             >
               Back to Kiosk Login
             </Link>
@@ -129,18 +129,18 @@ export function KioskRemovePage() {
 
   return (
     <main className="flex-1 px-6 py-8 max-w-lg mx-auto w-full flex items-center justify-center">
-      <div className="bg-secondary-700 border border-secondary-600 rounded-lg p-8 space-y-6 w-full">
+      <div className="bg-white border border-secondary-200 rounded-lg p-8 space-y-6 w-full">
         <div className="text-center space-y-2">
-          <AlertCircle size={48} className="text-primary-400 mx-auto" />
-          <h1 className="text-2xl font-bold text-white">Remove Kiosk Device</h1>
-          <p className="text-secondary-200">
+          <AlertCircle size={48} className="text-primary-500 mx-auto" />
+          <h1 className="text-2xl font-bold text-secondary-900">Remove Kiosk Device</h1>
+          <p className="text-secondary-600">
             This action will permanently remove this device and clear its authentication.
           </p>
         </div>
 
         {error && (
-          <div className="bg-primary-500/20 border border-primary-500/30 rounded-lg p-4">
-            <p className="text-primary-400 text-sm">{error}</p>
+          <div className="bg-primary-50 border border-primary-200 rounded-lg p-4">
+            <p className="text-primary-500 text-sm">{error}</p>
           </div>
         )}
 
@@ -159,13 +159,13 @@ export function KioskRemovePage() {
             type="button"
             onClick={() => navigate("/dashboard")}
             disabled={loading}
-            className="w-full py-3 px-4 rounded-lg bg-secondary-600 hover:bg-secondary-500 disabled:opacity-50 text-white font-semibold transition-colors"
+            className="w-full py-3 px-4 rounded-lg bg-secondary-100 hover:bg-secondary-200 disabled:opacity-50 text-secondary-900 font-semibold transition-colors"
           >
             Cancel
           </button>
         </div>
 
-        <p className="text-xs text-secondary-300 text-center">
+        <p className="text-xs text-secondary-500 text-center">
           You will be logged out after the device is removed.
         </p>
       </div>

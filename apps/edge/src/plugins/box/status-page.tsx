@@ -110,7 +110,7 @@ async function checkTunnel() {
   return res.json();
 }
 
-/** Live check of the worker → box tunnel (edge-agent.g3robotics.com). */
+/** Live check of the worker → box tunnel (the edge-agent subdomain). */
 function TunnelCard() {
   const [data, setData] = useState<Awaited<ReturnType<typeof checkTunnel>> | null>(null);
   const [error, setError] = useState<string | null>(null);

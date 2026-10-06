@@ -1,3 +1,4 @@
+import { requireAdmin, requireAuth } from "@g3/auth";
 import { desc, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
@@ -5,8 +6,9 @@ import { createEdgeDb } from "../../db";
 import { netClients, netSettings } from "../../db/schema";
 import { writeAudit } from "../../lib/audit";
 import { DAY, billingCycle } from "../../lib/time";
-import { requireAdmin, requireAgent, requireAuth } from "../../middleware/auth";
+import { requireAgent } from "../../middleware/auth";
 import { type AppEnv, WAN_KEY } from "../../types";
+import { LOOKUP_USAGE_KEY } from "../lookup/types";
 import { clientName, getSettings } from "./common";
 import { desiredState } from "./control";
 import { controlRouter } from "./control-routes";
@@ -69,10 +71,12 @@ export const networkRouter = new Hono<AppEnv>()
     const recentStart = Math.max(t - SEVEN_DAYS, firstTs ?? t);
 
     const byMac = new Map(clients.map((cl) => [cl.mac, cl]));
+    const lookups = totals.get(LOOKUP_USAGE_KEY) ?? { dl: 0, ul: 0 };
     let attributed = 0;
     const topClients = [];
     for (const [mac, u] of totals) {
-      if (mac === WAN_KEY) continue;
+      // Pseudo-clients ("_wan", "_lookup") aren't LAN devices.
+      if (mac.startsWith("_")) continue;
       attributed += u.dl + u.ul;
       const cl = byMac.get(mac);
       topClients.push({
@@ -91,8 +95,10 @@ export const networkRouter = new Hono<AppEnv>()
       capBytes: settings.capBytes,
       used,
       wan,
-      // WAN bytes not attributed to any LAN client: the box's own traffic plus overhead.
-      unattributed: Math.max(0, used - attributed),
+      // The box's own part lookups for G3 Orders (measured on the box; part of the WAN total).
+      lookups,
+      // WAN bytes not attributed to any LAN client or to lookups: the box's other traffic plus overhead.
+      unattributed: Math.max(0, used - attributed - lookups.dl - lookups.ul),
       projection: project({
         used,
         now: t,

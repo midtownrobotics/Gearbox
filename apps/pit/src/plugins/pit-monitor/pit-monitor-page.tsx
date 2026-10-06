@@ -1,3 +1,4 @@
+import { useTeamNames } from "@g3/ui";
 import { useEffect, useState } from "react";
 import { api } from "../../shared/api";
 import { useBatteryCache } from "../../shared/battery-cache-context";
@@ -564,6 +565,7 @@ function ChecklistSection({
 // ── Root ───────────────────────────────────────────────────────────────────
 
 export function PitMonitorPage() {
+  const names = useTeamNames();
   const { isFullscreen, setFullscreen } = useFullscreen();
   const { setBatteries: setCachedBatteries } = useBatteryCache();
   const [batteries, setBatteries] = useState<Battery[]>([]);
@@ -640,7 +642,7 @@ export function PitMonitorPage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-gray-100 flex items-center justify-center">
+      <main className="min-h-screen bg-page flex items-center justify-center">
         <p className="text-gray-600 text-lg">Loading…</p>
       </main>
     );
@@ -651,11 +653,11 @@ export function PitMonitorPage() {
   const nexus = monitor?.nexus;
 
   return (
-    <main className="min-h-screen bg-gray-100 text-gray-900">
+    <main className="min-h-screen bg-page text-gray-900">
       <div className="px-6 py-5 space-y-5">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-gray-200 pb-4">
-          <h1 className="text-2xl font-black tracking-tight">G3 Pit Monitor</h1>
+          <h1 className="text-2xl font-black tracking-tight">{names.appTitle("Pit")} Monitor</h1>
           <div className="flex items-center gap-4">
             {lastUpdated && (
               <p className="text-xs text-gray-600">Updated {lastUpdated.toLocaleTimeString()}</p>

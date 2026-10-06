@@ -1,10 +1,12 @@
+import { appUrl } from "@g3/site-config";
 import { api } from "./api";
 
 /** localStorage flag marking this browser as a dedicated shop kiosk device. */
 const KIOSK_FLAG = "shop_kiosk_mode";
 
 export function g3idUrl(): string {
-  return import.meta.env.VITE_G3ID_URL || "http://localhost:5173";
+  // The page's team's G3ID (the dev gateway's in dev).
+  return appUrl("id");
 }
 
 /** True when this device has been marked as a kiosk from the Admin page. */

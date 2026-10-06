@@ -1,5 +1,8 @@
+import { wordmark } from "@g3/site-config";
+import { versionLabel } from "@g3/site-config/versions";
+import { AppNavBar, activePath, linkWith } from "@g3/ui";
 import { useEffect, useRef, useState } from "react";
-import { Link, NavLink } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { matchMachineProcess } from "./derive";
 import { exitKioskMode, kioskLogout } from "./kiosk";
 import { processPath } from "./nav";
@@ -7,13 +10,14 @@ import type { PluginNavItem } from "./plugin-types";
 import { useAuthUser, useKiosk } from "./use-auth";
 import { useShopData } from "./use-shop-data";
 
+const routerLink = linkWith(Link);
+
+/** The shared G3 top bar. In kiosk mode: no pages, just the machine and Log Out. */
 export function NavBar({ items }: { items: PluginNavItem[] }) {
-  const [open, setOpen] = useState(false);
-  const [visible, setVisible] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const kiosk = useKiosk();
   const user = useAuthUser();
   const { data } = useShopData();
+  const { pathname } = useLocation();
 
   let logoHref = "/";
   if (kiosk.active && data && kiosk.machineName) {
@@ -21,53 +25,29 @@ export function NavBar({ items }: { items: PluginNavItem[] }) {
     if (machine) logoHref = processPath(machine.id);
   }
 
-  // In kiosk mode hide all nav items, show only logout buttons.
-  const visibleItems = kiosk.active ? [] : items;
-
-  function openMenu() {
-    setOpen(true);
-    requestAnimationFrame(() => setVisible(true));
-  }
-
-  function closeMenu() {
-    setVisible(false);
-    timerRef.current = setTimeout(() => setOpen(false), 200);
-  }
-
-  useEffect(
-    () => () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    },
-    [],
+  const shown = kiosk.active ? [] : items;
+  const active = activePath(
+    pathname,
+    shown.map((item) => item.to),
   );
 
-  const linkClass = ({ isActive }: { isActive: boolean }) =>
-    `relative text-sm font-medium transition-colors py-4 ${
-      isActive
-        ? "text-crimson after:absolute after:left-0 after:right-0 after:bottom-0 after:h-0.5 after:bg-crimson"
-        : "text-steel-dark hover:text-ink"
-    }`;
-
   return (
-    <>
-      <nav className="sticky top-0 z-50 bg-paper border-b border-steel/25 px-6 flex items-center gap-8 h-14">
-        <Link
-          to={logoHref}
-          className="font-display text-2xl text-crimson tracking-wide leading-none"
-        >
-          G3 SHOP
-        </Link>
-
-        <div className="hidden md:flex items-center gap-7 h-full">
-          {visibleItems.map((item) => (
-            <NavLink key={item.to} to={item.to} end={item.to === "/"} className={linkClass}>
-              {item.label}
-            </NavLink>
-          ))}
-        </div>
-
-        {kiosk.active ? (
-          <div className="ml-auto flex items-center gap-3">
+    <AppNavBar
+      version={versionLabel("Shop")}
+      icon="/favicon.svg"
+      title={wordmark("Shop")}
+      homeHref={logoHref}
+      link={routerLink}
+      allApps={!kiosk.active}
+      items={shown.map((item) => ({
+        key: item.to,
+        label: item.label,
+        href: item.to,
+        active: item.to === active,
+      }))}
+      actions={
+        kiosk.active && (
+          <>
             <KioskBadge machineName={kiosk.machineName} />
             {user?.displayName && (
               <p className="text-sm font-semibold text-steel-dark">{user.displayName}</p>
@@ -79,61 +59,10 @@ export function NavBar({ items }: { items: PluginNavItem[] }) {
             >
               Log Out
             </button>
-          </div>
-        ) : (
-          <>
-            <a
-              className="hidden md:block ml-auto text-sm font-medium text-steel-dark hover:text-ink transition-colors"
-              href="https://web.g3robotics.com"
-            >
-              All Apps
-            </a>
-
-            <div className="ml-auto md:hidden">
-              <button
-                type="button"
-                className="flex flex-col gap-1.5 p-1 group"
-                onClick={() => (open ? closeMenu() : openMenu())}
-                aria-label="Toggle menu"
-              >
-                <span
-                  className={`block w-6 h-0.5 bg-ink group-hover:bg-crimson transition-all duration-200 ${open ? "translate-y-2 rotate-45" : ""}`}
-                />
-                <span
-                  className={`block w-6 h-0.5 bg-ink group-hover:bg-crimson transition-all duration-200 ${open ? "opacity-0" : ""}`}
-                />
-                <span
-                  className={`block w-6 h-0.5 bg-ink group-hover:bg-crimson transition-all duration-200 ${open ? "-translate-y-2 -rotate-45" : ""}`}
-                />
-              </button>
-            </div>
           </>
-        )}
-      </nav>
-
-      {open && !kiosk.active && (
-        <div
-          className={`fixed inset-0 z-40 bg-paper flex flex-col px-8 pt-24 gap-8 md:hidden transition-opacity duration-200 ${visible ? "opacity-100" : "opacity-0"}`}
-        >
-          {visibleItems.map((item) => (
-            <Link
-              key={item.to}
-              to={item.to}
-              onClick={closeMenu}
-              className="text-2xl font-bold text-ink hover:text-crimson transition-colors"
-            >
-              {item.label}
-            </Link>
-          ))}
-          <a
-            className="text-2xl font-bold text-ink hover:text-crimson transition-colors"
-            href="https://web.g3robotics.com"
-          >
-            All Apps
-          </a>
-        </div>
-      )}
-    </>
+        )
+      }
+    />
   );
 }
 

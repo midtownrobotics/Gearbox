@@ -1,10 +1,10 @@
+import { site } from "@g3/site-config";
 import { OnShapeIcon } from "@g3/ui";
 import { Loader2, Shield } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { FaGithub, FaGoogle, FaSlack, FaSteam } from "react-icons/fa";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../../lib/api";
-import { AttendanceLeaderboard } from "./attendance-leaderboard";
 
 type Identity = {
   id: string;
@@ -39,7 +39,6 @@ export function DashboardPage() {
   const navigate = useNavigate();
   const [me, setMe] = useState<Me | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"account" | "attendance">("account");
 
   const [slackCode, setSlackCode] = useState<string | null>(null);
   const [slackError, setSlackError] = useState<string | null>(null);
@@ -209,7 +208,7 @@ export function DashboardPage() {
   if (error) {
     return (
       <main className="flex-1 flex items-center justify-center px-4">
-        <p className="text-sm text-primary-400">{error}</p>
+        <p className="text-sm text-primary-500">{error}</p>
       </main>
     );
   }
@@ -217,54 +216,31 @@ export function DashboardPage() {
   if (!me) {
     return (
       <main className="flex-1 flex items-center justify-center px-4">
-        <Loader2 size={24} className="animate-spin text-secondary-300" />
+        <Loader2 size={24} className="animate-spin text-secondary-500" />
       </main>
     );
   }
 
   return (
     <main className="flex-1 px-6 py-8 max-w-lg mx-auto w-full">
-      <h1 className="text-5xl font-bold text-white mb-4 text-center">Dashboard</h1>
+      <h1 className="text-5xl font-bold text-secondary-900 mb-4 text-center">Dashboard</h1>
 
-      <div className="mb-4 flex border-b border-secondary-600" role="tablist">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={activeTab === "account"}
-          onClick={() => setActiveTab("account")}
-          className={`px-4 py-2 text-sm font-medium ${activeTab === "account" ? "border-b-2 border-primary-400 text-white" : "text-secondary-300 hover:text-white"}`}
-        >
-          Account
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={activeTab === "attendance"}
-          onClick={() => setActiveTab("attendance")}
-          className={`px-4 py-2 text-sm font-medium ${activeTab === "attendance" ? "border-b-2 border-primary-400 text-white" : "text-secondary-300 hover:text-white"}`}
-        >
-          Attendance Leaderboard
-        </button>
-      </div>
-
-      <div
-        className={`bg-secondary-700 border border-secondary-600 rounded-lg divide-y divide-gray-800 mt-4 ${activeTab === "account" ? "" : "hidden"}`}
-      >
+      <div className="bg-white border border-secondary-200 rounded-lg divide-y divide-secondary-100 mt-4">
         <div className="px-5 py-4 flex items-center gap-4">
           <div className="w-12 h-12 rounded-full bg-primary-500 flex items-center justify-center text-lg font-semibold text-white shrink-0">
             {me.displayName.charAt(0).toUpperCase()}
           </div>
           <div className="min-w-0">
-            <p className="text-white font-semibold truncate">{me.displayName}</p>
-            <p className="text-secondary-200 text-sm truncate">{me.email}</p>
+            <p className="text-secondary-900 font-semibold truncate">{me.displayName}</p>
+            <p className="text-secondary-600 text-sm truncate">{me.email}</p>
           </div>
-          <span className="ml-auto text-xs px-2.5 py-0.5 rounded-full border capitalize bg-green-500/20 text-green-300 border-green-500/30 shrink-0">
+          <span className="ml-auto text-xs px-2.5 py-0.5 rounded-full border capitalize bg-green-50 text-green-700 border-green-200 shrink-0">
             {me.status}
           </span>
         </div>
 
         <div className="px-5 py-4">
-          <p className="text-xs text-secondary-300 uppercase tracking-wide mb-3">Linked Accounts</p>
+          <p className="text-xs text-secondary-500 uppercase tracking-wide mb-3">Linked Accounts</p>
           <div className="space-y-2">
             {me.identities.map((identity) => {
               let displayText: string | null = null;
@@ -292,7 +268,7 @@ export function DashboardPage() {
                 >
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <p className="text-white">
+                      <p className="text-secondary-900">
                         {PROVIDER_LABELS[identity.provider] ?? identity.provider}
                       </p>
                       {displayText &&
@@ -301,7 +277,7 @@ export function DashboardPage() {
                             href={profileUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-primary-400 hover:text-primary-300 text-xs truncate"
+                            className="text-primary-500 hover:text-primary-600 text-xs truncate"
                           >
                             {displayText}
                           </a>
@@ -309,7 +285,7 @@ export function DashboardPage() {
                           <span className="text-secondary-400 text-xs truncate">{displayText}</span>
                         ))}
                     </div>
-                    <p className="text-secondary-300 text-xs">
+                    <p className="text-secondary-500 text-xs">
                       Added {new Date(identity.createdAt * 1000).toLocaleDateString()}
                     </p>
                   </div>
@@ -373,16 +349,18 @@ export function DashboardPage() {
           {!me.identities.some((i) => i.provider === "slack") && (
             <div className="mt-3">
               {slackCode ? (
-                <div className="rounded-lg bg-gray-700 border border-gray-600 px-4 py-3 space-y-2">
-                  <p className="text-xs text-secondary-200 text-center">
+                <div className="rounded-lg bg-secondary-50 border border-secondary-200 px-4 py-3 space-y-2">
+                  <p className="text-xs text-secondary-600 text-center">
                     DM this code to the {""}
-                    <span className="text-primary-500 font-medium">"G3 Bot" user in Slack</span>, or
-                    run <span className="font-mono text-primary-400">/link {slackCode}</span>
+                    <span className="text-primary-500 font-medium">
+                      "{site.slackBotName}" user in Slack
+                    </span>
+                    , or run <span className="font-mono text-primary-500">/link {slackCode}</span>
                   </p>
-                  <p className="font-mono text-3xl font-bold text-white text-center tracking-widest">
+                  <p className="font-mono text-3xl font-bold text-secondary-900 text-center tracking-widest">
                     {slackCode}
                   </p>
-                  <div className="flex items-center justify-center gap-1.5 text-xs text-secondary-300">
+                  <div className="flex items-center justify-center gap-1.5 text-xs text-secondary-500">
                     <Loader2 size={12} className="animate-spin" />
                     Waiting…
                   </div>
@@ -398,7 +376,7 @@ export function DashboardPage() {
                     Connect Slack
                   </button>
                   {slackError && (
-                    <p className="mt-1 text-xs text-primary-400 text-center">{slackError}</p>
+                    <p className="mt-1 text-xs text-primary-500 text-center">{slackError}</p>
                   )}
                 </>
               )}
@@ -417,10 +395,12 @@ export function DashboardPage() {
 
         {me.sessionType === "oauth" && (
           <div className="px-5 py-4">
-            <p className="text-xs text-secondary-300 uppercase tracking-wide mb-3">Kiosk PIN</p>
+            <p className="text-xs text-secondary-500 uppercase tracking-wide mb-3">Kiosk PIN</p>
             {pin && showPin ? (
-              <div className="bg-gray-700 border border-gray-600 rounded-lg p-3 text-center">
-                <p className="text-2xl font-mono font-bold text-white tracking-widest">{pin}</p>
+              <div className="bg-white border border-secondary-300 rounded-lg p-3 text-center">
+                <p className="text-2xl font-mono font-bold text-secondary-900 tracking-widest">
+                  {pin}
+                </p>
               </div>
             ) : (
               <button
@@ -433,20 +413,20 @@ export function DashboardPage() {
               </button>
             )}
             {pinError && !pin && (
-              <p className="text-xs text-primary-400 text-center mt-2">{pinError}</p>
+              <p className="text-xs text-primary-500 text-center mt-2">{pinError}</p>
             )}
           </div>
         )}
 
         <div className="px-5 py-4 flex items-center justify-between">
-          <p className="text-xs text-secondary-300">
+          <p className="text-xs text-secondary-500">
             Member since {new Date(me.createdAt * 1000).toLocaleDateString()}
           </p>
           <div className="flex items-center gap-3">
             {me.isAdmin ? (
               <Link
                 to="/admin/users"
-                className="text-xs text-primary-400 hover:text-primary-300 transition-colors flex items-center gap-1"
+                className="text-xs text-primary-500 hover:text-primary-600 transition-colors flex items-center gap-1"
               >
                 <Shield size={12} /> Admin
               </Link>
@@ -454,14 +434,13 @@ export function DashboardPage() {
             <button
               type="button"
               onClick={handleLogout}
-              className="text-xs text-secondary-300 hover:text-primary-400 transition-colors"
+              className="text-xs text-secondary-500 hover:text-primary-600 transition-colors"
             >
               Sign out
             </button>
           </div>
         </div>
       </div>
-      {activeTab === "attendance" && <AttendanceLeaderboard />}
     </main>
   );
 }

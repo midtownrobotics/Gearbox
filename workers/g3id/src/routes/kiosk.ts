@@ -32,6 +32,7 @@ export const kioskRouter = new Hono<AppEnv>()
     const activation = await db
       .select({
         id: kioskActivationCodes.id,
+        teamId: kioskActivationCodes.teamId,
         deviceName: kioskActivationCodes.deviceName,
         createdBy: kioskActivationCodes.createdBy,
         expiresAt: kioskActivationCodes.expiresAt,
@@ -58,6 +59,7 @@ export const kioskRouter = new Hono<AppEnv>()
     const result = await db
       .insert(kioskDevices)
       .values({
+        teamId: activation.teamId,
         name: activation.deviceName,
         token,
         createdBy: activation.createdBy,

@@ -15,9 +15,9 @@
       "name": "Pit App",
       "url": "http://localhost:5175"
     },
-    "web": {
+    "portal": {
       "port": 5178,
-      "name": "Web (Members Portal)",
+      "name": "Gearbox (Portal)",
       "url": "http://localhost:5178"
     },
     "skill-tree": {
@@ -39,6 +39,16 @@
       "port": 5183,
       "name": "Edge (Network)",
       "url": "http://localhost:5183"
+    },
+    "orders": {
+      "port": 5184,
+      "name": "Orders",
+      "url": "http://localhost:5184"
+    },
+    "platform": {
+      "port": 5185,
+      "name": "Platform (sign-up)",
+      "url": "http://localhost:5185"
     }
   },
   "workers": {
@@ -83,6 +93,24 @@
       "inspectorPort": 9235,
       "name": "Edge Worker",
       "url": "http://localhost:8793"
+    },
+    "orders": {
+      "port": 8794,
+      "inspectorPort": 9236,
+      "name": "Orders Worker",
+      "url": "http://localhost:8794"
+    },
+    "platform": {
+      "port": 8795,
+      "inspectorPort": 9237,
+      "name": "Platform Worker",
+      "url": "http://localhost:8795"
+    },
+    "gateway": {
+      "port": 8796,
+      "inspectorPort": 9238,
+      "name": "Gateway (team addresses)",
+      "url": "http://localhost:8796"
     }
   }
 }

@@ -1,3 +1,5 @@
+import { pageTeamNumber } from "@g3/site-config";
+import { useTeamNames } from "@g3/ui";
 import {
   AlertCircle,
   ArrowDown,
@@ -610,6 +612,7 @@ function Editor({
 }
 
 function AdminManager({ isG3IdAdmin }: { isG3IdAdmin: boolean }) {
+  const names = useTeamNames();
   const [admins, setAdmins] = useState<StrategyAdmin[]>([]);
   const [users, setUsers] = useState<UserOption[]>([]);
   const [userId, setUserId] = useState("");
@@ -637,7 +640,7 @@ function AdminManager({ isG3IdAdmin }: { isG3IdAdmin: boolean }) {
           }}
         >
           <select required value={userId} onChange={(event) => setUserId(event.target.value)}>
-            <option value="">Select a G3ID user</option>
+            <option value="">Select a {names.idName} user</option>
             {users
               .filter((user) => user.status === "active")
               .map((user) => {
@@ -680,6 +683,7 @@ function AdminManager({ isG3IdAdmin }: { isG3IdAdmin: boolean }) {
 }
 
 function AnnouncementManager() {
+  const names = useTeamNames();
   const [message, setMessage] = useState("");
   const [durationSeconds, setDurationSeconds] = useState("60");
   const [sent, setSent] = useState(false);
@@ -691,7 +695,8 @@ function AnnouncementManager() {
       <form
         onSubmit={async (event) => {
           event.preventDefault();
-          if (!window.confirm("Publish this announcement in G3 Strategy?")) return;
+          if (!window.confirm(`Publish this announcement in ${names.appTitle("Strategy")}?`))
+            return;
           await api("/announcements", {
             method: "POST",
             body: JSON.stringify({ message, durationSeconds: Number(durationSeconds) }),
@@ -806,7 +811,7 @@ function ServiceIssueReport() {
         required
         inputMode="numeric"
         pattern="[0-9]+"
-        title="Enter a team number using digits only, such as 1648."
+        title={`Enter a team number using digits only, such as ${pageTeamNumber}.`}
         value={report.teamName}
         onChange={(event) => setReport({ ...report, teamName: event.target.value })}
         onInput={clearInputError}
@@ -1014,6 +1019,7 @@ async function prepareScheduleFiles(files: File[]) {
 }
 
 function ManualModeManager() {
+  const names = useTeamNames();
   const [context, setContext] = useState<EventContext | null>(null);
   const [scheduleText, setScheduleText] = useState("");
   const [teamText, setTeamText] = useState("");
@@ -1380,7 +1386,7 @@ function ManualModeManager() {
               rows={12}
               value={scheduleText}
               onChange={(e) => setScheduleText(e.target.value)}
-              placeholder="1,2026-03-14T09:00:00,1648,1771,4910,2974,6829,8736"
+              placeholder={`1,2026-03-14T09:00:00,${pageTeamNumber},1771,4910,2974,6829,8736`}
             />
           </label>
           <label>
@@ -1390,7 +1396,7 @@ function ManualModeManager() {
               rows={12}
               value={teamText}
               onChange={(e) => setTeamText(e.target.value)}
-              placeholder="1648,G3 Robotics"
+              placeholder={`${pageTeamNumber},${names.name}`}
             />
           </label>
         </div>
@@ -1635,7 +1641,7 @@ function EventStatus({
             </span>
           </div>
           <details className="team-schedule">
-            <summary>Team 1648 schedule</summary>
+            <summary>Team {pageTeamNumber} schedule</summary>
             {context?.teamSchedule.map((match) => (
               <div key={match.key}>
                 <strong>{match.label}</strong>
@@ -1649,7 +1655,7 @@ function EventStatus({
       <div className="next-match-status">
         <CalendarClock size={20} />
         <div>
-          <span>Next Team 1648 match</span>
+          <span>Next Team {pageTeamNumber} match</span>
           <strong>{next?.label ?? "Schedule unavailable"}</strong>
           {next?.scheduledAt && <time>{new Date(next.scheduledAt).toLocaleString()}</time>}
         </div>
@@ -1665,6 +1671,7 @@ export function ScoutingForms({
   isAdmin: boolean;
   canManageServiceCrew: boolean;
 }) {
+  const names = useTeamNames();
   const [forms, setForms] = useState<ScoutingForm[]>([]);
   const [selected, setSelected] = useState<ScoutingForm | null>(null);
   const [editing, setEditing] = useState(false);
@@ -1710,7 +1717,9 @@ export function ScoutingForms({
       <div className="page-heading">
         <div className="scouting-heading-title">
           <h1>Scouting Forms</h1>
-          <span>Next G3 match: {context?.nextTeamMatch?.label ?? "Unavailable"}</span>
+          <span>
+            Next {names.shortName} match: {context?.nextTeamMatch?.label ?? "Unavailable"}
+          </span>
         </div>
         <button
           type="button"

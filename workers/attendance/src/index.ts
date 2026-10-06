@@ -1,7 +1,10 @@
+import { requireAuth } from "@g3/auth";
+import { corsOrigin } from "@g3/site-config";
+import { withApiPrefix } from "@g3/site-config/worker";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { Firestore } from "./firestore";
-import { requireAuth } from "./middleware/auth";
+import packageJson from "../package.json";
+import { AttendanceDb } from "./db";
 import { currentWindow, validateToken } from "./token";
 import type { AppEnv } from "./types";
 
@@ -21,15 +24,7 @@ base.onError((err, c) => {
 base.use(
   "*",
   cors({
-    origin: (origin) => {
-      if (!origin) return null;
-      if (origin === "https://g3robotics.com") return origin;
-      if (origin.endsWith(".g3robotics.com")) return origin;
-      if (origin.startsWith("http://localhost:")) return origin;
-      if (origin.startsWith("http://127.0.0.1:")) return origin;
-      if (origin.endsWith(".pages.dev")) return origin;
-      return null;
-    },
+    origin: corsOrigin,
     allowMethods: ["GET", "POST", "DELETE", "OPTIONS"],
     allowHeaders: ["Content-Type", "Authorization"],
     credentials: true,
@@ -37,27 +32,14 @@ base.use(
 );
 
 function db(env: AppEnv["Bindings"]) {
-  return new Firestore(
-    env.FIREBASE_PROJECT_ID,
-    env.FIREBASE_CLIENT_EMAIL,
-    env.FIREBASE_PRIVATE_KEY,
-  );
+  return new AttendanceDb(env.ATTENDANCE_DB);
 }
 
-async function listOpenSessions(fs: Firestore) {
-  // A collection-group query is one Firestore subrequest regardless of member
-  // count. Filter locally because a status filter requires a collection-group
-  // field index that is not configured for this project.
-  const [members, sessions] = await Promise.all([
-    fs.listCollection("members"),
-    fs.collectionGroupQuery("sessions", []),
-  ]);
+async function listOpenSessions(store: AttendanceDb) {
+  const [members, sessions] = await Promise.all([store.listMembers(), store.listOpenSessions()]);
   const membersById = new Map(members.map((member) => [member.id, member]));
-
   return sessions.flatMap((session) => {
-    if (session.data.status !== "open") return [];
-    const match = session.path.match(/\/members\/([^/]+)\/sessions\//);
-    const member = match ? membersById.get(match[1]) : undefined;
+    const member = membersById.get(session.memberId);
     return member ? [{ session, member }] : [];
   });
 }
@@ -70,17 +52,16 @@ function schoolYear(date: Date): string {
   return `${start}-${start + 1}`;
 }
 
-async function calculateSchoolYearTotals(fs: Firestore, memberId: string, year: string) {
-  const sessions = await fs.listCollection(`members/${memberId}/sessions`);
+async function calculateSchoolYearTotals(store: AttendanceDb, memberId: string, year: string) {
+  const sessions = await store.listSessions(memberId);
   let totalMs = 0;
   let completedSessions = 0;
   for (const session of sessions) {
-    const raw = session.data.signIn;
-    const signIn = raw instanceof Date ? raw : new Date(raw as string);
+    const signIn = new Date(session.signIn);
     if (Number.isNaN(signIn.getTime()) || schoolYear(signIn) !== year) continue;
-    const duration = session.data.durationMs;
-    if (session.data.status === "manual-adjustment") {
-      const adjustment = session.data.adjustmentMs;
+    const duration = session.durationMs;
+    if (session.status === "manual-adjustment") {
+      const adjustment = session.adjustmentMs;
       if (typeof adjustment === "number" && Number.isFinite(adjustment)) {
         totalMs += adjustment;
       } else if (typeof duration === "number" && Number.isFinite(duration)) {
@@ -92,7 +73,7 @@ async function calculateSchoolYearTotals(fs: Firestore, memberId: string, year: 
     }
     // Auto-closed sessions are invalid and never count toward attendance,
     // including records created before this rule stored a zero duration.
-    if (session.data.status === "auto-closed") {
+    if (session.status === "auto-closed") {
       completedSessions++;
       continue;
     }
@@ -104,9 +85,7 @@ async function calculateSchoolYearTotals(fs: Firestore, memberId: string, year: 
   return { totalMs: Math.max(0, totalMs), completedSessions };
 }
 
-// Firestore document key — the display-name slug joined with the G3ID id, so
-// docs are both human-readable in the Firebase console and guaranteed unique
-// (e.g. members/jane_doe_abc123). The full identity is also stored as fields.
+// Human-readable display-name slug joined with the G3ID id for a stable key.
 function memberKey(displayName: string, userId: string): string {
   const slug = displayName
     .trim()
@@ -120,52 +99,40 @@ function validMemberId(memberId: string): boolean {
   return /^[a-zA-Z0-9_-]+$/.test(memberId);
 }
 
-async function closeOpenSession(fs: Firestore, memberId: string) {
-  const sessionsPath = `members/${memberId}/sessions`;
-  const open = await fs.query(sessionsPath, [{ field: "status", op: "EQUAL", value: "open" }]);
+async function closeOpenSession(store: AttendanceDb, memberId: string) {
+  const open = await store.listOpenSessions(memberId);
   if (!open.length) return null;
 
   const session = open[0];
-  const signInRaw = session.data.signIn;
-  const signInMs =
-    signInRaw instanceof Date ? signInRaw.getTime() : new Date(signInRaw as string).getTime();
+  const signInMs = session.signIn;
   if (!Number.isFinite(signInMs)) throw new Error("INVALID_SESSION");
 
   const elapsedMs = Date.now() - signInMs;
   const timedOut = elapsedMs >= AUTO_SIGNOUT_MS;
   const durationMs = timedOut ? 0 : Math.max(0, elapsedMs);
-  await fs.updateDoc(session.path, {
-    signOut: timedOut ? new Date(signInMs + AUTO_SIGNOUT_MS) : new Date(),
+  await store.closeSession(
+    session.id,
+    timedOut ? signInMs + AUTO_SIGNOUT_MS : Date.now(),
     durationMs,
-    status: timedOut ? "auto-closed" : "completed",
-  });
+    timedOut ? "auto-closed" : "completed",
+  );
 
   return { durationMs, year: schoolYear(new Date(signInMs)) };
 }
 
-async function refreshTotal(fs: Firestore, memberId: string, year: string) {
-  const { totalMs, completedSessions } = await calculateSchoolYearTotals(fs, memberId, year);
-  await fs.setDoc(`members/${memberId}/totals/${year}`, {
-    totalMs,
-    totalHours: totalMs / 3_600_000,
-    sessions: completedSessions,
-    year,
-  });
+async function refreshTotal(store: AttendanceDb, memberId: string, year: string) {
+  const { totalMs, completedSessions } = await calculateSchoolYearTotals(store, memberId, year);
+  await store.setTotal(memberId, year, totalMs, completedSessions);
   return totalMs / 3_600_000;
 }
 
-async function attendanceSummaries(fs: Firestore, year: string) {
-  const [members, allSessions] = await Promise.all([
-    fs.listCollection("members"),
-    fs.collectionGroupQuery("sessions", []),
-  ]);
+async function attendanceSummaries(store: AttendanceDb, year: string) {
+  const [members, allSessions] = await Promise.all([store.listMembers(), store.listSessions()]);
   const sessionsByMember = new Map<string, typeof allSessions>();
   for (const session of allSessions) {
-    const match = session.path.match(/\/members\/([^/]+)\/sessions\//);
-    if (!match) continue;
-    const memberSessions = sessionsByMember.get(match[1]) ?? [];
+    const memberSessions = sessionsByMember.get(session.memberId) ?? [];
     memberSessions.push(session);
-    sessionsByMember.set(match[1], memberSessions);
+    sessionsByMember.set(session.memberId, memberSessions);
   }
 
   return members.map((member) => {
@@ -174,14 +141,13 @@ async function attendanceSummaries(fs: Firestore, year: string) {
     let totalMs = 0;
     let signedIn = false;
     for (const session of sessions) {
-      const signInRaw = session.data.signIn;
-      const signIn = signInRaw instanceof Date ? signInRaw : new Date(signInRaw as string);
+      const signIn = new Date(session.signIn);
       if (Number.isNaN(signIn.getTime())) continue;
-      if (session.data.status !== "manual-adjustment" && (!latestSignIn || signIn > latestSignIn))
+      if (session.status !== "manual-adjustment" && (!latestSignIn || signIn > latestSignIn))
         latestSignIn = signIn;
       if (schoolYear(signIn) !== year) continue;
 
-      const isOpen = session.data.status === "open" || session.data.signOut == null;
+      const isOpen = session.status === "open" || session.signOut == null;
       if (isOpen) {
         const elapsedMs = Date.now() - signIn.getTime();
         if (elapsedMs < AUTO_SIGNOUT_MS) {
@@ -190,31 +156,30 @@ async function attendanceSummaries(fs: Firestore, year: string) {
         }
         continue;
       }
-      if (session.data.status === "auto-closed") continue;
-      if (session.data.status === "manual-adjustment") {
-        const adjustmentMs = session.data.adjustmentMs;
-        const legacyDurationMs = session.data.durationMs;
+      if (session.status === "auto-closed") continue;
+      if (session.status === "manual-adjustment") {
+        const adjustmentMs = session.adjustmentMs;
+        const legacyDurationMs = session.durationMs;
         if (typeof adjustmentMs === "number" && Number.isFinite(adjustmentMs))
           totalMs += adjustmentMs;
         else if (typeof legacyDurationMs === "number" && Number.isFinite(legacyDurationMs))
           totalMs += Math.max(0, legacyDurationMs);
         continue;
       }
-      const durationMs = session.data.durationMs;
+      const durationMs = session.durationMs;
       if (typeof durationMs === "number" && Number.isFinite(durationMs)) {
         totalMs += Math.max(0, durationMs);
         continue;
       }
-      const signOutRaw = session.data.signOut;
-      const signOut = signOutRaw instanceof Date ? signOutRaw : new Date(signOutRaw as string);
+      const signOut = new Date(session.signOut ?? Number.NaN);
       if (!Number.isNaN(signOut.getTime()))
         totalMs += Math.max(0, signOut.getTime() - signIn.getTime());
     }
     return {
       id: member.id,
-      userId: (member.data.userId as string) ?? "",
-      displayName: (member.data.displayName as string) ?? member.id,
-      email: (member.data.email as string) ?? "",
+      userId: member.userId,
+      displayName: member.displayName || member.id,
+      email: member.email,
       signedIn,
       lastSignIn: latestSignIn?.toISOString() ?? null,
       totalHours: Math.max(0, totalMs) / 3_600_000,
@@ -223,7 +188,9 @@ async function attendanceSummaries(fs: Firestore, year: string) {
 }
 
 const app = base
-  .get("/health", (c) => c.json({ status: "ok", service: "attendance" }))
+  .get("/health", (c) =>
+    c.json({ status: "ok", service: "attendance", version: packageJson.version }),
+  )
 
   // Who am I — used by the scanned page to show "Sign in as <name>".
   .get("/me", requireAuth, (c) =>
@@ -252,25 +219,29 @@ const app = base
     }
 
     const memberId = memberKey(c.get("userDisplayName"), c.get("userId"));
-    const fs = db(c.env);
-    const sessionsPath = `members/${memberId}/sessions`;
+    const store = db(c.env);
     await autoSignOut(c.env);
 
-    await fs.setDoc(`members/${memberId}`, {
+    await store.upsertMember({
+      id: memberId,
       displayName: c.get("userDisplayName"),
       email: c.get("userEmail"),
       userId: c.get("userId"),
     });
 
-    const open = await fs.query(sessionsPath, [{ field: "status", op: "EQUAL", value: "open" }]);
+    const open = await store.listOpenSessions(memberId);
     if (open.length > 0) return c.json({ error: "ALREADY_SIGNED_IN" }, 409);
 
-    await fs.addDoc(sessionsPath, {
-      signIn: new Date(),
+    const now = new Date();
+    await store.addSession({
+      memberId,
+      signIn: now.getTime(),
       signOut: null,
       durationMs: null,
+      adjustmentMs: null,
       status: "open",
-      year: schoolYear(new Date()),
+      year: schoolYear(now),
+      addedBy: null,
     });
 
     return c.json({ ok: true });
@@ -286,16 +257,16 @@ const app = base
     }
 
     const memberId = memberKey(c.get("userDisplayName"), c.get("userId"));
-    const fs = db(c.env);
+    const store = db(c.env);
     let result: Awaited<ReturnType<typeof closeOpenSession>>;
     try {
-      result = await closeOpenSession(fs, memberId);
+      result = await closeOpenSession(store, memberId);
     } catch {
       return c.json({ error: "INVALID_SESSION" }, 500);
     }
     if (!result) return c.json({ error: "NOT_SIGNED_IN" }, 404);
 
-    const totalHours = await refreshTotal(fs, memberId, result.year);
+    const totalHours = await refreshTotal(store, memberId, result.year);
     return c.json({ ok: true, durationMs: result.durationMs, totalHours });
   })
   // Manual attendance controls — admin only.
@@ -304,10 +275,10 @@ const app = base
     const memberId = c.req.param("memberId");
     if (!validMemberId(memberId)) return c.json({ error: "Invalid member." }, 400);
 
-    const fs = db(c.env);
-    const result = await closeOpenSession(fs, memberId);
+    const store = db(c.env);
+    const result = await closeOpenSession(store, memberId);
     if (!result) return c.json({ error: "NOT_SIGNED_IN" }, 404);
-    const totalHours = await refreshTotal(fs, memberId, result.year);
+    const totalHours = await refreshTotal(store, memberId, result.year);
     return c.json({ ok: true, totalHours });
   })
   .post("/admin/members/:memberId/add-hours", requireAuth, async (c) => {
@@ -330,27 +301,28 @@ const app = base
       );
     }
 
-    const fs = db(c.env);
-    if (!(await fs.getDoc(`members/${memberId}`)))
-      return c.json({ error: "Member not found." }, 404);
+    const store = db(c.env);
+    if (!(await store.getMember(memberId))) return c.json({ error: "Member not found." }, 404);
     const now = new Date();
     const year = schoolYear(now);
     let appliedHours = hours;
     if (hours < 0) {
-      const current = await calculateSchoolYearTotals(fs, memberId, year);
+      const current = await calculateSchoolYearTotals(store, memberId, year);
       appliedHours = Math.max(hours, -(current.totalMs / 3_600_000));
     }
     if (appliedHours === 0) return c.json({ ok: true, totalHours: 0 });
 
-    await fs.addDoc(`members/${memberId}/sessions`, {
-      signIn: now,
-      signOut: now,
+    await store.addSession({
+      memberId,
+      signIn: now.getTime(),
+      signOut: now.getTime(),
+      durationMs: null,
       adjustmentMs: appliedHours * 3_600_000,
       status: "manual-adjustment",
       year,
       addedBy: c.get("userId"),
     });
-    const totalHours = await refreshTotal(fs, memberId, year);
+    const totalHours = await refreshTotal(store, memberId, year);
     return c.json({ ok: true, totalHours });
   })
   .delete("/admin/members/:memberId", requireAuth, async (c) => {
@@ -358,16 +330,9 @@ const app = base
     const memberId = c.req.param("memberId");
     if (!validMemberId(memberId)) return c.json({ error: "Invalid member." }, 400);
 
-    const fs = db(c.env);
-    const memberPath = `members/${memberId}`;
-    if (!(await fs.getDoc(memberPath))) return c.json({ error: "Member not found." }, 404);
-
-    const [sessions, totals] = await Promise.all([
-      fs.listCollection(`${memberPath}/sessions`),
-      fs.listCollection(`${memberPath}/totals`),
-    ]);
-    await fs.deleteDocs([...sessions, ...totals].map((document) => document.path));
-    await fs.deleteDoc(memberPath);
+    const store = db(c.env);
+    if (!(await store.getMember(memberId))) return c.json({ error: "Member not found." }, 404);
+    await store.deleteMember(memberId);
     return c.json({ ok: true });
   })
   // Attendance summary — admin only. One row per member: current status,
@@ -375,9 +340,9 @@ const app = base
   .get("/admin/summary", requireAuth, async (c) => {
     if (!c.get("userIsAdmin")) return c.json({ error: "Forbidden." }, 403);
 
-    const fs = db(c.env);
+    const store = db(c.env);
     const year = schoolYear(new Date());
-    const summaries = await attendanceSummaries(fs, year);
+    const summaries = await attendanceSummaries(store, year);
 
     summaries.sort((a, b) => a.displayName.localeCompare(b.displayName));
 
@@ -386,7 +351,7 @@ const app = base
   .get("/leaderboard", requireAuth, async (c) => {
     await autoSignOut(c.env);
     const eligibilityResponse = await c.env.G3ID.fetch(
-      new Request("http://g3id/users/attendance-eligible", {
+      new Request("http://g3id/api/users/attendance-eligible", {
         headers: { cookie: c.req.header("Cookie") ?? "" },
       }),
     );
@@ -419,21 +384,20 @@ const app = base
   // Who's currently signed in — any logged-in user can view.
   .get("/status", requireAuth, async (c) => {
     await autoSignOut(c.env);
-    const fs = db(c.env);
-    const open = await listOpenSessions(fs);
-    const signedIn = open.map(({ member }) => (member.data.displayName as string) ?? member.id);
+    const store = db(c.env);
+    const open = await listOpenSessions(store);
+    const signedIn = open.map(({ member }) => member.displayName || member.id);
 
     return c.json({ signedIn });
   });
 
 async function autoSignOut(env: AppEnv["Bindings"]) {
-  const fs = db(env);
+  const store = db(env);
   const now = Date.now();
-  const open = await listOpenSessions(fs);
+  const open = await listOpenSessions(store);
   const stale = open
     .map(({ session, member }) => {
-      const raw = session.data.signIn;
-      const signIn = raw instanceof Date ? raw : new Date(raw as string);
+      const signIn = new Date(session.signIn);
       return { session, member, signIn };
     })
     .filter(
@@ -442,20 +406,14 @@ async function autoSignOut(env: AppEnv["Bindings"]) {
 
   await Promise.all(
     stale.map(async ({ session, member, signIn }) => {
-      await fs.updateDoc(session.path, {
-        signOut: new Date(signIn.getTime() + AUTO_SIGNOUT_MS),
-        durationMs: 0,
-        status: "auto-closed",
-      });
+      await store.closeSession(session.id, signIn.getTime() + AUTO_SIGNOUT_MS, 0, "auto-closed");
       const year = schoolYear(signIn);
-      const totalPath = `members/${member.id}/totals/${year}`;
-      const { totalMs, completedSessions } = await calculateSchoolYearTotals(fs, member.id, year);
-      await fs.setDoc(totalPath, {
-        totalMs,
-        totalHours: totalMs / 3_600_000,
-        sessions: completedSessions,
+      const { totalMs, completedSessions } = await calculateSchoolYearTotals(
+        store,
+        member.id,
         year,
-      });
+      );
+      await store.setTotal(member.id, year, totalMs, completedSessions);
     }),
   );
   console.log(`Auto-closed ${stale.length} sessions`);
@@ -464,7 +422,7 @@ async function autoSignOut(env: AppEnv["Bindings"]) {
 export type AttendanceApp = typeof app;
 
 export default {
-  fetch: app.fetch,
+  fetch: withApiPrefix(app.fetch),
   scheduled: (_event: ScheduledController, env: AppEnv["Bindings"], ctx: ExecutionContext) => {
     ctx.waitUntil(autoSignOut(env));
   },

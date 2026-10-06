@@ -2,7 +2,7 @@ import { OnShapeIcon } from "@g3/ui";
 import { GraduationCap, Loader2, Shield, ShieldOff } from "lucide-react";
 import { useEffect, useState } from "react";
 import { FaGithub, FaGoogle, FaKey, FaSlack, FaSteam } from "react-icons/fa";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { api } from "../../lib/api";
 
 type Identity = { provider: string; createdAt: number };
@@ -29,9 +29,9 @@ function relativeTime(ts: number): string {
 }
 
 const STATUS_STYLES: Record<string, string> = {
-  pending: "bg-yellow-500/20 text-yellow-300 border-yellow-500/30",
-  active: "bg-green-500/20 text-green-300 border-green-500/30",
-  rejected: "bg-primary-500/20 text-primary-300 border-primary-500/30",
+  pending: "bg-amber-50 text-amber-700 border-amber-200",
+  active: "bg-green-50 text-green-700 border-green-200",
+  rejected: "bg-primary-50 text-primary-600 border-primary-200",
 };
 
 function ProviderIcon({ provider }: { provider: string }) {
@@ -39,42 +39,42 @@ function ProviderIcon({ provider }: { provider: string }) {
   switch (provider) {
     case "google":
       return (
-        <span className={`${cls} text-blue-400`} title="Google">
+        <span className={`${cls} text-blue-700`} title="Google">
           <FaGoogle />
         </span>
       );
     case "slack":
       return (
-        <span className={`${cls} text-primary-400`} title="Slack">
+        <span className={`${cls} text-primary-500`} title="Slack">
           <FaSlack />
         </span>
       );
     case "github":
       return (
-        <span className={`${cls} text-gray-200`} title="GitHub">
+        <span className={`${cls} text-secondary-700`} title="GitHub">
           <FaGithub />
         </span>
       );
     case "steam":
       return (
-        <span className={`${cls} text-cyan-400`} title="Steam">
+        <span className={`${cls} text-cyan-700`} title="Steam">
           <FaSteam />
         </span>
       );
     case "local":
       return (
-        <span className={`${cls} text-yellow-400`} title="Password">
+        <span className={`${cls} text-amber-700`} title="Password">
           <FaKey />
         </span>
       );
     case "onshape":
       return (
-        <span className={`${cls} text-green-400`} title="Onshape">
+        <span className={`${cls} text-green-700`} title="Onshape">
           <OnShapeIcon size={16} onshape-green />
         </span>
       );
     default:
-      return <span className="text-xs text-secondary-300">{provider}</span>;
+      return <span className="text-xs text-secondary-500">{provider}</span>;
   }
 }
 
@@ -304,29 +304,8 @@ export function AdminUsersPage() {
 
   return (
     <main className="flex-1 px-4 py-8 max-w-2xl mx-auto w-full">
-      <div className="mb-6 flex gap-4 border-b border-secondary-600">
-        <Link
-          to="/admin/users"
-          className="py-2 px-4 text-white font-medium border-b-2 border-primary-400"
-        >
-          Users
-        </Link>
-        <Link
-          to="/admin/kiosk"
-          className="py-2 px-4 text-secondary-200 hover:text-white transition-colors"
-        >
-          Kiosk Devices
-        </Link>
-        <Link
-          to="/admin/attendance"
-          className="py-2 px-4 text-secondary-200 hover:text-white transition-colors"
-        >
-          Attendance Summary
-        </Link>
-      </div>
-
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-white">Users</h1>
+        <h1 className="text-2xl font-bold text-secondary-900">Users</h1>
         <button
           type="button"
           onClick={exportActiveUsersToCSV}
@@ -346,7 +325,7 @@ export function AdminUsersPage() {
             className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors capitalize ${
               filter === f
                 ? "bg-primary-500 text-white"
-                : "bg-secondary-700 text-secondary-200 hover:text-white border border-gray-600"
+                : "bg-white text-secondary-600 hover:text-secondary-900 border border-secondary-300"
             }`}
           >
             {f} <span className="opacity-60">({countFor(f)})</span>
@@ -355,15 +334,15 @@ export function AdminUsersPage() {
       </div>
 
       {loading && (
-        <div className="flex justify-center py-16 text-secondary-300">
+        <div className="flex justify-center py-16 text-secondary-500">
           <Loader2 size={24} className="animate-spin" />
         </div>
       )}
 
-      {error && <p className="text-sm text-primary-400">{error}</p>}
+      {error && <p className="text-sm text-primary-500">{error}</p>}
 
       {!loading && !error && filtered.length === 0 && (
-        <p className="text-sm text-secondary-300 text-center py-16">
+        <p className="text-sm text-secondary-500 text-center py-16">
           No {filter === "all" ? "" : filter} users.
         </p>
       )}
@@ -373,7 +352,7 @@ export function AdminUsersPage() {
           {filtered.map((user) => (
             <div
               key={user.id}
-              className="bg-secondary-700 border border-secondary-600 rounded-lg overflow-hidden"
+              className="bg-white border border-secondary-200 rounded-lg overflow-hidden"
             >
               {/* Main row */}
               <div className="px-4 py-3 flex items-center gap-3 flex-wrap">
@@ -385,19 +364,19 @@ export function AdminUsersPage() {
                 {/* Name + identity icons */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-white font-semibold">{user.displayName}</span>
+                    <span className="text-secondary-900 font-semibold">{user.displayName}</span>
                     {user.isAdmin === 1 && (
-                      <span className="text-xs px-1.5 py-0.5 rounded bg-primary-500/20 text-primary-300 border border-primary-500/30">
+                      <span className="text-xs px-1.5 py-0.5 rounded bg-primary-50 text-primary-600 border border-primary-200">
                         Admin
                       </span>
                     )}
                     {user.isMentor === 1 && (
-                      <span className="text-xs px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                      <span className="text-xs px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
                         Mentor
                       </span>
                     )}
                     <span
-                      className={`text-xs px-2 py-0.5 rounded-full border capitalize ${STATUS_STYLES[user.status] ?? "bg-gray-700 text-secondary-200"}`}
+                      className={`text-xs px-2 py-0.5 rounded-full border capitalize ${STATUS_STYLES[user.status] ?? "bg-white text-secondary-600"}`}
                     >
                       {user.status}
                     </span>
@@ -407,12 +386,12 @@ export function AdminUsersPage() {
                     {user.identities.map((identity) => (
                       <ProviderIcon key={identity.provider} provider={identity.provider} />
                     ))}
-                    <span className="text-xs text-gray-600">·</span>
-                    <span className="text-xs text-secondary-300" title="Last login">
+                    <span className="text-xs text-secondary-500">·</span>
+                    <span className="text-xs text-secondary-500" title="Last login">
                       {user.lastLoginAt ? relativeTime(user.lastLoginAt) : "never logged in"}
                     </span>
-                    <span className="text-xs text-gray-600">·</span>
-                    <span className="text-xs text-secondary-300" title="Joined">
+                    <span className="text-xs text-secondary-500">·</span>
+                    <span className="text-xs text-secondary-500" title="Joined">
                       joined {relativeTime(user.createdAt)}
                     </span>
                   </div>
@@ -454,7 +433,7 @@ export function AdminUsersPage() {
                       onClick={() =>
                         user.isAdmin ? handleDemote(user.id) : handlePromote(user.id)
                       }
-                      className="px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-700 hover:bg-primary-900 hover:text-primary-300 disabled:opacity-50 disabled:cursor-not-allowed text-secondary-200 transition-colors flex items-center gap-1"
+                      className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white border border-secondary-300 hover:bg-primary-50 hover:text-primary-600 disabled:opacity-50 disabled:cursor-not-allowed text-secondary-600 transition-colors flex items-center gap-1"
                     >
                       {promoting.has(user.id) ? (
                         <Loader2 size={11} className="animate-spin" />
@@ -474,7 +453,7 @@ export function AdminUsersPage() {
                       onClick={() =>
                         user.isMentor ? handleRevokeMentor(user.id) : handleGrantMentor(user.id)
                       }
-                      className="px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-700 hover:bg-blue-900 hover:text-blue-300 disabled:opacity-50 disabled:cursor-not-allowed text-secondary-200 transition-colors flex items-center gap-1"
+                      className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white border border-secondary-300 hover:bg-blue-50 hover:text-blue-800 disabled:opacity-50 disabled:cursor-not-allowed text-secondary-600 transition-colors flex items-center gap-1"
                     >
                       {togglingMentor.has(user.id) ? (
                         <Loader2 size={11} className="animate-spin" />
@@ -491,7 +470,7 @@ export function AdminUsersPage() {
                         type="button"
                         disabled={deleting.has(user.id)}
                         onClick={() => handleDelete(user.id)}
-                        className="px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-700 hover:bg-primary-900 hover:text-primary-300 disabled:opacity-50 disabled:cursor-not-allowed text-secondary-200 transition-colors flex items-center gap-1"
+                        className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white border border-secondary-300 hover:bg-primary-50 hover:text-primary-600 disabled:opacity-50 disabled:cursor-not-allowed text-secondary-600 transition-colors flex items-center gap-1"
                       >
                         {deleting.has(user.id) ? (
                           <Loader2 size={11} className="animate-spin" />
@@ -510,7 +489,7 @@ export function AdminUsersPage() {
                           setMergeTargetId("");
                         }
                       }}
-                      className="px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-700 hover:bg-gray-600 text-gray-200 transition-colors"
+                      className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white border border-secondary-300 hover:bg-secondary-50 text-secondary-700 transition-colors"
                     >
                       {mergingUserId === user.id ? "Cancel" : "Merge"}
                     </button>
@@ -520,12 +499,12 @@ export function AdminUsersPage() {
 
               {/* Merge panel */}
               {mergingUserId === user.id && (
-                <div className="px-4 py-3 border-t border-secondary-600 flex items-center gap-3">
-                  <p className="text-xs text-secondary-200 shrink-0">Merge into:</p>
+                <div className="px-4 py-3 border-t border-secondary-200 flex items-center gap-3">
+                  <p className="text-xs text-secondary-600 shrink-0">Merge into:</p>
                   <select
                     value={mergeTargetId}
                     onChange={(e) => setMergeTargetId(e.target.value)}
-                    className="flex-1 rounded-lg bg-gray-700 border border-gray-600 px-3 py-1.5 text-sm text-white focus:outline-none focus:border-primary-400"
+                    className="flex-1 rounded-lg bg-white border border-secondary-300 px-3 py-1.5 text-sm text-secondary-900 focus:outline-none focus:border-primary-500"
                   >
                     <option value="">Select a user…</option>
                     {users

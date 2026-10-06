@@ -1,8 +1,8 @@
+import { requireAuth } from "@g3/auth";
 import { eq, gt } from "drizzle-orm";
 import { Hono } from "hono";
 import { createShopDb } from "../db";
 import { kioskPresence } from "../db/schema";
-import { requireAuth } from "../middleware/auth";
 import type { AppEnv } from "../types";
 
 /** Presence entries older than this are considered gone (heartbeats arrive every minute). */

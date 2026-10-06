@@ -4,6 +4,7 @@ import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { site } from "../packages/site-config/src/site.ts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const configPath = path.join(__dirname, "..", ".dev-ports.json");
@@ -48,7 +49,7 @@ async function waitForServers(config, timeout = 60000) {
 
 function printServerInfo(config) {
   console.log(`\n${"=".repeat(60)}`);
-  console.log("  G3 Robotics Development Servers");
+  console.log(`  ${site.team.name} Development Servers`);
   console.log(`${"=".repeat(60)}\n`);
 
   console.log("📱 Apps:");
@@ -61,6 +62,20 @@ function printServerInfo(config) {
     console.log(`  • ${server.name.padEnd(30)} ${server.url}`);
   }
 
+  // Every team's addresses, through the gateway (roadmap 2.9): gearbox.localhost (DEV_DOMAIN in
+  // @g3/site-config) stands for the platform's domain, and pages and /api come from the servers above.
+  const gateway = config.workers.gateway?.url;
+  if (gateway) {
+    const at = (host) => gateway.replace("localhost", `${host}gearbox.localhost`);
+    console.log("\n🌐 Through the gateway:");
+    console.log(`  • ${"Platform (sign-up)".padEnd(30)} ${at("")}`);
+    console.log(
+      `  • ${`Team ${site.team.number} sign-in`.padEnd(30)} ${at(`${site.team.number}-id.`)}`,
+    );
+    console.log(`  • ${`Team ${site.team.number} home`.padEnd(30)} ${at(`${site.team.number}.`)}`);
+    console.log(`  • ${"Any team's app".padEnd(30)} ${at("<number>-<app>.")}`);
+  }
+
   console.log(`\n${"=".repeat(60)}`);
   console.log("  ✅ All servers are ready!");
   console.log(`${"=".repeat(60)}\n`);
@@ -70,10 +85,10 @@ async function main() {
   try {
     const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
 
-    console.log("🚀 Starting G3 Robotics development servers...\n");
+    console.log(`🚀 Starting ${site.team.name} development servers...\n`);
 
     // Start the dev servers in background
-    const devProcess = spawn("pnpm", ["-r", "--parallel", "--if-present", "dev"], {
+    const devProcess = spawn("pnpm", ["-r", "--parallel", "--no-bail", "--if-present", "dev"], {
       cwd: path.join(__dirname, ".."),
       stdio: "inherit",
       shell: true,

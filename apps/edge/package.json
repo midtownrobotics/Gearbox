@@ -1,7 +1,7 @@
 {
   "name": "@g3/edge",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -17,6 +17,7 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250516.0",
+    "@g3/site-config": "workspace:*",
     "@g3/ui": "workspace:*",
     "@g3/worker-edge": "workspace:*",
     "@tailwindcss/vite": "^4.0.0",

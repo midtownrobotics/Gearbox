@@ -1,3 +1,4 @@
+import { requireAuth } from "@g3/auth";
 import { asc, eq, max } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
@@ -7,7 +8,6 @@ import {
   partInstanceProcesses,
   partInstances,
 } from "../db/schema";
-import { requireAuth } from "../middleware/auth";
 import type { AppEnv } from "../types";
 
 const createInstancesValidator = validator(

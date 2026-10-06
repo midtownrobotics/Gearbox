@@ -1,2 +1,8 @@
 # Copy to .dev.vars for local dev. Must match EDGE_AGENT_KEY in the agent's env.
 EDGE_AGENT_KEY=local-dev-agent-key
+
+# Optional: run part lookups on the real edge box (so vendors see the shop connection, like
+# production) while printing and everything else stay on the mock agent. The key is the box's
+# EDGE_AGENT_KEY (from /etc/g3-edge/agent.env on the box, or the production worker secret).
+#LOOKUP_AGENT_URL=https://edge-agent.g3robotics.com
+#LOOKUP_AGENT_KEY=

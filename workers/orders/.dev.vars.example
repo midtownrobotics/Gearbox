@@ -1,0 +1,4 @@
+# Copy to .dev.vars for local dev. All optional.
+# Approval DMs (use a test bot/workspace locally, not the team's):
+# SLACK_BOT_TOKEN=
+# (DigiKey lookup credentials live on the edge box: EDGE_DIGIKEY_* in its agent.env.)

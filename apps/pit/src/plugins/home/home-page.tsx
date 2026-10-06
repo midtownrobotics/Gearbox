@@ -1,3 +1,4 @@
+import { useTeamNames } from "@g3/ui";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
@@ -120,6 +121,7 @@ const TILES: Tile[] = [
 ];
 
 export function HomePage() {
+  const names = useTeamNames();
   const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
@@ -133,10 +135,12 @@ export function HomePage() {
   const tiles = TILES.filter((t) => !t.adminOnly || isAdmin);
 
   return (
-    <main className="min-h-screen bg-gray-100 text-gray-900">
+    <main className="min-h-screen bg-page text-gray-900">
       <div className="max-w-3xl mx-auto px-4 py-12 sm:py-16 space-y-10">
         <div className="text-center space-y-3">
-          <h1 className="text-5xl sm:text-6xl font-bold tracking-tight">G3 Pit Software</h1>
+          <h1 className="text-5xl sm:text-6xl font-bold tracking-tight">
+            {names.appTitle("Pit")} Software
+          </h1>
           <p className="text-red-400 font-semibold text-lg tracking-widest uppercase">
             Pit Management and Operations
           </p>

@@ -1,7 +1,11 @@
+import { apiUrl, site } from "@g3/site-config";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import * as schema from "../db/schema";
 import type { AppEnv } from "../types";
+
+/** Our webhook's name in Onshape; how we find it again to delete it. */
+const WEBHOOK_NAME = `${site.team.name} Shop SW`;
 
 interface BOMHeader {
   id: string;
@@ -92,7 +96,7 @@ export async function unregisterOnShapeWebhooks(documentId: string, env: AppEnv[
 
     // Delete our webhook
     for (const webhook of webhooks.items || []) {
-      if (webhook.name === "G3 Robotics Shop SW") {
+      if (webhook.name === WEBHOOK_NAME) {
         const deleteResponse = await fetch(
           `https://cad.onshape.com/api/v16/webhooks/${webhook.id}`,
           {
@@ -126,7 +130,7 @@ export async function registerOnShapeWebhook(documentId: string, env: AppEnv["Bi
   }
 
   const credentials = btoa(`${apiKey}:${apiSecret}`);
-  const webhookUrl = "https://api.shop.g3robotics.com/onshape/events";
+  const webhookUrl = `${apiUrl("shop")}/onshape/events`;
 
   const response = await fetch("https://cad.onshape.com/api/v16/webhooks", {
     method: "POST",
@@ -143,7 +147,7 @@ export async function registerOnShapeWebhook(documentId: string, env: AppEnv["Bi
       options: {
         collapseEvents: false,
       },
-      name: "G3 Robotics Shop SW",
+      name: WEBHOOK_NAME,
     }),
   });
 

@@ -2,22 +2,38 @@
 <html lang="en" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
+    <script>
+      // Light/dark for every app (the g3_theme cookie on the team's domain), set before first
+      // paint. @g3/ui's useTheme keeps it in sync after that.
+      (function () {
+        var saved = document.cookie.match(/(?:^|;\s*)g3_theme=(light|dark)/);
+        var dark = window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches;
+        var theme = saved ? saved[1] : dark ? "dark" : "light";
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.style.colorScheme = theme;
+        document.addEventListener("DOMContentLoaded", function () {
+          var meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) meta.content = theme === "dark" ? "#262626" : "#fefefe";
+        });
+      })();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#0b111b" />
+    <meta name="theme-color" content="#fefefe" />
     <meta
       name="description"
-      content="G3 Robotics scouting and strategy workspace."
+      content="A team's scouting and strategy workspace."
     />
-    <meta property="og:title" content="G3 Strategy" />
+    <meta property="og:title" content="Strategy" />
     <meta
       property="og:description"
       content="Plan the match. See the field differently."
     />
     <meta property="og:type" content="website" />
-    <meta property="og:image" content="https://scouting.g3robotics.com/og.png" />
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:image" content="https://scouting.g3robotics.com/og.png" />
-    <title>G3 Strategy</title>
+    <meta name="twitter:card" content="summary" />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <title>Strategy</title>
   </head>
   <body>
     <div id="root"></div>

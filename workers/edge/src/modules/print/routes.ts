@@ -1,7 +1,7 @@
+import { requireAdmin, requireAuth } from "@g3/auth";
 import { type Context, Hono } from "hono";
 import { validator } from "hono/validator";
 import { AgentError, agentFetch } from "../../lib/agent";
-import { requireAdmin, requireAuth } from "../../middleware/auth";
 import type { AppEnv } from "../../types";
 import {
   type DiscoveredPrinter,
@@ -43,7 +43,7 @@ async function relay<T>(c: Ctx, path: string, init?: Parameters<typeof agentFetc
 async function userNames(c: Ctx, ids: string[]) {
   if (ids.length === 0) return new Map<string, string>();
   const res = await c.env.G3ID.fetch(
-    new Request(`http://g3id/auth/users?ids=${encodeURIComponent(ids.join(","))}`, {
+    new Request(`http://g3id/api/auth/users?ids=${encodeURIComponent(ids.join(","))}`, {
       headers: { cookie: c.req.header("Cookie") ?? "" },
     }),
   );

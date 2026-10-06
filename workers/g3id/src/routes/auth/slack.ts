@@ -6,65 +6,44 @@ import { coreSlackLinkCodes } from "../../db/schema";
 import { sessionCookieOptions } from "../../lib/cookie";
 import { newId } from "../../lib/id";
 import { sanitizeRedirect } from "../../lib/redirect";
+import { createSigninCode } from "../../lib/slack-code";
+import { requestTeamId, teamFrontend, teamOfUser } from "../../lib/team";
 import { requireAuth } from "../../middleware/auth";
 import type { AppEnv } from "../../types";
 
-function generateCode(): string {
-  return (crypto.getRandomValues(new Uint32Array(1))[0] % 10000).toString().padStart(4, "0");
-}
-
-function generateToken(): string {
-  return Array.from(crypto.getRandomValues(new Uint8Array(16)))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}
+import { generateCode, generateToken } from "../../lib/slack-code";
 
 export const slackAuthRouter = new Hono<AppEnv>()
   // Sign-in initiation — generates code, redirects to /login/slack
   .get("/slack/initiate", async (c) => {
-    const redirect = sanitizeRedirect(c.req.query("redirect"));
-    const code = generateCode();
-    const token = generateToken();
-    const now = Math.floor(Date.now() / 1000);
-
-    await createDb(c.env.DB)
-      .insert(coreSlackLinkCodes)
-      .values({
-        id: newId(),
-        userId: null,
-        code,
-        type: "signin",
-        pollingToken: token,
-        redirectUrl: redirect || null,
-        expiresAt: now + 900,
-        used: 0,
-        createdAt: now,
-      });
+    const team = requestTeamId(c);
+    const redirect = sanitizeRedirect(c.req.query("redirect"), team);
+    const { code, token } = await createSigninCode(createDb(c.env.DB), team, redirect);
 
     const redirectParam = redirect ? `&redirect=${encodeURIComponent(redirect)}` : "";
     return c.redirect(
-      `${c.env.FRONTEND_URL}/login/slack?token=${token}&code=${code}${redirectParam}`,
+      `${teamFrontend(c.env, team)}/login/slack?token=${token}&code=${code}${redirectParam}`,
     );
   })
   // Link initiation — user must already be signed in, returns JSON code + token
   .get("/slack/link", requireAuth, async (c) => {
-    const userId = c.get("userId");
+    const userId = c.get("userId") as string;
     const code = generateCode();
     const token = generateToken();
     const now = Math.floor(Date.now() / 1000);
+    const db = createDb(c.env.DB);
 
-    await createDb(c.env.DB)
-      .insert(coreSlackLinkCodes)
-      .values({
-        id: newId(),
-        userId,
-        code,
-        type: "link",
-        pollingToken: token,
-        expiresAt: now + 900,
-        used: 0,
-        createdAt: now,
-      });
+    await db.insert(coreSlackLinkCodes).values({
+      id: newId(),
+      teamId: await teamOfUser(db, userId),
+      userId,
+      code,
+      type: "link",
+      pollingToken: token,
+      expiresAt: now + 900,
+      used: 0,
+      createdAt: now,
+    });
 
     return c.json({ code, token });
   })
@@ -97,7 +76,7 @@ export const slackAuthRouter = new Hono<AppEnv>()
 
     // Status is 'success' with a session ID — set cookie and report success
     if (record.status === "success" && record.sessionId) {
-      setCookie(c, "g3_session", record.sessionId, sessionCookieOptions(c.env.FRONTEND_URL));
+      setCookie(c, "g3_session", record.sessionId, sessionCookieOptions(c.req.url));
       return c.json({ status: "success" });
     }
 
@@ -106,7 +85,6 @@ export const slackAuthRouter = new Hono<AppEnv>()
   // Complete — from Slack link, set cookie and redirect (only for successful sign-ins)
   .get("/slack/complete", async (c) => {
     const token = c.req.query("token");
-    const redirect = sanitizeRedirect(c.req.query("redirect"));
 
     if (!token) {
       return c.text("Invalid or missing token", 400);
@@ -124,10 +102,11 @@ export const slackAuthRouter = new Hono<AppEnv>()
     }
 
     // Set the session cookie
-    setCookie(c, "g3_session", record.sessionId, sessionCookieOptions(c.env.FRONTEND_URL));
+    setCookie(c, "g3_session", record.sessionId, sessionCookieOptions(c.req.url));
 
-    // Redirect to the original URL or home
-    const redirectUrl = redirect || `${c.env.FRONTEND_URL}/`;
+    // Redirect to the original URL (one of the code's team's pages) or that team's G3ID
+    const redirect = sanitizeRedirect(c.req.query("redirect"), record.teamId);
+    const redirectUrl = redirect || `${teamFrontend(c.env, record.teamId)}/`;
     return c.redirect(redirectUrl);
   })
   // Cancel — expire the code so it cannot be redeemed

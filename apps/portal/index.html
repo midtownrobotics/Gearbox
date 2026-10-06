@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <script>
+      // Light/dark for every app (the g3_theme cookie on the team's domain), set before first
+      // paint. @g3/ui's useTheme keeps it in sync after that.
+      (function () {
+        var saved = document.cookie.match(/(?:^|;\s*)g3_theme=(light|dark)/);
+        var dark = window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches;
+        var theme = saved ? saved[1] : dark ? "dark" : "light";
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.style.colorScheme = theme;
+        document.addEventListener("DOMContentLoaded", function () {
+          var meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) meta.content = theme === "dark" ? "#262626" : "#fefefe";
+        });
+      })();
+    </script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="description" content="This is an educational tool used by high school robotics teams. It includes software for the production tracking, attendance, and other management tools. It uses math, science, ELA, reading, and other forms of school to help educate and teach. Education is our number one priority." />
+    <meta name="keywords" content="School, Education, SAT, ACT, Math, Science, Reading, ELA, Tools, Learning, Students, High School, Robotics, Teachers, Attendance" />
+    <title>Gearbox</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

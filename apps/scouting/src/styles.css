@@ -1,7 +1,8 @@
 @import url("https://fonts.googleapis.com/css2?family=Ubuntu:ital,wght@0,300;0,400;0,500;0,700;1,400;1,500;1,700&display=swap");
+@import "@g3/ui/nav-bar.css";
 @import "tailwindcss";
 
-/* G3 Sportsbook */
+/* Match predictions */
 .game-page {
   max-width: 1500px;
 }
@@ -232,7 +233,7 @@ aside.game-sidebar {
   }
 }
 
-/* Compact sportsbook layout */
+/* Compact predictions layout */
 .game-page {
   max-width: 1180px;
 }
@@ -303,8 +304,8 @@ aside.game-sidebar {
   font-weight: 500;
 }
 
-.sportsbook-columns,
-.sportsbook-row {
+.predictions-columns,
+.predictions-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 150px;
   gap: 7px;
@@ -312,7 +313,7 @@ aside.game-sidebar {
   padding: 7px 10px;
 }
 
-.sportsbook-columns {
+.predictions-columns {
   padding-block: 6px;
   border-bottom: 1px solid var(--line);
   color: #75879d;
@@ -322,15 +323,15 @@ aside.game-sidebar {
   text-transform: uppercase;
 }
 
-.sportsbook-columns span:not(:first-child) {
+.predictions-columns span:not(:first-child) {
   text-align: center;
 }
 
-.sportsbook-row {
+.predictions-row {
   border-bottom: 1px solid #1d2a3b;
 }
 
-.sportsbook-team {
+.predictions-team {
   display: grid;
   grid-template-columns: 42px minmax(0, 1fr);
   gap: 8px;
@@ -338,12 +339,12 @@ aside.game-sidebar {
   min-width: 0;
 }
 
-.sportsbook-team strong {
+.predictions-team strong {
   font-size: 12px;
   text-transform: uppercase;
 }
 
-.sportsbook-team span {
+.predictions-team span {
   overflow: hidden;
   color: #dbe4ef;
   font-size: 13px;
@@ -352,20 +353,20 @@ aside.game-sidebar {
   white-space: nowrap;
 }
 
-.sportsbook-team small {
+.predictions-team small {
   color: var(--muted);
   font-size: 11px;
 }
 
-.sportsbook-row.red .sportsbook-team strong {
+.predictions-row.red .predictions-team strong {
   color: #ff7775;
 }
 
-.sportsbook-row.blue .sportsbook-team strong {
+.predictions-row.blue .predictions-team strong {
   color: #65b1ff;
 }
 
-.sportsbook-row > button {
+.predictions-row > button {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -379,18 +380,18 @@ aside.game-sidebar {
   font-size: 12px;
 }
 
-.sportsbook-row > button:hover {
+.predictions-row > button:hover {
   border-color: #5b718c;
   background: #1d2d41;
 }
 
-.sportsbook-row > button.selected {
+.predictions-row > button.selected {
   border-color: var(--coral);
   outline: 1px solid var(--coral);
   background: rgba(167, 20, 51, 0.14);
 }
 
-.sportsbook-row > button b {
+.predictions-row > button b {
   color: var(--coral);
 }
 
@@ -538,23 +539,23 @@ aside.game-sidebar {
     display: none;
   }
 
-  .sportsbook-columns,
-  .sportsbook-row {
+  .predictions-columns,
+  .predictions-row {
     grid-template-columns: minmax(0, 1fr) 105px;
     gap: 5px;
     padding-inline: 7px;
   }
 
-  .sportsbook-team {
+  .predictions-team {
     grid-template-columns: 34px minmax(0, 1fr);
     gap: 5px;
   }
 
-  .sportsbook-team small {
+  .predictions-team small {
     display: none;
   }
 
-  .sportsbook-row > button {
+  .predictions-row > button {
     flex-direction: column;
     gap: 1px;
     min-height: 44px;
@@ -1976,7 +1977,7 @@ textarea:focus {
   background: var(--surface, white);
 }
 
-.match-history article.g3-match {
+.match-history article.team-match {
   border-color: rgba(167, 20, 51, 0.55);
   box-shadow: inset 4px 0 #a71433;
 }
@@ -4803,7 +4804,7 @@ textarea::placeholder {
 /* Match the G3 Shop application */
 :root {
   color: #0c0c0c;
-  background: #f4f6f7;
+  background: var(--g3-page);
   --panel: #fefefe;
   --panel-2: #eef1f3;
   --line: rgba(121, 138, 146, 0.3);
@@ -4815,7 +4816,7 @@ textarea::placeholder {
 
 body {
   color: #0c0c0c;
-  background: #f4f6f7;
+  background: var(--g3-page);
 }
 
 aside {
@@ -4902,7 +4903,7 @@ aside nav button.active {
 .app-shell > main {
   min-height: calc(100vh - 56px);
   margin: 0;
-  background: #f4f6f7;
+  background: var(--g3-page);
 }
 
 .page {
@@ -5134,7 +5135,7 @@ textarea:focus {
 
 .auth-screen {
   color: #0c0c0c;
-  background: #f4f6f7;
+  background: var(--g3-page);
 }
 
 .auth-screen p {
@@ -5193,7 +5194,7 @@ textarea:focus {
   --panel-2: #454545;
   --line: #5a5a5a;
   --muted: #c0c0c0;
-  --coral: #a32035;
+  --coral: var(--color-primary-500, #a32035);
   --blue: #c85a6b;
   --mint: #e8a5af;
   background: #1a1a1a;
@@ -5273,7 +5274,7 @@ aside {
   --panel-2: #454545;
   --line: #5a5a5a;
   --muted: #c0c0c0;
-  --coral: #a32035;
+  --coral: var(--color-primary-500, #a32035);
   --blue: #c85a6b;
   --mint: #e8a5af;
   background: #1a1a1a;
@@ -5377,7 +5378,7 @@ aside nav button.active svg {
   width: 30px;
   height: 30px;
   color: white;
-  background: #a32035;
+  background: var(--color-primary-500, #a32035);
 }
 
 .user-card small {
@@ -5409,7 +5410,7 @@ aside nav button.active svg {
 
 .primary-button,
 .auth-screen a {
-  background: #a32035;
+  background: var(--color-primary-500, #a32035);
 }
 
 .primary-button:hover,
@@ -5544,7 +5545,7 @@ textarea:focus {
 }
 
 .auth-mark {
-  background: #a32035;
+  background: var(--color-primary-500, #a32035);
   box-shadow: none;
 }
 
@@ -5605,7 +5606,7 @@ textarea:focus {
 /* Final Shop parity overrides */
 :root {
   color: #0c0c0c;
-  background: #f4f6f7;
+  background: var(--g3-page);
   --panel: #fefefe;
   --panel-2: #eef1f3;
   --line: rgba(121, 138, 146, 0.3);
@@ -5616,7 +5617,7 @@ textarea:focus {
 body,
 .app-shell > main {
   color: #0c0c0c;
-  background: #f4f6f7;
+  background: var(--g3-page);
 }
 
 .app-shell aside {
@@ -5850,7 +5851,7 @@ textarea {
 
 .auth-screen {
   color: #0c0c0c;
-  background: #f4f6f7;
+  background: var(--g3-page);
 }
 
 @media (max-width: 760px) {
@@ -5956,7 +5957,7 @@ textarea {
 html[data-theme="dark"] {
   color-scheme: dark;
   color: #f4f4f5;
-  background: #171717;
+  background: var(--g3-page);
   --panel: #262626;
   --panel-2: #303030;
   --line: #454545;
@@ -5967,7 +5968,7 @@ html[data-theme="dark"] body,
 html[data-theme="dark"] .app-shell > main,
 html[data-theme="dark"] .auth-screen {
   color: #f4f4f5;
-  background: #171717;
+  background: var(--g3-page);
 }
 
 html[data-theme="dark"] .app-shell aside,
@@ -6558,14 +6559,14 @@ body.scouting-workspace-open {
     max(32px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left));
   overflow-y: auto;
   overscroll-behavior: contain;
-  background: #f4f6f7;
+  background: var(--g3-page);
 }
 
 html[data-theme="dark"] .app-shell .page.scouting-forms-fullscreen {
   width: 100%;
   padding: max(24px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right))
     max(32px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left));
-  background: #171717;
+  background: var(--g3-page);
 }
 
 .scouting-fullscreen-toggle {
@@ -7986,4 +7987,37 @@ html[data-theme="dark"] textarea {
   .scouting-forms-page .scouting-match-teams {
     grid-template-columns: 1fr;
   }
+}
+
+.engagement-settings {
+  margin: 24px auto;
+  padding: 24px;
+  max-width: 1100px;
+  background: var(--g3-surface);
+  border: 1px solid var(--g3-line);
+  border-radius: 12px;
+}
+.engagement-settings fieldset {
+  border: 1px solid var(--g3-line);
+  border-radius: 8px;
+  margin: 16px 0;
+  padding: 16px;
+}
+.engagement-settings label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0;
+}
+.engagement-settings input[type="text"] {
+  padding: 8px;
+  background: var(--g3-page);
+  color: var(--g3-text);
+  border: 1px solid var(--g3-line);
+  border-radius: 6px;
+  min-width: 0;
+}
+.engagement-settings p {
+  color: var(--g3-muted);
+  margin: 12px 0;
 }

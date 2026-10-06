@@ -1,7 +1,7 @@
 {
   "name": "@g3/scouting",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite --port 5182",
@@ -11,11 +11,13 @@
     "test": "exit 0"
   },
   "dependencies": {
+    "@g3/ui": "workspace:*",
     "lucide-react": "^0.468.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
+    "@g3/site-config": "workspace:*",
     "@tailwindcss/vite": "^4.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",

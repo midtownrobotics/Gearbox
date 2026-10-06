@@ -33,3 +33,18 @@ export async function deleteSession(sessionId: string, env: AppEnv["Bindings"]):
     env.SESSIONS.delete(`session:${sessionId}:meta`),
   ]);
 }
+
+/** Whether the session was made by PIN sign-in on a kiosk (recorded in its KV metadata). */
+export async function isPinSession(
+  sessionId: string | undefined,
+  env: AppEnv["Bindings"],
+): Promise<boolean> {
+  if (!sessionId) return false;
+  const meta = await env.SESSIONS.get(`session:${sessionId}:meta`);
+  if (!meta) return false;
+  try {
+    return (JSON.parse(meta) as { sessionType?: string }).sessionType === "pin";
+  } catch {
+    return false;
+  }
+}

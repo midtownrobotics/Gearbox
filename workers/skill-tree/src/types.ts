@@ -1,16 +1,10 @@
+import type { G3AuthVariables } from "@g3/auth";
+
 export type AppEnv = {
   Bindings: {
     FRONTEND_URL: string;
-    SESSIONS: KVNamespace;
     SKILL_DB: D1Database;
     G3ID: Fetcher;
   };
-  Variables: {
-    userId: string;
-    userDisplayName: string;
-    userIsAdmin: boolean;
-    userIsMentor: boolean;
-    userEmail: string;
-    sessionType: "oauth" | "pin";
-  };
+  Variables: G3AuthVariables;
 };

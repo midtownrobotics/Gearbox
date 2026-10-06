@@ -64,7 +64,7 @@ export function AdminPage() {
 
   if (authLoading || loading) {
     return (
-      <main className="min-h-screen bg-gray-100 flex items-center justify-center">
+      <main className="min-h-screen bg-page flex items-center justify-center">
         <p className="text-gray-600">Loading…</p>
       </main>
     );
@@ -72,7 +72,7 @@ export function AdminPage() {
 
   if (!isAdmin) {
     return (
-      <main className="min-h-screen bg-gray-100 flex flex-col items-center justify-center gap-2">
+      <main className="min-h-screen bg-page flex flex-col items-center justify-center gap-2">
         <p className="text-gray-700 text-lg font-semibold">Access denied</p>
         <p className="text-gray-600 text-sm">You must be an admin to view this page.</p>
       </main>
@@ -80,7 +80,7 @@ export function AdminPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-100 text-gray-900">
+    <main className="min-h-screen bg-page text-gray-900">
       <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
         <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
 

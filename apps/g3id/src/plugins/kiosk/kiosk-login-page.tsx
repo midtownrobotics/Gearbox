@@ -92,24 +92,24 @@ export function KioskLoginPage() {
   }
 
   return (
-    <div className="flex-1 bg-secondary-900 flex items-start justify-center px-4 pt-8">
+    <div className="flex-1 bg-secondary-50 flex items-start justify-center px-4 pt-8">
       <div className="w-full max-w-xs space-y-3">
         <div className="text-center mb-2">
-          <h1 className="text-3xl font-bold text-white">Enter PIN</h1>
+          <h1 className="text-3xl font-bold text-secondary-900">Enter PIN</h1>
         </div>
 
         <div className="flex justify-center gap-3">
           {[0, 1, 2].map((i) => (
             <div
               key={i}
-              className="w-16 h-16 rounded-lg bg-secondary-700 border-2 border-gray-600 flex items-center justify-center"
+              className="w-16 h-16 rounded-lg bg-white border-2 border-secondary-300 flex items-center justify-center"
             >
-              <span className="text-3xl font-bold text-white">{pin[i] ? "●" : "○"}</span>
+              <span className="text-3xl font-bold text-secondary-900">{pin[i] ? "●" : "○"}</span>
             </div>
           ))}
         </div>
 
-        {error && <p className="text-primary-400 text-center text-sm font-medium">{error}</p>}
+        {error && <p className="text-primary-500 text-center text-sm font-medium">{error}</p>}
 
         <div className="grid grid-cols-3 gap-2">
           {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
@@ -118,7 +118,7 @@ export function KioskLoginPage() {
               type="button"
               onClick={() => addDigit(num.toString())}
               disabled={loading || pin.length >= 3}
-              className="h-16 rounded-lg bg-secondary-700 hover:bg-secondary-600 disabled:opacity-50 border border-gray-600 text-white text-2xl font-bold transition-colors active:bg-gray-700"
+              className="h-16 rounded-lg bg-white hover:bg-secondary-50 disabled:opacity-50 border border-secondary-300 text-secondary-900 text-2xl font-bold transition-colors active:bg-secondary-100"
             >
               {num}
             </button>
@@ -128,7 +128,7 @@ export function KioskLoginPage() {
             type="button"
             onClick={() => addDigit("0")}
             disabled={loading || pin.length >= 3}
-            className="col-span-3 h-14 rounded-lg bg-secondary-700 hover:bg-secondary-600 disabled:opacity-50 border border-gray-600 text-white text-xl font-bold transition-colors active:bg-gray-700"
+            className="col-span-3 h-14 rounded-lg bg-white hover:bg-secondary-50 disabled:opacity-50 border border-secondary-300 text-secondary-900 text-xl font-bold transition-colors active:bg-secondary-100"
           >
             0
           </button>
@@ -138,14 +138,14 @@ export function KioskLoginPage() {
           type="button"
           onClick={removeDigit}
           disabled={loading || pin.length === 0}
-          className="w-full h-12 rounded-lg bg-gray-700 hover:bg-gray-600 disabled:opacity-50 border border-gray-600 text-white text-sm font-semibold transition-colors active:bg-gray-600"
+          className="w-full h-12 rounded-lg bg-white hover:bg-secondary-50 disabled:opacity-50 border border-secondary-300 text-secondary-900 text-sm font-semibold transition-colors active:bg-secondary-100"
         >
           Clear
         </button>
 
         <Link
           to="/kiosk/remove"
-          className="block text-center text-xs text-secondary-400 hover:text-secondary-300 transition-colors mt-2"
+          className="block text-center text-xs text-secondary-400 hover:text-secondary-800 transition-colors mt-2"
         >
           Remove Device
         </Link>

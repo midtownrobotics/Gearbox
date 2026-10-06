@@ -1,0 +1,372 @@
+@import "./colors.css";
+
+/* The shared top bar (components/app-nav-bar.tsx), from G3 Strategy's. Plain CSS so it renders
+   the same in every app, Tailwind or not. */
+
+.g3-nav,
+.g3-nav-drawer {
+  --g3-nav-bg: var(--g3-surface);
+  --g3-nav-line: var(--g3-line);
+  --g3-nav-text: #57646c;
+  --g3-nav-strong: #0c0c0c;
+  --g3-nav-accent: var(--g3-accent);
+  --g3-nav-control: var(--g3-surface);
+  --g3-nav-control-line: rgba(121, 138, 146, 0.35);
+  --g3-nav-muted: #8a979d;
+  font-family: "Ubuntu", sans-serif;
+}
+
+html[data-theme="dark"] .g3-nav,
+html[data-theme="dark"] .g3-nav-drawer {
+  --g3-nav-text: #c4c4c4;
+  --g3-nav-strong: #ffffff;
+  --g3-nav-control: #303030;
+  --g3-nav-control-line: #555555;
+  --g3-nav-muted: #8a8a8a;
+}
+
+.g3-nav {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  height: 56px;
+  padding: 0 24px;
+  gap: 28px;
+  border-bottom: 1px solid var(--g3-nav-line);
+  background: var(--g3-nav-bg);
+  color: var(--g3-nav-text);
+}
+
+.g3-nav-brand {
+  flex-shrink: 0;
+  display: flex;
+}
+
+.g3-nav .g3-nav-wordmark,
+.g3-nav-drawer .g3-nav-wordmark {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--g3-nav-accent);
+  font-family: "Agency FB", "Agency", sans-serif;
+  font-size: 26px;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.g3-nav-icon {
+  display: block;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+}
+
+.g3-nav-links {
+  display: flex;
+  flex: 1;
+  align-self: stretch;
+  align-items: stretch;
+  min-width: 0;
+  gap: 28px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.g3-nav-group {
+  display: flex;
+  align-items: stretch;
+  gap: 28px;
+}
+
+/* A thin divider between groups. */
+.g3-nav-group + .g3-nav-group {
+  position: relative;
+  padding-left: 28px;
+}
+
+.g3-nav-group + .g3-nav-group::before {
+  content: "";
+  position: absolute;
+  top: 18px;
+  bottom: 18px;
+  left: 0;
+  width: 1px;
+  background: var(--g3-nav-line);
+}
+
+.g3-nav-group-name {
+  align-self: center;
+  color: var(--g3-nav-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.g3-nav-item {
+  display: flex;
+}
+
+.g3-nav .g3-nav-link,
+.g3-nav-drawer .g3-nav-link {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--g3-nav-text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 120ms;
+}
+
+.g3-nav .g3-nav-link:hover,
+.g3-nav-drawer .g3-nav-link:hover {
+  color: var(--g3-nav-strong);
+}
+
+.g3-nav .g3-nav-link.is-active,
+.g3-nav-drawer .g3-nav-link.is-active {
+  color: var(--g3-nav-accent);
+}
+
+.g3-nav .g3-nav-link.is-active::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  background: var(--g3-nav-accent);
+}
+
+.g3-nav-end {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 16px;
+  margin-left: auto;
+}
+
+.g3-nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.g3-nav .g3-nav-theme,
+.g3-nav-drawer .g3-nav-theme {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  padding: 9px 12px;
+  border: 1px solid var(--g3-nav-control-line);
+  border-radius: 8px;
+  background: var(--g3-nav-control);
+  color: var(--g3-nav-text);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.g3-nav .g3-nav-theme:hover,
+.g3-nav-drawer .g3-nav-theme:hover {
+  color: var(--g3-nav-strong);
+}
+
+/* Group names need room; below this the dividers alone separate the groups. */
+@media (max-width: 1439px) {
+  .g3-nav .g3-nav-group-name {
+    display: none;
+  }
+}
+
+/* With many pages, the switch shrinks to its icon until there's room for the words. */
+@media (max-width: 1279px) {
+  .g3-nav .g3-nav-theme:not(.is-labelled) .g3-nav-theme-label {
+    display: none;
+  }
+  .g3-nav .g3-nav-theme:not(.is-labelled) {
+    padding: 8px;
+  }
+}
+
+/* All Apps, and text links apps put in the bar's actions (the user's name, Log in). */
+.g3-nav .g3-nav-all-apps,
+.g3-nav-drawer .g3-nav-all-apps,
+.g3-nav .g3-nav-text-link,
+.g3-nav-drawer .g3-nav-text-link {
+  color: var(--g3-nav-text);
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.g3-nav .g3-nav-all-apps:hover,
+.g3-nav-drawer .g3-nav-all-apps:hover,
+.g3-nav .g3-nav-text-link:hover,
+.g3-nav-drawer .g3-nav-text-link:hover {
+  color: var(--g3-nav-strong);
+}
+
+.g3-nav .g3-nav-menu,
+.g3-nav-drawer .g3-nav-menu {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 6px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--g3-nav-strong);
+  cursor: pointer;
+}
+
+/* Drawer (phones). */
+.g3-nav-drawer {
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: 70;
+  display: flex;
+  flex-direction: column;
+  width: 260px;
+  max-width: 85vw;
+  border-right: 1px solid var(--g3-nav-line);
+  background: var(--g3-nav-bg);
+  color: var(--g3-nav-text);
+  transform: translateX(-100%);
+  transition: transform 200ms ease;
+  visibility: hidden;
+}
+
+.g3-nav-drawer.is-open {
+  transform: translateX(0);
+  visibility: visible;
+}
+
+.g3-nav-drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 12px 16px 20px;
+  border-bottom: 1px solid var(--g3-nav-line);
+}
+
+.g3-nav-drawer .g3-nav-drawer-head .g3-nav-menu {
+  display: flex;
+}
+
+.g3-nav-drawer-links {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.g3-nav-drawer-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Groups are separated by a line, like the dividers in the bar. */
+.g3-nav-drawer-group + .g3-nav-drawer-group {
+  padding-top: 16px;
+  border-top: 1px solid var(--g3-nav-line);
+}
+
+.g3-nav-drawer .g3-nav-item {
+  display: block;
+}
+
+.g3-nav-drawer .g3-nav-link {
+  width: 100%;
+  height: 44px;
+  padding: 0 8px;
+  border-radius: 8px;
+}
+
+.g3-nav-drawer .g3-nav-link.is-active::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--g3-nav-accent);
+  transform: translateY(-50%);
+}
+
+.g3-nav-drawer-foot {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 16px 20px 24px;
+  border-top: 1px solid var(--g3-nav-line);
+}
+
+.g3-nav-version {
+  color: var(--g3-nav-muted);
+  font-size: 12px;
+}
+
+.g3-nav-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: rgba(0, 0, 0, 0.4);
+  cursor: default;
+}
+
+@media (max-width: 767px) {
+  .g3-nav {
+    gap: 8px;
+    padding: 0 12px;
+  }
+  .g3-nav .g3-nav-menu {
+    display: flex;
+  }
+  .g3-nav-links,
+  .g3-nav:not(.is-flat) .g3-nav-end {
+    display: none;
+  }
+  .g3-nav.is-flat .g3-nav-end {
+    gap: 12px;
+  }
+}
+
+@media (min-width: 768px) {
+  .g3-nav-drawer,
+  .g3-nav-scrim {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .g3-nav-drawer {
+    transition: none;
+  }
+}

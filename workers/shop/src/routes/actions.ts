@@ -1,8 +1,8 @@
+import { requireAuth } from "@g3/auth";
 import { desc } from "drizzle-orm";
 import { Hono } from "hono";
 import { createShopDb } from "../db";
 import { actions } from "../db/schema";
-import { requireAuth } from "../middleware/auth";
 import type { AppEnv } from "../types";
 
 export const actionsRouter = new Hono<AppEnv>().get("/", requireAuth, async (c) => {

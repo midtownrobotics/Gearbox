@@ -1,5 +1,4 @@
 import { type WorkerClient, desiredVersion } from "../../core/worker-client";
-import { WAN_KEY } from "./deltas";
 import type { SiteStore } from "./site-store";
 import type { UsageStore } from "./store";
 
@@ -65,7 +64,8 @@ export class Pusher {
     for (;;) {
       const rows = this.store.unsent(BATCH_SIZE);
       if (rows.length === 0) return;
-      const macs = [...new Set(rows.map((r) => r.mac))].filter((m) => m !== WAN_KEY);
+      // "_wan", "_lookup", ...: pseudo-clients with no lease info.
+      const macs = [...new Set(rows.map((r) => r.mac))].filter((m) => !m.startsWith("_"));
       const res = await this.worker.agent.network.usage.$post({
         json: {
           samples: rows.map((r) => [r.ts, r.mac, r.dl, r.ul]),

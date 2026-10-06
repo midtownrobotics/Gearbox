@@ -8,13 +8,13 @@ export function OAuthErrorPage() {
     <main className="flex-1 flex items-center justify-center px-4">
       <div className="w-full max-w-sm space-y-6 text-center">
         <div>
-          <h1 className="text-3xl font-bold text-white">Sign-in failed</h1>
-          <p className="mt-2 text-secondary-200 text-sm">{error}</p>
+          <h1 className="text-3xl font-bold text-secondary-900">Sign-in failed</h1>
+          <p className="mt-2 text-secondary-600 text-sm">{error}</p>
         </div>
 
         <Link
           to="/login"
-          className="block text-sm text-primary-400 hover:text-primary-300 transition-colors"
+          className="block text-sm text-primary-500 hover:text-primary-600 transition-colors"
         >
           ← Back to sign in
         </Link>

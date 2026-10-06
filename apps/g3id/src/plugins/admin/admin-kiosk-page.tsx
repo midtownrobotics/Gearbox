@@ -1,6 +1,5 @@
 import { Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import { api } from "../../lib/api";
 
 type ActivationCode = {
@@ -95,35 +94,19 @@ export function AdminKioskPage() {
 
   return (
     <main className="flex-1 px-6 py-8 max-w-2xl mx-auto w-full">
-      <div className="mb-6 flex gap-4 border-b border-secondary-600">
-        <Link
-          to="/admin/users"
-          className="py-2 px-4 text-secondary-200 hover:text-white transition-colors"
-        >
-          Users
-        </Link>
-        <Link
-          to="/admin/kiosk"
-          className="py-2 px-4 text-white font-medium border-b-2 border-primary-400"
-        >
-          Kiosk Devices
-        </Link>
-        <Link
-          to="/admin/attendance"
-          className="py-2 px-4 text-secondary-200 hover:text-white transition-colors"
-        >
-          Attendance Summary
-        </Link>
-      </div>
-
-      <h1 className="text-3xl font-bold text-white mb-8">Kiosk Management</h1>
+      <h1 className="text-3xl font-bold text-secondary-900 mb-8">Kiosk Management</h1>
 
       <div className="space-y-8">
-        <div className="bg-secondary-700 border border-secondary-600 rounded-lg p-6">
-          <h2 className="text-xl font-semibold text-white mb-4">Generate Activation Code</h2>
+        <div className="bg-white border border-secondary-200 rounded-lg p-6">
+          <h2 className="text-xl font-semibold text-secondary-900 mb-4">
+            Generate Activation Code
+          </h2>
           <form onSubmit={handleGenerateCode} className="space-y-4">
             <div>
-              <label htmlFor="device-name" className="block text-sm font-medium text-gray-200 mb-2">
+              <label
+                htmlFor="device-name"
+                className="block text-sm font-medium text-secondary-700 mb-2"
+              >
                 Device Name
               </label>
               <input
@@ -132,7 +115,7 @@ export function AdminKioskPage() {
                 placeholder="e.g., Shop Register 1"
                 value={deviceName}
                 onChange={(e) => setDeviceName(e.target.value)}
-                className="w-full px-4 py-2 rounded-lg bg-gray-700 border border-gray-600 text-white placeholder-gray-500 focus:outline-none focus:border-primary-400"
+                className="w-full px-4 py-2 rounded-lg bg-white border border-secondary-300 text-secondary-900 placeholder-secondary-400 focus:outline-none focus:border-primary-500"
               />
             </div>
 
@@ -145,25 +128,25 @@ export function AdminKioskPage() {
             </button>
           </form>
 
-          {codeError && <p className="mt-3 text-sm text-primary-400">{codeError}</p>}
+          {codeError && <p className="mt-3 text-sm text-primary-500">{codeError}</p>}
 
           {code && (
-            <div className="mt-6 bg-gray-700 border border-gray-600 rounded-lg p-4 space-y-3">
+            <div className="mt-6 bg-white border border-secondary-300 rounded-lg p-4 space-y-3">
               <div>
-                <p className="text-xs text-secondary-200 mb-1">
+                <p className="text-xs text-secondary-600 mb-1">
                   Activation Code (expires in 30 min)
                 </p>
-                <p className="text-3xl font-mono font-bold text-primary-400 tracking-widest text-center">
+                <p className="text-3xl font-mono font-bold text-primary-500 tracking-widest text-center">
                   {code.code}
                 </p>
               </div>
-              <p className="text-xs text-secondary-200 text-center">
+              <p className="text-xs text-secondary-600 text-center">
                 Expires: {new Date(code.expiresAt * 1000).toLocaleString()}
               </p>
               <button
                 type="button"
                 onClick={() => setCode(null)}
-                className="w-full py-2 text-sm text-gray-200 hover:text-white transition-colors"
+                className="w-full py-2 text-sm text-secondary-700 hover:text-secondary-900 transition-colors"
               >
                 Generate Another Code
               </button>
@@ -171,34 +154,34 @@ export function AdminKioskPage() {
           )}
         </div>
 
-        <div className="bg-secondary-700 border border-secondary-600 rounded-lg p-6">
-          <h2 className="text-xl font-semibold text-white mb-4">Active Devices</h2>
+        <div className="bg-white border border-secondary-200 rounded-lg p-6">
+          <h2 className="text-xl font-semibold text-secondary-900 mb-4">Active Devices</h2>
 
-          {devicesError && <p className="text-sm text-primary-400 mb-4">{devicesError}</p>}
+          {devicesError && <p className="text-sm text-primary-500 mb-4">{devicesError}</p>}
 
           {devicesLoading ? (
-            <p className="text-secondary-200 text-sm">Loading devices...</p>
+            <p className="text-secondary-600 text-sm">Loading devices...</p>
           ) : devices.length === 0 ? (
-            <p className="text-secondary-200 text-sm">No devices registered yet</p>
+            <p className="text-secondary-600 text-sm">No devices registered yet</p>
           ) : (
             <div className="space-y-3">
               {devices.map((device) => (
                 <div
                   key={device.id}
-                  className="bg-gray-700 border border-gray-600 rounded-lg p-4 flex items-center justify-between"
+                  className="bg-white border border-secondary-300 rounded-lg p-4 flex items-center justify-between"
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-white">{device.name}</p>
-                    <p className="text-xs text-secondary-200 mt-1">
+                    <p className="font-semibold text-secondary-900">{device.name}</p>
+                    <p className="text-xs text-secondary-600 mt-1">
                       Created {new Date(device.createdAt * 1000).toLocaleDateString()}
                     </p>
                     {device.lastUsedAt && (
-                      <p className="text-xs text-secondary-200">
+                      <p className="text-xs text-secondary-600">
                         Last used {new Date(device.lastUsedAt * 1000).toLocaleString()}
                       </p>
                     )}
                     {device.revokedAt && (
-                      <p className="text-xs text-primary-400 font-medium">
+                      <p className="text-xs text-primary-500 font-medium">
                         Revoked {new Date(device.revokedAt * 1000).toLocaleString()}
                       </p>
                     )}

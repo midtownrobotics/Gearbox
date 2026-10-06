@@ -1,10 +1,12 @@
 import type { MessageBatch } from "@cloudflare/workers-types";
-import { sendMessage } from "@g3/slack";
+import { requireAuth } from "@g3/auth";
+import { corsOrigin } from "@g3/site-config";
+import { withApiPrefix } from "@g3/site-config/worker";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import packageJson from "../package.json";
 import { createShopDb } from "./db";
 import { type BOMQueueMessage, processBOMQueue } from "./lib/bom-queue-consumer";
-import { requireAuth } from "./middleware/auth";
 import { actionsRouter } from "./routes/actions";
 import { adminPartsRouter } from "./routes/admin-parts";
 import { drawingsRouter } from "./routes/drawings";
@@ -32,13 +34,7 @@ base.onError((err, c) => {
 base.use(
   "*",
   cors({
-    origin: (origin) => {
-      if (!origin) return null;
-      if (origin === "https://g3robotics.com") return origin;
-      if (origin.endsWith(".g3robotics.com")) return origin;
-      if (origin.startsWith("http://localhost:")) return origin;
-      return null;
-    },
+    origin: corsOrigin,
     allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowHeaders: ["Content-Type", "Authorization"],
     credentials: true,
@@ -46,7 +42,7 @@ base.use(
 );
 
 const app = base
-  .get("/health", (c) => c.json({ status: "ok", service: "shop", version: "v1.2.3" }))
+  .get("/health", (c) => c.json({ status: "ok", service: "shop", version: packageJson.version }))
   .get("/me", requireAuth, (c) =>
     c.json({
       userId: c.get("userId"),
@@ -70,7 +66,7 @@ const app = base
       await clearPresence(createShopDb(c.env.SHOP_DB), kioskDeviceId);
     }
     const res = await c.env.G3ID.fetch(
-      new Request("http://g3id/auth/logout", {
+      new Request("http://g3id/api/auth/logout", {
         method: "POST",
         headers: { cookie: c.req.header("Cookie") ?? "" },
       }),
@@ -84,7 +80,7 @@ const app = base
   .get("/users", requireAuth, async (c) => {
     const ids = c.req.query("ids") ?? "";
     const res = await c.env.G3ID.fetch(
-      new Request(`http://g3id/auth/users?ids=${encodeURIComponent(ids)}`, {
+      new Request(`http://g3id/api/auth/users?ids=${encodeURIComponent(ids)}`, {
         headers: { cookie: c.req.header("Cookie") ?? "" },
       }),
     );
@@ -101,16 +97,12 @@ const app = base
   .route("/staging-batches", stagingBatchesRouter)
   .route("/actions", actionsRouter)
   .route("/kiosk-presence", kioskPresenceRouter)
-  .route("/admin", adminPartsRouter)
-  .get("/slack-test", async (c) => {
-    c.executionCtx.waitUntil(sendMessage("C09QYMTSGKT", "test but now from shop sw worker", c.env));
-    return c.text("200", 200);
-  });
+  .route("/admin", adminPartsRouter);
 
 export type ShopApp = typeof app;
 
 export default {
-  fetch: app.fetch,
+  fetch: withApiPrefix(app.fetch),
   async queue(batch: MessageBatch<BOMQueueMessage>, env: AppEnv["Bindings"]) {
     for (const msg of batch.messages) {
       try {

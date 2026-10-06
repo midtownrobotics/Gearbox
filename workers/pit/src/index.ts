@@ -1,10 +1,13 @@
+import { requireAdmin, requireAuth } from "@g3/auth";
+import { corsOrigin } from "@g3/site-config";
+import { withApiPrefix } from "@g3/site-config/worker";
 import { eq, inArray, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { validator } from "hono/validator";
+import packageJson from "../package.json";
 import { createDb } from "./db";
 import { batteries, checklistIssues, checklistItems, checklistLists, settings } from "./db/schema";
-import { requireAdmin, requireAuth } from "./middleware/auth";
 import type { AppEnv } from "./types";
 
 const base = new Hono<AppEnv>();
@@ -18,13 +21,7 @@ base.onError((err, c) => {
 base.use(
   "*",
   cors({
-    origin: (origin) => {
-      if (!origin) return null;
-      if (origin === "https://g3robotics.com") return origin;
-      if (origin.endsWith(".g3robotics.com")) return origin;
-      if (origin.startsWith("http://localhost:")) return origin;
-      return null;
-    },
+    origin: corsOrigin,
     allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allowHeaders: ["Content-Type", "Authorization"],
     credentials: true,
@@ -186,7 +183,7 @@ const listSelect = {
 };
 
 const app = base
-  .get("/health", (c) => c.json({ status: "ok", service: "pit" }))
+  .get("/health", (c) => c.json({ status: "ok", service: "pit", version: packageJson.version }))
 
   .get("/me", requireAuth, (c) =>
     c.json({
@@ -801,4 +798,4 @@ const app = base
   });
 
 export type PitApp = typeof app;
-export default app;
+export default { fetch: withApiPrefix(app.fetch) };

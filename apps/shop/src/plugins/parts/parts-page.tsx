@@ -101,7 +101,7 @@ export function PartsPage() {
       : null;
 
   return (
-    <main className="min-h-screen bg-mist">
+    <main className="min-h-screen bg-page">
       <div className="max-w-5xl mx-auto px-6 py-8 space-y-8">
         <div className="flex items-center justify-between gap-3">
           <h1 className="font-display text-4xl text-ink">Parts</h1>

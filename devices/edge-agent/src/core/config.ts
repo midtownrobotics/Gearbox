@@ -1,5 +1,5 @@
 export interface AgentConfig {
-  /** Base URL of workers/edge, e.g. https://api.edge.g3robotics.com */
+  /** Base URL of workers/edge's API, e.g. https://edge.<domain>/api */
   workerUrl: string;
   /** Shared key; must match EDGE_AGENT_KEY on the worker. */
   agentKey: string;
@@ -22,6 +22,9 @@ export interface AgentConfig {
   /** Where the shop drive's web page listens: the box's LAN address only (never the tunnel). */
   driveHost: string;
   drivePort: number;
+  /** DigiKey API app for part lookup; optional (DigiKey links fail without it). */
+  digikeyClientId?: string;
+  digikeyClientSecret?: string;
   /** Polling/debounce settings for the closed-to-ground door microswitch. */
   switchPollMilliseconds: number;
   switchDebounceMilliseconds: number;
@@ -68,6 +71,8 @@ export function loadConfig(): AgentConfig {
     driveDir: process.env.EDGE_DRIVE_DIR ?? "/srv/g3-drive",
     driveHost: process.env.EDGE_DRIVE_HOST ?? "192.168.50.1",
     drivePort: int("EDGE_DRIVE_PORT", 80),
+    digikeyClientId: process.env.EDGE_DIGIKEY_CLIENT_ID || undefined,
+    digikeyClientSecret: process.env.EDGE_DIGIKEY_CLIENT_SECRET || undefined,
     switchPollMilliseconds: int("EDGE_SWITCH_POLL_MS", 25),
     switchDebounceMilliseconds: int("EDGE_SWITCH_DEBOUNCE_MS", 75),
     switchSounds: (process.env.EDGE_SWITCH_SOUNDS ?? "/srv/g3-sounds/switch.wav")

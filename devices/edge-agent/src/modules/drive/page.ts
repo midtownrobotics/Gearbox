@@ -1,14 +1,16 @@
+import { appTitle, wordmark } from "@g3/site-config";
+
 /**
  * The shop drive's web page, served by the box itself on the LAN. Fully
  * self-contained (no fonts, scripts, or images from the internet), so opening
- * it uses no hotspot data. Colors mirror the G3 palette in packages/ui.
+ * it uses no hotspot data. Colors mirror the palette in packages/ui.
  */
 export const DRIVE_PAGE = `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>G3 Shop Drive</title>
+<title>${appTitle("Shop Drive")}</title>
 <style>
   :root {
     --primary-50: #f8e6e8; --primary-200: #e8a5af; --primary-500: #a32035; --primary-600: #8b1a2c;
@@ -45,7 +47,7 @@ export const DRIVE_PAGE = `<!doctype html>
 </style>
 </head>
 <body>
-<header><b>G3 SHOP DRIVE</b><span>Files stay on the shop network</span></header>
+<header><b>${wordmark("Shop Drive")}</b><span>Files stay on the shop network</span></header>
 <main>
   <div id="error" class="error" hidden></div>
   <section class="card">

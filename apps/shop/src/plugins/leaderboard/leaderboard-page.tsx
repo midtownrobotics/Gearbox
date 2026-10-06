@@ -35,7 +35,7 @@ export function LeaderboardPage() {
 
   if (error)
     return (
-      <main className="min-h-screen bg-mist">
+      <main className="min-h-screen bg-page">
         <div className="max-w-3xl mx-auto px-6 py-8">
           <ErrorBanner message={error} />
         </div>
@@ -44,7 +44,7 @@ export function LeaderboardPage() {
   if (!actions) return <PageLoading />;
 
   return (
-    <main className="min-h-screen bg-mist">
+    <main className="min-h-screen bg-page">
       <div className="max-w-3xl mx-auto px-6 py-8 space-y-5">
         <div>
           <h1 className="font-display text-4xl text-ink">Leaderboard</h1>

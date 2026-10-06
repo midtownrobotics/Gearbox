@@ -1,3 +1,6 @@
+import { pageTeamId, pageTeamNumber, teamKey } from "@g3/site-config";
+import { versionLabel } from "@g3/site-config/versions";
+import { AppNavBar, useTeamNames, useTeamUiSettings } from "@g3/ui";
 import {
   ArrowRight,
   Camera,
@@ -8,16 +11,13 @@ import {
   LogIn,
   Map as MapIcon,
   Maximize2,
-  Menu,
   Minimize2,
   Monitor,
-  Moon,
   Pencil,
   Plus,
   RotateCcw,
   Save,
   Search,
-  Sun,
   Target,
   Trash2,
   Upload,
@@ -33,7 +33,8 @@ import {
   useState,
 } from "react";
 import { Analysis } from "./Analysis";
-import { Sportsbook } from "./Game";
+import { type EngagementSettings, EngagementSettingsPanel } from "./EngagementSettings";
+import { MatchPredictions } from "./Game";
 import { Operations } from "./Operations";
 import { ScoutingAdminPage, ScoutingForms } from "./ScoutingForms";
 import { API_URL, G3ID_URL, api } from "./api";
@@ -49,7 +50,7 @@ import { type ParsedTrajectory, parseTrajectoryFile, trajectoryToPng } from "./t
 
 type Page =
   | "forms"
-  | "sportsbook"
+  | "predictions"
   | "admin"
   | "analysis"
   | "service"
@@ -64,6 +65,7 @@ type User = {
   isAdmin: boolean;
   isG3IdAdmin: boolean;
   isHelper: boolean;
+  engagement: EngagementSettings;
 };
 type Tier = { id: string; name: string; color: string; items: string[] };
 type TierList = {
@@ -144,11 +146,15 @@ function AnnouncementBanner() {
   );
 }
 
-function G3Logo({ size = 20, className = "" }: { size?: number; className?: string }) {
+/** The team's logo (Team Appearance); G3's own on the site team's pages, otherwise none. */
+function TeamLogo({ size = 20, className = "" }: { size?: number; className?: string }) {
+  const { logoUrl } = useTeamUiSettings();
+  const src = logoUrl || (pageTeamId === teamKey ? "/g3.png" : "");
+  if (!src) return null;
   return (
     <img
       className={`g3-icon ${className}`}
-      src="/g3.png"
+      src={src}
       alt=""
       aria-hidden="true"
       width={size}
@@ -992,6 +998,7 @@ function MapCanvas({
 }
 
 function FieldMaps({ user }: { user: User }) {
+  const names = useTeamNames();
   const [maps, setMaps] = useState<FieldMap[]>([]);
   const [editingMap, setEditingMap] = useState<FieldMap | null>(null);
   const [canShare, setCanShare] = useState(false);
@@ -1109,9 +1116,9 @@ function FieldMaps({ user }: { user: User }) {
               required
               value={publisherUserId}
               onChange={(event) => setPublisherUserId(event.target.value)}
-              aria-label="G3ID account"
+              aria-label={`${names.idName} account`}
             >
-              <option value="">Select a G3ID account</option>
+              <option value="">Select a {names.idName} account</option>
               {publisherOptions
                 .filter(
                   (account) => !publishers.some((publisher) => publisher.email === account.email),
@@ -1345,12 +1352,12 @@ function AutoLibrary() {
                 className="team-number-input"
                 inputMode="numeric"
                 pattern="[0-9]+"
-                title="Enter a team number using digits only, such as 1648."
+                title={`Enter a team number using digits only, such as ${pageTeamNumber}.`}
                 value={form.team}
                 onChange={(e) => setForm({ ...form, team: e.target.value })}
                 onInput={clearInputError}
                 onInvalid={showTeamNumberError}
-                placeholder="1648"
+                placeholder={String(pageTeamNumber)}
               />
             </label>
             <div className="wide auto-route-input">
@@ -1432,7 +1439,7 @@ function AutoLibrary() {
                 )}
                 <header>
                   <span className="auto-icon">
-                    <G3Logo size={24} />
+                    <TeamLogo size={24} />
                   </span>
                   <div>
                     <span>{auto.team ? `Team ${auto.team}` : "Unassigned team"}</span>
@@ -1812,7 +1819,7 @@ function RobotLibrary() {
                 pattern="[0-9]+"
                 value={teamName}
                 onChange={(event) => setTeamName(event.target.value)}
-                placeholder="1648"
+                placeholder={String(pageTeamNumber)}
               />
             </label>
             <label className="wide">
@@ -1952,22 +1959,22 @@ function RobotLibrary() {
 void RobotLibrary;
 
 export function App() {
+  const names = useTeamNames();
   const [page, setPage] = useState<Page>("forms");
   const [analysisReportId, setAnalysisReportId] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [theme, setTheme] = useState<"light" | "dark">("dark");
-
-  useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-  }, [theme]);
-
   useEffect(() => {
     api<User>("/me")
       .then(setUser)
       .catch(() => setUser(null))
       .finally(() => setLoading(false));
+    const refresh = () =>
+      api<User>("/me")
+        .then(setUser)
+        .catch(() => setUser(null));
+    window.addEventListener("focus", refresh);
+    return () => window.removeEventListener("focus", refresh);
   }, []);
 
   useEffect(() => {
@@ -1999,12 +2006,12 @@ export function App() {
     return (
       <div className="auth-screen">
         <div className="auth-mark">
-          <G3Logo size={38} />
+          <TeamLogo size={38} />
         </div>
-        <h1>Scouting starts with G3ID</h1>
+        <h1>Scouting starts with {names.idName}</h1>
         <p>Sign in with your team account to open shared tier lists, field maps, and autos.</p>
         <a href={`${G3ID_URL}/login?redirect=${encodeURIComponent(returnTo)}`}>
-          <LogIn size={18} /> Sign in with G3ID
+          <LogIn size={18} /> Sign in with {names.idName}
         </a>
       </div>
     );
@@ -2012,92 +2019,73 @@ export function App() {
 
   const adminNav = [
     { id: "forms" as const, label: "Scouting Forms" },
-    { id: "sportsbook" as const, label: "Sportsbook" },
+    {
+      id: "predictions" as const,
+      label: user.engagement.predictionsEnabled ? "Match Predictions" : "Scouting Points",
+    },
     { id: "admin" as const, label: "Admin" },
     { id: "analysis" as const, label: "Analysis" },
     { id: "service" as const, label: "Service Tickets" },
     { id: "other" as const, label: "Other Tools" },
   ];
-  const nav = user.isAdmin
+  const navItems = user.isAdmin
     ? adminNav
     : [
         { id: "forms" as const, label: "Scouting Forms" },
-        { id: "sportsbook" as const, label: "Sportsbook" },
+        {
+          id: "predictions" as const,
+          label: user.engagement.predictionsEnabled ? "Match Predictions" : "Scouting Points",
+        },
         ...(user.isHelper ? [{ id: "service" as const, label: "Service Tickets" }] : []),
       ];
 
+  const nav = navItems.filter((item) => item.id !== "predictions" || user.engagement.enabled);
+  const visiblePage = page === "predictions" && !user.engagement.enabled ? "forms" : page;
   return (
     <div className="app-shell">
-      <aside className={menuOpen ? "open" : ""}>
-        <div className="brand">
-          <span>
-            G3 STRATEGY
-            <small>Scouting workspace</small>
-          </span>
-          <button type="button" aria-label="Close menu" onClick={() => setMenuOpen(false)}>
-            <X size={20} />
-          </button>
-        </div>
-        <nav>
-          <span className="nav-label">Workspace</span>
-          {nav.map(({ id, label }) => (
-            <button
-              type="button"
-              key={id}
-              className={
-                page === id || (id === "other" && ["autos", "tiers", "maps"].includes(page))
-                  ? "active"
-                  : ""
-              }
-              onClick={() => {
-                setPage(id);
-                setMenuOpen(false);
-              }}
-            >
-              {label}
-              {(page === id || (id === "other" && ["autos", "tiers", "maps"].includes(page))) && (
-                <span className="active-dot" />
-              )}
-            </button>
-          ))}
-        </nav>
-        <button
-          type="button"
-          className="theme-toggle"
-          onClick={() => setTheme((current) => (current === "light" ? "dark" : "light"))}
-          aria-label={`Switch to ${theme === "light" ? "dark" : "light"} mode`}
-        >
-          {theme === "light" ? <Moon size={17} /> : <Sun size={17} />}
-          {theme === "light" ? "Dark mode" : "Light mode"}
-        </button>
-        <a className="all-apps-link" href="https://web.g3robotics.com">
-          All Apps
-        </a>
-      </aside>
-      {menuOpen && (
-        <button
-          type="button"
-          className="scrim"
-          onClick={() => setMenuOpen(false)}
-          aria-label="Close"
-        />
-      )}
+      <AppNavBar
+        title={names.wordmark("Strategy")}
+        version={versionLabel("Strategy")}
+        icon="/favicon.svg"
+        homeHref="#"
+        link={({ href, children, ...props }) => (
+          <a
+            href={href}
+            {...props}
+            onClick={(e) => {
+              e.preventDefault();
+              setPage("forms");
+              props.onClick?.();
+            }}
+          >
+            {children}
+          </a>
+        )}
+        items={nav.map(({ id, label }) => ({
+          key: id,
+          label,
+          onSelect: () => setPage(id),
+          active:
+            visiblePage === id ||
+            (id === "other" && ["autos", "tiers", "maps"].includes(visiblePage)),
+        }))}
+      />
       <main>
-        <header className="mobile-header">
-          <button type="button" onClick={() => setMenuOpen(true)} aria-label="Open menu">
-            <Menu />
-          </button>
-          <span>G3 Strategy</span>
-        </header>
         <AnnouncementBanner />
-        {page === "forms" && (
+        {visiblePage === "forms" && (
           <ScoutingForms
             isAdmin={user.isAdmin}
             canManageServiceCrew={user.isAdmin || user.isHelper}
           />
         )}
-        {page === "sportsbook" && <Sportsbook />}
-        {page === "admin" && user.isAdmin && (
+        {visiblePage === "predictions" && <MatchPredictions />}
+        {visiblePage === "admin" && user.isG3IdAdmin && (
+          <EngagementSettingsPanel
+            settings={user.engagement}
+            onSaved={(engagement) => setUser({ ...user, engagement })}
+          />
+        )}
+        {visiblePage === "admin" && user.isAdmin && (
           <ScoutingAdminPage
             isG3IdAdmin={user.isG3IdAdmin}
             onOpenSubmission={(submissionId) => {
@@ -2106,12 +2094,14 @@ export function App() {
             }}
           />
         )}
-        {page === "other" && <OtherTools go={setPage} />}
-        {page === "tiers" && <TierLists />}
-        {page === "maps" && <FieldMaps user={user} />}
-        {page === "autos" && <AutoLibrary />}
-        {page === "analysis" && user.isAdmin && <Analysis initialReportId={analysisReportId} />}
-        {page === "service" && (user.isAdmin || user.isHelper) && <Operations />}
+        {visiblePage === "other" && <OtherTools go={setPage} />}
+        {visiblePage === "tiers" && <TierLists />}
+        {visiblePage === "maps" && <FieldMaps user={user} />}
+        {visiblePage === "autos" && <AutoLibrary />}
+        {visiblePage === "analysis" && user.isAdmin && (
+          <Analysis initialReportId={analysisReportId} />
+        )}
+        {visiblePage === "service" && (user.isAdmin || user.isHelper) && <Operations />}
       </main>
     </div>
   );

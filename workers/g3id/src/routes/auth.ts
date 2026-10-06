@@ -5,7 +5,9 @@ import { createDb } from "../db";
 import { coreUserIdentities, coreUserPins, coreUsers, kioskDevices } from "../db/schema";
 import { deleteCookieOptions } from "../lib/cookie";
 import { regeneratePinForUser } from "../lib/pin";
-import { deleteSession } from "../lib/session";
+import { deleteSession, isPinSession } from "../lib/session";
+import { slackForTeam } from "../lib/slack-install";
+import { requestTeamId } from "../lib/team";
 import { requireAuth } from "../middleware/auth";
 import type { AppEnv } from "../types";
 
@@ -18,6 +20,7 @@ export const authRouter = new Hono<AppEnv>()
     const user = await db
       .select({
         id: coreUsers.id,
+        teamId: coreUsers.teamId,
         email: coreUsers.email,
         displayName: coreUsers.displayName,
         status: coreUsers.status,
@@ -118,21 +121,11 @@ export const authRouter = new Hono<AppEnv>()
     let isKiosk = false;
 
     if (sessionId) {
-      const sessionData = await c.env.SESSIONS.get(sessionId);
-      if (sessionData) {
-        try {
-          const parsed = JSON.parse(sessionData) as { sessionType?: string };
-          if (parsed.sessionType === "pin") {
-            isKiosk = true;
-          }
-        } catch {
-          // Continue with logout
-        }
-      }
+      isKiosk = await isPinSession(sessionId, c.env);
       await deleteSession(sessionId, c.env);
     }
 
-    deleteCookie(c, "g3_session", deleteCookieOptions(c.env.FRONTEND_URL));
+    deleteCookie(c, "g3_session", deleteCookieOptions(c.req.url));
     return c.json({ ok: true, isKiosk });
   })
   .get("/pin/me", requireAuth, async (c) => {
@@ -140,18 +133,8 @@ export const authRouter = new Hono<AppEnv>()
     const sessionId = getCookie(c, "g3_session");
     const db = createDb(c.env.DB);
 
-    if (sessionId) {
-      const sessionData = await c.env.SESSIONS.get(sessionId);
-      if (sessionData) {
-        try {
-          const parsed = JSON.parse(sessionData) as { sessionType?: string };
-          if (parsed.sessionType === "pin") {
-            return c.json({ error: "PIN sessions cannot view PINs." }, 403);
-          }
-        } catch {
-          // Continue
-        }
-      }
+    if (await isPinSession(sessionId, c.env)) {
+      return c.json({ error: "PIN sessions cannot view PINs." }, 403);
     }
 
     const userPin = await db
@@ -170,18 +153,8 @@ export const authRouter = new Hono<AppEnv>()
     const userId = c.get("userId") as string;
     const sessionId = getCookie(c, "g3_session");
 
-    if (sessionId) {
-      const sessionData = await c.env.SESSIONS.get(sessionId);
-      if (sessionData) {
-        try {
-          const parsed = JSON.parse(sessionData) as { sessionType?: string };
-          if (parsed.sessionType === "pin") {
-            return c.json({ error: "PIN sessions cannot regenerate PINs." }, 403);
-          }
-        } catch {
-          // Continue
-        }
-      }
+    if (await isPinSession(sessionId, c.env)) {
+      return c.json({ error: "PIN sessions cannot regenerate PINs." }, 403);
     }
 
     const newPin = await regeneratePinForUser(userId, c.env);
@@ -227,9 +200,11 @@ export const authRouter = new Hono<AppEnv>()
 
     return c.json({ ok: true });
   })
-  .get("/slack/bot", (c) => {
+  // For the Slack sign-in page's "Open Slack" button: the bot in this team's workspace.
+  .get("/slack/bot", async (c) => {
+    const teamSlack = await slackForTeam(c.env, requestTeamId(c));
     return c.json({
       appId: c.env.SLACK_APP_ID,
-      teamId: c.env.SLACK_TEAM_ID,
+      teamId: teamSlack?.workspaceId ?? null,
     });
   });

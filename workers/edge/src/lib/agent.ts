@@ -23,19 +23,23 @@ export async function agentFetch(
   env: AppEnv["Bindings"],
   path: string,
   init: RequestInit & { timeoutMs?: number } = {},
+  /** A different agent than EDGE_AGENT_URL/EDGE_AGENT_KEY (dev lookups on the real box). */
+  agent: { url?: string; key?: string } = {},
 ) {
-  if (!env.EDGE_AGENT_URL) {
+  const agentUrl = agent.url ?? env.EDGE_AGENT_URL;
+  const agentKey = agent.key ?? env.EDGE_AGENT_KEY;
+  if (!agentUrl) {
     throw new AgentError("The edge box isn't set up (the worker has no EDGE_AGENT_URL).", 503);
   }
   const { timeoutMs = 15_000, headers, ...rest } = init;
   const unreachable = "The edge box isn't reachable right now. Try again once it's back online.";
   let res: Response;
   try {
-    res = await fetch(`${env.EDGE_AGENT_URL}${path}`, {
+    res = await fetch(`${agentUrl}${path}`, {
       ...rest,
       headers: {
         ...(headers as Record<string, string>),
-        Authorization: `Bearer ${env.EDGE_AGENT_KEY}`,
+        Authorization: `Bearer ${agentKey}`,
       },
       signal: AbortSignal.timeout(timeoutMs),
     });

@@ -1,8 +1,8 @@
+import { requireAuth } from "@g3/auth";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import { Hono } from "hono";
 import * as schema from "../db/schema";
-import { requireAuth } from "../middleware/auth";
 import type { AppEnv } from "../types";
 
 export const drawingsRouter = new Hono<AppEnv>()

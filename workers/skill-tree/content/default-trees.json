@@ -1,0 +1,1978 @@
+{
+  "format": "gearbox-skill-trees",
+  "version": 1,
+  "name": "Default skill trees",
+  "trees": [
+    {
+      "key": "safety",
+      "icon": "🦺",
+      "name": "Safety",
+      "subtitle": "100% required — gates all other trees",
+      "requires": null,
+      "categories": [
+        {
+          "key": "shop",
+          "name": "Shop Safety",
+          "requires": [],
+          "skills": [
+            {
+              "key": "S1",
+              "name": "General Shop Awareness",
+              "summary": "exits, first aid, adult rule, PPE",
+              "description": "Identify emergency exits, fire extinguisher and first aid kit locations. Understand the never-work-alone rule. Know required footwear and clothing standards in the shop.",
+              "requires": []
+            },
+            {
+              "key": "S2",
+              "name": "Eye & Hearing Protection",
+              "summary": "types & when required",
+              "description": "Identify which tasks require safety glasses vs. a full face shield. Know when hearing protection is required and how to wear it correctly.",
+              "requires": ["S1"]
+            },
+            {
+              "key": "S3",
+              "name": "Hazard Recognition",
+              "summary": "spills, damaged tools, frayed wires",
+              "description": "Recognize and correctly report hazardous conditions. Know the correct escalation chain for safety issues.",
+              "requires": ["S2"]
+            }
+          ]
+        },
+        {
+          "key": "battery",
+          "name": "Battery & Electrical",
+          "requires": ["shop"],
+          "skills": [
+            {
+              "key": "S4",
+              "name": "Battery Handling",
+              "summary": "carry, connect/disconnect, storage",
+              "description": "Demonstrate correct two-handed carry with terminal protection. Safely connect and disconnect a battery using main breaker first. Know correct storage conditions.",
+              "requires": []
+            },
+            {
+              "key": "S5",
+              "name": "Battery Charging & Damage",
+              "summary": "charger type, rate, damage signs",
+              "description": "Operate an FRC battery charger correctly. Identify a damaged or swollen battery: do not charge, tag, and report to a mentor.",
+              "requires": ["S4"]
+            },
+            {
+              "key": "S6",
+              "name": "Electrical Safety",
+              "summary": "high-current, short circuit, robot rules",
+              "description": "Understand why FRC batteries are dangerous even without motor controllers. Never work on a powered robot without mentor authorization. Identify short circuit risks.",
+              "requires": ["S5"]
+            }
+          ]
+        },
+        {
+          "key": "robot",
+          "name": "Robot Operation",
+          "requires": ["battery"],
+          "skills": [
+            {
+              "key": "S7",
+              "name": "Enable/Disable Protocol",
+              "summary": "DS procedure, callout, clear-the-robot",
+              "description": "Demonstrate correct Driver Station enable/disable procedure. Practice the \"robot enabled\" callout culture. Enforce the clear-the-robot rule — everyone steps back before enable.",
+              "requires": []
+            },
+            {
+              "key": "S8",
+              "name": "E-Stop Operation",
+              "summary": "when/how, restart requirement",
+              "description": "Know when and how to trigger the emergency stop. Understand that an e-stop requires a robot restart before re-enabling.",
+              "requires": ["S7"]
+            },
+            {
+              "key": "S9",
+              "name": "Competition & Pit Safety",
+              "summary": "stands, lifting, speed, safety captain",
+              "description": "Know pit safety rules at competition. Demonstrate proper team-lift technique. Identify your team's safety captain and their role.",
+              "requires": ["S8"]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "manufacturing",
+      "icon": "🔧",
+      "name": "Manufacturing",
+      "subtitle": "Unlocks after Safety is 100% complete",
+      "requires": "safety",
+      "categories": [
+        {
+          "key": "measure",
+          "name": "Measurement & Layout",
+          "requires": [],
+          "skills": [
+            {
+              "key": "M1",
+              "name": "Digital Calipers",
+              "summary": "zero, inside/outside/depth",
+              "description": "Zero the calipers correctly. Take accurate inside, outside, and depth measurements. Read both metric and imperial scales.",
+              "requires": []
+            },
+            {
+              "key": "M2",
+              "name": "Fastener Identification",
+              "summary": "bolts, nuts, thread sizes",
+              "description": "Identify common bolt head types, nut types, and FRC thread sizes in both imperial and metric.",
+              "requires": ["M1"]
+            },
+            {
+              "key": "M3",
+              "name": "Tape Measure",
+              "summary": "read to 1/32\"",
+              "description": "Read a tape measure to 1/32\" accuracy. Understand inside vs. outside measurements and hook allowance.",
+              "requires": ["M2"]
+            },
+            {
+              "key": "M8",
+              "name": "Reading Mech. Drawings",
+              "summary": "views, dimensions, tolerances",
+              "description": "Read a multi-view mechanical drawing and identify part features from orthographic projections. Interpret dimension annotations.",
+              "requires": ["M3"]
+            }
+          ]
+        },
+        {
+          "key": "hand",
+          "name": "Hand Tools",
+          "requires": ["measure"],
+          "skills": [
+            {
+              "key": "M4",
+              "name": "Hex Keys & Allen Wrenches",
+              "summary": "sizes, technique, avoiding cam-out",
+              "description": "Select the correct hex key size. Apply torque correctly to avoid cam-out and stripped sockets.",
+              "requires": []
+            },
+            {
+              "key": "M5",
+              "name": "Combo Wrench & Socket",
+              "summary": "sizes, ratchet, extensions",
+              "description": "Select the correct wrench or socket size. Use a ratchet and extension correctly.",
+              "requires": ["M4"]
+            },
+            {
+              "key": "M6",
+              "name": "Hand Tapping",
+              "summary": "tap & die set, technique",
+              "description": "Select the correct tap for a given hole size and pitch. Use a tap wrench with cutting fluid. Recognize and avoid tap breakage.",
+              "requires": ["M5"]
+            },
+            {
+              "key": "M7",
+              "name": "Thread-Locker & Torque",
+              "summary": "Loctite grades, torque sense",
+              "description": "Apply the correct grade of thread-locker for a given application. Develop tactile sense for correct fastener torque.",
+              "requires": ["M6"]
+            }
+          ]
+        },
+        {
+          "key": "power",
+          "name": "Power Tools",
+          "requires": ["measure"],
+          "skills": [
+            {
+              "key": "M9",
+              "name": "Hand Drill",
+              "summary": "bit selection, speeds, metal",
+              "description": "Select the correct drill bit type and size. Set appropriate speed for drilling metal. Secure work before drilling.",
+              "requires": []
+            },
+            {
+              "key": "M10",
+              "name": "Drill Press",
+              "summary": "clamping, depth stop, speed",
+              "description": "Set up and clamp work on a drill press table. Set the depth stop. Select appropriate speed. Use a center punch first.",
+              "requires": ["M9"]
+            },
+            {
+              "key": "M11",
+              "name": "Bandsaw",
+              "summary": "blade, feed rate, curves",
+              "description": "Select the correct blade for the cut type. Set correct feed rate. Make straight and curved cuts safely.",
+              "requires": ["M10"]
+            },
+            {
+              "key": "M12",
+              "name": "Bench Grinder",
+              "summary": "wheel, tool rest, guarding",
+              "description": "Select the correct grinding wheel. Set the tool rest to the correct angle and gap. Use with face shield and correct body position.",
+              "requires": ["M11"]
+            }
+          ]
+        },
+        {
+          "key": "fab",
+          "name": "Fabrication",
+          "requires": ["power"],
+          "skills": [
+            {
+              "key": "M13",
+              "name": "Aluminum Stock",
+              "summary": "extrusion, plate, tube — cut & finish",
+              "description": "Identify common aluminum profiles used in FRC. Make accurate cuts with the bandsaw. Deburr and finish cut edges.",
+              "requires": []
+            },
+            {
+              "key": "M17",
+              "name": "Riveting",
+              "summary": "blind rivets, rivet nuts",
+              "description": "Select the correct blind rivet size. Use a rivet tool correctly. Install a rivet nut for threaded connections in thin material.",
+              "requires": ["M13"]
+            },
+            {
+              "key": "M18",
+              "name": "Sheet Metal Work",
+              "summary": "bending, layout, hole patterns",
+              "description": "Lay out a flat pattern for a bent part. Use a brake to make accurate bends. Drill hole patterns from a drawing.",
+              "requires": ["M17"]
+            },
+            {
+              "key": "M20",
+              "name": "Lathe",
+              "summary": "facing, turning, parting",
+              "description": "Set up a part in the lathe chuck. Perform a facing cut. Turn a shaft to a specified diameter. Part off a piece safely.",
+              "requires": ["M13"]
+            },
+            {
+              "key": "M21",
+              "name": "Mill",
+              "summary": "squaring, drilling, profiling",
+              "description": "Indicate and square stock in a milling vise. Drill and bore holes on-center. Profile edges with an end mill.",
+              "requires": ["M20"]
+            },
+            {
+              "key": "M22",
+              "name": "CNC Router / Plasma Table",
+              "summary": "setup, fixturing, toolpaths",
+              "description": "Set up and fixture material. Load and verify a toolpath file. Run a job safely and inspect the output.",
+              "requires": ["M21"]
+            }
+          ]
+        },
+        {
+          "key": "assembly",
+          "name": "Assembly",
+          "requires": ["power", "hand"],
+          "skills": [
+            {
+              "key": "M14",
+              "name": "Bearing & Shaft Assembly",
+              "summary": "press fit, retention, inspection",
+              "description": "Press a bearing into a bearing block correctly. Install a shaft and secure with appropriate retention. Inspect for smooth rotation.",
+              "requires": []
+            },
+            {
+              "key": "M15",
+              "name": "Chain & Sprocket Assembly",
+              "summary": "master links, tensioning",
+              "description": "Install a roller chain on sprockets correctly. Install and orient a master link. Set correct tension and verify alignment.",
+              "requires": ["M14"]
+            },
+            {
+              "key": "M16",
+              "name": "Belt & Pulley Assembly",
+              "summary": "HTD/GT2, tensioning",
+              "description": "Install an HTD or GT2 belt on pulleys. Set correct tension using the deflection method. Verify pulley alignment.",
+              "requires": ["M14"]
+            },
+            {
+              "key": "M23",
+              "name": "Full Robot Assembly",
+              "summary": "from drawings — convergence",
+              "description": "Assemble a complete robot mechanism from drawings without verbal instruction. Coordinate with a partner. Verify assembly against the drawing.",
+              "requires": ["M15", "M16"]
+            },
+            {
+              "key": "M24",
+              "name": "Diagnosing Mech. Failures",
+              "summary": "under competition time pressure",
+              "description": "Diagnose a mechanical failure under competition time pressure. Identify root cause vs. symptoms. Execute or direct a repair and verify.",
+              "requires": ["M23"]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "design",
+      "icon": "✏️",
+      "name": "Design & Engineering",
+      "subtitle": "Unlocks after Safety is 100% complete",
+      "requires": "safety",
+      "categories": [
+        {
+          "key": "reqs",
+          "name": "Requirements & Research",
+          "requires": [],
+          "skills": [
+            {
+              "key": "D1",
+              "name": "Identifying Key Requirements",
+              "summary": "what must a mechanism do?",
+              "description": "Articulate the functional requirements a mechanism must meet before proposing any design. Distinguish must-have from nice-to-have.",
+              "requires": []
+            },
+            {
+              "key": "D2",
+              "name": "COTS Research",
+              "summary": "REV/WCP/AM specs, CAD downloads",
+              "description": "Find and evaluate COTS parts from REV, WCP, and Andymark. Read datasheets and load CAD models into your assembly.",
+              "requires": ["D1"]
+            },
+            {
+              "key": "D3",
+              "name": "Trade-off Articulation",
+              "summary": "COTS vs. custom, comparing options",
+              "description": "Present two or more design options with explicit trade-offs (cost, weight, lead time, complexity). Articulate which is better and why.",
+              "requires": ["D2"]
+            },
+            {
+              "key": "D9",
+              "name": "Decomposing Game Challenges",
+              "summary": "into mechanism requirements",
+              "description": "Read a game manual section and decompose the challenge into a ranked list of mechanism requirements.",
+              "requires": ["D1"]
+            }
+          ]
+        },
+        {
+          "key": "proto",
+          "name": "Prototyping",
+          "requires": ["reqs"],
+          "skills": [
+            {
+              "key": "D4",
+              "name": "Sketching with Dimensions",
+              "summary": "labeled dimensions & annotations",
+              "description": "Produce a hand sketch of a mechanism idea with labeled dimensions, annotations, and a note on key constraints.",
+              "requires": []
+            },
+            {
+              "key": "D5",
+              "name": "Measuring Existing Mechanisms",
+              "summary": "recording dims accurately",
+              "description": "Measure an existing mechanism and record dimensions accurately enough to reproduce it in CAD.",
+              "requires": ["D4"]
+            },
+            {
+              "key": "D6",
+              "name": "Low-Fidelity Prototyping",
+              "summary": "wood, cardboard, 3D print",
+              "description": "Build a low-fidelity prototype of a mechanism concept using wood, cardboard, or a quick 3D print to test geometry and motion.",
+              "requires": ["D5"]
+            },
+            {
+              "key": "D7",
+              "name": "Success Criteria & Testing",
+              "summary": "defining and running a test",
+              "description": "Write a clear success criterion before running a prototype test. Record pass/fail results and what was learned.",
+              "requires": ["D6"]
+            },
+            {
+              "key": "D8",
+              "name": "Structured Design Feedback",
+              "summary": "giving & receiving",
+              "description": "Give feedback on a design that is specific, actionable, and kind. Receive feedback without defensiveness.",
+              "requires": ["D7"]
+            }
+          ]
+        },
+        {
+          "key": "cad",
+          "name": "CAD",
+          "requires": ["proto"],
+          "skills": [
+            {
+              "key": "D10",
+              "name": "Simple CAD Part",
+              "summary": "extrude, hole, fillet",
+              "description": "Create a simple single-body part in CAD using extrude, hole, and fillet operations.",
+              "requires": []
+            },
+            {
+              "key": "D11",
+              "name": "Simple CAD Assembly",
+              "summary": "import parts, mates/joints",
+              "description": "Import parts into a CAD assembly and apply mates or joints to fully constrain the model.",
+              "requires": ["D10"]
+            },
+            {
+              "key": "D12",
+              "name": "Tolerances & Fits",
+              "summary": "clearance, tapped, press/slip",
+              "description": "Apply appropriate tolerances and fits to CAD geometry: clearance holes vs. tapped holes, press fit vs. slip fit.",
+              "requires": ["D11"]
+            },
+            {
+              "key": "D13",
+              "name": "Multi-Part Mechanism in CAD",
+              "summary": "fully constrained assembly",
+              "description": "Model a multi-part mechanism in CAD with all joints fully constrained and motion properly represented.",
+              "requires": ["D12"]
+            },
+            {
+              "key": "D14",
+              "name": "Manufacturing Drawings",
+              "summary": "dims, tolerances, views",
+              "description": "Generate a manufacturing drawing from CAD with correct views, dimensions, tolerances, and a title block.",
+              "requires": ["D13"]
+            }
+          ]
+        },
+        {
+          "key": "process",
+          "name": "Design Process",
+          "requires": ["cad"],
+          "skills": [
+            {
+              "key": "D15",
+              "name": "Participating in Design Review",
+              "summary": "presenting, fielding questions",
+              "description": "Present a design in a formal review. Field technical questions and incorporate feedback into the design.",
+              "requires": []
+            },
+            {
+              "key": "D16",
+              "name": "Motor & Gearbox Selection",
+              "summary": "torque-speed, gear ratio math",
+              "description": "Use a motor torque-speed curve to select a motor and gear ratio for a given mechanism load and speed requirement.",
+              "requires": []
+            },
+            {
+              "key": "D17",
+              "name": "DFM",
+              "summary": "design for manufacturability",
+              "description": "Review a design and identify features that cannot be made with the team's available tools. Propose alternatives.",
+              "requires": ["D16"]
+            },
+            {
+              "key": "D18",
+              "name": "DFA",
+              "summary": "design for assembly",
+              "description": "Review a design for assembly sequence, fastener access, and part count. Propose simplifications.",
+              "requires": ["D17"]
+            },
+            {
+              "key": "D19",
+              "name": "Leading a Design Review",
+              "summary": "facilitating, synthesizing feedback",
+              "description": "Facilitate a design review for another student's mechanism. Synthesize feedback and help the designer prioritize changes.",
+              "requires": ["D15"]
+            },
+            {
+              "key": "D20",
+              "name": "Failure Mode Identification",
+              "summary": "what breaks, designing against it",
+              "description": "List the likely failure modes for a mechanism design and propose design changes to reduce risk.",
+              "requires": ["D19"]
+            }
+          ]
+        },
+        {
+          "key": "mastery",
+          "name": "Mastery",
+          "requires": ["process"],
+          "skills": [
+            {
+              "key": "D21",
+              "name": "Full Mechanism CAD to Release",
+              "summary": "drawings, BOM, version control",
+              "description": "Complete a full mechanism design through CAD release: drawings, BOM, and version-controlled files.",
+              "requires": []
+            },
+            {
+              "key": "D22",
+              "name": "Notebook Documentation",
+              "summary": "decisions, rationale, iteration",
+              "description": "Write a complete engineering notebook section for a mechanism covering requirements, design decisions, prototyping, and test results.",
+              "requires": ["D21"]
+            },
+            {
+              "key": "D23",
+              "name": "Mentor a Newer Student",
+              "summary": "through design-prototype-test",
+              "description": "Guide a newer student through a complete design-prototype-test cycle, adjusting your coaching style to their level.",
+              "requires": ["D22"]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "electrical",
+      "icon": "⚡",
+      "name": "Electrical",
+      "subtitle": "Unlocks after Safety is 100% complete",
+      "requires": "safety",
+      "categories": [
+        {
+          "key": "fund",
+          "name": "Fundamentals & Wire Prep",
+          "requires": [],
+          "skills": [
+            {
+              "key": "E1",
+              "name": "Basic Circuits",
+              "summary": "voltage, current, resistance, Ohm's law",
+              "description": "Explain voltage, current, and resistance. Apply Ohm's law to simple series and parallel circuits.",
+              "requires": []
+            },
+            {
+              "key": "E2",
+              "name": "Wire Identification",
+              "summary": "gauge, color conventions, stranded vs solid",
+              "description": "Identify wire gauge by sight and feel. Know FRC color conventions and when to use stranded vs. solid wire.",
+              "requires": ["E1"]
+            },
+            {
+              "key": "E3",
+              "name": "Wire Stripping",
+              "summary": "correct length, no nicks",
+              "description": "Strip wire to the correct length without nicking the conductors. Know the correct strip length for each connector type.",
+              "requires": ["E2"]
+            }
+          ]
+        },
+        {
+          "key": "crimp",
+          "name": "Crimping & Connectors",
+          "requires": ["fund"],
+          "skills": [
+            {
+              "key": "E4",
+              "name": "Anderson PowerPole Assembly",
+              "summary": "crimp, housing, polarity",
+              "description": "Crimp a PowerPole contact correctly. Assemble the housing with correct polarity. Inspect for pull-out strength.",
+              "requires": []
+            },
+            {
+              "key": "E5",
+              "name": "Molex SL Crimping",
+              "summary": "housing, pin crimp, latch",
+              "description": "Crimp a Molex SL pin correctly. Seat the pin in the housing until it latches. Inspect for correct insertion.",
+              "requires": []
+            },
+            {
+              "key": "E6",
+              "name": "DuPont (PWM) Crimping",
+              "summary": "housing, pin crimp, strain relief",
+              "description": "Crimp a DuPont pin correctly. Assemble a PWM connector with correct pin order and strain relief.",
+              "requires": []
+            },
+            {
+              "key": "E7",
+              "name": "Ring Terminals",
+              "summary": "lug size, die selection, heat shrink",
+              "description": "Select the correct ring terminal lug size. Crimp with the correct die. Apply heat shrink for strain relief.",
+              "requires": []
+            },
+            {
+              "key": "E8",
+              "name": "Ferrule Crimping",
+              "summary": "size, tool setting, inspection",
+              "description": "Select the correct ferrule size for the wire gauge. Set the crimping tool correctly. Inspect for complete crimp.",
+              "requires": []
+            },
+            {
+              "key": "E13",
+              "name": "Hydraulic Crimping",
+              "summary": "large gauge cable, die, pull test",
+              "description": "Crimp a large-gauge battery cable lug using a hydraulic crimper. Select the correct die. Perform a pull test.",
+              "requires": ["E7"]
+            }
+          ]
+        },
+        {
+          "key": "control",
+          "name": "Control System",
+          "requires": ["crimp"],
+          "skills": [
+            {
+              "key": "E9",
+              "name": "FRC Control System Overview",
+              "summary": "RoboRIO, PDP/PDH, radio, breakers",
+              "description": "Identify and explain the function of each component in the FRC control system: RoboRIO, PDP/PDH, radio, main breaker, and motor controllers.",
+              "requires": []
+            },
+            {
+              "key": "E10",
+              "name": "Main Breaker & Fuse Sizing",
+              "summary": "PDP/PDH slot ratings, breaker types",
+              "description": "Select the correct fuse or breaker for a given motor circuit. Know PDP/PDH slot current ratings.",
+              "requires": ["E9"]
+            },
+            {
+              "key": "E11",
+              "name": "Multimeter Use",
+              "summary": "voltage, continuity, resistance",
+              "description": "Use a multimeter to measure voltage, check continuity, and measure resistance. Diagnose an open or short circuit.",
+              "requires": ["E9"]
+            },
+            {
+              "key": "E12",
+              "name": "Motor Controller Wiring",
+              "summary": "Talon/Spark, power & signal leads",
+              "description": "Wire a Talon FX or SPARK MAX correctly: power leads to PDP/PDH, signal leads to RoboRIO or CAN bus. Verify polarity.",
+              "requires": ["E10"]
+            }
+          ]
+        },
+        {
+          "key": "wiring",
+          "name": "Robot Wiring",
+          "requires": ["control"],
+          "skills": [
+            {
+              "key": "E14",
+              "name": "Main Power Fasteners",
+              "summary": "battery terminals, main breaker, PDP lugs",
+              "description": "Torque battery terminal bolts, main breaker connections, and PDP/PDH lugs to spec. Know anti-arc precautions.",
+              "requires": []
+            },
+            {
+              "key": "E15",
+              "name": "CAN Bus Wiring",
+              "summary": "daisy-chain, termination, device IDs",
+              "description": "Wire a CAN bus daisy chain with correct polarity. Install termination resistors. Assign device IDs.",
+              "requires": []
+            },
+            {
+              "key": "E16",
+              "name": "PWM & Digital I/O Wiring",
+              "summary": "signal/gnd/pwr, orientation",
+              "description": "Wire a PWM or digital I/O signal correctly: signal, ground, and power in the correct orientation on the RoboRIO.",
+              "requires": []
+            },
+            {
+              "key": "E17",
+              "name": "Limit Switch Wiring",
+              "summary": "NO/NC, pull-up, mounting",
+              "description": "Wire a limit switch in NO or NC configuration. Understand pull-up resistors. Mount for reliable actuation.",
+              "requires": ["E16"]
+            },
+            {
+              "key": "E18",
+              "name": "Control System Mounting",
+              "summary": "RoboRIO, PDP/PDH, radio — standoffs, grommets",
+              "description": "Mount RoboRIO, PDP/PDH, and radio with appropriate standoffs and vibration-isolating grommets.",
+              "requires": ["E17"]
+            },
+            {
+              "key": "E19",
+              "name": "Sensor Mounting",
+              "summary": "limit switches, beam breaks — brackets, adjustability",
+              "description": "Mount sensors with brackets that allow adjustment. Ensure reliable actuation or alignment across the robot's range of motion.",
+              "requires": ["E17"]
+            },
+            {
+              "key": "E20",
+              "name": "Wiring Diagrams",
+              "summary": "symbols, wire labels, rev blocks",
+              "description": "Read and create an FRC wiring diagram using standard symbols, wire labels, and a revision block.",
+              "requires": ["E15", "E18", "E19"]
+            }
+          ]
+        },
+        {
+          "key": "docs",
+          "name": "Documentation & Troubleshooting",
+          "requires": ["wiring"],
+          "skills": [
+            {
+              "key": "E21",
+              "name": "Wiring Documentation",
+              "summary": "diagram, BOM, revision control",
+              "description": "Produce a complete wiring documentation package: diagram, wire BOM, and revision-controlled files.",
+              "requires": []
+            },
+            {
+              "key": "E22",
+              "name": "Troubleshoot with Multimeter",
+              "summary": "tracing faults, voltage drop",
+              "description": "Use a multimeter to trace a wiring fault on a live robot. Identify voltage drop across a connection.",
+              "requires": ["E21"]
+            },
+            {
+              "key": "E23",
+              "name": "Power Budget & Breaker Sizing",
+              "summary": "stall current, load analysis",
+              "description": "Build a power budget for the robot. Verify that each circuit's breaker matches the motor stall current.",
+              "requires": ["E21"]
+            },
+            {
+              "key": "E24",
+              "name": "Diagnose Brownouts & CAN Faults",
+              "summary": "under competition conditions",
+              "description": "Diagnose a brownout or CAN bus fault on a robot under competition time pressure. Identify and fix the root cause.",
+              "requires": ["E22", "E23"]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "programming",
+      "icon": "💻",
+      "name": "Programming",
+      "subtitle": "Unlocks after Safety is 100% complete",
+      "requires": "safety",
+      "categories": [
+        {
+          "key": "fund",
+          "name": "Fundamentals",
+          "requires": [],
+          "skills": [
+            {
+              "key": "P1",
+              "name": "Java Syntax Fundamentals",
+              "summary": "variables, types, control flow, methods",
+              "description": "Write Java programs using variables, primitive types, conditionals, loops, and methods.",
+              "requires": []
+            },
+            {
+              "key": "P2",
+              "name": "Object-Oriented Concepts",
+              "summary": "inheritance, interfaces, encapsulation",
+              "description": "Implement classes with inheritance and interfaces. Understand encapsulation and polymorphism.",
+              "requires": ["P1"]
+            },
+            {
+              "key": "P3",
+              "name": "Git Basics",
+              "summary": "clone, commit, push, pull, branching",
+              "description": "Clone a repo, commit changes with a useful message, push to remote, pull updates, and create a branch.",
+              "requires": ["P1"]
+            },
+            {
+              "key": "P4",
+              "name": "VS Code & WPILib Setup",
+              "summary": "extension install, project creation",
+              "description": "Install WPILib and the VS Code extension. Create a new FRC robot project and add vendordeps.",
+              "requires": ["P2"]
+            },
+            {
+              "key": "P5",
+              "name": "Deploy Code to Robot",
+              "summary": "build, deploy, DS connection, logs",
+              "description": "Build and deploy robot code successfully. Connect the Driver Station and read the RoboRIO log on a failure.",
+              "requires": ["P3", "P4"]
+            },
+            {
+              "key": "P9",
+              "name": "Git Collaboration",
+              "summary": "pull requests, merge conflicts, review",
+              "description": "Open a pull request, resolve a merge conflict, and review a teammate's code before merging.",
+              "requires": ["P3"]
+            }
+          ]
+        },
+        {
+          "key": "arch",
+          "name": "Architecture",
+          "requires": ["fund"],
+          "skills": [
+            {
+              "key": "P6",
+              "name": "Command-Based Architecture",
+              "summary": "commands, subsystems, triggers",
+              "description": "Implement a subsystem and command using the WPILib command-based framework. Wire a trigger to a command.",
+              "requires": []
+            },
+            {
+              "key": "P7",
+              "name": "Subsystem State Machines",
+              "summary": "state enums, transition methods, periodic dispatch",
+              "description": "Model a subsystem as an explicit state machine using an enum. Implement transition methods and periodic dispatch.",
+              "requires": ["P6"]
+            },
+            {
+              "key": "P8",
+              "name": "Robot Superstructure Design",
+              "summary": "cross-subsystem coordination, request-based",
+              "description": "Design a superstructure class that coordinates multiple subsystems. Compare command-group vs. state-machine approaches at the robot level.",
+              "requires": ["P7"]
+            }
+          ]
+        },
+        {
+          "key": "control",
+          "name": "Motor & Sensor Control",
+          "requires": ["arch"],
+          "skills": [
+            {
+              "key": "P10",
+              "name": "CTRE Motor Control",
+              "summary": "TalonFX config, StatusSignals",
+              "description": "Configure a TalonFX using the CTRE API. Read position and velocity via StatusSignals.",
+              "requires": []
+            },
+            {
+              "key": "P11",
+              "name": "REV Motor Control",
+              "summary": "SPARK MAX/Flex config, followers",
+              "description": "Configure a SPARK MAX or SPARK Flex using the REV API. Set up a follower motor.",
+              "requires": []
+            },
+            {
+              "key": "P12",
+              "name": "CTRE Sensor Reading",
+              "summary": "integrated encoder, Pigeon 2",
+              "description": "Read integrated encoder position and velocity from a TalonFX via StatusSignals. Read heading from a Pigeon 2.",
+              "requires": ["P10"]
+            },
+            {
+              "key": "P13",
+              "name": "REV Sensor Reading",
+              "summary": "built-in encoder, absolute encoder via SPARK",
+              "description": "Read encoder position and velocity from a SPARK MAX. Configure and read an absolute encoder through the SPARK.",
+              "requires": ["P11"]
+            },
+            {
+              "key": "P14",
+              "name": "Basic Closed-Loop Control",
+              "summary": "PID theory, tuning, feedforward",
+              "description": "Implement a PID controller on a mechanism. Tune kP, kI, kD by observation. Add a feedforward term.",
+              "requires": ["P12", "P13"]
+            },
+            {
+              "key": "P15",
+              "name": "On-Robot PID",
+              "summary": "running PID on controller hardware",
+              "description": "Configure PID running on the motor controller hardware rather than the RoboRIO. Understand the trade-offs.",
+              "requires": ["P14"]
+            },
+            {
+              "key": "P16",
+              "name": "Simulation",
+              "summary": "WPILib sim, physics sim, sim vs. real",
+              "description": "Run robot code in WPILib simulation. Implement a physics sim for a mechanism. Compare sim and real behavior.",
+              "requires": ["P14"]
+            }
+          ]
+        },
+        {
+          "key": "auto",
+          "name": "Drive & Autonomous",
+          "requires": ["control"],
+          "skills": [
+            {
+              "key": "P17",
+              "name": "Swerve Drive Fundamentals",
+              "summary": "kinematics, odometry, field-relative",
+              "description": "Implement swerve drive kinematics and odometry. Enable field-relative control using a gyro.",
+              "requires": []
+            },
+            {
+              "key": "P18",
+              "name": "Simple Autonomous",
+              "summary": "timed sequences, SendableChooser",
+              "description": "Write a simple autonomous routine using a command group. Expose multiple auto options via SendableChooser.",
+              "requires": ["P17"]
+            },
+            {
+              "key": "P19",
+              "name": "Choreo Basics",
+              "summary": "trajectory creation, following a path",
+              "description": "Create a trajectory in Choreo. Load and follow it in robot code using ChoreoTrajectory.",
+              "requires": ["P17"]
+            },
+            {
+              "key": "P20",
+              "name": "Choreo Advanced",
+              "summary": "event markers, split trajectories, mirroring",
+              "description": "Add event markers to a Choreo path. Split trajectories for multi-piece autos. Mirror paths for alliance color.",
+              "requires": ["P19"]
+            },
+            {
+              "key": "P21",
+              "name": "Auto Routine Architecture",
+              "summary": "multiple paths, dynamic selection, state handoff",
+              "description": "Build a complete auto system with multiple paths, dynamic selection, and clean state handoff into teleop.",
+              "requires": ["P18", "P20"]
+            }
+          ]
+        },
+        {
+          "key": "telem",
+          "name": "Telemetry & Vision",
+          "requires": ["control"],
+          "skills": [
+            {
+              "key": "P22",
+              "name": "DogLog Setup & Logging",
+              "summary": "log fields, periodic logging, log file",
+              "description": "Integrate DogLog into a robot project. Log subsystem state and sensor values every loop. Read the log file.",
+              "requires": []
+            },
+            {
+              "key": "P23",
+              "name": "AdvantageKit Integration",
+              "summary": "io layers, logged inputs, replay",
+              "description": "Refactor a subsystem to use AdvantageKit IO layers. Implement logged inputs. Replay a match log.",
+              "requires": ["P22"]
+            },
+            {
+              "key": "P24",
+              "name": "AdvantageScope Analysis",
+              "summary": "log import, signal graphing, 3D field view",
+              "description": "Import a log into AdvantageScope. Graph signals over time. View robot pose on the 3D field.",
+              "requires": ["P23"]
+            },
+            {
+              "key": "P25",
+              "name": "Elastic Dashboard",
+              "summary": "widget layout, NT4 subscriptions",
+              "description": "Configure an Elastic dashboard with relevant widgets. Subscribe to NetworkTables values from robot code.",
+              "requires": []
+            },
+            {
+              "key": "P26",
+              "name": "Telemetry-Driven Debugging",
+              "summary": "reproduce a match bug from a log",
+              "description": "Take a match log and reproduce a specific bug by correlating software state with electrical and mechanical events.",
+              "requires": ["P24", "P25"]
+            },
+            {
+              "key": "P27",
+              "name": "PhotonVision Basics",
+              "summary": "camera config, AprilTag pipeline",
+              "description": "Configure a camera in PhotonVision. Set up an AprilTag pipeline. Apply latency compensation.",
+              "requires": []
+            },
+            {
+              "key": "P28",
+              "name": "Pose Estimation",
+              "summary": "PhotonPoseEstimator, multi-camera",
+              "description": "Implement PhotonPoseEstimator in robot code. Fuse multiple camera estimates. Visualize pose on Field2d.",
+              "requires": ["P27"]
+            },
+            {
+              "key": "P29",
+              "name": "Vision-Assisted Alignment",
+              "summary": "auto-align, filtering bad estimates",
+              "description": "Implement auto-align to a field target using vision. Filter low-confidence estimates with trust thresholds.",
+              "requires": ["P28"]
+            }
+          ]
+        },
+        {
+          "key": "mastery",
+          "name": "Mastery",
+          "requires": ["auto", "telem"],
+          "skills": [
+            {
+              "key": "P30",
+              "name": "Competition Code Readiness",
+              "summary": "pre-match checklist, NT4 alerts, fault monitoring",
+              "description": "Add pre-match alert checks, fault monitoring, and disable/enable state handling to competition code.",
+              "requires": []
+            },
+            {
+              "key": "P31",
+              "name": "Architecture Trade-off Judgment",
+              "summary": "propose & defend approach for a new mechanism",
+              "description": "Read a codebase, identify which architectural pattern was used and why, then write a design doc proposing an approach for a new mechanism.",
+              "requires": ["P30"]
+            },
+            {
+              "key": "P32",
+              "name": "Code Standards & Documentation",
+              "summary": "team conventions, subsystem README",
+              "description": "Write inline docs and a subsystem README meeting team standards. Produce an architecture diagram.",
+              "requires": ["P30"]
+            },
+            {
+              "key": "P33",
+              "name": "Mentor a Newer Student",
+              "summary": "scoping → PR → review → merge",
+              "description": "Guide a newer student through a complete feature: scoping, implementation, pull request, code review, and merge.",
+              "requires": ["P31", "P32"]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "driveteam",
+      "icon": "🎮",
+      "name": "Drive Team & Strategy",
+      "subtitle": "Unlocks after Safety is 100% complete",
+      "requires": "safety",
+      "categories": [
+        {
+          "key": "game",
+          "name": "Game Knowledge",
+          "requires": [],
+          "skills": [
+            {
+              "key": "DT1",
+              "name": "Game Manual Reading",
+              "summary": "structure, rules, scoring sections",
+              "description": "Navigate the game manual structure. Locate scoring rules, penalty rules, and game-specific sections quickly.",
+              "requires": []
+            },
+            {
+              "key": "DT2",
+              "name": "Scoring System Mastery",
+              "summary": "all scores, ranking points, coopertition",
+              "description": "State all point values, ranking point conditions, coopertition mechanics, and tie-breaker criteria from memory.",
+              "requires": ["DT1"]
+            },
+            {
+              "key": "DT3",
+              "name": "Foul & Penalty Rules",
+              "summary": "GP vs. technical fouls, card conditions",
+              "description": "Identify what triggers a GP foul vs. a technical foul. Know red and yellow card conditions.",
+              "requires": ["DT1"]
+            },
+            {
+              "key": "DT4",
+              "name": "Ranking & Alliance Selection",
+              "summary": "ranking criteria, selection order",
+              "description": "Explain the ranking criteria, alliance selection order, and backup robot rules.",
+              "requires": ["DT2"]
+            },
+            {
+              "key": "DT5",
+              "name": "Question Box Protocol",
+              "summary": "when to go, how to phrase, documentation",
+              "description": "Know when a score challenge is worth pursuing. Phrase a question box inquiry correctly. Document the outcome.",
+              "requires": ["DT3"]
+            }
+          ]
+        },
+        {
+          "key": "setup",
+          "name": "Field & Setup",
+          "requires": ["game"],
+          "skills": [
+            {
+              "key": "DT6",
+              "name": "Field Logistics Fundamentals",
+              "summary": "layout, station numbering, reset flow",
+              "description": "Identify field zones, alliance station numbering, and the field reset flow. Know referee positions.",
+              "requires": []
+            },
+            {
+              "key": "DT7",
+              "name": "Driver Station Setup",
+              "summary": "laptop, tether vs. comp mode, FMS checklist",
+              "description": "Set up the driver station laptop correctly. Switch between tether and competition mode. Run the pre-match FMS checklist.",
+              "requires": ["DT6"]
+            },
+            {
+              "key": "DT8",
+              "name": "Robot Staging & Setup",
+              "summary": "start tile, preloads, bumper check",
+              "description": "Place the robot on the correct start tile. Load game piece preloads. Verify bumper legality before queuing.",
+              "requires": ["DT6"]
+            },
+            {
+              "key": "DT9",
+              "name": "In-Queue Procedures",
+              "summary": "timing, battery swap, radio status",
+              "description": "Know the queue timing. Execute a battery swap in queue. Verify radio light pattern before entering the field.",
+              "requires": ["DT7", "DT8"]
+            },
+            {
+              "key": "DT10",
+              "name": "Robot Removal",
+              "summary": "power-down, carry, damage assessment",
+              "description": "Safely power down and carry the robot off the field. Assess damage before handing off to pit crew.",
+              "requires": ["DT8"]
+            },
+            {
+              "key": "DT11",
+              "name": "Cart & Pit Logistics",
+              "summary": "parking, cable management, tool bag",
+              "description": "Park the cart in the correct zone. Maintain cable management on the cart. Know tool bag contents.",
+              "requires": ["DT9", "DT10"]
+            }
+          ]
+        },
+        {
+          "key": "checks",
+          "name": "Pre-Match Checks",
+          "requires": ["setup"],
+          "skills": [
+            {
+              "key": "DT12",
+              "name": "Pre-Match System Check",
+              "summary": "confirm pit crew checklist, battery, radio",
+              "description": "Verify the pit crew's pre-match checklist is complete. Confirm battery voltage, radio lights, and DS connection.",
+              "requires": []
+            },
+            {
+              "key": "DT13",
+              "name": "Bumper Visual Check",
+              "summary": "number legibility, retention, height",
+              "description": "Verify bumper number legibility, retention, gap and height compliance, and no fabric tears.",
+              "requires": ["DT12"]
+            },
+            {
+              "key": "DT14",
+              "name": "Electrical Visual Check",
+              "summary": "Anderson seating, breaker, CAN lights",
+              "description": "Check Anderson connector seating, breaker status, CAN fault lights, and no exposed wiring.",
+              "requires": ["DT12"]
+            },
+            {
+              "key": "DT15",
+              "name": "Mechanical Visual Check",
+              "summary": "fasteners, chain/belt tension, clearance",
+              "description": "Check for loose fasteners, chain/belt tension, game piece path clearance, and bumper-to-frame contact.",
+              "requires": ["DT13", "DT14"]
+            },
+            {
+              "key": "DT16",
+              "name": "Queue Investigation",
+              "summary": "systematic sweep, escalation threshold",
+              "description": "Perform a systematic full-robot sweep in queue. Know the threshold for escalating an issue to pit crew vs. playing.",
+              "requires": ["DT15"]
+            },
+            {
+              "key": "DT17",
+              "name": "Between-Match Repair Triage",
+              "summary": "fix vs. defer vs. pull, precise comms",
+              "description": "Assess damage severity after a match. Decide fix vs. defer vs. pull robot. Communicate precisely to pit crew.",
+              "requires": ["DT16"]
+            }
+          ]
+        },
+        {
+          "key": "analysis",
+          "name": "Match Analysis",
+          "requires": ["game"],
+          "skills": [
+            {
+              "key": "DT18",
+              "name": "Live Score Tracking",
+              "summary": "reading display, discrepancies, RP progress",
+              "description": "Read the scoring display live. Identify potential discrepancies. Track ranking point progress during a match.",
+              "requires": []
+            },
+            {
+              "key": "DT19",
+              "name": "Foul & Event Logging",
+              "summary": "recording triggers, timing, ref interactions",
+              "description": "Record foul triggers, timing of key events, and referee interactions during a match.",
+              "requires": ["DT18"]
+            },
+            {
+              "key": "DT20",
+              "name": "Cycle Tracking",
+              "summary": "completed cycles, defensive interference",
+              "description": "Count completed cycles for one robot during a match. Note defensive interference and estimate opponent cycle rate.",
+              "requires": ["DT18"]
+            },
+            {
+              "key": "DT21",
+              "name": "Score Challenge Assessment",
+              "summary": "identifying discrepancies worth questioning",
+              "description": "Identify a scoring discrepancy worth challenging. Build a concise challenge argument from logged data.",
+              "requires": ["DT19"]
+            },
+            {
+              "key": "DT22",
+              "name": "Opponent Weakness ID",
+              "summary": "from live observation, defensive opportunities",
+              "description": "Identify an opponent's weakness from in-match observation. Note defensive opportunities.",
+              "requires": ["DT20"]
+            },
+            {
+              "key": "DT23",
+              "name": "Post-Match Debrief",
+              "summary": "robot vs. strategy vs. driver issues",
+              "description": "Run a structured post-match debrief. Separate robot issues from strategy issues from driver issues. Produce actionable next steps.",
+              "requires": ["DT21", "DT22"]
+            }
+          ]
+        },
+        {
+          "key": "strategy",
+          "name": "Strategy & Leadership",
+          "requires": ["checks", "analysis"],
+          "skills": [
+            {
+              "key": "DT24",
+              "name": "Match Preparation Routine",
+              "summary": "strategy card, alliance comms, backup plans",
+              "description": "Complete a full pre-match preparation: strategy card, alliance communication, and backup plans for common failure modes.",
+              "requires": []
+            },
+            {
+              "key": "DT25",
+              "name": "Alliance Strategy Coordination",
+              "summary": "roles, compensating for weakest link",
+              "description": "Negotiate auto and teleop roles with alliance partners. Identify the weakest alliance link and adapt strategy to compensate.",
+              "requires": ["DT24"]
+            },
+            {
+              "key": "DT26",
+              "name": "Competition Day Leadership",
+              "summary": "energy, pit comms, gracious professionalism",
+              "description": "Manage energy and focus across a full event day. Communicate with pit crew under time pressure. Model gracious professionalism in high-stakes moments.",
+              "requires": ["DT24"]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "scouting",
+      "icon": "🔭",
+      "name": "Scouting",
+      "subtitle": "Unlocks after Safety is 100% complete",
+      "requires": "safety",
+      "categories": [
+        {
+          "key": "found",
+          "name": "Foundations",
+          "requires": [],
+          "skills": [
+            {
+              "key": "SC1",
+              "name": "Field & Game Piece Familiarization",
+              "summary": "elements, zones, auto vs. teleop scoring",
+              "description": "Identify all physical field elements, game piece types, and legal interaction zones. Distinguish auto vs. teleop scoring.",
+              "requires": []
+            },
+            {
+              "key": "SC2",
+              "name": "Scoring System Mastery",
+              "summary": "all scores, ranking points, coopertition",
+              "description": "State all point values, ranking point conditions, coopertition mechanics, and tie-breaker criteria.",
+              "requires": ["SC1"]
+            },
+            {
+              "key": "SC3",
+              "name": "Foul & Penalty Recognition",
+              "summary": "identify fouls from observation",
+              "description": "Recognize fouls from the stands. Distinguish GP from technical fouls. Understand what referees are watching for.",
+              "requires": ["SC1"]
+            }
+          ]
+        },
+        {
+          "key": "match",
+          "name": "Match Scouting",
+          "requires": ["found"],
+          "skills": [
+            {
+              "key": "SC4",
+              "name": "Tally Scouting Basics",
+              "summary": "paper or app, auto/teleop/endgame",
+              "description": "Complete a match scouting form for auto, teleop, and endgame using paper or a scouting app.",
+              "requires": []
+            },
+            {
+              "key": "SC5",
+              "name": "Cycle Counting",
+              "summary": "defining a cycle, counting under pressure",
+              "description": "Define a complete cycle for the current game. Count cycles accurately under match pressure.",
+              "requires": ["SC4"]
+            },
+            {
+              "key": "SC6",
+              "name": "Defensive & Foul Logging",
+              "summary": "defense played, fouls committed & drawn",
+              "description": "Record defensive actions, fouls committed, fouls drawn, and their impact on match outcome.",
+              "requires": ["SC4"]
+            },
+            {
+              "key": "SC7",
+              "name": "Auto Routine Documentation",
+              "summary": "start position, scores, mobility, consistency",
+              "description": "Record a robot's starting position, auto game piece scores, mobility bonus, and consistency across matches.",
+              "requires": ["SC4"]
+            },
+            {
+              "key": "SC8",
+              "name": "Robot Capability Flags",
+              "summary": "climb type, intake, game piece handling",
+              "description": "Note a robot's observed capabilities: climb type, floor vs. source intake, game piece handling, under-stage ability.",
+              "requires": ["SC4"]
+            },
+            {
+              "key": "SC9",
+              "name": "Quantitative Data Entry",
+              "summary": "accurate entry, uncertain obs, surrogates",
+              "description": "Enter match data accurately into the team's scouting system. Flag uncertain observations. Handle no-shows and surrogates.",
+              "requires": ["SC5", "SC6", "SC7", "SC8"]
+            },
+            {
+              "key": "SC10",
+              "name": "Qualitative Match Scouting",
+              "summary": "descriptive notes — terminal",
+              "description": "Assigned to a single robot: write descriptive notes on strategy, adaptation, driver skill, mechanism reliability, and match-to-match behavioral patterns. Terminal skill.",
+              "requires": ["SC9"]
+            }
+          ]
+        },
+        {
+          "key": "pit",
+          "name": "Pit Scouting",
+          "requires": ["match"],
+          "skills": [
+            {
+              "key": "SC11",
+              "name": "Pit Scouting Preparation",
+              "summary": "form design, answerable vs. not",
+              "description": "Generate a pit scouting form. Know which questions are answerable by observation alone vs. requiring an interview.",
+              "requires": []
+            },
+            {
+              "key": "SC12",
+              "name": "Pit Interview Technique",
+              "summary": "open vs. closed questions, rapport",
+              "description": "Use open and closed questions effectively. Build rapport quickly. Know when to probe vs. move on.",
+              "requires": ["SC11"]
+            },
+            {
+              "key": "SC13",
+              "name": "Robot Observation in Pit",
+              "summary": "drivetrain, mechanisms, COTS vs. custom",
+              "description": "Observe a robot in the pit: drivetrain type, bumper construction, game piece mechanisms, notable COTS vs. custom features.",
+              "requires": ["SC11"]
+            },
+            {
+              "key": "SC14",
+              "name": "Pit Scouting Synthesis",
+              "summary": "combine interview & observation, flag discrepancies",
+              "description": "Combine interview data with observation. Flag discrepancies between what a team claims and what their robot shows.",
+              "requires": ["SC12", "SC13"]
+            }
+          ]
+        },
+        {
+          "key": "data",
+          "name": "Data Analysis",
+          "requires": ["pit"],
+          "skills": [
+            {
+              "key": "SC15",
+              "name": "Basic Data Analysis",
+              "summary": "averages, consistency, outliers, sample size",
+              "description": "Compute averages, identify outliers, assess consistency, and reason about small sample size risk.",
+              "requires": []
+            },
+            {
+              "key": "SC16",
+              "name": "Comparative Robot Ranking",
+              "summary": "pick list from raw data, weighting criteria",
+              "description": "Build a simple pick list from scouted data. Weight criteria by game relevance.",
+              "requires": ["SC15"]
+            },
+            {
+              "key": "SC17",
+              "name": "OPR & EPA Concepts",
+              "summary": "what they measure, when to trust vs. override",
+              "description": "Explain what OPR and EPA measure and where they come from. Know when to trust vs. override with observational data.",
+              "requires": ["SC15"]
+            },
+            {
+              "key": "SC18",
+              "name": "Scouting System Validation",
+              "summary": "cross-check against match scores",
+              "description": "Cross-check scouted data against match scores. Identify scouts with systematic errors.",
+              "requires": ["SC16"]
+            },
+            {
+              "key": "SC19",
+              "name": "Statbotics & TBA Literacy",
+              "summary": "event pages, component OPR, filtering",
+              "description": "Read a Statbotics or TBA event page. Understand component OPR. Filter by week, event, and year.",
+              "requires": ["SC17"]
+            }
+          ]
+        },
+        {
+          "key": "strategy",
+          "name": "Strategy & Leadership",
+          "requires": ["data"],
+          "skills": [
+            {
+              "key": "SC20",
+              "name": "Alliance Selection Analysis",
+              "summary": "pick list, complementary robots, anticipating picks",
+              "description": "Build a ranked pick list with rationale. Identify complementary vs. redundant robots. Anticipate other alliances' picks.",
+              "requires": []
+            },
+            {
+              "key": "SC21",
+              "name": "Match Strategy Reports",
+              "summary": "pre-match brief for drive team",
+              "description": "Produce a pre-match brief for the drive team: opponent tendencies, foul risks, auto conflicts, defensive opportunities.",
+              "requires": ["SC20"]
+            },
+            {
+              "key": "SC22",
+              "name": "Scouting System Design",
+              "summary": "form design, fields, cognitive load",
+              "description": "Design or improve a data collection form. Define required fields. Balance comprehensiveness vs. scout cognitive load.",
+              "requires": ["SC21"]
+            },
+            {
+              "key": "SC23",
+              "name": "Alliance Communication",
+              "summary": "present pick list, advocate with data",
+              "description": "Present pick list recommendations clearly to drive coach and strategy lead. Advocate for a position with data.",
+              "requires": ["SC21"]
+            },
+            {
+              "key": "SC24",
+              "name": "Mentor a New Scout",
+              "summary": "observation skills, data quality, culture",
+              "description": "Teach observation skills, calibrate cycle counting, review data quality, and build team scouting culture.",
+              "requires": ["SC22", "SC23"]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "pitcrew",
+      "icon": "🔩",
+      "name": "Pit Crew",
+      "subtitle": "Unlocks after Safety is 100% complete",
+      "requires": "safety",
+      "categories": [
+        {
+          "key": "familiar",
+          "name": "Robot Familiarity",
+          "requires": [],
+          "skills": [
+            {
+              "key": "PC1",
+              "name": "Robot Systems Overview",
+              "summary": "purpose, interactions, failure modes",
+              "description": "Explain each subsystem's purpose, how they interact, and the key failure modes to watch for.",
+              "requires": []
+            },
+            {
+              "key": "PC2",
+              "name": "Mechanical Systems Familiarity",
+              "summary": "as-built drivetrain, linkages, wear points",
+              "description": "Navigate the as-built mechanical layout: drivetrain, game mechanism linkages, fastener locations, wear points, and adjustment points.",
+              "requires": ["PC1"]
+            },
+            {
+              "key": "PC3",
+              "name": "Electrical Systems Familiarity",
+              "summary": "wiring diagram, breaker map, CAN order",
+              "description": "Navigate the as-built wiring diagram, breaker map, CAN bus order, and motor controller and sensor locations.",
+              "requires": ["PC1"]
+            },
+            {
+              "key": "PC4",
+              "name": "Software Systems Familiarity",
+              "summary": "deployed branch, controls, auto options",
+              "description": "Know the deployed branch and version, what each button and trigger does, current auto options, and known software limitations.",
+              "requires": ["PC1"]
+            },
+            {
+              "key": "PC5",
+              "name": "Battery Tracking",
+              "summary": "numbering, charge log, rotation, degraded",
+              "description": "Maintain the battery numbering system and charge log. Rotate batteries correctly. Identify degraded batteries.",
+              "requires": ["PC3"]
+            }
+          ]
+        },
+        {
+          "key": "repair",
+          "name": "Inspection & Repair",
+          "requires": ["familiar"],
+          "skills": [
+            {
+              "key": "PC6",
+              "name": "Pre-Match Checklist Execution",
+              "summary": "follow exactly, record pass/fail, flag marginal",
+              "description": "Follow the pre-match checklist exactly as written. Record pass/fail for each item. Flag marginal items. Never skip steps under time pressure.",
+              "requires": []
+            },
+            {
+              "key": "PC7",
+              "name": "Fastener Inspection & Tightening",
+              "summary": "systematic check, thread-locker, stripped threads",
+              "description": "Perform a systematic fastener check. Reapply thread-locker where needed. Identify stripped threads.",
+              "requires": []
+            },
+            {
+              "key": "PC8",
+              "name": "Drive System Maintenance",
+              "summary": "chain/belt tension, wheel condition, module alignment",
+              "description": "Check and adjust chain/belt tension. Assess wheel condition. Verify swerve module alignment.",
+              "requires": []
+            },
+            {
+              "key": "PC9",
+              "name": "Game Mechanism Inspection",
+              "summary": "linkage geometry, bearing condition, path clearance",
+              "description": "Check linkage geometry, sprocket/pulley alignment, bearing condition, and game piece path clearance.",
+              "requires": []
+            },
+            {
+              "key": "PC10",
+              "name": "Drivetrain Repair",
+              "summary": "wheel/module swap, chain/belt replacement",
+              "description": "Swap a wheel or swerve module. Replace a chain or belt. Reassemble and verify before returning to service.",
+              "requires": ["PC8"]
+            },
+            {
+              "key": "PC11",
+              "name": "Game Mechanism Repair",
+              "summary": "bearings, linkages, sprockets/pulleys",
+              "description": "Replace worn bearings, re-time linkages, and replace sprockets or pulleys. Restore game piece path clearance.",
+              "requires": ["PC9"]
+            },
+            {
+              "key": "PC12",
+              "name": "Electrical Repair",
+              "summary": "reseat connectors, replace controller, CAN isolation",
+              "description": "Reseat connectors, replace a motor controller, isolate a CAN bus fault, replace a sensor, re-route damaged wiring.",
+              "requires": []
+            },
+            {
+              "key": "PC13",
+              "name": "Timed Repair Execution",
+              "summary": "within match cycle time, parallel tasking",
+              "description": "Complete a known repair within match cycle time. Parallel task with a partner. Hand off cleanly to drive team.",
+              "requires": ["PC10", "PC11", "PC12"]
+            }
+          ]
+        },
+        {
+          "key": "org",
+          "name": "Pit Organization",
+          "requires": ["repair"],
+          "skills": [
+            {
+              "key": "PC14",
+              "name": "Pit Setup & Layout",
+              "summary": "furniture, tool org, robot stand, safety",
+              "description": "Arrange pit furniture and tools. Place the robot stand. Manage cables. Comply with pit safety rules.",
+              "requires": []
+            },
+            {
+              "key": "PC15",
+              "name": "Tool & Consumables Inventory",
+              "summary": "know location, return after use, flag missing",
+              "description": "Know where every tool is. Return tools after use. Flag missing or damaged tools immediately.",
+              "requires": ["PC14"]
+            },
+            {
+              "key": "PC16",
+              "name": "Spare Parts Organization",
+              "summary": "labeled bins, quantities, log consumed spares",
+              "description": "Maintain labeled spare parts bins with known quantities. Log consumed spares so restock is triggered.",
+              "requires": ["PC14"]
+            },
+            {
+              "key": "PC17",
+              "name": "Between-Match Pit Flow",
+              "summary": "receive robot, assess, prioritize, battery swap",
+              "description": "Receive the robot from drive team, immediately assess damage, prioritize repairs, swap the battery, and time the drive team handoff.",
+              "requires": ["PC15"]
+            }
+          ]
+        },
+        {
+          "key": "prep",
+          "name": "Event Prep",
+          "requires": ["org"],
+          "skills": [
+            {
+              "key": "PC18",
+              "name": "Spare Parts List Development",
+              "summary": "consumables, failure-prone parts, quantities",
+              "description": "Identify every consumable and failure-prone component on the robot. Determine quantities needed per event.",
+              "requires": []
+            },
+            {
+              "key": "PC19",
+              "name": "Pit Supplies Packing",
+              "summary": "tools, consumables, electronics — verified against list",
+              "description": "Pack tools, consumables, safety gear, and electronics spares against a master list before departure.",
+              "requires": ["PC18"]
+            },
+            {
+              "key": "PC20",
+              "name": "Pre-Match Checklist Development",
+              "summary": "identify items, write precisely, validate",
+              "description": "Identify every system needing pre-match verification. Write steps precisely enough for any trained student. Validate with a test run.",
+              "requires": []
+            },
+            {
+              "key": "PC21",
+              "name": "Event Readiness Review",
+              "summary": "robot, supplies, batteries, documentation",
+              "description": "Confirm robot, pit supplies, spare parts, batteries, and documentation are all accounted for before leaving for the event.",
+              "requires": ["PC19", "PC20"]
+            }
+          ]
+        },
+        {
+          "key": "inspect",
+          "name": "FRC Inspection",
+          "requires": ["repair"],
+          "skills": [
+            {
+              "key": "PC22",
+              "name": "FRC Inspection Familiarity",
+              "summary": "weight, bumper, electrical, software rules",
+              "description": "Know the full FRC inspection checklist: weight, bumper, electrical, software, and mechanical criteria.",
+              "requires": []
+            },
+            {
+              "key": "PC23",
+              "name": "Common Inspection Failures",
+              "summary": "self-inspection routine before formal inspection",
+              "description": "Know what gets flagged most often. Run a self-inspection routine before presenting to an inspector.",
+              "requires": ["PC22"]
+            },
+            {
+              "key": "PC24",
+              "name": "Bumper Compliance",
+              "summary": "number placement, height/gap, fabric, retention",
+              "description": "Verify bumper number placement, height and gap rules, fabric condition, and retention system.",
+              "requires": ["PC22"]
+            },
+            {
+              "key": "PC25",
+              "name": "Inspection Communication",
+              "summary": "presenting, clarifying, re-inspection process",
+              "description": "Present the robot confidently to an inspector. Know when to ask for clarification vs. accept a ruling. Understand the re-inspection request process.",
+              "requires": ["PC23", "PC24"]
+            },
+            {
+              "key": "PC26",
+              "name": "Inspection Strategy",
+              "summary": "timing, last-check items, event log",
+              "description": "Time inspection early in the event. Know which items to verify last. Maintain an inspection result log across events.",
+              "requires": ["PC25"]
+            }
+          ]
+        },
+        {
+          "key": "comms",
+          "name": "Communication & Leadership",
+          "requires": ["prep", "inspect"],
+          "skills": [
+            {
+              "key": "PC27",
+              "name": "Robot Presentation Basics",
+              "summary": "clear explanation to non-technical visitor",
+              "description": "Explain what the robot does clearly to a non-technical visitor. Identify the most compelling aspects of the design.",
+              "requires": []
+            },
+            {
+              "key": "PC28",
+              "name": "Pit Scout Interaction",
+              "summary": "answer accurately, direct to notable features",
+              "description": "Answer pit scout questions accurately and completely. Neither oversell nor undersell capabilities. Direct scouts to notable robot features.",
+              "requires": ["PC27"]
+            },
+            {
+              "key": "PC29",
+              "name": "Judge Interaction",
+              "summary": "recognize judge, present robot & team story",
+              "description": "Recognize a judge visiting the pit. Present the robot and team story concisely. Connect technical work to team values.",
+              "requires": ["PC27"]
+            },
+            {
+              "key": "PC30",
+              "name": "Awards Presentation Support",
+              "summary": "know target awards, coach newer members",
+              "description": "Know which awards the team is pursuing and what judges look for. Coach newer members on speaking to judges.",
+              "requires": ["PC28", "PC29"]
+            },
+            {
+              "key": "PC31",
+              "name": "Pit Crew Lead Readiness",
+              "summary": "own the between-match cycle independently",
+              "description": "Own the full between-match cycle independently. Make repair prioritization calls. Manage pit crew workload. Communicate status to drive coach.",
+              "requires": ["PC30"]
+            },
+            {
+              "key": "PC32",
+              "name": "Post-Event Robot Assessment",
+              "summary": "document wear, damage, near-misses",
+              "description": "Document wear, damage, and near-misses after an event. Feed findings into pre-season rebuild and spare parts planning.",
+              "requires": ["PC31"]
+            },
+            {
+              "key": "PC33",
+              "name": "Mentor a New Pit Crew Member",
+              "summary": "checklist discipline, repair technique, comms",
+              "description": "Teach checklist discipline, repair technique, and pit communication skills to a newer student.",
+              "requires": ["PC31"]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "leadership",
+      "icon": "🤝",
+      "name": "Leadership & Outreach",
+      "subtitle": "Unlocks after Safety is 100% complete",
+      "requires": "safety",
+      "categories": [
+        {
+          "key": "comms",
+          "name": "Communication",
+          "requires": [],
+          "skills": [
+            {
+              "key": "L1",
+              "name": "Self-Assessment & Goal Setting",
+              "summary": "strengths, growth areas, specific goals",
+              "description": "Honestly identify strengths and growth areas. Set specific short-term goals and revisit them regularly.",
+              "requires": []
+            },
+            {
+              "key": "L2",
+              "name": "Active Listening",
+              "summary": "full attention, clarifying questions, reflecting back",
+              "description": "Give full attention in a conversation. Ask clarifying questions. Reflect back what you heard before responding.",
+              "requires": ["L1"]
+            },
+            {
+              "key": "L3",
+              "name": "Clear Written Communication",
+              "summary": "unambiguous, concise, professional tone",
+              "description": "Write emails and messages that are unambiguous and appropriately concise. Use professional tone in external communications.",
+              "requires": ["L2"]
+            },
+            {
+              "key": "L4",
+              "name": "Clear Verbal Communication",
+              "summary": "technical topics to non-technical audiences",
+              "description": "Explain technical work clearly to a non-technical audience. Give structured updates in meetings. Speak confidently in public.",
+              "requires": ["L2"]
+            },
+            {
+              "key": "L5",
+              "name": "Constructive Feedback",
+              "summary": "specific, actionable, kind — receiving without defensiveness",
+              "description": "Give feedback that is specific, actionable, and kind. Receive feedback without defensiveness. Distinguish feedback on work from feedback on person.",
+              "requires": ["L3", "L4"]
+            }
+          ]
+        },
+        {
+          "key": "manage",
+          "name": "Team Management",
+          "requires": ["comms"],
+          "skills": [
+            {
+              "key": "L6",
+              "name": "Meeting Facilitation",
+              "summary": "agenda, on-track, quieter voices, action items",
+              "description": "Set an agenda. Keep discussion on track. Ensure quieter voices are heard. Close with clear action items and owners.",
+              "requires": []
+            },
+            {
+              "key": "L7",
+              "name": "Task Breakdown & Delegation",
+              "summary": "decompose, match to skills, follow up",
+              "description": "Decompose a goal into concrete tasks. Match tasks to people's skills and availability. Follow up without micromanaging.",
+              "requires": ["L6"]
+            },
+            {
+              "key": "L8",
+              "name": "Project Tracking",
+              "summary": "shared record of in-progress, blocked, done",
+              "description": "Maintain a shared record of what is in progress, what is blocked, and what is done — tool-agnostic.",
+              "requires": ["L7"]
+            },
+            {
+              "key": "L9",
+              "name": "Conflict Navigation",
+              "summary": "source of disagreement, common ground, escalation",
+              "description": "Identify the source of a disagreement. Find common ground. Know when to escalate to a mentor vs. resolve within the team.",
+              "requires": ["L6"]
+            },
+            {
+              "key": "L10",
+              "name": "Inclusive Team Culture",
+              "summary": "noticing disengagement, creating entry points, modeling GP",
+              "description": "Notice when students are disengaged or excluded. Actively create entry points for new members. Model gracious professionalism visibly.",
+              "requires": ["L6"]
+            },
+            {
+              "key": "L11",
+              "name": "Leading Under Pressure",
+              "summary": "composure, deciding with incomplete info, owning mistakes",
+              "description": "Maintain composure during build crunch or competition stress. Make decisions with incomplete information. Own mistakes quickly.",
+              "requires": ["L8", "L9", "L10"]
+            }
+          ]
+        },
+        {
+          "key": "mentor",
+          "name": "Mentorship",
+          "requires": ["comms"],
+          "skills": [
+            {
+              "key": "L12",
+              "name": "Mentorship Fundamentals",
+              "summary": "teaching vs. coaching vs. directing",
+              "description": "Understand the difference between teaching, coaching, and directing. Choose the right mode for the situation and person.",
+              "requires": []
+            },
+            {
+              "key": "L13",
+              "name": "Teaching a Skill",
+              "summary": "break down, check understanding, adjust",
+              "description": "Break a skill into learnable steps. Check for understanding rather than just completion. Adjust your explanation when the first approach doesn't land.",
+              "requires": ["L12"]
+            },
+            {
+              "key": "L14",
+              "name": "Supporting a Struggling Student",
+              "summary": "recognize stuck, ask good questions, know when to escalate",
+              "description": "Recognize when someone is stuck or discouraged. Ask good questions rather than jumping to solutions. Know when to involve a mentor.",
+              "requires": ["L12"]
+            },
+            {
+              "key": "L15",
+              "name": "Owning a Mentoring Relationship",
+              "summary": "season-long responsibility, track progress, advocate",
+              "description": "Take ongoing responsibility for a newer student's growth across a season. Track their skill tree progress. Celebrate milestones and advocate for opportunities.",
+              "requires": ["L13", "L14"]
+            }
+          ]
+        },
+        {
+          "key": "outreach",
+          "name": "Outreach",
+          "requires": ["comms"],
+          "skills": [
+            {
+              "key": "L16",
+              "name": "Robot & Team Presentation",
+              "summary": "engaging demo, adapt for audience, handle questions",
+              "description": "Deliver a clear, engaging robot demo to a public audience. Adapt depth and vocabulary for age and background. Handle unexpected questions.",
+              "requires": []
+            },
+            {
+              "key": "L17",
+              "name": "Outreach Event Execution",
+              "summary": "logistics, setup, visitors, professional representation",
+              "description": "Manage logistics for a public-facing outreach event: setup and breakdown, managing visitors, representing the team professionally.",
+              "requires": ["L16"]
+            },
+            {
+              "key": "L18",
+              "name": "FLL & Feeder School Support",
+              "summary": "coach middle school students, support without doing the work",
+              "description": "Work effectively with middle school students. Adapt coaching style for younger learners. Support FLL design and strategy without doing the work for them.",
+              "requires": ["L17"]
+            },
+            {
+              "key": "L19",
+              "name": "FLL Mentorship",
+              "summary": "season-long responsibility, competition prep — terminal",
+              "description": "Take ongoing responsibility for an FLL team across a season. Manage the school relationship. Prepare the team for competition. Terminal skill.",
+              "requires": ["L18"]
+            },
+            {
+              "key": "L20",
+              "name": "New Outreach Program Development",
+              "summary": "identify need, pilot, document — terminal",
+              "description": "Identify a community need, propose a program structure, pilot and evaluate it, and document for repeatability. Terminal skill.",
+              "requires": ["L17"]
+            },
+            {
+              "key": "L21",
+              "name": "Impact Award Contribution",
+              "summary": "understand criteria, contribute to submission — terminal",
+              "description": "Understand what the Impact Award evaluates. Contribute to the team's submission. Present the outreach story to judges. Terminal skill.",
+              "requires": ["L17"]
+            }
+          ]
+        },
+        {
+          "key": "sponsor",
+          "name": "Sponsors & Representation",
+          "requires": ["comms"],
+          "skills": [
+            {
+              "key": "L22",
+              "name": "Sponsor Communication Basics",
+              "summary": "professional outreach, thank-you, follow-up cadence",
+              "description": "Write a professional sponsor outreach or thank-you email. Understand what sponsors want to see from a team.",
+              "requires": []
+            },
+            {
+              "key": "L23",
+              "name": "Sponsor Relationship Maintenance",
+              "summary": "proactive updates, recognition, stewardship",
+              "description": "Send proactive updates to sponsors. Recognize sponsors at events. Fulfill recognition commitments before seeking new sponsors.",
+              "requires": ["L22"]
+            },
+            {
+              "key": "L24",
+              "name": "Fundraising Participation",
+              "summary": "support mentor-led efforts, understand grant structures",
+              "description": "Support mentor-led fundraising. Understand grant structures and timelines. Contribute to a grant application.",
+              "requires": ["L22"]
+            },
+            {
+              "key": "L25",
+              "name": "Social Media & Public Presence",
+              "summary": "accurate content, professional tone, documentation",
+              "description": "Create content that accurately represents the team. Maintain a professional tone. Document events and shop work with photos and video.",
+              "requires": []
+            },
+            {
+              "key": "L26",
+              "name": "External Representation",
+              "summary": "sponsor, community partner, or media — on-message",
+              "description": "Speak confidently about the team to a sponsor, community partner, or media contact. Stay on-message, accurate, and appropriately enthusiastic.",
+              "requires": ["L23", "L24", "L25"]
+            }
+          ]
+        },
+        {
+          "key": "growth",
+          "name": "Leadership Growth",
+          "requires": ["manage", "mentor", "sponsor"],
+          "skills": [
+            {
+              "key": "L27",
+              "name": "Leadership Reflection Practice",
+              "summary": "structured reflection, seek feedback proactively",
+              "description": "Reflect regularly on your own leadership: what worked, what didn't, what you'd do differently. Seek feedback proactively rather than waiting for it.",
+              "requires": []
+            },
+            {
+              "key": "L28",
+              "name": "Developing Other Leaders",
+              "summary": "identify potential, stretch opportunities, coach through difficulty",
+              "description": "Identify leadership potential in others. Create stretch opportunities. Coach them through difficulty rather than rescuing them.",
+              "requires": ["L27"]
+            },
+            {
+              "key": "L29",
+              "name": "Team Culture Stewardship",
+              "summary": "shape norms, traditions, visible values",
+              "description": "Actively shape team norms and traditions. Ensure the team's values are visible in how members treat each other, not just what they build.",
+              "requires": ["L27"]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
