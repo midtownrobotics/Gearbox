@@ -1,4 +1,3 @@
-import { idName, teamAppUrl } from "@g3/site-config";
 import { getUserInfo } from "@g3/slack";
 import { and, eq } from "drizzle-orm";
 import { createDb } from "../db";
@@ -7,6 +6,8 @@ import type { AppEnv } from "../types";
 import { newId } from "./id";
 import { createSession } from "./session";
 import { slackForTeam, teamForWorkspace } from "./slack-install";
+import { teamUrl } from "./team";
+import { teamIdName } from "./team-ui";
 
 export function generateCode(): string {
   return (crypto.getRandomValues(new Uint32Array(1))[0] % 10000).toString().padStart(4, "0");
@@ -127,6 +128,7 @@ export async function handleSlackCode(opts: {
 
   // --- Link flow ---
   if (type === "link") {
+    const idName = await teamIdName(db, record.teamId);
     const userId = record.userId;
     if (!userId) {
       await updateStatus("failed", "Invalid code.");
@@ -219,7 +221,7 @@ export async function handleSlackCode(opts: {
     : { email: null, displayName: "Unknown" };
 
   if (!slackUser.email) {
-    const msg = `Your Slack account has no email. Please sign up at ${new URL(teamAppUrl(record.teamId, "id")).host} with email first, then link Slack from your account settings.`;
+    const msg = `Your Slack account has no email. Please sign up at ${new URL(teamUrl(env, record.teamId, "id")).host} with email first, then link Slack from your account settings.`;
     await updateStatus("failed", msg);
     return { success: false, message: `❌ ${msg}` };
   }

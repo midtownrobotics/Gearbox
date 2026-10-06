@@ -1,4 +1,4 @@
-import { corsOrigin, idName, teamKey as ourTeamKey, site } from "@g3/site-config";
+import { corsOrigin, site, teamKey } from "@g3/site-config";
 import { withApiPrefix } from "@g3/site-config/worker";
 import { sendDM } from "@g3/slack";
 import { type Context, Hono } from "hono";
@@ -7,6 +7,10 @@ import packageJson from "../package.json";
 import { getEngagementSettings, parseEngagementSettings } from "./engagement";
 import { requireAuth } from "./middleware/auth";
 import type { AppEnv } from "./types";
+
+/** "Our team" for a request: the team the gateway says the page is for (the site team without it). */
+const ourTeam = (c: { req: { header(name: string): string | undefined } }) =>
+  c.req.header("X-Team-Id") ?? teamKey;
 
 type Tier = { id: string; name: string; color: string; items: string[] };
 type TierListInput = { name?: unknown; description?: unknown; tiers?: unknown };
@@ -296,7 +300,7 @@ async function getStatboticsMatches(eventKey: string) {
   const url = `https://api.statbotics.io/v3/matches?event=${encodeURIComponent(eventKey)}&limit=500`;
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     const response = await fetch(url, {
-      headers: { Accept: "application/json", "User-Agent": `${site.team.shortName}-Strategy/1.0` },
+      headers: { Accept: "application/json", "User-Agent": "Gearbox-Strategy/1.0" },
     });
     if (response.ok) {
       const body = (await response.json()) as unknown;
@@ -974,7 +978,7 @@ app.get("/event-context", requireAuth, async (c) => {
   if (config?.schedule_mode !== "manual")
     await persistAutomaticMatch(c, config?.current_match_number, current);
   const teamSchedule = matches.filter((match) =>
-    [...match.alliances.red.team_keys, ...match.alliances.blue.team_keys].includes(ourTeamKey),
+    [...match.alliances.red.team_keys, ...match.alliances.blue.team_keys].includes(ourTeam(c)),
   );
   const nextTeamMatch = current
     ? teamSchedule.find((match) => matchOrder(match) >= matchOrder(current))
@@ -1087,7 +1091,7 @@ app.put("/event-context", requireAuth, async (c) => {
   const nexusEventKey = text(body.nexusEventKey, 30).toLowerCase() || eventKey;
   const nexusApiKey = text(body.nexusApiKey, 300);
   if ((tbaAuthKey || nexusApiKey) && !c.get("userIsAdmin"))
-    return c.json({ error: `Only a ${idName} admin can update API keys.` }, 403);
+    return c.json({ error: "Only a team admin can update API keys." }, 403);
   if (activeConfig?.schedule_mode !== "manual" && eventKey && !/^\d{4}[a-z0-9]+$/.test(eventKey))
     return c.json({ error: "Enter a valid TBA event key, such as 2026gadal." }, 400);
   const tbaConfigChanged =
@@ -1810,7 +1814,7 @@ app.get("/engagement-settings", requireAuth, async (c) =>
 
 app.put("/engagement-settings", requireAuth, async (c) => {
   if (!c.get("userIsAdmin") || c.get("sessionType") === "pin")
-    return c.json({ error: `Only a ${idName} admin can change engagement settings.` }, 403);
+    return c.json({ error: "Only a team admin can change engagement settings." }, 403);
   const settings = parseEngagementSettings(await c.req.json().catch(() => null));
   if (!settings)
     return c.json(
@@ -1827,7 +1831,7 @@ app.put("/engagement-settings", requireAuth, async (c) => {
        points_label = excluded.points_label, updated_by = excluded.updated_by, updated_at = excluded.updated_at`,
   )
     .bind(
-      ourTeamKey,
+      teamKey,
       Number(settings.enabled),
       Number(settings.predictionsEnabled),
       Number(settings.combinationsEnabled),
@@ -2638,12 +2642,12 @@ app.get("/strategy-admins", requireAuth, async (c) => {
 
 app.post("/strategy-admins", requireAuth, async (c) => {
   if (!c.get("userIsAdmin"))
-    return c.json({ error: `Only a ${idName} admin can assign Strategy leads.` }, 403);
+    return c.json({ error: "Only a team admin can assign Strategy leads." }, 403);
   const body = await c.req.json<{ userId?: unknown }>();
   const userId = text(body.userId, 200);
   const users = await getG3IdUsers(c);
   const user = users?.find((candidate) => candidate.id === userId && candidate.status === "active");
-  if (!user) return c.json({ error: `Select an active ${idName} account.` }, 400);
+  if (!user) return c.json({ error: "Select an active account." }, 400);
   await c.env.SCOUTING_DB.prepare(
     "INSERT OR REPLACE INTO strategy_admins (user_id, email, display_name, granted_by, created_at) VALUES (?, ?, ?, ?, ?)",
   )
@@ -2654,7 +2658,7 @@ app.post("/strategy-admins", requireAuth, async (c) => {
 
 app.delete("/strategy-admins/:userId", requireAuth, async (c) => {
   if (!c.get("userIsAdmin"))
-    return c.json({ error: `Only a ${idName} admin can remove Strategy leads.` }, 403);
+    return c.json({ error: "Only a team admin can remove Strategy leads." }, 403);
   await c.env.SCOUTING_DB.prepare("DELETE FROM strategy_admins WHERE user_id = ?")
     .bind(c.req.param("userId"))
     .run();
@@ -2702,9 +2706,10 @@ app.get("/analysis", requireAuth, async (c) => {
         )
         .map((match) => {
           const alliance = match.alliances.red.team_keys.includes(teamKey) ? "red" : "blue";
-          const partner = match.alliances[alliance].team_keys.includes(ourTeamKey);
-          const opponent =
-            match.alliances[alliance === "red" ? "blue" : "red"].team_keys.includes(ourTeamKey);
+          const partner = match.alliances[alliance].team_keys.includes(ourTeam(c));
+          const opponent = match.alliances[alliance === "red" ? "blue" : "red"].team_keys.includes(
+            ourTeam(c),
+          );
           return {
             ...publicMatch(match),
             alliance,
@@ -2824,7 +2829,7 @@ app.delete("/analysis/reports/:id/permanent", requireAuth, async (c) => {
 app.get("/field-map-publisher-options", requireAuth, async (c) => {
   if (!c.get("userIsAdmin")) return c.json({ error: "Admin access required." }, 403);
   const users = await getG3IdUsers(c);
-  if (!users) return c.json({ error: `Could not load ${idName} accounts.` }, 502);
+  if (!users) return c.json({ error: "Could not load the team's accounts." }, 502);
   return c.json({
     users: users
       .filter((user) => user.status === "active")
@@ -2837,11 +2842,11 @@ app.post("/field-map-publishers", requireAuth, async (c) => {
   if (!c.get("userIsAdmin")) return c.json({ error: "Admin access required." }, 403);
   const body = await c.req.json<{ userId?: unknown }>();
   const userId = text(body.userId, 200);
-  if (!userId) return c.json({ error: `Select a ${idName} account.` }, 400);
+  if (!userId) return c.json({ error: "Select an account." }, 400);
   const users = await getG3IdUsers(c);
-  if (!users) return c.json({ error: `Could not validate the ${idName} account.` }, 502);
+  if (!users) return c.json({ error: "Could not check that account." }, 502);
   const user = users.find((candidate) => candidate.id === userId && candidate.status === "active");
-  if (!user) return c.json({ error: `Select an active ${idName} account.` }, 400);
+  if (!user) return c.json({ error: "Select an active account." }, 400);
   const email = user.email.toLowerCase();
   await c.env.SCOUTING_DB.prepare(
     "INSERT OR IGNORE INTO field_map_publishers (email, granted_by, created_at) VALUES (?, ?, ?)",
@@ -3282,7 +3287,7 @@ app.post("/service-helpers", requireAuth, async (c) => {
   const body = await c.req.json<Record<string, unknown>>();
   const users = await getG3IdUsers(c);
   const user = users?.find((item) => item.id === text(body.userId, 200));
-  if (!user) return c.json({ error: `Select an active ${idName} user.` }, 400);
+  if (!user) return c.json({ error: "Select an active user." }, 400);
   await c.env.SCOUTING_DB.prepare(
     "INSERT OR REPLACE INTO service_helpers (user_id, display_name, email, slack_user_id, skills_json, approved_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
   )

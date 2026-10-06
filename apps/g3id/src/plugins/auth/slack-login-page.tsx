@@ -1,4 +1,5 @@
 import { site } from "@g3/site-config";
+import { useTeamNames } from "@g3/ui";
 import { Check, Copy, Loader2, Send } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -18,6 +19,7 @@ type BotInfo = {
 };
 
 export function SlackLoginPage() {
+  const names = useTeamNames();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const token = searchParams.get("token") ?? "";
@@ -130,7 +132,7 @@ export function SlackLoginPage() {
       <div className="w-full max-w-sm space-y-6 text-center">
         <div>
           <h1 className="text-5xl font-bold text-secondary-900">
-            <span className="text-primary-500">G3</span>ID
+            <span className="text-primary-500">{names.shortName}</span>ID
           </h1>
         </div>
 

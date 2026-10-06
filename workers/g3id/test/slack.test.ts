@@ -286,5 +286,9 @@ describe("the session cookie", () => {
     expect(sessionCookieOptions(`https://254-id.${site.platformDomain}/api/x`).domain).toBe(
       site.platformDomain,
     );
+    // Local dev: the gateway's addresses share gearbox.localhost (browsers won't share "localhost").
+    expect(sessionCookieOptions("http://1648-id.gearbox.localhost:8796/api/x").domain).toBe(
+      "gearbox.localhost",
+    );
   });
 });

@@ -1,4 +1,3 @@
-import { defaultTeamUiSettings, idName, teamAppUrl } from "@g3/site-config";
 import { sendDM } from "@g3/slack";
 import { and, desc, eq, gt, isNull, or } from "drizzle-orm";
 import { Hono } from "hono";
@@ -13,8 +12,8 @@ import {
   teamUiSettings,
 } from "../db/schema";
 import { removeInstallation, slackForTeam } from "../lib/slack-install";
-import { teamOfUser } from "../lib/team";
-import { isTeamUiSettings, readTeamUiSettings } from "../lib/team-ui";
+import { teamOfUser, teamUrl } from "../lib/team";
+import { isTeamUiSettings, loadTeamUi, teamIdName } from "../lib/team-ui";
 import { requireAdmin } from "../middleware/auth";
 import type { AppEnv } from "../types";
 
@@ -23,12 +22,8 @@ export const adminRouter = new Hono<AppEnv>()
   // The admin's own team's appearance.
   .get("/team/ui", async (c) => {
     const db = createDb(c.env.DB);
-    const team = await teamOfUser(db, c.get("userId") as string);
-    const row = await db.select().from(teamUiSettings).where(eq(teamUiSettings.teamId, team)).get();
-    return c.json({
-      settings: row ? readTeamUiSettings(row.settingsJson) : defaultTeamUiSettings,
-      updatedAt: row?.updatedAt ?? null,
-    });
+    // The team's defaults too, for the editor's "Reset to defaults".
+    return c.json(await loadTeamUi(db, await teamOfUser(db, c.get("userId") as string)));
   })
   .put("/team/ui", async (c) => {
     const body: unknown = await c.req.json().catch(() => null);
@@ -105,7 +100,7 @@ export const adminRouter = new Hono<AppEnv>()
     if (slackIdentity?.providerId && teamSlack) {
       await sendDM(
         slackIdentity.providerId,
-        `✅ Your ${idName} account has been approved! Click <${teamAppUrl(user.teamId, "id")}/login|here> to go to the login page and *sign in with Slack*. Yes, you will have to repeat the code sending process.`,
+        `✅ Your ${await teamIdName(db, user.teamId)} account has been approved! Click <${teamUrl(c.env, user.teamId, "id")}/login|here> to go to the login page and *sign in with Slack*. Yes, you will have to repeat the code sending process.`,
         teamSlack.slack,
       );
     }

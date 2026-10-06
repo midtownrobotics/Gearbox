@@ -1,10 +1,11 @@
-import { site } from "@g3/site-config";
+import { useTeamNames } from "@g3/ui";
 import { Loader2 } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../../lib/api";
 
 export function EmailLoginPage() {
+  const names = useTeamNames();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const redirect = searchParams.get("redirect");
@@ -41,7 +42,7 @@ export function EmailLoginPage() {
       <div className="w-full max-w-sm space-y-6">
         <div className="text-center">
           <h1 className="text-5xl font-bold text-secondary-900">
-            <span className="text-primary-500">G3</span>ID
+            <span className="text-primary-500">{names.shortName}</span>ID
           </h1>
           <p className="mt-2 text-secondary-600 text-sm">Sign in with email</p>
         </div>
@@ -56,7 +57,7 @@ export function EmailLoginPage() {
               type="email"
               autoComplete="email"
               className="w-full rounded-lg bg-white border border-secondary-300 px-4 py-2.5 text-secondary-900 text-sm placeholder-secondary-400 focus:outline-none focus:border-primary-500"
-              placeholder={`you@${site.domain}`}
+              placeholder="you@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               disabled={loading}

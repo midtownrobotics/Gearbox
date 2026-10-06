@@ -1,5 +1,4 @@
 import { requireAuth, requireMentor } from "@g3/auth";
-import { site } from "@g3/site-config";
 import { and, eq, inArray } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
@@ -159,7 +158,7 @@ export const shareACartRouter = new Hono<AppEnv>()
       const day = new Date().toLocaleDateString("en-US", { timeZone: "America/New_York" });
       const cart = await saveCart(db, {
         vendor: sacVendor,
-        title: `${site.team.name} – ${vendor} order (${day})`,
+        title: `${vendor} order (${day})`,
         items,
       });
       return c.json({ ...cart, added: items.length, skipped });

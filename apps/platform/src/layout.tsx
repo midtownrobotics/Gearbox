@@ -62,12 +62,6 @@ export function Footer() {
           <Link to="/report" className="hover:text-secondary-900">
             Report a team number
           </Link>
-          <a
-            href={site.donationUrl}
-            className="font-semibold text-primary-500 hover:text-primary-600"
-          >
-            Donate
-          </a>
         </div>
       </div>
     </footer>

@@ -92,11 +92,9 @@ Gearbox can connect to services run by others, such as Slack, Google, GitHub, St
 
 The public demo is open to anyone without an account. Do not enter real personal information in it. Everything in the demo is erased on a regular schedule, and the rules in section 6 apply to it.
 
-## 10. Cost and donations
+## 10. Cost
 
 Gearbox is free. No team pays to register or to switch on an app.
-
-Donations to Midtown Robotics Boosters to help us maintain Gearbox are welcome and entirely voluntary. A donation buys no feature, priority or support, and Gearbox works the same for teams that donate and teams that do not. Within the United States, donations are tax-deductible.
 
 ## 11. Availability and changes
 

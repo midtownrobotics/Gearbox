@@ -1,4 +1,3 @@
-import { site } from "@g3/site-config";
 import { useEffect, useState } from "react";
 import { FaGithub, FaGoogle, FaSlack, FaSteam } from "react-icons/fa";
 import { Link, useSearchParams } from "react-router-dom";
@@ -71,18 +70,6 @@ export function LoginPage() {
           <Link to="/signup" className="text-primary-500 hover:text-primary-600 transition-colors">
             Sign up
           </Link>
-        </p>
-
-        <p className="pt-6 text-center text-xs text-secondary-400">
-          Gearbox is free and run by volunteers.{" "}
-          <a
-            href={site.donationUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="underline hover:text-primary-500 transition-colors"
-          >
-            Donate
-          </a>
         </p>
       </div>
     </main>

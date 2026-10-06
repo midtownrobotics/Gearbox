@@ -1,3 +1,4 @@
+import { useTeamNames } from "@g3/ui";
 import { DEFAULT_TEMPLATE, applyTemplate } from "@g3/worker-orders/naming";
 import { type FormEvent, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -255,6 +256,7 @@ function ShareACart() {
  * has opened G3 Orders), so a team of 60 stays one line plus a search box.
  */
 function TrustedStudents() {
+  const names = useTeamNames();
   const people = useLoad(async () => {
     const res = await api.trusted.$get();
     if (!res.ok) throw new Error(await getErrorMessage(res));
@@ -324,7 +326,7 @@ function TrustedStudents() {
                 <ul className="absolute z-10 mt-1 w-full rounded-lg border border-secondary-200 bg-white shadow-lg">
                   {matches.length === 0 ? (
                     <li className="px-3 py-2 text-secondary-500">
-                      No one by that name has opened G3 Orders yet.
+                      No one by that name has opened {names.appTitle("Orders")} yet.
                     </li>
                   ) : (
                     matches.map((p) => (
