@@ -44,7 +44,7 @@ migrations_dir = "src/db/migrations"
 
 
 [env.production.vars]
-FRONTEND_URL = "https://edge.g3robotics.com"
+FRONTEND_URL = "https://1648-edge.frcgearbox.com"
 EDGE_AGENT_URL = "https://edge-agent.g3robotics.com"
 
 # The app's page, served by this worker in production; only /api/* runs the worker code, and

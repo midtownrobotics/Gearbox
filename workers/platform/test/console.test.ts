@@ -91,7 +91,8 @@ describe("who may use the console", () => {
       });
     expect((await suspend(null)).status).toBe(403);
     expect((await suspend(`https://1234-orders.${site.platformDomain}`)).status).toBe(403);
-    expect((await suspend(`https://admin.${site.domain}`)).status).toBe(200);
+    expect((await suspend(`https://admin.${site.domain}`)).status).toBe(403);
+    expect((await suspend(`https://admin.${site.platformDomain}`)).status).toBe(200);
   });
 });
 

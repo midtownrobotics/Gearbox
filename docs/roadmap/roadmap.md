@@ -33,7 +33,7 @@ Labels on the arrows mark the three release points. Phases 5 and 6 each depend o
 
 Sizes compare the phases to each other. They are not a schedule.
 
-Three release points sit between phases: G3 moves to its frcgearbox.com addresses after Phase 3, invited pilot teams join after Phase 4, and public sign-up opens after Phase 5.
+Three release points sit between phases: G3 moves to its frcgearbox.com addresses (done early, before Phase 3: its old g3robotics.com app addresses are retired), invited pilot teams join after Phase 4, and public sign-up opens after Phase 5.
 
 ## Progress
 
@@ -69,6 +69,7 @@ As of 5 October 2026, five of the six Phase 0 steps are done on `main`, Phase 1 
 | Local development through the gateway: every team's addresses on `*.gearbox.localhost:8796`, with links and sign-in kept local | 2.9 | This PR |
 | Team context per page: names and links from the team's appearance settings, addresses from the page's team, no `%SITE_*%` placeholders | 2.10 | This PR |
 | G3 removed from what users see: sign-in pages, messages, Scouting's logo, share image and colours, tab icons; README rewritten | 1.1, 1.3, 1.4, 1.6, 1.7 | This PR |
+| G3 moved to its frcgearbox.com addresses (`1648-<app>.frcgearbox.com`); its g3robotics.com app, sign-in and console addresses retired (410) | G3's cutover, early | This PR |
 | Operators' console on the platform Worker at `admin.<domain>`: an operator flag kept by the platform, teams and number reports, and tools to hand over, renumber, suspend or delete a team, with a 12-month access log | 2.8 | This pull request |
 | A version per app, changelogs, and a `main` to `public` release flow | Part of 0.2 | [#128](https://github.com/midtownrobotics/Gearbox/pull/128), [#129](https://github.com/midtownrobotics/Gearbox/pull/129) |
 | Shared navbar, light and dark mode, one color scheme | Groundwork for 1.3 | [#126](https://github.com/midtownrobotics/Gearbox/pull/126), [#127](https://github.com/midtownrobotics/Gearbox/pull/127) |
@@ -405,7 +406,7 @@ Edge is no longer a phase. It stays in the repo as a single-team app contributed
 
 ## Moving G3 in as the first team
 
-G3 never migrates in one jump. Its data is tagged in place during Phases 2 and 3, and only its addresses change at the cutover after Phase 3.
+G3 never migrates in one jump. Its data is tagged in place during Phases 2 and 3. Its addresses changed first, ahead of Phase 3: G3 is at `1648-<app>.frcgearbox.com`, and its old g3robotics.com app addresses answer 410 Gone.
 
 ### What changes for G3 at the cutover
 

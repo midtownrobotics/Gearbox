@@ -55,15 +55,15 @@ id = "d36a0313dd774bf78bacd76250ec085a"
 [env.production.vars]
 ENVIRONMENT = "production"
 GOOGLE_CLIENT_ID = "26070176131-lom1rtgi2tmahrd12md7452oieha1vbl.apps.googleusercontent.com"
-GOOGLE_REDIRECT_URI = "https://id.g3robotics.com/api/auth/google/callback"
+GOOGLE_REDIRECT_URI = "https://id.frcgearbox.com/api/auth/google/callback"
 GITHUB_CLIENT_ID = "Iv23lii4BhJtKBycp2yB"
-GITHUB_REDIRECT_URI = "https://id.g3robotics.com/api/auth/github/callback"
+GITHUB_REDIRECT_URI = "https://id.frcgearbox.com/api/auth/github/callback"
 SLACK_TEAM_ID = "T04LF3F0D"
 SLACK_APP_ID = "A08M9C82LEL"
-STEAM_REDIRECT_URI = "https://id.g3robotics.com/api/auth/steam/callback"
+STEAM_REDIRECT_URI = "https://id.frcgearbox.com/api/auth/steam/callback"
 ONSHAPE_CLIENT_ID = "NREWPL5DFDUCQEIYYGYZ643CMR3FTTSUMI2XDWQ="
-ONSHAPE_REDIRECT_URI = "https://id.g3robotics.com/api/auth/onshape/callback"
-FRONTEND_URL = "https://g3id.g3robotics.com"
+ONSHAPE_REDIRECT_URI = "https://id.frcgearbox.com/api/auth/onshape/callback"
+FRONTEND_URL = "https://1648-id.frcgearbox.com"
 
 [observability]
 enabled = false

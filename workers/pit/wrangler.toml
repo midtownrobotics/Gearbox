@@ -44,7 +44,7 @@ database_id = "f10a16be-9193-4888-ac18-099ccebe63c2"
 migrations_dir = "src/db/migrations"
 
 [env.production.vars]
-FRONTEND_URL = "https://pit.g3robotics.com"
+FRONTEND_URL = "https://1648-pit.frcgearbox.com"
 TEAM_NUMBER = "1648"
 EVENT_KEY = "2026gacmp"
 # TBA_AUTH_KEY and NEXUS_API_KEY are secrets — set via `wrangler secret put <NAME> --env production`

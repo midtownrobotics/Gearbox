@@ -19,30 +19,28 @@ const routed = async (url: string, init?: RequestInit) =>
 
 describe("gateway", () => {
   it("sends each app's address to its worker, page and /api alike", async () => {
-    expect(await routed(`https://orders.${site.domain}/lists/4?x=1`)).toMatchObject({
+    expect(await routed(`${team(`${ours}-orders`)}/lists/4?x=1`)).toMatchObject({
       app: "ORDERS",
-      host: `orders.${site.domain}`,
+      host: `${ours}-orders.${site.platformDomain}`,
       path: "/lists/4?x=1",
     });
-    expect((await routed(`https://orders.${site.domain}/api/requests`)).path).toBe("/api/requests");
-    expect((await routed(`https://${site.apps.id.web}.${site.domain}/`)).app).toBe("G3ID");
-    expect((await routed(`https://${site.apps.portal.web}.${site.domain}/`)).app).toBe("PORTAL");
-    expect((await routed(`https://${site.apps.attendance.web}.${site.domain}/`)).app).toBe(
-      "ATTENDANCE",
-    );
+    expect((await routed(`${team(`${ours}-orders`)}/api/requests`)).path).toBe("/api/requests");
+    expect((await routed(`${team(`${ours}-id`)}/`)).app).toBe("G3ID");
+    expect((await routed(`${team(`${ours}`)}/`)).app).toBe("PORTAL");
+    expect((await routed(`${team(`${ours}-attendance`)}/`)).app).toBe("ATTENDANCE");
   });
 
   it("answers the retired api.<app> addresses with the app's address to use instead", async () => {
     const res = await gateway(`https://api.g3id.${site.domain}/auth/google/callback?code=abc`);
     expect(res.status).toBe(410);
-    expect(await res.json()).toMatchObject({ use: `https://g3id.${site.domain}/api` });
+    expect(await res.json()).toMatchObject({ use: `${team(`${ours}-id`)}/api` });
     expect((await gateway(`https://api.scouting.${site.domain}/scouting/me`)).status).toBe(410);
     // A hostname that merely starts with "api." still goes where its DNS points.
     expect(await routed(`https://api.example.${site.domain}/x`)).toMatchObject({ app: "origin" });
   });
 
   it("keeps the method, headers and body", async () => {
-    const echoed = await routed(`https://shop.${site.domain}/api/print`, {
+    const echoed = await routed(`${team(`${ours}-shop`)}/api/print`, {
       method: "POST",
       headers: { "Content-Type": "application/pdf" },
       body: "%PDF",
@@ -89,8 +87,19 @@ describe("team addresses", () => {
     });
   });
 
-  it("gives the site's own addresses its team", async () => {
-    expect((await routed(`https://shop.${site.domain}/`)).team).toBe(`frc${ours}`);
+  it("answers G3's old addresses on its own domain with 410 Gone and the new address", async () => {
+    const page = await gateway(`https://shop.${site.domain}/parts`, {
+      headers: { Accept: "text/html" },
+    });
+    expect(page.status).toBe(410);
+    expect(await page.text()).toContain(team(`${ours}-shop`));
+    for (const host of [
+      `id.${site.domain}`,
+      `admin.${site.domain}`,
+      `${site.apps.id.web}.${site.domain}`,
+    ]) {
+      expect((await gateway(`https://${host}/`)).status).toBe(410);
+    }
   });
 
   it("answers 404 for a team or app that doesn't exist", async () => {
@@ -107,7 +116,7 @@ describe("sessions and identity", () => {
     });
 
   it("tells the app who's signed in, for the team's own members", async () => {
-    expect(await api(`https://orders.${site.domain}/api/me`, "ours")).toMatchObject({
+    expect(await api(`${team(`${ours}-orders`)}/api/me`, "ours")).toMatchObject({
       user: "u-ours",
       sessionType: "oauth",
       roles: "admin",
@@ -121,7 +130,7 @@ describe("sessions and identity", () => {
   });
 
   it("drops another team's session, so its member is signed out here", async () => {
-    expect(await api(`https://orders.${site.domain}/api/me`, "theirs")).toMatchObject({
+    expect(await api(`${team(`${ours}-orders`)}/api/me`, "theirs")).toMatchObject({
       user: null,
       cookie: "theme=dark",
     });
@@ -132,14 +141,14 @@ describe("sessions and identity", () => {
   });
 
   it("leaves an unknown session for the app to reject", async () => {
-    expect(await api(`https://orders.${site.domain}/api/me`, "expired")).toMatchObject({
+    expect(await api(`${team(`${ours}-orders`)}/api/me`, "expired")).toMatchObject({
       user: null,
       cookie: "theme=dark; g3_session=expired",
     });
   });
 
   it("removes identity headers a client sends", async () => {
-    const echoed = await api(`https://orders.${site.domain}/api/me`, undefined, {
+    const echoed = await api(`${team(`${ours}-orders`)}/api/me`, undefined, {
       headers: { "X-User-Id": "u-ours", "X-User-Roles": "admin", "X-Team-Id": "frc254" },
     });
     expect(echoed).toMatchObject({ user: null, roles: null, team: `frc${ours}` });
@@ -153,21 +162,21 @@ describe("requests from other pages", () => {
   it("lets the team's own pages, the site's other pages and localhost call its API", async () => {
     expect((await from(team("254-shop"))).status).toBe(200);
     expect((await from(team("254"))).status).toBe(200);
-    expect(
-      (await from(`https://shop.${site.domain}`, `${team(`${ours}-orders`)}/api/x`)).status,
-    ).toBe(200);
-    expect((await from(`https://www.${site.domain}`)).status).toBe(200);
+    expect((await from(team(`${ours}-shop`), `${team(`${ours}-orders`)}/api/x`)).status).toBe(200);
+    expect((await from(`https://www.${site.platformDomain}`)).status).toBe(200);
     expect((await from("http://localhost:5184")).status).toBe(200);
   });
 
   it("refuses another team's pages and other sites, reads included", async () => {
-    expect((await from(`https://orders.${site.domain}`)).status).toBe(403);
+    expect((await from(team(`${ours}-orders`))).status).toBe(403);
+    // G3's old domain is no longer one of ours.
+    expect((await from(`https://www.${site.domain}`)).status).toBe(403);
     expect((await from(team(`${ours}-orders`), undefined, "GET")).status).toBe(403);
     expect((await from("https://evil.example")).status).toBe(403);
   });
 
   it("says why: another team's page, or a page that isn't ours", async () => {
-    expect(await (await from(`https://orders.${site.domain}`)).json()).toEqual({
+    expect(await (await from(team(`${ours}-orders`))).json()).toEqual({
       error: "Requests from another team's pages aren't allowed.",
     });
     expect(await (await from(`http://${site.platformDomain}`)).json()).toEqual({
@@ -186,7 +195,7 @@ describe("https", () => {
   it("sends http to https, keeping the path and query", () => {
     for (const url of [
       `http://${site.platformDomain}/signup?id=1`,
-      `http://${site.apps.orders.web}.${site.domain}/api/requests`,
+      `http://${ours}-orders.${site.platformDomain}/api/requests`,
       `http://254-orders.${site.platformDomain}/lists`,
     ]) {
       const res = toHttps(new URL(url));
@@ -199,9 +208,7 @@ describe("https", () => {
 
 describe("calling another app's API", () => {
   it("sends /api/~<app> to that app's /api, for the page's own team", async () => {
-    expect(
-      await routed(`https://${site.apps.id.web}.${site.domain}/api/~attendance/leaderboard`),
-    ).toMatchObject({
+    expect(await routed(`${team(`${ours}-id`)}/api/~attendance/leaderboard`)).toMatchObject({
       app: "ATTENDANCE",
       path: "/api/leaderboard",
       team: `frc${ours}`,
@@ -220,9 +227,12 @@ describe("calling another app's API", () => {
 
 describe("the platform's sign-in callback host", () => {
   it("sends id.<domain> to G3ID for no team, so the sign-in's state says which", async () => {
-    const echoed = await routed(`https://id.${site.domain}/api/auth/google/callback?code=x`, {
-      headers: { "X-Team-Id": "frc254", Cookie: "g3_session=theirs" },
-    });
+    const echoed = await routed(
+      `https://id.${site.platformDomain}/api/auth/google/callback?code=x`,
+      {
+        headers: { "X-Team-Id": "frc254", Cookie: "g3_session=theirs" },
+      },
+    );
     expect(echoed).toMatchObject({
       app: "G3ID",
       path: "/api/auth/google/callback?code=x",
@@ -243,14 +253,12 @@ describe("the platform", () => {
     expect((await routed(`https://www.${site.platformDomain}/`)).app).toBe("PLATFORM");
   });
 
-  it("serves the operators' console on admin.<domain> and admin.<platform>, for no team", async () => {
-    for (const domain of [site.domain, site.platformDomain]) {
-      expect(
-        await routed(`https://admin.${domain}/api/console/me`, {
-          headers: { Cookie: "g3_session=theirs" },
-        }),
-      ).toMatchObject({ app: "PLATFORM", team: null, user: null, cookie: "g3_session=theirs" });
-    }
+  it("serves the operators' console on admin.<platform>, for no team", async () => {
+    expect(
+      await routed(`https://admin.${site.platformDomain}/api/console/me`, {
+        headers: { Cookie: "g3_session=theirs" },
+      }),
+    ).toMatchObject({ app: "PLATFORM", team: null, user: null, cookie: "g3_session=theirs" });
   });
 
   it("answers id.<platform> for sign-in callbacks too", async () => {
@@ -269,7 +277,7 @@ describe("the platform", () => {
 
   it("never answers workers' internal routes", async () => {
     for (const url of [
-      `https://${site.apps.id.web}.${site.domain}/api/internal/teams`,
+      `${team(`${ours}-id`)}/api/internal/teams`,
       `${team("254")}/api/~id/internal/teams`,
       `https://${site.platformDomain}/api/internal/x`,
     ]) {

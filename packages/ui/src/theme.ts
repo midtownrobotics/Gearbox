@@ -42,10 +42,10 @@ function applyTheme(theme: Theme) {
 
 /** Saves the theme for every G3 app and applies it here. */
 export function setTheme(theme: Theme) {
-  // Shared by every app on the domain this page is on: the site's, the platform's, or in dev the
-  // gateway's (gearbox.localhost) or plain localhost.
+  // Shared by every app on the domain this page is on: the platform's, or in dev the gateway's
+  // (gearbox.localhost) or plain localhost.
   const host = window.location.hostname;
-  const shared = [site.domain, site.platformDomain, DEV_DOMAIN, "localhost"].find(
+  const shared = [site.platformDomain, DEV_DOMAIN, "localhost"].find(
     (d) => host === d || host.endsWith(`.${d}`),
   );
   const domain = shared ? `; domain=${shared}` : "";
