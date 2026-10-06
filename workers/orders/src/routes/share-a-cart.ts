@@ -4,6 +4,7 @@ import { Hono } from "hono";
 import { validator } from "hono/validator";
 import { createOrdersDb } from "../db";
 import { orderRequests } from "../db/schema";
+import { inChunks } from "../lib/chunks";
 import {
   SAC_VENDORS,
   SacError,
@@ -117,19 +118,15 @@ export const shareACartRouter = new Hono<AppEnv>()
     const sacVendor = SAC_VENDORS[vendorKey(vendor)];
     if (!sacVendor) return c.json({ error: `Share-A-Cart doesn't support ${vendor}.` }, 400);
     const db = createOrdersDb(c.env.ORDERS_DB);
-    const rows = await db
-      .select()
-      .from(orderRequests)
-      .where(
-        and(
-          inArray(
-            orderRequests.id,
-            lines.map((l) => l.requestId),
-          ),
-          eq(orderRequests.status, "approved"),
-        ),
-      )
-      .all();
+    const rows = await inChunks(
+      lines.map((l) => l.requestId),
+      (chunk) =>
+        db
+          .select()
+          .from(orderRequests)
+          .where(and(inArray(orderRequests.id, chunk), eq(orderRequests.status, "approved")))
+          .all(),
+    );
     const qty = new Map(lines.map((l) => [l.requestId, l.quantity]));
     const items: SacItem[] = [];
     const skipped: string[] = [];
