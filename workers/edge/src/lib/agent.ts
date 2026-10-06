@@ -59,3 +59,16 @@ export async function agentFetch(
   }
   return res;
 }
+
+/**
+ * Why a 404 came back for an agent route. The agent answers unknown routes
+ * with a "404 Not Found" body; cloudflared answers paths its public-hostname
+ * rule doesn't forward with an empty one.
+ */
+export async function missingRouteMessage(res: Response, route: string) {
+  const body = (await res.text().catch(() => "")).trim();
+  if (body === "") {
+    return `The tunnel doesn't forward ${route} to the edge box yet: add it to the edge-agent hostname's path rule (see infra/edge/README.md, "Tunnel").`;
+  }
+  return "The edge box's agent is too old for this. Upgrade it (infra/edge/README.md).";
+}

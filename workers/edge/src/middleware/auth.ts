@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { createMiddleware } from "hono/factory";
 import { createEdgeDb } from "../db";
 import { edgeStatus, netSettings } from "../db/schema";
@@ -44,17 +44,31 @@ export const requireAgent = createMiddleware<AppEnv>(async (c, next) => {
   const startedAt = Number(c.req.header("X-G3-Agent-Started"));
   const applied = Number(c.req.header("X-G3-Agent-State-Version") ?? 0);
   if (version && Number.isInteger(startedAt)) {
+    const now = Math.floor(Date.now() / 1000);
+    // Set by Cloudflare where the request arrived (the gateway passes it on), so
+    // it's the hotspot carrier's address, not one the box could choose.
+    const publicIp = c.req.header("CF-Connecting-IP")?.slice(0, 64) || null;
     const values = {
       agentVersion: version,
       agentStartedAt: startedAt,
-      lastSeenAt: Math.floor(Date.now() / 1000),
+      lastSeenAt: now,
       appliedStateVersion: Number.isInteger(applied) ? applied : 0,
     };
     c.executionCtx.waitUntil(
       db
         .insert(edgeStatus)
-        .values({ id: 1, ...values })
-        .onConflictDoUpdate({ target: edgeStatus.id, set: values })
+        .values({ id: 1, ...values, publicIp, publicIpSince: publicIp ? now : null })
+        .onConflictDoUpdate({
+          target: edgeStatus.id,
+          set: {
+            ...values,
+            // Without the header (local dev), keep the last known address.
+            publicIp: sql`coalesce(excluded.public_ip, ${edgeStatus.publicIp})`,
+            publicIpSince: sql`case
+              when excluded.public_ip is null or excluded.public_ip is ${edgeStatus.publicIp}
+              then ${edgeStatus.publicIpSince} else excluded.public_ip_since end`,
+          },
+        })
         .run(),
     );
   }

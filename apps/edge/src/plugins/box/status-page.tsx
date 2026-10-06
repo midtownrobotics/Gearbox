@@ -71,6 +71,10 @@ export function StatusPage() {
           <p className="text-secondary-500">The agent hasn't checked in yet.</p>
         )}
       </Card>
+      <AddressesCard
+        publicIp={agent?.publicIp ?? null}
+        publicIpSince={agent?.publicIpSince ?? null}
+      />
       <TunnelCard />
     </Page>
   );
@@ -164,6 +168,101 @@ function TunnelCard() {
             {checking ? "Checking…" : "Check again"}
           </button>
         </div>
+      )}
+    </Card>
+  );
+}
+
+async function loadInterfaces() {
+  const res = await api.status.interfaces.$get();
+  if (!res.ok) throw new Error(await getErrorMessage(res));
+  return res.json();
+}
+
+const ROLE_LABELS = {
+  lan: { label: "LAN", hint: "The shop network" },
+  wan: { label: "WAN", hint: "The hotspot" },
+} as const;
+
+/**
+ * The box's public address (recorded from its uploads, so it shows even when the
+ * tunnel is down) and its LAN/WAN addresses, read live on the box.
+ */
+function AddressesCard({
+  publicIp,
+  publicIpSince,
+}: { publicIp: string | null; publicIpSince: number | null }) {
+  const { data, error, reload } = useLoad(loadInterfaces, []);
+  return (
+    <Card title="Addresses">
+      <div className="mb-4">
+        <p className="text-xs font-bold uppercase tracking-widest text-secondary-400">
+          Public{" "}
+          <span className="font-normal normal-case tracking-normal">
+            Where the box's traffic comes from on the internet
+          </span>
+        </p>
+        {publicIp ? (
+          <>
+            <p className="font-mono break-all text-lg text-secondary-900 mt-1">{publicIp}</p>
+            {publicIpSince && (
+              <p className="text-xs text-secondary-400 mt-0.5">
+                Since {formatDateTime(publicIpSince)}. The carrier can change it, and other
+                customers may share it.
+              </p>
+            )}
+          </>
+        ) : (
+          <p className="text-sm text-secondary-500 mt-1">
+            Not known yet; it's recorded at the box's next upload.
+          </p>
+        )}
+      </div>
+      {error && <ErrorBanner message={error} />}
+      {!data && !error && <p className="text-sm text-secondary-400">Checking…</p>}
+      {data && (
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-10 gap-y-4 min-w-0">
+            {data.interfaces.map((i) => (
+              <div key={i.role} className="min-w-0">
+                <p className="text-xs font-bold uppercase tracking-widest text-secondary-400">
+                  {ROLE_LABELS[i.role].label}{" "}
+                  <span className="font-normal normal-case tracking-normal">
+                    {ROLE_LABELS[i.role].hint} · {i.name}
+                    {i.state && i.state !== "up" ? ` · ${i.state}` : ""}
+                    {!i.state ? " · not found" : ""}
+                  </span>
+                </p>
+                {i.addresses.length === 0 ? (
+                  <p className="text-sm text-secondary-500 mt-1">No address</p>
+                ) : (
+                  <ul className="mt-1 space-y-0.5">
+                    {i.addresses.map((a) => (
+                      <li
+                        key={a.address}
+                        className={`font-mono break-all ${a.family === "ipv4" ? "text-lg text-secondary-900" : "text-xs text-secondary-500"}`}
+                      >
+                        {a.address}
+                        <span className="text-secondary-400">/{a.prefixLength}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {i.mac && <p className="text-xs text-secondary-400 font-mono mt-0.5">{i.mac}</p>}
+              </div>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={reload}
+            className="text-sm font-medium rounded-lg px-3 py-1.5 text-secondary-600 hover:text-secondary-900 hover:bg-secondary-100"
+          >
+            Refresh
+          </button>
+        </div>
+      )}
+      {data && (
+        <p className="text-xs text-secondary-400 mt-3">Checked {formatDateTime(data.checkedAt)}</p>
       )}
     </Card>
   );
