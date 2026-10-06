@@ -30,18 +30,23 @@ export function catalogKey(url: string, storeVariantId: string | null): string |
   return `${key}?variant=${storeVariantId}`;
 }
 
-/** Whether a link is a product page, a vendor search, or just the vendor's homepage. */
+/** Query parameters that make a vendor's home page (or Amazon's /s) a search. */
+const SEARCH_PARAMS = ["q", "query", "search", "search_query", "keyword", "keywords", "k"];
+
+/**
+ * Whether a link is a product page, a vendor search, or just the vendor's homepage. It's a search
+ * when the page itself is one (a /search path, Amazon's /s, or the home page with a query), not
+ * when a product page carries search tracking from where it was found (REV's `?search_query=`,
+ * Amazon's `&keywords=`).
+ */
 export function linkKindOf(raw: string): LinkKind {
   try {
     const url = new URL(raw);
-    if (url.pathname.replace(/\/+$/, "") === "" && !url.search) return "homepage";
-    if (
-      /search/i.test(url.pathname) ||
-      ["q", "query", "search", "search_query", "keyword"].some((p) => url.searchParams.has(p))
-    ) {
-      return "search";
-    }
-    return "product";
+    const path = url.pathname.replace(/\/+$/, "");
+    if (path === "" && !url.search) return "homepage";
+    if (/search/i.test(path)) return "search";
+    const queried = SEARCH_PARAMS.some((p) => url.searchParams.has(p));
+    return queried && (path === "" || path === "/s") ? "search" : "product";
   } catch {
     return "product";
   }
