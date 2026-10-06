@@ -43,8 +43,8 @@ export function createLookupModule(ctx: ModuleContext): EdgeModule {
       return c.json(result);
     } catch (err) {
       if (err instanceof LookupError) {
-        // The vendor's site failed or blocked us: 422, never 502, which the edge worker
-        // (rightly) reads as "the tunnel is up but the agent isn't answering".
+        // The vendor's site failed or blocked us: 422, which the edge worker passes on as
+        // "this site isn't supported" (other statuses become a generic 502).
         return c.json({ error: err.message }, err.status === 502 ? 422 : err.status);
       }
       lastError = err instanceof Error ? err.message : String(err);

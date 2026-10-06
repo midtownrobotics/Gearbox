@@ -4,7 +4,8 @@ import { withApiPrefix } from "@g3/site-config/worker";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import packageJson from "../package.json";
-import { requireAgent } from "./middleware/auth";
+import { CONNECT_PATH, agentLink } from "./lib/agent-link";
+import { recordAgentContact, requireAgent, requireAgentKey } from "./middleware/auth";
 import { lookupRouter } from "./modules/lookup/routes";
 import { networkAgentRouter, networkRouter, networkScheduled } from "./modules/network";
 import { printRouter } from "./modules/print/routes";
@@ -47,9 +48,17 @@ const app = base
   // The agent calls this right after applying new state; requireAgent records the
   // applied version (X-G3-Agent-State-Version) so the UI can clear "pending".
   .post("/agent/ack", requireAgent, (c) => c.json({ ok: true }))
+  // The box's link: it opens this WebSocket and keeps it open; the worker sends
+  // its requests to the agent over it (lib/agent-link.ts).
+  .get("/agent/connect", requireAgentKey, (c) => {
+    recordAgentContact(c);
+    return agentLink(c.env).fetch(new Request(`http://agent${CONNECT_PATH}`, c.req.raw));
+  })
   .route("/agent/network", networkAgentRouter);
 
 export type EdgeApp = typeof app;
+
+export { AgentLink } from "./lib/agent-link";
 
 export default {
   fetch: withApiPrefix(app.fetch),

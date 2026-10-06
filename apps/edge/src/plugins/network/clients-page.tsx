@@ -12,7 +12,7 @@ async function loadClients() {
 }
 
 export function ClientsPage() {
-  // Each load asks the edge box who's on the LAN right now (through the tunnel).
+  // Each load asks the edge box who's on the LAN right now (over its link).
   const { data, error, reload } = useLoad(loadClients, []);
   const [params, setParams] = useSearchParams();
   const onlineOnly = params.get("online") === "1";

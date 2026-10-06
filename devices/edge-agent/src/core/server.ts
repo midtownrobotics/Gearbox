@@ -4,16 +4,18 @@ import type { EdgeModule } from "./module";
 import { AGENT_VERSION } from "./version";
 
 /**
- * Local HTTP API, bound to 127.0.0.1. The tunnel (cloudflared) forwards
- * POST /sync and the module routes (e.g. /print/*) from
- * the edge-agent subdomain; /health is local-only. Everything but /health
- * requires the shared key.
+ * The agent's API: /health, POST /sync (the worker's "something changed"
+ * poke) and each module's routes at /<name>. Everything but /health requires
+ * the shared key. The worker reaches it over the link (core/link.ts), which
+ * calls it directly with the key; it's also served on 127.0.0.1 for checks on
+ * the box.
  */
-export function startServer(
-  port: number,
+export function createAgentApp(
   modules: EdgeModule[],
   startedAt: number,
   agentKey: string,
+  /** Extra /health fields from core (the link's state). */
+  coreStatus: () => Record<string, unknown> = () => ({}),
 ) {
   const app = new Hono()
     .get("/health", (c) =>
@@ -21,6 +23,7 @@ export function startServer(
         version: AGENT_VERSION,
         startedAt,
         uptimeSeconds: Math.floor(Date.now() / 1000) - startedAt,
+        ...coreStatus(),
         modules: Object.fromEntries(modules.map((m) => [m.name, m.status()])),
       }),
     )
@@ -45,5 +48,12 @@ export function startServer(
     });
     app.route(`/${m.name}`, m.routes);
   }
+  return app;
+}
+
+export type AgentApp = ReturnType<typeof createAgentApp>;
+
+/** Local-only: bound to 127.0.0.1, never reachable from the LAN or the internet. */
+export function startServer(port: number, app: AgentApp) {
   return Bun.serve({ hostname: "127.0.0.1", port, fetch: app.fetch });
 }

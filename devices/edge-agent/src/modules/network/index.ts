@@ -91,7 +91,7 @@ export function createNetworkModule(ctx: ModuleContext): EdgeModule {
     }
   }
 
-  // Through the tunnel (shared key).
+  // Called by the worker over the link (shared key).
   const routes = new Hono()
     // Which LAN devices are on right now.
     .get("/presence", async (c) => {

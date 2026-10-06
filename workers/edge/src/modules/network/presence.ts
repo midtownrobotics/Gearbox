@@ -1,11 +1,11 @@
 import { sql } from "drizzle-orm";
 import type { EdgeDb } from "../../db";
 import { netClients } from "../../db/schema";
-import { AgentError, agentFetch, missingRouteMessage } from "../../lib/agent";
+import { AGENT_TOO_OLD, AgentError, agentFetch } from "../../lib/agent";
 import type { AppEnv } from "../../types";
 import type { PresenceResponse } from "./presence-types";
 
-/** The box probes the LAN for about 1.5 s; leave room for the tunnel. */
+/** The box probes the LAN for about 1.5 s; leave room for the link. */
 const PRESENCE_TIMEOUT_MS = 8_000;
 
 export type LivePresence =
@@ -13,7 +13,7 @@ export type LivePresence =
   | { available: false; error: string };
 
 /**
- * Asks the box (through the tunnel) which LAN devices are on right now, and
+ * Asks the box (over its link) which LAN devices are on right now, and
  * records each one it hasn't seen yet, so devices that never use the internet
  * (printers) are listed too. Never throws: when the box can't be asked, the
  * page still shows the stored list without online dots.
@@ -23,7 +23,7 @@ export async function livePresence(env: AppEnv["Bindings"], db: EdgeDb): Promise
   try {
     const res = await agentFetch(env, "/network/presence", { timeoutMs: PRESENCE_TIMEOUT_MS });
     if (res.status === 404) {
-      return { available: false, error: await missingRouteMessage(res, "/network") };
+      return { available: false, error: AGENT_TOO_OLD };
     }
     if (!res.ok) {
       const { error } = (await res.json().catch(() => ({}))) as { error?: string };

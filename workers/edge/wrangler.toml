@@ -18,10 +18,18 @@ database_name = "g3-edge-local"
 database_id = "00000000-0000-0000-0000-000000000003"
 migrations_dir = "src/db/migrations"
 
+# Holds the edge box's WebSocket (src/lib/agent-link.ts): the agent connects to
+# /api/agent/connect, and the worker's requests to the box go over it.
+[[durable_objects.bindings]]
+name = "AGENT_LINK"
+class_name = "AgentLink"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["AgentLink"]
+
 [vars]
 FRONTEND_URL = "http://localhost:5183"
-# The mock agent (pnpm --filter @g3/edge-agent run dev:mock).
-EDGE_AGENT_URL = "http://localhost:8700"
 # Secrets: EDGE_AGENT_KEY (shared with the agent; .dev.vars locally, `wrangler secret put` in prod)
 
 [env.production]
@@ -42,10 +50,12 @@ database_name = "g3-edge-prod"
 database_id = "0ba12f11-3577-472f-9998-81017319bd51"
 migrations_dir = "src/db/migrations"
 
+[[env.production.durable_objects.bindings]]
+name = "AGENT_LINK"
+class_name = "AgentLink"
 
 [env.production.vars]
 FRONTEND_URL = "https://1648-edge.frcgearbox.com"
-EDGE_AGENT_URL = "https://edge-agent.g3robotics.com"
 
 # The app's page, served by this worker in production; only /api/* runs the worker code, and
 # other paths fall back to index.html for the app's router. Wrangler builds the page before

@@ -68,7 +68,19 @@ On the very first install, `install-agent.sh` creates `/etc/g3-edge/agent.env` a
 ssh g3@192.168.50.1 'systemctl is-active g3-edge-agent && curl -fsS http://127.0.0.1:8700/health && echo && readlink -f /opt/g3-edge/current'
 ```
 
-The health output lists each module. After 5 minutes, `network` should show `lastCollectError: null`, `lastSitesError: null` and `presence.lastError: null`.
+The health output should show `"link": {"connected": true, ...}`: the box's own connection to the edge worker, which is how printing, part lookups and the live pages reach it. The agent opens it itself (to `EDGE_WORKER_URL`, with `EDGE_AGENT_KEY`) and reconnects whenever it drops, so there's no tunnel or port to set up. After 5 minutes, `network` should show `lastCollectError: null`, `lastSitesError: null` and `presence.lastError: null`. The Edge Box page's **Connection** card shows the same from the app.
+
+## Moving an existing box off the tunnel (once)
+
+Agents before 0.5.0 were reached through a Cloudflare Tunnel (`edge-agent.g3robotics.com`). The edge worker no longer uses it. After deploying the worker and installing the new agent (above), and once the Connection card says **Connected**:
+
+1. On the box, check the agent's worker address is the current one, then remove `cloudflared`:
+   ```bash
+   ssh -t g3@192.168.50.1 'sudo grep EDGE_WORKER_URL /etc/g3-edge/agent.env'   # https://1648-edge.frcgearbox.com/api
+   ssh -t g3@192.168.50.1 'sudo cloudflared service uninstall; sudo apt remove -y cloudflared'
+   ```
+2. In the Cloudflare dashboard, **Zero Trust → Networks → Tunnels**: delete the box's tunnel (and with it the `edge-agent.g3robotics.com` public hostname). Then check **DNS** for `g3robotics.com` and delete the `edge-agent` CNAME if it's still there.
+3. Delete the old worker setting if it's still in the dashboard: the edge worker no longer reads `EDGE_AGENT_URL`.
 
 **Roll back** to a previous version (they're kept in `/opt/g3-edge/versions/`):
 
@@ -97,17 +109,7 @@ Only for a new box (or a fresh Armbian install). Do these on the box over SSH, f
    ```
 5. **Shop drive:** `sudo ./setup-drive.sh` (makes the 10 GB image at `/srv/g3-drive`, mounts it, starts the `drive.local` announcement). Optionally keep mDNS off the hotspot side: `sudo sed -i 's/^#\?allow-interfaces=.*/allow-interfaces=lan0/' /etc/avahi/avahi-daemon.conf && sudo systemctl restart avahi-daemon g3-drive-mdns`.
 6. **Door sounds:** wire the microswitch between physical pin 22 (GPIO2_D4, Linux GPIO 92) and GND (pin 20); never connect it to 5 V. Plug powered speakers into the 3.5 mm jack. If `aplay -l` shows a card other than `rockchipes8388`, set `EDGE_SWITCH_AUDIO_DEVICE` in `agent.env` and restart the agent. Upload sounds in the Edge app under **Edge Box → Door Sounds**.
-7. **Tunnel.** In the Cloudflare dashboard (**Zero Trust → Networks → Tunnels**), create a Cloudflared tunnel and run the `sudo cloudflared service install <token>` it shows (the token is a secret). Add a public hostname:
-   - `edge-agent.g3robotics.com` (the edge worker's `EDGE_AGENT_URL`)
-   - Path: `^/(print|lookup|switch|network|sync)(/.*)?$` (only these agent routes are reachable; `/health` stays local)
-   - Service: `HTTP`, `localhost:8700`
-
-   From any machine this should print `401` (the tunnel reached the agent, which refused the missing key):
-   ```bash
-   curl -s -o /dev/null -w "%{http_code}\n" https://edge-agent.g3robotics.com/network/presence
-   ```
-   An existing box whose rule lacks `network` keeps working, but the Clients page can't show who's online until the rule is updated.
-8. **Printer:** in the Edge app, **Print → Printers → Find printers**, then **Add** and **Print test page**.
+7. **Printer:** in the Edge app, **Print → Printers → Find printers**, then **Add** and **Print test page**.
 
 Remove the `# TEMP` SSH-on-`wan0` rule in `nftables.conf` (both copies) before going live.
 
@@ -131,8 +133,8 @@ journalctl -u g3-edge-agent -f
 curl -s http://127.0.0.1:8700/health
 ```
 
-- **"The edge box isn't reachable"** in the app: check `systemctl status cloudflared` and the agent, then the `curl` from the tunnel step.
-- **"rejected the worker's key"**: `EDGE_AGENT_KEY` in `/etc/g3-edge/agent.env` doesn't match the worker secret.
+- **"The edge box isn't connected"** in the app: check `systemctl status g3-edge-agent`, then `"link"` in the health output. `lastError` says why it's down; the agent keeps retrying (up to once a minute).
+- **`link.lastError` mentions 401, or the agent never connects:** `EDGE_AGENT_KEY` in `/etc/g3-edge/agent.env` doesn't match the worker secret. A 410 means `EDGE_WORKER_URL` is a retired address.
 - **Blocking misbehaves:** turn off **Enforce blocklists** and **DNS hardening** in the app. Without the app, `sudo nft delete table inet g3` removes blocking until the agent's next cycle; `sudo systemctl stop g3-edge-agent` keeps it off.
 - **Printer "Stopped":** click **Resume** on the Printers page once it's back; `lpstat -p -d` and `sudo journalctl -u cups -n 50` on the box.
 - If the hotspot is down, usage is buffered in `/var/lib/g3-edge/agent.db` and uploaded later. Don't delete `/var/lib/g3-edge`.
