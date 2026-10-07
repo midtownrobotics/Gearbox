@@ -1,155 +1,153 @@
-export type Member = {
-  id: string;
-  userId: string;
-  displayName: string;
-  email: string;
-};
+import { inTeam, withTeam } from "@g3/auth";
+import { eq } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/d1";
+import {
+  attendanceMembers,
+  attendanceSessions,
+  attendanceSettings,
+  attendanceTotals,
+} from "./db/schema";
+import { type AttendanceSettings, DEFAULT_SETTINGS } from "./settings";
 
-export type Session = {
-  id: string;
-  memberId: string;
-  signIn: number;
-  signOut: number | null;
-  durationMs: number | null;
-  adjustmentMs: number | null;
-  status: "open" | "completed" | "auto-closed" | "manual-adjustment";
-  year: string;
-  addedBy: string | null;
-};
+export type Member = typeof attendanceMembers.$inferSelect;
+export type Session = typeof attendanceSessions.$inferSelect;
 
-type MemberRow = { id: string; user_id: string; display_name: string; email: string };
-type SessionRow = {
-  id: string;
-  member_id: string;
-  sign_in: number;
-  sign_out: number | null;
-  duration_ms: number | null;
-  adjustment_ms: number | null;
-  status: Session["status"];
-  school_year: string;
-  added_by: string | null;
-};
-
-const memberFromRow = (row: MemberRow): Member => ({
-  id: row.id,
-  userId: row.user_id,
-  displayName: row.display_name,
-  email: row.email,
-});
-
-const sessionFromRow = (row: SessionRow): Session => ({
-  id: row.id,
-  memberId: row.member_id,
-  signIn: row.sign_in,
-  signOut: row.sign_out,
-  durationMs: row.duration_ms,
-  adjustmentMs: row.adjustment_ms,
-  status: row.status,
-  year: row.school_year,
-  addedBy: row.added_by,
-});
-
-const SESSION_COLUMNS =
-  "id, member_id, sign_in, sign_out, duration_ms, adjustment_ms, status, school_year, added_by";
-
+/** One team's attendance records: every query here is kept to that team. */
 export class AttendanceDb {
-  constructor(private readonly d1: D1Database) {}
+  private readonly db;
 
-  async listMembers(): Promise<Member[]> {
-    const result = await this.d1
-      .prepare("SELECT id, user_id, display_name, email FROM attendance_members")
-      .all<MemberRow>();
-    return result.results.map(memberFromRow);
+  constructor(
+    d1: D1Database,
+    readonly teamId: string,
+  ) {
+    this.db = drizzle(d1);
+  }
+
+  listMembers(): Promise<Member[]> {
+    return this.db
+      .select()
+      .from(attendanceMembers)
+      .where(inTeam(attendanceMembers, this.teamId))
+      .all();
   }
 
   async getMember(id: string): Promise<Member | null> {
-    const row = await this.d1
-      .prepare("SELECT id, user_id, display_name, email FROM attendance_members WHERE id = ?")
-      .bind(id)
-      .first<MemberRow>();
-    return row ? memberFromRow(row) : null;
+    const row = await this.db
+      .select()
+      .from(attendanceMembers)
+      .where(inTeam(attendanceMembers, this.teamId, eq(attendanceMembers.id, id)))
+      .get();
+    return row ?? null;
   }
 
-  async upsertMember(member: Member): Promise<void> {
-    await this.d1
-      .prepare(
-        `INSERT INTO attendance_members (id, user_id, display_name, email)
-         VALUES (?, ?, ?, ?)
-         ON CONFLICT(id) DO UPDATE SET user_id = excluded.user_id,
-           display_name = excluded.display_name, email = excluded.email`,
+  async upsertMember(member: Omit<Member, "teamId">): Promise<void> {
+    await this.db
+      .insert(attendanceMembers)
+      .values(withTeam(this.teamId, member))
+      .onConflictDoUpdate({
+        target: attendanceMembers.id,
+        set: { userId: member.userId, displayName: member.displayName, email: member.email },
+        // A member id belongs to one team; never move another team's row.
+        setWhere: inTeam(attendanceMembers, this.teamId),
+      });
+  }
+
+  listSessions(memberId?: string): Promise<Session[]> {
+    return this.db
+      .select()
+      .from(attendanceSessions)
+      .where(
+        inTeam(
+          attendanceSessions,
+          this.teamId,
+          memberId ? eq(attendanceSessions.memberId, memberId) : undefined,
+        ),
       )
-      .bind(member.id, member.userId, member.displayName, member.email)
-      .run();
+      .all();
   }
 
-  async listSessions(memberId?: string): Promise<Session[]> {
-    const statement = memberId
-      ? this.d1
-          .prepare(`SELECT ${SESSION_COLUMNS} FROM attendance_sessions WHERE member_id = ?`)
-          .bind(memberId)
-      : this.d1.prepare(`SELECT ${SESSION_COLUMNS} FROM attendance_sessions`);
-    const result = await statement.all<SessionRow>();
-    return result.results.map(sessionFromRow);
+  listOpenSessions(memberId?: string): Promise<Session[]> {
+    return this.db
+      .select()
+      .from(attendanceSessions)
+      .where(
+        inTeam(
+          attendanceSessions,
+          this.teamId,
+          eq(attendanceSessions.status, "open"),
+          memberId ? eq(attendanceSessions.memberId, memberId) : undefined,
+        ),
+      )
+      .all();
   }
 
-  async listOpenSessions(memberId?: string): Promise<Session[]> {
-    const statement = memberId
-      ? this.d1
-          .prepare(
-            `SELECT ${SESSION_COLUMNS} FROM attendance_sessions
-             WHERE status = 'open' AND member_id = ?`,
-          )
-          .bind(memberId)
-      : this.d1.prepare(`SELECT ${SESSION_COLUMNS} FROM attendance_sessions WHERE status = 'open'`);
-    const result = await statement.all<SessionRow>();
-    return result.results.map(sessionFromRow);
-  }
-
-  async addSession(session: Omit<Session, "id"> & { id?: string }): Promise<string> {
+  async addSession(session: Omit<Session, "id" | "teamId"> & { id?: string }): Promise<string> {
     const id = session.id ?? crypto.randomUUID();
-    await this.d1
-      .prepare(
-        `INSERT INTO attendance_sessions
-           (id, member_id, sign_in, sign_out, duration_ms, adjustment_ms, status, school_year, added_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      )
-      .bind(
-        id,
-        session.memberId,
-        session.signIn,
-        session.signOut,
-        session.durationMs,
-        session.adjustmentMs,
-        session.status,
-        session.year,
-        session.addedBy,
-      )
-      .run();
+    await this.db.insert(attendanceSessions).values(withTeam(this.teamId, { ...session, id }));
     return id;
   }
 
   async closeSession(id: string, signOut: number, durationMs: number, status: Session["status"]) {
-    await this.d1
-      .prepare(
-        "UPDATE attendance_sessions SET sign_out = ?, duration_ms = ?, status = ? WHERE id = ?",
-      )
-      .bind(signOut, durationMs, status, id)
-      .run();
+    await this.db
+      .update(attendanceSessions)
+      .set({ signOut, durationMs, status })
+      .where(inTeam(attendanceSessions, this.teamId, eq(attendanceSessions.id, id)));
   }
 
   async setTotal(memberId: string, year: string, totalMs: number, sessions: number) {
-    await this.d1
-      .prepare(
-        `INSERT INTO attendance_totals (member_id, school_year, total_ms, total_hours, sessions)
-         VALUES (?, ?, ?, ?, ?)
-         ON CONFLICT(member_id, school_year) DO UPDATE SET total_ms = excluded.total_ms,
-           total_hours = excluded.total_hours, sessions = excluded.sessions`,
-      )
-      .bind(memberId, year, totalMs, totalMs / 3_600_000, sessions)
-      .run();
+    const values = { totalMs, totalHours: totalMs / 3_600_000, sessions };
+    await this.db
+      .insert(attendanceTotals)
+      .values(withTeam(this.teamId, { memberId, schoolYear: year, ...values }))
+      .onConflictDoUpdate({
+        target: [attendanceTotals.memberId, attendanceTotals.schoolYear],
+        set: values,
+        setWhere: inTeam(attendanceTotals, this.teamId),
+      });
   }
 
   async deleteMember(id: string): Promise<void> {
-    await this.d1.prepare("DELETE FROM attendance_members WHERE id = ?").bind(id).run();
+    await this.db
+      .delete(attendanceMembers)
+      .where(inTeam(attendanceMembers, this.teamId, eq(attendanceMembers.id, id)));
   }
+
+  async settings(): Promise<AttendanceSettings> {
+    const row = await this.db
+      .select({
+        schoolYearStartMonth: attendanceSettings.schoolYearStartMonth,
+        schoolYearStartDay: attendanceSettings.schoolYearStartDay,
+        autoSignOutHours: attendanceSettings.autoSignOutHours,
+      })
+      .from(attendanceSettings)
+      .where(inTeam(attendanceSettings, this.teamId))
+      .get();
+    return row ?? DEFAULT_SETTINGS;
+  }
+
+  async saveSettings(settings: AttendanceSettings, updatedBy: string): Promise<void> {
+    const now = Math.floor(Date.now() / 1000);
+    await this.db
+      .insert(attendanceSettings)
+      .values(withTeam(this.teamId, { ...settings, updatedAt: now, updatedBy }))
+      .onConflictDoUpdate({
+        target: attendanceSettings.teamId,
+        set: { ...settings, updatedAt: now, updatedBy },
+        setWhere: inTeam(attendanceSettings, this.teamId),
+      });
+  }
+}
+
+/**
+ * The teams with a session still open, for the auto sign-out cron, which then works team by
+ * team with each team's own limit.
+ */
+export async function teamsWithOpenSessions(d1: D1Database): Promise<string[]> {
+  // tenancy: all teams (the cron finds which teams to close sessions for, then scopes to each)
+  const rows = await drizzle(d1)
+    .selectDistinct({ teamId: attendanceSessions.teamId })
+    .from(attendanceSessions)
+    .where(eq(attendanceSessions.status, "open"))
+    .all();
+  return rows.map((row) => row.teamId);
 }

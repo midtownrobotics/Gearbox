@@ -1,6 +1,6 @@
 import { admin, asUser, student } from "@g3/testing/users";
 import { call, callAs, jsonAs } from "@g3/testing/worker";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import {
   CHUNK_BYTES,
   type LinkHeader,
@@ -14,7 +14,11 @@ import {
 // The box's link: the agent opens a WebSocket to /agent/connect, and the worker's requests to the
 // box go over it. Here the test plays the agent.
 
-const AGENT_KEY = "test-agent-key";
+// The site team's box key, made by an admin like on the Edge Box page.
+let AGENT_KEY = "";
+beforeAll(async () => {
+  AGENT_KEY = (await jsonAs<{ key: string }>(admin, "/box/key", { method: "POST" }, 201)).key;
+});
 
 type Handler = (req: {
   method: string;

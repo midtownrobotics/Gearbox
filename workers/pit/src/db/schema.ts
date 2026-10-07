@@ -1,12 +1,22 @@
-import { index, integer, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { index, integer, primaryKey, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
-export const settings = sqliteTable("settings", {
-  key: text("key").primaryKey(),
-  value: text("value").notNull(),
-});
+// Every table is one team's data and carries the team (migration 0011): every query goes through
+// inTeam/withTeam from @g3/auth (roadmap Phase 3).
+
+/** A team's Pit settings by name: eventKey, nexusEventKey, iframeUrl. */
+export const settings = sqliteTable(
+  "settings",
+  {
+    teamId: text("team_id").notNull(),
+    key: text("key").notNull(),
+    value: text("value").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.teamId, t.key] })],
+);
 
 export const checklistLists = sqliteTable("checklist_lists", {
   id: integer("id").primaryKey({ autoIncrement: true }),
+  teamId: text("team_id").notNull(),
   name: text("name").notNull(),
   description: text("description"),
   createdAt: integer("created_at").notNull(),
@@ -16,6 +26,7 @@ export const checklistItems = sqliteTable(
   "checklist_items",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
+    teamId: text("team_id").notNull(),
     listId: integer("list_id")
       .notNull()
       .references(() => checklistLists.id),
@@ -33,6 +44,7 @@ export const checklistItems = sqliteTable(
 
 export const batteries = sqliteTable("batteries", {
   id: integer("id").primaryKey({ autoIncrement: true }),
+  teamId: text("team_id").notNull(),
   name: text("name").notNull(),
   state: text("state", { enum: ["Charging", "In Robot", "Idle", "Broken", "Next Up"] })
     .notNull()
@@ -47,6 +59,7 @@ export const checklistIssues = sqliteTable(
   "checklist_issues",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
+    teamId: text("team_id").notNull(),
     itemId: integer("item_id")
       .notNull()
       .references(() => checklistItems.id),

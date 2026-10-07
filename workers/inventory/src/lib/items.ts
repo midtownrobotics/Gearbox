@@ -1,3 +1,4 @@
+import { inTeam } from "@g3/auth";
 import { asc, eq, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { type StockStatus, itemListings, items, stock } from "../db/schema";
@@ -42,26 +43,32 @@ export type ItemView = {
   listings: ListingView[];
 };
 
-/** Every entry by name, or just one. */
-export async function loadItems(db: Db, onlyId?: number): Promise<ItemView[]> {
+/** Every entry of the team's by name, or just one. */
+export async function loadItems(db: Db, team: string, onlyId?: number): Promise<ItemView[]> {
   const [itemRows, stockRows, listingRows] = await Promise.all([
     db
       .select()
       .from(items)
-      .where(onlyId === undefined ? undefined : eq(items.id, onlyId))
+      .where(inTeam(items, team, onlyId === undefined ? undefined : eq(items.id, onlyId)))
       .orderBy(sql`lower(${items.name})`, asc(items.id))
       .all(),
     db
       .select()
       .from(stock)
-      .where(onlyId === undefined ? undefined : eq(stock.itemId, onlyId))
+      .where(inTeam(stock, team, onlyId === undefined ? undefined : eq(stock.itemId, onlyId)))
       // Storage before in use, then oldest first.
       .orderBy(sql`${stock.status} = 'in_use'`, asc(stock.id))
       .all(),
     db
       .select()
       .from(itemListings)
-      .where(onlyId === undefined ? undefined : eq(itemListings.itemId, onlyId))
+      .where(
+        inTeam(
+          itemListings,
+          team,
+          onlyId === undefined ? undefined : eq(itemListings.itemId, onlyId),
+        ),
+      )
       .orderBy(asc(itemListings.id))
       .all(),
   ]);

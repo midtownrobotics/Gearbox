@@ -1,17 +1,28 @@
-import { requireAuth, requireMentor } from "@g3/auth";
-import { and, desc, eq, ne } from "drizzle-orm";
+import { inTeam, requireAuth, requireMentor, withTeam } from "@g3/auth";
+import { type SQL, desc, eq, exists, gt, ne, sql } from "drizzle-orm";
+import type { BatchItem } from "drizzle-orm/batch";
+import { alias } from "drizzle-orm/sqlite-core";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
 import { type Db, createDb } from "../db";
-import { STOCK_STATUSES, itemEvents, itemListings, items } from "../db/schema";
+import {
+  STOCK_STATUSES,
+  intakeReceipts,
+  itemEvents,
+  itemListings,
+  items,
+  stock,
+} from "../db/schema";
 import { applyValues, loadFields, parseValues } from "../lib/fields";
 import { parseId, quantityField, textField } from "../lib/input";
 import { type ListingInput, listingLabel, loadItems, parseListing } from "../lib/items";
 import {
   type Place,
   STOCK_ERRORS,
+  type StockTable,
   actorOf,
   addStock,
+  batch,
   describePlace,
   dropIfEmpty,
   loadNames,
@@ -33,14 +44,20 @@ const HISTORY_LIMIT = 500;
 
 const GONE = "That entry no longer exists.";
 
-/** The entry a catalog part is already listed on, if any (other than `exceptItemId`). */
-async function catalogOwner(db: Db, catalogItemId: number, exceptItemId?: number) {
+/** Other names for the stock table, for subqueries about other rows of it. */
+const s = alias(stock, "s");
+const t = alias(stock, "t");
+
+/** The team's entry a catalog part is already listed on, if any (other than `exceptItemId`). */
+async function catalogOwner(db: Db, team: string, catalogItemId: number, exceptItemId?: number) {
   return db
     .select({ id: items.id, name: items.name })
     .from(itemListings)
-    .innerJoin(items, eq(items.id, itemListings.itemId))
+    .innerJoin(items, inTeam(items, team, eq(items.id, itemListings.itemId)))
     .where(
-      and(
+      inTeam(
+        itemListings,
+        team,
         eq(itemListings.catalogItemId, catalogItemId),
         exceptItemId === undefined ? undefined : ne(itemListings.itemId, exceptItemId),
       ),
@@ -48,25 +65,19 @@ async function catalogOwner(db: Db, catalogItemId: number, exceptItemId?: number
     .get();
 }
 
-function insertListing(d1: D1Database, itemId: number, listing: ListingInput, now: number) {
-  return d1
-    .prepare(
-      `INSERT INTO item_listings
-         (item_id, catalog_item_id, vendor, sku, name, url, price_cents, price_at, created_at)
-       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)`,
-    )
-    .bind(
-      itemId,
-      listing.catalogItemId,
-      listing.vendor,
-      listing.sku,
-      listing.name,
-      listing.url,
-      listing.priceCents,
-      listing.priceAt,
-      now,
-    );
+function insertListing(db: Db, team: string, itemId: number, listing: ListingInput, now: number) {
+  return db.insert(itemListings).values(withTeam(team, { ...listing, itemId, createdAt: now }));
 }
+
+/** The team's entry `id`, as stored. */
+const itemRow = (db: Db, team: string, id: number | null) =>
+  id === null
+    ? null
+    : db
+        .select()
+        .from(items)
+        .where(inTeam(items, team, eq(items.id, id)))
+        .get();
 
 type NewItem = {
   name: string;
@@ -173,19 +184,19 @@ const splitValidator = validator("json", (value, c): Split => {
 export const itemsRouter = new Hono<AppEnv>()
   .post("/", requireAuth, newItemValidator, async (c) => {
     const body = c.req.valid("json");
-    const d1 = c.env.INVENTORY_DB;
-    const db = createDb(d1);
+    const db = createDb(c.env.INVENTORY_DB);
+    const team = c.get("teamId");
 
-    const applied = applyValues(body.values, {}, await loadFields(db));
+    const applied = applyValues(body.values, {}, await loadFields(db, team));
     if ("error" in applied) return c.json({ error: applied.error }, 400);
-    const names = await loadNames(db);
+    const names = await loadNames(db, team);
     const place: Place | null = body.stock
       ? { locationId: body.stock.locationId, status: "storage", robotId: null, subsystemId: null }
       : null;
     const problem = place && placeProblem(place, names);
     if (problem) return c.json({ error: problem }, 400);
     if (body.listing?.catalogItemId) {
-      const owner = await catalogOwner(db, body.listing.catalogItemId);
+      const owner = await catalogOwner(db, team, body.listing.catalogItemId);
       if (owner) {
         return c.json(
           { error: `That catalog part is already on "${owner.name}".`, itemId: owner.id },
@@ -198,27 +209,30 @@ export const itemsRouter = new Hono<AppEnv>()
     const by = actorOf(c);
     const made = await db
       .insert(items)
-      .values({
-        name: body.name,
-        fieldValues: JSON.stringify(applied.values),
-        createdById: by.id,
-        createdByName: by.name,
-        createdAt: now,
-        updatedAt: now,
-      })
+      .values(
+        withTeam(team, {
+          name: body.name,
+          fieldValues: JSON.stringify(applied.values),
+          createdById: by.id,
+          createdByName: by.name,
+          createdAt: now,
+          updatedAt: now,
+        }),
+      )
       .returning({ id: items.id })
       .get();
     const note =
       place && body.stock ? `${body.stock.quantity} in ${describePlace(place, names)}.` : null;
-    const statements = [logEvent(d1, made.id, "created", note, by, now)];
-    if (body.listing) statements.push(insertListing(d1, made.id, body.listing, now));
-    if (place && body.stock) {
-      statements.push(...addStock(d1, made.id, place, body.stock.quantity, now));
-    }
     try {
-      await d1.batch(statements);
+      await db.batch([
+        logEvent(db, team, made.id, "created", note, by, now),
+        ...(body.listing ? [insertListing(db, team, made.id, body.listing, now)] : []),
+        ...(place && body.stock
+          ? addStock(db, team, made.id, place, body.stock.quantity, now)
+          : []),
+      ]);
     } catch (err) {
-      await db.delete(items).where(eq(items.id, made.id));
+      await db.delete(items).where(inTeam(items, team, eq(items.id, made.id)));
       throw err;
     }
     return c.json({ id: made.id }, 201);
@@ -227,7 +241,8 @@ export const itemsRouter = new Hono<AppEnv>()
   .get("/:id", requireAuth, async (c) => {
     const id = parseId(c.req.param("id"));
     const db = createDb(c.env.INVENTORY_DB);
-    const [item] = id === null ? [] : await loadItems(db, id);
+    const team = c.get("teamId");
+    const [item] = id === null ? [] : await loadItems(db, team, id);
     if (!item) return c.json({ error: GONE }, 404);
     const events = await db
       .select({
@@ -239,7 +254,7 @@ export const itemsRouter = new Hono<AppEnv>()
         createdAt: itemEvents.createdAt,
       })
       .from(itemEvents)
-      .where(eq(itemEvents.itemId, item.id))
+      .where(inTeam(itemEvents, team, eq(itemEvents.itemId, item.id)))
       .orderBy(desc(itemEvents.createdAt), desc(itemEvents.id))
       .limit(HISTORY_LIMIT)
       .all();
@@ -247,9 +262,9 @@ export const itemsRouter = new Hono<AppEnv>()
   })
   .patch("/:id", requireAuth, editValidator, async (c) => {
     const id = parseId(c.req.param("id"));
-    const d1 = c.env.INVENTORY_DB;
-    const db = createDb(d1);
-    const row = id === null ? null : await db.select().from(items).where(eq(items.id, id)).get();
+    const db = createDb(c.env.INVENTORY_DB);
+    const team = c.get("teamId");
+    const row = await itemRow(db, team, id);
     if (!row) return c.json({ error: GONE }, 404);
     const body = c.req.valid("json");
 
@@ -258,7 +273,11 @@ export const itemsRouter = new Hono<AppEnv>()
     if (name !== row.name) changed.push("Name");
     let fieldValues = row.fieldValues;
     if (body.values !== undefined) {
-      const applied = applyValues(body.values, parseValues(row.fieldValues), await loadFields(db));
+      const applied = applyValues(
+        body.values,
+        parseValues(row.fieldValues),
+        await loadFields(db, team),
+      );
       if ("error" in applied) return c.json({ error: applied.error }, 400);
       changed.push(...applied.changed);
       fieldValues = JSON.stringify(applied.values);
@@ -270,11 +289,12 @@ export const itemsRouter = new Hono<AppEnv>()
       name !== row.name && changed.length === 1
         ? `Renamed from "${row.name}".`
         : `Changed ${changed.join(", ")}.`;
-    await d1.batch([
-      d1
-        .prepare("UPDATE items SET name = ?2, field_values = ?3, updated_at = ?4 WHERE id = ?1")
-        .bind(row.id, name, fieldValues, now),
-      logEvent(d1, row.id, "edited", note, actorOf(c), now),
+    await db.batch([
+      db
+        .update(items)
+        .set({ name, fieldValues, updatedAt: now })
+        .where(inTeam(items, team, eq(items.id, row.id))),
+      logEvent(db, team, row.id, "edited", note, actorOf(c), now),
     ]);
     return c.json({ ok: true });
   })
@@ -282,43 +302,46 @@ export const itemsRouter = new Hono<AppEnv>()
   .delete("/:id", requireMentor, async (c) => {
     const id = parseId(c.req.param("id"));
     if (id === null) return c.json({ error: GONE }, 404);
-    await createDb(c.env.INVENTORY_DB).delete(items).where(eq(items.id, id));
+    await createDb(c.env.INVENTORY_DB)
+      .delete(items)
+      .where(inTeam(items, c.get("teamId"), eq(items.id, id)));
     return c.json({ ok: true });
   })
   /** Adds parts that weren't counted before (found, donated, made), or gives an entry a home. */
   .post("/:id/stock", requireAuth, stockValidator, async (c) => {
     const id = parseId(c.req.param("id"));
-    const d1 = c.env.INVENTORY_DB;
-    const db = createDb(d1);
-    const row = id === null ? null : await db.select().from(items).where(eq(items.id, id)).get();
+    const db = createDb(c.env.INVENTORY_DB);
+    const team = c.get("teamId");
+    const row = await itemRow(db, team, id);
     if (!row) return c.json({ error: GONE }, 404);
     const { quantity, ...place } = c.req.valid("json");
-    const names = await loadNames(db);
+    const names = await loadNames(db, team);
     const problem = placeProblem(place, names);
     if (problem) return c.json({ error: problem }, 400);
 
     const now = Date.now();
     const where = describePlace(place, names);
-    await d1.batch([
-      ...addStock(d1, row.id, place, quantity, now),
+    await batch(db, [
+      ...addStock(db, team, row.id, place, quantity, now),
       logEvent(
-        d1,
+        db,
+        team,
         row.id,
         "added",
         quantity > 0 ? `${quantity} in ${where}.` : `Kept in ${where}.`,
         actorOf(c),
         now,
       ),
-      ...(place.status === "storage" ? [tidyStorage(d1, row.id, place.locationId)] : []),
+      ...(place.status === "storage" ? [tidyStorage(db, team, row.id, place.locationId)] : []),
     ]);
     return c.json({ ok: true });
   })
   /** Adds a way to buy the entry: a part from Orders' catalog, or a vendor's page typed in. */
   .post("/:id/listings", requireAuth, listingValidator, async (c) => {
     const id = parseId(c.req.param("id"));
-    const d1 = c.env.INVENTORY_DB;
-    const db = createDb(d1);
-    const row = id === null ? null : await db.select().from(items).where(eq(items.id, id)).get();
+    const db = createDb(c.env.INVENTORY_DB);
+    const team = c.get("teamId");
+    const row = await itemRow(db, team, id);
     if (!row) return c.json({ error: GONE }, 404);
     const listing = c.req.valid("json");
     if (listing.catalogItemId) {
@@ -326,14 +349,16 @@ export const itemsRouter = new Hono<AppEnv>()
         .select({ id: itemListings.id })
         .from(itemListings)
         .where(
-          and(
+          inTeam(
+            itemListings,
+            team,
             eq(itemListings.itemId, row.id),
             eq(itemListings.catalogItemId, listing.catalogItemId),
           ),
         )
         .get();
       if (mine) return c.json({ error: "That catalog part is already on this entry." }, 409);
-      const owner = await catalogOwner(db, listing.catalogItemId, row.id);
+      const owner = await catalogOwner(db, team, listing.catalogItemId, row.id);
       if (owner) {
         return c.json(
           {
@@ -346,30 +371,37 @@ export const itemsRouter = new Hono<AppEnv>()
     }
     const now = Date.now();
     const what = listing.catalogItemId ? " from the Orders catalog" : "";
-    await d1.batch([
-      insertListing(d1, row.id, listing, now),
-      logEvent(d1, row.id, "linked", `${listingLabel(listing)}${what}.`, actorOf(c), now),
+    await db.batch([
+      insertListing(db, team, row.id, listing, now),
+      logEvent(db, team, row.id, "linked", `${listingLabel(listing)}${what}.`, actorOf(c), now),
     ]);
     return c.json({ ok: true }, 201);
   })
   .delete("/:id/listings/:listingId", requireAuth, async (c) => {
     const id = parseId(c.req.param("id"));
     const listingId = parseId(c.req.param("listingId"));
-    const d1 = c.env.INVENTORY_DB;
-    const db = createDb(d1);
+    const db = createDb(c.env.INVENTORY_DB);
+    const team = c.get("teamId");
     const listing =
       id === null || listingId === null
         ? null
         : await db
             .select()
             .from(itemListings)
-            .where(and(eq(itemListings.id, listingId), eq(itemListings.itemId, id)))
+            .where(
+              inTeam(
+                itemListings,
+                team,
+                eq(itemListings.id, listingId),
+                eq(itemListings.itemId, id),
+              ),
+            )
             .get();
     if (!listing) return c.json({ error: "That listing is no longer on this entry." }, 404);
     const now = Date.now();
-    await d1.batch([
-      d1.prepare("DELETE FROM item_listings WHERE id = ?1").bind(listing.id),
-      logEvent(d1, listing.itemId, "unlinked", `${listingLabel(listing)}.`, actorOf(c), now),
+    await db.batch([
+      db.delete(itemListings).where(inTeam(itemListings, team, eq(itemListings.id, listing.id))),
+      logEvent(db, team, listing.itemId, "unlinked", `${listingLabel(listing)}.`, actorOf(c), now),
     ]);
     return c.json({ ok: true });
   })
@@ -381,16 +413,18 @@ export const itemsRouter = new Hono<AppEnv>()
   .post("/:id/merge", requireMentor, mergeValidator, async (c) => {
     const id = parseId(c.req.param("id"));
     const { fromId } = c.req.valid("json");
-    const d1 = c.env.INVENTORY_DB;
-    const db = createDb(d1);
+    const db = createDb(c.env.INVENTORY_DB);
+    const team = c.get("teamId");
     if (id === fromId) return c.json({ error: "Pick a different entry to merge in." }, 400);
     const [[into], [from]] =
-      id === null ? [[], []] : await Promise.all([loadItems(db, id), loadItems(db, fromId)]);
+      id === null
+        ? [[], []]
+        : await Promise.all([loadItems(db, team, id), loadItems(db, team, fromId)]);
     if (!into) return c.json({ error: GONE }, 404);
     if (!from) return c.json({ error: "The entry to merge in no longer exists." }, 404);
 
     const now = Date.now();
-    const defs = await loadFields(db);
+    const defs = await loadFields(db, team);
     const values = Object.fromEntries(
       Object.entries({ ...from.values, ...into.values }).filter(([key]) =>
         defs.some((def) => String(def.id) === key),
@@ -401,52 +435,93 @@ export const itemsRouter = new Hono<AppEnv>()
     const note = `"${from.name}" merged in: ${parts} ${parts === 1 ? "part" : "parts"}, ${listings} ${
       listings === 1 ? "listing" : "listings"
     }.`;
-    // `same` matches a row of one entry with the other entry's row in the same place.
-    const same = (alias: string) =>
-      `${alias}.location_id = stock.location_id AND ${alias}.status = stock.status
-       AND ${alias}.robot_id IS stock.robot_id AND ${alias}.subsystem_id IS stock.subsystem_id`;
+    // `same` matches another row with the stock row in the same place.
+    const same = (other: StockTable): SQL[] => [
+      eq(other.locationId, stock.locationId),
+      eq(other.status, stock.status),
+      sql`${other.robotId} IS ${stock.robotId}`,
+      sql`${other.subsystemId} IS ${stock.subsystemId}`,
+    ];
+    const statements: BatchItem<"sqlite">[] = [
+      db
+        .update(items)
+        .set({ fieldValues: JSON.stringify(values), updatedAt: now })
+        .where(inTeam(items, team, eq(items.id, into.id))),
+      // Where both have parts in the same place, the quantities add up...
+      db
+        .update(stock)
+        .set({
+          updatedAt: now,
+          quantity: sql`${stock.quantity} + (${db
+            .select({ quantity: s.quantity })
+            .from(s)
+            .where(inTeam(s, team, eq(s.itemId, from.id), ...same(s)))})`,
+        })
+        .where(
+          inTeam(
+            stock,
+            team,
+            eq(stock.itemId, into.id),
+            exists(
+              db
+                .select({ one: sql`1` })
+                .from(s)
+                .where(inTeam(s, team, eq(s.itemId, from.id), ...same(s))),
+            ),
+          ),
+        ),
+      db.delete(stock).where(
+        inTeam(
+          stock,
+          team,
+          eq(stock.itemId, from.id),
+          exists(
+            db
+              .select({ one: sql`1` })
+              .from(t)
+              .where(inTeam(t, team, eq(t.itemId, into.id), ...same(t))),
+          ),
+        ),
+      ),
+      // ...and everything else just changes entry.
+      db
+        .update(stock)
+        .set({ itemId: into.id, updatedAt: now })
+        .where(inTeam(stock, team, eq(stock.itemId, from.id))),
+      db.delete(stock).where(
+        inTeam(
+          stock,
+          team,
+          eq(stock.itemId, into.id),
+          eq(stock.status, "storage"),
+          eq(stock.quantity, 0),
+          exists(
+            db
+              .select({ one: sql`1` })
+              .from(s)
+              .where(
+                inTeam(s, team, eq(s.itemId, into.id), eq(s.status, "storage"), gt(s.quantity, 0)),
+              ),
+          ),
+        ),
+      ),
+      db
+        .update(itemListings)
+        .set({ itemId: into.id })
+        .where(inTeam(itemListings, team, eq(itemListings.itemId, from.id))),
+      db
+        .update(itemEvents)
+        .set({ itemId: into.id })
+        .where(inTeam(itemEvents, team, eq(itemEvents.itemId, from.id))),
+      db
+        .update(intakeReceipts)
+        .set({ itemId: into.id })
+        .where(inTeam(intakeReceipts, team, eq(intakeReceipts.itemId, from.id))),
+      db.delete(items).where(inTeam(items, team, eq(items.id, from.id))),
+      logEvent(db, team, into.id, "merged", note, actorOf(c), now),
+    ];
     try {
-      await d1.batch([
-        d1
-          .prepare("UPDATE items SET field_values = ?2, updated_at = ?3 WHERE id = ?1")
-          .bind(into.id, JSON.stringify(values), now),
-        // Where both have parts in the same place, the quantities add up...
-        d1
-          .prepare(
-            `UPDATE stock SET updated_at = ?3, quantity = quantity + (
-               SELECT s.quantity FROM stock s WHERE s.item_id = ?1 AND ${same("s")}
-             )
-             WHERE item_id = ?2
-               AND EXISTS (SELECT 1 FROM stock s WHERE s.item_id = ?1 AND ${same("s")})`,
-          )
-          .bind(from.id, into.id, now),
-        d1
-          .prepare(
-            `DELETE FROM stock WHERE item_id = ?1
-               AND EXISTS (SELECT 1 FROM stock t WHERE t.item_id = ?2 AND ${same("t")})`,
-          )
-          .bind(from.id, into.id),
-        // ...and everything else just changes entry.
-        d1
-          .prepare("UPDATE stock SET item_id = ?2, updated_at = ?3 WHERE item_id = ?1")
-          .bind(from.id, into.id, now),
-        d1
-          .prepare(
-            `DELETE FROM stock WHERE item_id = ?1 AND status = 'storage' AND quantity = 0
-               AND EXISTS (SELECT 1 FROM stock s
-                           WHERE s.item_id = ?1 AND s.status = 'storage' AND s.quantity > 0)`,
-          )
-          .bind(into.id),
-        d1
-          .prepare("UPDATE item_listings SET item_id = ?2 WHERE item_id = ?1")
-          .bind(from.id, into.id),
-        d1.prepare("UPDATE item_events SET item_id = ?2 WHERE item_id = ?1").bind(from.id, into.id),
-        d1
-          .prepare("UPDATE intake_receipts SET item_id = ?2 WHERE item_id = ?1")
-          .bind(from.id, into.id),
-        d1.prepare("DELETE FROM items WHERE id = ?1").bind(from.id),
-        logEvent(d1, into.id, "merged", note, actorOf(c), now),
-      ]);
+      await batch(db, statements);
     } catch (err) {
       console.error("[inventory] merge", err);
       return c.json({ error: "Those entries changed while merging. Reload and try again." }, 409);
@@ -460,9 +535,9 @@ export const itemsRouter = new Hono<AppEnv>()
   .post("/:id/split", requireMentor, splitValidator, async (c) => {
     const id = parseId(c.req.param("id"));
     const body = c.req.valid("json");
-    const d1 = c.env.INVENTORY_DB;
-    const db = createDb(d1);
-    const [item] = id === null ? [] : await loadItems(db, id);
+    const db = createDb(c.env.INVENTORY_DB);
+    const team = c.get("teamId");
+    const [item] = id === null ? [] : await loadItems(db, team, id);
     if (!item) return c.json({ error: GONE }, 404);
     const listing = item.listings.find((l) => l.id === body.listingId);
     if (!listing) return c.json({ error: "That listing is no longer on this entry." }, 404);
@@ -480,34 +555,68 @@ export const itemsRouter = new Hono<AppEnv>()
 
     const now = Date.now();
     const by = actorOf(c);
-    const row = await db.select().from(items).where(eq(items.id, item.id)).get();
+    const row = await itemRow(db, team, item.id);
     const name = body.name || listing.name || listingLabel(listing);
     const made = await db
       .insert(items)
-      .values({
-        name,
-        fieldValues: row?.fieldValues ?? "{}",
-        createdById: by.id,
-        createdByName: by.name,
-        createdAt: now,
-        updatedAt: now,
-      })
+      .values(
+        withTeam(team, {
+          name,
+          fieldValues: row?.fieldValues ?? "{}",
+          createdById: by.id,
+          createdByName: by.name,
+          createdAt: now,
+          updatedAt: now,
+        }),
+      )
       .returning({ id: items.id })
       .get();
     const moved = moves.reduce((sum, move) => sum + move.quantity, 0);
     try {
-      await d1.batch([
-        // Nothing moves unless the listing is still this entry's.
-        mustExist(d1, "item_listings WHERE id = ?1 AND item_id = ?2", listing.id, item.id),
-        d1.prepare("UPDATE item_listings SET item_id = ?2 WHERE id = ?1").bind(listing.id, made.id),
+      await db.batch([
+        // Nothing moves unless the listing is still this entry's (against the new entry, which
+        // certainly exists).
+        mustExist(
+          db,
+          team,
+          made.id,
+          exists(
+            db
+              .select({ one: sql`1` })
+              .from(itemListings)
+              .where(
+                inTeam(
+                  itemListings,
+                  team,
+                  eq(itemListings.id, listing.id),
+                  eq(itemListings.itemId, item.id),
+                ),
+              ),
+          ),
+        ),
+        db
+          .update(itemListings)
+          .set({ itemId: made.id })
+          .where(inTeam(itemListings, team, eq(itemListings.id, listing.id))),
         ...moves.flatMap((move) => [
-          mustExist(d1, "stock WHERE id = ?1 AND item_id = ?2", move.stockId, item.id),
-          takeStock(d1, move.stockId, move.quantity, now),
-          ...addStock(d1, made.id, move.place, move.quantity, now),
-          dropIfEmpty(d1, move.stockId, false),
+          mustExist(
+            db,
+            team,
+            made.id,
+            exists(
+              db
+                .select({ one: sql`1` })
+                .from(s)
+                .where(inTeam(s, team, eq(s.id, move.stockId), eq(s.itemId, item.id))),
+            ),
+          ),
+          takeStock(db, team, move.stockId, move.quantity, now),
+          ...addStock(db, team, made.id, move.place, move.quantity, now),
+          dropIfEmpty(db, team, move.stockId, false),
         ]),
         logEvent(
-          d1,
+          db,
+          team,
           item.id,
           "split",
           `"${name}" split off as its own entry${moved > 0 ? `, with ${moved}` : ""}.`,
@@ -517,7 +626,8 @@ export const itemsRouter = new Hono<AppEnv>()
           `item:${made.id}`,
         ),
         logEvent(
-          d1,
+          db,
+          team,
           made.id,
           "split",
           `Split from "${item.name}".`,
@@ -528,7 +638,7 @@ export const itemsRouter = new Hono<AppEnv>()
         ),
       ]);
     } catch (err) {
-      await db.delete(items).where(eq(items.id, made.id));
+      await db.delete(items).where(inTeam(items, team, eq(items.id, made.id)));
       const why = refusal(err);
       if (why) return c.json({ error: STOCK_ERRORS[why] }, 409);
       throw err;

@@ -106,8 +106,8 @@ async function setProgress(
 }
 
 /** Which of `skillIds` are in the team's tree set. */
-async function skillsInSet(db: Db, skillIds: number[]) {
-  const set = await currentTreeSet(db);
+async function skillsInSet(db: Db, teamId: string, skillIds: number[]) {
+  const set = await currentTreeSet(db, teamId);
   const found = await db
     .select({ id: skills.id })
     .from(skills)
@@ -120,8 +120,10 @@ export const studentsRouter = new Hono<AppEnv>()
   /** Every student and the status of each skill they've started. */
   .get("/", requireAuth, async (c) => {
     const db = createDb(c.env.SKILL_DB);
+    const set = await currentTreeSet(db, c.get("teamId"));
     const [students, progress] = await Promise.all([
-      loadStudents(c, db),
+      loadStudents(c),
+      // Progress on the team's own skills only.
       db
         .select({
           userId: skillProgress.userId,
@@ -129,6 +131,8 @@ export const studentsRouter = new Hono<AppEnv>()
           status: skillProgress.status,
         })
         .from(skillProgress)
+        .innerJoin(skills, eq(skills.id, skillProgress.skillId))
+        .where(eq(skills.treeSetId, set.id))
         .all(),
     ]);
     if (!students) return c.json({ error: ROSTER_UNAVAILABLE }, 502);
@@ -157,7 +161,7 @@ export const studentsRouter = new Hono<AppEnv>()
     );
     if (!res.ok) return c.json({ error: "No one has that PIN." }, 404);
     const { id } = (await res.json()) as { id: string };
-    const students = await loadStudents(c, createDb(c.env.SKILL_DB));
+    const students = await loadStudents(c);
     if (!students) return c.json({ error: ROSTER_UNAVAILABLE }, 502);
     const student = students.find((s) => s.userId === id);
     if (!student) return c.json({ error: "That PIN isn't a student's." }, 404);
@@ -166,7 +170,8 @@ export const studentsRouter = new Hono<AppEnv>()
   /** One student's progress, with who signed each skill off and when. */
   .get("/:userId", requireAuth, async (c) => {
     const db = createDb(c.env.SKILL_DB);
-    const students = await loadStudents(c, db);
+    const set = await currentTreeSet(db, c.get("teamId"));
+    const students = await loadStudents(c);
     if (!students) return c.json({ error: ROSTER_UNAVAILABLE }, 502);
     const student = students.find((s) => s.userId === c.req.param("userId"));
     if (!student) return c.json({ error: "No student by that id." }, 404);
@@ -178,7 +183,8 @@ export const studentsRouter = new Hono<AppEnv>()
         updatedAt: skillProgress.updatedAt,
       })
       .from(skillProgress)
-      .where(eq(skillProgress.userId, student.userId))
+      .innerJoin(skills, eq(skills.id, skillProgress.skillId))
+      .where(and(eq(skillProgress.userId, student.userId), eq(skills.treeSetId, set.id)))
       .all();
     return c.json({ ...student, progress });
   })
@@ -187,10 +193,10 @@ export const studentsRouter = new Hono<AppEnv>()
     const userId = c.req.param("userId");
     const { status } = c.req.valid("json");
     const db = createDb(c.env.SKILL_DB);
-    if (skillId === null || (await skillsInSet(db, [skillId])).length === 0) {
+    if (skillId === null || (await skillsInSet(db, c.get("teamId"), [skillId])).length === 0) {
       return c.json({ error: "Skill not found." }, 404);
     }
-    const students = await loadStudents(c, db);
+    const students = await loadStudents(c);
     if (!students) return c.json({ error: ROSTER_UNAVAILABLE }, 502);
     if (!students.some((s) => s.userId === userId)) {
       return c.json({ error: "No student by that id." }, 404);
@@ -207,10 +213,10 @@ export const progressRouter = new Hono<AppEnv>().post(
   async (c) => {
     const { userIds, skillIds, status } = c.req.valid("json");
     const db = createDb(c.env.SKILL_DB);
-    if ((await skillsInSet(db, skillIds)).length !== skillIds.length) {
+    if ((await skillsInSet(db, c.get("teamId"), skillIds)).length !== skillIds.length) {
       return c.json({ error: "One of those skills no longer exists. Reload and try again." }, 400);
     }
-    const students = await loadStudents(c, db);
+    const students = await loadStudents(c);
     if (!students) return c.json({ error: ROSTER_UNAVAILABLE }, 502);
     const known = new Set(students.map((s) => s.userId));
     if (!userIds.every((userId) => known.has(userId))) {

@@ -1,11 +1,13 @@
-import { requireAuth, requireMentor } from "@g3/auth";
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { inTeam, requireAuth, requireMentor, withTeam } from "@g3/auth";
+import { asc, eq, inArray } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
 import { type OrdersDb, createOrdersDb } from "../db";
 import { budgetCategories, categoryBudgets, orderRequests, vendorOrders } from "../db/schema";
 import { lineTotal, spentByCategory } from "../lib/accounting";
 import { fiscalYearOf } from "../lib/fiscal";
+import { localTimeZone } from "../lib/local-time";
+import { teamCalendar } from "../lib/settings";
 import type { AppEnv } from "../types";
 
 type CategoryInput = {
@@ -24,9 +26,10 @@ const fyQuery = validator("query", (value, c): { fy?: string } => {
   return { fy: value.fy as string | undefined };
 });
 
-/** Sets (or with null, removes) a category's budget for one fiscal year. */
+/** Sets (or with null, removes) one of the team's category budgets for one fiscal year. */
 async function setBudget(
   db: OrdersDb,
+  teamId: string,
   categoryId: number,
   fiscalYear: number,
   cents: number | null,
@@ -35,13 +38,18 @@ async function setBudget(
     await db
       .delete(categoryBudgets)
       .where(
-        and(eq(categoryBudgets.categoryId, categoryId), eq(categoryBudgets.fiscalYear, fiscalYear)),
+        inTeam(
+          categoryBudgets,
+          teamId,
+          eq(categoryBudgets.categoryId, categoryId),
+          eq(categoryBudgets.fiscalYear, fiscalYear),
+        ),
       );
     return;
   }
   await db
     .insert(categoryBudgets)
-    .values({ categoryId, fiscalYear, budgetCents: cents })
+    .values(withTeam(teamId, { categoryId, fiscalYear, budgetCents: cents }))
     .onConflictDoUpdate({
       target: [categoryBudgets.categoryId, categoryBudgets.fiscalYear],
       set: { budgetCents: cents },
@@ -101,10 +109,21 @@ export const categoriesRouter = new Hono<AppEnv>()
    */
   .get("/", requireAuth, fyQuery, async (c) => {
     const db = createOrdersDb(c.env.ORDERS_DB);
-    const fy = Number(c.req.valid("query").fy ?? fiscalYearOf(Date.now()));
+    const teamId = c.get("teamId");
+    const calendar = await teamCalendar(db, teamId, localTimeZone(c));
+    const fy = Number(c.req.valid("query").fy ?? fiscalYearOf(Date.now(), calendar));
     const [categories, budgets, requests, spent] = await Promise.all([
-      db.select().from(budgetCategories).orderBy(asc(budgetCategories.name)).all(),
-      db.select().from(categoryBudgets).where(eq(categoryBudgets.fiscalYear, fy)).all(),
+      db
+        .select()
+        .from(budgetCategories)
+        .where(inTeam(budgetCategories, teamId))
+        .orderBy(asc(budgetCategories.name))
+        .all(),
+      db
+        .select()
+        .from(categoryBudgets)
+        .where(inTeam(categoryBudgets, teamId, eq(categoryBudgets.fiscalYear, fy)))
+        .all(),
       db
         .select({
           categoryId: orderRequests.categoryId,
@@ -113,9 +132,11 @@ export const categoriesRouter = new Hono<AppEnv>()
           unitPriceCents: orderRequests.unitPriceCents,
         })
         .from(orderRequests)
-        .where(inArray(orderRequests.status, ["requested", "approved"]))
+        .where(
+          inTeam(orderRequests, teamId, inArray(orderRequests.status, ["requested", "approved"])),
+        )
         .all(),
-      spentByCategory(db, fy),
+      spentByCategory(db, teamId, calendar, fy),
     ]);
     const budgetOf = new Map(budgets.map((b) => [b.categoryId, b.budgetCents]));
     return c.json(
@@ -141,39 +162,55 @@ export const categoriesRouter = new Hono<AppEnv>()
   /** Fiscal years with budgets or orders, plus the current one, newest first. */
   .get("/years", requireAuth, async (c) => {
     const db = createOrdersDb(c.env.ORDERS_DB);
-    const [budgetYears, orders] = await Promise.all([
-      db.selectDistinct({ fy: categoryBudgets.fiscalYear }).from(categoryBudgets).all(),
-      db.select({ placedAt: vendorOrders.placedAt }).from(vendorOrders).all(),
+    const teamId = c.get("teamId");
+    const [calendar, budgetYears, orders] = await Promise.all([
+      teamCalendar(db, teamId, localTimeZone(c)),
+      db
+        .selectDistinct({ fy: categoryBudgets.fiscalYear })
+        .from(categoryBudgets)
+        .where(inTeam(categoryBudgets, teamId))
+        .all(),
+      db
+        .select({ placedAt: vendorOrders.placedAt })
+        .from(vendorOrders)
+        .where(inTeam(vendorOrders, teamId))
+        .all(),
     ]);
-    const current = fiscalYearOf(Date.now());
+    const current = fiscalYearOf(Date.now(), calendar);
     const years = new Set([
       current,
       ...budgetYears.map((b) => b.fy),
-      ...orders.map((o) => fiscalYearOf(o.placedAt)),
+      ...orders.map((o) => fiscalYearOf(o.placedAt, calendar)),
     ]);
     return c.json({ current, years: [...years].sort((a, b) => b - a) });
   })
   .post("/", requireMentor, categoryValidator(true), async (c) => {
     const body = c.req.valid("json");
     const db = createOrdersDb(c.env.ORDERS_DB);
+    const teamId = c.get("teamId");
     const existing = await db
       .select({ id: budgetCategories.id })
       .from(budgetCategories)
-      .where(eq(budgetCategories.name, body.name as string))
+      .where(inTeam(budgetCategories, teamId, eq(budgetCategories.name, body.name as string)))
       .get();
     if (existing) return c.json({ error: "A category with that name already exists." }, 409);
     const row = await db
       .insert(budgetCategories)
-      .values({
-        name: body.name as string,
-        code: body.code ?? null,
-        isArchived: body.isArchived ? 1 : 0,
-        createdAt: Date.now(),
-      })
+      .values(
+        withTeam(teamId, {
+          name: body.name as string,
+          code: body.code ?? null,
+          isArchived: body.isArchived ? 1 : 0,
+          createdAt: Date.now(),
+        }),
+      )
       .returning()
       .get();
     if (body.budgetCents !== undefined) {
-      await setBudget(db, row.id, body.fiscalYear ?? fiscalYearOf(Date.now()), body.budgetCents);
+      const fy =
+        body.fiscalYear ??
+        fiscalYearOf(Date.now(), await teamCalendar(db, teamId, localTimeZone(c)));
+      await setBudget(db, teamId, row.id, fy, body.budgetCents);
     }
     return c.json({ ...row, isArchived: row.isArchived === 1 }, 201);
   })
@@ -182,6 +219,7 @@ export const categoriesRouter = new Hono<AppEnv>()
     const body = c.req.valid("json");
     const id = Number(c.req.param("id"));
     const db = createOrdersDb(c.env.ORDERS_DB);
+    const teamId = c.get("teamId");
     const updates: Partial<typeof budgetCategories.$inferInsert> = {};
     if (body.name !== undefined) updates.name = body.name;
     if (body.code !== undefined) updates.code = body.code;
@@ -192,7 +230,7 @@ export const categoriesRouter = new Hono<AppEnv>()
     const current = await db
       .select()
       .from(budgetCategories)
-      .where(eq(budgetCategories.id, id))
+      .where(inTeam(budgetCategories, teamId, eq(budgetCategories.id, id)))
       .get();
     if (!current) return c.json({ error: "Category not found." }, 404);
     try {
@@ -201,12 +239,15 @@ export const categoriesRouter = new Hono<AppEnv>()
           ? await db
               .update(budgetCategories)
               .set(updates)
-              .where(eq(budgetCategories.id, id))
+              .where(inTeam(budgetCategories, teamId, eq(budgetCategories.id, id)))
               .returning()
               .get()
           : current;
       if (body.budgetCents !== undefined) {
-        await setBudget(db, id, body.fiscalYear ?? fiscalYearOf(Date.now()), body.budgetCents);
+        const fy =
+          body.fiscalYear ??
+          fiscalYearOf(Date.now(), await teamCalendar(db, teamId, localTimeZone(c)));
+        await setBudget(db, teamId, id, fy, body.budgetCents);
       }
       return c.json({ ...row, isArchived: row.isArchived === 1 });
     } catch (err) {

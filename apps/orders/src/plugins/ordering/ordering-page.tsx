@@ -5,7 +5,7 @@ import { api, getErrorMessage } from "../../shared/api";
 import { cartLinks } from "../../shared/cart";
 import { Deadline, isLate } from "../../shared/deadline";
 import { ExportCsvButton } from "../../shared/export-csv";
-import { formatCents, formatDate, parseDollars, startOfToday } from "../../shared/format";
+import { formatCents, formatDay, parseDollars, startOfToday } from "../../shared/format";
 import { PRIORITY_ORDER, PriorityBadge } from "../../shared/priority";
 import type { OrderRequest, Vendor } from "../../shared/types";
 import { Button, ErrorBanner, Loading, Page, SuccessBanner, inputClass } from "../../shared/ui";
@@ -691,7 +691,7 @@ function Nudges({ vendor, itemsTotal }: { vendor: Vendor | undefined; itemsTotal
     notes.push(
       expired
         ? {
-            text: `⚠ Tax-exempt certificate expired ${formatDate(vendor.taxExemptExpires as number)}`,
+            text: `⚠ Tax-exempt certificate expired ${formatDay(vendor.taxExemptExpires as number)}`,
             tone: "warn",
           }
         : {
@@ -719,7 +719,7 @@ function Nudges({ vendor, itemsTotal }: { vendor: Vendor | undefined; itemsTotal
     if (cr.expiresAt !== null && cr.expiresAt < today) continue;
     if (cr.balanceCents === 0) continue;
     notes.push({
-      text: `🎟 ${cr.label}${cr.code ? ` (code ${cr.code})` : ""}${cr.balanceCents !== null ? ` · ${formatCents(cr.balanceCents)} left` : ""}${cr.expiresAt !== null ? ` · expires ${formatDate(cr.expiresAt)}` : ""}`,
+      text: `🎟 ${cr.label}${cr.code ? ` (code ${cr.code})` : ""}${cr.balanceCents !== null ? ` · ${formatCents(cr.balanceCents)} left` : ""}${cr.expiresAt !== null ? ` · expires ${formatDay(cr.expiresAt)}` : ""}`,
       tone: "good",
     });
   }

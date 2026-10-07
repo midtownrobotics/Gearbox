@@ -1,3 +1,4 @@
+import { inTeam } from "@g3/auth";
 import { asc } from "drizzle-orm";
 import type { Db } from "../db";
 import { type FieldType, fields } from "../db/schema";
@@ -37,8 +38,13 @@ export function parseValues(json: string): FieldValues {
 }
 
 /** The team's fields, in their order. */
-export async function loadFields(db: Db): Promise<FieldView[]> {
-  const rows = await db.select().from(fields).orderBy(asc(fields.sortOrder), asc(fields.id)).all();
+export async function loadFields(db: Db, team: string): Promise<FieldView[]> {
+  const rows = await db
+    .select()
+    .from(fields)
+    .where(inTeam(fields, team))
+    .orderBy(asc(fields.sortOrder), asc(fields.id))
+    .all();
   return rows.map((row) => ({
     id: row.id,
     name: row.name,

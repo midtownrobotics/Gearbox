@@ -12,25 +12,28 @@ const now = Math.floor(Date.now() / 1000);
 /** `count` requests on placed orders: about one in three already received. */
 async function history(count: number): Promise<number[]> {
   const category = await db
-    .prepare("INSERT INTO budget_categories (name, created_at) VALUES (?, ?) RETURNING id")
-    .bind(`Big history ${crypto.randomUUID()}`, now)
+    .prepare(
+      "INSERT INTO budget_categories (team_id, name, created_at) VALUES (?, ?, ?) RETURNING id",
+    )
+    .bind(student.teamId, `Big history ${crypto.randomUUID()}`, now)
     .first<{ id: number }>();
   const order = await db
     .prepare(
-      "INSERT INTO vendor_orders (vendor, placed_by_id, placed_by_name, placed_at) VALUES ('WCP', ?, 'Mentor', ?) RETURNING id",
+      "INSERT INTO vendor_orders (team_id, vendor, placed_by_id, placed_by_name, placed_at) VALUES (?, 'WCP', ?, 'Mentor', ?) RETURNING id",
     )
-    .bind(mentor.id, now)
+    .bind(student.teamId, mentor.id, now)
     .first<{ id: number }>();
   const inserted = await db.batch<{ id: number }>(
     Array.from({ length: count }, (_, i) =>
       db
         .prepare(
-          `INSERT INTO order_requests (requester_id, requester_name, url, vendor, title, quantity,
+          `INSERT INTO order_requests (team_id, requester_id, requester_name, url, vendor, title, quantity,
              category_id, reason, status, order_id, created_at, updated_at)
-           VALUES (?, 'Student', 'https://example.com', 'WCP', ?, 1, ?, 'test', ?, ?, ?, ?)
+           VALUES (?, ?, 'Student', 'https://example.com', 'WCP', ?, 1, ?, 'test', ?, ?, ?, ?)
            RETURNING id`,
         )
         .bind(
+          student.teamId,
           student.id,
           `Part ${i}`,
           category?.id,

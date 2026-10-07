@@ -1,14 +1,17 @@
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
+@import "@g3/ui/index.css";
+@import "tailwindcss";
+
+/* Attendance uses the shared colors and fonts (--g3-*, the team's display font): the kiosk is
+   always dark, and the confirm page follows the shared light/dark setting. Sign-in is green and
+   sign-out red, from the shared palette. */
+:root {
+  --att-signin: #16a34a;
+  --att-signout: #dc2626;
 }
 
-:root {
-  --bg: oklch(21% 0.034 264.665);
-  --font: "Agency FB", "Arial Narrow", Arial, sans-serif;
+html[data-theme="dark"] {
+  --att-signin: #4ade80;
+  --att-signout: #f87171;
 }
 
 html,
@@ -18,7 +21,9 @@ body,
 }
 
 body {
-  background: var(--bg);
+  background: var(--g3-page);
+  color: var(--g3-text);
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }

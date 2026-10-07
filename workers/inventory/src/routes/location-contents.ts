@@ -1,4 +1,4 @@
-import { requireAuth } from "@g3/auth";
+import { inTeam, requireAuth } from "@g3/auth";
 import { eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
@@ -44,7 +44,7 @@ export const locationContentsRouter = new Hono<AppEnv>()
         : await db
             .update(locations)
             .set({ title })
-            .where(eq(locations.id, id))
+            .where(inTeam(locations, c.get("teamId"), eq(locations.id, id)))
             .returning({ id: locations.id })
             .get();
     if (!row) return c.json({ error: GONE }, 404);
@@ -57,12 +57,13 @@ export const locationContentsRouter = new Hono<AppEnv>()
   .post("/:id/move-contents", requireAuth, moveValidator, async (c) => {
     const id = parseId(c.req.param("id"));
     const { toLocationId } = c.req.valid("json");
-    const d1 = c.env.INVENTORY_DB;
-    const names = await loadNames(createDb(d1));
+    const db = createDb(c.env.INVENTORY_DB);
+    const team = c.get("teamId");
+    const names = await loadNames(db, team);
     if (id === null || !names.locations.byId.has(id)) return c.json({ error: GONE }, 404);
     if (!names.locations.byId.has(toLocationId)) return c.json({ error: "Pick a location." }, 400);
     if (toLocationId === id) {
       return c.json({ error: "Pick a different location to move them to." }, 400);
     }
-    return c.json(await moveLocationContents(d1, id, toLocationId, names, actorOf(c)));
+    return c.json(await moveLocationContents(db, team, id, toLocationId, names, actorOf(c)));
   });

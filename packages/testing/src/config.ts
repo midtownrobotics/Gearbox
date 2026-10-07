@@ -1,7 +1,7 @@
 import { fileURLToPath } from "node:url";
 import { cloudflareTest, readD1Migrations } from "@cloudflare/vitest-pool-workers";
 import { defineConfig } from "vitest/config";
-import { admin, mentor, otherStudent, student, userFromCookie } from "./users.ts";
+import { type TestUser, teamUsers, userFromCookie } from "./users.ts";
 
 // The Vitest config every worker's tests share: tests run inside the Workers runtime (workerd)
 // against local D1/KV/R2 from the worker's wrangler config, with its D1 migrations applied
@@ -30,11 +30,15 @@ const json = (body: unknown, status = 200) =>
     headers: { "Content-Type": "application/json" },
   });
 
+/** Slack DMs and channel posts apps asked G3ID to send, by team (tests read them back). */
+const slackDms = new Map<string, Record<string, string>[]>();
+const slackMessages = new Map<string, Record<string, string>[]>();
+
 /**
  * G3ID as other workers see it: /auth/me answers for the user in the test cookie (users.ts), like
  * the real one, never reporting admin or mentor for a kiosk PIN session.
  */
-export const g3idStub: ServiceStub = (request) => {
+export const g3idStub: ServiceStub = async (request) => {
   const url = new URL(request.url);
   // Workers call G3ID at /api (http://g3id/api/auth/me), like its public address.
   url.pathname = url.pathname.replace(/^\/api(?=\/)/, "");
@@ -55,20 +59,56 @@ export const g3idStub: ServiceStub = (request) => {
     return json(ids.map((id) => ({ id, displayName: id })));
   }
   if (url.pathname === "/auth/logout") return json({ ok: true });
-  // The member list (admins only, like the real one): the standard test users.
+  // The member list (admins only, like the real one): the standard test users of their team.
   if (url.pathname === "/users") {
     if (!user || user.sessionType === "pin" || !user.isAdmin)
       return json({ error: "Forbidden." }, 403);
-    return json([student, otherStudent, mentor, admin].map((u) => ({ ...u, status: "active" })));
+    return json(membersOf(user.teamId).map((u) => ({ ...u, status: "active" })));
   }
   if (url.pathname === "/users/attendance-eligible") {
     if (!user) return json({ error: "Unauthorized." }, 401);
     return json({
-      users: [student, otherStudent, mentor].map(({ id, displayName }) => ({ id, displayName })),
+      users: membersOf(user.teamId)
+        .filter((u) => !u.isAdmin || u.isMentor)
+        .map(({ id, displayName }) => ({ id, displayName })),
     });
+  }
+  // A team's members with their roles, for other workers over the service binding (the platform
+  // SDK's teamMembers). Any team's: the standard users, with ids of their own.
+  const members = url.pathname.match(/^\/internal\/teams\/([^/]+)\/members$/);
+  if (members) {
+    return json(
+      membersOf(decodeURIComponent(members[1])).map(
+        ({ id, displayName, email, isAdmin, isMentor }) => ({
+          id,
+          displayName,
+          email,
+          status: "active",
+          isAdmin,
+          isMentor,
+        }),
+      ),
+    );
+  }
+  // A DM or channel post from the team's Slack bot: recorded, never sent. Tests read them back
+  // (stub only) with GET /api/internal/teams/:id/slack/dms or .../slack/messages on env.G3ID.
+  const slack = url.pathname.match(/^\/internal\/teams\/([^/]+)\/slack\/(dm|message)s?$/);
+  if (slack) {
+    const store = slack[2] === "dm" ? slackDms : slackMessages;
+    const teamId = decodeURIComponent(slack[1]);
+    if (request.method === "GET") return json(store.get(teamId) ?? []);
+    const body = (await request.json()) as Record<string, string>;
+    store.set(teamId, [...(store.get(teamId) ?? []), body]);
+    return json({ ok: true });
   }
   return json({ error: `G3ID stub has no ${url.pathname}` }, 404);
 };
+
+/** The standard test users in a team (teamUsers: the site's team gets the plain ones). */
+function membersOf(teamId: string): TestUser[] {
+  const team = teamUsers(teamId);
+  return [team.student, team.otherStudent, team.mentor, team.admin];
+}
 
 /** A service that's down (e.g. the shop's edge box), for workers that must cope with that. */
 export const offlineService: ServiceStub = () => json({ error: "Service unavailable." }, 503);
@@ -103,6 +143,9 @@ export function workerTestConfig(options: WorkerTestOptions = {}) {
       test: {
         include: ["test/**/*.test.ts"],
         setupFiles: [fileURLToPath(new URL("./setup.ts", import.meta.url))],
+        // CI's runners are a few times slower than a dev machine, and a two-team isolation test
+        // makes a few hundred requests; 5 s (Vitest's default) isn't always enough there.
+        testTimeout: 30_000,
       },
     };
   });

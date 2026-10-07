@@ -12,6 +12,36 @@ compatibility_date = "2026-05-17"
 binding = "G3ID"
 service = "g3id"
 
+# The team-scoped apps: deleting a team (the operators' console) deletes its data in each, over
+# their /api/internal/teams/:id routes (src/console.ts).
+[[services]]
+binding = "ATTENDANCE"
+service = "attendance"
+
+[[services]]
+binding = "EDGE"
+service = "edge"
+
+[[services]]
+binding = "INVENTORY"
+service = "inventory"
+
+[[services]]
+binding = "ORDERS"
+service = "orders"
+
+[[services]]
+binding = "PIT"
+service = "pit"
+
+[[services]]
+binding = "SHOP"
+service = "shop"
+
+[[services]]
+binding = "SKILL_TREE"
+service = "skill-tree"
+
 [[d1_databases]]
 binding = "PLATFORM_DB"
 database_name = "gearbox-platform-local"
@@ -33,6 +63,34 @@ workers_dev = false
 [[env.production.services]]
 binding = "G3ID"
 service = "g3id-production"
+
+[[env.production.services]]
+binding = "ATTENDANCE"
+service = "attendance-production"
+
+[[env.production.services]]
+binding = "EDGE"
+service = "edge-production"
+
+[[env.production.services]]
+binding = "INVENTORY"
+service = "inventory-production"
+
+[[env.production.services]]
+binding = "ORDERS"
+service = "orders-production"
+
+[[env.production.services]]
+binding = "PIT"
+service = "pit-production"
+
+[[env.production.services]]
+binding = "SHOP"
+service = "shop-production"
+
+[[env.production.services]]
+binding = "SKILL_TREE"
+service = "skill-tree-production"
 
 # Create with `wrangler d1 create gearbox-platform-prod` and paste its ID here.
 [[env.production.d1_databases]]

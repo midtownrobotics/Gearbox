@@ -1,5 +1,5 @@
 import { env } from "cloudflare:test";
-import { admin, student } from "@g3/testing/users";
+import { SITE_TEAM, admin, student } from "@g3/testing/users";
 import { callAs, jsonAs } from "@g3/testing/worker";
 import { beforeEach, describe, expect, it } from "vitest";
 
@@ -100,15 +100,15 @@ describe("D1 attendance workflow", () => {
     const year = (await jsonAs<{ year: string }>(admin, "/admin/summary")).year;
     await database
       .prepare(
-        "INSERT INTO attendance_members (id, user_id, display_name, email) VALUES (?, ?, ?, ?)",
+        "INSERT INTO attendance_members (id, team_id, user_id, display_name, email) VALUES (?, ?, ?, ?, ?)",
       )
-      .bind(memberId, student.id, student.displayName, student.email)
+      .bind(memberId, SITE_TEAM, student.id, student.displayName, student.email)
       .run();
     await database
       .prepare(
-        "INSERT INTO attendance_sessions (id, member_id, sign_in, status, school_year) VALUES (?, ?, ?, 'open', ?)",
+        "INSERT INTO attendance_sessions (id, team_id, member_id, sign_in, status, school_year) VALUES (?, ?, ?, ?, 'open', ?)",
       )
-      .bind("stale", memberId, Date.now() - 13 * 3_600_000, year)
+      .bind("stale", SITE_TEAM, memberId, Date.now() - 13 * 3_600_000, year)
       .run();
     expect(await jsonAs(student, "/status")).toEqual({ signedIn: [] });
     expect(
@@ -123,15 +123,17 @@ describe("D1 attendance workflow", () => {
     const now = Date.now();
     await database
       .prepare(
-        "INSERT INTO attendance_members (id, user_id, display_name, email) VALUES (?, ?, ?, ?)",
+        "INSERT INTO attendance_members (id, team_id, user_id, display_name, email) VALUES (?, ?, ?, ?, ?)",
       )
-      .bind(memberId, student.id, student.displayName, student.email)
+      .bind(memberId, SITE_TEAM, student.id, student.displayName, student.email)
       .run();
     const insert = database.prepare(
-      "INSERT INTO attendance_sessions (id, member_id, sign_in, sign_out, duration_ms, status, school_year) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO attendance_sessions (id, team_id, member_id, sign_in, sign_out, duration_ms, status, school_year) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
     );
-    await insert.bind("legacy", memberId, now, now, 2 * 3_600_000, "manual-adjustment", year).run();
-    await insert.bind("invalid", memberId, now, now, 24 * 3_600_000, "auto-closed", year).run();
+    const legacy = ["legacy", SITE_TEAM, memberId, now, now, 2 * 3_600_000] as const;
+    await insert.bind(...legacy, "manual-adjustment", year).run();
+    const invalid = ["invalid", SITE_TEAM, memberId, now, now, 24 * 3_600_000] as const;
+    await insert.bind(...invalid, "auto-closed", year).run();
     const summary = await jsonAs<{ members: { totalHours: number }[] }>(admin, "/admin/summary");
     expect(summary.members[0].totalHours).toBe(2);
     const result = await jsonAs<{ totalHours: number }>(

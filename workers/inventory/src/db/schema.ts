@@ -1,9 +1,9 @@
 import { sql } from "drizzle-orm";
 import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
-// All of this is one team's data. Ids are row numbers and nothing is unique by name across a
-// table (names are checked among siblings in code), so a team column can be added later without
-// rebuilding tables (roadmap Phase 3).
+// All of this is one team's data, and every table carries the team (migration 0003): every query
+// goes through inTeam/withTeam from @g3/auth (roadmap Phase 3). Ids are row numbers and nothing
+// is unique by name across a table (names are checked among siblings in code).
 
 export const FIELD_TYPES = [
   "text",
@@ -19,6 +19,7 @@ export type FieldType = (typeof FIELD_TYPES)[number];
 /** What a team records about a part, beyond its name. Admins define these. */
 export const fields = sqliteTable("fields", {
   id: integer("id").primaryKey({ autoIncrement: true }),
+  teamId: text("team_id").notNull(),
   name: text("name").notNull(),
   type: text("type", { enum: FIELD_TYPES }).notNull(),
   /** For a choice field: the JSON list of choices. */
@@ -34,6 +35,7 @@ export const locations = sqliteTable(
   "locations",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
+    teamId: text("team_id").notNull(),
     parentId: integer("parent_id"),
     name: text("name").notNull(),
     /** What's kept there, shown beside the name ("A1 - Misc. Electronics"). "" for none. */
@@ -41,12 +43,13 @@ export const locations = sqliteTable(
     sortOrder: integer("sort_order").notNull().default(0),
     createdAt: integer("created_at").notNull(),
   },
-  (t) => [index("locations_parent_idx").on(t.parentId)],
+  (t) => [index("locations_parent_idx").on(t.parentId), index("locations_team_idx").on(t.teamId)],
 );
 
 /** What a part in use is in use on. */
 export const robots = sqliteTable("robots", {
   id: integer("id").primaryKey({ autoIncrement: true }),
+  teamId: text("team_id").notNull(),
   name: text("name").notNull(),
   sortOrder: integer("sort_order").notNull().default(0),
   createdAt: integer("created_at").notNull(),
@@ -54,6 +57,7 @@ export const robots = sqliteTable("robots", {
 
 export const subsystems = sqliteTable("subsystems", {
   id: integer("id").primaryKey({ autoIncrement: true }),
+  teamId: text("team_id").notNull(),
   name: text("name").notNull(),
   sortOrder: integer("sort_order").notNull().default(0),
   createdAt: integer("created_at").notNull(),
@@ -62,6 +66,7 @@ export const subsystems = sqliteTable("subsystems", {
 /** An inventory entry: one kind of part, whichever vendors it comes from. */
 export const items = sqliteTable("items", {
   id: integer("id").primaryKey({ autoIncrement: true }),
+  teamId: text("team_id").notNull(),
   name: text("name").notNull(),
   /** JSON object of the team's fields: field id -> value. */
   fieldValues: text("field_values").notNull().default("{}"),
@@ -80,6 +85,7 @@ export const itemListings = sqliteTable(
   "item_listings",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
+    teamId: text("team_id").notNull(),
     itemId: integer("item_id")
       .notNull()
       .references(() => items.id, { onDelete: "cascade" }),
@@ -94,7 +100,7 @@ export const itemListings = sqliteTable(
   },
   (t) => [
     index("item_listings_item_idx").on(t.itemId),
-    index("item_listings_catalog_idx").on(t.catalogItemId),
+    index("item_listings_catalog_idx").on(t.teamId, t.catalogItemId),
   ],
 );
 
@@ -110,6 +116,7 @@ export const stock = sqliteTable(
   "stock",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
+    teamId: text("team_id").notNull(),
     itemId: integer("item_id")
       .notNull()
       .references(() => items.id, { onDelete: "cascade" }),
@@ -145,6 +152,7 @@ export const itemEvents = sqliteTable(
   "item_events",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
+    teamId: text("team_id").notNull(),
     itemId: integer("item_id")
       .notNull()
       .references(() => items.id, { onDelete: "cascade" }),
@@ -171,11 +179,12 @@ export const intakeReceipts = sqliteTable(
   "intake_receipts",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
+    teamId: text("team_id").notNull(),
     sourceKey: text("source_key").notNull(),
     itemId: integer("item_id")
       .notNull()
       .references(() => items.id, { onDelete: "cascade" }),
     createdAt: integer("created_at").notNull(),
   },
-  (t) => [uniqueIndex("intake_receipts_source_idx").on(t.sourceKey)],
+  (t) => [uniqueIndex("intake_receipts_source_idx").on(t.teamId, t.sourceKey)],
 );

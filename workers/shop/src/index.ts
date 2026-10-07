@@ -10,6 +10,7 @@ import { type BOMQueueMessage, processBOMQueue } from "./lib/bom-queue-consumer"
 import { actionsRouter } from "./routes/actions";
 import { adminPartsRouter } from "./routes/admin-parts";
 import { drawingsRouter } from "./routes/drawings";
+import { internalRouter } from "./routes/internal";
 import { clearPresence, kioskPresenceRouter } from "./routes/kiosk-presence";
 import { onshapeExportRouter } from "./routes/onshape-export";
 import { onshapeWebhooksRouter } from "./routes/onshape-webhooks";
@@ -63,7 +64,7 @@ const app = base
   .post("/logout", requireAuth, async (c) => {
     const kioskDeviceId = c.get("kioskDeviceId");
     if (c.get("sessionType") === "pin" && kioskDeviceId) {
-      await clearPresence(createShopDb(c.env.SHOP_DB), kioskDeviceId);
+      await clearPresence(createShopDb(c.env.SHOP_DB), c.get("teamId"), kioskDeviceId);
     }
     const res = await c.env.G3ID.fetch(
       new Request("http://g3id/api/auth/logout", {
@@ -97,9 +98,11 @@ const app = base
   .route("/staging-batches", stagingBatchesRouter)
   .route("/actions", actionsRouter)
   .route("/kiosk-presence", kioskPresenceRouter)
-  .route("/admin", adminPartsRouter);
+  .route("/admin", adminPartsRouter)
+  .route("/internal", internalRouter);
 
 export type ShopApp = typeof app;
+export { app };
 
 export default {
   fetch: withApiPrefix(app.fetch),

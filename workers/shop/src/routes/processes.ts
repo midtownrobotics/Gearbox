@@ -1,4 +1,4 @@
-import { requireAuth } from "@g3/auth";
+import { inTeam, requireAuth, withTeam } from "@g3/auth";
 import { eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
@@ -52,7 +52,11 @@ const updateProcessValidator = validator(
 export const processesRouter = new Hono<AppEnv>()
   .get("/", requireAuth, async (c) => {
     const db = createShopDb(c.env.SHOP_DB);
-    const rows = await db.select().from(processes).all();
+    const rows = await db
+      .select()
+      .from(processes)
+      .where(inTeam(processes, c.get("teamId")))
+      .all();
     return c.json(rows);
   })
   .post("/", requireAuth, createProcessValidator, async (c) => {
@@ -61,7 +65,14 @@ export const processesRouter = new Hono<AppEnv>()
     const db = createShopDb(c.env.SHOP_DB);
     const row = await db
       .insert(processes)
-      .values({ name, type, requiresPartInfo: requiresPartInfo ? 1 : 0, createdAt: Date.now() })
+      .values(
+        withTeam(c.get("teamId"), {
+          name,
+          type,
+          requiresPartInfo: requiresPartInfo ? 1 : 0,
+          createdAt: Date.now(),
+        }),
+      )
       .returning()
       .get();
 
@@ -78,7 +89,7 @@ export const processesRouter = new Hono<AppEnv>()
         ...(type !== undefined && { type }),
         ...(requiresPartInfo !== undefined && { requiresPartInfo: requiresPartInfo ? 1 : 0 }),
       })
-      .where(eq(processes.id, id))
+      .where(inTeam(processes, c.get("teamId"), eq(processes.id, id)))
       .returning()
       .get();
 

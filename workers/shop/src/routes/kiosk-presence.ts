@@ -1,4 +1,4 @@
-import { requireAuth } from "@g3/auth";
+import { inTeam, requireAuth, withTeam } from "@g3/auth";
 import { eq, gt } from "drizzle-orm";
 import { Hono } from "hono";
 import { createShopDb } from "../db";
@@ -15,7 +15,13 @@ export const kioskPresenceRouter = new Hono<AppEnv>()
     const rows = await db
       .select()
       .from(kioskPresence)
-      .where(gt(kioskPresence.updatedAt, Date.now() - PRESENCE_TTL_MS))
+      .where(
+        inTeam(
+          kioskPresence,
+          c.get("teamId"),
+          gt(kioskPresence.updatedAt, Date.now() - PRESENCE_TTL_MS),
+        ),
+      )
       .all();
     return c.json(rows);
   })
@@ -28,16 +34,19 @@ export const kioskPresenceRouter = new Hono<AppEnv>()
     if (!kioskDeviceId) return c.json({ error: "No kiosk device on session." }, 400);
 
     const db = createShopDb(c.env.SHOP_DB);
+    const teamId = c.get("teamId");
     await db
       .insert(kioskPresence)
-      .values({
-        kioskDeviceId,
-        deviceName: c.get("kioskDeviceName") ?? `Kiosk ${kioskDeviceId}`,
-        userId: c.get("userId"),
-        updatedAt: Date.now(),
-      })
+      .values(
+        withTeam(teamId, {
+          kioskDeviceId,
+          deviceName: c.get("kioskDeviceName") ?? `Kiosk ${kioskDeviceId}`,
+          userId: c.get("userId"),
+          updatedAt: Date.now(),
+        }),
+      )
       .onConflictDoUpdate({
-        target: kioskPresence.kioskDeviceId,
+        target: [kioskPresence.teamId, kioskPresence.kioskDeviceId],
         set: {
           deviceName: c.get("kioskDeviceName") ?? `Kiosk ${kioskDeviceId}`,
           userId: c.get("userId"),
@@ -50,10 +59,13 @@ export const kioskPresenceRouter = new Hono<AppEnv>()
 /** Remove a device's presence row (called when its user logs out). */
 export async function clearPresence(
   db: ReturnType<typeof createShopDb>,
+  teamId: string,
   kioskDeviceId: number,
 ): Promise<void> {
   try {
-    await db.delete(kioskPresence).where(eq(kioskPresence.kioskDeviceId, kioskDeviceId));
+    await db
+      .delete(kioskPresence)
+      .where(inTeam(kioskPresence, teamId, eq(kioskPresence.kioskDeviceId, kioskDeviceId)));
   } catch (err) {
     console.error("Failed to clear kiosk presence:", err);
   }

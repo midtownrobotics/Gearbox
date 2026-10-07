@@ -1,4 +1,4 @@
-import { useTeamNames, useTeamUiSettings } from "@g3/ui";
+import { forceTheme, useTeamNames, useTeamUiSettings } from "@g3/ui";
 import { useEffect, useState } from "react";
 import "./index.css";
 import ConfirmPage from "./pages/ConfirmPage";
@@ -11,6 +11,12 @@ import type { PageType } from "./utils/token";
 function KioskGate({ types }: { types: PageType[] }) {
   const names = useTeamNames();
   const [state, setState] = useState<"loading" | "ok" | "denied">("loading");
+
+  // The kiosk display is always dark (it's usually a shop TV), whatever the shared setting says.
+  useEffect(() => {
+    forceTheme("dark");
+    return () => forceTheme(null);
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -38,7 +44,6 @@ function KioskGate({ types }: { types: PageType[] }) {
 
   return (
     <div className={`kiosk ${types.length > 1 ? "kiosk--combined" : `kiosk--${types[0]}`}`}>
-      <div className="scanlines" aria-hidden="true" />
       <div className="kiosk__content kiosk-gate">
         {state === "loading" ? (
           <p className="kiosk-gate__text">AUTHORIZING…</p>

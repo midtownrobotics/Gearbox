@@ -1,4 +1,4 @@
-import { requireAuth, requireMentor } from "@g3/auth";
+import { inTeam, requireAuth, requireMentor, withTeam } from "@g3/auth";
 import { and, asc, desc, eq, gte, inArray, isNotNull, lt } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
@@ -16,6 +16,8 @@ import { inChunks } from "../lib/chunks";
 import { csvDate, csvMoney, csvRow } from "../lib/csv";
 import { fiscalLabel, fiscalRange, fiscalYearOf } from "../lib/fiscal";
 import { type ReceiveDestination, parseDestination, sendToInventory } from "../lib/inventory";
+import { localTimeZone } from "../lib/local-time";
+import { calendarOf, teamSettings } from "../lib/settings";
 import { importSheet } from "../lib/sheet-import";
 import { vendorName } from "../lib/vendors";
 import type { AppEnv } from "../types";
@@ -127,22 +129,35 @@ export const ordersRouter = new Hono<AppEnv>()
    */
   .get("/receiving", requireAuth, async (c) => {
     const db = createOrdersDb(c.env.ORDERS_DB);
-    // Lines on a placed order. The orders and receipts below are picked by subquery, not by a list
-    // of ids: a team's history has far more lines than D1 binds in one statement (lib/chunks.ts).
+    const teamId = c.get("teamId");
+    // The team's lines on a placed order. The orders and receipts below are picked by subquery, not
+    // by a list of ids: a team's history has far more lines than D1 binds in one statement
+    // (lib/chunks.ts).
     const onOrder = and(
       isNotNull(orderRequests.orderId),
       inArray(orderRequests.status, ["ordered", "received"]),
     );
-    const lines = await db.select().from(orderRequests).where(onOrder).all();
+    const lines = await db
+      .select()
+      .from(orderRequests)
+      .where(inTeam(orderRequests, teamId, onOrder))
+      .all();
     if (lines.length === 0) return c.json({ open: [], recent: [] });
     const [orders, receipts] = await Promise.all([
       db
         .select()
         .from(vendorOrders)
         .where(
-          inArray(
-            vendorOrders.id,
-            db.select({ id: orderRequests.orderId }).from(orderRequests).where(onOrder),
+          inTeam(
+            vendorOrders,
+            teamId,
+            inArray(
+              vendorOrders.id,
+              db
+                .select({ id: orderRequests.orderId })
+                .from(orderRequests)
+                .where(inTeam(orderRequests, teamId, onOrder)),
+            ),
           ),
         )
         .all(),
@@ -150,11 +165,16 @@ export const ordersRouter = new Hono<AppEnv>()
         .select()
         .from(requestEvents)
         .where(
-          and(
+          inTeam(
+            requestEvents,
+            teamId,
             eq(requestEvents.action, "received"),
             inArray(
               requestEvents.requestId,
-              db.select({ id: orderRequests.id }).from(orderRequests).where(onOrder),
+              db
+                .select({ id: orderRequests.id })
+                .from(orderRequests)
+                .where(inTeam(orderRequests, teamId, onOrder)),
             ),
           ),
         )
@@ -213,6 +233,7 @@ export const ordersRouter = new Hono<AppEnv>()
   .post("/receive", requireAuth, receiveValidator, async (c) => {
     const { ids, inventory } = c.req.valid("json");
     const db = createOrdersDb(c.env.ORDERS_DB);
+    const teamId = c.get("teamId");
     const userId = c.get("userId");
     const rows = await inChunks(ids, (chunk) =>
       db
@@ -231,7 +252,7 @@ export const ordersRouter = new Hono<AppEnv>()
           orderId: orderRequests.orderId,
         })
         .from(orderRequests)
-        .where(inArray(orderRequests.id, chunk))
+        .where(inTeam(orderRequests, teamId, inArray(orderRequests.id, chunk)))
         .all(),
     );
     const mine = rows.filter((r) => r.status === "ordered");
@@ -245,20 +266,31 @@ export const ordersRouter = new Hono<AppEnv>()
       db
         .update(orderRequests)
         .set({ status: "received", updatedAt: now })
-        .where(and(inArray(orderRequests.id, chunk), eq(orderRequests.status, "ordered")))
+        .where(
+          inTeam(
+            orderRequests,
+            teamId,
+            inArray(orderRequests.id, chunk),
+            eq(orderRequests.status, "ordered"),
+          ),
+        )
         .returning({ id: orderRequests.id })
         .all(),
     );
-    for (let i = 0; i < received.length; i += 15) {
+    // Seven values an event: 14 a statement stays under D1's 100 bound parameters.
+    for (let i = 0; i < received.length; i += 14) {
       await db.insert(requestEvents).values(
-        received.slice(i, i + 15).map((r) => ({
-          requestId: r.id,
-          userId,
-          userName: c.get("userDisplayName"),
-          action: "received",
-          note: sent.added === null ? null : "Added to Inventory.",
-          createdAt: now,
-        })),
+        withTeam(
+          teamId,
+          received.slice(i, i + 14).map((r) => ({
+            requestId: r.id,
+            userId,
+            userName: c.get("userDisplayName"),
+            action: "received",
+            note: sent.added === null ? null : "Added to Inventory.",
+            createdAt: now,
+          })),
+        ),
       );
     }
     // Where each went in Inventory, for the next delivery of the same part.
@@ -273,7 +305,7 @@ export const ordersRouter = new Hono<AppEnv>()
         db
           .update(orderRequests)
           .set({ inventoryLocationId })
-          .where(inArray(orderRequests.id, chunk))
+          .where(inTeam(orderRequests, teamId, inArray(orderRequests.id, chunk)))
           .returning({ id: orderRequests.id })
           .all(),
       );
@@ -292,7 +324,7 @@ export const ordersRouter = new Hono<AppEnv>()
     const row = await db
       .update(vendorOrders)
       .set({ tracking: c.req.valid("json").tracking })
-      .where(eq(vendorOrders.id, Number(c.req.param("id"))))
+      .where(inTeam(vendorOrders, c.get("teamId"), eq(vendorOrders.id, Number(c.req.param("id")))))
       .returning()
       .get();
     if (!row) return c.json({ error: "Order not found." }, 404);
@@ -314,6 +346,8 @@ export const ordersRouter = new Hono<AppEnv>()
         return c.json({ error: "That file is too large (5 MB max)." }, 400);
       const result = await importSheet(
         createOrdersDb(c.env.ORDERS_DB),
+        c.get("teamId"),
+        localTimeZone(c),
         text,
         c.req.valid("query").dryRun === "1",
       );
@@ -329,12 +363,20 @@ export const ordersRouter = new Hono<AppEnv>()
   .post("/", requireMentor, placeValidator, async (c) => {
     const body = c.req.valid("json");
     const db = createOrdersDb(c.env.ORDERS_DB);
+    const teamId = c.get("teamId");
     const ids = body.lines.map((l) => l.requestId);
     const approved = await inChunks(ids, (chunk) =>
       db
         .select()
         .from(orderRequests)
-        .where(and(inArray(orderRequests.id, chunk), eq(orderRequests.status, "approved")))
+        .where(
+          inTeam(
+            orderRequests,
+            teamId,
+            inArray(orderRequests.id, chunk),
+            eq(orderRequests.status, "approved"),
+          ),
+        )
         .all(),
     );
     if (approved.length === 0) {
@@ -347,15 +389,17 @@ export const ordersRouter = new Hono<AppEnv>()
     const now = Date.now();
     const order = await db
       .insert(vendorOrders)
-      .values({
-        vendor: body.vendor,
-        placedById: c.get("userId"),
-        placedByName: c.get("userDisplayName"),
-        shippingCents: body.shippingCents,
-        taxCents: body.taxCents,
-        tracking: body.tracking,
-        placedAt: now,
-      })
+      .values(
+        withTeam(teamId, {
+          vendor: body.vendor,
+          placedById: c.get("userId"),
+          placedByName: c.get("userDisplayName"),
+          shippingCents: body.shippingCents,
+          taxCents: body.taxCents,
+          tracking: body.tracking,
+          placedAt: now,
+        }),
+      )
       .returning()
       .get();
 
@@ -375,7 +419,14 @@ export const ordersRouter = new Hono<AppEnv>()
             updatedAt: now,
           })
           // Still conditional on being approved, in case it was cancelled a moment ago.
-          .where(and(eq(orderRequests.id, line.requestId), eq(orderRequests.status, "approved"))),
+          .where(
+            inTeam(
+              orderRequests,
+              teamId,
+              eq(orderRequests.id, line.requestId),
+              eq(orderRequests.status, "approved"),
+            ),
+          ),
       );
     }
     // The order's fees as charged to each category (split by item cost), stored with the order.
@@ -392,27 +443,30 @@ export const ordersRouter = new Hono<AppEnv>()
       { orderId: order.id, kind: "Shipping", categoryId, cents: c.shipping },
       { orderId: order.id, kind: "Tax", categoryId, cents: c.tax },
     ]);
-    for (let i = 0; i < fees.length; i += 20) {
-      statements.push(db.insert(orderCharges).values(fees.slice(i, i + 20)));
+    for (let i = 0; i < fees.length; i += 16) {
+      statements.push(db.insert(orderCharges).values(withTeam(teamId, fees.slice(i, i + 16))));
     }
-    // D1 caps bound parameters at 100 per statement; events have 6 columns.
-    for (let i = 0; i < lines.length; i += 15) {
+    // D1 caps bound parameters at 100 per statement; events have 7 columns, fees 5.
+    for (let i = 0; i < lines.length; i += 14) {
       statements.push(
         db.insert(requestEvents).values(
-          lines.slice(i, i + 15).map((line) => {
-            const changes = describeChanges(
-              byId.get(line.requestId) as (typeof approved)[number],
-              line,
-            );
-            return {
-              requestId: line.requestId,
-              userId: c.get("userId"),
-              userName: c.get("userDisplayName"),
-              action: "ordered",
-              note: `Placed in ${body.vendor} order #${order.id}.${changes ? ` Changed ${changes}.` : ""}`,
-              createdAt: now,
-            };
-          }),
+          withTeam(
+            teamId,
+            lines.slice(i, i + 14).map((line) => {
+              const changes = describeChanges(
+                byId.get(line.requestId) as (typeof approved)[number],
+                line,
+              );
+              return {
+                requestId: line.requestId,
+                userId: c.get("userId"),
+                userName: c.get("userDisplayName"),
+                action: "ordered",
+                note: `Placed in ${body.vendor} order #${order.id}.${changes ? ` Changed ${changes}.` : ""}`,
+                createdAt: now,
+              };
+            }),
+          ),
         ),
       );
     }
@@ -421,6 +475,7 @@ export const ordersRouter = new Hono<AppEnv>()
     // What we paid becomes the catalog price (good for 7 days before it's looked up again).
     await recordPrices(
       db,
+      teamId,
       lines.map((l) => ({
         catalogItemId: (byId.get(l.requestId) as (typeof approved)[number]).catalogItemId,
         unitPriceCents: l.unitPriceCents,
@@ -450,31 +505,49 @@ export const ordersRouter = new Hono<AppEnv>()
     }),
     async (c) => {
       const db = createOrdersDb(c.env.ORDERS_DB);
-      const current = fiscalYearOf(Date.now());
+      const teamId = c.get("teamId");
+      const settings = await teamSettings(db, teamId);
+      const timeZone = localTimeZone(c);
+      const calendar = calendarOf(settings, timeZone);
+      const current = fiscalYearOf(Date.now(), calendar);
       const fy = Number(c.req.valid("query").fy ?? current);
-      const [from, to] = fiscalRange(fy);
+      const [from, to] = fiscalRange(fy, calendar);
       const [orders, requests, categories, receipts, charges] = await Promise.all([
         db
           .select()
           .from(vendorOrders)
-          .where(and(gte(vendorOrders.placedAt, from), lt(vendorOrders.placedAt, to)))
+          .where(
+            inTeam(
+              vendorOrders,
+              teamId,
+              gte(vendorOrders.placedAt, from),
+              lt(vendorOrders.placedAt, to),
+            ),
+          )
           .orderBy(asc(vendorOrders.placedAt))
           .all(),
         db
           .select()
           .from(orderRequests)
-          .where(inArray(orderRequests.status, ["approved", "ordered", "received"]))
+          .where(
+            inTeam(
+              orderRequests,
+              teamId,
+              inArray(orderRequests.status, ["approved", "ordered", "received"]),
+            ),
+          )
           .orderBy(asc(orderRequests.id))
           .all(),
-        db.select().from(budgetCategories).all(),
+        db.select().from(budgetCategories).where(inTeam(budgetCategories, teamId)).all(),
         db
           .select()
           .from(requestEvents)
-          .where(eq(requestEvents.action, "received"))
+          .where(inTeam(requestEvents, teamId, eq(requestEvents.action, "received")))
           .orderBy(desc(requestEvents.createdAt))
           .all(),
-        db.select().from(orderCharges).all(),
+        db.select().from(orderCharges).where(inTeam(orderCharges, teamId)).all(),
       ]);
+      const date = (ms: number | null | undefined) => csvDate(ms, timeZone);
       const catLabel = new Map(categories.map((cat) => [cat.id, cat.code?.trim() || cat.name]));
       const received = new Map<number, { at: number; by: string }>();
       for (const e of receipts) {
@@ -486,7 +559,7 @@ export const ordersRouter = new Hono<AppEnv>()
       for (const order of orders) {
         const lines = requests.filter((r) => r.orderId === order.id);
         if (lines.length === 0) continue;
-        const placed = [csvDate(order.placedAt), order.placedByName, order.tracking];
+        const placed = [date(order.placedAt), order.placedByName, order.tracking];
         for (const r of lines) {
           const got = received.get(r.id);
           rows.push(
@@ -501,7 +574,7 @@ export const ordersRouter = new Hono<AppEnv>()
               csvMoney(lineTotal(r)),
               r.reason,
               ...placed,
-              csvDate(got?.at),
+              date(got?.at),
               got?.by,
             ]),
           );
@@ -535,7 +608,7 @@ export const ordersRouter = new Hono<AppEnv>()
               csvMoney(fee.cents),
               null,
               ...placed,
-              csvDate(last?.at),
+              date(last?.at),
               last?.by,
             ]),
           );
@@ -566,7 +639,7 @@ export const ordersRouter = new Hono<AppEnv>()
 
       return c.body(`${rows.join("\r\n")}\r\n`, 200, {
         "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": `attachment; filename="g3-orders-${fiscalLabel(fy).replace("–", "-")}.csv"`,
+        "Content-Disposition": `attachment; filename="orders-${fiscalLabel(fy, calendar.startMonth).replace("–", "-")}.csv"`,
       });
     },
   );

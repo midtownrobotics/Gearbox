@@ -60,7 +60,7 @@ ssh -t g3@192.168.50.1 'cd ~/edge-infra && sudo ./install-agent.sh ./g3-edge-age
 
 SSH and `sudo` may each ask for the Pi's password. Copying the folder doesn't change the box's network config; only the steps under "Changing the network config" do.
 
-On the very first install, `install-agent.sh` creates `/etc/g3-edge/agent.env` and stops. Put the shared key in `EDGE_AGENT_KEY` (`sudo nano /etc/g3-edge/agent.env`; it must match the edge worker's `EDGE_AGENT_KEY` secret) and run the same install command again.
+On the very first install, `install-agent.sh` creates `/etc/g3-edge/agent.env` and stops. Put the team's box key in `EDGE_AGENT_KEY` (`sudo nano /etc/g3-edge/agent.env`; an admin makes it on the Edge app's Edge Box page, where it's shown once) and `EDGE_WORKER_URL` on the team's own Edge address (`https://<number>-edge.frcgearbox.com/api`), and run the same install command again. Set the box's time zone to the shop's (`sudo timedatectl set-timezone America/New_York`, or wherever the shop is): the team's days, billing cycles and "until midnight" exceptions are counted in it.
 
 **Check it** (same command on every OS):
 
@@ -134,7 +134,7 @@ curl -s http://127.0.0.1:8700/health
 ```
 
 - **"The edge box isn't connected"** in the app: check `systemctl status g3-edge-agent`, then `"link"` in the health output. `lastError` says why it's down; the agent keeps retrying (up to once a minute).
-- **`link.lastError` mentions 401, or the agent never connects:** `EDGE_AGENT_KEY` in `/etc/g3-edge/agent.env` doesn't match the worker secret. A 410 means `EDGE_WORKER_URL` is a retired address.
+- **`link.lastError` mentions 401, or the agent never connects:** `EDGE_AGENT_KEY` in `/etc/g3-edge/agent.env` isn't the team's current box key (a new key on the Edge Box page replaces the old one), or `EDGE_WORKER_URL` is another team's address. A 410 means `EDGE_WORKER_URL` is a retired address.
 - **Blocking misbehaves:** turn off **Enforce blocklists** and **DNS hardening** in the app. Without the app, `sudo nft delete table inet g3` removes blocking until the agent's next cycle; `sudo systemctl stop g3-edge-agent` keeps it off.
 - **Printer "Stopped":** click **Resume** on the Printers page once it's back; `lpstat -p -d` and `sudo journalctl -u cups -n 50` on the box.
 - If the hotspot is down, usage is buffered in `/var/lib/g3-edge/agent.db` and uploaded later. Don't delete `/var/lib/g3-edge`.

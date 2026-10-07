@@ -8,20 +8,26 @@ import {
 } from "drizzle-orm/sqlite-core";
 
 // All of this is one team's data, and everything hangs off the team's tree set: keys are unique
-// inside a set, a tree or a category, never across a whole table, so a team column on tree_sets
-// is all a second team needs here (roadmap Phase 3).
+// inside a set, a tree or a category, never across a whole table, so tree_sets is the one table
+// with a team column (roadmap Phase 3). Every other query is kept to the team's set by its id.
 
 /**
  * The trees a team uses, as one set that can be saved to a file and loaded from one
- * (src/lib/tree-set.ts). A single row until tables carry a team; then one per team.
+ * (src/lib/tree-set.ts). One row per team; every other table hangs off it.
  */
-export const treeSets = sqliteTable("tree_sets", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  name: text("name").notNull(),
-  /** Who last loaded the set from a file. Null when the app loaded the default set itself. */
-  loadedByName: text("loaded_by_name"),
-  loadedAt: integer("loaded_at").notNull(),
-});
+export const treeSets = sqliteTable(
+  "tree_sets",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    /** The team whose trees these are: one set per team (migration 0004). */
+    teamId: text("team_id").notNull(),
+    name: text("name").notNull(),
+    /** Who last loaded the set from a file. Null when the app loaded the default set itself. */
+    loadedByName: text("loaded_by_name"),
+    loadedAt: integer("loaded_at").notNull(),
+  },
+  (table) => [uniqueIndex("tree_sets_team").on(table.teamId)],
+);
 
 // `key` on trees, categories and skills is the name a file knows them by. Loading a file again
 // matches rows by key, so a skill that's still in the file keeps everyone's progress on it.
@@ -140,18 +146,4 @@ export const skillProgress = sqliteTable(
     primaryKey({ columns: [t.userId, t.skillId] }),
     index("skill_progress_skill_idx").on(t.skillId),
   ],
-);
-
-/**
- * G3ID accounts known to be mentors, which are left out of the list of students. G3ID's list of
- * accounts doesn't say who is a mentor, so this is what Skill Tree has learned from sign-ins
- * (src/lib/roster.ts).
- */
-export const mentors = sqliteTable(
-  "mentors",
-  {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    userId: text("user_id").notNull(),
-  },
-  (t) => [uniqueIndex("mentors_user_idx").on(t.userId)],
 );

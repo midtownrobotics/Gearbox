@@ -1,9 +1,21 @@
-import { hasMentorAccess, requireAuth } from "@g3/auth";
+import { deleteTeamRows, hasMentorAccess, requireAuth } from "@g3/auth";
 import { corsOrigin } from "@g3/site-config";
 import { withApiPrefix } from "@g3/site-config/worker";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import packageJson from "../package.json";
+import { createDb } from "./db";
+import {
+  fields,
+  intakeReceipts,
+  itemEvents,
+  itemListings,
+  items,
+  locations,
+  robots,
+  stock,
+  subsystems,
+} from "./db/schema";
 import { intakeRouter } from "./routes/intake";
 import { inventoryRouter } from "./routes/inventory";
 import { itemsRouter } from "./routes/items";
@@ -39,6 +51,22 @@ const app = base
   .get("/health", (c) =>
     c.json({ status: "ok", service: "inventory", version: packageJson.version }),
   )
+  // When an operator deletes the team (the platform's console), its data goes too. Only other
+  // workers reach /internal: the gateway never answers it.
+  .delete("/internal/teams/:teamId", async (c) => {
+    await deleteTeamRows(createDb(c.env.INVENTORY_DB), c.req.param("teamId"), [
+      stock,
+      itemEvents,
+      intakeReceipts,
+      itemListings,
+      items,
+      locations,
+      robots,
+      subsystems,
+      fields,
+    ]);
+    return c.json({ ok: true });
+  })
   .get("/me", requireAuth, (c) =>
     c.json({
       userId: c.get("userId"),
@@ -61,6 +89,8 @@ const app = base
   .route("/intake", intakeRouter);
 
 export type InventoryApp = typeof app;
+/** The Hono app itself, for the isolation test (test/isolation.test.ts). */
+export { app };
 export type { FieldValue, FieldValues, FieldView } from "./lib/fields";
 export type { ItemView, ListingInput, ListingView, StockView } from "./lib/items";
 export type { LocationRow } from "./lib/locations";

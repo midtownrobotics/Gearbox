@@ -1,4 +1,4 @@
-import { requireAuth } from "@g3/auth";
+import { inTeam, requireAuth } from "@g3/auth";
 import { eq } from "drizzle-orm";
 import type { Context } from "hono";
 import { Hono } from "hono";
@@ -81,7 +81,12 @@ async function rowOf(c: Context<AppEnv>) {
   const id = parseId(c.req.param("id"));
   if (id === null) return null;
   const db = createDb(c.env.INVENTORY_DB);
-  const row = await db.select().from(stock).where(eq(stock.id, id)).get();
+  const team = c.get("teamId");
+  const row = await db
+    .select()
+    .from(stock)
+    .where(inTeam(stock, team, eq(stock.id, id)))
+    .get();
   if (!row) return null;
   const place: Place = {
     locationId: row.locationId,
@@ -89,7 +94,7 @@ async function rowOf(c: Context<AppEnv>) {
     robotId: row.robotId,
     subsystemId: row.subsystemId,
   };
-  return { db, row, place };
+  return { db, team, row, place };
 }
 
 /**
@@ -104,14 +109,15 @@ async function transfer(
   event: { action: string; note: string },
   evenStorage: boolean,
 ) {
-  const d1 = c.env.INVENTORY_DB;
+  const db = createDb(c.env.INVENTORY_DB);
+  const team = c.get("teamId");
   const now = Date.now();
-  const outcome = await runStockChange(d1, [
-    takeStock(d1, from.id, quantity, now),
-    ...addStock(d1, from.itemId, to, quantity, now, from.id),
-    logEvent(d1, from.itemId, event.action, event.note, actorOf(c), now, from.id),
-    dropIfEmpty(d1, from.id, evenStorage),
-    ...(to.status === "storage" ? [tidyStorage(d1, from.itemId, to.locationId)] : []),
+  const outcome = await runStockChange(db, [
+    takeStock(db, team, from.id, quantity, now),
+    ...addStock(db, team, from.itemId, to, quantity, now, from.id),
+    logEvent(db, team, from.itemId, event.action, event.note, actorOf(c), now, from.id),
+    dropIfEmpty(db, team, from.id, evenStorage),
+    ...(to.status === "storage" ? [tidyStorage(db, team, from.itemId, to.locationId)] : []),
   ]);
   if (outcome !== "ok") return c.json({ error: STOCK_ERRORS[outcome] }, 409);
   return c.json({ ok: true });
@@ -125,10 +131,9 @@ export const stockRouter = new Hono<AppEnv>()
   .patch("/:id", requireAuth, editValidator, async (c) => {
     const found = await rowOf(c);
     if (!found) return c.json({ error: "That row no longer exists. Reload the page." }, 404);
-    const { db, row, place } = found;
+    const { db, team, row, place } = found;
     const body = c.req.valid("json");
-    const names = await loadNames(db);
-    const d1 = c.env.INVENTORY_DB;
+    const names = await loadNames(db, team);
     let quantity = row.quantity;
 
     if (body.quantity !== undefined) {
@@ -138,14 +143,18 @@ export const stockRouter = new Hono<AppEnv>()
         body.quantity === row.quantity
           ? `Confirmed ${row.quantity} in ${where}.`
           : `${row.quantity} → ${body.quantity} in ${where}.`;
-      const outcome = await runStockChange(d1, [
-        d1
-          .prepare(
-            "UPDATE stock SET quantity = ?2, counted_at = ?3, counted_by_name = ?4, updated_at = ?3 WHERE id = ?1",
-          )
-          .bind(row.id, body.quantity, now, actorOf(c).name),
-        logEvent(d1, row.itemId, "counted", note, actorOf(c), now, row.id),
-        dropIfEmpty(d1, row.id, false),
+      const outcome = await runStockChange(db, [
+        db
+          .update(stock)
+          .set({
+            quantity: body.quantity,
+            countedAt: now,
+            countedByName: actorOf(c).name,
+            updatedAt: now,
+          })
+          .where(inTeam(stock, team, eq(stock.id, row.id))),
+        logEvent(db, team, row.itemId, "counted", note, actorOf(c), now, row.id),
+        dropIfEmpty(db, team, row.id, false),
       ]);
       if (outcome !== "ok") return c.json({ error: STOCK_ERRORS[outcome] }, 409);
       quantity = body.quantity;
@@ -175,13 +184,13 @@ export const stockRouter = new Hono<AppEnv>()
   .post("/:id/check-out", requireAuth, checkOutValidator, async (c) => {
     const found = await rowOf(c);
     if (!found) return c.json({ error: "That row no longer exists. Reload the page." }, 404);
-    const { db, row, place } = found;
+    const { db, team, row, place } = found;
     if (row.status !== "storage") {
       return c.json({ error: "Those parts are already in use." }, 409);
     }
     const { quantity, ...where } = c.req.valid("json");
     const to: Place = { status: "in_use", ...where };
-    const names = await loadNames(db);
+    const names = await loadNames(db, team);
     const problem = placeProblem(to, names);
     if (problem) return c.json({ error: problem }, 400);
     return transfer(
@@ -200,13 +209,13 @@ export const stockRouter = new Hono<AppEnv>()
   .post("/:id/check-in", requireAuth, checkInValidator, async (c) => {
     const found = await rowOf(c);
     if (!found) return c.json({ error: "That row no longer exists. Reload the page." }, 404);
-    const { db, row, place } = found;
+    const { db, team, row, place } = found;
     if (row.status !== "in_use") {
       return c.json({ error: "Those parts are already in storage." }, 409);
     }
     const { quantity, locationId } = c.req.valid("json");
     const to: Place = { status: "storage", locationId, robotId: null, subsystemId: null };
-    const names = await loadNames(db);
+    const names = await loadNames(db, team);
     const problem = placeProblem(to, names);
     if (problem) return c.json({ error: problem }, 400);
     return transfer(

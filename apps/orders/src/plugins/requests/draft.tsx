@@ -4,7 +4,13 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { api, getErrorMessage } from "../../shared/api";
 import { useAuthUser } from "../../shared/auth";
-import { dateInputToMs, formatCents, formatDate, parseDollars } from "../../shared/format";
+import {
+  currentCurrency,
+  dateInputToMs,
+  formatCents,
+  formatDate,
+  parseDollars,
+} from "../../shared/format";
 import { PRIORITY, PRIORITY_ORDER } from "../../shared/priority";
 import { STATUS } from "../../shared/status-badge";
 import type { CatalogItem, Priority } from "../../shared/types";
@@ -79,7 +85,7 @@ export const blank = (url = ""): Draft => ({
   image: "",
   price: "",
   priceUnit: null,
-  currency: "USD",
+  currency: currentCurrency(),
   quantity: "1",
   packQuantity: "1",
   packGuessed: false,
@@ -145,7 +151,7 @@ export async function lookUpDraft(url: string): Promise<Partial<Draft>> {
     image: lookup?.image ?? "",
     price: dollars(lookup?.price),
     priceUnit: lookup?.priceUnit ?? null,
-    currency: lookup?.currency ?? "USD",
+    currency: lookup?.currency ?? currentCurrency(),
     ...suggestionFields(suggestion),
     storePlatform: lookup?.source ?? null,
     storeVariantId: variantId,

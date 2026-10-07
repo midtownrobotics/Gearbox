@@ -4,7 +4,7 @@ name = "edge"
 main = "src/index.ts"
 compatibility_date = "2026-05-17"
 
-# Daily rollup of 5-minute usage rows into hourly rows (UTC).
+# Daily rollup of old usage rows, team by team (src/modules/network/index.ts).
 [triggers]
 crons = ["30 8 * * *"]
 
@@ -18,8 +18,8 @@ database_name = "g3-edge-local"
 database_id = "00000000-0000-0000-0000-000000000003"
 migrations_dir = "src/db/migrations"
 
-# Holds the edge box's WebSocket (src/lib/agent-link.ts): the agent connects to
-# /api/agent/connect, and the worker's requests to the box go over it.
+# Holds each team's edge box WebSocket (src/lib/agent-link.ts, one instance per team): a box
+# connects to /api/agent/connect on its team's address, and the worker's requests to it go over it.
 [[durable_objects.bindings]]
 name = "AGENT_LINK"
 class_name = "AgentLink"
@@ -28,9 +28,9 @@ class_name = "AgentLink"
 tag = "v1"
 new_sqlite_classes = ["AgentLink"]
 
-[vars]
-FRONTEND_URL = "http://localhost:5183"
-# Secrets: EDGE_AGENT_KEY (shared with the agent; .dev.vars locally, `wrangler secret put` in prod)
+# No secrets: each team's box has its own key, made on the Edge Box page and stored hashed in D1.
+# Local dev: `pnpm --filter @g3/worker-edge box-key:set -- --local --key local-dev-agent-key`
+# lets the mock agent (mock.env) connect as the site team's box.
 
 [env.production]
 name = "edge-production"
@@ -53,9 +53,6 @@ migrations_dir = "src/db/migrations"
 [[env.production.durable_objects.bindings]]
 name = "AGENT_LINK"
 class_name = "AgentLink"
-
-[env.production.vars]
-FRONTEND_URL = "https://1648-edge.frcgearbox.com"
 
 # The app's page, served by this worker in production; only /api/* runs the worker code, and
 # other paths fall back to index.html for the app's router. Wrangler builds the page before

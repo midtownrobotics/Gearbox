@@ -373,3 +373,46 @@ describe("the session cookie", () => {
     );
   });
 });
+
+describe("messages from other apps", () => {
+  const dm = (teamId: string, body: unknown) =>
+    g3id(`/internal/teams/${teamId}/slack/dm`, { method: "POST", body });
+
+  it("go out on the team's own Slack, and nowhere for a team without one", async () => {
+    const team = await createTeam();
+    expect((await dm(team, { slackUserId: "U123", text: "Approved" })).status).toBe(404);
+    await install(team, workspace());
+    expect((await dm(team, { slackUserId: "U123", text: "Approved" })).status).toBe(200);
+    // The site's team, on its pre-teams settings.
+    expect((await dm(teamKey, { slackUserId: "U123", text: "Approved" })).status).toBe(200);
+  });
+
+  it("need someone to send to and something to say", async () => {
+    const team = await createTeam();
+    await install(team, workspace());
+    expect((await dm(team, { text: "Approved" })).status).toBe(400);
+    expect((await dm(team, { slackUserId: "U123", text: " " })).status).toBe(400);
+    // Never a channel: only a member's DM.
+    expect((await dm(team, { slackUserId: "C123", text: "Approved" })).status).toBe(400);
+  });
+});
+
+describe("channel posts from other apps", () => {
+  const post = (teamId: string, body: unknown) =>
+    g3id(`/internal/teams/${teamId}/slack/message`, { method: "POST", body });
+
+  it("go out on the team's own Slack, and nowhere for a team without one", async () => {
+    const team = await createTeam();
+    expect((await post(team, { channel: "C123", text: "Release" })).status).toBe(404);
+    await install(team, workspace());
+    expect((await post(team, { channel: "C123", text: "Release" })).status).toBe(200);
+  });
+
+  it("need a channel and something to say", async () => {
+    const team = await createTeam();
+    await install(team, workspace());
+    expect((await post(team, { text: "Release" })).status).toBe(400);
+    expect((await post(team, { channel: "U123", text: "Release" })).status).toBe(400);
+    expect((await post(team, { channel: "C123", text: "" })).status).toBe(400);
+  });
+});

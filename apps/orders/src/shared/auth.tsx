@@ -1,5 +1,6 @@
 import { type ReactNode, createContext, useContext, useEffect, useState } from "react";
 import { api, redirectToLogin } from "./api";
+import { setTeamCurrency } from "./format";
 import { PageLoading } from "./ui";
 
 export type AuthUser = {
@@ -9,6 +10,10 @@ export type AuthUser = {
   isMentor: boolean;
   /** Mentors and trusted students: add catalog categories and add, edit or delete parts. */
   canEditCatalog: boolean;
+  /** The team's settings every page needs: its currency and fiscal calendar. */
+  currency: string;
+  /** 1–12: the month the team's fiscal year starts. */
+  fiscalYearStart: number;
 };
 
 const AuthUserContext = createContext<AuthUser | null>(null);
@@ -26,7 +31,11 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
   useEffect(() => {
     api.me
       .$get()
-      .then(async (res) => setUser(res.ok ? await res.json() : null))
+      .then(async (res) => {
+        const me: AuthUser | null = res.ok ? await res.json() : null;
+        if (me) setTeamCurrency(me.currency);
+        setUser(me);
+      })
       .catch(() => setUser(null));
   }, []);
 

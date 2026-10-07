@@ -3,7 +3,7 @@ import { api, getErrorMessage } from "../../shared/api";
 import {
   dateInputToMs,
   formatCents,
-  formatDate,
+  formatDay,
   msToDateInput,
   parseDollars,
 } from "../../shared/format";
@@ -78,7 +78,7 @@ function VendorCard({
   const [editing, setEditing] = useState(false);
   const facts = [
     v.taxExempt &&
-      `Tax exempt${v.taxExemptExpires ? ` (certificate until ${formatDate(v.taxExemptExpires)})` : ""}`,
+      `Tax exempt${v.taxExemptExpires ? ` (certificate until ${formatDay(v.taxExemptExpires)})` : ""}`,
     v.teamAccountLogin && "Sign in to the team account",
     v.freeShippingCents !== null && `Free shipping over ${formatCents(v.freeShippingCents)}`,
     v.typicalShippingCents !== null && `Shipping usually ${formatCents(v.typicalShippingCents)}`,
@@ -112,7 +112,7 @@ function VendorCard({
               🎟 {cr.label}
               {cr.balanceCents !== null && ` · ${formatCents(cr.balanceCents)} left`}
               {cr.code && <span className="ml-1 font-mono text-xs">{cr.code}</span>}
-              {cr.expiresAt !== null && ` · expires ${formatDate(cr.expiresAt)}`}
+              {cr.expiresAt !== null && ` · expires ${formatDay(cr.expiresAt)}`}
             </li>
           ))}
         </ul>
@@ -404,7 +404,7 @@ function Credits({ vendor: v, onChanged }: { vendor: VendorProfile; onChanged: (
                 {CREDIT_KINDS[cr.kind]}: {cr.label}
                 {cr.code && <span className="ml-1 font-mono text-xs">{cr.code}</span>}
                 {cr.balanceCents !== null && ` · ${formatCents(cr.balanceCents)} left`}
-                {cr.expiresAt !== null && ` · expires ${formatDate(cr.expiresAt)}`}
+                {cr.expiresAt !== null && ` · expires ${formatDay(cr.expiresAt)}`}
               </span>
               <button
                 type="button"

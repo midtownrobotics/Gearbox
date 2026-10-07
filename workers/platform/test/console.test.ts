@@ -28,6 +28,17 @@ function call(
   );
 }
 
+/** The team-scoped apps the console deletes a team's data in (stubbed in vitest.config.mts). */
+const TEAM_APP_BINDINGS = [
+  "ATTENDANCE",
+  "EDGE",
+  "INVENTORY",
+  "ORDERS",
+  "PIT",
+  "SHOP",
+  "SKILL_TREE",
+] as const;
+
 const newNumber = () => 20000 + (crypto.getRandomValues(new Uint32Array(1))[0] % 70000);
 
 /** An active team, as sign-up leaves one. */
@@ -155,6 +166,13 @@ describe("teams", () => {
     expect((await del({ reason: "False registration", confirmNumber: number })).status).toBe(200);
 
     expect(await row("SELECT id FROM teams WHERE id = ?", id)).toBeNull();
+    // Its data in every team-scoped app went first.
+    for (const app of TEAM_APP_BINDINGS) {
+      const deleted = (await (
+        await testEnv[app].fetch("http://app/api/internal/deleted")
+      ).json()) as string[];
+      expect(deleted).toContain(id);
+    }
     const logged = await lastAction(id);
     expect(logged).toMatchObject({
       action: "delete_team",
@@ -181,7 +199,21 @@ describe("teams", () => {
     expect(signup.status).toBe(201);
   });
 
-  it("won't delete, renumber or suspend the site's own team", async () => {
+  it("deletes nothing else when an app can't delete the team's data", async () => {
+    const { id, number } = await createTeam();
+    await testEnv.SHOP.fetch(`http://app/api/internal/fail/${id}`, { method: "POST" });
+    const del = () =>
+      call(operator, `/teams/${id}`, {
+        method: "DELETE",
+        body: { reason: "False registration", confirmNumber: number },
+      });
+    const res = await del();
+    expect(res.status).toBe(502);
+    expect(((await res.json()) as { error: string }).error).toContain("Shop");
+    expect(await row("SELECT id FROM teams WHERE id = ?", id)).not.toBeNull();
+  });
+
+  it("won't delete or suspend the site's own team", async () => {
     const reason = "Testing";
     expect(
       (
@@ -193,44 +225,12 @@ describe("teams", () => {
     ).toBe(409);
     expect(
       (
-        await call(operator, `/teams/${teamKey}/renumber`, {
-          method: "POST",
-          body: { reason, teamNumber: newNumber() },
-        })
-      ).status,
-    ).toBe(409);
-    expect(
-      (
         await call(operator, `/teams/${teamKey}/status`, {
           method: "POST",
           body: { reason, status: "suspended" },
         })
       ).status,
     ).toBe(409);
-  });
-
-  it("renumbers a team, taking its log with it", async () => {
-    const { id, number } = await createTeam();
-    const taken = await createTeam();
-    const renumber = (teamNumber: number) =>
-      call(operator, `/teams/${id}/renumber`, {
-        method: "POST",
-        body: { reason: "They typed the wrong number", teamNumber },
-      });
-    expect((await renumber(taken.number)).status).toBe(409);
-
-    const next = newNumber();
-    expect(await (await renumber(next)).json()).toEqual({ id: `frc${next}` });
-    expect(await row("SELECT id FROM teams WHERE team_number = ?", number)).toBeNull();
-    expect(await row("SELECT status FROM teams WHERE id = ?", `frc${next}`)).toEqual({
-      status: "active",
-    });
-    const logged = await lastAction(`frc${next}`);
-    expect(logged?.action).toBe("renumber_team");
-    expect(JSON.parse(logged?.details as string)).toEqual({ from: number, to: next });
-    // Its addresses answer under the new number only.
-    expect((await exports.default.fetch(`http://platform/api/teams/frc${next}`)).status).toBe(200);
-    expect((await exports.default.fetch(`http://platform/api/teams/${id}`)).status).toBe(404);
   });
 
   it("hands a team to another member", async () => {

@@ -24,12 +24,13 @@ database_name = "g3-orders-local"
 database_id = "00000000-0000-0000-0000-000000000004"
 migrations_dir = "src/db/migrations"
 
+# Links to a team's pages (Slack messages, Share-A-Cart's sign-in callback) are its own
+# <number>-orders address; in dev they go through the local gateway (pnpm dev runs it). Approval
+# DMs go out on the team's own Slack, through G3ID, so this worker has no Slack token.
+# Secret: SECRETS_KEY encrypts each team's Share-A-Cart tokens in D1 (`openssl rand -base64 32`;
+# .dev.vars locally, `wrangler secret put` in prod).
 [vars]
-FRONTEND_URL = "http://localhost:5184"
-# How the browser reaches this worker (through the app's /api proxy in dev); used for OAuth callbacks.
-PUBLIC_API_URL = "http://localhost:5184/api"
-# Optional secrets (.dev.vars locally, `wrangler secret put` in prod):
-#   SLACK_BOT_TOKEN: DMs requesters when a mentor approves; without it nothing is sent.
+LOCAL_GATEWAY_URL = "http://localhost:8796"
 
 [env.production]
 name = "orders-production"
@@ -56,10 +57,6 @@ database_name = "g3-orders-prod"
 database_id = "987cdb22-15a0-4a3b-88c1-44330ef725f8"
 migrations_dir = "src/db/migrations"
 
-
-[env.production.vars]
-FRONTEND_URL = "https://1648-orders.frcgearbox.com"
-PUBLIC_API_URL = "https://1648-orders.frcgearbox.com/api"
 
 # The app's page, served by this worker in production; only /api/* runs the worker code, and
 # other paths fall back to index.html for the app's router. Wrangler builds the page before

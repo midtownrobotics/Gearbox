@@ -1,12 +1,21 @@
-import { requireAdmin } from "@g3/auth";
-import { eq } from "drizzle-orm";
+import { inTeam, requireAdmin, withTeam } from "@g3/auth";
+import { eq, gt, inArray, sql } from "drizzle-orm";
+import type { BatchItem } from "drizzle-orm/batch";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
-import { createDb } from "../db";
-import { FIELD_TYPES, type FieldType, fields, locations } from "../db/schema";
+import { type Db, createDb } from "../db";
+import {
+  FIELD_TYPES,
+  type FieldType,
+  fields,
+  locations,
+  robots,
+  stock,
+  subsystems,
+} from "../db/schema";
 import { parseOptions } from "../lib/fields";
-import { parseId, sameName, textField } from "../lib/input";
-import { MAX_DEPTH, depthOf, indexLocations, loadLocations } from "../lib/locations";
+import { chunks, parseId, sameName, textField } from "../lib/input";
+import { MAX_DEPTH, depthOf, indexLocations, loadLocations, subtreeOf } from "../lib/locations";
 import {
   MAX_CHOICES,
   MAX_FIELDS,
@@ -37,10 +46,18 @@ const orderValidator = validator("json", (value, c): { ids: number[] } => {
   return { ids: [...new Set(ids as number[])] };
 });
 
-const reorder = (d1: D1Database, table: string, ids: number[]) =>
-  d1.batch(
-    ids.map((id, i) => d1.prepare(`UPDATE ${table} SET sort_order = ?2 WHERE id = ?1`).bind(id, i)),
+type Ordered = typeof fields | typeof locations | typeof robots | typeof subsystems;
+
+/** Puts the team's rows of a list in the order of `ids` (others' ids change nothing). */
+async function reorder(db: Db, team: string, table: Ordered, ids: number[]) {
+  const [first, ...rest] = ids.map((id, i) =>
+    db
+      .update(table)
+      .set({ sortOrder: i })
+      .where(inTeam(table, team, eq(table.id, id))),
   );
+  if (first) await db.batch([first, ...rest]);
+}
 
 const nameValidator = validator("json", (value, c): { name: string } => {
   const name = textField((value as Record<string, unknown> | null)?.name, MAX_NAME, true);
@@ -96,7 +113,8 @@ export const fieldsRouter = new Hono<AppEnv>()
   .post("/", requireAdmin, fieldValidator(false), async (c) => {
     const body = c.req.valid("json");
     const db = createDb(c.env.INVENTORY_DB);
-    const have = await db.select().from(fields).all();
+    const team = c.get("teamId");
+    const have = await db.select().from(fields).where(inTeam(fields, team)).all();
     if (have.length >= MAX_FIELDS) {
       return c.json({ error: `There can be at most ${MAX_FIELDS} fields.` }, 400);
     }
@@ -109,20 +127,22 @@ export const fieldsRouter = new Hono<AppEnv>()
     }
     const made = await db
       .insert(fields)
-      .values({
-        name: body.name ?? "",
-        type: body.type ?? "text",
-        options: JSON.stringify(options),
-        showInTable: body.showInTable === false ? 0 : 1,
-        sortOrder: have.reduce((max, row) => Math.max(max, row.sortOrder), -1) + 1,
-        createdAt: Date.now(),
-      })
+      .values(
+        withTeam(team, {
+          name: body.name ?? "",
+          type: body.type ?? "text",
+          options: JSON.stringify(options),
+          showInTable: body.showInTable === false ? 0 : 1,
+          sortOrder: have.reduce((max, row) => Math.max(max, row.sortOrder), -1) + 1,
+          createdAt: Date.now(),
+        }),
+      )
       .returning({ id: fields.id })
       .get();
     return c.json({ id: made.id }, 201);
   })
   .put("/order", requireAdmin, orderValidator, async (c) => {
-    await reorder(c.env.INVENTORY_DB, "fields", c.req.valid("json").ids);
+    await reorder(createDb(c.env.INVENTORY_DB), c.get("teamId"), fields, c.req.valid("json").ids);
     return c.json({ ok: true });
   })
   /** Renames a field, changes its choices or whether the table shows it. Its type stays. */
@@ -130,7 +150,8 @@ export const fieldsRouter = new Hono<AppEnv>()
     const id = parseId(c.req.param("id"));
     const body = c.req.valid("json");
     const db = createDb(c.env.INVENTORY_DB);
-    const have = await db.select().from(fields).all();
+    const team = c.get("teamId");
+    const have = await db.select().from(fields).where(inTeam(fields, team)).all();
     const row = have.find((field) => field.id === id);
     if (!row) return c.json({ error: "That field no longer exists." }, 404);
     if (
@@ -153,22 +174,21 @@ export const fieldsRouter = new Hono<AppEnv>()
         options: JSON.stringify(options),
         showInTable: body.showInTable === undefined ? row.showInTable : body.showInTable ? 1 : 0,
       })
-      .where(eq(fields.id, row.id));
+      .where(inTeam(fields, team, eq(fields.id, row.id)));
     return c.json({ ok: true });
   })
   /** Removes a field. What entries had in it stops showing, and goes when they're next saved. */
   .delete("/:id", requireAdmin, async (c) => {
     const id = parseId(c.req.param("id"));
-    if (id !== null) await createDb(c.env.INVENTORY_DB).delete(fields).where(eq(fields.id, id));
+    if (id !== null) {
+      await createDb(c.env.INVENTORY_DB)
+        .delete(fields)
+        .where(inTeam(fields, c.get("teamId"), eq(fields.id, id)));
+    }
     return c.json({ ok: true });
   });
 
 // ---- Locations ----
-
-/** A location and everything inside it, as a subquery of ids. `?1` is the location. */
-const SUBTREE = `WITH RECURSIVE inside(id) AS (
-    SELECT ?1 UNION ALL SELECT l.id FROM locations l JOIN inside ON l.parent_id = inside.id
-  ) SELECT id FROM inside`;
 
 const newLocationsValidator = validator(
   "json",
@@ -212,7 +232,8 @@ export const locationsRouter = new Hono<AppEnv>()
   .post("/", requireAdmin, newLocationsValidator, async (c) => {
     const { parentId, names } = c.req.valid("json");
     const db = createDb(c.env.INVENTORY_DB);
-    const rows = await loadLocations(db);
+    const team = c.get("teamId");
+    const rows = await loadLocations(db, team);
     const { byId, childrenOf } = indexLocations(rows);
     if (parentId !== null) {
       if (!byId.has(parentId)) return c.json({ error: "That location no longer exists." }, 404);
@@ -226,26 +247,27 @@ export const locationsRouter = new Hono<AppEnv>()
       return c.json({ error: `There can be at most ${MAX_LOCATIONS} locations.` }, 400);
     }
     const now = Date.now();
-    const d1 = c.env.INVENTORY_DB;
-    const last = await d1
-      .prepare("SELECT COALESCE(MAX(sort_order), -1) + 1 AS next FROM locations")
-      .first<{ next: number }>();
+    const last = await db
+      .select({ next: sql<number>`coalesce(max(${locations.sortOrder}), -1) + 1` })
+      .from(locations)
+      .where(inTeam(locations, team))
+      .get();
     const start = last?.next ?? 0;
-    if (adding.length > 0) {
-      await d1.batch(
-        adding.map((name, i) =>
-          d1
-            .prepare(
-              "INSERT INTO locations (parent_id, name, sort_order, created_at) VALUES (?1, ?2, ?3, ?4)",
-            )
-            .bind(parentId, name, start + i, now),
-        ),
-      );
-    }
+    const [first, ...rest] = adding.map((name, i) =>
+      db
+        .insert(locations)
+        .values(withTeam(team, { parentId, name, sortOrder: start + i, createdAt: now })),
+    );
+    if (first) await db.batch([first, ...rest]);
     return c.json({ added: adding.length, skipped: names.length - adding.length }, 201);
   })
   .put("/order", requireAdmin, orderValidator, async (c) => {
-    await reorder(c.env.INVENTORY_DB, "locations", c.req.valid("json").ids);
+    await reorder(
+      createDb(c.env.INVENTORY_DB),
+      c.get("teamId"),
+      locations,
+      c.req.valid("json").ids,
+    );
     return c.json({ ok: true });
   })
   /** Renames a location, or moves it (with everything inside) to another place in the tree. */
@@ -253,7 +275,8 @@ export const locationsRouter = new Hono<AppEnv>()
     const id = parseId(c.req.param("id"));
     const body = c.req.valid("json");
     const db = createDb(c.env.INVENTORY_DB);
-    const { byId, childrenOf } = indexLocations(await loadLocations(db));
+    const team = c.get("teamId");
+    const { byId, childrenOf } = indexLocations(await loadLocations(db, team));
     const row = id === null ? undefined : byId.get(id);
     if (!row) return c.json({ error: "That location no longer exists." }, 404);
 
@@ -282,36 +305,55 @@ export const locationsRouter = new Hono<AppEnv>()
       (other) => other.id !== row.id && sameName(other.name, name),
     );
     if (clash) return c.json({ error: "There's already a location with that name there." }, 409);
-    await db.update(locations).set({ name, parentId }).where(eq(locations.id, row.id));
+    await db
+      .update(locations)
+      .set({ name, parentId })
+      .where(inTeam(locations, team, eq(locations.id, row.id)));
     return c.json({ ok: true });
   })
   /** Removes a location and everything inside it, if no parts are kept there. */
   .delete("/:id", requireAdmin, async (c) => {
     const id = parseId(c.req.param("id"));
     if (id === null) return c.json({ ok: true });
-    const d1 = c.env.INVENTORY_DB;
-    const held = await d1
-      .prepare(
-        `SELECT COUNT(DISTINCT item_id) AS n FROM stock WHERE quantity > 0 AND location_id IN (${SUBTREE})`,
-      )
-      .bind(id)
-      .first<{ n: number }>();
-    if (held && held.n > 0) {
+    const db = createDb(c.env.INVENTORY_DB);
+    const team = c.get("teamId");
+    const { byId, childrenOf } = indexLocations(await loadLocations(db, team));
+    if (!byId.has(id)) return c.json({ ok: true });
+    // The location and everything inside it, in groups that keep each statement under D1's 100
+    // bound parameters.
+    const groups = chunks(subtreeOf(id, childrenOf), 90);
+    const held = new Set<number>();
+    for (const group of groups) {
+      const rows = await db
+        .selectDistinct({ itemId: stock.itemId })
+        .from(stock)
+        .where(inTeam(stock, team, gt(stock.quantity, 0), inArray(stock.locationId, group)))
+        .all();
+      for (const row of rows) held.add(row.itemId);
+    }
+    if (held.size > 0) {
       return c.json(
         {
-          error: `${held.n} ${held.n === 1 ? "entry has" : "entries have"} parts there. Move them first.`,
+          error: `${held.size} ${held.size === 1 ? "entry has" : "entries have"} parts there. Move them first.`,
         },
         409,
       );
     }
+    const statements: BatchItem<"sqlite">[] = [
+      // Empty rows that only remember where an entry lived...
+      ...groups.map((group) =>
+        db
+          .delete(stock)
+          .where(inTeam(stock, team, eq(stock.quantity, 0), inArray(stock.locationId, group))),
+      ),
+      // ...then the locations. Parts put there since fail this (stock points at its location).
+      ...groups.map((group) =>
+        db.delete(locations).where(inTeam(locations, team, inArray(locations.id, group))),
+      ),
+    ];
     try {
-      await d1.batch([
-        // Empty rows that only remember where an entry lived.
-        d1
-          .prepare(`DELETE FROM stock WHERE quantity = 0 AND location_id IN (${SUBTREE})`)
-          .bind(id),
-        d1.prepare(`DELETE FROM locations WHERE id IN (${SUBTREE})`).bind(id),
-      ]);
+      const [first, ...rest] = statements;
+      if (first) await db.batch([first, ...rest]);
     } catch (err) {
       console.error("[inventory] delete location", err);
       return c.json({ error: "Parts were just put there. Move them first." }, 409);
@@ -321,15 +363,20 @@ export const locationsRouter = new Hono<AppEnv>()
 
 // ---- Robots and subsystems: what parts in use are in use on ----
 
-function namedRouter(table: "robots" | "subsystems", column: string, what: string, max: number) {
+function namedRouter(table: typeof robots | typeof subsystems, what: string, max: number) {
+  // The stock column that points at this list.
+  const usedBy = table === robots ? stock.robotId : stock.subsystemId;
   return (
     new Hono<AppEnv>()
       .post("/", requireAdmin, nameValidator, async (c) => {
         const { name } = c.req.valid("json");
-        const d1 = c.env.INVENTORY_DB;
-        const { results } = await d1
-          .prepare(`SELECT name, sort_order AS sortOrder FROM ${table}`)
-          .all<{ name: string; sortOrder: number }>();
+        const db = createDb(c.env.INVENTORY_DB);
+        const team = c.get("teamId");
+        const results = await db
+          .select({ name: table.name, sortOrder: table.sortOrder })
+          .from(table)
+          .where(inTeam(table, team))
+          .all();
         if (results.length >= max) {
           return c.json({ error: `There can be at most ${max} ${what}s.` }, 400);
         }
@@ -337,64 +384,71 @@ function namedRouter(table: "robots" | "subsystems", column: string, what: strin
           return c.json({ error: `There's already a ${what} with that name.` }, 409);
         }
         const next = results.reduce((top, row) => Math.max(top, row.sortOrder), -1) + 1;
-        const made = await d1
-          .prepare(
-            `INSERT INTO ${table} (name, sort_order, created_at) VALUES (?1, ?2, ?3) RETURNING id`,
-          )
-          .bind(name, next, Date.now())
-          .first<{ id: number }>();
-        return c.json({ id: made?.id ?? 0 }, 201);
+        const made = await db
+          .insert(table)
+          .values(withTeam(team, { name, sortOrder: next, createdAt: Date.now() }))
+          .returning({ id: table.id })
+          .get();
+        return c.json({ id: made.id }, 201);
       })
       .put("/order", requireAdmin, orderValidator, async (c) => {
-        await reorder(c.env.INVENTORY_DB, table, c.req.valid("json").ids);
+        await reorder(
+          createDb(c.env.INVENTORY_DB),
+          c.get("teamId"),
+          table,
+          c.req.valid("json").ids,
+        );
         return c.json({ ok: true });
       })
       .patch("/:id", requireAdmin, nameValidator, async (c) => {
         const id = parseId(c.req.param("id"));
         const { name } = c.req.valid("json");
-        const d1 = c.env.INVENTORY_DB;
-        const { results } = await d1
-          .prepare(`SELECT id, name FROM ${table}`)
-          .all<{ id: number; name: string }>();
-        if (!results.some((row) => row.id === id)) {
+        const db = createDb(c.env.INVENTORY_DB);
+        const team = c.get("teamId");
+        const results = await db
+          .select({ id: table.id, name: table.name })
+          .from(table)
+          .where(inTeam(table, team))
+          .all();
+        if (id === null || !results.some((row) => row.id === id)) {
           return c.json({ error: `That ${what} no longer exists.` }, 404);
         }
         if (results.some((row) => row.id !== id && sameName(row.name, name))) {
           return c.json({ error: `There's already a ${what} with that name.` }, 409);
         }
-        await d1.prepare(`UPDATE ${table} SET name = ?2 WHERE id = ?1`).bind(id, name).run();
+        await db
+          .update(table)
+          .set({ name })
+          .where(inTeam(table, team, eq(table.id, id)));
         return c.json({ ok: true });
       })
       /** Removes one, unless parts are in use on it. */
       .delete("/:id", requireAdmin, async (c) => {
         const id = parseId(c.req.param("id"));
         if (id === null) return c.json({ ok: true });
-        const d1 = c.env.INVENTORY_DB;
-        const used = await d1
-          .prepare(`SELECT COUNT(DISTINCT item_id) AS n FROM stock WHERE ${column} = ?1`)
-          .bind(id)
-          .first<{ n: number }>();
-        if (used && used.n > 0) {
+        const db = createDb(c.env.INVENTORY_DB);
+        const team = c.get("teamId");
+        const used = await db
+          .selectDistinct({ itemId: stock.itemId })
+          .from(stock)
+          .where(inTeam(stock, team, eq(usedBy, id)))
+          .all();
+        if (used.length > 0) {
           return c.json(
             {
-              error: `${used.n} ${used.n === 1 ? "entry has" : "entries have"} parts in use on this ${what}. Check them in first.`,
+              error: `${used.length} ${used.length === 1 ? "entry has" : "entries have"} parts in use on this ${what}. Check them in first.`,
             },
             409,
           );
         }
-        await d1.prepare(`DELETE FROM ${table} WHERE id = ?1`).bind(id).run();
+        await db.delete(table).where(inTeam(table, team, eq(table.id, id)));
         return c.json({ ok: true });
       })
   );
 }
 
-export const robotsRouter = namedRouter("robots", "robot_id", "robot", MAX_ROBOTS);
-export const subsystemsRouter = namedRouter(
-  "subsystems",
-  "subsystem_id",
-  "subsystem",
-  MAX_SUBSYSTEMS,
-);
+export const robotsRouter = namedRouter(robots, "robot", MAX_ROBOTS);
+export const subsystemsRouter = namedRouter(subsystems, "subsystem", MAX_SUBSYSTEMS);
 
 // ---- Setup files ----
 
@@ -409,17 +463,19 @@ const setupValidator = validator("json", (value, c) => {
 export const setupRouter = new Hono<AppEnv>()
   /** The team's setup as a file: its fields, locations, robots and subsystems, and no parts. */
   .get("/export", requireAdmin, async (c) =>
-    c.json(await exportSetup(createDb(c.env.INVENTORY_DB))),
+    c.json(await exportSetup(createDb(c.env.INVENTORY_DB), c.get("teamId"))),
   )
   /** The setup that comes with the app. */
   .get("/starter", requireAdmin, (c) => c.json(starterSetup()))
   /** What loading a file would add, without adding it. */
-  .post("/preview", requireAdmin, setupValidator, async (c) => {
-    const d1 = c.env.INVENTORY_DB;
-    return c.json(await loadSetup(createDb(d1), d1, c.req.valid("json"), false));
-  })
+  .post("/preview", requireAdmin, setupValidator, async (c) =>
+    c.json(
+      await loadSetup(createDb(c.env.INVENTORY_DB), c.get("teamId"), c.req.valid("json"), false),
+    ),
+  )
   /** Adds what's in a file that the team doesn't have yet. Nothing is changed or removed. */
-  .post("/import", requireAdmin, setupValidator, async (c) => {
-    const d1 = c.env.INVENTORY_DB;
-    return c.json(await loadSetup(createDb(d1), d1, c.req.valid("json"), true));
-  });
+  .post("/import", requireAdmin, setupValidator, async (c) =>
+    c.json(
+      await loadSetup(createDb(c.env.INVENTORY_DB), c.get("teamId"), c.req.valid("json"), true),
+    ),
+  );

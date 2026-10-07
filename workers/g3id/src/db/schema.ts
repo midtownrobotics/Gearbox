@@ -180,7 +180,7 @@ export const slackInstallations = sqliteTable("slack_installations", {
   slackTeamId: text("slack_team_id").notNull().unique(),
   slackTeamName: text("slack_team_name"),
   botUserId: text("bot_user_id"),
-  /** Encrypted with SECRETS_KEY (lib/secret-box.ts). */
+  /** Encrypted with SECRETS_KEY (`encryptSecret` in @g3/auth). */
   botTokenEncrypted: text("bot_token_encrypted").notNull(),
   installedBy: text("installed_by").references(() => coreUsers.id),
   createdAt: integer("created_at").notNull(),

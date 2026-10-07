@@ -1,36 +1,31 @@
-import { eq, sql } from "drizzle-orm";
+import { inTeam, requestTeamId, withTeam } from "@g3/auth";
+import { sql } from "drizzle-orm";
 import type { Context } from "hono";
 import { createMiddleware } from "hono/factory";
 import { createEdgeDb } from "../db";
-import { edgeStatus, netSettings } from "../db/schema";
+import { edgeStatus } from "../db/schema";
+import { isTeamBoxKey } from "../lib/box-key";
+import { getSettings } from "../modules/network/common";
 import type { AppEnv } from "../types";
 
-async function sha256(value: string) {
-  return new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)));
-}
+// The box signs in with its team's key (lib/box-key.ts), on its team's own address: the gateway
+// says which team (X-Team-Id), and the key must be that team's. The team is then `c.get("teamId")`
+// like on a member's request.
 
-/** Constant-time comparison. Digests are compared so length doesn't leak either. */
-async function keysMatch(expected: string, provided: string) {
-  const [a, b] = await Promise.all([sha256(expected), sha256(provided)]);
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) diff |= a[i] ^ b[i];
-  return diff === 0;
-}
-
-/** Whether the request carries the agent's key (Authorization: Bearer <key>). */
-async function hasAgentKey(c: Context<AppEnv>) {
-  const key = c.env.EDGE_AGENT_KEY;
+/** Whether the request carries the team's box key (Authorization: Bearer <key>). */
+async function hasBoxKey(c: Context<AppEnv>, teamId: string) {
   const header = c.req.header("Authorization") ?? "";
   const provided = header.startsWith("Bearer ") ? header.slice("Bearer ".length) : "";
-  return Boolean(key && provided && (await keysMatch(key, provided)));
+  return isTeamBoxKey(createEdgeDb(c.env.EDGE_DB), teamId, provided);
 }
 
 /**
- * Records the agent's version, last-seen time, applied state version and
- * public address from its X-G3-Agent-* headers (how the UI knows the box is
- * online and whether changes are pending).
+ * Records the agent's version, last-seen time, applied state version, time zone and public
+ * address from its X-G3-Agent-* headers (how the UI knows the box is online and whether changes
+ * are pending, and which days to count in).
  */
 export function recordAgentContact(c: Context<AppEnv>) {
+  const teamId = c.get("teamId");
   const version = c.req.header("X-G3-Agent-Version");
   const startedAt = Number(c.req.header("X-G3-Agent-Started"));
   const applied = Number(c.req.header("X-G3-Agent-State-Version") ?? 0);
@@ -39,6 +34,8 @@ export function recordAgentContact(c: Context<AppEnv>) {
   // Set by Cloudflare where the request arrived (the gateway passes it on), so
   // it's the hotspot carrier's address, not one the box could choose.
   const publicIp = c.req.header("CF-Connecting-IP")?.slice(0, 64) || null;
+  // Older agents don't say; the last one known stays.
+  const zone = c.req.header("X-G3-Agent-Time-Zone")?.slice(0, 64) || null;
   const values = {
     agentVersion: version,
     agentStartedAt: startedAt,
@@ -48,9 +45,16 @@ export function recordAgentContact(c: Context<AppEnv>) {
   c.executionCtx.waitUntil(
     createEdgeDb(c.env.EDGE_DB)
       .insert(edgeStatus)
-      .values({ id: 1, ...values, publicIp, publicIpSince: publicIp ? now : null })
+      .values(
+        withTeam(teamId, {
+          ...values,
+          publicIp,
+          publicIpSince: publicIp ? now : null,
+          timeZone: zone,
+        }),
+      )
       .onConflictDoUpdate({
-        target: edgeStatus.id,
+        target: edgeStatus.teamId,
         set: {
           ...values,
           // Without the header (local dev), keep the last known address.
@@ -58,31 +62,33 @@ export function recordAgentContact(c: Context<AppEnv>) {
           publicIpSince: sql`case
             when excluded.public_ip is null or excluded.public_ip is ${edgeStatus.publicIp}
             then ${edgeStatus.publicIpSince} else excluded.public_ip_since end`,
+          timeZone: sql`coalesce(excluded.time_zone, ${edgeStatus.timeZone})`,
         },
+        setWhere: inTeam(edgeStatus, teamId),
       })
       .run(),
   );
 }
 
-/** Only the agent's key; for the link's upgrade, whose 101 response can't take headers. */
+/** Only the box's key; for the link's upgrade, whose 101 response can't take headers. */
 export const requireAgentKey = createMiddleware<AppEnv>(async (c, next) => {
-  if (!(await hasAgentKey(c))) return c.json({ error: "Unauthorized." }, 401);
+  const teamId = requestTeamId(c);
+  if (!(await hasBoxKey(c, teamId))) return c.json({ error: "Unauthorized." }, 401);
+  c.set("teamId", teamId);
   await next();
 });
 
 /**
- * Authenticates the edge agent by its key and records its contact. Returns the
+ * Authenticates the team's box by its key and records its contact. Returns the
  * desired state version in X-G3-State-Version so the agent re-syncs if it
  * missed a poke.
  */
 export const requireAgent = createMiddleware<AppEnv>(async (c, next) => {
-  if (!(await hasAgentKey(c))) return c.json({ error: "Unauthorized." }, 401);
+  const teamId = requestTeamId(c);
+  if (!(await hasBoxKey(c, teamId))) return c.json({ error: "Unauthorized." }, 401);
+  c.set("teamId", teamId);
   await next();
-  const settings = await createEdgeDb(c.env.EDGE_DB)
-    .select({ stateVersion: netSettings.stateVersion })
-    .from(netSettings)
-    .where(eq(netSettings.id, 1))
-    .get();
-  if (settings) c.res.headers.set("X-G3-State-Version", String(settings.stateVersion));
+  const settings = await getSettings(createEdgeDb(c.env.EDGE_DB), teamId);
+  c.res.headers.set("X-G3-State-Version", String(settings.stateVersion));
   recordAgentContact(c);
 });

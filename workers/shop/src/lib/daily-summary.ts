@@ -1,4 +1,5 @@
-import { and, eq, gte } from "drizzle-orm";
+import { inTeam } from "@g3/auth";
+import { eq, gte } from "drizzle-orm";
 import type { createShopDb } from "../db";
 import { actions, partInstanceProcesses, partInstances, processes } from "../db/schema";
 
@@ -27,7 +28,11 @@ export type ReflectionStats = {
  * (the work still happened); part counts only cover current parts, which are completed once
  * every step is done.
  */
-export async function getReflectionStats(db: Db, since: number): Promise<ReflectionStats> {
+export async function getReflectionStats(
+  db: Db,
+  teamId: string,
+  since: number,
+): Promise<ReflectionStats> {
   const [instances, steps, procs, todaysActions] = await Promise.all([
     db
       .select({
@@ -36,7 +41,7 @@ export async function getReflectionStats(db: Db, since: number): Promise<Reflect
         createdAt: partInstances.createdAt,
       })
       .from(partInstances)
-      .where(eq(partInstances.isStale, 0))
+      .where(inTeam(partInstances, teamId, eq(partInstances.isStale, 0)))
       .all(),
     db
       .select({
@@ -46,12 +51,19 @@ export async function getReflectionStats(db: Db, since: number): Promise<Reflect
         completedAt: partInstanceProcesses.completedAt,
       })
       .from(partInstanceProcesses)
+      .where(inTeam(partInstanceProcesses, teamId))
       .all(),
-    db.select({ id: processes.id, name: processes.name }).from(processes).all(),
+    db
+      .select({ id: processes.id, name: processes.name })
+      .from(processes)
+      .where(inTeam(processes, teamId))
+      .all(),
     db
       .select({ userId: actions.userId, createdAt: actions.createdAt })
       .from(actions)
-      .where(and(eq(actions.action, "completed"), gte(actions.createdAt, since)))
+      .where(
+        inTeam(actions, teamId, eq(actions.action, "completed"), gte(actions.createdAt, since)),
+      )
       .all(),
   ]);
 
@@ -191,7 +203,7 @@ export type OverviewStats = {
  * Overview: the shop right now. Each current part is at its first unfinished step. A part has
  * been waiting there since its previous step finished (or since it was created).
  */
-export async function getOverviewStats(db: Db): Promise<OverviewStats> {
+export async function getOverviewStats(db: Db, teamId: string): Promise<OverviewStats> {
   const [instances, steps, procs] = await Promise.all([
     db
       .select({
@@ -200,7 +212,7 @@ export async function getOverviewStats(db: Db): Promise<OverviewStats> {
         createdAt: partInstances.createdAt,
       })
       .from(partInstances)
-      .where(eq(partInstances.isStale, 0))
+      .where(inTeam(partInstances, teamId, eq(partInstances.isStale, 0)))
       .all(),
     db
       .select({
@@ -211,8 +223,13 @@ export async function getOverviewStats(db: Db): Promise<OverviewStats> {
         completedAt: partInstanceProcesses.completedAt,
       })
       .from(partInstanceProcesses)
+      .where(inTeam(partInstanceProcesses, teamId))
       .all(),
-    db.select({ id: processes.id, name: processes.name }).from(processes).all(),
+    db
+      .select({ id: processes.id, name: processes.name })
+      .from(processes)
+      .where(inTeam(processes, teamId))
+      .all(),
   ]);
 
   const stepsByInstance = new Map<number, typeof steps>();
