@@ -34,7 +34,7 @@ export function OverviewPage() {
             <Link
               key={tree.id}
               to={`/trees/${tree.id}`}
-              className="block rounded-xl border border-secondary-200 bg-white p-5 hover:border-secondary-400"
+              className="block rounded-xl border border-secondary-200 bg-surface p-5 hover:border-secondary-400"
             >
               <div className="flex items-center gap-3">
                 <span className="text-3xl" aria-hidden="true">

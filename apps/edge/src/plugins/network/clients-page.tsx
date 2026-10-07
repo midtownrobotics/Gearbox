@@ -53,7 +53,7 @@ export function ClientsPage() {
       className={`px-3 py-1.5 text-sm font-medium transition-colors disabled:opacity-50 ${
         onlineOnly === on
           ? "bg-secondary-900 text-white"
-          : "bg-white text-secondary-600 hover:bg-secondary-50"
+          : "bg-surface text-secondary-600 hover:bg-secondary-50"
       }`}
     >
       {label}
@@ -72,7 +72,7 @@ export function ClientsPage() {
           <button
             type="button"
             onClick={reload}
-            className="px-3 py-1.5 text-sm font-medium rounded-lg border border-secondary-200 bg-white text-secondary-600 hover:bg-secondary-50"
+            className="px-3 py-1.5 text-sm font-medium rounded-lg border border-secondary-200 bg-surface text-secondary-600 hover:bg-secondary-50"
           >
             Refresh
           </button>

@@ -325,7 +325,7 @@ export function AdminUsersPage() {
             className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors capitalize ${
               filter === f
                 ? "bg-primary-500 text-white"
-                : "bg-white text-secondary-600 hover:text-secondary-900 border border-secondary-300"
+                : "bg-surface text-secondary-600 hover:text-secondary-900 border border-secondary-300"
             }`}
           >
             {f} <span className="opacity-60">({countFor(f)})</span>
@@ -352,7 +352,7 @@ export function AdminUsersPage() {
           {filtered.map((user) => (
             <div
               key={user.id}
-              className="bg-white border border-secondary-200 rounded-lg overflow-hidden"
+              className="bg-surface border border-secondary-200 rounded-lg overflow-hidden"
             >
               {/* Main row */}
               <div className="px-4 py-3 flex items-center gap-3 flex-wrap">
@@ -376,7 +376,7 @@ export function AdminUsersPage() {
                       </span>
                     )}
                     <span
-                      className={`text-xs px-2 py-0.5 rounded-full border capitalize ${STATUS_STYLES[user.status] ?? "bg-white text-secondary-600"}`}
+                      className={`text-xs px-2 py-0.5 rounded-full border capitalize ${STATUS_STYLES[user.status] ?? "bg-surface text-secondary-600"}`}
                     >
                       {user.status}
                     </span>
@@ -433,7 +433,7 @@ export function AdminUsersPage() {
                       onClick={() =>
                         user.isAdmin ? handleDemote(user.id) : handlePromote(user.id)
                       }
-                      className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white border border-secondary-300 hover:bg-primary-50 hover:text-primary-600 disabled:opacity-50 disabled:cursor-not-allowed text-secondary-600 transition-colors flex items-center gap-1"
+                      className="px-3 py-1.5 rounded-lg text-xs font-medium bg-surface border border-secondary-300 hover:bg-primary-50 hover:text-primary-600 disabled:opacity-50 disabled:cursor-not-allowed text-secondary-600 transition-colors flex items-center gap-1"
                     >
                       {promoting.has(user.id) ? (
                         <Loader2 size={11} className="animate-spin" />
@@ -453,7 +453,7 @@ export function AdminUsersPage() {
                       onClick={() =>
                         user.isMentor ? handleRevokeMentor(user.id) : handleGrantMentor(user.id)
                       }
-                      className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white border border-secondary-300 hover:bg-blue-50 hover:text-blue-800 disabled:opacity-50 disabled:cursor-not-allowed text-secondary-600 transition-colors flex items-center gap-1"
+                      className="px-3 py-1.5 rounded-lg text-xs font-medium bg-surface border border-secondary-300 hover:bg-primary-50 hover:text-primary-800 disabled:opacity-50 disabled:cursor-not-allowed text-secondary-600 transition-colors flex items-center gap-1"
                     >
                       {togglingMentor.has(user.id) ? (
                         <Loader2 size={11} className="animate-spin" />
@@ -470,7 +470,7 @@ export function AdminUsersPage() {
                         type="button"
                         disabled={deleting.has(user.id)}
                         onClick={() => handleDelete(user.id)}
-                        className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white border border-secondary-300 hover:bg-primary-50 hover:text-primary-600 disabled:opacity-50 disabled:cursor-not-allowed text-secondary-600 transition-colors flex items-center gap-1"
+                        className="px-3 py-1.5 rounded-lg text-xs font-medium bg-surface border border-secondary-300 hover:bg-primary-50 hover:text-primary-600 disabled:opacity-50 disabled:cursor-not-allowed text-secondary-600 transition-colors flex items-center gap-1"
                       >
                         {deleting.has(user.id) ? (
                           <Loader2 size={11} className="animate-spin" />
@@ -489,7 +489,7 @@ export function AdminUsersPage() {
                           setMergeTargetId("");
                         }
                       }}
-                      className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white border border-secondary-300 hover:bg-secondary-50 text-secondary-700 transition-colors"
+                      className="px-3 py-1.5 rounded-lg text-xs font-medium bg-surface border border-secondary-300 hover:bg-secondary-50 text-secondary-700 transition-colors"
                     >
                       {mergingUserId === user.id ? "Cancel" : "Merge"}
                     </button>
@@ -504,7 +504,7 @@ export function AdminUsersPage() {
                   <select
                     value={mergeTargetId}
                     onChange={(e) => setMergeTargetId(e.target.value)}
-                    className="flex-1 rounded-lg bg-white border border-secondary-300 px-3 py-1.5 text-sm text-secondary-900 focus:outline-none focus:border-primary-500"
+                    className="flex-1 rounded-lg bg-surface border border-secondary-300 px-3 py-1.5 text-sm text-secondary-900 focus:outline-none focus:border-primary-500"
                   >
                     <option value="">Select a user…</option>
                     {users

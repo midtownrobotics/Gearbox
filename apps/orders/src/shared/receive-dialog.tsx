@@ -280,7 +280,7 @@ export function ReceiveDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="w-full max-w-xl rounded-xl bg-white shadow-xl"
+        className="w-full max-w-xl rounded-xl bg-surface shadow-xl"
       >
         <header className="flex items-center justify-between border-b border-secondary-200 px-5 py-3">
           <h2 id={titleId} className="text-lg font-semibold text-secondary-900">

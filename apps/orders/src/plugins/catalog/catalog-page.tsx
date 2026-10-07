@@ -253,7 +253,7 @@ function Chip({
       className={`rounded-full border px-3 py-1 text-sm font-medium ${
         active
           ? "bg-secondary-900 text-white border-secondary-900"
-          : "bg-white text-secondary-600 border-secondary-300 hover:border-secondary-500"
+          : "bg-surface text-secondary-600 border-secondary-300 hover:border-secondary-500"
       }`}
     >
       {children}

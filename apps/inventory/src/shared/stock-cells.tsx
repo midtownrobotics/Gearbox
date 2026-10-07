@@ -55,7 +55,7 @@ export function QuantityCell({ stock, onSaved }: { stock: StockView; onSaved?: (
         step={1}
         aria-label="Quantity"
         title="Type what's there and press Enter to record a count"
-        className={`w-20 rounded-md border bg-white px-2 py-1 text-sm tabular-nums text-secondary-900 focus:outline-none focus:border-primary-500 ${
+        className={`w-20 rounded-md border bg-surface px-2 py-1 text-sm tabular-nums text-secondary-900 focus:outline-none focus:border-primary-500 ${
           error ? "border-primary-400" : "border-secondary-200 hover:border-secondary-400"
         }`}
         disabled={busy}
@@ -125,7 +125,7 @@ export function CheckButton({
       className={`whitespace-nowrap rounded-lg px-3 py-1 text-sm font-semibold ${
         out
           ? "bg-primary-500 text-white hover:bg-primary-600"
-          : "border border-secondary-300 bg-white text-secondary-800 hover:bg-secondary-50"
+          : "border border-secondary-300 bg-surface text-secondary-800 hover:bg-secondary-50"
       }`}
     >
       {out ? "Check out" : "Check in"}

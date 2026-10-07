@@ -163,7 +163,7 @@ export function ChecklistRunnerListPage() {
             <button
               type="button"
               onClick={() => navigate("/editor")}
-              className="text-red-400 hover:text-red-300 underline"
+              className="text-primary-600 hover:text-primary-700 underline"
             >
               Create one in the Editor.
             </button>
@@ -179,11 +179,11 @@ export function ChecklistRunnerListPage() {
                   key={list.id}
                   type="button"
                   onClick={() => navigate(`/checklists/${list.id}`)}
-                  className="w-full bg-white hover:bg-gray-100 border border-gray-300 hover:border-gray-600 rounded-xl p-5 text-left transition-colors group"
+                  className="w-full bg-surface hover:bg-gray-100 border border-gray-300 hover:border-gray-600 rounded-xl p-5 text-left transition-colors group"
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="text-lg font-semibold text-gray-900 group-hover:text-red-400 transition-colors truncate">
+                      <p className="text-lg font-semibold text-gray-900 group-hover:text-primary-600 transition-colors truncate">
                         {list.name}
                       </p>
                       {list.description && (
@@ -196,7 +196,7 @@ export function ChecklistRunnerListPage() {
                       >
                         {list.checkedCount}/{list.itemCount}
                       </span>
-                      <span className="text-gray-600 group-hover:text-red-400 transition-colors">
+                      <span className="text-gray-600 group-hover:text-primary-600 transition-colors">
                         →
                       </span>
                     </div>
@@ -228,7 +228,7 @@ export function ChecklistRunnerListPage() {
               {issues.map((issue) => (
                 <div
                   key={issue.id}
-                  className="bg-white border border-yellow-300 rounded-xl px-4 py-3"
+                  className="bg-surface border border-yellow-300 rounded-xl px-4 py-3"
                 >
                   {confirmDeleteIssueId === issue.id ? (
                     <div className="flex items-center gap-3">

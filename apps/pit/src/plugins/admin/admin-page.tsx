@@ -84,7 +84,7 @@ export function AdminPage() {
           </p>
         )}
 
-        <div className="bg-white rounded-xl border border-gray-300 p-5 space-y-5">
+        <div className="bg-surface rounded-xl border border-gray-300 p-5 space-y-5">
           <div>
             <h2 className="text-lg font-semibold text-gray-200">Event</h2>
             <p className="text-sm text-gray-600 mt-0.5">
@@ -115,7 +115,7 @@ export function AdminPage() {
           />
         </div>
 
-        <div className="bg-white rounded-xl border border-gray-300 p-5 space-y-5">
+        <div className="bg-surface rounded-xl border border-gray-300 p-5 space-y-5">
           <div>
             <h2 className="text-lg font-semibold text-gray-200">Pit Monitor Display</h2>
             <p className="text-sm text-gray-600 mt-0.5">
@@ -138,7 +138,7 @@ export function AdminPage() {
               type="button"
               onClick={handleSave}
               disabled={saving}
-              className="px-4 py-2 bg-red-600 hover:bg-red-500 disabled:opacity-50 text-gray-900 text-sm font-semibold rounded-lg transition-colors"
+              className="px-4 py-2 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-sm font-semibold rounded-lg transition-colors"
             >
               {saving ? "Saving…" : "Save"}
             </button>
@@ -185,7 +185,7 @@ function Field({
             onChange(e.target.value);
             onSaved();
           }}
-          className="flex-1 bg-gray-100 border border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:border-red-500 font-mono"
+          className="flex-1 bg-gray-100 border border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:border-primary-500 font-mono"
         />
         {secret && (
           <button

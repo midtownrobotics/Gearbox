@@ -141,7 +141,7 @@ export function HomePage() {
           <h1 className="text-5xl sm:text-6xl font-bold tracking-tight">
             {names.appTitle("Pit")} Software
           </h1>
-          <p className="text-red-400 font-semibold text-lg tracking-widest uppercase">
+          <p className="text-primary-600 font-semibold text-lg tracking-widest uppercase">
             Pit Management and Operations
           </p>
         </div>
@@ -151,18 +151,18 @@ export function HomePage() {
             <Link
               key={tile.to}
               to={tile.to}
-              className="group bg-white hover:bg-gray-100 border border-gray-200 hover:border-red-600 rounded-2xl p-5 flex items-center gap-4 transition-colors"
+              className="group bg-surface hover:bg-gray-100 border border-gray-200 hover:border-primary-600 rounded-2xl p-5 flex items-center gap-4 transition-colors"
             >
-              <div className="shrink-0 w-12 h-12 rounded-xl bg-gray-100 group-hover:bg-red-600/20 flex items-center justify-center text-red-400 transition-colors">
+              <div className="shrink-0 w-12 h-12 rounded-xl bg-gray-100 group-hover:bg-primary-600/20 flex items-center justify-center text-primary-600 transition-colors">
                 {tile.icon}
               </div>
               <div className="min-w-0">
-                <p className="text-lg font-semibold text-gray-900 group-hover:text-red-400 transition-colors">
+                <p className="text-lg font-semibold text-gray-900 group-hover:text-primary-600 transition-colors">
                   {tile.label}
                 </p>
                 <p className="text-sm text-gray-600 truncate">{tile.desc}</p>
               </div>
-              <span className="ml-auto text-gray-600 group-hover:text-red-400 transition-colors">
+              <span className="ml-auto text-gray-600 group-hover:text-primary-600 transition-colors">
                 →
               </span>
             </Link>

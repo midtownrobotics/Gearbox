@@ -225,7 +225,7 @@ export function DashboardPage() {
     <main className="flex-1 px-6 py-8 max-w-lg mx-auto w-full">
       <h1 className="text-5xl font-bold text-secondary-900 mb-4 text-center">Dashboard</h1>
 
-      <div className="bg-white border border-secondary-200 rounded-lg divide-y divide-secondary-100 mt-4">
+      <div className="bg-surface border border-secondary-200 rounded-lg divide-y divide-secondary-100 mt-4">
         <div className="px-5 py-4 flex items-center gap-4">
           <div className="w-12 h-12 rounded-full bg-primary-500 flex items-center justify-center text-lg font-semibold text-white shrink-0">
             {me.displayName.charAt(0).toUpperCase()}
@@ -397,7 +397,7 @@ export function DashboardPage() {
           <div className="px-5 py-4">
             <p className="text-xs text-secondary-500 uppercase tracking-wide mb-3">Kiosk PIN</p>
             {pin && showPin ? (
-              <div className="bg-white border border-secondary-300 rounded-lg p-3 text-center">
+              <div className="bg-surface border border-secondary-300 rounded-lg p-3 text-center">
                 <p className="text-2xl font-mono font-bold text-secondary-900 tracking-widest">
                   {pin}
                 </p>

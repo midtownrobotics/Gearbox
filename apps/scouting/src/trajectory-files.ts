@@ -120,6 +120,9 @@ export async function trajectoryToPng(trajectory: ParsedTrajectory): Promise<Fil
     field.onload = () => resolve();
     field.onerror = () => reject(new Error("Could not load the 2026 field background."));
   });
+  // The path and its end are drawn in the team's brand colour (colors.css).
+  const brand =
+    getComputedStyle(document.documentElement).getPropertyValue("--g3-brand").trim() || "#a71433";
   context.fillStyle = "#17191d";
   context.fillRect(0, 0, canvas.width, canvas.height);
   context.drawImage(field, 0, 0, canvas.width, canvas.height);
@@ -132,7 +135,7 @@ export async function trajectoryToPng(trajectory: ParsedTrajectory): Promise<Fil
     index ? context.lineTo(px(point.x), py(point.y)) : context.moveTo(px(point.x), py(point.y)),
   );
   context.stroke();
-  context.strokeStyle = "#a71433";
+  context.strokeStyle = brand;
   context.lineWidth = 6;
   context.beginPath();
   trajectory.points.forEach((point, index) =>
@@ -145,7 +148,7 @@ export async function trajectoryToPng(trajectory: ParsedTrajectory): Promise<Fil
   context.fill();
   const end = trajectory.points.at(-1);
   if (end) {
-    context.fillStyle = "#a71433";
+    context.fillStyle = brand;
     context.beginPath();
     context.arc(px(end.x), py(end.y), 11, 0, Math.PI * 2);
     context.fill();

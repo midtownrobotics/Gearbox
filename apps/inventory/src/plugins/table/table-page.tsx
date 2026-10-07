@@ -161,7 +161,7 @@ export function TablePage() {
               : count(items.length, "entry", "entries")}
           </p>
 
-          <div className="overflow-x-auto rounded-xl border border-secondary-200 bg-white">
+          <div className="overflow-x-auto rounded-xl border border-secondary-200 bg-surface">
             <table className="w-full text-left text-sm">
               <thead>
                 <tr className="border-b border-secondary-200 text-xs font-bold uppercase tracking-wider text-secondary-400">

@@ -81,7 +81,7 @@ export function ChecklistsPage() {
                 setCreating(true);
                 setBanner(null);
               }}
-              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-lg transition-colors"
+              className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold rounded-lg transition-colors"
             >
               + New List
             </button>
@@ -95,7 +95,7 @@ export function ChecklistsPage() {
         )}
 
         {creating && (
-          <div className="bg-white rounded-xl border border-gray-300 p-5 space-y-3">
+          <div className="bg-surface rounded-xl border border-gray-300 p-5 space-y-3">
             <span className="font-semibold text-gray-200">New Checklist</span>
             <input
               type="text"
@@ -109,7 +109,7 @@ export function ChecklistsPage() {
                 if (e.key === "Enter") handleCreate();
                 if (e.key === "Escape") setCreating(false);
               }}
-              className="mt-4 w-full bg-gray-100 border border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:border-red-500"
+              className="mt-4 w-full bg-gray-100 border border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:border-primary-500"
               // biome-ignore lint/a11y/noAutofocus: intentional — user just opened the create form
               autoFocus
             />
@@ -118,14 +118,14 @@ export function ChecklistsPage() {
               value={newDesc}
               onChange={(e) => setNewDesc(e.target.value)}
               rows={2}
-              className="w-full bg-gray-100 border border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:border-red-500 resize-none"
+              className="w-full bg-gray-100 border border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:border-primary-500 resize-none"
             />
             {createError && <p className="text-red-400 text-xs">{createError}</p>}
             <div className="flex gap-2">
               <button
                 type="button"
                 onClick={handleCreate}
-                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-lg transition-colors"
+                className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold rounded-lg transition-colors"
               >
                 Create
               </button>
@@ -161,7 +161,7 @@ export function ChecklistsPage() {
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === " ") navigate(`/editor/${list.id}`);
               }}
-              className="bg-white hover:bg-gray-100 rounded-xl border border-gray-300 p-5 cursor-pointer transition-colors"
+              className="bg-surface hover:bg-gray-100 rounded-xl border border-gray-300 p-5 cursor-pointer transition-colors"
             >
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-3 min-w-0">

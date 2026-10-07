@@ -80,7 +80,7 @@ export function KioskActivatePage() {
               placeholder="000000"
               value={code}
               onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-              className="w-full px-4 py-3 text-center text-2xl tracking-widest rounded-lg bg-white border border-secondary-300 text-secondary-900 placeholder-secondary-400 focus:outline-none focus:border-primary-500"
+              className="w-full px-4 py-3 text-center text-2xl tracking-widest rounded-lg bg-surface border border-secondary-300 text-secondary-900 placeholder-secondary-400 focus:outline-none focus:border-primary-500"
             />
           </div>
 
@@ -96,7 +96,7 @@ export function KioskActivatePage() {
 
           <Link
             to="/"
-            className="block text-center py-3 px-4 rounded-lg bg-white border border-secondary-300 hover:bg-secondary-50 text-secondary-900 font-semibold transition-colors"
+            className="block text-center py-3 px-4 rounded-lg bg-surface border border-secondary-300 hover:bg-secondary-50 text-secondary-900 font-semibold transition-colors"
           >
             Cancel
           </Link>

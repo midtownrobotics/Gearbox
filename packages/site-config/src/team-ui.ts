@@ -24,7 +24,11 @@ export type TeamUiSettings = {
   logoUrl: string;
   displayFont: "Agency FB" | "Ubuntu" | "system-ui";
   defaultTheme: "system" | "light" | "dark";
-  primaryColor: string;
+  /**
+   * Whether the editor keeps the light and dark accents on one hue (each with its own saturation
+   * and brightness). Only the editor reads it: the two accents are saved as they are.
+   */
+  linkAccents: boolean;
   light: TeamUiColors;
   dark: TeamUiColors;
   links: Record<TeamUiLinkKey, string>;
@@ -38,8 +42,27 @@ export type TeamUiColors = {
   line: string;
   text: string;
   muted: string;
+  /**
+   * The team's colour in this theme. The light accent is also its brand colour (`brandColor`):
+   * buttons, links and app icons take it in both themes.
+   */
   accent: string;
 };
+
+/**
+ * The brand colour built into the apps: what the primary palette (`packages/ui/src/index.css`)
+ * and the app icon files are drawn in.
+ */
+export const builtInBrandColor = "#a32035";
+
+/**
+ * A team's brand colour, for the primary palette and the app icons: its light accent. A team
+ * that keeps the default accent keeps the built-in palette and icons exactly as drawn.
+ */
+export function brandColor(settings: Pick<TeamUiSettings, "light">): string {
+  const accent = settings.light.accent.toLowerCase();
+  return accent === defaultTeamUiSettings.light.accent ? builtInBrandColor : accent;
+}
 
 export const defaultTeamUiSettings: TeamUiSettings = {
   name: site.team.name,
@@ -47,7 +70,7 @@ export const defaultTeamUiSettings: TeamUiSettings = {
   logoUrl: "",
   displayFont: "Agency FB",
   defaultTheme: "system",
-  primaryColor: "#a32035",
+  linkAccents: true,
   light: {
     page: "#f4f6f7",
     surface: "#ffffff",

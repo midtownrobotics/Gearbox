@@ -39,7 +39,7 @@ export function Card({
   className = "",
 }: { title?: string; children: ReactNode; className?: string }) {
   return (
-    <section className={`bg-white border border-secondary-200 rounded-xl p-5 ${className}`}>
+    <section className={`bg-surface border border-secondary-200 rounded-xl p-5 ${className}`}>
       {title && (
         <h2 className="text-xs font-bold uppercase tracking-widest text-secondary-400 font-sans mb-3">
           {title}
@@ -74,7 +74,7 @@ export function Loading() {
 }
 
 export const inputClass =
-  "w-full rounded-lg border border-secondary-300 bg-white px-3 py-2 text-sm text-secondary-900 focus:outline-none focus:border-primary-500";
+  "w-full rounded-lg border border-secondary-300 bg-surface px-3 py-2 text-sm text-secondary-900 focus:outline-none focus:border-primary-500";
 
 export function Button({
   variant = "primary",
@@ -85,8 +85,8 @@ export function Button({
 }) {
   const styles = {
     primary: "bg-primary-500 text-white hover:bg-primary-600",
-    secondary: "bg-white text-secondary-800 border border-secondary-300 hover:bg-secondary-50",
-    danger: "bg-white text-primary-700 border border-primary-300 hover:bg-primary-50",
+    secondary: "bg-surface text-secondary-800 border border-secondary-300 hover:bg-secondary-50",
+    danger: "bg-surface text-primary-700 border border-primary-300 hover:bg-primary-50",
   }[variant];
   return (
     <button
@@ -181,7 +181,7 @@ export function Dialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className={`w-full ${wide ? "max-w-2xl" : "max-w-md"} rounded-xl bg-white shadow-xl`}
+        className={`w-full ${wide ? "max-w-2xl" : "max-w-md"} rounded-xl bg-surface shadow-xl`}
       >
         <header className="flex items-center justify-between border-b border-secondary-200 px-5 py-3">
           <h2 id={titleId} className="text-lg font-semibold text-secondary-900">

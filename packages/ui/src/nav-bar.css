@@ -7,22 +7,22 @@
 .g3-nav-drawer {
   --g3-nav-bg: var(--g3-surface);
   --g3-nav-line: var(--g3-line);
-  --g3-nav-text: #57646c;
-  --g3-nav-strong: #0c0c0c;
+  /* Links are the theme's muted text, and the current page and titles its text. */
+  --g3-nav-text: var(--g3-muted);
+  --g3-nav-strong: var(--g3-text);
   --g3-nav-accent: var(--g3-accent);
   --g3-nav-control: var(--g3-surface);
-  --g3-nav-control-line: rgba(121, 138, 146, 0.35);
-  --g3-nav-muted: #8a979d;
+  --g3-nav-control-line: color-mix(in srgb, var(--g3-line), var(--g3-muted) 9%);
+  --g3-nav-muted: color-mix(in srgb, var(--g3-muted), var(--g3-surface) 32%);
   font-family: "Ubuntu", sans-serif;
 }
 
 html[data-theme="dark"] .g3-nav,
 html[data-theme="dark"] .g3-nav-drawer {
-  --g3-nav-text: #c4c4c4;
-  --g3-nav-strong: #ffffff;
-  --g3-nav-control: #303030;
-  --g3-nav-control-line: #555555;
-  --g3-nav-muted: #8a8a8a;
+  --g3-nav-text: color-mix(in srgb, var(--g3-muted), var(--g3-text) 41%);
+  --g3-nav-control: color-mix(in srgb, var(--g3-surface), var(--g3-text) 5%);
+  --g3-nav-control-line: color-mix(in srgb, var(--g3-line), var(--g3-text) 14%);
+  --g3-nav-muted: color-mix(in srgb, var(--g3-muted), var(--g3-surface) 20%);
 }
 
 .g3-nav {

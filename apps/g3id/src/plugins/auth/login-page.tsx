@@ -37,28 +37,28 @@ export function LoginPage() {
         <div className="space-y-3">
           <a
             href={`${apiBase}/auth/slack/initiate${rp}`}
-            className="w-full flex items-center justify-center gap-3 rounded-lg bg-white border border-secondary-300 hover:border-primary-500 hover:bg-secondary-50 px-4 py-2.5 text-sm text-secondary-900 transition-colors"
+            className="w-full flex items-center justify-center gap-3 rounded-lg bg-surface border border-secondary-300 hover:border-primary-500 hover:bg-secondary-50 px-4 py-2.5 text-sm text-secondary-900 transition-colors"
           >
             <FaSlack size={20} />
             Sign in with Slack
           </a>
           <a
             href={`${apiBase}/auth/google${rp}`}
-            className="w-full flex items-center justify-center gap-3 rounded-lg bg-white border border-secondary-300 hover:border-primary-500 hover:bg-secondary-50 px-4 py-2.5 text-sm text-secondary-900 transition-colors"
+            className="w-full flex items-center justify-center gap-3 rounded-lg bg-surface border border-secondary-300 hover:border-primary-500 hover:bg-secondary-50 px-4 py-2.5 text-sm text-secondary-900 transition-colors"
           >
             <FaGoogle size={20} />
             Sign in with Google
           </a>
           <a
             href={`${apiBase}/auth/github${rp}`}
-            className="w-full flex items-center justify-center gap-3 rounded-lg bg-white border border-secondary-300 hover:border-primary-500 hover:bg-secondary-50 px-4 py-2.5 text-sm text-secondary-900 transition-colors"
+            className="w-full flex items-center justify-center gap-3 rounded-lg bg-surface border border-secondary-300 hover:border-primary-500 hover:bg-secondary-50 px-4 py-2.5 text-sm text-secondary-900 transition-colors"
           >
             <FaGithub size={20} />
             Sign in with GitHub
           </a>
           <a
             href={`${apiBase}/auth/steam${rp}`}
-            className="w-full flex items-center justify-center gap-3 rounded-lg bg-white border border-secondary-300 hover:border-primary-500 hover:bg-secondary-50 px-4 py-2.5 text-sm text-secondary-900 transition-colors"
+            className="w-full flex items-center justify-center gap-3 rounded-lg bg-surface border border-secondary-300 hover:border-primary-500 hover:bg-secondary-50 px-4 py-2.5 text-sm text-secondary-900 transition-colors"
           >
             <FaSteam size={20} />
             Sign in with Steam

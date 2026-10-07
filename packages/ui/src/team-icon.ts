@@ -1,13 +1,13 @@
-import { defaultTeamUiSettings } from "@g3/site-config";
+import { builtInBrandColor } from "@g3/site-config";
 
 // App icons in a team's colour. Every app's icon is a black tile with a white drawing and one
-// accent, drawn in the default primary colour. A team's primary colour (Team Appearance) takes
-// the accent's place: the icon's SVG is read, the accent swapped, and the result used wherever
-// the icon shows (the top bar, the browser tab, the home-screen icon, the app list's tiles).
-// The files themselves stay as they are, so a team with the default colour changes nothing.
+// accent, drawn in the built-in brand colour. A team's brand colour (its light accent in Team
+// Appearance) takes the accent's place: the icon's SVG is read, the accent swapped, and the result
+// used wherever the icon shows (the top bar, the browser tab, the home-screen icon, the app list's
+// tiles). The files themselves stay as they are, so a team with the default colour changes nothing.
 
 /** The colour the icon files are drawn with. */
-const ACCENT = defaultTeamUiSettings.primaryColor.toLowerCase();
+const ACCENT = builtInBrandColor;
 const ACCENT_IN_SVG = new RegExp(ACCENT, "gi");
 
 /** Whether a team's colour is the one the icons already have. */

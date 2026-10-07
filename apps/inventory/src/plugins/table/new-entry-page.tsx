@@ -160,7 +160,7 @@ export function NewEntryPage() {
           </Button>
           <Link
             to="/inventory"
-            className="rounded-lg border border-secondary-300 bg-white px-3.5 py-2 text-sm font-semibold text-secondary-800 hover:bg-secondary-50"
+            className="rounded-lg border border-secondary-300 bg-surface px-3.5 py-2 text-sm font-semibold text-secondary-800 hover:bg-secondary-50"
           >
             Cancel
           </Link>

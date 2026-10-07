@@ -19,7 +19,7 @@ export const PRIORITY: Record<Priority, { label: string; hint: string; className
   nice: {
     label: "Nice to have",
     hint: "",
-    className: "bg-white text-secondary-500 border-secondary-200",
+    className: "bg-surface text-secondary-500 border-secondary-200",
   },
 };
 

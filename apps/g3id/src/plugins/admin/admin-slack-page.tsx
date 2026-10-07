@@ -52,7 +52,7 @@ export function AdminSlackPage() {
   return (
     <main className="flex-1 px-6 py-8 max-w-2xl mx-auto w-full">
       <h1 className="text-3xl font-bold text-secondary-900 mb-8">Slack</h1>
-      <div className="bg-white border border-secondary-200 rounded-lg p-6 space-y-4">
+      <div className="bg-surface border border-secondary-200 rounded-lg p-6 space-y-4">
         <p className="text-sm text-secondary-600">
           Members sign in with codes they send to the bot in your Slack, and the apps message them
           there.

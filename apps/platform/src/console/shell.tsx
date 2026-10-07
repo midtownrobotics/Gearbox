@@ -90,7 +90,7 @@ function SignIn() {
           pattern="[0-9]*"
           value={number}
           onChange={(e) => setNumber(e.target.value)}
-          className="w-32 rounded-lg border border-secondary-300 bg-white px-3 py-2"
+          className="w-32 rounded-lg border border-secondary-300 bg-surface px-3 py-2"
           aria-label="Team number"
         />
         <button type="submit" className={buttonClass("primary")}>
@@ -140,7 +140,7 @@ export function buttonClass(kind: "primary" | "danger" | "plain" = "plain") {
 }
 
 export const fieldClass =
-  "w-full rounded-lg border border-secondary-300 bg-white px-3 py-2 text-sm text-secondary-900 focus:border-primary-500 focus:outline-none";
+  "w-full rounded-lg border border-secondary-300 bg-surface px-3 py-2 text-sm text-secondary-900 focus:border-primary-500 focus:outline-none";
 
 const STATUS_STYLES = {
   active: "bg-green-100 text-green-800",

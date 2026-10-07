@@ -14,7 +14,7 @@ export function RedirectInfo() {
     <div className="bg-secondary-100 text-secondary-900 px-6 py-1 text-center">
       <span>
         Logging into{" "}
-        <a className="text-blue-700 underline" href={redirect}>
+        <a className="text-primary-700 underline" href={redirect}>
           {appName}
         </a>{" "}
         Software

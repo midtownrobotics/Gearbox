@@ -249,7 +249,7 @@ export function NewRequestPage() {
               <div className="flex items-center gap-2">
                 {(lists.data?.length ?? 0) > 0 && (
                   <select
-                    className="rounded-lg border border-secondary-300 bg-white px-3 py-2 text-sm text-secondary-700 focus:outline-none focus:border-primary-500"
+                    className="rounded-lg border border-secondary-300 bg-surface px-3 py-2 text-sm text-secondary-700 focus:outline-none focus:border-primary-500"
                     value={listId}
                     onChange={(e) => setListId(e.target.value)}
                     aria-label="List"

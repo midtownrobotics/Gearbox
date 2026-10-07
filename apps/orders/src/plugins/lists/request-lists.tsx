@@ -53,7 +53,7 @@ export function RequestLists({ requestId }: { requestId: number }) {
           {onLists.data.map((l) => (
             <li
               key={l.id}
-              className="inline-flex items-center gap-2 rounded-full border border-secondary-300 bg-white pl-3 pr-1 py-0.5 text-sm"
+              className="inline-flex items-center gap-2 rounded-full border border-secondary-300 bg-surface pl-3 pr-1 py-0.5 text-sm"
             >
               <Link to={`/lists/${l.id}`} className="text-secondary-800 hover:text-primary-500">
                 {l.name}

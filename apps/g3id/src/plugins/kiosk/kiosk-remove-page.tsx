@@ -88,7 +88,7 @@ export function KioskRemovePage() {
   if (status === "error") {
     return (
       <main className="flex-1 px-6 py-8 max-w-lg mx-auto w-full flex items-center justify-center">
-        <div className="bg-white border border-secondary-200 rounded-lg p-8 space-y-6 w-full text-center">
+        <div className="bg-surface border border-secondary-200 rounded-lg p-8 space-y-6 w-full text-center">
           <div className="space-y-2">
             <AlertCircle size={48} className="text-primary-500 mx-auto" />
             <h1 className="text-2xl font-bold text-secondary-900">Admin Access Required</h1>
@@ -129,7 +129,7 @@ export function KioskRemovePage() {
 
   return (
     <main className="flex-1 px-6 py-8 max-w-lg mx-auto w-full flex items-center justify-center">
-      <div className="bg-white border border-secondary-200 rounded-lg p-8 space-y-6 w-full">
+      <div className="bg-surface border border-secondary-200 rounded-lg p-8 space-y-6 w-full">
         <div className="text-center space-y-2">
           <AlertCircle size={48} className="text-primary-500 mx-auto" />
           <h1 className="text-2xl font-bold text-secondary-900">Remove Kiosk Device</h1>
