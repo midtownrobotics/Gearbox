@@ -19,12 +19,12 @@
     "@g3/site-config": "workspace:*",
     "@g3/slack": "workspace:*",
     "@paralleldrive/cuid2": "^2.2.2",
-    "drizzle-orm": "^0.44.0",
+    "drizzle-orm": "catalog:",
     "hono": "catalog:"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "catalog:",
-    "@cloudflare/workers-types": "^4.20250516.0",
+    "@cloudflare/workers-types": "catalog:",
     "@g3/testing": "workspace:*",
     "drizzle-kit": "^0.31.0",
     "typescript": "^5.8.0",

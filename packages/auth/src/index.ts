@@ -31,4 +31,6 @@ export {
   requireAuthWithIdentities,
   requireMentor,
   requireOAuthSession,
+  requestTeamId,
+  TEAM_HEADER,
 } from "./g3id";

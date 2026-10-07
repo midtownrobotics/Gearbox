@@ -23,12 +23,12 @@
   "dependencies": {
     "@g3/auth": "workspace:*",
     "@g3/site-config": "workspace:*",
-    "drizzle-orm": "^0.44.0",
+    "drizzle-orm": "catalog:",
     "hono": "catalog:"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "catalog:",
-    "@cloudflare/workers-types": "^4.20250516.0",
+    "@cloudflare/workers-types": "catalog:",
     "@g3/testing": "workspace:*",
     "typescript": "^5.8.0",
     "vitest": "catalog:",

@@ -1,5 +1,5 @@
 {
-  "name": "@g3/auth",
+  "name": "@g3/platform-sdk",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -9,15 +9,17 @@
   "scripts": {
     "typecheck": "tsc --noEmit"
   },
+  "dependencies": {
+    "@g3/auth": "workspace:*"
+  },
   "devDependencies": {
     "@cloudflare/workers-types": "catalog:",
+    "drizzle-orm": "catalog:",
     "hono": "catalog:",
     "typescript": "^5.8.0"
   },
   "peerDependencies": {
+    "drizzle-orm": "catalog:",
     "hono": "catalog:"
-  },
-  "dependencies": {
-    "@g3/site-config": "workspace:*"
   }
 }

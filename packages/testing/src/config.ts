@@ -1,7 +1,7 @@
 import { fileURLToPath } from "node:url";
 import { cloudflareTest, readD1Migrations } from "@cloudflare/vitest-pool-workers";
 import { defineConfig } from "vitest/config";
-import { admin, mentor, otherStudent, student, userFromCookie } from "./users.ts";
+import { type TestUser, teamUsers, userFromCookie } from "./users.ts";
 
 // The Vitest config every worker's tests share: tests run inside the Workers runtime (workerd)
 // against local D1/KV/R2 from the worker's wrangler config, with its D1 migrations applied
@@ -55,20 +55,45 @@ export const g3idStub: ServiceStub = (request) => {
     return json(ids.map((id) => ({ id, displayName: id })));
   }
   if (url.pathname === "/auth/logout") return json({ ok: true });
-  // The member list (admins only, like the real one): the standard test users.
+  // The member list (admins only, like the real one): the standard test users of their team.
   if (url.pathname === "/users") {
     if (!user || user.sessionType === "pin" || !user.isAdmin)
       return json({ error: "Forbidden." }, 403);
-    return json([student, otherStudent, mentor, admin].map((u) => ({ ...u, status: "active" })));
+    return json(membersOf(user.teamId).map((u) => ({ ...u, status: "active" })));
   }
   if (url.pathname === "/users/attendance-eligible") {
     if (!user) return json({ error: "Unauthorized." }, 401);
     return json({
-      users: [student, otherStudent, mentor].map(({ id, displayName }) => ({ id, displayName })),
+      users: membersOf(user.teamId)
+        .filter((u) => !u.isAdmin || u.isMentor)
+        .map(({ id, displayName }) => ({ id, displayName })),
     });
+  }
+  // A team's members with their roles, for other workers over the service binding (the platform
+  // SDK's teamMembers). Any team's: the standard users, with ids of their own.
+  const members = url.pathname.match(/^\/internal\/teams\/([^/]+)\/members$/);
+  if (members) {
+    return json(
+      membersOf(decodeURIComponent(members[1])).map(
+        ({ id, displayName, email, isAdmin, isMentor }) => ({
+          id,
+          displayName,
+          email,
+          status: "active",
+          isAdmin,
+          isMentor,
+        }),
+      ),
+    );
   }
   return json({ error: `G3ID stub has no ${url.pathname}` }, 404);
 };
+
+/** The standard test users in a team (teamUsers: the site's team gets the plain ones). */
+function membersOf(teamId: string): TestUser[] {
+  const team = teamUsers(teamId);
+  return [team.student, team.otherStudent, team.mentor, team.admin];
+}
 
 /** A service that's down (e.g. the shop's edge box), for workers that must cope with that. */
 export const offlineService: ServiceStub = () => json({ error: "Service unavailable." }, 503);

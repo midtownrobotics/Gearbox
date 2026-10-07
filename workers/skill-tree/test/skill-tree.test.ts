@@ -82,28 +82,12 @@ async function newTree(name: string) {
 }
 
 describe("the list of students", () => {
-  it("is G3ID's accounts, less the mentors Skill Tree learns about from sign-ins", async () => {
-    // No one has opened Skill Tree yet, and G3ID's list of accounts doesn't say who is a mentor.
-    let ids = await studentIds();
-    expect(ids).toEqual(
-      expect.arrayContaining([student.id, NEW_STUDENT, admin.id, mentor.id, QUIET_MENTOR]),
-    );
-
-    // A mentor's own sign-in says so.
-    await jsonAs(mentor, "/me");
-    ids = await studentIds();
+  it("is the team's active members, less its mentors", async () => {
+    // Roles come with the member list, so a mentor who never opens Skill Tree is left out too.
+    // An admin who isn't a mentor is a student.
+    const ids = await studentIds();
     expect(ids).not.toContain(mentor.id);
-    expect(ids).toContain(QUIET_MENTOR);
-
-    // A kiosk session reports no roles, which mustn't put the mentor back.
-    await jsonAs({ ...mentor, sessionType: "pin" }, "/me");
-    expect(await studentIds()).not.toContain(mentor.id);
-
-    // An admin's sign-in brings in everyone's roles. An admin who isn't a mentor is a student.
-    await jsonAs(admin, "/me");
-    ids = await studentIds();
     expect(ids).not.toContain(QUIET_MENTOR);
-    expect(ids).not.toContain(mentor.id);
     expect(ids).toEqual(
       expect.arrayContaining([student.id, otherStudent.id, NEW_STUDENT, BULK_STUDENT, admin.id]),
     );

@@ -1,6 +1,6 @@
 # Multi-Team Platform Roadmap
 
-Status as of 5 October 2026. This file is the plan of record: when a change completes or advances a step, update the step's Status, the Progress table and "What landed" in the same pull request.
+Status as of 6 October 2026. This file is the plan of record: when a change completes or advances a step, update the step's Status, the Progress table and "What landed" in the same pull request.
 
 ## Summary
 
@@ -37,14 +37,14 @@ Three release points sit between phases: G3 moves to its frcgearbox.com addresse
 
 ## Progress
 
-As of 5 October 2026, five of the six Phase 0 steps are done on `main`, Phase 1 is done (nothing a user sees says G3 unless it's G3's own settings), and Phase 2 is done: teams in G3ID, a team-aware gateway, sign-in, Slack and sign-up per team, and pages that take their team from their address. Skill Tree has done the parts of Phase 3 that don't need teams yet, and Scouting engagement controls provide early groundwork for optional plugins in Phase 4. The rest of Phases 3 to 6 has not started.
+As of 5 October 2026, five of the six Phase 0 steps are done on `main`, Phase 1 is done (nothing a user sees says G3 unless it's G3's own settings), and Phase 2 is done: teams in G3ID, a team-aware gateway, sign-in, Slack and sign-up per team, and pages that take their team from their address. Phase 3 has started: its shared pieces (the platform SDK, the tenancy lint and the isolation harness) are in, and Skill Tree is the first team-scoped app. Scouting engagement controls provide early groundwork for optional plugins in Phase 4. The rest of Phases 3 to 6 has not started. Edge is now planned as an app any team can run with its own box (see "Edge: an app any team can run"); its box link, the first step toward that, is done.
 
 | Phase | Status | What is left |
 | --- | --- | --- |
 | 0. Groundwork | In progress | A staging environment (0.2) |
 | 1. Remove G3 from the platform | Done | Nothing |
 | 2. Tenancy core | Done | Nothing |
-| 3. Team-scoped apps | Started early, Skill Tree only | Skill Tree's team column, scoped access and isolation test, which can now use the team the gateway resolves (2.3, 2.10). All of it for the other apps |
+| 3. Team-scoped apps | In progress: the shared pieces and Skill Tree are done | Pit, Orders, Shop, Attendance, Scouting, Portal and Edge, one pull request each, in the order below |
 | 4. App library and dashboard | Not started | All of it |
 | 5. Live demo | Not started | All of it |
 | 6. Creators' portal | Not started | All of it |
@@ -73,7 +73,8 @@ As of 5 October 2026, five of the six Phase 0 steps are done on `main`, Phase 1 
 | Operators' console on the platform Worker at `admin.<domain>`: an operator flag kept by the platform, teams and number reports, and tools to hand over, renumber, suspend or delete a team, with a 12-month access log | 2.8 | This pull request |
 | A version per app, changelogs, and a `main` to `public` release flow | Part of 0.2 | [#128](https://github.com/midtownrobotics/Gearbox/pull/128), [#129](https://github.com/midtownrobotics/Gearbox/pull/129) |
 | Shared navbar, light and dark mode, one color scheme | Groundwork for 1.3 | [#126](https://github.com/midtownrobotics/Gearbox/pull/126), [#127](https://github.com/midtownrobotics/Gearbox/pull/127) |
-| Edge box reached over its own WebSocket (a Durable Object) instead of a Cloudflare Tunnel; live online clients and box addresses | Edge (G3's single-team app); no phase step | This PR |
+| Phase 3's shared pieces: the platform SDK (`@g3/platform-sdk`: team-scoped query helpers, members with roles), the request's team in `@g3/auth`, the tenancy lint in CI and the two-team isolation harness. Skill Tree is the first team-scoped app: a team on its tree set, students from the member list, and its isolation test | Phase 3: shared pieces, Skill Tree | This PR |
+| Edge box reached over its own WebSocket (a Durable Object) instead of a Cloudflare Tunnel; live online clients and box addresses | Edge E.0: the box link that lets any team's box connect without a tunnel | [#151](https://github.com/midtownrobotics/Gearbox/pull/151) |
 | Optional Scouting engagement with configurable points label, predictions, combined picks and standings; neutral prediction language | Part of 1.6; groundwork for 4.1 and 4.5 | [#143](https://github.com/midtownrobotics/Gearbox/pull/143) |
 | Editable team appearance, reset to defaults, and editable/hidden portal resource links | Part of 1.3 and 1.4 | [#134](https://github.com/midtownrobotics/Gearbox/pull/134) |
 | Skill Tree rebuilt on the shared app pattern: a React frontend in place of the Firebase-shaped shim, the shared navbar, palette, fonts and dark mode, and mentors taken from G3ID roles. Its trees are now a team's own content: a tree set that is loaded from a file (the default set on first use) and edited in the app. Its student list is G3ID's accounts. Earlier progress was cleared | Phase 3 for Skill Tree: tenancy sheet, settings out of code, frontend rewrite, and a stand-in for its seed hook (4.3). Part of 1.3 | [#144](https://github.com/midtownrobotics/Gearbox/pull/144) |
@@ -88,7 +89,9 @@ As of 5 October 2026, five of the six Phase 0 steps are done on `main`, Phase 1 
 - **Changesets apply to everyone.** A variant's pull request needs one, like any other change to an app (6.4).
 - **One app-level role list is gone before Phase 2.** Skill Tree kept its own list of mentors. It now uses the mentor and admin roles from sign-in, so step 2.2 has one less place to map roles from. Scouting's strategy admins are the list still left.
 - **App content is loaded, not migrated.** Skill Tree's default trees are a file that goes through the same loader as a team's own file, the first time the app is opened. No migration holds content. That first-use load is what the seed hook (4.3) replaces, and it is the pattern for the other apps' starter data.
-- **Apps need the team's members with their roles.** Skill Tree's students are G3ID's accounts that aren't mentors, but G3ID's list of accounts carries no roles, so Skill Tree works out who the mentors are from sign-ins. The member list that apps read should include each member's role. This is added to the platform SDK's list in Phase 3.
+- **Edge is for every team, not only G3.** Edge was planned as G3's single-team app because each box needed a Cloudflare Tunnel set up by hand on G3's account. The box now opens its own WebSocket to the edge Worker, so another team's box needs only an address and a key, and nothing on Cloudflare per team. Edge becomes an optional app any team can subscribe to and pair its own box with. Its plan is the section "Edge: an app any team can run", which replaces "Edge: G3's single-team app"; Phase 3's Edge row, the Durable Object decision and the privacy notes change with it.
+- **The SDK doesn't take the user from headers alone.** The plan said the SDK reads the gateway's identity headers. It reads the team from `X-Team-Id`, but still confirms who is signed in with G3ID (as `@g3/auth` already did), and counts a session only on its own team's addresses. Trusting `X-User-Id` alone would save one call per request, but then a worker reachable without the gateway (a `workers.dev` address left on by mistake) would let anyone claim to be anyone. Sign-in and roles stay in `@g3/auth`; the SDK is the tenancy pieces on top.
+- **Apps need the team's members with their roles.** Skill Tree's students are G3ID's accounts that aren't mentors, but G3ID's list of accounts carries no roles, so Skill Tree works out who the mentors are from sign-ins. The member list that apps read should include each member's role. This is added to the platform SDK's list in Phase 3. Done in Phase 3: the SDK's `teamMembers` reads G3ID's member list with roles, and Skill Tree's `mentors` table is gone.
 
 ## Where the codebase started
 
@@ -150,7 +153,7 @@ flowchart TD
     Scouting
     SkillTree["Skill Tree"]
     Attendance
-    Edge["Edge (G3 only)"]
+    Edge["Edge (with the team's own box)"]
     Variant["An approved variant"]
   end
 ```
@@ -193,7 +196,7 @@ A team's address is its FRC team number, and no two teams can share a number. Th
 
 ## Hosting and stack decisions
 
-Seven choices were confirmed on 3 October 2026, and one more on 6 October. Everything else stays on the current stack.
+Seven choices were confirmed on 3 October 2026, and one more on 6 October, widened the same day to every team's box. Everything else stays on the current stack.
 
 | Decision | Confirmed choice | What it replaces |
 | --- | --- | --- |
@@ -204,13 +207,13 @@ Seven choices were confirmed on 3 October 2026, and one more on 6 October. Every
 | Deploys | Cloudflare's Git integration (Workers Builds): `public` deploys to production. A staging environment from `main` is still to come (0.2) | `wrangler deploy` by hand and Pages Git builds |
 | Variant apps | Reviewed pull requests merged into this repo | New |
 | Staging address | frcgearbox.com hostnames until G3's cutover, then g3robotics.com hostnames in the same team-app pattern. Production and staging trade domains, so they never share one | New |
-| Edge box link | A Durable Object (SQLite-backed, hibernating WebSockets) holds the edge box's connection, on the existing Workers Paid plan. Confirmed 6 October 2026, for G3's Edge app only | The Cloudflare Tunnel to `edge-agent.g3robotics.com` |
+| Edge box link | A Durable Object (SQLite-backed, hibernating WebSockets) holds each edge box's connection, one object per team's box, on the existing Workers Paid plan. Confirmed 6 October 2026 for G3's box, then for every team that runs Edge | The Cloudflare Tunnel to `edge-agent.g3robotics.com` |
 
 **Why one level.** Cloudflare's free certificate covers the domain and one level of subdomain ([Universal SSL limitations](https://developers.cloudflare.com/ssl/edge-certificates/universal-ssl/limitations/)). Today's two-level names work because each is a Custom Domain with its own certificate, but Custom Domains take no wildcards and stop at 100 per zone ([Custom Domains](https://developers.cloudflare.com/workers/configuration/routing/custom-domains/), [Workers limits](https://developers.cloudflare.com/workers/platform/limits/)). A wildcard route matches any hostname ([Routes](https://developers.cloudflare.com/workers/configuration/routing/routes/)), and a wildcard DNS record can be proxied on every plan ([Wildcard DNS records](https://developers.cloudflare.com/dns/manage-dns-records/reference/wildcard-dns-records/)).
 
 **Unchanged.** Cloudflare Workers, D1, KV, R2, Queues, Workers AI and cron triggers; Hono, Drizzle, React, Vite and Tailwind v4; pnpm, Biome and GitHub.
 
-**Not in this roadmap.** Each of these would need a separate yes from you: Advanced Certificate Manager, a custom domain per team, Workers for Platforms, a payment provider, and an email-sending service. Durable Objects are confirmed for the edge box's link only; any other use needs its own yes.
+**Not in this roadmap.** Each of these would need a separate yes from you: Advanced Certificate Manager, a custom domain per team, Workers for Platforms, a payment provider, and an email-sending service. Durable Objects are confirmed for edge box links only (one per team's box); any other use needs its own yes.
 
 ### Plan limits that affect the work
 
@@ -256,9 +259,9 @@ After Phase 1 the platform is named Gearbox and "G3" appears only in G3's own br
 | 1.6 | Rename G3-specific names in features: `relationTo1648` to `relationToTeam`, the `g3-match` class to `team-match`, and the points label the team sets. "Our team" for match labels is the request's team (`X-Team-Id`). Scouting's engagement settings and sample data still use the site team until Scouting is team-scoped (Phase 3) | `apps/scouting`, `workers/scouting` | Done |
 | 1.7 | Rewrite `README.md` for the platform: what Gearbox is, the apps, hosted or self-hosted use, developing and contributing. `CLAUDE.md` points every session at this roadmap | repo root | Done |
 
-**Leave alone for now.** Names on the edge box (`g3-edge-agent`, `/var/lib/g3-edge`, the nftables table `inet g3`) stay as they are, because Edge is G3's own app and not part of base Gearbox. Cloudflare resource names such as `g3-orders-prod` and `g3-bucket` are never shown to users and can stay.
+**Leave alone for now.** Names on the edge box (`g3-edge-agent`, `/var/lib/g3-edge`, the nftables table `inet g3`) stay as they are: like the `@g3/*` packages, they are internal names that members never see, even on another team's box. Cloudflare resource names such as `g3-orders-prod` and `g3-bucket` are never shown to users and can stay.
 
-**Done when:** nothing a user sees says G3, g3robotics.com or 1648 unless it came from the team's config. Internal names, G3's seed data and G3's Edge app are the exceptions.
+**Done when:** nothing a user sees says G3, g3robotics.com or 1648 unless it came from the team's config. Internal names and G3's seed data are the exceptions. Edge's G3 values (the 50 GB cap, the door-sounds wiring) leave code in step E.3.
 
 ## Phase 2: Tenancy core
 
@@ -299,24 +302,34 @@ After Phase 3 every app serves any number of teams from one deployment, and noth
 
 | Order | App | Tables | Settings to pull out | Notes |
 | --- | --- | --- | --- | --- |
-| 1 | Skill Tree | 8 | Done early: the trees are a tree set that a team loads from a file and edits in the app. The default set is `workers/skill-tree/content/default-trees.json`, loaded on first use by a stand-in for the seed hook in step 4.3 | Smallest app, so it proves the pattern. Done early: the frontend is rewritten off the Firebase-shaped shim, and the tenancy sheet is settled (all eight tables are team data, rooted at `tree_sets`, and none has a key that is unique across teams). Left for after Phase 2: the team on `tree_sets`, scoped access, the isolation test, and taking mentors from the member list in place of what sign-ins reveal |
+| 1 | Skill Tree | 7 | Done early: the trees are a tree set that a team loads from a file and edits in the app. The default set is `workers/skill-tree/content/default-trees.json`, loaded on first use by a stand-in for the seed hook in step 4.3 | **Done.** Smallest app, so it proved the pattern. All its tables are team data, rooted at `tree_sets`, the one table with `team_id` (one set per team, migration `0004`); every other query is kept to the team's set by its id. Students are the team's members less its mentors, from the SDK's member list, so the `mentors` table is gone. Its isolation test calls every route as team A's admin, mentor, student and kiosk session with team B's ids |
 | 2 | Pit | 5 | Team number and event key, from `wrangler.toml` | Team number comes from the team profile |
 | 3 | Orders | 17 | Fiscal-year start month, time zone and currency (New York time and US dollars are fixed in code today), Share-A-Cart account, Slack token | Budgets, categories, vendors, naming template and keyword rules are already rows. The seeded catalog becomes shared reference data; a team's own parts and prices are team data |
 | 4 | Shop | 17 | Slack channel IDs, Onshape credentials | Processes and subsystems are already rows. Drawings in R2 and the BOM queue need the team. Onshape webhooks must map a company to a team |
 | 5 | Attendance | 3 | Sign-in code rules | Built on D1 with `team_id` added to the tables created in step 0.5 |
 | 6 | Scouting | About 30 | "Our team" number; engagement settings already use team-keyed rows, to move into the platform settings schema; strategy admins become a role | First split the 3,255-line worker into modules and put its 151 raw SQL calls behind query helpers |
 | 7 | Portal | 0 | The app list and team links | Becomes the team home, built from subscriptions and brand links |
-| 8 | Edge | 11 | None. Its settings stay G3's own | A single-team app run only for G3. It moves behind the gateway and takes identity from the platform SDK. Its tables need no team column |
+| 8 | Edge | 11 | Monthly data cap (50 GB, seeded by migration), the agent key in env, which box modules are on | An optional app any team can run with its own box. Its tables get a team column and `edge_status` and `net_settings` lose `CHECK (id = 1)`. The box-specific work is steps E.1 to E.6 in "Edge: an app any team can run" |
 
-Core apps must not depend on Edge. Orders part lookup and Shop printing become optional providers: G3's Edge app supplies both for G3, and a team without a provider enters part details by hand and sees no print button.
+Core apps must not depend on Edge. Orders part lookup and Shop printing become optional providers: a team whose Edge box is connected gets both from it, and a team without one enters part details by hand and sees no print button.
 
 ### Shared pieces built once
 
-- **Platform SDK** (`packages/platform`): reads the gateway's identity headers, exposes the team-scoped database helper, typed team settings, role checks, and the team's members with their roles (Skill Tree's student list and Attendance's eligible list both need it).
-- **Tenancy lint in CI:** rejects a query on a team table that skips the helper, and any raw `prepare` call outside it.
-- **Isolation test harness:** one reusable test, built on packages/testing, that every app, and later every variant, must pass.
+- **Platform SDK** (`packages/platform`, `@g3/platform-sdk`; `apps/platform` already had the `@g3/platform` name): the team-scoped query helpers (`inTeam`, `withTeam`), the team's members with their roles (`teamMembers`, `activeMembers`, from G3ID's `/api/internal/teams/:id/members`), and `forwardIdentity` for calling another app as the user. Sign-in, roles and the request's team stay in `@g3/auth`, which every worker already uses: it takes the team from the gateway's `X-Team-Id` (the site's team without it, on an app's own port in dev and in tests) and counts a session only on its own team's addresses, so `c.get("teamId")` is always the signed-in user's team. Who is signed in is still confirmed with G3ID, not read from the gateway's user headers alone, so a request that skipped the gateway can't claim to be anyone. Typed team settings come with the first app that has settings (Pit). **Done** for Skill Tree's needs.
+- **Tenancy lint in CI** (`pnpm lint:tenancy`, `scripts/tenancy-lint.ts`): in each team-scoped app, rejects a Drizzle query on a team table without `inTeam`, an insert without `withTeam`, a raw `prepare` call, and a `sql` template naming a team table. Each app is added to its list in its own pull request. **Done.**
+- **Isolation test harness** (`@g3/testing/isolation`, `checkIsolation`): seeds teams A and B, calls every route the app has as A's admin, mentor, student and kiosk session with B's ids in the path, and fails if an answer contains anything only B has or B's rows change. Test users come per team (`teamUsers`), and `asUser` sends `X-Team-Id` like the gateway. **Done.**
+- **One Drizzle:** `drizzle-orm` and `@cloudflare/workers-types` are in the pnpm catalog, like Hono, so the SDK's helpers take any worker's tables.
 
-**Done when:** isolation tests pass for all seven apps and the lint is required in CI. G3 then moves to its frcgearbox.com addresses.
+### Decisions (6 October 2026)
+
+| Question | Decision |
+| --- | --- |
+| How Phase 3 is split | The shared pieces with Skill Tree first, then one pull request per app in the order above |
+| A team edits a part in the shared catalog | The edit makes a copy for that team only; other teams keep the original. Prices from a team's own orders stay with that team |
+| Where a team's app settings live | In each app's own database, in a team-keyed settings table read through the SDK, as Scouting's engagement settings already are |
+| Slack messages from Orders, Shop and Scouting | Each team's own Slack installation, which G3ID stores encrypted; the apps ask G3ID for it over the service binding. A team without Slack connected gets no messages |
+
+**Done when:** isolation tests pass for all eight apps and the lint is required in CI. (G3 already moved to its frcgearbox.com addresses during Phase 2.)
 
 ## Phase 4: App library and team dashboard
 
@@ -378,7 +391,7 @@ After Phase 6 a team can build its own variant of an app, submit it, and see it 
 | Step | Change | Where |
 | --- | --- | --- |
 | 6.1 | Creator kit: the scaffold command, platform SDK documentation, a local fake team, the written app contract, and contributor terms that place submitted code under the repo license | `scripts/`, `docs/` |
-| 6.2 | Variant model: a variant is its own library entry with its own slug and Worker, marked "variant of" a base app with its author team. A frontend-only variant reuses the base app's API and data. A full variant owns its own tables. A single-team app is a variant that only its author team can run, so it need not be configurable for others. G3's Edge app is the first | `workers/platform` registry |
+| 6.2 | Variant model: a variant is its own library entry with its own slug and Worker, marked "variant of" a base app with its author team. A frontend-only variant reuses the base app's API and data. A full variant owns its own tables. A single-team app is a variant that only its author team can run, so it need not be configurable for others | `workers/platform` registry |
 | 6.3 | Portal at `creators.frcgearbox.com`: new submission form, status timeline, reviewer notes | new portal app |
 | 6.4 | Checks on every submission: lint, types, tests, tenancy lint, the two-team isolation test, manifest validation, a changeset, staging preview | `.github/workflows` |
 | 6.5 | Review console for your team: queue, checklist (security, data scope, accessibility, named maintainer), approve, request changes, reject | `admin.frcgearbox.com` |
@@ -391,20 +404,30 @@ After Phase 6 a team can build its own variant of an app, submit it, and see it 
 
 **Done when:** one variant from outside your team has gone from fork to published without anyone touching Cloudflare by hand.
 
-## Edge: G3's single-team app
+## Edge: an app any team can run
 
-Edge is no longer a phase. It stays in the repo as a single-team app contributed by G3: listed in the library for anyone to read, and run only for G3.
+Edge was going to be G3's single-team app, because each box was reached through a Cloudflare Tunnel set up by hand on G3's account. That changed on 6 October 2026: the box now opens one WebSocket out to the edge Worker, held by a Durable Object ([#151](https://github.com/midtownrobotics/Gearbox/pull/151)). Nothing on the box listens on the internet, and nothing on Cloudflare is made per box. Another team's box needs only the Worker's address and a key, so Edge becomes an optional app that any team can subscribe to and pair its own box with.
+
+It stays optional. Core apps must keep working without it, and most teams will never run a box.
+
+| Step | Change | Where | Status |
+| --- | --- | --- | --- |
+| E.0 | The box connects out over a WebSocket held by a Durable Object, in place of the Cloudflare Tunnel | `workers/edge/src/lib/agent-link.ts`, `devices/edge-agent/src/core/link.ts` | Done ([#151](https://github.com/midtownrobotics/Gearbox/pull/151)) |
+| E.1 | Team-scoped data: Phase 3's five steps for Edge. A team column on its 11 tables; `edge_status` and `net_settings` become one row per team instead of `CHECK (id = 1)`; the daily rollup cron loops over teams | `workers/edge` | Not started |
+| E.2 | One link per team: the `AgentLink` Durable Object is named by the team (today one fixed name, `edge-box`), and each box has its own key in place of the shared `EDGE_AGENT_KEY`, stored hashed with the team. The box connects to its team's address (`<number>-edge.<platform>/api/agent/connect`), so the gateway must pass the WebSocket upgrade through and the key must belong to that team. `agentFetch` takes the team | `workers/edge`, `workers/gateway` | Not started |
+| E.3 | Settings out of code: the monthly data cap, which box modules are on (network, blocking, printing, part lookup, shop drive, door sounds), and module options such as the door switch's pin and audio device. The agent reads its module list from the worker, so a box without a door switch or printer just leaves those off | `workers/edge`, `devices/edge-agent` | Not started |
+| E.4 | Pairing a box: a team admin makes a short pairing code on the Edge app (like kiosk activation), the setup script on the box trades it for the box's key, and the admin can revoke or re-pair a box | `workers/edge`, `apps/edge`, `devices/edge-agent` | Not started |
+| E.5 | A setup kit another team can follow without G3's help: the released arm64 agent binary, one setup script for the supported board (Orange Pi 5 running Armbian today), and a guide built from `infra/edge/` and `docs/edge.md` that says what each module needs (a second network port, a cellular hotspot, a printer, a door switch) | `infra/edge/`, `docs/` | Not started |
+| E.6 | Privacy and terms: Edge's network module records each device's traffic and the sites it visits, which is per-student browsing data. The privacy policy and terms must say so before any other team turns it on: who can see it (the team's admins only, as today), how long it is kept (hourly rows 30 days, daily rows a year), and that the team must tell its members. Site tracking may need to be its own switch, off by default | `docs/legal/` | Needs a decision |
 
 | Topic | What it means |
 | --- | --- |
-| Classification | A variant app authored by G3, in the single-team category. It is not part of base Gearbox |
-| Hardware | One box, one key and one link (the box's WebSocket to the worker, held by a Durable Object), as today. Nothing is built for a second box |
-| Naming | On-box names such as `g3-edge-agent` and `inet g3` stay. G3 names are allowed inside G3's own app |
-| Move to the platform | In Phase 3 it goes behind the gateway and takes identity from the platform SDK. It needs no team column |
-| Library | From Phase 4 its manifest names G3 as the only team that may run it. In Phase 6 it becomes the first entry in the single-team category |
-| Core apps | Orders part lookup and Shop printing treat Edge as an optional provider. Without one, a team enters part details by hand and has no print button |
-| Other teams | They can read the source and the design brief in `docs/edge.md`, discuss it elsewhere, and submit their own version |
-| Privacy | Its site data is G3's data, under G3's own notice to its members. The platform policy only says that a single-team app may collect more, and that its team must say what |
+| Classification | An optional app in the library, open to every team, like Orders or Scouting. It is no longer a single-team app |
+| Hardware | One box per team. Nothing is planned for a team with two boxes |
+| Naming | On-box names such as `g3-edge-agent` and `inet g3` stay: members never see them, like the other internal names |
+| Core apps | Orders part lookup and Shop printing use the team's box when it is connected. Without one, a team enters part details by hand and has no print button |
+| Order | E.1 and E.2 come with Edge's turn in Phase 3, E.3 to E.5 before it is listed in the library in Phase 4, and E.6 before any team other than G3 turns it on |
+| Hosting | Each box adds one hibernating Durable Object on the existing plan and no new Cloudflare product. The box, its SIM or internet line, and its setup are the team's own |
 
 ## Moving G3 in as the first team
 
@@ -421,7 +444,7 @@ G3 never migrates in one jump. Its data is tagged in place during Phases 2 and 3
 | OAuth sign-in | Google, GitHub, Steam and Onshape callback addresses are registered for `id.frcgearbox.com` |
 | Slack | Slash command and event URLs are repointed. The workspace is recorded as G3's Slack installation |
 | Onshape webhooks | Registered again for the new host |
-| Edge box | The worker address in `agent.env` is updated. The shared key stays as it is, since Edge remains G3's own app |
+| Edge box | The worker address in `agent.env` is updated. The shared key stays until step E.4, when G3's box is paired like any other team's |
 | Secrets | Slack, Onshape and Share-A-Cart tokens move from Worker secrets into G3's encrypted team integrations |
 | Seeded values | The Slack channel IDs, the 50 GB cap, team number 1648 and the event key become G3's settings rows |
 | Staging | Moves from frcgearbox.com to g3robotics.com in the same window, keeping the team-app hostname pattern |
@@ -489,7 +512,7 @@ You can be open to all. Most of what international teams bring is handled in the
 - **An EU representative.** A non-EU service covered by GDPR must name a representative in the EU unless its processing is occasional and low-risk ([Art. 27](https://gdpr-info.eu/art-27-gdpr/)). Whether Gearbox fits that exception is a question for your reviewer.
 - **Countries that restrict sending data abroad.** Some require filings, approved contracts or local storage first. That duty sits with the team there and your terms cannot waive it. Ask your reviewer whether to list any country as unsupported.
 
-**Already met by design.** The UK's Children's code expects services used by children to default to high privacy, collect the minimum and avoid nudging ([ICO](https://ico.org.uk/for-organisations/uk-gdpr-guidance-and-resources/childrens-information/childrens-code-guidance-and-resources/age-appropriate-design-a-code-of-practice-for-online-services/)). Gearbox has no advertising, profiling or tracking, and Edge, the one feature that monitors behavior, now runs for G3 only.
+**Already met by design.** The UK's Children's code expects services used by children to default to high privacy, collect the minimum and avoid nudging ([ICO](https://ico.org.uk/for-organisations/uk-gdpr-guidance-and-resources/childrens-information/childrens-code-guidance-and-resources/age-appropriate-design-a-code-of-practice-for-online-services/)). Gearbox has no advertising, profiling or tracking. Edge is the one feature that monitors behavior, and it is opening to every team; step E.6 settles what the policy says about it and whether site tracking is off by default.
 
 **Gaps that are not legal.** Orders fixes US dollars and New York time in code, and both become team settings in Phase 3. The interface is English only, and the parts catalog lists US vendors.
 
@@ -549,7 +572,7 @@ The risk that matters most is one team seeing another team's data. Most of the s
 
 | Risk | Why it matters | What the roadmap does about it |
 | --- | --- | --- |
-| Data leaks between teams | One query without a team filter exposes another team's rows. Edge site data is per-student browsing history | Team-scoped helper, tenancy lint, an isolation test on every route, and the same checks on every variant |
+| Data leaks between teams | One query without a team filter exposes another team's rows. Edge site data is per-student browsing history, and with Edge open to every team it is held for many teams | Team-scoped helper, tenancy lint, an isolation test on every route, and the same checks on every variant. For Edge also a key per box, so one team's box can never reach another team's link (E.2) |
 | All teams are one site to the browser | Every `*.frcgearbox.com` host shares a site, so cookie SameSite rules do not separate teams | The gateway checks Origin on every write and app code never receives the cookie. Listing the domain on the Public Suffix List is a later option |
 | Approved variants run as trusted code | Your review is the only boundary | Automated checks before review, identity only through the SDK, code owners on the platform packages |
 | Table rebuilds on live data | SQLite cannot change a primary key in place, and several tables need the team added to theirs | Rehearse each rebuild on a staging copy; export before each production run |
@@ -558,6 +581,7 @@ The risk that matters most is one team seeing another team's data. Most of the s
 | Demo abuse | The demo accepts writes from anyone | Side-effect guard, upload caps, rate limits, scheduled reset |
 | Plan limits | Staging doubles the database and Worker counts | Settled: the account is on Workers Paid, and its limits leave room |
 | Wrong team-number claims | Anyone can claim a number that no team holds yet, including one that is not theirs | Sign-up warns that a falsely registered team may be permanently deleted with its data; anyone can report a number at `frcgearbox.com/report`, leaving an email to follow up (stored for operators and listed in their console); operators can suspend, delete, renumber or transfer a team; the terms require a truthful claim; every operator action is logged |
+| Supporting other teams' boxes | Edge runs on hardware the platform doesn't control, set up by people who didn't build it | One supported board and a setup kit (E.5); the box and its network stay the team's to run; Edge stays optional and core apps work without it |
 | Hosting single-team apps | Your organization runs and maintains code that serves only one other team | The same review bar as any variant; you may decline; every entry names a maintainer |
 
 ### Open questions
@@ -565,6 +589,7 @@ The risk that matters most is one team seeing another team's data. Most of the s
 - [ ] Are the retention periods in section 8 of the privacy policy final? The draft's own to-do list still asks to confirm them.
 - [ ] Does Gearbox need a representative in the EU? This is a question for your reviewer.
 - [ ] Should any country be listed as unsupported, beyond those US sanctions rule out? Also for your reviewer.
+- [ ] What do the privacy policy and terms say about Edge's network monitoring once other teams run it, and is per-site tracking off by default (E.6)?
 
 ### Answered
 
@@ -584,7 +609,7 @@ The risk that matters most is one team seeing another team's data. Most of the s
 | Code license | MIT for the whole repo |
 | Review of the terms | Offline, before applications open. Drafting proceeds now |
 | How `public` reaches Cloudflare | Cloudflare's Git integration (Workers Builds) deploys each Worker when `public` changes, so merging the release PR deploys. Step 0.2's deploy part is covered; what's left is the staging environment |
-| Edge | A single-team app contributed by G3, not a core app. The Edge phase is removed |
+| Edge | An optional app any team can run with its own box (changed 6 October 2026, once the box no longer needed a tunnel). Its plan is the Edge section, not a phase |
 | Single-team apps | A public category: listed for every team, run only by the author team. Teams discuss them off the platform |
 | Contact address | contact@frcgearbox.com, as written in both drafts |
 | Internal names | @g3 packages, the G3ID binding, and cookie and database names stay as they are, with no renames in this roadmap. Decided in the repo and recorded in CLAUDE.md |

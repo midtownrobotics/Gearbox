@@ -1,13 +1,28 @@
+import { teamKey } from "@g3/site-config";
 import type { Context, MiddlewareHandler } from "hono";
 import { createMiddleware } from "hono/factory";
 
 // Sign-in for every worker except G3ID itself: ask G3ID (the G3ID service binding) who the
 // request's session cookie belongs to. G3ID never reports admin or mentor for a kiosk PIN session,
 // so role checks here are safe from kiosks without checking the session type again.
+//
+// The team is the address's: the gateway sets X-Team-Id after removing any a client sent (the site's
+// team when there's none: an app's own port in dev, tests). A session counts only on its own team's
+// addresses, so `teamId` is always the signed-in user's team. Who is signed in still comes from
+// G3ID, never from the gateway's user headers alone, so a request that skipped the gateway can't
+// claim to be anyone.
+
+/** The header the gateway names the request's team in. */
+export const TEAM_HEADER = "X-Team-Id";
+
+/** The team the request is for: its address's (the gateway's X-Team-Id), else the site's team. */
+export const requestTeamId = (c: { req: { header(name: string): string | undefined } }) =>
+  c.req.header(TEAM_HEADER) || teamKey;
 
 /** What G3ID's /auth/me says about the signed-in user. */
 type G3IdMe = {
   id: string;
+  teamId?: string;
   displayName: string;
   email: string;
   isAdmin?: boolean;
@@ -20,6 +35,8 @@ type G3IdMe = {
 
 /** The signed-in user, as context variables (`c.get("userId")`, ...). */
 export type G3AuthVariables = {
+  /** The team the request is for, which is the signed-in user's team. */
+  teamId: string;
   userId: string;
   userDisplayName: string;
   userEmail: string;
@@ -49,6 +66,10 @@ async function loadUser(c: Context<G3AuthEnv>, identities: boolean) {
   );
   if (!res.ok) return null;
   const user = (await res.json()) as G3IdMe;
+  // Another team's member is signed out here (the gateway drops their session too).
+  const team = requestTeamId(c);
+  if (user.teamId && user.teamId !== team) return null;
+  c.set("teamId", team);
   c.set("userId", user.id);
   c.set("userDisplayName", user.displayName);
   c.set("userEmail", user.email);

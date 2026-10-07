@@ -20,7 +20,7 @@
     "react-router-dom": "^6.28.0"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20250516.0",
+    "@cloudflare/workers-types": "catalog:",
     "@g3/site-config": "workspace:*",
     "@g3/ui": "workspace:*",
     "@g3/worker-shop": "workspace:*",

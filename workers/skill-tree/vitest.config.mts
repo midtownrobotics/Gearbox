@@ -1,9 +1,9 @@
 import { g3idStub, workerTestConfig } from "@g3/testing/config";
-import { admin, mentor, otherStudent, student, testUser, userFromCookie } from "@g3/testing/users";
+import { SITE_TEAM, admin, mentor, otherStudent, student, testUser } from "@g3/testing/users";
 
-// G3ID as Skill Tree uses it: the shared stub, plus the team's accounts (the list of students
-// comes from them), their roles as an admin sees them, and two kiosk PINs.
-const accounts = [
+// G3ID as Skill Tree uses it: the shared stub (any team's members, with roles), plus more of the
+// site team's accounts and two kiosk PINs.
+const siteMembers = [
   student,
   otherStudent,
   mentor,
@@ -18,20 +18,15 @@ const json = (body: unknown, status = 200) => Response.json(body, { status });
 
 const g3id = (request: Request) => {
   const path = new URL(request.url).pathname;
-  const user = userFromCookie(request.headers.get("Cookie") ?? "");
-  // Active accounts, without roles, as the real route lists them.
-  if (path === "/api/users/attendance-eligible") {
-    if (!user) return json({ error: "Unauthorized." }, 401);
-    return json({ users: accounts.map(({ id, displayName }) => ({ id, displayName })) });
-  }
-  // Everyone's roles: admins only, never from a kiosk.
-  if (path === "/api/admin/users") {
-    if (!user?.isAdmin || user.sessionType === "pin") return json({ error: "Forbidden." }, 403);
+  if (path === `/api/internal/teams/${SITE_TEAM}/members`) {
     return json(
-      accounts.map(({ id, displayName, isMentor }) => ({
+      siteMembers.map(({ id, displayName, email, isAdmin, isMentor }) => ({
         id,
         displayName,
-        isMentor: isMentor ? 1 : 0,
+        email,
+        status: "active",
+        isAdmin,
+        isMentor,
       })),
     );
   }

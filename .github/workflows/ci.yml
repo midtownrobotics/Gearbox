@@ -32,6 +32,11 @@ jobs:
 
       - run: pnpm typecheck
 
+      # Team-scoped apps keep every query on a team's table behind the platform SDK's helpers
+      # (roadmap Phase 3): scripts/tenancy-lint.ts.
+      - name: Tenancy lint
+        run: pnpm lint:tenancy
+
       # wrangler.toml production values must match packages/site-config/src/site.ts.
       - name: Site config is applied
         run: pnpm configure --check
