@@ -1,5 +1,5 @@
 import { requireAuth, requireMentor } from "@g3/auth";
-import { desc, eq, like, or } from "drizzle-orm";
+import { desc, eq, or, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
 import { type OrdersDb, createOrdersDb } from "../db";
@@ -14,7 +14,9 @@ import {
 } from "../db/schema";
 import { productKey } from "../lib/catalog";
 import { guessCatalogCategory, matchesKeyword } from "../lib/category-guess";
+import { inventoryRequired, setInventoryRequired } from "../lib/inventory";
 import { DEFAULT_TEMPLATE, applyTemplate } from "../lib/naming";
+import { guessPackQuantity } from "../lib/pack-quantity";
 import { vendorKey, vendorName } from "../lib/vendors";
 import type { AppEnv } from "../types";
 
@@ -25,15 +27,32 @@ async function namingTemplate(db: OrdersDb) {
   return row?.value ?? DEFAULT_TEMPLATE;
 }
 
-const settingsValidator = validator("json", (value, c): { namingTemplate: string } => {
-  const t = (value as { namingTemplate?: unknown })?.namingTemplate;
-  if (typeof t !== "string" || !t.includes("{title}") || t.length > 200) {
-    return c.json(
-      { error: "The naming template must include {title} (up to 200 characters)." },
-      400,
-    ) as never;
+type SettingsInput = { namingTemplate?: string; inventoryRequired?: boolean };
+
+/** Any of the settings; the ones left out stay as they are. */
+const settingsValidator = validator("json", (value, c): SettingsInput => {
+  const v = (value ?? {}) as { namingTemplate?: unknown; inventoryRequired?: unknown };
+  const out: SettingsInput = {};
+  if (v.namingTemplate !== undefined) {
+    const t = v.namingTemplate;
+    if (typeof t !== "string" || !t.includes("{title}") || t.length > 200) {
+      return c.json(
+        { error: "The naming template must include {title} (up to 200 characters)." },
+        400,
+      ) as never;
+    }
+    out.namingTemplate = t.trim();
   }
-  return { namingTemplate: t.trim() };
+  if (v.inventoryRequired !== undefined) {
+    if (typeof v.inventoryRequired !== "boolean") {
+      return c.json({ error: "inventoryRequired must be true or false." }, 400) as never;
+    }
+    out.inventoryRequired = v.inventoryRequired;
+  }
+  if (out.namingTemplate === undefined && out.inventoryRequired === undefined) {
+    return c.json({ error: "Nothing to change." }, 400) as never;
+  }
+  return out;
 });
 
 export const settingsRouter = new Hono<AppEnv>()
@@ -42,16 +61,24 @@ export const settingsRouter = new Hono<AppEnv>()
     return c.json({
       namingTemplate: await namingTemplate(db),
       defaultNamingTemplate: DEFAULT_TEMPLATE,
+      /** Whether receiving a part must say where it goes in Inventory (lib/inventory.ts). */
+      inventoryRequired: await inventoryRequired(db),
     });
   })
   .put("/", requireMentor, settingsValidator, async (c) => {
-    const { namingTemplate: value } = c.req.valid("json");
+    const { namingTemplate: value, inventoryRequired: required } = c.req.valid("json");
     const db = createOrdersDb(c.env.ORDERS_DB);
-    await db
-      .insert(appSettings)
-      .values({ key: TEMPLATE_KEY, value })
-      .onConflictDoUpdate({ target: appSettings.key, set: { value } });
-    return c.json({ namingTemplate: value });
+    if (value !== undefined) {
+      await db
+        .insert(appSettings)
+        .values({ key: TEMPLATE_KEY, value })
+        .onConflictDoUpdate({ target: appSettings.key, set: { value } });
+    }
+    if (required !== undefined) await setInventoryRequired(db, required);
+    return c.json({
+      namingTemplate: await namingTemplate(db),
+      inventoryRequired: await inventoryRequired(db),
+    });
   });
 
 const ruleValidator = validator("json", (value, c): { keyword: string; categoryId: number } => {
@@ -172,13 +199,21 @@ export const suggestRouter = new Hono<AppEnv>().post(
     const key = productKey(input.url);
     // The catalog's category for this product (any of its options), so the requester doesn't
     // have to pick one for a part the catalog already knows.
+    // An option's key is the product's with "?variant=<id>" after it. Compared by prefix, not with
+    // LIKE: D1 refuses LIKE patterns over 50 bytes, which a product link easily is.
+    const optionPrefix = `${key}?variant=`;
     const inCatalog = key
       ? await db
-          .select({ category: catalogItems.category })
+          .select({ category: catalogItems.category, packQuantity: catalogItems.packQuantity })
           .from(catalogItems)
           .where(
-            or(eq(catalogItems.productKey, key), like(catalogItems.productKey, `${key}?variant=%`)),
+            or(
+              eq(catalogItems.productKey, key),
+              sql`substr(${catalogItems.productKey}, 1, ${optionPrefix.length}) = ${optionPrefix}`,
+            ),
           )
+          // The product itself before one of its options.
+          .orderBy(sql`${catalogItems.productKey} = ${key} desc`)
           .get()
       : undefined;
     // A part new to the catalog gets a category guessed from its name; the requester checks it.
@@ -240,9 +275,17 @@ export const suggestRouter = new Hono<AppEnv>().post(
       }
     }
 
+    // How many parts one unit is: the catalog's, for a product it knows as a pack; else what the
+    // product's name says ("PK4", "10 pack"), which the requester checks.
+    const packQuantity = inCatalog && inCatalog.packQuantity > 1 ? inCatalog.packQuantity : null;
+    const packQuantityGuess =
+      packQuantity === null ? guessPackQuantity(`${input.title} ${input.variant ?? ""}`) : null;
+
     return c.json({
       catalogCategory: inCatalog?.category ?? null,
       catalogCategoryGuess,
+      packQuantity,
+      packQuantityGuess,
       name: applyTemplate(template, input),
       vendor: input.vendor,
       category,

@@ -22,6 +22,8 @@ Each app worker uploads `apps/<app>/dist` with it, so its `wrangler.toml` has a 
 
 Apply D1 migrations before deploying a worker that needs them (`pnpm db:migrate:remote`).
 
+A worker with a service binding to another worker can't be deployed until that worker exists. `pnpm run deploy` goes in the right order. Orders binds Inventory (received parts are added to it), so the first time, Inventory goes first: create its database (`wrangler d1 create g3-inventory-prod`), paste the id into `workers/inventory/wrangler.toml`, apply its migration (`pnpm --filter @g3/worker-inventory run db:migrate:remote`) and deploy it (`pnpm --filter @g3/worker-inventory run deploy`), before Orders and the gateway. With Workers Builds, add a build for the `inventory-production` Worker like the other apps'.
+
 **Production deploys itself:** Cloudflare's Git integration (Workers Builds) deploys each Worker when the `public` branch changes, which happens when the release PR is merged. So anything that must happen before a deploy (a migration, a setting, an outside service moved) must happen before that merge. The builds need no extra setup: their `wrangler deploy` / `wrangler versions upload --env production` runs the same build command. Leave their build command empty.
 
 ## Switching over from Pages and per-app API domains (once, done)

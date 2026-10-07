@@ -13,6 +13,11 @@ service = "g3id"
 binding = "EDGE"
 service = "edge"
 
+# Received parts can be put in Inventory (src/lib/inventory.ts). Orders works without it.
+[[services]]
+binding = "INVENTORY"
+service = "inventory"
+
 [[d1_databases]]
 binding = "ORDERS_DB"
 database_name = "g3-orders-local"
@@ -38,6 +43,11 @@ service = "g3id-production"
 [[env.production.services]]
 binding = "EDGE"
 service = "edge-production"
+
+# Deploy the inventory worker before this one: a binding to a worker that doesn't exist fails.
+[[env.production.services]]
+binding = "INVENTORY"
+service = "inventory-production"
 
 # Create with `wrangler d1 create g3-orders-prod` and paste its ID here.
 [[env.production.d1_databases]]

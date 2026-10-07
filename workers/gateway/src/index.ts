@@ -63,6 +63,7 @@ const BINDINGS = {
   scouting: "SCOUTING",
   skillTree: "SKILL_TREE",
   attendance: "ATTENDANCE",
+  inventory: "INVENTORY",
 } as const satisfies Record<Worker, string>;
 
 /** Headers only the gateway sets. */
@@ -94,10 +95,15 @@ const PLATFORM_ROUTES = new Map<string, Route>([
  * console hosts. Each maps to the address to use instead.
  */
 const RETIRED_HOSTS = new Map<string, string>([
-  ...(Object.keys(site.apps) as AppName[]).flatMap((app): [string, string][] => [
-    [`${site.apps[app].web}.${site.domain}`, teamAppUrl(teamKey, app)],
-    [`api.${site.apps[app].web}.${site.domain}`, `${teamAppUrl(teamKey, app)}/api`],
-  ]),
+  ...(Object.keys(site.apps) as AppName[]).flatMap((app): [string, string][] => {
+    const { web } = site.apps[app];
+    // An app made since the move never had an address there.
+    if (web === null) return [];
+    return [
+      [`${web}.${site.domain}`, teamAppUrl(teamKey, app)],
+      [`api.${web}.${site.domain}`, `${teamAppUrl(teamKey, app)}/api`],
+    ];
+  }),
   [`id.${site.domain}`, `https://id.${site.platformDomain}`],
   [`admin.${site.domain}`, `https://admin.${site.platformDomain}`],
 ]);
@@ -242,6 +248,7 @@ const DEV_APPS: Record<Worker, keyof typeof devPorts.apps> = {
   scouting: "scouting",
   skillTree: "skill-tree",
   attendance: "attendance",
+  inventory: "inventory",
 };
 
 function devPage(request: Request, url: URL, app: Worker): Promise<Response> {

@@ -1,4 +1,4 @@
-import { hasMentorAccess, requireAuth, requireMentor } from "@g3/auth";
+import { requireAuth, requireMentor } from "@g3/auth";
 import { and, asc, desc, eq, gte, inArray, isNotNull, lt } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
@@ -15,6 +15,7 @@ import { recordPrices } from "../lib/catalog";
 import { inChunks } from "../lib/chunks";
 import { csvDate, csvMoney, csvRow } from "../lib/csv";
 import { fiscalLabel, fiscalRange, fiscalYearOf } from "../lib/fiscal";
+import { type ReceiveDestination, parseDestination, sendToInventory } from "../lib/inventory";
 import { importSheet } from "../lib/sheet-import";
 import { vendorName } from "../lib/vendors";
 import type { AppEnv } from "../types";
@@ -92,18 +93,24 @@ const CSV_HEADER = [
 
 const RECENT_DAYS = 14;
 
-const receiveValidator = validator("json", (value, c): { ids: number[] } => {
-  const ids = (value as { ids?: unknown })?.ids;
-  if (
-    !Array.isArray(ids) ||
-    ids.length === 0 ||
-    ids.length > 200 ||
-    !ids.every((id) => Number.isInteger(id) && id > 0)
-  ) {
-    return c.json({ error: "ids must be 1–200 request ids." }, 400) as never;
-  }
-  return { ids: [...new Set(ids as number[])] };
-});
+const receiveValidator = validator(
+  "json",
+  (value, c): { ids: number[]; inventory?: ReceiveDestination | null } => {
+    const v = (value ?? {}) as { ids?: unknown; inventory?: unknown };
+    const ids = v.ids;
+    if (
+      !Array.isArray(ids) ||
+      ids.length === 0 ||
+      ids.length > 200 ||
+      !ids.every((id) => Number.isInteger(id) && id > 0)
+    ) {
+      return c.json({ error: "ids must be 1–200 request ids." }, 400) as never;
+    }
+    const inventory = parseDestination(v.inventory);
+    if (inventory && "error" in inventory) return c.json({ error: inventory.error }, 400) as never;
+    return { ids: [...new Set(ids as number[])], inventory };
+  },
+);
 
 const trackingValidator = validator("json", (value, c): { tracking: string | null } => {
   const t = (value as { tracking?: unknown })?.tracking;
@@ -169,6 +176,7 @@ export const ordersRouter = new Hono<AppEnv>()
           sku: l.sku,
           url: l.url,
           quantity: l.quantity,
+          packQuantity: l.packQuantity,
           status: l.status as "ordered" | "received",
           requesterId: l.requesterId,
           requesterName: l.requesterName,
@@ -197,30 +205,41 @@ export const ordersRouter = new Hono<AppEnv>()
     });
   })
   /**
-   * Marks ordered items received. Mentors can receive anything; others only what they requested.
-   * Items not on order (or not yours) are skipped and reported.
+   * Marks ordered items received. Anyone signed in can: packages are opened by whoever is in the
+   * shop. Items not on order are skipped and reported. With `inventory` (where the parts
+   * are going), they're added to the Inventory app first; a team can make that required
+   * (lib/inventory.ts).
    */
   .post("/receive", requireAuth, receiveValidator, async (c) => {
-    const { ids } = c.req.valid("json");
+    const { ids, inventory } = c.req.valid("json");
     const db = createOrdersDb(c.env.ORDERS_DB);
-    const isMentor = hasMentorAccess(c);
     const userId = c.get("userId");
     const rows = await inChunks(ids, (chunk) =>
       db
         .select({
           id: orderRequests.id,
-          requesterId: orderRequests.requesterId,
           status: orderRequests.status,
+          title: orderRequests.title,
+          vendor: orderRequests.vendor,
+          sku: orderRequests.sku,
+          url: orderRequests.url,
+          quantity: orderRequests.quantity,
+          packQuantity: orderRequests.packQuantity,
+          unitPriceCents: orderRequests.unitPriceCents,
+          lineTotalCents: orderRequests.lineTotalCents,
+          catalogItemId: orderRequests.catalogItemId,
+          orderId: orderRequests.orderId,
         })
         .from(orderRequests)
         .where(inArray(orderRequests.id, chunk))
         .all(),
     );
-    const allowed = rows
-      .filter((r) => r.status === "ordered" && (isMentor || r.requesterId === userId))
-      .map((r) => r.id);
-    if (allowed.length === 0)
-      return c.json({ error: "None of those items are on order and yours to receive." }, 409);
+    const mine = rows.filter((r) => r.status === "ordered");
+    const allowed = mine.map((r) => r.id);
+    if (allowed.length === 0) return c.json({ error: "None of those items are on order." }, 409);
+    // Into Inventory first: if that can't be done, nothing is marked received.
+    const sent = await sendToInventory(c, db, mine, inventory ?? null);
+    if ("error" in sent) return c.json({ error: sent.error }, sent.status);
     const now = Date.now();
     const received = await inChunks(allowed, (chunk) =>
       db
@@ -237,13 +256,35 @@ export const ordersRouter = new Hono<AppEnv>()
           userId,
           userName: c.get("userDisplayName"),
           action: "received",
-          note: null,
+          note: sent.added === null ? null : "Added to Inventory.",
           createdAt: now,
         })),
       );
     }
+    // Where each went in Inventory, for the next delivery of the same part.
+    const byLocation = new Map<number, number[]>();
+    for (const { id } of received) {
+      const locationId = sent.locations.get(id);
+      if (locationId === undefined) continue;
+      byLocation.set(locationId, [...(byLocation.get(locationId) ?? []), id]);
+    }
+    for (const [inventoryLocationId, requestIds] of byLocation) {
+      await inChunks(requestIds, (chunk) =>
+        db
+          .update(orderRequests)
+          .set({ inventoryLocationId })
+          .where(inArray(orderRequests.id, chunk))
+          .returning({ id: orderRequests.id })
+          .all(),
+      );
+    }
     const done = received.map((r) => r.id);
-    return c.json({ received: done, skipped: ids.filter((id) => !done.includes(id)) });
+    return c.json({
+      received: done,
+      skipped: ids.filter((id) => !done.includes(id)),
+      /** How many went into Inventory; null when they weren't sent there. */
+      inventoryAdded: sent.added,
+    });
   })
   /** Sets or clears a placed order's tracking number. */
   .patch("/:id/tracking", requireMentor, trackingValidator, async (c) => {

@@ -36,6 +36,7 @@ We collect only what the apps need to work.
 | Sessions and devices | A session identifier in a cookie, and for shared shop devices a kiosk token | Created when you sign in |
 | Attendance | When you signed in and out, and hours added by an admin | You and your team's admins |
 | Orders | Part requests, reasons, approvals, costs, budgets and vendors | Members and mentors |
+| Inventory | What the team owns, how many and where, and a history of who counted, moved, checked out or received each part | Members and mentors |
 | Shop | Parts, production steps, who did them, drawings and files | Members, mentors and Onshape, if connected |
 | Pit | Checklists, issues and battery records | Members |
 | Skill Tree | Each member's progress on skills and who signed it off | Members and mentors |

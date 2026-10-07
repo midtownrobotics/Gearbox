@@ -24,7 +24,10 @@ export const site = {
    */
   platformDomain: "frcgearbox.com",
 
-  /** Each app, and its old, retired subdomain on `domain` (`web`). */
+  /**
+   * Each app, and its old, retired subdomain on `domain` (`web`; null for an app made after the
+   * move, which never had one).
+   */
   apps: {
     id: { web: "g3id" },
     portal: { web: "gearbox" },
@@ -35,6 +38,7 @@ export const site = {
     scouting: { web: "scouting" },
     skillTree: { web: "skilltree" },
     attendance: { web: "attendance" },
+    inventory: { web: null },
   },
 
   /** The team's public website, linked from the apps. */
