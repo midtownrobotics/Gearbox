@@ -61,6 +61,8 @@ const app = base
   .route("/intake", intakeRouter);
 
 export type InventoryApp = typeof app;
+/** The Hono app itself, for the isolation test (test/isolation.test.ts). */
+export { app };
 export type { FieldValue, FieldValues, FieldView } from "./lib/fields";
 export type { ItemView, ListingInput, ListingView, StockView } from "./lib/items";
 export type { LocationRow } from "./lib/locations";

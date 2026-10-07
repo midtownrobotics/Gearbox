@@ -35,7 +35,27 @@ const APPS: App[] = [
       attendanceSettings: "attendance_settings",
     },
   },
+  {
+    dir: "workers/inventory",
+    teamTables: {
+      fields: "fields",
+      locations: "locations",
+      robots: "robots",
+      subsystems: "subsystems",
+      items: "items",
+      itemListings: "item_listings",
+      stock: "stock",
+      itemEvents: "item_events",
+      intakeReceipts: "intake_receipts",
+    },
+  },
 ];
+
+/** The literal SQL a `sql` template writes: its text, not the `${…}` values put in. */
+function templateText(template: ts.TemplateLiteral) {
+  if (ts.isNoSubstitutionTemplateLiteral(template)) return template.text;
+  return [template.head.text, ...template.templateSpans.map((span) => span.literal.text)].join(" ");
+}
 
 /** A `// tenancy: all teams (…)` comment on one of the few lines above the node's statement. */
 function allTeamsAllowed(text: string, line: number) {
@@ -73,11 +93,29 @@ function chainOf(node: ts.Node): ts.Node {
 const problems: string[] = [];
 
 for (const app of APPS) {
-  const tables = app.teamTables;
-  const sqlNames = Object.values(tables);
+  const sqlNames = Object.values(app.teamTables);
   for (const file of sourceFiles(join(root, app.dir, "src"))) {
     const text = readFileSync(file, "utf8");
     const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
+    // A table's alias (`const s = alias(stock, "s")`) is the team table under another name.
+    const tables: Record<string, string> = { ...app.teamTables };
+    const findAliases = (node: ts.Node) => {
+      if (
+        ts.isVariableDeclaration(node) &&
+        ts.isIdentifier(node.name) &&
+        node.initializer &&
+        ts.isCallExpression(node.initializer) &&
+        ts.isIdentifier(node.initializer.expression) &&
+        node.initializer.expression.text === "alias"
+      ) {
+        const [of] = node.initializer.arguments;
+        if (of && ts.isIdentifier(of) && of.text in app.teamTables) {
+          tables[node.name.text] = app.teamTables[of.text];
+        }
+      }
+      ts.forEachChild(node, findAliases);
+    };
+    findAliases(source);
     const at = (node: ts.Node) => {
       const { line } = source.getLineAndCharacterOfPosition(node.getStart());
       return `${relative(root, file)}:${line + 1}`;
@@ -106,7 +144,7 @@ for (const app of APPS) {
         ts.isIdentifier(node.tag) &&
         node.tag.text === "sql"
       ) {
-        const template = node.template.getText(source);
+        const template = templateText(node.template);
         for (const name of sqlNames) {
           if (new RegExp(`\\b${name}\\b`).test(template)) {
             problems.push(`${at(node)}: raw SQL on team table ${name}; use Drizzle with inTeam`);

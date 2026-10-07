@@ -1,6 +1,6 @@
 # Multi-Team Platform Roadmap
 
-Status as of 6 October 2026. This file is the plan of record: when a change completes or advances a step, update the step's Status, the Progress table and "What landed" in the same pull request.
+Status as of 7 October 2026. This file is the plan of record: when a change completes or advances a step, update the step's Status, the Progress table and "What landed" in the same pull request.
 
 ## Summary
 
@@ -37,14 +37,14 @@ Three release points sit between phases: G3 moves to its frcgearbox.com addresse
 
 ## Progress
 
-As of 5 October 2026, five of the six Phase 0 steps are done on `main`, Phase 1 is done (nothing a user sees says G3 unless it's G3's own settings), and Phase 2 is done: teams in G3ID, a team-aware gateway, sign-in, Slack and sign-up per team, and pages that take their team from their address. Phase 3 has started: its shared pieces (the platform SDK in `@g3/auth`, the tenancy lint and the isolation harness) are in, and Skill Tree is the first team-scoped app. A ninth app (Inventory) was added already built to that pattern. Scouting engagement controls provide early groundwork for optional plugins in Phase 4. The rest of Phases 3 to 6 has not started. Edge is now planned as an app any team can run with its own box (see "Edge: an app any team can run"); its box link, the first step toward that, is done.
+As of 7 October 2026, five of the six Phase 0 steps are done on `main`, Phase 1 is done (nothing a user sees says G3 unless it's G3's own settings), and Phase 2 is done: teams in G3ID, a team-aware gateway, sign-in, Slack and sign-up per team, and pages that take their team from their address. Phase 3 has started: its shared pieces (the platform SDK in `@g3/auth`, the tenancy lint and the isolation harness) are in, and Skill Tree, Attendance and Inventory (a ninth app, added built to that pattern) are team-scoped, each with a passing two-team isolation test. Scouting engagement controls provide early groundwork for optional plugins in Phase 4. The rest of Phases 3 to 6 has not started. Edge is now planned as an app any team can run with its own box (see "Edge: an app any team can run"); its box link, the first step toward that, is done.
 
 | Phase | Status | What is left |
 | --- | --- | --- |
 | 0. Groundwork | In progress | A staging environment (0.2) |
 | 1. Remove G3 from the platform | Done | Nothing |
 | 2. Tenancy core | Done | Nothing |
-| 3. Team-scoped apps | In progress: the shared pieces, Skill Tree and Attendance are done | Pit, Orders, Shop, Scouting, Portal and Edge, one pull request each, in the order below, and Inventory's team column, scoped access and isolation test |
+| 3. Team-scoped apps | In progress: the shared pieces, Skill Tree, Attendance and Inventory are done | Pit, Orders, Shop, Scouting, Portal and Edge, one pull request each, in the order below |
 | 4. App library and dashboard | Not started | All of it |
 | 5. Live demo | Not started | All of it |
 | 6. Creators' portal | Not started | All of it |
@@ -75,7 +75,10 @@ As of 5 October 2026, five of the six Phase 0 steps are done on `main`, Phase 1 
 | A version per app, changelogs, and a `main` to `public` release flow | Part of 0.2 | [#128](https://github.com/midtownrobotics/Gearbox/pull/128), [#129](https://github.com/midtownrobotics/Gearbox/pull/129) |
 | Shared navbar, light and dark mode, one color scheme | Groundwork for 1.3 | [#126](https://github.com/midtownrobotics/Gearbox/pull/126), [#127](https://github.com/midtownrobotics/Gearbox/pull/127) |
 | Phase 3's shared pieces in `@g3/auth`: the request's team, team-scoped query helpers and members with roles; the tenancy lint in CI and the two-team isolation harness. Skill Tree is the first team-scoped app: a team on its tree set, students from the member list, and its isolation test | Phase 3: shared pieces, Skill Tree | This PR |
+| Inventory team-scoped: `team_id` on its nine tables, every query (its stock SQL included, moved to Drizzle) kept to the team, deliveries from Orders in the member's own team, and an isolation test | Phase 3: Inventory | This PR |
 | Attendance team-scoped: Drizzle with the team helpers, `team_id` on its tables, the team's members for the leaderboard, per-team school year and auto sign-out settings (edited on G3ID's Attendance admin page), and an isolation test. Its kiosk and confirm pages use the shared colours and fonts | Phase 3: Attendance | This PR |
+| G3ID's admin routes, member lists and name lookups kept to the caller's team (another team's admin could list, promote or delete any account and revoke any kiosk); a member can only unlink their own sign-ins; G3ID's own two-team admin isolation test | Fixes 2.2 and 2.5; groundwork for Phase 3's isolation tests | [#155](https://github.com/midtownrobotics/Gearbox/pull/155) |
+| Slack sign-in and link codes unique within a team, not across the table, with expired codes cleared and a taken code drawn again (they had begun to collide, failing sign-ins) | Fixes 2.6 | [#153](https://github.com/midtownrobotics/Gearbox/pull/153) |
 | Edge box reached over its own WebSocket (a Durable Object) instead of a Cloudflare Tunnel; live online clients and box addresses | Edge E.0: the box link that lets any team's box connect without a tunnel | [#151](https://github.com/midtownrobotics/Gearbox/pull/151) |
 | Optional Scouting engagement with configurable points label, predictions, combined picks and standings; neutral prediction language | Part of 1.6; groundwork for 4.1 and 4.5 | [#143](https://github.com/midtownrobotics/Gearbox/pull/143) |
 | Editable team appearance, reset to defaults, and editable/hidden portal resource links | Part of 1.3 and 1.4 | [#134](https://github.com/midtownrobotics/Gearbox/pull/134) |
@@ -313,7 +316,7 @@ After Phase 3 every app serves any number of teams from one deployment, and noth
 | 6 | Scouting | About 30 | "Our team" number; engagement settings already use team-keyed rows, to move into the platform settings schema; strategy admins become a role | First split the 3,255-line worker into modules and put its 151 raw SQL calls behind query helpers |
 | 7 | Portal | 0 | The app list and team links | Becomes the team home, built from subscriptions and brand links |
 | 8 | Edge | 11 | Monthly data cap (50 GB, seeded by migration), the agent key in env, which box modules are on | An optional app any team can run with its own box. Its tables get a team column and `edge_status` and `net_settings` lose `CHECK (id = 1)`. The box-specific work is steps E.1 to E.6 in "Edge: an app any team can run" |
-| 9 | Inventory | 9 | None: fields, locations, robots and subsystems are rows a team makes on Settings or loads from a setup file (`workers/inventory/content/starter-setup.json` is the starter) | New, and built for this from the start: all nine tables are team data and none has a key that is unique across teams, except `intake_receipts.source_key`, which names an Orders request and so is unique across teams once Orders' ids are. Left: the team column, scoped access and the isolation test. Settings is for G3ID admins until team roles reach apps |
+| 9 | Inventory | 9 | None: fields, locations, robots and subsystems are rows a team makes on Settings or loads from a setup file (`workers/inventory/content/starter-setup.json` is the starter) | **Done.** Built for this from the start: all nine tables are team data. `team_id` on each (migration `0003`); `intake_receipts.source_key` is now unique within a team. Its hand-written stock SQL moved to Drizzle with `inTeam`/`withTeam`, keeping its guards (stock never below zero, "only if the row still exists", all-or-nothing batches), with direct tests of those guards; the tenancy lint also checks aliased tables in subqueries. Orders sends deliveries with the member's team (`forwardIdentity`). Isolation test. Settings is for G3ID admins until team roles reach apps |
 
 Core apps must not depend on Edge. Orders part lookup and Shop printing become optional providers: a team whose Edge box is connected gets both from it, and a team without one enters part details by hand and sees no print button.
 

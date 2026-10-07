@@ -1,3 +1,4 @@
+import { forwardIdentity } from "@g3/auth";
 import type {
   IntakeRequest,
   IntakeResult,
@@ -108,7 +109,8 @@ export function parseDestination(raw: unknown): ReceiveDestination | null | { er
   };
 }
 
-const forwarded = (c: Context<AppEnv>) => ({ cookie: c.req.header("Cookie") ?? "" });
+/** The member's session and the request's team: Inventory acts for the same person, in their team. */
+const forwarded = (c: Context<AppEnv>) => forwardIdentity(c);
 
 /** Inventory's locations, robots and subsystems, or null if it can't be reached. */
 export async function inventoryOptions(c: Context<AppEnv>): Promise<InventoryOptions | null> {

@@ -1,7 +1,9 @@
-import { asc } from "drizzle-orm";
+import { inTeam, withTeam } from "@g3/auth";
+import { asc, eq } from "drizzle-orm";
+import type { BatchItem } from "drizzle-orm/batch";
 import starter from "../../content/starter-setup.json";
 import type { Db } from "../db";
-import { FIELD_TYPES, type FieldType, fields, robots, subsystems } from "../db/schema";
+import { FIELD_TYPES, type FieldType, fields, locations, robots, subsystems } from "../db/schema";
 import { loadFields } from "./fields";
 import { chunks, sameName } from "./input";
 import { MAX_DEPTH, MAX_TITLE, indexLocations, loadLocations } from "./locations";
@@ -223,12 +225,22 @@ export function starterSetup(): Setup {
 }
 
 /** The team's setup as a file. */
-export async function exportSetup(db: Db): Promise<Setup> {
+export async function exportSetup(db: Db, team: string): Promise<Setup> {
   const [fieldRows, locationRows, robotRows, subsystemRows] = await Promise.all([
-    loadFields(db),
-    loadLocations(db),
-    db.select().from(robots).orderBy(asc(robots.sortOrder), asc(robots.id)).all(),
-    db.select().from(subsystems).orderBy(asc(subsystems.sortOrder), asc(subsystems.id)).all(),
+    loadFields(db, team),
+    loadLocations(db, team),
+    db
+      .select()
+      .from(robots)
+      .where(inTeam(robots, team))
+      .orderBy(asc(robots.sortOrder), asc(robots.id))
+      .all(),
+    db
+      .select()
+      .from(subsystems)
+      .where(inTeam(subsystems, team))
+      .orderBy(asc(subsystems.sortOrder), asc(subsystems.id))
+      .all(),
   ]);
   const { childrenOf } = indexLocations(locationRows);
   const tree = (parentId: number | null, depth: number): SetupLocation[] =>
@@ -263,7 +275,7 @@ const countAll = (nodes: SetupLocation[]): number =>
  */
 export async function loadSetup(
   db: Db,
-  d1: D1Database,
+  team: string,
   setup: Setup,
   apply: boolean,
 ): Promise<SetupSummary> {
@@ -276,13 +288,14 @@ export async function loadSetup(
     already: 0,
   };
   const now = Date.now();
-  const statements: D1PreparedStatement[] = [];
+  const statements: BatchItem<"sqlite">[] = [];
 
   // Fields: new ones go after the team's own. A choice field the team has gains the file's
   // choices it's missing; any other field it has is left alone.
   const haveFields = await db
     .select()
     .from(fields)
+    .where(inTeam(fields, team))
     .orderBy(asc(fields.sortOrder), asc(fields.id))
     .all();
   let nextField = haveFields.reduce((max, row) => Math.max(max, row.sortOrder), -1) + 1;
@@ -291,18 +304,16 @@ export async function loadSetup(
     if (!have) {
       summary.fields++;
       statements.push(
-        d1
-          .prepare(
-            "INSERT INTO fields (name, type, options, show_in_table, sort_order, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-          )
-          .bind(
-            field.name,
-            field.type,
-            JSON.stringify(field.options),
-            field.showInTable ? 1 : 0,
-            nextField++,
-            now,
-          ),
+        db.insert(fields).values(
+          withTeam(team, {
+            name: field.name,
+            type: field.type,
+            options: JSON.stringify(field.options),
+            showInTable: field.showInTable ? 1 : 0,
+            sortOrder: nextField++,
+            createdAt: now,
+          }),
+        ),
       );
       continue;
     }
@@ -318,21 +329,19 @@ export async function loadSetup(
     if (missing.length === 0) continue;
     summary.choices += missing.length;
     statements.push(
-      d1
-        .prepare("UPDATE fields SET options = ?2 WHERE id = ?1")
-        .bind(have.id, JSON.stringify([...options, ...missing].slice(0, MAX_CHOICES))),
+      db
+        .update(fields)
+        .set({ options: JSON.stringify([...options, ...missing].slice(0, MAX_CHOICES)) })
+        .where(inTeam(fields, team, eq(fields.id, have.id))),
     );
   }
 
   // Robots and subsystems: plain lists of names.
   for (const [table, wanted, key] of [
-    ["robots", setup.robots, "robots"],
-    ["subsystems", setup.subsystems, "subsystems"],
+    [robots, setup.robots, "robots"],
+    [subsystems, setup.subsystems, "subsystems"],
   ] as const) {
-    const have = await db
-      .select()
-      .from(table === "robots" ? robots : subsystems)
-      .all();
+    const have = await db.select().from(table).where(inTeam(table, team)).all();
     let next = have.reduce((max, row) => Math.max(max, row.sortOrder), -1) + 1;
     for (const wantedName of wanted) {
       if (have.some((row) => sameName(row.name, wantedName))) {
@@ -341,16 +350,17 @@ export async function loadSetup(
       }
       summary[key]++;
       statements.push(
-        d1
-          .prepare(`INSERT INTO ${table} (name, sort_order, created_at) VALUES (?1, ?2, ?3)`)
-          .bind(wantedName, next++, now),
+        db
+          .insert(table)
+          .values(withTeam(team, { name: wantedName, sortOrder: next++, createdAt: now })),
       );
     }
   }
-  if (apply && statements.length > 0) await d1.batch(statements);
+  const [first, ...rest] = statements;
+  if (apply && first) await db.batch([first, ...rest]);
 
   // Locations, a level at a time: a new location's children need its id.
-  const { childrenOf } = indexLocations(await loadLocations(db));
+  const { childrenOf } = indexLocations(await loadLocations(db, team));
   let level: { parentId: number | null; nodes: SetupLocation[] }[] = [
     { parentId: null, nodes: setup.locations },
   ];
@@ -374,24 +384,23 @@ export async function loadSetup(
         }
       }
     }
-    // Five values a row: 20 rows keeps a statement at D1's 100 bound parameters.
-    for (const group of chunks(adding, 20)) {
-      const { results } = await d1
-        .prepare(
-          `INSERT INTO locations (parent_id, name, title, sort_order, created_at) VALUES ${group
-            .map(() => "(?, ?, ?, ?, ?)")
-            .join(", ")} RETURNING id, parent_id AS parentId, name`,
+    // Six values a row: 16 rows keeps a statement under D1's 100 bound parameters.
+    for (const group of chunks(adding, 16)) {
+      const results = await db
+        .insert(locations)
+        .values(
+          group.map((row) =>
+            withTeam(team, {
+              parentId: row.parentId,
+              name: row.node.name,
+              title: row.node.title ?? "",
+              sortOrder: row.sortOrder,
+              createdAt: now,
+            }),
+          ),
         )
-        .bind(
-          ...group.flatMap((row) => [
-            row.parentId,
-            row.node.name,
-            row.node.title ?? "",
-            row.sortOrder,
-            now,
-          ]),
-        )
-        .all<{ id: number; parentId: number | null; name: string }>();
+        .returning({ id: locations.id, parentId: locations.parentId, name: locations.name })
+        .all();
       for (const row of group) {
         const made = results.find((r) => r.parentId === row.parentId && r.name === row.node.name);
         if (made && row.node.children.length > 0) {
