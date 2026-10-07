@@ -1,16 +1,36 @@
-import { index, integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import {
+  index,
+  integer,
+  primaryKey,
+  sqliteTable,
+  text,
+  unique,
+  uniqueIndex,
+} from "drizzle-orm/sqlite-core";
+
+// Every table but lookup_cache is one team's data (roadmap Phase 3, migration 0018): it has
+// `team_id`, and every query on it goes through inTeam/withTeam from @g3/auth. The starter catalog
+// new teams copy is kept under the team id "starter" (lib/starter.ts).
+
+/** The team a row belongs to ("frc<number>"). */
+const teamId = () => text("team_id").notNull();
 
 /** What a purchase is charged against. Mentors manage these; archived ones can't take new requests. */
-export const budgetCategories = sqliteTable("budget_categories", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  name: text("name").notNull().unique(),
-  /** Allocated budget in cents; null when the category just tracks spending. */
-  budgetCents: integer("budget_cents"),
-  /** Accounting code used in exports (e.g. "4101"); exports fall back to the name. */
-  code: text("code"),
-  isArchived: integer("is_archived").notNull().default(0),
-  createdAt: integer("created_at").notNull(),
-});
+export const budgetCategories = sqliteTable(
+  "budget_categories",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    teamId: teamId(),
+    name: text("name").notNull(),
+    /** Allocated budget in cents; null when the category just tracks spending. */
+    budgetCents: integer("budget_cents"),
+    /** Accounting code used in exports (e.g. "4101"); exports fall back to the name. */
+    code: text("code"),
+    isArchived: integer("is_archived").notNull().default(0),
+    createdAt: integer("created_at").notNull(),
+  },
+  (t) => [unique().on(t.teamId, t.name)],
+);
 
 /**
  * A placed order with one vendor. Its lines are the order_requests pointing at it (their quantity
@@ -19,6 +39,7 @@ export const budgetCategories = sqliteTable("budget_categories", {
  */
 export const vendorOrders = sqliteTable("vendor_orders", {
   id: integer("id").primaryKey({ autoIncrement: true }),
+  teamId: teamId(),
   vendor: text("vendor").notNull(),
   placedById: text("placed_by_id").notNull(),
   placedByName: text("placed_by_name").notNull(),
@@ -33,6 +54,7 @@ export const orderCharges = sqliteTable(
   "order_charges",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
+    teamId: teamId(),
     orderId: integer("order_id")
       .notNull()
       .references(() => vendorOrders.id),
@@ -52,6 +74,7 @@ export type Priority = (typeof PRIORITIES)[number];
 export const categoryBudgets = sqliteTable(
   "category_budgets",
   {
+    teamId: teamId(),
     categoryId: integer("category_id")
       .notNull()
       .references(() => budgetCategories.id),
@@ -61,26 +84,31 @@ export const categoryBudgets = sqliteTable(
   (t) => [primaryKey({ columns: [t.categoryId, t.fiscalYear] })],
 );
 
-/** A vendor's purchasing profile, keyed by the lowercased vendor name requests use. */
-export const vendors = sqliteTable("vendors", {
-  key: text("key").primaryKey(),
-  name: text("name").notNull(),
-  taxExempt: integer("tax_exempt").notNull().default(0),
-  taxExemptExpires: integer("tax_exempt_expires"),
-  /** "Sign in to the team account before checkout" (needed for tax exemption, saved addresses). */
-  teamAccountLogin: integer("team_account_login").notNull().default(0),
-  freeShippingCents: integer("free_shipping_cents"),
-  typicalShippingCents: integer("typical_shipping_cents"),
-  minimumOrderCents: integer("minimum_order_cents"),
-  leadTimeDays: integer("lead_time_days"),
-  shippingDays: integer("shipping_days"),
-  orderCutoff: text("order_cutoff"),
-  paymentMethod: text("payment_method"),
-  accountOwner: text("account_owner"),
-  notes: text("notes"),
-  defaultCategoryId: integer("default_category_id").references(() => budgetCategories.id),
-  updatedAt: integer("updated_at").notNull(),
-});
+/** A vendor's purchasing profile, keyed by the team and the lowercased vendor name requests use. */
+export const vendors = sqliteTable(
+  "vendors",
+  {
+    teamId: teamId(),
+    key: text("key").notNull(),
+    name: text("name").notNull(),
+    taxExempt: integer("tax_exempt").notNull().default(0),
+    taxExemptExpires: integer("tax_exempt_expires"),
+    /** "Sign in to the team account before checkout" (needed for tax exemption, saved addresses). */
+    teamAccountLogin: integer("team_account_login").notNull().default(0),
+    freeShippingCents: integer("free_shipping_cents"),
+    typicalShippingCents: integer("typical_shipping_cents"),
+    minimumOrderCents: integer("minimum_order_cents"),
+    leadTimeDays: integer("lead_time_days"),
+    shippingDays: integer("shipping_days"),
+    orderCutoff: text("order_cutoff"),
+    paymentMethod: text("payment_method"),
+    accountOwner: text("account_owner"),
+    notes: text("notes"),
+    defaultCategoryId: integer("default_category_id").references(() => budgetCategories.id),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.teamId, t.key] })],
+);
 
 export const CREDIT_KINDS = ["voucher", "credit", "discount"] as const;
 
@@ -89,6 +117,7 @@ export const vendorCredits = sqliteTable(
   "vendor_credits",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
+    teamId: teamId(),
     vendorKey: text("vendor_key").notNull(),
     kind: text("kind", { enum: CREDIT_KINDS }).notNull(),
     label: text("label").notNull(),
@@ -97,7 +126,7 @@ export const vendorCredits = sqliteTable(
     expiresAt: integer("expires_at"),
     createdAt: integer("created_at").notNull(),
   },
-  (t) => [index("vendor_credits_vendor_idx").on(t.vendorKey)],
+  (t) => [index("vendor_credits_vendor_idx").on(t.teamId, t.vendorKey)],
 );
 
 export const REQUEST_STATUSES = [
@@ -115,6 +144,7 @@ export const orderRequests = sqliteTable(
   "order_requests",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
+    teamId: teamId(),
     requesterId: text("requester_id").notNull(),
     requesterName: text("requester_name").notNull(),
     /** The requester's linked Slack user, captured at submit time, for notifications. */
@@ -158,13 +188,14 @@ export const orderRequests = sqliteTable(
     /** The catalog item this line is (set when it's submitted; new links join the catalog). */
     catalogItemId: integer("catalog_item_id"),
     /** Fingerprint of the order-sheet row this was imported from (re-imports skip it). */
-    importKey: text("import_key").unique(),
+    importKey: text("import_key"),
     createdAt: integer("created_at").notNull(),
     updatedAt: integer("updated_at").notNull(),
   },
   (t) => [
-    index("order_requests_status_idx").on(t.status),
+    index("order_requests_status_idx").on(t.teamId, t.status),
     index("order_requests_requester_idx").on(t.requesterId),
+    uniqueIndex("order_requests_import_key_idx").on(t.teamId, t.importKey),
   ],
 );
 
@@ -173,6 +204,7 @@ export const requestEvents = sqliteTable(
   "request_events",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
+    teamId: teamId(),
     requestId: integer("request_id")
       .notNull()
       .references(() => orderRequests.id),
@@ -186,22 +218,31 @@ export const requestEvents = sqliteTable(
   (t) => [index("request_events_request_idx").on(t.requestId)],
 );
 
-/** Part lookup results by normalized URL (JSON PartLookup), reused for 7 days. */
+/**
+ * Part lookup results by normalized URL (JSON PartLookup), reused for 7 days. Shared by every team:
+ * it's vendors' public product pages, not anything a team entered.
+ */
 export const lookupCache = sqliteTable("lookup_cache", {
   url: text("url").primaryKey(),
   result: text("result").notNull(),
   fetchedAt: integer("fetched_at").notNull(),
 });
 
-/** Team-wide settings, one value per key (e.g. "naming_template"). */
-export const appSettings = sqliteTable("app_settings", {
-  key: text("key").primaryKey(),
-  value: text("value").notNull(),
-});
+/** A team's settings, one value per key (lib/settings.ts). */
+export const appSettings = sqliteTable(
+  "app_settings",
+  {
+    teamId: teamId(),
+    key: text("key").notNull(),
+    value: text("value").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.teamId, t.key] })],
+);
 
 /** A keyword that suggests a budget category for new requests whose name contains it. */
 export const categoryRules = sqliteTable("category_rules", {
   id: integer("id").primaryKey({ autoIncrement: true }),
+  teamId: teamId(),
   keyword: text("keyword").notNull(),
   categoryId: integer("category_id")
     .notNull()
@@ -210,23 +251,29 @@ export const categoryRules = sqliteTable("category_rules", {
 });
 
 /** A product family from the FRCDesign library (one part in its sizes and types). */
-export const catalogFamilies = sqliteTable("catalog_families", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  name: text("name").notNull(),
-  category: text("category").notNull(),
-  sourceId: text("source_id").unique(),
-  sourceUrl: text("source_url"),
-  createdAt: integer("created_at").notNull(),
-});
+export const catalogFamilies = sqliteTable(
+  "catalog_families",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    teamId: teamId(),
+    name: text("name").notNull(),
+    category: text("category").notNull(),
+    sourceId: text("source_id"),
+    sourceUrl: text("source_url"),
+    createdAt: integer("created_at").notNull(),
+  },
+  (t) => [uniqueIndex("catalog_families_source_idx").on(t.teamId, t.sourceId)],
+);
 
 export const LINK_KINDS = ["product", "search", "homepage"] as const;
 export type LinkKind = (typeof LINK_KINDS)[number];
 
-/** One buyable part in the catalog: seeded from FRCDesign, or added by a request. */
+/** One buyable part in a team's catalog: from the starter (FRCDesign), or added by a request. */
 export const catalogItems = sqliteTable(
   "catalog_items",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
+    teamId: teamId(),
     familyId: integer("family_id").references(() => catalogFamilies.id),
     category: text("category").notNull(),
     name: text("name").notNull(),
@@ -240,7 +287,7 @@ export const catalogItems = sqliteTable(
     /** catalogKey() of a product link, for matching requests to items. */
     productKey: text("product_key"),
     image: text("image"),
-    /** Last price paid (set when an order is placed); older than 7 days gets looked up again. */
+    /** Last price the team paid (set when it places an order); older than 7 days is looked up again. */
     priceCents: integer("price_cents"),
     priceAt: integer("price_at"),
     /** How many parts one of this product is: 4 for a pack of 4. Requests for it start with this. */
@@ -248,7 +295,7 @@ export const catalogItems = sqliteTable(
     storePlatform: text("store_platform"),
     storeVariantId: text("store_variant_id"),
     source: text("source", { enum: ["frcdesign", "request"] }).notNull(),
-    sourceId: text("source_id").unique(),
+    sourceId: text("source_id"),
     requestCount: integer("request_count").notNull().default(0),
     lastRequestedAt: integer("last_requested_at"),
     createdBy: text("created_by"),
@@ -257,21 +304,30 @@ export const catalogItems = sqliteTable(
     updatedAt: integer("updated_at").notNull(),
   },
   (t) => [
+    index("catalog_items_team_idx").on(t.teamId, t.name),
     index("catalog_items_family_idx").on(t.familyId),
-    index("catalog_items_product_key_idx").on(t.productKey),
+    index("catalog_items_product_key_idx").on(t.teamId, t.productKey),
+    uniqueIndex("catalog_items_source_idx").on(t.teamId, t.sourceId),
   ],
 );
 
 /** The catalog's categories; parts must be in one. Trusted students and mentors add them. */
-export const catalogCategories = sqliteTable("catalog_categories", {
-  name: text("name").primaryKey(),
-  createdBy: text("created_by"),
-  createdAt: integer("created_at").notNull(),
-});
+export const catalogCategories = sqliteTable(
+  "catalog_categories",
+  {
+    teamId: teamId(),
+    name: text("name").notNull(),
+    createdBy: text("created_by"),
+    createdAt: integer("created_at").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.teamId, t.name] })],
+);
 
-/** People who have opened G3 Orders; mentors mark trusted students (catalog editors). */
+/** People who have opened Orders; mentors mark trusted students (catalog editors). */
 export const appUsers = sqliteTable("app_users", {
+  /** The G3ID user id (an account is in one team). */
   id: text("id").primaryKey(),
+  teamId: teamId(),
   name: text("name").notNull(),
   trusted: integer("trusted").notNull().default(0),
   trustedBy: text("trusted_by"),
@@ -282,6 +338,7 @@ export const appUsers = sqliteTable("app_users", {
 /** A named list of requests (a mechanism's parts, a restock, ...) to follow together. */
 export const partLists = sqliteTable("part_lists", {
   id: integer("id").primaryKey({ autoIncrement: true }),
+  teamId: teamId(),
   name: text("name").notNull(),
   description: text("description"),
   createdById: text("created_by_id").notNull(),
@@ -295,6 +352,7 @@ export const partLists = sqliteTable("part_lists", {
 export const partListItems = sqliteTable(
   "part_list_items",
   {
+    teamId: teamId(),
     listId: integer("list_id")
       .notNull()
       .references(() => partLists.id, { onDelete: "cascade" }),

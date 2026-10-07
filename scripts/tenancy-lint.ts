@@ -46,6 +46,28 @@ const APPS: App[] = [
     },
   },
   {
+    dir: "workers/orders",
+    // lookup_cache is shared: vendors' public product pages, by link.
+    teamTables: {
+      budgetCategories: "budget_categories",
+      vendorOrders: "vendor_orders",
+      orderCharges: "order_charges",
+      categoryBudgets: "category_budgets",
+      vendors: "vendors",
+      vendorCredits: "vendor_credits",
+      orderRequests: "order_requests",
+      requestEvents: "request_events",
+      appSettings: "app_settings",
+      categoryRules: "category_rules",
+      catalogFamilies: "catalog_families",
+      catalogItems: "catalog_items",
+      catalogCategories: "catalog_categories",
+      appUsers: "app_users",
+      partLists: "part_lists",
+      partListItems: "part_list_items",
+    },
+  },
+  {
     dir: "workers/inventory",
     teamTables: {
       fields: "fields",

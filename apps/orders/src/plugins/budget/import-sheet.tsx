@@ -1,6 +1,6 @@
 import type { ImportSummary } from "@g3/worker-orders";
 import { useRef, useState } from "react";
-import { getErrorMessage } from "../../shared/api";
+import { getErrorMessage, localTimeHeaders } from "../../shared/api";
 import { formatCents } from "../../shared/format";
 import { Button, Card, ErrorBanner, SuccessBanner } from "../../shared/ui";
 
@@ -17,7 +17,7 @@ async function upload(text: string, dryRun: boolean): Promise<ImportSummary> {
     method: "POST",
     body: text,
     credentials: "include",
-    headers: { "Content-Type": "text/csv" },
+    headers: { "Content-Type": "text/csv", ...localTimeHeaders() },
   });
   if (!res.ok) throw new Error(await getErrorMessage(res));
   return res.json();

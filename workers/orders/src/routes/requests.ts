@@ -1,6 +1,12 @@
-import { hasMentorAccess, requireAuth, requireAuthWithIdentities } from "@g3/auth";
-import { sendDM } from "@g3/slack";
-import { and, asc, eq, inArray, sql } from "drizzle-orm";
+import {
+  hasMentorAccess,
+  inTeam,
+  requireAuth,
+  requireAuthWithIdentities,
+  sendTeamDM,
+  withTeam,
+} from "@g3/auth";
+import { type SQL, asc, eq, inArray, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
 import { type OrdersDb, createOrdersDb } from "../db";
@@ -19,6 +25,9 @@ import { type ReceiveDestination, parseDestination, sendToInventory } from "../l
 import { addToList } from "../lib/lists";
 import { formatCents } from "../lib/money";
 import { packQuantityField } from "../lib/pack-quantity";
+import { teamSettings } from "../lib/settings";
+import { catalogReady } from "../lib/starter";
+import { ordersUrl } from "../lib/urls";
 import { vendorName } from "../lib/vendors";
 import type { AppEnv } from "../types";
 
@@ -246,19 +255,20 @@ export function describeChanges(
   return parts.length ? parts.join(", ") : null;
 }
 
-/** Request rows with their category name. */
-function selectRequests(db: OrdersDb) {
+/** The team's request rows (those matching `conditions`) with their category name. */
+function selectRequests(db: OrdersDb, teamId: string, ...conditions: (SQL | undefined)[]) {
   return db
     .select({ request: orderRequests, categoryName: budgetCategories.name })
     .from(orderRequests)
-    .innerJoin(budgetCategories, eq(budgetCategories.id, orderRequests.categoryId));
+    .innerJoin(budgetCategories, eq(budgetCategories.id, orderRequests.categoryId))
+    .where(inTeam(orderRequests, teamId, ...conditions));
 }
 
-async function openCategory(db: OrdersDb, id: number) {
+async function openCategory(db: OrdersDb, teamId: string, id: number) {
   const category = await db
     .select()
     .from(budgetCategories)
-    .where(eq(budgetCategories.id, id))
+    .where(inTeam(budgetCategories, teamId, eq(budgetCategories.id, id)))
     .get();
   return category && !category.isArchived ? category : null;
 }
@@ -268,12 +278,12 @@ export const requestsRouter = new Hono<AppEnv>()
     const { status, mine } = c.req.valid("query");
     const onlyMine = mine === "true";
     const db = createOrdersDb(c.env.ORDERS_DB);
-    const filters = [
+    const rows = await selectRequests(
+      db,
+      c.get("teamId"),
       status ? eq(orderRequests.status, status) : undefined,
       onlyMine ? eq(orderRequests.requesterId, c.get("userId")) : undefined,
-    ].filter((f) => f !== undefined);
-    const rows = await selectRequests(db)
-      .where(filters.length ? and(...filters) : undefined)
+    )
       // Most urgent first: priority, then need-by date (none last), then oldest.
       .orderBy(
         sql`case ${orderRequests.priority} when 'blocking' then 0 when 'high' then 1 when 'normal' then 2 else 3 end`,
@@ -287,17 +297,18 @@ export const requestsRouter = new Hono<AppEnv>()
   .get("/:id", requireAuth, async (c) => {
     const id = Number(c.req.param("id"));
     const db = createOrdersDb(c.env.ORDERS_DB);
-    const row = await selectRequests(db).where(eq(orderRequests.id, id)).get();
+    const teamId = c.get("teamId");
+    const row = await selectRequests(db, teamId, eq(orderRequests.id, id)).get();
     if (!row) return c.json({ error: "Request not found." }, 404);
     const events = await db
       .select()
       .from(requestEvents)
-      .where(eq(requestEvents.requestId, id))
+      .where(inTeam(requestEvents, teamId, eq(requestEvents.requestId, id)))
       .orderBy(asc(requestEvents.createdAt), asc(requestEvents.id))
       .all();
     return c.json({ ...row.request, categoryName: row.categoryName, events });
   })
-  .post("/", requireAuthWithIdentities, requestValidator(false), async (c) => {
+  .post("/", requireAuthWithIdentities, catalogReady, requestValidator(false), async (c) => {
     const {
       catalogItemId: picked,
       catalogCategory,
@@ -307,53 +318,68 @@ export const requestsRouter = new Hono<AppEnv>()
     } = c.req.valid("json") as RequestFields & CatalogChoice & ListChoice;
     const catalog = { catalogItemId: picked, catalogCategory, catalogName };
     const db = createOrdersDb(c.env.ORDERS_DB);
-    if (!(await openCategory(db, body.categoryId))) {
+    const teamId = c.get("teamId");
+    if (!(await openCategory(db, teamId, body.categoryId))) {
       return c.json({ error: "That budget category doesn't exist or is archived." }, 400);
     }
     if (
       listId &&
-      !(await db.select({ id: partLists.id }).from(partLists).where(eq(partLists.id, listId)).get())
+      !(await db
+        .select({ id: partLists.id })
+        .from(partLists)
+        .where(inTeam(partLists, teamId, eq(partLists.id, listId)))
+        .get())
     ) {
       return c.json({ error: "That list doesn't exist anymore." }, 400);
     }
     // Every submitted link is in the catalog: the picked item, the one with this link, or new.
-    const catalogItemId = await catalogItemFor(db, catalog, body, c.get("userDisplayName"));
+    const catalogItemId = await catalogItemFor(db, teamId, catalog, body, c.get("userDisplayName"));
     if (catalogItemId === null) return c.json({ error: NEEDS_CATALOG_CATEGORY }, 400);
-    const packQuantity = body.packQuantity ?? (await catalogPackQuantity(db, catalogItemId));
+    const packQuantity =
+      body.packQuantity ?? (await catalogPackQuantity(db, teamId, catalogItemId));
     const now = Date.now();
     const row = await db
       .insert(orderRequests)
-      .values({
-        ...body,
-        packQuantity,
-        catalogItemId,
-        currency: body.currency ?? "USD",
-        requesterId: c.get("userId"),
-        requesterName: c.get("userDisplayName"),
-        requesterSlackId: c.get("userSlackId"),
-        status: "requested",
-        createdAt: now,
-        updatedAt: now,
-      })
+      .values(
+        withTeam(teamId, {
+          ...body,
+          packQuantity,
+          catalogItemId,
+          currency: body.currency ?? (await teamSettings(db, teamId)).currency,
+          requesterId: c.get("userId"),
+          requesterName: c.get("userDisplayName"),
+          requesterSlackId: c.get("userSlackId"),
+          status: "requested" as const,
+          createdAt: now,
+          updatedAt: now,
+        }),
+      )
       .returning()
       .get();
-    await db.insert(requestEvents).values({
-      requestId: row.id,
-      userId: c.get("userId"),
-      userName: c.get("userDisplayName"),
-      action: "created",
-      createdAt: now,
-    });
-    if (listId) await addToList(db, listId, [row.id], c.get("userDisplayName"));
+    await db.insert(requestEvents).values(
+      withTeam(teamId, {
+        requestId: row.id,
+        userId: c.get("userId"),
+        userName: c.get("userDisplayName"),
+        action: "created",
+        createdAt: now,
+      }),
+    );
+    if (listId) await addToList(db, teamId, listId, [row.id], c.get("userDisplayName"));
     return c.json(row, 201);
   })
   /** Edit while still awaiting a mentor (including swapping in another item): the requester or any mentor. */
-  .patch("/:id", requireAuth, requestValidator(true), async (c) => {
+  .patch("/:id", requireAuth, catalogReady, requestValidator(true), async (c) => {
     const id = Number(c.req.param("id"));
     const { catalogItemId: picked, catalogCategory, catalogName, ...body } = c.req.valid("json");
     const catalog = { catalogItemId: picked, catalogCategory, catalogName };
     const db = createOrdersDb(c.env.ORDERS_DB);
-    const current = await db.select().from(orderRequests).where(eq(orderRequests.id, id)).get();
+    const teamId = c.get("teamId");
+    const current = await db
+      .select()
+      .from(orderRequests)
+      .where(inTeam(orderRequests, teamId, eq(orderRequests.id, id)))
+      .get();
     if (!current) return c.json({ error: "Request not found." }, 404);
     if (current.requesterId !== c.get("userId") && !hasMentorAccess(c)) {
       return c.json({ error: "Only the requester or a mentor can edit this." }, 403);
@@ -361,7 +387,7 @@ export const requestsRouter = new Hono<AppEnv>()
     if (current.status !== "requested") {
       return c.json({ error: "Only requests still awaiting a mentor can be edited." }, 409);
     }
-    if (body.categoryId !== undefined && !(await openCategory(db, body.categoryId))) {
+    if (body.categoryId !== undefined && !(await openCategory(db, teamId, body.categoryId))) {
       return c.json({ error: "That budget category doesn't exist or is archived." }, 400);
     }
     if (Object.keys(body).length === 0) return c.json({ error: "Nothing to update." }, 400);
@@ -374,6 +400,7 @@ export const requestsRouter = new Hono<AppEnv>()
     ) {
       catalogItemId = await catalogItemFor(
         db,
+        teamId,
         catalog,
         { ...current, ...body },
         c.get("userDisplayName"),
@@ -384,23 +411,32 @@ export const requestsRouter = new Hono<AppEnv>()
     const row = await db
       .update(orderRequests)
       .set({ ...body, catalogItemId, updatedAt: now })
-      .where(and(eq(orderRequests.id, id), eq(orderRequests.status, "requested")))
+      .where(
+        inTeam(
+          orderRequests,
+          teamId,
+          eq(orderRequests.id, id),
+          eq(orderRequests.status, "requested"),
+        ),
+      )
       .returning()
       .get();
     if (!row) return c.json({ error: "This request was just decided; reload to see it." }, 409);
     // A new link means a different item (a mentor fixing the wrong part or supplier): keep what
     // it was in the history.
     const replaced = body.url !== undefined && body.url !== current.url;
-    await db.insert(requestEvents).values({
-      requestId: id,
-      userId: c.get("userId"),
-      userName: c.get("userDisplayName"),
-      action: replaced ? "replaced" : "edited",
-      note: replaced
-        ? `Was ${current.quantity}× ${current.title} from ${current.vendor}: ${current.url}`
-        : null,
-      createdAt: now,
-    });
+    await db.insert(requestEvents).values(
+      withTeam(teamId, {
+        requestId: id,
+        userId: c.get("userId"),
+        userName: c.get("userDisplayName"),
+        action: replaced ? "replaced" : "edited",
+        note: replaced
+          ? `Was ${current.quantity}× ${current.title} from ${current.vendor}: ${current.url}`
+          : null,
+        createdAt: now,
+      }),
+    );
     return c.json(row);
   })
   /**
@@ -417,8 +453,9 @@ export const requestsRouter = new Hono<AppEnv>()
     const rule = ACTIONS[action as Action];
     const { note, quantity, unitPriceCents, inventory } = c.req.valid("json");
     const db = createOrdersDb(c.env.ORDERS_DB);
+    const teamId = c.get("teamId");
 
-    const current = await selectRequests(db).where(eq(orderRequests.id, id)).get();
+    const current = await selectRequests(db, teamId, eq(orderRequests.id, id)).get();
     if (!current) return c.json({ error: "Request not found." }, 404);
     const isMentor = hasMentorAccess(c);
     const isRequester = current.request.requesterId === c.get("userId");
@@ -458,7 +495,14 @@ export const requestsRouter = new Hono<AppEnv>()
         ...(action === "approve" && unitPriceCents !== undefined ? { unitPriceCents } : {}),
         ...(inventoryLocationId !== undefined ? { inventoryLocationId } : {}),
       })
-      .where(and(eq(orderRequests.id, id), inArray(orderRequests.status, [...rule.from])))
+      .where(
+        inTeam(
+          orderRequests,
+          teamId,
+          eq(orderRequests.id, id),
+          inArray(orderRequests.status, [...rule.from]),
+        ),
+      )
       .returning()
       .get();
     if (!row) {
@@ -466,17 +510,20 @@ export const requestsRouter = new Hono<AppEnv>()
     }
     const changes =
       action === "approve" ? describeChanges(current.request, { quantity, unitPriceCents }) : null;
-    await db.insert(requestEvents).values({
-      requestId: id,
-      userId: c.get("userId"),
-      userName: c.get("userDisplayName"),
-      action: rule.to,
-      note:
-        [changes && `Changed ${changes}.`, inventoryNote, note].filter(Boolean).join(" ") || null,
-      createdAt: now,
-    });
+    await db.insert(requestEvents).values(
+      withTeam(teamId, {
+        requestId: id,
+        userId: c.get("userId"),
+        userName: c.get("userDisplayName"),
+        action: rule.to,
+        note:
+          [changes && `Changed ${changes}.`, inventoryNote, note].filter(Boolean).join(" ") || null,
+        createdAt: now,
+      }),
+    );
 
-    if (action === "approve" && row.requesterSlackId && c.env.SLACK_BOT_TOKEN) {
+    // The requester hears on the team's own Slack (nothing is sent if it hasn't connected one).
+    if (action === "approve" && row.requesterSlackId) {
       const cost =
         row.unitPriceCents === null
           ? ""
@@ -484,13 +531,13 @@ export const requestsRouter = new Hono<AppEnv>()
       const message = [
         `✅ ${c.get("userDisplayName")} approved your order request: ${row.quantity}× ${row.title}${cost}, charged to ${current.categoryName}.`,
         note ? `> ${note}` : null,
-        `${c.env.FRONTEND_URL}/requests/${row.id}`,
+        `${ordersUrl(c.env, teamId)}/requests/${row.id}`,
       ]
         .filter(Boolean)
         .join("\n");
       c.executionCtx.waitUntil(
-        sendDM(row.requesterSlackId, message, { SLACK_BOT_TOKEN: c.env.SLACK_BOT_TOKEN }).catch(
-          (err) => console.error("Approval DM failed:", err),
+        sendTeamDM(c.env, teamId, row.requesterSlackId, message).catch((err) =>
+          console.error("Approval DM failed:", err),
         ),
       );
     }

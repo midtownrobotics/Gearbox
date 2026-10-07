@@ -24,7 +24,7 @@ export async function resolveUserId(
   return null;
 }
 
-export { type Member, activeMembers, teamMembers } from "./members";
+export { type Member, activeMembers, sendTeamDM, teamMembers } from "./members";
 export { inTeam, withTeam } from "./scope";
 
 /**

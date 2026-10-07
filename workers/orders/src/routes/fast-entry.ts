@@ -1,10 +1,9 @@
-import { requireAuth, requireMentor } from "@g3/auth";
+import { inTeam, requireAuth, requireMentor, withTeam } from "@g3/auth";
 import { desc, eq, or, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
-import { type OrdersDb, createOrdersDb } from "../db";
+import { createOrdersDb } from "../db";
 import {
-  appSettings,
   budgetCategories,
   catalogCategories,
   catalogItems,
@@ -14,70 +13,79 @@ import {
 } from "../db/schema";
 import { productKey } from "../lib/catalog";
 import { guessCatalogCategory, matchesKeyword } from "../lib/category-guess";
-import { inventoryRequired, setInventoryRequired } from "../lib/inventory";
 import { DEFAULT_TEMPLATE, applyTemplate } from "../lib/naming";
 import { guessPackQuantity } from "../lib/pack-quantity";
+import { type TeamSettings, saveTeamSettings, teamSettings } from "../lib/settings";
+import { catalogReady } from "../lib/starter";
 import { vendorKey, vendorName } from "../lib/vendors";
 import type { AppEnv } from "../types";
 
-const TEMPLATE_KEY = "naming_template";
-
-async function namingTemplate(db: OrdersDb) {
-  const row = await db.select().from(appSettings).where(eq(appSettings.key, TEMPLATE_KEY)).get();
-  return row?.value ?? DEFAULT_TEMPLATE;
+/** Whether this runtime can format money in a currency ("USD", "CAD", ...). */
+function isCurrency(code: string) {
+  if (!/^[A-Z]{3}$/.test(code)) return false;
+  try {
+    new Intl.NumberFormat("en-US", { style: "currency", currency: code });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
-type SettingsInput = { namingTemplate?: string; inventoryRequired?: boolean };
-
 /** Any of the settings; the ones left out stay as they are. */
-const settingsValidator = validator("json", (value, c): SettingsInput => {
-  const v = (value ?? {}) as { namingTemplate?: unknown; inventoryRequired?: unknown };
-  const out: SettingsInput = {};
+const settingsValidator = validator("json", (value, c): Partial<TeamSettings> => {
+  const v = (value ?? {}) as Record<string, unknown>;
+  const fail = (error: string) => c.json({ error }, 400) as never;
+  const out: Partial<TeamSettings> = {};
   if (v.namingTemplate !== undefined) {
     const t = v.namingTemplate;
     if (typeof t !== "string" || !t.includes("{title}") || t.length > 200) {
-      return c.json(
-        { error: "The naming template must include {title} (up to 200 characters)." },
-        400,
-      ) as never;
+      return fail("The naming template must include {title} (up to 200 characters).");
     }
     out.namingTemplate = t.trim();
   }
   if (v.inventoryRequired !== undefined) {
     if (typeof v.inventoryRequired !== "boolean") {
-      return c.json({ error: "inventoryRequired must be true or false." }, 400) as never;
+      return fail("inventoryRequired must be true or false.");
     }
     out.inventoryRequired = v.inventoryRequired;
   }
-  if (out.namingTemplate === undefined && out.inventoryRequired === undefined) {
-    return c.json({ error: "Nothing to change." }, 400) as never;
+  if (v.currency !== undefined) {
+    if (typeof v.currency !== "string" || !isCurrency(v.currency.trim().toUpperCase())) {
+      return fail("currency must be a 3-letter currency code like USD.");
+    }
+    out.currency = v.currency.trim().toUpperCase();
   }
+  if (v.fiscalYearStart !== undefined) {
+    const month = v.fiscalYearStart;
+    if (!Number.isInteger(month) || (month as number) < 1 || (month as number) > 12) {
+      return fail("fiscalYearStart must be a month from 1 to 12.");
+    }
+    out.fiscalYearStart = month as number;
+  }
+  if (Object.keys(out).length === 0) return fail("Nothing to change.");
   return out;
 });
 
+/**
+ * The team's settings: everyone reads them (pages need the currency and calendar); mentors change
+ * them. Budgets and spending follow a new fiscal-year start right away, since they're
+ * worked out from when orders were placed.
+ */
 export const settingsRouter = new Hono<AppEnv>()
   .get("/", requireAuth, async (c) => {
     const db = createOrdersDb(c.env.ORDERS_DB);
     return c.json({
-      namingTemplate: await namingTemplate(db),
+      ...(await teamSettings(db, c.get("teamId"))),
       defaultNamingTemplate: DEFAULT_TEMPLATE,
-      /** Whether receiving a part must say where it goes in Inventory (lib/inventory.ts). */
-      inventoryRequired: await inventoryRequired(db),
     });
   })
   .put("/", requireMentor, settingsValidator, async (c) => {
-    const { namingTemplate: value, inventoryRequired: required } = c.req.valid("json");
     const db = createOrdersDb(c.env.ORDERS_DB);
-    if (value !== undefined) {
-      await db
-        .insert(appSettings)
-        .values({ key: TEMPLATE_KEY, value })
-        .onConflictDoUpdate({ target: appSettings.key, set: { value } });
-    }
-    if (required !== undefined) await setInventoryRequired(db, required);
+    const teamId = c.get("teamId");
+    await saveTeamSettings(db, teamId, c.req.valid("json"));
     return c.json({
-      namingTemplate: await namingTemplate(db),
-      inventoryRequired: await inventoryRequired(db),
+      ...(await teamSettings(db, teamId)),
+      defaultNamingTemplate: DEFAULT_TEMPLATE,
     });
   });
 
@@ -95,13 +103,28 @@ const ruleValidator = validator("json", (value, c): { keyword: string; categoryI
 export const categoryRulesRouter = new Hono<AppEnv>()
   .get("/", requireAuth, async (c) => {
     const db = createOrdersDb(c.env.ORDERS_DB);
-    return c.json(await db.select().from(categoryRules).orderBy(categoryRules.keyword).all());
+    return c.json(
+      await db
+        .select()
+        .from(categoryRules)
+        .where(inTeam(categoryRules, c.get("teamId")))
+        .orderBy(categoryRules.keyword)
+        .all(),
+    );
   })
   .post("/", requireMentor, ruleValidator, async (c) => {
     const db = createOrdersDb(c.env.ORDERS_DB);
+    const teamId = c.get("teamId");
+    const body = c.req.valid("json");
+    const category = await db
+      .select({ id: budgetCategories.id })
+      .from(budgetCategories)
+      .where(inTeam(budgetCategories, teamId, eq(budgetCategories.id, body.categoryId)))
+      .get();
+    if (!category) return c.json({ error: "Pick a budget category." }, 400);
     const row = await db
       .insert(categoryRules)
-      .values({ ...c.req.valid("json"), createdAt: Date.now() })
+      .values(withTeam(teamId, { ...body, createdAt: Date.now() }))
       .returning()
       .get();
     return c.json(row, 201);
@@ -110,7 +133,9 @@ export const categoryRulesRouter = new Hono<AppEnv>()
     const db = createOrdersDb(c.env.ORDERS_DB);
     const row = await db
       .delete(categoryRules)
-      .where(eq(categoryRules.id, Number(c.req.param("id"))))
+      .where(
+        inTeam(categoryRules, c.get("teamId"), eq(categoryRules.id, Number(c.req.param("id")))),
+      )
       .returning()
       .get();
     if (!row) return c.json({ error: "Rule not found." }, 404);
@@ -157,12 +182,14 @@ const suggestValidator = validator("json", (value, c): SuggestInput => {
 export const suggestRouter = new Hono<AppEnv>().post(
   "/",
   requireAuth,
+  catalogReady,
   suggestValidator,
   async (c) => {
     const input = c.req.valid("json");
     const db = createOrdersDb(c.env.ORDERS_DB);
-    const [template, categories, rules, profile, past] = await Promise.all([
-      namingTemplate(db),
+    const teamId = c.get("teamId");
+    const [settings, categories, rules, profile, past] = await Promise.all([
+      teamSettings(db, teamId),
       db
         .select({
           id: budgetCategories.id,
@@ -170,12 +197,18 @@ export const suggestRouter = new Hono<AppEnv>().post(
           isArchived: budgetCategories.isArchived,
         })
         .from(budgetCategories)
+        .where(inTeam(budgetCategories, teamId))
         .all(),
-      db.select().from(categoryRules).orderBy(categoryRules.id).all(),
+      db
+        .select()
+        .from(categoryRules)
+        .where(inTeam(categoryRules, teamId))
+        .orderBy(categoryRules.id)
+        .all(),
       db
         .select()
         .from(vendors)
-        .where(eq(vendors.key, vendorKey(input.vendor)))
+        .where(inTeam(vendors, teamId, eq(vendors.key, vendorKey(input.vendor))))
         .get(),
       db
         .select({
@@ -192,6 +225,7 @@ export const suggestRouter = new Hono<AppEnv>().post(
           createdAt: orderRequests.createdAt,
         })
         .from(orderRequests)
+        .where(inTeam(orderRequests, teamId))
         .orderBy(desc(orderRequests.createdAt))
         .all(),
     ]);
@@ -207,9 +241,13 @@ export const suggestRouter = new Hono<AppEnv>().post(
           .select({ category: catalogItems.category, packQuantity: catalogItems.packQuantity })
           .from(catalogItems)
           .where(
-            or(
-              eq(catalogItems.productKey, key),
-              sql`substr(${catalogItems.productKey}, 1, ${optionPrefix.length}) = ${optionPrefix}`,
+            inTeam(
+              catalogItems,
+              teamId,
+              or(
+                eq(catalogItems.productKey, key),
+                sql`substr(${catalogItems.productKey}, 1, ${optionPrefix.length}) = ${optionPrefix}`,
+              ),
             ),
           )
           // The product itself before one of its options.
@@ -221,9 +259,13 @@ export const suggestRouter = new Hono<AppEnv>().post(
       ? null
       : guessCatalogCategory(
           input.title,
-          (await db.select({ name: catalogCategories.name }).from(catalogCategories).all()).map(
-            (r) => r.name,
-          ),
+          (
+            await db
+              .select({ name: catalogCategories.name })
+              .from(catalogCategories)
+              .where(inTeam(catalogCategories, teamId))
+              .all()
+          ).map((r) => r.name),
         );
     const vendor = vendorKey(input.vendor);
     const sku = input.sku?.toLowerCase();
@@ -286,7 +328,7 @@ export const suggestRouter = new Hono<AppEnv>().post(
       catalogCategoryGuess,
       packQuantity,
       packQuantityGuess,
-      name: applyTemplate(template, input),
+      name: applyTemplate(settings.namingTemplate, input),
       vendor: input.vendor,
       category,
       history: history.map(({ categoryId, url, sku: _sku, vendor: _vendor, ...h }) => ({

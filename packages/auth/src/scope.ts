@@ -13,8 +13,9 @@ export function inTeam(table: TeamTable, teamId: string, ...conditions: (SQL | u
 }
 
 /** Values for an insert into a team table, with the team filled in. */
-export function withTeam<T extends object>(teamId: string, values: T): T & { teamId: string };
+// The array form goes first: an array is an object too, so it would match the single-row form.
 export function withTeam<T extends object>(teamId: string, values: T[]): (T & { teamId: string })[];
+export function withTeam<T extends object>(teamId: string, values: T): T & { teamId: string };
 export function withTeam<T extends object>(teamId: string, values: T | T[]) {
   return Array.isArray(values) ? values.map((v) => ({ ...v, teamId })) : { ...values, teamId };
 }

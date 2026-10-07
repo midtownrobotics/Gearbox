@@ -40,24 +40,27 @@ async function ordered(part: {
   packQuantity?: number;
 }) {
   const category = await db
-    .prepare("INSERT INTO budget_categories (name, created_at) VALUES (?, ?) RETURNING id")
-    .bind(`Inventory ${crypto.randomUUID()}`, now)
+    .prepare(
+      "INSERT INTO budget_categories (team_id, name, created_at) VALUES (?, ?, ?) RETURNING id",
+    )
+    .bind(student.teamId, `Inventory ${crypto.randomUUID()}`, now)
     .first<{ id: number }>();
   const order = await db
     .prepare(
-      "INSERT INTO vendor_orders (vendor, placed_by_id, placed_by_name, placed_at) VALUES ('WCP', ?, 'Mentor', ?) RETURNING id",
+      "INSERT INTO vendor_orders (team_id, vendor, placed_by_id, placed_by_name, placed_at) VALUES (?, 'WCP', ?, 'Mentor', ?) RETURNING id",
     )
-    .bind(mentor.id, now)
+    .bind(student.teamId, mentor.id, now)
     .first<{ id: number }>();
   const row = await db
     .prepare(
-      `INSERT INTO order_requests (requester_id, requester_name, url, vendor, title, sku, quantity,
+      `INSERT INTO order_requests (team_id, requester_id, requester_name, url, vendor, title, sku, quantity,
          pack_quantity, unit_price_cents, catalog_item_id, category_id, reason, status, order_id,
          created_at, updated_at)
-       VALUES (?, 'Sam Student', ?, 'WCP', ?, 'WCP-0500', ?, ?, 1299, ?, ?, 'test', 'ordered', ?, ?, ?)
+       VALUES (?, ?, 'Sam Student', ?, 'WCP', ?, 'WCP-0500', ?, ?, 1299, ?, ?, 'test', 'ordered', ?, ?, ?)
        RETURNING id`,
     )
     .bind(
+      student.teamId,
       student.id,
       `https://wcproducts.com/products/${crypto.randomUUID()}`,
       part.title,
@@ -248,7 +251,7 @@ describe("requiring it", () => {
     const before = await jsonAs<{ namingTemplate: string }>(student, "/settings");
     expect(
       await jsonAs(mentor, "/settings", { method: "PUT", body: { inventoryRequired: true } }),
-    ).toEqual({ namingTemplate: before.namingTemplate, inventoryRequired: true });
+    ).toMatchObject({ namingTemplate: before.namingTemplate, inventoryRequired: true });
     expect((await jsonAs<Intake>(student, "/inventory")).required).toBe(true);
     // The naming template is still saved on its own.
     expect(
@@ -256,7 +259,7 @@ describe("requiring it", () => {
         method: "PUT",
         body: { namingTemplate: "{vendor}: {title}" },
       }),
-    ).toEqual({ namingTemplate: "{vendor}: {title}", inventoryRequired: true });
+    ).toMatchObject({ namingTemplate: "{vendor}: {title}", inventoryRequired: true });
   });
 
   it("then refuses to receive without saying where the parts go", async () => {

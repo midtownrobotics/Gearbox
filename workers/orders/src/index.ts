@@ -1,9 +1,14 @@
-import { hasMentorAccess, requireAuth } from "@g3/auth";
+import { hasMentorAccess, requireAuth, withTeam } from "@g3/auth";
 import { corsOrigin } from "@g3/site-config";
 import { withApiPrefix } from "@g3/site-config/worker";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import packageJson from "../package.json";
+import { createOrdersDb } from "./db";
+import { appUsers } from "./db/schema";
+import { TIME_ZONE_HEADER } from "./lib/local-time";
+import { teamSettings } from "./lib/settings";
+import { catalogReady } from "./lib/starter";
 import { canEditCatalog } from "./middleware/auth";
 import { catalogRouter } from "./routes/catalog";
 import { categoriesRouter } from "./routes/categories";
@@ -30,26 +35,36 @@ base.use(
   cors({
     origin: corsOrigin,
     allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-    allowHeaders: ["Content-Type"],
+    allowHeaders: ["Content-Type", TIME_ZONE_HEADER],
     credentials: true,
   }),
 );
 
 const app = base
   .get("/health", (c) => c.json({ status: "ok", service: "orders", version: packageJson.version }))
-  .get("/me", requireAuth, async (c) => {
+  /** Who's signed in, and the team's settings every page needs (money, calendar). */
+  .get("/me", requireAuth, catalogReady, async (c) => {
+    const db = createOrdersDb(c.env.ORDERS_DB);
+    const teamId = c.get("teamId");
+    const now = Date.now();
     // Remembered so mentors can find people to mark trusted on the Settings page.
-    await c.env.ORDERS_DB.prepare(
-      `INSERT INTO app_users (id, name, last_seen_at) VALUES (?1, ?2, ?3)
-       ON CONFLICT (id) DO UPDATE SET name = ?2, last_seen_at = ?3`,
-    )
-      .bind(c.get("userId"), c.get("userDisplayName"), Date.now())
-      .run();
+    await db
+      .insert(appUsers)
+      .values(
+        withTeam(teamId, { id: c.get("userId"), name: c.get("userDisplayName"), lastSeenAt: now }),
+      )
+      .onConflictDoUpdate({
+        target: appUsers.id,
+        set: { teamId, name: c.get("userDisplayName"), lastSeenAt: now },
+      });
+    const settings = await teamSettings(db, teamId);
     return c.json({
       userId: c.get("userId"),
       displayName: c.get("userDisplayName"),
       isMentor: hasMentorAccess(c),
       canEditCatalog: await canEditCatalog(c),
+      currency: settings.currency,
+      fiscalYearStart: settings.fiscalYearStart,
     });
   })
   .route("/lookup", lookupRouter)
@@ -67,6 +82,7 @@ const app = base
   .route("/inventory", inventoryRouter);
 
 export type OrdersApp = typeof app;
+export { app };
 export type { ImportSummary } from "./lib/sheet-import";
 
 export default { fetch: withApiPrefix(app.fetch) };

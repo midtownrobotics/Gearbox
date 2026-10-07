@@ -1,3 +1,4 @@
+import { inTeam, withTeam } from "@g3/auth";
 import { eq, sql } from "drizzle-orm";
 import type { OrdersDb } from "../db";
 import { type LinkKind, catalogCategories, catalogItems } from "../db/schema";
@@ -88,11 +89,15 @@ type RequestItem = {
 };
 
 /** A catalog part's pack quantity (1 if it's gone). */
-export async function catalogPackQuantity(db: OrdersDb, catalogItemId: number): Promise<number> {
+export async function catalogPackQuantity(
+  db: OrdersDb,
+  teamId: string,
+  catalogItemId: number,
+): Promise<number> {
   const row = await db
     .select({ packQuantity: catalogItems.packQuantity })
     .from(catalogItems)
-    .where(eq(catalogItems.id, catalogItemId))
+    .where(inTeam(catalogItems, teamId, eq(catalogItems.id, catalogItemId)))
     .get();
   return row?.packQuantity ?? 1;
 }
@@ -107,13 +112,14 @@ const learnsPack = (known: number, item: RequestItem) =>
     : {};
 
 /**
- * The catalog item a submitted request is: the one picked from the catalog, or the one with the
- * same link, or a new one in the category the requester chose. A picked item that only had a
+ * The team's catalog item a submitted request is: the one picked from the catalog, or the one with
+ * the same link, or a new one in the category the requester chose. A picked item that only had a
  * search or homepage link takes the requester's product link. Returns null when the link is new
  * and no category was given (the caller rejects the request).
  */
 export async function catalogItemFor(
   db: OrdersDb,
+  teamId: string,
   choice: CatalogChoice,
   item: RequestItem,
   userName: string,
@@ -126,7 +132,7 @@ export async function catalogItemFor(
     const picked = await db
       .select()
       .from(catalogItems)
-      .where(eq(catalogItems.id, choice.catalogItemId))
+      .where(inTeam(catalogItems, teamId, eq(catalogItems.id, choice.catalogItemId)))
       .get();
     if (picked) {
       const better = picked.linkKind !== "product" && kind === "product";
@@ -149,7 +155,7 @@ export async function catalogItemFor(
           ...(picked.image ? {} : { image: item.image }),
           ...learnsPack(picked.packQuantity, item),
         })
-        .where(eq(catalogItems.id, picked.id));
+        .where(inTeam(catalogItems, teamId, eq(catalogItems.id, picked.id)));
       return picked.id;
     }
   }
@@ -162,7 +168,7 @@ export async function catalogItemFor(
         packQuantity: catalogItems.packQuantity,
       })
       .from(catalogItems)
-      .where(eq(catalogItems.productKey, key))
+      .where(inTeam(catalogItems, teamId, eq(catalogItems.productKey, key)))
       .get();
     if (same) {
       await db
@@ -173,7 +179,7 @@ export async function catalogItemFor(
           ...(same.image ? {} : { image: item.image }),
           ...learnsPack(same.packQuantity, item),
         })
-        .where(eq(catalogItems.id, same.id));
+        .where(inTeam(catalogItems, teamId, eq(catalogItems.id, same.id)));
       return same.id;
     }
   }
@@ -184,42 +190,45 @@ export async function catalogItemFor(
   const known = await db
     .select({ name: catalogCategories.name })
     .from(catalogCategories)
-    .where(eq(catalogCategories.name, category))
+    .where(inTeam(catalogCategories, teamId, eq(catalogCategories.name, category)))
     .get();
   if (!known) return null;
   const name =
     choice.catalogName?.trim() || (item.variant ? `${item.title} (${item.variant})` : item.title);
   const created = await db
     .insert(catalogItems)
-    .values({
-      category,
-      name: name.slice(0, 300),
-      vendor: item.vendor,
-      sku: item.sku,
-      options: JSON.stringify(item.variant ? { Option: item.variant } : {}),
-      url: catalogUrl(item.url, item.storePlatform, item.storeVariantId),
-      linkKind: kind,
-      productKey: kind === "product" ? key : null,
-      image: item.image,
-      packQuantity: item.packQuantity ?? 1,
-      storePlatform: item.storePlatform,
-      storeVariantId: item.storeVariantId,
-      source: "request",
-      requestCount: 1,
-      lastRequestedAt: now,
-      createdBy: userName,
-      createdAt: now,
-      updatedBy: userName,
-      updatedAt: now,
-    })
+    .values(
+      withTeam(teamId, {
+        category,
+        name: name.slice(0, 300),
+        vendor: item.vendor,
+        sku: item.sku,
+        options: JSON.stringify(item.variant ? { Option: item.variant } : {}),
+        url: catalogUrl(item.url, item.storePlatform, item.storeVariantId),
+        linkKind: kind,
+        productKey: kind === "product" ? key : null,
+        image: item.image,
+        packQuantity: item.packQuantity ?? 1,
+        storePlatform: item.storePlatform,
+        storeVariantId: item.storeVariantId,
+        source: "request",
+        requestCount: 1,
+        lastRequestedAt: now,
+        createdBy: userName,
+        createdAt: now,
+        updatedBy: userName,
+        updatedAt: now,
+      }),
+    )
     .returning({ id: catalogItems.id })
     .get();
   return created.id;
 }
 
-/** Placed lines set their catalog item's price (what we actually paid, and when). */
+/** Placed lines set their catalog item's price (what the team actually paid, and when). */
 export async function recordPrices(
   db: OrdersDb,
+  teamId: string,
   lines: { catalogItemId: number | null; unitPriceCents: number | null }[],
   at: number,
 ) {
@@ -228,6 +237,6 @@ export async function recordPrices(
     await db
       .update(catalogItems)
       .set({ priceCents: line.unitPriceCents, priceAt: at })
-      .where(eq(catalogItems.id, line.catalogItemId));
+      .where(inTeam(catalogItems, teamId, eq(catalogItems.id, line.catalogItemId)));
   }
 }

@@ -1,4 +1,4 @@
-import { requireMentor } from "@g3/auth";
+import { inTeam, requireMentor } from "@g3/auth";
 import { asc, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
@@ -16,12 +16,17 @@ const trustedValidator = validator("json", (value, c): { trusted: boolean } => {
 
 /**
  * Trusted students (mentors only): people who may add catalog categories and add, edit or delete
- * catalog parts. Anyone who has opened G3 Orders is listed.
+ * catalog parts. Anyone on the team who has opened Orders is listed.
  */
 export const trustedRouter = new Hono<AppEnv>()
   .get("/", requireMentor, async (c) => {
     const db = createOrdersDb(c.env.ORDERS_DB);
-    const rows = await db.select().from(appUsers).orderBy(asc(appUsers.name)).all();
+    const rows = await db
+      .select()
+      .from(appUsers)
+      .where(inTeam(appUsers, c.get("teamId")))
+      .orderBy(asc(appUsers.name))
+      .all();
     return c.json(rows.map((u) => ({ ...u, trusted: u.trusted === 1 })));
   })
   .put("/:id", requireMentor, trustedValidator, async (c) => {
@@ -34,7 +39,7 @@ export const trustedRouter = new Hono<AppEnv>()
           ? { trusted: 1, trustedBy: c.get("userDisplayName"), trustedAt: Date.now() }
           : { trusted: 0, trustedBy: null, trustedAt: null },
       )
-      .where(eq(appUsers.id, c.req.param("id")))
+      .where(inTeam(appUsers, c.get("teamId"), eq(appUsers.id, c.req.param("id"))))
       .returning()
       .get();
     if (!row) return c.json({ error: "That person hasn't opened Orders yet." }, 404);

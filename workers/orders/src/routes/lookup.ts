@@ -74,7 +74,15 @@ export const lookupRouter = new Hono<AppEnv>().get("/", requireAuth, urlValidato
         422,
       );
     }
-    const status = ([400, 401, 404, 503] as const).find((s) => s === res.status) ?? 502;
+    // Signed in here but not by Edge: the box isn't this team's (it's the site team's until each
+    // team can pair its own, roadmap E.1/E.2). The requester fills the details in by hand.
+    if (res.status === 401 || res.status === 403) {
+      return c.json(
+        { error: "Automatic lookup needs an edge box, and your team hasn't connected one." },
+        503,
+      );
+    }
+    const status = ([400, 404, 503] as const).find((s) => s === res.status) ?? 502;
     return c.json({ error: body.error ?? `Lookup failed (HTTP ${res.status}).` }, status);
   }
 

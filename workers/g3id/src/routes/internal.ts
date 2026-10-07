@@ -1,14 +1,16 @@
+import { sendDM } from "@g3/slack";
 import { and, eq, inArray, isNull, ne } from "drizzle-orm";
 import { Hono } from "hono";
 import { createDb } from "../db";
 import { coreSessions, coreSlackLinkCodes, coreUsers, teams } from "../db/schema";
 import { createSigninCode } from "../lib/slack-code";
-import { saveInstallation } from "../lib/slack-install";
+import { saveInstallation, slackForTeam } from "../lib/slack-install";
 import { siteTeamId } from "../lib/team";
 import type { AppEnv } from "../types";
 
 // For other workers only, over service bindings: the platform worker signs teams up through these,
 // and its operator console (roadmap 2.8) deletes, renumbers and hands over teams through them.
+// Apps read a team's members and send its Slack messages through them (@g3/auth).
 // The gateway never answers /api/internal, and production workers have no other public address.
 
 type NewTeam = { id: string; teamNumber: number; name: string };
@@ -203,6 +205,30 @@ export const internalRouter = new Hono<AppEnv>()
         .update(coreUsers)
         .set({ isAdmin: 0, updatedAt: now })
         .where(and(eq(coreUsers.id, demoteUserId), eq(coreUsers.teamId, teamId)));
+    }
+    return c.json({ ok: true });
+  })
+  // A direct message from the team's own Slack bot (an app telling a member something, like Orders
+  // approving their request). The bot token never leaves G3ID. 404 when the team has no Slack.
+  .post("/teams/:id/slack/dm", async (c) => {
+    const body = await c.req
+      .json<{ slackUserId?: unknown; text?: unknown }>()
+      .catch(() => ({}) as { slackUserId?: unknown; text?: unknown });
+    const { slackUserId, text } = body;
+    if (typeof slackUserId !== "string" || typeof text !== "string" || !text.trim()) {
+      return c.json({ error: "slackUserId and text are required." }, 400);
+    }
+    // Only ever a member's DM, never a channel.
+    if (!/^[UW][A-Z0-9]+$/.test(slackUserId)) {
+      return c.json({ error: "slackUserId must be a Slack user ID." }, 400);
+    }
+    if (text.length > 4000) return c.json({ error: "text is too long." }, 400);
+    const teamSlack = await slackForTeam(c.env, c.req.param("id"));
+    if (!teamSlack) return c.json({ error: "This team hasn't connected Slack." }, 404);
+    try {
+      await sendDM(slackUserId, text, teamSlack.slack);
+    } catch (err) {
+      return c.json({ error: err instanceof Error ? err.message : String(err) }, 502);
     }
     return c.json({ ok: true });
   })

@@ -42,8 +42,6 @@ const httpsVar = (key: string, value: (m: RegExpMatchArray) => string): Rule => 
 function wranglerRules(app: Exclude<AppName, "portal">): Rule[] {
   return [
     httpsVar("FRONTEND_URL", () => appUrl(app)),
-    // Orders' Share-A-Cart OAuth callbacks.
-    httpsVar("PUBLIC_API_URL", () => apiUrl(app)),
     httpsVar(
       "(GOOGLE|GITHUB|STEAM|ONSHAPE)_REDIRECT_URI",
       // One address for every team: the platform's id.<domain> host.

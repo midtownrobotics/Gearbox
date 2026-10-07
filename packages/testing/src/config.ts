@@ -30,11 +30,14 @@ const json = (body: unknown, status = 200) =>
     headers: { "Content-Type": "application/json" },
   });
 
+/** Slack DMs apps asked G3ID to send, by team (read back at /internal/teams/:id/slack/dms). */
+const slackDms = new Map<string, { slackUserId: string; text: string }[]>();
+
 /**
  * G3ID as other workers see it: /auth/me answers for the user in the test cookie (users.ts), like
  * the real one, never reporting admin or mentor for a kiosk PIN session.
  */
-export const g3idStub: ServiceStub = (request) => {
+export const g3idStub: ServiceStub = async (request) => {
   const url = new URL(request.url);
   // Workers call G3ID at /api (http://g3id/api/auth/me), like its public address.
   url.pathname = url.pathname.replace(/^\/api(?=\/)/, "");
@@ -85,6 +88,16 @@ export const g3idStub: ServiceStub = (request) => {
         }),
       ),
     );
+  }
+  // A DM from the team's Slack bot: recorded, never sent. Tests read them back (stub only) with
+  // GET /api/internal/teams/:id/slack/dms on env.G3ID.
+  const dm = url.pathname.match(/^\/internal\/teams\/([^/]+)\/slack\/dms?$/);
+  if (dm) {
+    const teamId = decodeURIComponent(dm[1]);
+    if (request.method === "GET") return json(slackDms.get(teamId) ?? []);
+    const body = (await request.json()) as { slackUserId: string; text: string };
+    slackDms.set(teamId, [...(slackDms.get(teamId) ?? []), body]);
+    return json({ ok: true });
   }
   return json({ error: `G3ID stub has no ${url.pathname}` }, 404);
 };

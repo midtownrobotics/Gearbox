@@ -1,5 +1,12 @@
-/** "$12.50" from 1250 cents; "—" when unknown. */
-export function formatCents(cents: number | null | undefined, currency = "USD"): string {
+/** The team's currency (its Orders setting), set once /me has loaded (shared/auth.tsx). */
+let teamCurrency = "USD";
+export function setTeamCurrency(currency: string) {
+  teamCurrency = currency;
+}
+export const currentCurrency = () => teamCurrency;
+
+/** "$12.50" from 1250 cents (in the team's currency unless told); "—" when unknown. */
+export function formatCents(cents: number | null | undefined, currency = teamCurrency): string {
   if (cents === null || cents === undefined) return "—";
   return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(cents / 100);
 }
@@ -12,6 +19,7 @@ export function parseDollars(value: string): number | null {
   return Math.round(Number(trimmed) * 100);
 }
 
+/** A moment's date, where the viewer is. */
 export function formatDate(ms: number): string {
   return new Date(ms).toLocaleDateString("en-US", {
     month: "short",
@@ -29,9 +37,25 @@ export function formatDateTime(ms: number): string {
   });
 }
 
+/**
+ * A calendar day (a need-by date, an expiry), as dateInputToMs stores it. Read in UTC, so it's the
+ * same day wherever the team is.
+ */
+export function formatDay(ms: number): string {
+  return new Date(ms).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+}
+
 const DAY_MS = 86_400_000;
 
-/** A date input's "YYYY-MM-DD" as midday Eastern that day (never shifts across US time zones). */
+/**
+ * A date input's "YYYY-MM-DD" as a calendar day: 16:00 UTC that day (how they've always been
+ * stored), read back in UTC so it's the same day in every time zone.
+ */
 export function dateInputToMs(value: string): number | null {
   const m = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   return m ? Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 16) : null;
@@ -40,12 +64,13 @@ export function dateInputToMs(value: string): number | null {
 /** The reverse, for prefilling a date input. */
 export function msToDateInput(ms: number | null): string {
   if (ms === null) return "";
-  return new Date(ms).toLocaleDateString("en-CA", { timeZone: "America/New_York" });
+  return new Date(ms).toLocaleDateString("en-CA", { timeZone: "UTC" });
 }
 
-/** Midnight today, Eastern. */
+/** Today (where the viewer is) as a calendar day's start, to compare with stored days. */
 export function startOfToday(): number {
-  return (dateInputToMs(msToDateInput(Date.now())) as number) - 16 * 3_600_000;
+  const today = new Date().toLocaleDateString("en-CA");
+  return (dateInputToMs(today) as number) - 16 * 3_600_000;
 }
 
 /**
