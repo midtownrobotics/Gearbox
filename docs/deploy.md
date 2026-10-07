@@ -118,6 +118,10 @@ Right after the release:
 - **Secret:** delete the edge worker's `EDGE_AGENT_KEY` secret (`wrangler secret delete EDGE_AGENT_KEY --env production` in `workers/edge`); nothing reads it.
 - **Another team's box:** an admin makes its key on the Edge app's Edge Box page and puts it in the box's `agent.env` with `EDGE_WORKER_URL=https://<number>-edge.frcgearbox.com/api`.
 
+## Portal's logo (once, roadmap Phase 3)
+
+Portal no longer has G3's logo built in. After the release, a G3ID admin sets G3's logo URL on G3ID's Admin → Team Appearance page (an https link to the image, e.g. on G3's public site); until then Portal's public-site tile shows a globe.
+
 ## Other outside services
 
 - **Slack for other teams:** in the Slack app's settings, set its display name to **Gearbot** (`slackBotName` in `site.ts`), turn on distribution (Manage Distribution), add the redirect URL `https://id.frcgearbox.com/api/slack/oauth/callback`, give the bot the scopes `commands, chat:write, im:write, im:history, users:read, users:read.email`, and subscribe to the `app_uninstalled` and `tokens_revoked` events. Then set G3ID's secrets `SLACK_CLIENT_ID`, `SLACK_CLIENT_SECRET` (Basic Information → App Credentials) and `SECRETS_KEY` (`openssl rand -base64 32`; keep it, since it decrypts the stored tokens). Team admins connect their workspace on G3ID's Admin → Slack page; G3 can keep its current settings.

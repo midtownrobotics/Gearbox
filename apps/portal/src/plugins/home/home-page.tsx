@@ -1,4 +1,4 @@
-import { type TeamUiLinkKey, appUrl, pageTeamId, pageTeamNumber, teamKey } from "@g3/site-config";
+import { type TeamUiLinkKey, appUrl, pageTeamNumber } from "@g3/site-config";
 import { useTeamNames, useTeamUiSettings } from "@g3/ui";
 import { useEffect, useState } from "react";
 import type { IconType } from "react-icons";
@@ -11,7 +11,6 @@ import pitIcon from "../../assets/app-icons/pit.svg";
 import scoutingIcon from "../../assets/app-icons/scouting.svg";
 import shopIcon from "../../assets/app-icons/shop.svg";
 import skillsIcon from "../../assets/app-icons/skills.svg";
-import g3Logo from "../../assets/g3.png";
 import { g3id } from "../../lib/api";
 import { BlueAllianceIcon, FirstIcon, Match13Icon, StatboticsIcon } from "./link-icons";
 
@@ -70,7 +69,7 @@ const APPS: App[] = [
     label: "Public Site",
     linkKey: "publicSite",
     href: "",
-    logoSrc: g3Logo,
+    icon: FaGlobe,
   },
   {
     label: "Slack",
@@ -123,10 +122,9 @@ const APPS: App[] = [
   },
 ];
 
-/** The public site's tile: the team's logo, G3's for the site team, or a globe. */
+/** The public site's tile: the team's logo (Team Appearance), or a globe until it sets one. */
 function publicSiteMark(logoUrl: string): { logoSrc?: string; icon?: IconType } {
-  const logo = logoUrl || (pageTeamId === teamKey ? g3Logo : "");
-  return logo ? { logoSrc: logo } : { logoSrc: undefined, icon: FaGlobe };
+  return logoUrl ? { logoSrc: logoUrl } : { logoSrc: undefined, icon: FaGlobe };
 }
 
 type AuthState = "checking" | "authenticated" | "unauthenticated";
