@@ -242,7 +242,7 @@ function TreeTabs({
             className={`flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm font-semibold ${
               selected
                 ? "border-secondary-900 bg-secondary-900 text-white"
-                : "border-secondary-200 bg-white text-secondary-700 hover:bg-secondary-50"
+                : "border-secondary-200 bg-surface text-secondary-700 hover:bg-secondary-50"
             }`}
           >
             <span aria-hidden="true">{tree.icon}</span>

@@ -3,7 +3,10 @@ import { site } from "./site.ts";
 // Everything apps and workers need from site.ts, already put together.
 
 export { site };
+export { type Hsv, hexToHsv, hsvToHex, isHexColor, withHueOf } from "./color.ts";
 export {
+  brandColor,
+  builtInBrandColor,
   defaultTeamUiSettings,
   teamUiDefaults,
   teamUiLinkLabels,

@@ -379,7 +379,7 @@ function TrustedStudents() {
                 aria-label="Add a trusted student"
               />
               {q && (
-                <ul className="absolute z-10 mt-1 w-full rounded-lg border border-secondary-200 bg-white shadow-lg">
+                <ul className="absolute z-10 mt-1 w-full rounded-lg border border-secondary-200 bg-surface shadow-lg">
                   {matches.length === 0 ? (
                     <li className="px-3 py-2 text-secondary-500">
                       No one by that name has opened {names.appTitle("Orders")} yet.

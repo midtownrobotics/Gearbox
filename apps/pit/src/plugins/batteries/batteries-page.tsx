@@ -331,7 +331,7 @@ export function BatteriesPage() {
                     setAdding(true);
                     setBanner(null);
                   }}
-                  className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-lg transition-colors"
+                  className="px-3 py-1.5 bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold rounded-lg transition-colors"
                 >
                   + Add Battery
                 </button>
@@ -396,7 +396,7 @@ export function BatteriesPage() {
         )}
 
         {adding && (
-          <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+          <div className="bg-surface rounded-xl border border-gray-200 p-4 space-y-3">
             <input
               type="text"
               placeholder="Battery name (e.g. A1)"
@@ -409,7 +409,7 @@ export function BatteriesPage() {
                 if (e.key === "Enter") handleAddBattery();
                 if (e.key === "Escape") setAdding(false);
               }}
-              className="w-full bg-gray-100 border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:border-red-500"
+              className="w-full bg-gray-100 border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:border-primary-500"
               // biome-ignore lint/a11y/noAutofocus: intentional
               autoFocus
             />
@@ -418,7 +418,7 @@ export function BatteriesPage() {
               <button
                 type="button"
                 onClick={handleAddBattery}
-                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-lg"
+                className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold rounded-lg"
               >
                 Add
               </button>
@@ -496,12 +496,12 @@ export function BatteriesPage() {
                                 setVoltageInput("");
                               }
                             }}
-                            className="w-20 bg-gray-100 border border-gray-300 rounded px-2 py-1 text-sm text-gray-900 focus:outline-none focus:border-red-500 [appearance:textfield]"
+                            className="w-20 bg-gray-100 border border-gray-300 rounded px-2 py-1 text-sm text-gray-900 focus:outline-none focus:border-primary-500 [appearance:textfield]"
                           />
                           <button
                             type="button"
                             onClick={() => handleSetVoltage(battery)}
-                            className="px-2 py-1 bg-red-600 hover:bg-red-500 text-white text-xs font-semibold rounded"
+                            className="px-2 py-1 bg-primary-600 hover:bg-primary-700 text-white text-xs font-semibold rounded"
                           >
                             Set
                           </button>
@@ -598,7 +598,7 @@ export function BatteriesPage() {
         {/* Labels Modal (Batteries + States) */}
         {showLabelsModal && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 space-y-4">
+            <div className="bg-surface rounded-lg shadow-xl max-w-md w-full p-6 space-y-4">
               <h2 className="text-xl font-bold text-gray-900">Print Labels</h2>
               <p className="text-sm text-gray-600">
                 Select batteries and/or states to print on a single PDF.

@@ -1,14 +1,16 @@
 import {
   type TeamUiColors,
   type TeamUiSettings,
+  builtInBrandColor,
   defaultTeamUiSettings,
+  isHexColor,
   teamUiDefaults,
+  withHueOf,
 } from "@g3/site-config";
 import { eq } from "drizzle-orm";
 import type { Db } from "../db";
 import { teamUiSettings, teams } from "../db/schema";
 
-const hex = /^#[0-9a-fA-F]{6}$/;
 const fields: (keyof TeamUiColors)[] = [
   "page",
   "surface",
@@ -26,7 +28,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function isColors(value: unknown): value is TeamUiColors {
   return (
     isRecord(value) &&
-    fields.every((field) => typeof value[field] === "string" && hex.test(value[field]))
+    fields.every((field) => {
+      const color = value[field];
+      return typeof color === "string" && isHexColor(color);
+    })
   );
 }
 
@@ -60,8 +65,7 @@ export function isTeamUiSettings(value: unknown): value is TeamUiSettings {
     isLink(value.logoUrl) &&
     ["Agency FB", "Ubuntu", "system-ui"].includes(String(value.displayFont)) &&
     ["system", "light", "dark"].includes(String(value.defaultTheme)) &&
-    typeof value.primaryColor === "string" &&
-    hex.test(value.primaryColor) &&
+    typeof value.linkAccents === "boolean" &&
     isColors(value.light) &&
     isColors(value.dark) &&
     Array.isArray(value.hiddenLinks) &&
@@ -76,9 +80,36 @@ export function isTeamUiSettings(value: unknown): value is TeamUiSettings {
 }
 
 /**
- * A stored record, with `defaults` (the team's, teamUiDefaults) filling links added since it was
- * saved, without losing its branding or its explicitly empty links. Writes still need the full
- * current schema, and unknown keys stay invalid.
+ * A record saved when the brand colour was a setting of its own (`primaryColor`), as one saved
+ * now, where the light accent is the brand colour. A brand colour the team chose becomes its light
+ * accent, so its buttons, links and icons stay the colour they were; a dark accent it never chose
+ * is turned to that colour's hue. The built-in brand colour meant "not chosen": the accents stay
+ * as saved.
+ */
+function withoutPrimaryColor(value: Record<string, unknown>): Record<string, unknown> {
+  if (!("primaryColor" in value)) return value;
+  const { primaryColor, ...rest } = value;
+  const { light, dark } = rest;
+  if (
+    typeof primaryColor !== "string" ||
+    !isHexColor(primaryColor) ||
+    primaryColor.toLowerCase() === builtInBrandColor ||
+    !isColors(light) ||
+    !isColors(dark)
+  )
+    return rest;
+  const darkUnchosen = dark.accent.toLowerCase() === defaultTeamUiSettings.dark.accent;
+  return {
+    ...rest,
+    light: { ...light, accent: primaryColor },
+    dark: darkUnchosen ? { ...dark, accent: withHueOf(dark.accent, primaryColor) } : dark,
+  };
+}
+
+/**
+ * A stored record, with `defaults` (the team's, teamUiDefaults) filling links and settings added
+ * since it was saved, without losing its branding or its explicitly empty links. Writes still need
+ * the full current schema, and unknown keys stay invalid.
  */
 export function readTeamUiSettings(
   json: string | undefined,
@@ -88,8 +119,10 @@ export function readTeamUiSettings(
   try {
     const value: unknown = JSON.parse(json);
     if (!isRecord(value) || !isRecord(value.links)) return defaults;
+    const stored = withoutPrimaryColor(value);
     const settings = {
-      ...value,
+      ...stored,
+      linkAccents: "linkAccents" in stored ? stored.linkAccents : defaults.linkAccents,
       links: { ...defaults.links, ...value.links },
       hiddenLinks: "hiddenLinks" in value ? value.hiddenLinks : [],
     };

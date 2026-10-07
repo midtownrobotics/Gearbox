@@ -48,7 +48,7 @@ export function PartDetailsView({
       {/* Main content */}
       <div className="flex-1 flex overflow-hidden">
         {/* Drawing PDF - 3/4 width */}
-        <div className="flex-1 border-r border-steel/30 bg-white flex">
+        <div className="flex-1 border-r border-steel/30 bg-surface flex">
           <DrawingPreview
             partNumber={row.definition.onshapePartNumber}
             revision={row.definition.revision}

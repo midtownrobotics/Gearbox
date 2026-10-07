@@ -163,7 +163,7 @@ export function HomePage() {
       <main className="min-h-screen bg-page flex items-center justify-center px-6">
         <div className="text-center">
           <div className="animate-pulse">
-            <p className="text-red-600 font-semibold text-lg tracking-widest uppercase">
+            <p className="text-primary-600 font-semibold text-lg tracking-widest uppercase">
               Loading...
             </p>
           </div>
@@ -177,17 +177,19 @@ export function HomePage() {
       <main className="min-h-screen bg-page flex items-center justify-center px-6">
         <div className="max-w-md w-full space-y-6 text-center">
           <div>
-            <p className="text-red-600 font-semibold text-lg tracking-widest uppercase mb-2">
+            <p className="text-primary-600 font-semibold text-lg tracking-widest uppercase mb-2">
               FRC Team {pageTeamNumber}
             </p>
-            <h1 className="text-4xl font-bold text-gray-900 mb-2">{teamUi.shortName} Gearbox</h1>
-            <p className="text-gray-600">FIRST Robotics Competition</p>
+            <h1 className="text-4xl font-bold text-secondary-900 mb-2">
+              {teamUi.shortName} Gearbox
+            </h1>
+            <p className="text-secondary-600">FIRST Robotics Competition</p>
           </div>
 
           <div className="space-y-3 pt-6">
             <a
               href={`${appUrl("id")}/login?redirect=${encodeURIComponent(window.location.href)}`}
-              className="block w-full px-6 py-3 rounded-lg bg-red-600 hover:bg-red-700 text-white font-semibold transition-colors"
+              className="block w-full px-6 py-3 rounded-lg bg-primary-600 hover:bg-primary-700 text-white font-semibold transition-colors"
             >
               Sign In
             </a>
@@ -196,7 +198,7 @@ export function HomePage() {
                 href={teamUi.links.publicSite}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="block w-full px-6 py-3 rounded-lg bg-gray-300 hover:bg-gray-400 text-gray-900 font-semibold transition-colors"
+                className="block w-full px-6 py-3 rounded-lg bg-secondary-200 hover:bg-secondary-300 text-secondary-900 font-semibold transition-colors"
               >
                 Not a member? Visit public site
               </a>
@@ -211,10 +213,10 @@ export function HomePage() {
     <main className="min-h-screen bg-page px-6 py-12">
       <div className="max-w-2xl mx-auto">
         <div className="mb-10">
-          <p className="text-red-600 text-sm font-semibold uppercase tracking-widest mb-1">
+          <p className="text-primary-600 text-sm font-semibold uppercase tracking-widest mb-1">
             Team {pageTeamNumber}
           </p>
-          <h1 className="text-4xl font-bold text-gray-900">{teamUi.shortName} Gearbox</h1>
+          <h1 className="text-4xl font-bold text-secondary-900">{teamUi.shortName} Gearbox</h1>
         </div>
 
         <div className="grid grid-cols-4 sm:grid-cols-5 gap-x-4 gap-y-8">
@@ -255,7 +257,7 @@ export function HomePage() {
                       )}
                     </div>
                   )}
-                  <span className="text-xs text-center leading-tight transition-colors text-gray-600 group-hover:text-gray-900">
+                  <span className="text-xs text-center leading-tight transition-colors text-secondary-600 group-hover:text-secondary-900">
                     {app.label}
                   </span>
                 </a>

@@ -104,7 +104,7 @@ export function PartViewerPage() {
   if (!partNumber) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-page p-4">
-        <div className="bg-white rounded-lg shadow-lg p-8 max-w-md w-full text-center">
+        <div className="bg-surface rounded-lg shadow-lg p-8 max-w-md w-full text-center">
           <div className="text-red-600 text-4xl mb-4">⚠️</div>
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Missing Part Number</h1>
           <p className="text-gray-600">
@@ -118,7 +118,7 @@ export function PartViewerPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-page p-4">
-        <div className="bg-white rounded-lg shadow-lg p-8 max-w-md w-full text-center">
+        <div className="bg-surface rounded-lg shadow-lg p-8 max-w-md w-full text-center">
           <div className="animate-spin text-primary-600 text-4xl mb-4">⏳</div>
           <h1 className="text-xl font-bold text-gray-900 mb-2">Loading Drawing</h1>
           <p className="text-gray-600">
@@ -130,7 +130,7 @@ export function PartViewerPage() {
   }
 
   return (
-    <div className="w-full h-screen bg-white flex flex-col">
+    <div className="w-full h-screen bg-surface flex flex-col">
       {pdfUrl && !showUploadForm && (
         <>
           <div className="bg-gray-50 border-b border-gray-200 px-6 py-4 flex items-center justify-between">
@@ -157,7 +157,7 @@ export function PartViewerPage() {
 
       {showUploadForm && (
         <div className="flex items-center justify-center flex-1 p-4">
-          <div className="bg-white rounded-lg shadow-lg p-8 max-w-md w-full">
+          <div className="bg-surface rounded-lg shadow-lg p-8 max-w-md w-full">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-bold text-gray-900">Upload Drawing</h2>
               <button
@@ -227,7 +227,7 @@ export function PartViewerPage() {
 
       {!pdfUrl && !loading && errorState && !showUploadForm && (
         <div className="flex items-center justify-center flex-1 p-4">
-          <div className="bg-white rounded-lg shadow-lg p-8 max-w-md w-full">
+          <div className="bg-surface rounded-lg shadow-lg p-8 max-w-md w-full">
             <div className="text-red-600 text-5xl mb-4 text-center">📋</div>
             <h2 className="text-2xl font-bold text-gray-900 mb-2">{errorState.error}</h2>
             <p className="text-gray-600 mb-6 leading-relaxed">{errorState.details}</p>

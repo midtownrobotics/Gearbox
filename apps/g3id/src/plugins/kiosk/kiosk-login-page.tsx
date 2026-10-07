@@ -102,7 +102,7 @@ export function KioskLoginPage() {
           {[0, 1, 2].map((i) => (
             <div
               key={i}
-              className="w-16 h-16 rounded-lg bg-white border-2 border-secondary-300 flex items-center justify-center"
+              className="w-16 h-16 rounded-lg bg-surface border-2 border-secondary-300 flex items-center justify-center"
             >
               <span className="text-3xl font-bold text-secondary-900">{pin[i] ? "●" : "○"}</span>
             </div>
@@ -118,7 +118,7 @@ export function KioskLoginPage() {
               type="button"
               onClick={() => addDigit(num.toString())}
               disabled={loading || pin.length >= 3}
-              className="h-16 rounded-lg bg-white hover:bg-secondary-50 disabled:opacity-50 border border-secondary-300 text-secondary-900 text-2xl font-bold transition-colors active:bg-secondary-100"
+              className="h-16 rounded-lg bg-surface hover:bg-secondary-50 disabled:opacity-50 border border-secondary-300 text-secondary-900 text-2xl font-bold transition-colors active:bg-secondary-100"
             >
               {num}
             </button>
@@ -128,7 +128,7 @@ export function KioskLoginPage() {
             type="button"
             onClick={() => addDigit("0")}
             disabled={loading || pin.length >= 3}
-            className="col-span-3 h-14 rounded-lg bg-white hover:bg-secondary-50 disabled:opacity-50 border border-secondary-300 text-secondary-900 text-xl font-bold transition-colors active:bg-secondary-100"
+            className="col-span-3 h-14 rounded-lg bg-surface hover:bg-secondary-50 disabled:opacity-50 border border-secondary-300 text-secondary-900 text-xl font-bold transition-colors active:bg-secondary-100"
           >
             0
           </button>
@@ -138,7 +138,7 @@ export function KioskLoginPage() {
           type="button"
           onClick={removeDigit}
           disabled={loading || pin.length === 0}
-          className="w-full h-12 rounded-lg bg-white hover:bg-secondary-50 disabled:opacity-50 border border-secondary-300 text-secondary-900 text-sm font-semibold transition-colors active:bg-secondary-100"
+          className="w-full h-12 rounded-lg bg-surface hover:bg-secondary-50 disabled:opacity-50 border border-secondary-300 text-secondary-900 text-sm font-semibold transition-colors active:bg-secondary-100"
         >
           Clear
         </button>

@@ -42,7 +42,7 @@ export function AttendanceLeaderboard() {
     );
 
   return (
-    <section className="overflow-hidden rounded-lg border border-secondary-200 bg-white">
+    <section className="overflow-hidden rounded-lg border border-secondary-200 bg-surface">
       <header className="flex items-center justify-between border-b border-secondary-200 px-4 py-3">
         <h2 className="flex items-center gap-2 font-semibold text-secondary-900">
           <Trophy size={18} className="text-primary-500" /> Attendance

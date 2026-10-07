@@ -353,7 +353,7 @@ function VendorOrder({
   const small = `${inputClass} !py-1 !px-2`;
 
   return (
-    <section className="bg-white border border-secondary-200 rounded-xl overflow-hidden">
+    <section className="bg-surface border border-secondary-200 rounded-xl overflow-hidden">
       <header className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 bg-secondary-50 border-b border-secondary-200">
         <h2
           className="min-w-0 max-w-full truncate font-semibold text-secondary-900"

@@ -60,7 +60,7 @@ export function RequestsPage() {
             className={`rounded-full border px-3 py-1 text-sm font-medium ${
               status === f
                 ? "bg-secondary-900 text-white border-secondary-900"
-                : "bg-white text-secondary-600 border-secondary-300 hover:border-secondary-500"
+                : "bg-surface text-secondary-600 border-secondary-300 hover:border-secondary-500"
             }`}
           >
             {f === "all" ? "All" : STATUS[f].label}
@@ -175,7 +175,7 @@ export function RequestList({
                             href={r.url}
                             target="_blank"
                             rel="noreferrer"
-                            className="inline-flex items-center gap-1 rounded-lg border border-secondary-300 bg-white px-3.5 py-2 text-sm font-semibold text-secondary-800 hover:bg-secondary-50"
+                            className="inline-flex items-center gap-1 rounded-lg border border-secondary-300 bg-surface px-3.5 py-2 text-sm font-semibold text-secondary-800 hover:bg-secondary-50"
                           >
                             Open link ↗
                           </a>

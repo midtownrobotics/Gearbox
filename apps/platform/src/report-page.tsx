@@ -7,7 +7,7 @@ import { Page } from "./layout";
 // Reporting a team number that someone else signed up. An operator follows up by email.
 
 const field =
-  "w-full rounded-lg border border-secondary-300 bg-white px-3 py-2 text-secondary-900 focus:border-primary-500 focus:outline-none";
+  "w-full rounded-lg border border-secondary-300 bg-surface px-3 py-2 text-secondary-900 focus:border-primary-500 focus:outline-none";
 
 export function ReportPage() {
   const [params] = useSearchParams();

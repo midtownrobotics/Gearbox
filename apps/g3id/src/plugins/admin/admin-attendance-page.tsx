@@ -179,7 +179,7 @@ export function AdminAttendancePage() {
           placeholder="Search by name..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full pl-9 pr-4 py-2 rounded-lg bg-white border border-secondary-300 text-secondary-900 placeholder-secondary-400 focus:outline-none focus:border-primary-500"
+          className="w-full pl-9 pr-4 py-2 rounded-lg bg-surface border border-secondary-300 text-secondary-900 placeholder-secondary-400 focus:outline-none focus:border-primary-500"
         />
       </div>
 
@@ -203,7 +203,7 @@ export function AdminAttendancePage() {
       )}
 
       {!loading && !error && filtered.length > 0 && (
-        <div className="bg-white border border-secondary-200 rounded-lg overflow-hidden">
+        <div className="bg-surface border border-secondary-200 rounded-lg overflow-hidden">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-secondary-200 text-left text-secondary-600">
@@ -268,7 +268,7 @@ export function AdminAttendancePage() {
                       <span className="min-w-14 text-right font-mono">
                         {m.totalHours.toFixed(1)}h
                       </span>
-                      <div className="flex items-center overflow-hidden rounded-md border border-secondary-300 bg-white focus-within:border-primary-500">
+                      <div className="flex items-center overflow-hidden rounded-md border border-secondary-300 bg-surface focus-within:border-primary-500">
                         <input
                           type="number"
                           min="0.1"

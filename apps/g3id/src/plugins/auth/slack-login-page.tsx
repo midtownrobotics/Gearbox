@@ -160,7 +160,7 @@ export function SlackLoginPage() {
                   Or DM this code to the {""}
                   <span className="text-primary-500 font-medium">"{site.slackBotName}"</span> user:
                 </p>
-                <div className="bg-white border border-secondary-200 rounded-xl px-6 py-4 flex items-center justify-center gap-3">
+                <div className="bg-surface border border-secondary-200 rounded-xl px-6 py-4 flex items-center justify-center gap-3">
                   <p className="text-5xl font-mono font-bold text-secondary-900 tracking-widest">
                     {formattedCode}
                   </p>
@@ -177,7 +177,7 @@ export function SlackLoginPage() {
 
               <div className="space-y-2">
                 <p className="text-sm text-secondary-700">Or run this command in any channel:</p>
-                <div className="bg-white border border-secondary-200 rounded-xl px-6 py-4 flex items-center justify-center gap-3">
+                <div className="bg-surface border border-secondary-200 rounded-xl px-6 py-4 flex items-center justify-center gap-3">
                   <p className="font-mono text-3xl font-bold text-primary-500 tracking-wide">
                     /signin {formattedCode}
                   </p>

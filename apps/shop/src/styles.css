@@ -1,16 +1,31 @@
 @import "@g3/ui/index.css";
 @import "tailwindcss";
 
-/* G3 brand palette (#A71433, #FEFEFE, #0C0C0C, #798A92) plus tints for a
-   light, professional tool surface. */
+/* Shop's own names for the team's colours (Team Appearance, loaded by @g3/ui): crimson is the
+   brand colour, ink text, paper cards, steel muted text and mist the page. They follow the team
+   and the theme; nothing here is a fixed colour. */
 @theme {
-  --color-crimson: #a71433;
-  --color-crimson-dark: #8a1029;
-  --color-crimson-tint: #faeef1;
-  --color-ink: #0c0c0c;
-  --color-paper: #ffffff;
-  --color-steel: #798a92;
-  --color-steel-dark: #57646c;
-  --color-steel-tint: #eef1f3;
-  --color-mist: #f4f6f7;
+  --color-crimson: var(--g3-brand);
+  --color-crimson-dark: color-mix(in srgb, var(--g3-brand), black 18%);
+  --color-crimson-tint: color-mix(in srgb, var(--g3-brand), var(--g3-surface) 93%);
+  --color-ink: var(--g3-text);
+  --color-paper: var(--g3-surface);
+  --color-steel: color-mix(in srgb, var(--g3-muted), var(--g3-surface) 24%);
+  --color-steel-dark: var(--g3-muted);
+  --color-steel-tint: var(--g3-inset);
+  --color-mist: var(--g3-page);
+}
+
+/* On a dark surface the tint is the brand colour sunk into the page, muted text is a little
+   lighter, and text in the brand colour takes the dark accent. Solid crimson fills keep the brand
+   colour, so their white text stays readable. */
+html[data-theme="dark"] {
+  --color-crimson-tint: color-mix(in srgb, var(--g3-brand), var(--g3-page) 75%);
+  --color-steel-dark: color-mix(in srgb, var(--g3-muted), var(--g3-text) 25%);
+}
+html[data-theme="dark"] :is(.text-crimson, .hover\:text-crimson:hover) {
+  color: var(--g3-accent);
+}
+html[data-theme="dark"] :is(.text-crimson-dark, .hover\:text-crimson-dark:hover) {
+  color: color-mix(in srgb, var(--g3-accent), white 40%);
 }

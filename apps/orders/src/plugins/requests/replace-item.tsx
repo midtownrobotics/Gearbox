@@ -136,7 +136,7 @@ function ReplaceDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby="replace-title"
-        className="w-full max-w-3xl rounded-xl bg-white shadow-xl"
+        className="w-full max-w-3xl rounded-xl bg-surface shadow-xl"
       >
         <header className="flex items-center justify-between border-b border-secondary-200 px-5 py-3">
           <h2 id="replace-title" className="text-lg font-semibold text-secondary-900">
@@ -162,7 +162,7 @@ function ReplaceDialog({
                 <img
                   src={request.image}
                   alt=""
-                  className="h-12 w-12 shrink-0 rounded-md bg-white object-contain"
+                  className="h-12 w-12 shrink-0 rounded-md bg-surface object-contain"
                 />
               ) : (
                 <div className="h-12 w-12 shrink-0 rounded-md bg-secondary-100" aria-hidden />

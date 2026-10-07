@@ -1,30 +1,54 @@
-/* The G3 color scheme every app shares (G3 Strategy's), light and dark. Plain CSS variables so
-   apps without the shared Tailwind theme (G3 Strategy) can use them too; Tailwind apps also get
-   bg-page, bg-surface, bg-inset and border-line (see index.css). */
+/* The color scheme every app shares, light and dark: the defaults here, and a team's own from Team
+   Appearance once they load (team-ui.ts sets the same variables on <html>). Plain CSS variables
+   so apps without the shared Tailwind theme (G3 Strategy, the attendance kiosk) can use them too;
+   Tailwind apps also get bg-page, bg-surface, bg-inset and border-line (see index.css). */
 :root {
+  /* Both themes' colors, whichever is showing: for styles written for one theme (a rule under
+     html[data-theme="dark"], or a screen that is always dark). Everything else uses the
+     --g3-<name> variables below, which switch with the theme. */
+  --g3-light-page: #f4f6f7;
+  --g3-light-surface: #ffffff;
+  --g3-light-inset: #eef1f3;
+  --g3-light-line: #dde2e5;
+  --g3-light-text: #0c0c0c;
+  --g3-light-muted: #57646c;
+  --g3-light-accent: #a71433;
+  --g3-dark-page: #171717;
+  --g3-dark-surface: #262626;
+  --g3-dark-inset: #1e1e1e;
+  --g3-dark-line: #3a3a3a;
+  --g3-dark-text: #f4f4f5;
+  --g3-dark-muted: #a3a3a3;
+  --g3-dark-accent: #e8677c;
+
   /* Behind everything. */
-  --g3-page: #f4f6f7;
+  --g3-page: var(--g3-light-page);
   /* Cards, panels and the top bar. */
-  --g3-surface: #ffffff;
+  --g3-surface: var(--g3-light-surface);
   /* Wells inside a surface: inputs' backgrounds, image placeholders, hover rows. */
-  --g3-inset: #eef1f3;
-  --g3-line: #dde2e5;
-  --g3-text: #0c0c0c;
-  --g3-muted: #57646c;
-  --g3-accent: #a71433;
+  --g3-inset: var(--g3-light-inset);
+  --g3-line: var(--g3-light-line);
+  --g3-text: var(--g3-light-text);
+  --g3-muted: var(--g3-light-muted);
+  /* Text and outlines in the team's color, in a shade for each theme. */
+  --g3-accent: var(--g3-light-accent);
+  /* The team's brand color (its light accent), the same in both themes: for solid fills that
+     carry white text. */
+  --g3-brand: var(--g3-light-accent);
 }
 
 html[data-theme="dark"] {
-  --g3-page: #171717;
-  --g3-surface: #262626;
-  --g3-inset: #1e1e1e;
-  --g3-line: #3a3a3a;
-  --g3-text: #f4f4f5;
-  --g3-muted: #a3a3a3;
-  --g3-accent: #e8677c;
+  --g3-page: var(--g3-dark-page);
+  --g3-surface: var(--g3-dark-surface);
+  --g3-inset: var(--g3-dark-inset);
+  --g3-line: var(--g3-dark-line);
+  --g3-text: var(--g3-dark-text);
+  --g3-muted: var(--g3-dark-muted);
+  --g3-accent: var(--g3-dark-accent);
 }
 
 html,
 body {
   background-color: var(--g3-page);
+  color: var(--g3-text);
 }

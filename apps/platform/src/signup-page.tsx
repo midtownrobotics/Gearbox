@@ -42,7 +42,7 @@ type Signup = {
 };
 
 const field =
-  "w-full rounded-lg border border-secondary-300 bg-white px-3 py-2 text-secondary-900 focus:border-primary-500 focus:outline-none";
+  "w-full rounded-lg border border-secondary-300 bg-surface px-3 py-2 text-secondary-900 focus:border-primary-500 focus:outline-none";
 
 const STEPS = ["Your team", "Connect Slack", "Confirm it's you"];
 

@@ -27,16 +27,24 @@ export function setDefaultTheme(theme: Theme | "system") {
   applyTheme(readTheme());
 }
 
+/**
+ * The browser's own bar matches the app's top bar: the theme's surface colour, the team's own
+ * once its appearance has loaded.
+ */
+export function syncThemeColor() {
+  const surface = getComputedStyle(document.documentElement).getPropertyValue("--g3-surface");
+  if (!surface.trim()) return;
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", surface.trim());
+}
+
 function applyTheme(theme: Theme) {
   const root = document.documentElement;
   if (root.dataset.theme === theme) return;
   root.dataset.theme = theme;
   root.style.colorScheme = theme;
+  // The team's colours for this theme are put in place by whoever listens (team-ui.ts).
   window.dispatchEvent(new Event("g3-theme-changed"));
-  // The browser's own bar matches the app's top bar.
-  document
-    .querySelector('meta[name="theme-color"]')
-    ?.setAttribute("content", theme === "dark" ? "#262626" : "#fefefe");
+  syncThemeColor();
   for (const listener of listeners) listener();
 }
 

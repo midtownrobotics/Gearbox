@@ -1,3 +1,5 @@
+@import "@g3/ui/colors.css";
+
 *,
 *::before,
 *::after {
@@ -7,7 +9,8 @@
 }
 
 :root {
-  --bg: oklch(21% 0.034 264.665);
+  /* These screens are always dark: the team's dark page color, whatever the theme. */
+  --bg: var(--g3-dark-page);
   --font: "Agency FB", "Arial Narrow", Arial, sans-serif;
 }
 
@@ -19,6 +22,7 @@ body,
 
 body {
   background: var(--bg);
+  color: var(--g3-dark-text);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }

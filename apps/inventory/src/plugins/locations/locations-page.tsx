@@ -98,7 +98,7 @@ function TitleInput({ row }: { row: LocationRow }) {
   return (
     <span className="inline-flex min-w-0 flex-1 basis-48 flex-col">
       <input
-        className={`w-full max-w-xs rounded-md border bg-white px-2 py-1 text-sm text-secondary-900 placeholder:text-secondary-400 focus:outline-none focus:border-primary-500 ${
+        className={`w-full max-w-xs rounded-md border bg-surface px-2 py-1 text-sm text-secondary-900 placeholder:text-secondary-400 focus:outline-none focus:border-primary-500 ${
           error ? "border-primary-400" : "border-secondary-200 hover:border-secondary-400"
         }`}
         aria-label={`Title for ${row.name}`}
@@ -181,7 +181,7 @@ function MoveContentsDialog({
 }
 
 const smallButton =
-  "whitespace-nowrap rounded-lg border border-secondary-300 bg-white px-2.5 py-1 text-xs font-semibold text-secondary-800 hover:bg-secondary-50";
+  "whitespace-nowrap rounded-lg border border-secondary-300 bg-surface px-2.5 py-1 text-xs font-semibold text-secondary-800 hover:bg-secondary-50";
 
 function Panel({
   row,
@@ -214,7 +214,7 @@ function Panel({
 
   return (
     <section
-      className={`rounded-xl border border-secondary-200 ${depth === 1 ? "bg-white" : "bg-secondary-50"}`}
+      className={`rounded-xl border border-secondary-200 ${depth === 1 ? "bg-surface" : "bg-secondary-50"}`}
     >
       <header className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2">
         <button
@@ -243,7 +243,7 @@ function Panel({
       {open && (
         <div className="space-y-2 border-t border-secondary-200 px-3 py-2.5">
           {own.length > 0 && (
-            <ul className="divide-y divide-secondary-100 rounded-lg border border-secondary-200 bg-white">
+            <ul className="divide-y divide-secondary-100 rounded-lg border border-secondary-200 bg-surface">
               {own.map((held) => (
                 <li
                   key={held.stock.id}

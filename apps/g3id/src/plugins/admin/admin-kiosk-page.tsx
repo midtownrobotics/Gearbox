@@ -97,7 +97,7 @@ export function AdminKioskPage() {
       <h1 className="text-3xl font-bold text-secondary-900 mb-8">Kiosk Management</h1>
 
       <div className="space-y-8">
-        <div className="bg-white border border-secondary-200 rounded-lg p-6">
+        <div className="bg-surface border border-secondary-200 rounded-lg p-6">
           <h2 className="text-xl font-semibold text-secondary-900 mb-4">
             Generate Activation Code
           </h2>
@@ -115,7 +115,7 @@ export function AdminKioskPage() {
                 placeholder="e.g., Shop Register 1"
                 value={deviceName}
                 onChange={(e) => setDeviceName(e.target.value)}
-                className="w-full px-4 py-2 rounded-lg bg-white border border-secondary-300 text-secondary-900 placeholder-secondary-400 focus:outline-none focus:border-primary-500"
+                className="w-full px-4 py-2 rounded-lg bg-surface border border-secondary-300 text-secondary-900 placeholder-secondary-400 focus:outline-none focus:border-primary-500"
               />
             </div>
 
@@ -131,7 +131,7 @@ export function AdminKioskPage() {
           {codeError && <p className="mt-3 text-sm text-primary-500">{codeError}</p>}
 
           {code && (
-            <div className="mt-6 bg-white border border-secondary-300 rounded-lg p-4 space-y-3">
+            <div className="mt-6 bg-surface border border-secondary-300 rounded-lg p-4 space-y-3">
               <div>
                 <p className="text-xs text-secondary-600 mb-1">
                   Activation Code (expires in 30 min)
@@ -154,7 +154,7 @@ export function AdminKioskPage() {
           )}
         </div>
 
-        <div className="bg-white border border-secondary-200 rounded-lg p-6">
+        <div className="bg-surface border border-secondary-200 rounded-lg p-6">
           <h2 className="text-xl font-semibold text-secondary-900 mb-4">Active Devices</h2>
 
           {devicesError && <p className="text-sm text-primary-500 mb-4">{devicesError}</p>}
@@ -168,7 +168,7 @@ export function AdminKioskPage() {
               {devices.map((device) => (
                 <div
                   key={device.id}
-                  className="bg-white border border-secondary-300 rounded-lg p-4 flex items-center justify-between"
+                  className="bg-surface border border-secondary-300 rounded-lg p-4 flex items-center justify-between"
                 >
                   <div className="min-w-0 flex-1">
                     <p className="font-semibold text-secondary-900">{device.name}</p>

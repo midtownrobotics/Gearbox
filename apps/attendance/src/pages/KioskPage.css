@@ -104,7 +104,7 @@
   font-family: var(--font);
   font-size: 15px;
   letter-spacing: .15em;
-  color: rgba(255, 255, 255, 0.45);
+  color: color-mix(in srgb, var(--g3-dark-text) 45%, transparent);
 }
 .kiosk__qr-loading {
   width: 100%;
@@ -114,7 +114,7 @@
   justify-content: center;
   font-family: var(--font);
   font-size: 48px;
-  color: rgba(255, 255, 255, 0.25);
+  color: color-mix(in srgb, var(--g3-dark-text) 25%, transparent);
 }
 
 @keyframes fadeUp {
@@ -162,8 +162,8 @@
   position: relative;
   width: 100%;
   padding: 20px;
-  background: oklch(14% 0.034 264.665);
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: color-mix(in srgb, var(--g3-dark-page), black 33%);
+  border: 1px solid color-mix(in srgb, var(--g3-dark-text) 7%, transparent);
   box-shadow: 0 0 0 1px var(--accent-dim), inset 0 0 30px rgba(0, 0, 0, 0.5);
   animation: qrAppear .25s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
@@ -218,7 +218,7 @@
   font-family: var(--font);
   font-size: 13px;
   letter-spacing: .3em;
-  color: rgba(255, 255, 255, 0.3);
+  color: color-mix(in srgb, var(--g3-dark-text) 30%, transparent);
   text-transform: uppercase;
 }
 
