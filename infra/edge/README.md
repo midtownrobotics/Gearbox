@@ -108,7 +108,7 @@ Only for a new box (or a fresh Armbian install). Do these on the box over SSH, f
    sudo cp local/etc/nftables.conf /etc/nftables.conf && sudo nft -f /etc/nftables.conf
    ```
 5. **Shop drive:** `sudo ./setup-drive.sh` (makes the 10 GB image at `/srv/g3-drive`, mounts it, starts the `drive.local` announcement). Optionally keep mDNS off the hotspot side: `sudo sed -i 's/^#\?allow-interfaces=.*/allow-interfaces=lan0/' /etc/avahi/avahi-daemon.conf && sudo systemctl restart avahi-daemon g3-drive-mdns`.
-6. **Door sounds:** wire the microswitch between physical pin 22 (GPIO2_D4, Linux GPIO 92) and GND (pin 20); never connect it to 5 V. Plug powered speakers into the 3.5 mm jack. If `aplay -l` shows a card other than `rockchipes8388`, set `EDGE_SWITCH_AUDIO_DEVICE` in `agent.env` and restart the agent. Upload sounds in the Edge app under **Edge Box → Door Sounds**.
+6. **Door sounds:** wire the microswitch between physical pin 22 (GPIO2_D4, Linux GPIO 92) and GND (pin 20); never connect it to 5 V. Plug powered speakers into the 3.5 mm jack. If `aplay -l` shows a card other than `rockchipes8388`, set `EDGE_SWITCH_AUDIO_DEVICE` in `agent.env` and restart the agent. Upload sounds in the Edge app under **Edge Box → Door Sounds**. The sound starts after the door opens and stops as soon as the switch reads closed; a stable close rearms the next opening.
 7. **Printer:** in the Edge app, **Print → Printers → Find printers**, then **Add** and **Print test page**.
 
 Remove the `# TEMP` SSH-on-`wan0` rule in `nftables.conf` (both copies) before going live.

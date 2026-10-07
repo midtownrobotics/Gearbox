@@ -41,12 +41,25 @@ describe("switch module integration", () => {
       switchGpioValuePath: "unused",
     };
     const db = new Database(":memory:");
-    const module = createSwitchModule({
-      config,
-      db,
-      worker: {} as WorkerClient,
-      sync: { applied: 0 },
-    });
+    let played = 0;
+    let stopped = 0;
+    const module = createSwitchModule(
+      {
+        config,
+        db,
+        worker: {} as WorkerClient,
+        sync: { applied: 0 },
+      },
+      {
+        async play(path) {
+          played++;
+          return path ?? join(soundDir, "welcome.wav");
+        },
+        stop() {
+          stopped++;
+        },
+      },
+    );
     if (!module.routes) throw new Error("Switch routes are missing.");
 
     try {
@@ -74,6 +87,30 @@ describe("switch module integration", () => {
       expect(state.grounded).toBe(false);
       expect(state.triggerCount).toBe(1);
       expect(state.lastSound).toEndWith("welcome.wav");
+      expect(played).toBe(2); // Manual test plus one door opening.
+
+      await module.routes.request("/input", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ grounded: true }),
+      });
+      await Bun.sleep(30);
+      const closed = (await (await module.routes.request("/state")).json()) as SwitchState;
+      expect(closed.grounded).toBe(true);
+      expect(closed.triggerCount).toBe(1);
+      expect(played).toBe(2);
+      expect(stopped).toBe(1);
+
+      await module.routes.request("/input", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ grounded: false }),
+      });
+      await Bun.sleep(30);
+      const reopened = (await (await module.routes.request("/state")).json()) as SwitchState;
+      expect(reopened.grounded).toBe(false);
+      expect(reopened.triggerCount).toBe(2);
+      expect(played).toBe(3);
 
       const remove = await module.routes.request("/sounds/welcome.wav", { method: "DELETE" });
       expect(remove.status).toBe(200);

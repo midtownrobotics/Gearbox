@@ -101,29 +101,58 @@ export function DoorSoundsPage() {
     <Page title="Door Sounds">
       {actionError && <ErrorBanner message={actionError} />}
       {message && (
-        <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm text-emerald-800">
+        <p className="break-words rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm text-emerald-800">
           {message}
         </p>
       )}
 
       <Card title="Door switch">
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-secondary-500">
+            Automatic sound plays only when the door opens.
+          </p>
+          <button type="button" className={button} onClick={state.reload}>
+            Refresh status
+          </button>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-3">
           <Stat label="Door" value={data.grounded ? "Closed" : "Open"} />
-          <Stat
-            label="Input"
-            value={data.input === "gpio" ? "GPIO2_D4" : "Mock"}
-            hint={data.gpio}
-          />
-          <Stat label="Audio output" value={data.audioDevice} hint="Bluetooth via ALSA" />
           <Stat label="Openings" value={data.triggerCount} />
           <Stat
             label="Last opened"
             value={data.lastTriggeredAt ? formatDateTime(data.lastTriggeredAt) : "Never"}
-            hint={data.lastSound ? `Played ${data.lastSound.split(/[\\/]/).pop()}` : undefined}
           />
         </div>
+        <dl className="mt-5 grid gap-4 border-t border-secondary-100 pt-4 sm:grid-cols-2">
+          <div className="min-w-0">
+            <dt className="text-xs font-bold uppercase tracking-widest text-secondary-400">
+              Input
+            </dt>
+            <dd className="mt-1 break-words text-sm text-secondary-900">
+              {data.input === "gpio" ? (data.gpio ?? "GPIO") : "Mock input"}
+            </dd>
+          </div>
+          <div className="min-w-0">
+            <dt className="text-xs font-bold uppercase tracking-widest text-secondary-400">
+              Audio output
+            </dt>
+            <dd className="mt-1 break-all font-mono text-sm text-secondary-900">
+              {data.audioDevice}
+            </dd>
+          </div>
+          {data.lastSound && (
+            <div className="min-w-0 sm:col-span-2">
+              <dt className="text-xs font-bold uppercase tracking-widest text-secondary-400">
+                Last sound
+              </dt>
+              <dd className="mt-1 break-all text-sm text-secondary-900">
+                {data.lastSound.split(/[\\/]/).pop()}
+              </dd>
+            </div>
+          )}
+        </dl>
         {data.lastError && (
-          <div className="mt-4">
+          <div className="mt-4 break-words">
             <ErrorBanner message={data.lastError} />
           </div>
         )}
@@ -163,11 +192,11 @@ export function DoorSoundsPage() {
                 key={sound.name}
                 className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0 last:pb-0"
               >
-                <div>
-                  <p className="font-medium text-secondary-900">{sound.name}</p>
+                <div className="min-w-0 flex-1">
+                  <p className="break-all font-medium text-secondary-900">{sound.name}</p>
                   <p className="text-xs text-secondary-500">{bytes(sound.size)}</p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
                     className={button}

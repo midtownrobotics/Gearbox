@@ -3,23 +3,30 @@ import { Hono } from "hono";
 import type { EdgeModule, ModuleContext } from "../../core/module";
 import { SwitchDetector } from "./detector";
 import { GpioSwitchInput, PlaceholderSwitchInput } from "./input";
-import { createMockSoundPlayer, createSoundPlayer } from "./player";
+import {
+  type SoundPlayer,
+  SoundStoppedError,
+  createMockSoundPlayer,
+  createSoundPlayer,
+} from "./player";
 import { SoundLibrary } from "./sounds";
 
-export function createSwitchModule(ctx: ModuleContext): EdgeModule {
+export function createSwitchModule(ctx: ModuleContext, soundPlayer?: SoundPlayer): EdgeModule {
   const input = ctx.config.mock
     ? new PlaceholderSwitchInput()
     : new GpioSwitchInput(ctx.config.switchGpioValuePath);
   const detector = new SwitchDetector(ctx.config.switchDebounceMilliseconds);
   const library = new SoundLibrary(ctx.config.switchSoundDir, ctx.config.switchSounds);
   const availableSounds = () => library.paths();
-  const player = ctx.config.mock
-    ? createMockSoundPlayer(availableSounds)
-    : createSoundPlayer(
-        ctx.config.switchAudioPlayer,
-        ctx.config.switchAudioDevice,
-        availableSounds,
-      );
+  const player =
+    soundPlayer ??
+    (ctx.config.mock
+      ? createMockSoundPlayer(availableSounds)
+      : createSoundPlayer(
+          ctx.config.switchAudioPlayer,
+          ctx.config.switchAudioDevice,
+          availableSounds,
+        ));
   let timer: ReturnType<typeof setInterval> | null = null;
   let triggerCount = 0;
   let lastTriggeredAt: number | null = null;
@@ -35,6 +42,7 @@ export function createSwitchModule(ctx: ModuleContext): EdgeModule {
       console.log(`[switch] played ${sound}`);
       return sound;
     } catch (error) {
+      if (error instanceof SoundStoppedError) throw error;
       lastError = error instanceof Error ? error.message : String(error);
       console.error(`[switch] ${lastError}`);
       throw error;
@@ -53,7 +61,10 @@ export function createSwitchModule(ctx: ModuleContext): EdgeModule {
     } finally {
       reading = false;
     }
+    const wasRawGrounded = detector.state().rawGrounded;
     const event = detector.sample(grounded);
+    // Silence the player on the first grounded reading; only openings need debounce.
+    if (grounded && !wasRawGrounded) player.stop();
     if (!event.triggered) return;
 
     triggerCount++;
@@ -136,6 +147,7 @@ export function createSwitchModule(ctx: ModuleContext): EdgeModule {
     stop() {
       if (timer) clearInterval(timer);
       timer = null;
+      player.stop();
     },
     status,
   };

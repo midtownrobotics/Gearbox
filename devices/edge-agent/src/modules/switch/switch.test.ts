@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SwitchDetector } from "./detector";
 import { GpioSwitchInput } from "./input";
-import { soundCommand } from "./player";
+import { SoundStoppedError, createSoundPlayer, soundCommand } from "./player";
 import { SoundLibrary } from "./sounds";
 
 describe("SwitchDetector", () => {
@@ -69,6 +69,52 @@ test("Bluetooth playback targets the configured BlueALSA PCM without a shell", (
     "bluealsa:DEV=AA:BB:CC:DD:EE:FF,PROFILE=a2dp",
     "/srv/g3-sounds/welcome.wav",
   ]);
+});
+
+test("closing the door stops the playing WAV and cancels queued playback", async () => {
+  const processes: { kill: () => void; finish: () => void; killed: () => boolean }[] = [];
+  const player = createSoundPlayer(
+    "aplay",
+    "plughw:CARD=rockchipes8388,DEV=0",
+    async () => ["/srv/g3-sounds/welcome.wav"],
+    () => {
+      let resolveExit: (code: number) => void = () => {};
+      let wasKilled = false;
+      const exited = new Promise<number>((resolve) => {
+        resolveExit = resolve;
+      });
+      const kill = () => {
+        wasKilled = true;
+        resolveExit(143);
+      };
+      processes.push({
+        kill,
+        finish: () => resolveExit(0),
+        killed: () => wasKilled,
+      });
+      return {
+        exited,
+        stderr: new ReadableStream<Uint8Array>({ start: (controller) => controller.close() }),
+        kill,
+      };
+    },
+  );
+
+  const playing = player.play();
+  const queued = player.play();
+  await Bun.sleep(0);
+  expect(processes).toHaveLength(1);
+
+  player.stop();
+  expect(processes[0].killed()).toBe(true);
+  await expect(playing).rejects.toBeInstanceOf(SoundStoppedError);
+  await expect(queued).rejects.toBeInstanceOf(SoundStoppedError);
+
+  const nextOpening = player.play();
+  await Bun.sleep(0);
+  expect(processes).toHaveLength(2);
+  processes[1].finish();
+  await expect(nextOpening).resolves.toBe("/srv/g3-sounds/welcome.wav");
 });
 
 describe("SoundLibrary", () => {
