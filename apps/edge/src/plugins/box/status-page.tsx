@@ -71,55 +71,49 @@ export function StatusPage() {
           <p className="text-secondary-500">The agent hasn't checked in yet.</p>
         )}
       </Card>
-      <TunnelCard />
+      <AddressesCard
+        publicIp={agent?.publicIp ?? null}
+        publicIpSince={agent?.publicIpSince ?? null}
+      />
+      <ConnectionCard />
     </Page>
   );
 }
 
-const TUNNEL_STATES = {
+const LINK_STATES = {
   connected: {
     dot: "bg-emerald-500",
     label: "Connected",
-    hint: "Changes made in the UI reach the box within seconds.",
+    hint: "The box keeps a connection open to the worker, so printing, part lookups and changes made here reach it within seconds.",
   },
-  agent_unreachable: {
+  not_answering: {
     dot: "bg-amber-400",
-    label: "Tunnel up, agent not answering",
-    hint: "cloudflared is connected, but nothing answered on the agent's port. Check `systemctl status g3-edge-agent` on the box.",
+    label: "Connected, agent not answering",
+    hint: "The box's connection is open, but the agent didn't answer. Check `systemctl status g3-edge-agent` on the box.",
   },
-  tunnel_down: {
+  offline: {
     dot: "bg-secondary-300",
-    label: "Tunnel down",
-    hint: "cloudflared on the box isn't connected (box offline, hotspot down, or cloudflared stopped). Changes still reach the box within 5 minutes of it reconnecting.",
-  },
-  not_configured: {
-    dot: "bg-secondary-300",
-    label: "Not configured",
-    hint: "The worker has no EDGE_AGENT_URL. Changes still reach the box within 5 minutes.",
-  },
-  error: {
-    dot: "bg-amber-400",
-    label: "Couldn't reach the box",
-    hint: "The check failed. Changes still reach the box within 5 minutes via its regular uploads.",
+    label: "Not connected",
+    hint: "The box isn't connected (offline, hotspot down, or the agent stopped). It reconnects by itself, and picks up changes within 5 minutes of coming back.",
   },
 } as const;
 
-async function checkTunnel() {
-  const res = await api.status.tunnel.$get();
+async function checkConnection() {
+  const res = await api.status.connection.$get();
   if (!res.ok) throw new Error(await getErrorMessage(res));
   return res.json();
 }
 
-/** Live check of the worker → box tunnel (the edge-agent subdomain). */
-function TunnelCard() {
-  const [data, setData] = useState<Awaited<ReturnType<typeof checkTunnel>> | null>(null);
+/** Live check of the box's connection to the worker (its WebSocket). */
+function ConnectionCard() {
+  const [data, setData] = useState<Awaited<ReturnType<typeof checkConnection>> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [checking, setChecking] = useState(true);
 
   const recheck = useCallback(async () => {
     setChecking(true);
     try {
-      setData(await checkTunnel());
+      setData(await checkConnection());
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -133,7 +127,7 @@ function TunnelCard() {
   }, [recheck]);
 
   return (
-    <Card title="Tunnel">
+    <Card title="Connection">
       {error && <ErrorBanner message={error} />}
       {!data && !error && <p className="text-sm text-secondary-400">Checking…</p>}
       {data && (
@@ -141,17 +135,18 @@ function TunnelCard() {
           <div>
             <p className="flex items-center gap-2 font-medium text-secondary-900">
               <span
-                className={`w-2.5 h-2.5 rounded-full ${TUNNEL_STATES[data.state].dot}`}
+                className={`w-2.5 h-2.5 rounded-full ${LINK_STATES[data.state].dot}`}
                 aria-hidden
               />
-              {TUNNEL_STATES[data.state].label}
+              {LINK_STATES[data.state].label}
               {data.latencyMs !== null && data.state === "connected" && (
                 <span className="text-sm font-normal text-secondary-400">{data.latencyMs} ms</span>
               )}
             </p>
-            <p className="text-sm text-secondary-500 mt-1">{TUNNEL_STATES[data.state].hint}</p>
+            <p className="text-sm text-secondary-500 mt-1">{LINK_STATES[data.state].hint}</p>
             {data.detail && <p className="text-xs text-secondary-400 mt-1">{data.detail}</p>}
             <p className="text-xs text-secondary-400 mt-1">
+              {data.connectedAt && `Connected since ${formatDateTime(data.connectedAt)} · `}
               Checked {formatDateTime(data.checkedAt)}
             </p>
           </div>
@@ -164,6 +159,101 @@ function TunnelCard() {
             {checking ? "Checking…" : "Check again"}
           </button>
         </div>
+      )}
+    </Card>
+  );
+}
+
+async function loadInterfaces() {
+  const res = await api.status.interfaces.$get();
+  if (!res.ok) throw new Error(await getErrorMessage(res));
+  return res.json();
+}
+
+const ROLE_LABELS = {
+  lan: { label: "LAN", hint: "The shop network" },
+  wan: { label: "WAN", hint: "The hotspot" },
+} as const;
+
+/**
+ * The box's public address (recorded from its uploads, so it shows even when the
+ * box is offline) and its LAN/WAN addresses, read live on the box.
+ */
+function AddressesCard({
+  publicIp,
+  publicIpSince,
+}: { publicIp: string | null; publicIpSince: number | null }) {
+  const { data, error, reload } = useLoad(loadInterfaces, []);
+  return (
+    <Card title="Addresses">
+      <div className="mb-4">
+        <p className="text-xs font-bold uppercase tracking-widest text-secondary-400">
+          Public{" "}
+          <span className="font-normal normal-case tracking-normal">
+            Where the box's traffic comes from on the internet
+          </span>
+        </p>
+        {publicIp ? (
+          <>
+            <p className="font-mono break-all text-lg text-secondary-900 mt-1">{publicIp}</p>
+            {publicIpSince && (
+              <p className="text-xs text-secondary-400 mt-0.5">
+                Since {formatDateTime(publicIpSince)}. The carrier can change it, and other
+                customers may share it.
+              </p>
+            )}
+          </>
+        ) : (
+          <p className="text-sm text-secondary-500 mt-1">
+            Not known yet; it's recorded at the box's next upload.
+          </p>
+        )}
+      </div>
+      {error && <ErrorBanner message={error} />}
+      {!data && !error && <p className="text-sm text-secondary-400">Checking…</p>}
+      {data && (
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-10 gap-y-4 min-w-0">
+            {data.interfaces.map((i) => (
+              <div key={i.role} className="min-w-0">
+                <p className="text-xs font-bold uppercase tracking-widest text-secondary-400">
+                  {ROLE_LABELS[i.role].label}{" "}
+                  <span className="font-normal normal-case tracking-normal">
+                    {ROLE_LABELS[i.role].hint} · {i.name}
+                    {i.state && i.state !== "up" ? ` · ${i.state}` : ""}
+                    {!i.state ? " · not found" : ""}
+                  </span>
+                </p>
+                {i.addresses.length === 0 ? (
+                  <p className="text-sm text-secondary-500 mt-1">No address</p>
+                ) : (
+                  <ul className="mt-1 space-y-0.5">
+                    {i.addresses.map((a) => (
+                      <li
+                        key={a.address}
+                        className={`font-mono break-all ${a.family === "ipv4" ? "text-lg text-secondary-900" : "text-xs text-secondary-500"}`}
+                      >
+                        {a.address}
+                        <span className="text-secondary-400">/{a.prefixLength}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {i.mac && <p className="text-xs text-secondary-400 font-mono mt-0.5">{i.mac}</p>}
+              </div>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={reload}
+            className="text-sm font-medium rounded-lg px-3 py-1.5 text-secondary-600 hover:text-secondary-900 hover:bg-secondary-100"
+          >
+            Refresh
+          </button>
+        </div>
+      )}
+      {data && (
+        <p className="text-xs text-secondary-400 mt-3">Checked {formatDateTime(data.checkedAt)}</p>
       )}
     </Card>
   );

@@ -78,7 +78,7 @@ table inet acct {
 
 ## Security
 
-> **As built (differs from the original plan below):** one edge device, one shared key (`EDGE_AGENT_KEY`) sent as `Authorization: Bearer` in both directions, no HMAC, and no Cloudflare Access. The tunnel (`edge-agent.g3robotics.com`) forwards the authenticated print and door-sound module routes plus `POST /sync`, which carries no data: it tells the agent to fetch the desired state from the worker with its own key. Every agent→worker response also carries `X-G3-State-Version`, so a missed poke is caught within 5 minutes. No SSH through the tunnel; SSH on `wan0` stays open for now (`# TEMP` rule in `nftables.conf`, to remove before go-live).
+> **As built (differs from the original plan below):** one edge device, one shared key (`EDGE_AGENT_KEY`), no HMAC, no Cloudflare Access, and **no tunnel**. The agent opens one WebSocket to the worker (`/api/agent/connect`, with the key) and keeps it open; the worker's `AgentLink` Durable Object holds it, and the worker's requests to the agent (print, lookup, door sounds, presence, `POST /sync`) go down it as framed HTTP requests that the agent runs on its own API. `POST /sync` carries no data: it tells the agent to fetch the desired state from the worker with its own key. Every agent→worker response also carries `X-G3-State-Version`, so a missed poke is caught within 5 minutes. Nothing on the box listens on the internet. No SSH from the internet; SSH on `wan0` stays open for now (`# TEMP` rule in `nftables.conf`, to remove before go-live).
 
 ~~**Worker → agent** (the tunnel hostname, e.g. `edge-api.g3robotics.com`) has two layers:~~
 1. ~~Cloudflare Access on the hostname with a service token.~~
@@ -87,8 +87,7 @@ table inet acct {
 ~~**Agent → worker:** HMAC with a separate per-device secret.~~
 
 **Other rules:**
-- The agent's HTTP server binds to `127.0.0.1` only. cloudflared is the only way in.
-- The tunnel also exposes SSH behind Cloudflare Access (for admins). That's a manual setup; document it in `infra/edge/README.md`.
+- The agent's HTTP server binds to `127.0.0.1` only, for checks on the box. The worker reaches the agent only over the link the agent opened.
 - Store secrets in Workers secrets and in a root-readable env file on the box (`/etc/g3-edge/agent.env`, mode 600). Never commit them.
 
 ## Agent (`devices/edge-agent`)
@@ -105,7 +104,7 @@ table inet acct {
   - Its own generated files: `/etc/dnsmasq.d/g3-edge-*.conf`. After changing them it may reload dnsmasq.
   - Nothing else. Base netplan, nftables, and dnsmasq configs are manual (see Infra rules).
 
-### Core endpoints (agent, via tunnel)
+### Core endpoints (agent, over the link)
 - `GET /health`: version, uptime, module status.
 - `POST /sync`: the worker asks the agent to re-fetch and apply desired state.
 - `POST /update`: Phase 3; see Updates.
@@ -124,7 +123,7 @@ table inet acct {
 - Hono with RPC, Drizzle on D1, G3ID for auth (match how other workers validate G3ID sessions and roles).
 - **Routes for the UI** (G3ID session): overview, clients, usage queries, grants CRUD, blocklist CRUD, device status, (later) trigger update.
 - **Routes for agents** (device HMAC): `POST /agent/usage` (batched samples, idempotent by `(device, mac, ts)`), `GET /agent/state` (full desired state).
-- **Commands to agents:** a small client that signs requests and calls the agent over the tunnel hostname. It writes D1 first, then pushes, then marks the change acknowledged or pending.
+- **Commands to agents:** `agentFetch` sends a request over the link (`lib/agent.ts`, `lib/agent-link.ts`). It writes D1 first, then pushes, then marks the change acknowledged or pending.
 
 ### D1 schema (starting point; adjust to repo conventions)
 - `edge_devices`: id, name, tunnel hostname, agent version, last_seen_at, secret reference.
@@ -173,7 +172,7 @@ table inet acct {
 - No agent polling. Pushes happen at most every 5 minutes, with keep-alive connections and compact JSON batches.
 - The UI is never served from the box.
 - Agent updates are a single binary download, triggered on demand only.
-- Tunnel idle traffic is acceptable, but the WAN-minus-clients gap in usage data should be checked after the tunnel goes live to confirm the box's own overhead stays small.
+- The link's idle traffic is a 4-byte `ping` every 25 s and its answer (about 10 MB a month with TCP/TLS overhead). Check the WAN-minus-clients gap in usage data to confirm the box's own overhead stays small.
 
 ## Phases
 
@@ -185,13 +184,13 @@ table inet acct {
 ### Print module (as built)
 
 - Drop-in replacement for the old shoppi-print server on the same box. The Shop SW's `POST /print?title=` is unchanged; the shop worker now forwards to the edge worker through a service binding and forces one-sided black and white on the default printer.
-- **No caching or storage**: the edge worker streams the file through the tunnel straight to the agent, which pipes it to `lp`. There's no R2 and no job table. If the box is unreachable, the request fails immediately (503).
+- **No caching or storage**: the edge worker streams the file over the link straight to the agent, which pipes it to `lp`. There's no R2 and no job table. If the box is unreachable, the request fails immediately (503).
 - CUPS on the box is the source of truth for printers and the queue. The Edge UI (**Print**) lets anyone print a file with options (copies, sides, color, paper, pages) and see the queue; admins find printers (DNS-SD via `lpinfo`), add them driverless (`lpadmin -m everywhere`), set the default, send a test page, resume, and remove.
-- The agent's module routes are behind the shared key; the tunnel forwards only `^/(print|lookup|switch|sync)`.
+- The agent's module routes are behind the shared key; the link adds it for the worker's requests.
 
 ### Shop drive (as built)
 
-- A shared 10 GB "drive" on the box for big files, so they only come over the hotspot once. Served by the agent's `drive` module **directly on the LAN** at `http://drive.local` (mDNS, with a dnsmasq fallback) and `http://192.168.50.1`, port 80, on the LAN address only. It's never exposed through the tunnel, so file bytes never cross the internet. This is a deliberate exception to "the UI is never served from the box": the page uses no WAN data.
+- A shared 10 GB "drive" on the box for big files, so they only come over the hotspot once. Served by the agent's `drive` module **directly on the LAN** at `http://drive.local` (mDNS, with a dnsmasq fallback) and `http://192.168.50.1`, port 80, on the LAN address only. It's never reachable over the link, so file bytes never cross the internet. This is a deliberate exception to "the UI is never served from the box": the page uses no WAN data.
 - No login (low-risk files): anyone on the shop network can upload, download (resumable), and delete. Flat file list; clashing names become `name (1).ext`.
 - Storage is a loop-mounted ext4 image (`/var/lib/g3-drive.img` at `/srv/g3-drive`), so it can't fill the main disk; the agent refuses to store files if it isn't mounted. Not backed up.
 - The Edge dashboard's **Drive** page just links there: an https page can't call a plain-http LAN address, and HTTPS on the box would need a public DNS record and certificate, which wasn't worth it for unauthenticated files.
@@ -199,5 +198,4 @@ table inet acct {
 ## Open questions to confirm with Gray before building
 - Exact G3ID role names for admin vs member, and how other workers check them.
 - The hotspot's billing cycle start day.
-- Whether the tunnel hostname should live on `g3robotics.com` or a separate internal zone.
 - Slack vs Discord for alerts.

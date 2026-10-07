@@ -1,9 +1,11 @@
 import { dirname } from "node:path";
+import { Hono } from "hono";
 import type { EdgeModule, ModuleContext } from "../../core/module";
 import { attribute, bucketFor, counterDeltas } from "./deltas";
 import { Enforcer, fileTarget, systemTarget } from "./enforcer";
 import { attributeFlows, idleFlows } from "./flows";
 import { type Lease, parseDnsLog } from "./parse";
+import { PresenceTracker } from "./presence";
 import { Pusher } from "./pusher";
 import { SiteStore } from "./site-store";
 import { mockSource, systemSource } from "./sources";
@@ -18,6 +20,16 @@ const KEEP_SENT_SECONDS = 7 * 86400;
  * readings can't be trusted and flows are re-baselined instead.
  */
 const MAX_FLOW_GAP_SECONDS = 50 * 60;
+
+/**
+ * Background presence checks keep the neighbor table fresh between page loads.
+ * A stale entry takes the kernel about 5-8 s to re-check (DELAY, then PROBE),
+ * so the background check waits that long; a page load only waits for
+ * addresses that weren't in the table at all, which answer within a second.
+ */
+const PRESENCE_INTERVAL_MS = 30_000;
+const PRESENCE_BACKGROUND_WAIT_MS = 8_000;
+const PRESENCE_REQUEST_WAIT_MS = 1_500;
 
 /**
  * Network module: every collection interval, reads byte counters, attributes
@@ -47,6 +59,52 @@ export function createNetworkModule(ctx: ModuleContext): EdgeModule {
   let lastSitesError: string | null = null;
   let lastDnsAnswers = 0;
   let trackedFlows = 0;
+  const presence = new PresenceTracker(source);
+  let presenceTimer: Timer | null = null;
+  let presenceRunning = false;
+  let lastPresenceAt: number | null = null;
+  let lastPresenceError: string | null = null;
+  let onlineCount = 0;
+
+  async function checkPresence(waitMs: number) {
+    try {
+      const result = await presence.check(waitMs);
+      lastPresenceAt = result.checkedAt;
+      lastPresenceError = null;
+      onlineCount = result.clients.filter((c) => c.online).length;
+      return result;
+    } catch (err) {
+      lastPresenceError = err instanceof Error ? err.message : String(err);
+      throw err;
+    }
+  }
+
+  async function presenceTick() {
+    if (presenceRunning) return;
+    presenceRunning = true;
+    try {
+      await checkPresence(PRESENCE_BACKGROUND_WAIT_MS);
+    } catch {
+      console.error(`[network] presence check failed: ${lastPresenceError}`);
+    } finally {
+      presenceRunning = false;
+    }
+  }
+
+  // Called by the worker over the link (shared key).
+  const routes = new Hono()
+    // Which LAN devices are on right now.
+    .get("/presence", async (c) => {
+      try {
+        return c.json(await checkPresence(PRESENCE_REQUEST_WAIT_MS));
+      } catch {
+        return c.json({ error: `Couldn't read the LAN's devices: ${lastPresenceError}` }, 500);
+      }
+    })
+    // The box's own LAN and WAN addresses.
+    .get("/interfaces", async (c) =>
+      c.json({ checkedAt: Math.floor(Date.now() / 1000), interfaces: await source.interfaces() }),
+    );
 
   async function collectUsage(ts: number, leases: Lease[], bootId: string) {
     const counters = await source.counters();
@@ -134,15 +192,19 @@ export function createNetworkModule(ctx: ModuleContext): EdgeModule {
 
   return {
     name: "network",
+    routes,
     async start() {
       // The first tick applies the last-known state (works offline), then the
       // worker's latest is fetched.
       await tick();
       void enforcer.sync();
       scheduleNext();
+      void presenceTick();
+      presenceTimer = setInterval(() => void presenceTick(), PRESENCE_INTERVAL_MS);
     },
     stop() {
       if (timer) clearTimeout(timer);
+      if (presenceTimer) clearInterval(presenceTimer);
       pusher.stop();
     },
     sync: () => enforcer.sync(),
@@ -158,6 +220,7 @@ export function createNetworkModule(ctx: ModuleContext): EdgeModule {
         lastPushAt: pusher.lastSuccessAt,
         lastPushError: pusher.lastError,
         unsentBuckets: store.unsentCount(),
+        presence: { lastCheckAt: lastPresenceAt, lastError: lastPresenceError, onlineCount },
       };
     },
   };

@@ -1,6 +1,6 @@
 import { admin, kioskAdmin, student } from "@g3/testing/users";
 import { call, callAs, jsonAs } from "@g3/testing/worker";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 // G3 Edge: the dashboard uses G3ID (admins change things); the shop's edge box uses a shared key
 // (EDGE_AGENT_KEY, "test-agent-key" in vitest.config.mts).
@@ -33,6 +33,33 @@ describe("dashboard sign-in and roles", () => {
 });
 
 describe("agent key", () => {
+  it("records the box's public address from its uploads, and when it changed", async () => {
+    const checkIn = (ip: string) =>
+      agent("/agent/network/state", {
+        headers: {
+          "X-G3-Agent-Version": "test",
+          "X-G3-Agent-Started": "1000",
+          "CF-Connecting-IP": ip,
+        },
+      });
+    type Status = { agent: { publicIp: string | null; publicIpSince: number | null } | null };
+    const publicIp = async (ip: string) =>
+      vi.waitFor(async () => {
+        const { agent } = await jsonAs<Status>(student, "/status");
+        expect(agent?.publicIp).toBe(ip);
+        return agent?.publicIpSince;
+      });
+
+    await checkIn("198.51.100.7");
+    const since = await publicIp("198.51.100.7");
+    expect(since).toBeTypeOf("number");
+    // The same address again keeps its "since"; a new one starts over.
+    await checkIn("198.51.100.7");
+    expect(await publicIp("198.51.100.7")).toBe(since);
+    await checkIn("203.0.113.9");
+    expect(await publicIp("203.0.113.9")).toBeGreaterThanOrEqual(since as number);
+  });
+
   it("rejects a missing or wrong key", async () => {
     expect((await call("/agent/network/state")).status).toBe(401);
     const wrong = await call("/agent/network/state", { headers: { Authorization: "Bearer nope" } });
@@ -88,6 +115,14 @@ describe("agent key", () => {
       "/network/clients",
     );
     expect(JSON.stringify(clients)).toContain("aa:bb:cc:dd:ee:ff");
+    // No edge box in tests: the list still loads, without online status.
+    const list = await jsonAs<{
+      presence: { available: boolean; error: string | null };
+      clients: { mac: string; online: boolean | null }[];
+    }>(student, "/network/clients");
+    expect(list.presence.available).toBe(false);
+    expect(list.presence.error).toBeTruthy();
+    expect(list.clients.find((c) => c.mac === "aa:bb:cc:dd:ee:ff")?.online).toBeNull();
     expect(
       (
         await agent("/agent/network/usage", {

@@ -13,6 +13,7 @@ import { clientName, getSettings } from "./common";
 import { desiredState } from "./control";
 import { controlRouter } from "./control-routes";
 import { ingestUsage, parseUsageBatch } from "./ingest";
+import { livePresence, onlineFlag, presenceSummary } from "./presence";
 import { ingestSites, parseSiteBatch } from "./sites";
 import { sitesRouter } from "./sites-routes";
 import { SEVEN_DAYS, dailyFor, earliestSample, hourlyFor, project, totalsByMac } from "./usage";
@@ -116,6 +117,9 @@ export const networkRouter = new Hono<AppEnv>()
     const t = now();
     const settings = await getSettings(db);
     const cycle = billingCycle(t, settings.cycleStartDay);
+    // Live from the box on every load, before reading the list, so devices
+    // that just showed up (and ones that never use data) are in it.
+    const presence = await livePresence(c.env, db);
     const [clients, cycleTotals, dayTotals] = await Promise.all([
       db.select().from(netClients).orderBy(desc(netClients.lastSeenAt)).all(),
       totalsByMac(db, cycle.start, cycle.end),
@@ -124,10 +128,12 @@ export const networkRouter = new Hono<AppEnv>()
     const zero = { dl: 0, ul: 0 };
     return c.json({
       cycle,
+      presence: presenceSummary(presence),
       clients: clients.map((cl) => ({
         ...cl,
         isInfrastructure: cl.isInfrastructure === 1,
         name: clientName(cl),
+        online: onlineFlag(presence, cl.mac),
         cycle: cycleTotals.get(cl.mac) ?? zero,
         last24h: dayTotals.get(cl.mac) ?? zero,
       })),
@@ -136,6 +142,7 @@ export const networkRouter = new Hono<AppEnv>()
   .get("/clients/:mac", requireAuth, async (c) => {
     const db = createEdgeDb(c.env.EDGE_DB);
     const mac = c.req.param("mac");
+    const presence = await livePresence(c.env, db);
     const client = await db.select().from(netClients).where(eq(netClients.mac, mac)).get();
     if (!client) return c.json({ error: "Client not found." }, 404);
     const t = now();
@@ -150,7 +157,9 @@ export const networkRouter = new Hono<AppEnv>()
         ...client,
         isInfrastructure: client.isInfrastructure === 1,
         name: clientName(client),
+        online: onlineFlag(presence, client.mac),
       },
+      presence: presenceSummary(presence),
       cycle,
       daily,
       hourly,

@@ -13,7 +13,7 @@ export const site = {
   },
 
   /**
-   * The team's own domain: its public website and the edge box's tunnel. Its apps used to run here
+   * The team's own domain: its public website. Its apps used to run here
    * (<web>.<domain>, below); those addresses are retired, and the gateway answers them 410 Gone.
    */
   domain: "g3robotics.com",
@@ -36,9 +36,6 @@ export const site = {
     skillTree: { web: "skilltree" },
     attendance: { web: "attendance" },
   },
-
-  /** The shop edge box's tunnel hostname (<subdomain>.<domain>), if you run one. */
-  edgeAgentSubdomain: "edge-agent",
 
   /** The team's public website, linked from the apps. */
   publicSiteUrl: "https://www.g3robotics.com",

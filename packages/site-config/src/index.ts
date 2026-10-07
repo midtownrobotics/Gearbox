@@ -148,9 +148,6 @@ export function signInCallbackApiUrl(_teamId?: string): string {
 /** The app list every app links back to. */
 export const allAppsUrl = appUrl("portal");
 
-/** The shop edge box's tunnel URL. */
-export const edgeAgentUrl = `https://${site.edgeAgentSubdomain}.${site.domain}`;
-
 /** An app's wordmark: "G3 SHOP". */
 export const wordmark = (app: string) => `${site.team.shortName} ${app}`.toUpperCase();
 

@@ -1,6 +1,7 @@
 import { and, eq, gt, isNull, sql } from "drizzle-orm";
 import type { EdgeDb } from "../../db";
 import { netBlocklistDomains, netBlocklists, netGrants, netSettings } from "../../db/schema";
+import { agentFetch, linkStatus } from "../../lib/agent";
 import { localMidnight, localParts } from "../../lib/time";
 import type { AppEnv } from "../../types";
 
@@ -130,71 +131,42 @@ export async function desiredState(db: EdgeDb) {
 
 export type DesiredState = Awaited<ReturnType<typeof desiredState>>;
 
-export type TunnelState =
-  | "connected"
-  | "agent_unreachable"
-  | "tunnel_down"
-  | "not_configured"
-  | "error";
+export type LinkState = "connected" | "not_answering" | "offline";
 
 /**
- * Checks the worker → agent path by sending POST /sync with no key. A 401 from
- * the agent means the tunnel and agent are both up (and nothing is triggered).
- * Otherwise Cloudflare's status says which part is down.
+ * Checks the worker → agent link: whether the box's WebSocket is open, and
+ * that the agent answers on it (GET /health), with the round trip time.
  */
-export async function probeTunnel(env: AppEnv["Bindings"]): Promise<{
-  state: TunnelState;
+export async function probeLink(env: AppEnv["Bindings"]): Promise<{
+  state: LinkState;
   detail: string | null;
   latencyMs: number | null;
+  connectedAt: number | null;
+  lastHeartbeatAt: number | null;
 }> {
-  if (!env.EDGE_AGENT_URL) return { state: "not_configured", detail: null, latencyMs: null };
+  const link = await linkStatus(env);
+  const base = { connectedAt: link.connectedAt, lastHeartbeatAt: link.lastHeartbeatAt };
+  if (!link.connected) return { state: "offline", detail: null, latencyMs: null, ...base };
   const started = Date.now();
   try {
-    const res = await fetch(`${env.EDGE_AGENT_URL}/sync`, {
-      method: "POST",
-      signal: AbortSignal.timeout(8000),
-    });
+    const res = await agentFetch(env, "/health", { timeoutMs: 8_000 });
     const latencyMs = Date.now() - started;
-    const body = await res.text();
-    if (res.status === 401 && body.includes("Unauthorized")) {
-      return { state: "connected", detail: null, latencyMs };
-    }
-    // 530 (Cloudflare error 1033): cloudflared isn't connected to Cloudflare.
-    if (res.status === 530) {
-      return { state: "tunnel_down", detail: "cloudflared isn't connected", latencyMs };
-    }
-    // 502/503/504: the tunnel is up but nothing answered on the agent's port.
-    if (res.status >= 502 && res.status <= 504) {
-      return { state: "agent_unreachable", detail: `HTTP ${res.status}`, latencyMs };
-    }
-    return { state: "error", detail: `Unexpected HTTP ${res.status}`, latencyMs };
+    if (res.ok) return { state: "connected", detail: null, latencyMs, ...base };
+    return { state: "not_answering", detail: `HTTP ${res.status}`, latencyMs, ...base };
   } catch (err) {
-    const timedOut = err instanceof Error && err.name === "TimeoutError";
-    return {
-      state: "error",
-      detail: timedOut
-        ? "No response within 8 seconds"
-        : err instanceof Error
-          ? err.message
-          : String(err),
-      latencyMs: null,
-    };
+    const detail = err instanceof Error ? err.message : String(err);
+    return { state: "not_answering", detail, latencyMs: null, ...base };
   }
 }
 
 /**
  * Tells the agent to fetch and apply the desired state now. Best-effort: if
- * the box is unreachable, it catches up on its next usage push (within 5
+ * the box isn't connected, it catches up on its next usage push (within 5
  * minutes of reconnecting), since every agent response carries the version.
  */
 export async function pokeAgent(env: AppEnv["Bindings"]) {
-  if (!env.EDGE_AGENT_URL) return;
   try {
-    const res = await fetch(`${env.EDGE_AGENT_URL}/sync`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${env.EDGE_AGENT_KEY}` },
-      signal: AbortSignal.timeout(5000),
-    });
+    const res = await agentFetch(env, "/sync", { method: "POST", timeoutMs: 5000 });
     if (!res.ok) console.warn("[Agent] sync poke returned", res.status);
   } catch (err) {
     console.warn("[Agent] sync poke failed", err instanceof Error ? err.message : err);

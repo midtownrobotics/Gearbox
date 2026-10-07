@@ -30,18 +30,13 @@ export const lookupRouter = new Hono<AppEnv>().post(
   lookupValidator,
   async (c) => {
     try {
-      const res = await agentFetch(
-        c.env,
-        "/lookup",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(c.req.valid("json")),
-          // Vendor fetches time out after 10 s each on the box; a lookup can chain a few.
-          timeoutMs: 30_000,
-        },
-        { url: c.env.LOOKUP_AGENT_URL, key: c.env.LOOKUP_AGENT_KEY },
-      );
+      const res = await agentFetch(c.env, "/lookup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(c.req.valid("json")),
+        // Vendor fetches time out after 10 s each on the box; a lookup can chain a few.
+        timeoutMs: 30_000,
+      });
       const body = (await res.json().catch(() => ({}))) as PartLookup & { error?: string };
       if (!res.ok) {
         // 422: the box is fine but the vendor's site couldn't be read.

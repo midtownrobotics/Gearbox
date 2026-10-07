@@ -7,6 +7,7 @@ import { Card, ErrorBanner, Loading, Page, Stat } from "../../shared/ui";
 import { useLoad } from "../../shared/use-load";
 import { BarChart, ChartLegend } from "./bar-chart";
 import { ClientExceptions } from "./client-exceptions";
+import { OnlineDot, PresenceNote } from "./online";
 import { isPseudoSite, sitePath } from "./sites-page";
 
 const hourFormat = new Intl.DateTimeFormat("en-US", {
@@ -40,13 +41,22 @@ export function ClientDetailPage() {
       </Page>
     );
 
-  const { client, daily, hourly } = data;
+  const { client, daily, hourly, presence } = data;
   const cycleTotal = daily.reduce((sum, d) => sum + d.dl + d.ul, 0);
   const dayTotal = hourly.reduce((sum, h) => sum + h.dl + h.ul, 0);
 
   return (
     <Page title={client.name} actions={back}>
+      <PresenceNote presence={presence} />
       <Card>
+        {client.online !== null && (
+          <p className="flex items-center gap-2 text-sm font-medium mb-3">
+            <OnlineDot online={client.online} />
+            <span className={client.online ? "text-emerald-700" : "text-secondary-500"}>
+              {client.online ? "Online now" : "Not on the network right now"}
+            </span>
+          </p>
+        )}
         <RenameForm mac={client.mac} current={client.displayName} onSaved={reload} />
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4">
           <Stat label="This cycle" value={formatBytes(cycleTotal)} />
