@@ -1,7 +1,8 @@
 import { site, teamKey } from "@g3/site-config";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { createDb } from "../src/db";
 import { sessionCookieOptions } from "../src/lib/cookie";
-import { handleSlackCode } from "../src/lib/slack-code";
+import { createLinkCode, createSigninCode, handleSlackCode } from "../src/lib/slack-code";
 import { saveInstallation, slackForTeam, teamForWorkspace } from "../src/lib/slack-install";
 import { createTeam, createUser, g3id, sessionCookie, testEnv } from "./helpers";
 
@@ -120,7 +121,7 @@ describe("Slack sign-in codes", () => {
   async function codeFor(teamId: string): Promise<string> {
     const code = String(1000 + (crypto.getRandomValues(new Uint32Array(1))[0] % 9000));
     await testEnv.DB.prepare(
-      "INSERT INTO core_slack_link_codes (id, team_id, code, type, polling_token, expires_at, created_at) VALUES (?, ?, ?, 'signin', ?, ?, 0) ON CONFLICT (code) DO UPDATE SET team_id = excluded.team_id, used = 0, expires_at = excluded.expires_at",
+      "INSERT INTO core_slack_link_codes (id, team_id, code, type, polling_token, expires_at, created_at) VALUES (?, ?, ?, 'signin', ?, ?, 0) ON CONFLICT (team_id, code) DO UPDATE SET used = 0, expires_at = excluded.expires_at",
     )
       .bind(crypto.randomUUID(), teamId, code, crypto.randomUUID(), 9_999_999_999)
       .run();
@@ -147,6 +148,86 @@ describe("Slack sign-in codes", () => {
 
     const fromNowhere = await send(await codeFor(team), workspace());
     expect(fromNowhere.message).toContain("isn't connected");
+  });
+});
+
+describe("sign-in and link codes", () => {
+  afterEach(() => vi.restoreAllMocks());
+  const db = () => createDb(testEnv.DB);
+  const rowsWith = async (code: string) =>
+    (
+      await testEnv.DB.prepare("SELECT team_id FROM core_slack_link_codes WHERE code = ?")
+        .bind(code)
+        .all<{ team_id: string }>()
+    ).results.map((r) => r.team_id);
+
+  // The real one, taken before any test replaces it (a second stub would otherwise call the first).
+  const realRandom = crypto.getRandomValues.bind(crypto);
+
+  /** Makes the next 4-digit codes drawn come out as `codes`, in order. */
+  function nextCodes(...codes: number[]) {
+    vi.spyOn(crypto, "getRandomValues").mockImplementation(((array: Uint8Array | Uint32Array) => {
+      if (array instanceof Uint32Array && codes.length > 0) {
+        array[0] = codes.shift() as number;
+        return array;
+      }
+      return realRandom(array);
+    }) as typeof crypto.getRandomValues);
+  }
+
+  it("draws another code when the first is taken in the team, instead of failing", async () => {
+    const team = await createTeam();
+    nextCodes(4321);
+    const first = await createSigninCode(db(), team, null);
+    nextCodes(4321, 4322);
+    const second = await createLinkCode(db(), team, await createUser({ teamId: team }));
+    expect([first.code, second.code]).toEqual(["4321", "4322"]);
+  });
+
+  it("lets two teams hold the same code, and each workspace finds its own", async () => {
+    const [a, b] = [await createTeam(), await createTeam()];
+    const [wsA, wsB] = [workspace(), workspace()];
+    await install(a, wsA);
+    await install(b, wsB);
+    nextCodes(5555, 5555);
+    await createSigninCode(db(), a, null);
+    await createSigninCode(db(), b, null);
+    expect((await rowsWith("5555")).filter((t) => t === a || t === b).sort()).toEqual(
+      [a, b].sort(),
+    );
+
+    const res = await handleSlackCode({
+      code: "5555",
+      slackUserId: `U${crypto.randomUUID().slice(0, 8).toUpperCase()}`,
+      workspaceId: wsB,
+      type: "signin",
+      env: testEnv,
+    });
+    // Team b's code is the one used (it's for team b, which has no members: a sign-up starts).
+    expect(res.message).not.toContain("another team");
+    const used = await testEnv.DB.prepare(
+      "SELECT team_id, used FROM core_slack_link_codes WHERE code = '5555' AND team_id IN (?, ?)",
+    )
+      .bind(a, b)
+      .all<{ team_id: string; used: number }>();
+    expect(Object.fromEntries(used.results.map((r) => [r.team_id, r.used]))).toEqual({
+      [a]: 0,
+      [b]: 1,
+    });
+  });
+
+  it("clears out codes that expired more than a day ago", async () => {
+    const team = await createTeam();
+    const old = Math.floor(Date.now() / 1000) - 2 * 86400;
+    await testEnv.DB.prepare(
+      "INSERT INTO core_slack_link_codes (id, team_id, code, type, polling_token, expires_at, created_at) VALUES (?, ?, '0007', 'signin', ?, ?, ?)",
+    )
+      .bind(crypto.randomUUID(), team, crypto.randomUUID(), old, old - 900)
+      .run();
+    nextCodes(7);
+    // The old one is gone, so its code is free again.
+    expect((await createSigninCode(db(), team, null)).code).toBe("0007");
+    expect((await rowsWith("0007")).filter((t) => t === team)).toHaveLength(1);
   });
 });
 

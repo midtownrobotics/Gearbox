@@ -4,14 +4,11 @@ import { setCookie } from "hono/cookie";
 import { createDb } from "../../db";
 import { coreSlackLinkCodes } from "../../db/schema";
 import { sessionCookieOptions } from "../../lib/cookie";
-import { newId } from "../../lib/id";
 import { sanitizeRedirect } from "../../lib/redirect";
-import { createSigninCode } from "../../lib/slack-code";
+import { createLinkCode, createSigninCode } from "../../lib/slack-code";
 import { requestTeamId, teamFrontend, teamOfUser } from "../../lib/team";
 import { requireAuth } from "../../middleware/auth";
 import type { AppEnv } from "../../types";
-
-import { generateCode, generateToken } from "../../lib/slack-code";
 
 export const slackAuthRouter = new Hono<AppEnv>()
   // Sign-in initiation — generates code, redirects to /login/slack
@@ -28,24 +25,8 @@ export const slackAuthRouter = new Hono<AppEnv>()
   // Link initiation — user must already be signed in, returns JSON code + token
   .get("/slack/link", requireAuth, async (c) => {
     const userId = c.get("userId") as string;
-    const code = generateCode();
-    const token = generateToken();
-    const now = Math.floor(Date.now() / 1000);
     const db = createDb(c.env.DB);
-
-    await db.insert(coreSlackLinkCodes).values({
-      id: newId(),
-      teamId: await teamOfUser(db, userId),
-      userId,
-      code,
-      type: "link",
-      pollingToken: token,
-      expiresAt: now + 900,
-      used: 0,
-      createdAt: now,
-    });
-
-    return c.json({ code, token });
+    return c.json(await createLinkCode(db, await teamOfUser(db, userId), userId));
   })
   // Polling — frontend calls this every 2s to check sign-in / link status
   .get("/slack/status", async (c) => {

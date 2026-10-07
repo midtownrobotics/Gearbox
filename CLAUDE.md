@@ -201,7 +201,7 @@ Key tables in D1:
 - `core_user_pins` — 3-digit PINs for kiosk login, unique within a team; a kiosk signs in only its own team's members
 - `kiosk_devices` — registered shop devices with tokens, in the activating admin's team
 - `kiosk_activation_codes` — 6-digit codes for device activation (30-min expiry)
-- `core_slack_link_codes` — Slack auth codes with polling status
+- `core_slack_link_codes` — Slack sign-in and link codes with polling status: 4 digits, unique within a team (migration 0015); `insertCode` in `lib/slack-code.ts` deletes codes a day after they expire and draws again if a code is taken
 
 Migrations are SQL files in `workers/g3id/src/db/migrations/` — always add new migrations for schema changes.
 
@@ -210,7 +210,7 @@ Migrations are SQL files in `workers/g3id/src/db/migrations/` — always add new
 Three flows:
 1. **Sign-in**: User runs `/signin 123456` with a code from the web app
 2. **Link**: Authenticated user runs `/link 123456` to add Slack to their account
-3. **Events**: Slack bot receives 6-digit codes via DM and processes them
+3. **Events**: Slack bot receives 4-digit codes via DM and processes them
 
 Routes:
 - `POST /slack/events` — Slack event API (URL verification, DM messages)
