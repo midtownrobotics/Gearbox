@@ -37,14 +37,14 @@ Three release points sit between phases: G3 moves to its frcgearbox.com addresse
 
 ## Progress
 
-As of 5 October 2026, five of the six Phase 0 steps are done on `main`, Phase 1 is done (nothing a user sees says G3 unless it's G3's own settings), and Phase 2 is done: teams in G3ID, a team-aware gateway, sign-in, Slack and sign-up per team, and pages that take their team from their address. Phase 3 has started: its shared pieces (the platform SDK in `@g3/auth`, the tenancy lint and the isolation harness) are in, and Skill Tree is the first team-scoped app. Scouting engagement controls provide early groundwork for optional plugins in Phase 4. The rest of Phases 3 to 6 has not started. Edge is now planned as an app any team can run with its own box (see "Edge: an app any team can run"); its box link, the first step toward that, is done.
+As of 5 October 2026, five of the six Phase 0 steps are done on `main`, Phase 1 is done (nothing a user sees says G3 unless it's G3's own settings), and Phase 2 is done: teams in G3ID, a team-aware gateway, sign-in, Slack and sign-up per team, and pages that take their team from their address. Phase 3 has started: its shared pieces (the platform SDK in `@g3/auth`, the tenancy lint and the isolation harness) are in, and Skill Tree is the first team-scoped app. A ninth app (Inventory) was added already built to that pattern. Scouting engagement controls provide early groundwork for optional plugins in Phase 4. The rest of Phases 3 to 6 has not started. Edge is now planned as an app any team can run with its own box (see "Edge: an app any team can run"); its box link, the first step toward that, is done.
 
 | Phase | Status | What is left |
 | --- | --- | --- |
 | 0. Groundwork | In progress | A staging environment (0.2) |
 | 1. Remove G3 from the platform | Done | Nothing |
 | 2. Tenancy core | Done | Nothing |
-| 3. Team-scoped apps | In progress: the shared pieces, Skill Tree and Attendance are done | Pit, Orders, Shop, Scouting, Portal and Edge, one pull request each, in the order below |
+| 3. Team-scoped apps | In progress: the shared pieces, Skill Tree and Attendance are done | Pit, Orders, Shop, Scouting, Portal and Edge, one pull request each, in the order below, and Inventory's team column, scoped access and isolation test |
 | 4. App library and dashboard | Not started | All of it |
 | 5. Live demo | Not started | All of it |
 | 6. Creators' portal | Not started | All of it |
@@ -53,6 +53,7 @@ As of 5 October 2026, five of the six Phase 0 steps are done on `main`, Phase 1 
 
 | Change | Roadmap step | Pull request |
 | --- | --- | --- |
+| Inventory, a new app: what a team owns, where it's kept (a tree of locations) and what's in use on a robot, with check out and check in, vendor listings tied to Orders' catalog, merge and split, and a history per entry. Its fields, locations, robots and subsystems are a team's own: made on Settings or loaded from a setup file, with none in code or migrations. Orders can put received parts into it, required or not by a team setting | Built to the Phase 3 pattern from the start: tenancy sheet settled, settings out of code, a starter file in place of the seed hook (4.3) | [#154](https://github.com/midtownrobotics/Gearbox/pull/154) |
 | Workers test setup and baseline tests for every worker | 0.1 | [#128](https://github.com/midtownrobotics/Gearbox/pull/128) |
 | One auth middleware in `packages/auth` | 0.3 | [#128](https://github.com/midtownrobotics/Gearbox/pull/128) |
 | One site config for domain, team and branding, with `pnpm configure` writing the generated values | 0.4, 1.5, most of 1.1, part of 1.4 | [#128](https://github.com/midtownrobotics/Gearbox/pull/128) |
@@ -89,6 +90,7 @@ As of 5 October 2026, five of the six Phase 0 steps are done on `main`, Phase 1 
 - **Operator tools live in the platform, not G3ID.** The operator flag, the console's API and its log are the platform Worker's, with the console in the platform app at `admin.<domain>` (step 2.8). G3ID only carries out what touches its accounts, through internal routes.
 - **Changesets apply to everyone.** A variant's pull request needs one, like any other change to an app (6.4).
 - **One app-level role list is gone before Phase 2.** Skill Tree kept its own list of mentors. It now uses the mentor and admin roles from sign-in, so step 2.2 has one less place to map roles from. Scouting's strategy admins are the list still left.
+- **A ninth app, Inventory.** It wasn't in the plan. It's a core app like Orders, built the way Phase 3 leaves an app: every table is one team's data with no key that is unique across teams, and nothing about a team is in code. It adds one production database and one Worker, which the plan's limits have room for. Orders reaches it over a service binding as an optional neighbour, the same rule as for Edge: Orders works without it.
 - **App content is loaded, not migrated.** Skill Tree's default trees are a file that goes through the same loader as a team's own file, the first time the app is opened. No migration holds content. That first-use load is what the seed hook (4.3) replaces, and it is the pattern for the other apps' starter data.
 - **Edge is for every team, not only G3.** Edge was planned as G3's single-team app because each box needed a Cloudflare Tunnel set up by hand on G3's account. The box now opens its own WebSocket to the edge Worker, so another team's box needs only an address and a key, and nothing on Cloudflare per team. Edge becomes an optional app any team can subscribe to and pair its own box with. Its plan is the section "Edge: an app any team can run", which replaces "Edge: G3's single-team app"; Phase 3's Edge row, the Durable Object decision and the privacy notes change with it.
 - **The SDK doesn't take the user from headers alone.** The plan said the SDK reads the gateway's identity headers. It reads the team from `X-Team-Id`, but still confirms who is signed in with G3ID (as `@g3/auth` already did), and counts a session only on its own team's addresses. Trusting `X-User-Id` alone would save one call per request, but then a worker reachable without the gateway (a `workers.dev` address left on by mistake) would let anyone claim to be anyone. The plan also had the SDK as its own package, `packages/platform`; it went into `@g3/auth` instead, since every worker already imports that for sign-in, and G3ID and the Platform worker stay separate services.
@@ -225,7 +227,7 @@ Seven choices were confirmed on 3 October 2026, and one more on 6 October, widen
 | Workers per account | 100 | 500 |
 | Static files per Worker | 20,000 | 100,000 |
 
-The account is on Workers Paid with the Standard usage model, so the right-hand column applies. Seven production databases and a staging copy of each fit well inside it. Sources: [D1 limits](https://developers.cloudflare.com/d1/platform/limits/), [Workers limits](https://developers.cloudflare.com/workers/platform/limits/).
+The account is on Workers Paid with the Standard usage model, so the right-hand column applies. Eight production databases (Inventory's is the eighth) and a staging copy of each fit well inside it. Sources: [D1 limits](https://developers.cloudflare.com/d1/platform/limits/), [Workers limits](https://developers.cloudflare.com/workers/platform/limits/).
 
 ## Phase 0: Groundwork
 
@@ -311,6 +313,7 @@ After Phase 3 every app serves any number of teams from one deployment, and noth
 | 6 | Scouting | About 30 | "Our team" number; engagement settings already use team-keyed rows, to move into the platform settings schema; strategy admins become a role | First split the 3,255-line worker into modules and put its 151 raw SQL calls behind query helpers |
 | 7 | Portal | 0 | The app list and team links | Becomes the team home, built from subscriptions and brand links |
 | 8 | Edge | 11 | Monthly data cap (50 GB, seeded by migration), the agent key in env, which box modules are on | An optional app any team can run with its own box. Its tables get a team column and `edge_status` and `net_settings` lose `CHECK (id = 1)`. The box-specific work is steps E.1 to E.6 in "Edge: an app any team can run" |
+| 9 | Inventory | 9 | None: fields, locations, robots and subsystems are rows a team makes on Settings or loads from a setup file (`workers/inventory/content/starter-setup.json` is the starter) | New, and built for this from the start: all nine tables are team data and none has a key that is unique across teams, except `intake_receipts.source_key`, which names an Orders request and so is unique across teams once Orders' ids are. Left: the team column, scoped access and the isolation test. Settings is for G3ID admins until team roles reach apps |
 
 Core apps must not depend on Edge. Orders part lookup and Shop printing become optional providers: a team whose Edge box is connected gets both from it, and a team without one enters part details by hand and sees no print button.
 
@@ -330,7 +333,7 @@ Core apps must not depend on Edge. Orders part lookup and Shop printing become o
 | Where a team's app settings live | In each app's own database, in a team-keyed settings table read through the SDK, as Scouting's engagement settings already are |
 | Slack messages from Orders, Shop and Scouting | Each team's own Slack installation, which G3ID stores encrypted; the apps ask G3ID for it over the service binding. A team without Slack connected gets no messages |
 
-**Done when:** isolation tests pass for all eight apps and the lint is required in CI. (G3 already moved to its frcgearbox.com addresses during Phase 2.)
+**Done when:** isolation tests pass for every app with team data and the lint is required in CI. (G3 already moved to its frcgearbox.com addresses during Phase 2.)
 
 ## Phase 4: App library and team dashboard
 

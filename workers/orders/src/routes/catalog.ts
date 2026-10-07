@@ -5,6 +5,7 @@ import { validator } from "hono/validator";
 import { type OrdersDb, createOrdersDb } from "../db";
 import { catalogCategories, catalogFamilies, catalogItems, orderRequests } from "../db/schema";
 import { catalogKey, linkKindOf } from "../lib/catalog";
+import { packQuantityField } from "../lib/pack-quantity";
 import { vendorName } from "../lib/vendors";
 import { requireCatalogEditor } from "../middleware/auth";
 import type { AppEnv } from "../types";
@@ -16,6 +17,8 @@ type ItemFields = {
   sku: string | null;
   url: string;
   options: Record<string, string>;
+  /** How many parts one unit is: 4 for a pack of 4. */
+  packQuantity: number;
 };
 
 /** A catalog item, created or edited by anyone. */
@@ -50,6 +53,11 @@ const itemValidator = (partial: boolean) =>
         return fail("url must be a link (http or https).");
       }
     }
+    if (v.packQuantity !== undefined) {
+      const pack = packQuantityField(v.packQuantity);
+      if (pack === null) return fail("packQuantity must be a whole number from 1 to 10000.");
+      out.packQuantity = pack;
+    }
     if (v.options !== undefined) {
       const o = v.options as Record<string, unknown>;
       if (!o || typeof o !== "object" || Array.isArray(o))
@@ -76,6 +84,7 @@ const itemColumns = {
   image: catalogItems.image,
   priceCents: catalogItems.priceCents,
   priceAt: catalogItems.priceAt,
+  packQuantity: catalogItems.packQuantity,
   storePlatform: catalogItems.storePlatform,
   storeVariantId: catalogItems.storeVariantId,
   source: catalogItems.source,

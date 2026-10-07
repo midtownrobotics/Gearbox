@@ -4,6 +4,7 @@ import { FaCheck, FaCodeBranch, FaGithub, FaServer, FaSlack } from "react-icons/
 import { Link } from "react-router-dom";
 import attendanceIcon from "./assets/app-icons/attendance.svg";
 import idIcon from "./assets/app-icons/id.svg";
+import inventoryIcon from "./assets/app-icons/inventory.svg";
 import ordersIcon from "./assets/app-icons/orders.svg";
 import pitIcon from "./assets/app-icons/pit.svg";
 import scoutingIcon from "./assets/app-icons/scouting.svg";
@@ -27,6 +28,12 @@ const APPS: App[] = [
     icon: ordersIcon,
     blurb:
       "Part requests from any member, mentor approvals, budgets by category, and carts grouped by vendor.",
+  },
+  {
+    name: "Inventory",
+    icon: inventoryIcon,
+    blurb:
+      "Everything your team owns and where it is: in storage by location, or in use on a robot. Received orders go straight in.",
   },
   {
     name: "Shop",
@@ -170,7 +177,7 @@ const MOMENTS: { app: string; label: string; text: string }[] = [
   { app: "Sign-in", label: "New member", text: "Jordan joined from Slack" },
 ];
 
-const LAUNCHER_APPS = APPS.filter((app) => app.name !== "Attendance");
+const LAUNCHER_APPS = APPS.filter((app) => app.name !== "Attendance" && app.name !== "Inventory");
 
 /** What a team's home looks like once it's signed up, with a moment from each app in turn. */
 function LauncherMock() {

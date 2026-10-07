@@ -4,6 +4,13 @@ import { Link } from "react-router-dom";
 import { api, getErrorMessage } from "../../shared/api";
 import { useAuthUser } from "../../shared/auth";
 import { formatDate } from "../../shared/format";
+import {
+  type Intake,
+  ReceiveDialog,
+  type ReceiveLine,
+  asksInventory,
+  useIntake,
+} from "../../shared/receive-dialog";
 import { Button, ErrorBanner, Loading, Page, SuccessBanner, inputClass } from "../../shared/ui";
 import { useLoad } from "../../shared/use-load";
 
@@ -24,8 +31,7 @@ export function trackingUrl(tracking: string): { label: string; href: string } {
 }
 
 /**
- * Packages on the way, by vendor order: mark items received as they arrive. Mentors can receive
- * anything; everyone else, what they requested.
+ * Packages on the way, by vendor order: anyone signed in marks items received as they arrive.
  */
 export function ReceivingPage() {
   const { data, error, reload } = useLoad(async () => {
@@ -35,6 +41,7 @@ export function ReceivingPage() {
   }, []);
   const [done, setDone] = useState<string | null>(null);
   const [showRecent, setShowRecent] = useState(false);
+  const intake = useIntake();
 
   return (
     <Page title="Receiving">
@@ -51,6 +58,7 @@ export function ReceivingPage() {
               <OrderCard
                 key={o.id}
                 order={o}
+                intake={intake}
                 onReceived={(message) => {
                   setDone(message);
                   reload();
@@ -68,7 +76,9 @@ export function ReceivingPage() {
                 {showRecent ? "▾" : "▸"} Received in the last two weeks ({data.recent.length})
               </button>
               {showRecent &&
-                data.recent.map((o) => <OrderCard key={o.id} order={o} onReceived={reload} />)}
+                data.recent.map((o) => (
+                  <OrderCard key={o.id} order={o} intake={intake} onReceived={reload} />
+                ))}
             </div>
           )}
         </>
@@ -79,27 +89,38 @@ export function ReceivingPage() {
 
 function OrderCard({
   order: o,
+  intake,
   onReceived,
-}: { order: IncomingOrder; onReceived: (message: string) => void }) {
+}: {
+  order: IncomingOrder;
+  /** Whether to ask where received parts go in Inventory (null until that's known). */
+  intake: Intake | null;
+  onReceived: (message: string) => void;
+}) {
   const user = useAuthUser();
   const [busy, setBusy] = useState(false);
+  const [receiving, setReceiving] = useState<ReceiveLine[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [editingTracking, setEditingTracking] = useState(false);
   const [tracking, setTracking] = useState(o.tracking ?? "");
-  const canReceive = (line: IncomingOrder["lines"][number]) =>
-    line.status === "ordered" && (user.isMentor || line.requesterId === user.userId);
+  const canReceive = (line: IncomingOrder["lines"][number]) => line.status === "ordered";
   const receivable = o.lines.filter(canReceive);
 
-  async function receive(ids: number[]) {
+  const receivedMessage = (count: number, toInventory: boolean) =>
+    `Received ${count} item${count === 1 ? "" : "s"} from ${o.vendor} order #${o.id}${
+      toInventory ? ", and added to Inventory" : ""
+    }.`;
+
+  async function receive(lines: ReceiveLine[]) {
+    // With Inventory set up (or required), a pop-up asks where the parts go first.
+    if (asksInventory(intake)) return setReceiving(lines);
     setBusy(true);
     setError(null);
-    const res = await api.orders.receive.$post({ json: { ids } });
+    const res = await api.orders.receive.$post({ json: { ids: lines.map((l) => l.id) } });
     setBusy(false);
     if (!res.ok) return setError(await getErrorMessage(res));
     const { received } = await res.json();
-    onReceived(
-      `Received ${received.length} item${received.length === 1 ? "" : "s"} from ${o.vendor} order #${o.id}.`,
-    );
+    onReceived(receivedMessage(received.length, false));
   }
 
   async function saveTracking() {
@@ -163,11 +184,7 @@ function OrderCard({
           )}
         </div>
         {receivable.length > 1 && (
-          <Button
-            className="ml-auto !py-1.5"
-            disabled={busy}
-            onClick={() => receive(receivable.map((l) => l.id))}
-          >
+          <Button className="ml-auto !py-1.5" disabled={busy} onClick={() => receive(receivable)}>
             Received all {receivable.length}
           </Button>
         )}
@@ -187,7 +204,15 @@ function OrderCard({
                 {l.title}
               </Link>
               <p className="truncate text-xs text-secondary-500">
-                {[l.variant, l.sku, `for ${l.requesterName}`].filter(Boolean).join(" · ")}
+                {[
+                  l.packQuantity > 1 &&
+                    `pack of ${l.packQuantity} (${l.quantity * l.packQuantity} parts)`,
+                  l.variant,
+                  l.sku,
+                  `for ${l.requesterName}`,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
               </p>
             </div>
             {l.status === "received" ? (
@@ -196,7 +221,7 @@ function OrderCard({
                 {l.receivedBy ? ` by ${l.receivedBy}` : ""}
               </span>
             ) : canReceive(l) ? (
-              <Button className="shrink-0 !py-1" disabled={busy} onClick={() => receive([l.id])}>
+              <Button className="shrink-0 !py-1" disabled={busy} onClick={() => receive([l])}>
                 Received
               </Button>
             ) : (
@@ -209,6 +234,17 @@ function OrderCard({
         <div className="px-4 pb-3">
           <ErrorBanner message={error} />
         </div>
+      )}
+      {receiving && intake && (
+        <ReceiveDialog
+          lines={receiving}
+          intake={intake}
+          onClose={() => setReceiving(null)}
+          onReceived={({ received, toInventory }) => {
+            setReceiving(null);
+            onReceived(receivedMessage(received, toInventory));
+          }}
+        />
       )}
     </section>
   );

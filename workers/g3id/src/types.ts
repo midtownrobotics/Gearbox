@@ -33,5 +33,7 @@ export type AppEnv = {
     kioskDeviceId?: number;
     /** The team of the kiosk the request came from (requireKioskToken). */
     kioskTeamId?: string;
+    /** The signed-in admin's team, on /admin routes: they only see and change its records. */
+    adminTeamId?: string;
   };
 };

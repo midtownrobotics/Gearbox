@@ -57,9 +57,17 @@ export default workerTestConfig({
   },
   services: {
     ...Object.fromEntries(
-      ["PORTAL", "SHOP", "PIT", "ORDERS", "EDGE", "SCOUTING", "SKILL_TREE", "ATTENDANCE"].map(
-        (binding) => [binding, echo(binding)],
-      ),
+      [
+        "PORTAL",
+        "SHOP",
+        "PIT",
+        "ORDERS",
+        "EDGE",
+        "SCOUTING",
+        "SKILL_TREE",
+        "ATTENDANCE",
+        "INVENTORY",
+      ].map((binding) => [binding, echo(binding)]),
     ),
     G3ID: g3id,
     PLATFORM: platform,

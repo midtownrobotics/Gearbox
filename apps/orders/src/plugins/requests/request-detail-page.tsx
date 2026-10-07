@@ -96,7 +96,11 @@ export function RequestDetailPage() {
                   <span className="font-mono">{r.sku}</span>
                 </Row>
               )}
-              <Row label="Quantity">{r.quantity}</Row>
+              <Row label="Quantity">
+                {r.quantity}
+                {r.packQuantity > 1 &&
+                  ` × pack of ${r.packQuantity} (${r.quantity * r.packQuantity} parts)`}
+              </Row>
               <Row label="Price each">{formatCents(r.unitPriceCents, r.currency)}</Row>
               <Row label={r.orderId === null ? "Estimated total" : "Ordered total"}>
                 {formatCents(estimate, r.currency)}
@@ -179,6 +183,7 @@ function EditForm({ request, onDone }: { request: RequestDetail; onDone: () => v
     return (await res.json()).filter((c) => !c.isArchived || c.id === request.categoryId);
   }, []);
   const [quantity, setQuantity] = useState(String(request.quantity));
+  const [packQuantity, setPackQuantity] = useState(String(request.packQuantity));
   const [price, setPrice] = useState(
     request.unitPriceCents === null ? "" : (request.unitPriceCents / 100).toFixed(2),
   );
@@ -198,6 +203,7 @@ function EditForm({ request, onDone }: { request: RequestDetail; onDone: () => v
       param: { id: String(request.id) },
       json: {
         quantity: Number(quantity),
+        packQuantity: Number(packQuantity),
         unitPriceCents,
         categoryId: Number(categoryId),
         reason,
@@ -222,6 +228,17 @@ function EditForm({ request, onDone }: { request: RequestDetail; onDone: () => v
               className={inputClass}
               value={quantity}
               onChange={(e) => setQuantity(e.target.value)}
+              required
+            />
+          </Field>
+          <Field label="Pack of" hint="Parts in one of these">
+            <input
+              type="number"
+              min={1}
+              max={10000}
+              className={inputClass}
+              value={packQuantity}
+              onChange={(e) => setPackQuantity(e.target.value)}
               required
             />
           </Field>
