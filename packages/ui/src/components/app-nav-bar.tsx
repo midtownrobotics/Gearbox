@@ -1,6 +1,6 @@
 import { allAppsUrl, site } from "@g3/site-config";
 import { type ComponentType, type ReactNode, useEffect, useState } from "react";
-import { useTeamUiSettings } from "../team-ui";
+import { useTeamIcon, useTeamUiSettings } from "../team-ui";
 import { useTheme } from "../theme";
 
 // The top bar every G3 app shares (from G3 Strategy's): the app's wordmark, its pages, the
@@ -99,6 +99,8 @@ export function AppNavBar({
   );
   // With no pages there's nothing for a menu; the bar keeps its controls on phones too.
   const flat = items.length === 0;
+  // The app's icon, with its accent in the team's colour.
+  const teamIcon = useTeamIcon(icon);
 
   useEffect(() => {
     if (!open) return;
@@ -162,8 +164,8 @@ export function AppNavBar({
         onClick: () => setOpen(false),
         children: (
           <>
-            {(teamUi.logoUrl || icon) && (
-              <img className="g3-nav-icon" src={teamUi.logoUrl || icon} alt="" />
+            {(teamUi.logoUrl || teamIcon) && (
+              <img className="g3-nav-icon" src={teamUi.logoUrl || teamIcon} alt="" />
             )}
             {brandedTitle}
           </>

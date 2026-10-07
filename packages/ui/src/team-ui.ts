@@ -7,7 +7,8 @@ import {
   pageTeamNumber,
   teamUiDefaults,
 } from "@g3/site-config";
-import { useEffect, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import { applyTabIcons, iconDataUrl, isIconAccent, loadIconSvg, recolorIcon } from "./team-icon";
 import { setDefaultTheme } from "./theme";
 
 // The page's team's appearance (roadmap 2.10): its defaults until G3ID's /team/ui answers, so a team
@@ -52,6 +53,8 @@ function applySettings() {
           : `color-mix(in srgb, ${base}, black ${blends[i]}%)`;
     root.style.setProperty(`--color-primary-${steps[i]}`, shade);
   }
+  // The tab's icon takes the team's colour too (team-icon.ts).
+  applyTabIcons(base);
   // index.html's title is the app's own name ("Orders"; "ID" for the sign-in app); the team's
   // short name goes in front: "G3 Orders", "G3ID".
   originalTitle ??= document.title;
@@ -113,6 +116,35 @@ export function useTeamUiSettings(): TeamUiSettings {
     };
   }, []);
   return settings;
+}
+
+/**
+ * An app icon (the address of its SVG) with its accent in the team's primary colour. Gives back
+ * the icon as it is until the recoloured one is ready, for a team with the default colour, and
+ * for anything that isn't an SVG.
+ */
+export function useTeamIcon(src: string | undefined): string | undefined {
+  const primaryColor = useSyncExternalStore(
+    subscribe,
+    () => current.primaryColor,
+    () => initial.primaryColor,
+  );
+  const [recolored, setRecolored] = useState<{ key: string; src: string } | null>(null);
+  const key = `${primaryColor.toLowerCase()} ${src}`;
+  const wanted = !!src && !isIconAccent(primaryColor);
+  useEffect(() => {
+    if (!wanted || !src) return;
+    let cancelled = false;
+    void loadIconSvg(src).then((svg) => {
+      if (svg && !cancelled) {
+        setRecolored({ key, src: iconDataUrl(recolorIcon(svg, primaryColor)) });
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [wanted, src, key, primaryColor]);
+  return wanted && recolored?.key === key ? recolored.src : src;
 }
 
 /**

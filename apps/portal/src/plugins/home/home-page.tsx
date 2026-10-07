@@ -1,5 +1,5 @@
 import { type TeamUiLinkKey, appUrl, pageTeamNumber } from "@g3/site-config";
-import { useTeamNames, useTeamUiSettings } from "@g3/ui";
+import { TeamIcon, useTeamNames, useTeamUiSettings } from "@g3/ui";
 import { useEffect, useState } from "react";
 import type { IconType } from "react-icons";
 import { FaGithub, FaGlobe, FaInstagram, FaSlack } from "react-icons/fa";
@@ -14,8 +14,10 @@ import skillsIcon from "../../assets/app-icons/skills.svg";
 import { g3id } from "../../lib/api";
 import { BlueAllianceIcon, FirstIcon, Match13Icon, StatboticsIcon } from "./link-icons";
 
-// The team's apps show their own app icon. Other links are drawn to match it: a black tile with a white
-// symbol, and a burgundy ↗ for sites outside G3. (`bg-black` isn't touched by dark mode.)
+// The team's apps show their own app icon, its accent in the team's primary colour (TeamIcon).
+// Other links are drawn to match it: a black tile with a white symbol, and a ↗ in that colour for
+// sites outside the team's apps. (`bg-black` isn't touched by dark mode, and neither is the
+// colour variable used directly, where the `text-primary-500` class would be lightened.)
 type App = {
   label: string;
   href: string;
@@ -228,9 +230,8 @@ export function HomePage() {
                   className="flex flex-col items-center gap-2 group"
                 >
                   {"tile" in app ? (
-                    <img
+                    <TeamIcon
                       src={app.tile}
-                      alt=""
                       className="w-16 h-16 shadow-lg rounded-[14px] transition-transform duration-150 group-hover:scale-110"
                     />
                   ) : (
@@ -244,7 +245,7 @@ export function HomePage() {
                       ) : null}
                       {app.external && (
                         <span
-                          className="absolute top-1.5 right-2 text-[11px] font-bold leading-none text-[#A32035]"
+                          className="absolute top-1.5 right-2 text-[11px] font-bold leading-none text-[var(--color-primary-500)]"
                           aria-hidden
                         >
                           ↗
