@@ -2,6 +2,7 @@ import { withTeam } from "@g3/auth";
 import { sql } from "drizzle-orm";
 import type { EdgeDb } from "../../db";
 import { netClients, netUsage } from "../../db/schema";
+import { chunk, rowsPerInsert } from "../../lib/d1";
 
 export const BUCKET_SECONDS = 300;
 export const MAX_SAMPLES_PER_BATCH = 2000;
@@ -45,13 +46,6 @@ export function parseUsageBatch(value: unknown): UsageBatch | null {
   return { samples: samples as UsageSample[], clients: clients as UsageClient[] };
 }
 
-// D1 allows 100 bound parameters per statement.
-function chunk<T>(items: T[], size: number) {
-  const out: T[][] = [];
-  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
-  return out;
-}
-
 /**
  * Stores a batch. Samples carry full bucket totals, so re-sending a bucket
  * replaces it rather than adding to it — retries and replays are safe.
@@ -68,7 +62,7 @@ export async function ingestUsage(db: EdgeDb, teamId: string, batch: UsageBatch)
 
   const statements = [];
   // Five values a row: 20 rows a statement.
-  for (const rows of chunk(batch.samples, 20)) {
+  for (const rows of chunk(batch.samples, rowsPerInsert(netUsage))) {
     statements.push(
       db
         .insert(netUsage)
@@ -96,7 +90,7 @@ export async function ingestUsage(db: EdgeDb, teamId: string, batch: UsageBatch)
       lastSeenAt: seenAt,
     }));
   // Six values a row: 15 rows a statement.
-  for (const rows of chunk(clientRows, 15)) {
+  for (const rows of chunk(clientRows, rowsPerInsert(netClients))) {
     statements.push(
       db
         .insert(netClients)

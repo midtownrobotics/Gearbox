@@ -3,6 +3,7 @@ import { type SQL, and, countDistinct, desc, eq, gte, lt, sql, sum } from "drizz
 import { unionAll } from "drizzle-orm/sqlite-core";
 import type { EdgeDb } from "../../db";
 import { netSiteUsage, netSiteUsageDaily } from "../../db/schema";
+import { chunk, rowsPerInsert } from "../../lib/d1";
 import { DAY, HOUR, localDayKey, localDayKeys, standardOffset } from "../../lib/time";
 
 export const MAX_SITE_ROWS_PER_BATCH = 5000;
@@ -49,17 +50,14 @@ export async function ingestSites(db: EdgeDb, teamId: string, rows: SiteRow[]) {
         .where(inTeam(netSiteUsage, teamId, eq(netSiteUsage.ts, ts), eq(netSiteUsage.mac, mac))),
     );
   }
-  // D1 allows 100 bound parameters per statement: 6 per row.
-  for (let i = 0; i < rows.length; i += 16) {
+  for (const group of chunk(rows, rowsPerInsert(netSiteUsage))) {
     statements.push(
       db
         .insert(netSiteUsage)
         .values(
           withTeam(
             teamId,
-            rows
-              .slice(i, i + 16)
-              .map(([ts, mac, site, dl, ul]) => ({ ts, mac, site, dlBytes: dl, ulBytes: ul })),
+            group.map(([ts, mac, site, dl, ul]) => ({ ts, mac, site, dlBytes: dl, ulBytes: ul })),
           ),
         )
         .onConflictDoUpdate({
