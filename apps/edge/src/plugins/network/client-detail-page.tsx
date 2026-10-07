@@ -2,18 +2,13 @@ import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, getErrorMessage } from "../../shared/api";
 import { useAuthUser } from "../../shared/auth";
-import { formatBytes, formatDateTime, formatDayKey } from "../../shared/format";
+import { formatBytes, formatDateTime, formatDayKey, formatHour } from "../../shared/format";
 import { Card, ErrorBanner, Loading, Page, Stat } from "../../shared/ui";
 import { useLoad } from "../../shared/use-load";
 import { BarChart, ChartLegend } from "./bar-chart";
 import { ClientExceptions } from "./client-exceptions";
 import { OnlineDot, PresenceNote } from "./online";
 import { isPseudoSite, sitePath } from "./sites-page";
-
-const hourFormat = new Intl.DateTimeFormat("en-US", {
-  timeZone: "America/New_York",
-  hour: "numeric",
-});
 
 export function ClientDetailPage() {
   const mac = useParams().mac ?? "";
@@ -96,7 +91,7 @@ export function ClientDetailPage() {
         <BarChart
           bars={hourly.map((h) => ({
             label: formatDateTime(h.hour),
-            tick: hourFormat.format(new Date(h.hour * 1000)),
+            tick: formatHour(h.hour),
             dl: h.dl,
             ul: h.ul,
           }))}

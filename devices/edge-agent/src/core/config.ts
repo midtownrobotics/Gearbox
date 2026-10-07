@@ -1,7 +1,7 @@
 export interface AgentConfig {
   /** Base URL of workers/edge's API, e.g. https://edge.<domain>/api */
   workerUrl: string;
-  /** Shared key; must match EDGE_AGENT_KEY on the worker. */
+  /** The team's box key, made on the Edge app's Edge Box page. */
   agentKey: string;
   dbPath: string;
   httpPort: number;

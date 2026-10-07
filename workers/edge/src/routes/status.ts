@@ -1,9 +1,10 @@
-import { requireAuth } from "@g3/auth";
-import { eq } from "drizzle-orm";
+import { inTeam, requireAuth } from "@g3/auth";
 import { Hono } from "hono";
 import { createEdgeDb } from "../db";
-import { edgeStatus, netSettings } from "../db/schema";
+import { edgeStatus } from "../db/schema";
 import { AGENT_TOO_OLD, AgentError, agentFetch } from "../lib/agent";
+import { teamBox } from "../lib/box-key";
+import { getSettings } from "../modules/network/common";
 import { probeLink } from "../modules/network/control";
 import type { InterfacesResponse } from "../modules/network/interface-types";
 import type { AppEnv } from "../types";
@@ -14,9 +15,11 @@ const OFFLINE_AFTER_SECONDS = 15 * 60;
 export const statusRouter = new Hono<AppEnv>()
   .get("/", requireAuth, async (c) => {
     const db = createEdgeDb(c.env.EDGE_DB);
-    const [status, settings] = await Promise.all([
-      db.select().from(edgeStatus).where(eq(edgeStatus.id, 1)).get(),
-      db.select().from(netSettings).where(eq(netSettings.id, 1)).get(),
+    const teamId = c.get("teamId");
+    const [status, settings, box] = await Promise.all([
+      db.select().from(edgeStatus).where(inTeam(edgeStatus, teamId)).get(),
+      getSettings(db, teamId),
+      teamBox(db, teamId),
     ]);
     const now = Math.floor(Date.now() / 1000);
     return c.json({
@@ -30,22 +33,27 @@ export const statusRouter = new Hono<AppEnv>()
             appliedStateVersion: status.appliedStateVersion,
             publicIp: status.publicIp,
             publicIpSince: status.publicIpSince,
+            timeZone: status.timeZone,
           }
         : null,
+      /** Whether the team has made a key for its box yet (Edge Box page). */
+      hasBox: box !== undefined,
       /** Latest settings/blocklist/grant version; the agent is up to date when it matches. */
-      stateVersion: settings?.stateVersion ?? 0,
+      stateVersion: settings.stateVersion,
     });
   })
   // Live check of the box's link. Separate from "/" because it can take a few
   // seconds when the box is connected but not answering.
   .get("/connection", requireAuth, async (c) => {
-    const result = await probeLink(c.env);
+    const result = await probeLink(c.env, c.get("teamId"));
     return c.json({ ...result, checkedAt: Math.floor(Date.now() / 1000) });
   })
   // The box's LAN and WAN addresses, asked live over its link.
   .get("/interfaces", requireAuth, async (c) => {
     try {
-      const res = await agentFetch(c.env, "/network/interfaces", { timeoutMs: 8_000 });
+      const res = await agentFetch(c.env, c.get("teamId"), "/network/interfaces", {
+        timeoutMs: 8_000,
+      });
       if (res.status === 404) {
         return c.json({ error: AGENT_TOO_OLD }, 502);
       }

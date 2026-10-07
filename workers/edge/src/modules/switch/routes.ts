@@ -12,9 +12,9 @@ import {
 
 type Ctx = Context<AppEnv>;
 
-async function relay<T>(c: Ctx, path: string, init?: Parameters<typeof agentFetch>[2]) {
+async function relay<T>(c: Ctx, path: string, init?: Parameters<typeof agentFetch>[3]) {
   try {
-    const res = await agentFetch(c.env, `/switch${path}`, init);
+    const res = await agentFetch(c.env, c.get("teamId"), `/switch${path}`, init);
     const body = (await res.json().catch(() => ({}))) as T & { error?: string };
     if (!res.ok) {
       return {

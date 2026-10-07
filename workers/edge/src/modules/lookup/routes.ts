@@ -30,7 +30,7 @@ export const lookupRouter = new Hono<AppEnv>().post(
   lookupValidator,
   async (c) => {
     try {
-      const res = await agentFetch(c.env, "/lookup", {
+      const res = await agentFetch(c.env, c.get("teamId"), "/lookup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(c.req.valid("json")),

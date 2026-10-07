@@ -1,4 +1,4 @@
-import { requireAuth } from "@g3/auth";
+import { forwardIdentity, requireAuth } from "@g3/auth";
 import {
   CLIENT_HEADER_NAMES,
   type ClientHeaders,
@@ -59,7 +59,8 @@ export const lookupRouter = new Hono<AppEnv>().get("/", requireAuth, urlValidato
   const res = await c.env.EDGE.fetch(
     new Request("http://edge/api/lookup", {
       method: "POST",
-      headers: { cookie: c.req.header("Cookie") ?? "", "Content-Type": "application/json" },
+      // As the member, for their team: Edge asks that team's own box.
+      headers: { ...forwardIdentity(c), "Content-Type": "application/json" },
       body: JSON.stringify({ url, client }),
     }),
   );
@@ -74,14 +75,7 @@ export const lookupRouter = new Hono<AppEnv>().get("/", requireAuth, urlValidato
         422,
       );
     }
-    // Signed in here but not by Edge: the box isn't this team's (it's the site team's until each
-    // team can pair its own, roadmap E.1/E.2). The requester fills the details in by hand.
-    if (res.status === 401 || res.status === 403) {
-      return c.json(
-        { error: "Automatic lookup needs an edge box, and your team hasn't connected one." },
-        503,
-      );
-    }
+    // Never 401: the member is signed in here, so the app mustn't send them to sign in again.
     const status = ([400, 404, 503] as const).find((s) => s === res.status) ?? 502;
     return c.json({ error: body.error ?? `Lookup failed (HTTP ${res.status}).` }, status);
   }

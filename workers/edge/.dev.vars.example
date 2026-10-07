@@ -1,2 +1,0 @@
-# Copy to .dev.vars for local dev. Must match EDGE_AGENT_KEY in the agent's env (mock.env).
-EDGE_AGENT_KEY=local-dev-agent-key

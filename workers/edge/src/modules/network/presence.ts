@@ -1,3 +1,4 @@
+import { withTeam } from "@g3/auth";
 import { sql } from "drizzle-orm";
 import type { EdgeDb } from "../../db";
 import { netClients } from "../../db/schema";
@@ -18,10 +19,16 @@ export type LivePresence =
  * (printers) are listed too. Never throws: when the box can't be asked, the
  * page still shows the stored list without online dots.
  */
-export async function livePresence(env: AppEnv["Bindings"], db: EdgeDb): Promise<LivePresence> {
+export async function livePresence(
+  env: AppEnv["Bindings"],
+  db: EdgeDb,
+  teamId: string,
+): Promise<LivePresence> {
   let body: PresenceResponse;
   try {
-    const res = await agentFetch(env, "/network/presence", { timeoutMs: PRESENCE_TIMEOUT_MS });
+    const res = await agentFetch(env, teamId, "/network/presence", {
+      timeoutMs: PRESENCE_TIMEOUT_MS,
+    });
     if (res.status === 404) {
       return { available: false, error: AGENT_TOO_OLD };
     }
@@ -36,7 +43,7 @@ export async function livePresence(env: AppEnv["Bindings"], db: EdgeDb): Promise
   }
 
   const online = body.clients.filter((c) => c.online && typeof c.mac === "string");
-  // D1 allows 100 bound parameters per statement: 5 per row.
+  // D1 allows 100 bound parameters per statement: 6 per row.
   const statements = [];
   for (let i = 0; i < online.length; i += 15) {
     const rows = online.slice(i, i + 15).map((c) => ({
@@ -49,9 +56,9 @@ export async function livePresence(env: AppEnv["Bindings"], db: EdgeDb): Promise
     statements.push(
       db
         .insert(netClients)
-        .values(rows)
+        .values(withTeam(teamId, rows))
         .onConflictDoUpdate({
-          target: netClients.mac,
+          target: [netClients.teamId, netClients.mac],
           set: {
             hostname: sql`coalesce(excluded.hostname, ${netClients.hostname})`,
             lastIp: sql`excluded.last_ip`,

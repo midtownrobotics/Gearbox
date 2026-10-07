@@ -1,11 +1,14 @@
 import { admin, kioskAdmin, student } from "@g3/testing/users";
 import { call, callAs, jsonAs } from "@g3/testing/worker";
-import { describe, expect, it, vi } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 
-// G3 Edge: the dashboard uses G3ID (admins change things); the shop's edge box uses a shared key
-// (EDGE_AGENT_KEY, "test-agent-key" in vitest.config.mts).
+// Edge: the dashboard uses G3ID (admins change things); the team's edge box uses its own key,
+// made by an admin on the Edge Box page (POST /box/key).
 
-const AGENT_KEY = "test-agent-key";
+let AGENT_KEY = "";
+beforeAll(async () => {
+  AGENT_KEY = (await jsonAs<{ key: string }>(admin, "/box/key", { method: "POST" }, 201)).key;
+});
 const agent = (path: string, init: RequestInit = {}) =>
   call(path, {
     ...init,

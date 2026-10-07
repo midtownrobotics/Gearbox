@@ -1,12 +1,13 @@
-import { requireAuth } from "@g3/auth";
+import { forwardIdentity, requireAuth } from "@g3/auth";
 import { type Context, Hono } from "hono";
 import { drawingKey } from "../lib/storage";
 import type { AppEnv } from "../types";
 
 /**
- * Sends a document to the shop printer through the edge box (workers/edge →
- * tunnel → CUPS on the box). Shop prints are always one-sided black and white
- * on the default printer, as the logged-in user.
+ * Sends a document to the shop printer through the team's edge box (workers/edge →
+ * its link → CUPS on the box). Shop prints are always one-sided black and white
+ * on the default printer, as the logged-in user. A team without a connected box
+ * gets Edge's 503 ("isn't connected").
  */
 async function sendToPrinter(
   c: Context<AppEnv>,
@@ -19,7 +20,8 @@ async function sendToPrinter(
     const res = await c.env.EDGE.fetch(
       new Request(`http://edge/api/print/jobs?${query}`, {
         method: "POST",
-        headers: { cookie: c.req.header("Cookie") ?? "", "content-type": contentType },
+        // As the member, for their team: Edge prints on that team's own box.
+        headers: { ...forwardIdentity(c), "content-type": contentType },
         body,
       }),
     );
@@ -29,17 +31,6 @@ async function sendToPrinter(
       error?: string;
       alerts?: { severity: "error" | "warning"; message: string }[];
     };
-    // Signed in here but not by Edge: the box isn't this team's (it's the site team's until each
-    // team can pair its own, roadmap E.1/E.2).
-    if (res.status === 401 || res.status === 403) {
-      return c.json(
-        {
-          ok: false as const,
-          error: "Printing needs an edge box, and your team hasn't connected one.",
-        },
-        503,
-      );
-    }
     if (!res.ok || !data.ok) {
       return c.json(
         { ok: false as const, error: data.error || "Print failed" },

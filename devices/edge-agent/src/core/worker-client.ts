@@ -3,9 +3,12 @@ import { hc } from "hono/client";
 import type { AgentConfig } from "./config";
 import { AGENT_VERSION } from "./version";
 
+/** The time zone the box is set to (`timedatectl set-timezone`); the team's days are counted in it. */
+const TIME_ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
 /**
- * Sent on every request to the worker (and when opening the link): the shared
- * key, and what the worker shows on the Edge Box page.
+ * Sent on every request to the worker (and when opening the link): the team's
+ * box key, and what the worker shows on the Edge Box page.
  */
 export function agentHeaders(config: AgentConfig, startedAt: number, sync: SyncState) {
   return {
@@ -13,6 +16,7 @@ export function agentHeaders(config: AgentConfig, startedAt: number, sync: SyncS
     "X-G3-Agent-Version": AGENT_VERSION,
     "X-G3-Agent-Started": String(startedAt),
     "X-G3-Agent-State-Version": String(sync.applied),
+    "X-G3-Agent-Time-Zone": TIME_ZONE,
   };
 }
 

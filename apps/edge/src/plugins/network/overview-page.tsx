@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { api, getErrorMessage } from "../../shared/api";
 import { useAuthUser } from "../../shared/auth";
-import { GB, formatBytes, formatDate, formatDayKey } from "../../shared/format";
+import { GB, formatBytes, formatDate, formatDayKey, todayKey } from "../../shared/format";
 import { Card, ErrorBanner, Loading, Page, Stat } from "../../shared/ui";
 import { useLoad } from "../../shared/use-load";
 import { BarChart, ChartLegend } from "./bar-chart";
@@ -33,15 +33,22 @@ export function OverviewPage() {
   const { capBytes, used, projection, cycle, daily } = data;
   const cycleDays = daily.length;
   const worst = Math.max(projection.runRate ?? 0, projection.sevenDayPace ?? 0);
-  const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/New_York" });
+  const today = todayKey();
 
   return (
     <Page title="Network">
       <Card title={`Billing cycle · ${formatDate(cycle.start)} – ${formatDate(cycle.end - 1)}`}>
-        <UsageBar used={used} cap={capBytes} projected={worst || null} />
+        {/* 0: the team hasn't set a cap (an admin sets it below). */}
+        {capBytes > 0 && <UsageBar used={used} cap={capBytes} projected={worst || null} />}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-5">
-          <Stat label="Used" value={formatBytes(used)} hint={`of ${formatBytes(capBytes)} cap`} />
-          <Stat label="Remaining" value={formatBytes(Math.max(0, capBytes - used))} />
+          <Stat
+            label="Used"
+            value={formatBytes(used)}
+            hint={capBytes > 0 ? `of ${formatBytes(capBytes)} cap` : "no cap set"}
+          />
+          {capBytes > 0 && (
+            <Stat label="Remaining" value={formatBytes(Math.max(0, capBytes - used))} />
+          )}
           <Projection label="Projected (cycle pace)" value={projection.runRate} cap={capBytes} />
           <Projection
             label="Projected (last 7 days)"
@@ -60,7 +67,7 @@ export function OverviewPage() {
             dl: d.day <= today ? d.dl : 0,
             ul: d.day <= today ? d.ul : 0,
           }))}
-          reference={{ value: capBytes / cycleDays, label: "even pace" }}
+          reference={capBytes > 0 ? { value: capBytes / cycleDays, label: "even pace" } : undefined}
         />
         <ChartLegend />
       </Card>
@@ -136,6 +143,7 @@ function UsageBar({
 
 function Projection({ label, value, cap }: { label: string; value: number | null; cap: number }) {
   if (value === null) return <Stat label={label} value="—" hint="Not enough data yet" />;
+  if (cap === 0) return <Stat label={label} value={formatBytes(value)} />;
   const over = value > cap;
   return (
     <Stat
@@ -186,7 +194,8 @@ function SettingsRow({ capBytes, onSaved }: { capBytes: number; onSaved: () => v
   if (!editing) {
     return (
       <p className="text-xs text-secondary-400 mt-4">
-        Cap {formatBytes(s.capBytes)} · cycle resets on day {s.cycleStartDay} of each month
+        {s.capBytes > 0 ? `Cap ${formatBytes(s.capBytes)}` : "No data cap set"} · cycle resets on
+        day {s.cycleStartDay} of each month
         {user.isAdmin && (
           <button
             type="button"

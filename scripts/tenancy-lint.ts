@@ -7,7 +7,7 @@
 // For each app below it reports:
 //   - a raw D1 `.prepare(` call (queries go through Drizzle and the helpers);
 //   - a Drizzle `from`/`update`/`delete`/join on a team table whose statement has no `inTeam(`,
-//     or an `insert` into one with no `withTeam(`;
+//     or an `insert` into one with no `withTeam(` (or, for INSERT … SELECT, no `inTeam(` select);
 //   - a `sql` template that names a team table.
 // A query that must read every team's rows (a cron job finding which teams to work on) goes on the
 // line after a `// tenancy: all teams (<why>)` comment, which a reviewer can see and question.
@@ -85,6 +85,23 @@ const APPS: App[] = [
       partInstanceFiles: "part_instance_files",
       stagingBatches: "staging_batches",
       adminSettings: "admin_settings",
+    },
+  },
+  {
+    dir: "workers/edge",
+    teamTables: {
+      edgeBoxes: "edge_boxes",
+      edgeStatus: "edge_status",
+      edgeAudit: "edge_audit",
+      netClients: "net_clients",
+      netUsage: "net_usage",
+      netUsageHourly: "net_usage_hourly",
+      netSettings: "net_settings",
+      netBlocklists: "net_blocklists",
+      netBlocklistDomains: "net_blocklist_domains",
+      netGrants: "net_grants",
+      netSiteUsage: "net_site_usage",
+      netSiteUsageDaily: "net_site_usage_daily",
     },
   },
   {
@@ -184,7 +201,9 @@ for (const app of APPS) {
           const statement = chain.getText(source);
           const { line } = source.getLineAndCharacterOfPosition(chain.getStart());
           if (allTeamsAllowed(text, line)) return ts.forEachChild(node, visit);
-          if (method === "insert" && !statement.includes("withTeam(")) {
+          // An INSERT … SELECT from the team's own rows (inTeam) keeps their team.
+          const copiesTeamRows = statement.includes(".select(") && statement.includes("inTeam(");
+          if (method === "insert" && !statement.includes("withTeam(") && !copiesTeamRows) {
             problems.push(`${at(node)}: insert into ${first.text} without withTeam()`);
           } else if (SCOPED.has(method) && !statement.includes("inTeam(")) {
             problems.push(`${at(node)}: ${method}(${first.text}) without inTeam()`);
