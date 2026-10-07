@@ -36,6 +36,16 @@ const APPS: App[] = [
     },
   },
   {
+    dir: "workers/pit",
+    teamTables: {
+      settings: "settings",
+      checklistLists: "checklist_lists",
+      checklistItems: "checklist_items",
+      checklistIssues: "checklist_issues",
+      batteries: "batteries",
+    },
+  },
+  {
     dir: "workers/inventory",
     teamTables: {
       fields: "fields",

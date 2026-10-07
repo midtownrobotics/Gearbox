@@ -3,8 +3,7 @@ import type { G3AuthVariables } from "@g3/auth";
 export type AppEnv = {
   Bindings: {
     FRONTEND_URL: string;
-    TEAM_NUMBER: string;
-    EVENT_KEY: string;
+    /** The Blue Alliance and Nexus API keys every team's monitor uses (secrets). */
     TBA_AUTH_KEY: string;
     NEXUS_API_KEY: string;
     SESSIONS: KVNamespace;

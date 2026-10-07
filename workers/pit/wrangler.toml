@@ -20,8 +20,6 @@ migrations_dir = "src/db/migrations"
 
 [vars]
 FRONTEND_URL = "http://localhost:5175"
-TEAM_NUMBER = "1648"
-EVENT_KEY = "2026gacmp"
 # TBA_AUTH_KEY and NEXUS_API_KEY are secrets — set via `.dev.vars` locally and `wrangler secret put` in prod
 
 [env.production]
@@ -45,8 +43,6 @@ migrations_dir = "src/db/migrations"
 
 [env.production.vars]
 FRONTEND_URL = "https://1648-pit.frcgearbox.com"
-TEAM_NUMBER = "1648"
-EVENT_KEY = "2026gacmp"
 # TBA_AUTH_KEY and NEXUS_API_KEY are secrets — set via `wrangler secret put <NAME> --env production`
 
 # The app's page, served by this worker in production; only /api/* runs the worker code, and
