@@ -85,7 +85,6 @@ test("closing the door stops the playing WAV and cancels queued playback", async
       });
       const kill = () => {
         wasKilled = true;
-        resolveExit(143);
       };
       processes.push({
         kill,
@@ -115,6 +114,62 @@ test("closing the door stops the playing WAV and cancels queued playback", async
   expect(processes).toHaveLength(2);
   processes[1].finish();
   await expect(nextOpening).resolves.toBe("/srv/g3-sounds/welcome.wav");
+});
+
+test("drains aplay stderr before waiting for the process to exit", async () => {
+  let finish: (code: number) => void = () => {};
+  const exited = new Promise<number>((resolve) => {
+    finish = resolve;
+  });
+  const player = createSoundPlayer(
+    "aplay",
+    "plughw:CARD=rockchipes8388,DEV=0",
+    async () => ["/srv/g3-sounds/welcome.wav"],
+    () => ({
+      exited,
+      stderr: new ReadableStream<Uint8Array>(
+        {
+          pull(controller) {
+            controller.enqueue(new TextEncoder().encode("audio error"));
+            controller.close();
+            // Model a child blocked on its stderr pipe until it is read.
+            finish(1);
+          },
+        },
+        { highWaterMark: 0 },
+      ),
+      kill() {},
+    }),
+  );
+
+  await expect(player.play()).rejects.toThrow("aplay exited 1: audio error");
+  await expect(player.play()).rejects.toThrow("sound is disabled until restart");
+});
+
+test("times out a stuck aplay process and disables further playback", async () => {
+  let processes = 0;
+  let kills = 0;
+  const player = createSoundPlayer(
+    "aplay",
+    "device",
+    async () => ["/srv/g3-sounds/welcome.wav"],
+    () => {
+      processes++;
+      return {
+        exited: new Promise<number>(() => {}),
+        stderr: new ReadableStream<Uint8Array>(),
+        kill() {
+          kills++;
+        },
+      };
+    },
+    10,
+  );
+
+  await expect(player.play()).rejects.toThrow("Audio playback timed out");
+  await expect(player.play()).rejects.toThrow("sound is disabled until restart");
+  expect(processes).toBe(1);
+  expect(kills).toBe(1);
 });
 
 describe("SoundLibrary", () => {

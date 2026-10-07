@@ -115,7 +115,10 @@ export function createSwitchModule(ctx: ModuleContext, soundPlayer?: SoundPlayer
     })
     .post("/sounds/:name/test", async (c) => {
       try {
-        const sound = await play(library.soundPath(c.req.param("name")));
+        const sound = library.soundPath(c.req.param("name"));
+        // A sound can outlast the worker's request deadline. Acknowledge the
+        // test immediately; playback errors remain visible in /state.
+        void play(sound).catch(() => {});
         return c.json({ ok: true, sound });
       } catch (error) {
         return c.json({ error: error instanceof Error ? error.message : String(error) }, 400);

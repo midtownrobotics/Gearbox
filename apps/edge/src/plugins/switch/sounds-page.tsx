@@ -208,7 +208,7 @@ export function DoorSoundsPage() {
                           request(`/sounds/${encodeURIComponent(sound.name)}/test`, {
                             method: "POST",
                           }),
-                        `Played ${sound.name} on the Orange Pi.`,
+                        `Started ${sound.name} on the Orange Pi. Refresh status if playback stops early.`,
                       )
                     }
                   >

@@ -43,6 +43,8 @@ describe("switch module integration", () => {
     const db = new Database(":memory:");
     let played = 0;
     let stopped = 0;
+    let finishManual = () => {};
+    let manualFinished = false;
     const module = createSwitchModule(
       {
         config,
@@ -53,6 +55,12 @@ describe("switch module integration", () => {
       {
         async play(path) {
           played++;
+          if (path) {
+            await new Promise<void>((resolve) => {
+              finishManual = resolve;
+            });
+            manualFinished = true;
+          }
           return path ?? join(soundDir, "welcome.wav");
         },
         stop() {
@@ -75,6 +83,10 @@ describe("switch module integration", () => {
       const play = await module.routes.request("/sounds/welcome.wav/test", { method: "POST" });
       expect(play.status).toBe(200);
       expect(((await play.json()) as { sound: string }).sound).toEndWith("welcome.wav");
+      expect(manualFinished).toBe(false);
+      finishManual();
+      await Bun.sleep(0);
+      expect(manualFinished).toBe(true);
 
       await module.routes.request("/input", {
         method: "POST",
