@@ -1,5 +1,5 @@
 // Tenancy lint (roadmap Phase 3): in every app that serves many teams, a query on a team's table
-// must go through the platform SDK's team-scoped helpers (@g3/platform-sdk `inTeam`, `withTeam`),
+// must go through the team-scoped helpers in @g3/auth (`inTeam`, `withTeam`),
 // so a forgotten team filter fails CI instead of showing one team another team's rows.
 //
 //   pnpm lint:tenancy

@@ -1,4 +1,4 @@
-import { inTeam, withTeam } from "@g3/platform-sdk";
+import { inTeam, withTeam } from "@g3/auth";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import defaultTrees from "../../content/default-trees.json";

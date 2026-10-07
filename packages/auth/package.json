@@ -12,10 +12,12 @@
   "devDependencies": {
     "@cloudflare/workers-types": "catalog:",
     "hono": "catalog:",
-    "typescript": "^5.8.0"
+    "typescript": "^5.8.0",
+    "drizzle-orm": "catalog:"
   },
   "peerDependencies": {
-    "hono": "catalog:"
+    "hono": "catalog:",
+    "drizzle-orm": "catalog:"
   },
   "dependencies": {
     "@g3/site-config": "workspace:*"

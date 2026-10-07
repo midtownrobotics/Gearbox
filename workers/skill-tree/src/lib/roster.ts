@@ -1,4 +1,4 @@
-import { activeMembers } from "@g3/platform-sdk";
+import { activeMembers } from "@g3/auth";
 import type { Context } from "hono";
 import type { AppEnv } from "../types";
 

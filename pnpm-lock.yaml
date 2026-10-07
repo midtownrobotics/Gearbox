@@ -584,22 +584,6 @@ importers:
       '@cloudflare/workers-types':
         specifier: 'catalog:'
         version: 4.20260702.1
-      hono:
-        specifier: 'catalog:'
-        version: 4.12.19
-      typescript:
-        specifier: ^5.8.0
-        version: 5.9.3
-
-  packages/platform:
-    dependencies:
-      '@g3/auth':
-        specifier: workspace:*
-        version: link:../auth
-    devDependencies:
-      '@cloudflare/workers-types':
-        specifier: 'catalog:'
-        version: 4.20260702.1
       drizzle-orm:
         specifier: 'catalog:'
         version: 0.44.7(@cloudflare/workers-types@4.20260702.1)(bun-types@1.4.2)
@@ -1016,9 +1000,6 @@ importers:
       '@g3/auth':
         specifier: workspace:*
         version: link:../../packages/auth
-      '@g3/platform-sdk':
-        specifier: workspace:*
-        version: link:../../packages/platform
       '@g3/site-config':
         specifier: workspace:*
         version: link:../../packages/site-config

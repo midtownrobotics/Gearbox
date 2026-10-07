@@ -18,8 +18,7 @@
     "@g3/auth": "workspace:*",
     "@g3/site-config": "workspace:*",
     "drizzle-orm": "catalog:",
-    "hono": "catalog:",
-    "@g3/platform-sdk": "workspace:*"
+    "hono": "catalog:"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "catalog:",
