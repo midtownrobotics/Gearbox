@@ -8,6 +8,7 @@ import { canEditCatalog } from "./middleware/auth";
 import { catalogRouter } from "./routes/catalog";
 import { categoriesRouter } from "./routes/categories";
 import { categoryRulesRouter, settingsRouter, suggestRouter } from "./routes/fast-entry";
+import { inventoryRouter } from "./routes/inventory";
 import { listsRouter } from "./routes/lists";
 import { lookupRouter } from "./routes/lookup";
 import { ordersRouter } from "./routes/orders";
@@ -62,7 +63,8 @@ const app = base
   .route("/share-a-cart", shareACartRouter)
   .route("/catalog", catalogRouter)
   .route("/trusted", trustedRouter)
-  .route("/lists", listsRouter);
+  .route("/lists", listsRouter)
+  .route("/inventory", inventoryRouter);
 
 export type OrdersApp = typeof app;
 export type { ImportSummary } from "./lib/sheet-import";

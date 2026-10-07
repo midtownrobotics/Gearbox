@@ -5,6 +5,7 @@ import type { IconType } from "react-icons";
 import { FaGithub, FaGlobe, FaInstagram, FaSlack } from "react-icons/fa";
 import edgeIcon from "../../assets/app-icons/edge.svg";
 import idIcon from "../../assets/app-icons/id.svg";
+import inventoryIcon from "../../assets/app-icons/inventory.svg";
 import ordersIcon from "../../assets/app-icons/orders.svg";
 import pitIcon from "../../assets/app-icons/pit.svg";
 import scoutingIcon from "../../assets/app-icons/scouting.svg";
@@ -54,6 +55,11 @@ const APPS: App[] = [
     label: "Orders",
     href: appUrl("orders"),
     tile: ordersIcon,
+  },
+  {
+    label: "Inventory",
+    href: appUrl("inventory"),
+    tile: inventoryIcon,
   },
   {
     label: "Edge",

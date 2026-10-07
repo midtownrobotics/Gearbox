@@ -13,6 +13,7 @@ const DEV_WORKERS: Partial<Record<AppName, string>> = {
   scouting: "scouting",
   skillTree: "skill-tree",
   attendance: "attendance",
+  inventory: "inventory",
 };
 
 /**

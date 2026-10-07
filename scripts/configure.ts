@@ -24,6 +24,7 @@ const WORKERS: Record<string, Exclude<AppName, "portal">> = {
   attendance: "attendance",
   edge: "edge",
   g3id: "id",
+  inventory: "inventory",
   orders: "orders",
   pit: "pit",
   scouting: "scouting",

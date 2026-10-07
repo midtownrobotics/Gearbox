@@ -3,6 +3,7 @@ import { DEFAULT_TEMPLATE, applyTemplate } from "@g3/worker-orders/naming";
 import { type FormEvent, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api, getErrorMessage } from "../../shared/api";
+import { forgetIntake } from "../../shared/receive-dialog";
 import {
   Button,
   Card,
@@ -28,9 +29,64 @@ export function SettingsPage() {
     <Page title="Settings">
       <TrustedStudents />
       <ShareACart />
+      <InventoryOnReceive />
       <NamingTemplate />
       <CategoryRules />
     </Page>
+  );
+}
+
+/** Whether marking a part received has to say where it goes in the Inventory app. */
+function InventoryOnReceive() {
+  const names = useTeamNames();
+  const inventory = names.appTitle("Inventory");
+  const settings = useLoad(async () => {
+    const res = await api.settings.$get();
+    if (!res.ok) throw new Error(await getErrorMessage(res));
+    return res.json();
+  }, []);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function set(required: boolean) {
+    setBusy(true);
+    setError(null);
+    const res = await api.settings.$put({ json: { inventoryRequired: required } });
+    setBusy(false);
+    if (!res.ok) return setError(await getErrorMessage(res));
+    forgetIntake();
+    settings.reload();
+  }
+
+  return (
+    <Card title="Receiving and Inventory">
+      {!settings.data ? (
+        <Loading />
+      ) : (
+        <div className="space-y-3">
+          <label className="flex items-start gap-3 text-sm text-secondary-900">
+            <input
+              type="checkbox"
+              className="mt-0.5"
+              checked={settings.data.inventoryRequired}
+              disabled={busy}
+              onChange={(e) => void set(e.target.checked)}
+            />
+            <span>
+              <span className="font-semibold">
+                Require a place in {inventory} when marking parts received
+              </span>
+              <span className="mt-0.5 block text-secondary-600">
+                {settings.data.inventoryRequired
+                  ? `Whoever receives a part has to say where it goes (a storage location, or in use on a robot), and it's added to ${inventory}.`
+                  : `Saying where a part goes is optional. Parts received without it don't appear in ${inventory}.`}
+              </span>
+            </span>
+          </label>
+          {error && <ErrorBanner message={error} />}
+        </div>
+      )}
+    </Card>
   );
 }
 

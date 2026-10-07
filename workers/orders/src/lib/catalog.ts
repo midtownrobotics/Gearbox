@@ -83,7 +83,28 @@ type RequestItem = {
   image: string | null;
   storePlatform: string | null;
   storeVariantId: string | null;
+  /** How many parts one unit is, if the request says. */
+  packQuantity?: number;
 };
+
+/** A catalog part's pack quantity (1 if it's gone). */
+export async function catalogPackQuantity(db: OrdersDb, catalogItemId: number): Promise<number> {
+  const row = await db
+    .select({ packQuantity: catalogItems.packQuantity })
+    .from(catalogItems)
+    .where(eq(catalogItems.id, catalogItemId))
+    .get();
+  return row?.packQuantity ?? 1;
+}
+
+/**
+ * A catalog part that doesn't know its pack quantity yet (still 1) learns it from a request that
+ * says more. One that has it keeps it: catalog editors change it from there.
+ */
+const learnsPack = (known: number, item: RequestItem) =>
+  known === 1 && item.packQuantity !== undefined && item.packQuantity > 1
+    ? { packQuantity: item.packQuantity }
+    : {};
 
 /**
  * The catalog item a submitted request is: the one picked from the catalog, or the one with the
@@ -126,6 +147,7 @@ export async function catalogItemFor(
               }
             : {}),
           ...(picked.image ? {} : { image: item.image }),
+          ...learnsPack(picked.packQuantity, item),
         })
         .where(eq(catalogItems.id, picked.id));
       return picked.id;
@@ -134,7 +156,11 @@ export async function catalogItemFor(
 
   if (key && kind === "product") {
     const same = await db
-      .select({ id: catalogItems.id, image: catalogItems.image })
+      .select({
+        id: catalogItems.id,
+        image: catalogItems.image,
+        packQuantity: catalogItems.packQuantity,
+      })
       .from(catalogItems)
       .where(eq(catalogItems.productKey, key))
       .get();
@@ -145,6 +171,7 @@ export async function catalogItemFor(
           requestCount: sql`${catalogItems.requestCount} + 1`,
           lastRequestedAt: now,
           ...(same.image ? {} : { image: item.image }),
+          ...learnsPack(same.packQuantity, item),
         })
         .where(eq(catalogItems.id, same.id));
       return same.id;
@@ -174,6 +201,7 @@ export async function catalogItemFor(
       linkKind: kind,
       productKey: kind === "product" ? key : null,
       image: item.image,
+      packQuantity: item.packQuantity ?? 1,
       storePlatform: item.storePlatform,
       storeVariantId: item.storeVariantId,
       source: "request",

@@ -29,6 +29,7 @@
     "@cloudflare/workers-types": "^4.20250516.0",
     "@g3/testing": "workspace:*",
     "@g3/worker-edge": "workspace:*",
+    "@g3/worker-inventory": "workspace:*",
     "typescript": "^5.8.0",
     "vitest": "catalog:",
     "wrangler": "^4.110.0"

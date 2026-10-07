@@ -1,0 +1,48 @@
+# Production URLs, route patterns and TEAM_NUMBER here are written by `pnpm configure` from
+# packages/site-config/src/site.ts. Change them there, not here.
+name = "inventory"
+main = "src/index.ts"
+compatibility_date = "2026-05-17"
+
+[[services]]
+binding = "G3ID"
+service = "g3id"
+
+[[d1_databases]]
+binding = "INVENTORY_DB"
+database_name = "g3-inventory-local"
+database_id = "00000000-0000-0000-0000-000000000007"
+migrations_dir = "src/db/migrations"
+
+[vars]
+FRONTEND_URL = "http://localhost:5186"
+
+[env.production]
+name = "inventory-production"
+# No workers.dev address: the gateway is the only way in, so its identity headers can be trusted.
+workers_dev = false
+
+[[env.production.services]]
+binding = "G3ID"
+service = "g3id-production"
+
+# Create with `wrangler d1 create g3-inventory-prod` and paste its ID here.
+[[env.production.d1_databases]]
+binding = "INVENTORY_DB"
+database_name = "g3-inventory-prod"
+database_id = "f85c16ce-a720-4b2a-b6b6-13612df56b8a"
+migrations_dir = "src/db/migrations"
+
+[env.production.vars]
+FRONTEND_URL = "https://1648-inventory.frcgearbox.com"
+
+# The app's page, served by this worker in production; only /api/* runs the worker code, and
+# other paths fall back to index.html for the app's router. Wrangler builds the page before
+# every production deploy or upload (Cloudflare's Git builds too).
+[env.production.build]
+command = "pnpm --filter @g3/inventory build"
+
+[env.production.assets]
+directory = "../../apps/inventory/dist"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]

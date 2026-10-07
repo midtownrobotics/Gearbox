@@ -37,6 +37,10 @@ export type Draft = {
   priceUnit: string | null;
   currency: string;
   quantity: string;
+  /** How many parts one of the quantity is: 4 for a pack of 4. */
+  packQuantity: string;
+  /** packQuantity was read from the product's name and the requester hasn't changed it. */
+  packGuessed: boolean;
   categoryId: string;
   categoryHint: string | null;
   priority: Priority;
@@ -77,6 +81,8 @@ export const blank = (url = ""): Draft => ({
   priceUnit: null,
   currency: "USD",
   quantity: "1",
+  packQuantity: "1",
+  packGuessed: false,
   categoryId: "",
   categoryHint: null,
   priority: "normal",
@@ -173,6 +179,9 @@ function suggestionFields(suggestion: Suggestion | null): Partial<Draft> {
         }`
       : null,
     history: suggestion?.history ?? [],
+    // The catalog's pack quantity for a product it knows, else what the name says.
+    packQuantity: String(suggestion?.packQuantity ?? suggestion?.packQuantityGuess ?? 1),
+    packGuessed: !suggestion?.packQuantity && !!suggestion?.packQuantityGuess,
     catalogCategory: suggestion?.catalogCategory ?? suggestion?.catalogCategoryGuess ?? "",
     catalogKnown: !!suggestion?.catalogCategory,
     catalogCategoryGuessed: !suggestion?.catalogCategory && !!suggestion?.catalogCategoryGuess,
@@ -195,6 +204,10 @@ export async function catalogDraft(item: CatalogItem): Promise<Partial<Draft>> {
     catalogCategory: item.category,
     catalogKnown: true,
     catalogCategoryGuessed: false,
+    // A part the catalog knows as a pack; otherwise the name's guess (if any) stands.
+    ...(item.packQuantity > 1
+      ? { packQuantity: String(item.packQuantity), packGuessed: false }
+      : {}),
     linkNote:
       item.linkKind === "search"
         ? "This link is the vendor's search for the part number. Paste the product page if you find it."
@@ -287,6 +300,8 @@ export function draftProblem(d: Draft, fallbackReason = ""): string | null {
     (!d.name.trim() && "Give it a name.") ||
     (Number.isNaN(parseDollars(d.price)) && "Price must be a dollar amount like 12.50.") ||
     (!(Number(d.quantity) >= 1) && "Quantity must be at least 1.") ||
+    (!(Number.isInteger(Number(d.packQuantity)) && Number(d.packQuantity) >= 1) &&
+      "Pack of must be a whole number, 1 or more.") ||
     (!d.categoryId && "Pick a budget category.") ||
     (!d.catalogItemId &&
       !d.catalogCategory.trim() &&
@@ -308,6 +323,7 @@ export function draftFields(d: Draft, fallbackReason = "") {
     unitPriceCents: parseDollars(d.price),
     currency: d.currency,
     quantity: Number(d.quantity),
+    packQuantity: Number(d.packQuantity),
     categoryId: Number(d.categoryId),
     reason: d.reason.trim() || fallbackReason.trim(),
     priority: d.priority,
@@ -361,6 +377,10 @@ export function DraftCard({
     unit !== null && !Number.isNaN(unit) && Number(d.quantity) > 0
       ? unit * Number(d.quantity)
       : null;
+  // How many parts arrive, when what's ordered is a pack.
+  const pack = Number(d.packQuantity);
+  const parts =
+    Number.isInteger(pack) && pack > 1 && Number(d.quantity) > 0 ? pack * Number(d.quantity) : null;
 
   return (
     <Card className="!p-4">
@@ -466,6 +486,25 @@ export function DraftCard({
                 className={inputClass}
                 value={d.quantity}
                 onChange={(e) => onChange({ quantity: e.target.value })}
+              />
+            </Field>
+            <Field
+              label="Pack of"
+              hint={
+                d.packGuessed
+                  ? "Guessed from the name. Check it's right and change it if not."
+                  : parts !== null
+                    ? `= ${parts} parts when it arrives`
+                    : "Parts in one of these"
+              }
+              warn={d.packGuessed}
+            >
+              <input
+                type="number"
+                min={1}
+                className={inputClass}
+                value={d.packQuantity}
+                onChange={(e) => onChange({ packQuantity: e.target.value, packGuessed: false })}
               />
             </Field>
             <div className="col-span-2">

@@ -130,6 +130,8 @@ export const orderRequests = sqliteTable(
     unitPriceCents: integer("unit_price_cents"),
     currency: text("currency").notNull().default("USD"),
     quantity: integer("quantity").notNull(),
+    /** How many parts one of `quantity` is: 4 for a pack of 4 (lib/pack-quantity.ts). */
+    packQuantity: integer("pack_quantity").notNull().default(1),
     categoryId: integer("category_id")
       .notNull()
       .references(() => budgetCategories.id),
@@ -236,6 +238,8 @@ export const catalogItems = sqliteTable(
     /** Last price paid (set when an order is placed); older than 7 days gets looked up again. */
     priceCents: integer("price_cents"),
     priceAt: integer("price_at"),
+    /** How many parts one of this product is: 4 for a pack of 4. Requests for it start with this. */
+    packQuantity: integer("pack_quantity").notNull().default(1),
     storePlatform: text("store_platform"),
     storeVariantId: text("store_variant_id"),
     source: text("source", { enum: ["frcdesign", "request"] }).notNull(),

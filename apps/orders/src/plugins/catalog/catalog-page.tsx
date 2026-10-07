@@ -437,6 +437,7 @@ function ItemRow({
         <p className="text-xs text-secondary-500">
           {item.vendor}
           {item.sku && ` · ${item.sku}`}
+          {item.packQuantity > 1 && ` · pack of ${item.packQuantity}`}
           {" · "}
           {item.priceCents === null ? (
             "no price yet"

@@ -37,14 +37,14 @@ Three release points sit between phases: G3 moves to its frcgearbox.com addresse
 
 ## Progress
 
-As of 5 October 2026, five of the six Phase 0 steps are done on `main`, Phase 1 is done (nothing a user sees says G3 unless it's G3's own settings), and Phase 2 is done: teams in G3ID, a team-aware gateway, sign-in, Slack and sign-up per team, and pages that take their team from their address. Skill Tree has done the parts of Phase 3 that don't need teams yet, and Scouting engagement controls provide early groundwork for optional plugins in Phase 4. The rest of Phases 3 to 6 has not started.
+As of 5 October 2026, five of the six Phase 0 steps are done on `main`, Phase 1 is done (nothing a user sees says G3 unless it's G3's own settings), and Phase 2 is done: teams in G3ID, a team-aware gateway, sign-in, Slack and sign-up per team, and pages that take their team from their address. Skill Tree has done the parts of Phase 3 that don't need teams yet, a ninth app (Inventory) was added already built to that pattern, and Scouting engagement controls provide early groundwork for optional plugins in Phase 4. The rest of Phases 3 to 6 has not started.
 
 | Phase | Status | What is left |
 | --- | --- | --- |
 | 0. Groundwork | In progress | A staging environment (0.2) |
 | 1. Remove G3 from the platform | Done | Nothing |
 | 2. Tenancy core | Done | Nothing |
-| 3. Team-scoped apps | Started early, Skill Tree only | Skill Tree's team column, scoped access and isolation test, which can now use the team the gateway resolves (2.3, 2.10). All of it for the other apps |
+| 3. Team-scoped apps | Started early, Skill Tree and Inventory only | Skill Tree's and Inventory's team column, scoped access and isolation test, which can now use the team the gateway resolves (2.3, 2.10). All of it for the other apps |
 | 4. App library and dashboard | Not started | All of it |
 | 5. Live demo | Not started | All of it |
 | 6. Creators' portal | Not started | All of it |
@@ -53,6 +53,7 @@ As of 5 October 2026, five of the six Phase 0 steps are done on `main`, Phase 1 
 
 | Change | Roadmap step | Pull request |
 | --- | --- | --- |
+| Inventory, a new app: what a team owns, where it's kept (a tree of locations) and what's in use on a robot, with check out and check in, vendor listings tied to Orders' catalog, merge and split, and a history per entry. Its fields, locations, robots and subsystems are a team's own: made on Settings or loaded from a setup file, with none in code or migrations. Orders can put received parts into it, required or not by a team setting | Built to the Phase 3 pattern from the start: tenancy sheet settled, settings out of code, a starter file in place of the seed hook (4.3) | This pull request |
 | Workers test setup and baseline tests for every worker | 0.1 | [#128](https://github.com/midtownrobotics/Gearbox/pull/128) |
 | One auth middleware in `packages/auth` | 0.3 | [#128](https://github.com/midtownrobotics/Gearbox/pull/128) |
 | One site config for domain, team and branding, with `pnpm configure` writing the generated values | 0.4, 1.5, most of 1.1, part of 1.4 | [#128](https://github.com/midtownrobotics/Gearbox/pull/128) |
@@ -86,6 +87,7 @@ As of 5 October 2026, five of the six Phase 0 steps are done on `main`, Phase 1 
 - **Operator tools live in the platform, not G3ID.** The operator flag, the console's API and its log are the platform Worker's, with the console in the platform app at `admin.<domain>` (step 2.8). G3ID only carries out what touches its accounts, through internal routes.
 - **Changesets apply to everyone.** A variant's pull request needs one, like any other change to an app (6.4).
 - **One app-level role list is gone before Phase 2.** Skill Tree kept its own list of mentors. It now uses the mentor and admin roles from sign-in, so step 2.2 has one less place to map roles from. Scouting's strategy admins are the list still left.
+- **A ninth app, Inventory.** It wasn't in the plan. It's a core app like Orders, built the way Phase 3 leaves an app: every table is one team's data with no key that is unique across teams, and nothing about a team is in code. It adds one production database and one Worker, which the plan's limits have room for. Orders reaches it over a service binding as an optional neighbour, the same rule as for Edge: Orders works without it.
 - **App content is loaded, not migrated.** Skill Tree's default trees are a file that goes through the same loader as a team's own file, the first time the app is opened. No migration holds content. That first-use load is what the seed hook (4.3) replaces, and it is the pattern for the other apps' starter data.
 - **Apps need the team's members with their roles.** Skill Tree's students are G3ID's accounts that aren't mentors, but G3ID's list of accounts carries no roles, so Skill Tree works out who the mentors are from sign-ins. The member list that apps read should include each member's role. This is added to the platform SDK's list in Phase 3.
 
@@ -219,7 +221,7 @@ Seven choices were confirmed on 3 October 2026. Everything else stays on the cur
 | Workers per account | 100 | 500 |
 | Static files per Worker | 20,000 | 100,000 |
 
-The account is on Workers Paid with the Standard usage model, so the right-hand column applies. Seven production databases and a staging copy of each fit well inside it. Sources: [D1 limits](https://developers.cloudflare.com/d1/platform/limits/), [Workers limits](https://developers.cloudflare.com/workers/platform/limits/).
+The account is on Workers Paid with the Standard usage model, so the right-hand column applies. Eight production databases (Inventory's is the eighth) and a staging copy of each fit well inside it. Sources: [D1 limits](https://developers.cloudflare.com/d1/platform/limits/), [Workers limits](https://developers.cloudflare.com/workers/platform/limits/).
 
 ## Phase 0: Groundwork
 
@@ -304,6 +306,7 @@ After Phase 3 every app serves any number of teams from one deployment, and noth
 | 5 | Attendance | 3 | Sign-in code rules | Built on D1 with `team_id` added to the tables created in step 0.5 |
 | 6 | Scouting | About 30 | "Our team" number; engagement settings already use team-keyed rows, to move into the platform settings schema; strategy admins become a role | First split the 3,255-line worker into modules and put its 151 raw SQL calls behind query helpers |
 | 7 | Portal | 0 | The app list and team links | Becomes the team home, built from subscriptions and brand links |
+| 9 | Inventory | 9 | None: fields, locations, robots and subsystems are rows a team makes on Settings or loads from a setup file (`workers/inventory/content/starter-setup.json` is the starter) | New, and built for this from the start: all nine tables are team data and none has a key that is unique across teams, except `intake_receipts.source_key`, which names an Orders request and so is unique across teams once Orders' ids are. Left: the team column, scoped access and the isolation test. Settings is for G3ID admins until team roles reach apps |
 | 8 | Edge | 11 | None. Its settings stay G3's own | A single-team app run only for G3. It moves behind the gateway and takes identity from the platform SDK. Its tables need no team column |
 
 Core apps must not depend on Edge. Orders part lookup and Shop printing become optional providers: G3's Edge app supplies both for G3, and a team without a provider enters part details by hand and sees no print button.
@@ -314,7 +317,7 @@ Core apps must not depend on Edge. Orders part lookup and Shop printing become o
 - **Tenancy lint in CI:** rejects a query on a team table that skips the helper, and any raw `prepare` call outside it.
 - **Isolation test harness:** one reusable test, built on packages/testing, that every app, and later every variant, must pass.
 
-**Done when:** isolation tests pass for all seven apps and the lint is required in CI. G3 then moves to its frcgearbox.com addresses.
+**Done when:** isolation tests pass for every app with team data and the lint is required in CI. G3 then moves to its frcgearbox.com addresses.
 
 ## Phase 4: App library and team dashboard
 

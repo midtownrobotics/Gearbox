@@ -90,6 +90,7 @@ export const TEAM_HOST_APPS = {
   scouting: "scouting",
   skillTree: "skill-tree",
   attendance: "attendance",
+  inventory: "inventory",
 } as const satisfies Record<Exclude<AppName, "portal">, string>;
 
 /** A team's address for an app. The site's own team keeps the app addresses above. */

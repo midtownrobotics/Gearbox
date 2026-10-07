@@ -14,9 +14,11 @@ import {
   partLists,
   requestEvents,
 } from "../db/schema";
-import { type CatalogChoice, catalogItemFor } from "../lib/catalog";
+import { type CatalogChoice, catalogItemFor, catalogPackQuantity } from "../lib/catalog";
+import { type ReceiveDestination, parseDestination, sendToInventory } from "../lib/inventory";
 import { addToList } from "../lib/lists";
 import { formatCents } from "../lib/money";
+import { packQuantityField } from "../lib/pack-quantity";
 import { vendorName } from "../lib/vendors";
 import type { AppEnv } from "../types";
 
@@ -30,6 +32,8 @@ type RequestFields = {
   unitPriceCents: number | null;
   currency: string;
   quantity: number;
+  /** How many parts one of `quantity` is. Left out, it's the catalog part's. */
+  packQuantity?: number;
   categoryId: number;
   reason: string;
   priority: Priority;
@@ -117,6 +121,11 @@ const requestValidator = (partial: boolean) =>
       }
       out.quantity = v.quantity as number;
     }
+    if (v.packQuantity !== undefined && v.packQuantity !== null) {
+      const pack = packQuantityField(v.packQuantity);
+      if (pack === null) return fail("packQuantity must be a whole number from 1 to 10000.");
+      out.packQuantity = pack;
+    }
     if (has("categoryId")) {
       if (!Number.isInteger(v.categoryId)) return fail("Pick a budget category.");
       out.categoryId = v.categoryId as number;
@@ -173,51 +182,53 @@ const listValidator = validator("query", (value, c): { status?: RequestStatus; m
 const ACTIONS = {
   approve: { from: ["requested"], to: "approved", who: "mentor" },
   deny: { from: ["requested"], to: "denied", who: "mentor" },
-  receive: { from: ["ordered"], to: "received", who: "mentor-or-requester" },
+  // Packages are opened by whoever is in the shop: anyone signed in marks them received.
+  receive: { from: ["ordered"], to: "received", who: "anyone" },
   cancel: { from: ["requested", "approved"], to: "cancelled", who: "mentor-or-requester" },
 } as const satisfies Record<
   string,
-  { from: RequestStatus[]; to: RequestStatus; who: "mentor" | "mentor-or-requester" }
+  { from: RequestStatus[]; to: RequestStatus; who: "mentor" | "mentor-or-requester" | "anyone" }
 >;
 type Action = keyof typeof ACTIONS;
 
-const actionValidator = validator(
-  "json",
-  (value, c): { note: string | null; quantity?: number; unitPriceCents?: number | null } => {
-    const v = (value ?? {}) as Record<string, unknown>;
-    const note = optionalText(v.note, 1000);
-    if (note === false)
-      return c.json({ error: "note must be up to 1000 characters." }, 400) as never;
-    const out: { note: string | null; quantity?: number; unitPriceCents?: number | null } = {
-      note,
-    };
-    // Approving can adjust the quantity and price at the same time.
-    if (v.quantity !== undefined) {
-      if (
-        !Number.isInteger(v.quantity) ||
-        (v.quantity as number) < 1 ||
-        (v.quantity as number) > 10_000
-      ) {
-        return c.json({ error: "quantity must be a whole number from 1 to 10000." }, 400) as never;
-      }
-      out.quantity = v.quantity as number;
+type ActionInput = {
+  note: string | null;
+  quantity?: number;
+  unitPriceCents?: number | null;
+  /** When receiving: where the parts go in the Inventory app. */
+  inventory?: ReceiveDestination | null;
+};
+
+const actionValidator = validator("json", (value, c): ActionInput => {
+  const v = (value ?? {}) as Record<string, unknown>;
+  const note = optionalText(v.note, 1000);
+  if (note === false) return c.json({ error: "note must be up to 1000 characters." }, 400) as never;
+  const inventory = parseDestination(v.inventory);
+  if (inventory && "error" in inventory) return c.json({ error: inventory.error }, 400) as never;
+  const out: ActionInput = { note, inventory };
+  // Approving can adjust the quantity and price at the same time.
+  if (v.quantity !== undefined) {
+    if (
+      !Number.isInteger(v.quantity) ||
+      (v.quantity as number) < 1 ||
+      (v.quantity as number) > 10_000
+    ) {
+      return c.json({ error: "quantity must be a whole number from 1 to 10000." }, 400) as never;
     }
-    if (v.unitPriceCents !== undefined) {
-      const p = v.unitPriceCents;
-      if (
-        p !== null &&
-        !(Number.isInteger(p) && (p as number) >= 0 && (p as number) <= 10_000_000)
-      ) {
-        return c.json(
-          { error: "unitPriceCents must be a non-negative whole number of cents." },
-          400,
-        ) as never;
-      }
-      out.unitPriceCents = p as number | null;
+    out.quantity = v.quantity as number;
+  }
+  if (v.unitPriceCents !== undefined) {
+    const p = v.unitPriceCents;
+    if (p !== null && !(Number.isInteger(p) && (p as number) >= 0 && (p as number) <= 10_000_000)) {
+      return c.json(
+        { error: "unitPriceCents must be a non-negative whole number of cents." },
+        400,
+      ) as never;
     }
-    return out;
-  },
-);
+    out.unitPriceCents = p as number | null;
+  }
+  return out;
+});
 
 /** "qty 2 → 3, price $5.00 → $4.50", or null when nothing changed. */
 export function describeChanges(
@@ -308,11 +319,13 @@ export const requestsRouter = new Hono<AppEnv>()
     // Every submitted link is in the catalog: the picked item, the one with this link, or new.
     const catalogItemId = await catalogItemFor(db, catalog, body, c.get("userDisplayName"));
     if (catalogItemId === null) return c.json({ error: NEEDS_CATALOG_CATEGORY }, 400);
+    const packQuantity = body.packQuantity ?? (await catalogPackQuantity(db, catalogItemId));
     const now = Date.now();
     const row = await db
       .insert(orderRequests)
       .values({
         ...body,
+        packQuantity,
         catalogItemId,
         currency: body.currency ?? "USD",
         requesterId: c.get("userId"),
@@ -393,6 +406,7 @@ export const requestsRouter = new Hono<AppEnv>()
   /**
    * Status changes: approve, deny, receive, cancel. Body: { note? }, and when approving optionally
    * { quantity?, unitPriceCents? } to adjust the line. Ordering happens through POST /orders.
+   * When receiving, { inventory? } says where the parts go in the Inventory app (lib/inventory.ts).
    */
   .post("/:id/:action", requireAuth, actionValidator, async (c) => {
     const id = Number(c.req.param("id"));
@@ -401,14 +415,16 @@ export const requestsRouter = new Hono<AppEnv>()
       return c.json({ error: `action must be one of ${Object.keys(ACTIONS).join(", ")}.` }, 404);
     }
     const rule = ACTIONS[action as Action];
-    const { note, quantity, unitPriceCents } = c.req.valid("json");
+    const { note, quantity, unitPriceCents, inventory } = c.req.valid("json");
     const db = createOrdersDb(c.env.ORDERS_DB);
 
     const current = await selectRequests(db).where(eq(orderRequests.id, id)).get();
     if (!current) return c.json({ error: "Request not found." }, 404);
     const isMentor = hasMentorAccess(c);
     const isRequester = current.request.requesterId === c.get("userId");
-    if (rule.who === "mentor" ? !isMentor : !(isMentor || isRequester)) {
+    const allowed =
+      rule.who === "anyone" || isMentor || (rule.who === "mentor-or-requester" && isRequester);
+    if (!allowed) {
       return c.json(
         {
           error:
@@ -418,6 +434,14 @@ export const requestsRouter = new Hono<AppEnv>()
         },
         403,
       );
+    }
+
+    // Into Inventory first: if that can't be done, the request isn't marked received.
+    let inventoryNote: string | null = null;
+    if (action === "receive" && current.request.status === "ordered") {
+      const sent = await sendToInventory(c, db, [current.request], inventory ?? null);
+      if ("error" in sent) return c.json({ error: sent.error }, sent.status);
+      if (sent.added !== null) inventoryNote = "Added to Inventory.";
     }
 
     const now = Date.now();
@@ -443,7 +467,8 @@ export const requestsRouter = new Hono<AppEnv>()
       userId: c.get("userId"),
       userName: c.get("userDisplayName"),
       action: rule.to,
-      note: [changes && `Changed ${changes}.`, note].filter(Boolean).join(" ") || null,
+      note:
+        [changes && `Changed ${changes}.`, inventoryNote, note].filter(Boolean).join(" ") || null,
       createdAt: now,
     });
 

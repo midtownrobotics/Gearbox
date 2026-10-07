@@ -1,0 +1,29 @@
+{
+  "format": "gearbox-inventory-setup",
+  "version": 1,
+  "fields": [
+    {
+      "name": "Type",
+      "type": "choice",
+      "options": [
+        "Hardware",
+        "Motion",
+        "Motors",
+        "Electronics",
+        "Pneumatics",
+        "Raw stock",
+        "Tools",
+        "Other"
+      ]
+    },
+    { "name": "Size", "type": "text" },
+    { "name": "Notes", "type": "paragraph", "showInTable": false }
+  ],
+  "locations": [
+    { "name": "Shop", "children": ["Shelves", "Cabinets", "Workbench"] },
+    { "name": "Storage", "children": [] },
+    { "name": "Pit", "children": ["Pit cart"] }
+  ],
+  "robots": ["Competition robot", "Practice robot"],
+  "subsystems": ["Drivetrain", "Intake", "Elevator", "Arm", "Climber", "Electrical", "Pneumatics"]
+}

@@ -53,6 +53,10 @@ service = "skill-tree"
 binding = "ATTENDANCE"
 service = "attendance"
 
+[[services]]
+binding = "INVENTORY"
+service = "inventory"
+
 [env.production]
 name = "gateway-production"
 workers_dev = false
@@ -110,3 +114,7 @@ service = "skill-tree-production"
 [[env.production.services]]
 binding = "ATTENDANCE"
 service = "attendance-production"
+
+[[env.production.services]]
+binding = "INVENTORY"
+service = "inventory-production"

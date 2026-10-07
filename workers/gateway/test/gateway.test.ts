@@ -28,6 +28,7 @@ describe("gateway", () => {
     expect((await routed(`${team(`${ours}-id`)}/`)).app).toBe("G3ID");
     expect((await routed(`${team(`${ours}`)}/`)).app).toBe("PORTAL");
     expect((await routed(`${team(`${ours}-attendance`)}/`)).app).toBe("ATTENDANCE");
+    expect((await routed(`${team(`${ours}-inventory`)}/`)).app).toBe("INVENTORY");
   });
 
   it("answers the retired api.<app> addresses with the app's address to use instead", async () => {
