@@ -1,4 +1,4 @@
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { Hono } from "hono";
 import { deleteCookie, getCookie } from "hono/cookie";
 import { createDb } from "../db";
@@ -7,7 +7,7 @@ import { deleteCookieOptions } from "../lib/cookie";
 import { regeneratePinForUser } from "../lib/pin";
 import { deleteSession, isPinSession } from "../lib/session";
 import { slackForTeam } from "../lib/slack-install";
-import { requestTeamId } from "../lib/team";
+import { requestTeamId, teamOfUser } from "../lib/team";
 import { requireAuth } from "../middleware/auth";
 import type { AppEnv } from "../types";
 
@@ -108,10 +108,12 @@ export const authRouter = new Hono<AppEnv>()
     if (ids.length === 0) return c.json([] as { id: string; displayName: string }[]);
 
     const db = createDb(c.env.DB);
+    // Names of the caller's own team's members only.
+    const team = await teamOfUser(db, c.get("userId") as string);
     const rows = await db
       .select({ id: coreUsers.id, displayName: coreUsers.displayName })
       .from(coreUsers)
-      .where(inArray(coreUsers.id, ids))
+      .where(and(inArray(coreUsers.id, ids), eq(coreUsers.teamId, team)))
       .all();
 
     return c.json(rows);
@@ -171,7 +173,8 @@ export const authRouter = new Hono<AppEnv>()
     const identity = await db
       .select({ id: coreUserIdentities.id, provider: coreUserIdentities.provider })
       .from(coreUserIdentities)
-      .where(eq(coreUserIdentities.id, identityId))
+      // Only one of the caller's own sign-ins.
+      .where(and(eq(coreUserIdentities.id, identityId), eq(coreUserIdentities.userId, userId)))
       .get();
 
     if (!identity) {
@@ -196,7 +199,9 @@ export const authRouter = new Hono<AppEnv>()
       return c.json({ error: "You must keep at least one sign-in method linked." }, 400);
     }
 
-    await db.delete(coreUserIdentities).where(eq(coreUserIdentities.id, identityId));
+    await db
+      .delete(coreUserIdentities)
+      .where(and(eq(coreUserIdentities.id, identityId), eq(coreUserIdentities.userId, userId)));
 
     return c.json({ ok: true });
   })
