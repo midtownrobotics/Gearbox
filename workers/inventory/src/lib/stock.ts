@@ -241,3 +241,87 @@ export function placeProblem(place: Place, names: Names): string | null {
   }
   return null;
 }
+
+/**
+ * Moves everything kept directly in one location to another: every row, whole. Where an entry
+ * already has a row in the same state at the new place, the two become one. Each entry gets a line
+ * in its history. One batch, so it all moves or none of it does.
+ */
+export async function moveLocationContents(
+  d1: D1Database,
+  from: number,
+  to: number,
+  names: Names,
+  by: Actor,
+): Promise<{ entries: number; parts: number }> {
+  const { results: rows } = await d1
+    .prepare(
+      `SELECT item_id AS itemId, status, robot_id AS robotId, subsystem_id AS subsystemId, quantity
+       FROM stock WHERE location_id = ?1 ORDER BY id`,
+    )
+    .bind(from)
+    .all<{
+      itemId: number;
+      status: StockStatus;
+      robotId: number | null;
+      subsystemId: number | null;
+      quantity: number;
+    }>();
+  if (rows.length === 0) return { entries: 0, parts: 0 };
+
+  const now = Date.now();
+  // A row here and the same entry's row in the same state there.
+  const twin = (alias: string, at: string) =>
+    `${alias}.location_id = ${at} AND ${alias}.item_id = stock.item_id
+     AND ${alias}.status = stock.status AND ${alias}.robot_id IS stock.robot_id
+     AND ${alias}.subsystem_id IS stock.subsystem_id`;
+  await d1.batch([
+    // Where the entry is already at the new place, the quantities add up...
+    d1
+      .prepare(
+        `UPDATE stock SET updated_at = ?3,
+           quantity = quantity + (SELECT s.quantity FROM stock s WHERE ${twin("s", "?1")})
+         WHERE location_id = ?2 AND EXISTS (SELECT 1 FROM stock s WHERE ${twin("s", "?1")})`,
+      )
+      .bind(from, to, now),
+    d1
+      .prepare(
+        `DELETE FROM stock
+         WHERE location_id = ?1 AND EXISTS (SELECT 1 FROM stock t WHERE ${twin("t", "?2")})`,
+      )
+      .bind(from, to),
+    // ...and everything else just changes place.
+    d1
+      .prepare("UPDATE stock SET location_id = ?2, updated_at = ?3 WHERE location_id = ?1")
+      .bind(from, to, now),
+    // An entry that now has parts in storage there doesn't need an empty row left elsewhere.
+    d1
+      .prepare(
+        `DELETE FROM stock
+         WHERE status = 'storage' AND quantity = 0
+           AND item_id IN (SELECT item_id FROM stock WHERE location_id = ?1)
+           AND EXISTS (SELECT 1 FROM stock s
+                       WHERE s.item_id = stock.item_id AND s.status = 'storage' AND s.id <> stock.id
+                         AND (s.quantity > 0 OR s.id < stock.id))`,
+      )
+      .bind(to),
+    ...rows.map((row) => {
+      const place = { ...row, locationId: from };
+      const there = describePlace({ ...place, locationId: to }, names);
+      return logEvent(
+        d1,
+        row.itemId,
+        "moved",
+        row.quantity > 0
+          ? `${row.quantity} from ${describePlace(place, names)} to ${there}.`
+          : `Now kept in ${there}.`,
+        by,
+        now,
+      );
+    }),
+  ]);
+  return {
+    entries: new Set(rows.map((row) => row.itemId)).size,
+    parts: rows.reduce((sum, row) => sum + row.quantity, 0),
+  };
+}

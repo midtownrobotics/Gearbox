@@ -438,10 +438,13 @@ export const requestsRouter = new Hono<AppEnv>()
 
     // Into Inventory first: if that can't be done, the request isn't marked received.
     let inventoryNote: string | null = null;
+    let inventoryLocationId: number | undefined;
     if (action === "receive" && current.request.status === "ordered") {
       const sent = await sendToInventory(c, db, [current.request], inventory ?? null);
       if ("error" in sent) return c.json({ error: sent.error }, sent.status);
       if (sent.added !== null) inventoryNote = "Added to Inventory.";
+      // Where it went, for the next delivery of the same part.
+      inventoryLocationId = sent.locations.get(id);
     }
 
     const now = Date.now();
@@ -453,6 +456,7 @@ export const requestsRouter = new Hono<AppEnv>()
         updatedAt: now,
         ...(action === "approve" && quantity !== undefined ? { quantity } : {}),
         ...(action === "approve" && unitPriceCents !== undefined ? { unitPriceCents } : {}),
+        ...(inventoryLocationId !== undefined ? { inventoryLocationId } : {}),
       })
       .where(and(eq(orderRequests.id, id), inArray(orderRequests.status, [...rule.from])))
       .returning()

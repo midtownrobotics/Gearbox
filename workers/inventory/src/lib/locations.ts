@@ -6,13 +6,25 @@ import { locations } from "../db/schema";
 // (a room, a cabinet in it, a drawer in that, a bin in the drawer).
 
 export const MAX_DEPTH = 4;
+export const MAX_TITLE = 60;
 
-export type LocationRow = { id: number; parentId: number | null; name: string };
+export type LocationRow = {
+  id: number;
+  parentId: number | null;
+  name: string;
+  /** What's kept there, shown beside the name ("A1 - Misc. Electronics"). "" for none. */
+  title: string;
+};
 
 /** Every location, in the order a tree lists them in: parents' order, then their own. */
 export async function loadLocations(db: Db): Promise<LocationRow[]> {
   return db
-    .select({ id: locations.id, parentId: locations.parentId, name: locations.name })
+    .select({
+      id: locations.id,
+      parentId: locations.parentId,
+      name: locations.name,
+      title: locations.title,
+    })
     .from(locations)
     .orderBy(asc(locations.sortOrder), asc(locations.id))
     .all();
@@ -45,11 +57,13 @@ export function pathOf(id: number, byId: Map<number, LocationRow>): LocationRow[
   return path;
 }
 
-/** "Dungeon › A1" */
+/** A location as people read it: its name, with its title when it has one ("A1 - Misc. Electronics"). */
+export const labelOf = (row: Pick<LocationRow, "name" | "title">) =>
+  row.title ? `${row.name} - ${row.title}` : row.name;
+
+/** "Dungeon › A1 - Misc. Electronics" */
 export const pathLabel = (id: number, byId: Map<number, LocationRow>) =>
-  pathOf(id, byId)
-    .map((row) => row.name)
-    .join(" › ");
+  pathOf(id, byId).map(labelOf).join(" › ");
 
 /** How many levels down a location is: 1 for a top-level one. */
 export const depthOf = (id: number, byId: Map<number, LocationRow>) => pathOf(id, byId).length;

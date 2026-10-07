@@ -132,6 +132,11 @@ export const orderRequests = sqliteTable(
     quantity: integer("quantity").notNull(),
     /** How many parts one of `quantity` is: 4 for a pack of 4 (lib/pack-quantity.ts). */
     packQuantity: integer("pack_quantity").notNull().default(1),
+    /**
+     * Where the parts went in the Inventory app when received (a location's id there), to offer
+     * the same place next time (lib/inventory.ts). Null when they weren't put in Inventory.
+     */
+    inventoryLocationId: integer("inventory_location_id"),
     categoryId: integer("category_id")
       .notNull()
       .references(() => budgetCategories.id),

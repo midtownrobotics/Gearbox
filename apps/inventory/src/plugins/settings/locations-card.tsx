@@ -175,10 +175,14 @@ function Node({
               {isOpen ? "▾" : "▸"}
             </span>
             <span className="font-semibold">{row.name}</span>
+            {row.title && <span className="text-secondary-500">- {row.title}</span>}
             <span className="text-xs text-secondary-400">{children.length}</span>
           </button>
         ) : (
-          <span className="pl-[1.125rem] text-sm text-secondary-900">{row.name}</span>
+          <span className="pl-[1.125rem] text-sm text-secondary-900">
+            {row.name}
+            {row.title && <span className="text-secondary-500"> - {row.title}</span>}
+          </span>
         )}
         {depth < MAX_DEPTH && (
           <button type="button" className={smallButton} onClick={() => onAdd(row)}>
@@ -227,6 +231,7 @@ export function LocationsCard() {
     <Card title="Locations">
       <p className="mb-3 text-sm text-secondary-500">
         Where parts are kept, as a tree: a room, what's in it, and so on, up to {MAX_DEPTH} levels.
+        Titles that say what's kept in a place are set on the Locations page.
         {places.locations.length > 0 && ` ${count(places.locations.length, "location")} so far.`}
       </p>
       {top.length > 0 && (

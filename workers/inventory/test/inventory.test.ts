@@ -10,7 +10,7 @@ import { describe, expect, it } from "vitest";
 // The tests share one database and run in order.
 
 type Field = { id: number; name: string; type: string; options: string[]; showInTable: boolean };
-type Location = { id: number; parentId: number | null; name: string };
+type Location = { id: number; parentId: number | null; name: string; title: string };
 type Named = { id: number; name: string };
 type Stock = {
   id: number;
@@ -815,5 +815,199 @@ describe("parts arriving from Orders", () => {
     expect(options.locations.length).toBeGreaterThan(5);
     expect(options.robots.map((r) => r.name)).toContain("Comp bot");
     expect(options.subsystems.map((s) => s.name)).toEqual(["Drivetrain", "Intake"]);
+  });
+});
+
+describe("the Locations page", () => {
+  type Places = {
+    places: {
+      sourceKey: string;
+      itemId: number | null;
+      itemName: string | null;
+      locationId: number | null;
+    }[];
+  };
+  const setTitle = (user: typeof student, id: number, title: unknown) =>
+    callAs(user, `/locations/${id}/title`, { method: "PUT", body: { title } });
+  const moveAll = (user: typeof student, from: number, toLocationId: unknown) =>
+    callAs(user, `/locations/${from}/move-contents`, post({ toLocationId }));
+
+  it("lets anyone signed in give a location a title, shown beside its name everywhere", async () => {
+    const cabinet = await locationId("Shop", "Cabinet");
+    expect((await call(`/locations/${cabinet}/title`, { method: "PUT" })).status).toBe(401);
+    expect((await setTitle(student, cabinet, "x".repeat(61))).status).toBe(400);
+    expect((await setTitle(student, 999999, "Nowhere")).status).toBe(404);
+    expect((await setTitle(kioskAdmin, cabinet, "  Fasteners ")).status).toBe(200);
+
+    const { locations } = await inventory();
+    expect(locations.find((l) => l.id === cabinet)).toMatchObject({
+      name: "Cabinet",
+      title: "Fasteners",
+    });
+    const options = await jsonAs<{ locations: Location[] }>(student, "/options");
+    expect(options.locations.find((l) => l.id === cabinet)?.title).toBe("Fasteners");
+
+    // History lines say it the way people read it.
+    const id = await newItem({
+      name: "Titled washers",
+      stock: { quantity: 5, locationId: cabinet },
+    });
+    expect((await detail(id)).events[0].note).toBe("5 in Shop › Cabinet - Fasteners.");
+    // A setup file carries it, and taking it off is an empty title.
+    const file = await jsonAs<{
+      locations: { name: string; children: { name: string; title?: string }[] }[];
+    }>(admin, "/setup/export");
+    const shop = file.locations.find((l) => l.name === "Shop");
+    expect(shop?.children.find((l) => l.name === "Cabinet")?.title).toBe("Fasteners");
+    expect(shop?.children.find((l) => l.name === "Shelves")?.title).toBeUndefined();
+    await jsonAs(
+      admin,
+      "/setup/import",
+      post({
+        ...SETUP,
+        fields: [],
+        robots: [],
+        subsystems: [],
+        locations: [{ name: "Annex", title: "Overflow", children: [] }],
+      }),
+    );
+    expect((await inventory()).locations.find((l) => l.name === "Annex")?.title).toBe("Overflow");
+    expect((await setTitle(student, cabinet, "")).status).toBe(200);
+    expect((await inventory()).locations.find((l) => l.id === cabinet)?.title).toBe("");
+    await jsonAs(mentor, `/items/${id}`, { method: "DELETE" });
+  });
+
+  it("moves everything in a location at once, whole", async () => {
+    const annex = await locationId("Annex");
+    const bin = await locationId("Shop", "Shelves", "Bin 3");
+    const cart = await locationId("Pit", "Pit cart");
+    const use = { robotId: await robotId("Comp bot"), subsystemId: await subsystemId("Intake") };
+
+    // In the annex: nuts, belts (some in use there), and a few more of the belts already in the bin.
+    const nuts = await newItem({ name: "Lock nuts", stock: { quantity: 30, locationId: annex } });
+    const belts = await newItem({ name: "Belts", stock: { quantity: 6, locationId: annex } });
+    await jsonAs(student, `/items/${belts}/stock`, post({ quantity: 4, locationId: bin }));
+    const [annexBelts] = (await itemOf(belts)).stock;
+    await jsonAs(
+      student,
+      `/stock/${annexBelts.id}/check-out`,
+      post({ quantity: 2, locationId: annex, ...use }),
+    );
+    // Elsewhere, and staying there.
+    const elsewhere = await newItem({
+      name: "Stays put",
+      stock: { quantity: 9, locationId: cart },
+    });
+
+    expect((await call(`/locations/${annex}/move-contents`, { method: "POST" })).status).toBe(401);
+    expect((await moveAll(student, annex, annex)).status).toBe(400);
+    expect((await moveAll(student, annex, 999999)).status).toBe(400);
+    expect((await moveAll(student, 999999, bin)).status).toBe(404);
+
+    const res = await moveAll(otherStudent, annex, bin);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ entries: 2, parts: 36 });
+
+    expect((await itemOf(nuts)).stock).toMatchObject([
+      { locationId: bin, status: "storage", quantity: 30 },
+    ]);
+    // The belts in storage joined the ones already in the bin; the ones in use moved as they were.
+    expect((await itemOf(belts)).stock).toMatchObject([
+      { locationId: bin, status: "storage", quantity: 8 },
+      { locationId: bin, status: "in_use", quantity: 2, ...use },
+    ]);
+    expect((await itemOf(elsewhere)).stock).toMatchObject([{ locationId: cart, quantity: 9 }]);
+    expect((await detail(nuts)).events[0]).toMatchObject({
+      action: "moved",
+      note: "30 from Annex - Overflow to Shop › Shelves › Bin 3.",
+      userName: "Olive Other",
+    });
+    expect((await detail(belts)).events.filter((e) => e.action === "moved")).toHaveLength(2);
+
+    // The tree is as it was, and there's nothing left to move.
+    expect((await inventory()).locations.some((l) => l.id === annex)).toBe(true);
+    expect(await (await moveAll(student, annex, bin)).json()).toEqual({ entries: 0, parts: 0 });
+    for (const id of [nuts, belts, elsewhere]) {
+      await jsonAs(mentor, `/items/${id}`, { method: "DELETE" });
+    }
+  });
+
+  it("takes deliveries for different places in one go, or none of them", async () => {
+    type Result = { added: { sourceKey: string; itemId: number; created: boolean }[] };
+    const bin = await locationId("Shop", "Shelves", "Bin 1");
+    const cabinet = await locationId("Shop", "Cabinet");
+    const line = (key: string, sku: string, where: unknown) => ({
+      sourceKey: key,
+      quantity: 2,
+      name: `Part ${sku}`,
+      listing: { vendor: "AndyMark", sku },
+      note: null,
+      locationId: where,
+    });
+    // One of them names a place that isn't there: nothing is added.
+    const bad = await callAs(
+      student,
+      "/intake",
+      post({
+        destination: { status: "storage" },
+        lines: [
+          line("orders:request:201", "am-201", bin),
+          line("orders:request:202", "am-202", 999999),
+        ],
+      }),
+    );
+    expect(bad.status).toBe(400);
+    expect((await inventory()).items.some((i) => i.name === "Part am-201")).toBe(false);
+    // With no place of its own and none given for all, a delivery has nowhere to go.
+    expect(
+      (
+        await callAs(
+          student,
+          "/intake",
+          post({
+            destination: { status: "storage" },
+            lines: [line("orders:request:203", "am-203", null)],
+          }),
+        )
+      ).status,
+    ).toBe(400);
+
+    const ok = await jsonAs<Result>(
+      student,
+      "/intake",
+      post({
+        destination: { status: "storage", locationId: cabinet },
+        lines: [
+          line("orders:request:201", "am-201", bin),
+          line("orders:request:202", "am-202", null),
+        ],
+      }),
+    );
+    expect((await itemOf(ok.added[0].itemId)).stock).toMatchObject([
+      { locationId: bin, quantity: 2 },
+    ]);
+    expect((await itemOf(ok.added[1].itemId)).stock).toMatchObject([
+      { locationId: cabinet, quantity: 2 },
+    ]);
+  });
+
+  it("says where a part that's about to arrive is already kept", async () => {
+    const bin = await locationId("Shop", "Shelves", "Bin 1");
+    const answer = await jsonAs<Places>(
+      kioskAdmin,
+      "/intake/places",
+      post({
+        lines: [
+          { sourceKey: "a", listing: { vendor: "andymark", sku: "AM-201" } },
+          { sourceKey: "b", listing: { vendor: "AndyMark", sku: "never-seen" } },
+        ],
+      }),
+    );
+    expect(answer.places).toMatchObject([
+      { sourceKey: "a", itemName: "Part am-201", locationId: bin },
+      { sourceKey: "b", itemId: null, itemName: null, locationId: null },
+    ]);
+    expect((await call("/intake/places", { method: "POST" })).status).toBe(401);
+    expect((await callAs(student, "/intake/places", post({ lines: [] }))).status).toBe(400);
   });
 });

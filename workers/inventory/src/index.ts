@@ -7,6 +7,7 @@ import packageJson from "../package.json";
 import { intakeRouter } from "./routes/intake";
 import { inventoryRouter } from "./routes/inventory";
 import { itemsRouter } from "./routes/items";
+import { locationContentsRouter } from "./routes/location-contents";
 import {
   fieldsRouter,
   locationsRouter,
@@ -53,6 +54,7 @@ const app = base
   .route("/stock", stockRouter)
   .route("/fields", fieldsRouter)
   .route("/locations", locationsRouter)
+  .route("/locations", locationContentsRouter)
   .route("/robots", robotsRouter)
   .route("/subsystems", subsystemsRouter)
   .route("/setup", setupRouter)

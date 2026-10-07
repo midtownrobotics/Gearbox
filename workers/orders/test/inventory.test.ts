@@ -23,6 +23,7 @@ type Sent = {
     priceCents: number | null;
   };
   note: string | null;
+  locationId?: number;
 };
 type Intake = {
   required: boolean;
@@ -91,7 +92,7 @@ describe("where received parts go", () => {
   it("offers Inventory's places, and isn't required until a mentor says so", async () => {
     const intake = await jsonAs<Intake>(student, "/inventory");
     expect(intake.required).toBe(false);
-    expect(intake.options?.locations.map((l) => l.name)).toEqual(["Shop", "Bin 2"]);
+    expect(intake.options?.locations.map((l) => l.name)).toEqual(["Shop", "Bin 2", "Bin 3"]);
     expect(await jsonAs(student, "/settings")).toMatchObject({ inventoryRequired: false });
   });
 
@@ -281,5 +282,95 @@ describe("requiring it", () => {
     await jsonAs(mentor, "/settings", { method: "PUT", body: { inventoryRequired: false } });
     const { id } = await ordered({ title: "Optional again" });
     expect((await receive(student, { ids: [id] })).status).toBe(200);
+  });
+});
+
+describe("where each part goes", () => {
+  type Defaults = {
+    defaults: Record<
+      string,
+      { locationId: number; from: "entry" | "history"; entryName: string | null }
+    >;
+  };
+  const defaultsFor = (ids: number[]) =>
+    jsonAs<Defaults>(student, "/inventory/defaults", { method: "POST", body: { ids } });
+  const placeOf = async (id: number) =>
+    (
+      await db
+        .prepare("SELECT inventory_location_id AS place FROM order_requests WHERE id = ?")
+        .bind(id)
+        .first<{ place: number | null }>()
+    )?.place;
+
+  it("can be a different place for each, and is remembered", async () => {
+    const a = await ordered({ title: "Goes in bin 2" });
+    const b = await ordered({ title: "Goes in bin 3" });
+    const c = await ordered({ title: "Goes with the rest" });
+    const res = await jsonAs<Received>(student, "/orders/receive", {
+      method: "POST",
+      body: {
+        ids: [a.id, b.id, c.id],
+        // One place for the rest, and their own for two of them.
+        inventory: { status: "storage", locationId: 1, locations: { [a.id]: 2, [b.id]: 3 } },
+      },
+    });
+    expect(res.inventoryAdded).toBe(3);
+    expect(await sentFor(a.id)).toMatchObject([{ locationId: 2 }]);
+    expect(await sentFor(b.id)).toMatchObject([{ locationId: 3 }]);
+    expect(await sentFor(c.id)).toMatchObject([{ locationId: 1 }]);
+    expect([await placeOf(a.id), await placeOf(b.id), await placeOf(c.id)]).toEqual([2, 3, 1]);
+  });
+
+  it("has to be said for every part", async () => {
+    const a = await ordered({ title: "Has a place" });
+    const b = await ordered({ title: "Has none" });
+    const res = await receive(student, {
+      ids: [a.id, b.id],
+      inventory: { status: "storage", locations: { [a.id]: 2 } },
+    });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "Pick where “Has none” goes in Inventory." });
+    expect(await statusOf(a.id)).toBe("ordered");
+    expect(await sentFor(a.id)).toEqual([]);
+    expect(await placeOf(a.id)).toBeNull();
+    // Nothing is remembered for parts received without Inventory.
+    await jsonAs(student, "/orders/receive", { method: "POST", body: { ids: [a.id, b.id] } });
+    expect(await placeOf(a.id)).toBeNull();
+  });
+
+  it("starts with the part's entry in Inventory, else where it went last time, else nothing", async () => {
+    // Catalog part 901 is one Inventory already keeps, in location 2.
+    const known = await ordered({ title: "Known bearing", catalogItemId: 901 });
+    // Catalog part 902 isn't in Inventory, but one was received into location 3 before.
+    const before = await ordered({ title: "Seen before", catalogItemId: 902 });
+    await callAs(student, `/requests/${before.id}/receive`, {
+      method: "POST",
+      body: { inventory: { status: "storage", locationId: 3 } },
+    });
+    expect(await placeOf(before.id)).toBe(3);
+    const again = await ordered({ title: "Seen before", catalogItemId: 902 });
+    const fresh = await ordered({ title: "Never seen", catalogItemId: 903 });
+    const loose = await ordered({ title: "Not in the catalog" });
+
+    const { defaults } = await defaultsFor([known.id, again.id, fresh.id, loose.id]);
+    expect(defaults).toEqual({
+      [known.id]: { locationId: 2, from: "entry", entryName: "Known bearing" },
+      [again.id]: { locationId: 3, from: "history", entryName: null },
+    });
+    // The latest place wins: received somewhere else now, that's where the next one starts.
+    await jsonAs(student, "/orders/receive", {
+      method: "POST",
+      body: { ids: [again.id], inventory: { status: "storage", locationId: 2 } },
+    });
+    const next = await ordered({ title: "Seen before", catalogItemId: 902 });
+    expect((await defaultsFor([next.id])).defaults[next.id]).toMatchObject({
+      locationId: 2,
+      from: "history",
+    });
+
+    expect((await call("/inventory/defaults", { method: "POST" })).status).toBe(401);
+    expect(
+      (await callAs(student, "/inventory/defaults", { method: "POST", body: { ids: [] } })).status,
+    ).toBe(400);
   });
 });

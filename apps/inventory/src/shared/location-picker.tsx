@@ -1,4 +1,4 @@
-import { type Places, pathOf } from "./places";
+import { type Places, labelOf, pathOf } from "./places";
 import { inputClass } from "./ui";
 
 /**
@@ -40,7 +40,7 @@ export function LocationPicker({
           <option value="">{level === 0 ? emptyLabel : "(right here)"}</option>
           {(places.childrenOf.get(parentId) ?? []).map((row) => (
             <option key={row.id} value={row.id}>
-              {row.name}
+              {labelOf(row)}
             </option>
           ))}
         </select>

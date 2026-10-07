@@ -3,9 +3,9 @@ import { eq, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
 import { type Db, createDb } from "../db";
-import { intakeReceipts, itemListings, items } from "../db/schema";
+import { type StockStatus, intakeReceipts, itemListings, items } from "../db/schema";
 import { parseId, quantityField, textField } from "../lib/input";
-import type { IntakeRequest, IntakeResult } from "../lib/intake-types";
+import type { IntakeRequest, IntakeResult, PlacesResult } from "../lib/intake-types";
 import { type ListingInput, listingLabel, parseListing } from "../lib/items";
 import {
   type Place,
@@ -35,25 +35,29 @@ type Line = {
   name: string;
   listing: ListingInput;
   note: string | null;
+  /** Where this delivery goes: its own location, or the one given for them all. */
+  locationId: number;
 };
 
-const intakeValidator = validator("json", (value, c): { place: Place; lines: Line[] } => {
+/** What every delivery in a request shares: storage, or in use on a robot's subsystem. */
+type Use = { status: StockStatus; robotId: number | null; subsystemId: number | null };
+
+const intakeValidator = validator("json", (value, c): { use: Use; lines: Line[] } => {
   const v = (value ?? {}) as Partial<Record<keyof IntakeRequest, unknown>>;
   const fail = (error: string) => c.json({ error }, 400) as never;
 
   const d = (v.destination ?? {}) as Record<string, unknown>;
-  const locationId = parseId(d.locationId);
-  if (locationId === null) return fail("Pick a location.");
   if (d.status !== "storage" && d.status !== "in_use") {
     return fail("status must be storage or in_use.");
   }
   const inUse = d.status === "in_use";
-  const place: Place = {
-    locationId,
+  const use: Use = {
     status: d.status,
     robotId: inUse ? parseId(d.robotId) : null,
     subsystemId: inUse ? parseId(d.subsystemId) : null,
   };
+  // The location for deliveries that don't name their own.
+  const shared = parseId(d.locationId);
 
   if (!Array.isArray(v.lines) || v.lines.length === 0 || v.lines.length > MAX_LINES) {
     return fail(`lines must be a list of 1–${MAX_LINES} deliveries.`);
@@ -69,12 +73,35 @@ const intakeValidator = validator("json", (value, c): { place: Place; lines: Lin
     }
     if (quantity === null) return fail("quantity must be a whole number, 1 or more.");
     if (name === null || note === null) return fail("A delivery's name or note is too long.");
+    const own = raw.locationId === undefined || raw.locationId === null ? null : raw.locationId;
+    const locationId = own === null ? shared : parseId(own);
+    if (locationId === null) return fail("Pick a location.");
     const listing = parseListing(raw.listing);
     if ("error" in listing) return fail(listing.error);
-    lines.push({ sourceKey, quantity, name, listing, note: note || null });
+    lines.push({ sourceKey, quantity, name, listing, note: note || null, locationId });
   }
-  return { place, lines };
+  return { use, lines };
 });
+
+const placesValidator = validator(
+  "json",
+  (value, c): { lines: { sourceKey: string; listing: ListingInput }[] } => {
+    const raw = (value as { lines?: unknown } | null)?.lines;
+    if (!Array.isArray(raw) || raw.length === 0 || raw.length > MAX_LINES) {
+      return c.json({ error: `lines must be a list of 1–${MAX_LINES} parts.` }, 400) as never;
+    }
+    const lines = [];
+    for (const line of raw as Record<string, unknown>[]) {
+      const sourceKey = textField(line?.sourceKey, 100, true);
+      const listing = parseListing(line?.listing);
+      if (sourceKey === null || "error" in listing) {
+        return c.json({ error: "Each part needs a sourceKey and a listing." }, 400) as never;
+      }
+      lines.push({ sourceKey, listing });
+    }
+    return { lines };
+  },
+);
 
 /** The entry's listing a delivery belongs to, if Inventory has the part. */
 async function findListing(db: Db, listing: ListingInput) {
@@ -109,24 +136,30 @@ async function findListing(db: Db, listing: ListingInput) {
   return null;
 }
 
-export const intakeRouter = new Hono<AppEnv>().post(
-  "/",
-  requireAuth,
-  intakeValidator,
-  async (c) => {
-    const { place, lines } = c.req.valid("json");
+export const intakeRouter = new Hono<AppEnv>()
+  .post("/", requireAuth, intakeValidator, async (c) => {
+    const { use, lines } = c.req.valid("json");
     const d1 = c.env.INVENTORY_DB;
     const db = createDb(d1);
     const names = await loadNames(db);
-    const problem = placeProblem(place, names);
-    if (problem) return c.json({ error: problem }, 400);
+
+    // Every place is checked before anything is added, so a bad one adds nothing.
+    const places = new Map<number, Place>();
+    for (const { locationId } of lines) {
+      if (places.has(locationId)) continue;
+      const place: Place = { ...use, locationId };
+      const problem = placeProblem(place, names);
+      if (problem) return c.json({ error: problem }, 400);
+      places.set(locationId, place);
+    }
 
     const by = actorOf(c);
-    const where = describePlace(place, names);
     const added: IntakeResult["added"] = [];
 
     // One delivery at a time, so two of the same new part in one order land on one entry.
     for (const line of lines) {
+      const place = places.get(line.locationId) as Place;
+      const where = describePlace(place, names);
       const receipt = () =>
         db
           .select({ itemId: intakeReceipts.itemId })
@@ -219,5 +252,39 @@ export const intakeRouter = new Hono<AppEnv>().post(
       }
     }
     return c.json({ added } satisfies IntakeResult);
-  },
-);
+  })
+  /**
+   * Where parts that are about to arrive are already kept: for each, the entry Inventory would
+   * add it to (found the same way as a delivery) and the location of that entry's parts in
+   * storage. For suggesting where a delivery goes; nothing is changed.
+   */
+  .post("/places", requireAuth, placesValidator, async (c) => {
+    const { lines } = c.req.valid("json");
+    const d1 = c.env.INVENTORY_DB;
+    const db = createDb(d1);
+    const places: PlacesResult["places"] = [];
+    for (const line of lines) {
+      const found = await findListing(db, line.listing);
+      if (!found) {
+        places.push({ sourceKey: line.sourceKey, itemId: null, itemName: null, locationId: null });
+        continue;
+      }
+      // Where it's kept: storage before in use, a row with parts before an empty one.
+      const home = await d1
+        .prepare(
+          `SELECT i.name AS itemName,
+                  (SELECT s.location_id FROM stock s WHERE s.item_id = i.id
+                   ORDER BY s.status = 'in_use', s.quantity = 0, s.id LIMIT 1) AS locationId
+           FROM items i WHERE i.id = ?1`,
+        )
+        .bind(found.itemId)
+        .first<{ itemName: string; locationId: number | null }>();
+      places.push({
+        sourceKey: line.sourceKey,
+        itemId: found.itemId,
+        itemName: home?.itemName ?? null,
+        locationId: home?.locationId ?? null,
+      });
+    }
+    return c.json({ places } satisfies PlacesResult);
+  });

@@ -4,7 +4,8 @@
 /** Where received parts go: into storage at a location, or in use on a robot's subsystem. */
 export type InventoryDestination = {
   status: "storage" | "in_use";
-  locationId: number;
+  /** The location for deliveries that don't name their own. */
+  locationId?: number | null;
   /** Both needed when `status` is "in_use". */
   robotId?: number | null;
   subsystemId?: number | null;
@@ -31,6 +32,8 @@ export type IntakeLine = {
   };
   /** Shown in the entry's history ("WCP order #12"). */
   note: string | null;
+  /** Where this delivery goes, when it isn't the destination's location. */
+  locationId?: number | null;
 };
 
 export type IntakeRequest = { destination: InventoryDestination; lines: IntakeLine[] };
@@ -41,7 +44,24 @@ export type IntakeResult = {
 
 /** What a destination can be picked from. */
 export type InventoryOptions = {
-  locations: { id: number; parentId: number | null; name: string }[];
+  /** `title` says what's kept there; a location reads as "name - title" when it has one. */
+  locations: { id: number; parentId: number | null; name: string; title: string }[];
   robots: { id: number; name: string }[];
   subsystems: { id: number; name: string }[];
+};
+
+/** Asks where parts that are about to arrive are already kept. */
+export type PlacesRequest = {
+  lines: { sourceKey: string; listing: IntakeLine["listing"] }[];
+};
+
+export type PlacesResult = {
+  places: {
+    sourceKey: string;
+    /** The entry the part would be added to, if Inventory has it. */
+    itemId: number | null;
+    itemName: string | null;
+    /** Where that entry's parts are kept (its storage, before parts in use). */
+    locationId: number | null;
+  }[];
 };

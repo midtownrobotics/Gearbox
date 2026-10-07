@@ -1,4 +1,4 @@
-import type { ItemView, StockView } from "@g3/worker-inventory";
+import type { StockView } from "@g3/worker-inventory";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuthUser } from "../../shared/auth";
@@ -7,6 +7,7 @@ import { count } from "../../shared/format";
 import { useInventory } from "../../shared/inventory-data";
 import { LocationPicker } from "../../shared/location-picker";
 import { type Places, locationLabel, useLabel, withinLocation } from "../../shared/places";
+import { type Row, rowsOf } from "../../shared/rows";
 import {
   CheckButton,
   LocationButton,
@@ -18,18 +19,6 @@ import { Card, Page, StatusBadge, inputClass } from "../../shared/ui";
 
 /** How many rows are drawn at first, and how many more each "Show more" adds. */
 const PAGE_ROWS = 200;
-
-type Row = { item: ItemView; stock: StockView | null };
-
-/**
- * An entry's rows: one for each place it has parts. With none anywhere, the row that remembers
- * where it's kept, or a bare row for an entry that has never had a place.
- */
-function rowsOf(item: ItemView): Row[] {
-  const held = item.stock.filter((stock) => stock.quantity > 0);
-  if (held.length > 0) return held.map((stock) => ({ item, stock }));
-  return [{ item, stock: item.stock[0] ?? null }];
-}
 
 type Filters = {
   query: string;

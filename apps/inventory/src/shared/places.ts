@@ -40,11 +40,13 @@ export function pathOf(id: number | null, places: Places): LocationRow[] {
   return path;
 }
 
-/** "Dungeon › A1" */
+/** A location as people read it: its name, with its title when it has one ("A1 - Misc. Electronics"). */
+export const labelOf = (row: Pick<LocationRow, "name" | "title">) =>
+  row.title ? `${row.name} - ${row.title}` : row.name;
+
+/** "Dungeon › A1 - Misc. Electronics" */
 export const locationLabel = (id: number | null, places: Places) =>
-  pathOf(id, places)
-    .map((row) => row.name)
-    .join(" › ");
+  pathOf(id, places).map(labelOf).join(" › ");
 
 /** "Comp bot · Drivetrain" for parts in use, "" for parts in storage. */
 export function useLabel(

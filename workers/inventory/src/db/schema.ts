@@ -36,6 +36,8 @@ export const locations = sqliteTable(
     id: integer("id").primaryKey({ autoIncrement: true }),
     parentId: integer("parent_id"),
     name: text("name").notNull(),
+    /** What's kept there, shown beside the name ("A1 - Misc. Electronics"). "" for none. */
+    title: text("title").notNull().default(""),
     sortOrder: integer("sort_order").notNull().default(0),
     createdAt: integer("created_at").notNull(),
   },

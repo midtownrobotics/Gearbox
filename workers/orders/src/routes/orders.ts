@@ -261,6 +261,23 @@ export const ordersRouter = new Hono<AppEnv>()
         })),
       );
     }
+    // Where each went in Inventory, for the next delivery of the same part.
+    const byLocation = new Map<number, number[]>();
+    for (const { id } of received) {
+      const locationId = sent.locations.get(id);
+      if (locationId === undefined) continue;
+      byLocation.set(locationId, [...(byLocation.get(locationId) ?? []), id]);
+    }
+    for (const [inventoryLocationId, requestIds] of byLocation) {
+      await inChunks(requestIds, (chunk) =>
+        db
+          .update(orderRequests)
+          .set({ inventoryLocationId })
+          .where(inArray(orderRequests.id, chunk))
+          .returning({ id: orderRequests.id })
+          .all(),
+      );
+    }
     const done = received.map((r) => r.id);
     return c.json({
       received: done,

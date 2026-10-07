@@ -4,7 +4,7 @@ import type { Db } from "../db";
 import { FIELD_TYPES, type FieldType, fields, robots, subsystems } from "../db/schema";
 import { loadFields } from "./fields";
 import { chunks, sameName } from "./input";
-import { MAX_DEPTH, indexLocations, loadLocations } from "./locations";
+import { MAX_DEPTH, MAX_TITLE, indexLocations, loadLocations } from "./locations";
 
 // A setup file: how a team has Inventory arranged (its fields, its tree of locations, its robots
 // and subsystems), without any of its parts. The app itself holds none of this. A team builds its
@@ -26,7 +26,12 @@ export type SetupField = {
   showInTable: boolean;
 };
 
-export type SetupLocation = { name: string; children: SetupLocation[] };
+export type SetupLocation = {
+  name: string;
+  /** What's kept there, shown beside the name. Left out for none. */
+  title?: string;
+  children: SetupLocation[];
+};
 
 export type Setup = {
   format: typeof SETUP_FORMAT;
@@ -154,6 +159,13 @@ export function parseSetup(input: unknown): { setup: Setup } | { problems: strin
     }
     const locationName = name(raw.name, where);
     const label = locationName ? `Location "${locationName}"` : where;
+    let title = "";
+    if (raw.title !== undefined && raw.title !== null) {
+      if (typeof raw.title !== "string") fail(label, `"title" must be text.`);
+      else if (raw.title.trim().length > MAX_TITLE) {
+        fail(label, `"title" is longer than ${MAX_TITLE} characters.`);
+      } else title = raw.title.trim();
+    }
     const inside = list(raw.children, MAX_LOCATIONS, label, "children");
     if (inside.length > 0 && depth >= MAX_DEPTH) {
       fail(label, `locations can only be ${MAX_DEPTH} levels deep.`);
@@ -168,7 +180,7 @@ export function parseSetup(input: unknown): { setup: Setup } | { problems: strin
       children.map((child) => child.name),
       label,
     );
-    return { name: locationName, children };
+    return { name: locationName, ...(title ? { title } : {}), children };
   };
   const setupLocations = list(input.locations, MAX_LOCATIONS, "File", "locations").map((raw, i) =>
     location(raw, `Location ${i + 1}`, 1),
@@ -224,6 +236,7 @@ export async function exportSetup(db: Db): Promise<Setup> {
       ? []
       : (childrenOf.get(parentId) ?? []).map((row) => ({
           name: row.name,
+          ...(row.title ? { title: row.title } : {}),
           children: tree(row.id, depth + 1),
         }));
   return {
@@ -361,15 +374,23 @@ export async function loadSetup(
         }
       }
     }
-    // Four values a row: 25 rows keeps a statement at D1's 100 bound parameters.
-    for (const group of chunks(adding, 25)) {
+    // Five values a row: 20 rows keeps a statement at D1's 100 bound parameters.
+    for (const group of chunks(adding, 20)) {
       const { results } = await d1
         .prepare(
-          `INSERT INTO locations (parent_id, name, sort_order, created_at) VALUES ${group
-            .map(() => "(?, ?, ?, ?)")
+          `INSERT INTO locations (parent_id, name, title, sort_order, created_at) VALUES ${group
+            .map(() => "(?, ?, ?, ?, ?)")
             .join(", ")} RETURNING id, parent_id AS parentId, name`,
         )
-        .bind(...group.flatMap((row) => [row.parentId, row.node.name, row.sortOrder, now]))
+        .bind(
+          ...group.flatMap((row) => [
+            row.parentId,
+            row.node.name,
+            row.node.title ?? "",
+            row.sortOrder,
+            now,
+          ]),
+        )
         .all<{ id: number; parentId: number | null; name: string }>();
       for (const row of group) {
         const made = results.find((r) => r.parentId === row.parentId && r.name === row.node.name);

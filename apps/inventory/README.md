@@ -23,7 +23,8 @@ starter setup that comes with the app.
 ## Who can do what
 
 - **Anyone signed in** (kiosk PIN sessions too) sees everything, adds and edits entries, counts,
-  moves, checks parts out and in, and adds or removes vendor listings.
+  moves, checks parts out and in, adds or removes vendor listings, gives a location its title and
+  moves everything in a location somewhere else.
 - **Mentors and admins** (the G3ID roles, never a kiosk PIN session) delete entries, merge two
   entries into one, and split a listing off as its own entry.
 - **Admins** arrange Settings: fields, locations, robots, subsystems and setup files.
@@ -36,6 +37,11 @@ Every change to an entry is in its History, with who made it.
   location to change it, and use Check out / Check in to move parts between storage and a robot.
   Check in is preset to put parts back with the entry's parts already in storage (the first such
   row, if it's kept in several places).
+- **Locations** (`/locations`): the table the other way round. Every location is a panel that
+  opens, nested like the tree, with what's kept in it. Type a title into a location's bar to say
+  what belongs there: it then reads "A1 - Misc. Electronics" everywhere, in Orders' receive pop-up
+  too. Move an entry, or everything in a location with "Move all", when things are rearranged:
+  whole quantities move at once, and the locations themselves stay as they are.
 - **Add an entry** (`/new`).
 - **An entry** (`/items/:id`): details, where its parts are, vendor listings, history.
 - **Settings** (`/settings`, admins).
@@ -48,7 +54,8 @@ Every change to an entry is in its History, with who made it.
   listing shows its own saved copy.
 - When a part is marked received in Orders, the person receiving it can say where it goes, and it's
   added here (`POST /intake` on the worker): to the entry with that listing, or a new entry.
-  Whether that's required is a setting in Orders.
+  Whether that's required is a setting in Orders. Each part's location starts as where this app
+  already keeps it, else where it went the last time it was received.
 
 ## Setup files
 
@@ -69,7 +76,8 @@ Every change to an entry is in its History, with who made it.
 ```
 
 Field types: `text`, `paragraph`, `number`, `choice` (with `options`), `checkbox`, `link`, `date`.
-A location is a name, or `{ "name", "children" }`, at most four levels deep. Loading a file only
+A location is a name, or `{ "name", "title", "children" }` (the title is optional), at most four
+levels deep. Loading a file only
 adds what the team doesn't have yet, matched by name; nothing is changed or removed.
 
 ## Development
