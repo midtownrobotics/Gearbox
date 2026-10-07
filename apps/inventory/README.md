@@ -27,7 +27,8 @@ starter setup that comes with the app.
   moves everything in a location somewhere else.
 - **Mentors and admins** (the G3ID roles, never a kiosk PIN session) delete entries, merge two
   entries into one, and split a listing off as its own entry.
-- **Admins** arrange Settings: fields, locations, robots, subsystems and setup files.
+- **Admins** arrange Settings: fields, locations, robots, subsystems and setup files. Locations
+  are put in order by dragging them by their handles, each among the ones in the same place.
 
 Every change to an entry is in its History, with who made it.
 
