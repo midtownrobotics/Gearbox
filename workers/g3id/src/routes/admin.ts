@@ -17,8 +17,17 @@ import { isTeamUiSettings, loadTeamUi, teamIdName } from "../lib/team-ui";
 import { requireAdmin } from "../middleware/auth";
 import type { AppEnv } from "../types";
 
+/** A user in the admin's own team: an admin only ever sees and changes their team's accounts. */
+const memberOf = (team: string, id: string) =>
+  and(eq(coreUsers.id, id), eq(coreUsers.teamId, team));
+
 export const adminRouter = new Hono<AppEnv>()
   .use("*", requireAdmin)
+  // Everything here is the admin's own team's, so find it once.
+  .use("*", async (c, next) => {
+    c.set("adminTeamId", await teamOfUser(createDb(c.env.DB), c.get("userId") as string));
+    await next();
+  })
   // The admin's own team's appearance.
   .get("/team/ui", async (c) => {
     const db = createDb(c.env.DB);
@@ -47,8 +56,14 @@ export const adminRouter = new Hono<AppEnv>()
   .get("/users", async (c) => {
     const db = createDb(c.env.DB);
 
+    const team = c.get("adminTeamId") as string;
     const [users, identities] = await Promise.all([
-      db.select().from(coreUsers).orderBy(desc(coreUsers.createdAt)).all(),
+      db
+        .select()
+        .from(coreUsers)
+        .where(eq(coreUsers.teamId, team))
+        .orderBy(desc(coreUsers.createdAt))
+        .all(),
       db
         .select({
           userId: coreUserIdentities.userId,
@@ -56,6 +71,8 @@ export const adminRouter = new Hono<AppEnv>()
           createdAt: coreUserIdentities.createdAt,
         })
         .from(coreUserIdentities)
+        .innerJoin(coreUsers, eq(coreUsers.id, coreUserIdentities.userId))
+        .where(eq(coreUsers.teamId, team))
         .all(),
     ]);
 
@@ -80,7 +97,7 @@ export const adminRouter = new Hono<AppEnv>()
     const user = await db
       .select({ id: coreUsers.id, teamId: coreUsers.teamId, status: coreUsers.status })
       .from(coreUsers)
-      .where(eq(coreUsers.id, id))
+      .where(memberOf(c.get("adminTeamId") as string, id))
       .get();
 
     if (!user) return c.json({ error: "User not found." }, 404);
@@ -89,7 +106,7 @@ export const adminRouter = new Hono<AppEnv>()
     await db
       .update(coreUsers)
       .set({ status: "active", updatedAt: Math.floor(Date.now() / 1000) })
-      .where(eq(coreUsers.id, id));
+      .where(memberOf(c.get("adminTeamId") as string, id));
 
     const [slackIdentity] = await db
       .select({ providerId: coreUserIdentities.providerId })
@@ -114,7 +131,7 @@ export const adminRouter = new Hono<AppEnv>()
     const user = await db
       .select({ id: coreUsers.id, status: coreUsers.status })
       .from(coreUsers)
-      .where(eq(coreUsers.id, id))
+      .where(memberOf(c.get("adminTeamId") as string, id))
       .get();
 
     if (!user) return c.json({ error: "User not found." }, 404);
@@ -123,7 +140,7 @@ export const adminRouter = new Hono<AppEnv>()
     await db
       .update(coreUsers)
       .set({ status: "rejected", updatedAt: Math.floor(Date.now() / 1000) })
-      .where(eq(coreUsers.id, id));
+      .where(memberOf(c.get("adminTeamId") as string, id));
 
     return c.json({ message: "User rejected." });
   })
@@ -148,12 +165,12 @@ export const adminRouter = new Hono<AppEnv>()
       db
         .select({ id: coreUsers.id, status: coreUsers.status })
         .from(coreUsers)
-        .where(eq(coreUsers.id, id))
+        .where(memberOf(c.get("adminTeamId") as string, id))
         .get(),
       db
         .select({ id: coreUsers.id, status: coreUsers.status })
         .from(coreUsers)
-        .where(eq(coreUsers.id, targetUserId))
+        .where(memberOf(c.get("adminTeamId") as string, targetUserId))
         .get(),
     ]);
 
@@ -198,7 +215,7 @@ export const adminRouter = new Hono<AppEnv>()
 
     // Source user's identities and sessions are now on the target — delete the shell
     await db.delete(coreSlackLinkCodes).where(eq(coreSlackLinkCodes.userId, id));
-    await db.delete(coreUsers).where(eq(coreUsers.id, id));
+    await db.delete(coreUsers).where(memberOf(c.get("adminTeamId") as string, id));
 
     return c.json({ message: "User merged." });
   })
@@ -209,7 +226,7 @@ export const adminRouter = new Hono<AppEnv>()
     const user = await db
       .select({ id: coreUsers.id, status: coreUsers.status })
       .from(coreUsers)
-      .where(eq(coreUsers.id, id))
+      .where(memberOf(c.get("adminTeamId") as string, id))
       .get();
 
     if (!user) return c.json({ error: "User not found." }, 404);
@@ -220,7 +237,7 @@ export const adminRouter = new Hono<AppEnv>()
     await db.delete(coreSlackLinkCodes).where(eq(coreSlackLinkCodes.userId, id));
     await db.delete(coreSessions).where(eq(coreSessions.userId, id));
     await db.delete(coreUserIdentities).where(eq(coreUserIdentities.userId, id));
-    await db.delete(coreUsers).where(eq(coreUsers.id, id));
+    await db.delete(coreUsers).where(memberOf(c.get("adminTeamId") as string, id));
 
     return c.json({ message: "User deleted." });
   })
@@ -231,7 +248,7 @@ export const adminRouter = new Hono<AppEnv>()
     const user = await db
       .select({ id: coreUsers.id })
       .from(coreUsers)
-      .where(eq(coreUsers.id, id))
+      .where(memberOf(c.get("adminTeamId") as string, id))
       .get();
 
     if (!user) return c.json({ error: "User not found." }, 404);
@@ -239,7 +256,7 @@ export const adminRouter = new Hono<AppEnv>()
     await db
       .update(coreUsers)
       .set({ isAdmin: 1, updatedAt: Math.floor(Date.now() / 1000) })
-      .where(eq(coreUsers.id, id));
+      .where(memberOf(c.get("adminTeamId") as string, id));
 
     return c.json({ message: "User promoted to admin." });
   })
@@ -253,7 +270,7 @@ export const adminRouter = new Hono<AppEnv>()
     const user = await db
       .select({ id: coreUsers.id })
       .from(coreUsers)
-      .where(eq(coreUsers.id, id))
+      .where(memberOf(c.get("adminTeamId") as string, id))
       .get();
 
     if (!user) return c.json({ error: "User not found." }, 404);
@@ -261,7 +278,7 @@ export const adminRouter = new Hono<AppEnv>()
     await db
       .update(coreUsers)
       .set({ isAdmin: 0, updatedAt: Math.floor(Date.now() / 1000) })
-      .where(eq(coreUsers.id, id));
+      .where(memberOf(c.get("adminTeamId") as string, id));
 
     return c.json({ message: "User demoted." });
   })
@@ -272,7 +289,7 @@ export const adminRouter = new Hono<AppEnv>()
     const user = await db
       .select({ id: coreUsers.id })
       .from(coreUsers)
-      .where(eq(coreUsers.id, id))
+      .where(memberOf(c.get("adminTeamId") as string, id))
       .get();
 
     if (!user) return c.json({ error: "User not found." }, 404);
@@ -280,7 +297,7 @@ export const adminRouter = new Hono<AppEnv>()
     await db
       .update(coreUsers)
       .set({ isMentor: 1, updatedAt: Math.floor(Date.now() / 1000) })
-      .where(eq(coreUsers.id, id));
+      .where(memberOf(c.get("adminTeamId") as string, id));
 
     return c.json({ message: "User granted mentor." });
   })
@@ -291,7 +308,7 @@ export const adminRouter = new Hono<AppEnv>()
     const user = await db
       .select({ id: coreUsers.id })
       .from(coreUsers)
-      .where(eq(coreUsers.id, id))
+      .where(memberOf(c.get("adminTeamId") as string, id))
       .get();
 
     if (!user) return c.json({ error: "User not found." }, 404);
@@ -299,7 +316,7 @@ export const adminRouter = new Hono<AppEnv>()
     await db
       .update(coreUsers)
       .set({ isMentor: 0, updatedAt: Math.floor(Date.now() / 1000) })
-      .where(eq(coreUsers.id, id));
+      .where(memberOf(c.get("adminTeamId") as string, id));
 
     return c.json({ message: "Mentor revoked." });
   })
@@ -326,7 +343,7 @@ export const adminRouter = new Hono<AppEnv>()
     const db = createDb(c.env.DB);
 
     await db.insert(kioskActivationCodes).values({
-      teamId: await teamOfUser(db, userId),
+      teamId: c.get("adminTeamId") as string,
       code,
       createdBy: userId,
       deviceName,
@@ -361,7 +378,12 @@ export const adminRouter = new Hono<AppEnv>()
     const devices = await db
       .select()
       .from(kioskDevices)
-      .where(or(isNull(kioskDevices.revokedAt), gt(kioskDevices.revokedAt, fifteenMinutesAgo)))
+      .where(
+        and(
+          eq(kioskDevices.teamId, c.get("adminTeamId") as string),
+          or(isNull(kioskDevices.revokedAt), gt(kioskDevices.revokedAt, fifteenMinutesAgo)),
+        ),
+      )
       .all();
     return c.json(devices);
   })
@@ -379,7 +401,9 @@ export const adminRouter = new Hono<AppEnv>()
     const device = await db
       .select({ id: kioskDevices.id })
       .from(kioskDevices)
-      .where(eq(kioskDevices.id, deviceId))
+      .where(
+        and(eq(kioskDevices.id, deviceId), eq(kioskDevices.teamId, c.get("adminTeamId") as string)),
+      )
       .get();
 
     if (!device) {
