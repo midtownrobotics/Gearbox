@@ -63,7 +63,7 @@ const app = base
   .post("/logout", requireAuth, async (c) => {
     const kioskDeviceId = c.get("kioskDeviceId");
     if (c.get("sessionType") === "pin" && kioskDeviceId) {
-      await clearPresence(createShopDb(c.env.SHOP_DB), kioskDeviceId);
+      await clearPresence(createShopDb(c.env.SHOP_DB), c.get("teamId"), kioskDeviceId);
     }
     const res = await c.env.G3ID.fetch(
       new Request("http://g3id/api/auth/logout", {
@@ -100,6 +100,7 @@ const app = base
   .route("/admin", adminPartsRouter);
 
 export type ShopApp = typeof app;
+export { app };
 
 export default {
   fetch: withApiPrefix(app.fetch),

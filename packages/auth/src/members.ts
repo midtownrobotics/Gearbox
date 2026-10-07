@@ -51,3 +51,29 @@ export async function sendTeamDM(
   }
   return res.ok;
 }
+
+/**
+ * Posts to one of the team's Slack channels from its own bot. Never throws: gives back why it
+ * wasn't posted (the team has no Slack, or Slack's refusal, like "not_in_channel").
+ */
+export async function sendTeamMessage(
+  env: { G3ID: Fetcher },
+  teamId: string,
+  channel: string,
+  text: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const res = await env.G3ID.fetch(
+      new Request(`http://g3id/api/internal/teams/${encodeURIComponent(teamId)}/slack/message`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ channel, text }),
+      }),
+    );
+    if (res.ok) return { ok: true };
+    const body = (await res.json().catch(() => ({}))) as { error?: string };
+    return { ok: false, error: body.error ?? `G3ID answered ${res.status}` };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}

@@ -13,7 +13,8 @@
     "db:migrate:local": "wrangler d1 migrations apply SHOP_DB --local",
     "db:migrate:remote": "wrangler d1 migrations apply SHOP_DB --env production --remote",
     "test": "vitest run",
-    "build": "wrangler deploy --env production --dry-run"
+    "build": "wrangler deploy --env production --dry-run",
+    "r2:move-to-team": "node scripts/r2-move-to-team.ts"
   },
   "dependencies": {
     "@g3/auth": "workspace:*",

@@ -16,7 +16,7 @@ export type AppEnv = {
     /** The Slack app's OAuth credentials, for installing it into a team's workspace. */
     SLACK_CLIENT_ID?: string;
     SLACK_CLIENT_SECRET?: string;
-    /** Encrypts secrets stored in D1, like each team's Slack bot token (lib/secret-box.ts). */
+    /** Encrypts secrets stored in D1, like each team's Slack bot token (`encryptSecret` in @g3/auth). */
     SECRETS_KEY?: string;
     STEAM_API_KEY: string;
     STEAM_REDIRECT_URI: string;

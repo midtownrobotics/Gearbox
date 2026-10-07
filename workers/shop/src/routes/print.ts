@@ -1,5 +1,6 @@
 import { requireAuth } from "@g3/auth";
 import { type Context, Hono } from "hono";
+import { drawingKey } from "../lib/storage";
 import type { AppEnv } from "../types";
 
 /**
@@ -28,6 +29,17 @@ async function sendToPrinter(
       error?: string;
       alerts?: { severity: "error" | "warning"; message: string }[];
     };
+    // Signed in here but not by Edge: the box isn't this team's (it's the site team's until each
+    // team can pair its own, roadmap E.1/E.2).
+    if (res.status === 401 || res.status === 403) {
+      return c.json(
+        {
+          ok: false as const,
+          error: "Printing needs an edge box, and your team hasn't connected one.",
+        },
+        503,
+      );
+    }
     if (!res.ok || !data.ok) {
       return c.json(
         { ok: false as const, error: data.error || "Print failed" },
@@ -68,7 +80,7 @@ export const printRouter = new Hono<AppEnv>()
   // once, to the box, instead of down to the kiosk and back up again.
   .post("/drawing/:partNumber/:revision", requireAuth, async (c) => {
     const { partNumber, revision } = c.req.param();
-    const file = await c.env.DRAWINGS.get(`drawings/${partNumber}/${revision}/drawing.pdf`);
+    const file = await c.env.DRAWINGS.get(drawingKey(c.get("teamId"), partNumber, revision));
     if (!file) {
       return c.json({ ok: false as const, error: "There's no drawing for this revision." }, 404);
     }

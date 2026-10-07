@@ -1,8 +1,8 @@
+import { decryptSecret, encryptSecret } from "@g3/auth";
 import { eq } from "drizzle-orm";
 import { createDb } from "../db";
 import { slackInstallations } from "../db/schema";
 import type { AppEnv } from "../types";
-import { decryptSecret, encryptSecret } from "./secret-box";
 import { siteTeamId } from "./team";
 
 // Each team's Slack workspace. One Slack app is installed into every team's workspace (from

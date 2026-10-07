@@ -447,20 +447,45 @@ function ProcessList({
   );
 }
 
+type OnShapeStatus = {
+  documentId: string;
+  mainAssemblyId: string;
+  companyId: string;
+  hasApiKey: boolean;
+  hasWebhookKeys: boolean;
+  fromWorkerSecrets: boolean;
+  webhookUrl: string;
+};
+
+const inputCls =
+  "w-full bg-paper border border-steel/40 rounded-lg px-3 py-2 text-sm text-ink placeholder-steel focus:outline-none focus:border-crimson";
+
+/**
+ * The team's Onshape connection: the document Shop follows, and the team's own API keys and
+ * webhook signing keys from Onshape's Developer Portal. Keys are never shown again once saved;
+ * leave them blank to keep them.
+ */
 function OnShapeConfig() {
   const [documentId, setDocumentId] = useState("");
   const [mainAssemblyId, setMainAssemblyId] = useState("");
+  const [companyId, setCompanyId] = useState("");
+  const [apiKey, setApiKey] = useState("");
+  const [apiSecret, setApiSecret] = useState("");
+  const [webhookKeyPrimary, setWebhookKeyPrimary] = useState("");
+  const [webhookKeySecondary, setWebhookKeySecondary] = useState("");
+  const [status, setStatus] = useState<OnShapeStatus | null>(null);
   const [urlInput, setUrlInput] = useState("");
   const [saving, setSaving] = useState(false);
-  const [banner, setBanner] = useState<string | null>(null);
+  const [banner, setBanner] = useState<{ ok: boolean; text: string } | null>(null);
 
   function parseUrl() {
     // Format: https://cad.onshape.com/documents/[DOCID]/[not used]/[not used]/e/[MAINASSEMBLYID]
     const match = urlInput.match(/\/documents\/([^/]+)\/[^/]*\/[^/]*\/e\/([^/?]+)/);
     if (!match) {
-      setBanner(
-        "Invalid URL format. Expected: https://cad.onshape.com/documents/[DOCID]/[...]/e/[MAINASSEMBLYID]",
-      );
+      setBanner({
+        ok: false,
+        text: "Invalid URL format. Expected: https://cad.onshape.com/documents/[DOCID]/[...]/e/[MAINASSEMBLYID]",
+      });
       return;
     }
 
@@ -473,62 +498,98 @@ function OnShapeConfig() {
 
   async function loadConfig() {
     try {
-      // biome-ignore lint/suspicious/noExplicitAny: workaround for Hono client type generation
-      const res = await (api as any).admin.onshape.config.$get();
+      const res = await api.admin.onshape.config.$get();
       if (!res.ok) {
-        setBanner(await getErrorMessage(res as unknown as Response));
+        setBanner({ ok: false, text: await getErrorMessage(res as unknown as Response) });
         return;
       }
-      const config = (await res.json()) as { documentId: string; mainAssemblyId: string };
+      const config = (await res.json()) as OnShapeStatus;
+      setStatus(config);
       setDocumentId(config.documentId || "");
       setMainAssemblyId(config.mainAssemblyId || "");
+      setCompanyId(config.companyId || "");
     } catch (err) {
-      setBanner(err instanceof Error ? err.message : "Failed to load OnShape config");
+      setBanner({
+        ok: false,
+        text: err instanceof Error ? err.message : "Failed to load OnShape config",
+      });
     }
   }
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: load once
+  useEffect(() => {
+    void loadConfig();
+  }, []);
+
   async function handleSave() {
     if (!documentId.trim()) {
-      setBanner("Document ID is required");
+      setBanner({ ok: false, text: "Document ID is required" });
       return;
     }
 
     setSaving(true);
     try {
-      // biome-ignore lint/suspicious/noExplicitAny: workaround for Hono client type generation
-      const res = await (api as any).admin.onshape.config.$post({
+      const res = await api.admin.onshape.config.$post({
         json: {
           documentId: documentId.trim(),
           mainAssemblyId: mainAssemblyId.trim() || undefined,
+          companyId: companyId.trim() || undefined,
+          apiKey: apiKey.trim() || undefined,
+          apiSecret: apiSecret.trim() || undefined,
+          webhookKeyPrimary: webhookKeyPrimary.trim() || undefined,
+          webhookKeySecondary: webhookKeySecondary.trim() || undefined,
         },
       });
 
       if (!res.ok) {
-        setBanner(await getErrorMessage(res as unknown as Response));
+        setBanner({ ok: false, text: await getErrorMessage(res as unknown as Response) });
         return;
       }
-
-      setBanner(null);
+      const result = (await res.json()) as { webhook?: string };
+      setApiKey("");
+      setApiSecret("");
+      setWebhookKeyPrimary("");
+      setWebhookKeySecondary("");
+      setBanner(
+        result.webhook === "registered"
+          ? { ok: true, text: "Saved. Onshape will send releases to Shop." }
+          : result.webhook === "failed"
+            ? {
+                ok: false,
+                text: "Saved, but Onshape refused the webhook. Check the keys and company.",
+              }
+            : { ok: true, text: "Saved. Add the API keys and company ID to receive releases." },
+      );
       await loadConfig();
     } catch (err) {
-      setBanner(err instanceof Error ? err.message : "Failed to save config");
+      setBanner({ ok: false, text: err instanceof Error ? err.message : "Failed to save config" });
     } finally {
       setSaving(false);
     }
   }
+
+  const keptHint = (saved: boolean | undefined) =>
+    saved ? "Saved; leave blank to keep it" : "From Onshape's Developer Portal";
 
   return (
     <div className="space-y-4 max-w-xl">
       {banner && (
         <div
           className={`text-sm rounded-lg px-3 py-2 ${
-            banner.includes("Failed") || banner.includes("required") || banner.includes("Invalid")
-              ? "text-crimson-dark bg-crimson-50 border border-crimson-200"
-              : "text-emerald-700 bg-emerald-50 border border-emerald-300"
+            banner.ok
+              ? "text-emerald-700 bg-emerald-50 border border-emerald-300"
+              : "text-crimson-dark bg-crimson-50 border border-crimson-200"
           }`}
         >
-          {banner}
+          {banner.text}
         </div>
+      )}
+
+      {status?.fromWorkerSecrets && (
+        <p className="text-xs text-steel">
+          Using the keys this deployment had before teams. Save the team's own keys here to replace
+          them.
+        </p>
       )}
 
       <div className="p-3 bg-mist rounded-lg border border-steel/25 space-y-2">
@@ -564,7 +625,7 @@ function OnShapeConfig() {
           value={documentId}
           onChange={(e) => setDocumentId(e.target.value)}
           placeholder="e.g. abc123def456"
-          className="w-full bg-paper border border-steel/40 rounded-lg px-3 py-2 text-sm text-ink placeholder-steel focus:outline-none focus:border-crimson"
+          className={inputCls}
         />
         <p className="text-xs text-steel">
           From OnShape URL: cad.onshape.com/documents/[DOCUMENT_ID]/...
@@ -580,20 +641,91 @@ function OnShapeConfig() {
           type="text"
           value={mainAssemblyId}
           onChange={(e) => setMainAssemblyId(e.target.value)}
-          placeholder="e.g. xyz789 (optional)"
-          className="w-full bg-paper border border-steel/40 rounded-lg px-3 py-2 text-sm text-ink placeholder-steel focus:outline-none focus:border-crimson"
+          placeholder="e.g. xyz789"
+          className={inputCls}
         />
-        <p className="text-xs text-steel">Optional — usually not needed for drawing exports</p>
+        <p className="text-xs text-steel">Needed to read the release's bill of materials</p>
       </div>
 
+      <div className="space-y-1">
+        <label htmlFor="company-id" className="text-xs font-medium text-steel-dark">
+          Company ID
+        </label>
+        <input
+          id="company-id"
+          type="text"
+          value={companyId}
+          onChange={(e) => setCompanyId(e.target.value)}
+          placeholder="The Onshape company (or classroom) that owns the document"
+          className={inputCls}
+        />
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="space-y-1">
+          <label htmlFor="api-key" className="text-xs font-medium text-steel-dark">
+            API access key
+          </label>
+          <input
+            id="api-key"
+            type="password"
+            autoComplete="off"
+            value={apiKey}
+            onChange={(e) => setApiKey(e.target.value)}
+            className={inputCls}
+          />
+          <p className="text-xs text-steel">{keptHint(status?.hasApiKey)}</p>
+        </div>
+        <div className="space-y-1">
+          <label htmlFor="api-secret" className="text-xs font-medium text-steel-dark">
+            API secret key
+          </label>
+          <input
+            id="api-secret"
+            type="password"
+            autoComplete="off"
+            value={apiSecret}
+            onChange={(e) => setApiSecret(e.target.value)}
+            className={inputCls}
+          />
+          <p className="text-xs text-steel">{keptHint(status?.hasApiKey)}</p>
+        </div>
+        <div className="space-y-1">
+          <label htmlFor="webhook-primary" className="text-xs font-medium text-steel-dark">
+            Webhook signing key (primary)
+          </label>
+          <input
+            id="webhook-primary"
+            type="password"
+            autoComplete="off"
+            value={webhookKeyPrimary}
+            onChange={(e) => setWebhookKeyPrimary(e.target.value)}
+            className={inputCls}
+          />
+          <p className="text-xs text-steel">{keptHint(status?.hasWebhookKeys)}</p>
+        </div>
+        <div className="space-y-1">
+          <label htmlFor="webhook-secondary" className="text-xs font-medium text-steel-dark">
+            Webhook signing key (secondary)
+          </label>
+          <input
+            id="webhook-secondary"
+            type="password"
+            autoComplete="off"
+            value={webhookKeySecondary}
+            onChange={(e) => setWebhookKeySecondary(e.target.value)}
+            className={inputCls}
+          />
+          <p className="text-xs text-steel">{keptHint(status?.hasWebhookKeys)}</p>
+        </div>
+      </div>
+      {status && (
+        <p className="text-xs text-steel break-all">
+          Saving registers Shop's webhook on the document, calling back on {status.webhookUrl}
+        </p>
+      )}
+
       <div className="flex gap-2 pt-2">
-        <button
-          type="button"
-          onClick={loadConfig}
-          className="px-4 py-2 bg-steel-tint hover:bg-steel/30 text-steel-dark text-sm font-medium rounded-lg transition-colors"
-        >
-          Load Current
-        </button>
         <button
           type="button"
           onClick={handleSave}

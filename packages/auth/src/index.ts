@@ -24,8 +24,15 @@ export async function resolveUserId(
   return null;
 }
 
-export { type Member, activeMembers, sendTeamDM, teamMembers } from "./members";
+export {
+  type Member,
+  activeMembers,
+  sendTeamDM,
+  sendTeamMessage,
+  teamMembers,
+} from "./members";
 export { inTeam, withTeam } from "./scope";
+export { decryptSecret, encryptSecret } from "./secret-box";
 
 /**
  * Headers for calling another app's worker as the signed-in user (a service binding skips the

@@ -1,11 +1,14 @@
-import { apiUrl, site } from "@g3/site-config";
+import { inTeam, withTeam } from "@g3/auth";
 import { eq } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/d1";
+import type { createShopDb } from "../db";
 import * as schema from "../db/schema";
-import type { AppEnv } from "../types";
+import type { BOMQueueMessage } from "./bom-queue-consumer";
+import { type OnshapeCredentials, basicAuth } from "./onshape-config";
 
-/** Our webhook's name in Onshape; how we find it again to delete it. */
-const WEBHOOK_NAME = `${site.team.name} Shop SW`;
+type ShopDb = ReturnType<typeof createShopDb>;
+
+/** Our webhook's name in Onshape; with its address, how we find it again to delete it. */
+const WEBHOOK_NAME = "Gearbox Shop";
 
 interface BOMHeader {
   id: string;
@@ -65,51 +68,36 @@ export async function verifyOnshapeSignature(
   return secondaryMatch;
 }
 
-export async function unregisterOnShapeWebhooks(documentId: string, env: AppEnv["Bindings"]) {
-  const apiKey = env.ONSHAPE_API_KEY;
-  const apiSecret = env.ONSHAPE_API_SECRET;
+type OnshapeWebhook = { id: string; name?: string; url?: string };
 
-  if (!apiKey || !apiSecret) {
-    console.warn("[OnShape] Cannot unregister webhooks: credentials missing");
-    return;
-  }
-
-  const credentials = btoa(`${apiKey}:${apiSecret}`);
-
+/**
+ * Deletes Shop's webhook from a document: any that calls back on this team's events address, or
+ * carries our name. Onshape keeps webhooks per document, so saving the config again replaces
+ * ours instead of adding a second.
+ */
+export async function unregisterOnShapeWebhooks(
+  documentId: string,
+  credentials: OnshapeCredentials,
+  eventsUrl: string,
+) {
   try {
-    // List all webhooks for this document
     const listResponse = await fetch(
       `https://cad.onshape.com/api/v16/webhooks?documentId=${documentId}`,
-      {
-        headers: {
-          Authorization: `Basic ${credentials}`,
-        },
-      },
+      { headers: { Authorization: basicAuth(credentials) } },
     );
-
     if (!listResponse.ok) {
       console.warn("[OnShape] Failed to list webhooks for cleanup");
       return;
     }
-
-    const webhooks = (await listResponse.json()) as { items: { id: string; name: string }[] };
-
-    // Delete our webhook
-    for (const webhook of webhooks.items || []) {
-      if (webhook.name === WEBHOOK_NAME) {
-        const deleteResponse = await fetch(
-          `https://cad.onshape.com/api/v16/webhooks/${webhook.id}`,
-          {
-            method: "DELETE",
-            headers: {
-              Authorization: `Basic ${credentials}`,
-            },
-          },
-        );
-
-        if (deleteResponse.ok) {
-          console.log("[OnShape Webhook Unregistered]", { documentId, webhookId: webhook.id });
-        }
+    const webhooks = (await listResponse.json()) as { items?: OnshapeWebhook[] };
+    for (const webhook of webhooks.items ?? []) {
+      if (webhook.url !== eventsUrl && webhook.name !== WEBHOOK_NAME) continue;
+      const deleteResponse = await fetch(`https://cad.onshape.com/api/v16/webhooks/${webhook.id}`, {
+        method: "DELETE",
+        headers: { Authorization: basicAuth(credentials) },
+      });
+      if (deleteResponse.ok) {
+        console.log("[OnShape Webhook Unregistered]", { documentId, webhookId: webhook.id });
       }
     }
   } catch (err) {
@@ -120,29 +108,24 @@ export async function unregisterOnShapeWebhooks(documentId: string, env: AppEnv[
   }
 }
 
-export async function registerOnShapeWebhook(documentId: string, env: AppEnv["Bindings"]) {
-  const apiKey = env.ONSHAPE_API_KEY;
-  const apiSecret = env.ONSHAPE_API_SECRET;
-  const companyId = env.ONSHAPE_COMPANY_ID;
-
-  if (!apiKey || !apiSecret || !companyId) {
-    throw new Error("OnShape API credentials not configured");
-  }
-
-  const credentials = btoa(`${apiKey}:${apiSecret}`);
-  const webhookUrl = `${apiUrl("shop")}/onshape/events`;
-
+/** Registers Shop's webhook on a document, calling back on the team's own events address. */
+export async function registerOnShapeWebhook(
+  documentId: string,
+  credentials: OnshapeCredentials,
+  companyId: string,
+  eventsUrl: string,
+) {
   const response = await fetch("https://cad.onshape.com/api/v16/webhooks", {
     method: "POST",
     headers: {
-      Authorization: `Basic ${credentials}`,
+      Authorization: basicAuth(credentials),
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
       documentId,
       companyId,
       events: ONSHAPE_WEBHOOK_EVENTS,
-      url: webhookUrl,
+      url: eventsUrl,
       isTransient: false,
       options: {
         collapseEvents: false,
@@ -167,14 +150,14 @@ export async function registerOnShapeWebhook(documentId: string, env: AppEnv["Bi
 }
 
 export async function processRevisionEvent(
+  db: ShopDb,
+  teamId: string,
   elementId: string,
   elementType: number,
   partNumber: string,
   onshapeReleaseId: string,
   versionId: string,
-  env: AppEnv["Bindings"],
 ): Promise<void> {
-  const database = drizzle(env.SHOP_DB, { schema });
   const now = Math.floor(Date.now() / 1000);
 
   const isDrawing = elementType === 2;
@@ -187,20 +170,27 @@ export async function processRevisionEvent(
   if (isPart) updateData.entityId = elementId;
   if (isDrawing) updateData.partDrawingEntityId = elementId;
 
-  await database
+  await db
     .insert(schema.onshapeParts)
-    .values({
-      onshapeReleaseId,
-      partNumber,
-      ...updateData,
-      createdAt: now,
-    })
+    .values(
+      withTeam(teamId, {
+        onshapeReleaseId,
+        partNumber,
+        ...updateData,
+        createdAt: now,
+      }),
+    )
     .onConflictDoUpdate({
-      target: [schema.onshapeParts.onshapeReleaseId, schema.onshapeParts.partNumber],
+      target: [
+        schema.onshapeParts.teamId,
+        schema.onshapeParts.onshapeReleaseId,
+        schema.onshapeParts.partNumber,
+      ],
       set: updateData,
     });
 
   console.log("[OnShape Webhook] Updated part", {
+    teamId,
     partNumber,
     onshapeReleaseId,
     versionId,
@@ -212,21 +202,17 @@ export async function fetchAndParseBOM(
   documentId: string,
   versionId: string,
   mainAssemblyId: string,
-  apiKey: string,
-  apiSecret: string,
+  credentials: OnshapeCredentials,
 ): Promise<
   Map<string, { quantity?: number; name?: string; description?: string; revision?: string }>
 > {
   const bomStartTime = Date.now();
-  const credentials = btoa(`${apiKey}:${apiSecret}`);
   const bomUrl = `https://cad.onshape.com/api/v16/assemblies/d/${documentId}/v/${versionId}/e/${mainAssemblyId}/bom?indented=false`;
 
   try {
     console.log("[BOM Fetch] Starting BOM request");
     const response = await fetch(bomUrl, {
-      headers: {
-        Authorization: `Basic ${credentials}`,
-      },
+      headers: { Authorization: basicAuth(credentials) },
     });
     console.log(
       `[BOM Fetch] Response received after ${Date.now() - bomStartTime}ms, status: ${response.status}`,
@@ -311,27 +297,23 @@ export async function fetchAndParseBOM(
 }
 
 export async function processReleaseEvent(
+  database: ShopDb,
+  teamId: string,
   releaseId: string,
   timestamp: string,
-  env: AppEnv["Bindings"],
   queue: Queue,
 ): Promise<void> {
   const startTime = Date.now();
   console.log(`[OnShape Webhook] Starting processReleaseEvent for ${releaseId}`);
 
-  const database = drizzle(env.SHOP_DB, { schema });
   const now = Math.floor(Date.now() / 1000);
 
   console.log(`[OnShape Webhook] [${Date.now() - startTime}ms] Inserting release`);
   const release = await database
     .insert(schema.onshapeReleases)
-    .values({
-      releaseId,
-      timestamp,
-      createdAt: now,
-    })
+    .values(withTeam(teamId, { releaseId, timestamp, createdAt: now }))
     .onConflictDoUpdate({
-      target: schema.onshapeReleases.releaseId,
+      target: [schema.onshapeReleases.teamId, schema.onshapeReleases.releaseId],
       set: { timestamp },
     })
     .returning({ id: schema.onshapeReleases.id });
@@ -346,14 +328,16 @@ export async function processReleaseEvent(
   const existingParts = await database
     .select()
     .from(schema.onshapeParts)
-    .where(eq(schema.onshapeParts.onshapeReleaseId, releaseId));
+    .where(
+      inTeam(schema.onshapeParts, teamId, eq(schema.onshapeParts.onshapeReleaseId, releaseId)),
+    );
 
   for (const part of existingParts) {
     if (!part.releaseId) {
       await database
         .update(schema.onshapeParts)
         .set({ releaseId: releaseRowId })
-        .where(eq(schema.onshapeParts.id, part.id));
+        .where(inTeam(schema.onshapeParts, teamId, eq(schema.onshapeParts.id, part.id)));
     }
   }
 
@@ -365,17 +349,13 @@ export async function processReleaseEvent(
   const parts = await database
     .select()
     .from(schema.onshapeParts)
-    .where(eq(schema.onshapeParts.releaseId, releaseRowId));
+    .where(inTeam(schema.onshapeParts, teamId, eq(schema.onshapeParts.releaseId, releaseRowId)));
 
   console.log(`[OnShape Webhook] [${Date.now() - startTime}ms] Found ${parts.length} parts`);
 
   // Queue BOM fetch job for async processing
   console.log(`[OnShape Webhook] [${Date.now() - startTime}ms] Queuing BOM fetch job`);
-  await queue.send({
-    releaseId,
-    releaseRowId,
-    timestamp,
-  });
+  await queue.send({ teamId, releaseId, releaseRowId, timestamp } satisfies BOMQueueMessage);
 
   const totalTime = Date.now() - startTime;
   console.log("[OnShape Webhook] Release processed, BOM job queued", {

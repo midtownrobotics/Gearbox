@@ -1,4 +1,4 @@
-import { sendDM } from "@g3/slack";
+import { sendDM, sendMessage } from "@g3/slack";
 import { and, eq, inArray, isNull, ne } from "drizzle-orm";
 import { Hono } from "hono";
 import { createDb } from "../db";
@@ -227,6 +227,30 @@ export const internalRouter = new Hono<AppEnv>()
     if (!teamSlack) return c.json({ error: "This team hasn't connected Slack." }, 404);
     try {
       await sendDM(slackUserId, text, teamSlack.slack);
+    } catch (err) {
+      return c.json({ error: err instanceof Error ? err.message : String(err) }, 502);
+    }
+    return c.json({ ok: true });
+  })
+  // A message from the team's own Slack bot to one of its channels (Shop's release and daily
+  // summary posts). 404 when the team has no Slack; Slack's own refusal (not_in_channel, ...) is
+  // passed back as the error.
+  .post("/teams/:id/slack/message", async (c) => {
+    const body = await c.req
+      .json<{ channel?: unknown; text?: unknown }>()
+      .catch(() => ({}) as { channel?: unknown; text?: unknown });
+    const { channel, text } = body;
+    if (typeof channel !== "string" || !/^[CG][A-Z0-9]+$/.test(channel)) {
+      return c.json({ error: "channel must be a Slack channel ID." }, 400);
+    }
+    if (typeof text !== "string" || !text.trim()) {
+      return c.json({ error: "text is required." }, 400);
+    }
+    if (text.length > 40_000) return c.json({ error: "text is too long." }, 400);
+    const teamSlack = await slackForTeam(c.env, c.req.param("id"));
+    if (!teamSlack) return c.json({ error: "This team hasn't connected Slack." }, 404);
+    try {
+      await sendMessage(channel, text, teamSlack.slack);
     } catch (err) {
       return c.json({ error: err instanceof Error ? err.message : String(err) }, 502);
     }

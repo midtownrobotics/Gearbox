@@ -68,6 +68,26 @@ const APPS: App[] = [
     },
   },
   {
+    dir: "workers/shop",
+    teamTables: {
+      subsystems: "subsystems",
+      partDefinitions: "part_definitions",
+      partInstances: "part_instances",
+      processes: "processes",
+      partDefinitionProcessBlueprints: "part_definition_process_blueprints",
+      partInstanceProcesses: "part_instance_processes",
+      actions: "actions",
+      kioskPresence: "kiosk_presence",
+      onshapeReleases: "onshape_releases",
+      onshapeParts: "onshape_parts",
+      drawings: "drawings",
+      files: "files",
+      partInstanceFiles: "part_instance_files",
+      stagingBatches: "staging_batches",
+      adminSettings: "admin_settings",
+    },
+  },
+  {
     dir: "workers/inventory",
     teamTables: {
       fields: "fields",

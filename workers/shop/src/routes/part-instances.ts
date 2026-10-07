@@ -1,10 +1,11 @@
-import { requireAuth } from "@g3/auth";
+import { inTeam, requireAuth, withTeam } from "@g3/auth";
 import { asc, eq, max } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
 import { createShopDb } from "../db";
 import {
   partDefinitionProcessBlueprints,
+  partDefinitions,
   partInstanceProcesses,
   partInstances,
 } from "../db/schema";
@@ -37,24 +38,34 @@ export const partInstancesRouter = new Hono<AppEnv>()
   .get("/", requireAuth, async (c) => {
     const partDefinitionId = c.req.query("partDefinitionId");
     const db = createShopDb(c.env.SHOP_DB);
-
-    if (partDefinitionId) {
-      const rows = await db
-        .select()
-        .from(partInstances)
-        .where(eq(partInstances.partDefinitionId, Number(partDefinitionId)))
-        .all();
-      return c.json(rows);
-    }
-
-    const rows = await db.select().from(partInstances).all();
+    const rows = await db
+      .select()
+      .from(partInstances)
+      .where(
+        inTeam(
+          partInstances,
+          c.get("teamId"),
+          partDefinitionId
+            ? eq(partInstances.partDefinitionId, Number(partDefinitionId))
+            : undefined,
+        ),
+      )
+      .all();
     return c.json(rows);
   })
   .post("/", requireAuth, createInstancesValidator, async (c) => {
     const { partDefinitionId, quantity } = c.req.valid("json");
 
     const db = createShopDb(c.env.SHOP_DB);
+    const teamId = c.get("teamId");
     const now = Date.now();
+
+    const definition = await db
+      .select({ id: partDefinitions.id })
+      .from(partDefinitions)
+      .where(inTeam(partDefinitions, teamId, eq(partDefinitions.id, partDefinitionId)))
+      .get();
+    if (!definition) return c.json({ error: "Part definition not found." }, 404);
 
     let rows: (typeof partInstances.$inferSelect)[] | null = null;
     let retries = 0;
@@ -65,7 +76,9 @@ export const partInstancesRouter = new Hono<AppEnv>()
         const result = await db
           .select({ maxInstance: max(partInstances.instanceNumber) })
           .from(partInstances)
-          .where(eq(partInstances.partDefinitionId, partDefinitionId))
+          .where(
+            inTeam(partInstances, teamId, eq(partInstances.partDefinitionId, partDefinitionId)),
+          )
           .get();
 
         const nextNumber = (result?.maxInstance ?? 0) + 1;
@@ -73,11 +86,14 @@ export const partInstancesRouter = new Hono<AppEnv>()
         rows = await db
           .insert(partInstances)
           .values(
-            Array.from({ length: quantity }, (_, i) => ({
-              partDefinitionId,
-              instanceNumber: nextNumber + i,
-              createdAt: now,
-            })),
+            withTeam(
+              teamId,
+              Array.from({ length: quantity }, (_, i) => ({
+                partDefinitionId,
+                instanceNumber: nextNumber + i,
+                createdAt: now,
+              })),
+            ),
           )
           .returning()
           .all();
@@ -101,7 +117,13 @@ export const partInstancesRouter = new Hono<AppEnv>()
       const blueprints = await db
         .select()
         .from(partDefinitionProcessBlueprints)
-        .where(eq(partDefinitionProcessBlueprints.partDefinitionId, partDefinitionId))
+        .where(
+          inTeam(
+            partDefinitionProcessBlueprints,
+            teamId,
+            eq(partDefinitionProcessBlueprints.partDefinitionId, partDefinitionId),
+          ),
+        )
         .orderBy(asc(partDefinitionProcessBlueprints.index))
         .all();
 
@@ -121,7 +143,7 @@ export const partInstancesRouter = new Hono<AppEnv>()
         const batchSize = 10;
         for (let i = 0; i < processRecords.length; i += batchSize) {
           const batch = processRecords.slice(i, i + batchSize);
-          await db.insert(partInstanceProcesses).values(batch);
+          await db.insert(partInstanceProcesses).values(withTeam(teamId, batch));
         }
       }
     } catch (err) {
@@ -154,7 +176,7 @@ export const partInstancesRouter = new Hono<AppEnv>()
     const row = await db
       .update(partInstances)
       .set(updates)
-      .where(eq(partInstances.id, id))
+      .where(inTeam(partInstances, c.get("teamId"), eq(partInstances.id, id)))
       .returning()
       .get();
 
