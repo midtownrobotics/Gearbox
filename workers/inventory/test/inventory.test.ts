@@ -255,6 +255,37 @@ describe("settings", () => {
     await jsonAs(admin, `/locations/${bin}`, patch({ parentId: shelves, name: "Bin 1" }));
   });
 
+  it("puts the locations inside one place in order, leaving the other places alone", async () => {
+    const bin = await locationId("Shop", "Shelves", "Bin 1");
+    const inside = async (parentId: number | null) =>
+      (await inventory()).locations
+        .filter((row) => row.parentId === parentId)
+        .map((row) => row.name);
+    const idsOf = (names: string[]) =>
+      Promise.all(names.map((name) => locationId("Shop", "Shelves", "Bin 1", name)));
+    const order = (ids: number[]) => ({ method: "PUT", body: { ids } });
+    expect(await inside(bin)).toEqual(["Left", "Right", "Middle"]);
+    const top = await inside(null);
+    const shelves = await inside(await locationId("Shop", "Shelves"));
+
+    const ids = await idsOf(["Middle", "Left", "Right"]);
+    // The tree is the admins' to arrange.
+    expect((await callAs(mentor, "/locations/order", order(ids))).status).toBe(403);
+    expect((await callAs(admin, "/locations/order", order([]))).status).toBe(400);
+    await jsonAs(admin, "/locations/order", order(ids));
+    expect(await inside(bin)).toEqual(["Middle", "Left", "Right"]);
+    expect(await inside(null)).toEqual(top);
+    expect(await inside(await locationId("Shop", "Shelves"))).toEqual(shelves);
+
+    // A location added afterwards goes at the end.
+    await jsonAs(admin, "/locations", post({ parentId: bin, names: ["Spare"] }), 201);
+    expect(await inside(bin)).toEqual(["Middle", "Left", "Right", "Spare"]);
+    const spare = await locationId("Shop", "Shelves", "Bin 1", "Spare");
+    await jsonAs(admin, `/locations/${spare}`, { method: "DELETE" });
+    await jsonAs(admin, "/locations/order", order(await idsOf(["Left", "Right", "Middle"])));
+    expect(await inside(bin)).toEqual(["Left", "Right", "Middle"]);
+  });
+
   it("defines the fields entries are described by", async () => {
     const made = await jsonAs<{ id: number }>(
       admin,
