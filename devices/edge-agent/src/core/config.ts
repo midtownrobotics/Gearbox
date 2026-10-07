@@ -19,7 +19,7 @@ export interface AgentConfig {
   collectIntervalSeconds: number;
   /** Shop drive storage: the mounted 10 GB image. */
   driveDir: string;
-  /** Where the shop drive's web page listens: the box's LAN address only (never the tunnel). */
+  /** Where the shop drive's web page listens: the box's LAN address only (never the worker link). */
   driveHost: string;
   drivePort: number;
   /** DigiKey API app for part lookup; optional (DigiKey links fail without it). */

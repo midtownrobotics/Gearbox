@@ -10,7 +10,6 @@ import {
   type AppName,
   apiUrl,
   appUrl,
-  edgeAgentUrl,
   signInCallbackApiUrl,
   site,
   teamKey,
@@ -45,7 +44,6 @@ function wranglerRules(app: Exclude<AppName, "portal">): Rule[] {
     httpsVar("FRONTEND_URL", () => appUrl(app)),
     // Orders' Share-A-Cart OAuth callbacks.
     httpsVar("PUBLIC_API_URL", () => apiUrl(app)),
-    httpsVar("EDGE_AGENT_URL", () => edgeAgentUrl),
     httpsVar(
       "(GOOGLE|GITHUB|STEAM|ONSHAPE)_REDIRECT_URI",
       // One address for every team: the platform's id.<domain> host.
@@ -73,10 +71,6 @@ const FILES: [path: string, rules: Rule[]][] = [
       [/^(pattern = )"[^"]*"( # platform)$/gm, (m) => `${m[1]}"${site.platformDomain}/*"${m[2]}`],
       [/^(zone_name = )"[^"]*"( # platform.*)$/gm, (m) => `${m[1]}"${site.platformDomain}"${m[2]}`],
     ],
-  ],
-  [
-    "workers/edge/.dev.vars.example",
-    [[/^(#?LOOKUP_AGENT_URL=)https:\/\/\S*/gm, (m) => `${m[1]}${edgeAgentUrl}`]],
   ],
   [
     "infra/edge/etc/g3-edge/agent.env.example",

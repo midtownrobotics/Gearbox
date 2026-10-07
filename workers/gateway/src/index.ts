@@ -14,7 +14,7 @@ import devPorts from "../../../.dev-ports.json";
 // addresses): works out the team and app from the hostname and sends the request to that app's
 // worker. Each app's worker serves the app's page and its API at /api (see
 // @g3/site-config/worker). <platform> is site.ts's `platformDomain`, where every team's apps are,
-// G3's included; <domain> its `domain`, G3's own (its public website and the edge box's tunnel).
+// G3's included; <domain> its `domain`, G3's own (its public website).
 //   <platform>/, www.<platform>/   → the platform worker: public site and team sign-up
 //   admin.<platform>/              → the platform worker: the operators' console
 //   <number>.<platform>/...        → that team's home (Portal)
@@ -25,7 +25,7 @@ import devPorts from "../../../.dev-ports.json";
 //                                    (`signInCallbackApiUrl`); the team is in the sign-in's state
 //   <app>.<domain>, api.<app>.<domain>, id.<domain>, admin.<domain>
 //                                  → 410 Gone, naming the new address: G3's old addresses, retired
-//   anything else                  → passed on to wherever its DNS points (www, the edge box's tunnel)
+//   anything else                  → passed on to wherever its DNS points (www)
 // /api/internal/... is for workers only (over service bindings) and never answered here.
 //
 // Local dev (roadmap 2.9; `LOCAL_DEV` in wrangler.toml's dev settings, `pnpm dev`): the gateway

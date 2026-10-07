@@ -74,6 +74,7 @@ As of 5 October 2026, five of the six Phase 0 steps are done on `main`, Phase 1 
 | Operators' console on the platform Worker at `admin.<domain>`: an operator flag kept by the platform, teams and number reports, and tools to hand over, renumber, suspend or delete a team, with a 12-month access log | 2.8 | This pull request |
 | A version per app, changelogs, and a `main` to `public` release flow | Part of 0.2 | [#128](https://github.com/midtownrobotics/Gearbox/pull/128), [#129](https://github.com/midtownrobotics/Gearbox/pull/129) |
 | Shared navbar, light and dark mode, one color scheme | Groundwork for 1.3 | [#126](https://github.com/midtownrobotics/Gearbox/pull/126), [#127](https://github.com/midtownrobotics/Gearbox/pull/127) |
+| Edge box reached over its own WebSocket (a Durable Object) instead of a Cloudflare Tunnel; live online clients and box addresses | Edge (G3's single-team app); no phase step | This PR |
 | Optional Scouting engagement with configurable points label, predictions, combined picks and standings; neutral prediction language | Part of 1.6; groundwork for 4.1 and 4.5 | [#143](https://github.com/midtownrobotics/Gearbox/pull/143) |
 | Editable team appearance, reset to defaults, and editable/hidden portal resource links | Part of 1.3 and 1.4 | [#134](https://github.com/midtownrobotics/Gearbox/pull/134) |
 | Skill Tree rebuilt on the shared app pattern: a React frontend in place of the Firebase-shaped shim, the shared navbar, palette, fonts and dark mode, and mentors taken from G3ID roles. Its trees are now a team's own content: a tree set that is loaded from a file (the default set on first use) and edited in the app. Its student list is G3ID's accounts. Earlier progress was cleared | Phase 3 for Skill Tree: tenancy sheet, settings out of code, frontend rewrite, and a stand-in for its seed hook (4.3). Part of 1.3 | [#144](https://github.com/midtownrobotics/Gearbox/pull/144) |
@@ -194,7 +195,7 @@ A team's address is its FRC team number, and no two teams can share a number. Th
 
 ## Hosting and stack decisions
 
-Seven choices were confirmed on 3 October 2026. Everything else stays on the current stack.
+Seven choices were confirmed on 3 October 2026, and one more on 6 October. Everything else stays on the current stack.
 
 | Decision | Confirmed choice | What it replaces |
 | --- | --- | --- |
@@ -205,12 +206,13 @@ Seven choices were confirmed on 3 October 2026. Everything else stays on the cur
 | Deploys | Cloudflare's Git integration (Workers Builds): `public` deploys to production. A staging environment from `main` is still to come (0.2) | `wrangler deploy` by hand and Pages Git builds |
 | Variant apps | Reviewed pull requests merged into this repo | New |
 | Staging address | frcgearbox.com hostnames until G3's cutover, then g3robotics.com hostnames in the same team-app pattern. Production and staging trade domains, so they never share one | New |
+| Edge box link | A Durable Object (SQLite-backed, hibernating WebSockets) holds the edge box's connection, on the existing Workers Paid plan. Confirmed 6 October 2026, for G3's Edge app only | The Cloudflare Tunnel to `edge-agent.g3robotics.com` |
 
 **Why one level.** Cloudflare's free certificate covers the domain and one level of subdomain ([Universal SSL limitations](https://developers.cloudflare.com/ssl/edge-certificates/universal-ssl/limitations/)). Today's two-level names work because each is a Custom Domain with its own certificate, but Custom Domains take no wildcards and stop at 100 per zone ([Custom Domains](https://developers.cloudflare.com/workers/configuration/routing/custom-domains/), [Workers limits](https://developers.cloudflare.com/workers/platform/limits/)). A wildcard route matches any hostname ([Routes](https://developers.cloudflare.com/workers/configuration/routing/routes/)), and a wildcard DNS record can be proxied on every plan ([Wildcard DNS records](https://developers.cloudflare.com/dns/manage-dns-records/reference/wildcard-dns-records/)).
 
 **Unchanged.** Cloudflare Workers, D1, KV, R2, Queues, Workers AI and cron triggers; Hono, Drizzle, React, Vite and Tailwind v4; pnpm, Biome and GitHub.
 
-**Not in this roadmap.** Each of these would need a separate yes from you: Advanced Certificate Manager, a custom domain per team, Workers for Platforms, a payment provider, an email-sending service, and Durable Objects.
+**Not in this roadmap.** Each of these would need a separate yes from you: Advanced Certificate Manager, a custom domain per team, Workers for Platforms, a payment provider, and an email-sending service. Durable Objects are confirmed for the edge box's link only; any other use needs its own yes.
 
 ### Plan limits that affect the work
 
@@ -399,7 +401,7 @@ Edge is no longer a phase. It stays in the repo as a single-team app contributed
 | Topic | What it means |
 | --- | --- |
 | Classification | A variant app authored by G3, in the single-team category. It is not part of base Gearbox |
-| Hardware | One box, one key and one tunnel, as today. Nothing is built for a second box |
+| Hardware | One box, one key and one link (the box's WebSocket to the worker, held by a Durable Object), as today. Nothing is built for a second box |
 | Naming | On-box names such as `g3-edge-agent` and `inet g3` stay. G3 names are allowed inside G3's own app |
 | Move to the platform | In Phase 3 it goes behind the gateway and takes identity from the platform SDK. It needs no team column |
 | Library | From Phase 4 its manifest names G3 as the only team that may run it. In Phase 6 it becomes the first entry in the single-team category |
@@ -440,7 +442,7 @@ Production and staging trade domains at the cutover, so the two environments nev
 
 - **Before the cutover,** production is on g3robotics.com and staging uses frcgearbox.com. This also rehearses the wildcard route and the gateway on the real domain.
 - **After the cutover,** staging uses `<number>-<app>.g3robotics.com`. The free certificate for `*.g3robotics.com` covers it, so nothing is purchased.
-- **Exclusions.** The staging route must leave alone G3's public site, the redirects from the old app addresses, and the edge box's tunnel hostname. `edge-agent.g3robotics.com` contains a hyphen, so it would otherwise be read as a staging address.
+- **Exclusions.** The staging route must leave alone G3's public site and the redirects from the old app addresses. (The edge box's tunnel hostname, `edge-agent.g3robotics.com`, is gone: the box now connects out to the edge Worker.)
 - **Telling them apart.** Staging gets its own cookie name and a visible banner, so a G3 member who lands there cannot mistake it for the real apps.
 
 ## Terms and privacy

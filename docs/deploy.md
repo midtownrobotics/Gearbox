@@ -33,7 +33,7 @@ The app workers' old `api.<app>` custom domains send requests straight to the wo
 1. **Sign-in providers:** sign-in callbacks are now on the new addresses, so add them to each provider before deploying (keep the old ones until the switch is done):
    - Google, GitHub, Onshape: `https://id.<domain>/api/auth/<provider>/callback` (`google`, `github`, `onshape`). Every team's sign-in calls back there; the team travels in the sign-in's state. Steam needs no change: it accepts any return address.
    - Share-A-Cart: Orders now calls back on `https://orders.<domain>/api/share-a-cart/callback`; reconnect it once on Orders' Settings page after the switch.
-2. **DNS:** make sure there's a proxied wildcard record for the domain: `*` → AAAA `100::` (proxied, orange cloud). Hostnames with their own records (`www`, the edge box's tunnel) keep them.
+2. **DNS:** make sure there's a proxied wildcard record for the domain: `*` → AAAA `100::` (proxied, orange cloud). Hostnames with their own records (`www`) keep them.
 3. **Deploy the app workers:** `pnpm --filter "./workers/*" --filter "!@g3/worker-gateway" run deploy`.
 4. **Remove the old hostnames:**
    - Workers & Pages → each app worker → Settings → Domains & Routes: remove its `api.<app>.<domain>` custom domain.
@@ -66,7 +66,7 @@ Platform operators manage teams at `admin.frcgearbox.com`. The gateway sends it 
 
 ## Moving G3 to frcgearbox.com (once)
 
-G3's apps move from `<app>.g3robotics.com` to `1648-<app>.frcgearbox.com` (its home to `1648.frcgearbox.com`, sign-in to `1648-id.frcgearbox.com`). The old app addresses, and `id.` and `admin.g3robotics.com`, stop working: the gateway answers them `410 Gone` with the new address. `www.g3robotics.com` and the edge box's tunnel are unaffected. Everyone signs in again once, since sessions belong to a domain.
+G3's apps move from `<app>.g3robotics.com` to `1648-<app>.frcgearbox.com` (its home to `1648.frcgearbox.com`, sign-in to `1648-id.frcgearbox.com`). The old app addresses, and `id.` and `admin.g3robotics.com`, stop working: the gateway answers them `410 Gone` with the new address. `www.g3robotics.com` is unaffected. Everyone signs in again once, since sessions belong to a domain.
 
 Before merging the release PR that includes the move (it deploys on merge):
 
@@ -87,7 +87,7 @@ The gateway stops answering `api.<app>.<domain>` (it says `410 Gone`). Move ever
 
 - **Slack app:** change the slash command and event URLs to `https://id.frcgearbox.com/api/slack/...` (`/commands/signin`, `/commands/link`, `/events`). Slack verifies the events URL when you save it.
 - **Onshape webhook:** save the Onshape settings on Shop's admin page once; it registers the webhook at `https://shop.<domain>/api/onshape/events`.
-- **Edge box:** set `EDGE_WORKER_URL=https://edge.<domain>/api` in `/etc/g3-edge/agent.env` and restart the agent (`sudo systemctl restart g3-edge-agent`).
+- **Edge box:** now `EDGE_WORKER_URL=https://1648-edge.frcgearbox.com/api` (see the move above). An old `api.edge.g3robotics.com` value fails every upload with a certificate error, since that two-level name has no certificate any more.
 - **Sign-in providers:** remove the old `api.g3id.<domain>` and `id.<domain>` callback URLs (they're on `id.frcgearbox.com` now).
 - **Anything else** (a bookmark, a script, a kiosk) gets a `410` naming its new address, so it's easy to spot in the gateway's logs.
 

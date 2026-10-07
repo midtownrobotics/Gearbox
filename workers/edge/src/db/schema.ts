@@ -6,6 +6,10 @@ export const edgeStatus = sqliteTable("edge_status", {
   agentStartedAt: integer("agent_started_at").notNull(),
   lastSeenAt: integer("last_seen_at").notNull(),
   appliedStateVersion: integer("applied_state_version").notNull().default(0),
+  /** The box's public address: where its uploads come from, per Cloudflare. */
+  publicIp: text("public_ip"),
+  /** When publicIp last changed. */
+  publicIpSince: integer("public_ip_since"),
 });
 
 export const edgeAudit = sqliteTable("edge_audit", {

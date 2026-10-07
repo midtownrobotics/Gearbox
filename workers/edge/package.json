@@ -6,7 +6,10 @@
     ".": "./src/index.ts",
     "./print-types": "./src/modules/print/types.ts",
     "./lookup-types": "./src/modules/lookup/types.ts",
-    "./switch-types": "./src/modules/switch/types.ts"
+    "./switch-types": "./src/modules/switch/types.ts",
+    "./presence-types": "./src/modules/network/presence-types.ts",
+    "./interface-types": "./src/modules/network/interface-types.ts",
+    "./link-protocol": "./src/lib/link-protocol.ts"
   },
   "scripts": {
     "dev": "wrangler dev --port 8793 --inspector-port 9235",
