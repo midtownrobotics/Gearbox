@@ -1,10 +1,9 @@
+# Encrypts each team's Onshape keys in D1: `openssl rand -base64 32`.
+SECRETS_KEY=
+
+# The site team's Onshape keys from before teams (used until an admin saves its own on Admin).
 ONSHAPE_API_KEY=
 ONSHAPE_API_SECRET=
 ONSHAPE_WEBHOOK_KEY_PRIMARY=
 ONSHAPE_WEBHOOK_KEY_SECONDARY=
 ONSHAPE_COMPANY_ID=
-
-SLACK_BOT_TOKEN=
-SLACK_SIGNING_SECRET=
-
-PRINT_TOKEN=

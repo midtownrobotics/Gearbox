@@ -1,11 +1,13 @@
-import { requireAuth } from "@g3/auth";
+import { forwardIdentity, requireAuth } from "@g3/auth";
 import { type Context, Hono } from "hono";
+import { drawingKey } from "../lib/storage";
 import type { AppEnv } from "../types";
 
 /**
- * Sends a document to the shop printer through the edge box (workers/edge →
- * tunnel → CUPS on the box). Shop prints are always one-sided black and white
- * on the default printer, as the logged-in user.
+ * Sends a document to the shop printer through the team's edge box (workers/edge →
+ * its link → CUPS on the box). Shop prints are always one-sided black and white
+ * on the default printer, as the logged-in user. A team without a connected box
+ * gets Edge's 503 ("isn't connected").
  */
 async function sendToPrinter(
   c: Context<AppEnv>,
@@ -18,7 +20,8 @@ async function sendToPrinter(
     const res = await c.env.EDGE.fetch(
       new Request(`http://edge/api/print/jobs?${query}`, {
         method: "POST",
-        headers: { cookie: c.req.header("Cookie") ?? "", "content-type": contentType },
+        // As the member, for their team: Edge prints on that team's own box.
+        headers: { ...forwardIdentity(c), "content-type": contentType },
         body,
       }),
     );
@@ -68,7 +71,7 @@ export const printRouter = new Hono<AppEnv>()
   // once, to the box, instead of down to the kiosk and back up again.
   .post("/drawing/:partNumber/:revision", requireAuth, async (c) => {
     const { partNumber, revision } = c.req.param();
-    const file = await c.env.DRAWINGS.get(`drawings/${partNumber}/${revision}/drawing.pdf`);
+    const file = await c.env.DRAWINGS.get(drawingKey(c.get("teamId"), partNumber, revision));
     if (!file) {
       return c.json({ ok: false as const, error: "There's no drawing for this revision." }, 404);
     }

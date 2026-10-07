@@ -3,8 +3,15 @@
 // made here. Used both by the stub (in Node) and by tests (in the Workers runtime), so it only
 // uses what both have.
 
+import { teamKey } from "@g3/site-config";
+
+/** The site's team (site.ts); test users are in it unless made with `teamUsers`. */
+export const SITE_TEAM = teamKey;
+
 export type TestUser = {
   id: string;
+  /** Their team's id ("frc<number>"); the site's team unless made with `teamUsers`. */
+  teamId: string;
   displayName: string;
   email: string;
   isAdmin: boolean;
@@ -18,6 +25,7 @@ export type TestUser = {
 
 export function testUser(overrides: Partial<TestUser> & { id: string }): TestUser {
   return {
+    teamId: SITE_TEAM,
     displayName: overrides.id,
     email: `${overrides.id}@test.g3`,
     isAdmin: false,
@@ -43,6 +51,29 @@ export const kioskAdmin = testUser({
   kioskDeviceId: 1,
   kioskDeviceName: "Test Kiosk",
 });
+
+/**
+ * The standard users in another team: the same people, with ids of their own (so a leak between
+ * teams shows up), for isolation tests. The site's team gets the plain exported users.
+ */
+export function teamUsers(teamId: string) {
+  const inTeam = (user: TestUser): TestUser =>
+    teamId === SITE_TEAM ? user : { ...user, id: `${user.id}.${teamId}`, teamId };
+  return {
+    teamId,
+    student: inTeam(student),
+    otherStudent: inTeam(otherStudent),
+    mentor: inTeam(mentor),
+    admin: inTeam(admin),
+    kioskAdmin: inTeam(kioskAdmin),
+  };
+}
+
+export type TeamUsers = ReturnType<typeof teamUsers>;
+
+/** A team id no other test has used (an "frc" number past any real one). */
+export const newTeamId = () =>
+  `frc${100000 + (crypto.getRandomValues(new Uint32Array(1))[0] % 900000)}`;
 
 const PREFIX = "test.";
 
@@ -78,6 +109,8 @@ export function asUser(
 ): RequestInit {
   const headers = new Headers(init.headers);
   headers.set("Cookie", cookieFor(user));
+  // As the gateway sends it: the request is on the user's own team's address.
+  if (!headers.has("X-Team-Id")) headers.set("X-Team-Id", user.teamId);
   let body = init.body as BodyInit | undefined;
   if (
     init.body !== undefined &&

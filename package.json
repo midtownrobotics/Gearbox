@@ -8,6 +8,7 @@
     "dev": "node scripts/print-dev-ports.js",
     "dev:silent": "pnpm -r --parallel --no-bail --if-present dev",
     "lint": "biome ci .",
+    "lint:tenancy": "node scripts/tenancy-lint.ts",
     "typecheck": "pnpm -r --if-present typecheck",
     "test": "pnpm -r --if-present test",
     "db:migrate:local": "pnpm -r --if-present db:migrate:local",
@@ -21,6 +22,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
-    "@changesets/cli": "^3.0.3"
+    "@changesets/cli": "^3.0.3",
+    "typescript": "^5.8.0"
   }
 }

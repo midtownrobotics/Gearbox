@@ -17,17 +17,52 @@ import type { AppEnv } from "./types";
 // apps/platform's /console, opened at admin.<domain> (CONSOLE_HOSTS). Operators are G3ID accounts
 // flagged in this worker's `operators` table, never by a team role. They:
 // - delete a team: its registry row here, and in G3ID every account, session, kiosk and its Slack;
-// - renumber a team (its id is "frc<number>", so every row pointing at it moves too);
 // - hand a team to another of its members, who becomes an admin;
 // - suspend a team (the gateway stops answering its addresses) and reactivate it;
 // - follow up reports that a number was falsely registered (POST /reports);
 // - add and remove other operators.
 // Every action is logged in `operator_actions` with the operator's reason, and so is each look at a
 // team's members (the privacy policy's operator access log, kept 12 months). The site's own team
-// (site.ts) can't be deleted, renumbered or suspended: its apps' data isn't per team yet.
+// (site.ts) can't be deleted or suspended. A team's number is its id ("frc<number>") everywhere,
+// so it's never changed: a team that claimed the wrong number is deleted and signs up again.
 //
-// Other apps' data isn't per team until Phase 3; when it is, deleting and renumbering a team must
-// reach it too (each app's "delete a team's data" hook).
+// Deleting a team deletes its data in every team-scoped app first (TEAM_APPS), then in G3ID.
+
+/** The team-scoped apps, by name and binding. Scouting's data isn't per team yet. */
+const TEAM_APPS = [
+  ["Attendance", "ATTENDANCE"],
+  ["Edge", "EDGE"],
+  ["Inventory", "INVENTORY"],
+  ["Orders", "ORDERS"],
+  ["Pit", "PIT"],
+  ["Shop", "SHOP"],
+  ["Skill Tree", "SKILL_TREE"],
+] as const satisfies readonly (readonly [string, keyof AppEnv["Bindings"]])[];
+
+/** Deletes the team's data in every team-scoped app. Gives back the apps that couldn't. */
+async function deleteAppData(env: AppEnv["Bindings"], teamId: string) {
+  const results = await Promise.all(
+    TEAM_APPS.map(async ([name, binding]) => {
+      try {
+        const res = await (env[binding] as Fetcher).fetch(
+          new Request(
+            `http://${binding.toLowerCase()}/api/internal/teams/${encodeURIComponent(teamId)}`,
+            {
+              method: "DELETE",
+            },
+          ),
+        );
+        if (!res.ok)
+          console.error("[console] deleting team data", name, res.status, await res.text());
+        return res.ok ? null : name;
+      } catch (err) {
+        console.error("[console] deleting team data", name, err);
+        return name;
+      }
+    }),
+  );
+  return results.filter((name): name is (typeof TEAM_APPS)[number][0] => name !== null);
+}
 
 type Member = {
   id: string;
@@ -127,8 +162,6 @@ async function errorOf(res: Response, fallback: string): Promise<string> {
   const body = (await res.json().catch(() => ({}))) as { error?: string };
   return body.error ?? fallback;
 }
-
-const validNumber = (n: number) => Number.isInteger(n) && n >= 1 && n <= 99999;
 
 export const consoleRouter = new Hono<AppEnv>()
   // Who's signed in, and whether they're an operator: the console's sign-in check. Comes before
@@ -266,6 +299,18 @@ export const consoleRouter = new Hono<AppEnv>()
       return c.json({ error: `Type ${team.teamNumber} to confirm.` }, 400);
     }
 
+    // Each app's data first: if one can't, nothing else goes, and deleting again finishes the job
+    // (an app with nothing left of the team answers OK).
+    const failed = await deleteAppData(c.env, team.id);
+    if (failed.length > 0) {
+      return c.json(
+        {
+          error: `Couldn't delete the team's data in ${failed.join(", ")}. Its accounts are untouched; try again.`,
+        },
+        502,
+      );
+    }
+
     const res = await g3id(c.env, `/teams/${team.id}`, { method: "DELETE" });
     if (!res.ok) return c.json({ error: await errorOf(res, "G3ID couldn't delete it.") }, 502);
     const { deletedUserIds } = (await res.json()) as { deletedUserIds: string[] };
@@ -284,64 +329,10 @@ export const consoleRouter = new Hono<AppEnv>()
         status: team.status,
         slackWorkspaceName: team.slackWorkspaceName,
         deletedAccounts: deletedUserIds.length,
+        apps: TEAM_APPS.map(([name]) => name),
       },
     });
     return c.json({ ok: true });
-  })
-  // Moving a team to another number, when it claimed the wrong one. Its addresses change with it.
-  .post("/teams/:id/renumber", async (c) => {
-    const body = await c.req.json<{ reason?: unknown; teamNumber?: unknown }>();
-    const reason = reasonOf(body);
-    if (!reason) return c.json({ error: NO_REASON }, 400);
-    const teamNumber = Number(body.teamNumber);
-    if (!validNumber(teamNumber)) return c.json({ error: "Enter the new team number." }, 400);
-    const team = await teamById(c.env, c.req.param("id"));
-    if (!team) return c.json({ error: "No such team." }, 404);
-    if (team.id === teamKey) {
-      return c.json({ error: "The site's own team's number is set in site.ts." }, 409);
-    }
-    if (teamNumber === team.teamNumber) return c.json({ error: "That's its number already." }, 400);
-    const holder = await db(c.env)
-      .select({ status: teams.status })
-      .from(teams)
-      .where(eq(teams.teamNumber, teamNumber))
-      .get();
-    if (holder) {
-      return c.json(
-        {
-          error:
-            holder.status === "pending"
-              ? `Someone is signing up team ${teamNumber}. Delete that sign-up first.`
-              : `Team ${teamNumber} is already on Gearbox.`,
-        },
-        409,
-      );
-    }
-
-    const res = await g3id(c.env, `/teams/${team.id}/renumber`, {
-      method: "POST",
-      body: { teamNumber },
-    });
-    if (!res.ok) return c.json({ error: await errorOf(res, "G3ID couldn't renumber it.") }, 409);
-
-    const newId = `frc${teamNumber}`;
-    await db(c.env).batch([
-      db(c.env)
-        .update(teams)
-        .set({ id: newId, teamNumber, updatedAt: now() })
-        .where(eq(teams.id, team.id)),
-      // The team's log follows it to its new id.
-      db(c.env)
-        .update(operatorActions)
-        .set({ teamId: newId })
-        .where(eq(operatorActions.teamId, team.id)),
-    ]);
-    await log(c.env, c.get("userId"), "renumber_team", {
-      teamId: newId,
-      reason,
-      details: { from: team.teamNumber, to: teamNumber },
-    });
-    return c.json({ id: newId });
   })
   // Handing the team to another of its members, who becomes an admin. The previous owner stays
   // an admin unless the operator says otherwise.

@@ -1,7 +1,9 @@
-// Secrets stored in D1 (each team's Slack bot token), encrypted with AES-GCM. The key is the
-// SECRETS_KEY Worker secret: 32 random bytes, base64 (`openssl rand -base64 32`).
+// A team's secrets stored in D1 (G3ID's Slack bot tokens, Shop's Onshape keys), encrypted with
+// AES-GCM. The key is each worker's SECRETS_KEY secret: 32 random bytes, base64
+// (`openssl rand -base64 32`).
 
-const toBase64 = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes));
+const toBase64 = (bytes: Uint8Array) =>
+  btoa(Array.from(bytes, (b) => String.fromCharCode(b)).join(""));
 const fromBase64 = (text: string) => Uint8Array.from(atob(text), (ch) => ch.charCodeAt(0));
 
 async function key(secretsKey: string | undefined): Promise<CryptoKey> {

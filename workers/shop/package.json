@@ -13,19 +13,20 @@
     "db:migrate:local": "wrangler d1 migrations apply SHOP_DB --local",
     "db:migrate:remote": "wrangler d1 migrations apply SHOP_DB --env production --remote",
     "test": "vitest run",
-    "build": "wrangler deploy --env production --dry-run"
+    "build": "wrangler deploy --env production --dry-run",
+    "r2:move-to-team": "node scripts/r2-move-to-team.ts"
   },
   "dependencies": {
     "@g3/auth": "workspace:*",
     "@g3/site-config": "workspace:*",
     "@g3/slack": "workspace:*",
-    "drizzle-orm": "^0.44.0",
+    "drizzle-orm": "catalog:",
     "hono": "catalog:",
     "pdf-lib": "^1.17.1"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "catalog:",
-    "@cloudflare/workers-types": "^4.20250516.0",
+    "@cloudflare/workers-types": "catalog:",
     "@g3/testing": "workspace:*",
     "drizzle-kit": "^0.31.0",
     "typescript": "^5.8.0",

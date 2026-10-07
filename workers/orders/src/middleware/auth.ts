@@ -1,6 +1,9 @@
-import { hasMentorAccess } from "@g3/auth";
+import { hasMentorAccess, inTeam } from "@g3/auth";
+import { eq } from "drizzle-orm";
 import type { Context } from "hono";
 import { createMiddleware } from "hono/factory";
+import { createOrdersDb } from "../db";
+import { appUsers } from "../db/schema";
 import type { AppEnv } from "../types";
 
 // Sign-in and roles come from @g3/auth; this is the catalog's own rule.
@@ -8,9 +11,11 @@ import type { AppEnv } from "../types";
 /** Whether this user may edit the catalog: mentors (and admins), and students mentors trusted. */
 export async function canEditCatalog(c: Context<AppEnv>) {
   if (hasMentorAccess(c)) return true;
-  const row = await c.env.ORDERS_DB.prepare("SELECT trusted FROM app_users WHERE id = ?")
-    .bind(c.get("userId"))
-    .first<{ trusted: number }>();
+  const row = await createOrdersDb(c.env.ORDERS_DB)
+    .select({ trusted: appUsers.trusted })
+    .from(appUsers)
+    .where(inTeam(appUsers, c.get("teamId"), eq(appUsers.id, c.get("userId"))))
+    .get();
   return row?.trusted === 1;
 }
 

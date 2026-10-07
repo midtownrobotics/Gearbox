@@ -91,6 +91,42 @@ The gateway stops answering `api.<app>.<domain>` (it says `410 Gone`). Move ever
 - **Sign-in providers:** remove the old `api.g3id.<domain>` and `id.<domain>` callback URLs (they're on `id.frcgearbox.com` now).
 - **Anything else** (a bookmark, a script, a kiosk) gets a `410` naming its new address, so it's easy to spot in the gateway's logs.
 
+## Shop for every team (once, roadmap Phase 3)
+
+Shop keeps each team's files in R2 under `teams/<team>/`, each team's Onshape keys in its own settings (encrypted), and posts to Slack through G3ID. Before merging the release PR that brings it:
+
+1. **Encryption key:** `wrangler secret put SECRETS_KEY --env production` in `workers/shop` (`openssl rand -base64 32`; keep it, since it decrypts the stored keys).
+2. **Copy G3's files** to their team prefix: `pnpm --filter @g3/worker-shop r2:move-to-team -- --dry-run` to see what it would copy, then without `--dry-run`. It only copies (and skips what's already copied), so the running Shop keeps working.
+3. **Migration:** `pnpm --filter @g3/worker-shop run db:migrate:remote` (`0016_teams.sql`), right before the merge: it points the stored file keys at the copies, and the Shop that's still running can't save settings until the new one is deployed.
+
+After the release:
+
+- **Onshape** keeps working on the `ONSHAPE_*` worker secrets for G3 until an admin saves G3's keys on Shop's Admin page (API keys and webhook signing keys from Onshape's Developer Portal); after that the secrets can be deleted. Other teams enter their own there; saving registers the team's webhook at `https://<number>-shop.frcgearbox.com/api/onshape/events`.
+- **Old copies in R2:** once drawings and part files open, `pnpm --filter @g3/worker-shop r2:move-to-team -- --delete-old` removes the originals (only those whose copy is there).
+- **Slack:** Shop's `SLACK_BOT_TOKEN` and `SLACK_SIGNING_SECRET` secrets are no longer used; delete them. Release and summary posts go to the channels set on the Admin page, on the team's own Slack.
+
+## Edge for every team (once, roadmap Phase 3)
+
+Each team's box now signs in with its own key, stored hashed in Edge's database, in place of the shared `EDGE_AGENT_KEY` secret. G3's box keeps the key it has. Before merging the release PR that brings it:
+
+1. **Migration:** `pnpm --filter @g3/worker-edge run db:migrate:remote` (`0005_teams.sql`). It rebuilds the usage tables with the team in their keys; check their size first (`wrangler d1 execute g3-edge-prod --remote --env production --command "SELECT count(*) FROM net_site_usage"`) if it's been a long time.
+2. **G3's box key:** `EDGE_AGENT_KEY=<the current key> pnpm --filter @g3/worker-edge box-key:set` stores its hash as G3's box key (the key is in the box's `/etc/g3-edge/agent.env`).
+
+Right after the release:
+
+- **Agent:** upgrade G3's box to the agent in this release (`infra/edge/README.md`); it reports the box's time zone. Before that, G3's days stay New York's (the migration stored it). Check the box's own zone first: `timedatectl` should say the shop's (`sudo timedatectl set-timezone America/New_York`).
+- **Secret:** delete the edge worker's `EDGE_AGENT_KEY` secret (`wrangler secret delete EDGE_AGENT_KEY --env production` in `workers/edge`); nothing reads it.
+- **Another team's box:** an admin makes its key on the Edge app's Edge Box page and puts it in the box's `agent.env` with `EDGE_WORKER_URL=https://<number>-edge.frcgearbox.com/api`.
+
+## Deleting teams and Share-A-Cart secrets (once, roadmap Phase 3)
+
+- **Orders:** before deploying, set its encryption key: `wrangler secret put SECRETS_KEY --env production` in `workers/orders` (`openssl rand -base64 32`; keep it). G3's Share-A-Cart connection is encrypted the first time it's used; without the key, Share-A-Cart stops working.
+- **Platform:** its worker now binds every team-scoped app (to delete a team's data in each), so deploy it after them; `pnpm run deploy` deploys the platform with the other workers, which all exist already.
+
+## Portal's logo (once, roadmap Phase 3)
+
+Portal no longer has G3's logo built in. After the release, a G3ID admin sets G3's logo URL on G3ID's Admin → Team Appearance page (an https link to the image, e.g. on G3's public site); until then Portal's public-site tile shows a globe.
+
 ## Other outside services
 
 - **Slack for other teams:** in the Slack app's settings, set its display name to **Gearbot** (`slackBotName` in `site.ts`), turn on distribution (Manage Distribution), add the redirect URL `https://id.frcgearbox.com/api/slack/oauth/callback`, give the bot the scopes `commands, chat:write, im:write, im:history, users:read, users:read.email`, and subscribe to the `app_uninstalled` and `tokens_revoked` events. Then set G3ID's secrets `SLACK_CLIENT_ID`, `SLACK_CLIENT_SECRET` (Basic Information → App Credentials) and `SECRETS_KEY` (`openssl rand -base64 32`; keep it, since it decrypts the stored tokens). Team admins connect their workspace on G3ID's Admin → Slack page; G3 can keep its current settings.

@@ -1,14 +1,16 @@
+import { inTeam, withTeam } from "@g3/auth";
 import { eq, inArray } from "drizzle-orm";
 import type { OrdersDb } from "../db";
 import { orderRequests, partListItems, partLists } from "../db/schema";
 import { inChunks } from "./chunks";
 
 /**
- * Puts requests on a list (ones already there are left alone). Returns how many were new, or
- * null if any request doesn't exist.
+ * Puts the team's requests on one of its lists (ones already there are left alone). Returns how
+ * many were new, or null if any request isn't the team's.
  */
 export async function addToList(
   db: OrdersDb,
+  teamId: string,
   listId: number,
   requestIds: number[],
   addedByName: string,
@@ -17,23 +19,31 @@ export async function addToList(
     db
       .select({ id: orderRequests.id })
       .from(orderRequests)
-      .where(inArray(orderRequests.id, chunk))
+      .where(inTeam(orderRequests, teamId, inArray(orderRequests.id, chunk)))
       .all(),
   );
   if (existing.length !== requestIds.length) return null;
   const now = Date.now();
-  // Four values a row: chunks of 20 rows stay under D1's limit.
+  // Five values a row: chunks of 20 rows stay under D1's limit.
   const inserted = await inChunks(
     requestIds,
     (chunk) =>
       db
         .insert(partListItems)
-        .values(chunk.map((requestId) => ({ listId, requestId, addedByName, addedAt: now })))
+        .values(
+          withTeam(
+            teamId,
+            chunk.map((requestId) => ({ listId, requestId, addedByName, addedAt: now })),
+          ),
+        )
         .onConflictDoNothing()
         .returning()
         .all(),
     20,
   );
-  await db.update(partLists).set({ updatedAt: now }).where(eq(partLists.id, listId));
+  await db
+    .update(partLists)
+    .set({ updatedAt: now })
+    .where(inTeam(partLists, teamId, eq(partLists.id, listId)));
   return inserted.length;
 }

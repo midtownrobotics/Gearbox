@@ -14,21 +14,23 @@ export function formatBytes(bytes: number): string {
 
 export const GB = 1e9;
 
-const dateFormat = new Intl.DateTimeFormat("en-US", {
-  timeZone: "America/New_York",
-  month: "short",
-  day: "numeric",
-});
-const dateTimeFormat = new Intl.DateTimeFormat("en-US", {
-  timeZone: "America/New_York",
-  month: "short",
-  day: "numeric",
-  hour: "numeric",
-  minute: "2-digit",
-});
+// Dates and times are the box's local time (it's in the shop), as the worker counts days and
+// billing cycles. Set from /me when the app loads (shared/auth.tsx).
+let timeZone = "UTC";
+export function setBoxTimeZone(zone: string) {
+  timeZone = zone;
+}
 
-export const formatDate = (ts: number) => dateFormat.format(new Date(ts * 1000));
-export const formatDateTime = (ts: number) => dateTimeFormat.format(new Date(ts * 1000));
+const format = (ts: number, options: Intl.DateTimeFormatOptions) =>
+  new Intl.DateTimeFormat("en-US", { timeZone, ...options }).format(new Date(ts * 1000));
+
+export const formatDate = (ts: number) => format(ts, { month: "short", day: "numeric" });
+export const formatDateTime = (ts: number) =>
+  format(ts, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+export const formatHour = (ts: number) => format(ts, { hour: "numeric" });
+
+/** Today's "YYYY-MM-DD" day key where the box is. */
+export const todayKey = () => new Date().toLocaleDateString("en-CA", { timeZone });
 
 /** "Sep 29" from a "2026-09-29" day key. */
 export function formatDayKey(day: string) {

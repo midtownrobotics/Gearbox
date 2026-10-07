@@ -46,6 +46,7 @@ export const operators = sqliteTable("operators", {
 export const OPERATOR_ACTIONS = [
   "view_team",
   "delete_team",
+  /** No longer done (teams aren't renumbered); past log rows may have it. */
   "renumber_team",
   "transfer_owner",
   "suspend_team",

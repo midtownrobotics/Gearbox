@@ -1,32 +1,57 @@
-import { requireAuth } from "@g3/auth";
+import { inTeam, requireAuth, withTeam } from "@g3/auth";
 import { eq } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/d1";
 import { Hono } from "hono";
+import { createShopDb } from "../db";
 import * as schema from "../db/schema";
+import { drawingKey, drawingsPrefix, uploadedDrawingKey } from "../lib/storage";
 import type { AppEnv } from "../types";
 
+/** Every object under a prefix (R2 lists 1,000 at a time). */
+async function listAll(bucket: R2Bucket, prefix: string) {
+  const objects: R2Object[] = [];
+  let cursor: string | undefined;
+  do {
+    const page = await bucket.list({ prefix, cursor });
+    objects.push(...page.objects);
+    cursor = page.truncated ? page.cursor : undefined;
+  } while (cursor);
+  return objects;
+}
+
+/** The team's drawings, signed in only. */
 export const drawingsRouter = new Hono<AppEnv>()
+  .use(requireAuth)
   // Deletes a released drawing (the same object /parts/:partNumber/:revision/drawing serves).
-  .delete("/:partNumber/:revision", requireAuth, async (c) => {
+  .delete("/:partNumber/:revision", async (c) => {
     if (c.get("sessionType") === "pin") {
       return c.json({ error: "Kiosks can't delete drawings." }, 403);
     }
     const partNumber = c.req.param("partNumber");
     const revision = c.req.param("revision");
-    const r2Key = `drawings/${partNumber}/${revision}/drawing.pdf`;
+    const teamId = c.get("teamId");
+    const r2Key = drawingKey(teamId, partNumber, revision);
 
     const existing = await c.env.DRAWINGS.head(r2Key);
     if (!existing) return c.json({ error: "Drawing not found." }, 404);
 
     await c.env.DRAWINGS.delete(r2Key);
-    const db = drizzle(c.env.SHOP_DB, { schema });
-    await db.delete(schema.drawings).where(eq(schema.drawings.r2Key, r2Key));
+    const db = createShopDb(c.env.SHOP_DB);
+    await db
+      .delete(schema.drawings)
+      .where(inTeam(schema.drawings, teamId, eq(schema.drawings.r2Key, r2Key)));
     return c.json({ ok: true });
   })
   .get("/", async (c) => {
     try {
-      const db = drizzle(c.env.SHOP_DB, { schema });
-      const r2Objects = await c.env.DRAWINGS.list({ prefix: "drawings/" });
+      const db = createShopDb(c.env.SHOP_DB);
+      const teamId = c.get("teamId");
+      const prefix = drawingsPrefix(teamId);
+      const r2Objects = { objects: await listAll(c.env.DRAWINGS, prefix) };
+      const records = new Map(
+        (await db.select().from(schema.drawings).where(inTeam(schema.drawings, teamId)).all()).map(
+          (d) => [d.r2Key, d],
+        ),
+      );
 
       const drawings: Array<{
         id: number;
@@ -43,7 +68,7 @@ export const drawingsRouter = new Hono<AppEnv>()
       let totalSize = 0;
 
       for (const obj of r2Objects.objects) {
-        const match = obj.key.match(/^drawings\/([^/]+)\/([^/]+)\/drawing\.pdf$/);
+        const match = obj.key.slice(prefix.length).match(/^([^/]+)\/([^/]+)\/drawing\.pdf$/);
         if (!match) continue;
 
         const [, partNumber, revision] = match;
@@ -51,12 +76,8 @@ export const drawingsRouter = new Hono<AppEnv>()
         totalSize += fileSize;
         partCounts.set(partNumber, (partCounts.get(partNumber) || 0) + 1);
 
-        // Try to get metadata from DB if it exists
-        const dbRecord = await db
-          .select()
-          .from(schema.drawings)
-          .where(eq(schema.drawings.r2Key, obj.key))
-          .get();
+        // Metadata from the database, if it has a row for it
+        const dbRecord = records.get(obj.key);
 
         drawings.push({
           id: dbRecord?.id || 0,
@@ -104,8 +125,8 @@ export const drawingsRouter = new Hono<AppEnv>()
         return c.json({ error: "Only PDF files are supported" }, 400);
       }
 
-      // Use standard R2 key that matches OnShape export location
-      const r2Key = `drawings/${partNumber}.pdf`;
+      const teamId = c.get("teamId");
+      const r2Key = uploadedDrawingKey(teamId, partNumber);
 
       // Upload to R2 (overwrites any existing drawing)
       const arrayBuffer = await fileObj.arrayBuffer();
@@ -118,19 +139,21 @@ export const drawingsRouter = new Hono<AppEnv>()
       console.log("[Drawing Upload] Successfully uploaded to R2");
 
       // Store in database
-      const db = drizzle(c.env.SHOP_DB, { schema });
+      const db = createShopDb(c.env.SHOP_DB);
       const now = Math.floor(Date.now() / 1000);
 
       const result = await db
         .insert(schema.drawings)
-        .values({
-          partNumber,
-          filename: fileObj.name,
-          r2Key,
-          fileSize: fileObj.size,
-          uploadedBy: uploadedBy || "unknown",
-          createdAt: now,
-        })
+        .values(
+          withTeam(teamId, {
+            partNumber,
+            filename: fileObj.name,
+            r2Key,
+            fileSize: fileObj.size,
+            uploadedBy: uploadedBy || c.get("userId"),
+            createdAt: now,
+          }),
+        )
         .returning({ id: schema.drawings.id });
 
       const drawingId = result[0]?.id;
@@ -152,12 +175,12 @@ export const drawingsRouter = new Hono<AppEnv>()
   .get("/list/:partNumber", async (c) => {
     try {
       const partNumber = c.req.param("partNumber");
-      const db = drizzle(c.env.SHOP_DB, { schema });
+      const db = createShopDb(c.env.SHOP_DB);
 
       const drawings = await db
         .select()
         .from(schema.drawings)
-        .where(eq(schema.drawings.partNumber, partNumber))
+        .where(inTeam(schema.drawings, c.get("teamId"), eq(schema.drawings.partNumber, partNumber)))
         .orderBy(schema.drawings.createdAt);
 
       return c.json({ drawings });
@@ -169,12 +192,12 @@ export const drawingsRouter = new Hono<AppEnv>()
   .get("/:drawingId/download", async (c) => {
     try {
       const drawingId = Number.parseInt(c.req.param("drawingId"), 10);
-      const db = drizzle(c.env.SHOP_DB, { schema });
+      const db = createShopDb(c.env.SHOP_DB);
 
       const drawing = await db
         .select()
         .from(schema.drawings)
-        .where(eq(schema.drawings.id, drawingId))
+        .where(inTeam(schema.drawings, c.get("teamId"), eq(schema.drawings.id, drawingId)))
         .get();
 
       if (!drawing) {

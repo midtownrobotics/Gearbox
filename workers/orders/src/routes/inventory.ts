@@ -1,4 +1,4 @@
-import { requireAuth } from "@g3/auth";
+import { inTeam, requireAuth } from "@g3/auth";
 import { inArray } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
@@ -28,7 +28,7 @@ export const inventoryRouter = new Hono<AppEnv>()
    */
   .get("/", requireAuth, async (c) => {
     const [required, options] = await Promise.all([
-      inventoryRequired(createOrdersDb(c.env.ORDERS_DB)),
+      inventoryRequired(createOrdersDb(c.env.ORDERS_DB), c.get("teamId")),
       inventoryOptions(c),
     ]);
     return c.json({ required, options });
@@ -57,7 +57,7 @@ export const inventoryRouter = new Hono<AppEnv>()
           orderId: orderRequests.orderId,
         })
         .from(orderRequests)
-        .where(inArray(orderRequests.id, chunk))
+        .where(inTeam(orderRequests, c.get("teamId"), inArray(orderRequests.id, chunk)))
         .all(),
     );
     return c.json({ defaults: await inventoryDefaults(c, db, lines) });

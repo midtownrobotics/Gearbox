@@ -1,3 +1,4 @@
+import { forwardIdentity, inTeam } from "@g3/auth";
 import type {
   IntakeRequest,
   IntakeResult,
@@ -5,13 +6,14 @@ import type {
   PlacesRequest,
   PlacesResult,
 } from "@g3/worker-inventory/intake-types";
-import { and, desc, eq, inArray, isNotNull } from "drizzle-orm";
+import { desc, inArray, isNotNull } from "drizzle-orm";
 import type { Context } from "hono";
 import type { OrdersDb } from "../db";
-import { appSettings, orderRequests } from "../db/schema";
+import { orderRequests } from "../db/schema";
 import type { AppEnv } from "../types";
 import { inChunks } from "./chunks";
 import { pricePerPart } from "./pack-quantity";
+import { teamSettings } from "./settings";
 
 // Receiving a part can put it in the Inventory app: the person receiving it says where it's going
 // (a storage location, or in use on a robot), and Orders passes that on with what was received.
@@ -21,20 +23,9 @@ import { pricePerPart } from "./pack-quantity";
 // said about where a part goes, receiving works as it always has and nothing reaches Inventory;
 // unless a mentor has turned on the setting that makes the destination required.
 
-const REQUIRED_KEY = "inventory_required";
-
 /** Whether receiving a part must say where it goes in Inventory. Off unless a mentor turns it on. */
-export async function inventoryRequired(db: OrdersDb): Promise<boolean> {
-  const row = await db.select().from(appSettings).where(eq(appSettings.key, REQUIRED_KEY)).get();
-  return row?.value === "true";
-}
-
-export async function setInventoryRequired(db: OrdersDb, required: boolean) {
-  const value = required ? "true" : "false";
-  await db
-    .insert(appSettings)
-    .values({ key: REQUIRED_KEY, value })
-    .onConflictDoUpdate({ target: appSettings.key, set: { value } });
+export async function inventoryRequired(db: OrdersDb, teamId: string): Promise<boolean> {
+  return (await teamSettings(db, teamId)).inventoryRequired;
 }
 
 /**
@@ -108,7 +99,8 @@ export function parseDestination(raw: unknown): ReceiveDestination | null | { er
   };
 }
 
-const forwarded = (c: Context<AppEnv>) => ({ cookie: c.req.header("Cookie") ?? "" });
+/** The member's session and the request's team: Inventory acts for the same person, in their team. */
+const forwarded = (c: Context<AppEnv>) => forwardIdentity(c);
 
 /** Inventory's locations, robots and subsystems, or null if it can't be reached. */
 export async function inventoryOptions(c: Context<AppEnv>): Promise<InventoryOptions | null> {
@@ -230,7 +222,9 @@ export async function inventoryDefaults(
         })
         .from(orderRequests)
         .where(
-          and(
+          inTeam(
+            orderRequests,
+            c.get("teamId"),
             inArray(orderRequests.catalogItemId, chunk),
             isNotNull(orderRequests.inventoryLocationId),
           ),
@@ -271,7 +265,7 @@ export async function sendToInventory(
 > {
   const locations = new Map<number, number>();
   if (!destination) {
-    if (await inventoryRequired(db)) {
+    if (await inventoryRequired(db, c.get("teamId"))) {
       return { error: "Say where these parts go in Inventory.", status: 400 };
     }
     return { added: null, locations };

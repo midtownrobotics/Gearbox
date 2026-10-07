@@ -1,9 +1,11 @@
-import { and, eq, gt, isNull, sql } from "drizzle-orm";
+import { inTeam } from "@g3/auth";
+import { gt, isNull, sql } from "drizzle-orm";
 import type { EdgeDb } from "../../db";
 import { netBlocklistDomains, netBlocklists, netGrants, netSettings } from "../../db/schema";
 import { agentFetch, linkStatus } from "../../lib/agent";
 import { localMidnight, localParts } from "../../lib/time";
 import type { AppEnv } from "../../types";
+import { getSettings } from "./common";
 
 export const MAX_BLOCKLISTS = 20;
 export const MAX_DOMAINS_PER_LIST = 1000;
@@ -69,26 +71,31 @@ export function parseBlocklistInput(value: unknown): BlocklistInput | string {
   return { name, action: v.action, rateKbps, enabled: v.enabled, domains: [...domains].sort() };
 }
 
-/** When a grant made now for `duration` ends. "today" = local midnight tonight. */
-export function grantExpiry(duration: GrantDuration, now: number) {
+/** When a grant made now for `duration` ends. "today" = midnight tonight where the box is. */
+export function grantExpiry(duration: GrantDuration, now: number, tz: string) {
   if (duration === "1h") return now + 3600;
   if (duration === "4h") return now + 4 * 3600;
-  const p = localParts(now);
-  return localMidnight(p.year, p.month, p.day + 1);
+  const p = localParts(now, tz);
+  return localMidnight(p.year, p.month, p.day + 1, tz);
 }
 
-/** Marks desired state as changed; the agent applies it and reports this version back. */
-export function bumpStateVersion(db: EdgeDb) {
+/** Marks the team's desired state as changed; its agent applies it and reports this version back. */
+export function bumpStateVersion(db: EdgeDb, teamId: string) {
   return db
     .update(netSettings)
     .set({ stateVersion: sql`${netSettings.stateVersion} + 1` })
-    .where(eq(netSettings.id, 1));
+    .where(inTeam(netSettings, teamId));
 }
 
-export async function listBlocklists(db: EdgeDb) {
+export async function listBlocklists(db: EdgeDb, teamId: string) {
   const [lists, domains] = await Promise.all([
-    db.select().from(netBlocklists).orderBy(netBlocklists.name).all(),
-    db.select().from(netBlocklistDomains).all(),
+    db
+      .select()
+      .from(netBlocklists)
+      .where(inTeam(netBlocklists, teamId))
+      .orderBy(netBlocklists.name)
+      .all(),
+    db.select().from(netBlocklistDomains).where(inTeam(netBlocklistDomains, teamId)).all(),
   ]);
   return lists.map((l) => ({
     id: l.id,
@@ -100,24 +107,23 @@ export async function listBlocklists(db: EdgeDb) {
   }));
 }
 
-export function activeGrants(db: EdgeDb, now: number) {
+export function activeGrants(db: EdgeDb, teamId: string, now: number) {
   return db
     .select()
     .from(netGrants)
-    .where(and(gt(netGrants.expiresAt, now), isNull(netGrants.revokedAt)))
+    .where(inTeam(netGrants, teamId, gt(netGrants.expiresAt, now), isNull(netGrants.revokedAt)))
     .orderBy(netGrants.expiresAt)
     .all();
 }
 
-/** Everything the agent needs to enforce, fetched by it after a sync poke. */
-export async function desiredState(db: EdgeDb) {
+/** Everything the team's agent needs to enforce, fetched by it after a sync poke. */
+export async function desiredState(db: EdgeDb, teamId: string) {
   const now = Math.floor(Date.now() / 1000);
   const [settings, lists, grants] = await Promise.all([
-    db.select().from(netSettings).where(eq(netSettings.id, 1)).get(),
-    listBlocklists(db),
-    activeGrants(db, now),
+    getSettings(db, teamId),
+    listBlocklists(db, teamId),
+    activeGrants(db, teamId, now),
   ]);
-  if (!settings) throw new Error("net_settings row missing");
   return {
     version: settings.stateVersion,
     enforce: settings.enforce === 1,
@@ -137,19 +143,22 @@ export type LinkState = "connected" | "not_answering" | "offline";
  * Checks the worker → agent link: whether the box's WebSocket is open, and
  * that the agent answers on it (GET /health), with the round trip time.
  */
-export async function probeLink(env: AppEnv["Bindings"]): Promise<{
+export async function probeLink(
+  env: AppEnv["Bindings"],
+  teamId: string,
+): Promise<{
   state: LinkState;
   detail: string | null;
   latencyMs: number | null;
   connectedAt: number | null;
   lastHeartbeatAt: number | null;
 }> {
-  const link = await linkStatus(env);
+  const link = await linkStatus(env, teamId);
   const base = { connectedAt: link.connectedAt, lastHeartbeatAt: link.lastHeartbeatAt };
   if (!link.connected) return { state: "offline", detail: null, latencyMs: null, ...base };
   const started = Date.now();
   try {
-    const res = await agentFetch(env, "/health", { timeoutMs: 8_000 });
+    const res = await agentFetch(env, teamId, "/health", { timeoutMs: 8_000 });
     const latencyMs = Date.now() - started;
     if (res.ok) return { state: "connected", detail: null, latencyMs, ...base };
     return { state: "not_answering", detail: `HTTP ${res.status}`, latencyMs, ...base };
@@ -164,9 +173,9 @@ export async function probeLink(env: AppEnv["Bindings"]): Promise<{
  * the box isn't connected, it catches up on its next usage push (within 5
  * minutes of reconnecting), since every agent response carries the version.
  */
-export async function pokeAgent(env: AppEnv["Bindings"]) {
+export async function pokeAgent(env: AppEnv["Bindings"], teamId: string) {
   try {
-    const res = await agentFetch(env, "/sync", { method: "POST", timeoutMs: 5000 });
+    const res = await agentFetch(env, teamId, "/sync", { method: "POST", timeoutMs: 5000 });
     if (!res.ok) console.warn("[Agent] sync poke returned", res.status);
   } catch (err) {
     console.warn("[Agent] sync poke failed", err instanceof Error ? err.message : err);

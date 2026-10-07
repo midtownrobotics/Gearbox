@@ -1,3 +1,4 @@
+import { inTeam } from "@g3/auth";
 import { asc } from "drizzle-orm";
 import type { Db } from "../db";
 import { locations } from "../db/schema";
@@ -17,7 +18,7 @@ export type LocationRow = {
 };
 
 /** Every location, in the order a tree lists them in: parents' order, then their own. */
-export async function loadLocations(db: Db): Promise<LocationRow[]> {
+export async function loadLocations(db: Db, team: string): Promise<LocationRow[]> {
   return db
     .select({
       id: locations.id,
@@ -26,6 +27,7 @@ export async function loadLocations(db: Db): Promise<LocationRow[]> {
       title: locations.title,
     })
     .from(locations)
+    .where(inTeam(locations, team))
     .orderBy(asc(locations.sortOrder), asc(locations.id))
     .all();
 }
@@ -55,6 +57,19 @@ export function pathOf(id: number, byId: Map<number, LocationRow>): LocationRow[
     at = at.parentId === null ? undefined : byId.get(at.parentId);
   }
   return path;
+}
+
+/** The location and everything inside it, from the tree: its own id first. */
+export function subtreeOf(id: number, childrenOf: Map<number | null, LocationRow[]>): number[] {
+  const ids: number[] = [];
+  const visit = (at: number, depth: number) => {
+    ids.push(at);
+    // The depth limit also stops a loop in bad data from running forever.
+    if (depth >= MAX_DEPTH) return;
+    for (const child of childrenOf.get(at) ?? []) visit(child.id, depth + 1);
+  };
+  visit(id, 1);
+  return ids;
 }
 
 /** A location as people read it: its name, with its title when it has one ("A1 - Misc. Electronics"). */

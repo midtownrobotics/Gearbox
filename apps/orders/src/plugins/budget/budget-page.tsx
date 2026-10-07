@@ -24,7 +24,7 @@ const SEGMENTS = [
 ] as const;
 
 /**
- * Spending per budget category for one fiscal year (July–June): the summary table, then each
+ * Spending per budget category for one fiscal year (from the team's start month): the summary table, then each
  * category's bar. Mentors add, rename, set each year's budget, archive, import and export.
  */
 export function BudgetPage() {
@@ -68,7 +68,7 @@ export function BudgetPage() {
             >
               {years.data.years.map((y) => (
                 <option key={y} value={y}>
-                  FY {fiscalLabel(y)}
+                  FY {fiscalLabel(y, user.fiscalYearStart)}
                   {y === years.data?.current ? " (current)" : ""}
                 </option>
               ))}
@@ -153,9 +153,10 @@ function SummaryTable({ categories, fiscalYear }: { categories: Category[]; fisc
   const money = (cents: number | null) =>
     cents === null ? "—" : cents < 0 ? `-${formatCents(-cents)}` : formatCents(cents);
   const over = (s: number, b: number | null) => b !== null && s > b;
+  const { fiscalYearStart } = useAuthUser();
 
   return (
-    <Card title={`General expenses · FY ${fiscalLabel(fiscalYear)}`}>
+    <Card title={`General expenses · FY ${fiscalLabel(fiscalYear, fiscalYearStart)}`}>
       <div className="overflow-x-auto">
         <table className="w-full text-sm tabular-nums">
           <thead>
@@ -307,6 +308,7 @@ function CategoryRow({
 }
 
 function EditCategory({ category, onDone }: { category: Category; onDone: () => void }) {
+  const { fiscalYearStart } = useAuthUser();
   const [name, setName] = useState(category.name);
   const [code, setCode] = useState(category.code ?? "");
   const [budget, setBudget] = useState(
@@ -317,7 +319,7 @@ function EditCategory({ category, onDone }: { category: Category; onDone: () => 
   async function save(e: FormEvent) {
     e.preventDefault();
     const budgetCents = parseDollars(budget);
-    if (Number.isNaN(budgetCents)) return setError("Budget must be a dollar amount like 500.");
+    if (Number.isNaN(budgetCents)) return setError("Budget must be an amount like 500.");
     const res = await api.categories[":id"].$patch({
       param: { id: String(category.id) },
       json: { name, code: code.trim() || null, budgetCents, fiscalYear: category.fiscalYear },
@@ -348,7 +350,7 @@ function EditCategory({ category, onDone }: { category: Category; onDone: () => 
         inputMode="decimal"
         value={budget}
         onChange={(e) => setBudget(e.target.value)}
-        placeholder={`FY ${fiscalLabel(category.fiscalYear)} budget`}
+        placeholder={`FY ${fiscalLabel(category.fiscalYear, fiscalYearStart)} budget`}
       />
       <Button type="submit">Save</Button>
       <Button variant="secondary" onClick={onDone}>
@@ -360,6 +362,7 @@ function EditCategory({ category, onDone }: { category: Category; onDone: () => 
 }
 
 function AddCategory({ fiscalYear, onAdded }: { fiscalYear: number; onAdded: () => void }) {
+  const { fiscalYearStart } = useAuthUser();
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
   const [budget, setBudget] = useState("");
@@ -368,7 +371,7 @@ function AddCategory({ fiscalYear, onAdded }: { fiscalYear: number; onAdded: () 
   async function add(e: FormEvent) {
     e.preventDefault();
     const budgetCents = parseDollars(budget);
-    if (Number.isNaN(budgetCents)) return setError("Budget must be a dollar amount like 500.");
+    if (Number.isNaN(budgetCents)) return setError("Budget must be an amount like 500.");
     const res = await api.categories.$post({
       json: { name, code: code.trim() || null, budgetCents, fiscalYear },
     });
@@ -403,7 +406,7 @@ function AddCategory({ fiscalYear, onAdded }: { fiscalYear: number; onAdded: () 
         inputMode="decimal"
         value={budget}
         onChange={(e) => setBudget(e.target.value)}
-        placeholder={`FY ${fiscalLabel(fiscalYear)} budget`}
+        placeholder={`FY ${fiscalLabel(fiscalYear, fiscalYearStart)} budget`}
       />
       <Button type="submit" className="shrink-0">
         Add category

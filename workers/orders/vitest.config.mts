@@ -79,5 +79,7 @@ const inventory = async (request: Request) => {
 
 export default workerTestConfig({
   d1: "ORDERS_DB",
+  // A key for the Share-A-Cart secrets kept in D1 (32 zero bytes).
+  vars: { SECRETS_KEY: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=" },
   services: { EDGE: offlineService, INVENTORY: inventory },
 });

@@ -1,4 +1,5 @@
-import { and, asc, eq, inArray, sql } from "drizzle-orm";
+import { inTeam, withTeam } from "@g3/auth";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import defaultTrees from "../../content/default-trees.json";
 import type { Db } from "../db";
@@ -287,28 +288,30 @@ export function defaultTreeSet(): TreeSet {
 
 export type TreeSetRow = typeof treeSets.$inferSelect;
 
-const firstSet = (db: Db) => db.select().from(treeSets).orderBy(asc(treeSets.id)).limit(1).get();
+/** The team's set (one per team: tree_sets.team_id is unique). */
+const teamSet = (db: Db, teamId: string) =>
+  db.select().from(treeSets).where(inTeam(treeSets, teamId)).get();
 
 /**
  * The team's tree set. The first time anyone asks, it's made from the default set: the app's
  * stand-in for the "seed" step a team will go through when it switches the app on (roadmap 4.3).
  */
-export async function currentTreeSet(db: Db): Promise<TreeSetRow> {
-  const existing = await firstSet(db);
+export async function currentTreeSet(db: Db, teamId: string): Promise<TreeSetRow> {
+  const existing = await teamSet(db, teamId);
   if (existing) return existing;
 
   const starter = defaultTreeSet();
-  // Only one of two first requests at once gets to make the row, and so to fill it.
-  const made = await db.all<{ id: number }>(
-    sql`insert into tree_sets (name, loaded_at)
-        select ${starter.name}, ${Date.now()} where not exists (select 1 from tree_sets)
-        returning id`,
-  );
-  const row = await firstSet(db);
+  // Only one of two first requests at once gets to make the row (one per team), and so to fill it.
+  const made = await db
+    .insert(treeSets)
+    .values(withTeam(teamId, { name: starter.name, loadedAt: Date.now() }))
+    .onConflictDoNothing()
+    .returning({ id: treeSets.id });
+  const row = await teamSet(db, teamId);
   if (!row) throw new Error("The tree set couldn't be made.");
   if (made.length === 0) return row;
   await applyTreeSet(db, row, starter, null);
-  return (await firstSet(db)) ?? row;
+  return (await teamSet(db, teamId)) ?? row;
 }
 
 /** The set as a file. */
@@ -452,7 +455,7 @@ export async function applyTreeSet(
     db
       .update(treeSets)
       .set({ name: set.name, loadedByName, loadedAt: now })
-      .where(eq(treeSets.id, setId)),
+      .where(inTeam(treeSets, row.teamId, eq(treeSets.id, setId))),
   ];
 
   // Each statement stays under D1's 100 bound values.

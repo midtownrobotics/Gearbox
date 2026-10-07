@@ -17,6 +17,8 @@ export const LINK_ERROR_HEADER = "X-G3-Link-Error";
 /** Its control paths; the agent's own paths never start with "/__". */
 export const CONNECT_PATH = "/__connect";
 export const STATUS_PATH = "/__status";
+/** Closes the box's connection (its key was replaced or revoked). */
+export const DISCONNECT_PATH = "/__disconnect";
 
 export interface LinkStatus {
   connected: boolean;
@@ -48,7 +50,7 @@ const linkError = (kind: "offline" | "timeout", message: string) =>
 const NO_BODY = new Set([101, 204, 205, 304]);
 
 /**
- * Holds the edge box's WebSocket (one box, so one instance: `agentLink(env)`),
+ * Holds one team's edge box WebSocket (one instance per team: `agentLink(env, teamId)`),
  * and turns the worker's requests to the agent into frames on it. Uses the
  * hibernation API: an idle connection costs nothing, and heartbeats are
  * answered without waking it. A request in flight keeps it awake, so the
@@ -66,6 +68,10 @@ export class AgentLink extends DurableObject<AppEnv["Bindings"]> {
     const { pathname } = new URL(request.url);
     if (pathname === CONNECT_PATH) return this.acceptAgent(request);
     if (pathname === STATUS_PATH) return Response.json(this.status());
+    if (pathname === DISCONNECT_PATH) {
+      for (const ws of this.ctx.getWebSockets()) ws.close(4001, "The box's key changed.");
+      return new Response(null, { status: 204 });
+    }
     return this.forward(request);
   }
 
@@ -217,6 +223,6 @@ export class AgentLink extends DurableObject<AppEnv["Bindings"]> {
   }
 }
 
-/** The one box's link. */
-export const agentLink = (env: AppEnv["Bindings"]) =>
-  env.AGENT_LINK.get(env.AGENT_LINK.idFromName("edge-box"));
+/** The team's box link. */
+export const agentLink = (env: AppEnv["Bindings"], teamId: string) =>
+  env.AGENT_LINK.get(env.AGENT_LINK.idFromName(`team:${teamId}`));

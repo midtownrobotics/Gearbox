@@ -7,17 +7,19 @@
     "./config": "./src/config.ts",
     "./users": "./src/users.ts",
     "./setup": "./src/setup.ts",
-    "./worker": "./src/worker.ts"
+    "./worker": "./src/worker.ts",
+    "./isolation": "./src/isolation.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@cloudflare/vitest-pool-workers": "catalog:",
-    "vitest": "catalog:"
+    "vitest": "catalog:",
+    "@g3/site-config": "workspace:*"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20250516.0",
+    "@cloudflare/workers-types": "catalog:",
     "@types/node": "^22.0.0",
     "typescript": "^5.8.0"
   }

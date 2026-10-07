@@ -2,11 +2,145 @@ import { apiPath } from "@g3/site-config";
 import { Loader2, LogOut, Minus, Plus, Search, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
-// The attendance worker lives on its own subdomain (api.attendance.<domain>)
-// but shares the g3id session cookie (set on the team's root domain), so
-// a plain fetch with credentials works the same way api.ts's typed client does for
-// g3id's own routes.
+// The attendance worker's API, reached from this page's own address (`/api/~attendance`: the
+// gateway sends it to Attendance for the same team), with the same session cookie.
 const ATTENDANCE_API_URL = apiPath("attendance");
+
+type AttendanceSettings = {
+  schoolYearStartMonth: number;
+  schoolYearStartDay: number;
+  autoSignOutHours: number;
+};
+
+const MONTHS = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
+/** The team's attendance settings: when its school year starts, and the auto sign-out limit. */
+function AttendanceSettingsCard() {
+  const [settings, setSettings] = useState<AttendanceSettings | null>(null);
+  const [saved, setSaved] = useState<AttendanceSettings | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [status, setStatus] = useState<"idle" | "saving" | "saved">("idle");
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch(`${ATTENDANCE_API_URL}/admin/settings`, {
+          credentials: "include",
+        });
+        if (!res.ok) throw new Error();
+        const data = (await res.json()) as AttendanceSettings;
+        setSettings(data);
+        setSaved(data);
+      } catch {
+        setError("Couldn't load attendance settings.");
+      }
+    })();
+  }, []);
+
+  if (!settings) {
+    return error ? <p className="text-primary-500 text-sm mb-6">{error}</p> : null;
+  }
+  const changed = JSON.stringify(settings) !== JSON.stringify(saved);
+  const update = (patch: Partial<AttendanceSettings>) => {
+    setSettings({ ...settings, ...patch });
+    setStatus("idle");
+  };
+
+  async function save() {
+    setStatus("saving");
+    setError(null);
+    try {
+      const res = await fetch(`${ATTENDANCE_API_URL}/admin/settings`, {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(settings),
+      });
+      const data = (await res.json().catch(() => ({}))) as AttendanceSettings & { error?: string };
+      if (!res.ok) throw new Error(data.error ?? "Couldn't save the settings.");
+      setSaved(data);
+      setSettings(data);
+      setStatus("saved");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't save the settings.");
+      setStatus("idle");
+    }
+  }
+
+  const fieldClass =
+    "rounded-lg bg-surface border border-secondary-300 px-3 py-2 text-sm text-secondary-900 focus:outline-none focus:border-primary-500";
+  return (
+    <section className="bg-surface border border-secondary-200 rounded-lg p-4 mb-8">
+      <h2 className="text-lg font-bold text-secondary-900 mb-1">Settings</h2>
+      <p className="text-sm text-secondary-600 mb-4">
+        Hours are counted per school year. A session still open after the auto sign-out limit is
+        closed and doesn't count.
+      </p>
+      <div className="flex flex-wrap items-end gap-4">
+        <label className="text-sm text-secondary-700">
+          <span className="block mb-1">School year starts</span>
+          <span className="flex gap-2">
+            <select
+              value={settings.schoolYearStartMonth}
+              onChange={(e) => update({ schoolYearStartMonth: Number(e.target.value) })}
+              className={fieldClass}
+              aria-label="School year start month"
+            >
+              {MONTHS.map((name, i) => (
+                <option key={name} value={i + 1}>
+                  {name}
+                </option>
+              ))}
+            </select>
+            <input
+              type="number"
+              min={1}
+              max={31}
+              value={settings.schoolYearStartDay}
+              onChange={(e) => update({ schoolYearStartDay: Number(e.target.value) })}
+              className={`${fieldClass} w-20`}
+              aria-label="School year start day"
+            />
+          </span>
+        </label>
+        <label className="text-sm text-secondary-700">
+          <span className="block mb-1">Auto sign-out after (hours)</span>
+          <input
+            type="number"
+            min={1}
+            max={24}
+            value={settings.autoSignOutHours}
+            onChange={(e) => update({ autoSignOutHours: Number(e.target.value) })}
+            className={`${fieldClass} w-24`}
+          />
+        </label>
+        <button
+          type="button"
+          onClick={save}
+          disabled={!changed || status === "saving"}
+          className="inline-flex items-center gap-2 rounded-lg bg-primary-500 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-600 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {status === "saving" && <Loader2 size={14} className="animate-spin" />}
+          {status === "saved" && !changed ? "Saved" : "Save"}
+        </button>
+      </div>
+      {error && <p className="mt-3 text-sm text-red-700">{error}</p>}
+    </section>
+  );
+}
 
 type MemberSummary = {
   id: string;
@@ -165,6 +299,8 @@ export function AdminAttendancePage() {
         <h1 className="text-3xl font-bold text-secondary-900">Attendance Summary</h1>
         <span className="text-sm text-secondary-600">Total Hours {year}</span>
       </div>
+
+      <AttendanceSettingsCard />
 
       {!loading && !error && (
         <p className="text-sm text-secondary-600 mb-4">

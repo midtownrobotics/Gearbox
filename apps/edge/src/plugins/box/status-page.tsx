@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, getErrorMessage } from "../../shared/api";
+import { useAuthUser } from "../../shared/auth";
 import { formatAgo, formatDateTime, formatDuration } from "../../shared/format";
 import { Card, ErrorBanner, Loading, Page, Stat } from "../../shared/ui";
 import { useLoad } from "../../shared/use-load";
@@ -28,6 +29,7 @@ export function StatusPage() {
   const { agent, now } = data;
   return (
     <Page title="Edge Box">
+      <BoxKeyCard hasBox={data.hasBox} />
       <Card>
         {agent ? (
           <>
@@ -68,7 +70,11 @@ export function StatusPage() {
             )}
           </>
         ) : (
-          <p className="text-secondary-500">The agent hasn't checked in yet.</p>
+          <p className="text-secondary-500">
+            {data.hasBox
+              ? "The agent hasn't checked in yet."
+              : "Your team hasn't set up an edge box. An admin makes its key below."}
+          </p>
         )}
       </Card>
       <AddressesCard
@@ -77,6 +83,74 @@ export function StatusPage() {
       />
       <ConnectionCard />
     </Page>
+  );
+}
+
+const button = "text-sm font-medium rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50";
+
+/**
+ * The team's box key (admins): made here and shown once, then set as EDGE_AGENT_KEY in the box's
+ * /etc/g3-edge/agent.env. Making a new one disconnects a box still on the old one.
+ */
+function BoxKeyCard({ hasBox }: { hasBox: boolean }) {
+  const user = useAuthUser();
+  const box = useLoad(async () => {
+    if (!user.isAdmin) return null;
+    const res = await api.box.$get();
+    if (!res.ok) throw new Error(await getErrorMessage(res));
+    return (await res.json()).box;
+  }, []);
+  const [key, setKey] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  if (!user.isAdmin) return null;
+
+  async function makeKey() {
+    if (
+      box.data &&
+      !window.confirm("Make a new key? The box disconnects until its agent.env has the new one.")
+    ) {
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    const res = await api.box.key.$post();
+    setBusy(false);
+    if (!res.ok) return setError(await getErrorMessage(res));
+    setKey((await res.json()).key);
+    box.reload();
+  }
+
+  return (
+    <Card title="Box key">
+      {box.error && <ErrorBanner message={box.error} />}
+      {error && <ErrorBanner message={error} />}
+      {key ? (
+        <div className="space-y-2">
+          <p className="text-sm text-secondary-700">
+            Put this in the box's <code>/etc/g3-edge/agent.env</code> as <code>EDGE_AGENT_KEY</code>{" "}
+            and restart the agent. It won't be shown again.
+          </p>
+          <code className="block break-all rounded-lg bg-secondary-100 p-3 text-sm">{key}</code>
+        </div>
+      ) : (
+        <p className="text-sm text-secondary-600">
+          {box.data
+            ? `The box signs in with the key ending ${box.data.keyHint}, made by ${box.data.createdByName} on ${formatDateTime(box.data.createdAt)}.`
+            : hasBox
+              ? "Loading…"
+              : "Make a key for your team's box. Its agent signs in with it."}
+        </p>
+      )}
+      <button
+        type="button"
+        disabled={busy}
+        onClick={() => void makeKey()}
+        className={`${button} mt-3 bg-primary-500 hover:bg-primary-600 text-white`}
+      >
+        {box.data ? "Make a new key" : "Make the box's key"}
+      </button>
+    </Card>
   );
 }
 

@@ -117,7 +117,7 @@ export class WorkerLink {
         signal: AbortSignal.timeout(10_000),
       });
       const reasons: Record<number, string> = {
-        401: "The worker refused the agent's key (EDGE_AGENT_KEY doesn't match its secret).",
+        401: "The worker refused the agent's key (EDGE_AGENT_KEY isn't the team's box key; make a new one on the Edge Box page).",
         404: "The worker has no link endpoint (it's older than this agent, or EDGE_WORKER_URL is wrong).",
         410: "EDGE_WORKER_URL is a retired address; use the one in agent.env.example.",
       };

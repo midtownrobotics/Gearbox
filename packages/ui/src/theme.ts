@@ -7,6 +7,8 @@ import { useEffect, useSyncExternalStore } from "react";
 
 export type Theme = "light" | "dark";
 let defaultTheme: Theme | "system" = "system";
+/** A page that must always look one way (Attendance's kiosk display, on a shop TV). */
+let forcedTheme: Theme | null = null;
 
 const COOKIE = "g3_theme";
 const listeners = new Set<() => void>();
@@ -17,8 +19,18 @@ function systemTheme(): Theme {
 
 /** The saved theme, or the system's when none is saved. */
 export function readTheme(): Theme {
+  if (forcedTheme) return forcedTheme;
   const saved = document.cookie.match(/(?:^|;\s*)g3_theme=(light|dark)/)?.[1];
   return (saved as Theme | undefined) ?? (defaultTheme === "system" ? systemTheme() : defaultTheme);
+}
+
+/**
+ * Pins this page to one theme whatever the saved setting or the team's default says (null lets
+ * the setting decide again). Doesn't change the saved setting other apps use.
+ */
+export function forceTheme(theme: Theme | null) {
+  forcedTheme = theme;
+  applyTheme(readTheme());
 }
 
 /** Team choice applies only when the member has not saved a personal preference. */

@@ -23,16 +23,95 @@ const EXAMPLE = {
   variant: "8mm SplineXS",
 };
 
-/** Mentors: the request naming template and the keyword rules that guess budget categories. */
+/** Mentors: the team's money and calendar, who edits the catalog, and how requests are named. */
 export function SettingsPage() {
   return (
     <Page title="Settings">
+      <MoneyAndCalendar />
       <TrustedStudents />
       <ShareACart />
       <InventoryOnReceive />
       <NamingTemplate />
       <CategoryRules />
     </Page>
+  );
+}
+
+const MONTHS = Array.from({ length: 12 }, (_, i) =>
+  new Date(Date.UTC(2026, i, 1)).toLocaleDateString("en-US", { month: "long", timeZone: "UTC" }),
+);
+
+/** The team's currency and fiscal calendar: what budgets, prices and fiscal years are in. */
+function MoneyAndCalendar() {
+  const settings = useLoad(async () => {
+    const res = await api.settings.$get();
+    if (!res.ok) throw new Error(await getErrorMessage(res));
+    return res.json();
+  }, []);
+  const [currency, setCurrency] = useState("");
+  const [start, setStart] = useState(7);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!settings.data) return;
+    setCurrency(settings.data.currency);
+    setStart(settings.data.fiscalYearStart);
+  }, [settings.data]);
+
+  async function save(e: FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    const res = await api.settings.$put({
+      json: { currency: currency.trim().toUpperCase(), fiscalYearStart: start },
+    });
+    setBusy(false);
+    if (!res.ok) return setError(await getErrorMessage(res));
+    // Every page reads these when it loads.
+    window.location.reload();
+  }
+
+  return (
+    <Card title="Money and calendar">
+      {!settings.data ? (
+        <Loading />
+      ) : (
+        <form onSubmit={save} className="space-y-3">
+          <p className="text-sm text-secondary-600">
+            Budgets and spending are counted by fiscal year, which starts on the 1st of the month
+            below (dates are in your own local time). Changing it recounts every year from when
+            orders were placed; nothing is lost.
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Currency" hint="A 3-letter code: USD, CAD, EUR, ...">
+              <input
+                className={`${inputClass} uppercase`}
+                value={currency}
+                maxLength={3}
+                onChange={(e) => setCurrency(e.target.value)}
+              />
+            </Field>
+            <Field label="Fiscal year starts in">
+              <select
+                className={inputClass}
+                value={start}
+                onChange={(e) => setStart(Number(e.target.value))}
+              >
+                {MONTHS.map((month, i) => (
+                  <option key={month} value={i + 1}>
+                    {month}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </div>
+          {error && <ErrorBanner message={error} />}
+          <Button type="submit" disabled={busy}>
+            Save
+          </Button>
+        </form>
+      )}
+    </Card>
   );
 }
 

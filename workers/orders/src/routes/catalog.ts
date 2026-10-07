@@ -1,4 +1,4 @@
-import { requireAuth } from "@g3/auth";
+import { inTeam, requireAuth, withTeam } from "@g3/auth";
 import { asc, count, eq, inArray } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
@@ -6,6 +6,7 @@ import { type OrdersDb, createOrdersDb } from "../db";
 import { catalogCategories, catalogFamilies, catalogItems, orderRequests } from "../db/schema";
 import { catalogKey, linkKindOf } from "../lib/catalog";
 import { packQuantityField } from "../lib/pack-quantity";
+import { catalogReady } from "../lib/starter";
 import { vendorName } from "../lib/vendors";
 import { requireCatalogEditor } from "../middleware/auth";
 import type { AppEnv } from "../types";
@@ -109,11 +110,12 @@ const nameValidator = validator("json", (value, c): { name: string } => {
 
 const NO_CATEGORY = { error: "Pick one of the catalog's categories." };
 
-/** The catalog's categories, A–Z. */
-async function categoryNames(db: OrdersDb) {
+/** The team's catalog categories, A–Z. */
+async function categoryNames(db: OrdersDb, teamId: string) {
   const rows = await db
     .select({ name: catalogCategories.name })
     .from(catalogCategories)
+    .where(inTeam(catalogCategories, teamId))
     .orderBy(asc(catalogCategories.name))
     .all();
   return rows.map((r) => r.name);
@@ -126,15 +128,18 @@ const linkFields = (url: string) => {
 };
 
 /**
- * The product catalog: anyone logged in can browse and request (new links join it then); mentors
- * and trusted students add categories and add, edit or delete parts. The whole catalog is small
- * enough (a few thousand items) for the app to load at once and search in the browser.
+ * The team's product catalog: anyone logged in can browse and request (new links join it then);
+ * mentors and trusted students add categories and add, edit or delete parts. The whole catalog is
+ * small enough (a few thousand items) for the app to load at once and search in the browser. A team
+ * starts with its own copy of the starter catalog (lib/starter.ts), so its edits are its own.
  */
 export const catalogRouter = new Hono<AppEnv>()
-  .get("/", requireAuth, async (c) => {
+  .use(requireAuth, catalogReady)
+  .get("/", async (c) => {
     const db = createOrdersDb(c.env.ORDERS_DB);
+    const teamId = c.get("teamId");
     const [categories, families, items] = await Promise.all([
-      categoryNames(db),
+      categoryNames(db, teamId),
       db
         .select({
           id: catalogFamilies.id,
@@ -143,23 +148,34 @@ export const catalogRouter = new Hono<AppEnv>()
           sourceUrl: catalogFamilies.sourceUrl,
         })
         .from(catalogFamilies)
+        .where(inTeam(catalogFamilies, teamId))
         .all(),
-      db.select(itemColumns).from(catalogItems).orderBy(asc(catalogItems.name)).all(),
+      db
+        .select(itemColumns)
+        .from(catalogItems)
+        .where(inTeam(catalogItems, teamId))
+        .orderBy(asc(catalogItems.name))
+        .all(),
     ]);
     return c.json({ categories, families, items: items.map(parsed) });
   })
   /** Just the catalog's categories (New Request's picker for parts new to the catalog). */
-  .get("/categories", requireAuth, async (c) => {
-    return c.json(await categoryNames(createOrdersDb(c.env.ORDERS_DB)));
+  .get("/categories", async (c) => {
+    return c.json(await categoryNames(createOrdersDb(c.env.ORDERS_DB), c.get("teamId")));
   })
-  .post("/categories", requireAuth, requireCatalogEditor, nameValidator, async (c) => {
+  .post("/categories", requireCatalogEditor, nameValidator, async (c) => {
     const { name } = c.req.valid("json");
     const db = createOrdersDb(c.env.ORDERS_DB);
-    const existing = (await categoryNames(db)).find((n) => n.toLowerCase() === name.toLowerCase());
+    const teamId = c.get("teamId");
+    const existing = (await categoryNames(db, teamId)).find(
+      (n) => n.toLowerCase() === name.toLowerCase(),
+    );
     if (existing) return c.json({ error: `“${existing}” already exists.` }, 409);
     await db
       .insert(catalogCategories)
-      .values({ name, createdBy: c.get("userDisplayName"), createdAt: Date.now() });
+      .values(
+        withTeam(teamId, { name, createdBy: c.get("userDisplayName"), createdAt: Date.now() }),
+      );
     return c.json({ name }, 201);
   })
   /**
@@ -168,7 +184,6 @@ export const catalogRouter = new Hono<AppEnv>()
    */
   .delete(
     "/categories",
-    requireAuth,
     requireCatalogEditor,
     validator("json", (value, c): { name: string; moveTo: string | null } => {
       const v = (value ?? {}) as { name?: unknown; moveTo?: unknown };
@@ -181,16 +196,17 @@ export const catalogRouter = new Hono<AppEnv>()
     async (c) => {
       const { name, moveTo } = c.req.valid("json");
       const db = createOrdersDb(c.env.ORDERS_DB);
-      const names = await categoryNames(db);
+      const teamId = c.get("teamId");
+      const names = await categoryNames(db, teamId);
       if (!names.includes(name)) return c.json({ error: `There's no category “${name}”.` }, 404);
       const [{ parts }] = await db
         .select({ parts: count() })
         .from(catalogItems)
-        .where(eq(catalogItems.category, name));
+        .where(inTeam(catalogItems, teamId, eq(catalogItems.category, name)));
       const [{ families }] = await db
         .select({ families: count() })
         .from(catalogFamilies)
-        .where(eq(catalogFamilies.category, name));
+        .where(inTeam(catalogFamilies, teamId, eq(catalogFamilies.category, name)));
       if (parts + families > 0) {
         if (!moveTo) {
           return c.json(
@@ -207,18 +223,20 @@ export const catalogRouter = new Hono<AppEnv>()
         db
           .update(catalogItems)
           .set({ category: moveTo ?? name, updatedBy: user, updatedAt: now })
-          .where(eq(catalogItems.category, name)),
+          .where(inTeam(catalogItems, teamId, eq(catalogItems.category, name))),
         db
           .update(catalogFamilies)
           .set({ category: moveTo ?? name })
-          .where(eq(catalogFamilies.category, name)),
-        db.delete(catalogCategories).where(eq(catalogCategories.name, name)),
+          .where(inTeam(catalogFamilies, teamId, eq(catalogFamilies.category, name))),
+        db
+          .delete(catalogCategories)
+          .where(inTeam(catalogCategories, teamId, eq(catalogCategories.name, name))),
       ]);
       return c.json({ moved: parts, to: parts + families > 0 ? moveTo : null });
     },
   )
   /** Some items by id (?ids=1,2,3), for requesting them. */
-  .get("/items", requireAuth, async (c) => {
+  .get("/items", async (c) => {
     const ids = (c.req.query("ids") ?? "")
       .split(",")
       .map(Number)
@@ -229,39 +247,45 @@ export const catalogRouter = new Hono<AppEnv>()
     const rows = await db
       .select(itemColumns)
       .from(catalogItems)
-      .where(inArray(catalogItems.id, ids));
+      .where(inTeam(catalogItems, c.get("teamId"), inArray(catalogItems.id, ids)));
     return c.json(rows.map(parsed));
   })
-  .post("/items", requireAuth, requireCatalogEditor, itemValidator(false), async (c) => {
+  .post("/items", requireCatalogEditor, itemValidator(false), async (c) => {
     const body = c.req.valid("json") as ItemFields;
     const db = createOrdersDb(c.env.ORDERS_DB);
-    if (!(await categoryNames(db)).includes(body.category)) return c.json(NO_CATEGORY, 400);
+    const teamId = c.get("teamId");
+    if (!(await categoryNames(db, teamId)).includes(body.category)) {
+      return c.json(NO_CATEGORY, 400);
+    }
     const now = Date.now();
     const user = c.get("userDisplayName");
     const row = await db
       .insert(catalogItems)
-      .values({
-        ...body,
-        options: JSON.stringify(body.options ?? {}),
-        ...linkFields(body.url),
-        source: "request",
-        createdBy: user,
-        createdAt: now,
-        updatedBy: user,
-        updatedAt: now,
-      })
+      .values(
+        withTeam(teamId, {
+          ...body,
+          options: JSON.stringify(body.options ?? {}),
+          ...linkFields(body.url),
+          source: "request" as const,
+          createdBy: user,
+          createdAt: now,
+          updatedBy: user,
+          updatedAt: now,
+        }),
+      )
       .returning(itemColumns)
       .get();
     return c.json(parsed(row), 201);
   })
-  .patch("/items/:id", requireAuth, requireCatalogEditor, itemValidator(true), async (c) => {
+  .patch("/items/:id", requireCatalogEditor, itemValidator(true), async (c) => {
     const id = Number(c.req.param("id"));
     const { options, ...body } = c.req.valid("json");
     if (Object.keys(body).length === 0 && options === undefined) {
       return c.json({ error: "Nothing to update." }, 400);
     }
     const db = createOrdersDb(c.env.ORDERS_DB);
-    if (body.category !== undefined && !(await categoryNames(db)).includes(body.category)) {
+    const teamId = c.get("teamId");
+    if (body.category !== undefined && !(await categoryNames(db, teamId)).includes(body.category)) {
       return c.json(NO_CATEGORY, 400);
     }
     const row = await db
@@ -276,22 +300,26 @@ export const catalogRouter = new Hono<AppEnv>()
         updatedBy: c.get("userDisplayName"),
         updatedAt: Date.now(),
       })
-      .where(eq(catalogItems.id, id))
+      .where(inTeam(catalogItems, teamId, eq(catalogItems.id, id)))
       .returning(itemColumns)
       .get();
     if (!row) return c.json({ error: "Catalog part not found." }, 404);
     return c.json(parsed(row));
   })
   /** Deleting an item keeps the requests for it (they just stop pointing at the catalog). */
-  .delete("/items/:id", requireAuth, requireCatalogEditor, async (c) => {
+  .delete("/items/:id", requireCatalogEditor, async (c) => {
     const id = Number(c.req.param("id"));
     const db = createOrdersDb(c.env.ORDERS_DB);
+    const teamId = c.get("teamId");
     const [, deleted] = await db.batch([
       db
         .update(orderRequests)
         .set({ catalogItemId: null })
-        .where(eq(orderRequests.catalogItemId, id)),
-      db.delete(catalogItems).where(eq(catalogItems.id, id)).returning({ id: catalogItems.id }),
+        .where(inTeam(orderRequests, teamId, eq(orderRequests.catalogItemId, id))),
+      db
+        .delete(catalogItems)
+        .where(inTeam(catalogItems, teamId, eq(catalogItems.id, id)))
+        .returning({ id: catalogItems.id }),
     ]);
     if (deleted.length === 0) return c.json({ error: "Catalog part not found." }, 404);
     return c.json({ ok: true });

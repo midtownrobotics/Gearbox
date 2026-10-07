@@ -22,9 +22,9 @@ type Ctx = Context<AppEnv>;
  * is stored here: CUPS on the box holds the printers and the queue, and if the
  * box is unreachable the request fails right away.
  */
-async function relay<T>(c: Ctx, path: string, init?: Parameters<typeof agentFetch>[2]) {
+async function relay<T>(c: Ctx, path: string, init?: Parameters<typeof agentFetch>[3]) {
   try {
-    const res = await agentFetch(c.env, `/print${path}`, init);
+    const res = await agentFetch(c.env, c.get("teamId"), `/print${path}`, init);
     const body = (await res.json().catch(() => ({}))) as T & { error?: string };
     if (!res.ok) {
       return {

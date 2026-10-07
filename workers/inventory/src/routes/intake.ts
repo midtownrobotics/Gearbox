@@ -1,9 +1,9 @@
-import { requireAuth } from "@g3/auth";
-import { eq, sql } from "drizzle-orm";
+import { inTeam, requireAuth, withTeam } from "@g3/auth";
+import { asc, eq, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
 import { type Db, createDb } from "../db";
-import { type StockStatus, intakeReceipts, itemListings, items } from "../db/schema";
+import { type StockStatus, intakeReceipts, itemListings, items, stock } from "../db/schema";
 import { parseId, quantityField, textField } from "../lib/input";
 import type { IntakeRequest, IntakeResult, PlacesResult } from "../lib/intake-types";
 import { type ListingInput, listingLabel, parseListing } from "../lib/items";
@@ -103,14 +103,14 @@ const placesValidator = validator(
   },
 );
 
-/** The entry's listing a delivery belongs to, if Inventory has the part. */
-async function findListing(db: Db, listing: ListingInput) {
+/** The team's listing a delivery belongs to, if its Inventory has the part. */
+async function findListing(db: Db, team: string, listing: ListingInput) {
   const pick = { id: itemListings.id, itemId: itemListings.itemId };
   if (listing.catalogItemId) {
     const byCatalog = await db
       .select(pick)
       .from(itemListings)
-      .where(eq(itemListings.catalogItemId, listing.catalogItemId))
+      .where(inTeam(itemListings, team, eq(itemListings.catalogItemId, listing.catalogItemId)))
       .get();
     if (byCatalog) return byCatalog;
   }
@@ -119,8 +119,12 @@ async function findListing(db: Db, listing: ListingInput) {
       .select(pick)
       .from(itemListings)
       .where(
-        sql`lower(${itemListings.vendor}) = ${listing.vendor.toLowerCase()}
-            AND lower(${itemListings.sku}) = ${listing.sku.toLowerCase()}`,
+        inTeam(
+          itemListings,
+          team,
+          sql`lower(${itemListings.vendor}) = ${listing.vendor.toLowerCase()}`,
+          sql`lower(${itemListings.sku}) = ${listing.sku.toLowerCase()}`,
+        ),
       )
       .get();
     if (bySku) return bySku;
@@ -129,7 +133,7 @@ async function findListing(db: Db, listing: ListingInput) {
     const byUrl = await db
       .select(pick)
       .from(itemListings)
-      .where(eq(itemListings.url, listing.url))
+      .where(inTeam(itemListings, team, eq(itemListings.url, listing.url)))
       .get();
     if (byUrl) return byUrl;
   }
@@ -139,9 +143,9 @@ async function findListing(db: Db, listing: ListingInput) {
 export const intakeRouter = new Hono<AppEnv>()
   .post("/", requireAuth, intakeValidator, async (c) => {
     const { use, lines } = c.req.valid("json");
-    const d1 = c.env.INVENTORY_DB;
-    const db = createDb(d1);
-    const names = await loadNames(db);
+    const db = createDb(c.env.INVENTORY_DB);
+    const team = c.get("teamId");
+    const names = await loadNames(db, team);
 
     // Every place is checked before anything is added, so a bad one adds nothing.
     const places = new Map<number, Place>();
@@ -164,7 +168,7 @@ export const intakeRouter = new Hono<AppEnv>()
         db
           .select({ itemId: intakeReceipts.itemId })
           .from(intakeReceipts)
-          .where(eq(intakeReceipts.sourceKey, line.sourceKey))
+          .where(inTeam(intakeReceipts, team, eq(intakeReceipts.sourceKey, line.sourceKey)))
           .get();
       const before = await receipt();
       if (before) {
@@ -173,78 +177,78 @@ export const intakeRouter = new Hono<AppEnv>()
       }
 
       const now = Date.now();
-      const found = await findListing(db, line.listing);
+      const found = await findListing(db, team, line.listing);
       let itemId = found?.itemId;
       if (itemId === undefined) {
         const made = await db
           .insert(items)
-          .values({
-            name: (line.name || line.listing.name || listingLabel(line.listing)).slice(0, 200),
-            createdById: by.id,
-            createdByName: by.name,
-            createdAt: now,
-            updatedAt: now,
-          })
+          .values(
+            withTeam(team, {
+              name: (line.name || line.listing.name || listingLabel(line.listing)).slice(0, 200),
+              createdById: by.id,
+              createdByName: by.name,
+              createdAt: now,
+              updatedAt: now,
+            }),
+          )
           .returning({ id: items.id })
           .get();
         itemId = made.id;
       }
 
       const listing = line.listing;
-      const statements = [
-        // First, and unique: a delivery that's already been added stops here.
-        d1
-          .prepare(
-            "INSERT INTO intake_receipts (source_key, item_id, created_at) VALUES (?1, ?2, ?3)",
-          )
-          .bind(line.sourceKey, itemId, now),
-        found
-          ? // The listing learns what Orders knows now: the catalog part, and the latest price.
-            d1
-              .prepare(
-                `UPDATE item_listings SET
-                   catalog_item_id = COALESCE(catalog_item_id, ?2),
-                   price_cents = COALESCE(?3, price_cents),
-                   price_at = CASE WHEN ?3 IS NULL THEN price_at ELSE ?4 END
-                 WHERE id = ?1`,
-              )
-              .bind(found.id, listing.catalogItemId, listing.priceCents, listing.priceAt ?? now)
-          : d1
-              .prepare(
-                `INSERT INTO item_listings
-                   (item_id, catalog_item_id, vendor, sku, name, url, price_cents, price_at, created_at)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)`,
-              )
-              .bind(
-                itemId,
-                listing.catalogItemId,
-                listing.vendor,
-                listing.sku,
-                listing.name || line.name,
-                listing.url,
-                listing.priceCents,
-                listing.priceCents === null ? null : (listing.priceAt ?? now),
-                now,
-              ),
-        ...(found ? [] : [logEvent(d1, itemId, "created", "From a received order.", by, now)]),
-        ...addStock(d1, itemId, place, line.quantity, now),
-        logEvent(
-          d1,
-          itemId,
-          "received",
-          `${line.quantity} into ${where}${line.note ? ` (${line.note})` : ""}.`,
-          by,
-          now,
-          null,
-          line.sourceKey,
-        ),
-        ...(place.status === "storage" ? [tidyStorage(d1, itemId, place.locationId)] : []),
-      ];
       try {
-        await d1.batch(statements);
+        await db.batch([
+          // First, and unique for the team: a delivery that's already been added stops here.
+          db
+            .insert(intakeReceipts)
+            .values(withTeam(team, { sourceKey: line.sourceKey, itemId, createdAt: now })),
+          found
+            ? // The listing learns what Orders knows now: the catalog part, and the latest price.
+              db
+                .update(itemListings)
+                .set({
+                  catalogItemId: sql`coalesce(${itemListings.catalogItemId}, ${listing.catalogItemId})`,
+                  priceCents: sql`coalesce(${listing.priceCents}, ${itemListings.priceCents})`,
+                  priceAt:
+                    listing.priceCents === null
+                      ? sql`${itemListings.priceAt}`
+                      : (listing.priceAt ?? now),
+                })
+                .where(inTeam(itemListings, team, eq(itemListings.id, found.id)))
+            : db.insert(itemListings).values(
+                withTeam(team, {
+                  itemId,
+                  catalogItemId: listing.catalogItemId,
+                  vendor: listing.vendor,
+                  sku: listing.sku,
+                  name: listing.name || line.name,
+                  url: listing.url,
+                  priceCents: listing.priceCents,
+                  priceAt: listing.priceCents === null ? null : (listing.priceAt ?? now),
+                  createdAt: now,
+                }),
+              ),
+          ...(found
+            ? []
+            : [logEvent(db, team, itemId, "created", "From a received order.", by, now)]),
+          ...addStock(db, team, itemId, place, line.quantity, now),
+          logEvent(
+            db,
+            team,
+            itemId,
+            "received",
+            `${line.quantity} into ${where}${line.note ? ` (${line.note})` : ""}.`,
+            by,
+            now,
+            null,
+            line.sourceKey,
+          ),
+          ...(place.status === "storage" ? [tidyStorage(db, team, itemId, place.locationId)] : []),
+        ]);
         added.push({ sourceKey: line.sourceKey, itemId, created: !found, duplicate: false });
       } catch (err) {
-        if (!found) await db.delete(items).where(eq(items.id, itemId));
+        if (!found) await db.delete(items).where(inTeam(items, team, eq(items.id, itemId)));
         // Sent twice at the same moment: the other one added it.
         const after = await receipt();
         if (!after) throw err;
@@ -260,30 +264,35 @@ export const intakeRouter = new Hono<AppEnv>()
    */
   .post("/places", requireAuth, placesValidator, async (c) => {
     const { lines } = c.req.valid("json");
-    const d1 = c.env.INVENTORY_DB;
-    const db = createDb(d1);
+    const db = createDb(c.env.INVENTORY_DB);
+    const team = c.get("teamId");
     const places: PlacesResult["places"] = [];
     for (const line of lines) {
-      const found = await findListing(db, line.listing);
+      const found = await findListing(db, team, line.listing);
       if (!found) {
         places.push({ sourceKey: line.sourceKey, itemId: null, itemName: null, locationId: null });
         continue;
       }
       // Where it's kept: storage before in use, a row with parts before an empty one.
-      const home = await d1
-        .prepare(
-          `SELECT i.name AS itemName,
-                  (SELECT s.location_id FROM stock s WHERE s.item_id = i.id
-                   ORDER BY s.status = 'in_use', s.quantity = 0, s.id LIMIT 1) AS locationId
-           FROM items i WHERE i.id = ?1`,
-        )
-        .bind(found.itemId)
-        .first<{ itemName: string; locationId: number | null }>();
+      const [item, kept] = await Promise.all([
+        db
+          .select({ name: items.name })
+          .from(items)
+          .where(inTeam(items, team, eq(items.id, found.itemId)))
+          .get(),
+        db
+          .select({ locationId: stock.locationId })
+          .from(stock)
+          .where(inTeam(stock, team, eq(stock.itemId, found.itemId)))
+          .orderBy(sql`${stock.status} = 'in_use'`, sql`${stock.quantity} = 0`, asc(stock.id))
+          .limit(1)
+          .get(),
+      ]);
       places.push({
         sourceKey: line.sourceKey,
         itemId: found.itemId,
-        itemName: home?.itemName ?? null,
-        locationId: home?.locationId ?? null,
+        itemName: item?.name ?? null,
+        locationId: kept?.locationId ?? null,
       });
     }
     return c.json({ places } satisfies PlacesResult);

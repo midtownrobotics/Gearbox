@@ -4,8 +4,8 @@ import { g3idStub, workerTestConfig } from "@g3/testing/config";
 // workspace, TTAKEN, is already another team's), and hands out codes. A code is pending the first
 // time it's checked, and sent by its founder ("u-founder") after that.
 // For the operators' console: every team has two members, its founder ("u-founder") and
-// "u-member"; any account exists except "u-nobody"; and deleting, renumbering and handing over a
-// team work. /auth/me is the usual test stub (@g3/testing).
+// "u-member"; any account exists except "u-nobody"; and deleting and handing over a team work.
+// /auth/me is the usual test stub (@g3/testing).
 const checks = new Map<string, number>();
 const MEMBERS = [
   {
@@ -46,7 +46,6 @@ const g3id = async (request: Request) => {
     if (!rest && request.method === "DELETE") {
       return Response.json({ deletedUserIds: MEMBERS.map((m) => m.id) });
     }
-    if (rest === "/renumber") return Response.json({ moved: true });
     if (rest === "/owner") {
       const { userId } = (await request.json()) as { userId: string };
       return MEMBERS.some((m) => m.id === userId)
@@ -94,6 +93,32 @@ const slack = async (request: Request) => {
   return new Response("Not stubbed", { status: 502 });
 };
 
+/**
+ * A team-scoped app's /api/internal/teams/:id: records each team it's asked to delete (read back
+ * with GET /api/internal/deleted), and fails for a team a test named with POST /api/internal/fail/:id.
+ */
+function teamApp() {
+  const deleted: string[] = [];
+  const failing = new Set<string>();
+  return (request: Request) => {
+    const path = new URL(request.url).pathname;
+    if (path === "/api/internal/deleted") return Response.json(deleted);
+    const fail = path.match(/^\/api\/internal\/fail\/(.+)$/);
+    if (fail) {
+      failing.add(decodeURIComponent(fail[1]));
+      return Response.json({ ok: true });
+    }
+    const team = path.match(/^\/api\/internal\/teams\/(.+)$/);
+    if (team && request.method === "DELETE") {
+      const id = decodeURIComponent(team[1]);
+      if (failing.has(id)) return Response.json({ error: "Down." }, { status: 500 });
+      deleted.push(id);
+      return Response.json({ ok: true });
+    }
+    return Response.json({ error: "Not stubbed" }, { status: 404 });
+  };
+}
+
 export default workerTestConfig({
   d1: "PLATFORM_DB",
   // Production addresses, not the dev gateway's.
@@ -102,6 +127,15 @@ export default workerTestConfig({
     SLACK_CLIENT_SECRET: "test-secret",
     LOCAL_GATEWAY_URL: "",
   },
-  services: { G3ID: g3id },
+  services: {
+    G3ID: g3id,
+    ATTENDANCE: teamApp(),
+    EDGE: teamApp(),
+    INVENTORY: teamApp(),
+    ORDERS: teamApp(),
+    PIT: teamApp(),
+    SHOP: teamApp(),
+    SKILL_TREE: teamApp(),
+  },
   outbound: slack,
 });

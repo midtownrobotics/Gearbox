@@ -8,8 +8,6 @@ export function AdminPage() {
 
   const [eventKey, setEventKey] = useState("");
   const [nexusEventKey, setNexusEventKey] = useState("");
-  const [tbaAuthKey, setTbaAuthKey] = useState("");
-  const [nexusApiKey, setNexusApiKey] = useState("");
   const [iframeUrl, setIframeUrl] = useState("");
   const [teamNumber, setTeamNumber] = useState("");
   const [loading, setLoading] = useState(true);
@@ -31,8 +29,6 @@ export function AdminPage() {
         if (data) {
           setEventKey(data.eventKey);
           setNexusEventKey(data.nexusEventKey);
-          setTbaAuthKey(data.tbaAuthKey);
-          setNexusApiKey(data.nexusApiKey);
           setIframeUrl(data.iframeUrl ?? "");
           setTeamNumber(data.teamNumber);
         }
@@ -48,8 +44,6 @@ export function AdminPage() {
       json: {
         eventKey: eventKey.trim(),
         nexusEventKey: nexusEventKey.trim(),
-        tbaAuthKey: tbaAuthKey.trim(),
-        nexusApiKey: nexusApiKey.trim(),
         iframeUrl: iframeUrl.trim(),
       },
     });
@@ -92,10 +86,11 @@ export function AdminPage() {
 
         <div className="bg-surface rounded-xl border border-gray-300 p-5 space-y-5">
           <div>
-            <h2 className="text-lg font-semibold text-gray-200">Event & API Configuration</h2>
+            <h2 className="text-lg font-semibold text-gray-200">Event</h2>
             <p className="text-sm text-gray-600 mt-0.5">
               Team {teamNumber}. Nexus and TBA event keys can be different (especially for
-              offseason).
+              offseason). The monitor reads The Blue Alliance and Nexus with the platform's own
+              access, so there are no API keys to enter.
             </p>
           </div>
 
@@ -117,28 +112,6 @@ export function AdminPage() {
             onChange={setNexusEventKey}
             onSaved={() => setSaved(false)}
             hint="Nexus event key (can differ from TBA, especially for offseason). Leave blank to disable Nexus data."
-          />
-
-          <Field
-            id="tba-key"
-            label="TBA Auth Key"
-            placeholder="The Blue Alliance read API key"
-            value={tbaAuthKey}
-            onChange={setTbaAuthKey}
-            onSaved={() => setSaved(false)}
-            secret
-            hint="From thebluealliance.com/account. Powers rankings & match data."
-          />
-
-          <Field
-            id="nexus-key"
-            label="Nexus API Key"
-            placeholder="FRC Nexus API key"
-            value={nexusApiKey}
-            onChange={setNexusApiKey}
-            onSaved={() => setSaved(false)}
-            secret
-            hint="From frc.nexus. Powers live queuing/match status."
           />
         </div>
 
