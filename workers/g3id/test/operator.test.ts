@@ -2,7 +2,7 @@ import { teamKey } from "@g3/site-config";
 import { describe, expect, it } from "vitest";
 import { createTeam, createUser, createUserWithPin, g3id, sessionCookie, testEnv } from "./helpers";
 
-// The platform's operator console (roadmap 2.8) deletes, renumbers and hands over teams through
+// The platform's operator console (roadmap 2.8) deletes and hands over teams through
 // these internal routes, over its service binding.
 
 const internal = (path: string, init: Parameters<typeof g3id>[1] = {}) =>
@@ -20,8 +20,6 @@ const setAppearance = (teamId: string, userId: string) =>
   )
     .bind(teamId, userId)
     .run();
-
-const freeNumber = () => 1_100_000 + (crypto.getRandomValues(new Uint32Array(1))[0] % 1_000_000);
 
 describe("operator tools in G3ID", () => {
   it("lists a team's members", async () => {
@@ -55,54 +53,8 @@ describe("operator tools in G3ID", () => {
     expect(await one("SELECT id FROM core_users WHERE id = ?", keep)).not.toBeNull();
   });
 
-  it("won't delete or renumber the site's team", async () => {
+  it("won't delete the site's team", async () => {
     expect((await internal(`/teams/${teamKey}`, { method: "DELETE" })).status).toBe(409);
-    const res = await internal(`/teams/${teamKey}/renumber`, {
-      method: "POST",
-      body: { teamNumber: freeNumber() },
-    });
-    expect(res.status).toBe(409);
-  });
-
-  it("renumbers a team, keeping its accounts, PINs and appearance", async () => {
-    const team = await createTeam();
-    const { id } = await createUserWithPin({ teamId: team });
-    await setAppearance(team, id);
-    const cookie = await sessionCookie(id);
-    const number = freeNumber();
-
-    const res = await internal(`/teams/${team}/renumber`, {
-      method: "POST",
-      body: { teamNumber: number },
-    });
-    expect(await res.json()).toEqual({ moved: true });
-    expect(await one("SELECT id FROM teams WHERE id = ?", team)).toBeNull();
-    expect(await one("SELECT team_number FROM teams WHERE id = ?", `frc${number}`)).toEqual({
-      team_number: number,
-    });
-    expect(await one("SELECT team_id FROM core_users WHERE id = ?", id)).toEqual({
-      team_id: `frc${number}`,
-    });
-    expect(await one("SELECT team_id FROM core_user_pins WHERE user_id = ?", id)).toEqual({
-      team_id: `frc${number}`,
-    });
-    expect(
-      await one("SELECT updated_by FROM team_ui_settings WHERE team_id = ?", `frc${number}`),
-    ).toEqual({ updated_by: id });
-    // Still signed in.
-    expect(await (await g3id("/auth/me", { cookie })).json()).toMatchObject({
-      teamId: `frc${number}`,
-    });
-  });
-
-  it("won't renumber onto a team it already has", async () => {
-    const team = await createTeam();
-    const other = await createTeam();
-    const res = await internal(`/teams/${team}/renumber`, {
-      method: "POST",
-      body: { teamNumber: Number(other.slice(3)) },
-    });
-    expect(res.status).toBe(409);
   });
 
   it("hands a team to one of its members", async () => {

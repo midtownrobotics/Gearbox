@@ -9,22 +9,11 @@ import { siteTeamId } from "../lib/team";
 import type { AppEnv } from "../types";
 
 // For other workers only, over service bindings: the platform worker signs teams up through these,
-// and its operator console (roadmap 2.8) deletes, renumbers and hands over teams through them.
+// and its operator console (roadmap 2.8) deletes and hands over teams through them.
 // Apps read a team's members and send its Slack messages through them (@g3/auth).
 // The gateway never answers /api/internal, and production workers have no other public address.
 
 type NewTeam = { id: string; teamNumber: number; name: string };
-
-/** Tables that carry a team (migrations 0012, 0013, 0014). */
-const TEAM_TABLES = [
-  "team_ui_settings",
-  "core_users",
-  "core_user_pins",
-  "kiosk_devices",
-  "kiosk_activation_codes",
-  "core_slack_link_codes",
-  "slack_installations",
-] as const;
 
 /** The team's members (?1 is the team's id). */
 const MEMBERS = "(SELECT id FROM core_users WHERE team_id = ?1)";
@@ -139,39 +128,6 @@ export const internalRouter = new Hono<AppEnv>()
       ]),
     );
     return c.json({ deletedUserIds: members.map((m) => m.id) });
-  })
-  // An operator moves a team to another number (its id is "frc<number>"). Accounts, sessions,
-  // kiosks and Slack stay; they just point at the new id. Nothing to do for a team G3ID doesn't
-  // have yet (a sign-up that hasn't reached Slack).
-  .post("/teams/:id/renumber", async (c) => {
-    const id = c.req.param("id");
-    const { teamNumber } = await c.req.json<{ teamNumber: number }>();
-    if (id === siteTeamId) {
-      return c.json({ error: "The site's own team's number is set in site.ts." }, 409);
-    }
-    if (!Number.isInteger(teamNumber) || teamNumber < 1) {
-      return c.json({ error: "Not a team number." }, 400);
-    }
-    const newId = `frc${teamNumber}`;
-    const db = createDb(c.env.DB);
-    if (await db.select({ id: teams.id }).from(teams).where(eq(teams.id, newId)).get()) {
-      return c.json({ error: `G3ID already has team ${teamNumber}.` }, 409);
-    }
-    if (!(await db.select({ id: teams.id }).from(teams).where(eq(teams.id, id)).get())) {
-      return c.json({ moved: false });
-    }
-    const now = Math.floor(Date.now() / 1000);
-    // The new row first, so every row can point at it; then the old one, with nothing left on it.
-    await c.env.DB.batch([
-      c.env.DB.prepare(
-        "INSERT INTO teams (id, team_number, name, created_at, updated_at) SELECT ?2, ?3, name, created_at, ?4 FROM teams WHERE id = ?1",
-      ).bind(id, newId, teamNumber, now),
-      ...TEAM_TABLES.map((table) =>
-        c.env.DB.prepare(`UPDATE ${table} SET team_id = ?2 WHERE team_id = ?1`).bind(id, newId),
-      ),
-      c.env.DB.prepare("DELETE FROM teams WHERE id = ?1").bind(id),
-    ]);
-    return c.json({ moved: true });
   })
   // An operator hands a team to one of its members: they become an active admin. The previous
   // owner stays an admin unless `demoteUserId` names them.

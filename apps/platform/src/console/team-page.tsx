@@ -6,7 +6,7 @@ import { ReportCard } from "./reports-page";
 import { Notice, Panel, StatusBadge, buttonClass, fieldClass } from "./shell";
 
 // One team: its details and members, the reports against its number, what operators have done to
-// it, and the tools for a number claimed wrongly (hand it over, renumber, suspend, delete).
+// it, and the tools for a number claimed wrongly (hand it over, suspend, delete; a wrong number is deleted and signed up again).
 
 export function TeamPage() {
   const { id = "" } = useParams();
@@ -108,19 +108,6 @@ export function TeamPage() {
                 status: team.status === "suspended" ? "active" : "suspended",
               }).then(detail.reload)
             }
-          />
-        )}
-        {!team.isSite && (
-          <Renumber
-            current={team.teamNumber}
-            onSubmit={async (reason, teamNumber) => {
-              const { id: newId } = await send<{ id: string }>(
-                "POST",
-                `/teams/${team.id}/renumber`,
-                { reason, teamNumber },
-              );
-              navigate(`/console/teams/${newId}`, { replace: true });
-            }}
           />
         )}
         {!team.isSite && (
@@ -260,34 +247,6 @@ function TransferOwner({
           Keep {team.team.owner.name} an admin
         </label>
       )}
-    </ActionForm>
-  );
-}
-
-function Renumber({
-  current,
-  onSubmit,
-}: {
-  current: number;
-  onSubmit: (reason: string, teamNumber: number) => Promise<void>;
-}) {
-  const [number, setNumber] = useState("");
-  return (
-    <ActionForm
-      title="Change the team number"
-      description={`Moves the team from ${current} to its real number. Its accounts, Slack and kiosks stay; its addresses change, and ${current} is free again.`}
-      button="Change number"
-      onSubmit={(reason) => onSubmit(reason, Number(number))}
-    >
-      <input
-        required
-        inputMode="numeric"
-        pattern="[0-9]*"
-        value={number}
-        onChange={(e) => setNumber(e.target.value)}
-        placeholder="New team number"
-        className={fieldClass}
-      />
     </ActionForm>
   );
 }

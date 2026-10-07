@@ -25,6 +25,7 @@ function describe(action: Action): string {
       return "Looked at the team's members";
     case "delete_team":
       return `Deleted team ${str(d.teamNumber)} (${str(d.name)}) and ${str(d.deletedAccounts)} accounts`;
+    // Renumbering was removed; kept so a past log row still reads.
     case "renumber_team":
       return `Changed team ${str(d.from)} to ${str(d.to)}`;
     case "transfer_owner":

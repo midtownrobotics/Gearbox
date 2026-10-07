@@ -181,7 +181,7 @@ describe("teams", () => {
     expect(signup.status).toBe(201);
   });
 
-  it("won't delete, renumber or suspend the site's own team", async () => {
+  it("won't delete or suspend the site's own team", async () => {
     const reason = "Testing";
     expect(
       (
@@ -193,44 +193,12 @@ describe("teams", () => {
     ).toBe(409);
     expect(
       (
-        await call(operator, `/teams/${teamKey}/renumber`, {
-          method: "POST",
-          body: { reason, teamNumber: newNumber() },
-        })
-      ).status,
-    ).toBe(409);
-    expect(
-      (
         await call(operator, `/teams/${teamKey}/status`, {
           method: "POST",
           body: { reason, status: "suspended" },
         })
       ).status,
     ).toBe(409);
-  });
-
-  it("renumbers a team, taking its log with it", async () => {
-    const { id, number } = await createTeam();
-    const taken = await createTeam();
-    const renumber = (teamNumber: number) =>
-      call(operator, `/teams/${id}/renumber`, {
-        method: "POST",
-        body: { reason: "They typed the wrong number", teamNumber },
-      });
-    expect((await renumber(taken.number)).status).toBe(409);
-
-    const next = newNumber();
-    expect(await (await renumber(next)).json()).toEqual({ id: `frc${next}` });
-    expect(await row("SELECT id FROM teams WHERE team_number = ?", number)).toBeNull();
-    expect(await row("SELECT status FROM teams WHERE id = ?", `frc${next}`)).toEqual({
-      status: "active",
-    });
-    const logged = await lastAction(`frc${next}`);
-    expect(logged?.action).toBe("renumber_team");
-    expect(JSON.parse(logged?.details as string)).toEqual({ from: number, to: next });
-    // Its addresses answer under the new number only.
-    expect((await exports.default.fetch(`http://platform/api/teams/frc${next}`)).status).toBe(200);
-    expect((await exports.default.fetch(`http://platform/api/teams/${id}`)).status).toBe(404);
   });
 
   it("hands a team to another member", async () => {
