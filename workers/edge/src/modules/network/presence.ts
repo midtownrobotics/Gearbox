@@ -3,6 +3,7 @@ import { sql } from "drizzle-orm";
 import type { EdgeDb } from "../../db";
 import { netClients } from "../../db/schema";
 import { AGENT_TOO_OLD, AgentError, agentFetch } from "../../lib/agent";
+import { chunk, rowsPerInsert } from "../../lib/d1";
 import type { AppEnv } from "../../types";
 import type { PresenceResponse } from "./presence-types";
 
@@ -43,10 +44,9 @@ export async function livePresence(
   }
 
   const online = body.clients.filter((c) => c.online && typeof c.mac === "string");
-  // D1 allows 100 bound parameters per statement: 6 per row.
   const statements = [];
-  for (let i = 0; i < online.length; i += 15) {
-    const rows = online.slice(i, i + 15).map((c) => ({
+  for (const group of chunk(online, rowsPerInsert(netClients))) {
+    const rows = group.map((c) => ({
       mac: c.mac.slice(0, 64),
       hostname: c.hostname?.slice(0, 255) ?? null,
       lastIp: c.ip.slice(0, 255),

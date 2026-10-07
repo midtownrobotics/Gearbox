@@ -135,4 +135,26 @@ describe("agent key", () => {
       ).status,
     ).toBe(400);
   });
+
+  it("stores a push with more clients than fit in one D1 statement", async () => {
+    const bucket = Math.floor(Date.now() / 1000 / 300) * 300;
+    const macs = Array.from(
+      { length: 40 },
+      (_, i) => `02:00:00:00:01:${i.toString(16).padStart(2, "0")}`,
+    );
+    const res = await agent("/agent/network/usage", {
+      method: "POST",
+      body: JSON.stringify({
+        samples: macs.map((mac) => [bucket, mac, 100, 10]),
+        clients: macs.map((mac, i) => ({
+          mac,
+          hostname: `device-${i}`,
+          ip: `192.168.50.${100 + i}`,
+        })),
+      }),
+    });
+    expect(res.status).toBe(200);
+    const list = await jsonAs<{ clients: { mac: string }[] }>(student, "/network/clients");
+    for (const mac of macs) expect(list.clients.some((c) => c.mac === mac)).toBe(true);
+  });
 });

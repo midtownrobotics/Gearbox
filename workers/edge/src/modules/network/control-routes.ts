@@ -13,6 +13,7 @@ import {
   netSettings,
 } from "../../db/schema";
 import { writeAudit } from "../../lib/audit";
+import { chunk, rowsPerInsert } from "../../lib/d1";
 import type { AppEnv } from "../../types";
 import { getSettings, teamTimeZone } from "./common";
 import { clientName } from "./common";
@@ -59,10 +60,9 @@ function replaceDomains(db: EdgeDb, teamId: string, blocklistId: number, domains
       .delete(netBlocklistDomains)
       .where(inTeam(netBlocklistDomains, teamId, eq(netBlocklistDomains.blocklistId, blocklistId))),
   ];
-  // D1 allows 100 bound parameters per statement: 3 per row.
-  for (let i = 0; i < domains.length; i += 30) {
-    const chunk = domains.slice(i, i + 30).map((domain) => ({ blocklistId, domain }));
-    statements.push(db.insert(netBlocklistDomains).values(withTeam(teamId, chunk)));
+  for (const group of chunk(domains, rowsPerInsert(netBlocklistDomains))) {
+    const rows = group.map((domain) => ({ blocklistId, domain }));
+    statements.push(db.insert(netBlocklistDomains).values(withTeam(teamId, rows)));
   }
   return statements;
 }
