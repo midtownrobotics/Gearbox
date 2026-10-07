@@ -26,7 +26,43 @@ import type { AppEnv } from "./types";
 // (site.ts) can't be deleted or suspended. A team's number is its id ("frc<number>") everywhere,
 // so it's never changed: a team that claimed the wrong number is deleted and signs up again.
 //
-// Deleting a team must also reach each app's data, now that it's per team (Phase 3).
+// Deleting a team deletes its data in every team-scoped app first (TEAM_APPS), then in G3ID.
+
+/** The team-scoped apps, by name and binding. Scouting's data isn't per team yet. */
+const TEAM_APPS = [
+  ["Attendance", "ATTENDANCE"],
+  ["Edge", "EDGE"],
+  ["Inventory", "INVENTORY"],
+  ["Orders", "ORDERS"],
+  ["Pit", "PIT"],
+  ["Shop", "SHOP"],
+  ["Skill Tree", "SKILL_TREE"],
+] as const satisfies readonly (readonly [string, keyof AppEnv["Bindings"]])[];
+
+/** Deletes the team's data in every team-scoped app. Gives back the apps that couldn't. */
+async function deleteAppData(env: AppEnv["Bindings"], teamId: string) {
+  const results = await Promise.all(
+    TEAM_APPS.map(async ([name, binding]) => {
+      try {
+        const res = await (env[binding] as Fetcher).fetch(
+          new Request(
+            `http://${binding.toLowerCase()}/api/internal/teams/${encodeURIComponent(teamId)}`,
+            {
+              method: "DELETE",
+            },
+          ),
+        );
+        if (!res.ok)
+          console.error("[console] deleting team data", name, res.status, await res.text());
+        return res.ok ? null : name;
+      } catch (err) {
+        console.error("[console] deleting team data", name, err);
+        return name;
+      }
+    }),
+  );
+  return results.filter((name): name is (typeof TEAM_APPS)[number][0] => name !== null);
+}
 
 type Member = {
   id: string;
@@ -263,6 +299,18 @@ export const consoleRouter = new Hono<AppEnv>()
       return c.json({ error: `Type ${team.teamNumber} to confirm.` }, 400);
     }
 
+    // Each app's data first: if one can't, nothing else goes, and deleting again finishes the job
+    // (an app with nothing left of the team answers OK).
+    const failed = await deleteAppData(c.env, team.id);
+    if (failed.length > 0) {
+      return c.json(
+        {
+          error: `Couldn't delete the team's data in ${failed.join(", ")}. Its accounts are untouched; try again.`,
+        },
+        502,
+      );
+    }
+
     const res = await g3id(c.env, `/teams/${team.id}`, { method: "DELETE" });
     if (!res.ok) return c.json({ error: await errorOf(res, "G3ID couldn't delete it.") }, 502);
     const { deletedUserIds } = (await res.json()) as { deletedUserIds: string[] };
@@ -281,6 +329,7 @@ export const consoleRouter = new Hono<AppEnv>()
         status: team.status,
         slackWorkspaceName: team.slackWorkspaceName,
         deletedAccounts: deletedUserIds.length,
+        apps: TEAM_APPS.map(([name]) => name),
       },
     });
     return c.json({ ok: true });

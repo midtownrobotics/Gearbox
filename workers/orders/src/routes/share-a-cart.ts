@@ -34,6 +34,7 @@ const settingsPage = (env: AppEnv["Bindings"], teamId: string, params: string) =
 const teamOf = (c: Context<AppEnv>, teamId = c.get("teamId")): Team => ({
   db: createOrdersDb(c.env.ORDERS_DB),
   teamId,
+  secretsKey: c.env.SECRETS_KEY,
 });
 
 /** The Amazon ASIN Share-A-Cart's `asin` field wants: from the product link, or the SKU. */

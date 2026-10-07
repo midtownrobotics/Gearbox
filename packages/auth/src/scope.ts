@@ -19,3 +19,19 @@ export function withTeam<T extends object>(teamId: string, values: T): T & { tea
 export function withTeam<T extends object>(teamId: string, values: T | T[]) {
   return Array.isArray(values) ? values.map((v) => ({ ...v, teamId })) : { ...values, teamId };
 }
+
+/**
+ * Deletes every row a team has in these tables, in one all-or-nothing batch, in the order given
+ * (children before the rows they point at). For an app's `DELETE /internal/teams/:teamId`, which
+ * the platform calls when an operator deletes a team.
+ */
+export async function deleteTeamRows(
+  // Any app's Drizzle database: only `delete` and `batch` are used.
+  // biome-ignore lint/suspicious/noExplicitAny: each app's Drizzle type differs
+  db: { delete(table: any): { where(where: SQL): unknown }; batch(queries: any): Promise<unknown> },
+  teamId: string,
+  tables: TeamTable[],
+) {
+  const [first, ...rest] = tables.map((table) => db.delete(table).where(inTeam(table, teamId)));
+  if (first) await db.batch([first, ...rest]);
+}

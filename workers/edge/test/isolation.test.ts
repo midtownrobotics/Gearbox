@@ -1,7 +1,7 @@
 import { env } from "cloudflare:test";
-import { type Seeded, checkIsolation } from "@g3/testing/isolation";
+import { type Seeded, checkIsolation, checkTeamDeletion } from "@g3/testing/isolation";
 import type { TeamUsers } from "@g3/testing/users";
-import { jsonAs } from "@g3/testing/worker";
+import { call, jsonAs } from "@g3/testing/worker";
 import { expect, it } from "vitest";
 import { app } from "../src/index";
 import { boxCall } from "./box";
@@ -140,3 +140,13 @@ it("keeps every team's box, network and browsing data to itself", async () => {
   expect(problems).toEqual([]);
   expect(requests).toBeGreaterThan(100);
 }, 120_000);
+
+it("deletes a team's data when an operator deletes the team, and only that team's", async () => {
+  const problems = await checkTeamDeletion({
+    seed,
+    snapshot,
+    // As the platform calls it, over the service binding (the gateway never answers /internal).
+    remove: (teamId) => call(`/internal/teams/${teamId}`, { method: "DELETE" }),
+  });
+  expect(problems).toEqual([]);
+}, 60_000);

@@ -10,6 +10,8 @@ export type AppEnv = {
     /** workers/inventory, where received parts can be put. Orders works without it. */
     INVENTORY?: Fetcher;
     ORDERS_DB: D1Database;
+    /** Encrypts each team's Share-A-Cart tokens in D1 (encryptSecret in @g3/auth). */
+    SECRETS_KEY?: string;
   };
   Variables: G3AuthVariables;
 };

@@ -1,4 +1,4 @@
-import { inTeam, requireAdmin, requireAuth, withTeam } from "@g3/auth";
+import { deleteTeamRows, inTeam, requireAdmin, requireAuth, withTeam } from "@g3/auth";
 import { corsOrigin } from "@g3/site-config";
 import { withApiPrefix } from "@g3/site-config/worker";
 import { eq, inArray, sql } from "drizzle-orm";
@@ -189,6 +189,18 @@ const listSelect = {
 const app = base
   .get("/health", (c) => c.json({ status: "ok", service: "pit", version: packageJson.version }))
 
+  // When an operator deletes the team (the platform's console), its data goes too. Only other
+  // workers reach /internal: the gateway never answers it.
+  .delete("/internal/teams/:teamId", async (c) => {
+    await deleteTeamRows(createDb(c.env.PIT_DB), c.req.param("teamId"), [
+      checklistIssues,
+      checklistItems,
+      checklistLists,
+      batteries,
+      settings,
+    ]);
+    return c.json({ ok: true });
+  })
   .get("/me", requireAuth, (c) =>
     c.json({
       id: c.get("userId"),

@@ -1,3 +1,4 @@
+import { decryptSecret, encryptSecret } from "@g3/auth";
 import type { OrdersDb } from "../db";
 import { deleteSetting, getSetting, putSetting, settingsLike } from "./settings";
 
@@ -33,16 +34,30 @@ export type SacAuth = {
 
 export class SacError extends Error {}
 
-/** One team's settings. */
-export type Team = { db: OrdersDb; teamId: string };
+/** One team's settings, and the worker's key for the secrets in them. */
+export type Team = { db: OrdersDb; teamId: string; secretsKey: string | undefined };
 
-async function getJson<T>({ db, teamId }: Team, key: string): Promise<T | null> {
-  const value = await getSetting(db, teamId, key);
-  return value === null ? null : (JSON.parse(value) as T);
+// The team's Share-A-Cart client, tokens and pending sign-ins are kept encrypted with the
+// worker's SECRETS_KEY (encryptSecret in @g3/auth). Rows saved before that are plain JSON: they're
+// still read, and saved again encrypted the first time.
+
+/** A stored value's JSON: decrypted, or as it is for one saved before encryption. */
+async function openValue<T>(team: Team, value: string): Promise<{ data: T; plain: boolean }> {
+  if (value.startsWith("{")) return { data: JSON.parse(value) as T, plain: true };
+  return { data: JSON.parse(await decryptSecret(value, team.secretsKey)) as T, plain: false };
 }
 
-async function putJson({ db, teamId }: Team, key: string, value: unknown) {
-  await putSetting(db, teamId, key, JSON.stringify(value));
+async function getJson<T>(team: Team, key: string): Promise<T | null> {
+  const value = await getSetting(team.db, team.teamId, key);
+  if (value === null) return null;
+  const { data, plain } = await openValue<T>(team, value);
+  if (plain && team.secretsKey) await putJson(team, key, data);
+  return data;
+}
+
+async function putJson(team: Team, key: string, value: unknown) {
+  const sealed = await encryptSecret(JSON.stringify(value), team.secretsKey);
+  await putSetting(team.db, team.teamId, key, sealed);
 }
 
 const b64url = (bytes: Uint8Array) =>
@@ -90,7 +105,7 @@ export async function startConnect(team: Team, redirectUri: string, userName: st
   );
   // Drop abandoned attempts, then remember this one.
   for (const p of await settingsLike(team.db, team.teamId, PENDING_PREFIX)) {
-    const { createdAt } = JSON.parse(p.value) as { createdAt: number };
+    const { createdAt } = (await openValue<{ createdAt: number }>(team, p.value)).data;
     if (Date.now() - createdAt > PENDING_TTL_MS) await deleteSetting(team.db, team.teamId, p.key);
   }
   await putJson(team, PENDING_PREFIX + state, { verifier, userName, createdAt: Date.now() });

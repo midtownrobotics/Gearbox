@@ -1,10 +1,17 @@
-import { activeMembers, requireAuth } from "@g3/auth";
+import { activeMembers, deleteTeamRows, requireAuth } from "@g3/auth";
 import { corsOrigin } from "@g3/site-config";
 import { withApiPrefix } from "@g3/site-config/worker";
+import { drizzle } from "drizzle-orm/d1";
 import { type Context, Hono } from "hono";
 import { cors } from "hono/cors";
 import packageJson from "../package.json";
 import { AttendanceDb, teamsWithOpenSessions } from "./db";
+import {
+  attendanceMembers,
+  attendanceSessions,
+  attendanceSettings,
+  attendanceTotals,
+} from "./db/schema";
 import { type AttendanceSettings, autoSignOutMs, parseSettings, schoolYear } from "./settings";
 import { currentWindow, validateToken } from "./token";
 import type { AppEnv } from "./types";
@@ -228,6 +235,17 @@ const app = base
   )
 
   // Who am I — used by the scanned page to show "Sign in as <name>".
+  // When an operator deletes the team (the platform's console), its data goes too. Only other
+  // workers reach /internal: the gateway never answers it.
+  .delete("/internal/teams/:teamId", async (c) => {
+    await deleteTeamRows(drizzle(c.env.ATTENDANCE_DB), c.req.param("teamId"), [
+      attendanceSessions,
+      attendanceTotals,
+      attendanceMembers,
+      attendanceSettings,
+    ]);
+    return c.json({ ok: true });
+  })
   .get("/me", requireAuth, (c) =>
     c.json({
       id: c.get("userId"),

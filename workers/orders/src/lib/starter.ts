@@ -84,6 +84,11 @@ export async function ensureCatalog(db: OrdersDb, teamId: string) {
   loaded.add(teamId);
 }
 
+/** Forgets that the team has its catalog (its data was deleted). */
+export function forgetCatalog(teamId: string) {
+  loaded.delete(teamId);
+}
+
 /** Makes sure the team has its catalog before the route reads it. Goes after requireAuth. */
 export const catalogReady = createMiddleware<AppEnv>(async (c, next) => {
   await ensureCatalog(createOrdersDb(c.env.ORDERS_DB), c.get("teamId"));

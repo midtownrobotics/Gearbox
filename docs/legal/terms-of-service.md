@@ -37,7 +37,7 @@ When you create a team you confirm that:
 - your team has whatever permission its school, organization or members' parents require for members to use Gearbox; and
 - the information you give us is accurate.
 
-Each team number can be registered once. If a team is registered under a number that is not its own, we may transfer that team to the rightful team's representative, change its number, or delete it. Where we reasonably can, we will tell the team owner first and allow time to export the team's data.
+Each team number can be registered once. If a team is registered under a number that is not its own, we may transfer that team to the rightful team's representative or delete it (a team registered under the wrong number signs up again under its own). Where we reasonably can, we will tell the team owner first and allow time to export the team's data.
 
 ## 4. Members and accounts
 

@@ -118,6 +118,11 @@ Right after the release:
 - **Secret:** delete the edge worker's `EDGE_AGENT_KEY` secret (`wrangler secret delete EDGE_AGENT_KEY --env production` in `workers/edge`); nothing reads it.
 - **Another team's box:** an admin makes its key on the Edge app's Edge Box page and puts it in the box's `agent.env` with `EDGE_WORKER_URL=https://<number>-edge.frcgearbox.com/api`.
 
+## Deleting teams and Share-A-Cart secrets (once, roadmap Phase 3)
+
+- **Orders:** before deploying, set its encryption key: `wrangler secret put SECRETS_KEY --env production` in `workers/orders` (`openssl rand -base64 32`; keep it). G3's Share-A-Cart connection is encrypted the first time it's used; without the key, Share-A-Cart stops working.
+- **Platform:** its worker now binds every team-scoped app (to delete a team's data in each), so deploy it after them; `pnpm run deploy` deploys the platform with the other workers, which all exist already.
+
 ## Portal's logo (once, roadmap Phase 3)
 
 Portal no longer has G3's logo built in. After the release, a G3ID admin sets G3's logo URL on G3ID's Admin → Team Appearance page (an https link to the image, e.g. on G3's public site); until then Portal's public-site tile shows a globe.

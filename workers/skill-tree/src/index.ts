@@ -1,9 +1,11 @@
-import { hasMentorAccess, requireAuth } from "@g3/auth";
+import { deleteTeamRows, hasMentorAccess, requireAuth } from "@g3/auth";
 import { corsOrigin } from "@g3/site-config";
 import { withApiPrefix } from "@g3/site-config/worker";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import packageJson from "../package.json";
+import { createDb } from "./db";
+import { treeSets } from "./db/schema";
 import { progressRouter, studentsRouter } from "./routes/students";
 import { categoriesRouter, skillsRouter, treesRouter } from "./routes/trees";
 import type { AppEnv } from "./types";
@@ -29,6 +31,13 @@ const app = base
   .get("/health", (c) =>
     c.json({ status: "ok", service: "skill-tree", version: packageJson.version }),
   )
+  // When an operator deletes the team (the platform's console), its data goes too. Only other
+  // workers reach /internal: the gateway never answers it.
+  .delete("/internal/teams/:teamId", async (c) => {
+    // Everything else hangs off the team's tree set and goes with it (ON DELETE CASCADE).
+    await deleteTeamRows(createDb(c.env.SKILL_DB), c.req.param("teamId"), [treeSets]);
+    return c.json({ ok: true });
+  })
   .get("/me", requireAuth, (c) =>
     c.json({
       userId: c.get("userId"),

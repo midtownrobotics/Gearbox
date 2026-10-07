@@ -264,3 +264,39 @@ describe("approval messages", () => {
     expect(dm.text).toContain(`${team.teamId.replace("frc", "")}-orders.`);
   });
 });
+
+describe("Share-A-Cart", () => {
+  it("keeps the team's tokens encrypted, and encrypts ones saved before that", async () => {
+    const team = teamUsers(newTeamId());
+    const auth = {
+      accessToken: "secret-access-token",
+      refreshToken: "secret-refresh-token",
+      expiresAt: Date.now() + 3_600_000,
+      connectedBy: "Mentor",
+      connectedAt: 1,
+    };
+    // As a connection saved before encryption: plain JSON.
+    await database
+      .prepare("INSERT INTO app_settings (team_id, key, value) VALUES (?, 'sac_auth', ?)")
+      .bind(team.teamId, JSON.stringify(auth))
+      .run();
+    expect(await jsonAs(team.student, "/share-a-cart/status")).toMatchObject({
+      connected: true,
+      connectedBy: "Mentor",
+    });
+    const stored = await database
+      .prepare("SELECT value FROM app_settings WHERE team_id = ? AND key = 'sac_auth'")
+      .bind(team.teamId)
+      .first<{ value: string }>();
+    expect(stored?.value).not.toContain("secret-");
+    // Still reads as the same connection.
+    expect(await jsonAs(team.student, "/share-a-cart/status")).toMatchObject({
+      connected: true,
+      connectedBy: "Mentor",
+    });
+    // Another team doesn't see it.
+    expect(await jsonAs(teamUsers(newTeamId()).student, "/share-a-cart/status")).toMatchObject({
+      connected: false,
+    });
+  });
+});

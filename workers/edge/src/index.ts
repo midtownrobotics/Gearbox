@@ -13,6 +13,7 @@ import { teamTimeZone } from "./modules/network/common";
 import { printRouter } from "./modules/print/routes";
 import { switchRouter } from "./modules/switch/routes";
 import { boxRouter } from "./routes/box";
+import { internalRouter } from "./routes/internal";
 import { statusRouter } from "./routes/status";
 import type { AppEnv } from "./types";
 
@@ -62,7 +63,8 @@ const app = base
       new Request(`http://agent${CONNECT_PATH}`, c.req.raw),
     );
   })
-  .route("/agent/network", networkAgentRouter);
+  .route("/agent/network", networkAgentRouter)
+  .route("/internal", internalRouter);
 
 export type EdgeApp = typeof app;
 export { app };

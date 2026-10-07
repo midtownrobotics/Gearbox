@@ -48,6 +48,8 @@ export function routesOf(app: IsolationSpec["app"]) {
   const routes: { method: string; path: string }[] = [];
   for (const { method, path } of app.routes) {
     if (!METHODS.has(method) || path.includes("*")) continue;
+    // Only other workers reach /internal (the gateway never answers it): checkTeamDeletion tests it.
+    if (path === "/internal" || path.startsWith("/internal/")) continue;
     const key = `${method} ${path}`;
     if (seen.has(key)) continue;
     seen.add(key);
@@ -96,4 +98,44 @@ export async function checkIsolation(spec: IsolationSpec): Promise<IsolationResu
     }
   }
   return { requests, problems };
+}
+
+export type DeletionSpec = Pick<IsolationSpec, "seed" | "snapshot"> & {
+  /** Calls the app as the platform does when an operator deletes the team. */
+  remove(teamId: string): Promise<Response>;
+  /** What's left of a deleted team that's fine (its snapshot after), as a predicate. */
+  isEmpty?: (snapshot: unknown) => boolean;
+};
+
+/** Every value in a snapshot is an empty list (or an object of them). */
+export function emptySnapshot(value: unknown): boolean {
+  if (Array.isArray(value)) return value.length === 0;
+  if (value && typeof value === "object") return Object.values(value).every(emptySnapshot);
+  return true;
+}
+
+/**
+ * Deleting a team's data (`DELETE /internal/teams/:teamId`) leaves nothing of it and doesn't touch
+ * another team's. Gives back what went wrong, one line each.
+ */
+export async function checkTeamDeletion(spec: DeletionSpec): Promise<string[]> {
+  const a = teamUsers(newTeamId());
+  const b = teamUsers(newTeamId());
+  await spec.seed(a);
+  await spec.seed(b);
+  const before = JSON.stringify(await spec.snapshot(b.teamId));
+  const problems: string[] = [];
+  const res = await spec.remove(a.teamId);
+  if (!res.ok) problems.push(`deleting team A answered ${res.status}: ${await res.text()}`);
+  const left = await spec.snapshot(a.teamId);
+  if (!(spec.isEmpty ?? emptySnapshot)(left)) {
+    problems.push(`team A still has: ${JSON.stringify(left).slice(0, 500)}`);
+  }
+  if (JSON.stringify(await spec.snapshot(b.teamId)) !== before) {
+    problems.push("deleting team A changed team B's data");
+  }
+  // Deleting a team with nothing left (a retry) is fine too.
+  const again = await spec.remove(a.teamId);
+  if (!again.ok) problems.push(`deleting it again answered ${again.status}`);
+  return problems;
 }

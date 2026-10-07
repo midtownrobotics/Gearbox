@@ -31,7 +31,7 @@ export {
   sendTeamMessage,
   teamMembers,
 } from "./members";
-export { inTeam, withTeam } from "./scope";
+export { deleteTeamRows, inTeam, withTeam } from "./scope";
 export { decryptSecret, encryptSecret } from "./secret-box";
 
 /**

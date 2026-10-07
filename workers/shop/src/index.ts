@@ -10,6 +10,7 @@ import { type BOMQueueMessage, processBOMQueue } from "./lib/bom-queue-consumer"
 import { actionsRouter } from "./routes/actions";
 import { adminPartsRouter } from "./routes/admin-parts";
 import { drawingsRouter } from "./routes/drawings";
+import { internalRouter } from "./routes/internal";
 import { clearPresence, kioskPresenceRouter } from "./routes/kiosk-presence";
 import { onshapeExportRouter } from "./routes/onshape-export";
 import { onshapeWebhooksRouter } from "./routes/onshape-webhooks";
@@ -97,7 +98,8 @@ const app = base
   .route("/staging-batches", stagingBatchesRouter)
   .route("/actions", actionsRouter)
   .route("/kiosk-presence", kioskPresenceRouter)
-  .route("/admin", adminPartsRouter);
+  .route("/admin", adminPartsRouter)
+  .route("/internal", internalRouter);
 
 export type ShopApp = typeof app;
 export { app };
