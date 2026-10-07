@@ -1,5 +1,5 @@
 import { getUserInfo } from "@g3/slack";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq, gte, lt, sql } from "drizzle-orm";
 import { createDb } from "../db";
 import { coreSlackLinkCodes, coreUserIdentities, coreUsers } from "../db/schema";
 import type { AppEnv } from "../types";
@@ -19,31 +19,71 @@ export function generateToken(): string {
     .join("");
 }
 
+/** How long a code works. */
+const CODE_SECONDS = 900;
+/** Expired codes are deleted after this long; nothing polls them by then. */
+const KEEP_EXPIRED_SECONDS = 86400;
+/** A team has only a handful of live codes, so a free one turns up within a few tries. */
+const CODE_ATTEMPTS = 20;
+
+/**
+ * Stores a new sign-in or link code with its polling token. Codes are 4 digits and unique within
+ * a team, so old ones are cleared out first and a code that's taken is just drawn again: 10,000
+ * codes only go so far if every sign-in keeps one forever.
+ */
+async function insertCode(
+  db: ReturnType<typeof createDb>,
+  values: {
+    teamId: string;
+    userId: string | null;
+    type: "signin" | "link";
+    redirectUrl?: string | null;
+  },
+): Promise<{ code: string; token: string }> {
+  const now = Math.floor(Date.now() / 1000);
+  await db
+    .delete(coreSlackLinkCodes)
+    .where(lt(coreSlackLinkCodes.expiresAt, now - KEEP_EXPIRED_SECONDS));
+  const token = generateToken();
+  for (let attempt = 0; attempt < CODE_ATTEMPTS; attempt++) {
+    const code = generateCode();
+    const inserted = await db
+      .insert(coreSlackLinkCodes)
+      .values({
+        id: newId(),
+        ...values,
+        code,
+        pollingToken: token,
+        expiresAt: now + CODE_SECONDS,
+        used: 0,
+        createdAt: now,
+      })
+      .onConflictDoNothing()
+      .returning({ id: coreSlackLinkCodes.id });
+    if (inserted.length > 0) return { code, token };
+  }
+  throw new Error("No free Slack code; too many are in use for this team.");
+}
+
 /**
  * A code someone sends to the team's Slack bot to sign in (or, for a team with no members yet, to
  * become its first admin), and the token their page polls with. Valid for 15 minutes.
  */
-export async function createSigninCode(
+export function createSigninCode(
   db: ReturnType<typeof createDb>,
   teamId: string,
   redirect: string | null,
 ): Promise<{ code: string; token: string }> {
-  const code = generateCode();
-  const token = generateToken();
-  const now = Math.floor(Date.now() / 1000);
-  await db.insert(coreSlackLinkCodes).values({
-    id: newId(),
-    teamId,
-    userId: null,
-    code,
-    type: "signin",
-    pollingToken: token,
-    redirectUrl: redirect,
-    expiresAt: now + 900,
-    used: 0,
-    createdAt: now,
-  });
-  return { code, token };
+  return insertCode(db, { teamId, userId: null, type: "signin", redirectUrl: redirect });
+}
+
+/** A code a signed-in member sends to the bot to link their Slack account. Valid for 15 minutes. */
+export function createLinkCode(
+  db: ReturnType<typeof createDb>,
+  teamId: string,
+  userId: string,
+): Promise<{ code: string; token: string }> {
+  return insertCode(db, { teamId, userId, type: "link" });
 }
 
 type HandleResult = {
@@ -96,10 +136,20 @@ export async function handleSlackCode(opts: {
 
   const db = createDb(env.DB);
 
+  // Codes are unique within a team, so another team may have a live one with the same digits:
+  // prefer this workspace's own, and fall back to another team's only to say so.
   const record = await db
     .select()
     .from(coreSlackLinkCodes)
-    .where(and(eq(coreSlackLinkCodes.code, code), eq(coreSlackLinkCodes.type, type)))
+    .where(
+      and(
+        eq(coreSlackLinkCodes.code, code),
+        eq(coreSlackLinkCodes.type, type),
+        eq(coreSlackLinkCodes.used, 0),
+        gte(coreSlackLinkCodes.expiresAt, now),
+      ),
+    )
+    .orderBy(desc(sql`${coreSlackLinkCodes.teamId} = ${workspaceTeam}`))
     .get();
 
   if (!record || record.used || record.expiresAt < now) {

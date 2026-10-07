@@ -100,7 +100,8 @@ export const coreSlackLinkCodes = sqliteTable(
       .notNull()
       .references(() => teams.id),
     userId: text("user_id").references(() => coreUsers.id), // null for signin codes
-    code: text("code").notNull().unique(),
+    /** 4 digits, unique within the team (migration 0015); expired codes are deleted after a day. */
+    code: text("code").notNull(),
     type: text("type").notNull(),
     pollingToken: text("polling_token"),
     redirectUrl: text("redirect_url"), // where to redirect after successful auth
@@ -112,6 +113,7 @@ export const coreSlackLinkCodes = sqliteTable(
     createdAt: integer("created_at").notNull(),
   },
   (table) => [
+    unique().on(table.teamId, table.code),
     check("core_slack_link_codes_type_check", sql`${table.type} IN ('signin', 'link')`),
     check(
       "core_slack_link_codes_status_check",
