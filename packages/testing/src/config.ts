@@ -143,6 +143,9 @@ export function workerTestConfig(options: WorkerTestOptions = {}) {
       test: {
         include: ["test/**/*.test.ts"],
         setupFiles: [fileURLToPath(new URL("./setup.ts", import.meta.url))],
+        // CI's runners are a few times slower than a dev machine, and a two-team isolation test
+        // makes a few hundred requests; 5 s (Vitest's default) isn't always enough there.
+        testTimeout: 30_000,
       },
     };
   });
