@@ -9,6 +9,8 @@
 //   - a Drizzle `from`/`update`/`delete`/join on a team table whose statement has no `inTeam(`,
 //     or an `insert` into one with no `withTeam(`;
 //   - a `sql` template that names a team table.
+// A query that must read every team's rows (a cron job finding which teams to work on) goes on the
+// line after a `// tenancy: all teams (<why>)` comment, which a reviewer can see and question.
 // An app joins this list when its Phase 3 pull request makes it team-scoped.
 
 import { readFileSync, readdirSync, statSync } from "node:fs";
@@ -24,7 +26,24 @@ type App = {
 const APPS: App[] = [
   // Every other table hangs off the team's tree set and is reached by the set's id.
   { dir: "workers/skill-tree", teamTables: { treeSets: "tree_sets" } },
+  {
+    dir: "workers/attendance",
+    teamTables: {
+      attendanceMembers: "attendance_members",
+      attendanceSessions: "attendance_sessions",
+      attendanceTotals: "attendance_totals",
+      attendanceSettings: "attendance_settings",
+    },
+  },
 ];
+
+/** A `// tenancy: all teams (…)` comment on one of the few lines above the node's statement. */
+function allTeamsAllowed(text: string, line: number) {
+  const lines = text.split("\n");
+  return lines
+    .slice(Math.max(0, line - 3), line)
+    .some((l) => /\/\/\s*tenancy: all teams \(.+\)/.test(l));
+}
 
 const SCOPED = new Set(["from", "update", "delete", "innerJoin", "leftJoin", "rightJoin"]);
 const root = new URL("..", import.meta.url).pathname;
@@ -71,7 +90,10 @@ for (const app of APPS) {
         if (method === "prepare") {
           problems.push(`${at(node)}: raw D1 query; use Drizzle with inTeam/withTeam`);
         } else if (first && ts.isIdentifier(first) && first.text in tables) {
-          const statement = chainOf(node).getText(source);
+          const chain = chainOf(node);
+          const statement = chain.getText(source);
+          const { line } = source.getLineAndCharacterOfPosition(chain.getStart());
+          if (allTeamsAllowed(text, line)) return ts.forEachChild(node, visit);
           if (method === "insert" && !statement.includes("withTeam(")) {
             problems.push(`${at(node)}: insert into ${first.text} without withTeam()`);
           } else if (SCOPED.has(method) && !statement.includes("inTeam(")) {

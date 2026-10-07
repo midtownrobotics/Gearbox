@@ -136,8 +136,6 @@ export default function ConfirmPage({ action, w }: Props) {
 
   return (
     <div className={`select select--${variant}`}>
-      <div className="scanlines" aria-hidden="true" />
-
       <div className="select__inner">
         {status.kind === "loading" && (
           <div className="select__state">
