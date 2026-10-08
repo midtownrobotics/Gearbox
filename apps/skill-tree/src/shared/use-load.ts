@@ -8,19 +8,19 @@ export function useLoad<T>(load: () => Promise<T>, deps: DependencyList) {
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: callers pass their own deps
   useEffect(() => {
-    let cancelled = false;
+    let canceled = false;
     load()
       .then((value) => {
-        if (!cancelled) {
+        if (!canceled) {
           setData(value);
           setError(null);
         }
       })
       .catch((err: unknown) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : String(err));
+        if (!canceled) setError(err instanceof Error ? err.message : String(err));
       });
     return () => {
-      cancelled = true;
+      canceled = true;
     };
   }, [...deps, version]);
 

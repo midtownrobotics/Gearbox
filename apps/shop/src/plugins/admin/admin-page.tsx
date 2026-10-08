@@ -161,8 +161,7 @@ export function AdminPage() {
             {deletingObsolete ? "Deleting…" : "Delete Obsolete Instances"}
           </button>
           <p className="text-xs text-steel mt-2">
-            Permanently removes all part instances marked as obsolete from previous Edit & Obsolete
-            operations. This frees up instance numbers for reuse.
+            Permanently removes all obsolete part instances, freeing their numbers for reuse.
           </p>
         </Section>
 
@@ -193,10 +192,9 @@ function KioskModeSettings() {
   return (
     <div className="space-y-3 max-w-xl">
       <p className="text-sm text-steel-dark">
-        Kiosk mode turns this device into a shared shop-floor station. It logs out the current
-        account, sends the device through {names.idName} kiosk activation, and users then sign in
-        with their 3-digit PIN. Name the kiosk after a machine (e.g. a process like “Mill”) and the
-        app will auto-open that machine's queue and show machine-specific stats.
+        Kiosk mode makes this device a shared station where members sign in with their 3-digit PIN.
+        It signs you out and takes the device through {names.idName} kiosk activation. Name the
+        kiosk after a machine (“Mill”) to open that machine's queue.
       </p>
       {confirming ? (
         <div className="flex flex-wrap items-center gap-2">
@@ -587,8 +585,7 @@ function OnShapeConfig() {
 
       {status?.fromWorkerSecrets && (
         <p className="text-xs text-steel">
-          Using the keys this deployment had before teams. Save the team's own keys here to replace
-          them.
+          Using the built-in keys. Save your team's own to replace them.
         </p>
       )}
 
@@ -905,8 +902,7 @@ function SlackSettings() {
           className="w-full bg-paper border border-steel/40 rounded-lg px-3 py-2 text-sm text-ink placeholder-steel focus:outline-none focus:border-crimson"
         />
         <p className="text-xs text-steel">
-          The Slack channel ID where release notifications are sent. Find it by clicking on the
-          channel name in Slack.
+          Channel ID for release notifications. Click the channel's name in Slack to find it.
         </p>
       </div>
 

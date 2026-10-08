@@ -90,20 +90,20 @@ export type TeamUiColors = {
   text: string;
   muted: string;
   /**
-   * The team's colour in this theme. The light accent is also its brand colour (`brandColor`):
+   * The team's color in this theme. The light accent is also its brand color (`brandColor`):
    * buttons, links and app icons take it in both themes.
    */
   accent: string;
 };
 
 /**
- * The brand colour built into the apps: what the primary palette (`packages/ui/src/index.css`)
+ * The brand color built into the apps: what the primary palette (`packages/ui/src/index.css`)
  * and the app icon files are drawn in.
  */
 export const builtInBrandColor = "#a32035";
 
 /**
- * A team's brand colour, for the primary palette and the app icons: its light accent. A team
+ * A team's brand color, for the primary palette and the app icons: its light accent. A team
  * that keeps the default accent keeps the built-in palette and icons exactly as drawn.
  */
 export function brandColor(settings: Pick<TeamUiSettings, "light">): string {
@@ -151,7 +151,7 @@ export const defaultTeamUiSettings: TeamUiSettings = {
 /**
  * A team's appearance before its admins change anything: the site team's from site.ts (above), and
  * for any other team its own name, its number as the short name ("254 SHOP"), the FRC links for its
- * number, and the shared colours. `name` is the team's registered name, when known.
+ * number, and the shared colors. `name` is the team's registered name, when known.
  */
 export function teamUiDefaults(teamId: string, name?: string): TeamUiSettings {
   if (teamId === `frc${site.team.number}`) return defaultTeamUiSettings;

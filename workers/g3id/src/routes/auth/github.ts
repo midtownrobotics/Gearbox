@@ -176,7 +176,7 @@ export const githubAuthRouter = new Hono<AppEnv>()
 
     const err = (msg: string) => c.redirect(app(`/login/error?error=${encodeURIComponent(msg)}`));
 
-    if (oauthError) return err("Sign-in was cancelled or denied.");
+    if (oauthError) return err("Sign-in was canceled or denied.");
     if (!code || !state) return err("Missing code or state.");
 
     const stateValue = await verifyState(c.env, state);

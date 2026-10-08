@@ -93,7 +93,7 @@ export function OverviewPage() {
             ))}
             <li
               className="py-2 flex items-center gap-3 text-secondary-500"
-              title={`Product pages the edge box fetched for ${names.appTitle("Orders")} part lookups (each link is cached for 7 days).`}
+              title={`Product pages fetched for ${names.appTitle("Orders")} part lookups.`}
             >
               <span className="italic">Part lookups ({names.appTitle("Orders")})</span>
               <ShareBar share={(data.lookups.dl + data.lookups.ul) / Math.max(1, used)} />
@@ -103,7 +103,7 @@ export function OverviewPage() {
             </li>
             <li
               className="py-2 flex items-center gap-3 text-secondary-500"
-              title="WAN traffic not attributed to a LAN client or part lookups: the edge box itself and protocol overhead."
+              title="Traffic from the box itself and network overhead."
             >
               <span className="italic">Edge box &amp; overhead</span>
               <ShareBar share={data.unattributed / Math.max(1, used)} />

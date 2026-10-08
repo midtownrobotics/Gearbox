@@ -158,7 +158,7 @@ export function DashboardPage() {
     }
 
     const confirmed = window.confirm(
-      `Unlink ${PROVIDER_LABELS[provider] ?? provider}? You'll no longer be able to sign in with this method.`,
+      `Unlink ${PROVIDER_LABELS[provider] ?? provider}? You won't be able to sign in with it.`,
     );
     if (!confirmed) return;
 

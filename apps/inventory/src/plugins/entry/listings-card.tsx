@@ -277,8 +277,7 @@ function SplitDialog({
     <Dialog title="Split off a listing" onClose={onClose}>
       <form onSubmit={split} className="space-y-4">
         <p className="text-sm text-secondary-600">
-          This listing becomes its own entry, with the same details. Say how many of the parts go
-          with it.
+          The listing becomes its own entry. Say how many parts go with it.
         </p>
         <Field label="The new entry's name">
           <input
@@ -336,7 +335,7 @@ export function ListingsCard({
     <Card title="Vendor listings">
       {item.listings.length === 0 ? (
         <p className="text-sm text-secondary-500">
-          No listings yet. Add the part it's bought as to see its product page and price here.
+          No listings yet. Add one to see its product page and price.
         </p>
       ) : (
         <ul className="space-y-3">
@@ -353,9 +352,7 @@ export function ListingsCard({
         </ul>
       )}
       {item.listings.length > 1 && (
-        <p className="mt-3 text-xs text-secondary-500">
-          These are counted together as one entry: equivalent parts, whoever they came from.
-        </p>
+        <p className="mt-3 text-xs text-secondary-500">Equivalent parts, counted together.</p>
       )}
       <div className="mt-4">
         <Button variant="secondary" onClick={() => setAdding(true)}>

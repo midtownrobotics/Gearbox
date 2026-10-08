@@ -16,7 +16,7 @@
 | **Attendance** | Kiosk sign-in and sign-out, with season hours. |
 | **Edge** | G3's own app for the shop's network box (printing, network usage, a shared drive). Not part of the platform other teams get. |
 
-Each team has its own address for every app, its own sign-in through its own Slack workspace, and its own name, colours, logo and links, set by its admins.
+Each team has its own address for every app, its own sign-in through its own Slack workspace, and its own name, colors, logo and links, set by its admins.
 
 ## Using it
 

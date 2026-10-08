@@ -64,8 +64,7 @@ export function StatusPage() {
             </div>
             {!agent.online && (
               <p className="text-sm text-secondary-500 mt-4">
-                The box keeps routing and enforcing its last settings while offline, and uploads
-                buffered usage and picks up changes when it reconnects.
+                While offline, the box keeps its last settings and catches up when it reconnects.
               </p>
             )}
           </>
@@ -158,7 +157,7 @@ const LINK_STATES = {
   connected: {
     dot: "bg-emerald-500",
     label: "Connected",
-    hint: "The box keeps a connection open to the worker, so printing, part lookups and changes made here reach it within seconds.",
+    hint: "Printing, part lookups and changes reach the box within seconds.",
   },
   not_answering: {
     dot: "bg-amber-400",
@@ -168,7 +167,7 @@ const LINK_STATES = {
   offline: {
     dot: "bg-secondary-300",
     label: "Not connected",
-    hint: "The box isn't connected (offline, hotspot down, or the agent stopped). It reconnects by itself, and picks up changes within 5 minutes of coming back.",
+    hint: "The box isn't connected. It reconnects by itself and picks up changes within 5 minutes.",
   },
 } as const;
 
@@ -272,15 +271,13 @@ function AddressesCard({
             <p className="font-mono break-all text-lg text-secondary-900 mt-1">{publicIp}</p>
             {publicIpSince && (
               <p className="text-xs text-secondary-400 mt-0.5">
-                Since {formatDateTime(publicIpSince)}. The carrier can change it, and other
-                customers may share it.
+                Since {formatDateTime(publicIpSince)}. The carrier can change it or share it with
+                others.
               </p>
             )}
           </>
         ) : (
-          <p className="text-sm text-secondary-500 mt-1">
-            Not known yet; it's recorded at the box's next upload.
-          </p>
+          <p className="text-sm text-secondary-500 mt-1">Not known yet.</p>
         )}
       </div>
       {error && <ErrorBanner message={error} />}

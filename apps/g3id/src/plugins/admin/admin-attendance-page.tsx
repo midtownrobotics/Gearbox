@@ -86,8 +86,8 @@ function AttendanceSettingsCard() {
     <section className="bg-surface border border-secondary-200 rounded-lg p-4 mb-8">
       <h2 className="text-lg font-bold text-secondary-900 mb-1">Settings</h2>
       <p className="text-sm text-secondary-600 mb-4">
-        Hours are counted per school year. A session still open after the auto sign-out limit is
-        closed and doesn't count.
+        Hours count per school year. A session left open past the auto sign-out limit is closed and
+        doesn't count.
       </p>
       <div className="flex flex-wrap items-end gap-4">
         <label className="text-sm text-secondary-700">

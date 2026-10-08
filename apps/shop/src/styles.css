@@ -1,9 +1,9 @@
 @import "@g3/ui/index.css";
 @import "tailwindcss";
 
-/* Shop's own names for the team's colours (Team Appearance, loaded by @g3/ui): crimson is the
-   brand colour, ink text, paper cards, steel muted text and mist the page. They follow the team
-   and the theme; nothing here is a fixed colour. */
+/* Shop's own names for the team's colors (Team Appearance, loaded by @g3/ui): crimson is the
+   brand color, ink text, paper cards, steel muted text and mist the page. They follow the team
+   and the theme; nothing here is a fixed color. */
 @theme {
   --color-crimson: var(--g3-brand);
   --color-crimson-dark: color-mix(in srgb, var(--g3-brand), black 18%);
@@ -16,9 +16,9 @@
   --color-mist: var(--g3-page);
 }
 
-/* On a dark surface the tint is the brand colour sunk into the page, muted text is a little
-   lighter, and text in the brand colour takes the dark accent. Solid crimson fills keep the brand
-   colour, so their white text stays readable. */
+/* On a dark surface the tint is the brand color sunk into the page, muted text is a little
+   lighter, and text in the brand color takes the dark accent. Solid crimson fills keep the brand
+   color, so their white text stays readable. */
 html[data-theme="dark"] {
   --color-crimson-tint: color-mix(in srgb, var(--g3-brand), var(--g3-page) 75%);
   --color-steel-dark: color-mix(in srgb, var(--g3-muted), var(--g3-text) 25%);

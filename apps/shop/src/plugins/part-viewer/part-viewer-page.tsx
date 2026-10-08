@@ -178,7 +178,7 @@ export function PartViewerPage() {
                 <span className="font-mono text-primary-600">{partNumber}</span>
               </p>
               <p className="text-xs text-gray-600 mt-2">
-                Upload a PDF drawing file for this part. This will replace any existing drawing.
+                Upload a PDF drawing. It replaces any existing one.
               </p>
             </div>
             <form onSubmit={handleUpload} className="space-y-3">

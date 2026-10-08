@@ -1118,7 +1118,7 @@ function ManualModeManager() {
     setMessage("");
     try {
       await api("/manual-schedule", { method: "PUT", body: JSON.stringify(schedule) });
-      setMessage("Manual schedule saved. It is now active everywhere scouting uses match data.");
+      setMessage("Manual schedule saved.");
       await load();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not save schedule.");
@@ -1195,13 +1195,9 @@ function ManualModeManager() {
           Switch back to TBA mode
         </button>
       </header>
-      <p>
-        This temporary schedule will be automatically deleted three days after the competition ends.
-      </p>
+      <p>This schedule is deleted three days after the competition ends.</p>
       <p className="manual-scan-help">
-        Upload schedule pages or photos. Long and side-by-side screenshots are automatically split
-        into overlapping sections for better recognition. The scan never goes live until you review
-        and save it.
+        Upload schedule pages or photos. Nothing goes live until you review and save it.
       </p>
       <div className="manual-import">
         <input
@@ -1266,7 +1262,7 @@ function ManualModeManager() {
               setMessage(
                 result.warnings.length
                   ? `Found ${result.matches.length} matches. Some pages need attention: ${result.warnings.join(" ")}`
-                  : `Found ${result.matches.length} matches across ${result.pageCount} page${result.pageCount === 1 ? "" : "s"}${result.cachedPageCount ? ` (${result.cachedPageCount} reused without another AI request)` : ""}. Review them, then save.`,
+                  : `Found ${result.matches.length} matches across ${result.pageCount} page${result.pageCount === 1 ? "" : "s"}. Review them, then save.`,
               );
             } catch (error) {
               setMessage(

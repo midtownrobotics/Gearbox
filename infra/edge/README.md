@@ -32,7 +32,7 @@ You need [Bun](https://bun.sh), Node.js (for Corepack/pnpm) and an SSH client, t
 
 - **Ubuntu:** `curl -fsSL https://bun.sh/install | bash`, Node.js from your package manager or nvm, `sudo apt install openssh-client rsync`.
 - **macOS:** `brew install oven-sh/bun/bun node rsync` (ssh is built in).
-- **Windows:** install Bun (`powershell -c "irm bun.sh/install.ps1 | iex"`), Node.js, and the OpenSSH client (Settings → Optional features). Open a new PowerShell window afterwards so `bun`, `corepack`, `ssh` and `scp` are on `PATH`. Use `corepack pnpm` wherever this page says `pnpm`.
+- **Windows:** install Bun (`powershell -c "irm bun.sh/install.ps1 | iex"`), Node.js, and the OpenSSH client (Settings → Optional features). Open a new PowerShell window afterward so `bun`, `corepack`, `ssh` and `scp` are on `PATH`. Use `corepack pnpm` wherever this page says `pnpm`.
 
 The build cross-compiles a Linux ARM64 binary (about 80 MB) on any of these, so copy it over the shop LAN, not the hotspot.
 

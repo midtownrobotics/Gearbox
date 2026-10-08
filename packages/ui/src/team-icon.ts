@@ -1,16 +1,16 @@
 import { builtInBrandColor } from "@g3/site-config";
 
-// App icons in a team's colour. Every app's icon is a black tile with a white drawing and one
-// accent, drawn in the built-in brand colour. A team's brand colour (its light accent in Team
+// App icons in a team's color. Every app's icon is a black tile with a white drawing and one
+// accent, drawn in the built-in brand color. A team's brand color (its light accent in Team
 // Appearance) takes the accent's place: the icon's SVG is read, the accent swapped, and the result
 // used wherever the icon shows (the top bar, the browser tab, the home-screen icon, the app list's
-// tiles). The files themselves stay as they are, so a team with the default colour changes nothing.
+// tiles). The files themselves stay as they are, so a team with the default color changes nothing.
 
-/** The colour the icon files are drawn with. */
+/** The color the icon files are drawn with. */
 const ACCENT = builtInBrandColor;
 const ACCENT_IN_SVG = new RegExp(ACCENT, "gi");
 
-/** Whether a team's colour is the one the icons already have. */
+/** Whether a team's color is the one the icons already have. */
 export const isIconAccent = (color: string) => color.toLowerCase() === ACCENT;
 
 /** An icon's SVG with the accent swapped for `color`. */
@@ -65,13 +65,13 @@ function iconLink(selector: string): HTMLLinkElement | null {
   return link;
 }
 
-/** The colour the tab's icons were last asked to be. */
+/** The color the tab's icons were last asked to be. */
 let wanted = "";
 
 /**
  * Puts the page's own icons (index.html's links: the tab's SVG, its .ico fallback and the
  * home-screen icon) in `color`. The fallback and home-screen icons are pictures, so they're drawn
- * from the recoloured SVG.
+ * from the recolored SVG.
  */
 export function applyTabIcons(color: string) {
   const key = color.toLowerCase();

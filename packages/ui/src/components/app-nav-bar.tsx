@@ -99,7 +99,7 @@ export function AppNavBar({
   );
   // With no pages there's nothing for a menu; the bar keeps its controls on phones too.
   const flat = items.length === 0;
-  // The app's icon, with its accent in the team's colour.
+  // The app's icon, with its accent in the team's color.
   const teamIcon = useTeamIcon(icon);
 
   useEffect(() => {
@@ -238,7 +238,7 @@ export function AppNavBar({
           </nav>
           <div className="g3-nav-drawer-foot">
             {actions && <div className="g3-nav-actions">{actions}</div>}
-            <ThemeToggle labelled />
+            <ThemeToggle labeled />
             {allApps && (
               <a className="g3-nav-all-apps" href={ALL_APPS_URL}>
                 All Apps
@@ -253,14 +253,14 @@ export function AppNavBar({
 }
 
 /** Switches light/dark for every G3 app. */
-export function ThemeToggle({ labelled = false }: { labelled?: boolean }) {
+export function ThemeToggle({ labeled = false }: { labeled?: boolean }) {
   const [theme, setTheme] = useTheme();
   const next = theme === "dark" ? "light" : "dark";
   const label = next === "dark" ? "Dark mode" : "Light mode";
   return (
     <button
       type="button"
-      className={`g3-nav-theme${labelled ? " is-labelled" : ""}`}
+      className={`g3-nav-theme${labeled ? " is-labeled" : ""}`}
       onClick={() => setTheme(next)}
       aria-label={`Switch to ${next} mode`}
       title={`Switch to ${next} mode`}

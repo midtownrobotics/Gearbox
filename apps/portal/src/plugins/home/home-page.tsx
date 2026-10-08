@@ -26,10 +26,10 @@ import {
   StatboticsIcon,
 } from "./link-icons";
 
-// The team's apps show their own app icon, its accent in the team's primary colour (TeamIcon).
-// Other links are drawn to match it: a black tile with a white symbol, and a ↗ in that colour for
+// The team's apps show their own app icon, its accent in the team's primary color (TeamIcon).
+// Other links are drawn to match it: a black tile with a white symbol, and a ↗ in that color for
 // sites outside the team's apps. (`bg-black` isn't touched by dark mode, and neither is the
-// colour variable used directly, where the `text-primary-500` class would be lightened.)
+// color variable used directly, where the `text-primary-500` class would be lightened.)
 type App = {
   /** Which tile it is, for the team's order (Team Appearance's "Apps grid order"). */
   key: PortalTileKey;

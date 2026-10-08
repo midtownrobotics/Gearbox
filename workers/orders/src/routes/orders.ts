@@ -418,7 +418,7 @@ export const ordersRouter = new Hono<AppEnv>()
             orderId: order.id,
             updatedAt: now,
           })
-          // Still conditional on being approved, in case it was cancelled a moment ago.
+          // Still conditional on being approved, in case it was canceled a moment ago.
           .where(
             inTeam(
               orderRequests,

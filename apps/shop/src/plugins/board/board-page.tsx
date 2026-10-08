@@ -85,17 +85,17 @@ export function BoardPage() {
 
   // Who is logged in at each kiosk, refreshed alongside the heartbeat cadence.
   useEffect(() => {
-    let cancelled = false;
+    let canceled = false;
     const load = () =>
       fetchKioskPresence()
         .then((rows) => {
-          if (!cancelled) setPresence(rows);
+          if (!canceled) setPresence(rows);
         })
         .catch(() => {});
     load();
     const id = setInterval(load, 60 * 1000);
     return () => {
-      cancelled = true;
+      canceled = true;
       clearInterval(id);
     };
   }, []);

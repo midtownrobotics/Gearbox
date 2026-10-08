@@ -120,7 +120,7 @@ export async function trajectoryToPng(trajectory: ParsedTrajectory): Promise<Fil
     field.onload = () => resolve();
     field.onerror = () => reject(new Error("Could not load the 2026 field background."));
   });
-  // The path and its end are drawn in the team's brand colour (colors.css).
+  // The path and its end are drawn in the team's brand color (colors.css).
   const brand =
     getComputedStyle(document.documentElement).getPropertyValue("--g3-brand").trim() || "#a71433";
   context.fillStyle = "#17191d";

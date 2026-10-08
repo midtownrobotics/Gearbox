@@ -74,7 +74,7 @@ export function DoorSoundsPage() {
           headers: { "Content-Type": "audio/wav" },
           body: file,
         }),
-      `Uploaded ${file.name}. It is now included in the door-opening sound rotation.`,
+      `Uploaded ${file.name}.`,
     );
     if (!uploaded) return;
     setFile(null);
@@ -160,8 +160,7 @@ export function DoorSoundsPage() {
 
       <Card title="Upload a sound">
         <p className="mb-3 text-sm text-secondary-500">
-          Upload a RIFF/WAVE file up to 10 MB. Uploaded sounds join the rotation immediately;
-          restarting the edge agent is not required.
+          Upload a WAV file up to 10 MB. It joins the rotation right away.
         </p>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <input
@@ -223,7 +222,7 @@ export function DoorSoundsPage() {
                           request(`/sounds/${encodeURIComponent(sound.name)}/test`, {
                             method: "POST",
                           }),
-                        `Started ${sound.name} on the Orange Pi. Refresh status if playback stops early.`,
+                        `Playing ${sound.name} on the box.`,
                       )
                     }
                   >

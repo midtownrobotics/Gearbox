@@ -68,7 +68,7 @@ export function ControlsPage() {
         <div className="space-y-4">
           <Toggle
             label="Enforce blocklists"
-            description="Block or throttle the sites in the enabled lists below, except for devices with an active exception."
+            description="Block or throttle sites in the enabled lists, except on devices with an exception."
             checked={data.enforce}
             disabled={busy}
             onChange={(enforce) =>
@@ -77,7 +77,7 @@ export function ControlsPage() {
           />
           <Toggle
             label="DNS hardening"
-            description="Send all DNS through the box and block encrypted-DNS services and iCloud Private Relay, so blocklists can't be bypassed that way and fewer sites show as (unknown)."
+            description="Stop devices getting around blocklists with encrypted DNS or iCloud Private Relay."
             checked={data.dnsHardening}
             disabled={busy}
             onChange={(dnsHardening) =>
@@ -168,8 +168,7 @@ function Blocklists({ lists, onChanged }: { lists: Blocklist[]; onChanged: () =>
       <div className="space-y-3">
         {lists.length === 0 && editing !== "new" && (
           <p className="text-sm text-secondary-400">
-            No blocklists yet. A list is a set of domains (each includes its subdomains) that is
-            either blocked or throttled.
+            No blocklists yet. A list is a set of domains to block or throttle.
           </p>
         )}
         {lists.map((l) =>

@@ -277,7 +277,7 @@ function AddPrinter({ onAdded, existing }: { onAdded: () => void; existing: Prin
             {searching ? "Searching the shop network…" : "Find printers"}
           </button>
           <span className="text-sm text-secondary-500">
-            Looks for AirPrint / IPP Everywhere printers on the shop network (about 10 seconds).
+            Looks for printers on the shop network. Takes about 10 seconds.
           </span>
         </div>
         {found &&
@@ -333,10 +333,7 @@ function AddPrinter({ onAdded, existing }: { onAdded: () => void; existing: Prin
             {adding === manualUri ? "Setting up…" : "Add"}
           </button>
         </form>
-        <p className="text-xs text-secondary-400">
-          Setting up a printer asks it for its capabilities (driverless), which can take up to a
-          minute.
-        </p>
+        <p className="text-xs text-secondary-400">Setting up a printer can take up to a minute.</p>
         {error && <ErrorBanner message={error} />}
       </div>
     </Card>

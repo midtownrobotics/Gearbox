@@ -18,7 +18,7 @@ import { AppOrder } from "./app-order";
 type Mode = "light" | "dark";
 const modes: Mode[] = ["light", "dark"];
 
-// A theme's colours other than its accent, which has its own controls (AccentColors).
+// A theme's colors other than its accent, which has its own controls (AccentColors).
 const colorLabels: Record<Exclude<keyof TeamUiColors, "accent">, string> = {
   page: "Page background",
   surface: "Cards and navigation",
@@ -87,7 +87,7 @@ export function AdminTeamUiPage() {
   function reset() {
     setSettings(structuredClone(defaults));
     setError("");
-    setMessage("Defaults restored in this form. Save team appearance to apply them.");
+    setMessage("Defaults restored. Save to apply them.");
   }
 
   async function save(event: React.FormEvent) {
@@ -102,7 +102,7 @@ export function AdminTeamUiPage() {
         throw new Error(data.error ?? "Could not save team settings.");
       }
       await refreshTeamUiSettings(true);
-      setMessage("Team appearance saved. Other open tabs will pick it up when focused.");
+      setMessage("Team appearance saved.");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not save team settings.");
     } finally {
@@ -116,10 +116,7 @@ export function AdminTeamUiPage() {
   return (
     <main className="mx-auto w-full max-w-4xl px-6 py-8">
       <h1 className="mb-2 text-3xl font-bold text-secondary-900">Team appearance</h1>
-      <p className="mb-8 text-secondary-600">
-        These settings apply to this team across Gearbox. Team number, domain, and sign-in
-        configuration stay with deployment settings.
-      </p>
+      <p className="mb-8 text-secondary-600">How your team looks across Gearbox.</p>
       {error && (
         <p role="alert" className="mb-4 rounded-md border border-primary-500 p-3 text-primary-700">
           {error}
@@ -196,9 +193,7 @@ export function AdminTeamUiPage() {
         <section className="rounded-lg border border-line bg-surface p-5">
           <h2 className="mb-2 text-xl font-semibold">Colors</h2>
           <p className="mb-4 text-sm text-secondary-600">
-            Your team's color, in a shade for each theme. Buttons and app icons use the light accent
-            in both themes. In dark mode, links and highlights use the dark accent, so they stay
-            readable on a dark background.
+            Your team's color in each theme. Buttons and app icons use the light accent in both.
           </p>
           <AccentColors
             light={settings.light}
@@ -211,8 +206,7 @@ export function AdminTeamUiPage() {
             <summary className="cursor-pointer px-4 py-3 font-semibold">More options</summary>
             <div className="space-y-6 border-t border-line p-4">
               <p className="text-sm text-secondary-600">
-                The backgrounds, borders and text of each theme, used across every app. Colors that
-                carry a meaning, such as green for done or red for an error, stay as they are.
+                Each theme's backgrounds, borders and text.
               </p>
               {modes.map((mode) => (
                 <div key={mode}>
@@ -246,9 +240,7 @@ export function AdminTeamUiPage() {
         <section className="rounded-lg border border-line bg-surface p-5">
           <h2 className="mb-4 text-xl font-semibold">Links</h2>
           <p className="mb-4 text-sm text-secondary-600">
-            Edit the links shown on the portal. Hide a link to keep its URL for later, or remove it
-            to clear its URL. Empty links are omitted. Hiding the public site also hides its link on
-            the portal sign-in screen.
+            Links shown on the portal. Hide one to keep its URL for later; empty links aren't shown.
           </p>
           <div className="grid gap-4 sm:grid-cols-2">
             {(Object.keys(teamUiLinkLabels) as TeamUiLinkKey[]).map((key) => (
@@ -294,8 +286,7 @@ export function AdminTeamUiPage() {
         <section className="rounded-lg border border-line bg-surface p-5">
           <h2 className="mb-4 text-xl font-semibold">Apps grid order</h2>
           <p className="mb-4 text-sm text-secondary-600">
-            The order of the tiles on the portal. Drag a tile by its handle, or focus the handle and
-            use Space and the arrow keys. Hidden or empty links keep their place but aren't shown.
+            Drag tiles into the order they appear on the portal.
           </p>
           <AppOrder
             settings={settings}
@@ -384,8 +375,8 @@ function ColorField({
 }
 
 /**
- * A theme's colours together, as the apps use them: a top bar and a card on the page, with text,
- * muted text, an inset box, a link in the accent and a button in the brand colour (the light
+ * A theme's colors together, as the apps use them: a top bar and a card on the page, with text,
+ * muted text, an inset box, a link in the accent and a button in the brand color (the light
  * accent, in both themes).
  */
 function ThemePreview({
@@ -447,7 +438,7 @@ function ThemePreview({
 
 const otherMode = (mode: Mode): Mode => (mode === "light" ? "dark" : "light");
 
-// The two parts of an accent its own sliders set; its hue comes from the colour entered.
+// The two parts of an accent its own sliders set; its hue comes from the color entered.
 const sliders: { part: "s" | "v"; label: string }[] = [
   { part: "s", label: "Saturation" },
   { part: "v", label: "Brightness" },
@@ -467,8 +458,8 @@ const sliderClass = [
 ].join(" ");
 
 /**
- * A colour just entered, for the sliders. Black has no hue or saturation and a grey no hue, so
- * those stay as they were: the sliders can bring the colour back.
+ * A color just entered, for the sliders. Black has no hue or saturation and a gray no hue, so
+ * those stay as they were: the sliders can bring the color back.
  */
 function shadeOf(entered: Hsv, previous: Hsv): Hsv {
   if (entered.v === 0) return { ...previous, v: 0 };
@@ -476,7 +467,7 @@ function shadeOf(entered: Hsv, previous: Hsv): Hsv {
 }
 
 /**
- * The team's accent in each theme. Linked, a colour entered in either box gives the other its
+ * The team's accent in each theme. Linked, a color entered in either box gives the other its
  * hue, and the other keeps its own saturation and brightness; unlinked, the two are chosen freely.
  * Either way the sliders under a box change only that box, and never its hue.
  */
@@ -494,13 +485,13 @@ function AccentColors({
   onChange: (accents: Partial<Record<Mode, string>>) => void;
 }) {
   const palettes = { light, dark };
-  // Each accent as the sliders see it. A hex code alone forgets the hue of a colour slid down to
-  // grey or black, and rounds the rest, so the exact shade is kept here beside it.
+  // Each accent as the sliders see it. A hex code alone forgets the hue of a color slid down to
+  // gray or black, and rounds the rest, so the exact shade is kept here beside it.
   const [kept, setKept] = useState<Record<Mode, Hsv>>(() => ({
     light: isHexColor(light.accent) ? hexToHsv(light.accent) : { h: 0, s: 0, v: 0 },
     dark: isHexColor(dark.accent) ? hexToHsv(dark.accent) : { h: 0, s: 0, v: 0 },
   }));
-  // A colour that arrived from outside (loaded, or reset to defaults) replaces the kept shade.
+  // A color that arrived from outside (loaded, or reset to defaults) replaces the kept shade.
   let shades = kept;
   for (const mode of modes) {
     const hex = palettes[mode].accent.toLowerCase();
@@ -511,12 +502,12 @@ function AccentColors({
   if (shades !== kept) setKept(shades);
 
   function enter(mode: Mode, text: string) {
-    // Still being typed: nothing else changes until it's a whole colour.
+    // Still being typed: nothing else changes until it's a whole color.
     if (!isHexColor(text)) return onChange({ [mode]: text });
     const entered = hexToHsv(text);
     const next = { ...shades, [mode]: shadeOf(entered, shades[mode]) };
     const accents: Partial<Record<Mode, string>> = { [mode]: text };
-    // A grey or black has no hue to give the other accent.
+    // A gray or black has no hue to give the other accent.
     if (linked && entered.s > 0) {
       const twin = otherMode(mode);
       next[twin] = { ...shades[twin], h: entered.h };
@@ -563,7 +554,7 @@ function AccentColors({
               </label>
               {sliders.map(({ part, label: name }) => {
                 const percent = Math.round(shade[part] * 100);
-                // The track runs through the colours the slider can reach.
+                // The track runs through the colors the slider can reach.
                 const from = hsvToHex({ ...shade, [part]: 0 });
                 const to = hsvToHex({ ...shade, [part]: 1 });
                 return (
@@ -616,8 +607,7 @@ function AccentColors({
         <span>
           <span className="font-medium">Link the light and dark accents</span>
           <span className="block text-secondary-600">
-            A color entered in either box gives the other the same hue. Each keeps its own
-            saturation and brightness, set with its sliders.
+            Entering a color in one box gives the other the same hue.
           </span>
         </span>
       </label>

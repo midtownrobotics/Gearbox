@@ -200,7 +200,7 @@ function VendorOrder({
   /** Set when Share-A-Cart supports this vendor. */
   shareACart: { connected: boolean } | null;
   onPlaced: (message: string) => void;
-  /** A line was cancelled (trashed) instead of ordered. */
+  /** A line was canceled (trashed) instead of ordered. */
   onRemoved: (message: string) => void;
 }) {
   const [sacBusy, setSacBusy] = useState(false);
@@ -222,7 +222,7 @@ function VendorOrder({
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
-  // Lines in this order: the ticked ones, or all of them when nothing is ticked.
+  // Lines in this order: the checked ones, or all of them when nothing is checked.
   const inOrder = selected.size > 0 ? group.items.filter((r) => selected.has(r.id)) : group.items;
   const parsed = inOrder.map((r) => {
     const e = edits[r.id] ?? { quantity: String(r.quantity), price: dollars(r.unitPriceCents) };
@@ -278,7 +278,7 @@ function VendorOrder({
     });
   const allSelected = selected.size === group.items.length;
 
-  /** Takes a line off the order list by cancelling the request (the requester sees why). */
+  /** Takes a line off the order list by canceling the request (the requester sees why). */
   async function trash(r: OrderRequest) {
     const reason = window.prompt(
       `Remove “${r.title}” and cancel ${r.requesterName}'s request? Say why (shown to them):`,
@@ -295,7 +295,7 @@ function VendorOrder({
       next.delete(r.id);
       return next;
     });
-    onRemoved(`Removed “${r.title}” (request cancelled).`);
+    onRemoved(`Removed “${r.title}” (request canceled).`);
   }
 
   async function place() {

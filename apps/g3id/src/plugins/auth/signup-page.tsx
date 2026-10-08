@@ -14,8 +14,7 @@ export function SignupPage() {
             Join <span className="text-primary-500">{names.shortName}</span>ID
           </h1>
           <p className="mt-2 text-secondary-700 text-sm">
-            {names.idName} uses Slack for signup. Once you signup, you can add additional login
-            methods.
+            Sign up with Slack. You can add other sign-in methods afterward.
           </p>
         </div>
 

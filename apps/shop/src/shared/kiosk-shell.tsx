@@ -53,19 +53,19 @@ export function KioskShell({ children }: { children: ReactNode }) {
   // the machine has a part in progress (which suspends the auto-logout).
   useEffect(() => {
     if (!isKioskSession) return;
-    let cancelled = false;
+    let canceled = false;
 
     async function beat() {
       api["kiosk-presence"].heartbeat.$post().catch(() => {});
       try {
         if (machineProcessIdRef.current === null && machineName) {
           const processes = await fetchProcesses();
-          if (cancelled) return;
+          if (canceled) return;
           machineProcessIdRef.current = matchMachineProcess(processes, machineName)?.id ?? null;
         }
         if (machineProcessIdRef.current !== null) {
           const queue = await fetchProcessQueue(machineProcessIdRef.current);
-          if (cancelled) return;
+          if (canceled) return;
           machineBusyRef.current = queue.some((p) => p.status === "doing");
         }
       } catch {
@@ -76,7 +76,7 @@ export function KioskShell({ children }: { children: ReactNode }) {
     beat();
     const id = setInterval(beat, HEARTBEAT_MS);
     return () => {
-      cancelled = true;
+      canceled = true;
       clearInterval(id);
     };
   }, [isKioskSession, machineName]);

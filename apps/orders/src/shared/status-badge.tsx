@@ -29,7 +29,7 @@ export const STATUS: Record<RequestStatus, { label: string; icon: string; classN
     className: "bg-emerald-50 text-emerald-800 border-emerald-300",
   },
   cancelled: {
-    label: "Cancelled",
+    label: "Canceled",
     icon: "–",
     className: "bg-secondary-100 text-secondary-600 border-secondary-300",
   },

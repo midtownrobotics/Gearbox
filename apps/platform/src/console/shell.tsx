@@ -75,7 +75,7 @@ function SignIn() {
   return (
     <Panel title="Sign in">
       <p className="text-sm text-secondary-600">
-        Operators sign in through their own team, like any member. Which team are you on?
+        Sign in through your own team. Which team are you on?
       </p>
       <form
         className="mt-4 flex gap-2"

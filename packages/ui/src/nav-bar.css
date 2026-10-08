@@ -197,10 +197,10 @@ html[data-theme="dark"] .g3-nav-drawer {
 
 /* With many pages, the switch shrinks to its icon until there's room for the words. */
 @media (max-width: 1279px) {
-  .g3-nav .g3-nav-theme:not(.is-labelled) .g3-nav-theme-label {
+  .g3-nav .g3-nav-theme:not(.is-labeled) .g3-nav-theme-label {
     display: none;
   }
-  .g3-nav .g3-nav-theme:not(.is-labelled) {
+  .g3-nav .g3-nav-theme:not(.is-labeled) {
     padding: 8px;
   }
 }

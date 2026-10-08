@@ -2,7 +2,7 @@ import type { ImgHTMLAttributes } from "react";
 import { useTeamIcon } from "../team-ui";
 
 /**
- * An app's icon, with its accent in the team's brand colour (team-icon.ts). Takes what an
+ * An app's icon, with its accent in the team's brand color (team-icon.ts). Takes what an
  * `<img>` takes; `src` is the icon's SVG.
  */
 export function TeamIcon({

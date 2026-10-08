@@ -16,10 +16,10 @@ export function useUserNames(ids: (string | null | undefined)[]) {
     const wanted = key ? key.split(",") : [];
     const missing = wanted.filter((id) => !(id in names));
     if (missing.length === 0) return;
-    let cancelled = false;
+    let canceled = false;
     fetchUserNames(missing)
       .then((rows) => {
-        if (cancelled) return;
+        if (canceled) return;
         setNames((prev) => {
           const next = { ...prev };
           for (const row of rows) next[row.id] = row.displayName;
@@ -29,7 +29,7 @@ export function useUserNames(ids: (string | null | undefined)[]) {
         });
       })
       .catch(() => {
-        if (cancelled) return;
+        if (canceled) return;
         setNames((prev) => {
           const next = { ...prev };
           for (const id of missing) if (!(id in next)) next[id] = id;
@@ -37,7 +37,7 @@ export function useUserNames(ids: (string | null | undefined)[]) {
         });
       });
     return () => {
-      cancelled = true;
+      canceled = true;
     };
   }, [key]);
 
