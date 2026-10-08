@@ -1,6 +1,6 @@
 import { teamAppUrl } from "@g3/site-config";
 import { forgetTeam, rememberedTeam } from "@g3/ui/my-team";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { FaArrowRight, FaSearch } from "react-icons/fa";
 import { Link, useSearchParams } from "react-router-dom";
 import { Page } from "./layout";
@@ -21,6 +21,11 @@ const parseNumber = (value: string) => {
 export function TeamNumberForm({ autoFocus = false }: { autoFocus?: boolean }) {
   const [value, setValue] = useState("");
   const [error, setError] = useState("");
+  const input = useRef<HTMLInputElement>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: only when the form first appears
+  useEffect(() => {
+    if (autoFocus) input.current?.focus();
+  }, []);
   return (
     <form
       className="space-y-2"
@@ -43,7 +48,7 @@ export function TeamNumberForm({ autoFocus = false }: { autoFocus?: boolean }) {
           inputMode="numeric"
           pattern="[0-9]*"
           maxLength={5}
-          autoFocus={autoFocus}
+          ref={input}
           value={value}
           onChange={(event) => {
             setValue(event.target.value.replace(/\D/g, ""));
