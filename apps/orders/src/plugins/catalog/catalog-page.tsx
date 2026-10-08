@@ -1,23 +1,42 @@
-import { useEffect, useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { api, getErrorMessage } from "../../shared/api";
 import { useAuthUser } from "../../shared/auth";
 import { formatCents } from "../../shared/format";
 import type { CatalogFamily, CatalogItem } from "../../shared/types";
-import { Button, Card, ErrorBanner, Loading, Page, inputClass } from "../../shared/ui";
+import {
+  Button,
+  Card,
+  ErrorBanner,
+  Loading,
+  Page,
+  SuccessBanner,
+  inputClass,
+} from "../../shared/ui";
 import { useLoad } from "../../shared/use-load";
 import { priceIsFresh } from "../requests/draft";
+import type { RequestDone, RequestFrom } from "../requests/request-page";
 import { invalidateCatalog } from "./catalog-data";
 import { ItemEditor } from "./item-editor";
+import { findByLink } from "./link-match";
 import { buildIndex, searchIds } from "./search";
 
 const PAGE = 30;
 
+const LINKS = /https?:\/\/[^\s<>"']+/g;
+
+/** A part's Request button opens the request page for it. */
+const Composer = createContext<{ add: (item: CatalogItem) => void; wishlist: boolean }>({
+  add: () => {},
+  wishlist: false,
+});
+
 type Group = { key: string; family: CatalogFamily | null; items: CatalogItem[] };
 
 /**
- * The parts catalog, like a store: search loosely ("1/2 hex bearing", "10-32 button 3/4"),
- * narrow by category and vendor, pick a family's size and type, and request the part.
+ * The parts catalog, like a store, and where requests are written (New Request is this page):
+ * search loosely ("1/2 hex bearing", "10-32 button 3/4"), narrow by category and vendor, pick a
+ * family's size and type, and request the part. The search box also takes product links.
  * Anyone can add, fix or delete parts; links people request join the catalog on their own.
  */
 export function CatalogPage() {
@@ -45,6 +64,38 @@ export function CatalogPage() {
   const { canEditCatalog } = useAuthUser();
   // Opened from a list (?list=…): parts requested from here go on it.
   const [params] = useSearchParams();
+  const navigate = useNavigate();
+  const location = useLocation();
+  // ?wishlist=1 (the wishlist's "Add parts"): parts go on the wishlist instead of being requested.
+  const wishlist = params.get("wishlist") === "1";
+  const listParam = params.get("list");
+  // What the request page said when it came back here ("Your request was submitted…").
+  const done = (location.state as RequestDone | null)?.requestMessage;
+
+  /** One request on its own page; it comes back here when it's submitted or cancelled. */
+  const openRequest = (what: Record<string, string>) => {
+    const query = new URLSearchParams({
+      ...what,
+      ...(wishlist ? { wishlist: "1" } : {}),
+      ...(listParam ? { list: listParam } : {}),
+    });
+    const state: RequestFrom = { from: `${location.pathname}${location.search}` };
+    navigate(`/request?${query}`, { state });
+  };
+  const addPart = (item: CatalogItem) => openRequest({ catalog: String(item.id) });
+
+  // The search box is an omnibox: words search the catalog; a pasted link opens a request for it
+  // right away, from its catalog part when the catalog has it (else New Request looks it up).
+  const pasted = query.match(LINKS) ?? [];
+  const link = pasted.length > 0 && query.replace(LINKS, "").trim() === "";
+  // biome-ignore lint/correctness/useExhaustiveDependencies: open once the link and catalog are in
+  useEffect(() => {
+    const first = pasted[0];
+    if (!link || !data || !first) return;
+    const linked = findByLink(data.items, first);
+    setQuery("");
+    openRequest(linked ? { catalog: String(linked.id) } : { urls: first });
+  }, [link, data]);
   const fromList = useLoad(async () => {
     const id = params.get("list");
     if (!id) return null;
@@ -66,16 +117,17 @@ export function CatalogPage() {
   // Matches for the search (before the category filter, which shows counts over them).
   const matches = useMemo(() => {
     if (!data || !index) return [];
-    const found = query.trim()
-      ? searchIds(index, query).map((id) => byId.get(id) as CatalogItem)
-      : [...data.items].sort(
-          (a, b) =>
-            a.category.localeCompare(b.category) ||
-            familyName(a, families).localeCompare(familyName(b, families)) ||
-            a.name.localeCompare(b.name),
-        );
+    const found =
+      query.trim() && !link
+        ? searchIds(index, query).map((id) => byId.get(id) as CatalogItem)
+        : [...data.items].sort(
+            (a, b) =>
+              a.category.localeCompare(b.category) ||
+              familyName(a, families).localeCompare(familyName(b, families)) ||
+              a.name.localeCompare(b.name),
+          );
     return vendor ? found.filter((i) => i.vendor === vendor) : found;
-  }, [data, index, query, vendor, byId, families]);
+  }, [data, index, query, link, vendor, byId, families]);
 
   const counts = useMemo(() => {
     const n = new Map<string, number>();
@@ -106,131 +158,159 @@ export function CatalogPage() {
   );
 
   return (
-    <Page
-      title="Catalog"
-      actions={
-        canEditCatalog && (
-          <div className="flex gap-2">
-            <Button variant="secondary" onClick={() => setNewCategory(true)}>
-              New category
-            </Button>
-            <Button variant="secondary" onClick={() => setRemovingCategory(true)}>
-              Remove category
-            </Button>
-            <Button variant="secondary" onClick={() => setAdding(true)}>
-              Add part
-            </Button>
+    <Composer.Provider value={{ add: addPart, wishlist }}>
+      <Page
+        title={wishlist ? "Add to Wishlist" : "New Request"}
+        actions={
+          (wishlist || canEditCatalog) && (
+            <div className="flex flex-wrap items-center gap-2">
+              {wishlist && (
+                <Link
+                  to="/wishlist"
+                  className="text-sm text-secondary-500 hover:text-secondary-800"
+                >
+                  ← Back to the wishlist
+                </Link>
+              )}
+              {canEditCatalog && (
+                <>
+                  <Button variant="secondary" onClick={() => setNewCategory(true)}>
+                    New category
+                  </Button>
+                  <Button variant="secondary" onClick={() => setRemovingCategory(true)}>
+                    Remove category
+                  </Button>
+                  <Button variant="secondary" onClick={() => setAdding(true)}>
+                    Add part
+                  </Button>
+                </>
+              )}
+            </div>
+          )
+        }
+      >
+        {done && <SuccessBanner message={done} />}
+        {fromList.data && (
+          <p className="text-sm text-sky-900 bg-sky-50 border border-sky-200 rounded-lg px-4 py-2.5">
+            Parts you request from here go on <strong>{fromList.data.name}</strong>.{" "}
+            <Link to={`/lists/${fromList.data.id}`} className="underline">
+              Back to the list
+            </Link>
+          </p>
+        )}
+        {error && <ErrorBanner message={error} />}
+        {newCategory && (
+          <NewCategory
+            onDone={(name) => {
+              setNewCategory(false);
+              if (name) reload();
+            }}
+          />
+        )}
+        {removingCategory && data && (
+          <RemoveCategory
+            categories={data.categories}
+            items={data.items}
+            onDone={(removed) => {
+              setRemovingCategory(false);
+              if (removed) {
+                if (category === removed) setCategory(null);
+                reload();
+              }
+            }}
+          />
+        )}
+        {adding && data && (
+          <ItemEditor
+            categories={data.categories}
+            onDone={(saved) => {
+              setAdding(false);
+              if (saved) reload();
+            }}
+          />
+        )}
+        <div className="space-y-3">
+          <input
+            type="search"
+            className={`${inputClass} !text-base`}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder='Search parts ("1/2 hex bearing", "WCP-0320", "neo") or paste a product link'
+            aria-label="Search the catalog, or paste a product link"
+            // biome-ignore lint/a11y/noAutofocus: the page is for searching
+            autoFocus
+          />
+          {link && <p className="text-sm text-secondary-500">Opening a request for that link…</p>}
+          <div className={`flex flex-wrap items-center gap-2 ${link ? "hidden" : ""}`}>
+            <select
+              className={`${inputClass} !w-auto !py-1.5 text-sm`}
+              value={vendor}
+              onChange={(e) => setVendor(e.target.value)}
+              aria-label="Vendor"
+            >
+              <option value="">All vendors</option>
+              {vendors.map((v) => (
+                <option key={v} value={v}>
+                  {v}
+                </option>
+              ))}
+            </select>
+            <Chip active={category === null} onClick={() => setCategory(null)}>
+              All · {matches.length}
+            </Chip>
+            {(data?.categories ?? [])
+              .filter((cat) => counts.has(cat))
+              .map((cat) => (
+                <Chip
+                  key={cat}
+                  active={category === cat}
+                  onClick={() => setCategory(category === cat ? null : cat)}
+                >
+                  {cat} · {counts.get(cat)}
+                </Chip>
+              ))}
           </div>
-        )
-      }
-    >
-      {fromList.data && (
-        <p className="text-sm text-sky-900 bg-sky-50 border border-sky-200 rounded-lg px-4 py-2.5">
-          Parts you request from here go on <strong>{fromList.data.name}</strong>.{" "}
-          <Link to={`/lists/${fromList.data.id}`} className="underline">
-            Back to the list
-          </Link>
-        </p>
-      )}
-      {error && <ErrorBanner message={error} />}
-      {newCategory && (
-        <NewCategory
-          onDone={(name) => {
-            setNewCategory(false);
-            if (name) reload();
-          }}
-        />
-      )}
-      {removingCategory && data && (
-        <RemoveCategory
-          categories={data.categories}
-          items={data.items}
-          onDone={(removed) => {
-            setRemovingCategory(false);
-            if (removed) {
-              if (category === removed) setCategory(null);
-              reload();
-            }
-          }}
-        />
-      )}
-      {adding && data && (
-        <ItemEditor
-          categories={data.categories}
-          onDone={(saved) => {
-            setAdding(false);
-            if (saved) reload();
-          }}
-        />
-      )}
-      <div className="space-y-3">
-        <input
-          type="search"
-          className={`${inputClass} !text-base`}
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder='Search parts: "1/2 hex bearing", "10-32 button head 3/4", "WCP-0320", "neo"…'
-          aria-label="Search the catalog"
-          // biome-ignore lint/a11y/noAutofocus: the page is for searching
-          autoFocus
-        />
-        <div className="flex flex-wrap items-center gap-2">
-          <select
-            className={`${inputClass} !w-auto !py-1.5 text-sm`}
-            value={vendor}
-            onChange={(e) => setVendor(e.target.value)}
-            aria-label="Vendor"
-          >
-            <option value="">All vendors</option>
-            {vendors.map((v) => (
-              <option key={v} value={v}>
-                {v}
-              </option>
-            ))}
-          </select>
-          <Chip active={category === null} onClick={() => setCategory(null)}>
-            All · {matches.length}
-          </Chip>
-          {(data?.categories ?? [])
-            .filter((cat) => counts.has(cat))
-            .map((cat) => (
-              <Chip
-                key={cat}
-                active={category === cat}
-                onClick={() => setCategory(category === cat ? null : cat)}
-              >
-                {cat} · {counts.get(cat)}
-              </Chip>
-            ))}
         </div>
-      </div>
 
-      {!data ? (
-        <Loading />
-      ) : groups.length === 0 ? (
-        <p className="text-sm text-secondary-500">
-          Nothing matches. Try fewer words
-          {canEditCatalog ? ", or add the part with “Add part”" : ""}.
+        <p className="text-xs text-secondary-500">
+          No link?{" "}
+          <button
+            type="button"
+            className="underline hover:text-secondary-800"
+            onClick={() => openRequest({})}
+          >
+            Add a part by hand
+          </button>
+          .
         </p>
-      ) : (
-        <div className="space-y-2">
-          {groups.slice(0, limit).map((g) => (
-            <FamilyCard
-              key={g.key}
-              group={g}
-              open={groups.length <= 3}
-              categories={data.categories}
-              onChanged={reload}
-            />
-          ))}
-          {groups.length > limit && (
-            <Button variant="secondary" onClick={() => setLimit((n) => n + PAGE)}>
-              Show more ({groups.length - limit} more)
-            </Button>
-          )}
-        </div>
-      )}
-    </Page>
+
+        {link ? null : !data ? (
+          <Loading />
+        ) : groups.length === 0 ? (
+          <p className="text-sm text-secondary-500">
+            Nothing matches. Try fewer words, or paste the part's link to request it
+            {canEditCatalog ? " (or add it with “Add part”)" : ""}.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {groups.slice(0, limit).map((g) => (
+              <FamilyCard
+                key={g.key}
+                group={g}
+                open={groups.length <= 3}
+                categories={data.categories}
+                onChanged={reload}
+              />
+            ))}
+            {groups.length > limit && (
+              <Button variant="secondary" onClick={() => setLimit((n) => n + PAGE)}>
+                Show more ({groups.length - limit} more)
+              </Button>
+            )}
+          </div>
+        )}
+      </Page>
+    </Composer.Provider>
   );
 }
 
@@ -414,8 +494,7 @@ function ItemRow({
 }) {
   const [editing, setEditing] = useState(false);
   const { canEditCatalog } = useAuthUser();
-  const [params] = useSearchParams();
-  const listId = params.get("list");
+  const composer = useContext(Composer);
   if (editing) {
     return (
       <li className="py-2">
@@ -433,7 +512,12 @@ function ItemRow({
   return (
     <li className="py-2 flex flex-wrap items-center gap-x-3 gap-y-1">
       <div className="min-w-0 flex-1 basis-64">
-        <p className="text-sm text-secondary-900">{item.name}</p>
+        <Link
+          to={`/catalog/items/${item.id}`}
+          className="text-sm text-secondary-900 hover:text-primary-600"
+        >
+          {item.name}
+        </Link>
         <p className="text-xs text-secondary-500">
           {item.vendor}
           {item.sku && ` · ${item.sku}`}
@@ -474,12 +558,13 @@ function ItemRow({
           Edit
         </button>
       )}
-      <Link
-        to={`/new?catalog=${item.id}${listId ? `&list=${listId}` : ""}`}
+      <button
+        type="button"
+        onClick={() => composer.add(item)}
         className="rounded-lg bg-primary-500 px-3 py-1 text-sm font-semibold text-white hover:bg-primary-600"
       >
-        Request
-      </Link>
+        {composer.wishlist ? "Add" : "Request"}
+      </button>
     </li>
   );
 }

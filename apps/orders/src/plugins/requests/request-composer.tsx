@@ -1,10 +1,9 @@
-import { type KeyboardEvent, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api, getErrorMessage } from "../../shared/api";
 import type { CatalogItem } from "../../shared/types";
-import { Button, Card, ErrorBanner, Field, Page, SuccessBanner, inputClass } from "../../shared/ui";
+import { Button, Card, ErrorBanner, Field, SuccessBanner, inputClass } from "../../shared/ui";
 import { useLoad } from "../../shared/use-load";
-import { CatalogSearch } from "../catalog/catalog-search";
 import {
   type Draft,
   DraftCard,
@@ -29,11 +28,23 @@ async function eachLimited<T>(items: T[], limit: number, fn: (item: T) => Promis
 }
 
 /**
- * Fast entry: paste one or more product links (one per line). Each becomes a row filled in by the
- * lookup, named by the team template, with a budget category guess and the product's purchase
- * history. Rows can also be added by hand; everything is submitted together.
+ * Writing requests, on the Catalog page (/catalog, and /new for older links): product links and
+ * catalog parts each become a row filled in by the lookup, named by the team template, with a
+ * budget category guess and the product's purchase history. Rows can also be added by hand;
+ * everything is submitted together. `?wishlist=1` saves them to the wishlist instead.
+ *
+ * The page adds rows (`lookUp`, `addCatalogItems`, `addBlank`) and shows `view` (the rows and
+ * the submit card) under its search box.
  */
-export function NewRequestPage() {
+export function useRequestComposer({
+  onDone,
+  onCancel,
+}: {
+  /** One request at a time (the New Request page): called after it's saved, with what to say. */
+  onDone?: (message: string) => void;
+  /** Its row was removed: leave without saving. */
+  onCancel?: () => void;
+} = {}) {
   const [params, setParams] = useSearchParams();
   const categories = useLoad(async () => {
     const res = await api.categories.$get({ query: {} });
@@ -61,7 +72,6 @@ export function NewRequestPage() {
   const wishlist = params.get("wishlist") === "1";
   const listName = lists.data?.find((l) => String(l.id) === listId)?.name;
 
-  const [links, setLinks] = useState("");
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [sharedReason, setSharedReason] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -76,15 +86,20 @@ export function NewRequestPage() {
     update(draft.key, await lookUpDraft(draft.url));
   }
 
-  async function lookUp(text = links) {
+  async function lookUp(text: string) {
     const urls = [...new Set(text.match(LINK) ?? [])];
     if (urls.length === 0) return setError("Paste at least one link (starting with http).");
     setError(null);
     setSubmitted(null);
     const fresh = urls.map((u) => ({ ...blank(u), state: "loading" as const }));
     setDrafts((all) => [...all.filter((d) => d.url || d.name), ...fresh]);
-    setLinks("");
     await eachLimited(fresh, 3, fill);
+  }
+
+  /** An empty row, for a part with no link. */
+  function addBlank() {
+    setSubmitted(null);
+    setDrafts((all) => [...all, blank()]);
   }
 
   /** Rows for parts picked in the catalog (?catalog=1,2,3). */
@@ -114,7 +129,13 @@ export function NewRequestPage() {
   useEffect(() => {
     const handed = params.get("urls");
     const picked = params.get("catalog");
-    if ((!handed && !picked) || started.current) return;
+    if (started.current) return;
+    // One at a time: the first link, the picked part, or an empty row to fill in by hand.
+    if (onDone && !handed && !picked) {
+      started.current = true;
+      return addBlank();
+    }
+    if (!handed && !picked) return;
     started.current = true;
     setParams(
       { ...(listId ? { list: listId } : {}), ...(wishlist ? { wishlist: "1" } : {}) },
@@ -122,7 +143,7 @@ export function NewRequestPage() {
         replace: true,
       },
     );
-    if (handed) void lookUp(handed);
+    if (handed) void lookUp(onDone ? (handed.match(LINK)?.[0] ?? handed) : handed);
     if (picked) void fromCatalog(picked);
   }, []);
 
@@ -154,6 +175,14 @@ export function NewRequestPage() {
     }
     setBusy(false);
     setDrafts([...failed, ...drafts.filter((d) => d.state === "loading")]);
+    if (done > 0 && onDone && failed.length === 0) {
+      onDone(
+        wishlist
+          ? "Added to the wishlist."
+          : `Your request was submitted for review${listName ? ` and added to ${listName}` : ""}.`,
+      );
+      return;
+    }
     if (done > 0) {
       const left = failed.length ? ` ${failed.length} still need attention below.` : "";
       setSubmitted(
@@ -168,58 +197,22 @@ export function NewRequestPage() {
     }
   }
 
-  const onLinksKey = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-      e.preventDefault();
-      void lookUp();
-    }
-  };
   const readyCount = drafts.filter((d) => d.state === "ready").length;
 
-  return (
-    <Page
-      title={wishlist ? "Add to Wishlist" : "New Request"}
-      actions={
-        wishlist ? (
-          <Link to="/wishlist" className="text-sm text-secondary-500 hover:text-secondary-800">
-            ← Back to the wishlist
-          </Link>
-        ) : (
-          listName && (
-            <Link
-              to={`/lists/${listId}`}
-              className="text-sm text-secondary-500 hover:text-secondary-800"
-            >
-              ← Back to {listName}
-            </Link>
-          )
-        )
-      }
-    >
+  /** Back to where the page was opened for: the wishlist, or a list. */
+  const back = wishlist ? (
+    <Link to="/wishlist" className="text-sm text-secondary-500 hover:text-secondary-800">
+      ← Back to the wishlist
+    </Link>
+  ) : listName ? (
+    <Link to={`/lists/${listId}`} className="text-sm text-secondary-500 hover:text-secondary-800">
+      ← Back to {listName}
+    </Link>
+  ) : null;
+
+  const view = (
+    <>
       {submitted && <SuccessBanner message={submitted} />}
-      <div className="space-y-2">
-        <CatalogSearch
-          onPick={(item) => void addCatalogItems([item])}
-          placeholder='Find a part in the catalog: "1/2 hex bearing", "WCP-0320"…'
-        />
-        <textarea
-          className={`${inputClass} min-h-20`}
-          value={links}
-          onChange={(e) => setLinks(e.target.value)}
-          onKeyDown={onLinksKey}
-          placeholder="…or paste product links, one per line (WCP, REV, AndyMark, Amazon, McMaster, …)"
-          aria-label="Product links"
-        />
-        <div className="flex flex-wrap items-center gap-2">
-          <Button onClick={() => lookUp()} disabled={!links.trim()}>
-            Look up
-          </Button>
-          <Button variant="secondary" onClick={() => setDrafts((all) => [...all, blank()])}>
-            Add by hand
-          </Button>
-          <span className="hidden sm:inline text-xs text-secondary-400">Ctrl+Enter to look up</span>
-        </div>
-      </div>
       {error && <ErrorBanner message={error} />}
       {categories.data?.length === 0 && (
         <p className="text-sm text-secondary-500">
@@ -240,7 +233,9 @@ export function NewRequestPage() {
           onCategoryAdded={catalogCategories.reload}
           onChange={(patch) => update(d.key, patch)}
           onVariant={(id) => pickVariant(d, id)}
-          onRemove={() => setDrafts((all) => all.filter((x) => x.key !== d.key))}
+          onRemove={() =>
+            onCancel ? onCancel() : setDrafts((all) => all.filter((x) => x.key !== d.key))
+          }
         />
       ))}
 
@@ -298,6 +293,8 @@ export function NewRequestPage() {
           </div>
         </Card>
       )}
-    </Page>
+    </>
   );
+
+  return { lookUp, addCatalogItems, addBlank, wishlist, drafts: drafts.length, back, view };
 }

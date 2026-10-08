@@ -2,34 +2,14 @@ import { inTeam, withTeam } from "@g3/auth";
 import { eq, sql } from "drizzle-orm";
 import type { OrdersDb } from "../db";
 import { type LinkKind, catalogCategories, catalogItems } from "../db/schema";
+import { catalogKey } from "./product-key";
 
 /** A price paid more than this long ago may have changed: look it up again. */
 export const PRICE_FRESH_MS = 7 * 24 * 60 * 60 * 1000;
 
-/** The part of a product URL that identifies it: host + path, or an Amazon ASIN. */
-export function productKey(raw: string): string | null {
-  try {
-    const url = new URL(raw);
-    const host = url.hostname.toLowerCase().replace(/^www\./, "");
-    const asin = url.pathname.match(
-      /\/(?:dp|gp\/product|gp\/aw\/d|product)\/([A-Z0-9]{10})(?:[/?]|$)/i,
-    )?.[1];
-    if (asin && /(^|\.)amazon\./.test(host)) return `amazon:${asin.toUpperCase()}`;
-    const variant = url.searchParams.get("variant");
-    return `${host}${url.pathname.replace(/\/+$/, "").toLowerCase()}${variant ? `?variant=${variant}` : ""}`;
-  } catch {
-    return null;
-  }
-}
-
-/** The catalog's key for one buyable thing: the product link plus the chosen store option. */
-export function catalogKey(url: string, storeVariantId: string | null): string | null {
-  const key = productKey(url);
-  if (!key || !storeVariantId || key.includes("?variant=") || key.startsWith("amazon:")) {
-    return key;
-  }
-  return `${key}?variant=${storeVariantId}`;
-}
+// The link keys live in their own file so pages can match links the same way (the catalog's
+// omnibox): @g3/worker-orders/product-key.
+export { catalogKey, productKey } from "./product-key";
 
 /** Query parameters that make a vendor's home page (or Amazon's /s) a search. */
 const SEARCH_PARAMS = ["q", "query", "search", "search_query", "keyword", "keywords", "k"];

@@ -73,7 +73,7 @@ export function WishlistPage() {
       wide
       actions={
         <Link
-          to="/new?wishlist=1"
+          to="/catalog?wishlist=1"
           className="rounded-lg bg-primary-600 px-3.5 py-2 text-sm font-semibold text-white hover:bg-primary-700"
         >
           Add parts

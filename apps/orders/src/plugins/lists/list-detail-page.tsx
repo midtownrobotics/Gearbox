@@ -1,12 +1,23 @@
 import { type FormEvent, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { api, getErrorMessage } from "../../shared/api";
 import { useAuthUser } from "../../shared/auth";
 import { formatCents } from "../../shared/format";
 import { STATUS, StatusBadge } from "../../shared/status-badge";
 import type { OrderRequest, PartListDetail, RequestStatus } from "../../shared/types";
-import { Button, Card, ErrorBanner, Field, Loading, Page, Stat, inputClass } from "../../shared/ui";
+import {
+  Button,
+  Card,
+  ErrorBanner,
+  Field,
+  Loading,
+  Page,
+  Stat,
+  SuccessBanner,
+  inputClass,
+} from "../../shared/ui";
 import { useLoad } from "../../shared/use-load";
+import type { RequestDone } from "../requests/request-page";
 import { RequestList } from "../requests/requests-page";
 import { ProgressBar, STAGES, StageCounts } from "./progress";
 import { requestSearch } from "./search";
@@ -35,6 +46,9 @@ export function ListDetailPage() {
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState(false);
   const [removeError, setRemoveError] = useState<string | null>(null);
+  // Back from the request page: "Your request was submitted for review and added to …".
+  const location = useLocation();
+  const done = (location.state as RequestDone | null)?.requestMessage;
 
   const find = useMemo(() => requestSearch(data?.requests ?? []), [data]);
   const onList = useMemo(() => new Set((data?.requests ?? []).map((r) => r.id)), [data]);
@@ -69,6 +83,7 @@ export function ListDetailPage() {
         </Link>
       }
     >
+      {done && <SuccessBanner message={done} />}
       {list.isArchived && (
         <p className="text-sm text-secondary-600 bg-secondary-100 border border-secondary-200 rounded-lg px-4 py-2.5">
           Archived.
@@ -135,17 +150,12 @@ export function ListDetailPage() {
       </Card>
 
       <div className="flex flex-wrap gap-2">
-        <Link
-          to={`/new?list=${list.id}`}
-          className="rounded-lg bg-primary-500 px-3.5 py-2 text-sm font-semibold text-white hover:bg-primary-600"
-        >
-          Request a new part
-        </Link>
+        {/* New Request (search, or paste a link) for this list: what's requested goes on it. */}
         <Link
           to={`/catalog?list=${list.id}`}
-          className="rounded-lg border border-secondary-300 bg-surface px-3.5 py-2 text-sm font-semibold text-secondary-800 hover:bg-secondary-50"
+          className="rounded-lg bg-primary-500 px-3.5 py-2 text-sm font-semibold text-white hover:bg-primary-600"
         >
-          Pick from catalog
+          Request parts
         </Link>
         <Button variant="secondary" onClick={() => setAdding(!adding)}>
           {adding ? "Done adding" : "Add existing requests"}
