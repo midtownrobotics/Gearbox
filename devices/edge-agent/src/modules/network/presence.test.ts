@@ -1,5 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import { type Neighbor, ONLINE_SECONDS, PresenceTracker, parseNeighbors } from "./presence";
+import { attribute } from "./deltas";
+import {
+  type Neighbor,
+  ONLINE_SECONDS,
+  PresenceTracker,
+  knownDevices,
+  parseNeighbors,
+} from "./presence";
 
 describe("parseNeighbors", () => {
   test("reads `ip -j neigh` and skips IPv6 and junk", () => {
@@ -72,5 +79,37 @@ describe("PresenceTracker", () => {
       online: false,
       lastConfirmedAt: 1_000_000,
     });
+  });
+});
+
+describe("knownDevices", () => {
+  const lease = { mac: "aa:aa:aa:aa:aa:01", ip: "192.168.50.101", hostname: "laptop" };
+  const printer: Neighbor = { ip: "192.168.50.9", mac: "bb:bb:bb:bb:bb:09", state: ["STALE"] };
+
+  test("adds fixed-IP devices from the neighbor table, so they're matched by MAC", () => {
+    const devices = knownDevices([lease], [printer]);
+    expect(devices).toContainEqual({
+      mac: "bb:bb:bb:bb:bb:09",
+      ip: "192.168.50.9",
+      hostname: null,
+    });
+    expect(devices).toContainEqual(lease);
+    // Their usage goes to the MAC, the key who's online uses, not "ip:192.168.50.9".
+    const usage = attribute(new Map([["dl:192.168.50.9", 500]]), devices);
+    expect([...usage.keys()]).toEqual(["bb:bb:bb:bb:bb:09"]);
+  });
+
+  test("trusts the table over a lease for who has an address now, keeping the hostname", () => {
+    const moved: Neighbor = { ip: "192.168.50.150", mac: lease.mac, state: ["REACHABLE"] };
+    const taken: Neighbor = { ip: lease.ip, mac: "cc:cc:cc:cc:cc:03", state: ["REACHABLE"] };
+    const devices = knownDevices([lease], [moved, taken]);
+    expect(devices).toContainEqual({ mac: lease.mac, ip: "192.168.50.150", hostname: "laptop" });
+    expect(devices).toContainEqual({ mac: "cc:cc:cc:cc:cc:03", ip: lease.ip, hostname: null });
+    expect(devices).toHaveLength(2);
+  });
+
+  test("skips table entries with no MAC and keeps leases the table doesn't know", () => {
+    const unresolved: Neighbor = { ip: "192.168.50.30", mac: null, state: ["FAILED"] };
+    expect(knownDevices([lease], [unresolved])).toEqual([lease]);
   });
 });

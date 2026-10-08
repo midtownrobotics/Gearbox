@@ -86,8 +86,13 @@ export const switchRouter = new Hono<AppEnv>()
     const result = await relay<{ ok: true; sound: string }>(
       c,
       `/sounds/${encodeURIComponent(name)}/test`,
-      { method: "POST", timeoutMs: 60_000 },
+      { method: "POST" },
     );
+    if ("error" in result) return c.json({ error: result.error }, result.status);
+    return c.json(result.data);
+  })
+  .post("/stop", requireAdmin, async (c) => {
+    const result = await relay<{ ok: true }>(c, "/stop", { method: "POST" });
     if ("error" in result) return c.json({ error: result.error }, result.status);
     return c.json(result.data);
   })

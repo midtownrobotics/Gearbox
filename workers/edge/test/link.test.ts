@@ -174,6 +174,17 @@ describe("the box's link", () => {
     expect(echoed.pad.length).toBe(size);
   });
 
+  it("lets only admins stop the door sound, over the link", async () => {
+    const seen: string[] = [];
+    await connectAgent(({ method, path }) => {
+      seen.push(`${method} ${path}`);
+      return Response.json({ ok: true });
+    });
+    expect((await callAs(student, "/switch/stop", { method: "POST" })).status).toBe(403);
+    expect(await jsonAs(admin, "/switch/stop", { method: "POST" })).toEqual({ ok: true });
+    expect(seen).toEqual(["POST /switch/stop"]);
+  });
+
   it("answers heartbeats", async () => {
     const { ws } = await connectAgent(() => null);
     const pong = new Promise<string>((resolve) =>

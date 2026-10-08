@@ -5,7 +5,7 @@ import { attribute, bucketFor, counterDeltas } from "./deltas";
 import { Enforcer, fileTarget, systemTarget } from "./enforcer";
 import { attributeFlows, idleFlows } from "./flows";
 import { type Lease, parseDnsLog } from "./parse";
-import { PresenceTracker } from "./presence";
+import { PresenceTracker, knownDevices } from "./presence";
 import { Pusher } from "./pusher";
 import { SiteStore } from "./site-store";
 import { mockSource, systemSource } from "./sources";
@@ -38,6 +38,17 @@ const PRESENCE_REQUEST_WAIT_MS = 1_500;
  */
 export function createNetworkModule(ctx: ModuleContext): EdgeModule {
   const source = ctx.config.mock ? mockSource() : systemSource(ctx.config, ctx.db);
+  /**
+   * Leases plus the neighbor table, so usage, sites and grants follow a device by MAC even
+   * with a fixed IP or no lease (otherwise it's "ip:<addr>", which never matches who's online).
+   */
+  const devices = async () => {
+    const [leases, neighbors] = await Promise.all([
+      source.leases(),
+      source.neighbors().catch(() => []),
+    ]);
+    return knownDevices(leases, neighbors);
+  };
   const store = new UsageStore(ctx.db);
   const sites = new SiteStore(ctx.db);
   const enforcer = new Enforcer(
@@ -45,7 +56,7 @@ export function createNetworkModule(ctx: ModuleContext): EdgeModule {
     ctx.config.mock
       ? fileTarget(dirname(ctx.config.dbPath), ctx.config.dnsmasqConfPath)
       : systemTarget(ctx.config.dnsmasqConfPath),
-    () => source.leases(),
+    () => devices(),
   );
   // Every worker response says which state version is current; fetch it if ours is behind.
   const pusher = new Pusher(store, sites, ctx.worker, (version) => {
@@ -159,7 +170,7 @@ export function createNetworkModule(ctx: ModuleContext): EdgeModule {
     // and moves grants to devices' current IPs.
     await enforcer.ensure().catch((err) => console.error("[network] enforcement failed:", err));
     try {
-      const [leases, bootId] = await Promise.all([source.leases(), source.bootId()]);
+      const [leases, bootId] = await Promise.all([devices(), source.bootId()]);
       const ts = Math.floor(Date.now() / 1000);
       await collectUsage(ts, leases, bootId);
       lastCollectAt = ts;
