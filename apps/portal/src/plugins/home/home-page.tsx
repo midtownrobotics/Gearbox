@@ -6,7 +6,7 @@ import {
   pageTeamNumber,
   portalAppLabels,
 } from "@g3/site-config";
-import { TeamIcon, useTeamNames, useTeamUiSettings } from "@g3/ui";
+import { TeamIcon, rememberTeam, useTeamNames, useTeamUiSettings } from "@g3/ui";
 import { useEffect, useState } from "react";
 import type { IconType } from "react-icons";
 import { FaCube, FaGithub, FaGlobe, FaInstagram, FaSlack } from "react-icons/fa";
@@ -201,6 +201,10 @@ export function HomePage() {
   const me = useMe();
   const teamApps = useTeamApps(!!me);
   const authState = me === undefined ? "checking" : me ? "authenticated" : "unauthenticated";
+  // A member signed in on their team's home: the platform's site offers it as "My team".
+  useEffect(() => {
+    if (me) rememberTeam(pageTeamNumber);
+  }, [me]);
   // In the team's order; a tile its saved order doesn't name keeps its default place.
   const order = completeAppOrder(teamUi.appOrder ?? []);
   const rank = (app: App) => order.indexOf(app.key);

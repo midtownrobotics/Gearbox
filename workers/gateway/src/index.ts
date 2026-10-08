@@ -26,6 +26,7 @@ import devPorts from "../../../.dev-ports.json";
 //                                    (`signInCallbackApiUrl`); the team is in the sign-in's state
 //   <app>.<domain>, api.<app>.<domain>, id.<domain>, admin.<domain>
 //                                  → 410 Gone, naming the new address: G3's old addresses, retired
+//   any other <x>.<platform>       → the platform's not-found page (JSON 404 for API calls)
 //   anything else                  → passed on to wherever its DNS points (www)
 // /api/internal/... is for workers only (over service bindings) and never answered here.
 //
@@ -215,6 +216,38 @@ async function loadTeamApps(env: Env, team: string): Promise<TeamApps> {
 const appEnabled = (apps: TeamApps, app: Worker) =>
   ALWAYS_ON.has(app) || apps === "all" || (apps?.includes(app) ?? false);
 
+/**
+ * A team-number address for a team the platform doesn't have: a page goes to the platform's
+ * team-not-found page (another number, or sign it up); an API call gets JSON.
+ */
+function noSuchTeam(request: Request, url: URL, team: string, local: boolean): Response {
+  if (!wantsPage(request, url)) return json(404, "No such team.");
+  const number = team.replace(/^frc/, "");
+  return Response.redirect(`${platformOrigin(url, local)}/team-not-found?team=${number}`, 302);
+}
+
+/**
+ * An address on the platform's domain that's nothing (no app, no team pattern): a page goes to
+ * the platform's not-found page, naming the address; anything else gets JSON.
+ */
+function nothingHere(request: Request, url: URL, local: boolean, error: string): Response {
+  if (!wantsPage(request, url)) return json(404, error);
+  const host = encodeURIComponent(url.hostname);
+  return Response.redirect(`${platformOrigin(url, local)}/not-found?host=${host}`, 302);
+}
+
+/** A browser asking for a page (not an API call). */
+function wantsPage(request: Request, url: URL): boolean {
+  const isApi = url.pathname === "/api" || url.pathname.startsWith("/api/");
+  return !isApi && (request.headers.get("Accept") ?? "").includes("text/html");
+}
+
+/** The platform's own site: https://<platform>, or in dev the gateway's gearbox.localhost. */
+function platformOrigin(url: URL, local: boolean): string {
+  if (!local) return `https://${site.platformDomain}`;
+  return `${url.protocol}//${DEV_DOMAIN}${url.port ? `:${url.port}` : ""}`;
+}
+
 /** The team's home for a team address: <number>-<app>.<domain> → <number>.<domain>. */
 function homeOf(url: URL): string {
   const [first, ...rest] = url.hostname.split(".");
@@ -314,7 +347,12 @@ export default {
     const url = new URL(request.url);
     const localHost = env.LOCAL_DEV === "true" ? fromLocalHost(url.hostname) : null;
     const local = localHost !== null;
-    const target = route(localHost ?? url.hostname);
+    const host = localHost ?? url.hostname;
+    const target = route(host);
+    // Any other name on the platform's domain is nothing: the platform's not-found page.
+    if (target === null && host.endsWith(`.${site.platformDomain}`)) {
+      return nothingHere(request, url, local, "Nothing is here.");
+    }
     if (target === null) {
       const moved = retiredHost(url.hostname);
       if (moved) return gone(request, moved);
@@ -326,7 +364,7 @@ export default {
         return new Response("Nothing is here.", { status: 502 });
       }
     }
-    if (target === "unknown app") return json(404, "No such app.");
+    if (target === "unknown app") return nothingHere(request, url, local, "No such app.");
 
     const insecure = local ? null : toHttps(url);
     if (insecure) return insecure;
@@ -340,7 +378,7 @@ export default {
         console.error("[gateway] team lookup", err);
         return json(503, "Please try again in a minute.");
       }
-      if (apps === null) return json(404, "No such team.");
+      if (apps === null) return noSuchTeam(request, url, team, local);
     }
     if (!appEnabled(apps, target.app)) return notEnabled(request, target.app, homeOf(url));
 

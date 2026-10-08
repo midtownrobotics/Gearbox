@@ -12,6 +12,7 @@ import { TeamsPage } from "./console/teams-page";
 import { HomePage } from "./home-page";
 import { ReportPage } from "./report-page";
 import { SignupPage } from "./signup-page";
+import { MyTeamPage, NotFoundPage, TeamNotFoundPage } from "./team-pages";
 
 /** admin.<domain> is only the operators' console (also at /console on the platform's own host). */
 const onConsoleHost = (CONSOLE_HOSTS as readonly string[]).includes(window.location.hostname);
@@ -36,6 +37,9 @@ createRoot(rootElement).render(
           <>
             <Route path="/signup" element={<SignupPage />} />
             <Route path="/report" element={<ReportPage />} />
+            <Route path="/team" element={<MyTeamPage />} />
+            <Route path="/team-not-found" element={<TeamNotFoundPage />} />
+            <Route path="/not-found" element={<NotFoundPage />} />
             <Route path="*" element={<HomePage />} />
           </>
         )}

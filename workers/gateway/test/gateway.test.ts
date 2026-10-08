@@ -107,6 +107,31 @@ describe("team addresses", () => {
     expect((await gateway(`${team("999-orders")}/`)).status).toBe(404);
     expect((await gateway(`${team("254-nope")}/`)).status).toBe(404);
   });
+
+  it("sends a browser on a team that isn't there to the platform's team-not-found page", async () => {
+    const html = { headers: { Accept: "text/html" }, redirect: "manual" as const };
+    for (const host of ["999", "999-orders"]) {
+      const res = await gateway(`${team(host)}/lists`, html);
+      expect(res.status).toBe(302);
+      expect(res.headers.get("Location")).toBe(
+        `https://${site.platformDomain}/team-not-found?team=999`,
+      );
+    }
+    // Its API still answers JSON.
+    expect((await gateway(`${team("999-orders")}/api/requests`, html)).status).toBe(404);
+  });
+
+  it("sends a browser on any other name on the platform's domain to the not-found page", async () => {
+    const html = { headers: { Accept: "text/html" }, redirect: "manual" as const };
+    for (const host of ["nope", "254-nope", "www2"]) {
+      const res = await gateway(`${team(host)}/`, html);
+      expect(res.status).toBe(302);
+      expect(res.headers.get("Location")).toBe(
+        `https://${site.platformDomain}/not-found?host=${host}.${site.platformDomain}`,
+      );
+    }
+    expect((await gateway(`${team("nope")}/api/x`)).status).toBe(404);
+  });
 });
 
 describe("sessions and identity", () => {
