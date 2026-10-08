@@ -12,6 +12,7 @@ import {
 } from "@g3/site-config";
 import { refreshTeamUiSettings, useTeamNames } from "@g3/ui";
 import { type CSSProperties, useEffect, useState } from "react";
+import { FaEye, FaEyeSlash, FaTimes } from "react-icons/fa";
 import { g3id } from "../../lib/api";
 import { AppOrder } from "./app-order";
 
@@ -244,51 +245,31 @@ export function AppearancePage() {
         </section>
 
         <section className="rounded-lg border border-line bg-surface p-5">
-          <h2 className="mb-4 text-xl font-semibold">Links</h2>
+          <h2 className="mb-1 text-xl font-semibold">Links</h2>
           <p className="mb-4 text-sm text-secondary-600">
-            Edit the links shown on the portal. Hide a link to keep its URL for later, or remove it
-            to clear its URL. Empty links are omitted. Hiding the public site also hides its link on
-            the portal sign-in screen.
+            Shown as tiles on your team's home. Leave one empty to leave it out, or hide it to keep
+            its address for later.
           </p>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <ul className="divide-y divide-line rounded-md border border-line">
             {(Object.keys(teamUiLinkLabels) as TeamUiLinkKey[]).map((key) => (
-              <div key={key} className="space-y-2">
-                <TextField
-                  label={teamUiLinkLabels[key]}
-                  value={settings.links[key]}
-                  onChange={(value) => update("links", { ...settings.links, [key]: value })}
-                  type="url"
-                  placeholder="https://…"
-                />
-                <div className="flex items-center justify-between gap-3 text-sm">
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={settings.hiddenLinks.includes(key)}
-                      onChange={(event) =>
-                        update(
-                          "hiddenLinks",
-                          event.target.checked
-                            ? [...settings.hiddenLinks, key]
-                            : settings.hiddenLinks.filter((link) => link !== key),
-                        )
-                      }
-                    />
-                    Hide {teamUiLinkLabels[key]}
-                  </label>
-                  <button
-                    type="button"
-                    disabled={!settings.links[key] || saving}
-                    className="text-primary-700 underline disabled:opacity-50"
-                    onClick={() => update("links", { ...settings.links, [key]: "" })}
-                    aria-label={`Remove ${teamUiLinkLabels[key]} link`}
-                  >
-                    Remove link
-                  </button>
-                </div>
-              </div>
+              <LinkRow
+                key={key}
+                label={teamUiLinkLabels[key]}
+                value={settings.links[key]}
+                hidden={settings.hiddenLinks.includes(key)}
+                disabled={saving}
+                onChange={(value) => update("links", { ...settings.links, [key]: value })}
+                onHiddenChange={(hidden) =>
+                  update(
+                    "hiddenLinks",
+                    hidden
+                      ? [...settings.hiddenLinks, key]
+                      : settings.hiddenLinks.filter((link) => link !== key),
+                  )
+                }
+              />
             ))}
-          </div>
+          </ul>
         </section>
 
         <section className="rounded-lg border border-line bg-surface p-5">
@@ -323,6 +304,68 @@ export function AppearancePage() {
         </div>
       </form>
     </main>
+  );
+}
+
+/** One link: its name, its address, and buttons to hide it or clear it. */
+function LinkRow({
+  label,
+  value,
+  hidden,
+  disabled,
+  onChange,
+  onHiddenChange,
+}: {
+  label: string;
+  value: string;
+  hidden: boolean;
+  disabled: boolean;
+  onChange: (value: string) => void;
+  onHiddenChange: (hidden: boolean) => void;
+}) {
+  const iconButton =
+    "flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-secondary-500 hover:bg-inset hover:text-secondary-900 disabled:opacity-40 disabled:hover:bg-transparent";
+  return (
+    <li className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 sm:flex-nowrap">
+      <label
+        htmlFor={`link-${label}`}
+        className={`w-full text-sm font-medium sm:w-36 sm:shrink-0 ${hidden ? "text-secondary-500" : ""}`}
+      >
+        {label}
+        {hidden && <span className="ml-1 text-xs font-normal">(hidden)</span>}
+      </label>
+      <input
+        id={`link-${label}`}
+        type="url"
+        value={value}
+        placeholder="https://…"
+        onChange={(event) => onChange(event.target.value)}
+        className={`min-w-0 flex-1 rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-secondary-900 focus:outline-none focus:ring-2 focus:ring-primary-500 ${
+          hidden ? "opacity-60" : ""
+        }`}
+      />
+      <button
+        type="button"
+        className={iconButton}
+        disabled={disabled}
+        onClick={() => onHiddenChange(!hidden)}
+        aria-pressed={hidden}
+        aria-label={hidden ? `Show ${label}` : `Hide ${label}`}
+        title={hidden ? "Show on the home page" : "Hide, keeping the address"}
+      >
+        {hidden ? <FaEyeSlash /> : <FaEye />}
+      </button>
+      <button
+        type="button"
+        className={iconButton}
+        disabled={disabled || !value}
+        onClick={() => onChange("")}
+        aria-label={`Clear ${label} link`}
+        title="Clear the address"
+      >
+        <FaTimes />
+      </button>
+    </li>
   );
 }
 
