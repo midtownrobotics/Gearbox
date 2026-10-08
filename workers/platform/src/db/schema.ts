@@ -1,4 +1,4 @@
-import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 /** The platform's team registry (migration 0001). */
 export const teams = sqliteTable("teams", {
@@ -64,6 +64,37 @@ export const operatorActions = sqliteTable("operator_actions", {
   action: text("action", { enum: OPERATOR_ACTIONS }).notNull(),
   teamId: text("team_id"),
   reason: text("reason"),
+  /** JSON. */
+  details: text("details").notNull().default("{}"),
+  createdAt: integer("created_at").notNull(),
+});
+
+/** Which apps each team has switched on (migration 0005); the apps are src/registry.ts. */
+export const teamApps = sqliteTable(
+  "team_apps",
+  {
+    teamId: text("team_id").notNull(),
+    app: text("app").notNull(),
+    enabled: integer("enabled", { mode: "boolean" }).notNull(),
+    changedAt: integer("changed_at").notNull(),
+    changedBy: text("changed_by"),
+    /** Switched off: when its data goes. */
+    deleteAfter: integer("delete_after"),
+    dataDeletedAt: integer("data_deleted_at"),
+  },
+  (t) => [primaryKey({ columns: [t.teamId, t.app] })],
+);
+
+export const TEAM_ACTIONS = ["app_enabled", "app_disabled", "app_data_deleted"] as const;
+
+/** A team's own log of what its admins did on its dashboard (migration 0005). */
+export const teamAuditLog = sqliteTable("team_audit_log", {
+  id: text("id").primaryKey(),
+  teamId: text("team_id").notNull(),
+  /** Null for the platform itself (the daily cron). */
+  userId: text("user_id"),
+  action: text("action", { enum: TEAM_ACTIONS }).notNull(),
+  app: text("app"),
   /** JSON. */
   details: text("details").notNull().default("{}"),
   createdAt: integer("created_at").notNull(),

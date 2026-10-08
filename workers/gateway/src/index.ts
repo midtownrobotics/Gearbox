@@ -4,6 +4,7 @@ import {
   DEV_DOMAIN,
   TEAM_HOST_APPS,
   isAllowedOrigin,
+  portalAppLabels,
   site,
   teamAppUrl,
   teamKey,
@@ -34,7 +35,10 @@ import devPorts from "../../../.dev-ports.json";
 // 1648-id.gearbox.localhost:8796 this team's G3ID. /api goes to each app's local worker, pages to its Vite dev server (.dev-ports.json).
 //
 // On the way it keeps teams apart (roadmap step 2.3):
-// - A team-number host only answers for a team the platform has (signed up and active).
+// - A team-number host only answers for a team the platform has (signed up and active), and an
+//   app's address (and /api/~<app>) only for an app the team has switched on (roadmap 4.6): any
+//   other answers "not enabled". Sign-in, the team's home and the platform's API are always on.
+//   What the platform says is remembered for a minute, so a change shows within one.
 // - A session belonging to another team's member is dropped: the app sees a signed-out request.
 // - An /api request from another team's page (its Origin) is refused. Every app's CORS allows the
 //   whole domain, so without this one team's page could call another team's API with a member's
@@ -182,7 +186,56 @@ function memo<T>() {
   };
 }
 
-const teamExists = memo<boolean>();
+/** A team's apps that are on (null: no such team; "all": the platform didn't say). */
+type TeamApps = readonly string[] | "all" | null;
+const teamApps = memo<TeamApps>();
+
+/** Always on for every team: sign-in, the team's home, and the platform's own API. */
+const ALWAYS_ON = new Set<Worker>(["id", "portal", "platform"]);
+
+async function loadTeamApps(env: Env, team: string): Promise<TeamApps> {
+  let res: Response;
+  try {
+    res = await env.PLATFORM.fetch(`http://platform/api/teams/${team}`);
+  } catch (err) {
+    // The site's own team keeps working while the platform is down.
+    if (team === teamKey) return "all";
+    throw err;
+  }
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    if (team === teamKey) return "all";
+    throw new Error(`platform /teams: ${res.status}`);
+  }
+  const { apps } = (await res.json()) as { apps?: string[] };
+  // A platform from before the app library: every app.
+  return apps ?? "all";
+}
+
+const appEnabled = (apps: TeamApps, app: Worker) =>
+  ALWAYS_ON.has(app) || apps === "all" || (apps?.includes(app) ?? false);
+
+/** The team's home for a team address: <number>-<app>.<domain> → <number>.<domain>. */
+function homeOf(url: URL): string {
+  const [first, ...rest] = url.hostname.split(".");
+  const number = first.split("-")[0];
+  return `${url.protocol}//${[number, ...rest].join(".")}${url.port ? `:${url.port}` : ""}`;
+}
+
+/** An app the team hasn't switched on: a short page (JSON for API calls). */
+function notEnabled(request: Request, app: Worker, home: string): Response {
+  const name = app in portalAppLabels ? portalAppLabels[app as keyof typeof portalAppLabels] : app;
+  const message = `${name} isn't switched on for this team.`;
+  const accept = request.headers.get("Accept") ?? "";
+  if (!accept.includes("text/html")) {
+    return Response.json({ error: message, code: "app_not_enabled" }, { status: 404 });
+  }
+  const body = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${name} isn't on</title><style>body{font-family:system-ui,sans-serif;margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f4f6f7;color:#1a1a1a}@media (prefers-color-scheme:dark){body{background:#171717;color:#ededed}}main{max-width:28rem;padding:1.5rem;text-align:center}a{color:inherit}</style></head><body><main><h1>${message}</h1><p>A team admin can switch it on under Apps on the <a href="${home}/admin">team's admin pages</a>.</p><p><a href="${home}/">Back to the team's home</a></p></main></body></html>`;
+  return new Response(body, {
+    status: 404,
+    headers: { "Content-Type": "text/html; charset=utf-8" },
+  });
+}
 const sessionIdentity = memo<Identity | null>();
 
 type Identity = {
@@ -279,13 +332,17 @@ export default {
     if (insecure) return insecure;
 
     const { team } = target;
-    if (team !== null && team !== teamKey) {
-      const exists = await teamExists(team, async () => {
-        const res = await env.PLATFORM.fetch(`http://platform/api/teams/${team}`);
-        return res.ok;
-      });
-      if (!exists) return json(404, "No such team.");
+    let apps: TeamApps = "all";
+    if (team !== null) {
+      try {
+        apps = await teamApps(team, () => loadTeamApps(env, team));
+      } catch (err) {
+        console.error("[gateway] team lookup", err);
+        return json(503, "Please try again in a minute.");
+      }
+      if (apps === null) return json(404, "No such team.");
     }
+    if (!appEnabled(apps, target.app)) return notEnabled(request, target.app, homeOf(url));
 
     const isApi = url.pathname === "/api" || url.pathname.startsWith("/api/");
     const headers = new Headers(request.headers);
@@ -329,6 +386,7 @@ export default {
     if (other) {
       if (!(other[1] in BINDINGS)) return json(404, "No such app.");
       app = other[1] as Worker;
+      if (!appEnabled(apps, app)) return notEnabled(request, app, homeOf(url));
       url.pathname = `/api${other[2] ?? "/"}`;
     }
     if (url.pathname === "/api/internal" || url.pathname.startsWith("/api/internal/")) {

@@ -4,7 +4,8 @@
   "private": true,
   "exports": {
     ".": "./src/index.ts",
-    "./intake-types": "./src/lib/intake-types.ts"
+    "./intake-types": "./src/lib/intake-types.ts",
+    "./manifest": "./src/manifest.ts"
   },
   "scripts": {
     "dev": "wrangler dev --port 8797 --inspector-port 9239",

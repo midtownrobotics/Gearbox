@@ -10,7 +10,8 @@ import {
   operators,
   teams,
 } from "./db/schema";
-import { db, g3id, now } from "./lib";
+import { accounts, db, g3id, now } from "./lib";
+import { DELETABLE, callHook } from "./registry";
 import type { AppEnv } from "./types";
 
 // The platform operators' console (roadmap 2.8), at /console on the platform worker; its page is
@@ -26,42 +27,17 @@ import type { AppEnv } from "./types";
 // (site.ts) can't be deleted or suspended. A team's number is its id ("frc<number>") everywhere,
 // so it's never changed: a team that claimed the wrong number is deleted and signs up again.
 //
-// Deleting a team deletes its data in every team-scoped app first (TEAM_APPS), then in G3ID.
+// Deleting a team deletes its data in every app that keeps it first (each manifest's delete hook,
+// src/registry.ts), then in G3ID.
 
-/** The team-scoped apps, by name and binding. Scouting's data isn't per team yet. */
-const TEAM_APPS = [
-  ["Attendance", "ATTENDANCE"],
-  ["Edge", "EDGE"],
-  ["Inventory", "INVENTORY"],
-  ["Orders", "ORDERS"],
-  ["Pit", "PIT"],
-  ["Shop", "SHOP"],
-  ["Skill Tree", "SKILL_TREE"],
-] as const satisfies readonly (readonly [string, keyof AppEnv["Bindings"]])[];
-
-/** Deletes the team's data in every team-scoped app. Gives back the apps that couldn't. */
+/** Deletes the team's data in every app that keeps it. Gives back the apps that couldn't. */
 async function deleteAppData(env: AppEnv["Bindings"], teamId: string) {
   const results = await Promise.all(
-    TEAM_APPS.map(async ([name, binding]) => {
-      try {
-        const res = await (env[binding] as Fetcher).fetch(
-          new Request(
-            `http://${binding.toLowerCase()}/api/internal/teams/${encodeURIComponent(teamId)}`,
-            {
-              method: "DELETE",
-            },
-          ),
-        );
-        if (!res.ok)
-          console.error("[console] deleting team data", name, res.status, await res.text());
-        return res.ok ? null : name;
-      } catch (err) {
-        console.error("[console] deleting team data", name, err);
-        return name;
-      }
-    }),
+    DELETABLE.map(async (app) =>
+      (await callHook(env, app.slug, "delete", teamId)) ? null : app.name,
+    ),
   );
-  return results.filter((name): name is (typeof TEAM_APPS)[number][0] => name !== null);
+  return results.filter((name): name is string => name !== null);
 }
 
 type Member = {
@@ -73,18 +49,6 @@ type Member = {
   isMentor: boolean;
   lastLoginAt: number | null;
 };
-
-type Account = { id: string; displayName: string; email: string; teamId: string };
-
-/** G3ID accounts by id (any team). */
-async function accounts(env: AppEnv["Bindings"], ids: (string | null)[]) {
-  const wanted = [...new Set(ids.filter((id): id is string => !!id))];
-  if (wanted.length === 0) return new Map<string, Account>();
-  const res = await g3id(env, `/users?ids=${wanted.map(encodeURIComponent).join(",")}`);
-  if (!res.ok) throw new Error(`G3ID /users: ${res.status}`);
-  const list = (await res.json()) as Account[];
-  return new Map(list.map((a) => [a.id, a]));
-}
 
 /** A page of the console: its own address, or a local dev server. */
 function fromConsole(origin: string | undefined): boolean {
@@ -329,7 +293,7 @@ export const consoleRouter = new Hono<AppEnv>()
         status: team.status,
         slackWorkspaceName: team.slackWorkspaceName,
         deletedAccounts: deletedUserIds.length,
-        apps: TEAM_APPS.map(([name]) => name),
+        apps: DELETABLE.map((app) => app.name),
       },
     });
     return c.json({ ok: true });

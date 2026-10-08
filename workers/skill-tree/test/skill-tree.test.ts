@@ -1,4 +1,13 @@
-import { type TestUser, admin, kioskAdmin, mentor, otherStudent, student } from "@g3/testing/users";
+import {
+  type TestUser,
+  admin,
+  kioskAdmin,
+  mentor,
+  newTeamId,
+  otherStudent,
+  student,
+  teamUsers,
+} from "@g3/testing/users";
 import { call, callAs, jsonAs } from "@g3/testing/worker";
 import { describe, expect, it } from "vitest";
 
@@ -137,6 +146,19 @@ describe("the default trees", () => {
     expect(battery.requires).toEqual([shop.id]);
     expect(shop.skills[1].requires).toEqual([shop.skills[0].id]);
     expect(trees.flatMap((t) => t.categories.flatMap((c) => c.skills))).toHaveLength(224);
+  });
+
+  it("are loaded when a team switches Skill Tree on (its seed hook), and kept after", async () => {
+    const team = teamUsers(newTeamId());
+    expect((await call(`/internal/teams/${team.teamId}/seed`, { method: "POST" })).status).toBe(
+      200,
+    );
+    const first = await jsonAs<Loaded>(team.student, "/trees");
+    expect(first.trees).toHaveLength(9);
+    // Again (switched off and on): the team's set stays as it is.
+    await call(`/internal/teams/${team.teamId}/seed`, { method: "POST" });
+    const again = await jsonAs<Loaded>(team.student, "/trees");
+    expect(again.trees.map((t) => t.id)).toEqual(first.trees.map((t) => t.id));
   });
 });
 

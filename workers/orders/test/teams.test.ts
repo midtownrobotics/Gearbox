@@ -1,6 +1,6 @@
 import { env } from "cloudflare:test";
 import { newTeamId, student, teamUsers } from "@g3/testing/users";
-import { callAs, jsonAs } from "@g3/testing/worker";
+import { call, callAs, jsonAs } from "@g3/testing/worker";
 import { describe, expect, it } from "vitest";
 import { fiscalLabel, fiscalRange, fiscalYearOf } from "../src/lib/fiscal";
 
@@ -180,6 +180,19 @@ describe("the starter catalog", () => {
       .bind(team.teamId)
       .first<{ n: number }>();
     expect(families?.n).toBe(0);
+  });
+
+  it("is copied when the team switches Orders on (its seed hook), and only once", async () => {
+    const team = teamUsers(newTeamId());
+    for (let i = 0; i < 2; i++) {
+      const res = await call(`/internal/teams/${team.teamId}/seed`, { method: "POST" });
+      expect(res.status).toBe(200);
+    }
+    const copied = await database
+      .prepare("SELECT count(*) AS n FROM catalog_items WHERE team_id = ?")
+      .bind(team.teamId)
+      .first<{ n: number }>();
+    expect(copied?.n).toBe(await starterCount());
   });
 
   it("is copied once, even when the team's first requests arrive together", async () => {

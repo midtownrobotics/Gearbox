@@ -19,3 +19,15 @@ export function g3id(
     }),
   );
 }
+
+type Account = { id: string; displayName: string; email: string; teamId: string };
+
+/** G3ID accounts by id (any team). */
+export async function accounts(env: AppEnv["Bindings"], ids: (string | null)[]) {
+  const wanted = [...new Set(ids.filter((id): id is string => !!id))];
+  if (wanted.length === 0) return new Map<string, Account>();
+  const res = await g3id(env, `/users?ids=${wanted.map(encodeURIComponent).join(",")}`);
+  if (!res.ok) throw new Error(`G3ID /users: ${res.status}`);
+  const list = (await res.json()) as Account[];
+  return new Map(list.map((a) => [a.id, a]));
+}

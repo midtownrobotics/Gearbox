@@ -12,7 +12,7 @@ import {
 } from "@g3/site-config";
 import { refreshTeamUiSettings, useTeamNames } from "@g3/ui";
 import { type CSSProperties, useEffect, useState } from "react";
-import { api } from "../../lib/api";
+import { g3id } from "../../lib/api";
 import { AppOrder } from "./app-order";
 
 type Mode = "light" | "dark";
@@ -31,7 +31,7 @@ const colorLabels: Record<Exclude<keyof TeamUiColors, "accent">, string> = {
 const fieldClass =
   "w-full rounded-md border border-line bg-surface px-3 py-2 text-secondary-900 focus:outline-none focus:ring-2 focus:ring-primary-500";
 
-export function AdminTeamUiPage() {
+export function AppearancePage() {
   const { idName } = useTeamNames();
   const [settings, setSettings] = useState<TeamUiSettings>(() => teamUiDefaults(pageTeamId));
   // The team's own defaults (its name and number), from G3ID: what "Reset to defaults" restores.
@@ -42,7 +42,7 @@ export function AdminTeamUiPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    api.admin.team.ui
+    g3id.admin.team.ui
       .$get()
       .then(async (response) => {
         if (!response.ok) throw new Error("Could not load team settings.");
@@ -96,7 +96,7 @@ export function AdminTeamUiPage() {
     setMessage("");
     setError("");
     try {
-      const response = await api.admin.team.ui.$put({ json: settings });
+      const response = await g3id.admin.team.ui.$put({ json: settings });
       if (!response.ok) {
         const data = (await response.json()) as { error?: string };
         throw new Error(data.error ?? "Could not save team settings.");

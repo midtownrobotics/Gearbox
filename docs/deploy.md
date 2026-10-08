@@ -125,7 +125,14 @@ Right after the release:
 
 ## Portal's logo (once, roadmap Phase 3)
 
-Portal no longer has G3's logo built in. After the release, a G3ID admin sets G3's logo URL on G3ID's Admin → Team Appearance page (an https link to the image, e.g. on G3's public site); until then Portal's public-site tile shows a globe.
+Portal no longer has G3's logo built in. After the release, a G3ID admin sets G3's logo URL on the team's Appearance page (`https://1648.frcgearbox.com/admin/appearance`) (an https link to the image, e.g. on G3's public site); until then Portal's public-site tile shows a globe.
+
+## The app library (once, roadmap Phase 4)
+
+- **Platform first:** apply its migration `0005_team_apps.sql` (`pnpm --filter @g3/worker-platform run db:migrate:remote`) before the release deploys. It switches every app on for every team already signed up (G3 included), so nothing disappears; teams signing up after it start with none.
+- The platform now has a daily cron (cleaning up apps switched off more than 90 days ago); `wrangler deploy` sets it up, nothing to do by hand.
+- The gateway asks the platform which apps a team has on. If it's deployed before the platform's new code, it sees no app list and leaves every app open, so the order doesn't break anything.
+- Slack's install now returns admins to the team's home (`<number>.frcgearbox.com/admin/slack`), still through G3ID's `id.<platform>` callback: nothing changes in the Slack app's settings.
 
 ## Other outside services
 

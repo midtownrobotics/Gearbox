@@ -80,7 +80,7 @@ export function apiUrl(app: AppName): string {
  * gateway sends it to that app (Vite's dev proxy does in dev), so the call is same-origin and
  * always for the page's own team. E.g. `${apiPath("id")}/auth/me`.
  */
-export function apiPath(app: AppName): string {
+export function apiPath(app: AppName | "platform"): string {
   return `/api/~${app}`;
 }
 

@@ -8,6 +8,10 @@ name = "platform"
 main = "src/index.ts"
 compatibility_date = "2026-05-17"
 
+# Daily: apps a team switched off more than 90 days ago have its data deleted (src/team.ts).
+[triggers]
+crons = ["15 7 * * *"]
+
 [[services]]
 binding = "G3ID"
 service = "g3id"
@@ -98,6 +102,9 @@ binding = "PLATFORM_DB"
 database_name = "gearbox-platform-prod"
 database_id = "12a64874-012b-4940-bb0f-98ff5a9c5d2e"
 migrations_dir = "src/db/migrations"
+
+[env.production.triggers]
+crons = ["15 7 * * *"]
 
 [env.production.vars]
 SLACK_CLIENT_ID = "4695117013.8723416088496"

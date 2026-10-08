@@ -189,8 +189,9 @@ const listSelect = {
 const app = base
   .get("/health", (c) => c.json({ status: "ok", service: "pit", version: packageJson.version }))
 
-  // When an operator deletes the team (the platform's console), its data goes too. Only other
-  // workers reach /internal: the gateway never answers it.
+  // When an operator deletes the team (the platform's console), or 90 days after the team switches
+  // the app off (the platform's app library), its data goes too. Only other workers reach
+  // /internal: the gateway never answers it.
   .delete("/internal/teams/:teamId", async (c) => {
     await deleteTeamRows(createDb(c.env.PIT_DB), c.req.param("teamId"), [
       checklistIssues,

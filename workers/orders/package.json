@@ -7,7 +7,8 @@
     "./split": "./src/lib/split.ts",
     "./fiscal": "./src/lib/fiscal.ts",
     "./naming": "./src/lib/naming.ts",
-    "./product-key": "./src/lib/product-key.ts"
+    "./product-key": "./src/lib/product-key.ts",
+    "./manifest": "./src/manifest.ts"
   },
   "scripts": {
     "dev": "wrangler dev --port 8794 --inspector-port 9236",

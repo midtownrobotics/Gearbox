@@ -94,15 +94,23 @@ const slack = async (request: Request) => {
 };
 
 /**
- * A team-scoped app's /api/internal/teams/:id: records each team it's asked to delete (read back
- * with GET /api/internal/deleted), and fails for a team a test named with POST /api/internal/fail/:id.
+ * A team-scoped app's /api/internal/teams/:id: records each team it's asked to delete or seed
+ * (read back with GET /api/internal/deleted and /seeded), and fails for a team a test named with
+ * POST /api/internal/fail/:id.
  */
 function teamApp() {
   const deleted: string[] = [];
+  const seeded: string[] = [];
   const failing = new Set<string>();
   return (request: Request) => {
     const path = new URL(request.url).pathname;
     if (path === "/api/internal/deleted") return Response.json(deleted);
+    if (path === "/api/internal/seeded") return Response.json(seeded);
+    const seed = path.match(/^\/api\/internal\/teams\/(.+)\/seed$/);
+    if (seed && request.method === "POST") {
+      seeded.push(decodeURIComponent(seed[1]));
+      return Response.json({ ok: true });
+    }
     const fail = path.match(/^\/api\/internal\/fail\/(.+)$/);
     if (fail) {
       failing.add(decodeURIComponent(fail[1]));
