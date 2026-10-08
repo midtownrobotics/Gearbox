@@ -36,7 +36,7 @@ export const adminPlugin: Plugin = {
     },
   ],
   navItems: [
-    { label: "Apps", to: "/admin", order: 10, requiresAdmin: true, group: "Admin" },
+    { label: "Manage apps", to: "/admin", order: 10, requiresAdmin: true, group: "Admin" },
     {
       label: "Appearance",
       to: "/admin/appearance",
