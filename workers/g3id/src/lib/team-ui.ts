@@ -87,10 +87,10 @@ export function isTeamUiSettings(value: unknown): value is TeamUiSettings {
 }
 
 /**
- * A record saved when the brand colour was a setting of its own (`primaryColor`), as one saved
- * now, where the light accent is the brand colour. A brand colour the team chose becomes its light
- * accent, so its buttons, links and icons stay the colour they were; a dark accent it never chose
- * is turned to that colour's hue. The built-in brand colour meant "not chosen": the accents stay
+ * A record saved when the brand color was a setting of its own (`primaryColor`), as one saved
+ * now, where the light accent is the brand color. A brand color the team chose becomes its light
+ * accent, so its buttons, links and icons stay the color they were; a dark accent it never chose
+ * is turned to that color's hue. The built-in brand color meant "not chosen": the accents stay
  * as saved.
  */
 function withoutPrimaryColor(value: Record<string, unknown>): Record<string, unknown> {

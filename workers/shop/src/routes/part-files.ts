@@ -149,7 +149,7 @@ export const partFilesRouter = new Hono<AppEnv>()
       .all();
     return c.json(await withAssignments(db, teamId, rows, fileIds));
   })
-  // Multipart upload into the library. Assign instances afterwards with PUT /:id/assignments.
+  // Multipart upload into the library. Assign instances afterward with PUT /:id/assignments.
   .post("/", requireAuth, denyKiosk, async (c) => {
     const form = await c.req.formData();
     // Workers' FormData typings omit File, but multipart file fields arrive as File objects.

@@ -9,4 +9,4 @@
 "@g3/worker-platform": patch
 ---
 
-Sign-in pages, messages, Scouting's logo and colours, and tab icons use each team's own name, logo and colour instead of G3's.
+Sign-in pages, messages, Scouting's logo and colors, and tab icons use each team's own name, logo and color instead of G3's.

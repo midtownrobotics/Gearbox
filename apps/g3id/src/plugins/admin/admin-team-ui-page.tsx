@@ -18,7 +18,7 @@ import { AppOrder } from "./app-order";
 type Mode = "light" | "dark";
 const modes: Mode[] = ["light", "dark"];
 
-// A theme's colours other than its accent, which has its own controls (AccentColors).
+// A theme's colors other than its accent, which has its own controls (AccentColors).
 const colorLabels: Record<Exclude<keyof TeamUiColors, "accent">, string> = {
   page: "Page background",
   surface: "Cards and navigation",
@@ -375,8 +375,8 @@ function ColorField({
 }
 
 /**
- * A theme's colours together, as the apps use them: a top bar and a card on the page, with text,
- * muted text, an inset box, a link in the accent and a button in the brand colour (the light
+ * A theme's colors together, as the apps use them: a top bar and a card on the page, with text,
+ * muted text, an inset box, a link in the accent and a button in the brand color (the light
  * accent, in both themes).
  */
 function ThemePreview({
@@ -438,7 +438,7 @@ function ThemePreview({
 
 const otherMode = (mode: Mode): Mode => (mode === "light" ? "dark" : "light");
 
-// The two parts of an accent its own sliders set; its hue comes from the colour entered.
+// The two parts of an accent its own sliders set; its hue comes from the color entered.
 const sliders: { part: "s" | "v"; label: string }[] = [
   { part: "s", label: "Saturation" },
   { part: "v", label: "Brightness" },
@@ -458,8 +458,8 @@ const sliderClass = [
 ].join(" ");
 
 /**
- * A colour just entered, for the sliders. Black has no hue or saturation and a grey no hue, so
- * those stay as they were: the sliders can bring the colour back.
+ * A color just entered, for the sliders. Black has no hue or saturation and a gray no hue, so
+ * those stay as they were: the sliders can bring the color back.
  */
 function shadeOf(entered: Hsv, previous: Hsv): Hsv {
   if (entered.v === 0) return { ...previous, v: 0 };
@@ -467,7 +467,7 @@ function shadeOf(entered: Hsv, previous: Hsv): Hsv {
 }
 
 /**
- * The team's accent in each theme. Linked, a colour entered in either box gives the other its
+ * The team's accent in each theme. Linked, a color entered in either box gives the other its
  * hue, and the other keeps its own saturation and brightness; unlinked, the two are chosen freely.
  * Either way the sliders under a box change only that box, and never its hue.
  */
@@ -485,13 +485,13 @@ function AccentColors({
   onChange: (accents: Partial<Record<Mode, string>>) => void;
 }) {
   const palettes = { light, dark };
-  // Each accent as the sliders see it. A hex code alone forgets the hue of a colour slid down to
-  // grey or black, and rounds the rest, so the exact shade is kept here beside it.
+  // Each accent as the sliders see it. A hex code alone forgets the hue of a color slid down to
+  // gray or black, and rounds the rest, so the exact shade is kept here beside it.
   const [kept, setKept] = useState<Record<Mode, Hsv>>(() => ({
     light: isHexColor(light.accent) ? hexToHsv(light.accent) : { h: 0, s: 0, v: 0 },
     dark: isHexColor(dark.accent) ? hexToHsv(dark.accent) : { h: 0, s: 0, v: 0 },
   }));
-  // A colour that arrived from outside (loaded, or reset to defaults) replaces the kept shade.
+  // A color that arrived from outside (loaded, or reset to defaults) replaces the kept shade.
   let shades = kept;
   for (const mode of modes) {
     const hex = palettes[mode].accent.toLowerCase();
@@ -502,12 +502,12 @@ function AccentColors({
   if (shades !== kept) setKept(shades);
 
   function enter(mode: Mode, text: string) {
-    // Still being typed: nothing else changes until it's a whole colour.
+    // Still being typed: nothing else changes until it's a whole color.
     if (!isHexColor(text)) return onChange({ [mode]: text });
     const entered = hexToHsv(text);
     const next = { ...shades, [mode]: shadeOf(entered, shades[mode]) };
     const accents: Partial<Record<Mode, string>> = { [mode]: text };
-    // A grey or black has no hue to give the other accent.
+    // A gray or black has no hue to give the other accent.
     if (linked && entered.s > 0) {
       const twin = otherMode(mode);
       next[twin] = { ...shades[twin], h: entered.h };
@@ -554,7 +554,7 @@ function AccentColors({
               </label>
               {sliders.map(({ part, label: name }) => {
                 const percent = Math.round(shade[part] * 100);
-                // The track runs through the colours the slider can reach.
+                // The track runs through the colors the slider can reach.
                 const from = hsvToHex({ ...shade, [part]: 0 });
                 const to = hsvToHex({ ...shade, [part]: 1 });
                 return (

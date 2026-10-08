@@ -243,12 +243,12 @@ function SkillPicker({
   const tree = trees.find((t) => String(t.id) === treeId);
   const category = tree?.categories.find((c) => String(c.id) === categoryId);
   const pickedIds = new Set(picked.map((s) => s.id));
-  const labelled = (category?.skills ?? []).map((skill) => ({
+  const labeled = (category?.skills ?? []).map((skill) => ({
     id: skill.id,
     name: skill.name,
     label: `${tree?.name} › ${category?.name} › ${skill.name}`,
   }));
-  const allPicked = labelled.length > 0 && labelled.every((s) => pickedIds.has(s.id));
+  const allPicked = labeled.length > 0 && labeled.every((s) => pickedIds.has(s.id));
 
   const toggle = (skill: PickedSkill) =>
     onChange(
@@ -257,10 +257,10 @@ function SkillPicker({
   const toggleAll = () =>
     onChange(
       allPicked
-        ? picked.filter((s) => !labelled.some((l) => l.id === s.id))
+        ? picked.filter((s) => !labeled.some((l) => l.id === s.id))
         : [
             ...picked,
-            ...labelled.filter((l) => !pickedIds.has(l.id)).map(({ id, label }) => ({ id, label })),
+            ...labeled.filter((l) => !pickedIds.has(l.id)).map(({ id, label }) => ({ id, label })),
           ],
     );
 
@@ -302,7 +302,7 @@ function SkillPicker({
       </div>
       {category && (
         <div className="rounded-lg border border-secondary-200 p-3">
-          {labelled.length === 0 ? (
+          {labeled.length === 0 ? (
             <p className="text-sm text-secondary-500">This category has no skills yet.</p>
           ) : (
             <>
@@ -311,7 +311,7 @@ function SkillPicker({
                 All of {category.name}
               </label>
               <ul className="mt-2 grid gap-1 sm:grid-cols-2">
-                {labelled.map((skill) => (
+                {labeled.map((skill) => (
                   <li key={skill.id}>
                     <label className="flex items-center gap-2 text-sm text-secondary-700">
                       <input

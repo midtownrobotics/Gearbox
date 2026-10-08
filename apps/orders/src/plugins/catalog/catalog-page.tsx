@@ -72,7 +72,7 @@ export function CatalogPage() {
   // What the request page said when it came back here ("Your request was submitted…").
   const done = (location.state as RequestDone | null)?.requestMessage;
 
-  /** One request on its own page; it comes back here when it's submitted or cancelled. */
+  /** One request on its own page; it comes back here when it's submitted or canceled. */
   const openRequest = (what: Record<string, string>) => {
     const query = new URLSearchParams({
       ...what,

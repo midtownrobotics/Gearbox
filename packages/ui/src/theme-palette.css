@@ -1,7 +1,7 @@
 /* Dark mode for the Tailwind palette. Light-styled apps keep their classes; in dark mode the
    neutral ramps invert, tinted backgrounds become dark tints, and dark text shades become light
    ones. Solid fills (500/600 buttons) stay as they are. The neutral ramps are built from the
-   theme's own colours (page, inset, line, muted, text: colors.css, or the team's from Team
+   theme's own colors (page, inset, line, muted, text: colors.css, or the team's from Team
    Appearance), so they follow a team's dark palette. */
 html[data-theme="dark"] {
   --color-secondary-50: var(--g3-page);

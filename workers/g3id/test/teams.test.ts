@@ -207,7 +207,7 @@ describe("signing in to a team", () => {
     });
   });
 
-  /** Where a Slack sign-in for `team` would send someone back to afterwards. */
+  /** Where a Slack sign-in for `team` would send someone back to afterward. */
   const redirectOf = async (team: string, redirect: string) => {
     const res = await asTeam(team, `/auth/slack/initiate?redirect=${encodeURIComponent(redirect)}`);
     const token = new URL(res.headers.get("Location") as string).searchParams.get("token");

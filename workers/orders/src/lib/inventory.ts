@@ -18,7 +18,7 @@ import { teamSettings } from "./settings";
 // Receiving a part can put it in the Inventory app: the person receiving it says where it's going
 // (a storage location, or in use on a robot), and Orders passes that on with what was received.
 //
-// Inventory is an optional neighbour. Orders reaches it over the INVENTORY service binding with
+// Inventory is an optional neighbor. Orders reaches it over the INVENTORY service binding with
 // the person's own session, so Inventory decides what they may do. Without it, or with nothing
 // said about where a part goes, receiving works as it always has and nothing reaches Inventory;
 // unless a mentor has turned on the setting that makes the destination required.
@@ -134,7 +134,7 @@ export type ReceivedLine = {
 
 const sourceKey = (line: Pick<ReceivedLine, "id">) => `orders:request:${line.id}`;
 
-/** How Inventory recognises a request's part: by its catalog part, vendor and part number, or link. */
+/** How Inventory recognizes a request's part: by its catalog part, vendor and part number, or link. */
 const listingOf = (line: ReceivedLine) => ({
   catalogItemId: line.catalogItemId,
   vendor: line.vendor,

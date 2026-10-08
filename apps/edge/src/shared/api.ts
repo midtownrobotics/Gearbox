@@ -11,7 +11,7 @@ export function g3idUrl(): string {
   return appUrl("id");
 }
 
-/** Send the user to g3id login, returning here afterwards. */
+/** Send the user to g3id login, returning here afterward. */
 export function redirectToLogin(): void {
   const redirect = encodeURIComponent(window.location.href);
   window.location.href = `${g3idUrl()}/login?redirect=${redirect}`;

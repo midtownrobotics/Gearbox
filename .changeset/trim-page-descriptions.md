@@ -10,4 +10,4 @@
 "@g3/worker-platform": patch
 ---
 
-Shorter descriptions and hints across the apps: they say what you can do on a page and leave out how it works underneath.
+Shorter descriptions and hints across the apps: they say what you can do on a page and leave out how it works underneath. Spelling follows US English throughout, so a canceled request now reads "Canceled".

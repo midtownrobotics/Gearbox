@@ -16,7 +16,7 @@ html[data-theme="dark"] {
 }
 
 /* A card written as `bg-white` before `bg-surface` existed: the theme's surface in dark mode.
-   (New code uses `bg-surface`, which follows the team's colour in both themes and keeps its hover
+   (New code uses `bg-surface`, which follows the team's color in both themes and keeps its hover
    styles.) `white` itself stays white so white text on colored buttons still works. */
 html[data-theme="dark"] .bg-white,
 html[data-theme="dark"] .hover\:bg-white:hover {

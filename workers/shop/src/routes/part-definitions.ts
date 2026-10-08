@@ -398,7 +398,7 @@ export const partDefinitionsRouter = new Hono<AppEnv>()
     return c.json(await blueprintOf(db, c.get("teamId"), partDefinitionId));
   })
   // Replaces the whole blueprint (processes may be added, removed, or reordered). Existing
-  // instances keep their own pipelines; only instances created afterwards use the new one.
+  // instances keep their own pipelines; only instances created afterward use the new one.
   .put("/:id/processes", requireAuth, replaceBlueprintValidator, async (c) => {
     const partDefinitionId = Number(c.req.param("id"));
     const { processIds } = c.req.valid("json");

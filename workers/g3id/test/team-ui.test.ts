@@ -18,7 +18,7 @@ import { teamUiSettings } from "../src/db/schema";
 import { readTeamUiSettings } from "../src/lib/team-ui";
 import { createTeam, createUser, g3id, sessionCookie, testEnv } from "./helpers";
 
-/** What pages are sent: the settings, and the brand colour for pages loaded before it was the accent. */
+/** What pages are sent: the settings, and the brand color for pages loaded before it was the accent. */
 const served = (settings: TeamUiSettings) => ({
   ...settings,
   primaryColor: brandColor(settings),
@@ -49,7 +49,7 @@ describe("team UI settings", () => {
     expect((await put()).status).toBe(401);
     expect((await put(member)).status).toBe(403);
     expect((await put(admin)).status).toBe(200);
-    // Pages get the light accent as the brand colour, too.
+    // Pages get the light accent as the brand color, too.
     expect(await (await g3id("/team/ui")).json()).toEqual({ ...settings, primaryColor: "#123456" });
     expect(await (await g3id("/admin/team/ui", { cookie: admin })).json()).toMatchObject({
       settings,
@@ -65,7 +65,7 @@ describe("team UI settings", () => {
       { ...base, light: { ...base.light, accent: "red" } },
       { ...base, dark: { ...base.dark, accent: "#12345" } },
       { ...base, linkAccents: "yes" },
-      // The brand colour is the light accent now: an editor from before can't save its own.
+      // The brand color is the light accent now: an editor from before can't save its own.
       { ...base, primaryColor: "#123456" },
       { ...base, links: { ...base.links, github: "javascript:alert(1)" } },
       { ...base, unexpected: true },
@@ -234,11 +234,11 @@ describe("team UI settings", () => {
     expect((await put(defaultAppOrder)).status).toBe(200);
   });
 
-  describe("settings saved when the brand colour was its own setting", () => {
+  describe("settings saved when the brand color was its own setting", () => {
     const { linkAccents: _linked, ...appearance } = defaultTeamUiSettings;
     const read = (legacy: object) => readTeamUiSettings(JSON.stringify(legacy));
 
-    it("makes a chosen brand colour the light accent, and gives an unchosen dark accent its hue", () => {
+    it("makes a chosen brand color the light accent, and gives an unchosen dark accent its hue", () => {
       const settings = read({ ...appearance, primaryColor: "#0b5fa5" });
       expect(settings).toEqual({
         ...defaultTeamUiSettings,
@@ -246,7 +246,7 @@ describe("team UI settings", () => {
         // The default dark accent, turned to #0b5fa5's hue.
         dark: { ...defaultTeamUiSettings.dark, accent: "#67ade8" },
       });
-      // So buttons, links and icons stay the colour the team chose.
+      // So buttons, links and icons stay the color the team chose.
       expect(brandColor(settings)).toBe("#0b5fa5");
     });
 
@@ -259,7 +259,7 @@ describe("team UI settings", () => {
       });
     });
 
-    it("keeps the accents as saved when the brand colour was the built-in one", () => {
+    it("keeps the accents as saved when the brand color was the built-in one", () => {
       const light = { ...appearance.light, accent: "#0a7d55" };
       expect(read({ ...appearance, primaryColor: builtInBrandColor })).toEqual(
         defaultTeamUiSettings,
@@ -272,8 +272,8 @@ describe("team UI settings", () => {
   });
 });
 
-describe("accent colours", () => {
-  it("reads a colour's hue, saturation and value, and writes it back", () => {
+describe("accent colors", () => {
+  it("reads a color's hue, saturation and value, and writes it back", () => {
     expect(hexToHsv("#ff0000")).toEqual({ h: 0, s: 1, v: 1 });
     expect(hexToHsv("#008000")).toEqual({ h: 120, s: 1, v: 128 / 255 });
     expect(hexToHsv("#808080")).toEqual({ h: 0, s: 0, v: 128 / 255 });
@@ -293,7 +293,7 @@ describe("accent colours", () => {
     }
   });
 
-  it("turns one colour to another's hue, keeping its own saturation and value", () => {
+  it("turns one color to another's hue, keeping its own saturation and value", () => {
     expect(withHueOf("#bf4040", "#0000ff")).toBe("#4040bf");
     expect(withHueOf("#e8677c", "#0b5fa5")).toBe("#67ade8");
     const before = hexToHsv("#e8677c");
@@ -301,7 +301,7 @@ describe("accent colours", () => {
     expect(linked.s).toBe(before.s);
     expect(linked.v).toBe(before.v);
     expect(linked.h).toBeCloseTo(hexToHsv("#1d4ed8").h, 0);
-    // A grey stays a grey whatever hue it's given, and has none to give.
+    // A gray stays a gray whatever hue it's given, and has none to give.
     expect(withHueOf("#808080", "#ff0000")).toBe("#808080");
     expect(withHueOf("#a71433", "#777777")).toBe("#a71433");
     expect(withHueOf("#A71433", "#000000")).toBe("#a71433");

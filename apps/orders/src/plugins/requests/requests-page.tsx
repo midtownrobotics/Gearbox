@@ -15,7 +15,7 @@ import { ReplaceItem } from "./replace-item";
 import { RequestActions } from "./request-actions";
 
 // The requests table: one small row each, like the team's order sheet. Pending (awaiting
-// approval) first, then approved, ordered and received (denied and cancelled last); within each,
+// approval) first, then approved, ordered and received (denied and canceled last); within each,
 // your own first, then oldest first. A row opens the request's page.
 
 type Group = "pending" | "approved" | "ordered" | "received" | "closed";
@@ -25,7 +25,7 @@ const GROUPS: { key: Group; label: string }[] = [
   { key: "approved", label: "Approved" },
   { key: "ordered", label: "Ordered" },
   { key: "received", label: "Received" },
-  { key: "closed", label: "Denied or cancelled" },
+  { key: "closed", label: "Denied or canceled" },
 ];
 
 // Wishlist items aren't listed here (the worker leaves them out); counted as pending if one were.
@@ -38,7 +38,7 @@ const groupOf = (status: RequestStatus): Group =>
 
 const FILTERS: { key: Group | "all"; label: string }[] = [
   { key: "all", label: "All" },
-  ...GROUPS.map((g) => ({ ...g, label: g.key === "closed" ? "Denied/cancelled" : g.label })),
+  ...GROUPS.map((g) => ({ ...g, label: g.key === "closed" ? "Denied/canceled" : g.label })),
 ];
 
 async function loadRequests(status: RequestStatus | undefined, mine: boolean) {

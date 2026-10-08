@@ -70,7 +70,7 @@ export const googleAuthRouter = new Hono<AppEnv>()
 
     const err = (msg: string) => c.redirect(app(`/login/error?error=${encodeURIComponent(msg)}`));
 
-    if (oauthError) return err("Sign-in was cancelled or denied.");
+    if (oauthError) return err("Sign-in was canceled or denied.");
     if (!code || !state) return err("Missing code or state.");
 
     const stateValue = await c.env.RATE_LIMIT.get(`oauth_state:${state}`);
