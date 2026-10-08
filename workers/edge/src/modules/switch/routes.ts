@@ -91,6 +91,11 @@ export const switchRouter = new Hono<AppEnv>()
     if ("error" in result) return c.json({ error: result.error }, result.status);
     return c.json(result.data);
   })
+  .post("/stop", requireAdmin, async (c) => {
+    const result = await relay<{ ok: true }>(c, "/stop", { method: "POST" });
+    if ("error" in result) return c.json({ error: result.error }, result.status);
+    return c.json(result.data);
+  })
   .delete("/sounds/:name", requireAdmin, async (c) => {
     const name = soundName(c);
     if (!name) return c.json({ error: "Invalid sound name." }, 400);

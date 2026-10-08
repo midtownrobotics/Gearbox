@@ -71,49 +71,75 @@ test("Bluetooth playback targets the configured BlueALSA PCM without a shell", (
   ]);
 });
 
-test("closing the door stops the playing WAV and cancels queued playback", async () => {
-  const processes: { kill: () => void; finish: () => void; killed: () => boolean }[] = [];
+function fakeProcesses() {
+  const processes: { finish: (code: number) => void; killed: () => boolean }[] = [];
+  const spawn = () => {
+    let resolveExit: (code: number) => void = () => {};
+    let wasKilled = false;
+    const exited = new Promise<number>((resolve) => {
+      resolveExit = resolve;
+    });
+    processes.push({ finish: (code) => resolveExit(code), killed: () => wasKilled });
+    return {
+      exited,
+      stderr: new ReadableStream<Uint8Array>({ start: (controller) => controller.close() }),
+      kill: () => {
+        // Like aplay on SIGTERM: it exits, releasing the audio device.
+        wasKilled = true;
+        resolveExit(143);
+      },
+    };
+  };
+  return { processes, spawn };
+}
+
+test("closing the door stops the playing WAV", async () => {
+  const { processes, spawn } = fakeProcesses();
   const player = createSoundPlayer(
     "aplay",
     "plughw:CARD=rockchipes8388,DEV=0",
     async () => ["/srv/g3-sounds/welcome.wav"],
-    () => {
-      let resolveExit: (code: number) => void = () => {};
-      let wasKilled = false;
-      const exited = new Promise<number>((resolve) => {
-        resolveExit = resolve;
-      });
-      const kill = () => {
-        wasKilled = true;
-      };
-      processes.push({
-        kill,
-        finish: () => resolveExit(0),
-        killed: () => wasKilled,
-      });
-      return {
-        exited,
-        stderr: new ReadableStream<Uint8Array>({ start: (controller) => controller.close() }),
-        kill,
-      };
-    },
+    spawn,
   );
 
   const playing = player.play();
-  const queued = player.play();
   await Bun.sleep(0);
   expect(processes).toHaveLength(1);
 
   player.stop();
   expect(processes[0].killed()).toBe(true);
   await expect(playing).rejects.toBeInstanceOf(SoundStoppedError);
-  await expect(queued).rejects.toBeInstanceOf(SoundStoppedError);
 
   const nextOpening = player.play();
   await Bun.sleep(0);
   expect(processes).toHaveLength(2);
-  processes[1].finish();
+  processes[1].finish(0);
   await expect(nextOpening).resolves.toBe("/srv/g3-sounds/welcome.wav");
+});
+
+test("a new sound replaces the playing one instead of queuing behind it", async () => {
+  const { processes, spawn } = fakeProcesses();
+  const player = createSoundPlayer(
+    "aplay",
+    "device",
+    async () => ["/srv/g3-sounds/welcome.wav"],
+    spawn,
+  );
+
+  const first = player.play("/srv/g3-sounds/one.wav");
+  await Bun.sleep(0);
+  const second = player.play("/srv/g3-sounds/two.wav");
+  const third = player.play("/srv/g3-sounds/three.wav");
+  // The playing sound is stopped, and a press superseded before it started never plays.
+  const [one, two] = await Promise.allSettled([first, second]);
+  expect(one.status === "rejected" && one.reason).toBeInstanceOf(SoundStoppedError);
+  expect(two.status === "rejected" && two.reason).toBeInstanceOf(SoundStoppedError);
+  await Bun.sleep(0);
+
+  expect(processes).toHaveLength(2);
+  expect(processes[0].killed()).toBe(true);
+  processes[1].finish(0);
+  await expect(third).resolves.toBe("/srv/g3-sounds/three.wav");
 });
 
 test("drains aplay stderr before waiting for the process to exit", async () => {

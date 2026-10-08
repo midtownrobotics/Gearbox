@@ -11,6 +11,9 @@ import {
 } from "./player";
 import { SoundLibrary } from "./sounds";
 
+// A sound that ends at once (a tiny or broken file) mustn't make the repeat spin.
+const MIN_REPEAT_MS = 1_000;
+
 export function createSwitchModule(ctx: ModuleContext, soundPlayer?: SoundPlayer): EdgeModule {
   const input = ctx.config.mock
     ? new PlaceholderSwitchInput()
@@ -33,6 +36,8 @@ export function createSwitchModule(ctx: ModuleContext, soundPlayer?: SoundPlayer
   let lastSound: string | null = null;
   let lastError: string | null = null;
   let reading = false;
+  // Bumped whenever the repeat for an opening must end: the door closed, a test, or Stop.
+  let opening = 0;
 
   async function play(path?: string) {
     try {
@@ -47,6 +52,27 @@ export function createSwitchModule(ctx: ModuleContext, soundPlayer?: SoundPlayer
       console.error(`[switch] ${lastError}`);
       throw error;
     }
+  }
+
+  /** Plays sounds back to back for as long as the door stays open. */
+  async function playWhileOpen() {
+    const current = ++opening;
+    while (current === opening && !detector.state().rawGrounded) {
+      const began = Date.now();
+      try {
+        await play();
+      } catch {
+        return; // Stopped (closed, a test, Stop) or failed: lastError says which.
+      }
+      const left = MIN_REPEAT_MS - (Date.now() - began);
+      if (left > 0) await Bun.sleep(left);
+    }
+  }
+
+  /** Silences the sound and ends any repeat. */
+  function silence() {
+    opening++;
+    player.stop();
   }
 
   function poll() {
@@ -64,13 +90,13 @@ export function createSwitchModule(ctx: ModuleContext, soundPlayer?: SoundPlayer
     const wasRawGrounded = detector.state().rawGrounded;
     const event = detector.sample(grounded);
     // Silence the player on the first grounded reading; only openings need debounce.
-    if (grounded && !wasRawGrounded) player.stop();
+    if (grounded && !wasRawGrounded) silence();
     if (!event.triggered) return;
 
     triggerCount++;
     lastTriggeredAt = Math.floor(Date.now() / 1000);
     console.log("[switch] door opened");
-    void play().catch(() => {});
+    void playWhileOpen();
   }
 
   const status = () => ({
@@ -118,11 +144,17 @@ export function createSwitchModule(ctx: ModuleContext, soundPlayer?: SoundPlayer
         const sound = library.soundPath(c.req.param("name"));
         // A sound can outlast the worker's request deadline. Acknowledge the
         // test immediately; playback errors remain visible in /state.
+        opening++; // A test replaces the door's sound, repeat included.
         void play(sound).catch(() => {});
         return c.json({ ok: true, sound });
       } catch (error) {
         return c.json({ error: error instanceof Error ? error.message : String(error) }, 400);
       }
+    })
+    /** Stops whatever sound is playing (a test or a door opening). */
+    .post("/stop", (c) => {
+      silence();
+      return c.json({ ok: true });
     })
     .delete("/sounds/:name", async (c) => {
       try {
@@ -150,7 +182,7 @@ export function createSwitchModule(ctx: ModuleContext, soundPlayer?: SoundPlayer
     stop() {
       if (timer) clearInterval(timer);
       timer = null;
-      player.stop();
+      silence();
     },
     status,
   };

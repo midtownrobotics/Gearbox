@@ -109,7 +109,7 @@ export function DoorSoundsPage() {
       <Card title="Door switch">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-secondary-500">
-            Automatic sound plays only when the door opens.
+            Sound starts when the door opens, repeats while it stays open, and stops when it closes.
           </p>
           <button type="button" className={button} onClick={state.reload}>
             Refresh status
@@ -183,6 +183,21 @@ export function DoorSoundsPage() {
       </Card>
 
       <Card title="Sounds on the Orange Pi">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-secondary-500">
+            One sound plays at a time: a test or door opening replaces the one playing.
+          </p>
+          <button
+            type="button"
+            className={button}
+            disabled={busy !== null}
+            onClick={() =>
+              void act("stop", () => request("/stop", { method: "POST" }), "Stopped the sound.")
+            }
+          >
+            {busy === "stop" ? "Stopping…" : "Stop sound"}
+          </button>
+        </div>
         {data.sounds.length === 0 ? (
           <p className="text-sm text-secondary-500">No uploaded sounds yet.</p>
         ) : (
