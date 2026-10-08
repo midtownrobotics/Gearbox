@@ -57,6 +57,8 @@ export function NewRequestPage() {
   }, []);
   // Arriving from a list (?list=…) puts everything submitted here on it.
   const [listId, setListId] = useState(() => params.get("list") ?? "");
+  // /new?wishlist=1: the same form, saving parts to the wishlist instead of requesting them.
+  const wishlist = params.get("wishlist") === "1";
   const listName = lists.data?.find((l) => String(l.id) === listId)?.name;
 
   const [links, setLinks] = useState("");
@@ -114,7 +116,12 @@ export function NewRequestPage() {
     const picked = params.get("catalog");
     if ((!handed && !picked) || started.current) return;
     started.current = true;
-    setParams(listId ? { list: listId } : {}, { replace: true });
+    setParams(
+      { ...(listId ? { list: listId } : {}), ...(wishlist ? { wishlist: "1" } : {}) },
+      {
+        replace: true,
+      },
+    );
     if (handed) void lookUp(handed);
     if (picked) void fromCatalog(picked);
   }, []);
@@ -138,7 +145,9 @@ export function NewRequestPage() {
         continue;
       }
       const res = await api.requests.$post({
-        json: { ...draftFields(d, sharedReason), listId: listId ? Number(listId) : null },
+        json: wishlist
+          ? { ...draftFields(d, sharedReason), wishlist: true }
+          : { ...draftFields(d, sharedReason), listId: listId ? Number(listId) : null },
       });
       if (res.ok) done++;
       else failed.push({ ...d, submitError: await getErrorMessage(res) });
@@ -146,10 +155,13 @@ export function NewRequestPage() {
     setBusy(false);
     setDrafts([...failed, ...drafts.filter((d) => d.state === "loading")]);
     if (done > 0) {
+      const left = failed.length ? ` ${failed.length} still need attention below.` : "";
       setSubmitted(
-        `${done === 1 ? "Your request was" : `${done} requests were`} submitted for review${
-          listName ? ` and added to ${listName}` : ""
-        }.${failed.length ? ` ${failed.length} still need attention below.` : ""}`,
+        wishlist
+          ? `${done === 1 ? "1 part was" : `${done} parts were`} added to the wishlist.${left}`
+          : `${done === 1 ? "Your request was" : `${done} requests were`} submitted for review${
+              listName ? ` and added to ${listName}` : ""
+            }.${left}`,
       );
       if (failed.length === 0) setSharedReason("");
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -166,15 +178,21 @@ export function NewRequestPage() {
 
   return (
     <Page
-      title="New Request"
+      title={wishlist ? "Add to Wishlist" : "New Request"}
       actions={
-        listName && (
-          <Link
-            to={`/lists/${listId}`}
-            className="text-sm text-secondary-500 hover:text-secondary-800"
-          >
-            ← Back to {listName}
+        wishlist ? (
+          <Link to="/wishlist" className="text-sm text-secondary-500 hover:text-secondary-800">
+            ← Back to the wishlist
           </Link>
+        ) : (
+          listName && (
+            <Link
+              to={`/lists/${listId}`}
+              className="text-sm text-secondary-500 hover:text-secondary-800"
+            >
+              ← Back to {listName}
+            </Link>
+          )
         )
       }
     >
@@ -244,10 +262,12 @@ export function NewRequestPage() {
             )}
             <div className="flex flex-wrap items-center justify-between gap-3">
               <p className="text-xs text-secondary-500">
-                You'll get a Slack DM when a mentor approves each one.
+                {wishlist
+                  ? "Nothing is requested yet: anyone can promote it to a request later."
+                  : "You'll get a Slack DM when a mentor approves each one."}
               </p>
               <div className="flex items-center gap-2">
-                {(lists.data?.length ?? 0) > 0 && (
+                {!wishlist && (lists.data?.length ?? 0) > 0 && (
                   <select
                     className="rounded-lg border border-secondary-300 bg-surface px-3 py-2 text-sm text-secondary-700 focus:outline-none focus:border-primary-500"
                     value={listId}
@@ -264,10 +284,14 @@ export function NewRequestPage() {
                 )}
                 <Button onClick={submitAll} disabled={busy || readyCount === 0}>
                   {busy
-                    ? "Submitting…"
-                    : readyCount > 1
-                      ? `Submit all ${readyCount}`
-                      : "Submit request"}
+                    ? "Saving…"
+                    : wishlist
+                      ? readyCount > 1
+                        ? `Add all ${readyCount} to the wishlist`
+                        : "Add to wishlist"
+                      : readyCount > 1
+                        ? `Submit all ${readyCount}`
+                        : "Submit request"}
                 </Button>
               </div>
             </div>

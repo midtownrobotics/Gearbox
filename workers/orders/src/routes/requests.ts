@@ -6,7 +6,7 @@ import {
   sendTeamDM,
   withTeam,
 } from "@g3/auth";
-import { type SQL, asc, eq, inArray, max, sql } from "drizzle-orm";
+import { type SQL, and, asc, eq, inArray, max, ne, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
 import { type OrdersDb, createOrdersDb } from "../db";
@@ -18,6 +18,7 @@ import {
   budgetCategories,
   catalogItems,
   orderRequests,
+  partListItems,
   partLists,
   requestEvents,
   vendorOrders,
@@ -61,7 +62,11 @@ const optionalText = (v: unknown, max: number): string | null | false => {
 
 /** Validates a full request (create) or a partial one (edit), plus its catalog choice. */
 /** A new request can go straight onto a list. */
-type ListChoice = { listId?: number | null };
+type ListChoice = {
+  listId?: number | null;
+  /** Add it to the wishlist instead of requesting it (a list is then left out). */
+  wishlist?: boolean;
+};
 
 const requestValidator = (partial: boolean) =>
   validator("json", (value, c): Partial<RequestFields> & CatalogChoice & ListChoice => {
@@ -170,6 +175,10 @@ const requestValidator = (partial: boolean) =>
       const text = optionalText(v[key], key === "catalogName" ? 300 : 100);
       if (text === false) return fail(`${key} must be text.`);
       out[key] = text;
+    }
+    if (!partial && v.wishlist !== undefined) {
+      if (typeof v.wishlist !== "boolean") return fail("wishlist must be true or false.");
+      out.wishlist = v.wishlist;
     }
     if (!partial && v.listId !== undefined && v.listId !== null) {
       if (!Number.isInteger(v.listId)) return fail("listId must be a list id.");
@@ -282,8 +291,9 @@ export const requestsRouter = new Hono<AppEnv>()
     const onlyMine = mine === "true";
     const db = createOrdersDb(c.env.ORDERS_DB);
     const teamId = c.get("teamId");
+    // The wishlist isn't requests: it's only listed when asked for (?status=wishlist).
     const conditions = [
-      status ? eq(orderRequests.status, status) : undefined,
+      status ? eq(orderRequests.status, status) : ne(orderRequests.status, "wishlist"),
       onlyMine ? eq(orderRequests.requesterId, c.get("userId")) : undefined,
     ];
     const listed = (column: typeof orderRequests.id | typeof orderRequests.orderId) =>
@@ -364,9 +374,12 @@ export const requestsRouter = new Hono<AppEnv>()
       catalogItemId: picked,
       catalogCategory,
       catalogName,
-      listId,
+      listId: requestedList,
+      wishlist,
       ...body
     } = c.req.valid("json") as RequestFields & CatalogChoice & ListChoice;
+    // Lists are of requests: a wishlist item goes on one once it's promoted.
+    const listId = wishlist ? undefined : requestedList;
     const catalog = { catalogItemId: picked, catalogCategory, catalogName };
     const db = createOrdersDb(c.env.ORDERS_DB);
     const teamId = c.get("teamId");
@@ -400,7 +413,7 @@ export const requestsRouter = new Hono<AppEnv>()
           requesterId: c.get("userId"),
           requesterName: c.get("userDisplayName"),
           requesterSlackId: c.get("userSlackId"),
-          status: "requested" as const,
+          status: wishlist ? ("wishlist" as const) : ("requested" as const),
           createdAt: now,
           updatedAt: now,
         }),
@@ -412,7 +425,7 @@ export const requestsRouter = new Hono<AppEnv>()
         requestId: row.id,
         userId: c.get("userId"),
         userName: c.get("userDisplayName"),
-        action: "created",
+        action: wishlist ? "wished" : "created",
         createdAt: now,
       }),
     );
@@ -432,10 +445,12 @@ export const requestsRouter = new Hono<AppEnv>()
       .where(inTeam(orderRequests, teamId, eq(orderRequests.id, id)))
       .get();
     if (!current) return c.json({ error: "Request not found." }, 404);
-    if (current.requesterId !== c.get("userId") && !hasMentorAccess(c)) {
+    // Anyone edits a wishlist item; a request, its requester or a mentor while it's waiting.
+    const wished = current.status === "wishlist";
+    if (!wished && current.requesterId !== c.get("userId") && !hasMentorAccess(c)) {
       return c.json({ error: "Only the requester or a mentor can edit this." }, 403);
     }
-    if (current.status !== "requested") {
+    if (!wished && current.status !== "requested") {
       return c.json({ error: "Only requests still awaiting a mentor can be edited." }, 409);
     }
     if (body.categoryId !== undefined && !(await openCategory(db, teamId, body.categoryId))) {
@@ -467,7 +482,7 @@ export const requestsRouter = new Hono<AppEnv>()
           orderRequests,
           teamId,
           eq(orderRequests.id, id),
-          eq(orderRequests.status, "requested"),
+          eq(orderRequests.status, current.status),
         ),
       )
       .returning()
@@ -489,6 +504,84 @@ export const requestsRouter = new Hono<AppEnv>()
       }),
     );
     return c.json(row);
+  })
+  /**
+   * Promotes a wishlist item to a request (anyone): it's then requested by whoever promoted it,
+   * dated now, and goes to the mentors like any new request. Who wished for it stays in its
+   * history.
+   */
+  .post("/:id/promote", requireAuthWithIdentities, async (c) => {
+    const id = Number(c.req.param("id"));
+    const db = createOrdersDb(c.env.ORDERS_DB);
+    const teamId = c.get("teamId");
+    const current = await db
+      .select()
+      .from(orderRequests)
+      .where(inTeam(orderRequests, teamId, eq(orderRequests.id, id)))
+      .get();
+    if (!current) return c.json({ error: "Request not found." }, 404);
+    if (current.status !== "wishlist") {
+      return c.json({ error: "Only wishlist items can be promoted." }, 409);
+    }
+    if (!(await openCategory(db, teamId, current.categoryId))) {
+      return c.json({ error: "Its budget category is archived: edit it first." }, 409);
+    }
+    const now = Date.now();
+    const row = await db
+      .update(orderRequests)
+      .set({
+        status: "requested",
+        requesterId: c.get("userId"),
+        requesterName: c.get("userDisplayName"),
+        requesterSlackId: c.get("userSlackId"),
+        createdAt: now,
+        updatedAt: now,
+      })
+      .where(
+        inTeam(
+          orderRequests,
+          teamId,
+          eq(orderRequests.id, id),
+          eq(orderRequests.status, "wishlist"),
+        ),
+      )
+      .returning()
+      .get();
+    if (!row) return c.json({ error: "Someone just promoted or removed it; reload." }, 409);
+    await db.insert(requestEvents).values(
+      withTeam(teamId, {
+        requestId: id,
+        userId: c.get("userId"),
+        userName: c.get("userDisplayName"),
+        action: "promoted",
+        note: `On the wishlist from ${current.requesterName}.`,
+        createdAt: now,
+      }),
+    );
+    return c.json(row);
+  })
+  /** Removes a wishlist item (anyone), with its history. Requests are never deleted. */
+  .delete("/:id", requireAuth, async (c) => {
+    const id = Number(c.req.param("id"));
+    const db = createOrdersDb(c.env.ORDERS_DB);
+    const teamId = c.get("teamId");
+    const wished = and(eq(orderRequests.id, id), eq(orderRequests.status, "wishlist"));
+    const current = await db
+      .select({ id: orderRequests.id })
+      .from(orderRequests)
+      .where(inTeam(orderRequests, teamId, wished))
+      .get();
+    if (!current) return c.json({ error: "That isn't on the wishlist anymore." }, 404);
+    await db.batch([
+      db
+        .delete(requestEvents)
+        .where(inTeam(requestEvents, teamId, eq(requestEvents.requestId, id))),
+      db
+        .delete(partListItems)
+        .where(inTeam(partListItems, teamId, eq(partListItems.requestId, id))),
+      db.delete(orderRequests).where(inTeam(orderRequests, teamId, wished)),
+    ]);
+    return c.json({ ok: true });
   })
   /**
    * Status changes: approve, deny, receive, cancel. Body: { note? }, and when approving optionally

@@ -28,8 +28,9 @@ const GROUPS: { key: Group; label: string }[] = [
   { key: "closed", label: "Denied or cancelled" },
 ];
 
+// Wishlist items aren't listed here (the worker leaves them out); counted as pending if one were.
 const groupOf = (status: RequestStatus): Group =>
-  status === "requested"
+  status === "requested" || status === "wishlist"
     ? "pending"
     : status === "denied" || status === "cancelled"
       ? "closed"
@@ -133,41 +134,76 @@ export function RequestsPage() {
           {query || filter !== "all" || mine ? "No requests match." : "No requests here yet."}
         </p>
       ) : (
-        <div
-          className={`grid ${COLUMNS} overflow-hidden rounded-xl border border-secondary-200 bg-surface text-sm`}
-        >
-          <div
-            className={`${ROW} bg-inset text-xs font-semibold uppercase tracking-wide text-secondary-500`}
-          >
-            <Cell className="col-span-2 md:col-span-1">Name</Cell>
-            <Cell right>Qty</Cell>
-            <Cell right>Price</Cell>
-            <Cell line2 lineStart>
-              Supplier
-            </Cell>
-            <Cell line2>Req by</Cell>
-            <Cell line2 className="col-span-2 md:col-span-1">
-              Req at
-            </Cell>
-            <Cell className="hidden md:block">Ordered at</Cell>
-            <Cell className="hidden md:block">Received at</Cell>
-          </div>
-          {groups.map(
-            (g) =>
-              g.rows.length > 0 && (
-                <section key={g.key} className="col-span-full grid grid-cols-subgrid">
-                  <h2 className="col-span-full bg-primary-600 px-2 py-1 text-xs font-semibold uppercase tracking-wide text-white">
-                    {g.label} · {g.rows.length}
-                  </h2>
-                  {g.rows.map((r) => (
-                    <RequestRow key={r.id} request={r} mine={r.requesterId === user.userId} />
-                  ))}
-                </section>
-              ),
-          )}
-        </div>
+        <RequestTable sections={groups} userId={user.userId} />
       )}
     </Page>
+  );
+}
+
+/**
+ * The requests table (the Requests page; the Wishlist without its ordered and received columns):
+ * a section per status, each with a header bar unless it has no label.
+ */
+export function RequestTable({
+  sections,
+  userId,
+  wishlist = false,
+  actions,
+}: {
+  sections: { key: string; label?: string; rows: RequestListRow[] }[];
+  userId: string;
+  /** Wishlist items: "added" instead of "requested", and never ordered or received. */
+  wishlist?: boolean;
+  /** Buttons at the end of each row (the wishlist's); on a phone, a line of their own. */
+  actions?: (request: RequestListRow) => ReactNode;
+}) {
+  return (
+    <div
+      className={`grid ${wishlist ? (actions ? WISHLIST_ACTION_COLUMNS : WISHLIST_COLUMNS) : COLUMNS} overflow-hidden rounded-xl border border-secondary-200 bg-surface text-sm`}
+    >
+      <div
+        className={`${ROW} bg-inset text-xs font-semibold uppercase tracking-wide text-secondary-500`}
+      >
+        <Cell className="col-span-2 md:col-span-1">Name</Cell>
+        <Cell right>Qty</Cell>
+        <Cell right>Price</Cell>
+        <Cell line2 lineStart>
+          Supplier
+        </Cell>
+        <Cell line2>{wishlist ? "Added by" : "Req by"}</Cell>
+        <Cell line2 className="col-span-2 md:col-span-1">
+          {wishlist ? "Added at" : "Req at"}
+        </Cell>
+        {!wishlist && <Cell className="hidden md:block">Ordered at</Cell>}
+        {!wishlist && <Cell className="hidden md:block">Received at</Cell>}
+        {actions && (
+          <Cell className="hidden md:block">
+            <span className="sr-only">Actions</span>
+          </Cell>
+        )}
+      </div>
+      {sections.map(
+        (g) =>
+          g.rows.length > 0 && (
+            <section key={g.key} className="col-span-full grid grid-cols-subgrid">
+              {g.label && (
+                <h2 className="col-span-full bg-primary-600 px-2 py-1 text-xs font-semibold uppercase tracking-wide text-white">
+                  {g.label} · {g.rows.length}
+                </h2>
+              )}
+              {g.rows.map((r) => (
+                <RequestRow
+                  key={r.id}
+                  request={r}
+                  mine={r.requesterId === userId}
+                  wishlist={wishlist}
+                  actions={actions}
+                />
+              ))}
+            </section>
+          ),
+      )}
+    </div>
   );
 }
 
@@ -178,6 +214,14 @@ export function RequestsPage() {
 const COLUMNS =
   "grid-cols-[minmax(0,1fr)_minmax(0,1fr)_max-content_max-content] " +
   "md:grid-cols-[minmax(6rem,1fr)_max-content_max-content_minmax(4rem,max-content)_minmax(4rem,max-content)_max-content_max-content_max-content]";
+/** The same without the ordered and received columns. */
+const WISHLIST_COLUMNS =
+  "grid-cols-[minmax(0,1fr)_minmax(0,1fr)_max-content_max-content] " +
+  "md:grid-cols-[minmax(6rem,1fr)_max-content_max-content_minmax(4rem,max-content)_minmax(4rem,max-content)_max-content]";
+/** The wishlist's with a column for its buttons (a line of their own on a phone). */
+const WISHLIST_ACTION_COLUMNS =
+  "grid-cols-[minmax(0,1fr)_minmax(0,1fr)_max-content_max-content] " +
+  "md:grid-cols-[minmax(6rem,1fr)_max-content_max-content_minmax(4rem,max-content)_minmax(4rem,max-content)_max-content_max-content]";
 /** A row of the table: its cells sit on the table's columns. */
 const ROW = "col-span-full grid grid-cols-subgrid border-b border-secondary-200 last:border-b-0";
 
@@ -240,7 +284,17 @@ function Done({ at }: { at: number | null }) {
  * One request as a row: two lines on a phone (every other request shaded, so each pair of lines
  * reads as one), the sheet's columns on a wide screen.
  */
-function RequestRow({ request: r, mine }: { request: RequestListRow; mine: boolean }) {
+function RequestRow({
+  request: r,
+  mine,
+  wishlist,
+  actions,
+}: {
+  request: RequestListRow;
+  mine: boolean;
+  wishlist: boolean;
+  actions?: (request: RequestListRow) => ReactNode;
+}) {
   const cents = lineCents(r);
   const estimate = r.orderId === null;
   const price = formatCents(cents, r.currency);
@@ -284,8 +338,20 @@ function RequestRow({ request: r, mine }: { request: RequestListRow; mine: boole
         <span className="md:hidden">{shortDay(r.createdAt)}</span>
         <span className="hidden md:inline">{day(r.createdAt)}</span>
       </Cell>
-      <Done at={r.orderedAt} />
-      <Done at={r.receivedAt} />
+      {!wishlist && <Done at={r.orderedAt} />}
+      {!wishlist && <Done at={r.receivedAt} />}
+      {actions && (
+        // Buttons inside the row's link: a click on one does its job, not open the request.
+        <span
+          className="col-span-full flex justify-end gap-2 border-t border-dashed border-secondary-200 px-2 py-1.5 md:col-span-1 md:border-t-0 md:border-l md:border-solid md:py-1"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+        >
+          {actions(r)}
+        </span>
+      )}
     </Link>
   );
 }

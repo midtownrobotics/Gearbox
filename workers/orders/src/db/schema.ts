@@ -130,6 +130,8 @@ export const vendorCredits = sqliteTable(
 );
 
 export const REQUEST_STATUSES = [
+  /** Not requested yet: someone would like it one day (anyone promotes it to "requested"). */
+  "wishlist",
   "requested",
   "approved",
   "denied",

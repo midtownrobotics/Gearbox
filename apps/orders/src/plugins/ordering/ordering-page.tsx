@@ -90,12 +90,17 @@ export function VendorCart({
     <>
       {done && <SuccessBanner message={done} />}
       {items.length > 0 && (
-        <VendorOrder
-          group={cartFor(items, vendorFor)}
-          shareACart={sac.data?.vendors.includes(key) ? { connected: sac.data.connected } : null}
-          onPlaced={changed}
-          onRemoved={changed}
-        />
+        <section className="space-y-2">
+          <h2 className="text-xs font-bold uppercase tracking-widest text-secondary-400 font-sans">
+            Everything approved to order from {items[0].vendor}
+          </h2>
+          <VendorOrder
+            group={cartFor(items, vendorFor)}
+            shareACart={sac.data?.vendors.includes(key) ? { connected: sac.data.connected } : null}
+            onPlaced={changed}
+            onRemoved={changed}
+          />
+        </section>
       )}
     </>
   );
