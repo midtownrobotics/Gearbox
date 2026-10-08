@@ -159,9 +159,9 @@ function MoveContentsDialog({
     <Dialog title={`Move everything in ${labelOf(row)}`} onClose={onClose}>
       <form onSubmit={move} className="space-y-4">
         <p className="text-sm text-secondary-600">
-          {count(entries, "entry", "entries")} ({count(parts, "part")}) kept in{" "}
+          {count(entries, "entry", "entries")} ({count(parts, "part")}) in{" "}
           <span className="font-semibold text-secondary-900">{locationLabel(row.id, places)}</span>{" "}
-          move to the place you pick, all of each. The locations themselves stay as they are.
+          move to the place you pick.
         </p>
         <Field label="Move them to">
           <LocationPicker places={places} value={toLocationId} onChange={setToLocationId} />
@@ -366,9 +366,8 @@ export function LocationsPage() {
       ) : (
         <>
           <p className="text-sm text-secondary-500">
-            What's kept where. Move an entry, or everything in a location, when things are
-            rearranged: all of it moves at once. A title says what belongs in a place, and shows
-            beside its name everywhere.
+            What's kept where. Move an entry or everything in a location, and give each place a
+            title.
           </p>
           <input
             type="search"

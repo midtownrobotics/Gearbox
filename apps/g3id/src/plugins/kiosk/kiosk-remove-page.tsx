@@ -133,9 +133,7 @@ export function KioskRemovePage() {
         <div className="text-center space-y-2">
           <AlertCircle size={48} className="text-primary-500 mx-auto" />
           <h1 className="text-2xl font-bold text-secondary-900">Remove Kiosk Device</h1>
-          <p className="text-secondary-600">
-            This action will permanently remove this device and clear its authentication.
-          </p>
+          <p className="text-secondary-600">This permanently removes the device.</p>
         </div>
 
         {error && (

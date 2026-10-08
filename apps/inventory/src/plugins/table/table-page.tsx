@@ -60,7 +60,7 @@ const rowPlace = (stock: StockView, places: Places) =>
   `${locationLabel(stock.locationId, places)} ${useLabel(stock, places)}`;
 
 /**
- * The main table: everything the team has catalogued, a row for each place an entry has parts.
+ * The main table: everything the team has cataloged, a row for each place an entry has parts.
  * Quantities and locations are changed right here, and parts are checked out to a robot or back
  * in.
  */
@@ -99,12 +99,12 @@ export function TablePage() {
     >
       {items.length === 0 ? (
         <Card>
-          <p className="text-secondary-700">Nothing has been catalogued yet.</p>
+          <p className="text-secondary-700">Nothing has been cataloged yet.</p>
           <p className="mt-1 text-sm text-secondary-500">
             {places.locations.length === 0
               ? user.isAdmin
-                ? "Start on Settings: set up the locations parts are kept in, then add entries here."
-                : "An admin sets up the locations parts are kept in on Settings. After that, anyone can add entries here."
+                ? "Set up locations on Settings, then add entries here."
+                : "Once an admin sets up locations on Settings, anyone can add entries here."
               : "Add the first entry with the button above."}
           </p>
         </Card>

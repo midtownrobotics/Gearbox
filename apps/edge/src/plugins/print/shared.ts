@@ -20,7 +20,7 @@ export function alertsFor(p: PrinterRow) {
   return printerAlerts(p.stateReasons);
 }
 
-/** Green "Ready", amber "Printing", red "Needs attention", or grey "Stopped". */
+/** Green "Ready", amber "Printing", red "Needs attention", or gray "Stopped". */
 export function printerStatus(p: PrinterRow) {
   if (alertsFor(p).some((a) => a.severity === "error")) {
     return { dot: "bg-primary-500", label: "Needs attention" };

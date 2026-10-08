@@ -1,7 +1,7 @@
 import { consoleUrl, teamOfHost } from "@g3/site-config";
 
 /**
- * Where a sign-in may send someone afterwards: a page of the team they're signing in to, the
+ * Where a sign-in may send someone afterward: a page of the team they're signing in to, the
  * platform operators' console on the team's domain (an operator signs in through their own team),
  * a path on G3ID's own page, or localhost (dev). Anything else (another team's pages, other sites)
  * is dropped.

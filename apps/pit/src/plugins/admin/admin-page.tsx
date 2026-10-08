@@ -88,9 +88,7 @@ export function AdminPage() {
           <div>
             <h2 className="text-lg font-semibold text-gray-200">Event</h2>
             <p className="text-sm text-gray-600 mt-0.5">
-              Team {teamNumber}. Nexus and TBA event keys can be different (especially for
-              offseason). The monitor reads The Blue Alliance and Nexus with the platform's own
-              access, so there are no API keys to enter.
+              Team {teamNumber}. Nexus and TBA event keys can differ, especially in the offseason.
             </p>
           </div>
 
@@ -101,7 +99,7 @@ export function AdminPage() {
             value={eventKey}
             onChange={setEventKey}
             onSaved={() => setSaved(false)}
-            hint="The Blue Alliance event key (year + event code). Used for rankings, matches, and status."
+            hint="Year + event code. Used for rankings and matches."
           />
 
           <Field
@@ -111,7 +109,7 @@ export function AdminPage() {
             value={nexusEventKey}
             onChange={setNexusEventKey}
             onSaved={() => setSaved(false)}
-            hint="Nexus event key (can differ from TBA, especially for offseason). Leave blank to disable Nexus data."
+            hint="Leave blank to turn off Nexus data."
           />
         </div>
 
@@ -119,7 +117,7 @@ export function AdminPage() {
           <div>
             <h2 className="text-lg font-semibold text-gray-200">Pit Monitor Display</h2>
             <p className="text-sm text-gray-600 mt-0.5">
-              Customize the monitor page display with an embedded feed or dashboard.
+              Embed a feed or dashboard on the monitor page.
             </p>
           </div>
 
@@ -130,7 +128,7 @@ export function AdminPage() {
             value={iframeUrl}
             onChange={setIframeUrl}
             onSaved={() => setSaved(false)}
-            hint="URL to display in an iframe on the pit monitor page. Leave blank to disable. Should support embedding (no X-Frame-Options restriction)."
+            hint="A page that allows embedding. Leave blank for none."
           />
 
           <div className="flex items-center gap-3 pt-1">

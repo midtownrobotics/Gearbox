@@ -95,7 +95,7 @@ export function ListDetailPage() {
           <Stat
             label="Parts"
             value={p.active}
-            hint={p.total > p.active ? `+ ${p.total - p.active} denied or cancelled` : undefined}
+            hint={p.total > p.active ? `+ ${p.total - p.active} denied or canceled` : undefined}
           />
           {STAGES.map((s) => (
             <Stat

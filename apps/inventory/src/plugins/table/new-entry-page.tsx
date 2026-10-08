@@ -139,8 +139,8 @@ export function NewEntryPage() {
           ) : (
             <>
               <p className="mb-2 text-sm text-secondary-500">
-                Optional. Linking the part it's bought as shows its product page and price here, and
-                received orders of it are added to this entry.
+                Optional. Shows the part's product page and price here, and adds received orders of
+                it to this entry.
               </p>
               <CatalogPick
                 taken={taken}

@@ -277,7 +277,7 @@ describe("settings", () => {
     expect(await inside(null)).toEqual(top);
     expect(await inside(await locationId("Shop", "Shelves"))).toEqual(shelves);
 
-    // A location added afterwards goes at the end.
+    // A location added afterward goes at the end.
     await jsonAs(admin, "/locations", post({ parentId: bin, names: ["Spare"] }), 201);
     expect(await inside(bin)).toEqual(["Middle", "Left", "Right", "Spare"]);
     const spare = await locationId("Shop", "Shelves", "Bin 1", "Spare");

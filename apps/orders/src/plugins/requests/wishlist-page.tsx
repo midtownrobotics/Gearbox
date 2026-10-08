@@ -81,8 +81,7 @@ export function WishlistPage() {
       }
     >
       <p className="text-sm text-secondary-500">
-        Parts we'd like one day. They aren't requested until someone promotes one from its page: it
-        then goes to the mentors as that person's request.
+        Parts we'd like one day. Promote one from its page to request it.
       </p>
       <input
         type="search"

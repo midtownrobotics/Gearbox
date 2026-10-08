@@ -45,12 +45,12 @@ function loadCatalog(): Promise<CatalogPart[] | null> {
 export function useCatalog(): CatalogPart[] | null | undefined {
   const [parts, setParts] = useState<CatalogPart[] | null | undefined>(undefined);
   useEffect(() => {
-    let cancelled = false;
+    let canceled = false;
     void loadCatalog().then((loaded) => {
-      if (!cancelled) setParts(loaded);
+      if (!canceled) setParts(loaded);
     });
     return () => {
-      cancelled = true;
+      canceled = true;
     };
   }, []);
   return parts;

@@ -10,4 +10,4 @@
 "@g3/worker-inventory": minor
 ---
 
-App icons now use your team's primary colour from Team Appearance in place of the built-in burgundy: in the top bar, on the browser tab, on a phone's home screen and on the app list's tiles. Teams that keep the default colour see no change.
+App icons now use your team's primary color from Team Appearance in place of the built-in burgundy: in the top bar, on the browser tab, on a phone's home screen and on the app list's tiles. Teams that keep the default color see no change.

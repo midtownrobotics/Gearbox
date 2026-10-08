@@ -33,12 +33,12 @@ export function DrawingPreview({
 
   useEffect(() => {
     const controller = new AbortController();
-    let cancelled = false;
+    let canceled = false;
     let doc: pdfjs.PDFDocumentProxy | null = null;
     let task: pdfjs.RenderTask | null = null;
     let objectUrl: string | null = null;
     const timeout = setTimeout(() => {
-      cancelled = true;
+      canceled = true;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
       setState({ kind: "error" });
     }, 30000); // 30 second timeout
@@ -46,7 +46,7 @@ export function DrawingPreview({
     fetchDrawingObjectUrl(partNumber, revision, controller.signal)
       .then(async (url) => {
         objectUrl = url;
-        if (controller.signal.aborted || cancelled || !objectUrl) {
+        if (controller.signal.aborted || canceled || !objectUrl) {
           if (objectUrl) URL.revokeObjectURL(objectUrl);
           setState(objectUrl ? { kind: "rendering" } : { kind: "none" });
           return;
@@ -59,11 +59,11 @@ export function DrawingPreview({
           console.log("Starting PDF load for", objectUrl);
           doc = await pdfjs.getDocument({ url: objectUrl }).promise;
           console.log("PDF loaded, getting page 1");
-          if (cancelled) return;
+          if (canceled) return;
 
           const page = await doc.getPage(1);
           console.log("Page 1 retrieved, rendering to canvas");
-          if (cancelled) return;
+          if (canceled) return;
 
           const canvas = canvasRef.current;
           if (!canvas) {
@@ -120,7 +120,7 @@ export function DrawingPreview({
       });
 
     return () => {
-      cancelled = true;
+      canceled = true;
       controller.abort();
       task?.cancel();
       clearTimeout(timeout);

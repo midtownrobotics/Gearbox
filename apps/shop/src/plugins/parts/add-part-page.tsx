@@ -217,8 +217,7 @@ export function AddPartPage() {
           </h1>
           {transfer && (
             <p className="text-sm text-steel-dark mt-1">
-              Creating a new part from an existing one. The original will be moved to the Obsolete
-              table once this is created.
+              The original moves to Obsolete once this part is created.
             </p>
           )}
         </div>

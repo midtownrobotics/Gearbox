@@ -29,7 +29,7 @@ type Incoming = { header: Extract<LinkHeader, { t: "req" }>; parts: Uint8Array[]
 export class WorkerLink {
   private ws: WebSocket | null = null;
   private incoming = new Map<string, Incoming>();
-  private cancelled = new Set<string>();
+  private canceled = new Set<string>();
   private retryTimer: Timer | null = null;
   private pingTimer: Timer | null = null;
   private stableTimer: Timer | null = null;
@@ -138,7 +138,7 @@ export class WorkerLink {
     this.ws = null;
     this.connectedAt = null;
     this.incoming.clear();
-    this.cancelled.clear();
+    this.canceled.clear();
     if (this.stableTimer) clearTimeout(this.stableTimer);
     if (this.stopped) return;
     if (wasConnected)
@@ -174,7 +174,7 @@ export class WorkerLink {
     const { header, body } = frame;
     if (header.t === "cancel") {
       this.incoming.delete(header.id);
-      this.cancelled.add(header.id);
+      this.canceled.add(header.id);
       return;
     }
     if (header.t === "req") {
@@ -217,7 +217,7 @@ export class WorkerLink {
   }
 
   private async reply(ws: WebSocket, id: string, res: Response) {
-    if (this.cancelled.delete(id)) return;
+    if (this.canceled.delete(id)) return;
     const send = (frame: Uint8Array) => {
       if (ws.readyState !== WebSocket.OPEN) throw new Error("The link closed.");
       ws.send(frame);

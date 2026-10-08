@@ -11,7 +11,7 @@ export type RequestDone = { requestMessage?: string };
 /**
  * One request (or wishlist part), on its own page, with no search or link box of its own: the
  * New Request page's search box opens it for a pasted link (`?urls=`) or a picked part
- * (`?catalog=`), and "Add a part by hand" opens it empty. Submitting or cancelling goes back to
+ * (`?catalog=`), and "Add a part by hand" opens it empty. Submitting or canceling goes back to
  * where it was opened from (the New Request page, a catalog part, a list, the wishlist).
  */
 export function RequestPage() {

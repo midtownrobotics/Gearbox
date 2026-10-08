@@ -152,9 +152,8 @@ export function TreeSetCard() {
         </div>
       </div>
       <p className="mt-3 text-sm text-secondary-500">
-        All of your team's trees, as one file. Save it to keep a copy or to edit it outside the app,
-        and load a file to make the trees match it. Skills that are still in the file keep
-        everyone's progress.
+        Your team's trees as one file. Loading a file makes the trees match it; skills still in the
+        file keep everyone's progress.
       </p>
 
       {pending && (

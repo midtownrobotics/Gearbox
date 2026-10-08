@@ -98,7 +98,7 @@ export function productionRows(rows: InstanceRow[]): InstanceRow[] {
   );
 }
 
-/** Summarises which in-production instances something covers, e.g. "Main Shaft (P-1 · Rev A) #1–3". */
+/** Summarizes which in-production instances something covers, e.g. "Main Shaft (P-1 · Rev A) #1–3". */
 export function describeUsage(rows: InstanceRow[]): string {
   const byPart = new Map<number, InstanceRow[]>();
   for (const r of rows) byPart.set(r.definition.id, [...(byPart.get(r.definition.id) ?? []), r]);

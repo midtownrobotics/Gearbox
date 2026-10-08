@@ -405,9 +405,7 @@ export function LocationsCard() {
   return (
     <Card title="Locations">
       <p className="mb-3 text-sm text-secondary-500">
-        Where parts are kept, as a tree: a room, what's in it, and so on, up to {MAX_DEPTH} levels.
-        Drag a location by its handle to put it in order among the ones beside it. Titles that say
-        what's kept in a place are set on the Locations page.
+        Where parts are kept, up to {MAX_DEPTH} levels deep. Drag a location to reorder it.
         {places.locations.length > 0 && ` ${count(places.locations.length, "location")} so far.`}
       </p>
       {error && (

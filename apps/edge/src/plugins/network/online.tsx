@@ -28,9 +28,8 @@ export function PresenceNote({
   }
   return (
     <p className="text-xs text-secondary-400">
-      Online status checked live on the edge box{" "}
-      {presence.checkedAt ? formatAgo(presence.checkedAt) : ""}. It includes devices that only talk
-      on the shop network, like printers.
+      Online status, checked {presence.checkedAt ? formatAgo(presence.checkedAt) : "live"}. Includes
+      printers and other devices that only use the shop network.
     </p>
   );
 }

@@ -4,7 +4,7 @@ import { call } from "./worker";
 // The two-team isolation test every app must pass (roadmap Phase 3, and every variant in Phase 6).
 // Two teams get their own data; then every route the app has is called as team A's users, with
 // team B's ids in the path. It fails if any answer contains something only B has, or if B's rows
-// are any different afterwards.
+// are any different afterward.
 
 export type Seeded = {
   /**

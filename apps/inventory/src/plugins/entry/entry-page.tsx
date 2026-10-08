@@ -165,9 +165,7 @@ function DetailsCard({ item, onChanged }: { item: ItemView; onChanged: () => Pro
   return (
     <Card title="Details">
       {fields.length === 0 ? (
-        <p className="text-sm text-secondary-500">
-          No fields have been set up yet. An admin defines them on Settings.
-        </p>
+        <p className="text-sm text-secondary-500">No fields yet. An admin adds them on Settings.</p>
       ) : (
         <dl className="grid grid-cols-[minmax(7rem,auto)_1fr] gap-x-6 gap-y-2 text-sm">
           {fields.map((field) => (
@@ -321,19 +319,16 @@ function MergeDialog({
 
   return (
     <Dialog title="Merge another entry into this one" onClose={onClose}>
-      <p className="text-sm text-secondary-600">
-        For equivalent parts that are counted together, like the same bolt from two vendors.
-      </p>
+      <p className="text-sm text-secondary-600">For the same part from different vendors.</p>
       {from ? (
         <>
           <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-            “{from.name}” will be merged into “{item.name}”: its{" "}
+            “{from.name}” merges into “{item.name}” with its{" "}
             {count(
               from.stock.reduce((sum, row) => sum + row.quantity, 0),
               "part",
             )}
-            , {count(from.listings.length, "listing")} and history move here, and it's removed. A
-            listing can be split off again later.
+            , {count(from.listings.length, "listing")} and history.
           </p>
           {error && <ErrorBanner message={error} />}
           <div className="flex justify-end gap-2">
@@ -411,8 +406,7 @@ function DeleteDialog({ item, onClose }: { item: ItemView; onClose: () => void }
   return (
     <Dialog title="Delete this entry?" onClose={onClose}>
       <p className="text-sm text-secondary-600">
-        “{item.name}” is removed from the inventory, with its counts, listings and history. This
-        can't be undone.
+        “{item.name}” and its counts, listings and history are deleted. This can't be undone.
       </p>
       {error && <ErrorBanner message={error} />}
       <div className="flex justify-end gap-2">

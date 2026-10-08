@@ -298,8 +298,7 @@ function ConnectSlack({ signupId }: { signupId: string }) {
     <div className="space-y-4">
       <h2 className="text-lg font-semibold text-secondary-900">Connect your team's Slack</h2>
       <p className="text-sm text-secondary-600">
-        Your team signs in with Slack: members send a code to {site.slackBotName} to sign in, and
-        the apps message them there. Add {site.slackBotName} to your team's workspace to continue.
+        Your team signs in with Slack. Add {site.slackBotName} to your workspace to continue.
       </p>
       <a
         href={`/api/signup/${signupId}/slack`}

@@ -124,8 +124,7 @@ function UseFields({
   if (places.robots.length === 0 || places.subsystems.length === 0) {
     return (
       <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-        Parts in use are on a robot's subsystem, and none are set up yet. An admin adds them on
-        Settings.
+        No robots or subsystems yet. An admin adds them on Settings.
       </p>
     );
   }
@@ -234,7 +233,7 @@ export function CheckOutDialog({ item, stock, onClose, onDone }: RowProps) {
         onRobot={setRobotId}
         onSubsystem={setSubsystemId}
       />
-      <Field label="Location" hint="Where they'll be while in use. Leave it to keep their place.">
+      <Field label="Location" hint="Leave it to keep their place.">
         <LocationPicker places={places} value={locationId} onChange={setLocationId} />
       </Field>
     </StockForm>
@@ -369,8 +368,7 @@ export function AddStockDialog({
       <p className="text-sm text-secondary-600">
         <span className="font-semibold text-secondary-900">{item.name}</span>
         <br />
-        Parts that turned up, were donated or were made. To fix a count, change the quantity in the
-        table instead.
+        For parts that were found, donated or made. To fix a count, edit the quantity in the table.
       </p>
       <QuantityField label="How many" value={quantity} onChange={setQuantity} min={0} />
       <div className="flex gap-4 text-sm text-secondary-700">

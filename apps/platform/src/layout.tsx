@@ -101,7 +101,7 @@ function ByTeam({ className = "" }: { className?: string }) {
   );
 }
 
-/** A small gear in the team colour: Gearbox's mark. */
+/** A small gear in the team color: Gearbox's mark. */
 export function GearMark({ small = false }: { small?: boolean }) {
   const size = small ? 18 : 26;
   return (

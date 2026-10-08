@@ -27,8 +27,8 @@ function notify() {
 }
 
 /**
- * The team's colours as the variables colors.css declares: both themes' (--g3-light-page,
- * --g3-dark-page), the showing theme's (--g3-page) and the brand colour, which is the light accent
+ * The team's colors as the variables colors.css declares: both themes' (--g3-light-page,
+ * --g3-dark-page), the showing theme's (--g3-page) and the brand color, which is the light accent
  * in both themes.
  */
 function applyColors(colors: TeamUiColors) {
@@ -42,10 +42,10 @@ function applyColors(colors: TeamUiColors) {
   style.setProperty("--g3-brand", current.light.accent);
 }
 
-// The neutral ramps apps write their greys with (text-secondary-600, border-gray-200).
+// The neutral ramps apps write their grays with (text-secondary-600, border-gray-200).
 const NEUTRALS = ["secondary", "gray", "slate", "zinc", "neutral", "stone"];
 const NEUTRAL_KEYS = ["surface", "inset", "line", "muted", "text"] as const;
-// What a light colour left at its default stands for in the built-in ramp (index.css).
+// What a light color left at its default stands for in the built-in ramp (index.css).
 const BUILT_IN_NEUTRALS: Record<(typeof NEUTRAL_KEYS)[number], string> = {
   surface: "#ffffff",
   inset: "#efefef",
@@ -55,10 +55,10 @@ const BUILT_IN_NEUTRALS: Record<(typeof NEUTRAL_KEYS)[number], string> = {
 };
 
 /**
- * The greys inside every app, from the team's colours. In light mode the ramps are built in
- * (index.css, and Tailwind's own greys), and stay exactly so for a team on the default colours. A
- * team that changes its light card, inset, border, text or muted colour gets ramps built from
- * them: 100 is the inset colour, 200 the border, 500 muted text, 900 text, and the steps between
+ * The grays inside every app, from the team's colors. In light mode the ramps are built in
+ * (index.css, and Tailwind's own grays), and stay exactly so for a team on the default colors. A
+ * team that changes its light card, inset, border, text or muted color gets ramps built from
+ * them: 100 is the inset color, 200 the border, 500 muted text, 900 text, and the steps between
  * are mixes. Dark mode builds its ramps the same way in CSS (theme-palette.css), so nothing is set
  * here for it.
  */
@@ -101,9 +101,9 @@ function applySettings() {
     "--font-display",
     current.displayFont === "system-ui" ? "system-ui" : `"${current.displayFont}", sans-serif`,
   );
-  // The primary palette, from the team's brand colour (its light accent). Tailwind utilities
+  // The primary palette, from the team's brand color (its light accent). Tailwind utilities
   // resolve these variables at runtime across all apps. Solid fills are the same in both themes;
-  // the tints behind banners and selected rows are dark in dark mode (the brand colour sunk into
+  // the tints behind banners and selected rows are dark in dark mode (the brand color sunk into
   // the page), and brand text there takes the dark accent (theme.css).
   const base = brandColor(current);
   const dark = root.dataset.theme === "dark";
@@ -125,7 +125,7 @@ function applySettings() {
             : `color-mix(in srgb, ${base}, black ${blends[i]}%)`;
     root.style.setProperty(`--color-primary-${steps[i]}`, shade);
   }
-  // The tab's icon takes the team's colour too (team-icon.ts).
+  // The tab's icon takes the team's color too (team-icon.ts).
   applyTabIcons(base);
   // index.html's title is the app's own name ("Orders"; "ID" for the sign-in app); the team's
   // short name goes in front: "G3 Orders", "G3ID".
@@ -191,8 +191,8 @@ export function useTeamUiSettings(): TeamUiSettings {
 }
 
 /**
- * An app icon (the address of its SVG) with its accent in the team's brand colour. Gives back
- * the icon as it is until the recoloured one is ready, for a team with the default colour, and
+ * An app icon (the address of its SVG) with its accent in the team's brand color. Gives back
+ * the icon as it is until the recolored one is ready, for a team with the default color, and
  * for anything that isn't an SVG.
  */
 export function useTeamIcon(src: string | undefined): string | undefined {
@@ -206,14 +206,14 @@ export function useTeamIcon(src: string | undefined): string | undefined {
   const wanted = !!src && !isIconAccent(color);
   useEffect(() => {
     if (!wanted || !src) return;
-    let cancelled = false;
+    let canceled = false;
     void loadIconSvg(src).then((svg) => {
-      if (svg && !cancelled) {
+      if (svg && !canceled) {
         setRecolored({ key, src: iconDataUrl(recolorIcon(svg, color)) });
       }
     });
     return () => {
-      cancelled = true;
+      canceled = true;
     };
   }, [wanted, src, key, color]);
   return wanted && recolored?.key === key ? recolored.src : src;

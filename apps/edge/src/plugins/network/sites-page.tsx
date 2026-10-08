@@ -34,9 +34,8 @@ export function SitesPage() {
   return (
     <Page title="Sites">
       <p className="text-sm text-secondary-500">
-        Data by site since {formatDate(data.cycle.start)}, grouped by domain. Updated hourly.
-        “(unknown)” is traffic whose DNS lookup the box didn’t see (e.g. encrypted DNS or VPNs);
-        “(other)” is each device’s smaller sites, grouped together.
+        Data by site since {formatDate(data.cycle.start)}, updated hourly. “(unknown)” is traffic
+        the box couldn’t name, such as VPNs; “(other)” is each device’s smaller sites.
       </p>
       <Card className="p-0! overflow-x-auto">
         <table className="w-full text-sm">
@@ -80,8 +79,7 @@ export function SitesPage() {
             {data.sites.length === 0 && (
               <tr>
                 <td colSpan={5} className="px-4 py-6 text-center text-secondary-400">
-                  No site data yet. The first hour appears about an hour after the agent starts
-                  tracking.
+                  No site data yet. It appears within about an hour.
                 </td>
               </tr>
             )}

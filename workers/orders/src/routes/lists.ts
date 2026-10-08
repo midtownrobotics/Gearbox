@@ -59,7 +59,7 @@ const itemsValidator = validator("json", (value, c): { requestIds: number[] } =>
 /** How many of a list's requests are in each status, and what the live ones cost. */
 type Progress = Record<RequestStatus, number> & {
   total: number;
-  /** Requests not denied or cancelled: what the list still needs or already has. */
+  /** Requests not denied or canceled: what the list still needs or already has. */
   active: number;
   /** Known cost of the active requests (ordered prices once ordered, estimates before). */
   costCents: number;

@@ -40,7 +40,7 @@ export function setDefaultTheme(theme: Theme | "system") {
 }
 
 /**
- * The browser's own bar matches the app's top bar: the theme's surface colour, the team's own
+ * The browser's own bar matches the app's top bar: the theme's surface color, the team's own
  * once its appearance has loaded.
  */
 export function syncThemeColor() {
@@ -54,7 +54,7 @@ function applyTheme(theme: Theme) {
   if (root.dataset.theme === theme) return;
   root.dataset.theme = theme;
   root.style.colorScheme = theme;
-  // The team's colours for this theme are put in place by whoever listens (team-ui.ts).
+  // The team's colors for this theme are put in place by whoever listens (team-ui.ts).
   window.dispatchEvent(new Event("g3-theme-changed"));
   syncThemeColor();
   for (const listener of listeners) listener();

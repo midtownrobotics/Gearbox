@@ -162,8 +162,7 @@ export function FieldsCard() {
   return (
     <Card title="Fields">
       <p className="mb-3 text-sm text-secondary-500">
-        What's recorded about each entry, beyond its name, quantity and location. Everyone fills
-        these in when adding or editing an entry.
+        What's recorded about each entry besides its name, quantity and location.
       </p>
       {fields.length > 0 && (
         <ul className="mb-3 divide-y divide-secondary-100">

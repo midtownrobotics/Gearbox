@@ -98,7 +98,7 @@ function sheetDate(s: string, timeZone: string): number | null {
 
 /**
  * The date as row fingerprints have always written it (16:00 UTC that day), so a sheet imported
- * before teams had time zones is still recognised and skipped.
+ * before teams had time zones is still recognized and skipped.
  */
 function keyDate(s: string): number | null {
   const day = sheetDay(s);
