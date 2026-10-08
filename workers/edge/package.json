@@ -9,7 +9,8 @@
     "./switch-types": "./src/modules/switch/types.ts",
     "./presence-types": "./src/modules/network/presence-types.ts",
     "./interface-types": "./src/modules/network/interface-types.ts",
-    "./link-protocol": "./src/lib/link-protocol.ts"
+    "./link-protocol": "./src/lib/link-protocol.ts",
+    "./manifest": "./src/manifest.ts"
   },
   "scripts": {
     "dev": "wrangler dev --port 8793 --inspector-port 9235",

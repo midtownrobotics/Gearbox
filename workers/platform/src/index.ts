@@ -7,10 +7,12 @@ import packageJson from "../package.json";
 import { consoleRouter } from "./console";
 import { numberReports, teams } from "./db/schema";
 import { db, g3id, now } from "./lib";
+import { clearSwitchedOff, enabledApps, teamRouter } from "./team";
 import type { AppEnv } from "./types";
 
-// The platform: team sign-up (roadmap 2.7), the team registry the gateway asks about, and the
-// operators' console at /console (roadmap 2.8, src/console.ts).
+// The platform: team sign-up (roadmap 2.7), the team registry the gateway asks about, the
+// operators' console at /console (roadmap 2.8, src/console.ts), and each team's apps at /team
+// (roadmap Phase 4, src/team.ts; the app library is src/registry.ts).
 //
 // Signing a team up, all on the platform's site:
 //   1. POST /signup: the team's number, name, country, and the terms. A pending team.
@@ -55,14 +57,16 @@ const routes = app
   .get("/health", (c) =>
     c.json({ status: "ok", service: "platform", version: packageJson.version }),
   )
-  // Whether a team exists (signed up and active): the gateway asks before answering its addresses.
+  // Whether a team exists (signed up and active), and the apps it has on: the gateway asks before
+  // answering its addresses.
   .get("/teams/:id", async (c) => {
     const team = await db(c.env)
       .select({ id: teams.id, teamNumber: teams.teamNumber, name: teams.name })
       .from(teams)
       .where(and(eq(teams.id, c.req.param("id")), eq(teams.status, "active")))
       .get();
-    return team ? c.json(team) : c.json({ error: "No such team." }, 404);
+    if (!team) return c.json({ error: "No such team." }, 404);
+    return c.json({ ...team, apps: await enabledApps(db(c.env), team.id) });
   })
   .post("/signup", async (c) => {
     const body = await c.req.json<{
@@ -295,7 +299,14 @@ const routes = app
     if (code.status === "pending") return c.json({ status: "pending" as const });
     return c.json({ status: "expired" as const });
   })
-  .route("/console", consoleRouter);
+  .route("/console", consoleRouter)
+  .route("/team", teamRouter);
 
 export type PlatformApp = typeof routes;
-export default { fetch: withApiPrefix(app.fetch) };
+export default {
+  fetch: withApiPrefix(app.fetch),
+  // Daily: apps switched off for longer than the grace period have the team's data deleted.
+  async scheduled(_controller: ScheduledController, env: AppEnv["Bindings"]) {
+    await clearSwitchedOff(env);
+  },
+} satisfies ExportedHandler<AppEnv["Bindings"]>;

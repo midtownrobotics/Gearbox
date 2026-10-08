@@ -20,7 +20,8 @@ import type { AppEnv } from "../types";
 
 /**
  * For other workers only: the gateway never answers /internal. When an operator deletes a team
- * (the platform's console), its box's key, link and data go too.
+ * (the platform's console), or 90 days after the team switches Edge off (the platform's app
+ * library), its box's key, link and data go too.
  */
 export const internalRouter = new Hono<AppEnv>().delete("/teams/:teamId", async (c) => {
   const teamId = c.req.param("teamId");

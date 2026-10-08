@@ -16,6 +16,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import {
   type PortalTileKey,
+  type TeamUiLinkKey,
   type TeamUiSettings,
   completeAppOrder,
   portalAppLabels,
@@ -31,14 +32,18 @@ const labelOf = (key: PortalTileKey, idName: string) =>
 
 /**
  * The order of Portal's grid (Team Appearance): drag a tile by its handle, or focus the handle and
- * use Space and the arrow keys. Links that are hidden or empty keep their place but don't show.
+ * use Space and the arrow keys. Only the tiles that show are listed: links the team hasn't added
+ * (empty or hidden) keep their place in the saved order, so adding one back puts it where it was.
  */
 export function AppOrder({
   settings,
+  shownLinks,
   idName,
   onChange,
 }: {
   settings: TeamUiSettings;
+  /** The links listed in the Links section: the others aren't listed here. */
+  shownLinks: TeamUiLinkKey[];
   /** The sign-in app's name for this team ("G3ID"). */
   idName: string;
   onChange: (order: PortalTileKey[]) => void;
@@ -50,9 +55,9 @@ export function AppOrder({
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
   const hidden = (key: PortalTileKey) =>
-    key in settings.links &&
-    (settings.hiddenLinks.includes(key as keyof typeof settings.links) ||
-      !settings.links[key as keyof typeof settings.links]);
+    key in settings.links && !shownLinks.includes(key as TeamUiLinkKey);
+
+  const shown = order.filter((key) => !hidden(key));
 
   return (
     <DndContext
@@ -60,21 +65,20 @@ export function AppOrder({
       collisionDetection={closestCenter}
       onDragEnd={({ active, over }) => {
         if (!over || active.id === over.id) return;
-        const from = order.indexOf(active.id as PortalTileKey);
-        const to = order.indexOf(over.id as PortalTileKey);
-        onChange(arrayMove(order, from, to));
+        const moved = arrayMove(
+          shown,
+          shown.indexOf(active.id as PortalTileKey),
+          shown.indexOf(over.id as PortalTileKey),
+        );
+        // The shown tiles go back into the places shown tiles had; the others stay put.
+        let next = 0;
+        onChange(order.map((key) => (hidden(key) ? key : moved[next++])));
       }}
     >
-      <SortableContext items={order} strategy={verticalListSortingStrategy}>
+      <SortableContext items={shown} strategy={verticalListSortingStrategy}>
         <ol className="divide-y divide-line rounded-md border border-line">
-          {order.map((key, i) => (
-            <Tile
-              key={key}
-              id={key}
-              place={i + 1}
-              label={labelOf(key, idName)}
-              hidden={hidden(key)}
-            />
+          {shown.map((key, i) => (
+            <Tile key={key} id={key} place={i + 1} label={labelOf(key, idName)} />
           ))}
         </ol>
       </SortableContext>
@@ -86,12 +90,10 @@ function Tile({
   id,
   place,
   label,
-  hidden,
 }: {
   id: PortalTileKey;
   place: number;
   label: string;
-  hidden: boolean;
 }) {
   const {
     attributes,
@@ -131,8 +133,7 @@ function Tile({
         </svg>
       </button>
       <span className="w-6 text-right tabular-nums text-secondary-400">{place}</span>
-      <span className={hidden ? "text-secondary-400" : "text-secondary-900"}>{label}</span>
-      {hidden && <span className="text-xs text-secondary-400">(hidden or empty)</span>}
+      <span className="text-secondary-900">{label}</span>
     </li>
   );
 }

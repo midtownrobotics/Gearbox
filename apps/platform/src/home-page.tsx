@@ -1,6 +1,16 @@
 import { site } from "@g3/site-config";
 import { type ReactNode, useEffect, useState } from "react";
-import { FaCheck, FaCodeBranch, FaGithub, FaServer, FaSlack } from "react-icons/fa";
+import {
+  FaCodeBranch,
+  FaGithub,
+  FaHome,
+  FaPalette,
+  FaServer,
+  FaSlack,
+  FaSlidersH,
+  FaToggleOn,
+  FaUserShield,
+} from "react-icons/fa";
 import { Link } from "react-router-dom";
 import attendanceIcon from "./assets/app-icons/attendance.svg";
 import idIcon from "./assets/app-icons/id.svg";
@@ -11,62 +21,110 @@ import scoutingIcon from "./assets/app-icons/scouting.svg";
 import shopIcon from "./assets/app-icons/shop.svg";
 import skillsIcon from "./assets/app-icons/skills.svg";
 import { Page } from "./layout";
+import { MyTeamButton } from "./team-pages";
 
-// The platform's public page. Temporary marketing copy until the app library (roadmap Phase 4).
+// The platform's public page: what Gearbox is, its apps, how a team makes it its own, and how to
+// sign up. Written from the release announcement.
 
 type App = { name: string; icon: string; blurb: string };
 
+/** Sign-in, on every team: in the launcher mock, not the app list. */
+const SIGN_IN: App = { name: "Sign-in", icon: idIcon, blurb: "" };
+
 const APPS: App[] = [
-  {
-    name: "Sign-in",
-    icon: idIcon,
-    blurb:
-      "One account for every app. Members sign in with your team's Slack, and shop computers use 3-digit kiosk PINs.",
-  },
   {
     name: "Orders",
     icon: ordersIcon,
     blurb:
-      "Part requests from any member, mentor approvals, budgets by category, and carts grouped by vendor.",
-  },
-  {
-    name: "Inventory",
-    icon: inventoryIcon,
-    blurb:
-      "Everything your team owns and where it is: in storage by location, or in use on a robot. Received orders go straight in.",
+      "Paste a vendor link or pick from the FRC parts catalog. Mentors approve, carts build themselves per vendor, and budgets only count money actually spent.",
   },
   {
     name: "Shop",
     icon: shopIcon,
     blurb:
-      "Track every manufactured part from your CAD's bill of materials through each process, and print drawings.",
+      "Parts released in Onshape show up ready to make. Students pick up and finish each step from a phone or a shop kiosk, with drawings a scan away.",
   },
   {
     name: "Pit",
     icon: pitIcon,
     blurb:
-      "Competition days: battery tracking, pit checklists, and a pit monitor for the next match.",
+      "Checklists before every match, an issue log, battery health and cycle counts, and a monitor showing the schedule and rankings.",
   },
   {
     name: "Scouting",
     icon: scoutingIcon,
-    blurb: "Scouting forms, pick-list tier lists, field maps and a library of autos for strategy.",
+    blurb:
+      "Your own match and pit forms, pick lists and strategy tools, shared with the whole team. Turn on a points game to keep scouts engaged.",
   },
   {
-    name: "Skill Tree",
-    icon: skillsIcon,
-    blurb: "Each student's skills as a tree, with mentors signing off progress as they learn.",
+    name: "Inventory",
+    icon: inventoryIcon,
+    blurb:
+      "What you own and where it lives, on a shelf or on a robot. Deliveries from Orders land here automatically.",
   },
   {
     name: "Attendance",
     icon: attendanceIcon,
-    blurb: "Sign in and out at a kiosk, with hours that add up to a season leaderboard.",
+    blurb:
+      "Members scan a QR code at the door to check in and out. Hours roll up into a season leaderboard, and missed check-outs fix themselves.",
+  },
+  {
+    name: "Skill Tree",
+    icon: skillsIcon,
+    blurb:
+      "Training laid out as skills that unlock one after another. Mentors sign off individuals or whole groups, using our trees or yours.",
+  },
+];
+
+const FOUNDATION = [
+  {
+    icon: FaSlack,
+    title: "Sign in once",
+    body: "Members join from your Slack workspace and an admin lets them in. That one account works in every app. (Slack is required today; other options are planned.)",
+  },
+  {
+    icon: FaUserShield,
+    title: "Roles that follow you",
+    body: "Admin, mentor or student is set once and respected everywhere, so mentors approve orders and sign off skills with the same account.",
+  },
+  {
+    icon: FaHome,
+    title: "A home for your team",
+    body: "Your own address on frcgearbox.com with your apps and the links your team uses most, from your website to The Blue Alliance.",
+  },
+  {
+    icon: FaPalette,
+    title: "Your colors, everywhere",
+    body: "Set your name, logo and colors once and every app picks them up, light mode and dark.",
+  },
+];
+
+const CUSTOMIZE = [
+  {
+    icon: FaToggleOn,
+    title: "Pick your apps",
+    body: "Team admins turn apps on or off whenever they like. Use one, use them all.",
+  },
+  {
+    icon: FaSlidersH,
+    title: "Fill them with your process",
+    body: "Your budget categories, shop steps, checklists, scouting forms and skill trees. Nothing in the apps assumes how our team works.",
+  },
+  {
+    icon: FaCodeBranch,
+    title: "Build your own",
+    body: "Fork an app into the version your team wants, or write a new one, and send it as a pull request.",
+  },
+  {
+    icon: FaServer,
+    title: "Run your own copy",
+    body: "Everything deploys to a Cloudflare account, so you can host Gearbox yourself with your data on your own terms.",
   },
 ];
 
 const STEPS = [
   {
-    title: "Tell us your team",
+    title: "Enter your team number",
     body: "Your FRC number, name and country. One team per number.",
   },
   {
@@ -74,41 +132,8 @@ const STEPS = [
     body: `One click installs ${site.slackBotName} in your team's workspace. It's how everyone signs in.`,
   },
   {
-    title: "Send it a code",
-    body: `DM ${site.slackBotName} the code on screen. You're your team's first admin, and your apps are live.`,
-  },
-];
-
-const FEATURES = [
-  "Free, with no ads and nothing to buy",
-  "Open source under the MIT license",
-  "Sign-in through your team's own Slack",
-  "Roles for admins, mentors and students",
-  "Kiosk PINs for shared shop computers",
-  "Light and dark mode on every app",
-  "Your team's data stays your team's",
-];
-
-const FAQ = [
-  {
-    q: "What does it cost?",
-    a: "Nothing. Gearbox is free, and run by volunteers.",
-  },
-  {
-    q: "Do our members need new accounts?",
-    a: "They sign in with your team's Slack. The first time, they send the bot a code, and an admin approves them.",
-  },
-  {
-    q: "Who can see our data?",
-    a: "Only your team's members, by role. Every team's sign-ins and data are kept apart, and members must be 13 or older.",
-  },
-  {
-    q: "Who built this?",
-    a: `${site.team.name}, FRC Team ${site.team.number}, who've run their own season on these apps, and anyone who sends a pull request.`,
-  },
-  {
-    q: "Is it really open source?",
-    a: "Yes. Every line is on GitHub under the MIT license: read it, run your own copy, or change it and send the change back.",
+    title: "Send it the code on screen",
+    body: `DM ${site.slackBotName} the code. You're your team's first admin, and your apps are live.`,
   },
 ];
 
@@ -116,11 +141,12 @@ export function HomePage() {
   return (
     <Page>
       <Hero />
+      <Foundation />
       <Apps />
-      <OpenSource />
+      <MakeItYours />
       <HowItWorks />
-      <Features />
-      <Faq />
+      <Feedback />
+      <Thanks />
       <FinalCall />
     </Page>
   );
@@ -135,13 +161,15 @@ function Hero() {
       />
       <div className="relative mx-auto grid max-w-6xl items-center gap-12 px-5 py-16 sm:py-24 lg:grid-cols-[1.1fr_1fr]">
         <div className="space-y-6">
-          <h1 className="text-4xl font-bold leading-tight tracking-tight text-secondary-900 sm:text-6xl">
-            The Linux of FRC productivity platforms.
+          <p className="text-sm font-semibold uppercase tracking-widest text-primary-500">
+            FRC productivity for the modern era
+          </p>
+          <h1 className="text-4xl font-bold leading-tight tracking-tight text-secondary-900 sm:text-5xl">
+            Run your whole team from one place.
           </h1>
           <p className="max-w-xl text-lg text-secondary-600">
-            Gearbox is free, open-source software that runs your FIRST Robotics Competition team:
-            ordering, shop tracking, scouting, attendance and more, behind one sign-in with your
-            team's Slack.
+            Parts, shop, pit, scouting, attendance and training in apps that share your members,
+            roles and branding. Free, open source and made by an FRC team.
           </p>
           <div className="flex flex-wrap gap-3">
             <Link
@@ -150,12 +178,7 @@ function Hero() {
             >
               Sign up your team
             </Link>
-            <a
-              href={site.sourceUrl}
-              className="flex items-center gap-2 rounded-lg border border-line bg-surface px-6 py-3 font-semibold text-secondary-900 transition-colors hover:border-primary-500"
-            >
-              <FaGithub /> View the source
-            </a>
+            <MyTeamButton large />
           </div>
           <p className="text-sm text-secondary-500">
             Takes about two minutes. You'll need to be able to add an app to your team's Slack.
@@ -169,15 +192,18 @@ function Hero() {
 
 /** A moment from each app, shown in turn on the launcher mock. */
 const MOMENTS: { app: string; label: string; text: string }[] = [
+  { app: "Sign-in", label: "New member", text: "Jordan joined from Slack" },
   { app: "Orders", label: "Order approved", text: '4× 1/2" hex bearings' },
   { app: "Shop", label: "Part finished", text: "Intake side plate · 2 of 2 cut" },
   { app: "Pit", label: "Battery ready", text: "Battery 7 charged for Q42" },
   { app: "Scouting", label: "Pick list updated", text: "Team 254 moved to the top tier" },
   { app: "Skill Tree", label: "Skill signed off", text: "CAD Basics · complete" },
-  { app: "Sign-in", label: "New member", text: "Jordan joined from Slack" },
 ];
 
-const LAUNCHER_APPS = APPS.filter((app) => app.name !== "Attendance" && app.name !== "Inventory");
+const LAUNCHER_APPS = [
+  SIGN_IN,
+  ...APPS.filter((app) => app.name !== "Attendance" && app.name !== "Inventory"),
+];
 
 /** What a team's home looks like once it's signed up, with a moment from each app in turn. */
 function LauncherMock() {
@@ -297,6 +323,31 @@ function Section({
   );
 }
 
+function Foundation() {
+  return (
+    <Section eyebrow="Why Gearbox" title="Stop juggling a dozen tools.">
+      <p className="-mt-4 mb-10 max-w-3xl text-secondary-600">
+        Spreadsheets, forms and whiteboards each want their own login and their own roster. Gearbox
+        started as {site.team.name}'s ({site.team.number}) answer to that, and now any team can use
+        it.
+      </p>
+      <div className="grid gap-4 sm:grid-cols-2">
+        {FOUNDATION.map(({ icon: Icon, title, body }) => (
+          <div key={title} className="flex gap-4 rounded-xl border border-line bg-surface p-6">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-50 text-primary-600">
+              <Icon />
+            </span>
+            <div>
+              <h3 className="font-semibold text-secondary-900">{title}</h3>
+              <p className="mt-1 text-sm text-secondary-600">{body}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </Section>
+  );
+}
+
 function Apps() {
   return (
     <Section id="apps" eyebrow="The apps" title="Everything a build season runs on.">
@@ -318,45 +369,23 @@ function Apps() {
   );
 }
 
-const OPEN = [
-  {
-    icon: FaGithub,
-    title: "MIT licensed",
-    body: "Use it, change it, share it. No license fees, no lock-in, no catch.",
-  },
-  {
-    icon: FaCodeBranch,
-    title: "Contributions welcome",
-    body: "Every change is a public pull request, and yours are wanted. Found a bug or want a feature? Open an issue or send a PR.",
-  },
-  {
-    icon: FaServer,
-    title: "Run it yourself",
-    body: "Prefer your own servers? One config file sets your team, domain and name.",
-  },
-];
-
-function OpenSource() {
+function MakeItYours() {
   return (
-    <section className="border-t border-line bg-[#111111]">
+    <section id="customize" className="scroll-mt-16 border-t border-line bg-[#111111]">
       <div className="mx-auto grid max-w-6xl items-center gap-12 px-5 py-16 sm:py-20 lg:grid-cols-[1fr_1fr]">
         <div>
           <p className="text-sm font-semibold uppercase tracking-widest text-[#e05a6f]">
-            Open source
+            Make it yours
           </p>
           <h2 className="mt-2 text-3xl font-bold tracking-tight text-[#ffffff] sm:text-4xl">
-            Built by the FRC community.
+            Shape it to how your team works.
           </h2>
           <p className="mt-4 text-[#b8b8b8]">
-            Gearbox isn't a product you rent. It's software teams share, started by {site.team.name}{" "}
-            and better with every team that pitches in.
-          </p>
-          <p className="mt-3 text-[#b8b8b8]">
-            We want your pull requests: bug fixes, new features, docs, even whole new apps, from
-            students and mentors alike.
+            Customize Gearbox as deeply as your team wants. It's MIT licensed, and every change is a
+            public pull request.
           </p>
           <ul className="mt-8 space-y-5">
-            {OPEN.map(({ icon: Icon, title, body }) => (
+            {CUSTOMIZE.map(({ icon: Icon, title, body }) => (
               <li key={title} className="flex gap-4">
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#2a2a2a] text-[#ffffff]">
                   <Icon />
@@ -401,7 +430,7 @@ function OpenSource() {
 
 function HowItWorks() {
   return (
-    <Section id="how" eyebrow="How it works" title="From sign-up to your first order in minutes.">
+    <Section id="how" eyebrow="Set up your team" title="Live in a couple of minutes.">
       <ol className="grid gap-6 md:grid-cols-3">
         {STEPS.map((step, i) => (
           <li key={step.title} className="relative rounded-xl border border-line bg-surface p-6">
@@ -420,34 +449,39 @@ function HowItWorks() {
   );
 }
 
-function Features() {
+function Feedback() {
   return (
-    <Section eyebrow="Built in" title="The boring parts, done for you.">
-      <ul className="grid gap-x-8 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
-        {FEATURES.map((feature) => (
-          <li key={feature} className="flex items-start gap-3 text-secondary-700">
-            <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary-50 text-primary-600">
-              <FaCheck size={10} />
-            </span>
-            {feature}
-          </li>
-        ))}
-      </ul>
+    <Section eyebrow="Feedback" title="Something missing for your team?">
+      <div className="max-w-3xl space-y-4 text-secondary-600">
+        <p>
+          We built these apps around our own season, so they won't suit everyone out of the box. Let
+          us know what would make Gearbox work for you, or borrow the ideas for your own tools.
+        </p>
+        <a
+          href={site.sourceUrl}
+          className="inline-flex items-center gap-2 rounded-lg border border-line bg-surface px-5 py-2.5 font-semibold text-secondary-900 transition-colors hover:border-primary-500"
+        >
+          <FaGithub /> Share feedback on GitHub
+        </a>
+      </div>
     </Section>
   );
 }
 
-function Faq() {
+function Thanks() {
   return (
-    <Section id="faq" eyebrow="Questions" title="Good to know.">
-      <dl className="grid gap-6 md:grid-cols-2">
-        {FAQ.map((item) => (
-          <div key={item.q} className="rounded-xl border border-line bg-surface p-6">
-            <dt className="font-semibold text-secondary-900">{item.q}</dt>
-            <dd className="mt-2 text-sm text-secondary-600">{item.a}</dd>
-          </div>
-        ))}
-      </dl>
+    <Section eyebrow="Thanks" title="Standing on the shoulders of other teams.">
+      <ul className="grid max-w-4xl gap-4 text-sm text-secondary-600 md:grid-cols-3">
+        <li className="rounded-xl border border-line bg-surface p-5">
+          Team 4414's TideApps showed us what team-built web apps could be.
+        </li>
+        <li className="rounded-xl border border-line bg-surface p-5">
+          Our Onshape integration builds on work by Team 6328, FRCBOM's David Masin and crummyh.
+        </li>
+        <li className="rounded-xl border border-line bg-surface p-5">
+          Orders takes cues from FRCTools, and its catalog grew out of the FRCDesign library.
+        </li>
+      </ul>
     </Section>
   );
 }

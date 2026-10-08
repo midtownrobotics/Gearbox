@@ -60,3 +60,10 @@ export {
   requestTeamId,
   TEAM_HEADER,
 } from "./g3id";
+
+export {
+  type AppIntegration,
+  type AppManifest,
+  type AppRole,
+  defineManifest,
+} from "./manifest";

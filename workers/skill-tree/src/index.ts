@@ -6,6 +6,7 @@ import { cors } from "hono/cors";
 import packageJson from "../package.json";
 import { createDb } from "./db";
 import { treeSets } from "./db/schema";
+import { currentTreeSet } from "./lib/tree-set";
 import { progressRouter, studentsRouter } from "./routes/students";
 import { categoriesRouter, skillsRouter, treesRouter } from "./routes/trees";
 import type { AppEnv } from "./types";
@@ -31,11 +32,18 @@ const app = base
   .get("/health", (c) =>
     c.json({ status: "ok", service: "skill-tree", version: packageJson.version }),
   )
-  // When an operator deletes the team (the platform's console), its data goes too. Only other
-  // workers reach /internal: the gateway never answers it.
+  // When an operator deletes the team (the platform's console), or 90 days after the team switches
+  // the app off (the platform's app library), its data goes too. Only other workers reach
+  // /internal: the gateway never answers it.
   .delete("/internal/teams/:teamId", async (c) => {
     // Everything else hangs off the team's tree set and goes with it (ON DELETE CASCADE).
     await deleteTeamRows(createDb(c.env.SKILL_DB), c.req.param("teamId"), [treeSets]);
+    return c.json({ ok: true });
+  })
+  // When the team switches Skill Tree on (the platform's app library): its default trees. Opening
+  // the app does the same, so this only gets them ready; a team that has a tree set keeps it.
+  .post("/internal/teams/:teamId/seed", async (c) => {
+    await currentTreeSet(createDb(c.env.SKILL_DB), c.req.param("teamId"));
     return c.json({ ok: true });
   })
   .get("/me", requireAuth, (c) =>

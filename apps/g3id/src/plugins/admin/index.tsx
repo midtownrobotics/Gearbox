@@ -1,9 +1,19 @@
+import { appUrl } from "@g3/site-config";
+import { useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import type { Plugin } from "../../shared/plugin-types";
 import { AdminAttendancePage } from "./admin-attendance-page";
 import { AdminKioskPage } from "./admin-kiosk-page";
-import { AdminSlackPage } from "./admin-slack-page";
-import { AdminTeamUiPage } from "./admin-team-ui-page";
 import { AdminUsersPage } from "./admin-users-page";
+
+/** A page that moved to the team's admin pages on its home (roadmap 4.5): old links go there. */
+function MovedToHome({ to }: { to: string }) {
+  const { search } = useLocation();
+  useEffect(() => {
+    window.location.replace(`${appUrl("portal")}${to}${search}`);
+  }, [to, search]);
+  return null;
+}
 
 export const adminPlugin: Plugin = {
   name: "admin",
@@ -11,20 +21,12 @@ export const adminPlugin: Plugin = {
     { path: "/admin/users", element: <AdminUsersPage /> },
     { path: "/admin/kiosk", element: <AdminKioskPage /> },
     { path: "/admin/attendance", element: <AdminAttendancePage /> },
-    { path: "/admin/slack", element: <AdminSlackPage /> },
-    { path: "/admin/team-ui", element: <AdminTeamUiPage /> },
+    { path: "/admin/slack", element: <MovedToHome to="/admin/slack" /> },
+    { path: "/admin/team-ui", element: <MovedToHome to="/admin/appearance" /> },
   ],
   navItems: [
     { label: "Users", to: "/admin/users", order: 10, audience: "admin", group: "Admin" },
     { label: "Kiosk Devices", to: "/admin/kiosk", order: 11, audience: "admin", group: "Admin" },
     { label: "Attendance", to: "/admin/attendance", order: 12, audience: "admin", group: "Admin" },
-    {
-      label: "Team Appearance",
-      to: "/admin/team-ui",
-      order: 13,
-      audience: "admin",
-      group: "Admin",
-    },
-    { label: "Slack", to: "/admin/slack", order: 14, audience: "admin", group: "Admin" },
   ],
 };

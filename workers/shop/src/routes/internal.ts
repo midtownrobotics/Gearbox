@@ -26,7 +26,8 @@ import type { AppEnv } from "../types";
 
 /**
  * For other workers only: the gateway never answers /internal. When an operator deletes a team
- * (the platform's console), its data here goes too: its Onshape webhook (if Onshape still lets
+ * (the platform's console), or 90 days after the team switches Shop off (the platform's app
+ * library), its data here goes too: its Onshape webhook (if Onshape still lets
  * us), its files in R2 and every row.
  */
 export const internalRouter = new Hono<AppEnv>().delete("/teams/:teamId", async (c) => {

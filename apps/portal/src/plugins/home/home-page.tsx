@@ -4,8 +4,9 @@ import {
   appUrl,
   completeAppOrder,
   pageTeamNumber,
+  portalAppLabels,
 } from "@g3/site-config";
-import { TeamIcon, useTeamNames, useTeamUiSettings } from "@g3/ui";
+import { TeamIcon, rememberTeam, useTeamNames, useTeamUiSettings } from "@g3/ui";
 import { useEffect, useState } from "react";
 import type { IconType } from "react-icons";
 import { FaCube, FaGithub, FaGlobe, FaInstagram, FaSlack } from "react-icons/fa";
@@ -17,7 +18,8 @@ import pitIcon from "../../assets/app-icons/pit.svg";
 import scoutingIcon from "../../assets/app-icons/scouting.svg";
 import shopIcon from "../../assets/app-icons/shop.svg";
 import skillsIcon from "../../assets/app-icons/skills.svg";
-import { g3id } from "../../lib/api";
+import { platform } from "../../lib/platform";
+import { useMe } from "../../shared/me";
 import {
   BlueAllianceIcon,
   FirstIcon,
@@ -31,7 +33,7 @@ import {
 // sites outside the team's apps. (`bg-black` isn't touched by dark mode, and neither is the
 // color variable used directly, where the `text-primary-500` class would be lightened.)
 type App = {
-  /** Which tile it is, for the team's order (Team Appearance's "Apps grid order"). */
+  /** Which tile it is, for the team's order (Team Appearance's "Apps grid order"); for an app, its slug. */
   key: PortalTileKey;
   label: string;
   href: string;
@@ -176,12 +178,33 @@ function publicSiteMark(logoUrl: string): { logoSrc?: string; icon?: IconType } 
   return logoUrl ? { logoSrc: logoUrl } : { logoSrc: undefined, icon: FaGlobe };
 }
 
-type AuthState = "checking" | "authenticated" | "unauthenticated";
+/**
+ * The team's apps that are on (the platform's app library): null while asked, or "all" if the
+ * platform didn't answer (the gateway still keeps the others closed).
+ */
+function useTeamApps(signedIn: boolean): Set<string> | "all" | null {
+  const [apps, setApps] = useState<Set<string> | "all" | null>(null);
+  useEffect(() => {
+    if (!signedIn) return;
+    platform<{ apps: { slug: string }[] }>("/team/apps")
+      .then((data) => setApps(new Set(data.apps.map((a) => a.slug))))
+      .catch(() => setApps("all"));
+  }, [signedIn]);
+  return apps;
+}
+
+const isApp = (key: PortalTileKey) => key in portalAppLabels;
 
 export function HomePage() {
   const teamUi = useTeamUiSettings();
   const names = useTeamNames();
-  const [authState, setAuthState] = useState<AuthState>("checking");
+  const me = useMe();
+  const teamApps = useTeamApps(!!me);
+  const authState = me === undefined ? "checking" : me ? "authenticated" : "unauthenticated";
+  // A member signed in on their team's home: the platform's site offers it as "My team".
+  useEffect(() => {
+    if (me) rememberTeam(pageTeamNumber);
+  }, [me]);
   // In the team's order; a tile its saved order doesn't name keeps its default place.
   const order = completeAppOrder(teamUi.appOrder ?? []);
   const rank = (app: App) => order.indexOf(app.key);
@@ -198,17 +221,7 @@ export function HomePage() {
       };
     });
 
-  useEffect(() => {
-    g3id.auth.me.$get().then(async (res) => {
-      if (res.ok) {
-        setAuthState("authenticated");
-      } else {
-        setAuthState("unauthenticated");
-      }
-    });
-  }, []);
-
-  if (authState === "checking") {
+  if (authState === "checking" || (authState === "authenticated" && teamApps === null)) {
     return (
       <main className="min-h-screen bg-page flex items-center justify-center px-6">
         <div className="text-center">
@@ -267,12 +280,24 @@ export function HomePage() {
             Team {pageTeamNumber}
           </p>
           <h1 className="text-4xl font-bold text-secondary-900">{teamUi.shortName} Gearbox</h1>
+          {me?.isAdmin && teamApps !== "all" && (teamApps?.size ?? 0) <= 2 && (
+            <p className="mt-4 rounded-lg border border-line bg-surface p-4 text-secondary-700">
+              Your team has no apps switched on yet.{" "}
+              <a href="/admin" className="font-semibold text-primary-600 hover:underline">
+                Choose your apps
+              </a>
+            </p>
+          )}
         </div>
 
         <div className="grid grid-cols-4 sm:grid-cols-5 gap-x-4 gap-y-8">
           {apps
             .filter(
-              (app) => app.href && (!app.linkKey || !teamUi.hiddenLinks?.includes(app.linkKey)),
+              (app) =>
+                app.href &&
+                (!app.linkKey || !teamUi.hiddenLinks?.includes(app.linkKey)) &&
+                // Only the apps the team has on.
+                (!isApp(app.key) || teamApps === "all" || teamApps?.has(app.key)),
             )
             .map((app) => {
               return (

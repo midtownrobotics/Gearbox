@@ -1,5 +1,5 @@
-import { DEV_DOMAIN, site } from "@g3/site-config";
 import { useEffect, useSyncExternalStore } from "react";
+import { sharedCookieAttributes } from "./shared-cookie";
 
 // One light/dark setting for every app. It lives in a cookie on the team's domain, which every
 // app's subdomain can read (localStorage is per subdomain). On localhost, cookies are shared
@@ -62,15 +62,8 @@ function applyTheme(theme: Theme) {
 
 /** Saves the theme for every G3 app and applies it here. */
 export function setTheme(theme: Theme) {
-  // Shared by every app on the domain this page is on: the platform's, or in dev the gateway's
-  // (gearbox.localhost) or plain localhost.
-  const host = window.location.hostname;
-  const shared = [site.platformDomain, DEV_DOMAIN, "localhost"].find(
-    (d) => host === d || host.endsWith(`.${d}`),
-  );
-  const domain = shared ? `; domain=${shared}` : "";
-  const secure = window.location.protocol === "https:" ? "; secure" : "";
-  document.cookie = `${COOKIE}=${theme}; path=/; max-age=31536000; samesite=lax${domain}${secure}`;
+  // Shared by every app on the domain this page is on.
+  document.cookie = `${COOKIE}=${theme}; ${sharedCookieAttributes(31536000)}`;
   applyTheme(theme);
 }
 

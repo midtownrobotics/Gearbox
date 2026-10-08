@@ -35,13 +35,16 @@ const g3id = (request: Request) => {
   return echo("G3ID")(request);
 };
 
-// The platform knows which teams exist.
+// The platform knows which teams exist, and which apps they have on: 254 has only sign-in, its
+// home and Orders; 1648's answer has no app list (a platform from before the app library), so it
+// has every app.
 const platform = (request: Request) => {
   const team = new URL(request.url).pathname.match(/^\/api\/teams\/(.+)$/)?.[1];
   if (team !== undefined) {
-    return teams.includes(team)
-      ? Response.json({ id: team })
-      : Response.json({ error: "No such team." }, { status: 404 });
+    if (!teams.includes(team)) return Response.json({ error: "No such team." }, { status: 404 });
+    return Response.json(
+      team === "frc254" ? { id: team, apps: ["id", "portal", "orders"] } : { id: team },
+    );
   }
   return echo("PLATFORM")(request);
 };

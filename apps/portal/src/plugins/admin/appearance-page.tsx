@@ -11,8 +11,9 @@ import {
   teamUiLinkLabels,
 } from "@g3/site-config";
 import { refreshTeamUiSettings, useTeamNames } from "@g3/ui";
-import { type CSSProperties, useEffect, useState } from "react";
-import { api } from "../../lib/api";
+import { type CSSProperties, useEffect, useRef, useState } from "react";
+import { FaTimes } from "react-icons/fa";
+import { g3id } from "../../lib/api";
 import { AppOrder } from "./app-order";
 
 type Mode = "light" | "dark";
@@ -31,7 +32,7 @@ const colorLabels: Record<Exclude<keyof TeamUiColors, "accent">, string> = {
 const fieldClass =
   "w-full rounded-md border border-line bg-surface px-3 py-2 text-secondary-900 focus:outline-none focus:ring-2 focus:ring-primary-500";
 
-export function AdminTeamUiPage() {
+export function AppearancePage() {
   const { idName } = useTeamNames();
   const [settings, setSettings] = useState<TeamUiSettings>(() => teamUiDefaults(pageTeamId));
   // The team's own defaults (its name and number), from G3ID: what "Reset to defaults" restores.
@@ -40,15 +41,20 @@ export function AdminTeamUiPage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  // The links listed in the Links section (and the grid order): the ones the team shows as
+  // loaded, plus any added here, less any removed. Clearing a link's address doesn't take it off
+  // the list until it's saved.
+  const [linkRows, setLinkRows] = useState<TeamUiLinkKey[]>([]);
 
   useEffect(() => {
-    api.admin.team.ui
+    g3id.admin.team.ui
       .$get()
       .then(async (response) => {
         if (!response.ok) throw new Error("Could not load team settings.");
         const data = await response.json();
         setSettings(data.settings);
         setDefaults(data.defaults);
+        setLinkRows(shownLinks(data.settings));
       })
       .catch((reason) =>
         setError(reason instanceof Error ? reason.message : "Could not load team settings."),
@@ -86,6 +92,7 @@ export function AdminTeamUiPage() {
 
   function reset() {
     setSettings(structuredClone(defaults));
+    setLinkRows(shownLinks(defaults));
     setError("");
     setMessage("Defaults restored. Save to apply them.");
   }
@@ -96,12 +103,13 @@ export function AdminTeamUiPage() {
     setMessage("");
     setError("");
     try {
-      const response = await api.admin.team.ui.$put({ json: settings });
+      const response = await g3id.admin.team.ui.$put({ json: settings });
       if (!response.ok) {
         const data = (await response.json()) as { error?: string };
         throw new Error(data.error ?? "Could not save team settings.");
       }
       await refreshTeamUiSettings(true);
+      setLinkRows(shownLinks(settings));
       setMessage("Team appearance saved.");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not save team settings.");
@@ -238,49 +246,19 @@ export function AdminTeamUiPage() {
         </section>
 
         <section className="rounded-lg border border-line bg-surface p-5">
-          <h2 className="mb-4 text-xl font-semibold">Links</h2>
-          <p className="mb-4 text-sm text-secondary-600">
-            Links shown on the portal. Hide one to keep its URL for later; empty links aren't shown.
-          </p>
-          <div className="grid gap-4 sm:grid-cols-2">
-            {(Object.keys(teamUiLinkLabels) as TeamUiLinkKey[]).map((key) => (
-              <div key={key} className="space-y-2">
-                <TextField
-                  label={teamUiLinkLabels[key]}
-                  value={settings.links[key]}
-                  onChange={(value) => update("links", { ...settings.links, [key]: value })}
-                  type="url"
-                  placeholder="https://…"
-                />
-                <div className="flex items-center justify-between gap-3 text-sm">
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={settings.hiddenLinks.includes(key)}
-                      onChange={(event) =>
-                        update(
-                          "hiddenLinks",
-                          event.target.checked
-                            ? [...settings.hiddenLinks, key]
-                            : settings.hiddenLinks.filter((link) => link !== key),
-                        )
-                      }
-                    />
-                    Hide {teamUiLinkLabels[key]}
-                  </label>
-                  <button
-                    type="button"
-                    disabled={!settings.links[key] || saving}
-                    className="text-primary-700 underline disabled:opacity-50"
-                    onClick={() => update("links", { ...settings.links, [key]: "" })}
-                    aria-label={`Remove ${teamUiLinkLabels[key]} link`}
-                  >
-                    Remove link
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
+          <h2 className="mb-1 text-xl font-semibold">Links</h2>
+          <p className="mb-4 text-sm text-secondary-600">Shown as tiles on your team's home.</p>
+          <Links
+            links={settings.links}
+            hiddenLinks={settings.hiddenLinks}
+            rows={linkRows}
+            onRowsChange={setLinkRows}
+            disabled={saving}
+            onChange={(links, hiddenLinks) => {
+              setSettings((current) => ({ ...current, links, hiddenLinks }));
+              setMessage("");
+            }}
+          />
         </section>
 
         <section className="rounded-lg border border-line bg-surface p-5">
@@ -290,6 +268,7 @@ export function AdminTeamUiPage() {
           </p>
           <AppOrder
             settings={settings}
+            shownLinks={linkRows}
             idName={idName}
             onChange={(order) => update("appOrder", order)}
           />
@@ -314,6 +293,150 @@ export function AdminTeamUiPage() {
         </div>
       </form>
     </main>
+  );
+}
+
+/** The links a team's saved settings show on its home: an address, and not hidden. */
+function shownLinks(settings: TeamUiSettings): TeamUiLinkKey[] {
+  return (Object.keys(teamUiLinkLabels) as TeamUiLinkKey[]).filter(
+    (key) => settings.links[key] && !settings.hiddenLinks.includes(key),
+  );
+}
+
+/**
+ * The team's links: one row for each it shows, and a menu to add another. Removing one clears its
+ * address. A link hidden in the editor before this one (address kept, not shown) comes back with
+ * its address when it's added again.
+ */
+function Links({
+  links,
+  hiddenLinks,
+  rows,
+  onRowsChange,
+  disabled,
+  onChange,
+}: {
+  links: TeamUiSettings["links"];
+  hiddenLinks: TeamUiLinkKey[];
+  /** The links listed (see `linkRows`). */
+  rows: TeamUiLinkKey[];
+  onRowsChange: (rows: TeamUiLinkKey[]) => void;
+  disabled: boolean;
+  onChange: (links: TeamUiSettings["links"], hiddenLinks: TeamUiLinkKey[]) => void;
+}) {
+  // Rows added here, whose address box gets the cursor.
+  const [added, setAdded] = useState<TeamUiLinkKey[]>([]);
+  const keys = Object.keys(teamUiLinkLabels) as TeamUiLinkKey[];
+  const shown = keys.filter((key) => rows.includes(key));
+  const addable = keys.filter((key) => !rows.includes(key));
+
+  function add(key: TeamUiLinkKey) {
+    setAdded((current) => [...current, key]);
+    onRowsChange([...rows, key]);
+    onChange(
+      links,
+      hiddenLinks.filter((link) => link !== key),
+    );
+  }
+
+  function remove(key: TeamUiLinkKey) {
+    onRowsChange(rows.filter((link) => link !== key));
+    onChange(
+      { ...links, [key]: "" },
+      hiddenLinks.filter((link) => link !== key),
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {shown.length > 0 ? (
+        <ul className="divide-y divide-line rounded-md border border-line">
+          {shown.map((key) => (
+            <LinkRow
+              key={key}
+              label={teamUiLinkLabels[key]}
+              value={links[key]}
+              disabled={disabled}
+              autoFocus={added.includes(key) && !links[key]}
+              onChange={(value) => onChange({ ...links, [key]: value }, hiddenLinks)}
+              onRemove={() => remove(key)}
+            />
+          ))}
+        </ul>
+      ) : (
+        <p className="rounded-md border border-dashed border-line px-3 py-4 text-center text-sm text-secondary-500">
+          No links yet.
+        </p>
+      )}
+      {addable.length > 0 && (
+        <select
+          aria-label="Add a link"
+          value=""
+          disabled={disabled}
+          onChange={(event) => add(event.target.value as TeamUiLinkKey)}
+          className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-secondary-900 focus:outline-none focus:ring-2 focus:ring-primary-500"
+        >
+          <option value="" disabled>
+            + Add a link
+          </option>
+          {addable.map((key) => (
+            <option key={key} value={key}>
+              {teamUiLinkLabels[key]}
+            </option>
+          ))}
+        </select>
+      )}
+    </div>
+  );
+}
+
+/** One link: its name, its address, and a button to remove it. */
+function LinkRow({
+  label,
+  value,
+  disabled,
+  autoFocus,
+  onChange,
+  onRemove,
+}: {
+  label: string;
+  value: string;
+  disabled: boolean;
+  autoFocus: boolean;
+  onChange: (value: string) => void;
+  onRemove: () => void;
+}) {
+  // A link just added from the menu: ready to type its address.
+  const input = useRef<HTMLInputElement>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: only when the row first appears
+  useEffect(() => {
+    if (autoFocus) input.current?.focus();
+  }, []);
+  return (
+    <li className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 sm:flex-nowrap">
+      <label htmlFor={`link-${label}`} className="w-full text-sm font-medium sm:w-36 sm:shrink-0">
+        {label}
+      </label>
+      <input
+        id={`link-${label}`}
+        type="url"
+        value={value}
+        placeholder="https://…"
+        ref={input}
+        onChange={(event) => onChange(event.target.value)}
+        className="min-w-0 flex-1 rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-secondary-900 focus:outline-none focus:ring-2 focus:ring-primary-500"
+      />
+      <button
+        type="button"
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-secondary-500 hover:bg-inset hover:text-red-600 disabled:opacity-40"
+        disabled={disabled}
+        onClick={onRemove}
+        aria-label={`Remove ${label}`}
+        title="Remove"
+      >
+        <FaTimes />
+      </button>
+    </li>
   );
 }
 

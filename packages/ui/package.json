@@ -6,6 +6,7 @@
     "./index.css": "./src/index.css",
     "./nav-bar.css": "./src/nav-bar.css",
     "./theme.css": "./src/theme.css",
+    "./my-team": "./src/my-team.ts",
     ".": "./src/index.ts"
   },
   "peerDependencies": {

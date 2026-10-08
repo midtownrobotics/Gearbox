@@ -1,3 +1,4 @@
+import { teamAppUrlVia } from "@g3/site-config";
 import { site, teamKey } from "@g3/site-config";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createDb } from "../src/db";
@@ -91,7 +92,10 @@ describe("connecting Slack", () => {
     const back = await g3id(`/slack/oauth/callback?code=ws:${ws}&state=${state}`, {
       redirect: "manual",
     });
-    expect(back.headers.get("Location")).toMatch(/\/admin\/slack\?connected=1$/);
+    // Back to the Slack page on the team's admin pages, on its home.
+    expect(back.headers.get("Location")).toBe(
+      `${teamAppUrlVia(undefined, team, "portal")}/admin/slack?connected=1`,
+    );
     expect(await teamForWorkspace(testEnv, ws)).toBe(team);
     expect(await (await g3id("/admin/slack", { cookie: admin })).json()).toMatchObject({
       connected: true,

@@ -130,9 +130,11 @@ export function SignupPage() {
 
 function TeamForm({ onError }: { onError: (error: string | null) => void }) {
   const navigate = useNavigate();
+  const [params] = useSearchParams();
   const countryName = useMemo(() => new Intl.DisplayNames(undefined, { type: "region" }), []);
   const [form, setForm] = useState({
-    teamNumber: "",
+    // From the team-not-found page's "Sign up team <number>".
+    teamNumber: /^\d{1,5}$/.test(params.get("team") ?? "") ? (params.get("team") as string) : "",
     name: "",
     country: "US",
     acceptTerms: false,

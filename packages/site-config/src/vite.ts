@@ -3,8 +3,9 @@ import { join } from "node:path";
 import type { Plugin } from "vite";
 import { type AppName, apiPath } from "./index.ts";
 
-/** Each app's worker in .dev-ports.json (Portal has none). */
-const DEV_WORKERS: Partial<Record<AppName, string>> = {
+/** Each app's worker in .dev-ports.json (Portal has none), and the platform's. */
+const DEV_WORKERS: Partial<Record<AppName | "platform", string>> = {
+  platform: "platform",
   id: "g3id",
   shop: "shop",
   pit: "pit",
@@ -55,7 +56,7 @@ export function siteConfig(
         if (gateway) Object.assign(define, { __G3_LOCAL_GATEWAY__: JSON.stringify(gateway) });
         const proxies = Object.fromEntries(
           Object.entries(DEV_WORKERS).map(([app, worker]) => {
-            const prefix = apiPath(app as AppName);
+            const prefix = apiPath(app as AppName | "platform");
             return [
               prefix,
               {

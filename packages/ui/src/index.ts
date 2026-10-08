@@ -15,3 +15,4 @@ export {
 } from "./components/app-nav-bar";
 export { forceTheme, readTheme, setTheme, type Theme, useTheme } from "./theme";
 export { refreshTeamUiSettings, useTeamIcon, useTeamNames, useTeamUiSettings } from "./team-ui";
+export { forgetTeam, rememberedTeam, rememberTeam } from "./my-team";

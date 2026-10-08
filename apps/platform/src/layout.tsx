@@ -2,6 +2,7 @@ import { site } from "@g3/site-config";
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import g3Logo from "./assets/g3.png";
+import { MyTeamButton } from "./team-pages";
 
 // The platform's header and footer, shared by its pages.
 
@@ -19,14 +20,18 @@ export function Header() {
             Apps
           </a>
           <a href="/#how" className="hidden text-secondary-600 hover:text-secondary-900 sm:block">
-            How it works
+            Set up
           </a>
-          <a href="/#faq" className="hidden text-secondary-600 hover:text-secondary-900 sm:block">
-            FAQ
+          <a
+            href="/#customize"
+            className="hidden text-secondary-600 hover:text-secondary-900 sm:block"
+          >
+            Make it yours
           </a>
+          <MyTeamButton />
           <Link
             to="/signup"
-            className="rounded-lg bg-primary-600 px-4 py-2 font-semibold text-white transition-colors hover:bg-primary-500"
+            className="hidden rounded-lg bg-primary-600 px-4 py-2 font-semibold text-white transition-colors hover:bg-primary-500 sm:block"
           >
             Sign up your team
           </Link>

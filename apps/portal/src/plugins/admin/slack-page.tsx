@@ -1,9 +1,8 @@
+import { apiPath } from "@g3/site-config";
 import { useEffect, useState } from "react";
 import { FaSlack } from "react-icons/fa";
 import { useSearchParams } from "react-router-dom";
-import { api } from "../../lib/api";
-
-const apiBase = import.meta.env.VITE_API_BASE_URL ?? "";
+import { g3id } from "../../lib/api";
 
 type SlackStatus = {
   connected: boolean;
@@ -15,14 +14,16 @@ type SlackStatus = {
 };
 
 // The team's Slack workspace: members sign in with codes sent to its bot, and get DMs from it.
-export function AdminSlackPage() {
+// The connection is G3ID's (its /admin/slack and /slack/install, through /api/~id); Slack sends
+// the admin back here (G3ID's /slack/oauth/callback).
+export function SlackPage() {
   const [searchParams] = useSearchParams();
   const [status, setStatus] = useState<SlackStatus | null>(null);
   const [error, setError] = useState<string | null>(searchParams.get("error"));
   const [busy, setBusy] = useState(false);
 
   async function load() {
-    const res = await api.admin.slack.$get();
+    const res = await g3id.admin.slack.$get();
     if (res.ok) setStatus((await res.json()) as SlackStatus);
     else setError("Couldn't load the Slack connection.");
   }
@@ -41,7 +42,7 @@ export function AdminSlackPage() {
       return;
     setBusy(true);
     try {
-      const res = await api.admin.slack.$delete();
+      const res = await g3id.admin.slack.$delete();
       if (!res.ok) setError("Couldn't disconnect Slack.");
       await load();
     } finally {
@@ -77,7 +78,7 @@ export function AdminSlackPage() {
             {status.canConnect && (
               <div className="flex gap-2">
                 <a
-                  href={`${apiBase}/slack/install`}
+                  href={`${apiPath("id")}/slack/install`}
                   className="rounded-lg bg-primary-600 hover:bg-primary-500 px-3 py-1.5 text-sm font-semibold text-white transition-colors"
                 >
                   {status.connected ? "Reconnect" : "Connect Slack"}

@@ -77,9 +77,9 @@ describe("team addresses", () => {
       path: "/api/requests",
       team: "frc254",
     });
-    expect(await routed(`${team("254-skill-tree")}/`)).toMatchObject({
+    expect(await routed(`${team(`${ours}-skill-tree`)}/`)).toMatchObject({
       app: "SKILL_TREE",
-      team: "frc254",
+      team: `frc${ours}`,
     });
     expect(await routed(`${team("254")}/`)).toMatchObject({ app: "PORTAL", team: "frc254" });
     expect(await routed(`${team(`${ours}-id`)}/login`)).toMatchObject({
@@ -106,6 +106,31 @@ describe("team addresses", () => {
   it("answers 404 for a team or app that doesn't exist", async () => {
     expect((await gateway(`${team("999-orders")}/`)).status).toBe(404);
     expect((await gateway(`${team("254-nope")}/`)).status).toBe(404);
+  });
+
+  it("sends a browser on a team that isn't there to the platform's team-not-found page", async () => {
+    const html = { headers: { Accept: "text/html" }, redirect: "manual" as const };
+    for (const host of ["999", "999-orders"]) {
+      const res = await gateway(`${team(host)}/lists`, html);
+      expect(res.status).toBe(302);
+      expect(res.headers.get("Location")).toBe(
+        `https://${site.platformDomain}/team-not-found?team=999`,
+      );
+    }
+    // Its API still answers JSON.
+    expect((await gateway(`${team("999-orders")}/api/requests`, html)).status).toBe(404);
+  });
+
+  it("sends a browser on any other name on the platform's domain to the not-found page", async () => {
+    const html = { headers: { Accept: "text/html" }, redirect: "manual" as const };
+    for (const host of ["nope", "254-nope", "www2"]) {
+      const res = await gateway(`${team(host)}/`, html);
+      expect(res.status).toBe(302);
+      expect(res.headers.get("Location")).toBe(
+        `https://${site.platformDomain}/not-found?host=${host}.${site.platformDomain}`,
+      );
+    }
+    expect((await gateway(`${team("nope")}/api/x`)).status).toBe(404);
   });
 });
 
@@ -223,6 +248,36 @@ describe("calling another app's API", () => {
 
   it("answers 404 for an app that doesn't exist", async () => {
     expect((await gateway(`${team("254")}/api/~nope/x`)).status).toBe(404);
+  });
+});
+
+// Team 254 has switched on only Orders (vitest.config.mts); sign-in and its home are always on.
+describe("apps a team hasn't switched on", () => {
+  it("answers their pages with a page saying so, linking the team's admin pages", async () => {
+    const res = await gateway(`${team("254-shop")}/parts`, { headers: { Accept: "text/html" } });
+    expect(res.status).toBe(404);
+    const page = await res.text();
+    expect(page).toContain("Shop isn't switched on for this team.");
+    expect(page).toContain(`href="${team("254")}/admin"`);
+  });
+
+  it("answers their API, and calls to it from the team's other pages, with JSON", async () => {
+    for (const url of [`${team("254-shop")}/api/parts`, `${team("254-orders")}/api/~shop/parts`]) {
+      const res = await gateway(url);
+      expect(res.status).toBe(404);
+      expect(await res.json()).toMatchObject({ code: "app_not_enabled" });
+    }
+  });
+
+  it("still serves the apps it has on, sign-in, its home and the platform's API", async () => {
+    expect((await routed(`${team("254-orders")}/`)).app).toBe("ORDERS");
+    expect((await routed(`${team("254-id")}/`)).app).toBe("G3ID");
+    expect((await routed(`${team("254")}/admin`)).app).toBe("PORTAL");
+    expect(await routed(`${team("254")}/api/~platform/team/apps`)).toMatchObject({
+      app: "PLATFORM",
+      path: "/api/team/apps",
+      team: "frc254",
+    });
   });
 });
 

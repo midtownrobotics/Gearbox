@@ -11,13 +11,13 @@ import {
   slackForTeam,
   teamForWorkspace,
 } from "../lib/slack-install";
-import { siteTeamId, teamFrontend, teamOfUser, teamUrl } from "../lib/team";
+import { siteTeamId, teamOfUser, teamUrl } from "../lib/team";
 import { requireAdmin } from "../middleware/auth";
 import type { AppEnv } from "../types";
 
 // Slack per team: one Slack app, installed into each team's workspace by a team admin (/install,
-// calling back on the platform's id.<domain>). Slash commands and events arrive from any of those
-// workspaces and find their team by workspace.
+// from the Slack page on the team's admin pages, calling back on the platform's id.<domain>).
+// Slash commands and events arrive from any of those workspaces and find their team by workspace.
 
 /** Where Slack sends an admin back after installing: the same for every team. */
 const INSTALL_REDIRECT_URI = `${signInCallbackApiUrl(siteTeamId)}/slack/oauth/callback`;
@@ -57,8 +57,11 @@ export const slackRouter = new Hono<AppEnv>()
     const { team, userId } = saved
       ? (JSON.parse(saved) as { team: string; userId: string })
       : { team: null, userId: null };
+    // Back to the Slack page on the team's admin pages (its home's /admin).
     const back = (query: string) =>
-      c.redirect(`${team ? teamFrontend(c.env, team) : c.env.FRONTEND_URL}/admin/slack?${query}`);
+      c.redirect(
+        `${team ? teamUrl(c.env, team, "portal") : c.env.FRONTEND_URL}/admin/slack?${query}`,
+      );
     const fail = (message: string) => back(`error=${encodeURIComponent(message)}`);
 
     if (!team || !userId) return fail("This link has expired. Please try again.");
