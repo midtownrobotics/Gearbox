@@ -30,6 +30,31 @@ async function newRequest(categoryId: number, title = "WCP 1/2in Hex Bearing", b
   );
 }
 
+describe("the reason", () => {
+  it("is optional: left out or blank, the request is still made", async () => {
+    const category = await newCategory(`No reason ${crypto.randomUUID()}`);
+    for (const reason of [undefined, "", "  "]) {
+      const made = await jsonAs<{ reason: string }>(
+        student,
+        "/requests",
+        {
+          method: "POST",
+          body: {
+            url: `https://wcproducts.com/products/${crypto.randomUUID()}`,
+            title: "WCP Shaft Collar",
+            quantity: 1,
+            categoryId: category.id,
+            catalogCategory: "Bearings & Bushings",
+            ...(reason === undefined ? {} : { reason }),
+          },
+        },
+        201,
+      );
+      expect(made.reason).toBe("");
+    }
+  });
+});
+
 describe("sign-in and roles", () => {
   it("needs a G3ID session", async () => {
     expect((await call("/me")).status).toBe(401);

@@ -44,7 +44,7 @@ export function ReceivingPage() {
   const intake = useIntake();
 
   return (
-    <Page title="Receiving">
+    <Page title="Deliveries">
       {error && <ErrorBanner message={error} />}
       {done && <SuccessBanner message={done} />}
       {!data ? (

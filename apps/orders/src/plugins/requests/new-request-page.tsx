@@ -132,7 +132,7 @@ export function NewRequestPage() {
     let done = 0;
     const failed: Draft[] = [];
     for (const d of ready) {
-      const problem = draftProblem(d, sharedReason);
+      const problem = draftProblem(d);
       if (problem) {
         failed.push({ ...d, submitError: problem });
         continue;
@@ -232,7 +232,7 @@ export function NewRequestPage() {
             {drafts.length > 1 && (
               <Field
                 label="Why do we need these?"
-                hint="Used for every item without its own reason"
+                hint="Optional. Used for every item without its own reason"
               >
                 <textarea
                   className={`${inputClass} min-h-16`}

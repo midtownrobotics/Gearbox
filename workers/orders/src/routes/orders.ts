@@ -124,7 +124,7 @@ const trackingValidator = validator("json", (value, c): { tracking: string | nul
 
 export const ordersRouter = new Hono<AppEnv>()
   /**
-   * For the Receiving page: vendor orders with items still on the way (oldest first), and orders
+   * For the Deliveries page: vendor orders with items still on the way (oldest first), and orders
    * fully received in the last two weeks (newest first), each with its lines and who received what.
    */
   .get("/receiving", requireAuth, async (c) => {

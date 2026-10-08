@@ -1,5 +1,5 @@
 import { type FormEvent, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { api, getErrorMessage } from "../../shared/api";
 import { useAuthUser } from "../../shared/auth";
 import { Deadline } from "../../shared/deadline";
@@ -17,6 +17,7 @@ import { Button, Card, ErrorBanner, Field, Loading, Page, inputClass } from "../
 import { useLoad } from "../../shared/use-load";
 import { useVendors } from "../../shared/vendors";
 import { RequestLists } from "../lists/request-lists";
+import { VendorCart } from "../ordering/ordering-page";
 import { RequestActions } from "./request-actions";
 
 const EVENT_LABELS: Record<string, string> = {
@@ -30,6 +31,19 @@ export function RequestDetailPage() {
   const user = useAuthUser();
   const { vendorFor } = useVendors();
   const [editing, setEditing] = useState(false);
+  const navigate = useNavigate();
+  // Back to where the request was opened from (a list, Approvals, a filtered search); straight
+  // to Requests when the page was opened directly (a link in Slack, a new tab).
+  const cameFromApp = useLocation().key !== "default";
+  const back = (
+    <button
+      type="button"
+      onClick={() => (cameFromApp ? navigate(-1) : navigate("/requests"))}
+      className="text-sm text-secondary-500 hover:text-secondary-800"
+    >
+      ← {cameFromApp ? "Back" : "All requests"}
+    </button>
+  );
   const { data, error, reload } = useLoad(async () => {
     const res = await api.requests[":id"].$get({ param: { id } });
     if (!res.ok) throw new Error(await getErrorMessage(res));
@@ -56,14 +70,7 @@ export function RequestDetailPage() {
   const canEdit = r.status === "requested" && (user.isMentor || r.requesterId === user.userId);
 
   return (
-    <Page
-      title={`Request #${r.id}`}
-      actions={
-        <Link to="/requests" className="text-sm text-secondary-500 hover:text-secondary-800">
-          ← All requests
-        </Link>
-      }
-    >
+    <Page title={`Request #${r.id}`} actions={back}>
       <Card>
         <div className="flex flex-col md:flex-row gap-6">
           {r.image && (
@@ -115,10 +122,12 @@ export function RequestDetailPage() {
               )}
               <Row label="Requested by">{r.requesterName}</Row>
             </dl>
-            <div>
-              <p className="text-sm font-medium text-secondary-700">Why</p>
-              <p className="text-sm text-secondary-800 whitespace-pre-wrap">{r.reason}</p>
-            </div>
+            {r.reason && (
+              <div>
+                <p className="text-sm font-medium text-secondary-700">Why</p>
+                <p className="text-sm text-secondary-800 whitespace-pre-wrap">{r.reason}</p>
+              </div>
+            )}
           </div>
         </div>
         <div className="mt-5 space-y-3">
@@ -130,6 +139,11 @@ export function RequestDetailPage() {
           )}
         </div>
       </Card>
+
+      {/* Approved: its vendor's whole cart, to place it from here (mentors place orders). */}
+      {r.status === "approved" && user.isMentor && (
+        <VendorCart vendor={r.vendor} onChanged={reload} />
+      )}
 
       <RequestLists requestId={r.id} />
 
@@ -285,12 +299,11 @@ function EditForm({ request, onDone }: { request: RequestDetail; onDone: () => v
             />
           </Field>
           <div className="sm:col-span-3">
-            <Field label="Why do we need it?">
+            <Field label="Why do we need it?" hint="Optional">
               <textarea
                 className={`${inputClass} min-h-20`}
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
-                required
                 maxLength={1000}
               />
             </Field>

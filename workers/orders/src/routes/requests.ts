@@ -6,7 +6,7 @@ import {
   sendTeamDM,
   withTeam,
 } from "@g3/auth";
-import { type SQL, asc, eq, inArray, sql } from "drizzle-orm";
+import { type SQL, asc, eq, inArray, max, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
 import { type OrdersDb, createOrdersDb } from "../db";
@@ -16,9 +16,11 @@ import {
   REQUEST_STATUSES,
   type RequestStatus,
   budgetCategories,
+  catalogItems,
   orderRequests,
   partLists,
   requestEvents,
+  vendorOrders,
 } from "../db/schema";
 import { type CatalogChoice, catalogItemFor, catalogPackQuantity } from "../lib/catalog";
 import { type ReceiveDestination, parseDestination, sendToInventory } from "../lib/inventory";
@@ -139,11 +141,12 @@ const requestValidator = (partial: boolean) =>
       if (!Number.isInteger(v.categoryId)) return fail("Pick a budget category.");
       out.categoryId = v.categoryId as number;
     }
+    // Why it's needed is optional: left out or blank, it's empty.
     if (has("reason")) {
-      if (typeof v.reason !== "string" || !v.reason.trim() || v.reason.length > 1000) {
-        return fail("reason must be 1–1000 characters.");
-      }
-      out.reason = v.reason.trim();
+      if (v.reason === undefined || v.reason === null) out.reason = "";
+      else if (typeof v.reason !== "string" || v.reason.length > 1000) {
+        return fail("reason must be up to 1000 characters.");
+      } else out.reason = v.reason.trim();
     }
     // Anyone can set priority (including Blocking) and a need-by date.
     if (v.priority !== undefined || !partial) {
@@ -278,12 +281,17 @@ export const requestsRouter = new Hono<AppEnv>()
     const { status, mine } = c.req.valid("query");
     const onlyMine = mine === "true";
     const db = createOrdersDb(c.env.ORDERS_DB);
-    const rows = await selectRequests(
-      db,
-      c.get("teamId"),
+    const teamId = c.get("teamId");
+    const conditions = [
       status ? eq(orderRequests.status, status) : undefined,
       onlyMine ? eq(orderRequests.requesterId, c.get("userId")) : undefined,
-    )
+    ];
+    const listed = (column: typeof orderRequests.id | typeof orderRequests.orderId) =>
+      db
+        .select({ id: column })
+        .from(orderRequests)
+        .where(inTeam(orderRequests, teamId, ...conditions));
+    const rows = await selectRequests(db, teamId, ...conditions)
       // Most urgent first: priority, then need-by date (none last), then oldest.
       .orderBy(
         sql`case ${orderRequests.priority} when 'blocking' then 0 when 'high' then 1 when 'normal' then 2 else 3 end`,
@@ -292,7 +300,39 @@ export const requestsRouter = new Hono<AppEnv>()
         asc(orderRequests.createdAt),
       )
       .all();
-    return c.json(rows.map((r) => ({ ...r.request, categoryName: r.categoryName })));
+    // When each was ordered (its vendor order) and received (the latest receipt), for the table.
+    const [placed, receipts] = await Promise.all([
+      db
+        .select({ id: vendorOrders.id, placedAt: vendorOrders.placedAt })
+        .from(vendorOrders)
+        .where(
+          inTeam(vendorOrders, teamId, inArray(vendorOrders.id, listed(orderRequests.orderId))),
+        )
+        .all(),
+      db
+        .select({ requestId: requestEvents.requestId, at: max(requestEvents.createdAt) })
+        .from(requestEvents)
+        .where(
+          inTeam(
+            requestEvents,
+            teamId,
+            eq(requestEvents.action, "received"),
+            inArray(requestEvents.requestId, listed(orderRequests.id)),
+          ),
+        )
+        .groupBy(requestEvents.requestId)
+        .all(),
+    ]);
+    const placedAt = new Map(placed.map((o) => [o.id, o.placedAt]));
+    const receivedAt = new Map(receipts.map((e) => [e.requestId, e.at]));
+    return c.json(
+      rows.map((r) => ({
+        ...r.request,
+        categoryName: r.categoryName,
+        orderedAt: r.request.orderId === null ? null : (placedAt.get(r.request.orderId) ?? null),
+        receivedAt: r.request.status === "received" ? (receivedAt.get(r.request.id) ?? null) : null,
+      })),
+    );
   })
   .get("/:id", requireAuth, async (c) => {
     const id = Number(c.req.param("id"));
@@ -306,7 +346,18 @@ export const requestsRouter = new Hono<AppEnv>()
       .where(inTeam(requestEvents, teamId, eq(requestEvents.requestId, id)))
       .orderBy(asc(requestEvents.createdAt), asc(requestEvents.id))
       .all();
-    return c.json({ ...row.request, categoryName: row.categoryName, events });
+    // No picture saved with the request (a catalog pick, an imported sheet row): its catalog
+    // part's, when that has one.
+    let image = row.request.image;
+    if (!image && row.request.catalogItemId !== null) {
+      const item = await db
+        .select({ image: catalogItems.image })
+        .from(catalogItems)
+        .where(inTeam(catalogItems, teamId, eq(catalogItems.id, row.request.catalogItemId)))
+        .get();
+      image = item?.image ?? null;
+    }
+    return c.json({ ...row.request, image, categoryName: row.categoryName, events });
   })
   .post("/", requireAuthWithIdentities, catalogReady, requestValidator(false), async (c) => {
     const {

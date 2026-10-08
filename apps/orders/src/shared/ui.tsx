@@ -11,11 +11,18 @@ export function PageLoading() {
 export function Page({
   title,
   actions,
+  wide = false,
   children,
-}: { title: string; actions?: ReactNode; children: ReactNode }) {
+}: {
+  title: string;
+  actions?: ReactNode;
+  /** Use the whole width of the screen (a table), not the reading column. */
+  wide?: boolean;
+  children: ReactNode;
+}) {
   return (
     <main className="flex-1 bg-page">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-5">
+      <div className={`${wide ? "" : "max-w-5xl mx-auto "}px-4 sm:px-6 py-6 space-y-5`}>
         <div className="flex items-end justify-between gap-4">
           <h1 className="text-4xl text-secondary-900">{title}</h1>
           {actions}

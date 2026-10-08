@@ -12,8 +12,8 @@ export const requestsPlugin: Plugin = {
     { path: "/approvals", element: <ApprovalsPage /> },
   ],
   navItems: [
-    { label: "New Request", to: "/new", order: 10 },
-    { label: "Requests", to: "/requests", order: 20 },
+    { label: "New Request", to: "/new", order: 20 },
+    { label: "Requests", to: "/requests", order: 10 },
     { label: "Approvals", to: "/approvals", order: 30, mentorOnly: true },
   ],
 };

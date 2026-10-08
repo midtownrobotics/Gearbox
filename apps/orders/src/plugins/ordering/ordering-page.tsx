@@ -34,6 +34,73 @@ const isTaxExempt = (vendor: Vendor | undefined) =>
   vendor.taxExempt &&
   (vendor.taxExemptExpires === null || vendor.taxExemptExpires >= startOfToday());
 
+const priorityRank = (r: OrderRequest) => PRIORITY_ORDER.indexOf(r.priority);
+
+/** One vendor's approved requests as its cart, most urgent lines first. */
+function cartFor(items: OrderRequest[], vendorFor: (name: string) => Vendor | undefined): Group {
+  const vendor = vendorFor(items[0].vendor);
+  return {
+    vendor: items[0].vendor,
+    profile: vendor,
+    placeToday: items.some((r) => r.priority === "blocking" || isLate(r, vendor)),
+    items: [...items].sort(
+      (a, b) =>
+        priorityRank(a) - priorityRank(b) ||
+        (a.needBy ?? Number.MAX_SAFE_INTEGER) - (b.needBy ?? Number.MAX_SAFE_INTEGER) ||
+        a.title.localeCompare(b.title),
+    ),
+  };
+}
+
+/**
+ * One vendor's cart, as on the Carts page (a request's page shows its vendor's): everything
+ * approved from that vendor, ready to place as one order. Nothing when nothing is approved there.
+ */
+export function VendorCart({
+  vendor,
+  onChanged,
+}: {
+  vendor: string;
+  /** After the order is placed or a line removed (the request may have changed). */
+  onChanged: () => void;
+}) {
+  const sac = useLoad(async () => {
+    const res = await api["share-a-cart"].status.$get();
+    if (!res.ok) throw new Error(await getErrorMessage(res));
+    return res.json();
+  }, []);
+  const { data, error, reload } = useLoad(async () => {
+    const res = await api.requests.$get({ query: { status: "approved" } });
+    if (!res.ok) throw new Error(await getErrorMessage(res));
+    return res.json();
+  }, []);
+  const [done, setDone] = useState<string | null>(null);
+  const { vendorFor } = useVendors();
+  const key = vendorKey(vendor);
+  const items = (data ?? []).filter((r) => vendorKey(r.vendor) === key);
+
+  if (error) return <ErrorBanner message={error} />;
+  if (!data) return <Loading />;
+  const changed = (message: string) => {
+    setDone(message);
+    reload();
+    onChanged();
+  };
+  return (
+    <>
+      {done && <SuccessBanner message={done} />}
+      {items.length > 0 && (
+        <VendorOrder
+          group={cartFor(items, vendorFor)}
+          shareACart={sac.data?.vendors.includes(key) ? { connected: sac.data.connected } : null}
+          onPlaced={changed}
+          onRemoved={changed}
+        />
+      )}
+    </>
+  );
+}
+
 /**
  * Approved requests grouped by vendor, for placing orders (mentors). Quantities and prices can be
  * corrected to what the vendor actually charges; with shipping and tax, those are the only numbers
@@ -55,33 +122,19 @@ export function OrderingPage() {
   const { vendorFor } = useVendors();
 
   // Most urgent carts first: anything Blocking or past its place-by date, then by the highest
-  // priority inside, then the biggest. Within a cart, the same order for its lines.
+  // priority inside, then the biggest.
   const groups = useMemo<Group[]>(() => {
     const byVendor = new Map<string, OrderRequest[]>();
     for (const r of data ?? []) {
       const key = vendorKey(r.vendor);
       byVendor.set(key, [...(byVendor.get(key) ?? []), r]);
     }
-    const rank = (r: OrderRequest) => PRIORITY_ORDER.indexOf(r.priority);
     return [...byVendor.values()]
-      .map((items) => {
-        const vendor = vendorFor(items[0].vendor);
-        return {
-          vendor: items[0].vendor,
-          profile: vendor,
-          placeToday: items.some((r) => r.priority === "blocking" || isLate(r, vendor)),
-          items: items.sort(
-            (a, b) =>
-              rank(a) - rank(b) ||
-              (a.needBy ?? Number.MAX_SAFE_INTEGER) - (b.needBy ?? Number.MAX_SAFE_INTEGER) ||
-              a.title.localeCompare(b.title),
-          ),
-        };
-      })
+      .map((items) => cartFor(items, vendorFor))
       .sort(
         (a, b) =>
           Number(b.placeToday) - Number(a.placeToday) ||
-          Math.min(...a.items.map(rank)) - Math.min(...b.items.map(rank)) ||
+          Math.min(...a.items.map(priorityRank)) - Math.min(...b.items.map(priorityRank)) ||
           b.items.length - a.items.length ||
           a.vendor.localeCompare(b.vendor),
       );
@@ -91,7 +144,7 @@ export function OrderingPage() {
   const estimate = (data ?? []).reduce((n, r) => n + (r.unitPriceCents ?? 0) * r.quantity, 0);
 
   return (
-    <Page title="Ordering" actions={<ExportCsvButton />}>
+    <Page title="Carts" actions={<ExportCsvButton />}>
       {error && <ErrorBanner message={error} />}
       {done && <SuccessBanner message={done} />}
       {!data ? (
@@ -425,7 +478,9 @@ function VendorOrder({
         </div>
       </header>
       <Nudges vendor={group.profile} itemsTotal={itemsTotal} />
-      <div className="overflow-x-auto">
+      {/* relative: the cells' screen-reader-only labels are positioned, and without it they'd
+          sit outside this scroll box and widen the whole page on a phone. */}
+      <div className="relative overflow-x-auto">
         {/* Fixed column widths: long names wrap inside their column instead of squeezing the
             others; on narrow screens the table scrolls sideways. */}
         <table className="w-full min-w-[55rem] table-fixed text-sm">
