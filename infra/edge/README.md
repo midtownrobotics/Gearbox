@@ -93,6 +93,11 @@ ssh -t g3@192.168.50.1 'sudo ln -sfn versions/<old> /opt/g3-edge/current && sudo
 Only for a new box (or a fresh Armbian install). Do these on the box over SSH, from `~/edge-infra` after copying the folder as above.
 
 1. **Base system.** Flash Armbian, create the `g3` user, set the timezone to `America/New_York`. Disable NetworkManager and use `systemd-networkd`: install `etc/netplan/10-router.yaml`, `etc/systemd/network/10-wan0.link` and `20-wan0.network` (from `local/`, with real MACs) and `etc/sysctl.d/99-router.conf`, run `sudo netplan apply && sudo sysctl --system`, and reboot so `wan0` gets its name.
+   **Make the disk save writes promptly.** Armbian sets its root filesystem to `data=writeback` with `commit=120`, so files written up to two minutes before a power cut come back empty or cut short (on this box that emptied the agent's units and its query-log setup, which took DHCP and DNS down after the next boot). Turn both off; they apply from the next boot:
+   ```bash
+   sudo tune2fs -o ^journal_data_writeback "$(findmnt -no SOURCE /)"
+   sudo sed -i '/ \/ ext4 /s/,commit=[0-9]*//' /etc/fstab && sudo systemctl daemon-reload
+   ```
 2. **Packages.**
    ```bash
    sudo apt install nftables dnsmasq cups cups-filters avahi-daemon avahi-utils alsa-utils
