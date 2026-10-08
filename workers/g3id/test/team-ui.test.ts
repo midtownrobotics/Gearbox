@@ -8,6 +8,7 @@ import {
   teamKey,
   teamLinks,
   teamUiDefaults,
+  toolLinks,
   withHueOf,
 } from "@g3/site-config";
 import { describe, expect, it } from "vitest";
@@ -195,7 +196,7 @@ describe("team UI settings", () => {
     const current = {
       ...legacy,
       linkAccents: true,
-      links: { ...legacy.links, ...teamLinks },
+      links: { ...legacy.links, ...teamLinks, ...toolLinks },
       hiddenLinks: [],
     };
     expect(await (await g3id("/team/ui")).json()).toEqual({ ...current, primaryColor: "#0a7d55" });

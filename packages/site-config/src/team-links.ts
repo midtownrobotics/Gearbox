@@ -10,5 +10,11 @@ export function teamLinksFor(teamNumber: number) {
   };
 }
 
+/** FRC tools any team can use, the same for every team (Portal's tiles; a team can change them). */
+export const toolLinks = {
+  frcToolsOrders: "https://orders.frctools.com",
+  frcBom: "https://frcbom.com",
+};
+
 /** The site team's pages on FIRST's event site and FRC stats sites. */
 export const teamLinks = teamLinksFor(site.team.number);

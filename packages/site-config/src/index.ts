@@ -161,7 +161,7 @@ export const appTitle = (app: string) => `${site.team.shortName} ${app}`;
 /** The sign-in service's name, as people see it ("G3ID"). */
 export const idName = `${site.team.shortName}ID`;
 
-export { teamLinks, teamLinksFor } from "./team-links.ts";
+export { teamLinks, teamLinksFor, toolLinks } from "./team-links.ts";
 
 /**
  * CORS: which browser origins may call the workers with credentials. The platform's domain and its

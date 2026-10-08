@@ -2,7 +2,7 @@ import { type TeamUiLinkKey, appUrl, pageTeamNumber } from "@g3/site-config";
 import { TeamIcon, useTeamNames, useTeamUiSettings } from "@g3/ui";
 import { useEffect, useState } from "react";
 import type { IconType } from "react-icons";
-import { FaGithub, FaGlobe, FaInstagram, FaSlack } from "react-icons/fa";
+import { FaCube, FaGithub, FaGlobe, FaInstagram, FaSlack } from "react-icons/fa";
 import edgeIcon from "../../assets/app-icons/edge.svg";
 import idIcon from "../../assets/app-icons/id.svg";
 import inventoryIcon from "../../assets/app-icons/inventory.svg";
@@ -12,7 +12,13 @@ import scoutingIcon from "../../assets/app-icons/scouting.svg";
 import shopIcon from "../../assets/app-icons/shop.svg";
 import skillsIcon from "../../assets/app-icons/skills.svg";
 import { g3id } from "../../lib/api";
-import { BlueAllianceIcon, FirstIcon, Match13Icon, StatboticsIcon } from "./link-icons";
+import {
+  BlueAllianceIcon,
+  FirstIcon,
+  FrcToolsIcon,
+  Match13Icon,
+  StatboticsIcon,
+} from "./link-icons";
 
 // The team's apps show their own app icon, its accent in the team's primary colour (TeamIcon).
 // Other links are drawn to match it: a black tile with a white symbol, and a ↗ in that colour for
@@ -66,6 +72,21 @@ const APPS: App[] = [
     label: "Edge",
     href: appUrl("edge"),
     tile: edgeIcon,
+  },
+  {
+    label: "FRCTools Orders",
+    linkKey: "frcToolsOrders",
+    href: "",
+    icon: FrcToolsIcon,
+    external: true,
+  },
+  {
+    label: "FRCBOM",
+    linkKey: "frcBom",
+    href: "",
+    // FRCBOM's mark is Font Awesome's solid cube.
+    icon: FaCube,
+    external: true,
   },
   {
     label: "Public Site",

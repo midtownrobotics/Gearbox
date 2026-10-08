@@ -1,7 +1,9 @@
 import { site } from "./site.ts";
-import { teamLinks, teamLinksFor } from "./team-links.ts";
+import { teamLinks, teamLinksFor, toolLinks } from "./team-links.ts";
 
 export const teamUiLinkLabels = {
+  frcToolsOrders: "FRCTools Orders",
+  frcBom: "FRCBOM",
   publicSite: "Public site",
   slack: "Slack",
   github: "GitHub",
@@ -95,6 +97,7 @@ export const defaultTeamUiSettings: TeamUiSettings = {
     github: site.links.github,
     instagram: site.links.instagram,
     ...teamLinks,
+    ...toolLinks,
   },
   hiddenLinks: [],
 };
@@ -111,6 +114,13 @@ export function teamUiDefaults(teamId: string, name?: string): TeamUiSettings {
     ...defaultTeamUiSettings,
     name: name ?? `Team ${number}`,
     shortName: String(number),
-    links: { publicSite: "", slack: "", github: "", instagram: "", ...teamLinksFor(number) },
+    links: {
+      publicSite: "",
+      slack: "",
+      github: "",
+      instagram: "",
+      ...teamLinksFor(number),
+      ...toolLinks,
+    },
   };
 }
