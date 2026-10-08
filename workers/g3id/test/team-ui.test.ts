@@ -2,6 +2,7 @@ import {
   type TeamUiSettings,
   brandColor,
   builtInBrandColor,
+  defaultAppOrder,
   defaultTeamUiSettings,
   hexToHsv,
   hsvToHex,
@@ -198,12 +199,39 @@ describe("team UI settings", () => {
       linkAccents: true,
       links: { ...legacy.links, ...teamLinks, ...toolLinks },
       hiddenLinks: [],
+      appOrder: defaultAppOrder,
     };
     expect(await (await g3id("/team/ui")).json()).toEqual({ ...current, primaryColor: "#0a7d55" });
     const admin = await sessionCookie(await createUser({ isAdmin: true }));
     expect(await (await g3id("/admin/team/ui", { cookie: admin })).json()).toMatchObject({
       settings: current,
     });
+  });
+
+  it("keeps each team's order for the apps grid, and fills in tiles a saved order is missing", async () => {
+    const admin = await sessionCookie(await createUser({ isAdmin: true }));
+    const reordered = [...defaultAppOrder].reverse();
+    const put = (appOrder: unknown) =>
+      g3id("/admin/team/ui", {
+        method: "PUT",
+        cookie: admin,
+        body: { ...defaultTeamUiSettings, appOrder },
+      });
+    expect((await put(reordered)).status).toBe(200);
+    expect(((await (await g3id("/team/ui")).json()) as { appOrder: string[] }).appOrder).toEqual(
+      reordered,
+    );
+    // Every tile once: none missing, none twice, nothing unknown.
+    expect((await put(reordered.slice(1))).status).toBe(400);
+    expect((await put([...reordered, reordered[0]])).status).toBe(400);
+    expect((await put([...reordered.slice(1), "nope"])).status).toBe(400);
+    // Saved before a tile existed: it's added in its default place, after the saved ones.
+    const older = readTeamUiSettings(
+      JSON.stringify({ ...defaultTeamUiSettings, appOrder: ["edge", "shop"] }),
+    );
+    expect(older.appOrder.slice(0, 2)).toEqual(["edge", "shop"]);
+    expect(older.appOrder).toHaveLength(defaultAppOrder.length);
+    expect((await put(defaultAppOrder)).status).toBe(200);
   });
 
   describe("settings saved when the brand colour was its own setting", () => {

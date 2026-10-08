@@ -1,4 +1,10 @@
-import { type TeamUiLinkKey, appUrl, pageTeamNumber } from "@g3/site-config";
+import {
+  type PortalTileKey,
+  type TeamUiLinkKey,
+  appUrl,
+  completeAppOrder,
+  pageTeamNumber,
+} from "@g3/site-config";
 import { TeamIcon, useTeamNames, useTeamUiSettings } from "@g3/ui";
 import { useEffect, useState } from "react";
 import type { IconType } from "react-icons";
@@ -25,6 +31,8 @@ import {
 // sites outside the team's apps. (`bg-black` isn't touched by dark mode, and neither is the
 // colour variable used directly, where the `text-primary-500` class would be lightened.)
 type App = {
+  /** Which tile it is, for the team's order (Team Appearance's "Apps grid order"). */
+  key: PortalTileKey;
   label: string;
   href: string;
   external?: boolean;
@@ -34,47 +42,56 @@ type App = {
 const APPS: App[] = [
   {
     // The sign-in app: named after the team ("G3ID") below.
+    key: "id",
     label: "ID",
     href: appUrl("id"),
     tile: idIcon,
   },
   {
+    key: "shop",
     label: "Shop",
     href: appUrl("shop"),
     tile: shopIcon,
   },
   {
+    key: "pit",
     label: "Pit",
     href: appUrl("pit"),
     tile: pitIcon,
   },
   {
+    key: "skillTree",
     label: "Skill Tree",
     href: appUrl("skillTree"),
     tile: skillsIcon,
   },
   {
+    key: "scouting",
     label: "Scouting",
     href: appUrl("scouting"),
     tile: scoutingIcon,
   },
   {
+    key: "orders",
     label: "Orders",
     href: appUrl("orders"),
     tile: ordersIcon,
   },
   {
+    key: "inventory",
     label: "Inventory",
     href: appUrl("inventory"),
     tile: inventoryIcon,
   },
   {
+    key: "edge",
     label: "Edge",
     href: appUrl("edge"),
     tile: edgeIcon,
   },
   {
     label: "FRCTools Orders",
+    key: "frcToolsOrders",
     linkKey: "frcToolsOrders",
     href: "",
     icon: FrcToolsIcon,
@@ -82,6 +99,7 @@ const APPS: App[] = [
   },
   {
     label: "FRCBOM",
+    key: "frcBom",
     linkKey: "frcBom",
     href: "",
     // FRCBOM's mark is Font Awesome's solid cube.
@@ -90,12 +108,14 @@ const APPS: App[] = [
   },
   {
     label: "Public Site",
+    key: "publicSite",
     linkKey: "publicSite",
     href: "",
     icon: FaGlobe,
   },
   {
     label: "Slack",
+    key: "slack",
     linkKey: "slack",
     href: "",
     icon: FaSlack,
@@ -103,6 +123,7 @@ const APPS: App[] = [
   },
   {
     label: "GitHub",
+    key: "github",
     linkKey: "github",
     href: "",
     icon: FaGithub,
@@ -110,6 +131,7 @@ const APPS: App[] = [
   },
   {
     label: "Instagram",
+    key: "instagram",
     linkKey: "instagram",
     href: "",
     icon: FaInstagram,
@@ -117,6 +139,7 @@ const APPS: App[] = [
   },
   {
     label: "FRC-Events",
+    key: "frcEvents",
     linkKey: "frcEvents",
     href: "",
     icon: FirstIcon,
@@ -124,6 +147,7 @@ const APPS: App[] = [
   },
   {
     label: "The Blue Alliance",
+    key: "blueAlliance",
     linkKey: "blueAlliance",
     href: "",
     icon: BlueAllianceIcon,
@@ -131,12 +155,14 @@ const APPS: App[] = [
   },
   {
     label: "Statbotics",
+    key: "statbotics",
     linkKey: "statbotics",
     href: "",
     icon: StatboticsIcon,
     external: true,
   },
   {
+    key: "match13",
     label: "match13",
     linkKey: "match13",
     href: "",
@@ -156,16 +182,21 @@ export function HomePage() {
   const teamUi = useTeamUiSettings();
   const names = useTeamNames();
   const [authState, setAuthState] = useState<AuthState>("checking");
-  const apps = APPS.map((app) => {
-    if (app.label === "ID") return { ...app, label: names.idName };
-    if (!app.linkKey) return app;
-    return {
-      ...app,
-      // The team's own links (Team Appearance); a link it hasn't set is left out.
-      href: teamUi.links[app.linkKey] ?? "",
-      ...(app.linkKey === "publicSite" ? publicSiteMark(teamUi.logoUrl) : {}),
-    };
-  });
+  // In the team's order; a tile its saved order doesn't name keeps its default place.
+  const order = completeAppOrder(teamUi.appOrder ?? []);
+  const rank = (app: App) => order.indexOf(app.key);
+  const apps = [...APPS]
+    .sort((a, b) => rank(a) - rank(b))
+    .map((app) => {
+      if (app.label === "ID") return { ...app, label: names.idName };
+      if (!app.linkKey) return app;
+      return {
+        ...app,
+        // The team's own links (Team Appearance); a link it hasn't set is left out.
+        href: teamUi.links[app.linkKey] ?? "",
+        ...(app.linkKey === "publicSite" ? publicSiteMark(teamUi.logoUrl) : {}),
+      };
+    });
 
   useEffect(() => {
     g3id.auth.me.$get().then(async (res) => {

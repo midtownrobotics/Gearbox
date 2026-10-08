@@ -2,8 +2,10 @@ import {
   type TeamUiColors,
   type TeamUiSettings,
   builtInBrandColor,
+  completeAppOrder,
   defaultTeamUiSettings,
   isHexColor,
+  isPortalTileKey,
   teamUiDefaults,
   withHueOf,
 } from "@g3/site-config";
@@ -75,7 +77,12 @@ export function isTeamUiSettings(value: unknown): value is TeamUiSettings {
         typeof key === "string" &&
         Object.prototype.hasOwnProperty.call(defaultTeamUiSettings.links, key),
     ) &&
-    Object.values(value.links).every(isLink)
+    Object.values(value.links).every(isLink) &&
+    // Every tile of Portal's grid, once each, in the team's order.
+    Array.isArray(value.appOrder) &&
+    value.appOrder.every(isPortalTileKey) &&
+    completeAppOrder(value.appOrder).length === value.appOrder.length &&
+    new Set(value.appOrder).size === value.appOrder.length
   );
 }
 
@@ -125,6 +132,11 @@ export function readTeamUiSettings(
       linkAccents: "linkAccents" in stored ? stored.linkAccents : defaults.linkAccents,
       links: { ...defaults.links, ...value.links },
       hiddenLinks: "hiddenLinks" in value ? value.hiddenLinks : [],
+      // Saved before the grid could be reordered: the default order. Saved before a tile
+      // existed: that tile in its default place.
+      appOrder: Array.isArray(value.appOrder)
+        ? completeAppOrder(value.appOrder)
+        : defaults.appOrder,
     };
     return isTeamUiSettings(settings) ? settings : defaults;
   } catch {

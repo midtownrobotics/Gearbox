@@ -16,6 +16,49 @@ export const teamUiLinkLabels = {
 
 export type TeamUiLinkKey = keyof typeof teamUiLinkLabels;
 
+/** The team's own apps on Portal's grid (the sign-in app is named after the team: "G3ID"). */
+export const portalAppLabels = {
+  id: "ID",
+  shop: "Shop",
+  pit: "Pit",
+  skillTree: "Skill Tree",
+  scouting: "Scouting",
+  orders: "Orders",
+  inventory: "Inventory",
+  edge: "Edge",
+} as const;
+
+/** A tile on Portal's grid: one of the team's apps, or one of its links. */
+export type PortalTileKey = keyof typeof portalAppLabels | TeamUiLinkKey;
+
+/** The grid's order before a team changes it: the apps, then the tools, then the team's links. */
+export const defaultAppOrder: PortalTileKey[] = [
+  ...(Object.keys(portalAppLabels) as (keyof typeof portalAppLabels)[]),
+  "frcToolsOrders",
+  "frcBom",
+  "publicSite",
+  "slack",
+  "github",
+  "instagram",
+  "frcEvents",
+  "blueAlliance",
+  "statbotics",
+  "match13",
+];
+
+const portalTiles = new Set<string>(defaultAppOrder);
+export const isPortalTileKey = (key: unknown): key is PortalTileKey =>
+  typeof key === "string" && portalTiles.has(key);
+
+/**
+ * A saved grid order made whole: its tiles in its order (unknown ones and repeats dropped), then
+ * any it doesn't name, in their default places' order (a tile added after the team saved).
+ */
+export function completeAppOrder(order: readonly unknown[]): PortalTileKey[] {
+  const known = order.filter(isPortalTileKey).filter((key, i, all) => all.indexOf(key) === i);
+  return [...known, ...defaultAppOrder.filter((key) => !known.includes(key))];
+}
+
 /**
  * A team's editable appearance (G3ID's Team Appearance page), loaded by every page at runtime for
  * the team its address is for. Identity (the team's number, its addresses) comes from the address.
@@ -35,6 +78,8 @@ export type TeamUiSettings = {
   dark: TeamUiColors;
   links: Record<TeamUiLinkKey, string>;
   hiddenLinks: TeamUiLinkKey[];
+  /** The order of Portal's tiles (every tile, once; `completeAppOrder` fills in new ones). */
+  appOrder: PortalTileKey[];
 };
 
 export type TeamUiColors = {
@@ -100,6 +145,7 @@ export const defaultTeamUiSettings: TeamUiSettings = {
     ...toolLinks,
   },
   hiddenLinks: [],
+  appOrder: defaultAppOrder,
 };
 
 /**
