@@ -1,5 +1,5 @@
 import { inTeam, requireAuth, requireMentor, withTeam } from "@g3/auth";
-import { desc, eq, or, sql } from "drizzle-orm";
+import { desc, eq, ne, or, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
 import { createOrdersDb } from "../db";
@@ -225,7 +225,8 @@ export const suggestRouter = new Hono<AppEnv>().post(
           createdAt: orderRequests.createdAt,
         })
         .from(orderRequests)
-        .where(inTeam(orderRequests, teamId))
+        // The wishlist was never requested: it isn't "bought before" or a category's history.
+        .where(inTeam(orderRequests, teamId, ne(orderRequests.status, "wishlist")))
         .orderBy(desc(orderRequests.createdAt))
         .all(),
     ]);

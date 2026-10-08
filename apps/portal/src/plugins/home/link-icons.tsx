@@ -53,3 +53,10 @@ export const Match13Icon: IconType = () => (
     <path d="m8 3 4 8 5-5 5 15H2L8 3z" />
   </svg>
 );
+
+/** FRCTools' logo: the 📦 emoji (its logo.svg is that emoji, so it keeps the emoji's colours). */
+export const FrcToolsIcon: IconType = () => (
+  <span aria-hidden="true" style={{ fontSize: "1em", lineHeight: 1 }}>
+    📦
+  </span>
+);

@@ -17,17 +17,6 @@ export function App() {
               <Route key={r.path} path={r.path} element={r.element} />
             ))}
           </Routes>
-          <footer className="px-4 py-6 text-center text-xs text-secondary-400">
-            Inspired by{" "}
-            <a
-              href="https://orders.frctools.com"
-              target="_blank"
-              rel="noreferrer"
-              className="underline hover:text-secondary-700"
-            >
-              FRCTools.com
-            </a>
-          </footer>
         </div>
       </ProtectedRoute>
     </BrowserRouter>

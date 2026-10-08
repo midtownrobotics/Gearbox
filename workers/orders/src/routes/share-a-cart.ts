@@ -130,7 +130,7 @@ export const shareACartRouter = new Hono<AppEnv>()
   })
   /**
    * Builds a Share-A-Cart cart from approved lines at one vendor (quantities as edited on the
-   * Ordering tab) and returns its link. Lines without an ASIN are left out and reported.
+   * Carts page) and returns its link. Lines without an ASIN are left out and reported.
    */
   .post("/carts", requireMentor, cartValidator, async (c) => {
     const { vendor, lines } = c.req.valid("json");

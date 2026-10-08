@@ -352,7 +352,7 @@ function ShareACart() {
     <Card title="Share-A-Cart">
       <div className="space-y-3 text-sm">
         <p className="text-secondary-600">
-          Builds one-click Amazon carts on the Ordering tab. Carts are saved to the connected
+          Builds one-click Amazon carts on the Carts page. Carts are saved to the connected
           Share-A-Cart account.
         </p>
         {justConnected && <SuccessBanner message="Share-A-Cart is connected." />}

@@ -77,4 +77,20 @@ describe("a long order history", () => {
     });
     expect(res.status).toBe(200);
   });
+
+  it("lists when each request was ordered and received", async () => {
+    const ids = await history(3);
+    await jsonAs(mentor, "/orders/receive", { method: "POST", body: { ids } });
+    const rows = await jsonAs<
+      { id: number; status: string; orderedAt: number | null; receivedAt: number | null }[]
+    >(student, "/requests");
+    const mine = ids.map((id) => rows.find((r) => r.id === id));
+    for (const r of mine) {
+      expect(r?.status).toBe("received");
+      expect(r?.orderedAt).toBe(now); // the vendor order's placed_at
+    }
+    // history() seeds the first as already received, with no receipt to date it; the other two
+    // were received just now.
+    expect(mine.map((r) => r?.receivedAt === null)).toEqual([true, false, false]);
+  });
 });

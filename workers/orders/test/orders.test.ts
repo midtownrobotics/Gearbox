@@ -30,6 +30,31 @@ async function newRequest(categoryId: number, title = "WCP 1/2in Hex Bearing", b
   );
 }
 
+describe("the reason", () => {
+  it("is optional: left out or blank, the request is still made", async () => {
+    const category = await newCategory(`No reason ${crypto.randomUUID()}`);
+    for (const reason of [undefined, "", "  "]) {
+      const made = await jsonAs<{ reason: string }>(
+        student,
+        "/requests",
+        {
+          method: "POST",
+          body: {
+            url: `https://wcproducts.com/products/${crypto.randomUUID()}`,
+            title: "WCP Shaft Collar",
+            quantity: 1,
+            categoryId: category.id,
+            catalogCategory: "Bearings & Bushings",
+            ...(reason === undefined ? {} : { reason }),
+          },
+        },
+        201,
+      );
+      expect(made.reason).toBe("");
+    }
+  });
+});
+
 describe("sign-in and roles", () => {
   it("needs a G3ID session", async () => {
     expect((await call("/me")).status).toBe(401);
@@ -167,5 +192,100 @@ describe("part lookup", () => {
       `/lookup?url=${encodeURIComponent("https://wcproducts.com/products/x")}`,
     );
     expect(res.status).toBeGreaterThanOrEqual(500);
+  });
+});
+
+describe("the wishlist", () => {
+  async function wish(categoryId: number, by = student) {
+    return jsonAs<Request & { requesterName: string }>(
+      by,
+      "/requests",
+      {
+        method: "POST",
+        body: {
+          url: `https://wcproducts.com/products/${crypto.randomUUID()}`,
+          title: "WCP Swerve X2",
+          quantity: 4,
+          categoryId,
+          catalogCategory: "Bearings & Bushings",
+          wishlist: true,
+        },
+      },
+      201,
+    );
+  }
+
+  it("keeps wished-for parts out of the requests, until anyone promotes one", async () => {
+    const category = await newCategory(`Wishlist ${crypto.randomUUID()}`);
+    const item = await wish(category.id);
+    expect(item.status).toBe("wishlist");
+
+    const requests = await jsonAs<Request[]>(mentor, "/requests");
+    expect(requests.some((r) => r.id === item.id)).toBe(false);
+    const wishlist = await jsonAs<Request[]>(student, "/requests?status=wishlist");
+    expect(wishlist.some((r) => r.id === item.id)).toBe(true);
+
+    // It isn't a request yet: no approving it, and it can't go on a list.
+    expect(
+      (await callAs(mentor, `/requests/${item.id}/approve`, { method: "POST", body: {} })).status,
+    ).toBe(409);
+    const list = await jsonAs<{ id: number }>(
+      student,
+      "/lists",
+      { method: "POST", body: { name: `Wish list ${crypto.randomUUID()}` } },
+      201,
+    );
+    expect(
+      (
+        await callAs(student, `/lists/${list.id}/items`, {
+          method: "POST",
+          body: { requestIds: [item.id] },
+        })
+      ).status,
+    ).not.toBe(200);
+
+    // Anyone edits it, and anyone promotes it: it's then their request, awaiting a mentor.
+    expect(
+      (
+        await callAs(otherStudent, `/requests/${item.id}`, {
+          method: "PATCH",
+          body: { quantity: 2 },
+        })
+      ).status,
+    ).toBe(200);
+    const promoted = await jsonAs<Request>(otherStudent, `/requests/${item.id}/promote`, {
+      method: "POST",
+    });
+    expect(promoted).toMatchObject({ status: "requested", requesterId: otherStudent.id });
+    const after = await jsonAs<Request[]>(mentor, "/requests");
+    expect(after.some((r) => r.id === item.id)).toBe(true);
+    const detail = await jsonAs<{ events: { action: string; note: string | null }[] }>(
+      mentor,
+      `/requests/${item.id}`,
+    );
+    expect(detail.events.map((e) => e.action)).toEqual(["wished", "edited", "promoted"]);
+
+    // Promoted once: it's a request now, so not again, and never deleted.
+    expect((await callAs(student, `/requests/${item.id}/promote`, { method: "POST" })).status).toBe(
+      409,
+    );
+    expect((await callAs(mentor, `/requests/${item.id}`, { method: "DELETE" })).status).toBe(404);
+  });
+
+  it("lets anyone remove a wished-for part", async () => {
+    const category = await newCategory(`Wishlist ${crypto.randomUUID()}`);
+    const item = await wish(category.id);
+    expect(await jsonAs(otherStudent, `/requests/${item.id}`, { method: "DELETE" })).toEqual({
+      ok: true,
+    });
+    expect((await callAs(student, `/requests/${item.id}`)).status).toBe(404);
+  });
+
+  it("never deletes a request", async () => {
+    const category = await newCategory(`Wishlist ${crypto.randomUUID()}`);
+    const request = await newRequest(category.id);
+    expect((await callAs(student, `/requests/${request.id}`, { method: "DELETE" })).status).toBe(
+      404,
+    );
   });
 });

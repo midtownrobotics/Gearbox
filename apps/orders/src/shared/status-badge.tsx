@@ -2,6 +2,11 @@ import type { RequestStatus } from "./types";
 
 // Each status reads by its label and icon, not color alone.
 export const STATUS: Record<RequestStatus, { label: string; icon: string; className: string }> = {
+  wishlist: {
+    label: "Wishlist",
+    icon: "☆",
+    className: "bg-secondary-50 text-secondary-700 border-secondary-300",
+  },
   requested: {
     label: "Awaiting approval",
     icon: "⏳",

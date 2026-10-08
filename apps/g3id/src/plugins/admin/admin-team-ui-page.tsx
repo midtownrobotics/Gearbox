@@ -10,9 +10,10 @@ import {
   teamUiDefaults,
   teamUiLinkLabels,
 } from "@g3/site-config";
-import { refreshTeamUiSettings } from "@g3/ui";
+import { refreshTeamUiSettings, useTeamNames } from "@g3/ui";
 import { type CSSProperties, useEffect, useState } from "react";
 import { api } from "../../lib/api";
+import { AppOrder } from "./app-order";
 
 type Mode = "light" | "dark";
 const modes: Mode[] = ["light", "dark"];
@@ -31,6 +32,7 @@ const fieldClass =
   "w-full rounded-md border border-line bg-surface px-3 py-2 text-secondary-900 focus:outline-none focus:ring-2 focus:ring-primary-500";
 
 export function AdminTeamUiPage() {
+  const { idName } = useTeamNames();
   const [settings, setSettings] = useState<TeamUiSettings>(() => teamUiDefaults(pageTeamId));
   // The team's own defaults (its name and number), from G3ID: what "Reset to defaults" restores.
   const [defaults, setDefaults] = useState<TeamUiSettings>(() => teamUiDefaults(pageTeamId));
@@ -287,6 +289,19 @@ export function AdminTeamUiPage() {
               </div>
             ))}
           </div>
+        </section>
+
+        <section className="rounded-lg border border-line bg-surface p-5">
+          <h2 className="mb-4 text-xl font-semibold">Apps grid order</h2>
+          <p className="mb-4 text-sm text-secondary-600">
+            The order of the tiles on the portal. Drag a tile by its handle, or focus the handle and
+            use Space and the arrow keys. Hidden or empty links keep their place but aren't shown.
+          </p>
+          <AppOrder
+            settings={settings}
+            idName={idName}
+            onChange={(order) => update("appOrder", order)}
+          />
         </section>
 
         <div className="flex flex-wrap items-center gap-3">

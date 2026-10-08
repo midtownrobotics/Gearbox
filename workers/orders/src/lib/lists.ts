@@ -1,5 +1,5 @@
 import { inTeam, withTeam } from "@g3/auth";
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, ne } from "drizzle-orm";
 import type { OrdersDb } from "../db";
 import { orderRequests, partListItems, partLists } from "../db/schema";
 import { inChunks } from "./chunks";
@@ -19,7 +19,15 @@ export async function addToList(
     db
       .select({ id: orderRequests.id })
       .from(orderRequests)
-      .where(inTeam(orderRequests, teamId, inArray(orderRequests.id, chunk)))
+      // Lists are of requests: wishlist items can't go on one until they're promoted.
+      .where(
+        inTeam(
+          orderRequests,
+          teamId,
+          inArray(orderRequests.id, chunk),
+          ne(orderRequests.status, "wishlist"),
+        ),
+      )
       .all(),
   );
   if (existing.length !== requestIds.length) return null;

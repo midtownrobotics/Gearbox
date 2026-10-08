@@ -300,7 +300,7 @@ export function variantPatch(
 }
 
 /** What's missing before a draft can be sent, or null when it's complete. */
-export function draftProblem(d: Draft, fallbackReason = ""): string | null {
+export function draftProblem(d: Draft): string | null {
   return (
     (!d.url && "Add the product link.") ||
     (!d.name.trim() && "Give it a name.") ||
@@ -312,7 +312,6 @@ export function draftProblem(d: Draft, fallbackReason = ""): string | null {
     (!d.catalogItemId &&
       !d.catalogCategory.trim() &&
       "This part is new to the catalog: pick a catalog category for it.") ||
-    (!(d.reason.trim() || fallbackReason.trim()) && "Say why it's needed.") ||
     null
   );
 }
@@ -583,7 +582,7 @@ export function DraftCard({
               </div>
             )}
             <div className="col-span-2 sm:col-span-4">
-              <Field label="Why do we need it?">
+              <Field label="Why do we need it?" hint="Optional">
                 <input
                   className={inputClass}
                   value={d.reason}

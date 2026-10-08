@@ -17,7 +17,7 @@ const LABELS: Record<Action, string> = {
 
 /**
  * What this user may do to the request right now (mirrors the worker's rules). Ordering isn't
- * here: mentors place orders for whole vendors on the Ordering page.
+ * here: mentors place orders for whole vendors on the Carts page.
  */
 export function allowedActions(
   request: Pick<OrderRequest, "status" | "requesterId">,

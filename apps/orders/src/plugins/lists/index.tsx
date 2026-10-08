@@ -8,5 +8,5 @@ export const listsPlugin: Plugin = {
     { path: "/lists", element: <ListsPage /> },
     { path: "/lists/:id", element: <ListDetailPage /> },
   ],
-  navItems: [{ label: "Lists", to: "/lists", order: 25 }],
+  navItems: [{ label: "Lists", to: "/lists", order: 38 }],
 };
