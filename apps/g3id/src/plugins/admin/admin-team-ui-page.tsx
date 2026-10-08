@@ -87,7 +87,7 @@ export function AdminTeamUiPage() {
   function reset() {
     setSettings(structuredClone(defaults));
     setError("");
-    setMessage("Defaults restored in this form. Save team appearance to apply them.");
+    setMessage("Defaults restored. Save to apply them.");
   }
 
   async function save(event: React.FormEvent) {
@@ -102,7 +102,7 @@ export function AdminTeamUiPage() {
         throw new Error(data.error ?? "Could not save team settings.");
       }
       await refreshTeamUiSettings(true);
-      setMessage("Team appearance saved. Other open tabs will pick it up when focused.");
+      setMessage("Team appearance saved.");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not save team settings.");
     } finally {
@@ -116,10 +116,7 @@ export function AdminTeamUiPage() {
   return (
     <main className="mx-auto w-full max-w-4xl px-6 py-8">
       <h1 className="mb-2 text-3xl font-bold text-secondary-900">Team appearance</h1>
-      <p className="mb-8 text-secondary-600">
-        These settings apply to this team across Gearbox. Team number, domain, and sign-in
-        configuration stay with deployment settings.
-      </p>
+      <p className="mb-8 text-secondary-600">How your team looks across Gearbox.</p>
       {error && (
         <p role="alert" className="mb-4 rounded-md border border-primary-500 p-3 text-primary-700">
           {error}
@@ -196,9 +193,7 @@ export function AdminTeamUiPage() {
         <section className="rounded-lg border border-line bg-surface p-5">
           <h2 className="mb-2 text-xl font-semibold">Colors</h2>
           <p className="mb-4 text-sm text-secondary-600">
-            Your team's color, in a shade for each theme. Buttons and app icons use the light accent
-            in both themes. In dark mode, links and highlights use the dark accent, so they stay
-            readable on a dark background.
+            Your team's color in each theme. Buttons and app icons use the light accent in both.
           </p>
           <AccentColors
             light={settings.light}
@@ -211,8 +206,7 @@ export function AdminTeamUiPage() {
             <summary className="cursor-pointer px-4 py-3 font-semibold">More options</summary>
             <div className="space-y-6 border-t border-line p-4">
               <p className="text-sm text-secondary-600">
-                The backgrounds, borders and text of each theme, used across every app. Colors that
-                carry a meaning, such as green for done or red for an error, stay as they are.
+                Each theme's backgrounds, borders and text.
               </p>
               {modes.map((mode) => (
                 <div key={mode}>
@@ -246,9 +240,7 @@ export function AdminTeamUiPage() {
         <section className="rounded-lg border border-line bg-surface p-5">
           <h2 className="mb-4 text-xl font-semibold">Links</h2>
           <p className="mb-4 text-sm text-secondary-600">
-            Edit the links shown on the portal. Hide a link to keep its URL for later, or remove it
-            to clear its URL. Empty links are omitted. Hiding the public site also hides its link on
-            the portal sign-in screen.
+            Links shown on the portal. Hide one to keep its URL for later; empty links aren't shown.
           </p>
           <div className="grid gap-4 sm:grid-cols-2">
             {(Object.keys(teamUiLinkLabels) as TeamUiLinkKey[]).map((key) => (
@@ -294,8 +286,7 @@ export function AdminTeamUiPage() {
         <section className="rounded-lg border border-line bg-surface p-5">
           <h2 className="mb-4 text-xl font-semibold">Apps grid order</h2>
           <p className="mb-4 text-sm text-secondary-600">
-            The order of the tiles on the portal. Drag a tile by its handle, or focus the handle and
-            use Space and the arrow keys. Hidden or empty links keep their place but aren't shown.
+            Drag tiles into the order they appear on the portal.
           </p>
           <AppOrder
             settings={settings}
@@ -616,8 +607,7 @@ function AccentColors({
         <span>
           <span className="font-medium">Link the light and dark accents</span>
           <span className="block text-secondary-600">
-            A color entered in either box gives the other the same hue. Each keeps its own
-            saturation and brightness, set with its sliders.
+            Entering a color in one box gives the other the same hue.
           </span>
         </span>
       </label>

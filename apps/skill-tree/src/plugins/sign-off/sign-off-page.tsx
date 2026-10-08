@@ -63,8 +63,7 @@ export function SignOffPage() {
   return (
     <Page title="Sign Off">
       <p className="text-sm text-secondary-500">
-        Set one status for several people on several skills at once. This skips the locks: use it
-        for what you've seen them do.
+        Set one status for several people and skills at once, locked skills included.
       </p>
       <Card title="People">
         <PeoplePicker onAdd={addPerson} />

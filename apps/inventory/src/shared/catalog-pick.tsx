@@ -39,7 +39,7 @@ export function CatalogPick({
   if (parts === null) {
     return (
       <p className="text-sm text-secondary-500">
-        The Orders catalog can't be reached right now. A listing can still be typed in.
+        The Orders catalog can't be reached. You can still type a listing in.
       </p>
     );
   }

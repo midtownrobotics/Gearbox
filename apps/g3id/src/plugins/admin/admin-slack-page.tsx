@@ -54,8 +54,7 @@ export function AdminSlackPage() {
       <h1 className="text-3xl font-bold text-secondary-900 mb-8">Slack</h1>
       <div className="bg-surface border border-secondary-200 rounded-lg p-6 space-y-4">
         <p className="text-sm text-secondary-600">
-          Members sign in with codes they send to the bot in your Slack, and the apps message them
-          there.
+          Members sign in through your Slack, and the apps message them there.
         </p>
         {searchParams.get("connected") && status?.connected && (
           <p className="text-sm text-green-700">Slack is connected.</p>

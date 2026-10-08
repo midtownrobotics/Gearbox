@@ -348,8 +348,7 @@ export function ReceiveDialog({
                   How many parts, and where {many ? "each goes" : "they go"}
                 </p>
                 <p className="text-xs text-secondary-500">
-                  Packs are counted as the parts in them. Change a number if that isn't what
-                  arrived.
+                  Packs count as the parts in them. Edit a number if it isn't what arrived.
                 </p>
                 <ul className="mt-2 max-h-80 divide-y divide-secondary-100 overflow-y-auto rounded-lg border border-secondary-200">
                   {lines.map((line) => {

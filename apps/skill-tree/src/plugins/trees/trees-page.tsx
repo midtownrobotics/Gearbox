@@ -173,9 +173,7 @@ export function TreesPage() {
           )}
         </div>
         {students.length === 0 && (
-          <p className="text-sm text-secondary-500">
-            There are no student accounts yet, so there's no progress to show.
-          </p>
+          <p className="text-sm text-secondary-500">No student accounts yet.</p>
         )}
       </Card>
       {category && (

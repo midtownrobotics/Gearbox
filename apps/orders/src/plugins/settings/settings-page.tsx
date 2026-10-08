@@ -78,9 +78,8 @@ function MoneyAndCalendar() {
       ) : (
         <form onSubmit={save} className="space-y-3">
           <p className="text-sm text-secondary-600">
-            Budgets and spending are counted by fiscal year, which starts on the 1st of the month
-            below (dates are in your own local time). Changing it recounts every year from when
-            orders were placed; nothing is lost.
+            Budgets and spending are counted by fiscal year, starting on the 1st of the month below.
+            Changing it recounts every year.
           </p>
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Currency" hint="A 3-letter code: USD, CAD, EUR, ...">
@@ -157,8 +156,8 @@ function InventoryOnReceive() {
               </span>
               <span className="mt-0.5 block text-secondary-600">
                 {settings.data.inventoryRequired
-                  ? `Whoever receives a part has to say where it goes (a storage location, or in use on a robot), and it's added to ${inventory}.`
-                  : `Saying where a part goes is optional. Parts received without it don't appear in ${inventory}.`}
+                  ? `Whoever receives a part must say where it goes, and it's added to ${inventory}.`
+                  : `Optional. Parts received without a place aren't added to ${inventory}.`}
               </span>
             </span>
           </label>
@@ -197,10 +196,7 @@ function NamingTemplate() {
         <Loading />
       ) : (
         <form onSubmit={save} className="space-y-3">
-          <Field
-            label="Template"
-            hint="Tokens: {vendor} {sku} {title} {variant}. The title is cleaned of store names and the SKU."
-          >
+          <Field label="Template" hint="Tokens: {vendor} {sku} {title} {variant}.">
             <input
               className={`${inputClass} font-mono`}
               value={template}
@@ -263,8 +259,8 @@ function CategoryRules() {
   return (
     <Card title="Budget category guesses">
       <p className="text-sm text-secondary-600 mb-3">
-        New requests get a budget category from the last time the same product was bought, then the
-        vendor's default (set on Vendors), then these keywords (matched in the item name).
+        A new request's budget category comes from the product's last purchase, then the vendor's
+        default, then these keywords.
       </p>
       {rules.data && rules.data.length > 0 && (
         <ul className="mb-3 divide-y divide-secondary-100 text-sm">
@@ -352,8 +348,7 @@ function ShareACart() {
     <Card title="Share-A-Cart">
       <div className="space-y-3 text-sm">
         <p className="text-secondary-600">
-          Builds one-click Amazon carts on the Carts page. Carts are saved to the connected
-          Share-A-Cart account.
+          Builds one-click Amazon carts, saved to your Share-A-Cart account.
         </p>
         {justConnected && <SuccessBanner message="Share-A-Cart is connected." />}
         {error && <ErrorBanner message={error} />}
@@ -417,10 +412,7 @@ function TrustedStudents() {
   return (
     <Card title="Trusted students">
       <div className="space-y-3 text-sm">
-        <p className="text-secondary-600">
-          Like mentors, they can add catalog categories and add, edit or delete parts. Everyone else
-          browses and requests.
-        </p>
+        <p className="text-secondary-600">They can edit the catalog, like mentors.</p>
         {error && <ErrorBanner message={error} />}
         {!people.data ? (
           <Loading />

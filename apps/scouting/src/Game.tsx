@@ -207,9 +207,8 @@ export function MatchPredictions() {
       <p>Earn points by completing match scouting reports. Points have no monetary value.</p>
       {data?.settings.predictionsEnabled && (
         <p>
-          Each pick uses points from your balance. Choose the alliance that will lead after the
-          displayed score adjustment. Correct picks return points at the reward multiplier;
-          incorrect picks return none. Combined picks must all be correct.
+          Each pick costs points. Choose the alliance that will lead after the score adjustment
+          shown. A correct pick pays out at the multiplier; a combined pick needs every part right.
         </p>
       )}
       <div className="game-tabs" role="tablist" aria-label="Prediction sections">

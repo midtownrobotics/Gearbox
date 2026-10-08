@@ -15,9 +15,8 @@ export function DrivePage() {
       <Card>
         <div className="space-y-4">
           <p className="text-secondary-700">
-            A shared 10 GB drive on the edge box for big files (CAD exports, installers, videos), so
-            they only need to come over the internet once. Uploads and downloads go straight between
-            your device and the box over the shop network.
+            A shared 10 GB drive for big files (CAD exports, installers, videos). Files move over
+            the shop network, not the internet.
           </p>
           <div className="flex flex-wrap items-center gap-3">
             <a

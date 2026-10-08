@@ -103,8 +103,8 @@ export function TablePage() {
           <p className="mt-1 text-sm text-secondary-500">
             {places.locations.length === 0
               ? user.isAdmin
-                ? "Start on Settings: set up the locations parts are kept in, then add entries here."
-                : "An admin sets up the locations parts are kept in on Settings. After that, anyone can add entries here."
+                ? "Set up locations on Settings, then add entries here."
+                : "Once an admin sets up locations on Settings, anyone can add entries here."
               : "Add the first entry with the button above."}
           </p>
         </Card>

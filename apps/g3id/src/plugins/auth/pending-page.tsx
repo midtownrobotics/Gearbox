@@ -11,12 +11,11 @@ export function PendingPage() {
           <h1 className="text-3xl font-bold text-secondary-900">PLEASE READ THIS!</h1>
           <p className="mt-4 text-secondary-600 text-sm leading-relaxed space-y-3">
             <span className="block">
-              Your account is awaiting admin approval. Once your account has been approved by an
-              admin, you will receive a Slack message.
+              Your account is waiting for an admin's approval. You'll get a Slack message when it's
+              approved.
             </span>
             <span className="block">
-              This may not happen immediately. You must then return to the login page and repeat the
-              code sending process, this time to login rather than to sign up.
+              Then come back to the login page and sign in with a new code.
             </span>
           </p>
         </div>

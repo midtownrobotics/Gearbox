@@ -307,9 +307,8 @@ function SetupCard() {
         />
       </div>
       <p className="mt-3 text-sm text-secondary-500">
-        Everything on this page as one file: your fields, locations, robots and subsystems, and none
-        of your parts. Loading a file adds what you don't have yet. Nothing you have is changed or
-        removed.
+        Your fields, locations, robots and subsystems as one file, without your parts. Loading a
+        file only adds what's missing.
       </p>
 
       {pending && (
@@ -369,7 +368,7 @@ export function SettingsPage() {
       <div className="grid gap-5 md:grid-cols-2">
         <NamesCard
           title="Robots"
-          about="What parts in use are on. Add this season's robot, and older ones still together."
+          about="Robots that parts can be in use on."
           what="robot"
           rows={places.robots}
           client={api.robots}

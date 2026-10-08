@@ -41,7 +41,7 @@ export function EngagementSettingsPanel({
   return (
     <section className="engagement-settings">
       <h2>Optional engagement</h2>
-      <p>Choose which activities your team uses. This module is off by default.</p>
+      <p>Choose which activities your team uses.</p>
       <label>
         <input
           type="checkbox"
@@ -52,8 +52,8 @@ export function EngagementSettingsPanel({
         Enable scouting points and activities
       </label>
       <p>
-        Valid match scouting reports earn 10 points. Turning this off hides the module and pauses
-        point awards and prediction results. Existing balances and picks are kept.
+        Match scouting reports earn 10 points. Turning this off hides it and pauses points; balances
+        and picks are kept.
       </p>
       <fieldset disabled={!draft.enabled || saving}>
         <legend>Activities and naming</legend>
@@ -76,8 +76,8 @@ export function EngagementSettingsPanel({
           Match predictions
         </label>
         <p>
-          Members use earned points on match picks. Those points are spent when submitted; correct
-          picks earn points back. Points have no monetary value.
+          Members spend points on match picks and win points back for correct ones. Points have no
+          monetary value.
         </p>
         <label>
           <input
