@@ -43,6 +43,22 @@ export function parseNeighbors(json: string): Neighbor[] {
  */
 export const isConfirmed = (n: Neighbor) => n.mac !== null && n.state.includes("REACHABLE");
 
+/**
+ * Every LAN device the box can put a MAC to, with its current address: the neighbor table
+ * (any device that has talked on the LAN, fixed-IP ones included) and the DHCP leases. When
+ * the two disagree about an address, the table wins: it's what the device uses now, and a
+ * lease can outlive the device that held it. Hostnames come from the leases, by MAC.
+ */
+export function knownDevices(leases: Lease[], neighbors: Neighbor[]): Lease[] {
+  const hostnames = new Map(leases.map((l) => [l.mac, l.hostname]));
+  const byIp = new Map<string, Lease>();
+  for (const n of neighbors) {
+    if (n.mac) byIp.set(n.ip, { mac: n.mac, ip: n.ip, hostname: hostnames.get(n.mac) ?? null });
+  }
+  for (const l of leases) if (!byIp.has(l.ip)) byIp.set(l.ip, l);
+  return [...byIp.values()];
+}
+
 export interface PresenceSource {
   leases(): Promise<Lease[]>;
   neighbors(): Promise<Neighbor[]>;
