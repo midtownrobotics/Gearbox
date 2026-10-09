@@ -23,7 +23,7 @@ starter setup that comes with the app.
 ## Who can do what
 
 - **Anyone signed in** (kiosk PIN sessions too) sees everything, adds and edits entries, counts,
-  moves, checks parts out and in, adds or removes vendor listings, gives a location its title and
+  moves, checks parts out and in, adds or removes vendor listings, gives a location its description and
   moves everything in a location somewhere else.
 - **Mentors and admins** (the G3ID roles, never a kiosk PIN session) delete entries, merge two
   entries into one, and split a listing off as its own entry.
@@ -37,11 +37,15 @@ Every change to an entry is in its History, with who made it.
 - **Inventory** (`/inventory`): the main table. Type a new quantity to record a count, click a
   location to change it, and use Check out / Check in to move parts between storage and a robot.
   Check in is preset to put parts back with the entry's parts already in storage (the first such
-  row, if it's kept in several places).
+  row, if it's kept in several places). On a phone each row is two lines, so nothing scrolls
+  sideways: the entry and its Check out / Check in button, then its location, quantity and
+  status. The team's own columns are left out there; they're on the entry's page.
 - **Locations** (`/locations`): the table the other way round. Every location is a panel that
-  opens, nested like the tree, with what's kept in it. Type a title into a location's bar to say
-  what belongs there: it then reads "A1 - Misc. Electronics" everywhere, in Orders' receive pop-up
-  too. Move an entry, or everything in a location with "Move all", when things are rearranged:
+  opens, nested like the tree, with what's kept in it. "Add description" beside a location's name
+  says what belongs there: it shows under the name, and the location then reads
+  "A1 - Misc. Electronics" everywhere else, in Orders' receive pop-up too (in a setup file it is
+  the location's `title`). Move an entry, or everything in a location with "Move all", when things
+  are rearranged:
   whole quantities move at once, and the locations themselves stay as they are.
 - **Add an entry** (`/new`).
 - **An entry** (`/items/:id`): details, where its parts are, vendor listings, history.
