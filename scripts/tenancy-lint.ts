@@ -15,6 +15,7 @@
 
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
+import { fileURLToPath } from "node:url";
 import ts from "typescript";
 
 type App = {
@@ -135,7 +136,8 @@ function allTeamsAllowed(text: string, line: number) {
 }
 
 const SCOPED = new Set(["from", "update", "delete", "innerJoin", "leftJoin", "rightJoin"]);
-const root = new URL("..", import.meta.url).pathname;
+// A URL's own path is "/C:/…" on Windows, which isn't a folder there.
+const root = fileURLToPath(new URL("..", import.meta.url));
 
 function sourceFiles(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
