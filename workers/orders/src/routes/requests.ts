@@ -23,6 +23,7 @@ import {
   requestEvents,
   vendorOrders,
 } from "../db/schema";
+import { expandAmazonLink } from "../lib/amazon-link";
 import { type CatalogChoice, catalogItemFor, catalogPackQuantity } from "../lib/catalog";
 import { type ReceiveDestination, parseDestination, sendToInventory } from "../lib/inventory";
 import { addToList } from "../lib/lists";
@@ -69,123 +70,128 @@ type ListChoice = {
 };
 
 const requestValidator = (partial: boolean) =>
-  validator("json", (value, c): Partial<RequestFields> & CatalogChoice & ListChoice => {
-    const v = (value ?? {}) as Record<string, unknown>;
-    const out: Partial<RequestFields> & CatalogChoice & ListChoice = {};
-    const fail = (error: string) => c.json({ error }, 400) as never;
-    const has = (key: string) => !partial || v[key] !== undefined;
+  validator(
+    "json",
+    async (value, c): Promise<Partial<RequestFields> & CatalogChoice & ListChoice> => {
+      const v = (value ?? {}) as Record<string, unknown>;
+      const out: Partial<RequestFields> & CatalogChoice & ListChoice = {};
+      const fail = (error: string) => c.json({ error }, 400) as never;
+      const has = (key: string) => !partial || v[key] !== undefined;
 
-    if (has("url")) {
-      let url: URL;
-      try {
-        url = new URL(String(v.url));
-      } catch {
-        return fail("url must be a link to the product.");
+      if (has("url")) {
+        let url: URL;
+        try {
+          url = new URL(String(v.url));
+        } catch {
+          return fail("url must be a link to the product.");
+        }
+        if (url.protocol !== "https:" && url.protocol !== "http:")
+          return fail("url must be http(s).");
+        // An Amazon share link (a.co) is saved as the product page it leads to, so its ASIN is there
+        // for Amazon's carts.
+        out.url = await expandAmazonLink(url.toString());
+        // No vendor given: name it from the link (also when an edit swaps in a new link).
+        if (typeof v.vendor !== "string" || !v.vendor.trim()) {
+          out.vendor = vendorName(url.hostname);
+        }
       }
-      if (url.protocol !== "https:" && url.protocol !== "http:")
-        return fail("url must be http(s).");
-      out.url = url.toString();
-      // No vendor given: name it from the link (also when an edit swaps in a new link).
-      if (typeof v.vendor !== "string" || !v.vendor.trim()) {
-        out.vendor = vendorName(url.hostname);
+      if (typeof v.vendor === "string" && v.vendor.trim()) {
+        out.vendor = vendorName(v.vendor).slice(0, 100);
       }
-    }
-    if (typeof v.vendor === "string" && v.vendor.trim()) {
-      out.vendor = vendorName(v.vendor).slice(0, 100);
-    }
-    if (has("title")) {
-      if (typeof v.title !== "string" || !v.title.trim() || v.title.length > 300) {
-        return fail("title must be 1–300 characters.");
+      if (has("title")) {
+        if (typeof v.title !== "string" || !v.title.trim() || v.title.length > 300) {
+          return fail("title must be 1–300 characters.");
+        }
+        out.title = v.title.trim();
       }
-      out.title = v.title.trim();
-    }
-    for (const [key, max] of [
-      ["sku", 100],
-      ["variant", 200],
-      ["image", 2000],
-      ["storePlatform", 20],
-      ["storeVariantId", 60],
-    ] as const) {
-      if (v[key] === undefined && partial) continue;
-      const text = optionalText(v[key], max);
-      if (text === false) return fail(`${key} must be text up to ${max} characters.`);
-      out[key] = text;
-    }
-    if (has("unitPriceCents")) {
-      const p = v.unitPriceCents ?? null;
-      if (
-        p !== null &&
-        !(Number.isInteger(p) && (p as number) >= 0 && (p as number) <= 10_000_000)
-      ) {
-        return fail("unitPriceCents must be a non-negative whole number of cents.");
+      for (const [key, max] of [
+        ["sku", 100],
+        ["variant", 200],
+        ["image", 2000],
+        ["storePlatform", 20],
+        ["storeVariantId", 60],
+      ] as const) {
+        if (v[key] === undefined && partial) continue;
+        const text = optionalText(v[key], max);
+        if (text === false) return fail(`${key} must be text up to ${max} characters.`);
+        out[key] = text;
       }
-      out.unitPriceCents = p as number | null;
-    }
-    if (v.currency !== undefined) {
-      if (typeof v.currency !== "string" || !/^[A-Z]{3}$/.test(v.currency)) {
-        return fail("currency must be a 3-letter code.");
+      if (has("unitPriceCents")) {
+        const p = v.unitPriceCents ?? null;
+        if (
+          p !== null &&
+          !(Number.isInteger(p) && (p as number) >= 0 && (p as number) <= 10_000_000)
+        ) {
+          return fail("unitPriceCents must be a non-negative whole number of cents.");
+        }
+        out.unitPriceCents = p as number | null;
       }
-      out.currency = v.currency;
-    }
-    if (has("quantity")) {
-      if (
-        !Number.isInteger(v.quantity) ||
-        (v.quantity as number) < 1 ||
-        (v.quantity as number) > 10_000
-      ) {
-        return fail("quantity must be a whole number from 1 to 10000.");
+      if (v.currency !== undefined) {
+        if (typeof v.currency !== "string" || !/^[A-Z]{3}$/.test(v.currency)) {
+          return fail("currency must be a 3-letter code.");
+        }
+        out.currency = v.currency;
       }
-      out.quantity = v.quantity as number;
-    }
-    if (v.packQuantity !== undefined && v.packQuantity !== null) {
-      const pack = packQuantityField(v.packQuantity);
-      if (pack === null) return fail("packQuantity must be a whole number from 1 to 10000.");
-      out.packQuantity = pack;
-    }
-    if (has("categoryId")) {
-      if (!Number.isInteger(v.categoryId)) return fail("Pick a budget category.");
-      out.categoryId = v.categoryId as number;
-    }
-    // Why it's needed is optional: left out or blank, it's empty.
-    if (has("reason")) {
-      if (v.reason === undefined || v.reason === null) out.reason = "";
-      else if (typeof v.reason !== "string" || v.reason.length > 1000) {
-        return fail("reason must be up to 1000 characters.");
-      } else out.reason = v.reason.trim();
-    }
-    // Anyone can set priority (including Blocking) and a need-by date.
-    if (v.priority !== undefined || !partial) {
-      const priority = v.priority ?? "normal";
-      if (!PRIORITIES.includes(priority as Priority)) {
-        return fail(`priority must be one of ${PRIORITIES.join(", ")}.`);
+      if (has("quantity")) {
+        if (
+          !Number.isInteger(v.quantity) ||
+          (v.quantity as number) < 1 ||
+          (v.quantity as number) > 10_000
+        ) {
+          return fail("quantity must be a whole number from 1 to 10000.");
+        }
+        out.quantity = v.quantity as number;
       }
-      out.priority = priority as Priority;
-    }
-    if (v.needBy !== undefined) {
-      if (v.needBy !== null && !(Number.isInteger(v.needBy) && (v.needBy as number) > 0)) {
-        return fail("needBy must be a date (ms) or null.");
+      if (v.packQuantity !== undefined && v.packQuantity !== null) {
+        const pack = packQuantityField(v.packQuantity);
+        if (pack === null) return fail("packQuantity must be a whole number from 1 to 10000.");
+        out.packQuantity = pack;
       }
-      out.needBy = v.needBy as number | null;
-    }
-    if (v.catalogItemId !== undefined && v.catalogItemId !== null) {
-      if (!Number.isInteger(v.catalogItemId)) return fail("catalogItemId must be an id.");
-      out.catalogItemId = v.catalogItemId as number;
-    }
-    for (const key of ["catalogCategory", "catalogName"] as const) {
-      const text = optionalText(v[key], key === "catalogName" ? 300 : 100);
-      if (text === false) return fail(`${key} must be text.`);
-      out[key] = text;
-    }
-    if (!partial && v.wishlist !== undefined) {
-      if (typeof v.wishlist !== "boolean") return fail("wishlist must be true or false.");
-      out.wishlist = v.wishlist;
-    }
-    if (!partial && v.listId !== undefined && v.listId !== null) {
-      if (!Number.isInteger(v.listId)) return fail("listId must be a list id.");
-      out.listId = v.listId as number;
-    }
-    return out;
-  });
+      if (has("categoryId")) {
+        if (!Number.isInteger(v.categoryId)) return fail("Pick a budget category.");
+        out.categoryId = v.categoryId as number;
+      }
+      // Why it's needed is optional: left out or blank, it's empty.
+      if (has("reason")) {
+        if (v.reason === undefined || v.reason === null) out.reason = "";
+        else if (typeof v.reason !== "string" || v.reason.length > 1000) {
+          return fail("reason must be up to 1000 characters.");
+        } else out.reason = v.reason.trim();
+      }
+      // Anyone can set priority (including Blocking) and a need-by date.
+      if (v.priority !== undefined || !partial) {
+        const priority = v.priority ?? "normal";
+        if (!PRIORITIES.includes(priority as Priority)) {
+          return fail(`priority must be one of ${PRIORITIES.join(", ")}.`);
+        }
+        out.priority = priority as Priority;
+      }
+      if (v.needBy !== undefined) {
+        if (v.needBy !== null && !(Number.isInteger(v.needBy) && (v.needBy as number) > 0)) {
+          return fail("needBy must be a date (ms) or null.");
+        }
+        out.needBy = v.needBy as number | null;
+      }
+      if (v.catalogItemId !== undefined && v.catalogItemId !== null) {
+        if (!Number.isInteger(v.catalogItemId)) return fail("catalogItemId must be an id.");
+        out.catalogItemId = v.catalogItemId as number;
+      }
+      for (const key of ["catalogCategory", "catalogName"] as const) {
+        const text = optionalText(v[key], key === "catalogName" ? 300 : 100);
+        if (text === false) return fail(`${key} must be text.`);
+        out[key] = text;
+      }
+      if (!partial && v.wishlist !== undefined) {
+        if (typeof v.wishlist !== "boolean") return fail("wishlist must be true or false.");
+        out.wishlist = v.wishlist;
+      }
+      if (!partial && v.listId !== undefined && v.listId !== null) {
+        if (!Number.isInteger(v.listId)) return fail("listId must be a list id.");
+        out.listId = v.listId as number;
+      }
+      return out;
+    },
+  );
 
 const NEEDS_CATALOG_CATEGORY = "This part is new to the catalog: pick a catalog category for it.";
 

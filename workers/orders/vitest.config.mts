@@ -77,7 +77,23 @@ const inventory = async (request: Request) => {
   return json({ error: `Inventory stub has no ${path}` }, 404);
 };
 
+/**
+ * The internet, as far as Orders goes: Amazon's share links redirect to a product page (a.co/d/ok
+ * to B0B9MMC59Q, through amzn.to once), and a.co/d/dead goes nowhere. Anything else fails.
+ */
+const outbound = (request: Request) => {
+  const url = new URL(request.url);
+  const to = (location: string) => new Response("", { status: 301, headers: { location } });
+  if (url.hostname === "a.co" && url.pathname === "/d/ok") return to("https://amzn.to/x");
+  if (url.hostname === "amzn.to") {
+    return to("https://www.amazon.com/WORKPRO-Light/dp/B0B9MMC59Q/ref=share?th=1");
+  }
+  if (url.hostname === "a.co") return new Response("Not found", { status: 404 });
+  return new Response("No network in tests", { status: 502 });
+};
+
 export default workerTestConfig({
+  outbound,
   d1: "ORDERS_DB",
   // A key for the Share-A-Cart secrets kept in D1 (32 zero bytes).
   vars: { SECRETS_KEY: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=" },
