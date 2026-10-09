@@ -24,6 +24,11 @@ export type AppEnv = {
     ONSHAPE_CLIENT_SECRET: string;
     ONSHAPE_REDIRECT_URI: string;
     FRONTEND_URL: string;
+    /**
+     * The platform, for the team's log (`lib/team-log.ts`): G3ID's own big changes and the ones
+     * other apps send it. Optional: a missing log line never stops a change.
+     */
+    PLATFORM?: Fetcher;
     /** Local dev only: the dev gateway (http://localhost:8796), for other teams' addresses. */
     LOCAL_GATEWAY_URL?: string;
     ENVIRONMENT?: string;

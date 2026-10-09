@@ -10,5 +10,27 @@ export const manifest = defineManifest({
   integrations: [],
   availability: "every team",
   version: packageJson.version,
-  hooks: { seed: false, delete: true },
+  hooks: { seed: false, delete: true, export: true },
+  // Edited on G3ID's Attendance admin page, which stays on G3ID with members and kiosks.
+  settings: [
+    {
+      key: "schoolYearStart",
+      label: "School year starts",
+      type: "day of year",
+      default: "08-01",
+      help: "Month and day; hours count from here",
+      editedBy: "admin",
+      page: "id:/admin/attendance",
+    },
+    {
+      key: "autoSignOutHours",
+      label: "Auto sign-out",
+      type: "number",
+      default: 12,
+      help: "Hours; a session open longer is closed and doesn't count",
+      editedBy: "admin",
+      page: "id:/admin/attendance",
+    },
+  ],
+  plugins: [],
 });

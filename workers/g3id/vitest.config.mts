@@ -31,6 +31,18 @@ const slack = (request: Request) => {
   return Response.json({ ok: true });
 };
 
+// The platform, for the team's log (src/lib/team-log.ts): records each line by team, read back
+// with GET /api/internal/teams/:id/audit.
+const logged = new Map<string, unknown[]>();
+const platform = async (request: Request) => {
+  const team = new URL(request.url).pathname.match(/^\/api\/internal\/teams\/([^/]+)\/audit$/);
+  if (!team) return Response.json({ error: "Not stubbed" }, { status: 404 });
+  const id = decodeURIComponent(team[1]);
+  if (request.method === "GET") return Response.json(logged.get(id) ?? []);
+  logged.set(id, [...(logged.get(id) ?? []), await request.json()]);
+  return Response.json({ ok: true });
+};
+
 export default workerTestConfig({
   d1: "DB",
   vars: {
@@ -43,5 +55,6 @@ export default workerTestConfig({
     // Production addresses for other teams, not the dev gateway's.
     LOCAL_GATEWAY_URL: "",
   },
+  services: { PLATFORM: platform },
   outbound: slack,
 });

@@ -18,6 +18,11 @@ id = "c27ba19a75fb4eb6b93f9d2d47de6c0f"
 binding = "RATE_LIMIT"
 id = "45e7485d5f0e4f2abf76bd6400e64897"
 
+# The platform, for the team's log (src/lib/team-log.ts). The platform binds G3ID too.
+[[services]]
+binding = "PLATFORM"
+service = "platform"
+
 [vars]
 ENVIRONMENT = "development"
 GOOGLE_CLIENT_ID = "26070176131-lom1rtgi2tmahrd12md7452oieha1vbl.apps.googleusercontent.com"
@@ -51,6 +56,10 @@ id = "db4457ce43c9468eb9ec5a049afa65b1"
 [[env.production.kv_namespaces]]
 binding = "RATE_LIMIT"
 id = "d36a0313dd774bf78bacd76250ec085a"
+
+[[env.production.services]]
+binding = "PLATFORM"
+service = "platform-production"
 
 [env.production.vars]
 ENVIRONMENT = "production"

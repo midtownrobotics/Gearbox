@@ -7,7 +7,7 @@ import packageJson from "../package.json";
 import { consoleRouter } from "./console";
 import { numberReports, teams } from "./db/schema";
 import { db, g3id, now } from "./lib";
-import { clearSwitchedOff, enabledApps, teamRouter } from "./team";
+import { clearSwitchedOff, enabledApps, logTeam, teamRouter } from "./team";
 import type { AppEnv } from "./types";
 
 // The platform: team sign-up (roadmap 2.7), the team registry the gateway asks about, the
@@ -298,6 +298,44 @@ const routes = app
     }
     if (code.status === "pending") return c.json({ status: "pending" as const });
     return c.json({ status: "expired" as const });
+  })
+  // A big settings change in one of the team's apps, for the team's log (its admins read it on
+  // the home's Apps page). Apps send it through G3ID (`logTeamChange` in @g3/auth); only other
+  // workers reach /internal: the gateway never answers it. Field names only, never values.
+  .post("/internal/teams/:id/audit", async (c) => {
+    const teamId = c.req.param("id");
+    const body = (await c.req.json().catch(() => null)) as {
+      userId?: unknown;
+      app?: unknown;
+      what?: unknown;
+      changed?: unknown;
+    } | null;
+    const text = (v: unknown, max: number) =>
+      typeof v === "string" && v.trim() && v.length <= max ? v.trim() : null;
+    const app = text(body?.app, 40);
+    const what = text(body?.what, 100);
+    if (!app || !what) return c.json({ error: "Say which app and what changed." }, 400);
+    const userId = body?.userId === null ? null : text(body?.userId, 100);
+    const changed = Array.isArray(body?.changed)
+      ? body.changed
+          .filter((f): f is string => typeof f === "string" && f.length <= 60)
+          .slice(0, 30)
+      : [];
+    const database = db(c.env);
+    const team = await database
+      .select({ id: teams.id })
+      .from(teams)
+      .where(eq(teams.id, teamId))
+      .get();
+    if (!team) return c.json({ error: "No such team." }, 404);
+    await logTeam(database, {
+      teamId,
+      userId,
+      action: "settings_changed",
+      app,
+      details: { what, changed },
+    });
+    return c.json({ ok: true });
   })
   .route("/console", consoleRouter)
   .route("/team", teamRouter);

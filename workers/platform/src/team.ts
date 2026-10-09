@@ -1,10 +1,10 @@
 import { requireAdmin, requireAuth } from "@g3/auth";
-import type { AppName } from "@g3/site-config";
+import { type AppName, teamAppUrlVia } from "@g3/site-config";
 import { and, desc, eq, isNull, lte } from "drizzle-orm";
 import { Hono } from "hono";
 import { type TEAM_ACTIONS, teamApps, teamAuditLog, teams } from "./db/schema";
-import { accounts, db, now } from "./lib";
-import { ALWAYS_ON, MANIFESTS, callHook, inLibrary, isAppName } from "./registry";
+import { accounts, db, g3id, now } from "./lib";
+import { ALWAYS_ON, MANIFESTS, callHook, fetchExport, inLibrary, isAppName } from "./registry";
 import type { AppEnv } from "./types";
 
 // A team's apps (roadmap 4.2 to 4.4), for the team's own pages: the gateway sends
@@ -15,7 +15,8 @@ import type { AppEnv } from "./types";
 // Switching an app on runs its seed hook (starter content; safe to run again). Switching it off
 // hides it at once (the gateway checks with GET /teams/:id, remembered for a minute) and keeps its
 // data for GRACE_S, so switching it on again brings everything back. After that the daily cron
-// (clearSwitchedOff) has the app delete the team's data.
+// (clearSwitchedOff) has the app delete the team's data. Before switching one off an admin can
+// download its data (its export hook), and every admin is told on Slack when one goes on or off.
 
 /** How long a switched-off app's data is kept (the privacy policy's 90 days). */
 export const GRACE_S = 90 * 24 * 60 * 60;
@@ -36,13 +37,14 @@ export async function enabledApps(database: Db, teamId: string): Promise<AppName
   return [...ALWAYS_ON, ...on];
 }
 
-async function logTeam(
+export async function logTeam(
   database: Db,
   entry: {
     teamId: string;
     userId: string | null;
     action: (typeof TEAM_ACTIONS)[number];
-    app: AppName;
+    /** An app's slug, or "id" for the team's own settings in G3ID. */
+    app: string;
     details?: Record<string, unknown>;
   },
 ) {
@@ -55,6 +57,33 @@ async function logTeam(
     details: JSON.stringify(entry.details ?? {}),
     createdAt: now(),
   });
+}
+
+const longDay = (seconds: number) =>
+  new Date(seconds * 1000).toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+
+/**
+ * Tells every admin of the team, on its Slack, that an app was switched on or off (G3ID sends it
+ * from the team's own bot to each active admin with a linked Slack account). Never fails the
+ * change: a team without Slack just isn't told.
+ */
+async function tellAdmins(env: AppEnv["Bindings"], teamId: string, text: string) {
+  try {
+    const res = await g3id(env, `/teams/${encodeURIComponent(teamId)}/slack/dm-admins`, {
+      method: "POST",
+      body: { text },
+    });
+    if (!res.ok && res.status !== 404) {
+      console.error("[apps] telling admins", res.status, await res.text().catch(() => ""));
+    }
+  } catch (err) {
+    console.error("[apps] telling admins", err);
+  }
 }
 
 /** The library as the team's admins see it: every app the team may have, and its state. */
@@ -84,6 +113,8 @@ async function library(env: AppEnv["Bindings"], teamId: string) {
         /** Switched off and its data already deleted. */
         dataDeleted: row ? !row.enabled && row.dataDeletedAt !== null : false,
         keepsDataWhenOff: !app.hooks.delete,
+        /** Its data can be downloaded (its export hook). */
+        exportable: app.hooks.export,
       };
     });
 }
@@ -158,7 +189,48 @@ export const teamRouter = new Hono<AppEnv>()
       app: slug,
       details: enabled ? { restored, seeded } : { deleteAfter: values.deleteAfter },
     });
+    const apps = `${teamAppUrlVia(c.env.LOCAL_GATEWAY_URL, teamId, "portal")}/admin`;
+    const who = c.get("userDisplayName");
+    await tellAdmins(
+      c.env,
+      teamId,
+      enabled
+        ? `${who} switched *${app.name}* on for your team.${restored ? " Everything it had is back." : ""} ${apps}`
+        : `${who} switched *${app.name}* off for your team. Nobody can open it now.${
+            values.deleteAfter
+              ? ` Its data is kept until ${longDay(values.deleteAfter)}, then deleted; switch it on again before then to keep it.`
+              : " Its data is kept."
+          } ${apps}`,
+    );
     return c.json({ apps: await library(c.env, teamId), seeded });
+  })
+  // An app's data for the team, as a file to download (offered before switching it off). Logged.
+  .get("/library/:slug/export", async (c) => {
+    const teamId = c.get("teamId");
+    const slug = c.req.param("slug");
+    if (!isAppName(slug) || !inLibrary(MANIFESTS[slug], teamId)) {
+      return c.json({ error: "No such app." }, 404);
+    }
+    if (!MANIFESTS[slug].hooks.export) {
+      return c.json({ error: `${MANIFESTS[slug].name} has no data to download.` }, 404);
+    }
+    const res = await fetchExport(c.env, slug, teamId);
+    if (!res)
+      return c.json({ error: `Couldn't get ${MANIFESTS[slug].name}'s data. Try again.` }, 502);
+    await logTeam(db(c.env), {
+      teamId,
+      userId: c.get("userId"),
+      action: "app_exported",
+      app: slug,
+    });
+    const day = new Date().toISOString().slice(0, 10);
+    const name = `${teamId.replace(/^frc/, "")}-${slug}-${day}.json`;
+    return new Response(res.body, {
+      headers: {
+        "Content-Type": "application/json",
+        "Content-Disposition": `attachment; filename="${name}"`,
+      },
+    });
   })
   // The team's log, newest first.
   .get("/log", async (c) => {

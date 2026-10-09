@@ -1,4 +1,14 @@
-import { deleteTeamRows, inTeam, requireAdmin, requireAuth, withTeam } from "@g3/auth";
+import {
+  deleteTeamRows,
+  exportTeamRows,
+  inTeam,
+  logTeamChange,
+  requireAdmin,
+  requireAuth,
+  settingLabels,
+  teamExport,
+  withTeam,
+} from "@g3/auth";
 import { corsOrigin } from "@g3/site-config";
 import { withApiPrefix } from "@g3/site-config/worker";
 import { eq, inArray, sql } from "drizzle-orm";
@@ -8,6 +18,7 @@ import { validator } from "hono/validator";
 import packageJson from "../package.json";
 import { createDb } from "./db";
 import { batteries, checklistIssues, checklistItems, checklistLists, settings } from "./db/schema";
+import { manifest } from "./manifest";
 import type { AppEnv } from "./types";
 
 const base = new Hono<AppEnv>();
@@ -192,6 +203,19 @@ const app = base
   // When an operator deletes the team (the platform's console), or 90 days after the team switches
   // the app off (the platform's app library), its data goes too. Only other workers reach
   // /internal: the gateway never answers it.
+  // The team's data, for its admins to download before switching the app off (the platform's app
+  // library). Only other workers reach /internal.
+  .get("/internal/teams/:teamId/export", async (c) => {
+    const teamId = c.req.param("teamId");
+    const tables = await exportTeamRows(createDb(c.env.PIT_DB), teamId, [
+      settings,
+      batteries,
+      checklistLists,
+      checklistItems,
+      checklistIssues,
+    ]);
+    return c.json(teamExport(manifest, teamId, tables));
+  })
   .delete("/internal/teams/:teamId", async (c) => {
     await deleteTeamRows(createDb(c.env.PIT_DB), c.req.param("teamId"), [
       checklistIssues,
@@ -953,6 +977,10 @@ const app = base
     const updates = c.req.valid("json");
     const db = createDb(c.env.PIT_DB);
     const team = c.get("teamId");
+    const changed: string[] = [];
+    for (const [key, value] of Object.entries(updates)) {
+      if ((await getSetting(db, team, key as SettingKey)) !== value) changed.push(key);
+    }
     await Promise.all(
       Object.entries(updates).map(([key, value]) =>
         db
@@ -961,6 +989,14 @@ const app = base
           .onConflictDoUpdate({ target: [settings.teamId, settings.key], set: { value } }),
       ),
     );
+    if (changed.length > 0) {
+      await logTeamChange(c.env, team, {
+        userId: c.get("userId"),
+        app: "pit",
+        what: "Pit settings",
+        changed: settingLabels(manifest, changed),
+      });
+    }
     return c.json({ ok: true });
   });
 

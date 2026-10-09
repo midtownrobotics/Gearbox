@@ -194,3 +194,81 @@ describe("teams from before the library", () => {
     }
   });
 });
+
+describe("telling the team's admins", () => {
+  it("DMs every admin on the team's Slack when an app goes on or off", async () => {
+    const team = await newTeam();
+    const dms = async () =>
+      (await (
+        await testEnv.G3ID.fetch(`http://g3id/api/internal/teams/${team.teamId}/slack/dm-admins`)
+      ).json()) as { text: string }[];
+    await switchApp(team.admin, "pit", true);
+    await switchApp(team.admin, "pit", false);
+    const [on, off] = (await dms()).map((d) => d.text);
+    expect(on).toContain("switched *Pit* on");
+    expect(off).toContain("switched *Pit* off");
+    expect(off).toMatch(/kept until \w+ \d+, \d{4}/);
+    // Each says where to change it back: the team's own Apps page.
+    expect(off).toContain(`${team.teamId.replace("frc", "")}.`);
+    expect(off).toContain("/admin");
+  });
+});
+
+describe("downloading an app's data", () => {
+  it("gives the team's admins the app's export as a file, and logs it", async () => {
+    const team = await newTeam();
+    const res = await call(team.admin, "/team/library/pit/export");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Content-Disposition")).toMatch(
+      /attachment; filename=".*-pit-.*\.json"/,
+    );
+    expect(await res.json()).toMatchObject({ format: "gearbox-team-export", teamId: team.teamId });
+    const log = await json<{ action: string; app: string }[]>(team.admin, "/team/log");
+    expect(log[0]).toMatchObject({ action: "app_exported", app: "pit" });
+  });
+
+  it("is for the team's admins only", async () => {
+    const team = await newTeam();
+    for (const user of [team.student, team.mentor, team.kioskAdmin]) {
+      expect((await call(user, "/team/library/pit/export")).status).toBe(403);
+    }
+    expect((await call(team.admin, "/team/library/nope/export")).status).toBe(404);
+  });
+});
+
+describe("the team's log of settings changes", () => {
+  const post = (teamId: string, body: unknown) =>
+    exports.default.fetch(
+      new Request(`http://platform/api/internal/teams/${teamId}/audit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+    );
+
+  it("keeps what apps send (through G3ID) for the team's admins", async () => {
+    const team = await newTeam();
+    const change = {
+      userId: team.admin.id,
+      app: "orders",
+      what: "Orders settings",
+      changed: ["Currency"],
+    };
+    expect((await post(team.teamId, change)).status).toBe(200);
+    const log = await json<{ action: string; app: string; details: unknown }[]>(
+      team.admin,
+      "/team/log",
+    );
+    expect(log[0]).toMatchObject({
+      action: "settings_changed",
+      app: "orders",
+      details: { what: "Orders settings", changed: ["Currency"] },
+    });
+  });
+
+  it("refuses a change without an app or what changed, or for a team that isn't here", async () => {
+    const team = await newTeam();
+    expect((await post(team.teamId, { app: "orders" })).status).toBe(400);
+    expect((await post("frc1", { app: "orders", what: "x" })).status).toBe(404);
+  });
+});

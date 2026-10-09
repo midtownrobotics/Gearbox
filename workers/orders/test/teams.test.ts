@@ -313,3 +313,21 @@ describe("Share-A-Cart", () => {
     });
   });
 });
+
+describe("the team's log", () => {
+  it("records which settings a mentor changed, and nothing when nothing changed", async () => {
+    const team = teamUsers(newTeamId());
+    const g3id = (env as unknown as { G3ID: Fetcher }).G3ID;
+    const log = async () =>
+      (await (
+        await g3id.fetch(`http://g3id/api/internal/teams/${team.teamId}/audit`)
+      ).json()) as unknown[];
+    await jsonAs(team.mentor, "/settings", { method: "PUT", body: { currency: "CAD" } });
+    expect(await log()).toEqual([
+      { userId: team.mentor.id, app: "orders", what: "Orders settings", changed: ["Currency"] },
+    ]);
+    // Saving the same again changes nothing, so it isn't logged.
+    await jsonAs(team.mentor, "/settings", { method: "PUT", body: { currency: "CAD" } });
+    expect(await log()).toHaveLength(1);
+  });
+});

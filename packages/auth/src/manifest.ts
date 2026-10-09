@@ -3,7 +3,9 @@ import type { AppName } from "@g3/site-config";
 // What each app tells the platform about itself (roadmap 4.1). Every app has one, in
 // `workers/<app>/src/manifest.ts` (exported as `@g3/worker-<app>/manifest`); the platform
 // builds its app library from them (workers/platform/src/registry.ts), so a deploy is what changes
-// the library. The settings schema and optional plugins (4.5) come later.
+// the library. It also says what the team can set (`settings`), which optional parts it has
+// (`plugins`) and which of the platform's hooks it answers; the dashboard's forms for the
+// settings (4.5) come later, so each says where it's edited today.
 
 /** The roles an app gives a meaning to. */
 export type AppRole = "admin" | "mentor" | "member" | "kiosk";
@@ -15,6 +17,38 @@ export type AppIntegration =
   | "onshape"
   | "share-a-cart"
   | "the blue alliance";
+
+/** One of a team's settings for an app, as it stores it (roadmap 4.1). */
+export type AppSetting = {
+  /** The app's own name for it (its settings row or field). */
+  key: string;
+  label: string;
+  type: "text" | "number" | "boolean" | "choice" | "month" | "day of year" | "url" | "secret";
+  /** What a team that never set it gets. Null: nothing (a secret, a link it must enter). */
+  default: string | number | boolean | null;
+  /** For a `choice`: the values it takes. */
+  choices?: { value: string; label: string }[];
+  /** A unit or a short note ("hours", "0 means no cap"). */
+  help?: string;
+  /** Who may change it. */
+  editedBy: "admin" | "mentor";
+  /**
+   * Where it's edited today, until the dashboard's forms (4.5): the page's path in the app, or
+   * `<app>:<path>` for a page in another app (Attendance's settings are on G3ID: `id:/admin/attendance`).
+   */
+  page: string;
+};
+
+/** An optional part of an app a team switches on inside it (Scouting's engagement modules). */
+export type AppPlugin = {
+  key: string;
+  name: string;
+  summary: string;
+  /** On for a team that never chose. */
+  default: boolean;
+  /** Plugins it needs on too. */
+  requires?: string[];
+};
 
 export type AppManifest = {
   /** The app's name in site.ts: its address (<number>-<app>) and its key everywhere. */
@@ -39,8 +73,14 @@ export type AppManifest = {
    *   run again (a team switching it off and on again keeps what it had).
    * - `delete`: `DELETE /api/internal/teams/:id` when a team switched off for its grace period is
    *   cleared, or the team is deleted. Without it, the app's data is kept.
+   * - `export`: `GET /api/internal/teams/:id/export`, the team's data as a `TeamExport` (JSON,
+   *   secrets left out), offered to the team's admins before they switch the app off.
    */
-  hooks: { seed: boolean; delete: boolean };
+  hooks: { seed: boolean; delete: boolean; export: boolean };
+  /** The team's settings for this app (none for an app without any). */
+  settings: AppSetting[];
+  /** Its optional parts, each switched on and off inside the app. */
+  plugins: AppPlugin[];
 };
 
 export function defineManifest(manifest: AppManifest): AppManifest {

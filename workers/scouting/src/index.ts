@@ -1,3 +1,4 @@
+import { logTeamChange } from "@g3/auth";
 import { corsOrigin, site, teamKey } from "@g3/site-config";
 import { withApiPrefix } from "@g3/site-config/worker";
 import { sendDM } from "@g3/slack";
@@ -1821,6 +1822,7 @@ app.put("/engagement-settings", requireAuth, async (c) => {
       { error: "Use boolean activity switches and a points name of 1 to 40 characters." },
       400,
     );
+  const before = await getEngagementSettings(c.env.SCOUTING_DB);
   await c.env.SCOUTING_DB.prepare(
     `INSERT INTO scouting_engagement_settings
       (team_key, enabled, predictions_enabled, combinations_enabled, leaderboard_enabled, points_label, updated_by, updated_at)
@@ -1841,6 +1843,25 @@ app.put("/engagement-settings", requireAuth, async (c) => {
       Date.now(),
     )
     .run();
+  // The team's log (its home's Apps page), by the names in Scouting's manifest.
+  const names: Record<keyof typeof settings, string> = {
+    enabled: "Scout points",
+    predictionsEnabled: "Match predictions",
+    combinationsEnabled: "Combined picks",
+    leaderboardEnabled: "Team standings",
+    pointsLabel: "Points name",
+  };
+  const changed = (Object.keys(names) as (keyof typeof settings)[])
+    .filter((key) => before[key] !== settings[key])
+    .map((key) => names[key]);
+  if (changed.length > 0) {
+    await logTeamChange(c.env, teamKey, {
+      userId: c.get("userId"),
+      app: "scouting",
+      what: "Scouting engagement",
+      changed,
+    });
+  }
   return c.json(settings);
 });
 

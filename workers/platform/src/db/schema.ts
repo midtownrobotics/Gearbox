@@ -85,7 +85,14 @@ export const teamApps = sqliteTable(
   (t) => [primaryKey({ columns: [t.teamId, t.app] })],
 );
 
-export const TEAM_ACTIONS = ["app_enabled", "app_disabled", "app_data_deleted"] as const;
+export const TEAM_ACTIONS = [
+  "app_enabled",
+  "app_disabled",
+  "app_data_deleted",
+  // Migration 0006.
+  "app_exported",
+  "settings_changed",
+] as const;
 
 /** A team's own log of what its admins did on its dashboard (migration 0005). */
 export const teamAuditLog = sqliteTable("team_audit_log", {

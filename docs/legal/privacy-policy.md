@@ -107,6 +107,7 @@ Where the law of your team's country requires a legal basis for that transfer, t
 | Sign-in sessions | 7 days from sign-in |
 | Your account and memberships | Until you are removed from every team you belong to, then deleted within 30 days |
 | Team data | While the team is registered. Deleted within 30 days after the team closes |
+| The team's log (apps switched on or off, data downloads, and which settings were changed and by whom, never their values) | Kept as team data |
 | Data of an app your team switches off | 90 days, in case your team switches it back on, then deleted |
 | Records that name a removed member, such as past orders | Kept by the team, with the member's name replaced by a placeholder |
 | Operator access log | 12 months |
@@ -119,7 +120,7 @@ Where the law of your team's country requires a legal basis for that transfer, t
 - **See, correct or remove your information.** Ask your team's admin first. Your team controls its data and can do each of these in the product.
 - **Leave a team.** A team admin can remove you. Records your team must keep will no longer show your name.
 - **Unlink a sign-in service.** You can do this from your account page at any time.
-- **Export.** A team owner can export the team's data. Your team can ask us for a copy of the information held about one member.
+- **Export.** A team's admins can download each app's data at any time, and are offered it before switching an app off. Your team can ask us for a copy of the information held about one member.
 - **If your team cannot help.** Contact us at contact@frcgearbox.com. We will work with your team and answer within 30 days.
 
 Depending on where you live, the law may give you further rights, such as the right to object to a use of your information or to complain to your data protection authority. Nothing in this policy limits those rights.

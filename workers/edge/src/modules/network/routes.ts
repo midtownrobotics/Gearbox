@@ -1,4 +1,11 @@
-import { inTeam, requireAdmin, requireAuth } from "@g3/auth";
+import {
+  changedFields,
+  inTeam,
+  logTeamChange,
+  requireAdmin,
+  requireAuth,
+  settingLabels,
+} from "@g3/auth";
 import { desc, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
@@ -6,6 +13,7 @@ import { createEdgeDb } from "../../db";
 import { netClients, netSettings } from "../../db/schema";
 import { writeAudit } from "../../lib/audit";
 import { DAY, billingCycle } from "../../lib/time";
+import { manifest } from "../../manifest";
 import { requireAgent } from "../../middleware/auth";
 import { type AppEnv, WAN_KEY } from "../../types";
 import { LOOKUP_USAGE_KEY } from "../lookup/types";
@@ -256,7 +264,11 @@ export const networkRouter = new Hono<AppEnv>()
       const teamId = c.get("teamId");
       const changes = c.req.valid("json");
       if (Object.keys(changes).length === 0) return c.json({ ok: true });
-      await getSettings(db, teamId);
+      const before = await getSettings(db, teamId);
+      const changed = changedFields(
+        { capBytes: before.capBytes, cycleStartDay: before.cycleStartDay },
+        changes,
+      );
       await db
         .update(netSettings)
         .set({ ...changes, updatedAt: now() })
@@ -268,6 +280,14 @@ export const networkRouter = new Hono<AppEnv>()
         "network.settings.update",
         changes,
       );
+      if (changed.length > 0) {
+        await logTeamChange(c.env, teamId, {
+          userId: c.get("userId"),
+          app: "edge",
+          what: "Data cap",
+          changed: settingLabels(manifest, changed),
+        });
+      }
       return c.json({ ok: true });
     },
   );

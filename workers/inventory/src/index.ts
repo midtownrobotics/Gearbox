@@ -1,4 +1,4 @@
-import { deleteTeamRows, hasMentorAccess, requireAuth } from "@g3/auth";
+import { deleteTeamRows, exportTeamRows, hasMentorAccess, requireAuth, teamExport } from "@g3/auth";
 import { corsOrigin } from "@g3/site-config";
 import { withApiPrefix } from "@g3/site-config/worker";
 import { Hono } from "hono";
@@ -16,6 +16,7 @@ import {
   stock,
   subsystems,
 } from "./db/schema";
+import { manifest } from "./manifest";
 import { intakeRouter } from "./routes/intake";
 import { inventoryRouter } from "./routes/inventory";
 import { itemsRouter } from "./routes/items";
@@ -54,6 +55,23 @@ const app = base
   // When an operator deletes the team (the platform's console), or 90 days after the team switches
   // the app off (the platform's app library), its data goes too. Only other workers reach
   // /internal: the gateway never answers it.
+  // The team's data, for its admins to download before switching the app off (the platform's app
+  // library). Only other workers reach /internal.
+  .get("/internal/teams/:teamId/export", async (c) => {
+    const teamId = c.req.param("teamId");
+    const tables = await exportTeamRows(createDb(c.env.INVENTORY_DB), teamId, [
+      fields,
+      locations,
+      robots,
+      subsystems,
+      items,
+      itemListings,
+      stock,
+      itemEvents,
+      intakeReceipts,
+    ]);
+    return c.json(teamExport(manifest, teamId, tables));
+  })
   .delete("/internal/teams/:teamId", async (c) => {
     await deleteTeamRows(createDb(c.env.INVENTORY_DB), c.req.param("teamId"), [
       stock,

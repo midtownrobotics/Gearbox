@@ -2,10 +2,17 @@ import { sendDM, sendMessage } from "@g3/slack";
 import { and, eq, inArray, isNull, ne } from "drizzle-orm";
 import { Hono } from "hono";
 import { createDb } from "../db";
-import { coreSessions, coreSlackLinkCodes, coreUsers, teams } from "../db/schema";
+import {
+  coreSessions,
+  coreSlackLinkCodes,
+  coreUserIdentities,
+  coreUsers,
+  teams,
+} from "../db/schema";
 import { createSigninCode } from "../lib/slack-code";
 import { saveInstallation, slackForTeam } from "../lib/slack-install";
 import { siteTeamId } from "../lib/team";
+import { logToTeam } from "../lib/team-log";
 import type { AppEnv } from "../types";
 
 // For other workers only, over service bindings: the platform worker signs teams up through these,
@@ -187,6 +194,59 @@ export const internalRouter = new Hono<AppEnv>()
       return c.json({ error: err instanceof Error ? err.message : String(err) }, 502);
     }
     return c.json({ ok: true });
+  })
+  // The same message to every active admin of the team, each in a DM from its own bot (the
+  // platform tells them when an app is switched on or off). Admins without a linked Slack account
+  // aren't sent one; 404 when the team has no Slack.
+  .post("/teams/:id/slack/dm-admins", async (c) => {
+    const body = await c.req.json<{ text?: unknown }>().catch(() => ({}) as { text?: unknown });
+    const text = typeof body.text === "string" ? body.text.trim() : "";
+    if (!text || text.length > 4000)
+      return c.json({ error: "text is required (up to 4000)." }, 400);
+    const teamId = c.req.param("id");
+    const teamSlack = await slackForTeam(c.env, teamId);
+    if (!teamSlack) return c.json({ error: "This team hasn't connected Slack." }, 404);
+    const admins = await createDb(c.env.DB)
+      .select({ slackId: coreUserIdentities.providerId })
+      .from(coreUsers)
+      .innerJoin(coreUserIdentities, eq(coreUserIdentities.userId, coreUsers.id))
+      .where(
+        and(
+          eq(coreUsers.teamId, teamId),
+          eq(coreUsers.isAdmin, 1),
+          eq(coreUsers.status, "active"),
+          eq(coreUserIdentities.provider, "slack"),
+        ),
+      )
+      .all();
+    const ids = [...new Set(admins.map((a) => a.slackId).filter((id): id is string => !!id))];
+    let sent = 0;
+    for (const id of ids) {
+      try {
+        await sendDM(id, text, teamSlack.slack);
+        sent++;
+      } catch (err) {
+        console.error("[slack] admin DM failed", id, err);
+      }
+    }
+    return c.json({ ok: true, sent, admins: ids.length });
+  })
+  // A change for the team's log, from another app (`logTeamChange` in @g3/auth): passed on to the
+  // platform, which keeps the log.
+  .post("/teams/:id/audit", async (c) => {
+    const body = (await c.req.json().catch(() => null)) as Record<string, unknown> | null;
+    if (!body || typeof body.app !== "string" || typeof body.what !== "string") {
+      return c.json({ error: "Say which app and what changed." }, 400);
+    }
+    const ok = await logToTeam(c.env, c.req.param("id"), {
+      userId: typeof body.userId === "string" ? body.userId : null,
+      app: body.app,
+      what: body.what,
+      changed: Array.isArray(body.changed) ? body.changed.map(String) : [],
+    });
+    return ok
+      ? c.json({ ok: true })
+      : c.json({ error: "The team's log couldn't be written." }, 502);
   })
   // A message from the team's own Slack bot to one of its channels (Shop's release and daily
   // summary posts). 404 when the team has no Slack; Slack's own refusal (not_in_channel, ...) is

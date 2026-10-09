@@ -33,6 +33,9 @@ const json = (body: unknown, status = 200) =>
 /** Slack DMs and channel posts apps asked G3ID to send, by team (tests read them back). */
 const slackDms = new Map<string, Record<string, string>[]>();
 const slackMessages = new Map<string, Record<string, string>[]>();
+/** Lines apps added to a team's log (`logTeamChange`), and messages sent to all its admins. */
+const teamLogs = new Map<string, Record<string, unknown>[]>();
+const adminDms = new Map<string, Record<string, unknown>[]>();
 
 /**
  * G3ID as other workers see it: /auth/me answers for the user in the test cookie (users.ts), like
@@ -98,6 +101,18 @@ export const g3idStub: ServiceStub = async (request) => {
     const teamId = decodeURIComponent(slack[1]);
     if (request.method === "GET") return json(store.get(teamId) ?? []);
     const body = (await request.json()) as Record<string, string>;
+    store.set(teamId, [...(store.get(teamId) ?? []), body]);
+    return json({ ok: true });
+  }
+  // A line for the team's log (`logTeamChange`), or a message to every admin (the platform, when
+  // an app is switched on or off): recorded. Tests read them back (stub only) with a GET to the
+  // same path on env.G3ID.
+  const team = url.pathname.match(/^\/internal\/teams\/([^/]+)\/(audit|slack\/dm-admins)$/);
+  if (team) {
+    const store = team[2] === "audit" ? teamLogs : adminDms;
+    const teamId = decodeURIComponent(team[1]);
+    if (request.method === "GET") return json(store.get(teamId) ?? []);
+    const body = (await request.json()) as Record<string, unknown>;
     store.set(teamId, [...(store.get(teamId) ?? []), body]);
     return json({ ok: true });
   }
