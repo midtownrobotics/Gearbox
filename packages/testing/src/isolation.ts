@@ -139,3 +139,46 @@ export async function checkTeamDeletion(spec: DeletionSpec): Promise<string[]> {
   if (!again.ok) problems.push(`deleting it again answered ${again.status}`);
   return problems;
 }
+
+export type ExportSpec = Pick<IsolationSpec, "seed"> & {
+  /** Calls the app as the platform does when an admin downloads its data. */
+  exportOf(teamId: string): Promise<Response>;
+  /** Strings a team's export must never contain (its secrets, as the test saved them). */
+  secrets?: (team: Seeded) => string[];
+};
+
+/**
+ * A team's export (`GET /internal/teams/:teamId/export`) is its data and only its data: it answers
+ * in the platform's format, has team A's markers, none of team B's, and none of the secrets the
+ * test gave. Gives back what went wrong, one line each.
+ */
+export async function checkTeamExport(spec: ExportSpec): Promise<string[]> {
+  const a = teamUsers(newTeamId());
+  const b = teamUsers(newTeamId());
+  const seededA = await spec.seed(a);
+  const seededB = await spec.seed(b);
+  const problems: string[] = [];
+  const res = await spec.exportOf(a.teamId);
+  if (!res.ok) return [`exporting team A answered ${res.status}: ${await res.text()}`];
+  const text = await res.text();
+  let body: { format?: unknown; teamId?: unknown; tables?: unknown };
+  try {
+    body = JSON.parse(text);
+  } catch {
+    return ["the export isn't JSON"];
+  }
+  if (body.format !== "gearbox-team-export")
+    problems.push("the export isn't a gearbox-team-export");
+  if (body.teamId !== a.teamId) problems.push(`the export is for ${String(body.teamId)}`);
+  if (!body.tables || typeof body.tables !== "object") problems.push("the export has no tables");
+  if (!seededA.markers.some((marker) => text.includes(marker))) {
+    problems.push("team A's export has none of team A's data");
+  }
+  for (const marker of seededB.markers) {
+    if (text.includes(marker)) problems.push(`team A's export has team B's "${marker}"`);
+  }
+  for (const secret of spec.secrets?.(seededA) ?? []) {
+    if (text.includes(secret)) problems.push(`the export has a secret ("${secret.slice(0, 6)}…")`);
+  }
+  return problems;
+}

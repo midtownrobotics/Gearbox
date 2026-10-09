@@ -1,4 +1,11 @@
-import { activeMembers, deleteTeamRows, requireAuth } from "@g3/auth";
+import {
+  activeMembers,
+  deleteTeamRows,
+  exportTeamRows,
+  logTeamChange,
+  requireAuth,
+  teamExport,
+} from "@g3/auth";
 import { corsOrigin } from "@g3/site-config";
 import { withApiPrefix } from "@g3/site-config/worker";
 import { drizzle } from "drizzle-orm/d1";
@@ -12,6 +19,7 @@ import {
   attendanceSettings,
   attendanceTotals,
 } from "./db/schema";
+import { manifest } from "./manifest";
 import { type AttendanceSettings, autoSignOutMs, parseSettings, schoolYear } from "./settings";
 import { currentWindow, validateToken } from "./token";
 import type { AppEnv } from "./types";
@@ -238,6 +246,18 @@ const app = base
   // When an operator deletes the team (the platform's console), or 90 days after the team switches
   // the app off (the platform's app library), its data goes too. Only other workers reach
   // /internal: the gateway never answers it.
+  // The team's data, for its admins to download before switching the app off (the platform's app
+  // library). Only other workers reach /internal.
+  .get("/internal/teams/:teamId/export", async (c) => {
+    const teamId = c.req.param("teamId");
+    const tables = await exportTeamRows(drizzle(c.env.ATTENDANCE_DB), teamId, [
+      attendanceSettings,
+      attendanceMembers,
+      attendanceSessions,
+      attendanceTotals,
+    ]);
+    return c.json(teamExport(manifest, teamId, tables));
+  })
   .delete("/internal/teams/:teamId", async (c) => {
     await deleteTeamRows(drizzle(c.env.ATTENDANCE_DB), c.req.param("teamId"), [
       attendanceSessions,
@@ -402,7 +422,23 @@ const app = base
     if (!c.get("userIsAdmin")) return c.json({ error: "Forbidden." }, 403);
     const settings = parseSettings(await c.req.json().catch(() => null));
     if (typeof settings === "string") return c.json({ error: settings }, 400);
+    const before = await teamDb(c).settings();
     await teamDb(c).saveSettings(settings, c.get("userId"));
+    const changed = [
+      ...(before.schoolYearStartMonth !== settings.schoolYearStartMonth ||
+      before.schoolYearStartDay !== settings.schoolYearStartDay
+        ? ["School year starts"]
+        : []),
+      ...(before.autoSignOutHours !== settings.autoSignOutHours ? ["Auto sign-out"] : []),
+    ];
+    if (changed.length > 0) {
+      await logTeamChange(c.env, c.get("teamId"), {
+        userId: c.get("userId"),
+        app: "attendance",
+        what: "Attendance settings",
+        changed,
+      });
+    }
     return c.json(settings);
   })
   // Attendance summary — admin only. One row per member: current status,

@@ -1,4 +1,4 @@
-import { deleteTeamRows } from "@g3/auth";
+import { deleteTeamRows, exportTeamRows, teamExport } from "@g3/auth";
 import { Hono } from "hono";
 import { createOrdersDb } from "../db";
 import {
@@ -20,6 +20,7 @@ import {
   vendors,
 } from "../db/schema";
 import { ensureCatalog, forgetCatalog } from "../lib/starter";
+import { manifest } from "../manifest";
 import type { AppEnv } from "../types";
 
 /**
@@ -34,6 +35,37 @@ export const internalRouter = new Hono<AppEnv>()
   .post("/teams/:teamId/seed", async (c) => {
     await ensureCatalog(createOrdersDb(c.env.ORDERS_DB), c.req.param("teamId"));
     return c.json({ ok: true });
+  })
+  // The team's data, for its admins to download before switching Orders off (the platform's app
+  // library). Share-A-Cart's connection (`sac_*` settings, encrypted tokens) is left out.
+  .get("/teams/:teamId/export", async (c) => {
+    const teamId = c.req.param("teamId");
+    const tables = await exportTeamRows(createOrdersDb(c.env.ORDERS_DB), teamId, [
+      appSettings,
+      appUsers,
+      budgetCategories,
+      categoryBudgets,
+      categoryRules,
+      catalogCategories,
+      catalogFamilies,
+      catalogItems,
+      vendors,
+      vendorCredits,
+      vendorOrders,
+      orderCharges,
+      orderRequests,
+      requestEvents,
+      partLists,
+      partListItems,
+    ]);
+    tables.app_settings = (tables.app_settings ?? []).filter(
+      (row) => !String(row.key).startsWith("sac_"),
+    );
+    return c.json(
+      teamExport(manifest, teamId, tables, [
+        "Share-A-Cart's connection isn't included: connect the account again on Settings.",
+      ]),
+    );
   })
   .delete("/teams/:teamId", async (c) => {
     const teamId = c.req.param("teamId");

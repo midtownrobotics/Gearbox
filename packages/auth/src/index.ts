@@ -31,8 +31,16 @@ export {
   sendTeamMessage,
   teamMembers,
 } from "./members";
-export { deleteTeamRows, inTeam, withTeam } from "./scope";
+export {
+  type TeamExport,
+  deleteTeamRows,
+  exportTeamRows,
+  inTeam,
+  teamExport,
+  withTeam,
+} from "./scope";
 export { decryptSecret, encryptSecret } from "./secret-box";
+export { type TeamChange, changedFields, logTeamChange, settingLabels } from "./audit";
 
 /**
  * Headers for calling another app's worker as the signed-in user (a service binding skips the
@@ -64,6 +72,8 @@ export {
 export {
   type AppIntegration,
   type AppManifest,
+  type AppPlugin,
   type AppRole,
+  type AppSetting,
   defineManifest,
 } from "./manifest";

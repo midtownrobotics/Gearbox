@@ -16,17 +16,41 @@ export type LibraryApp = TeamApp & {
   /** Switched off and its data already deleted. */
   dataDeleted: boolean;
   keepsDataWhenOff: boolean;
+  /** Its data can be downloaded (offered before switching it off). */
+  exportable: boolean;
 };
 
 export type LogEntry = {
   id: string;
-  action: "app_enabled" | "app_disabled" | "app_data_deleted";
+  action: "app_enabled" | "app_disabled" | "app_data_deleted" | "app_exported" | "settings_changed";
   app: string | null;
   appName: string | null;
   userName: string | null;
   details: Record<string, unknown>;
   createdAt: number;
 };
+
+/** Downloads an app's data for the team as a JSON file (the platform's export, logged there). */
+export async function downloadAppData(slug: string) {
+  const res = await fetch(
+    `${apiPath("platform")}/team/library/${encodeURIComponent(slug)}/export`,
+    {
+      credentials: "include",
+    },
+  );
+  if (!res.ok) {
+    const data = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(data.error ?? "Couldn't download its data. Please try again.");
+  }
+  const name =
+    res.headers.get("Content-Disposition")?.match(/filename="([^"]+)"/)?.[1] ?? `${slug}.json`;
+  const url = URL.createObjectURL(await res.blob());
+  const link = Object.assign(document.createElement("a"), { href: url, download: name });
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
 
 export async function platform<T>(path: string, init?: { method: string; body?: unknown }) {
   const res = await fetch(`${apiPath("platform")}${path}`, {

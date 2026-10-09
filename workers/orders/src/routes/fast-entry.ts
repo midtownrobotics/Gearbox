@@ -1,4 +1,12 @@
-import { inTeam, requireAuth, requireMentor, withTeam } from "@g3/auth";
+import {
+  changedFields,
+  inTeam,
+  logTeamChange,
+  requireAuth,
+  requireMentor,
+  settingLabels,
+  withTeam,
+} from "@g3/auth";
 import { desc, eq, ne, or, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
@@ -18,6 +26,7 @@ import { guessPackQuantity } from "../lib/pack-quantity";
 import { type TeamSettings, saveTeamSettings, teamSettings } from "../lib/settings";
 import { catalogReady } from "../lib/starter";
 import { vendorKey, vendorName } from "../lib/vendors";
+import { manifest } from "../manifest";
 import type { AppEnv } from "../types";
 
 /** Whether this runtime can format money in a currency ("USD", "CAD", ...). */
@@ -82,7 +91,18 @@ export const settingsRouter = new Hono<AppEnv>()
   .put("/", requireMentor, settingsValidator, async (c) => {
     const db = createOrdersDb(c.env.ORDERS_DB);
     const teamId = c.get("teamId");
-    await saveTeamSettings(db, teamId, c.req.valid("json"));
+    const input = c.req.valid("json");
+    const before = await teamSettings(db, teamId);
+    await saveTeamSettings(db, teamId, input);
+    const changed = changedFields(before, input);
+    if (changed.length > 0) {
+      await logTeamChange(c.env, teamId, {
+        userId: c.get("userId"),
+        app: "orders",
+        what: "Orders settings",
+        changed: settingLabels(manifest, changed),
+      });
+    }
     return c.json({
       ...(await teamSettings(db, teamId)),
       defaultNamingTemplate: DEFAULT_TEMPLATE,

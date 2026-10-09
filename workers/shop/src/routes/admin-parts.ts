@@ -1,4 +1,4 @@
-import { inTeam, requireAdmin, requireAuth, sendTeamMessage } from "@g3/auth";
+import { inTeam, logTeamChange, requireAdmin, requireAuth, sendTeamMessage } from "@g3/auth";
 import { eq, inArray } from "drizzle-orm";
 import { Hono } from "hono";
 import { createShopDb } from "../db";
@@ -250,6 +250,30 @@ export const adminPartsRouter = new Hono<AppEnv>()
         webhookKeySecondary: text("webhookKeySecondary"),
       });
       const config = await onshapeConfig(c.env, db, teamId);
+      // Which parts changed: the document and company by value, the keys whenever new ones were
+      // entered (their values never go in the log).
+      const changed = [
+        ...(before.documentId !== documentId ? ["Onshape document"] : []),
+        ...(text("mainAssemblyId") !== undefined &&
+        (before.mainAssemblyId ?? undefined) !== text("mainAssemblyId")
+          ? ["Main assembly"]
+          : []),
+        ...(text("companyId") !== undefined && (before.companyId ?? undefined) !== text("companyId")
+          ? ["Onshape company"]
+          : []),
+        ...(text("apiKey") || text("apiSecret") ? ["Onshape API keys"] : []),
+        ...(text("webhookKeyPrimary") || text("webhookKeySecondary")
+          ? ["Onshape webhook signing keys"]
+          : []),
+      ];
+      if (changed.length > 0) {
+        await logTeamChange(c.env, teamId, {
+          userId: c.get("userId"),
+          app: "shop",
+          what: "Onshape connection",
+          changed,
+        });
+      }
 
       // Replace our webhook: drop it from the old document (if it changed) and from this one, so
       // saving re-registers it at the current address instead of adding a second one.
@@ -307,8 +331,24 @@ export const adminPartsRouter = new Hono<AppEnv>()
 
     try {
       const teamId = c.get("teamId");
+      const [oldRelease, oldSummary] = await Promise.all([
+        getSetting(db, teamId, RELEASE_CHANNEL_KEY),
+        getSetting(db, teamId, SUMMARY_CHANNEL_KEY),
+      ]);
       await setSetting(db, teamId, RELEASE_CHANNEL_KEY, release);
       if (summary) await setSetting(db, teamId, SUMMARY_CHANNEL_KEY, summary);
+      const changed = [
+        ...(oldRelease !== release ? ["Slack channel for releases"] : []),
+        ...(summary && oldSummary !== summary ? ["Slack channel for daily summaries"] : []),
+      ];
+      if (changed.length > 0) {
+        await logTeamChange(c.env, teamId, {
+          userId: c.get("userId"),
+          app: "shop",
+          what: "Shop's Slack channels",
+          changed,
+        });
+      }
       return c.json({ slackReleaseChannelId: release, slackSummaryChannelId: summary ?? "" });
     } catch (err) {
       return c.json(

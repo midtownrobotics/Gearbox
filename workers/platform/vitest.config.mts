@@ -7,6 +7,8 @@ import { g3idStub, workerTestConfig } from "@g3/testing/config";
 // "u-member"; any account exists except "u-nobody"; and deleting and handing over a team work.
 // /auth/me is the usual test stub (@g3/testing).
 const checks = new Map<string, number>();
+/** Messages to every admin of a team (the app library's), by team: read back with a GET. */
+const adminDms = new Map<string, { text: string }[]>();
 const MEMBERS = [
   {
     id: "u-founder",
@@ -43,6 +45,13 @@ const g3id = async (request: Request) => {
   if (team) {
     const [, , rest] = team;
     if (rest === "/members") return Response.json(MEMBERS);
+    if (rest === "/slack/dm-admins") {
+      const id = team[1];
+      if (request.method === "GET") return Response.json(adminDms.get(id) ?? []);
+      const body = (await request.json()) as { text: string };
+      adminDms.set(id, [...(adminDms.get(id) ?? []), body]);
+      return Response.json({ ok: true, sent: 1, admins: 1 });
+    }
     if (!rest && request.method === "DELETE") {
       return Response.json({ deletedUserIds: MEMBERS.map((m) => m.id) });
     }
@@ -115,6 +124,15 @@ function teamApp() {
     if (fail) {
       failing.add(decodeURIComponent(fail[1]));
       return Response.json({ ok: true });
+    }
+    const exported = path.match(/^\/api\/internal\/teams\/(.+)\/export$/);
+    if (exported && request.method === "GET") {
+      return Response.json({
+        format: "gearbox-team-export",
+        version: 1,
+        teamId: decodeURIComponent(exported[1]),
+        tables: { rows: [{ marker: "exported" }] },
+      });
     }
     const team = path.match(/^\/api\/internal\/teams\/(.+)$/);
     if (team && request.method === "DELETE") {

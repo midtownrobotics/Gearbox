@@ -1,4 +1,4 @@
-import { inTeam, requireAdmin, withTeam } from "@g3/auth";
+import { inTeam, logTeamChange, requireAdmin, settingLabels, withTeam } from "@g3/auth";
 import { count, eq, isNull } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import { Hono } from "hono";
@@ -14,6 +14,7 @@ import {
 } from "../../db/schema";
 import { writeAudit } from "../../lib/audit";
 import { chunk, rowsPerInsert } from "../../lib/d1";
+import { manifest } from "../../manifest";
 import type { AppEnv } from "../../types";
 import { getSettings, teamTimeZone } from "./common";
 import { clientName } from "./common";
@@ -129,12 +130,23 @@ export const controlRouter = new Hono<AppEnv>()
       if (Object.keys(changes).length === 0) return c.json({ ok: true });
       const flag = (v: boolean | undefined) => (v === undefined ? undefined : v ? 1 : 0);
       const teamId = c.get("teamId");
-      await getSettings(db, teamId);
+      const before = await getSettings(db, teamId);
+      const changed = (["enforce", "dnsHardening"] as const).filter(
+        (key) => changes[key] !== undefined && changes[key] !== Boolean(before[key]),
+      );
       await db
         .update(netSettings)
         .set({ enforce: flag(changes.enforce), dnsHardening: flag(changes.dnsHardening) })
         .where(inTeam(netSettings, teamId));
       await afterChange(c, db, "network.control.settings", changes);
+      if (changed.length > 0) {
+        await logTeamChange(c.env, teamId, {
+          userId: c.get("userId"),
+          app: "edge",
+          what: "Network blocking",
+          changed: settingLabels(manifest, [...changed]),
+        });
+      }
       return c.json({ ok: true });
     },
   )

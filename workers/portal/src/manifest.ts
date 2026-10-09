@@ -12,5 +12,7 @@ export const manifest = defineManifest({
   availability: "every team",
   alwaysOn: true,
   version: packageJson.version,
-  hooks: { seed: false, delete: false },
+  hooks: { seed: false, delete: false, export: false },
+  settings: [],
+  plugins: [],
 });

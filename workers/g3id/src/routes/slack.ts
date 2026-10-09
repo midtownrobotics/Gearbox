@@ -12,6 +12,7 @@ import {
   teamForWorkspace,
 } from "../lib/slack-install";
 import { siteTeamId, teamOfUser, teamUrl } from "../lib/team";
+import { logToTeam } from "../lib/team-log";
 import { requireAdmin } from "../middleware/auth";
 import type { AppEnv } from "../types";
 
@@ -98,6 +99,12 @@ export const slackRouter = new Hono<AppEnv>()
     });
     if (result === "taken")
       return fail("That Slack workspace is already connected to another team.");
+    await logToTeam(c.env, team, {
+      userId,
+      app: "id",
+      what: "Slack connected",
+      changed: [data.team.name ?? data.team.id],
+    });
     return back("connected=1");
   })
   // Events API — handles DMs and URL verification challenge

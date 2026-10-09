@@ -1,5 +1,10 @@
 import { env } from "cloudflare:test";
-import { type Seeded, checkIsolation, checkTeamDeletion } from "@g3/testing/isolation";
+import {
+  type Seeded,
+  checkIsolation,
+  checkTeamDeletion,
+  checkTeamExport,
+} from "@g3/testing/isolation";
 import type { TeamUsers } from "@g3/testing/users";
 import { call, jsonAs } from "@g3/testing/worker";
 import { expect, it } from "vitest";
@@ -147,6 +152,15 @@ it("deletes a team's data when an operator deletes the team, and only that team'
     snapshot,
     // As the platform calls it, over the service binding (the gateway never answers /internal).
     remove: (teamId) => call(`/internal/teams/${teamId}`, { method: "DELETE" }),
+  });
+  expect(problems).toEqual([]);
+}, 60_000);
+
+it("exports a team's data for its admins, and only that team's", async () => {
+  const problems = await checkTeamExport({
+    seed,
+    // As the platform calls it when an admin downloads the app's data.
+    exportOf: (teamId) => call(`/internal/teams/${teamId}/export`),
   });
   expect(problems).toEqual([]);
 }, 60_000);

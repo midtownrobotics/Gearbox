@@ -13,6 +13,7 @@ import {
 } from "../db/schema";
 import { removeInstallation, slackForTeam } from "../lib/slack-install";
 import { teamOfUser, teamUrl } from "../lib/team";
+import { appearanceChanges, logToTeam } from "../lib/team-log";
 import { isTeamUiSettings, loadTeamUi, teamIdName } from "../lib/team-ui";
 import { requireAdmin } from "../middleware/auth";
 import type { AppEnv } from "../types";
@@ -39,10 +40,12 @@ export const adminRouter = new Hono<AppEnv>()
     if (!isTeamUiSettings(body)) return c.json({ error: "Invalid team UI settings." }, 400);
     const now = Math.floor(Date.now() / 1000);
     const db = createDb(c.env.DB);
+    const team = await teamOfUser(db, c.get("userId") as string);
+    const before = (await loadTeamUi(db, team)).settings;
     await db
       .insert(teamUiSettings)
       .values({
-        teamId: await teamOfUser(db, c.get("userId") as string),
+        teamId: team,
         settingsJson: JSON.stringify(body),
         updatedAt: now,
         updatedBy: c.get("userId"),
@@ -51,6 +54,15 @@ export const adminRouter = new Hono<AppEnv>()
         target: teamUiSettings.teamId,
         set: { settingsJson: JSON.stringify(body), updatedAt: now, updatedBy: c.get("userId") },
       });
+    const changed = appearanceChanges(before, body);
+    if (changed.length > 0) {
+      await logToTeam(c.env, team, {
+        userId: c.get("userId") as string,
+        app: "id",
+        what: "Team appearance",
+        changed,
+      });
+    }
     return c.json({ settings: body, updatedAt: now });
   })
   .get("/users", async (c) => {
@@ -368,6 +380,11 @@ export const adminRouter = new Hono<AppEnv>()
   .delete("/slack", async (c) => {
     const team = await teamOfUser(createDb(c.env.DB), c.get("userId") as string);
     await removeInstallation(c.env, { teamId: team });
+    await logToTeam(c.env, team, {
+      userId: c.get("userId") as string,
+      app: "id",
+      what: "Slack disconnected",
+    });
     return c.json({ ok: true });
   })
   .get("/kiosk/devices", async (c) => {

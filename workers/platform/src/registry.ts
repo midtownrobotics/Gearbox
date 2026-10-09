@@ -58,6 +58,29 @@ export const ALWAYS_ON = Object.values(MANIFESTS)
 export const DELETABLE = Object.values(MANIFESTS).filter((app) => app.hooks.delete);
 
 /**
+ * An app's export of a team's data (its `GET /api/internal/teams/:id/export`), or null when it
+ * has none or didn't answer.
+ */
+export async function fetchExport(
+  env: AppEnv["Bindings"],
+  app: AppName,
+  teamId: string,
+): Promise<Response | null> {
+  const binding = BINDINGS[app];
+  if (!binding || !MANIFESTS[app].hooks.export) return null;
+  try {
+    const res = await (env[binding] as Fetcher).fetch(
+      new Request(`http://${app}/api/internal/teams/${encodeURIComponent(teamId)}/export`),
+    );
+    if (res.ok) return res;
+    console.error(`[apps] export ${app} for ${teamId}`, res.status, await res.text());
+  } catch (err) {
+    console.error(`[apps] export ${app} for ${teamId}`, err);
+  }
+  return null;
+}
+
+/**
  * Calls an app's hook for a team (its /api/internal/teams/:id routes, which the gateway never
  * answers): true if it answered OK.
  */
