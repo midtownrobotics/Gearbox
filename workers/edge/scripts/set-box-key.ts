@@ -12,6 +12,9 @@
 
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
+import { createRequire } from "node:module";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { teamKey } from "@g3/site-config";
 
 const args = process.argv.slice(2);
@@ -35,11 +38,16 @@ ON CONFLICT (team_id) DO UPDATE SET key_hash = excluded.key_hash, key_hint = exc
   created_by = excluded.created_by, created_by_name = excluded.created_by_name,
   created_at = excluded.created_at;`;
 
+// Wrangler's own entry, run with this Node: `pnpm` and `wrangler` are .cmd files on Windows,
+// which can't be started without a shell (and a shell would mangle the command's quotes).
+const require = createRequire(import.meta.url);
+const wranglerPackage = require.resolve("wrangler/package.json");
+const wrangler = join(dirname(wranglerPackage), require(wranglerPackage).bin.wrangler);
+
 execFileSync(
-  "pnpm",
+  process.execPath,
   [
-    "exec",
-    "wrangler",
+    wrangler,
     "d1",
     "execute",
     "EDGE_DB",
@@ -47,6 +55,7 @@ execFileSync(
     "--command",
     command,
   ],
-  { stdio: "inherit", cwd: new URL("..", import.meta.url).pathname },
+  // A URL's own path is "/C:/…" on Windows, which isn't a folder there.
+  { stdio: "inherit", cwd: fileURLToPath(new URL("..", import.meta.url)) },
 );
 console.log(`Stored the box key ending ${key.slice(-4)} for ${team}${local ? " (local)" : ""}.`);
