@@ -51,6 +51,9 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
+        // A link to the API is a page load too: it must reach the worker, not get the app's
+        // page like every other address does.
+        navigateFallbackDenylist: [/^\/api\//],
         runtimeCaching: [
           {
             // Dev: same-origin /api/* via Vite proxy
