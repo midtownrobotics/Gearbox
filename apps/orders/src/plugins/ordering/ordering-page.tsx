@@ -1,3 +1,4 @@
+import { amazonAsin, isAmazonShortLink } from "@g3/worker-orders/product-key";
 import { chargesByCategory } from "@g3/worker-orders/split";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
@@ -587,6 +588,14 @@ function VendorOrder({
                     )}
                   </td>
                   <td className="py-1.5 pr-3">
+                    {shareACart && !amazonAsin(r) && !isAmazonShortLink(r.url) && (
+                      <span
+                        className="mb-0.5 block text-xs font-semibold text-amber-700"
+                        title="Share-A-Cart leaves this out. Edit the request's link to the product's Amazon page."
+                      >
+                        No Amazon ASIN
+                      </span>
+                    )}
                     {r.sku ? (
                       <button
                         type="button"

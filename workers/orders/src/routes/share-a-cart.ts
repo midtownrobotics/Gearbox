@@ -5,8 +5,10 @@ import { Hono } from "hono";
 import { validator } from "hono/validator";
 import { createOrdersDb } from "../db";
 import { orderRequests } from "../db/schema";
+import { expandAmazonLink } from "../lib/amazon-link";
 import { inChunks } from "../lib/chunks";
 import { localTimeZone } from "../lib/local-time";
+import { amazonAsin, isAmazonShortLink } from "../lib/product-key";
 import { teamSettings } from "../lib/settings";
 import {
   SAC_VENDORS,
@@ -38,20 +40,7 @@ const teamOf = (c: Context<AppEnv>, teamId = c.get("teamId")): Team => ({
 });
 
 /** The Amazon ASIN Share-A-Cart's `asin` field wants: from the product link, or the SKU. */
-export function storeItemId(line: { url: string; sku: string | null }): string | null {
-  let path = "";
-  try {
-    path = new URL(line.url).pathname;
-  } catch {
-    // Not a URL (some imported rows); fall back to the SKU.
-  }
-  const sku = line.sku?.trim() || null;
-  return (
-    path
-      .match(/\/(?:dp|gp\/product|gp\/aw\/d|product)\/([A-Z0-9]{10})(?:[/?]|$)/i)?.[1]
-      ?.toUpperCase() ?? (sku && /^[A-Z0-9]{10}$/i.test(sku) ? sku.toUpperCase() : null)
-  );
-}
+export const storeItemId = amazonAsin;
 
 const cartValidator = validator(
   "json",
@@ -158,7 +147,12 @@ export const shareACartRouter = new Hono<AppEnv>()
     const items: SacItem[] = [];
     const skipped: string[] = [];
     for (const r of rows) {
-      const asin = storeItemId(r);
+      // A share link (a.co) saved before links were expanded, or when the expansion failed.
+      const asin =
+        storeItemId(r) ??
+        (isAmazonShortLink(r.url)
+          ? storeItemId({ ...r, url: await expandAmazonLink(r.url) })
+          : null);
       if (!asin) {
         skipped.push(r.title);
         continue;

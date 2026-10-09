@@ -49,6 +49,85 @@ describe("amazon price", () => {
   });
 });
 
+describe("amazon from a phone", () => {
+  const phone = {
+    userAgent:
+      "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36",
+    secChUa: '"Chromium";v="130"',
+    secChUaMobile: "?1",
+    secChUaPlatform: '"Android"',
+    acceptLanguage: "en-US",
+  };
+
+  test("asks Amazon as a desktop browser, for short links too", async () => {
+    const seen: Headers[] = [];
+    globalThis.fetch = (async (url: unknown, init?: RequestInit) => {
+      seen.push(new Headers(init?.headers as Record<string, string>));
+      if (String(url).startsWith("https://a.co/")) {
+        return new Response("", {
+          status: 301,
+          headers: { location: "https://www.amazon.com/dp/B0B9MMC59Q?ref=share" },
+        });
+      }
+      return new Response(amazonPage("", price("apex-pricetopay-value", "$9.99")), {
+        headers: { "content-type": "text/html" },
+      });
+    }) as unknown as typeof fetch;
+
+    const result = await lookupPart("https://a.co/d/08hanaAx", { client: phone });
+    expect(result.sku).toBe("B0B9MMC59Q");
+    expect(seen).toHaveLength(2);
+    for (const headers of seen) {
+      expect(headers.get("User-Agent")).not.toMatch(/Mobile|Android/);
+      expect(headers.get("Sec-CH-UA-Mobile")).toBeNull();
+      expect(headers.get("Accept-Language")).toBe("en-US");
+    }
+  });
+
+  test("keeps a desktop requester's own headers", async () => {
+    let headers = new Headers();
+    globalThis.fetch = (async (_url: unknown, init?: RequestInit) => {
+      headers = new Headers(init?.headers as Record<string, string>);
+      return new Response(amazonPage("", ""), { headers: { "content-type": "text/html" } });
+    }) as unknown as typeof fetch;
+    const desktop = { userAgent: "Mozilla/5.0 (Macintosh) Firefox/131.0", secChUaMobile: "?0" };
+    await lookupPart("https://www.amazon.com/dp/B000000000", { client: desktop });
+    expect(headers.get("User-Agent")).toBe(desktop.userAgent);
+  });
+});
+
+describe("amazon product name", () => {
+  test("comes from the mobile page's title when there's no desktop one", async () => {
+    servePage('<html><body><span id="title"> WORKPRO LED Pen Light, 4-Pack </span></body></html>');
+    expect((await lookupPart("https://www.amazon.com/dp/B0B9MMC59Q")).title).toBe(
+      "WORKPRO LED Pen Light, 4-Pack",
+    );
+  });
+
+  test("falls back to the page's own title, without Amazon's parts", async () => {
+    servePage(
+      "<html><head><title>Amazon.com: WORKPRO LED Pen Light : Sports &amp; Outdoors</title></head></html>",
+    );
+    expect((await lookupPart("https://www.amazon.com/dp/B0B9MMC59Q")).title).toBe(
+      "WORKPRO LED Pen Light",
+    );
+  });
+
+  test("says so when Amazon answers with a CAPTCHA", async () => {
+    servePage(
+      '<html><head><title>Amazon.com</title></head><body><form action="/errors/validateCaptcha"><h4>Type the characters you see in this image:</h4></form></body></html>',
+    );
+    await expect(lookupPart("https://www.amazon.com/dp/B0B9MMC59Q")).rejects.toThrow(/CAPTCHA/);
+  });
+
+  test("doesn't blame a bot check for a page it just can't read", async () => {
+    servePage("<html><head><title>Amazon.com</title></head><body></body></html>");
+    await expect(lookupPart("https://www.amazon.com/dp/B0B9MMC59Q")).rejects.toThrow(
+      "Couldn't find the product on Amazon's page.",
+    );
+  });
+});
+
 describe("data metering", () => {
   test("counts compressed bytes on the wire and still parses the page", async () => {
     const page = amazonPage("", price("apex-pricetopay-value", "$13.58")) + " ".repeat(50_000);
