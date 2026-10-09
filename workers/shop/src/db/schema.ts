@@ -44,6 +44,9 @@ export const partInstances = sqliteTable(
     instanceNumber: integer("instance_number").notNull(),
     isPriority: integer("is_priority").notNull().default(0),
     isStale: integer("is_stale").notNull().default(0),
+    // When it was made obsolete and who did it. Null when it isn't, or was before this was kept.
+    obsoletedAt: integer("obsoleted_at"),
+    obsoletedBy: text("obsoleted_by"),
     createdAt: integer("created_at").notNull(),
   },
   (t) => [unique().on(t.partDefinitionId, t.instanceNumber)],

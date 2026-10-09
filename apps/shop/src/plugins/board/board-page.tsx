@@ -43,7 +43,7 @@ export function BoardPage() {
   const { data, loading, error, refresh } = useShopData();
   const navigate = useNavigate();
   const location = useLocation();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const kiosk = useKiosk();
   // Kiosks are tablets — always use the finger-friendly layout there.
   const touch = useTouchDevice() || kiosk.active;
@@ -82,6 +82,20 @@ export function BoardPage() {
       setSelectedInstanceId(Number(instanceParam));
     }
   }, [searchParams]);
+
+  // A link to a part's shop view (`?part=`, from its details view) opens it: the work view if it's
+  // being worked on, else the one with Start Part. The address is then put back as it was, so
+  // closing the view doesn't leave it to open again.
+  useEffect(() => {
+    const part = searchParams.get("part");
+    if (!part || !data) return;
+    const row = rows.find((r) => r.instance.id === Number(part));
+    if (row?.state === "doing") setWorkingPartInstanceId(row.instance.id);
+    else if (row) setViewingPartInstanceId(row.instance.id);
+    const rest = new URLSearchParams(searchParams);
+    rest.delete("part");
+    setSearchParams(rest, { replace: true });
+  }, [searchParams, setSearchParams, data, rows]);
 
   // Who is logged in at each kiosk, refreshed alongside the heartbeat cadence.
   useEffect(() => {
@@ -486,25 +500,21 @@ function ProcessView({
             ) : (
               <div className="bg-paper border border-steel/30 rounded-xl divide-y divide-steel/15">
                 {inProgress.map((row) => (
-                  <PartLine key={row.instance.id} row={row} touch={touch}>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onOpenWorkView(row.instance.id);
-                      }}
-                      className={`text-xs bg-crimson hover:bg-crimson-dark text-paper rounded-lg font-semibold transition-colors shrink-0 ${btnSize}`}
-                    >
-                      Open
-                    </button>
-                    <span className="relative group shrink-0">
+                  <PartLine
+                    key={row.instance.id}
+                    row={row}
+                    touch={touch}
+                    onOpenPart={() => onOpenWorkView(row.instance.id)}
+                    stack
+                  >
+                    <span className="relative group">
                       <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           onAdvance(row, "done");
                         }}
-                        className={`text-xs bg-emerald-600 hover:bg-emerald-700 text-paper rounded-lg font-semibold transition-colors ${btnSize}`}
+                        className={`w-full whitespace-nowrap text-xs bg-emerald-600 hover:bg-emerald-700 text-paper rounded-lg font-semibold transition-colors ${btnSize}`}
                       >
                         Mark as Complete
                       </button>
@@ -527,25 +537,31 @@ function ProcessView({
             ) : (
               <div className="bg-paper border border-steel/30 rounded-xl divide-y divide-steel/15">
                 {todo.map((row) => (
-                  <PartLine key={row.instance.id} row={row} touch={touch} onViewPart={onViewPart}>
+                  <PartLine
+                    key={row.instance.id}
+                    row={row}
+                    touch={touch}
+                    onOpenPart={() => onViewPart(row.instance.id)}
+                    stack
+                  >
                     <button
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
                         onAdvance(row, "doing");
                       }}
-                      className={`text-xs bg-crimson hover:bg-crimson-dark text-paper rounded-lg font-semibold transition-colors shrink-0 ${btnSize}`}
+                      className={`whitespace-nowrap text-xs bg-crimson hover:bg-crimson-dark text-paper rounded-lg font-semibold transition-colors ${btnSize}`}
                     >
                       Start Part
                     </button>
-                    <span className="relative group shrink-0">
+                    <span className="relative group">
                       <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           onAdvance(row, "done");
                         }}
-                        className={`text-xs bg-emerald-600 hover:bg-emerald-700 text-paper rounded-lg font-semibold transition-colors ${btnSize}`}
+                        className={`w-full whitespace-nowrap text-xs bg-emerald-600 hover:bg-emerald-700 text-paper rounded-lg font-semibold transition-colors ${btnSize}`}
                       >
                         Mark as Complete
                       </button>
@@ -594,66 +610,83 @@ function ProcessView({
 
 // ── Shared bits ───────────────────────────────────────────────────────────────
 
+/**
+ * One part in a list. With `onOpenPart` its name is the link that opens it. With `stack` its
+ * buttons (`children`) go on a row of their own under the name on a narrow screen, where they'd
+ * otherwise leave no room for it.
+ */
 function PartLine({
   row,
   muted,
   touch,
   navigate,
-  onOpen,
-  onViewPart,
+  onOpenPart,
+  stack,
   children,
 }: {
   row: InstanceRow;
   muted?: boolean;
   touch?: boolean;
   navigate?: (path: string) => void;
-  onOpen?: () => void;
-  onViewPart?: (instanceId: number) => void;
+  onOpenPart?: () => void;
+  stack?: boolean;
   children?: React.ReactNode;
 }) {
-  const handleClick = () => {
-    // In overview, navigate to the process where the part currently is
-    if (navigate && row.current) {
-      navigate(processPath(row.current.processId));
-    } else if (onOpen) {
-      // In process view, open the part card
-      onOpen();
-    }
-  };
-
-  const isClickable = (navigate && row.current) || onOpen;
+  // On the overview, a row goes to the machine its part is at.
+  const goToMachine = navigate && row.current ? navigate : null;
+  const name = (
+    <>
+      {row.definition.name}
+      <span className="text-steel font-normal ml-1.5">#{row.instance.instanceNumber}</span>
+    </>
+  );
 
   return (
     <div
-      className={`relative flex items-center gap-3 px-4 ${
-        isClickable ? "cursor-pointer hover:bg-mist/70 transition-colors" : ""
-      } ${touch ? "py-4" : "py-2.5"}`}
-      onClick={handleClick}
-      title={navigate && row.current ? "Go to machine" : "View part details"}
+      className={`relative px-4 ${
+        stack
+          ? "flex flex-col gap-2.5 sm:flex-row sm:items-center sm:gap-3"
+          : "flex items-center gap-3"
+      } ${goToMachine ? "cursor-pointer hover:bg-mist/70 transition-colors" : ""} ${
+        touch ? "py-4" : "py-2.5"
+      }`}
+      onClick={() => {
+        if (goToMachine && row.current) goToMachine(processPath(row.current.processId));
+      }}
+      title={goToMachine ? "Go to machine" : undefined}
     >
       {row.instance.isPriority ? (
         <span className="absolute left-0 inset-y-0 w-1 bg-amber-400" title="Priority part" />
       ) : null}
-      <div className="flex-1 min-w-0">
-        <p className={`text-sm font-medium truncate ${muted ? "text-steel-dark" : "text-ink"}`}>
-          {row.definition.name}
-          <span className="text-steel font-normal ml-1.5">#{row.instance.instanceNumber}</span>
-        </p>
+      <div className={`min-w-0 ${stack ? "sm:flex-1" : "flex-1"}`}>
+        {onOpenPart ? (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenPart();
+            }}
+            title="Open this part"
+            className={`block max-w-full truncate text-left text-sm font-medium text-crimson underline hover:text-crimson-dark transition-colors ${
+              touch ? "py-1" : ""
+            }`}
+          >
+            {name}
+          </button>
+        ) : (
+          <p className={`text-sm font-medium truncate ${muted ? "text-steel-dark" : "text-ink"}`}>
+            {name}
+          </p>
+        )}
         <p className="text-xs font-mono text-steel truncate">{partLabel(row)}</p>
       </div>
-      {onViewPart && (
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onViewPart(row.instance.id);
-          }}
-          className="text-xs bg-crimson hover:bg-crimson-dark text-paper rounded-lg font-semibold transition-colors shrink-0 px-3 py-1.5"
-        >
-          Open
-        </button>
+      {stack ? (
+        <div className="grid auto-cols-fr grid-flow-col gap-2 sm:flex sm:shrink-0 sm:items-center sm:gap-3">
+          {children}
+        </div>
+      ) : (
+        children
       )}
-      {children}
     </div>
   );
 }

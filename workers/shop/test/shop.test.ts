@@ -118,3 +118,91 @@ describe("removed test routes", () => {
     expect((await call("/slack-test")).status).toBe(404);
   });
 });
+
+describe("obsolete parts", () => {
+  type Id = { id: number };
+  type Instance = Id & { isStale: number; obsoletedAt: number | null; obsoletedBy: string | null };
+  const post = (body: unknown) => ({ method: "POST", body });
+  const patch = (body: unknown) => ({ method: "PATCH", body });
+  const assign = (file: Id, part: Id, count: number) =>
+    callAs(student, `/part-files/${file.id}/assignments`, {
+      method: "PUT",
+      body: { partDefinitionId: part.id, count },
+    });
+
+  /** A part of its own with `quantity` instances, and a file. */
+  async function seed(quantity: number) {
+    const tag = crypto.randomUUID().slice(0, 8);
+    const subsystem = await jsonAs<Id>(student, "/subsystems", post({ name: `Arm ${tag}` }), 201);
+    const process = await jsonAs<Id>(student, "/processes", post({ name: `Mill ${tag}` }), 201);
+    const part = await jsonAs<Id>(
+      student,
+      "/part-definitions",
+      post({
+        onshapePartNumber: `OBS-${tag}`,
+        revision: "A",
+        subsystemId: subsystem.id,
+        name: "Plate",
+        processIds: [process.id],
+      }),
+      201,
+    );
+    const instances = await jsonAs<Instance[]>(
+      student,
+      "/part-instances",
+      post({ partDefinitionId: part.id, quantity }),
+      201,
+    );
+    const form = new FormData();
+    form.set("file", new File(["G-code"], `plate-${tag}.nc`, { type: "text/plain" }));
+    const file = await jsonAs<Id>(student, "/part-files", { method: "POST", body: form }, 201);
+    return { part, instances, file };
+  }
+
+  it("keeps when a part was made obsolete and by whom", async () => {
+    const { instances } = await seed(1);
+    expect(instances[0]).toMatchObject({ isStale: 0, obsoletedAt: null, obsoletedBy: null });
+
+    const before = Date.now();
+    const made = await jsonAs<Instance>(
+      admin,
+      `/part-instances/${instances[0].id}`,
+      patch({ isStale: true }),
+    );
+    expect(made).toMatchObject({ isStale: 1, obsoletedBy: admin.id });
+    expect(made.obsoletedAt).toBeGreaterThanOrEqual(before);
+
+    // Saying so again, or changing something else, leaves the first record as it is.
+    const again = await jsonAs<Instance>(
+      student,
+      `/part-instances/${instances[0].id}`,
+      patch({ isStale: true, isPriority: true }),
+    );
+    expect(again).toMatchObject({ obsoletedAt: made.obsoletedAt, obsoletedBy: admin.id });
+
+    // Bringing it back forgets them.
+    const back = await jsonAs<Instance>(
+      student,
+      `/part-instances/${instances[0].id}`,
+      patch({ isStale: false }),
+    );
+    expect(back).toMatchObject({ isStale: 0, obsoletedAt: null, obsoletedBy: null });
+  });
+
+  it("won't assign a file to a part whose every instance is obsolete", async () => {
+    const { part, instances, file } = await seed(2);
+    expect(await (await assign(file, part, 1)).json()).toMatchObject({ assigned: 1 });
+
+    // One obsolete instance of two: the part is still live.
+    await jsonAs(student, `/part-instances/${instances[1].id}`, patch({ isStale: true }));
+    expect((await assign(file, part, 1)).status).toBe(200);
+
+    await jsonAs(student, `/part-instances/${instances[0].id}`, patch({ isStale: true }));
+    const refused = await assign(file, part, 2);
+    expect(refused.status).toBe(409);
+    expect(((await refused.json()) as { error: string }).error).toMatch(/Rev A is obsolete/);
+
+    // Taking the file off it is still allowed.
+    expect(await (await assign(file, part, 0)).json()).toMatchObject({ assigned: 0 });
+  });
+});
