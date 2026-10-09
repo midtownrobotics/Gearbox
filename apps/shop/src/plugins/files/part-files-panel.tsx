@@ -39,6 +39,16 @@ export function formatInstanceRanges(numbers: number[]): string {
 export const partLabelOf = (d: Pick<PartDefinition, "onshapePartNumber" | "revision">) =>
   `${d.onshapePartNumber} · Rev ${d.revision}`;
 
+/**
+ * A revision no file can be assigned to: one marked obsolete, or one whose every instance has
+ * been made obsolete. The worker refuses the same ones.
+ */
+export function isObsoleteRevision(definition: PartDefinition, instances: PartInstance[]): boolean {
+  if (definition.isObsolete) return true;
+  const own = instances.filter((i) => i.partDefinitionId === definition.id);
+  return own.length > 0 && own.every((i) => i.isStale);
+}
+
 /** Active (non-obsolete) instance ids of each part definition that no file covers yet. */
 export function freeInstancesByPart(
   instances: PartInstance[],
@@ -498,6 +508,32 @@ export function UploadButton({
         {busy ? "Working…" : label}
       </button>
     </>
+  );
+}
+
+/**
+ * The top of a file's row: its name and details, then its status and buttons. On a narrow screen
+ * those go under the details, so the name has the whole row and is shown in full.
+ */
+export function FileHeading({
+  name,
+  details,
+  children,
+}: {
+  name: string;
+  details: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+      <div className="min-w-0 sm:flex-1">
+        <p className="text-sm font-medium text-ink break-all sm:truncate" title={name}>
+          {name}
+        </p>
+        {details}
+      </div>
+      <div className="flex flex-wrap items-center gap-2 sm:shrink-0 sm:gap-3">{children}</div>
+    </div>
   );
 }
 

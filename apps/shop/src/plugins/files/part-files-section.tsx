@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { InstanceRow } from "../../shared/derive";
 import { deletePartFile, fetchPartFiles } from "../../shared/getters";
-import type { PartDefinition, PartFile } from "../../shared/types";
+import type { PartDefinition, PartFile, PartInstance } from "../../shared/types";
 import { useKiosk } from "../../shared/use-auth";
 import type { ShopData } from "../../shared/use-shop-data";
 import { useUserNames } from "../../shared/use-user-names";
@@ -10,6 +10,7 @@ import {
   CountInput,
   DownloadLink,
   ErrorText,
+  FileHeading,
   FileMeta,
   InProductionBadge,
   NoticeText,
@@ -18,6 +19,7 @@ import {
   confirmDeleteFile,
   formatBytes,
   freeInstancesByPart,
+  isObsoleteRevision,
   partLabelOf,
   uploadAndAssign,
 } from "./part-files-panel";
@@ -96,11 +98,12 @@ export function PartFilesSection({
     }
   }
 
-  const resolve = (t: PartTarget) => resolvePartTarget(t, data?.definitions ?? []);
+  const resolve = (t: PartTarget) =>
+    resolvePartTarget(t, data?.definitions ?? [], data?.instances ?? []);
 
   function handleUpload(selected: File[]) {
     if (selected.length === 0) return;
-    const blank = !uploadTarget.partNumber.trim() && !uploadTarget.revision.trim();
+    const blank = !uploadTarget.partNumber.trim();
     const target = blank ? null : resolve(uploadTarget);
     if (target && "error" in target) {
       setError(target.error);
@@ -136,6 +139,7 @@ export function PartFilesSection({
               onChange={setUploadTarget}
               freeCount={(d) => free.get(d.id) ?? 0}
               definitions={data?.definitions ?? []}
+              instances={data?.instances ?? []}
               optionalHint="Leave blank to upload without assigning"
             />
             <UploadButton busy={busy} onFiles={handleUpload} />
@@ -168,13 +172,10 @@ export function PartFilesSection({
             const partIds = [...new Set(file.assignments.map((a) => a.partDefinitionId))];
             return (
               <li key={file.id} className="px-4 py-3 space-y-2">
-                <div className="flex items-center gap-3">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-ink truncate" title={file.filename}>
-                      {file.filename}
-                    </p>
-                    <FileMeta file={file} uploader={resolveName(file.uploadedBy)} />
-                  </div>
+                <FileHeading
+                  name={file.filename}
+                  details={<FileMeta file={file} uploader={resolveName(file.uploadedBy)} />}
+                >
                   <InProductionBadge rows={usageOf(file)} />
                   <DownloadLink file={file} />
                   {!kiosk.active && (
@@ -191,7 +192,7 @@ export function PartFilesSection({
                       Delete
                     </button>
                   )}
-                </div>
+                </FileHeading>
 
                 {partIds.length === 0 && (
                   <p className="text-xs text-steel">Not assigned to any instances.</p>
@@ -220,6 +221,7 @@ export function PartFilesSection({
                   <AssignToPart
                     busy={busy}
                     definitions={data?.definitions ?? []}
+                    instances={data?.instances ?? []}
                     freeCount={(d) => free.get(d.id) ?? 0}
                     onError={setError}
                     onAssign={(d, count) => {
@@ -240,45 +242,56 @@ export function PartFilesSection({
   );
 }
 
-type PartTarget = { partNumber: string; revision: string; count: string };
-const EMPTY_TARGET: PartTarget = { partNumber: "", revision: "", count: "" };
+type PartTarget = { partNumber: string; count: string };
+const EMPTY_TARGET: PartTarget = { partNumber: "", count: "" };
 
-/** Matches typed part number + revision (case-insensitive) to a non-obsolete part. */
+/**
+ * The part a typed part number means (case-insensitive): always its most recent revision. A file
+ * is never assigned to an older one, so there is no revision to type.
+ */
 function resolvePartTarget(
   t: PartTarget,
   definitions: PartDefinition[],
+  instances: PartInstance[],
 ): { definition: PartDefinition } | { error: string } {
   const partNumber = t.partNumber.trim().toLowerCase();
-  const revision = t.revision.trim().toLowerCase();
-  if (!partNumber || !revision) return { error: "Enter both a part number and a revision." };
-  const matches = definitions.filter(
-    (d) =>
-      d.onshapePartNumber.trim().toLowerCase() === partNumber &&
-      (d.revision ?? "").trim().toLowerCase() === revision,
+  if (!partNumber) return { error: "Enter a part number." };
+  const revisions = definitions.filter(
+    (d) => d.onshapePartNumber.trim().toLowerCase() === partNumber,
   );
-  const label = `${t.partNumber.trim()} Rev ${t.revision.trim()}`;
-  if (matches.length === 0) return { error: `No part ${label} exists in the shop.` };
-  const active = matches.find((d) => !d.isObsolete);
-  if (!active) return { error: `${label} is obsolete.` };
+  if (revisions.length === 0) {
+    return { error: `No part ${t.partNumber.trim()} exists in the shop.` };
+  }
+  const latest = revisions.reduce((newest, d) =>
+    d.createdAt > newest.createdAt || (d.createdAt === newest.createdAt && d.id > newest.id)
+      ? d
+      : newest,
+  );
+  if (isObsoleteRevision(latest, instances)) {
+    return { error: `${partLabelOf(latest)} is obsolete.` };
+  }
   if (!(Number(t.count) > 0)) return { error: "Enter how many instances to assign." };
-  return { definition: active };
+  return { definition: latest };
 }
 
 function PartTargetFields({
   value,
   onChange,
   definitions,
+  instances,
   freeCount,
   optionalHint,
 }: {
   value: PartTarget;
   onChange: (v: PartTarget) => void;
   definitions: PartDefinition[];
+  instances: PartInstance[];
   freeCount: (d: PartDefinition) => number;
   optionalHint?: string;
 }) {
-  const filled = value.partNumber.trim() && value.revision.trim();
-  const match = filled ? resolvePartTarget({ ...value, count: "1" }, definitions) : null;
+  const match = value.partNumber.trim()
+    ? resolvePartTarget({ ...value, count: "1" }, definitions, instances)
+    : null;
   const inputClass =
     "bg-paper border border-steel/40 rounded-lg px-2.5 py-1.5 text-xs text-ink placeholder-steel focus:outline-none focus:border-crimson";
 
@@ -292,14 +305,6 @@ function PartTargetFields({
         aria-label="Part number"
         className={`${inputClass} w-36 font-mono`}
       />
-      <input
-        type="text"
-        value={value.revision}
-        onChange={(e) => onChange({ ...value, revision: e.target.value })}
-        placeholder="Rev"
-        aria-label="Revision"
-        className={`${inputClass} w-14 font-mono`}
-      />
       <CountInput value={value.count} onChange={(count) => onChange({ ...value, count })} />
       <span className="text-xs text-steel-dark">instances</span>
       <span className="text-xs text-steel w-full sm:w-auto">
@@ -307,7 +312,7 @@ function PartTargetFields({
           ? optionalHint
           : "error" in match
             ? match.error
-            : `${match.definition.name ? `${match.definition.name} · ` : ""}${freeCount(match.definition)} without a file`}
+            : `Rev ${match.definition.revision} · ${match.definition.name ? `${match.definition.name} · ` : ""}${freeCount(match.definition)} without a file`}
       </span>
     </div>
   );
@@ -316,12 +321,14 @@ function PartTargetFields({
 function AssignToPart({
   busy,
   definitions,
+  instances,
   freeCount,
   onAssign,
   onError,
 }: {
   busy: boolean;
   definitions: PartDefinition[];
+  instances: PartInstance[];
   freeCount: (d: PartDefinition) => number;
   onAssign: (d: PartDefinition, count: number) => void;
   onError: (message: string) => void;
@@ -347,13 +354,14 @@ function AssignToPart({
         value={target}
         onChange={setTarget}
         definitions={definitions}
+        instances={instances}
         freeCount={freeCount}
       />
       <button
         type="button"
         disabled={busy}
         onClick={() => {
-          const resolved = resolvePartTarget(target, definitions);
+          const resolved = resolvePartTarget(target, definitions, instances);
           if ("error" in resolved) {
             onError(resolved.error);
             return;

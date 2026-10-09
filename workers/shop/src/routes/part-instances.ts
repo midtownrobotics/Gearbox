@@ -164,7 +164,12 @@ export const partInstancesRouter = new Hono<AppEnv>()
     const id = Number(c.req.param("id"));
     const body = c.req.valid("json");
 
-    const updates: Partial<{ isPriority: number; isStale: number }> = {};
+    const updates: Partial<{
+      isPriority: number;
+      isStale: number;
+      obsoletedAt: number | null;
+      obsoletedBy: string | null;
+    }> = {};
     if (body.isPriority !== undefined) updates.isPriority = body.isPriority ? 1 : 0;
     if (body.isStale !== undefined) updates.isStale = body.isStale ? 1 : 0;
 
@@ -173,10 +178,28 @@ export const partInstancesRouter = new Hono<AppEnv>()
     }
 
     const db = createShopDb(c.env.SHOP_DB);
+    const teamId = c.get("teamId");
+    const before = await db
+      .select({ isStale: partInstances.isStale })
+      .from(partInstances)
+      .where(inTeam(partInstances, teamId, eq(partInstances.id, id)))
+      .get();
+    if (!before) return c.json({ error: "Part instance not found." }, 404);
+
+    // Making a part obsolete keeps when and who; bringing it back forgets them. One that's
+    // already obsolete keeps what it has.
+    if (body.isStale === true && !before.isStale) {
+      updates.obsoletedAt = Date.now();
+      updates.obsoletedBy = c.get("userId");
+    } else if (body.isStale === false) {
+      updates.obsoletedAt = null;
+      updates.obsoletedBy = null;
+    }
+
     const row = await db
       .update(partInstances)
       .set(updates)
-      .where(inTeam(partInstances, c.get("teamId"), eq(partInstances.id, id)))
+      .where(inTeam(partInstances, teamId, eq(partInstances.id, id)))
       .returning()
       .get();
 

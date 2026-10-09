@@ -230,7 +230,12 @@ export const partFilesRouter = new Hono<AppEnv>()
         .where(inTeam(files, teamId, eq(files.id, id)))
         .get(),
       db
-        .select({ id: partDefinitions.id })
+        .select({
+          id: partDefinitions.id,
+          isObsolete: partDefinitions.isObsolete,
+          partNumber: partDefinitions.onshapePartNumber,
+          revision: partDefinitions.revision,
+        })
         .from(partDefinitions)
         .where(inTeam(partDefinitions, teamId, eq(partDefinitions.id, partDefinitionId)))
         .get(),
@@ -241,6 +246,19 @@ export const partFilesRouter = new Hono<AppEnv>()
     const current = await assignmentsOn(db, teamId, id, partDefinitionId);
 
     if (count > current.length) {
+      // No file goes to an obsolete revision: one marked obsolete, or one whose every instance
+      // has been made obsolete. Taking a file off one is still allowed.
+      const instances = await db
+        .select({ isStale: partInstances.isStale })
+        .from(partInstances)
+        .where(inTeam(partInstances, teamId, eq(partInstances.partDefinitionId, partDefinitionId)))
+        .all();
+      const allObsolete = instances.length > 0 && instances.every((i) => i.isStale);
+      if (definition.isObsolete || allObsolete) {
+        const label = `${definition.partNumber}${definition.revision ? ` Rev ${definition.revision}` : ""}`;
+        return c.json({ error: `${label} is obsolete, so a file can't be assigned to it.` }, 409);
+      }
+
       const free = await db
         .select({ id: partInstances.id })
         .from(partInstances)

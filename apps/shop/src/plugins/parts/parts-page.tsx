@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   type InstanceRow,
   type InstanceState,
@@ -60,7 +60,19 @@ export function PartsPage() {
   const navigate = useNavigate();
   const user = useAuthUser();
   const [selectedInstanceId, setSelectedInstanceId] = useState<number | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
   const [lookupPartNumber, setLookupPartNumber] = useState("");
+
+  // A link to a part's details view (`?instance=`, from its shop view) opens its card. The
+  // address is then put back as it was, so closing the card doesn't leave it to open again.
+  useEffect(() => {
+    const instance = searchParams.get("instance");
+    if (!instance) return;
+    setSelectedInstanceId(Number(instance));
+    const rest = new URLSearchParams(searchParams);
+    rest.delete("instance");
+    setSearchParams(rest, { replace: true });
+  }, [searchParams, setSearchParams]);
   const [showRestrictedModal, setShowRestrictedModal] = useState(false);
 
   const handleAddPartClick = () => {
