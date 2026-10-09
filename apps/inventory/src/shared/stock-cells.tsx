@@ -9,9 +9,13 @@ import { AddStockDialog, CheckInDialog, CheckOutDialog, MoveDialog } from "./sto
 
 /**
  * A row's quantity, changed in place: type the number that's there and press Enter (or click
- * away). That's recorded as a count, with who counted.
+ * away). That's recorded as a count, with who counted. `compact`: a narrower box, for a phone.
  */
-export function QuantityCell({ stock, onSaved }: { stock: StockView; onSaved?: () => void }) {
+export function QuantityCell({
+  stock,
+  onSaved,
+  compact = false,
+}: { stock: StockView; onSaved?: () => void; compact?: boolean }) {
   const { reload } = useInventory();
   const [text, setText] = useState(String(stock.quantity));
   const [busy, setBusy] = useState(false);
@@ -55,7 +59,7 @@ export function QuantityCell({ stock, onSaved }: { stock: StockView; onSaved?: (
         step={1}
         aria-label="Quantity"
         title="Type what's there and press Enter to record a count"
-        className={`w-20 rounded-md border bg-surface px-2 py-1 text-sm tabular-nums text-secondary-900 focus:outline-none focus:border-primary-500 ${
+        className={`${compact ? "w-16" : "w-20"} rounded-md border bg-surface px-2 py-1 text-sm tabular-nums text-secondary-900 focus:outline-none focus:border-primary-500 ${
           error ? "border-primary-400" : "border-secondary-200 hover:border-secondary-400"
         }`}
         disabled={busy}
@@ -70,7 +74,11 @@ export function QuantityCell({ stock, onSaved }: { stock: StockView; onSaved?: (
           }
         }}
       />
-      {error && <span className="mt-0.5 max-w-40 text-xs text-primary-700">{error}</span>}
+      {error && (
+        <span className={`mt-0.5 text-xs text-primary-700 ${compact ? "max-w-16" : "max-w-40"}`}>
+          {error}
+        </span>
+      )}
     </span>
   );
 }

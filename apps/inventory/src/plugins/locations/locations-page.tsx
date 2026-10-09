@@ -1,5 +1,5 @@
 import type { LocationRow } from "@g3/worker-inventory";
-import { type FormEvent, useEffect, useMemo, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, getErrorMessage } from "../../shared/api";
 import { useAuthUser } from "../../shared/auth";
@@ -22,7 +22,7 @@ import {
 
 // The inventory the other way round: every location, as nested panels that open, with what's
 // kept in each. For rearranging: an entry, or everything in a location, moves somewhere else
-// whole. A location's title (what belongs there) is typed into its bar.
+// whole. A location's description (what belongs there) is added from its bar.
 
 /** A top-level location starts open if it has this many places inside it, or fewer. */
 const OPEN_UP_TO = 20;
@@ -65,20 +65,31 @@ function contentsOf(items: ReturnType<typeof useInventory>["items"], places: Pla
 }
 
 /**
- * A location's title, typed into its bar: a few words on what's kept there, shown beside its name
- * everywhere. Saved on Enter or on clicking away.
+ * The box a location's description is typed into: a few words on what's kept there, shown under
+ * its name here and beside it everywhere else ("A1 - Misc. Electronics"). It opens under the name,
+ * and saves on Enter or on clicking away; Escape or Cancel leaves the description as it was.
  */
-function TitleInput({ row }: { row: LocationRow }) {
+function DescriptionEditor({ row, onDone }: { row: LocationRow; onDone: () => void }) {
   const { reload } = useInventory();
   const [text, setText] = useState(row.title);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Escape and Cancel close the box, and a box that's closing must not save as it loses focus.
+  const left = useRef(false);
+  const input = useRef<HTMLInputElement>(null);
 
-  useEffect(() => setText(row.title), [row.title]);
+  // The box opens ready to type in.
+  useEffect(() => input.current?.focus(), []);
+
+  function cancel() {
+    left.current = true;
+    onDone();
+  }
 
   async function save() {
+    if (left.current) return;
     const title = text.trim();
-    if (title === row.title) return setText(title);
+    if (title === row.title) return onDone();
     setBusy(true);
     setError(null);
     try {
@@ -88,6 +99,7 @@ function TitleInput({ row }: { row: LocationRow }) {
       });
       if (!res.ok) return setError(await getErrorMessage(res));
       await reload();
+      onDone();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -96,28 +108,43 @@ function TitleInput({ row }: { row: LocationRow }) {
   }
 
   return (
-    <span className="inline-flex min-w-0 flex-1 basis-48 flex-col">
-      <input
-        className={`w-full max-w-xs rounded-md border bg-surface px-2 py-1 text-sm text-secondary-900 placeholder:text-secondary-400 focus:outline-none focus:border-primary-500 ${
-          error ? "border-primary-400" : "border-secondary-200 hover:border-secondary-400"
-        }`}
-        aria-label={`Title for ${row.name}`}
-        placeholder="Title: what's kept here"
-        maxLength={60}
-        disabled={busy}
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        onBlur={() => void save()}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") e.currentTarget.blur();
-          if (e.key === "Escape") {
-            setText(row.title);
-            setError(null);
-          }
-        }}
-      />
-      {error && <span className="mt-0.5 text-xs text-primary-700">{error}</span>}
-    </span>
+    <div className="mt-1.5 pl-5">
+      <div className="flex items-baseline gap-3">
+        <input
+          ref={input}
+          className={`min-w-0 max-w-md flex-1 rounded-md border bg-surface px-2 py-1 text-sm text-secondary-900 placeholder:text-secondary-400 focus:outline-none focus:border-primary-500 ${
+            error ? "border-red-400" : "border-secondary-300"
+          }`}
+          aria-label={`Description of ${row.name}`}
+          placeholder="What's kept here"
+          maxLength={60}
+          disabled={busy}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onFocus={() => {
+            left.current = false;
+          }}
+          onBlur={() => void save()}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") e.currentTarget.blur();
+            if (e.key === "Escape") cancel();
+          }}
+        />
+        <button
+          type="button"
+          className={textButton}
+          disabled={busy}
+          // Pressing Cancel takes the focus from the box first: that must not save.
+          onPointerDown={() => {
+            left.current = true;
+          }}
+          onClick={cancel}
+        >
+          Cancel
+        </button>
+      </div>
+      {error && <p className="mt-0.5 text-xs text-red-700">{error}</p>}
+    </div>
   );
 }
 
@@ -182,6 +209,9 @@ function MoveContentsDialog({
 
 const smallButton =
   "whitespace-nowrap rounded-lg border border-secondary-300 bg-surface px-2.5 py-1 text-xs font-semibold text-secondary-800 hover:bg-secondary-50";
+/** A plain text button, like the ones beside each location on Settings. */
+const textButton =
+  "-my-1 whitespace-nowrap py-1 text-xs text-secondary-500 hover:text-primary-600 disabled:opacity-50";
 
 function Panel({
   row,
@@ -211,33 +241,55 @@ function Panel({
   const own = contents.own.get(row.id) ?? [];
   const total = contents.totals.get(row.id) ?? { entries: 0, parts: 0 };
   const open = isOpen(row.id);
+  const [describing, setDescribing] = useState(false);
 
   return (
     <section
       className={`rounded-xl border border-secondary-200 ${depth === 1 ? "bg-surface" : "bg-secondary-50"}`}
     >
-      <header className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2">
-        <button
-          type="button"
-          onClick={() => toggle(row.id)}
-          aria-expanded={open}
-          className="flex items-center gap-2 text-left text-sm font-semibold text-secondary-900 hover:text-primary-600"
-        >
-          <span className="inline-block w-3 text-secondary-400" aria-hidden>
-            {open ? "▾" : "▸"}
+      <header className="px-3 py-2">
+        {/* The count is always at the right of the first line, whatever is beside the name. */}
+        <div className="flex items-baseline gap-x-3">
+          <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-3 gap-y-1">
+            <button
+              type="button"
+              onClick={() => toggle(row.id)}
+              aria-expanded={open}
+              className="flex min-w-0 items-baseline gap-2 text-left text-sm font-semibold text-secondary-900 hover:text-primary-600"
+            >
+              <span className="inline-block w-3 shrink-0 text-secondary-400" aria-hidden>
+                {open ? "▾" : "▸"}
+              </span>
+              <span className="min-w-0 break-words">{row.name}</span>
+            </button>
+            {!row.title && !describing && (
+              <button type="button" className={textButton} onClick={() => setDescribing(true)}>
+                Add description
+              </button>
+            )}
+          </div>
+          <span className="shrink-0 whitespace-nowrap text-xs text-secondary-500">
+            {total.entries === 0
+              ? "Empty"
+              : `${count(total.entries, "entry", "entries")} · ${count(total.parts, "part")}`}
           </span>
-          {row.name}
-        </button>
-        <TitleInput row={row} />
-        <span className="ml-auto whitespace-nowrap text-xs text-secondary-500">
-          {total.entries === 0
-            ? "Empty"
-            : `${count(total.entries, "entry", "entries")} · ${count(total.parts, "part")}`}
-        </span>
-        {own.length > 0 && (
-          <button type="button" className={smallButton} onClick={() => onMoveAll(row)}>
-            Move all…
-          </button>
+        </div>
+        {describing ? (
+          <DescriptionEditor row={row} onDone={() => setDescribing(false)} />
+        ) : (
+          row.title && (
+            <p className="break-words pl-5 text-sm text-secondary-600">
+              {row.title}{" "}
+              <button
+                type="button"
+                className={`${textButton} ml-1`}
+                aria-label={`Edit the description of ${row.name}`}
+                onClick={() => setDescribing(true)}
+              >
+                Edit
+              </button>
+            </p>
+          )
         )}
       </header>
       {open && (
@@ -270,6 +322,13 @@ function Panel({
                 </li>
               ))}
             </ul>
+          )}
+          {own.length > 0 && (
+            <div className="flex justify-end">
+              <button type="button" className={smallButton} onClick={() => onMoveAll(row)}>
+                Move all…
+              </button>
+            </div>
           )}
           {children.map((child) => (
             <Panel
@@ -305,7 +364,7 @@ export function LocationsPage() {
   const [action, setAction] = useState<StockAction | null>(null);
   const [movingAll, setMovingAll] = useState<LocationRow | null>(null);
 
-  // A search shows the locations it finds (by name, title, or an entry kept there), opened, with
+  // A search shows the locations it finds (by name, description, or an entry kept there), opened, with
   // what they're inside.
   const shown = useMemo(() => {
     const words = query.toLowerCase().split(/\s+/).filter(Boolean);
@@ -366,13 +425,13 @@ export function LocationsPage() {
       ) : (
         <>
           <p className="text-sm text-secondary-500">
-            What's kept where. Move an entry or everything in a location, and give each place a
-            title.
+            What's kept where. Move an entry or everything in a location, and describe what each
+            place is for.
           </p>
           <input
             type="search"
             className={`${inputClass} max-w-md`}
-            placeholder="Find a location, a title or a part…"
+            placeholder="Find a location, a description or a part…"
             aria-label="Search locations"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
