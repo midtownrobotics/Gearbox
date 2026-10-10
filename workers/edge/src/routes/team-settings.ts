@@ -35,7 +35,10 @@ export const teamSettingsRouter = teamSettingsRoutes<AppEnv>(manifest, "Edge set
       secretsSet: { boxKey: box !== undefined },
       integrations: {
         "edge box": box
-          ? { connected: online, detail: online ? "Online" : "Offline" }
+          ? {
+              connected: online,
+              detail: online ? undefined : "The box has a key but isn't online.",
+            }
           : { connected: false },
       },
     };

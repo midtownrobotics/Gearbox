@@ -50,18 +50,25 @@ const INTEGRATIONS: Integration[] = [
   },
 ];
 
+/** Connected or not, on one line beside the name; anything more goes under the summary. */
 function StatusBadge({ status }: { status: Status }) {
-  if (status === "loading") return <span className="text-xs text-secondary-500">Checking…</span>;
-  if (status === "unknown") return <span className="text-xs text-secondary-500">Unknown</span>;
+  const fixed = "shrink-0 whitespace-nowrap text-xs";
+  if (status === "loading") return <span className={`${fixed} text-secondary-500`}>Checking…</span>;
+  if (status === "unknown") return <span className={`${fixed} text-secondary-500`}>Unknown</span>;
   return (
     <span
-      className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+      className={`${fixed} rounded-full px-2 py-0.5 font-semibold ${
         status.connected ? "bg-green-100 text-green-800" : "bg-secondary-100 text-secondary-700"
       }`}
     >
-      {status.connected ? (status.detail ?? "Connected") : (status.detail ?? "Not connected")}
+      {status.connected ? "Connected" : "Not connected"}
     </span>
   );
+}
+
+function StatusDetail({ status }: { status: Status | undefined }) {
+  if (!status || typeof status === "string" || !status.detail) return null;
+  return <p className="mt-1 text-xs text-secondary-500">{status.detail}</p>;
 }
 
 export function IntegrationsPage() {
@@ -76,7 +83,10 @@ export function IntegrationsPage() {
       .then(async (res) => {
         if (!res.ok) throw new Error();
         const data = (await res.json()) as { connected: boolean; workspaceName: string | null };
-        setSlack({ connected: data.connected, detail: data.workspaceName ?? undefined });
+        setSlack({
+          connected: data.connected,
+          detail: data.workspaceName ? `Workspace: ${data.workspaceName}` : undefined,
+        });
       })
       .catch(() => setSlack("unknown"));
 
@@ -116,11 +126,12 @@ export function IntegrationsPage() {
       <ul className="space-y-3">
         <li className="rounded-lg border border-line bg-surface p-4">
           <div className="flex items-start justify-between gap-4">
-            <div>
+            <div className="min-w-0 flex-1">
               <h2 className="font-semibold text-secondary-900">Slack</h2>
               <p className="text-sm text-secondary-600">
                 Members sign in through it, and the apps message them there.
               </p>
+              <StatusDetail status={slack} />
             </div>
             <StatusBadge status={slack} />
           </div>
@@ -137,9 +148,10 @@ export function IntegrationsPage() {
           return (
             <li key={i.key} className="rounded-lg border border-line bg-surface p-4">
               <div className="flex items-start justify-between gap-4">
-                <div>
+                <div className="min-w-0 flex-1">
                   <h2 className="font-semibold text-secondary-900">{i.name}</h2>
                   <p className="text-sm text-secondary-600">{i.summary}</p>
+                  {ownerOn && <StatusDetail status={statuses[i.key]} />}
                   <p className="mt-1 text-xs text-secondary-500">
                     Used by {usedBy(i.key).join(", ")}
                   </p>

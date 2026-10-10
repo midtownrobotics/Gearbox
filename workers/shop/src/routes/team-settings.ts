@@ -34,7 +34,9 @@ export const teamSettingsRouter = teamSettingsRoutes<AppEnv>(manifest, "Shop set
         onshape: {
           connected,
           detail:
-            connected && onshape?.fromWorkerSecrets ? "From the server's settings" : undefined,
+            connected && onshape?.fromWorkerSecrets
+              ? "Uses keys set up on the server. Save your own in Shop to replace them."
+              : undefined,
         },
       },
     };
