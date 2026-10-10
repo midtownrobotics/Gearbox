@@ -15,7 +15,17 @@ const routerLink = linkWith(Link);
 export function NavBar({ items }: { items: PluginNavItem[] }) {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  /** The team's sign-in methods: pages for one it switched off are hidden. */
+  const [methods, setMethods] = useState<Partial<Record<string, boolean>>>({});
   const location = useLocation();
+
+  useEffect(() => {
+    api.team["sign-in"]
+      .$get()
+      .then((res) => (res.ok ? res.json() : {}))
+      .then(setMethods)
+      .catch(() => {});
+  }, []);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: location is used to trigger re-fetch on navigation
   useEffect(() => {
@@ -33,6 +43,7 @@ export function NavBar({ items }: { items: PluginNavItem[] }) {
 
   const shown = items.filter((item) => {
     if (isLoggedIn === null) return false; // Loading
+    if (item.signInMethod && methods[item.signInMethod] === false) return false;
     const audience = item.audience ?? "signed-in";
     if (audience === "signed-out") return !isLoggedIn;
     if (audience === "admin") return isLoggedIn && isAdmin;

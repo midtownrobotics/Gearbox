@@ -13,6 +13,7 @@ import {
   slackInstallations,
   teamUiSettings,
 } from "../db/schema";
+import { methodOff } from "../lib/sign-in-methods";
 import { removeInstallation, slackForTeam } from "../lib/slack-install";
 import { teamOfUser, teamUrl } from "../lib/team";
 import { appearanceChanges, logToTeam } from "../lib/team-log";
@@ -377,6 +378,8 @@ export const adminRouter = new Hono<AppEnv>()
   })
   .post("/kiosk/codes", async (c) => {
     const userId = c.get("userId") as string;
+    const off = await methodOff(c.env, c.get("adminTeamId") as string, "pin");
+    if (off) return c.json({ error: off }, 403);
     let body: { deviceName?: unknown };
     try {
       body = await c.req.json();

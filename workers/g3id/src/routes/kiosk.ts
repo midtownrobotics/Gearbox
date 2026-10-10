@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { createDb } from "../db";
 import { kioskActivationCodes, kioskDevices } from "../db/schema";
+import { methodOff } from "../lib/sign-in-methods";
 import { requireKioskToken } from "../middleware/auth";
 import type { AppEnv } from "../types";
 
@@ -53,6 +54,9 @@ export const kioskRouter = new Hono<AppEnv>()
     if (activation.expiresAt < now) {
       return c.json({ error: "Activation code expired." }, 400);
     }
+
+    const off = await methodOff(c.env, activation.teamId, "pin");
+    if (off) return c.json({ error: off }, 403);
 
     const token = generateToken();
 

@@ -75,6 +75,32 @@ describe("sign-in methods", () => {
     expect(res.status).toBe(403);
   });
 
+  it("with kiosk PINs off, no kiosk can be added, even with a code made before", async () => {
+    const team = await createTeam();
+    const adminId = await createUser({ teamId: team, isAdmin: true });
+    await link(adminId, "slack");
+    const admin = await sessionCookie(adminId);
+    const made = await g3id("/admin/kiosk/codes", {
+      method: "POST",
+      cookie: admin,
+      body: { deviceName: "Lathe" },
+    });
+    const { code } = (await made.json()) as { code: string };
+    await g3id("/admin/team/sign-in", {
+      method: "PUT",
+      cookie: admin,
+      body: { ...all, pin: false },
+    });
+
+    const another = await g3id("/admin/kiosk/codes", {
+      method: "POST",
+      cookie: admin,
+      body: { deviceName: "Mill" },
+    });
+    expect(another.status).toBe(403);
+    expect((await g3id("/kiosk/activate", { method: "POST", body: { code } })).status).toBe(403);
+  });
+
   it("counts who could only sign in with each, and won't lock out the admin changing them", async () => {
     const team = await createTeam();
     const adminId = await createUser({ teamId: team, isAdmin: true });
