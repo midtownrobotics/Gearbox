@@ -60,6 +60,8 @@ export type AppSetting = {
    * Integrations page, not in the app's settings form.
    */
   integration?: AppIntegration;
+  /** Another app it's about: the dashboard leaves it out while the team has that app off. */
+  requiresApp?: AppName;
 };
 
 /** An optional part of an app a team switches on inside it (Scouting's engagement modules). */

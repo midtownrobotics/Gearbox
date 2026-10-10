@@ -1,6 +1,6 @@
 import { idName } from "@g3/site-config";
 import { versionLabel } from "@g3/site-config/versions";
-import { AppNavBar, activePath, linkWith } from "@g3/ui";
+import { AppNavBar, activePath, linkWith, useTeamApps } from "@g3/ui";
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { api } from "../lib/api";
@@ -41,8 +41,13 @@ export function NavBar({ items }: { items: PluginNavItem[] }) {
     });
   }, [location]);
 
+  // Pages for another app's data (the Leaderboard is Attendance's) go while the team has it off.
+  const teamApps = useTeamApps(isLoggedIn === true);
   const shown = items.filter((item) => {
     if (isLoggedIn === null) return false; // Loading
+    if (item.requiresApp && teamApps instanceof Set && !teamApps.has(item.requiresApp)) {
+      return false;
+    }
     if (item.signInMethod && methods[item.signInMethod] === false) return false;
     const audience = item.audience ?? "signed-in";
     if (audience === "signed-out") return !isLoggedIn;

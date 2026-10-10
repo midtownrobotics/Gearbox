@@ -27,6 +27,7 @@ export type AppSetting = {
   editedBy: "admin" | "mentor";
   page: string;
   integration?: string;
+  requiresApp?: string;
 };
 
 export type SettingValue = string | number | boolean | null;

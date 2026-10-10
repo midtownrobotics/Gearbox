@@ -232,6 +232,17 @@ export const internalRouter = new Hono<AppEnv>()
     }
     return c.json({ ok: true, sent, admins: ids.length });
   })
+  // Which apps the team has on (the platform's app library), for an app whose feature needs
+  // another (`teamHasApp` in @g3/auth). 503 when the platform can't say.
+  .get("/teams/:id/apps", async (c) => {
+    if (!c.env.PLATFORM) return c.json({ error: "No platform here." }, 503);
+    const res = await c.env.PLATFORM.fetch(
+      new Request(`http://platform/api/teams/${encodeURIComponent(c.req.param("id"))}`),
+    ).catch(() => null);
+    if (!res?.ok) return c.json({ error: "The platform didn't answer." }, 503);
+    const team = (await res.json()) as { apps?: string[] };
+    return c.json({ apps: team.apps ?? [] });
+  })
   // A change for the team's log, from another app (`logTeamChange` in @g3/auth): passed on to the
   // platform, which keeps the log.
   .post("/teams/:id/audit", async (c) => {

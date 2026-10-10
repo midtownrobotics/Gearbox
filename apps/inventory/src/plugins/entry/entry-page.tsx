@@ -4,6 +4,7 @@ import { type FormEvent, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, getErrorMessage } from "../../shared/api";
 import { useAuthUser } from "../../shared/auth";
+import { useOrdersOn } from "../../shared/catalog";
 import { type Draft, FieldInputs, ValueView, draftOf, valuesOf } from "../../shared/field-inputs";
 import { count, formatDate, formatDateTime } from "../../shared/format";
 import { useInventory } from "../../shared/inventory-data";
@@ -56,8 +57,10 @@ type Event = {
 /** Where a history line points: the Orders request parts came from, or another entry. */
 function RefLink({ refText }: { refText: string | null }) {
   const { items } = useInventory();
+  const ordersOn = useOrdersOn();
   const request = refText?.match(/^orders:request:(\d+)$/);
   if (request) {
+    if (!ordersOn) return null;
     return (
       <a
         href={`${appUrl("orders")}/requests/${request[1]}`}

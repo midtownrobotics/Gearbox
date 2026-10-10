@@ -29,6 +29,7 @@ export {
   activeMembers,
   sendTeamDM,
   sendTeamMessage,
+  teamHasApp,
   teamMembers,
 } from "./members";
 export {

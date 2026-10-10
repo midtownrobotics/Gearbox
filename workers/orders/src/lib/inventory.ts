@@ -1,4 +1,4 @@
-import { forwardIdentity, inTeam } from "@g3/auth";
+import { forwardIdentity, inTeam, teamHasApp } from "@g3/auth";
 import type {
   IntakeRequest,
   IntakeResult,
@@ -23,9 +23,17 @@ import { teamSettings } from "./settings";
 // said about where a part goes, receiving works as it always has and nothing reaches Inventory;
 // unless a mentor has turned on the setting that makes the destination required.
 
-/** Whether receiving a part must say where it goes in Inventory. Off unless a mentor turns it on. */
-export async function inventoryRequired(db: OrdersDb, teamId: string): Promise<boolean> {
-  return (await teamSettings(db, teamId)).inventoryRequired;
+/**
+ * Whether receiving a part must say where it goes in Inventory. Off unless a mentor turns it on,
+ * and never while the team has Inventory switched off.
+ */
+export async function inventoryRequired(
+  env: AppEnv["Bindings"],
+  db: OrdersDb,
+  teamId: string,
+): Promise<boolean> {
+  if (!(await teamSettings(db, teamId)).inventoryRequired) return false;
+  return (await teamHasApp(env, teamId, "inventory")) !== false;
 }
 
 /**
@@ -265,7 +273,7 @@ export async function sendToInventory(
 > {
   const locations = new Map<number, number>();
   if (!destination) {
-    if (await inventoryRequired(db, c.get("teamId"))) {
+    if (await inventoryRequired(c.env, db, c.get("teamId"))) {
       return { error: "Say where these parts go in Inventory.", status: 400 };
     }
     return { added: null, locations };

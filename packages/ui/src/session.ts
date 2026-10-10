@@ -71,6 +71,17 @@ export function useSignedInUser(signedIn?: boolean | null): SignedInUser | null 
 
 let teamApps: Promise<ReadonlySet<string> | "all"> | null = null;
 
+function loadTeamApps(): Promise<ReadonlySet<string> | "all"> {
+  teamApps ??= fetch(`${apiPath("platform")}/team/apps`, { credentials: "include" })
+    .then(async (res) => {
+      if (!res.ok) throw new Error();
+      const data = (await res.json()) as { apps: { slug: string }[] };
+      return new Set(data.apps.map((app) => app.slug));
+    })
+    .catch(() => "all" as const);
+  return teamApps;
+}
+
 /**
  * The apps the signed-in user's team has on (the platform's app library), by slug: null while
  * asked or when signed out, "all" if the platform didn't answer (the gateway still keeps the
@@ -81,17 +92,32 @@ export function useTeamApps(signedIn: boolean): ReadonlySet<string> | "all" | nu
   useEffect(() => {
     if (!signedIn) return setApps(null);
     let live = true;
-    teamApps ??= fetch(`${apiPath("platform")}/team/apps`, { credentials: "include" })
-      .then(async (res) => {
-        if (!res.ok) throw new Error();
-        const data = (await res.json()) as { apps: { slug: string }[] };
-        return new Set(data.apps.map((app) => app.slug));
-      })
-      .catch(() => "all" as const);
-    teamApps.then((loaded) => live && setApps(loaded));
+    loadTeamApps().then((loaded) => live && setApps(loaded));
     return () => {
       live = false;
     };
   }, [signedIn]);
   return apps;
+}
+
+// A feature that needs another app (Orders' part lookup needs Edge, Inventory's Request buttons
+// need Orders) is left out of a page when the team has that app off. When it can't be told (the
+// platform didn't answer), the app counts as on: the feature is offered and its own errors say
+// what's wrong.
+
+/** Whether the team has an app on, for code outside a component (a lookup before it runs). */
+export async function appOn(app: string): Promise<boolean> {
+  const apps = await loadTeamApps();
+  return apps === "all" || apps.has(app);
+}
+
+/**
+ * Whether the team has an app on: undefined until it's known (signed out: never known). Show a
+ * feature that needs it while this isn't `false`, so a team that has it never sees it flicker.
+ */
+export function useAppOn(app: string): boolean | undefined {
+  const user = useSignedInUser();
+  const apps = useTeamApps(Boolean(user));
+  if (apps === null) return undefined;
+  return apps === "all" || apps.has(app);
 }

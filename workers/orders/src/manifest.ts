@@ -46,6 +46,7 @@ export const manifest = defineManifest({
       default: false,
       editedBy: "mentor",
       page: "/settings",
+      requiresApp: "inventory",
     },
   ],
   settingsForm: true,

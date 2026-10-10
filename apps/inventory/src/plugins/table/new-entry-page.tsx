@@ -1,7 +1,7 @@
 import { type FormEvent, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api, getErrorMessage } from "../../shared/api";
-import { type CatalogPart, partPriceCents } from "../../shared/catalog";
+import { type CatalogPart, partPriceCents, useOrdersOn } from "../../shared/catalog";
 import { CatalogPick, partLine } from "../../shared/catalog-pick";
 import { type Draft, FieldInputs, draftOf, valuesOf } from "../../shared/field-inputs";
 import { useInventory } from "../../shared/inventory-data";
@@ -30,6 +30,7 @@ export function NewEntryPage() {
   const { fields, places, items, reload } = useInventory();
   const navigate = useNavigate();
   const taken = useTakenParts();
+  const ordersOn = useOrdersOn();
   const [name, setName] = useState("");
   const [draft, setDraft] = useState<Draft>(() => draftOf(fields, {}));
   const [quantity, setQuantity] = useState("");
@@ -125,33 +126,35 @@ export function NewEntryPage() {
           </div>
         </Card>
 
-        <Card title="Part in the Orders catalog">
-          {part ? (
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="text-sm text-secondary-900">{part.name}</p>
-                <p className="text-xs text-secondary-500">{partLine(part)}</p>
+        {ordersOn && (
+          <Card title="Part in the Orders catalog">
+            {part ? (
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm text-secondary-900">{part.name}</p>
+                  <p className="text-xs text-secondary-500">{partLine(part)}</p>
+                </div>
+                <Button variant="secondary" onClick={() => setPart(null)}>
+                  Remove
+                </Button>
               </div>
-              <Button variant="secondary" onClick={() => setPart(null)}>
-                Remove
-              </Button>
-            </div>
-          ) : (
-            <>
-              <p className="mb-2 text-sm text-secondary-500">
-                Optional. Shows the part's product page and price here, and adds received orders of
-                it to this entry.
-              </p>
-              <CatalogPick
-                taken={taken}
-                onPick={(picked) => {
-                  setPart(picked);
-                  if (!name.trim()) setName(picked.name);
-                }}
-              />
-            </>
-          )}
-        </Card>
+            ) : (
+              <>
+                <p className="mb-2 text-sm text-secondary-500">
+                  Optional. Shows the part's product page and price here, and adds received orders
+                  of it to this entry.
+                </p>
+                <CatalogPick
+                  taken={taken}
+                  onPick={(picked) => {
+                    setPart(picked);
+                    if (!name.trim()) setName(picked.name);
+                  }}
+                />
+              </>
+            )}
+          </Card>
+        )}
 
         {error && <ErrorBanner message={error} />}
         <div className="flex gap-2">

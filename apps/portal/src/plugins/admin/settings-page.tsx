@@ -308,7 +308,15 @@ export function SettingsPage() {
 
   useEffect(() => {
     platform<LibraryApp[]>("/team/library")
-      .then((all) => setApps(all.filter((a) => a.enabled && formSettings(a).length > 0)))
+      .then((all) => {
+        // A setting about another app (Orders' Inventory place) only while that app is on.
+        const on = new Set(all.filter((a) => a.enabled).map((a) => a.slug));
+        const shown = all.map((a) => ({
+          ...a,
+          settings: a.settings.filter((s) => !s.requiresApp || on.has(s.requiresApp)),
+        }));
+        setApps(shown.filter((a) => a.enabled && formSettings(a).length > 0));
+      })
       .catch((reason: Error) => setError(reason.message));
   }, []);
 

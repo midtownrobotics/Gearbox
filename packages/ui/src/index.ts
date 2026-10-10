@@ -14,4 +14,4 @@ export {
 export { forceTheme, readTheme, setTheme, type Theme, useTheme } from "./theme";
 export { refreshTeamUiSettings, useTeamIcon, useTeamNames, useTeamUiSettings } from "./team-ui";
 export { forgetTeam, rememberedTeam, rememberTeam } from "./my-team";
-export { type SignedInUser, useSignedInUser, useTeamApps } from "./session";
+export { type SignedInUser, appOn, useAppOn, useSignedInUser, useTeamApps } from "./session";

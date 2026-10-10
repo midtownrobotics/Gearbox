@@ -1,4 +1,4 @@
-import { useTeamNames } from "@g3/ui";
+import { useAppOn, useTeamNames } from "@g3/ui";
 import { DEFAULT_TEMPLATE, applyTemplate } from "@g3/worker-orders/naming";
 import { type FormEvent, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -25,12 +25,14 @@ const EXAMPLE = {
 
 /** Mentors: the team's money and calendar, who edits the catalog, and how requests are named. */
 export function SettingsPage() {
+  // Receiving into Inventory is only a setting while the team has Inventory on.
+  const inventoryOn = useAppOn("inventory");
   return (
     <Page title="Settings">
       <MoneyAndCalendar />
       <TrustedStudents />
       <ShareACart />
-      <InventoryOnReceive />
+      {inventoryOn !== false && <InventoryOnReceive />}
       <NamingTemplate />
       <CategoryRules />
     </Page>

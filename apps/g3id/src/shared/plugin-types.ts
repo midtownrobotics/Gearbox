@@ -15,6 +15,8 @@ export interface PluginNavItem {
   group?: string;
   /** Shown only while the team allows this sign-in method (the Kiosk Devices page: kiosk PINs). */
   signInMethod?: "pin";
+  /** Shown only while the team has this app on (the Leaderboard: Attendance). */
+  requiresApp?: string;
 }
 
 export interface Plugin {

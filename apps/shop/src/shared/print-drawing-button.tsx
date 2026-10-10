@@ -1,3 +1,4 @@
+import { useAppOn } from "@g3/ui";
 import { useEffect, useState } from "react";
 import { api } from "./api";
 
@@ -12,7 +13,8 @@ type Status =
 /**
  * Prints a part revision's drawing on the shop printer (one-sided, black and
  * white). The shop worker sends the PDF from storage straight to the edge
- * box, so nothing is downloaded to this device.
+ * box, so nothing is downloaded to this device. Not shown while the team has
+ * Edge switched off.
  */
 export function PrintDrawingButton({
   partNumber,
@@ -33,6 +35,9 @@ export function PrintDrawingButton({
     const t = setTimeout(() => setStatus({ kind: "idle" }), status.kind === "sent" ? 4000 : 15000);
     return () => clearTimeout(t);
   }, [status]);
+
+  const edgeOn = useAppOn("edge");
+  if (edgeOn === false) return null;
 
   async function print() {
     setStatus({ kind: "sending" });
