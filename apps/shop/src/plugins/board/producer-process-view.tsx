@@ -4,6 +4,7 @@ import {
   completeStagingBatch,
   createStagingBatch,
   deleteStagingBatch,
+  fetchOnshapeLinks,
   fetchPartFiles,
   fetchStagingBatches,
   setStagingBatchFile,
@@ -11,7 +12,7 @@ import {
   unstageFromBatch,
   uploadPartFile,
 } from "../../shared/getters";
-import type { PartDefinition, PartFile, StagingBatch } from "../../shared/types";
+import type { OnshapePartLink, PartDefinition, PartFile, StagingBatch } from "../../shared/types";
 import { useAuthUser, useKiosk } from "../../shared/use-auth";
 import { useUserNames } from "../../shared/use-user-names";
 import { FilePickerModal } from "../files/file-picker-modal";
@@ -19,8 +20,12 @@ import { DownloadLink, ErrorText, UploadButton } from "../files/part-files-panel
 
 const MAX_FILE_BYTES = 100 * 1024 * 1024;
 
-/** True on processes that require part info, so part headers show material and thickness. */
-const ShowPartInfo = createContext(false);
+/**
+ * What a part header shows besides its name: material and thickness on a process that requires
+ * part info, and the team's Onshape links by part number, newest release first.
+ */
+type PartHeaderContext = { showInfo: boolean; links: Map<string, OnshapePartLink[]> };
+const PartHeader = createContext<PartHeaderContext>({ showInfo: false, links: new Map() });
 const NEW_BATCH = "new";
 
 type PartGroup = { key: number; rows: InstanceRow[] };
@@ -45,6 +50,19 @@ function groupByPart(rows: InstanceRow[]): PartGroup[] {
     .sort((a, b) =>
       (a.rows[0].definition.name ?? "").localeCompare(b.rows[0].definition.name ?? ""),
     );
+}
+
+/**
+ * Where a part is in Onshape: the release that gave it the revision being made, else its newest
+ * one, since a part's number is what Onshape releases and a hand-typed revision may match none.
+ */
+function onshapeLinkFor(
+  links: Map<string, OnshapePartLink[]>,
+  definition: PartDefinition,
+): OnshapePartLink | null {
+  const released = links.get(definition.onshapePartNumber);
+  if (!released) return null;
+  return released.find((l) => l.revision === definition.revision) ?? released[0] ?? null;
 }
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
@@ -81,6 +99,7 @@ export function ProducerSections({
   const user = useAuthUser();
   const [files, setFiles] = useState<PartFile[]>([]);
   const [batches, setBatches] = useState<StagingBatch[]>([]);
+  const [onshapeLinks, setOnshapeLinks] = useState<OnshapePartLink[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [target, setTarget] = useState<string>("");
   const [pickerBatchId, setPickerBatchId] = useState<number | null>(null);
@@ -90,12 +109,15 @@ export function ProducerSections({
 
   const load = useCallback(async () => {
     try {
-      const [nextFiles, nextBatches] = await Promise.all([
+      // Onshape only decides whether part names are links, so losing it doesn't fail the view.
+      const [nextFiles, nextBatches, nextLinks] = await Promise.all([
         fetchPartFiles(),
         fetchStagingBatches(processId),
+        fetchOnshapeLinks().catch(() => []),
       ]);
       setFiles(nextFiles);
       setBatches(nextBatches);
+      setOnshapeLinks(nextLinks);
       setLoaded(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load staging batches.");
@@ -116,6 +138,16 @@ export function ProducerSections({
     const pick = mine[mine.length - 1] ?? batches[batches.length - 1];
     setTarget(pick ? String(pick.id) : NEW_BATCH);
   }, [batches, busy, loaded, target, user?.userId]);
+
+  const header = useMemo<PartHeaderContext>(() => {
+    const links = new Map<string, OnshapePartLink[]>();
+    for (const link of onshapeLinks) {
+      const list = links.get(link.partNumber);
+      if (list) list.push(link);
+      else links.set(link.partNumber, [link]);
+    }
+    return { showInfo: showPartInfo, links };
+  }, [onshapeLinks, showPartInfo]);
 
   const fileById = useMemo(() => new Map(files.map((f) => [f.id, f])), [files]);
   const rowById = useMemo(() => new Map(rows.map((r) => [r.instance.id, r])), [rows]);
@@ -175,7 +207,7 @@ export function ProducerSections({
     `Batch ${b.id} · ${b.createdBy === "migration" ? "carried over" : resolveName(b.createdBy)}`;
 
   return (
-    <ShowPartInfo.Provider value={showPartInfo}>
+    <PartHeader.Provider value={header}>
       {pickerBatch && (
         <FilePickerModal
           files={files.filter((f) => f.id !== pickerBatch.fileId)}
@@ -413,7 +445,7 @@ export function ProducerSections({
           </div>
         )}
       </section>
-    </ShowPartInfo.Provider>
+    </PartHeader.Provider>
   );
 }
 
@@ -493,23 +525,50 @@ function PartGroup({
   actions: React.ReactNode;
   renderRow: (row: InstanceRow) => React.ReactNode;
 }) {
-  const showInfo = useContext(ShowPartInfo);
+  const { showInfo, links } = useContext(PartHeader);
   const first = rows[0];
+  const onshape = onshapeLinkFor(links, first.definition);
+  const name = (
+    <>
+      {first.definition.name}
+      {showInfo && partInfoLabel(first.definition) && (
+        <span className="font-normal text-steel-dark"> — {partInfoLabel(first.definition)}</span>
+      )}
+    </>
+  );
   return (
     <div className={`px-4 ${touch ? "py-3" : "py-2.5"}`}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-ink truncate">
-            {first.definition.name}
-            {showInfo && partInfoLabel(first.definition) && (
-              <span className="font-normal text-steel-dark">
-                {" "}
-                — {partInfoLabel(first.definition)}
-              </span>
-            )}
-          </p>
+          {onshape?.part ? (
+            <a
+              href={onshape.part}
+              target="_blank"
+              rel="noreferrer"
+              title="Open this part in Onshape"
+              className="block max-w-full truncate text-sm font-semibold text-crimson underline hover:text-crimson-dark transition-colors"
+            >
+              {name}
+            </a>
+          ) : (
+            <p className="text-sm font-semibold text-ink truncate">{name}</p>
+          )}
           <p className="text-xs font-mono text-steel truncate">
             {partLabel(first)} · {plural(rows.length, "instance")}
+            {onshape && (
+              <>
+                {" · "}
+                <a
+                  href={onshape.release}
+                  target="_blank"
+                  rel="noreferrer"
+                  title="Open the release this part came from in Onshape"
+                  className="text-steel-dark underline hover:text-crimson transition-colors"
+                >
+                  Release
+                </a>
+              </>
+            )}
           </p>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">{actions}</div>
