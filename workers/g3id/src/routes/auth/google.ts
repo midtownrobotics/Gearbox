@@ -9,6 +9,7 @@ import { newId } from "../../lib/id";
 import { decodeState, encodeState } from "../../lib/oauth-state";
 import { sanitizeRedirect } from "../../lib/redirect";
 import { createSession } from "../../lib/session";
+import { methodOff } from "../../lib/sign-in-methods";
 import { providerRedirectUri, requestTeamId, teamFrontend, teamOfUser } from "../../lib/team";
 import type { AppEnv } from "../../types";
 
@@ -42,6 +43,12 @@ export const googleAuthRouter = new Hono<AppEnv>()
   // Sign-in initiation
   .get("/google", async (c) => {
     const team = requestTeamId(c);
+    const off = await methodOff(c.env, team, "google");
+    if (off) {
+      return c.redirect(
+        `${teamFrontend(c.env, team)}/login/error?error=${encodeURIComponent(off)}`,
+      );
+    }
     const redirect = sanitizeRedirect(c.req.query("redirect"), team);
     const state = await generateState(c.env, encodeState({ team, redirect, linkUserId: null }));
     return c.redirect(buildGoogleUrl(c.env, state, providerRedirectUri(c.env, "google", team)));
@@ -53,6 +60,12 @@ export const googleAuthRouter = new Hono<AppEnv>()
     if (!userId) return c.redirect(app("/login"));
 
     const team = await teamOfUser(createDb(c.env.DB), userId);
+    const off = await methodOff(c.env, team, "google");
+    if (off) {
+      return c.redirect(
+        `${teamFrontend(c.env, team)}/login/error?error=${encodeURIComponent(off)}`,
+      );
+    }
     const state = await generateState(
       c.env,
       encodeState({ team, redirect: null, linkUserId: userId }),
@@ -79,6 +92,8 @@ export const googleAuthRouter = new Hono<AppEnv>()
 
     const st = decodeState(stateValue);
     frontend = teamFrontend(c.env, st.team);
+    const off = await methodOff(c.env, st.team, "google");
+    if (off) return err(off);
     const linkUserId = st.linkUserId;
     const isLink = linkUserId !== null;
     const redirectTo = st.redirect?.startsWith("/") ? app(st.redirect) : st.redirect;

@@ -13,6 +13,7 @@ import {
   slackInstallations,
   teamUiSettings,
 } from "../db/schema";
+import { methodOff } from "../lib/sign-in-methods";
 import { removeInstallation, slackForTeam } from "../lib/slack-install";
 import { teamOfUser, teamUrl } from "../lib/team";
 import { appearanceChanges, logToTeam } from "../lib/team-log";
@@ -82,6 +83,7 @@ export const adminRouter = new Hono<AppEnv>()
         .select({
           userId: coreUserIdentities.userId,
           provider: coreUserIdentities.provider,
+          providerEmail: coreUserIdentities.providerEmail,
           createdAt: coreUserIdentities.createdAt,
         })
         .from(coreUserIdentities)
@@ -90,11 +92,16 @@ export const adminRouter = new Hono<AppEnv>()
         .all(),
     ]);
 
-    const identitiesByUser = new Map<string, { provider: string; createdAt: number }[]>();
-    for (const identity of identities) {
-      const list = identitiesByUser.get(identity.userId) ?? [];
-      list.push({ provider: identity.provider, createdAt: identity.createdAt });
-      identitiesByUser.set(identity.userId, list);
+    // Each sign-in with the account's name there (an email or username), so the list can be
+    // searched by it.
+    const identitiesByUser = new Map<
+      string,
+      { provider: string; providerEmail: string | null; createdAt: number }[]
+    >();
+    for (const { userId, ...identity } of identities) {
+      const list = identitiesByUser.get(userId) ?? [];
+      list.push(identity);
+      identitiesByUser.set(userId, list);
     }
 
     return c.json(
@@ -103,6 +110,44 @@ export const adminRouter = new Hono<AppEnv>()
         identities: identitiesByUser.get(user.id) ?? [],
       })),
     );
+  })
+  // One member in full, for their page in the Users list: their sign-ins (the account's name at
+  // each service and when it was linked) and whether they have a kiosk PIN (never the PIN).
+  .get("/users/:id", async (c) => {
+    const db = createDb(c.env.DB);
+    const user = await db
+      .select({
+        id: coreUsers.id,
+        email: coreUsers.email,
+        displayName: coreUsers.displayName,
+        status: coreUsers.status,
+        isAdmin: coreUsers.isAdmin,
+        isMentor: coreUsers.isMentor,
+        createdAt: coreUsers.createdAt,
+        lastLoginAt: coreUsers.lastLoginAt,
+      })
+      .from(coreUsers)
+      .where(memberOf(c.get("adminTeamId") as string, c.req.param("id")))
+      .get();
+    if (!user) return c.json({ error: "User not found." }, 404);
+    const [identities, pin] = await Promise.all([
+      db
+        .select({
+          provider: coreUserIdentities.provider,
+          providerEmail: coreUserIdentities.providerEmail,
+          createdAt: coreUserIdentities.createdAt,
+        })
+        .from(coreUserIdentities)
+        .where(eq(coreUserIdentities.userId, user.id))
+        .orderBy(coreUserIdentities.createdAt)
+        .all(),
+      db
+        .select({ createdAt: coreUserPins.createdAt })
+        .from(coreUserPins)
+        .where(eq(coreUserPins.userId, user.id))
+        .get(),
+    ]);
+    return c.json({ ...user, identities, kioskPinSince: pin?.createdAt ?? null });
   })
   .post("/users/:id/approve", async (c) => {
     const id = c.req.param("id");
@@ -377,6 +422,8 @@ export const adminRouter = new Hono<AppEnv>()
   })
   .post("/kiosk/codes", async (c) => {
     const userId = c.get("userId") as string;
+    const off = await methodOff(c.env, c.get("adminTeamId") as string, "pin");
+    if (off) return c.json({ error: off }, 403);
     let body: { deviceName?: unknown };
     try {
       body = await c.req.json();

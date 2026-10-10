@@ -42,7 +42,10 @@ export function BarChart({
   const slot = plotW / Math.max(1, bars.length);
   const barW = Math.max(2, slot * 0.7);
   const y = (v: number) => PAD.top + plotH - (v / max) * plotH;
-  const tickEvery = Math.ceil(bars.length / 10);
+  // At most about 10 labels, and never closer than the widest one needs (about 6.5 units a
+  // character at 11px, plus a gap), so "11 AM" and "12 PM" don't run into each other.
+  const widest = Math.max(1, ...bars.map((b) => b.tick.length));
+  const tickEvery = Math.max(Math.ceil(bars.length / 10), Math.ceil((widest * 6.5 + 10) / slot));
 
   return (
     // Keeps a readable minimum size on phones; the chart scrolls sideways instead.

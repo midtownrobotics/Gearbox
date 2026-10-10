@@ -100,9 +100,12 @@ export function WhenCharts({ stats }: { stats: UsageStats }) {
   );
 
   return (
-    <div className={`grid gap-6 ${hours ? "lg:grid-cols-2" : ""}`}>
+    // One above the other, each the card's full width like the page's other charts (side by side
+    // they'd be under a chart's minimum width and scroll). A minmax(0, 1fr) column and min-w-0
+    // cells: on a phone a chart scrolls inside its card instead of widening the page.
+    <div className="grid grid-cols-1 gap-6">
       {!stats.singleDay && (
-        <div>
+        <div className="min-w-0">
           <h3 className="mb-1 text-sm font-semibold text-secondary-700">Average by weekday</h3>
           <BarChart
             single
@@ -121,7 +124,7 @@ export function WhenCharts({ stats }: { stats: UsageStats }) {
         </div>
       )}
       {hours && (
-        <div>
+        <div className="min-w-0">
           <h3 className="mb-1 text-sm font-semibold text-secondary-700">
             {stats.singleDay ? "By hour" : "Average by hour of the day"}
           </h3>

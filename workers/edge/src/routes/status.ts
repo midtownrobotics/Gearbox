@@ -10,7 +10,7 @@ import type { InterfacesResponse } from "../modules/network/interface-types";
 import type { AppEnv } from "../types";
 
 /** The agent pushes every 5 minutes; after this long without contact it's shown as offline. */
-const OFFLINE_AFTER_SECONDS = 15 * 60;
+export const OFFLINE_AFTER_SECONDS = 15 * 60;
 
 export const statusRouter = new Hono<AppEnv>()
   .get("/", requireAuth, async (c) => {

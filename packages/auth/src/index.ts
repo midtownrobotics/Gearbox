@@ -29,6 +29,7 @@ export {
   activeMembers,
   sendTeamDM,
   sendTeamMessage,
+  teamHasApp,
   teamMembers,
 } from "./members";
 export {
@@ -41,6 +42,16 @@ export {
 } from "./scope";
 export { decryptSecret, encryptSecret } from "./secret-box";
 export { type TeamChange, changedFields, logTeamChange, settingLabels } from "./audit";
+export {
+  type IntegrationFact,
+  type IntegrationStatus,
+  type SettingValue,
+  type TeamSettingsState,
+  type TeamSettingsStore,
+  formSettings,
+  parseSettingValue,
+  teamSettingsRoutes,
+} from "./team-settings";
 
 /**
  * Headers for calling another app's worker as the signed-in user (a service binding skips the

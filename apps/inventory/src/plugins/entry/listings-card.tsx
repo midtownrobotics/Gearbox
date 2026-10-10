@@ -11,6 +11,7 @@ import {
   partPriceCents,
   requestUrl,
   useCatalog,
+  useOrdersOn,
 } from "../../shared/catalog";
 import { CatalogPick } from "../../shared/catalog-pick";
 import { ago, formatCents } from "../../shared/format";
@@ -128,6 +129,7 @@ function AddListingDialog({
   onChanged,
 }: { item: ItemView; onClose: () => void; onChanged: () => Promise<void> }) {
   const taken = useTakenParts();
+  const ordersOn = useOrdersOn();
   const [vendor, setVendor] = useState("");
   const [sku, setSku] = useState("");
   const [url, setUrl] = useState("");
@@ -170,30 +172,37 @@ function AddListingDialog({
 
   return (
     <Dialog title="Add a vendor listing" wide onClose={onClose}>
-      <section className="space-y-2">
-        <p className="text-xs font-bold uppercase tracking-widest text-secondary-400">
-          From the Orders catalog
-        </p>
-        <CatalogPick
-          taken={taken}
-          initialQuery={item.listings.length === 0 ? item.name : ""}
-          onPick={(part) =>
-            void add({
-              catalogItemId: part.id,
-              vendor: part.vendor,
-              sku: part.sku,
-              name: part.name,
-              url: part.url,
-              priceCents: partPriceCents(part),
-              priceAt: part.priceAt,
-            })
-          }
-        />
-      </section>
-      <form onSubmit={typed} className="space-y-3 border-t border-secondary-200 pt-4">
-        <p className="text-xs font-bold uppercase tracking-widest text-secondary-400">
-          Or type one in
-        </p>
+      {ordersOn && (
+        <section className="space-y-2">
+          <p className="text-xs font-bold uppercase tracking-widest text-secondary-400">
+            From the Orders catalog
+          </p>
+          <CatalogPick
+            taken={taken}
+            initialQuery={item.listings.length === 0 ? item.name : ""}
+            onPick={(part) =>
+              void add({
+                catalogItemId: part.id,
+                vendor: part.vendor,
+                sku: part.sku,
+                name: part.name,
+                url: part.url,
+                priceCents: partPriceCents(part),
+                priceAt: part.priceAt,
+              })
+            }
+          />
+        </section>
+      )}
+      <form
+        onSubmit={typed}
+        className={ordersOn ? "space-y-3 border-t border-secondary-200 pt-4" : "space-y-3"}
+      >
+        {ordersOn && (
+          <p className="text-xs font-bold uppercase tracking-widest text-secondary-400">
+            Or type one in
+          </p>
+        )}
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Vendor">
             <input

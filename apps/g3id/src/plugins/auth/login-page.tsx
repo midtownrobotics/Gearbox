@@ -5,6 +5,13 @@ import { api } from "../../lib/api";
 
 const apiBase = import.meta.env.VITE_API_BASE_URL ?? "";
 
+const PROVIDERS = [
+  { method: "slack", label: "Slack", Icon: FaSlack },
+  { method: "google", label: "Google", Icon: FaGoogle },
+  { method: "github", label: "GitHub", Icon: FaGithub },
+  { method: "steam", label: "Steam", Icon: FaSteam },
+] as const;
+
 export function LoginPage() {
   const [searchParams] = useSearchParams();
   const error = searchParams.get("error");
@@ -14,11 +21,18 @@ export function LoginPage() {
 
   // Each team signs in on its own address; this is the team this one is for.
   const [team, setTeam] = useState<{ name: string; teamNumber: number } | null>(null);
+  const [methods, setMethods] = useState<Partial<Record<string, boolean>>>({});
   useEffect(() => {
     api.teams.current
       .$get()
       .then((res) => (res.ok ? res.json() : null))
       .then(setTeam)
+      .catch(() => {});
+    // The ways this team signs in (its admins can switch some off); all of them until it says.
+    api.team["sign-in"]
+      .$get()
+      .then((res) => (res.ok ? res.json() : {}))
+      .then(setMethods)
       .catch(() => {});
   }, []);
 
@@ -35,34 +49,16 @@ export function LoginPage() {
         {error && <p className="text-sm text-primary-500 text-center">{error}</p>}
 
         <div className="space-y-3">
-          <a
-            href={`${apiBase}/auth/slack/initiate${rp}`}
-            className="w-full flex items-center justify-center gap-3 rounded-lg bg-surface border border-secondary-300 hover:border-primary-500 hover:bg-secondary-50 px-4 py-2.5 text-sm text-secondary-900 transition-colors"
-          >
-            <FaSlack size={20} />
-            Sign in with Slack
-          </a>
-          <a
-            href={`${apiBase}/auth/google${rp}`}
-            className="w-full flex items-center justify-center gap-3 rounded-lg bg-surface border border-secondary-300 hover:border-primary-500 hover:bg-secondary-50 px-4 py-2.5 text-sm text-secondary-900 transition-colors"
-          >
-            <FaGoogle size={20} />
-            Sign in with Google
-          </a>
-          <a
-            href={`${apiBase}/auth/github${rp}`}
-            className="w-full flex items-center justify-center gap-3 rounded-lg bg-surface border border-secondary-300 hover:border-primary-500 hover:bg-secondary-50 px-4 py-2.5 text-sm text-secondary-900 transition-colors"
-          >
-            <FaGithub size={20} />
-            Sign in with GitHub
-          </a>
-          <a
-            href={`${apiBase}/auth/steam${rp}`}
-            className="w-full flex items-center justify-center gap-3 rounded-lg bg-surface border border-secondary-300 hover:border-primary-500 hover:bg-secondary-50 px-4 py-2.5 text-sm text-secondary-900 transition-colors"
-          >
-            <FaSteam size={20} />
-            Sign in with Steam
-          </a>
+          {PROVIDERS.filter((p) => methods[p.method] !== false).map(({ method, label, Icon }) => (
+            <a
+              key={method}
+              href={`${apiBase}${method === "slack" ? "/auth/slack/initiate" : `/auth/${method}`}${rp}`}
+              className="w-full flex items-center justify-center gap-3 rounded-lg bg-surface border border-secondary-300 hover:border-primary-500 hover:bg-secondary-50 px-4 py-2.5 text-sm text-secondary-900 transition-colors"
+            >
+              <Icon size={20} />
+              Sign in with {label}
+            </a>
+          ))}
         </div>
 
         <p className="text-center text-sm text-secondary-500">

@@ -1,3 +1,4 @@
+import { appUrl } from "@g3/site-config";
 import { Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api } from "../../lib/api";
@@ -44,9 +45,22 @@ export function AdminKioskPage() {
     }
   }
 
+  /** Whether the team allows kiosk PINs (its Sign-in page); null while asking. */
+  const [kioskOn, setKioskOn] = useState<boolean | null>(null);
+
   // biome-ignore lint/correctness/useExhaustiveDependencies: loadDevices changes on every render but we only want to load once on mount
   useEffect(() => {
-    loadDevices();
+    api.team["sign-in"]
+      .$get()
+      .then((res) => (res.ok ? res.json() : { pin: true }))
+      .then((methods) => {
+        setKioskOn(methods.pin !== false);
+        if (methods.pin !== false) loadDevices();
+      })
+      .catch(() => {
+        setKioskOn(true);
+        loadDevices();
+      });
   }, []);
 
   async function handleGenerateCode(e: React.FormEvent) {
@@ -90,6 +104,25 @@ export function AdminKioskPage() {
     } catch {
       alert("Failed to revoke device");
     }
+  }
+
+  if (kioskOn === null) return null;
+  if (!kioskOn) {
+    return (
+      <main className="flex-1 px-6 py-8 max-w-2xl mx-auto w-full">
+        <h1 className="text-3xl font-bold text-secondary-900 mb-4">Kiosk Management</h1>
+        <p className="text-secondary-600">
+          Kiosk sign-in is off for your team, so kiosks can't be added or used. Turn it on from the{" "}
+          <a
+            href={`${appUrl("portal")}/admin/sign-in`}
+            className="font-semibold text-primary-600 underline"
+          >
+            Sign-in page
+          </a>
+          .
+        </p>
+      </main>
+    );
   }
 
   return (

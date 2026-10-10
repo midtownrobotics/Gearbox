@@ -5,6 +5,7 @@ import {
   logTeamChange,
   requireAuth,
   teamExport,
+  teamSettingsRoutes,
 } from "@g3/auth";
 import { corsOrigin } from "@g3/site-config";
 import { withApiPrefix } from "@g3/site-config/worker";
@@ -567,7 +568,39 @@ const app = base
     const signedIn = open.map(({ member }) => member.displayName || member.id);
 
     return c.json({ signedIn });
-  });
+  })
+  // The same settings as /admin/settings for the team's dashboard (roadmap 4.5), by manifest key:
+  // the school year's start as "MM-DD".
+  .route(
+    "/team-settings",
+    teamSettingsRoutes<AppEnv>(manifest, "Attendance settings", {
+      async read(c) {
+        const s = await teamDb(c).settings();
+        const pad = (n: number) => String(n).padStart(2, "0");
+        return {
+          values: {
+            schoolYearStart: `${pad(s.schoolYearStartMonth)}-${pad(s.schoolYearStartDay)}`,
+            autoSignOutHours: s.autoSignOutHours,
+          },
+        };
+      },
+      async save(c, changes) {
+        const store = teamDb(c);
+        const before = await store.settings();
+        const [month, day] =
+          typeof changes.schoolYearStart === "string"
+            ? changes.schoolYearStart.split("-").map(Number)
+            : [before.schoolYearStartMonth, before.schoolYearStartDay];
+        const settings = parseSettings({
+          schoolYearStartMonth: month,
+          schoolYearStartDay: day,
+          autoSignOutHours: changes.autoSignOutHours ?? before.autoSignOutHours,
+        });
+        if (typeof settings === "string") return settings;
+        await store.saveSettings(settings, c.get("userId"));
+      },
+    }),
+  );
 
 export type AttendanceApp = typeof app;
 /** The Hono app itself, for the isolation test (test/isolation.test.ts). */

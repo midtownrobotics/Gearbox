@@ -68,7 +68,7 @@ describe("tier lists", () => {
       { method: "POST", body: { name: "Picks", tiers: [] } },
       201,
     );
-    const tiers = [{ id: "s", name: "S", color: "#a32035", items: ["254"] }];
+    const tiers = [{ id: "s", name: "S", color: "#a32035", items: ["9999"] }];
     await jsonAs(student, `/scouting/tier-lists/${id}`, {
       method: "PUT",
       body: { name: "Picks v2", tiers },

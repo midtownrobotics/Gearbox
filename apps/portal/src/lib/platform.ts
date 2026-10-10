@@ -1,9 +1,16 @@
-import { apiPath } from "@g3/site-config";
+import { type AppName, apiPath } from "@g3/site-config";
 
 // The platform's API for the team's own pages (workers/platform/src/team.ts), through the
 // gateway's /api/~platform, which says which team it's for.
 
 export type TeamApp = { slug: string; name: string; summary: string };
+
+/** Whether an integration is connected, and what there is to know about it (@g3/auth). */
+export type IntegrationStatus = {
+  connected: boolean;
+  detail?: string;
+  facts?: { label: string; value?: string; at?: number }[];
+};
 
 export type LibraryApp = TeamApp & {
   integrations: string[];
@@ -62,4 +69,18 @@ export async function platform<T>(path: string, init?: { method: string; body?: 
   const data = (await res.json().catch(() => ({}))) as T & { error?: string };
   if (!res.ok) throw new Error(data.error ?? "Something went wrong. Please try again.");
   return data as T;
+}
+
+/**
+ * What an app knows about the integrations it connects (its own /team-settings, through the
+ * gateway's /api/~<app>), by integration.
+ */
+export async function appIntegrations(slug: string): Promise<Record<string, IntegrationStatus>> {
+  const res = await fetch(`${apiPath(slug as AppName)}/team-settings`, { credentials: "include" });
+  const data = (await res.json().catch(() => ({}))) as {
+    integrations?: Record<string, IntegrationStatus>;
+    error?: string;
+  };
+  if (!res.ok) throw new Error(data.error ?? "Couldn't ask it. Please try again.");
+  return data.integrations ?? {};
 }

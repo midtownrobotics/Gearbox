@@ -62,7 +62,7 @@ const chip = (active: boolean) =>
   }`;
 
 /**
- * Pick the dates: the billing cycle, the last 7/30/90 days, or any two days; and a day at a time
+ * Pick the dates: the billing cycle, today, the last 7/30/90 days, or any two days; and a day at a time
  * once zoomed to one (‹ ›). `range` is the one the page shows (from the worker).
  */
 export function RangePicker({ range }: { range: PageRange | null }) {
@@ -79,6 +79,13 @@ export function RangePicker({ range }: { range: PageRange | null }) {
     <div className="flex flex-wrap items-center gap-2">
       <button type="button" className={chip(!!range?.isCycle)} onClick={clear}>
         Billing cycle
+      </button>
+      <button
+        type="button"
+        className={chip(!!range && !range.isCycle && single && range.fromDay === today)}
+        onClick={() => zoom(today)}
+      >
+        Today
       </button>
       {PRESETS.map((p) => (
         <button

@@ -5,6 +5,7 @@ import { createDb } from "../../db";
 import { coreUserPins, coreUsers } from "../../db/schema";
 import { sessionCookieOptions } from "../../lib/cookie";
 import { createSession } from "../../lib/session";
+import { methodOff } from "../../lib/sign-in-methods";
 import { requireKioskToken } from "../../middleware/auth";
 import type { AppEnv } from "../../types";
 
@@ -20,6 +21,9 @@ export const pinAuthRouter = new Hono<AppEnv>().post("/pin", requireKioskToken, 
   if (!pin) {
     return c.json({ error: "PIN is required." }, 400);
   }
+
+  const off = await methodOff(c.env, c.get("kioskTeamId") as string, "pin");
+  if (off) return c.json({ error: off }, 403);
 
   // PINs are unique within a team, and a kiosk signs in only its own team's members.
   const db = createDb(c.env.DB);

@@ -8,13 +8,12 @@ import { authRouter } from "./routes/auth";
 import { emailAuthRouter } from "./routes/auth/email";
 import { githubAuthRouter } from "./routes/auth/github";
 import { googleAuthRouter } from "./routes/auth/google";
-import { onshapeAuthRouter } from "./routes/auth/onshape";
 import { pinAuthRouter } from "./routes/auth/pin";
 import { slackAuthRouter } from "./routes/auth/slack";
 import { steamAuthRouter } from "./routes/auth/steam";
 import { internalRouter } from "./routes/internal";
 import { kioskRouter } from "./routes/kiosk";
-import { onshapeRouter } from "./routes/onshape";
+import { adminSignInRouter, teamSignInRouter } from "./routes/sign-in-methods";
 import { slackRouter } from "./routes/slack";
 import { teamUiRouter } from "./routes/team-ui";
 import { teamsRouter } from "./routes/teams";
@@ -44,16 +43,16 @@ const app = base
   .route("/auth", emailAuthRouter)
   .route("/auth", githubAuthRouter)
   .route("/auth", googleAuthRouter)
-  .route("/auth", onshapeAuthRouter)
   .route("/auth", pinAuthRouter)
   .route("/auth", slackAuthRouter)
   .route("/auth", steamAuthRouter)
+  .route("/admin/team/sign-in", adminSignInRouter)
   .route("/admin", adminRouter)
+  .route("/team/sign-in", teamSignInRouter)
   .route("/team/ui", teamUiRouter)
   .route("/users", usersRouter)
   .route("/teams", teamsRouter)
   .route("/internal", internalRouter)
-  .route("/onshape", onshapeRouter)
   .route("/", kioskRouter)
   .route("/slack", slackRouter);
 

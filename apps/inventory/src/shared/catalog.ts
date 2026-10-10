@@ -1,10 +1,12 @@
 import { apiPath, appUrl } from "@g3/site-config";
+import { appOn, useAppOn } from "@g3/ui";
 import type { ListingView } from "@g3/worker-inventory";
 import { useEffect, useState } from "react";
 
 // Orders' parts catalog, read through Orders' own API (the same address for every team's page).
 // Inventory works without it: a listing keeps its own copy of the vendor, part number, link and
-// price, and the catalog only adds what's newer.
+// price, and the catalog only adds what's newer. While the team has Orders switched off, nothing
+// of it shows: no catalog search, no Request buttons, no links to requests (`useOrdersOn`).
 
 export type CatalogPart = {
   id: number;
@@ -33,13 +35,22 @@ export const partPriceCents = (part: Pick<CatalogPart, "priceCents" | "packQuant
 
 let loading: Promise<CatalogPart[] | null> | null = null;
 
-/** The catalog's parts, or null if Orders can't be reached. Loaded once per page load. */
+/** The catalog's parts, or null if Orders is off or can't be reached. Loaded once per page load. */
 function loadCatalog(): Promise<CatalogPart[] | null> {
-  loading ??= fetch(`${apiPath("orders")}/catalog`, { credentials: "include" })
-    .then(async (res) => (res.ok ? ((await res.json()) as { items: CatalogPart[] }).items : null))
-    .catch(() => null);
+  loading ??= appOn("orders").then((on) =>
+    on
+      ? fetch(`${apiPath("orders")}/catalog`, { credentials: "include" })
+          .then(async (res) =>
+            res.ok ? ((await res.json()) as { items: CatalogPart[] }).items : null,
+          )
+          .catch(() => null)
+      : null,
+  );
   return loading;
 }
+
+/** Whether the team has Orders on: catalog sections and links to Orders show unless it's off. */
+export const useOrdersOn = () => useAppOn("orders") !== false;
 
 /** `undefined` while loading, `null` when Orders can't be reached. */
 export function useCatalog(): CatalogPart[] | null | undefined {

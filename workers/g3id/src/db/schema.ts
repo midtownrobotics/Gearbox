@@ -28,6 +28,19 @@ export const teamUiSettings = sqliteTable("team_ui_settings", {
   updatedBy: text("updated_by").references(() => coreUsers.id, { onDelete: "set null" }),
 });
 
+/** The sign-in methods a team allows (migration 0016); no row: all of them. Slack is always on. */
+export const teamSignInMethods = sqliteTable("team_sign_in_methods", {
+  teamId: text("team_id").primaryKey(),
+  google: integer("google").notNull().default(1),
+  github: integer("github").notNull().default(1),
+  steam: integer("steam").notNull().default(1),
+  kioskPin: integer("kiosk_pin").notNull().default(1),
+  updatedAt: integer("updated_at").notNull(),
+  updatedBy: text("updated_by").references((): AnySQLiteColumn => coreUsers.id, {
+    onDelete: "set null",
+  }),
+});
+
 export const coreUsers = sqliteTable(
   "core_users",
   {

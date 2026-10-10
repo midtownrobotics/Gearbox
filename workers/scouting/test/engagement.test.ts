@@ -202,7 +202,7 @@ describe("optional engagement", () => {
         .run();
       await db
         .prepare(
-          "INSERT OR IGNORE INTO scouting_match_assignments (event_key, match_number, user_id, team_number, assigned_at) VALUES (?, ?, ?, '254', ?)",
+          "INSERT OR IGNORE INTO scouting_match_assignments (event_key, match_number, user_id, team_number, assigned_at) VALUES (?, ?, ?, '9999', ?)",
         )
         .bind(eventKey, match, student.id, Date.now())
         .run();

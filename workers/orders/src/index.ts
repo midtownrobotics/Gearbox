@@ -20,6 +20,7 @@ import { lookupRouter } from "./routes/lookup";
 import { ordersRouter } from "./routes/orders";
 import { requestsRouter } from "./routes/requests";
 import { shareACartRouter } from "./routes/share-a-cart";
+import { teamSettingsRouter } from "./routes/team-settings";
 import { trustedRouter } from "./routes/trusted";
 import { vendorsRouter } from "./routes/vendors";
 import type { AppEnv } from "./types";
@@ -74,6 +75,7 @@ const app = base
   .route("/orders", ordersRouter)
   .route("/vendors", vendorsRouter)
   .route("/settings", settingsRouter)
+  .route("/team-settings", teamSettingsRouter)
   .route("/category-rules", categoryRulesRouter)
   .route("/suggest", suggestRouter)
   .route("/share-a-cart", shareACartRouter)

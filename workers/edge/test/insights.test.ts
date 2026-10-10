@@ -68,7 +68,10 @@ describe("a range of days", () => {
     const o = await jsonAs<Overview>(student, "/network/overview?from=2026-09-02&to=2026-09-02");
     expect(o.stats.singleDay).toBe(true);
     expect(o.stats.total).toEqual({ dl: 3000, ul: 1000 });
-    expect(o.hourly.map((h) => h.hour)).toEqual([
+    // Every hour of the day, so the chart's hours are evenly spaced; only two had traffic.
+    expect(o.hourly).toHaveLength(24);
+    expect(o.hourly[0].hour).toBe(at("2026-09-02T00:00:00Z"));
+    expect(o.hourly.filter((h) => h.dl + h.ul > 0).map((h) => h.hour)).toEqual([
       at("2026-09-02T14:00:00Z"),
       at("2026-09-02T15:00:00Z"),
     ]);
@@ -77,7 +80,8 @@ describe("a range of days", () => {
       `/network/clients/${encodeURIComponent(mac)}?from=2026-09-02&to=2026-09-02`,
     );
     expect(device.stats.total).toEqual({ dl: 2500, ul: 0 });
-    expect(device.hourly.map((h) => h.dl)).toEqual([2500]);
+    expect(device.hourly).toHaveLength(24);
+    expect(device.hourly.filter((h) => h.dl > 0).map((h) => h.dl)).toEqual([2500]);
   });
 
   it("is the billing cycle when none is asked for", async () => {

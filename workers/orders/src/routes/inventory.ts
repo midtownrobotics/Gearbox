@@ -1,4 +1,4 @@
-import { inTeam, requireAuth } from "@g3/auth";
+import { inTeam, requireAuth, teamHasApp } from "@g3/auth";
 import { inArray } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
@@ -24,11 +24,15 @@ const idsValidator = validator("json", (value, c): { ids: number[] } => {
 export const inventoryRouter = new Hono<AppEnv>()
   /**
    * What the pages need to ask where received parts go: whether that's required, and Inventory's
-   * locations, robots and subsystems (null when Inventory can't be reached).
+   * locations, robots and subsystems (null when Inventory can't be reached). With Inventory
+   * switched off, neither: receiving doesn't ask.
    */
   .get("/", requireAuth, async (c) => {
+    if ((await teamHasApp(c.env, c.get("teamId"), "inventory")) === false) {
+      return c.json({ required: false, options: null });
+    }
     const [required, options] = await Promise.all([
-      inventoryRequired(createOrdersDb(c.env.ORDERS_DB), c.get("teamId")),
+      inventoryRequired(c.env, createOrdersDb(c.env.ORDERS_DB), c.get("teamId")),
       inventoryOptions(c),
     ]);
     return c.json({ required, options });

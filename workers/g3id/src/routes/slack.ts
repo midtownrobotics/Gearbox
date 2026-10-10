@@ -58,10 +58,10 @@ export const slackRouter = new Hono<AppEnv>()
     const { team, userId } = saved
       ? (JSON.parse(saved) as { team: string; userId: string })
       : { team: null, userId: null };
-    // Back to the Slack page on the team's admin pages (its home's /admin).
+    // Back to the Integrations page on the team's admin pages (its home's /admin), where Slack is.
     const back = (query: string) =>
       c.redirect(
-        `${team ? teamUrl(c.env, team, "portal") : c.env.FRONTEND_URL}/admin/slack?${query}`,
+        `${team ? teamUrl(c.env, team, "portal") : c.env.FRONTEND_URL}/admin/integrations?${query}`,
       );
     const fail = (message: string) => back(`error=${encodeURIComponent(message)}`);
 

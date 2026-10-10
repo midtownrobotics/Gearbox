@@ -37,7 +37,7 @@ wrangler secret put {PROVIDER}_CLIENT_ID --env production
 wrangler secret put {PROVIDER}_CLIENT_SECRET --env production
 ```
 
-**`workers/g3id/wrangler.toml`** — add `{PROVIDER}_REDIRECT_URI` to `[env.production.vars]`, add the provider to the `(GOOGLE|GITHUB|STEAM|ONSHAPE)` list in `scripts/configure.ts`, and run `pnpm configure`, which writes the site team's callback address. Other teams' addresses come from `providerRedirectUri()`; add the provider to it too.
+**`workers/g3id/wrangler.toml`** — add `{PROVIDER}_REDIRECT_URI` to `[env.production.vars]`, add the provider to the `(GOOGLE|GITHUB|STEAM)` list in `scripts/configure.ts`, and run `pnpm configure`, which writes the site team's callback address. Other teams' addresses come from `providerRedirectUri()`; add the provider to it too.
 
 **`workers/g3id/src/types.ts`** — add the three variables to the `Bindings` block of `AppEnv`.
 

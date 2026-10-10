@@ -146,7 +146,7 @@ export function consoleUrl(_teamId?: string): string {
 }
 
 /**
- * Where sign-in providers (Google, GitHub, Steam, Onshape) send people back: G3ID's API on the
+ * Where sign-in providers (Google, GitHub, Steam) send people back: G3ID's API on the
  * platform's id.<platform domain> host, one address for every team. The team travels in the
  * sign-in's state. (`teamId` no longer changes it.)
  */

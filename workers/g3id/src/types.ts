@@ -20,9 +20,6 @@ export type AppEnv = {
     SECRETS_KEY?: string;
     STEAM_API_KEY: string;
     STEAM_REDIRECT_URI: string;
-    ONSHAPE_CLIENT_ID: string;
-    ONSHAPE_CLIENT_SECRET: string;
-    ONSHAPE_REDIRECT_URI: string;
     FRONTEND_URL: string;
     /**
      * The platform, for the team's log (`lib/team-log.ts`): G3ID's own big changes and the ones

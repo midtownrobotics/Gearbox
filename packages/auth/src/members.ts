@@ -77,3 +77,23 @@ export async function sendTeamMessage(
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
 }
+
+/**
+ * Whether the team has an app on (the platform's app library, through G3ID): null when that can't
+ * be told. For a feature that needs another app, so it isn't asked for while that app is off.
+ */
+export async function teamHasApp(
+  env: { G3ID: Fetcher },
+  teamId: string,
+  app: string,
+): Promise<boolean | null> {
+  try {
+    const res = await env.G3ID.fetch(
+      new Request(`http://g3id/api/internal/teams/${encodeURIComponent(teamId)}/apps`),
+    );
+    if (!res.ok) return null;
+    return ((await res.json()) as { apps: string[] }).apps.includes(app);
+  } catch {
+    return null;
+  }
+}
