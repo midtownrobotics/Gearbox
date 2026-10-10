@@ -1,9 +1,43 @@
-import { apiPath } from "@g3/site-config";
+import { type AppName, apiPath } from "@g3/site-config";
 
 // The platform's API for the team's own pages (workers/platform/src/team.ts), through the
 // gateway's /api/~platform, which says which team it's for.
 
 export type TeamApp = { slug: string; name: string; summary: string };
+
+/** One of an app's team settings, as its manifest describes it (AppSetting in @g3/auth). */
+export type AppSetting = {
+  key: string;
+  label: string;
+  type:
+    | "text"
+    | "number"
+    | "boolean"
+    | "choice"
+    | "month"
+    | "day of year"
+    | "url"
+    | "bytes"
+    | "secret";
+  default: SettingValue;
+  min?: number;
+  max?: number;
+  choices?: { value: string; label: string }[];
+  help?: string;
+  editedBy: "admin" | "mentor";
+  page: string;
+  integration?: string;
+};
+
+export type SettingValue = string | number | boolean | null;
+
+/** What an app's /team-settings answers (TeamSettingsState in @g3/auth). */
+export type TeamSettingsState = {
+  values: Record<string, SettingValue>;
+  secretsSet: Record<string, boolean>;
+  integrations: Record<string, { connected: boolean; detail?: string }>;
+  canEdit: string[];
+};
 
 export type LibraryApp = TeamApp & {
   integrations: string[];
@@ -18,6 +52,9 @@ export type LibraryApp = TeamApp & {
   keepsDataWhenOff: boolean;
   /** Its data can be downloaded (offered before switching it off). */
   exportable: boolean;
+  settings: AppSetting[];
+  /** It answers /team-settings, so the dashboard has a form for its settings. */
+  settingsForm: boolean;
 };
 
 export type LogEntry = {
@@ -62,4 +99,20 @@ export async function platform<T>(path: string, init?: { method: string; body?: 
   const data = (await res.json().catch(() => ({}))) as T & { error?: string };
   if (!res.ok) throw new Error(data.error ?? "Something went wrong. Please try again.");
   return data as T;
+}
+
+/** An app's team settings (its own /team-settings, through the gateway's /api/~<app>). */
+export async function appSettings(
+  slug: string,
+  values?: Record<string, SettingValue>,
+): Promise<TeamSettingsState> {
+  const res = await fetch(`${apiPath(slug as AppName)}/team-settings`, {
+    method: values ? "PUT" : "GET",
+    credentials: "include",
+    headers: values ? { "Content-Type": "application/json" } : undefined,
+    body: values ? JSON.stringify({ values }) : undefined,
+  });
+  const data = (await res.json().catch(() => ({}))) as TeamSettingsState & { error?: string };
+  if (!res.ok) throw new Error(data.error ?? "Couldn't load its settings. Please try again.");
+  return data;
 }

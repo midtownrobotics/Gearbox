@@ -7,6 +7,7 @@ import {
   requireAuth,
   settingLabels,
   teamExport,
+  teamSettingsRoutes,
   withTeam,
 } from "@g3/auth";
 import { corsOrigin } from "@g3/site-config";
@@ -998,7 +999,38 @@ const app = base
       });
     }
     return c.json({ ok: true });
-  });
+  })
+
+  // The same settings for the team's dashboard (roadmap 4.5), by manifest key. Empty is stored
+  // as "", like the Admin page does.
+  .route(
+    "/team-settings",
+    teamSettingsRoutes<AppEnv>(manifest, "Pit settings", {
+      async read(c) {
+        const db = createDb(c.env.PIT_DB);
+        const team = c.get("teamId");
+        const values = await Promise.all(SETTING_KEYS.map((key) => getSetting(db, team, key)));
+        return {
+          values: Object.fromEntries(SETTING_KEYS.map((key, i) => [key, values[i] || null])),
+        };
+      },
+      async save(c, changes) {
+        const db = createDb(c.env.PIT_DB);
+        const team = c.get("teamId");
+        await Promise.all(
+          Object.entries(changes).map(([key, value]) =>
+            db
+              .insert(settings)
+              .values(withTeam(team, { key, value: String(value ?? "") }))
+              .onConflictDoUpdate({
+                target: [settings.teamId, settings.key],
+                set: { value: String(value ?? "") },
+              }),
+          ),
+        );
+      },
+    }),
+  );
 
 export type PitApp = typeof app;
 /** The Hono app itself, for the isolation test (test/teams.test.ts). */

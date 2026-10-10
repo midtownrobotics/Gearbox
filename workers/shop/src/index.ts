@@ -23,6 +23,7 @@ import { printRouter } from "./routes/print";
 import { processesRouter } from "./routes/processes";
 import { stagingBatchesRouter } from "./routes/staging-batches";
 import { subsystemsRouter } from "./routes/subsystems";
+import { teamSettingsRouter } from "./routes/team-settings";
 import type { AppEnv } from "./types";
 
 const base = new Hono<AppEnv>();
@@ -99,6 +100,7 @@ const app = base
   .route("/actions", actionsRouter)
   .route("/kiosk-presence", kioskPresenceRouter)
   .route("/admin", adminPartsRouter)
+  .route("/team-settings", teamSettingsRouter)
   .route("/internal", internalRouter);
 
 export type ShopApp = typeof app;

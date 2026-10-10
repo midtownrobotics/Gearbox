@@ -40,38 +40,43 @@ function isCurrency(code: string) {
   }
 }
 
-/** Any of the settings; the ones left out stay as they are. */
-const settingsValidator = validator("json", (value, c): Partial<TeamSettings> => {
+/** Any of the settings, checked; the ones left out stay as they are. Or why they can't be saved. */
+export function checkSettings(value: unknown): Partial<TeamSettings> | string {
   const v = (value ?? {}) as Record<string, unknown>;
-  const fail = (error: string) => c.json({ error }, 400) as never;
   const out: Partial<TeamSettings> = {};
   if (v.namingTemplate !== undefined) {
     const t = v.namingTemplate;
     if (typeof t !== "string" || !t.includes("{title}") || t.length > 200) {
-      return fail("The naming template must include {title} (up to 200 characters).");
+      return "The naming template must include {title} (up to 200 characters).";
     }
     out.namingTemplate = t.trim();
   }
   if (v.inventoryRequired !== undefined) {
     if (typeof v.inventoryRequired !== "boolean") {
-      return fail("inventoryRequired must be true or false.");
+      return "inventoryRequired must be true or false.";
     }
     out.inventoryRequired = v.inventoryRequired;
   }
   if (v.currency !== undefined) {
     if (typeof v.currency !== "string" || !isCurrency(v.currency.trim().toUpperCase())) {
-      return fail("currency must be a 3-letter currency code like USD.");
+      return "currency must be a 3-letter currency code like USD.";
     }
     out.currency = v.currency.trim().toUpperCase();
   }
   if (v.fiscalYearStart !== undefined) {
     const month = v.fiscalYearStart;
     if (!Number.isInteger(month) || (month as number) < 1 || (month as number) > 12) {
-      return fail("fiscalYearStart must be a month from 1 to 12.");
+      return "fiscalYearStart must be a month from 1 to 12.";
     }
     out.fiscalYearStart = month as number;
   }
-  if (Object.keys(out).length === 0) return fail("Nothing to change.");
+  return out;
+}
+
+const settingsValidator = validator("json", (value, c): Partial<TeamSettings> => {
+  const out = checkSettings(value);
+  if (typeof out === "string") return c.json({ error: out }, 400) as never;
+  if (Object.keys(out).length === 0) return c.json({ error: "Nothing to change." }, 400) as never;
   return out;
 });
 

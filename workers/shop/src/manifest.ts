@@ -19,6 +19,7 @@ export const manifest = defineManifest({
       default: null,
       editedBy: "admin",
       page: "/admin",
+      integration: "onshape",
     },
     {
       key: "companyId",
@@ -27,6 +28,7 @@ export const manifest = defineManifest({
       default: null,
       editedBy: "admin",
       page: "/admin",
+      integration: "onshape",
     },
     {
       key: "apiKey",
@@ -35,6 +37,7 @@ export const manifest = defineManifest({
       default: null,
       editedBy: "admin",
       page: "/admin",
+      integration: "onshape",
     },
     {
       key: "secretKey",
@@ -43,6 +46,7 @@ export const manifest = defineManifest({
       default: null,
       editedBy: "admin",
       page: "/admin",
+      integration: "onshape",
     },
     {
       key: "webhookKeys",
@@ -51,6 +55,7 @@ export const manifest = defineManifest({
       default: null,
       editedBy: "admin",
       page: "/admin",
+      integration: "onshape",
     },
     {
       key: "slackReleaseChannelId",
@@ -69,5 +74,6 @@ export const manifest = defineManifest({
       page: "/admin",
     },
   ],
+  settingsForm: true,
   plugins: [],
 });

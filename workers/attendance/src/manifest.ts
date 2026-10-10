@@ -27,10 +27,13 @@ export const manifest = defineManifest({
       label: "Auto sign-out",
       type: "number",
       default: 12,
+      min: 1,
+      max: 24,
       help: "Hours; a session open longer is closed and doesn't count",
       editedBy: "admin",
       page: "id:/admin/attendance",
     },
   ],
+  settingsForm: true,
   plugins: [],
 });

@@ -38,5 +38,6 @@ export const manifest = defineManifest({
       page: "/admin",
     },
   ],
+  settingsForm: true,
   plugins: [],
 });

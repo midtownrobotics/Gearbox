@@ -14,5 +14,6 @@ export const manifest = defineManifest({
   // Fields, locations, robots and subsystems are the team's content (Settings, or a setup file),
   // not settings with defaults.
   settings: [],
+  settingsForm: false,
   plugins: [],
 });

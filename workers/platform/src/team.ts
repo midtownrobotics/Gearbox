@@ -115,6 +115,10 @@ async function library(env: AppEnv["Bindings"], teamId: string) {
         keepsDataWhenOff: !app.hooks.delete,
         /** Its data can be downloaded (its export hook). */
         exportable: app.hooks.export,
+        /** The team's settings for it, for the dashboard's forms (4.5). */
+        settings: app.settings,
+        /** It answers /team-settings, so the dashboard has a form for them. */
+        settingsForm: app.settingsForm,
       };
     });
 }

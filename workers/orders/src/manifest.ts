@@ -48,5 +48,6 @@ export const manifest = defineManifest({
       page: "/settings",
     },
   ],
+  settingsForm: true,
   plugins: [],
 });

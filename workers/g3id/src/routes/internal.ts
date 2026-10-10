@@ -28,6 +28,7 @@ const MEMBER_ROWS = `user_id IN ${MEMBERS}`;
 /** Deleting a team, in order: each row goes before the rows it points at. */
 const DELETE_TEAM = [
   "DELETE FROM team_ui_settings WHERE team_id = ?1",
+  "DELETE FROM team_sign_in_methods WHERE team_id = ?1",
   `DELETE FROM core_sessions WHERE ${MEMBER_ROWS}`,
   `DELETE FROM core_user_identities WHERE ${MEMBER_ROWS}`,
   `DELETE FROM core_user_pins WHERE team_id = ?1 OR ${MEMBER_ROWS}`,

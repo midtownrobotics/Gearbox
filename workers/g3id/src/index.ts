@@ -15,6 +15,7 @@ import { steamAuthRouter } from "./routes/auth/steam";
 import { internalRouter } from "./routes/internal";
 import { kioskRouter } from "./routes/kiosk";
 import { onshapeRouter } from "./routes/onshape";
+import { adminSignInRouter, teamSignInRouter } from "./routes/sign-in-methods";
 import { slackRouter } from "./routes/slack";
 import { teamUiRouter } from "./routes/team-ui";
 import { teamsRouter } from "./routes/teams";
@@ -48,7 +49,9 @@ const app = base
   .route("/auth", pinAuthRouter)
   .route("/auth", slackAuthRouter)
   .route("/auth", steamAuthRouter)
+  .route("/admin/team/sign-in", adminSignInRouter)
   .route("/admin", adminRouter)
+  .route("/team/sign-in", teamSignInRouter)
   .route("/team/ui", teamUiRouter)
   .route("/users", usersRouter)
   .route("/teams", teamsRouter)

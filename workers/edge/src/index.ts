@@ -15,6 +15,7 @@ import { switchRouter } from "./modules/switch/routes";
 import { boxRouter } from "./routes/box";
 import { internalRouter } from "./routes/internal";
 import { statusRouter } from "./routes/status";
+import { teamSettingsRouter } from "./routes/team-settings";
 import type { AppEnv } from "./types";
 
 const base = new Hono<AppEnv>();
@@ -51,6 +52,7 @@ const app = base
   .route("/print", printRouter)
   .route("/lookup", lookupRouter)
   .route("/switch", switchRouter)
+  .route("/team-settings", teamSettingsRouter)
   // Agent-facing routes (the team's box key, on its team's address), one prefix per module.
   // The agent calls this right after applying new state; requireAgent records the
   // applied version (X-G3-Agent-State-Version) so the UI can clear "pending".
