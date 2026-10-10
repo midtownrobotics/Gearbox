@@ -1,6 +1,6 @@
 import { OnShapeIcon } from "@g3/ui";
 import { GraduationCap, Loader2, Shield, ShieldOff } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { FaGithub, FaGoogle, FaKey, FaSlack, FaSteam } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { api } from "../../lib/api";
@@ -81,11 +81,62 @@ function ProviderIcon({ provider }: { provider: string }) {
 const FILTERS = ["pending", "active", "rejected", "all"] as const;
 type Filter = (typeof FILTERS)[number];
 
+/** The orders the list can be put in. Someone who has never logged in is always last. */
+const SORTS = {
+  "joined-new": { label: "Joined: newest first", by: "joined", descending: true },
+  "joined-old": { label: "Joined: oldest first", by: "joined", descending: false },
+  "name-az": { label: "Name: A to Z", by: "name", descending: false },
+  "name-za": { label: "Name: Z to A", by: "name", descending: true },
+  "login-new": { label: "Last login: most recent first", by: "login", descending: true },
+  "login-old": { label: "Last login: longest ago first", by: "login", descending: false },
+} as const;
+type Sort = keyof typeof SORTS;
+
+const ROLES = {
+  admin: { label: "Admins", has: (u: User) => u.isAdmin === 1 },
+  mentor: { label: "Mentors", has: (u: User) => u.isMentor === 1 },
+  none: { label: "Neither", has: (u: User) => u.isAdmin !== 1 && u.isMentor !== 1 },
+} as const;
+type Role = keyof typeof ROLES;
+
+/** Sign-in providers by the name people know them by, in the order they're offered. */
+const PROVIDERS: Record<string, string> = {
+  slack: "Slack",
+  google: "Google",
+  github: "GitHub",
+  steam: "Steam",
+  onshape: "Onshape",
+  local: "Password",
+};
+
+function sortUsers(users: User[], sort: Sort): User[] {
+  const { by, descending } = SORTS[sort];
+  const direction = descending ? -1 : 1;
+  return [...users].sort((a, b) => {
+    if (by === "name") {
+      return (
+        direction * a.displayName.localeCompare(b.displayName, undefined, { sensitivity: "base" })
+      );
+    }
+    if (by === "joined") return direction * (a.createdAt - b.createdAt);
+    if (a.lastLoginAt === null || b.lastLoginAt === null) {
+      return Number(a.lastLoginAt === null) - Number(b.lastLoginAt === null);
+    }
+    return direction * (a.lastLoginAt - b.lastLoginAt);
+  });
+}
+
+const selectClass =
+  "rounded-lg bg-surface border border-secondary-300 px-3 py-1.5 text-sm text-secondary-900 focus:outline-none focus:border-primary-500";
+
 export function AdminUsersPage() {
   const navigate = useNavigate();
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [filter, setFilter] = useState<Filter>("pending");
+  const [sort, setSort] = useState<Sort>("joined-new");
+  const [role, setRole] = useState<Role | "">("");
+  const [provider, setProvider] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -247,9 +298,30 @@ export function AdminUsersPage() {
     }
   }
 
-  const filtered = filter === "all" ? users : users.filter((u) => u.status === filter);
+  // The role and sign-in filters narrow every tab, so each tab's count is of what it would show.
+  const matching = useMemo(
+    () =>
+      users.filter(
+        (u) =>
+          (role === "" || ROLES[role].has(u)) &&
+          (provider === "" || u.identities.some((identity) => identity.provider === provider)),
+      ),
+    [users, role, provider],
+  );
+  const filtered = useMemo(
+    () =>
+      sortUsers(filter === "all" ? matching : matching.filter((u) => u.status === filter), sort),
+    [matching, filter, sort],
+  );
   const countFor = (f: Filter) =>
-    f === "all" ? users.length : users.filter((u) => u.status === f).length;
+    f === "all" ? matching.length : matching.filter((u) => u.status === f).length;
+  // The providers to offer: the usual ones, then any other that someone here signs in with.
+  const providers = [
+    ...new Set([
+      ...Object.keys(PROVIDERS),
+      ...users.flatMap((u) => u.identities.map((i) => i.provider)),
+    ]),
+  ];
 
   function exportActiveUsersToCSV() {
     const activeUsers = users.filter((u) => u.status === "active");
@@ -316,7 +388,7 @@ export function AdminUsersPage() {
       </div>
 
       {/* Filter tabs */}
-      <div className="flex gap-2 mb-6">
+      <div className="flex flex-wrap gap-2 mb-3">
         {FILTERS.map((f) => (
           <button
             key={f}
@@ -333,6 +405,48 @@ export function AdminUsersPage() {
         ))}
       </div>
 
+      {/* Sort, and filter by role and sign-in */}
+      <div className="flex flex-wrap gap-2 mb-6">
+        <select
+          value={sort}
+          onChange={(e) => setSort(e.target.value as Sort)}
+          className={selectClass}
+          aria-label="Sort by"
+        >
+          {Object.entries(SORTS).map(([key, { label }]) => (
+            <option key={key} value={key}>
+              {label}
+            </option>
+          ))}
+        </select>
+        <select
+          value={role}
+          onChange={(e) => setRole(e.target.value as Role | "")}
+          className={selectClass}
+          aria-label="Role"
+        >
+          <option value="">Any role</option>
+          {Object.entries(ROLES).map(([key, { label }]) => (
+            <option key={key} value={key}>
+              {label}
+            </option>
+          ))}
+        </select>
+        <select
+          value={provider}
+          onChange={(e) => setProvider(e.target.value)}
+          className={selectClass}
+          aria-label="Sign-in"
+        >
+          <option value="">Any sign-in</option>
+          {providers.map((key) => (
+            <option key={key} value={key}>
+              {PROVIDERS[key] ?? key}
+            </option>
+          ))}
+        </select>
+      </div>
+
       {loading && (
         <div className="flex justify-center py-16 text-secondary-500">
           <Loader2 size={24} className="animate-spin" />
@@ -343,7 +457,9 @@ export function AdminUsersPage() {
 
       {!loading && !error && filtered.length === 0 && (
         <p className="text-sm text-secondary-500 text-center py-16">
-          No {filter === "all" ? "" : filter} users.
+          {role || provider
+            ? "No users match."
+            : `No ${filter === "all" ? "" : `${filter} `}users.`}
         </p>
       )}
 

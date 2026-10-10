@@ -12,7 +12,7 @@ import { drizzle } from "drizzle-orm/d1";
 import { type Context, Hono } from "hono";
 import { cors } from "hono/cors";
 import packageJson from "../package.json";
-import { AttendanceDb, teamsWithOpenSessions } from "./db";
+import { AttendanceDb, type Session, teamsWithOpenSessions } from "./db";
 import {
   attendanceMembers,
   attendanceSessions,
@@ -153,6 +153,45 @@ async function refreshTotal(
   return totalMs / 3_600_000;
 }
 
+/**
+ * The team's active members (G3ID), the only ones who appear on the leaderboard and in the
+ * reports; null when G3ID can't say.
+ */
+async function leaderboardMembers(env: AppEnv["Bindings"], teamId: string) {
+  const members = await activeMembers(env, teamId);
+  return members?.filter((member) => member.displayName.trim().toLowerCase() !== "admin") ?? null;
+}
+
+/** What a session counted for: `ms` is the time it adds to (or, for an adjustment, takes from) hours. */
+type Counted = { kind: "completed" | "open" | "missed" | "adjustment"; ms: number };
+
+/**
+ * How a session counts, by the one set of rules the summary and the reports share. Time in a
+ * session still open counts as it runs. A missed sign-out (closed by the auto sign-out limit, or
+ * open past it) counts for nothing. An admin's adjustment counts as given.
+ */
+function countSession(session: Session, limitMs: number, now: number): Counted {
+  if (session.status === "open" || session.signOut == null) {
+    const elapsedMs = now - session.signIn;
+    return elapsedMs < limitMs
+      ? { kind: "open", ms: Math.max(0, elapsedMs) }
+      : { kind: "missed", ms: 0 };
+  }
+  if (session.status === "auto-closed") return { kind: "missed", ms: 0 };
+  const duration = session.durationMs;
+  const hasDuration = typeof duration === "number" && Number.isFinite(duration);
+  if (session.status === "manual-adjustment") {
+    const adjustment = session.adjustmentMs;
+    if (typeof adjustment === "number" && Number.isFinite(adjustment)) {
+      return { kind: "adjustment", ms: adjustment };
+    }
+    // Adjustments made before they could be negative kept their hours as a duration.
+    return { kind: "adjustment", ms: hasDuration ? Math.max(0, duration) : 0 };
+  }
+  if (hasDuration) return { kind: "completed", ms: Math.max(0, duration) };
+  return { kind: "completed", ms: Math.max(0, session.signOut - session.signIn) };
+}
+
 async function attendanceSummaries(
   store: AttendanceDb,
   settings: AttendanceSettings,
@@ -166,6 +205,7 @@ async function attendanceSummaries(
     sessionsByMember.set(session.memberId, memberSessions);
   }
   const limitMs = autoSignOutMs(settings);
+  const now = Date.now();
 
   return members.map((member) => {
     const sessions = sessionsByMember.get(member.id) ?? [];
@@ -179,33 +219,9 @@ async function attendanceSummaries(
         latestSignIn = signIn;
       if (schoolYear(signIn, settings) !== year) continue;
 
-      const isOpen = session.status === "open" || session.signOut == null;
-      if (isOpen) {
-        const elapsedMs = Date.now() - signIn.getTime();
-        if (elapsedMs < limitMs) {
-          signedIn = true;
-          totalMs += Math.max(0, elapsedMs);
-        }
-        continue;
-      }
-      if (session.status === "auto-closed") continue;
-      if (session.status === "manual-adjustment") {
-        const adjustmentMs = session.adjustmentMs;
-        const legacyDurationMs = session.durationMs;
-        if (typeof adjustmentMs === "number" && Number.isFinite(adjustmentMs))
-          totalMs += adjustmentMs;
-        else if (typeof legacyDurationMs === "number" && Number.isFinite(legacyDurationMs))
-          totalMs += Math.max(0, legacyDurationMs);
-        continue;
-      }
-      const durationMs = session.durationMs;
-      if (typeof durationMs === "number" && Number.isFinite(durationMs)) {
-        totalMs += Math.max(0, durationMs);
-        continue;
-      }
-      const signOut = new Date(session.signOut ?? Number.NaN);
-      if (!Number.isNaN(signOut.getTime()))
-        totalMs += Math.max(0, signOut.getTime() - signIn.getTime());
+      const counted = countSession(session, limitMs, now);
+      if (counted.kind === "open") signedIn = true;
+      totalMs += counted.ms;
     }
     return {
       id: member.id,
@@ -358,6 +374,19 @@ const app = base
     const totalHours = await refreshTotal(store, settings, memberId, result.year);
     return c.json({ ok: true, totalHours });
   })
+  // Signs out everyone who is signed in, each with the time they've had so far.
+  .post("/admin/signout-all", requireAuth, async (c) => {
+    if (!c.get("userIsAdmin")) return c.json({ error: "Forbidden." }, 403);
+
+    const store = teamDb(c);
+    const settings = await store.settings();
+    const memberIds = [...new Set((await store.listOpenSessions()).map((s) => s.memberId))];
+    for (const memberId of memberIds) {
+      const result = await closeOpenSession(store, settings, memberId);
+      if (result) await refreshTotal(store, settings, memberId, result.year);
+    }
+    return c.json({ ok: true, signedOut: memberIds.length });
+  })
   .post("/admin/members/:memberId/add-hours", requireAuth, async (c) => {
     if (!c.get("userIsAdmin")) return c.json({ error: "Forbidden." }, 403);
     const memberId = c.req.param("memberId");
@@ -455,18 +484,61 @@ const app = base
 
     return c.json({ year, members: summaries });
   })
+  // Attendance reports — any member, for the same people as the leaderboard. Every sign-in and
+  // adjustment of the current school year with what it counted for, oldest first. The page lays
+  // them out by day in the viewer's own time zone (a team has no time zone of its own), so days
+  // aren't worked out here.
+  .get("/report", requireAuth, async (c) => {
+    const store = teamDb(c);
+    const settings = await store.settings();
+    const roster = await leaderboardMembers(c.env, c.get("teamId"));
+    if (!roster) return c.json({ error: "Unable to verify attendance eligibility." }, 502);
+    const year = schoolYear(new Date(), settings);
+    const [members, sessions] = await Promise.all([store.listMembers(), store.listSessions()]);
+
+    // The people with an attendance record, by name. Someone whose name changed has more than
+    // one record: they're one person here, under the name they have now.
+    const people = roster
+      .filter((person) => members.some((member) => member.userId === person.id))
+      .sort((a, b) => a.displayName.localeCompare(b.displayName));
+    const indexOfUser = new Map(people.map((person, index) => [person.id, index]));
+    const indexOfMember = new Map(
+      members.flatMap((member) => {
+        const index = indexOfUser.get(member.userId);
+        return index === undefined ? [] : [[member.id, index] as const];
+      }),
+    );
+    const limitMs = autoSignOutMs(settings);
+    const now = Date.now();
+
+    return c.json({
+      year,
+      members: people.map((person) => ({
+        id: person.id,
+        displayName: person.displayName,
+        isMentor: person.isMentor,
+      })),
+      sessions: sessions
+        .filter(
+          (session) =>
+            Number.isFinite(session.signIn) &&
+            schoolYear(new Date(session.signIn), settings) === year,
+        )
+        .sort((a, b) => a.signIn - b.signIn)
+        .flatMap((session) => {
+          const member = indexOfMember.get(session.memberId);
+          if (member === undefined) return [];
+          return [{ member, signIn: session.signIn, ...countSession(session, limitMs, now) }];
+        }),
+    });
+  })
   .get("/leaderboard", requireAuth, async (c) => {
     const store = teamDb(c);
     const settings = await store.settings();
     await autoSignOut(store, settings);
-    // The team's active members (G3ID): the only ones who appear on the leaderboard.
-    const members = await activeMembers(c.env, c.get("teamId"));
+    const members = await leaderboardMembers(c.env, c.get("teamId"));
     if (!members) return c.json({ error: "Unable to verify attendance eligibility." }, 502);
-    const eligibleNames = new Map(
-      members
-        .filter((member) => member.displayName.trim().toLowerCase() !== "admin")
-        .map((member) => [member.id, member.displayName]),
-    );
+    const eligibleNames = new Map(members.map((member) => [member.id, member.displayName]));
     const year = schoolYear(new Date(), settings);
     const summaries = await attendanceSummaries(store, settings, year);
     const totals = new Map<string, { displayName: string; totalHours: number }>();

@@ -27,6 +27,6 @@ export const adminPlugin: Plugin = {
   navItems: [
     { label: "Users", to: "/admin/users", order: 10, audience: "admin", group: "Admin" },
     { label: "Kiosk Devices", to: "/admin/kiosk", order: 11, audience: "admin", group: "Admin" },
-    { label: "Attendance", to: "/admin/attendance", order: 12, audience: "admin", group: "Admin" },
+    { label: "Settings", to: "/admin/attendance", order: 12, audience: "admin", group: "Admin" },
   ],
 };

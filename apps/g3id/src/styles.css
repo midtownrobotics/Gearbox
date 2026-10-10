@@ -11,3 +11,40 @@
   appearance: textfield;
   -moz-appearance: textfield;
 }
+
+/* Attendance reports (admins). These colors stand for amounts and for people, not for the team's
+   brand, so they're fixed. Each theme has its own steps, checked against that theme's card. */
+.att-report {
+  /* Hours in a day, least to most: the least is nearest the card's own color. */
+  --att-heat-1: #50c76a;
+  --att-heat-2: #27a74b;
+  --att-heat-3: #048634;
+  --att-heat-4: #056426;
+  --att-heat-5: #044418;
+  --att-missed: #d03b3b;
+  /* The ring around the day of someone who is signed in now. */
+  --att-open: #048634;
+  /* The lines of the members the hours chart names, in a fixed order. */
+  --att-series-1: #2a78d6;
+  --att-series-2: #eb6834;
+  --att-series-3: #1baf7a;
+  --att-series-4: #eda100;
+  --att-series-5: #e87ba4;
+  --att-series-6: #008300;
+}
+
+html[data-theme="dark"] .att-report {
+  --att-heat-1: #056426;
+  --att-heat-2: #048634;
+  --att-heat-3: #27a74b;
+  --att-heat-4: #50c76a;
+  --att-heat-5: #73e889;
+  --att-missed: #e66767;
+  --att-open: #50c76a;
+  --att-series-1: #3987e5;
+  --att-series-2: #d95926;
+  --att-series-3: #199e70;
+  --att-series-4: #c98500;
+  --att-series-5: #d55181;
+  --att-series-6: #008300;
+}
