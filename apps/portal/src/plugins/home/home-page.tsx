@@ -6,8 +6,8 @@ import {
   pageTeamNumber,
   portalAppLabels,
 } from "@g3/site-config";
-import { TeamIcon, rememberTeam, useTeamNames, useTeamUiSettings } from "@g3/ui";
-import { useEffect, useState } from "react";
+import { TeamIcon, rememberTeam, useTeamApps, useTeamNames, useTeamUiSettings } from "@g3/ui";
+import { useEffect } from "react";
 import type { IconType } from "react-icons";
 import { FaCube, FaGithub, FaGlobe, FaInstagram, FaSlack } from "react-icons/fa";
 import edgeIcon from "../../assets/app-icons/edge.svg";
@@ -18,7 +18,6 @@ import pitIcon from "../../assets/app-icons/pit.svg";
 import scoutingIcon from "../../assets/app-icons/scouting.svg";
 import shopIcon from "../../assets/app-icons/shop.svg";
 import skillsIcon from "../../assets/app-icons/skills.svg";
-import { platform } from "../../lib/platform";
 import { useMe } from "../../shared/me";
 import {
   BlueAllianceIcon,
@@ -176,21 +175,6 @@ const APPS: App[] = [
 /** The public site's tile: the team's logo (Team Appearance), or a globe until it sets one. */
 function publicSiteMark(logoUrl: string): { logoSrc?: string; icon?: IconType } {
   return logoUrl ? { logoSrc: logoUrl } : { logoSrc: undefined, icon: FaGlobe };
-}
-
-/**
- * The team's apps that are on (the platform's app library): null while asked, or "all" if the
- * platform didn't answer (the gateway still keeps the others closed).
- */
-function useTeamApps(signedIn: boolean): Set<string> | "all" | null {
-  const [apps, setApps] = useState<Set<string> | "all" | null>(null);
-  useEffect(() => {
-    if (!signedIn) return;
-    platform<{ apps: { slug: string }[] }>("/team/apps")
-      .then((data) => setApps(new Set(data.apps.map((a) => a.slug))))
-      .catch(() => setApps("all"));
-  }, [signedIn]);
-  return apps;
 }
 
 const isApp = (key: PortalTileKey) => key in portalAppLabels;

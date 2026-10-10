@@ -4,7 +4,6 @@ export { useIsOnline };
 export { OnShapeIcon } from "./components/onshape-icon";
 export { TeamIcon } from "./components/team-icon";
 export {
-  ALL_APPS_URL,
   activePath,
   AppNavBar,
   type AppNavItem,
@@ -16,3 +15,4 @@ export {
 export { forceTheme, readTheme, setTheme, type Theme, useTheme } from "./theme";
 export { refreshTeamUiSettings, useTeamIcon, useTeamNames, useTeamUiSettings } from "./team-ui";
 export { forgetTeam, rememberedTeam, rememberTeam } from "./my-team";
+export { type SignedInUser, useSignedInUser, useTeamApps } from "./session";
