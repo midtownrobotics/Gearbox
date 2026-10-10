@@ -220,18 +220,19 @@ html[data-theme="dark"] .g3-nav-drawer {
   color: var(--g3-nav-strong);
 }
 
-/* A long name is cut short rather than squeezing the pages. */
-.g3-nav .g3-nav-hello,
-.g3-nav-drawer .g3-nav-hello {
+/* Who's signed in is in the bar at every width. A long name is cut short ("Hello, Alexand…")
+   rather than squeezing the wordmark or the pages. */
+.g3-nav .g3-nav-hello {
+  min-width: 0;
   max-width: 16rem;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-/* Between a phone and a desktop the pages need the room: the greeting is in the menu instead. */
-@media (max-width: 1023px) {
-  .g3-nav .g3-nav-end .g3-nav-hello {
-    display: none;
+/* Between a phone and a desktop the pages need most of the room. */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .g3-nav .g3-nav-hello {
+    max-width: 9rem;
   }
 }
 
@@ -372,8 +373,16 @@ html[data-theme="dark"] .g3-nav-drawer {
     gap: 8px;
     padding: 0 12px;
   }
-  .g3-nav-links,
+  .g3-nav-links {
+    display: none;
+  }
+  /* On a phone the bar's other controls are in the menu. The greeting stays, in the room the
+     wordmark leaves. */
   .g3-nav:not(.is-flat) .g3-nav-end {
+    flex-shrink: 1;
+    min-width: 0;
+  }
+  .g3-nav:not(.is-flat) .g3-nav-end > :not(.g3-nav-hello) {
     display: none;
   }
   .g3-nav.is-flat .g3-nav-end {
