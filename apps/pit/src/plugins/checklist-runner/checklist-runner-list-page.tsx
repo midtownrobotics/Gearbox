@@ -1,10 +1,17 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { api } from "../../shared/api";
 import { getErrorMessage } from "../../shared/api-error";
+import { archiveTitle, fetchArchiveDefaults } from "../../shared/getters/archives";
 import { fetchAllIssues } from "../../shared/getters/issues";
 import { fetchLists } from "../../shared/getters/lists";
-import type { ChecklistIssueSummary, ChecklistList } from "../../shared/getters/types";
+import type {
+  ArchiveDefaults,
+  ChecklistArchive,
+  ChecklistIssueSummary,
+  ChecklistList,
+} from "../../shared/getters/types";
+import { ArchiveDialog } from "./archive-dialog";
 
 const POLL_INTERVAL_MS = 5000;
 
@@ -13,7 +20,9 @@ export function ChecklistRunnerListPage() {
   const [lists, setLists] = useState<ChecklistList[]>([]);
   const [issues, setIssues] = useState<ChecklistIssueSummary[]>([]);
   const [loading, setLoading] = useState(true);
-  const [confirmReset, setConfirmReset] = useState(false);
+  const [archiving, setArchiving] = useState(false);
+  const [archiveDefaults, setArchiveDefaults] = useState<ArchiveDefaults | null>(null);
+  const [archived, setArchived] = useState<ChecklistArchive | null>(null);
   const [confirmDeleteIssueId, setConfirmDeleteIssueId] = useState<number | null>(null);
   const [banner, setBanner] = useState<string | null>(null);
 
@@ -25,6 +34,10 @@ export function ChecklistRunnerListPage() {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
+    // The team's event, so the Archive pop-up opens knowing it.
+    fetchArchiveDefaults()
+      .then(setArchiveDefaults)
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -69,14 +82,9 @@ export function ChecklistRunnerListPage() {
     }
   }
 
-  async function handleGlobalReset() {
-    const res = await api.reset.$post({});
-    if (!res.ok) {
-      setBanner(await getErrorMessage(res as unknown as Response));
-      setConfirmReset(false);
-      return;
-    }
-    setConfirmReset(false);
+  function handleArchived(archive: ChecklistArchive) {
+    setArchiving(false);
+    setArchived(archive);
     setBanner(null);
     Promise.all([fetchLists(), fetchAllIssues()])
       .then(([listsData, issuesData]) => {
@@ -102,41 +110,34 @@ export function ChecklistRunnerListPage() {
   return (
     <main className="min-h-screen bg-page text-gray-900">
       <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-3xl font-bold tracking-tight">Checklists</h1>
-          {lists.length > 0 && !confirmReset && (
+          {lists.length > 0 && (
             <button
               type="button"
-              onClick={() => setConfirmReset(true)}
-              className="text-sm text-gray-600 hover:text-red-400 transition-colors"
+              onClick={() => {
+                setArchived(null);
+                setArchiving(true);
+              }}
+              className="rounded-lg bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-700"
             >
-              Reset All
+              Archive and Reset
             </button>
-          )}
-          {confirmReset && (
-            <div className="flex items-center gap-3">
-              <span className="text-sm text-gray-600">Reset all checklists?</span>
-              <button
-                type="button"
-                onClick={handleGlobalReset}
-                className="px-3 py-1 bg-red-700 hover:bg-red-600 text-white text-xs font-semibold rounded-lg"
-              >
-                Reset
-              </button>
-              <button
-                type="button"
-                onClick={() => setConfirmReset(false)}
-                className="px-3 py-1 bg-gray-700 hover:bg-gray-600 text-gray-200 text-xs rounded-lg"
-              >
-                Cancel
-              </button>
-            </div>
           )}
         </div>
 
         {banner && (
           <p className="text-red-400 text-sm bg-red-950 border border-red-800 rounded-lg px-4 py-2">
             {banner}
+          </p>
+        )}
+
+        {archived && (
+          <p className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-lg border border-green-300 bg-green-50 px-4 py-2 text-sm text-green-800">
+            <span>Archived: {archiveTitle(archived)}</span>
+            <Link to="/logs" className="font-semibold underline">
+              View in Logs
+            </Link>
           </p>
         )}
 
@@ -233,14 +234,14 @@ export function ChecklistRunnerListPage() {
                   {confirmDeleteIssueId === issue.id ? (
                     <div className="flex items-center gap-3">
                       <span className="text-xs text-gray-600 flex-1 truncate">
-                        Delete this issue?
+                        Resolve this issue?
                       </span>
                       <button
                         type="button"
                         onClick={() => handleDeleteIssue(issue)}
-                        className="px-2 py-0.5 bg-red-700 hover:bg-red-600 text-white text-xs font-semibold rounded"
+                        className="px-2 py-0.5 bg-primary-600 hover:bg-primary-700 text-white text-xs font-semibold rounded"
                       >
-                        Delete
+                        Resolve
                       </button>
                       <button
                         type="button"
@@ -262,7 +263,7 @@ export function ChecklistRunnerListPage() {
                         type="button"
                         onClick={() => setConfirmDeleteIssueId(issue.id)}
                         className="opacity-0 group-hover/issue:opacity-100 p-0.5 text-gray-600 hover:text-red-400 transition-all shrink-0 mt-0.5"
-                        title="Delete issue"
+                        title="Resolve issue"
                       >
                         ✕
                       </button>
@@ -274,6 +275,14 @@ export function ChecklistRunnerListPage() {
           </div>
         )}
       </div>
+
+      {archiving && (
+        <ArchiveDialog
+          known={archiveDefaults}
+          onClose={() => setArchiving(false)}
+          onArchived={handleArchived}
+        />
+      )}
     </main>
   );
 }

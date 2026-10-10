@@ -43,6 +43,7 @@ const APPS: App[] = [
       checklistLists: "checklist_lists",
       checklistItems: "checklist_items",
       checklistIssues: "checklist_issues",
+      checklistArchives: "checklist_archives",
       batteries: "batteries",
     },
   },

@@ -72,5 +72,5 @@ export const checklistsPlugin: Plugin = {
       ),
     },
   ],
-  navItems: [{ label: "Editor", to: "/editor", order: 2 }],
+  navItems: [{ label: "Editor", to: "/editor", order: 3 }],
 };

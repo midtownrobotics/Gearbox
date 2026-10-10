@@ -12,14 +12,23 @@ import {
 } from "@g3/auth";
 import { corsOrigin } from "@g3/site-config";
 import { withApiPrefix } from "@g3/site-config/worker";
-import { eq, inArray, sql } from "drizzle-orm";
+import { eq, inArray, isNull, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { validator } from "hono/validator";
 import packageJson from "../package.json";
+import { archiveRoutes } from "./archives";
 import { createDb } from "./db";
-import { batteries, checklistIssues, checklistItems, checklistLists, settings } from "./db/schema";
+import {
+  batteries,
+  checklistArchives,
+  checklistIssues,
+  checklistItems,
+  checklistLists,
+  settings,
+} from "./db/schema";
 import { manifest } from "./manifest";
+import { SETTING_KEYS, type SettingKey, getSetting, teamNumberOf } from "./settings";
 import type { AppEnv } from "./types";
 
 const base = new Hono<AppEnv>();
@@ -114,13 +123,6 @@ const issueTextValidator = validator("json", (value, c) => {
   return { text: v.text.trim() };
 });
 
-/**
- * A team's settings. The Blue Alliance and Nexus API keys aren't among them: every team's monitor
- * uses the worker's own (TBA_AUTH_KEY, NEXUS_API_KEY).
- */
-const SETTING_KEYS = ["eventKey", "nexusEventKey", "iframeUrl"] as const;
-type SettingKey = (typeof SETTING_KEYS)[number];
-
 interface NexusMonitorData {
   matches?: unknown[];
   isRealNexus?: boolean;
@@ -172,22 +174,6 @@ const reorderValidator = validator("json", (value, c) => {
   return { ids: v.ids as number[] };
 });
 
-/** One of the team's settings, or "" when it hasn't set it. */
-async function getSetting(
-  db: ReturnType<typeof createDb>,
-  team: string,
-  key: SettingKey,
-): Promise<string> {
-  const [row] = await db
-    .select()
-    .from(settings)
-    .where(inTeam(settings, team, eq(settings.key, key)));
-  return row?.value ?? "";
-}
-
-/** The team's FRC number, from its id ("frc1648" → "1648"). */
-const teamNumberOf = (team: string) => team.replace(/^frc/, "");
-
 // Shared select shape for list queries — counts only checkable items (type = 'item')
 const listSelect = {
   id: checklistLists.id,
@@ -214,11 +200,13 @@ const app = base
       checklistLists,
       checklistItems,
       checklistIssues,
+      checklistArchives,
     ]);
     return c.json(teamExport(manifest, teamId, tables));
   })
   .delete("/internal/teams/:teamId", async (c) => {
     await deleteTeamRows(createDb(c.env.PIT_DB), c.req.param("teamId"), [
+      checklistArchives,
       checklistIssues,
       checklistItems,
       checklistLists,
@@ -288,7 +276,7 @@ const app = base
     return c.json(items);
   })
 
-  // Issues — reads (all)
+  // Issues — reads (all that are open; a resolved one waits, unseen, for the next archive)
   .get("/issues", requireAuth, async (c) => {
     const db = createDb(c.env.PIT_DB);
     const team = c.get("teamId");
@@ -305,7 +293,7 @@ const app = base
       .from(checklistIssues)
       .innerJoin(checklistItems, eq(checklistIssues.itemId, checklistItems.id))
       .innerJoin(checklistLists, eq(checklistItems.listId, checklistLists.id))
-      .where(inTeam(checklistIssues, team))
+      .where(inTeam(checklistIssues, team, isNull(checklistIssues.resolvedAt)))
       .orderBy(checklistIssues.createdAt);
     return c.json(issues);
   })
@@ -333,7 +321,14 @@ const app = base
       })
       .from(checklistIssues)
       .innerJoin(checklistItems, eq(checklistIssues.itemId, checklistItems.id))
-      .where(inTeam(checklistItems, team, eq(checklistItems.listId, listId)))
+      .where(
+        inTeam(
+          checklistItems,
+          team,
+          eq(checklistItems.listId, listId),
+          isNull(checklistIssues.resolvedAt),
+        ),
+      )
       .orderBy(checklistIssues.createdAt);
     return c.json(issues);
   })
@@ -643,6 +638,8 @@ const app = base
     return c.json(created, 201);
   })
 
+  // Resolving an issue. It's kept, out of the open issues, until the next archive has recorded
+  // it as resolved (./archives.ts).
   .delete("/lists/:id/items/:itemId/issues/:issueId", requireAuth, async (c) => {
     const listId = parseId(c.req.param("id"));
     const itemId = parseId(c.req.param("itemId"));
@@ -661,11 +658,19 @@ const app = base
     const [issue] = await db
       .select()
       .from(checklistIssues)
-      .where(inTeam(checklistIssues, team, eq(checklistIssues.id, issueId)));
+      .where(
+        inTeam(
+          checklistIssues,
+          team,
+          eq(checklistIssues.id, issueId),
+          isNull(checklistIssues.resolvedAt),
+        ),
+      );
     if (!issue || issue.itemId !== itemId) return c.json({ error: "Issue not found." }, 404);
 
     await db
-      .delete(checklistIssues)
+      .update(checklistIssues)
+      .set({ resolvedAt: Math.floor(Date.now() / 1000) })
       .where(inTeam(checklistIssues, team, eq(checklistIssues.id, issueId)));
     return c.json({ success: true });
   })
@@ -786,7 +791,10 @@ const app = base
     return c.json(updated);
   })
 
-  // Global reset — unchecks all items across all lists, preserves issues
+  // Checklist archives: "Archive and Reset" and the Logs page (./archives.ts).
+  .route("/archives", archiveRoutes)
+
+  // Global reset — unchecks all items across all lists, preserves issues, archives nothing
   .post("/reset", requireAuth, async (c) => {
     const db = createDb(c.env.PIT_DB);
     const team = c.get("teamId");

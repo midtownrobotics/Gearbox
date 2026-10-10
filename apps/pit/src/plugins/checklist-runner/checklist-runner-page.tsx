@@ -305,14 +305,14 @@ export function ChecklistRunnerPage() {
                           {confirmDeleteIssueId === issue.id ? (
                             <div className="flex items-center gap-3 py-0.5">
                               <span className="text-xs text-gray-600 flex-1 truncate">
-                                Delete "{issue.text}"?
+                                Resolve "{issue.text}"?
                               </span>
                               <button
                                 type="button"
                                 onClick={() => deleteIssue(issue)}
-                                className="px-2 py-0.5 bg-red-700 hover:bg-red-600 text-white text-xs font-semibold rounded"
+                                className="px-2 py-0.5 bg-primary-600 hover:bg-primary-700 text-white text-xs font-semibold rounded"
                               >
-                                Delete
+                                Resolve
                               </button>
                               <button
                                 type="button"
