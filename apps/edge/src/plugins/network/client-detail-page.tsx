@@ -7,19 +7,25 @@ import { Card, ErrorBanner, Loading, Page, Stat } from "../../shared/ui";
 import { useLoad } from "../../shared/use-load";
 import { BarChart, ChartLegend } from "./bar-chart";
 import { ClientExceptions } from "./client-exceptions";
+import { InsightStats, WhenCharts } from "./insights";
 import { OnlineDot, PresenceNote } from "./online";
+import { RangePicker, rangeLabel, useRange } from "./range";
 import { isPseudoSite, sitePath } from "./sites-page";
 
 export function ClientDetailPage() {
   const mac = useParams().mac ?? "";
+  const { query, zoom, withRange } = useRange();
   const { data, error, reload } = useLoad(async () => {
-    const res = await api.network.clients[":mac"].$get({ param: { mac } });
+    const res = await api.network.clients[":mac"].$get({ param: { mac }, query });
     if (!res.ok) throw new Error(await getErrorMessage(res));
     return res.json();
-  }, [mac]);
+  }, [mac, query.from, query.to]);
 
   const back = (
-    <Link to="/network/clients" className="text-sm text-secondary-500 hover:text-secondary-900">
+    <Link
+      to={withRange("/network/clients")}
+      className="text-sm text-secondary-500 hover:text-secondary-900"
+    >
       ← All clients
     </Link>
   );
@@ -36,12 +42,12 @@ export function ClientDetailPage() {
       </Page>
     );
 
-  const { client, daily, hourly, presence } = data;
-  const cycleTotal = daily.reduce((sum, d) => sum + d.dl + d.ul, 0);
-  const dayTotal = hourly.reduce((sum, h) => sum + h.dl + h.ul, 0);
+  const { client, daily, hourly, presence, range, stats } = data;
+  const label = rangeLabel(range);
 
   return (
     <Page title={client.name} actions={back}>
+      <RangePicker range={range} />
       <PresenceNote presence={presence} />
       <Card>
         {client.online !== null && (
@@ -54,8 +60,6 @@ export function ClientDetailPage() {
         )}
         <RenameForm mac={client.mac} current={client.displayName} onSaved={reload} />
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4">
-          <Stat label="This cycle" value={formatBytes(cycleTotal)} />
-          <Stat label="Last 24h" value={formatBytes(dayTotal)} />
           <Stat
             label="Last seen"
             value={<span className="text-base">{formatDateTime(client.lastSeenAt)}</span>}
@@ -75,28 +79,55 @@ export function ClientDetailPage() {
         </dl>
       </Card>
 
-      <Card title="Daily usage this cycle">
-        <BarChart
-          bars={daily.map((d) => ({
-            label: formatDayKey(d.day),
-            tick: String(Number(d.day.slice(8))),
-            dl: d.dl,
-            ul: d.ul,
-          }))}
-        />
-        <ChartLegend />
+      <Card title={`Usage · ${label}`}>
+        <InsightStats stats={stats} onDay={zoom} />
+        <div className="mt-5">
+          {stats.singleDay ? (
+            <BarChart
+              label="Usage by hour"
+              bars={hourly.map((h) => ({
+                label: formatDateTime(h.hour),
+                tick: formatHour(h.hour),
+                dl: h.dl,
+                ul: h.ul,
+              }))}
+            />
+          ) : (
+            <BarChart
+              label="Usage by day: choose a day to see its hours"
+              bars={daily.map((d) => ({
+                label: formatDayKey(d.day),
+                tick: String(Number(d.day.slice(8))),
+                dl: d.dl,
+                ul: d.ul,
+              }))}
+              onSelect={(i) => zoom(daily[i].day)}
+              reference={stats.perDay > 0 ? { value: stats.perDay, label: "average" } : undefined}
+            />
+          )}
+          <ChartLegend />
+          {!stats.singleDay && (
+            <p className="mt-1 text-xs text-secondary-500">Choose a day to see its hours.</p>
+          )}
+        </div>
       </Card>
 
-      <Card title="Last 24 hours">
-        <BarChart
-          bars={hourly.map((h) => ({
-            label: formatDateTime(h.hour),
-            tick: formatHour(h.hour),
-            dl: h.dl,
-            ul: h.ul,
-          }))}
-        />
+      <Card title="When it's used">
+        <WhenCharts stats={stats} />
       </Card>
+
+      {!stats.singleDay && (
+        <Card title="Last 24 hours">
+          <BarChart
+            bars={hourly.map((h) => ({
+              label: formatDateTime(h.hour),
+              tick: formatHour(h.hour),
+              dl: h.dl,
+              ul: h.ul,
+            }))}
+          />
+        </Card>
+      )}
 
       <ClientExceptions mac={client.mac} />
       <ClientSites mac={client.mac} />
@@ -104,19 +135,20 @@ export function ClientDetailPage() {
   );
 }
 
-/** Admin-only: this device’s top sites this cycle. */
+/** Admin-only: this device’s top sites over the page's range. */
 function ClientSites({ mac }: { mac: string }) {
   const user = useAuthUser();
+  const { query, withRange } = useRange();
   const { data, error } = useLoad(async () => {
     if (!user.isAdmin) return null;
-    const res = await api.network.sites.client[":mac"].$get({ param: { mac } });
+    const res = await api.network.sites.client[":mac"].$get({ param: { mac }, query });
     if (!res.ok) throw new Error(await getErrorMessage(res));
     return res.json();
-  }, [mac, user.isAdmin]);
+  }, [mac, user.isAdmin, query.from, query.to]);
   if (!user.isAdmin) return null;
 
   return (
-    <Card title="Top sites this cycle">
+    <Card title={data ? `Top sites · ${rangeLabel(data.range)}` : "Top sites"}>
       {error && <ErrorBanner message={error} />}
       {!data && !error && <Loading />}
       {data && data.sites.length === 0 && (
@@ -127,7 +159,7 @@ function ClientSites({ mac }: { mac: string }) {
           {data.sites.map((s) => (
             <li key={s.site} className="py-2 flex items-center justify-between gap-3">
               <Link
-                to={sitePath(s.site)}
+                to={withRange(sitePath(s.site))}
                 className={`truncate hover:text-primary-500 ${isPseudoSite(s.site) ? "italic text-secondary-500" : "text-secondary-900 font-medium"}`}
               >
                 {s.site}

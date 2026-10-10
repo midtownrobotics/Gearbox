@@ -1,20 +1,26 @@
 import { Link, useParams } from "react-router-dom";
 import { api, getErrorMessage } from "../../shared/api";
 import { formatBytes, formatDayKey } from "../../shared/format";
-import { Card, ErrorBanner, Loading, Page, Stat } from "../../shared/ui";
+import { Card, ErrorBanner, Loading, Page } from "../../shared/ui";
 import { useLoad } from "../../shared/use-load";
 import { BarChart, ChartLegend } from "./bar-chart";
+import { InsightStats, WhenCharts } from "./insights";
+import { RangePicker, rangeLabel, useRange } from "./range";
 
 export function SiteDetailPage() {
   const site = useParams().site ?? "";
+  const { query, zoom, withRange } = useRange();
   const { data, error } = useLoad(async () => {
-    const res = await api.network.sites.site[":site"].$get({ param: { site } });
+    const res = await api.network.sites.site[":site"].$get({ param: { site }, query });
     if (!res.ok) throw new Error(await getErrorMessage(res));
     return res.json();
-  }, [site]);
+  }, [site, query.from, query.to]);
 
   const back = (
-    <Link to="/network/sites" className="text-sm text-secondary-500 hover:text-secondary-900">
+    <Link
+      to={withRange("/network/sites")}
+      className="text-sm text-secondary-500 hover:text-secondary-900"
+    >
       ← All sites
     </Link>
   );
@@ -31,34 +37,49 @@ export function SiteDetailPage() {
       </Page>
     );
 
-  const total = data.clients.reduce((sum, c) => sum + c.dl + c.ul, 0);
+  const { range, stats, daily } = data;
+  const label = rangeLabel(range);
   return (
     <Page title={site} actions={back}>
-      <Card>
-        <div className="grid grid-cols-2 gap-4">
-          <Stat label="This cycle" value={formatBytes(total)} />
-          <Stat label="Devices" value={data.clients.length} />
-        </div>
+      <RangePicker range={range} />
+      <Card title={`Usage · ${label}`}>
+        <InsightStats stats={stats} onDay={zoom} />
+        <p className="mt-3 text-sm text-secondary-600">
+          {data.clients.length} {data.clients.length === 1 ? "device" : "devices"} used it.
+        </p>
+        {!stats.singleDay && (
+          <div className="mt-5">
+            <BarChart
+              label="Usage by day: choose a day to see that day's devices"
+              bars={daily.map((d) => ({
+                label: formatDayKey(d.day),
+                tick: String(Number(d.day.slice(8))),
+                dl: d.dl,
+                ul: d.ul,
+              }))}
+              onSelect={(i) => zoom(daily[i].day)}
+              reference={stats.perDay > 0 ? { value: stats.perDay, label: "average" } : undefined}
+            />
+            <ChartLegend />
+            <p className="mt-1 text-xs text-secondary-500">
+              Choose a day to see which devices used it that day.
+            </p>
+          </div>
+        )}
       </Card>
 
-      <Card title="Daily usage this cycle">
-        <BarChart
-          bars={data.daily.map((d) => ({
-            label: formatDayKey(d.day),
-            tick: String(Number(d.day.slice(8))),
-            dl: d.dl,
-            ul: d.ul,
-          }))}
-        />
-        <ChartLegend />
-      </Card>
+      {!stats.singleDay && (
+        <Card title="When it's used">
+          <WhenCharts stats={stats} />
+        </Card>
+      )}
 
-      <Card title="Devices">
+      <Card title={`Devices · ${label}`}>
         <ul className="divide-y divide-secondary-100">
           {data.clients.map((c) => (
             <li key={c.mac} className="py-2 flex items-center justify-between gap-3">
               <Link
-                to={`/network/clients/${encodeURIComponent(c.mac)}`}
+                to={withRange(`/network/clients/${encodeURIComponent(c.mac)}`)}
                 className="text-secondary-900 hover:text-primary-500 font-medium truncate"
               >
                 {c.name}

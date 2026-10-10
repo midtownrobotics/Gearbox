@@ -22,6 +22,7 @@ import { desiredState } from "./control";
 import { controlRouter } from "./control-routes";
 import { ingestUsage, parseUsageBatch } from "./ingest";
 import { livePresence, onlineFlag, presenceSummary } from "./presence";
+import { rangeOf, rangeQuery, usageStats } from "./range";
 import { ingestSites, parseSiteBatch } from "./sites";
 import { sitesRouter } from "./sites-routes";
 import { SEVEN_DAYS, dailyFor, earliestSample, hourlyFor, project, totalsByMac } from "./usage";
@@ -69,23 +70,30 @@ export const networkAgentRouter = new Hono<AppEnv>()
 export const networkRouter = new Hono<AppEnv>()
   .route("/sites", sitesRouter)
   .route("/control", controlRouter)
-  .get("/overview", requireAuth, async (c) => {
+  .get("/overview", requireAuth, rangeQuery, async (c) => {
     const db = createEdgeDb(c.env.EDGE_DB);
     const teamId = c.get("teamId");
     const t = now();
     const [settings, tz] = await Promise.all([getSettings(db, teamId), teamTimeZone(db, teamId)]);
     const cycle = billingCycle(t, settings.cycleStartDay, tz);
+    // The cap and its projection are the cycle's; everything else is the range's (?from=&to=).
+    const range = rangeOf(c, t, tz, settings.cycleStartDay);
+    if ("error" in range) return c.json({ error: range.error }, 400);
 
-    const [totals, clients, daily, recent, firstTs] = await Promise.all([
-      totalsByMac(db, teamId, cycle.start, cycle.end),
+    const [cycleTotals, totals, clients, daily, hourly, recent, firstTs] = await Promise.all([
+      range.isCycle ? null : totalsByMac(db, teamId, cycle.start, cycle.end),
+      totalsByMac(db, teamId, range.from, range.to),
       db.select().from(netClients).where(inTeam(netClients, teamId)).all(),
-      dailyFor(db, teamId, tz, WAN_KEY, cycle.start, cycle.end),
+      dailyFor(db, teamId, tz, WAN_KEY, range.from, range.to),
+      hourlyFor(db, teamId, WAN_KEY, range.from, range.to),
       totalsByMac(db, teamId, t - SEVEN_DAYS, t + 1),
       earliestSample(db, teamId, WAN_KEY),
     ]);
 
+    const cycleWan = (cycleTotals ?? totals).get(WAN_KEY) ?? { dl: 0, ul: 0 };
+    const used = cycleWan.dl + cycleWan.ul;
     const wan = totals.get(WAN_KEY) ?? { dl: 0, ul: 0 };
-    const used = wan.dl + wan.ul;
+    const rangeUsed = wan.dl + wan.ul;
     const recentWan = recent.get(WAN_KEY) ?? { dl: 0, ul: 0 };
     const recentStart = Math.max(t - SEVEN_DAYS, firstTs ?? t);
 
@@ -117,7 +125,7 @@ export const networkRouter = new Hono<AppEnv>()
       // The box's own part lookups for Orders (measured on the box; part of the WAN total).
       lookups,
       // WAN bytes not attributed to any LAN client or to lookups: the box's other traffic plus overhead.
-      unattributed: Math.max(0, used - attributed - lookups.dl - lookups.ul),
+      unattributed: Math.max(0, rangeUsed - attributed - lookups.dl - lookups.ul),
       projection: project({
         used,
         now: t,
@@ -126,7 +134,12 @@ export const networkRouter = new Hono<AppEnv>()
         recentBytes: recentWan.dl + recentWan.ul,
         recentSeconds: t - recentStart,
       }),
+      range,
+      rangeUsed,
       daily,
+      // A single day's hours, for its chart (longer ranges show days).
+      hourly: range.days === 1 ? hourly : [],
+      stats: usageStats(range, daily, hourly, t, tz),
       topClients: topClients.slice(0, 10),
     });
   })
@@ -163,7 +176,7 @@ export const networkRouter = new Hono<AppEnv>()
       })),
     });
   })
-  .get("/clients/:mac", requireAuth, async (c) => {
+  .get("/clients/:mac", requireAuth, rangeQuery, async (c) => {
     const db = createEdgeDb(c.env.EDGE_DB);
     const teamId = c.get("teamId");
     const mac = c.req.param("mac");
@@ -177,10 +190,15 @@ export const networkRouter = new Hono<AppEnv>()
     const t = now();
     const [settings, tz] = await Promise.all([getSettings(db, teamId), teamTimeZone(db, teamId)]);
     const cycle = billingCycle(t, settings.cycleStartDay, tz);
-    const [daily, hourly] = await Promise.all([
-      dailyFor(db, teamId, tz, mac, cycle.start, cycle.end),
-      hourlyFor(db, teamId, mac, t - DAY, t + 1),
+    const range = rangeOf(c, t, tz, settings.cycleStartDay);
+    if ("error" in range) return c.json({ error: range.error }, 400);
+    const [daily, rangeHourly, lastDay] = await Promise.all([
+      dailyFor(db, teamId, tz, mac, range.from, range.to),
+      hourlyFor(db, teamId, mac, range.from, range.to),
+      range.days === 1 ? null : hourlyFor(db, teamId, mac, t - DAY, t + 1),
     ]);
+    // A single day shows its own hours; otherwise the last 24 hours, as before.
+    const hourly = lastDay ?? rangeHourly;
     return c.json({
       client: {
         ...client,
@@ -190,8 +208,10 @@ export const networkRouter = new Hono<AppEnv>()
       },
       presence: presenceSummary(presence),
       cycle,
+      range,
       daily,
       hourly,
+      stats: usageStats(range, daily, rangeHourly, t, tz),
     });
   })
   .patch(

@@ -28,6 +28,8 @@ export const formatDate = (ts: number) => format(ts, { month: "short", day: "num
 export const formatDateTime = (ts: number) =>
   format(ts, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 export const formatHour = (ts: number) => format(ts, { hour: "numeric" });
+/** "2 PM – 3 PM" for the hour starting at ts (the box's time). */
+export const formatHourRange = (ts: number) => `${formatHour(ts)} – ${formatHour(ts + 3600)}`;
 
 /** Today's "YYYY-MM-DD" day key where the box is. */
 export const todayKey = () => new Date().toLocaleDateString("en-CA", { timeZone });
