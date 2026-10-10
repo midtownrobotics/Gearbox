@@ -1,5 +1,4 @@
 import { site } from "@g3/site-config";
-import { OnShapeIcon } from "@g3/ui";
 import { Loader2, Shield } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { FaGithub, FaGoogle, FaSlack, FaSteam } from "react-icons/fa";
@@ -32,7 +31,6 @@ const PROVIDER_LABELS: Record<string, string> = {
   slack: "Slack",
   github: "GitHub",
   steam: "Steam",
-  onshape: "OnShape",
 };
 
 export function DashboardPage() {
@@ -392,15 +390,6 @@ export function DashboardPage() {
                 </>
               )}
             </div>
-          )}
-          {me.sessionType === "oauth" && !me.identities.some((i) => i.provider === "onshape") && (
-            <a
-              href={`${import.meta.env.VITE_API_BASE_URL}/auth/onshape`}
-              className="mt-3 w-full flex items-center justify-center gap-2 rounded-lg bg-primary-600 hover:bg-primary-700 px-4 py-2 text-sm text-white transition-colors"
-            >
-              <OnShapeIcon size={16} white />
-              Connect OnShape
-            </a>
           )}
         </div>
 

@@ -43,7 +43,7 @@ function wranglerRules(app: Exclude<AppName, "portal">): Rule[] {
   return [
     httpsVar("FRONTEND_URL", () => appUrl(app)),
     httpsVar(
-      "(GOOGLE|GITHUB|STEAM|ONSHAPE)_REDIRECT_URI",
+      "(GOOGLE|GITHUB|STEAM)_REDIRECT_URI",
       // One address for every team: the platform's id.<domain> host.
       (m) => `${signInCallbackApiUrl(teamKey)}/auth/${m[2].toLowerCase()}/callback`,
     ),

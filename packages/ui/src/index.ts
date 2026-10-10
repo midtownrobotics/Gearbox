@@ -1,7 +1,6 @@
 import { useIsOnline } from "./hooks/use-is-online";
 export { useIsOnline };
 
-export { OnShapeIcon } from "./components/onshape-icon";
 export { TeamIcon } from "./components/team-icon";
 export {
   activePath,

@@ -38,7 +38,7 @@ export function teamUrl(env: AppEnv["Bindings"], teamId: string, app: AppName): 
  */
 export function providerRedirectUri(
   env: AppEnv["Bindings"],
-  provider: "google" | "github" | "steam" | "onshape",
+  provider: "google" | "github" | "steam",
   teamId: string,
 ): string {
   if (teamId === teamKey) {
@@ -46,7 +46,6 @@ export function providerRedirectUri(
       google: env.GOOGLE_REDIRECT_URI,
       github: env.GITHUB_REDIRECT_URI,
       steam: env.STEAM_REDIRECT_URI,
-      onshape: env.ONSHAPE_REDIRECT_URI,
     };
     return settings[provider];
   }

@@ -1,4 +1,3 @@
-import { OnShapeIcon } from "@g3/ui";
 import { GraduationCap, Loader2, Shield, ShieldOff } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { FaGithub, FaGoogle, FaKey, FaSlack, FaSteam } from "react-icons/fa";
@@ -67,12 +66,6 @@ function ProviderIcon({ provider }: { provider: string }) {
           <FaKey />
         </span>
       );
-    case "onshape":
-      return (
-        <span className={`${cls} text-green-700`} title="Onshape">
-          <OnShapeIcon size={16} onshape-green />
-        </span>
-      );
     default:
       return <span className="text-xs text-secondary-500">{provider}</span>;
   }
@@ -105,7 +98,6 @@ const PROVIDERS: Record<string, string> = {
   google: "Google",
   github: "GitHub",
   steam: "Steam",
-  onshape: "Onshape",
   local: "Password",
 };
 
@@ -336,7 +328,7 @@ export function AdminUsersPage() {
     const activeUsers = users.filter((u) => u.status === "active");
     if (activeUsers.length === 0) return;
 
-    const authMethods = ["Slack", "Google", "GitHub", "Steam", "OnShape"];
+    const authMethods = ["Slack", "Google", "GitHub", "Steam"];
     const headers = [
       "Name",
       "Email",
@@ -354,7 +346,6 @@ export function AdminUsersPage() {
         google: providerSet.has("google"),
         github: providerSet.has("github"),
         steam: providerSet.has("steam"),
-        onshape: providerSet.has("onshape"),
       };
       return [
         u.displayName,
@@ -367,7 +358,6 @@ export function AdminUsersPage() {
         authValues.google ? "TRUE" : "FALSE",
         authValues.github ? "TRUE" : "FALSE",
         authValues.steam ? "TRUE" : "FALSE",
-        authValues.onshape ? "TRUE" : "FALSE",
       ];
     });
 

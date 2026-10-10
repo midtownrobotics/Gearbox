@@ -31,7 +31,7 @@ A worker with a service binding to another worker can't be deployed until that w
 The app workers' old `api.<app>` custom domains send requests straight to the worker, without the `/api` the gateway adds, so they must go when the new workers go live. Do this at a quiet time; the apps are down for the few minutes between steps 3 and 5.
 
 1. **Sign-in providers:** sign-in callbacks are now on the new addresses, so add them to each provider before deploying (keep the old ones until the switch is done):
-   - Google, GitHub, Onshape: `https://id.<domain>/api/auth/<provider>/callback` (`google`, `github`, `onshape`). Every team's sign-in calls back there; the team travels in the sign-in's state. Steam needs no change: it accepts any return address.
+   - Google, GitHub: `https://id.<domain>/api/auth/<provider>/callback` (`google`, `github`). Every team's sign-in calls back there; the team travels in the sign-in's state. Steam needs no change: it accepts any return address.
    - Share-A-Cart: Orders now calls back on `https://orders.<domain>/api/share-a-cart/callback`; reconnect it once on Orders' Settings page after the switch.
 2. **DNS:** make sure there's a proxied wildcard record for the domain: `*` → AAAA `100::` (proxied, orange cloud). Hostnames with their own records (`www`) keep them.
 3. **Deploy the app workers:** `pnpm --filter "./workers/*" --filter "!@g3/worker-gateway" run deploy`.
@@ -48,7 +48,7 @@ The platform Worker serves `frcgearbox.com` (team sign-up) and every other team'
 1. **Zone and DNS:** add `frcgearbox.com` to the Cloudflare account, with proxied records for the domain itself and a wildcard: `@` and `*` → AAAA `100::`.
 2. **Database:** `wrangler d1 create gearbox-platform-prod`, paste its ID into `workers/platform/wrangler.toml`, and apply its migrations (`pnpm --filter @g3/worker-platform db:migrate:remote`).
 3. **Slack app:** add the redirect URLs `https://frcgearbox.com/api/signup/slack/callback` and `https://id.frcgearbox.com/api/slack/oauth/callback`. Set `SLACK_CLIENT_ID` in `workers/platform/wrangler.toml` and the `SLACK_CLIENT_SECRET` secret on the platform Worker (the same values as G3ID's).
-4. **Sign-in providers:** add `https://id.frcgearbox.com/api/auth/<provider>/callback` for Google, GitHub and Onshape (other teams' sign-ins call back there).
+4. **Sign-in providers:** add `https://id.frcgearbox.com/api/auth/<provider>/callback` for Google and GitHub (other teams' sign-ins call back there).
 5. **Deploy** G3ID, then the platform Worker, then the gateway (it binds to the platform).
 
 ## The operators' console (once)
@@ -71,7 +71,7 @@ G3's apps move from `<app>.g3robotics.com` to `1648-<app>.frcgearbox.com` (its h
 Before merging the release PR that includes the move (it deploys on merge):
 
 1. **frcgearbox.com is set up** (above): zone, `@` and `*` DNS records, the platform Worker, migrations, and team 1648 active in the platform's registry (its first migration adds it).
-2. **Sign-in providers:** `https://id.frcgearbox.com/api/auth/<provider>/callback` registered with Google, GitHub and Onshape (Steam needs nothing).
+2. **Sign-in providers:** `https://id.frcgearbox.com/api/auth/<provider>/callback` registered with Google and GitHub (Steam needs nothing).
 3. **Slack app:** slash commands and events at `https://id.frcgearbox.com/api/slack/...` (`/commands/signin`, `/commands/link`, `/events`), and the redirect URLs `https://id.frcgearbox.com/api/slack/oauth/callback` and `https://frcgearbox.com/api/signup/slack/callback`.
 4. **Edge box:** `EDGE_WORKER_URL=https://1648-edge.frcgearbox.com/api` in `/etc/g3-edge/agent.env`, then restart the agent.
 
