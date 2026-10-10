@@ -64,6 +64,7 @@ These apps are being turned from one team's tools into a hosted platform that ma
 - Database schema in `src/db/schema.ts` with migrations in `src/db/migrations/`
 - Session management: OAuth sessions stored in KV with D1 backup, PIN sessions in D1 only
 - **Important**: PIN sessions cannot access admin routes (enforced in `middleware/auth.ts`)
+- Deleting a user (`DELETE /admin/users/:id`) removes the account and everything that points at it (sign-ins, sessions, kiosk PIN, sign-in and activation codes, old merged-in shells) in one batch, so it's all or nothing; the team's kiosks pass to the admin doing it, and its Slack connection stays. A new table that points at `core_users` must be handled there. An admin can't delete their own account
 
 **G3ID Web App** (`apps/g3id/`)
 - Plugin-based architecture: each feature is a plugin with routes and nav items
