@@ -4,6 +4,7 @@ import { useLocation } from "react-router-dom";
 import type { Plugin } from "../../shared/plugin-types";
 import { AdminAttendancePage } from "./admin-attendance-page";
 import { AdminKioskPage } from "./admin-kiosk-page";
+import { AdminUserPage } from "./admin-user-page";
 import { AdminUsersPage } from "./admin-users-page";
 
 /** A page that moved to the team's admin pages on its home (roadmap 4.5): old links go there. */
@@ -19,6 +20,7 @@ export const adminPlugin: Plugin = {
   name: "admin",
   routes: [
     { path: "/admin/users", element: <AdminUsersPage /> },
+    { path: "/admin/users/:id", element: <AdminUserPage /> },
     { path: "/admin/kiosk", element: <AdminKioskPage /> },
     { path: "/admin/attendance", element: <AdminAttendancePage /> },
     { path: "/admin/slack", element: <MovedToHome to="/admin/slack" /> },

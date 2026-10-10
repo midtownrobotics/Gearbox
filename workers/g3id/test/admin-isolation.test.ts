@@ -72,6 +72,8 @@ describe("an admin can't reach another team", () => {
 
     const kiosks = (await (await asA("/admin/kiosk/devices")).json()) as { id: number }[];
     expect(kiosks.map((k) => k.id)).not.toContain(kioskB);
+    // Nor one of them on their own.
+    expect((await asA(`/admin/users/${memberB}`)).status).toBe(404);
   });
 
   it("changes nothing of another team's", async () => {

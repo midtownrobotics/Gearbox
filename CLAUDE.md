@@ -71,7 +71,7 @@ These apps are being turned from one team's tools into a hosted platform that ma
 - Color system centralized in `packages/ui/src/index.css` using Tailwind v4 `@theme` block
 - Primary color: #A32035 (burgundy), Secondary: neutral grays (#f8f8f8–#1a1a1a)
 - Navbar updates auth state on every route change (useLocation dependency)
-- The Users list (`plugins/admin/admin-users-page.tsx`) is sorted (join date, name, last login; never-logged-in last) and filtered (status tabs, role, sign-in provider) in the page, from the one `GET /admin/users` load
+- The Users list (`plugins/admin/admin-users-page.tsx`) opens on the Active tab and is searched (name, email and the account names people sign in with: `providerEmail` on each identity, `matchesSearch` in `users-shared.tsx`), sorted (join date, name, last login; never-logged-in last) and filtered (status tabs, role, sign-in provider) in the page, from the one `GET /admin/users` load; the tab, search and filters are in the address. Clicking someone opens their page (`/admin/users/:id`, `admin-user-page.tsx`, from `GET /admin/users/:id`: their sign-ins with account names, whether they have a kiosk PIN (never the PIN), and approve, roles and delete, which asks in the page)
 
 **Attendance Worker** (`workers/attendance/`)
 - Attendance members, sessions, manual adjustments, and yearly totals live in its own Cloudflare D1 database, bound as `ATTENDANCE_DB`. Team-scoped (roadmap Phase 3): every table has `team_id` (migration `0002`), and every query goes through `AttendanceDb(d1, teamId)` (`src/db.ts`, Drizzle with `inTeam`/`withTeam`; schema in `src/db/schema.ts`).
