@@ -25,7 +25,15 @@ import { livePresence, onlineFlag, presenceSummary } from "./presence";
 import { rangeOf, rangeQuery, usageStats } from "./range";
 import { ingestSites, parseSiteBatch } from "./sites";
 import { sitesRouter } from "./sites-routes";
-import { SEVEN_DAYS, dailyFor, earliestSample, hourlyFor, project, totalsByMac } from "./usage";
+import {
+  SEVEN_DAYS,
+  dailyFor,
+  earliestSample,
+  everyHour,
+  hourlyFor,
+  project,
+  totalsByMac,
+} from "./usage";
 
 const now = () => Math.floor(Date.now() / 1000);
 
@@ -137,8 +145,8 @@ export const networkRouter = new Hono<AppEnv>()
       range,
       rangeUsed,
       daily,
-      // A single day's hours, for its chart (longer ranges show days).
-      hourly: range.days === 1 ? hourly : [],
+      // A single day's hours, every one up to now, for its chart (longer ranges show days).
+      hourly: range.days === 1 ? everyHour(hourly, range.from, Math.min(range.to, t + 1)) : [],
       stats: usageStats(range, daily, hourly, t, tz),
       topClients: topClients.slice(0, 10),
     });
@@ -197,8 +205,11 @@ export const networkRouter = new Hono<AppEnv>()
       hourlyFor(db, teamId, mac, range.from, range.to),
       range.days === 1 ? null : hourlyFor(db, teamId, mac, t - DAY, t + 1),
     ]);
-    // A single day shows its own hours; otherwise the last 24 hours, as before.
-    const hourly = lastDay ?? rangeHourly;
+    // A single day shows its own hours; otherwise the last 24 hours, as before. Every hour, so the
+    // chart's hours are evenly spaced.
+    const hourly = lastDay
+      ? everyHour(lastDay, t - DAY, t + 1)
+      : everyHour(rangeHourly, range.from, Math.min(range.to, t + 1));
     return c.json({
       client: {
         ...client,

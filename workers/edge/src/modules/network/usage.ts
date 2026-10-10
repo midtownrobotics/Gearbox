@@ -66,6 +66,23 @@ export async function hourlyFor(db: EdgeDb, teamId: string, mac: string, from: n
     .all();
 }
 
+/**
+ * An hour row for every hour from `from` up to `until` (zero where there was no traffic), so a
+ * day's chart has a bar for each hour instead of only the busy ones.
+ */
+export function everyHour(
+  rows: { hour: number; dl: number; ul: number }[],
+  from: number,
+  until: number,
+) {
+  const byHour = new Map(rows.map((r) => [r.hour, r]));
+  const out = [];
+  for (let hour = Math.floor(from / HOUR) * HOUR; hour < until; hour += HOUR) {
+    out.push(byHour.get(hour) ?? { hour, dl: 0, ul: 0 });
+  }
+  return out;
+}
+
 /** Per-local-day totals for one client, with a zero entry for every day in range. */
 export async function dailyFor(
   db: EdgeDb,
