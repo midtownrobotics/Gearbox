@@ -31,11 +31,18 @@ export type AppSetting = {
 
 export type SettingValue = string | number | boolean | null;
 
+/** Whether an integration is connected, and what there is to know about it (@g3/auth). */
+export type IntegrationStatus = {
+  connected: boolean;
+  detail?: string;
+  facts?: { label: string; value?: string; at?: number }[];
+};
+
 /** What an app's /team-settings answers (TeamSettingsState in @g3/auth). */
 export type TeamSettingsState = {
   values: Record<string, SettingValue>;
   secretsSet: Record<string, boolean>;
-  integrations: Record<string, { connected: boolean; detail?: string }>;
+  integrations: Record<string, IntegrationStatus>;
   canEdit: string[];
 };
 

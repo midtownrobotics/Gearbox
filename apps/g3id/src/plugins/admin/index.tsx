@@ -23,7 +23,7 @@ export const adminPlugin: Plugin = {
     { path: "/admin/users/:id", element: <AdminUserPage /> },
     { path: "/admin/kiosk", element: <AdminKioskPage /> },
     { path: "/admin/attendance", element: <AdminAttendancePage /> },
-    { path: "/admin/slack", element: <MovedToHome to="/admin/slack" /> },
+    { path: "/admin/slack", element: <MovedToHome to="/admin/integrations" /> },
     { path: "/admin/team-ui", element: <MovedToHome to="/admin/appearance" /> },
   ],
   navItems: [

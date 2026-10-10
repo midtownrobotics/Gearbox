@@ -18,7 +18,21 @@ export const teamSettingsRouter = teamSettingsRoutes<AppEnv>(manifest, "Orders s
     ]);
     return {
       values: { ...settings },
-      integrations: { "share-a-cart": { connected: sac !== null } },
+      integrations: {
+        "share-a-cart": sac
+          ? {
+              connected: true,
+              facts: [
+                // Share-A-Cart's connection keeps milliseconds.
+                {
+                  label: "Connected",
+                  value: `by ${sac.connectedBy}`,
+                  at: Math.floor(sac.connectedAt / 1000),
+                },
+              ],
+            }
+          : { connected: false },
+      },
     };
   },
   async save(c, changes) {

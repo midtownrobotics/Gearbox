@@ -38,6 +38,17 @@ export const teamSettingsRouter = teamSettingsRoutes<AppEnv>(manifest, "Edge set
           ? {
               connected: online,
               detail: online ? undefined : "The box has a key but isn't online.",
+              facts: [
+                { label: "Key", value: `ends in ${box.keyHint}` },
+                { label: "Key made", value: `by ${box.createdByName}`, at: box.createdAt },
+                ...(status
+                  ? [
+                      { label: "Last heard from", at: status.lastSeenAt },
+                      { label: "Agent version", value: status.agentVersion },
+                      ...(status.timeZone ? [{ label: "Time zone", value: status.timeZone }] : []),
+                    ]
+                  : []),
+              ],
             }
           : { connected: false },
       },

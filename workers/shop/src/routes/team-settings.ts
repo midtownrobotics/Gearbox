@@ -37,6 +37,15 @@ export const teamSettingsRouter = teamSettingsRoutes<AppEnv>(manifest, "Shop set
             connected && onshape?.fromWorkerSecrets
               ? "Uses keys set up on the server. Save your own in Shop to replace them."
               : undefined,
+          facts: [
+            { label: "Document", value: onshape?.documentId ?? "Not set" },
+            { label: "Company", value: onshape?.companyId ?? "Not set" },
+            { label: "API keys", value: onshape?.credentials ? "Set" : "Not set" },
+            {
+              label: "Webhook signing keys",
+              value: onshape?.webhookKeys ? "Set" : "Not set (releases won't arrive)",
+            },
+          ],
         },
       },
     };

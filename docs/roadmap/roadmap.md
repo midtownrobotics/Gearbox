@@ -45,7 +45,7 @@ As of 10 October 2026, five of the six Phase 0 steps are done on `main`, Phase 1
 | 1. Remove G3 from the platform | Done | Nothing |
 | 2. Tenancy core | Done | Nothing |
 | 3. Team-scoped apps | In progress: the shared pieces, Skill Tree, Pit, Attendance, Inventory, Orders, Shop, Edge and Portal are done | Scouting |
-| 4. App library and dashboard | In progress: the app library with full manifests (settings, plugins, seed, delete and export hooks), subscriptions, export before switching off, grace-period delete, Slack notes to admins, the gateway's check, Portal from subscriptions, the team's log of big settings changes, and the dashboard's Apps, App settings, Appearance, Sign-in, Slack and Integrations pages | Scouting's settings and plugins on the dashboard (with its Phase 3 step), and the "Done when" check on staging (needs 0.2). Members, roles, kiosks and Attendance's own page stay on G3ID (decided 8 October) |
+| 4. App library and dashboard | In progress: the app library with full manifests (settings, plugins, seed, delete and export hooks), subscriptions, export before switching off, grace-period delete, Slack notes to admins, the gateway's check, Portal from subscriptions, the team's log of big settings changes, and the dashboard's Apps, App settings, Appearance, Sign-in and Integrations pages (Slack is connected on Integrations) | Scouting's settings and plugins on the dashboard (with its Phase 3 step), and the "Done when" check on staging (needs 0.2). Members, roles, kiosks and Attendance's own page stay on G3ID (decided 8 October) |
 | 5. Live demo | Not started | All of it |
 | 6. Creators' portal | Not started | All of it |
 

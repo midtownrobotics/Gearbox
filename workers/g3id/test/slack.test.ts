@@ -94,7 +94,7 @@ describe("connecting Slack", () => {
     });
     // Back to the Slack page on the team's admin pages, on its home.
     expect(back.headers.get("Location")).toBe(
-      `${teamAppUrlVia(undefined, team, "portal")}/admin/slack?connected=1`,
+      `${teamAppUrlVia(undefined, team, "portal")}/admin/integrations?connected=1`,
     );
     expect(await teamForWorkspace(testEnv, ws)).toBe(team);
     expect(await (await g3id("/admin/slack", { cookie: admin })).json()).toMatchObject({

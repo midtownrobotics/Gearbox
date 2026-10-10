@@ -42,6 +42,7 @@ export {
 export { decryptSecret, encryptSecret } from "./secret-box";
 export { type TeamChange, changedFields, logTeamChange, settingLabels } from "./audit";
 export {
+  type IntegrationFact,
   type IntegrationStatus,
   type SettingValue,
   type TeamSettingsState,

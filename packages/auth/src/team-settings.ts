@@ -14,9 +14,13 @@ export type SettingValue = string | number | boolean | null;
 /** Whether an integration is connected, for the dashboard's Integrations page. */
 export type IntegrationStatus = {
   connected: boolean;
-  /** A few words more: "Online", "From the server's settings". */
+  /** A sentence more, when there's something to know: "The box has a key but isn't online." */
   detail?: string;
+  /** What there is to know about the connection, a line each: a value, or a time (`at`, seconds). */
+  facts?: IntegrationFact[];
 };
+
+export type IntegrationFact = { label: string; value?: string; at?: number };
 
 /** What `GET /team-settings` answers. */
 export type TeamSettingsState = {
