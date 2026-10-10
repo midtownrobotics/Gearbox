@@ -291,7 +291,6 @@ export function AppNavBar({
           </nav>
           <div className="g3-nav-drawer-foot">
             {actions && <div className="g3-nav-actions">{actions}</div>}
-            {hello}
             <ThemeToggle labeled />
             {version && <span className="g3-nav-version">{version}</span>}
           </div>
