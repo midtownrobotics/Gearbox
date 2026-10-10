@@ -10,8 +10,9 @@ import { call, callAs, jsonAs } from "@g3/testing/worker";
 import { describe, expect, it } from "vitest";
 import { app } from "../src/index";
 
-// Pit for many teams: each team's checklists, batteries and settings are its own, its team number
-// is its own, and the Blue Alliance and Nexus API keys are the platform's, never a team setting.
+// Pit for many teams: each team's checklists, their archives, batteries and settings are its own,
+// its team number is its own, and the Blue Alliance and Nexus API keys are the platform's, never a
+// team setting.
 
 const database = (env as unknown as { PIT_DB: D1Database }).PIT_DB;
 
@@ -73,11 +74,21 @@ async function seed(team: TeamUsers): Promise<Seeded> {
     method: "PATCH",
     body: { eventKey: `2026${tag}`, iframeUrl: `https://example.com/${tag}` },
   });
+  // An archive of the list above (which unchecks its item), for the team's event.
+  const archive = await jsonAs<{ id: number }>(
+    team.student,
+    "/archives",
+    { method: "POST", body: { type: "match", details: `Qual ${tag}` } },
+    201,
+  );
   return {
     params: (path, name) => {
       if (name === "itemId") return String(item.id);
       if (name === "issueId") return String(issue.id);
-      if (name === "id") return String(path.startsWith("/batteries") ? battery.id : list.id);
+      if (name === "id") {
+        if (path.startsWith("/batteries")) return String(battery.id);
+        return String(path.startsWith("/archives") ? archive.id : list.id);
+      }
       return undefined;
     },
     markers: [tag],
@@ -87,7 +98,13 @@ async function seed(team: TeamUsers): Promise<Seeded> {
 
 async function snapshot(teamId: string) {
   const out: Record<string, unknown> = {};
-  for (const table of ["checklist_lists", "checklist_items", "checklist_issues", "batteries"]) {
+  for (const table of [
+    "checklist_lists",
+    "checklist_items",
+    "checklist_issues",
+    "checklist_archives",
+    "batteries",
+  ]) {
     out[table] = (
       await database
         .prepare(`SELECT * FROM ${table} WHERE team_id = ? ORDER BY id`)
@@ -104,7 +121,7 @@ async function snapshot(teamId: string) {
   return out;
 }
 
-it("keeps every team's checklists, batteries and settings to itself", async () => {
+it("keeps every team's checklists, archives, batteries and settings to itself", async () => {
   const { problems, requests } = await checkIsolation({
     app,
     seed,
@@ -121,6 +138,7 @@ it("keeps every team's checklists, batteries and settings to itself", async () =
       "PATCH /lists/:id/items/:itemId/description": { description: "Changed" },
       "PATCH /lists/:id/items/:itemId/checked": { checked: false },
       "POST /lists/:id/items/:itemId/issues": { text: "Mine now" },
+      "POST /archives": { type: "other", event: "Mine", details: "Mine now" },
       "PATCH /batteries/:id/state": { state: "Broken" },
       "PATCH /batteries/:id/voltage": { voltage: 1 },
       "PATCH /admin/settings": { eventKey: "2026mine" },

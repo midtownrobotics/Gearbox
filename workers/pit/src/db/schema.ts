@@ -65,6 +65,30 @@ export const checklistIssues = sqliteTable(
       .references(() => checklistItems.id),
     text: text("text").notNull(),
     createdAt: integer("created_at").notNull(),
+    // Seconds; null while the issue is open. A resolved issue is kept only until the next archive
+    // has recorded it (migration 0012), so every read of open issues leaves these out.
+    resolvedAt: integer("resolved_at"),
   },
   (table) => [index("checklist_issues_item_created_idx").on(table.itemId, table.createdAt)],
+);
+
+/**
+ * The checklists as they stood one time they were archived and reset (migration 0012): what it
+ * was for, who archived it and when, and a JSON snapshot of every list, item and issue
+ * (ArchiveSnapshot in ../archives.ts).
+ */
+export const checklistArchives = sqliteTable(
+  "checklist_archives",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    teamId: text("team_id").notNull(),
+    event: text("event").notNull().default(""),
+    type: text("type", { enum: ["match", "practice", "other"] }).notNull(),
+    details: text("details").notNull().default(""),
+    archivedAt: integer("archived_at").notNull(), // seconds
+    archivedBy: text("archived_by").notNull(), // G3ID user id
+    archivedByName: text("archived_by_name").notNull(),
+    snapshot: text("snapshot").notNull(),
+  },
+  (table) => [index("checklist_archives_team_idx").on(table.teamId, table.id)],
 );
