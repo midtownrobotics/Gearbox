@@ -9,7 +9,7 @@ const G3ID_LOGIN = `${appUrl("id")}/login?redirect=${encodeURIComponent(typeof w
 
 const routerLink = linkWith(Link);
 
-/** The shared G3 top bar, with who's signed in. Gearbox is the app list, so no All Apps link. */
+/** The shared G3 top bar; signed out, it offers Log in. */
 export function NavBar({ items }: { items: PluginNavItem[] }) {
   const me = useMe();
   const { pathname } = useLocation();
@@ -25,7 +25,6 @@ export function NavBar({ items }: { items: PluginNavItem[] }) {
       version={versionLabel("Portal")}
       title={wordmark("Gearbox")}
       link={routerLink}
-      allApps={false}
       items={shown.map((item) => ({
         key: item.to,
         label: item.label,
@@ -34,11 +33,7 @@ export function NavBar({ items }: { items: PluginNavItem[] }) {
         group: item.group,
       }))}
       actions={
-        me === undefined ? null : me ? (
-          <a className="g3-nav-text-link" href={`${appUrl("id")}/`}>
-            Hello, {me.displayName}!
-          </a>
-        ) : (
+        me === null && (
           <a className="g3-nav-text-link" href={G3ID_LOGIN}>
             Log in
           </a>

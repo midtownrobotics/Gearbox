@@ -10,7 +10,7 @@ const routerLink = linkWith(Link);
 
 /**
  * The shared G3 top bar. Signed out: Log in and Sign up. Signed in: Dash and Leaderboard, the
- * Admin pages for admins, and All Apps.
+ * Admin pages for admins, and the team's apps in the menu.
  */
 export function NavBar({ items }: { items: PluginNavItem[] }) {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
@@ -52,6 +52,7 @@ export function NavBar({ items }: { items: PluginNavItem[] }) {
       icon="/favicon.svg"
       link={routerLink}
       allApps={isLoggedIn === true}
+      signedIn={isLoggedIn}
       items={shown.map((item) => ({
         key: item.to,
         label: item.label,

@@ -39,6 +39,7 @@ export function NavBar({ items }: { items: PluginNavItem[] }) {
       homeHref={logoHref}
       link={routerLink}
       allApps={!kiosk.active}
+      account={!kiosk.active}
       items={shown.map((item) => ({
         key: item.to,
         label: item.label,
