@@ -1,9 +1,9 @@
+import { appUrl } from "@g3/site-config";
 import { useTeamNames } from "@g3/ui";
-import { useState } from "react";
 import { Link } from "react-router-dom";
 import { api, getErrorMessage } from "../../shared/api";
 import { useAuthUser } from "../../shared/auth";
-import { GB, formatBytes, formatDate, formatDayKey, todayKey } from "../../shared/format";
+import { formatBytes, formatDate, formatDayKey, todayKey } from "../../shared/format";
 import { Card, ErrorBanner, Loading, Page, Stat } from "../../shared/ui";
 import { useLoad } from "../../shared/use-load";
 import { BarChart, ChartLegend } from "./bar-chart";
@@ -165,95 +165,29 @@ function ShareBar({ share }: { share: number }) {
   );
 }
 
-/** Admin-only: set the data cap and billing-cycle start day. */
-function SettingsRow({ capBytes, onSaved }: { capBytes: number; onSaved: () => void }) {
+/** The data cap and billing day; admins change them on the team's App settings page. */
+function SettingsRow({ capBytes }: { capBytes: number; onSaved: () => void }) {
   const user = useAuthUser();
   const settings = useLoad(async () => {
     const res = await api.network.settings.$get();
     if (!res.ok) throw new Error(await getErrorMessage(res));
     return res.json();
   }, [capBytes]);
-  const [editing, setEditing] = useState(false);
-  const [cap, setCap] = useState("");
-  const [day, setDay] = useState("");
-  const [error, setError] = useState<string | null>(null);
 
   const s = settings.data;
   if (!s) return null;
-
-  async function save() {
-    setError(null);
-    const res = await api.network.settings.$patch({
-      json: { capBytes: Math.round(Number(cap) * GB), cycleStartDay: Number(day) },
-    });
-    if (!res.ok) return setError(await getErrorMessage(res));
-    setEditing(false);
-    onSaved();
-  }
-
-  if (!editing) {
-    return (
-      <p className="text-xs text-secondary-400 mt-4">
-        {s.capBytes > 0 ? `Cap ${formatBytes(s.capBytes)}` : "No data cap set"} · cycle resets on
-        day {s.cycleStartDay} of each month
-        {user.isAdmin && (
-          <button
-            type="button"
-            className="ml-2 text-primary-500 hover:text-primary-700 font-medium"
-            onClick={() => {
-              setCap(String(s.capBytes / GB));
-              setDay(String(s.cycleStartDay));
-              setEditing(true);
-            }}
-          >
-            Edit
-          </button>
-        )}
-      </p>
-    );
-  }
-
-  const input = "border border-secondary-300 rounded-lg px-2 py-1 w-20 text-sm";
   return (
-    <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-secondary-600">
-      <label className="flex items-center gap-1.5">
-        Cap{" "}
-        <input
-          className={input}
-          type="number"
-          min="1"
-          step="0.1"
-          value={cap}
-          onChange={(e) => setCap(e.target.value)}
-        />{" "}
-        GB
-      </label>
-      <label className="flex items-center gap-1.5">
-        Resets on day{" "}
-        <input
-          className={input}
-          type="number"
-          min="1"
-          max="31"
-          value={day}
-          onChange={(e) => setDay(e.target.value)}
-        />
-      </label>
-      <button
-        type="button"
-        onClick={save}
-        className="bg-primary-500 hover:bg-primary-600 text-white font-medium rounded-lg px-3 py-1"
-      >
-        Save
-      </button>
-      <button
-        type="button"
-        onClick={() => setEditing(false)}
-        className="text-secondary-500 hover:text-secondary-900"
-      >
-        Cancel
-      </button>
-      {error && <span className="text-primary-600">{error}</span>}
-    </div>
+    <p className="text-xs text-secondary-400 mt-4">
+      {s.capBytes > 0 ? `Cap ${formatBytes(s.capBytes)}` : "No data cap set"} · cycle resets on day{" "}
+      {s.cycleStartDay} of each month
+      {user.isAdmin && (
+        <a
+          href={`${appUrl("portal")}/admin/settings`}
+          className="ml-2 text-primary-500 hover:text-primary-700 font-medium"
+        >
+          Change
+        </a>
+      )}
+    </p>
   );
 }

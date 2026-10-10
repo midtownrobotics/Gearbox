@@ -20,7 +20,6 @@ export const manifest = defineManifest({
       default: 0,
       help: "0 means no cap",
       editedBy: "admin",
-      page: "/network",
     },
     {
       key: "cycleStartDay",
@@ -31,7 +30,6 @@ export const manifest = defineManifest({
       max: 31,
       help: "Day of the month the data cap starts again",
       editedBy: "admin",
-      page: "/network",
     },
     {
       key: "enforce",
@@ -39,7 +37,6 @@ export const manifest = defineManifest({
       type: "boolean",
       default: false,
       editedBy: "admin",
-      page: "/network/controls",
     },
     {
       key: "dnsHardening",
@@ -48,7 +45,6 @@ export const manifest = defineManifest({
       default: false,
       help: "Devices can only use the box's DNS",
       editedBy: "admin",
-      page: "/network/controls",
     },
     {
       key: "boxKey",

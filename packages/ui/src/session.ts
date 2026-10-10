@@ -8,6 +8,8 @@ export type SignedInUser = {
   id: string;
   displayName: string;
   isAdmin: boolean;
+  /** A mentor (never on a kiosk session). */
+  isMentor: boolean;
   /** A kiosk PIN session: a shared device, with no account page of its own to go to. */
   kiosk: boolean;
 };
@@ -26,12 +28,14 @@ function loadUser(sure: boolean): Promise<SignedInUser | null> {
           id: string;
           displayName?: string;
           isAdmin?: boolean;
+          isMentor?: boolean;
           sessionType?: string;
         };
         return {
           id: me.id,
           displayName: me.displayName ?? "",
           isAdmin: me.isAdmin === true,
+          isMentor: me.isMentor === true,
           kiosk: me.sessionType === "pin",
         };
       })

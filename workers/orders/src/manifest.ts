@@ -19,7 +19,6 @@ export const manifest = defineManifest({
       default: "USD",
       help: "A 3-letter code (USD, CAD, EUR) for budgets and prices",
       editedBy: "mentor",
-      page: "/settings",
     },
     {
       key: "fiscalYearStart",
@@ -28,7 +27,6 @@ export const manifest = defineManifest({
       default: 7,
       help: "Budgets run from this month",
       editedBy: "mentor",
-      page: "/settings",
     },
     {
       key: "namingTemplate",
@@ -37,7 +35,6 @@ export const manifest = defineManifest({
       default: "{vendor} {sku} – {title}",
       help: "Must include {title}",
       editedBy: "mentor",
-      page: "/settings",
     },
     {
       key: "inventoryRequired",
@@ -45,7 +42,6 @@ export const manifest = defineManifest({
       type: "boolean",
       default: false,
       editedBy: "mentor",
-      page: "/settings",
       requiresApp: "inventory",
     },
   ],

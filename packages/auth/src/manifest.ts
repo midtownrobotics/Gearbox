@@ -50,10 +50,11 @@ export type AppSetting = {
   /** Who may change it. */
   editedBy: "admin" | "mentor";
   /**
-   * The page in the app that also edits it: its path in the app, or `<app>:<path>` for a page in
-   * another app (Attendance's settings are on G3ID: `id:/admin/attendance`).
+   * Where it's edited when the team's App settings page can't (an integration's keys, or an app
+   * without `settingsForm`): its path in the app, or `<app>:<path>` for a page in another app.
+   * A setting the App settings page edits has none: it's edited only there.
    */
-  page: string;
+  page?: string;
   /**
    * Part of connecting this integration (keys, a box key): set up on `page`, where saving does more
    * than store it (registering a webhook, making a key). The dashboard lists it on its

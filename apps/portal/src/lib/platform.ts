@@ -25,7 +25,7 @@ export type AppSetting = {
   choices?: { value: string; label: string }[];
   help?: string;
   editedBy: "admin" | "mentor";
-  page: string;
+  page?: string;
   integration?: string;
   requiresApp?: string;
 };
@@ -45,6 +45,14 @@ export type TeamSettingsState = {
   secretsSet: Record<string, boolean>;
   integrations: Record<string, IntegrationStatus>;
   canEdit: string[];
+};
+
+/** An app that's on and has settings (the platform's /team/settings). */
+export type SettingsApp = {
+  slug: string;
+  name: string;
+  settings: AppSetting[];
+  settingsForm: boolean;
 };
 
 export type LibraryApp = TeamApp & {

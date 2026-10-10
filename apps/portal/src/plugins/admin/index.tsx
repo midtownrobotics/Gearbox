@@ -25,7 +25,14 @@ export const adminPlugin: Plugin = {
   name: "admin",
   routes: [
     { path: "/admin", element: admin(<AppsPage />) },
-    { path: "/admin/settings", element: admin(<SettingsPage />) },
+    {
+      path: "/admin/settings",
+      element: (
+        <AdminOnly mentors>
+          <SettingsPage />
+        </AdminOnly>
+      ),
+    },
     { path: "/admin/appearance", element: admin(<AppearancePage />) },
     { path: "/admin/sign-in", element: admin(<SignInPage />) },
     { path: "/admin/slack", element: <SlackMoved /> },
@@ -37,7 +44,7 @@ export const adminPlugin: Plugin = {
       label: "App settings",
       to: "/admin/settings",
       order: 11,
-      requiresAdmin: true,
+      requiresMentor: true,
       group: "Admin",
     },
     {

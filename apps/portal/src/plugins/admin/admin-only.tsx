@@ -2,8 +2,11 @@ import { appUrl } from "@g3/site-config";
 import type { ReactNode } from "react";
 import { useMe } from "../../shared/me";
 
-/** The team's admin pages: for its admins only (the platform and G3ID check again). */
-export function AdminOnly({ children }: { children: ReactNode }) {
+/**
+ * The team's admin pages: for its admins only (the platform and G3ID check again). `mentors`
+ * lets mentors in too (App settings, where each setting is changed only by whom it allows).
+ */
+export function AdminOnly({ children, mentors }: { children: ReactNode; mentors?: boolean }) {
   const me = useMe();
   if (me === undefined) return null;
   if (me === null) {
@@ -19,7 +22,7 @@ export function AdminOnly({ children }: { children: ReactNode }) {
       </main>
     );
   }
-  if (!me.isAdmin) {
+  if (!me.isAdmin && !(mentors && me.isMentor)) {
     return (
       <main className="mx-auto w-full max-w-2xl px-6 py-12 text-center text-secondary-700">
         Only your team's admins can manage the team.

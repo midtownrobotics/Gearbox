@@ -2,8 +2,8 @@ import { type AppName, appUrl } from "@g3/site-config";
 import { useEffect, useState } from "react";
 import {
   type AppSetting,
-  type LibraryApp,
   type SettingValue,
+  type SettingsApp,
   type TeamSettingsState,
   appSettings,
   platform,
@@ -11,7 +11,9 @@ import {
 import { Switch } from "./switch";
 
 // Each app's team settings (roadmap 4.5), in a form built from its manifest (the platform's
-// library) and saved through the app's own /team-settings. An integration's keys aren't here:
+// /team/settings) and saved through the app's own /team-settings. The apps' own pages don't
+// edit these: this is the one place. Mentors and admins open it; each setting is changed only
+// by whom its manifest allows. An integration's keys aren't here:
 // they're on the Integrations page, and set up in the app.
 
 const MONTHS = Array.from({ length: 12 }, (_, i) =>
@@ -26,7 +28,7 @@ export function pageUrl(slug: string, page: string) {
 }
 
 /** The settings a form shows: not an integration's connection. */
-const formSettings = (app: LibraryApp) => app.settings.filter((s) => !s.integration);
+const formSettings = (app: SettingsApp) => app.settings.filter((s) => !s.integration);
 
 const inputClass =
   "w-full rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-secondary-900 disabled:opacity-60";
@@ -178,7 +180,7 @@ function Field({
 }
 
 /** One app's settings form. */
-function AppSettingsCard({ app }: { app: LibraryApp }) {
+function AppSettingsCard({ app }: { app: SettingsApp }) {
   const settings = formSettings(app);
   const [state, setState] = useState<TeamSettingsState | null>(null);
   const [draft, setDraft] = useState<Record<string, SettingValue>>({});
@@ -278,8 +280,8 @@ function AppSettingsCard({ app }: { app: LibraryApp }) {
 }
 
 /** An app whose settings are only on its own pages. */
-function ElsewhereCard({ app }: { app: LibraryApp }) {
-  const pages = [...new Set(formSettings(app).map((s) => s.page))];
+function ElsewhereCard({ app }: { app: SettingsApp }) {
+  const pages = [...new Set(formSettings(app).flatMap((s) => (s.page ? [s.page] : [])))];
   return (
     <section className="rounded-lg border border-line bg-surface p-5">
       <h2 className="mb-1 text-lg font-semibold text-secondary-900">{app.name}</h2>
@@ -303,20 +305,12 @@ function ElsewhereCard({ app }: { app: LibraryApp }) {
 }
 
 export function SettingsPage() {
-  const [apps, setApps] = useState<LibraryApp[] | null>(null);
+  const [apps, setApps] = useState<SettingsApp[] | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    platform<LibraryApp[]>("/team/library")
-      .then((all) => {
-        // A setting about another app (Orders' Inventory place) only while that app is on.
-        const on = new Set(all.filter((a) => a.enabled).map((a) => a.slug));
-        const shown = all.map((a) => ({
-          ...a,
-          settings: a.settings.filter((s) => !s.requiresApp || on.has(s.requiresApp)),
-        }));
-        setApps(shown.filter((a) => a.enabled && formSettings(a).length > 0));
-      })
+    platform<SettingsApp[]>("/team/settings")
+      .then(setApps)
       .catch((reason: Error) => setError(reason.message));
   }, []);
 
