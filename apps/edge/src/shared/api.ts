@@ -1,3 +1,4 @@
+import { appUrl } from "@g3/site-config";
 import type { EdgeApp } from "@g3/worker-edge";
 import { hc } from "hono/client";
 
@@ -6,10 +7,11 @@ export const api = hc<EdgeApp>(import.meta.env.VITE_API_BASE_URL ?? "", {
 });
 
 export function g3idUrl(): string {
-  return import.meta.env.VITE_G3ID_URL || "http://localhost:5173";
+  // The page's team's G3ID (the dev gateway's in dev).
+  return appUrl("id");
 }
 
-/** Send the user to g3id login, returning here afterwards. */
+/** Send the user to g3id login, returning here afterward. */
 export function redirectToLogin(): void {
   const redirect = encodeURIComponent(window.location.href);
   window.location.href = `${g3idUrl()}/login?redirect=${redirect}`;

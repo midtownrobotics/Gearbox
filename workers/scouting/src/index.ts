@@ -1,8 +1,17 @@
+import { logTeamChange } from "@g3/auth";
+import { corsOrigin, site, teamKey } from "@g3/site-config";
+import { withApiPrefix } from "@g3/site-config/worker";
 import { sendDM } from "@g3/slack";
 import { type Context, Hono } from "hono";
 import { cors } from "hono/cors";
+import packageJson from "../package.json";
+import { getEngagementSettings, parseEngagementSettings } from "./engagement";
 import { requireAuth } from "./middleware/auth";
 import type { AppEnv } from "./types";
+
+/** "Our team" for a request: the team the gateway says the page is for (the site team without it). */
+const ourTeam = (c: { req: { header(name: string): string | undefined } }) =>
+  c.req.header("X-Team-Id") ?? teamKey;
 
 type Tier = { id: string; name: string; color: string; items: string[] };
 type TierListInput = { name?: unknown; description?: unknown; tiers?: unknown };
@@ -63,12 +72,7 @@ app.onError((error, c) => {
 app.use(
   "*",
   cors({
-    origin: (origin) => {
-      if (!origin) return null;
-      if (origin.endsWith(".g3robotics.com")) return origin;
-      if (origin.startsWith("http://localhost:")) return origin;
-      return null;
-    },
+    origin: corsOrigin,
     allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowHeaders: ["Content-Type"],
     credentials: true,
@@ -297,7 +301,7 @@ async function getStatboticsMatches(eventKey: string) {
   const url = `https://api.statbotics.io/v3/matches?event=${encodeURIComponent(eventKey)}&limit=500`;
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     const response = await fetch(url, {
-      headers: { Accept: "application/json", "User-Agent": "G3-Strategy/1.0" },
+      headers: { Accept: "application/json", "User-Agent": "Gearbox-Strategy/1.0" },
     });
     if (response.ok) {
       const body = (await response.json()) as unknown;
@@ -322,7 +326,7 @@ function localDemoGameMatches(): GameMatch[] {
   const now = Date.now();
   return [
     {
-      redTeams: ["1648", "1771", "2974"],
+      redTeams: [String(site.team.number), "1771", "2974"],
       blueTeams: ["4910", "6829", "8736"],
       redScore: 142.4,
       blueScore: 135.1,
@@ -343,7 +347,7 @@ function localDemoGameMatches(): GameMatch[] {
       redWinProbability: 0.53,
     },
     {
-      redTeams: ["1648", "4188", "6829"],
+      redTeams: [String(site.team.number), "4188", "6829"],
       blueTeams: ["1771", "4910", "5900"],
       redScore: 146.9,
       blueScore: 141.3,
@@ -526,6 +530,8 @@ async function settleGameParlays(db: D1Database, eventKey: string, matches: Game
 }
 
 async function settleConfiguredGame(env: AppEnv["Bindings"]) {
+  const settings = await getEngagementSettings(env.SCOUTING_DB);
+  if (!settings.enabled || !settings.predictionsEnabled) return;
   const config = await env.SCOUTING_DB.prepare(
     "SELECT event_key FROM strategy_event_config WHERE id = 1",
   ).first<{ event_key: string }>();
@@ -573,7 +579,9 @@ async function withTimeout<T>(promise: Promise<T>, milliseconds: number, label: 
   }
 }
 
-app.get("/health", (c) => c.json({ status: "ok", service: "scouting" }));
+app.get("/health", (c) =>
+  c.json({ status: "ok", service: "scouting", version: packageJson.version }),
+);
 async function isStrategyAdmin(c: Context<AppEnv>) {
   if (c.get("userIsAdmin")) return true;
   const row = await c.env.SCOUTING_DB.prepare(
@@ -601,6 +609,7 @@ app.get("/me", requireAuth, async (c) =>
     isAdmin: await isStrategyAdmin(c),
     isG3IdAdmin: c.get("userIsAdmin"),
     isHelper: await isServiceHelper(c),
+    engagement: await getEngagementSettings(c.env.SCOUTING_DB),
   }),
 );
 
@@ -970,7 +979,7 @@ app.get("/event-context", requireAuth, async (c) => {
   if (config?.schedule_mode !== "manual")
     await persistAutomaticMatch(c, config?.current_match_number, current);
   const teamSchedule = matches.filter((match) =>
-    [...match.alliances.red.team_keys, ...match.alliances.blue.team_keys].includes("frc1648"),
+    [...match.alliances.red.team_keys, ...match.alliances.blue.team_keys].includes(ourTeam(c)),
   );
   const nextTeamMatch = current
     ? teamSchedule.find((match) => matchOrder(match) >= matchOrder(current))
@@ -1083,7 +1092,7 @@ app.put("/event-context", requireAuth, async (c) => {
   const nexusEventKey = text(body.nexusEventKey, 30).toLowerCase() || eventKey;
   const nexusApiKey = text(body.nexusApiKey, 300);
   if ((tbaAuthKey || nexusApiKey) && !c.get("userIsAdmin"))
-    return c.json({ error: "Only a G3ID admin can update API keys." }, 403);
+    return c.json({ error: "Only a team admin can update API keys." }, 403);
   if (activeConfig?.schedule_mode !== "manual" && eventKey && !/^\d{4}[a-z0-9]+$/.test(eventKey))
     return c.json({ error: "Enter a valid TBA event key, such as 2026gadal." }, 400);
   const tbaConfigChanged =
@@ -1359,9 +1368,9 @@ app.post("/manual-schedule/extract", requireAuth, async (c) => {
 
   const prompt = `Read this FRC match schedule photo or screenshot. Transcribe every visible practice, qualification, or playoff match.
 The page may be angled, rotated, wrinkled, dim, or contain tables side by side. Side-by-side blocks continue the schedule. Ignore rankings, page numbers, and sponsor text.
-Copy the six team cells in their exact printed LEFT-TO-RIGHT order. Set "o" to "blue-red" when the headers show Blue 1-3 before Red 1-3, otherwise set it to "red-blue". Keep the match-number column separate: match 6 followed by team 1648 means 1648, never 61648. Never guess an unreadable digit.
+Copy the six team cells in their exact printed LEFT-TO-RIGHT order. Set "o" to "blue-red" when the headers show Blue 1-3 before Red 1-3, otherwise set it to "red-blue". Keep the match-number column separate: match 6 followed by team ${site.team.number} means ${site.team.number}, never 6${site.team.number}. Never guess an unreadable digit.
 Inspect each row digit-by-digit. Always include every visible match row and use null only for an individual team cell that truly cannot be read; never omit the entire row.
-Return ONLY compact JSON: {"matches":[{"n":1,"t":null,"o":"red-blue","a":[1648,1771,4910,2974,6829,8736]}]}. No names, markdown, or explanations.`;
+Return ONLY compact JSON: {"matches":[{"n":1,"t":null,"o":"red-blue","a":[${site.team.number},1771,4910,2974,6829,8736]}]}. No names, markdown, or explanations.`;
   const visionOutput = async (result: unknown) => {
     const modelResult = result as {
       response?: string;
@@ -1413,7 +1422,7 @@ Return ONLY compact JSON: {"matches":[{"n":1,"t":null,"o":"red-blue","a":[1648,1
   >();
   const combinedTeams = new Map<string, string>();
   const warnings: string[] = [];
-  const knownTeamNumbers = new Set<string>(["1648"]);
+  const knownTeamNumbers = new Set<string>([String(site.team.number)]);
   const cachedTeams = await c.env.SCOUTING_DB.prepare(
     "SELECT teams_json FROM tba_team_cache ORDER BY expires_at DESC LIMIT 20",
   ).all<{ teams_json: string }>();
@@ -1571,7 +1580,7 @@ The first pass produced these partial Red-then-Blue cells: ${schedule.matches
                   `${match.matchNumber}=[${match.teams.map((team) => team || "?").join(",")}]`,
               )
               .join("; ")}.
-Use the printed grid and column headers to fill the question marks and verify the other digits. Keep the match number separate from team numbers. Return ONLY JSON: {"matches":[{"n":1,"red":[1648,1771,4910],"blue":[2974,6829,8736]}]}. Return only the requested rows, exactly six teams per row.`,
+Use the printed grid and column headers to fill the question marks and verify the other digits. Keep the match number separate from team numbers. Return ONLY JSON: {"matches":[{"n":1,"red":[${site.team.number},1771,4910],"blue":[2974,6829,8736]}]}. Return only the requested rows, exactly six teams per row.`,
             384,
           );
           const recoveryOutput = await visionOutput(recovery);
@@ -1800,7 +1809,66 @@ function parseScoutingFields(value: unknown): ScoutingField[] | null {
   return fields;
 }
 
+app.get("/engagement-settings", requireAuth, async (c) =>
+  c.json(await getEngagementSettings(c.env.SCOUTING_DB)),
+);
+
+app.put("/engagement-settings", requireAuth, async (c) => {
+  if (!c.get("userIsAdmin") || c.get("sessionType") === "pin")
+    return c.json({ error: "Only a team admin can change engagement settings." }, 403);
+  const settings = parseEngagementSettings(await c.req.json().catch(() => null));
+  if (!settings)
+    return c.json(
+      { error: "Use boolean activity switches and a points name of 1 to 40 characters." },
+      400,
+    );
+  const before = await getEngagementSettings(c.env.SCOUTING_DB);
+  await c.env.SCOUTING_DB.prepare(
+    `INSERT INTO scouting_engagement_settings
+      (team_key, enabled, predictions_enabled, combinations_enabled, leaderboard_enabled, points_label, updated_by, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(team_key) DO UPDATE SET
+       enabled = excluded.enabled, predictions_enabled = excluded.predictions_enabled,
+       combinations_enabled = excluded.combinations_enabled, leaderboard_enabled = excluded.leaderboard_enabled,
+       points_label = excluded.points_label, updated_by = excluded.updated_by, updated_at = excluded.updated_at`,
+  )
+    .bind(
+      teamKey,
+      Number(settings.enabled),
+      Number(settings.predictionsEnabled),
+      Number(settings.combinationsEnabled),
+      Number(settings.leaderboardEnabled),
+      settings.pointsLabel,
+      c.get("userId"),
+      Date.now(),
+    )
+    .run();
+  // The team's log (its home's Apps page), by the names in Scouting's manifest.
+  const names: Record<keyof typeof settings, string> = {
+    enabled: "Scout points",
+    predictionsEnabled: "Match predictions",
+    combinationsEnabled: "Combined picks",
+    leaderboardEnabled: "Team standings",
+    pointsLabel: "Points name",
+  };
+  const changed = (Object.keys(names) as (keyof typeof settings)[])
+    .filter((key) => before[key] !== settings[key])
+    .map((key) => names[key]);
+  if (changed.length > 0) {
+    await logTeamChange(c.env, teamKey, {
+      userId: c.get("userId"),
+      app: "scouting",
+      what: "Scouting engagement",
+      changed,
+    });
+  }
+  return c.json(settings);
+});
+
 app.get("/game", requireAuth, async (c) => {
+  const settings = await getEngagementSettings(c.env.SCOUTING_DB);
+  if (!settings.enabled)
+    return c.json({ error: "Scouting engagement is disabled for this team." }, 403);
   const now = Date.now();
   await c.env.SCOUTING_DB.prepare(
     `INSERT INTO boylebucks_accounts (user_id, display_name, balance, earned, wagered, updated_at)
@@ -1824,13 +1892,13 @@ app.get("/game", requireAuth, async (c) => {
       c.env.SCOUTING_DB.prepare(
         `INSERT OR IGNORE INTO boylebucks_ledger
           (id, user_id, amount, reason, reference_id, created_at)
-         VALUES (?, ?, 250, 'Local sportsbook test credit', ?, ?)`,
+         VALUES (?, ?, 250, 'Local prediction test points', ?, ?)`,
       ).bind(id("ledger"), c.get("userId"), reference, now),
     ]);
   }
   let matches: GameMatch[] = [];
   let statsError = "";
-  if (config?.event_key) {
+  if (settings.predictionsEnabled && config?.event_key) {
     try {
       matches = await gameMatches(c.env, config.event_key);
       await settleGameBets(c.env.SCOUTING_DB, config.event_key, matches);
@@ -1844,11 +1912,13 @@ app.get("/game", requireAuth, async (c) => {
   )
     .bind(c.get("userId"))
     .first<Record<string, number>>();
-  const leaderboard = await c.env.SCOUTING_DB.prepare(
-    `SELECT display_name, balance, earned, wagered
+  const leaderboard = settings.leaderboardEnabled
+    ? await c.env.SCOUTING_DB.prepare(
+        `SELECT display_name, balance, earned, wagered
        FROM boylebucks_accounts
       ORDER BY balance DESC, earned DESC, display_name`,
-  ).all<Record<string, unknown>>();
+      ).all<Record<string, unknown>>()
+    : { results: [] };
   const bets = await c.env.SCOUTING_DB.prepare(
     `SELECT id, match_key, match_label, market, selection, line, odds, stake, status, payout, placed_at
        FROM game_bets WHERE user_id = ? ORDER BY placed_at DESC LIMIT 30`,
@@ -1935,15 +2005,19 @@ app.get("/game", requireAuth, async (c) => {
   return c.json({
     eventKey: config?.event_key ?? "",
     account: account ?? { balance: 0, earned: 0, wagered: 0 },
+    settings,
     leaderboard: leaderboard.results,
-    bets: bets.results,
-    parlays,
+    bets: settings.predictionsEnabled ? bets.results : [],
+    parlays: settings.predictionsEnabled ? parlays : [],
     matches: availableMatches,
     statsError,
   });
 });
 
 app.post("/game/bets", requireAuth, async (c) => {
+  const settings = await getEngagementSettings(c.env.SCOUTING_DB);
+  if (!settings.enabled || !settings.predictionsEnabled)
+    return c.json({ error: "Match predictions are disabled for this team." }, 403);
   const body = await c.req.json<Record<string, unknown>>();
   const matchKey = text(body.matchKey, 100);
   const market = text(body.market, 20);
@@ -1951,10 +2025,11 @@ app.post("/game/bets", requireAuth, async (c) => {
   const expectedLine = finiteNumber(body.expectedLine);
   const stake = Math.floor(finiteNumber(body.stake) ?? 0);
   if (!matchKey || market !== "spread")
-    return c.json({ error: "Only spread bets are available." }, 400);
-  if (!["red", "blue"].includes(selection)) return c.json({ error: "Choose a valid spread." }, 400);
+    return c.json({ error: "Only score-adjusted match picks are available." }, 400);
+  if (!["red", "blue"].includes(selection))
+    return c.json({ error: "Choose a valid alliance pick." }, 400);
   if (stake < 1 || stake > 10_000)
-    return c.json({ error: "Bet between 1 and 10,000 BoyleBucks." }, 400);
+    return c.json({ error: "Use between 1 and 10,000 points." }, 400);
   const config = await c.env.SCOUTING_DB.prepare(
     "SELECT event_key, current_match_number FROM strategy_event_config WHERE id = 1",
   ).first<{ event_key: string; current_match_number: number | null }>();
@@ -1970,19 +2045,19 @@ app.post("/game/bets", requireAuth, async (c) => {
   }
   const match = matches.find((candidate) => candidate.key === matchKey);
   if (!match || !gameMatchIsOpen(match, Date.now(), config.current_match_number ?? 0))
-    return c.json({ error: "That match is no longer open for betting." }, 409);
+    return c.json({ error: "That match is no longer open for predictions." }, 409);
   const account = await c.env.SCOUTING_DB.prepare(
     "SELECT balance FROM boylebucks_accounts WHERE user_id = ?",
   )
     .bind(c.get("userId"))
     .first<{ balance: number }>();
   if (!account || account.balance < stake)
-    return c.json({ error: "You do not have enough BoyleBucks." }, 409);
+    return c.json({ error: "You do not have enough points." }, 409);
   const line = gameLine(match);
   const betLine = line.spread;
   const selectedLine = selection === "red" ? betLine : -betLine;
   if (expectedLine === null || Math.abs(expectedLine - selectedLine) > 1e-9)
-    return c.json({ error: "The spread moved. Refresh and choose the new line." }, 409);
+    return c.json({ error: "The score adjustment changed. Refresh and choose again." }, 409);
   const odds = -110;
   const betId = id("bet");
   const placedAt = Date.now();
@@ -2010,27 +2085,32 @@ app.post("/game/bets", requireAuth, async (c) => {
         "UPDATE boylebucks_accounts SET balance = balance - ?, wagered = wagered + ?, display_name = ?, updated_at = ? WHERE user_id = ? AND balance >= ?",
       ).bind(stake, stake, c.get("userDisplayName"), placedAt, c.get("userId"), stake),
       c.env.SCOUTING_DB.prepare(
-        "INSERT INTO boylebucks_ledger (id, user_id, amount, reason, reference_id, created_at) VALUES (?, ?, ?, 'Bet placed', ?, ?)",
+        "INSERT INTO boylebucks_ledger (id, user_id, amount, reason, reference_id, created_at) VALUES (?, ?, ?, 'Prediction submitted', ?, ?)",
       ).bind(id("ledger"), c.get("userId"), -stake, `wager:${betId}`, placedAt),
     ]);
   } catch (error) {
     if (String(error).includes("UNIQUE"))
-      return c.json({ error: "You already placed this type of bet on that match." }, 409);
+      return c.json({ error: "You already submitted this type of pick for that match." }, 409);
     if (String(error).includes("insufficient BoyleBucks"))
-      return c.json({ error: "You do not have enough BoyleBucks." }, 409);
+      return c.json({ error: "You do not have enough points." }, 409);
     throw error;
   }
   return c.json({ ok: true, betId }, 201);
 });
 
 app.post("/game/parlays", requireAuth, async (c) => {
+  const settings = await getEngagementSettings(c.env.SCOUTING_DB);
+  if (!settings.enabled || !settings.predictionsEnabled)
+    return c.json({ error: "Match predictions are disabled for this team." }, 403);
+  if (!settings.combinationsEnabled)
+    return c.json({ error: "Combined picks are disabled for this team." }, 403);
   const body = await c.req.json<Record<string, unknown>>();
   const inputs = Array.isArray(body.legs) ? body.legs.slice(0, 9) : [];
   const stake = Math.floor(finiteNumber(body.stake) ?? 0);
   if (inputs.length < 2 || inputs.length > 8)
-    return c.json({ error: "A parlay needs 2 to 8 matches." }, 400);
+    return c.json({ error: "A combined pick needs 2 to 8 matches." }, 400);
   if (stake < 1 || stake > 10_000)
-    return c.json({ error: "Bet between 1 and 10,000 BoyleBucks." }, 400);
+    return c.json({ error: "Use between 1 and 10,000 points." }, 400);
   const requested = inputs.map((input) => {
     const leg = record(input);
     return {
@@ -2041,7 +2121,7 @@ app.post("/game/parlays", requireAuth, async (c) => {
     };
   });
   if (new Set(requested.map((leg) => leg.matchKey)).size !== requested.length)
-    return c.json({ error: "Choose only one bet from each match in a parlay." }, 400);
+    return c.json({ error: "Choose only one pick from each match in a combination." }, 400);
   if (
     requested.some(
       (leg) =>
@@ -2051,7 +2131,7 @@ app.post("/game/parlays", requireAuth, async (c) => {
         leg.expectedLine === null,
     )
   )
-    return c.json({ error: "One or more parlay legs are invalid." }, 400);
+    return c.json({ error: "One or more combined picks are invalid." }, 400);
   const config = await c.env.SCOUTING_DB.prepare(
     "SELECT event_key, current_match_number FROM strategy_event_config WHERE id = 1",
   ).first<{ event_key: string; current_match_number: number | null }>();
@@ -2069,11 +2149,17 @@ app.post("/game/parlays", requireAuth, async (c) => {
   for (const request of requested) {
     const match = matches.find((candidate) => candidate.key === request.matchKey);
     if (!match || !gameMatchIsOpen(match, now, config.current_match_number ?? 0))
-      return c.json({ error: `${match?.label ?? "A match"} is no longer open for betting.` }, 409);
+      return c.json(
+        { error: `${match?.label ?? "A match"} is no longer open for predictions.` },
+        409,
+      );
     const currentLine = gameLine(match).spread;
     const selectedLine = request.selection === "red" ? currentLine : -currentLine;
     if (Math.abs((request.expectedLine as number) - selectedLine) > 1e-9)
-      return c.json({ error: `${match.label}'s spread moved. Refresh your bet slip.` }, 409);
+      return c.json(
+        { error: `${match.label}'s score adjustment changed. Refresh your picks.` },
+        409,
+      );
   }
   const matchMap = new Map(matches.map((match) => [match.key, match]));
   const legs = requested.map((request) => {
@@ -2091,7 +2177,7 @@ app.post("/game/parlays", requireAuth, async (c) => {
   for (const leg of legs) {
     const teams = [...leg.match.redTeams, ...leg.match.blueTeams];
     if (teams.some((team) => usedTeams.has(team)))
-      return c.json({ error: "Parlay legs cannot contain the same team more than once." }, 400);
+      return c.json({ error: "Combined picks cannot contain the same team more than once." }, 400);
     for (const team of teams) usedTeams.add(team);
   }
   const account = await c.env.SCOUTING_DB.prepare(
@@ -2100,7 +2186,7 @@ app.post("/game/parlays", requireAuth, async (c) => {
     .bind(c.get("userId"))
     .first<{ balance: number }>();
   if (!account || account.balance < stake)
-    return c.json({ error: "You do not have enough BoyleBucks." }, 409);
+    return c.json({ error: "You do not have enough points." }, 409);
   const parlayId = id("parlay");
   const odds = combinedAmericanOdds(legs.map((leg) => leg.odds));
   const statements = [
@@ -2129,14 +2215,14 @@ app.post("/game/parlays", requireAuth, async (c) => {
       "UPDATE boylebucks_accounts SET balance = balance - ?, wagered = wagered + ?, updated_at = ? WHERE user_id = ? AND balance >= ?",
     ).bind(stake, stake, now, c.get("userId"), stake),
     c.env.SCOUTING_DB.prepare(
-      "INSERT INTO boylebucks_ledger (id, user_id, amount, reason, reference_id, created_at) VALUES (?, ?, ?, 'Parlay placed', ?, ?)",
+      "INSERT INTO boylebucks_ledger (id, user_id, amount, reason, reference_id, created_at) VALUES (?, ?, ?, 'Combined pick submitted', ?, ?)",
     ).bind(id("ledger"), c.get("userId"), -stake, `wager:${parlayId}`, now),
   ];
   try {
     await c.env.SCOUTING_DB.batch(statements);
   } catch (error) {
     if (String(error).includes("insufficient BoyleBucks"))
-      return c.json({ error: "You do not have enough BoyleBucks." }, 409);
+      return c.json({ error: "You do not have enough points." }, 409);
     throw error;
   }
   return c.json({ ok: true, parlayId, odds }, 201);
@@ -2229,8 +2315,7 @@ app.post("/scouting-forms/:id/submissions", requireAuth, async (c) => {
   const fields = parseJson<ScoutingField[]>(formDefinition.fields_json, []);
   const eventLink = await resolveEventLink(c);
   if (formDefinition.form_kind === "scouting") {
-    if (!fields.length)
-      return c.json({ error: "This scouting form has no fields and cannot earn BoyleBucks." }, 409);
+    if (!fields.length) return c.json({ error: "This scouting form has no fields." }, 409);
     if (!eventLink.eventKey || !eventLink.matchNumber)
       return c.json({ error: "No current match is configured." }, 409);
     const existing = await c.env.SCOUTING_DB.prepare(
@@ -2338,7 +2423,10 @@ app.post("/scouting-forms/:id/submissions", requireAuth, async (c) => {
   );
   let boyleBucksAwarded = 0;
   try {
-    if (formDefinition.form_kind === "scouting") {
+    if (
+      formDefinition.form_kind === "scouting" &&
+      (await getEngagementSettings(c.env.SCOUTING_DB)).enabled
+    ) {
       const rewardReference = `submission:${submissionId}`;
       await c.env.SCOUTING_DB.batch([
         submissionStatement,
@@ -2556,7 +2644,7 @@ async function getG3IdUsers(c: Context<AppEnv>) {
     ];
   }
   const response = await c.env.G3ID.fetch(
-    new Request("http://g3id/users", {
+    new Request("http://g3id/api/users", {
       headers: { cookie: c.req.header("Cookie") ?? "" },
     }),
   );
@@ -2575,12 +2663,12 @@ app.get("/strategy-admins", requireAuth, async (c) => {
 
 app.post("/strategy-admins", requireAuth, async (c) => {
   if (!c.get("userIsAdmin"))
-    return c.json({ error: "Only a G3ID admin can assign Strategy leads." }, 403);
+    return c.json({ error: "Only a team admin can assign Strategy leads." }, 403);
   const body = await c.req.json<{ userId?: unknown }>();
   const userId = text(body.userId, 200);
   const users = await getG3IdUsers(c);
   const user = users?.find((candidate) => candidate.id === userId && candidate.status === "active");
-  if (!user) return c.json({ error: "Select an active G3ID account." }, 400);
+  if (!user) return c.json({ error: "Select an active account." }, 400);
   await c.env.SCOUTING_DB.prepare(
     "INSERT OR REPLACE INTO strategy_admins (user_id, email, display_name, granted_by, created_at) VALUES (?, ?, ?, ?, ?)",
   )
@@ -2591,7 +2679,7 @@ app.post("/strategy-admins", requireAuth, async (c) => {
 
 app.delete("/strategy-admins/:userId", requireAuth, async (c) => {
   if (!c.get("userIsAdmin"))
-    return c.json({ error: "Only a G3ID admin can remove Strategy leads." }, 403);
+    return c.json({ error: "Only a team admin can remove Strategy leads." }, 403);
   await c.env.SCOUTING_DB.prepare("DELETE FROM strategy_admins WHERE user_id = ?")
     .bind(c.req.param("userId"))
     .run();
@@ -2639,9 +2727,10 @@ app.get("/analysis", requireAuth, async (c) => {
         )
         .map((match) => {
           const alliance = match.alliances.red.team_keys.includes(teamKey) ? "red" : "blue";
-          const partner = match.alliances[alliance].team_keys.includes("frc1648");
-          const opponent =
-            match.alliances[alliance === "red" ? "blue" : "red"].team_keys.includes("frc1648");
+          const partner = match.alliances[alliance].team_keys.includes(ourTeam(c));
+          const opponent = match.alliances[alliance === "red" ? "blue" : "red"].team_keys.includes(
+            ourTeam(c),
+          );
           return {
             ...publicMatch(match),
             alliance,
@@ -2649,7 +2738,7 @@ app.get("/analysis", requireAuth, async (c) => {
             blueTeams: match.alliances.blue.team_keys.map((key) => key.replace(/^frc/, "")),
             redScore: match.alliances.red.score,
             blueScore: match.alliances.blue.score,
-            relationTo1648: partner ? "with" : opponent ? "against" : "none",
+            relationToTeam: partner ? "with" : opponent ? "against" : "none",
             played: match.alliances.red.score >= 0 && match.alliances.blue.score >= 0,
           };
         });
@@ -2761,7 +2850,7 @@ app.delete("/analysis/reports/:id/permanent", requireAuth, async (c) => {
 app.get("/field-map-publisher-options", requireAuth, async (c) => {
   if (!c.get("userIsAdmin")) return c.json({ error: "Admin access required." }, 403);
   const users = await getG3IdUsers(c);
-  if (!users) return c.json({ error: "Could not load G3ID accounts." }, 502);
+  if (!users) return c.json({ error: "Could not load the team's accounts." }, 502);
   return c.json({
     users: users
       .filter((user) => user.status === "active")
@@ -2774,11 +2863,11 @@ app.post("/field-map-publishers", requireAuth, async (c) => {
   if (!c.get("userIsAdmin")) return c.json({ error: "Admin access required." }, 403);
   const body = await c.req.json<{ userId?: unknown }>();
   const userId = text(body.userId, 200);
-  if (!userId) return c.json({ error: "Select a G3ID account." }, 400);
+  if (!userId) return c.json({ error: "Select an account." }, 400);
   const users = await getG3IdUsers(c);
-  if (!users) return c.json({ error: "Could not validate the G3ID account." }, 502);
+  if (!users) return c.json({ error: "Could not check that account." }, 502);
   const user = users.find((candidate) => candidate.id === userId && candidate.status === "active");
-  if (!user) return c.json({ error: "Select an active G3ID account." }, 400);
+  if (!user) return c.json({ error: "Select an active account." }, 400);
   const email = user.email.toLowerCase();
   await c.env.SCOUTING_DB.prepare(
     "INSERT OR IGNORE INTO field_map_publishers (email, granted_by, created_at) VALUES (?, ?, ?)",
@@ -3219,7 +3308,7 @@ app.post("/service-helpers", requireAuth, async (c) => {
   const body = await c.req.json<Record<string, unknown>>();
   const users = await getG3IdUsers(c);
   const user = users?.find((item) => item.id === text(body.userId, 200));
-  if (!user) return c.json({ error: "Select an active G3ID user." }, 400);
+  if (!user) return c.json({ error: "Select an active user." }, 400);
   await c.env.SCOUTING_DB.prepare(
     "INSERT OR REPLACE INTO service_helpers (user_id, display_name, email, slack_user_id, skills_json, approved_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
   )
@@ -3248,7 +3337,7 @@ const worker = new Hono<AppEnv>().route("/scouting", app);
 
 export type ScoutingApp = typeof worker;
 export default {
-  fetch: worker.fetch,
+  fetch: withApiPrefix(worker.fetch),
   scheduled: (_event: ScheduledController, env: AppEnv["Bindings"], ctx: ExecutionContext) => {
     ctx.waitUntil(settleConfiguredGame(env));
   },

@@ -75,7 +75,7 @@ export function CatalogSearch({
         autoFocus={autoFocus}
       />
       {open && query.trim() && (
-        <ul className="absolute z-30 mt-1 w-full max-h-80 overflow-y-auto rounded-lg border border-secondary-200 bg-white shadow-lg">
+        <ul className="absolute z-30 mt-1 w-full max-h-80 overflow-y-auto rounded-lg border border-secondary-200 bg-surface shadow-lg">
           {catalog.error ? (
             <li className="px-3 py-2 text-sm text-primary-700">{catalog.error}</li>
           ) : !catalog.data ? (

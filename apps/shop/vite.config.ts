@@ -1,3 +1,4 @@
+import { siteConfig } from "@g3/site-config/vite";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
@@ -5,15 +6,21 @@ import { VitePWA } from "vite-plugin-pwa";
 
 export default defineConfig({
   plugins: [
+    siteConfig({
+      app: "shop",
+      productionEnv: { VITE_API_BASE_URL: "/api" },
+    }),
+
     react(),
     tailwindcss(),
     VitePWA({
       registerType: "autoUpdate",
       includeAssets: ["favicon.ico", "favicon.svg", "apple-touch-icon.png"],
       manifest: {
-        name: "G3 Shop",
-        short_name: "G3 Shop",
-        description: "G3 Robotics parts management and shop operations",
+        // One build serves every team, so the installed app is just "Shop".
+        name: "Shop",
+        short_name: "Shop",
+        description: "Parts management and shop operations",
         theme_color: "#111827",
         background_color: "#030712",
         display: "standalone",
@@ -44,12 +51,14 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
+        // A link to the API (a drawing, a file download) is a page load too: it must reach the
+        // worker, not get the app's page like every other address does.
+        navigateFallbackDenylist: [/^\/api\//],
         runtimeCaching: [
           {
             // Dev: same-origin /api/* via Vite proxy
-            // Prod: https://api.shop.g3robotics.com/*
-            urlPattern: ({ url }) =>
-              url.pathname.startsWith("/api/") || url.hostname === "api.shop.g3robotics.com",
+            // Prod: the same, the API is at /api on the app's own address
+            urlPattern: ({ url }) => url.pathname.startsWith("/api/"),
             handler: "NetworkFirst",
             options: {
               cacheName: "api-cache",

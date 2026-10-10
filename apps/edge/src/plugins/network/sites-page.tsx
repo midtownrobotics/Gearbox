@@ -1,11 +1,12 @@
 import { Link } from "react-router-dom";
 import { api, getErrorMessage } from "../../shared/api";
-import { formatBytes, formatDate } from "../../shared/format";
+import { formatBytes } from "../../shared/format";
 import { Card, ErrorBanner, Loading, Page } from "../../shared/ui";
 import { useLoad } from "../../shared/use-load";
+import { RangePicker, rangeLabel, useRange } from "./range";
 
-async function loadSites() {
-  const res = await api.network.sites.$get();
+async function loadSites(query: { from: string | undefined; to: string | undefined }) {
+  const res = await api.network.sites.$get({ query });
   if (!res.ok) throw new Error(await getErrorMessage(res));
   return res.json();
 }
@@ -16,10 +17,12 @@ export const sitePath = (site: string) => `/network/sites/${encodeURIComponent(s
 export const isPseudoSite = (site: string) => site.startsWith("(");
 
 export function SitesPage() {
-  const { data, error } = useLoad(loadSites, []);
+  const { query, withRange } = useRange();
+  const { data, error } = useLoad(() => loadSites(query), [query.from, query.to]);
   if (error)
     return (
       <Page title="Sites">
+        <RangePicker range={null} />
         <ErrorBanner message={error} />
       </Page>
     );
@@ -33,10 +36,10 @@ export function SitesPage() {
   const total = data.sites.reduce((sum, s) => sum + s.dl + s.ul, 0);
   return (
     <Page title="Sites">
+      <RangePicker range={data.range} />
       <p className="text-sm text-secondary-500">
-        Data by site since {formatDate(data.cycle.start)}, grouped by domain. Updated hourly.
-        “(unknown)” is traffic whose DNS lookup the box didn’t see (e.g. encrypted DNS or VPNs);
-        “(other)” is each device’s smaller sites, grouped together.
+        Data by site for {rangeLabel(data.range)}, updated hourly. “(unknown)” is traffic the box
+        couldn’t name, such as VPNs; “(other)” is each device’s smaller sites.
       </p>
       <Card className="p-0! overflow-x-auto">
         <table className="w-full text-sm">
@@ -45,7 +48,7 @@ export function SitesPage() {
               <th className="px-4 py-3 font-bold w-8">#</th>
               <th className="px-4 py-3 font-bold">Site</th>
               <th className="px-4 py-3 font-bold hidden sm:table-cell">Share</th>
-              <th className="px-4 py-3 font-bold text-right">This cycle</th>
+              <th className="px-4 py-3 font-bold text-right">Used</th>
               <th className="px-4 py-3 font-bold text-right">Devices</th>
             </tr>
           </thead>
@@ -55,7 +58,7 @@ export function SitesPage() {
                 <td className="px-4 py-2.5 text-secondary-400 tabular-nums">{i + 1}</td>
                 <td className="px-4 py-2.5">
                   <Link
-                    to={sitePath(s.site)}
+                    to={withRange(sitePath(s.site))}
                     className={`font-medium hover:text-primary-500 ${isPseudoSite(s.site) ? "italic text-secondary-500" : "text-secondary-900"}`}
                   >
                     {s.site}
@@ -80,8 +83,7 @@ export function SitesPage() {
             {data.sites.length === 0 && (
               <tr>
                 <td colSpan={5} className="px-4 py-6 text-center text-secondary-400">
-                  No site data yet. The first hour appears about an hour after the agent starts
-                  tracking.
+                  No site data yet. It appears within about an hour.
                 </td>
               </tr>
             )}

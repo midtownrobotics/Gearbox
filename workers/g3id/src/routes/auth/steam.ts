@@ -5,8 +5,11 @@ import { setCookie } from "hono/cookie";
 import { createDb } from "../../db";
 import { coreUserIdentities, coreUsers } from "../../db/schema";
 import { sessionCookieOptions } from "../../lib/cookie";
+import { decodeState, encodeState } from "../../lib/oauth-state";
 import { sanitizeRedirect } from "../../lib/redirect";
 import { createSession } from "../../lib/session";
+import { methodOff } from "../../lib/sign-in-methods";
+import { providerRedirectUri, requestTeamId, teamFrontend, teamOfUser } from "../../lib/team";
 import type { AppEnv } from "../../types";
 
 const STEAM_OPENID_URL = "https://steamcommunity.com/openid/login";
@@ -36,10 +39,16 @@ function buildSteamUrl(redirectUri: string, state: string): string {
 export const steamAuthRouter = new Hono<AppEnv>()
   // Sign-in initiation
   .get("/steam", async (c) => {
-    const redirect = sanitizeRedirect(c.req.query("redirect"));
-    const stateValue = redirect ? `signin:${redirect}` : "signin";
-    const state = await generateState(c.env, stateValue);
-    return c.redirect(buildSteamUrl(c.env.STEAM_REDIRECT_URI, state));
+    const team = requestTeamId(c);
+    const off = await methodOff(c.env, team, "steam");
+    if (off) {
+      return c.redirect(
+        `${teamFrontend(c.env, team)}/login/error?error=${encodeURIComponent(off)}`,
+      );
+    }
+    const redirect = sanitizeRedirect(c.req.query("redirect"), team);
+    const state = await generateState(c.env, encodeState({ team, redirect, linkUserId: null }));
+    return c.redirect(buildSteamUrl(providerRedirectUri(c.env, "steam", team), state));
   })
   // Link initiation — user must already be signed in
   .get("/steam/link", async (c) => {
@@ -47,12 +56,24 @@ export const steamAuthRouter = new Hono<AppEnv>()
     const userId = await resolveUserId(c.req.header("Cookie") ?? "", c.env);
     if (!userId) return c.redirect(app("/login"));
 
-    const state = await generateState(c.env, `link:${userId}`);
-    return c.redirect(buildSteamUrl(c.env.STEAM_REDIRECT_URI, state));
+    const team = await teamOfUser(createDb(c.env.DB), userId);
+    const off = await methodOff(c.env, team, "steam");
+    if (off) {
+      return c.redirect(
+        `${teamFrontend(c.env, team)}/login/error?error=${encodeURIComponent(off)}`,
+      );
+    }
+    const state = await generateState(
+      c.env,
+      encodeState({ team, redirect: null, linkUserId: userId }),
+    );
+    return c.redirect(buildSteamUrl(providerRedirectUri(c.env, "steam", team), state));
   })
   // Shared callback
   .get("/steam/callback", async (c) => {
-    const app = (path: string) => `${c.env.FRONTEND_URL}${path}`;
+    // Until the state says which team this is, errors go to the site team's page.
+    let frontend = c.env.FRONTEND_URL;
+    const app = (path: string) => `${frontend}${path}`;
     const err = (msg: string) => c.redirect(app(`/login/error?error=${encodeURIComponent(msg)}`));
 
     const state = c.req.query("state");
@@ -62,9 +83,13 @@ export const steamAuthRouter = new Hono<AppEnv>()
     await c.env.RATE_LIMIT.delete(`oauth_state:${state}`);
     if (!stateValue) return err("This sign-in link has expired. Please try again.");
 
-    const isLink = stateValue.startsWith("link:");
-    const linkUserId = isLink ? stateValue.slice(5) : null;
-    const redirectTo = !isLink && stateValue.startsWith("signin:") ? stateValue.slice(7) : null;
+    const st = decodeState(stateValue);
+    frontend = teamFrontend(c.env, st.team);
+    const off = await methodOff(c.env, st.team, "steam");
+    if (off) return err(off);
+    const linkUserId = st.linkUserId;
+    const isLink = linkUserId !== null;
+    const redirectTo = st.redirect?.startsWith("/") ? app(st.redirect) : st.redirect;
 
     const claimedId = c.req.query("openid.claimed_id");
     if (!claimedId) return err("Invalid OpenID response.");
@@ -150,10 +175,14 @@ export const steamAuthRouter = new Hono<AppEnv>()
     }
 
     const user = await db
-      .select({ id: coreUsers.id, status: coreUsers.status })
+      .select({ id: coreUsers.id, teamId: coreUsers.teamId, status: coreUsers.status })
       .from(coreUsers)
       .where(eq(coreUsers.id, identity.userId))
       .get();
+
+    if (user && user.teamId !== st.team) {
+      return err("This account belongs to another team. Sign in on your own team's page.");
+    }
 
     if (!user || user.status !== "active") {
       const message =
@@ -164,6 +193,6 @@ export const steamAuthRouter = new Hono<AppEnv>()
     }
 
     const sessionId = await createSession(user.id, c.env);
-    setCookie(c, "g3_session", sessionId, sessionCookieOptions(c.env.FRONTEND_URL));
+    setCookie(c, "g3_session", sessionId, sessionCookieOptions(c.req.url));
     return c.redirect(redirectTo ?? app("/dashboard"));
   });

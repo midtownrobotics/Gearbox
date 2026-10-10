@@ -1,8 +1,10 @@
+# Production URLs, route patterns and TEAM_NUMBER here are written by `pnpm configure` from
+# packages/site-config/src/site.ts. Change them there, not here.
 name = "edge"
 main = "src/index.ts"
 compatibility_date = "2026-05-17"
 
-# Daily rollup of 5-minute usage rows into hourly rows (UTC).
+# Daily rollup of old usage rows, team by team (src/modules/network/index.ts).
 [triggers]
 crons = ["30 8 * * *"]
 
@@ -16,14 +18,24 @@ database_name = "g3-edge-local"
 database_id = "00000000-0000-0000-0000-000000000003"
 migrations_dir = "src/db/migrations"
 
-[vars]
-FRONTEND_URL = "http://localhost:5183"
-# The mock agent (pnpm --filter @g3/edge-agent run dev:mock).
-EDGE_AGENT_URL = "http://localhost:8700"
-# Secrets: EDGE_AGENT_KEY (shared with the agent; .dev.vars locally, `wrangler secret put` in prod)
+# Holds each team's edge box WebSocket (src/lib/agent-link.ts, one instance per team): a box
+# connects to /api/agent/connect on its team's address, and the worker's requests to it go over it.
+[[durable_objects.bindings]]
+name = "AGENT_LINK"
+class_name = "AgentLink"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["AgentLink"]
+
+# No secrets: each team's box has its own key, made on the Edge Box page and stored hashed in D1.
+# Local dev: `pnpm --filter @g3/worker-edge box-key:set -- --local --key local-dev-agent-key`
+# lets the mock agent (mock.env) connect as the site team's box.
 
 [env.production]
 name = "edge-production"
+# No workers.dev address: the gateway is the only way in, so its identity headers can be trusted.
+workers_dev = false
 
 [env.production.triggers]
 crons = ["30 8 * * *"]
@@ -38,10 +50,17 @@ database_name = "g3-edge-prod"
 database_id = "0ba12f11-3577-472f-9998-81017319bd51"
 migrations_dir = "src/db/migrations"
 
-[[env.production.routes]]
-pattern = "api.edge.g3robotics.com"
-custom_domain = true
+[[env.production.durable_objects.bindings]]
+name = "AGENT_LINK"
+class_name = "AgentLink"
 
-[env.production.vars]
-FRONTEND_URL = "https://edge.g3robotics.com"
-EDGE_AGENT_URL = "https://edge-agent.g3robotics.com"
+# The app's page, served by this worker in production; only /api/* runs the worker code, and
+# other paths fall back to index.html for the app's router. Wrangler builds the page before
+# every production deploy or upload (Cloudflare's Git builds too).
+[env.production.build]
+command = "pnpm --filter @g3/edge build"
+
+[env.production.assets]
+directory = "../../apps/edge/dist"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]

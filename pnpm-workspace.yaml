@@ -4,6 +4,18 @@ packages:
   - "packages/*"
   - "devices/*"
 
+# Versions shared by every package that uses them (`"vitest": "catalog:"`).
+catalog:
+  # The Workers test pool supports Vitest 4.1.x only.
+  "@cloudflare/vitest-pool-workers": 0.22.0
+  # One Hono for every worker and @g3/auth, so shared middleware types line up.
+  hono: 4.12.19
+  # One Drizzle (and the Workers types it's built against) for every worker and @g3/auth,
+  # so its team-scoped query helpers take any worker's tables.
+  "@cloudflare/workers-types": 4.20260702.1
+  drizzle-orm: 0.44.7
+  vitest: 4.1.11
+
 # pnpm v10 (Cloudflare Pages CI)
 onlyBuiltDependencies:
   - "@biomejs/biome"

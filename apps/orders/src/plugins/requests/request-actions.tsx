@@ -2,6 +2,7 @@ import { useState } from "react";
 import { api, getErrorMessage } from "../../shared/api";
 import { useAuthUser } from "../../shared/auth";
 import { formatCents, parseDollars } from "../../shared/format";
+import { ReceiveDialog, asksInventory, useIntake } from "../../shared/receive-dialog";
 import type { OrderRequest } from "../../shared/types";
 import { Button, ErrorBanner, inputClass } from "../../shared/ui";
 
@@ -16,7 +17,7 @@ const LABELS: Record<Action, string> = {
 
 /**
  * What this user may do to the request right now (mirrors the worker's rules). Ordering isn't
- * here: mentors place orders for whole vendors on the Ordering page.
+ * here: mentors place orders for whole vendors on the Carts page.
  */
 export function allowedActions(
   request: Pick<OrderRequest, "status" | "requesterId">,
@@ -33,7 +34,8 @@ export function allowedActions(
     case "approved":
       return mentor || owner ? ["cancel"] : [];
     case "ordered":
-      return mentor || owner ? ["receive"] : [];
+      // Whoever opens the package marks it received.
+      return ["receive"];
     default:
       return [];
   }
@@ -61,12 +63,16 @@ export function RequestActions({
   const [price, setPrice] = useState(dollars(request.unitPriceCents));
   const [busy, setBusy] = useState<Action | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [receiving, setReceiving] = useState(false);
+  const intake = useIntake();
 
   if (actions.length === 0) return null;
   const canApprove = actions.includes("approve");
 
   async function run(action: Action) {
     if (action === "cancel" && !window.confirm("Cancel this request?")) return;
+    // With Inventory set up (or required), a pop-up asks where the parts go first.
+    if (action === "receive" && asksInventory(intake)) return setReceiving(true);
     let reason = note;
     if (compact && action === "deny") {
       const answer = window.prompt("Why is it denied? (shown to the requester)");
@@ -154,6 +160,17 @@ export function RequestActions({
         ))}
       </div>
       {error && <ErrorBanner message={error} />}
+      {receiving && intake && (
+        <ReceiveDialog
+          lines={[request]}
+          intake={intake}
+          onClose={() => setReceiving(false)}
+          onReceived={() => {
+            setReceiving(false);
+            onChanged();
+          }}
+        />
+      )}
     </div>
   );
 }

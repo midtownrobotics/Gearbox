@@ -191,7 +191,7 @@ export function ChecklistDetailPage() {
         <button
           type="button"
           onClick={() => navigate("/editor")}
-          className="text-red-400 hover:text-red-300 text-sm underline"
+          className="text-primary-600 hover:text-primary-700 text-sm underline"
         >
           Back to Checklists
         </button>
@@ -230,12 +230,12 @@ export function ChecklistDetailPage() {
                   if (e.key === "Enter") saveListName();
                   if (e.key === "Escape") setEditingListField(null);
                 }}
-                className="flex-1 bg-gray-100 border border-gray-600 rounded-lg px-3 py-2 text-xl font-bold text-gray-900 focus:outline-none focus:border-red-500"
+                className="flex-1 bg-gray-100 border border-gray-600 rounded-lg px-3 py-2 text-xl font-bold text-gray-900 focus:outline-none focus:border-primary-500"
               />
               <button
                 type="button"
                 onClick={saveListName}
-                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-lg"
+                className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold rounded-lg"
               >
                 Save
               </button>
@@ -274,13 +274,13 @@ export function ChecklistDetailPage() {
                   if (e.key === "Escape") setEditingListField(null);
                 }}
                 rows={2}
-                className="flex-1 bg-gray-100 border border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:border-red-500 resize-none"
+                className="flex-1 bg-gray-100 border border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:border-primary-500 resize-none"
               />
               <div className="flex flex-col gap-1">
                 <button
                   type="button"
                   onClick={saveListDescription}
-                  className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-lg"
+                  className="px-3 py-1.5 bg-primary-600 hover:bg-primary-700 text-white text-xs font-semibold rounded-lg"
                 >
                   Save
                 </button>
@@ -332,7 +332,7 @@ export function ChecklistDetailPage() {
                   setAddingType("item");
                   setBanner(null);
                 }}
-                className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-lg transition-colors"
+                className="px-3 py-1.5 bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold rounded-lg transition-colors"
               >
                 + Add Item
               </button>
@@ -341,7 +341,7 @@ export function ChecklistDetailPage() {
         </div>
 
         {adding && (
-          <div className="bg-white rounded-xl border border-gray-300 p-4 space-y-3">
+          <div className="bg-surface rounded-xl border border-gray-300 p-4 space-y-3">
             <p className="text-xs font-semibold uppercase tracking-widest text-gray-600">
               {addingType === "topic" ? "New Topic" : "New Item"}
             </p>
@@ -357,7 +357,7 @@ export function ChecklistDetailPage() {
                 if (e.key === "Enter") handleAddItem();
                 if (e.key === "Escape") setAdding(false);
               }}
-              className="w-full bg-gray-100 border border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:border-red-500"
+              className="w-full bg-gray-100 border border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:border-primary-500"
               // biome-ignore lint/a11y/noAutofocus: intentional — user just opened the add form
               autoFocus
             />
@@ -367,7 +367,7 @@ export function ChecklistDetailPage() {
                 value={newItemDesc}
                 onChange={(e) => setNewItemDesc(e.target.value)}
                 rows={2}
-                className="w-full bg-gray-100 border border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:border-red-500 resize-none"
+                className="w-full bg-gray-100 border border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:border-primary-500 resize-none"
               />
             )}
             {addError && <p className="text-red-400 text-xs">{addError}</p>}
@@ -375,7 +375,7 @@ export function ChecklistDetailPage() {
               <button
                 type="button"
                 onClick={handleAddItem}
-                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-lg"
+                className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold rounded-lg"
               >
                 Add
               </button>
@@ -416,12 +416,12 @@ export function ChecklistDetailPage() {
                         if (e.key === "Enter") saveItemEdit();
                         if (e.key === "Escape") setEditingItem(null);
                       }}
-                      className="flex-1 bg-gray-100 border border-gray-600 rounded-lg px-3 py-1.5 text-sm font-semibold text-gray-900 focus:outline-none focus:border-red-500"
+                      className="flex-1 bg-gray-100 border border-gray-600 rounded-lg px-3 py-1.5 text-sm font-semibold text-gray-900 focus:outline-none focus:border-primary-500"
                     />
                     <button
                       type="button"
                       onClick={saveItemEdit}
-                      className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-lg"
+                      className="px-3 py-1.5 bg-primary-600 hover:bg-primary-700 text-white text-xs font-semibold rounded-lg"
                     >
                       Save
                     </button>
@@ -502,7 +502,7 @@ export function ChecklistDetailPage() {
                 )}
               </div>
             ) : (
-              <div key={item.id} className="bg-white rounded-xl border border-gray-300 p-4">
+              <div key={item.id} className="bg-surface rounded-xl border border-gray-300 p-4">
                 {editingItem?.id === item.id && editingItem.field === "name" ? (
                   <div className="flex gap-2 mb-1">
                     <input
@@ -513,12 +513,12 @@ export function ChecklistDetailPage() {
                         if (e.key === "Enter") saveItemEdit();
                         if (e.key === "Escape") setEditingItem(null);
                       }}
-                      className="flex-1 bg-gray-100 border border-gray-600 rounded-lg px-3 py-1.5 text-sm text-gray-900 focus:outline-none focus:border-red-500"
+                      className="flex-1 bg-gray-100 border border-gray-600 rounded-lg px-3 py-1.5 text-sm text-gray-900 focus:outline-none focus:border-primary-500"
                     />
                     <button
                       type="button"
                       onClick={saveItemEdit}
-                      className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-lg"
+                      className="px-3 py-1.5 bg-primary-600 hover:bg-primary-700 text-white text-xs font-semibold rounded-lg"
                     >
                       Save
                     </button>
@@ -587,13 +587,13 @@ export function ChecklistDetailPage() {
                         if (e.key === "Escape") setEditingItem(null);
                       }}
                       rows={2}
-                      className="flex-1 bg-gray-100 border border-gray-600 rounded-lg px-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:border-red-500 resize-none"
+                      className="flex-1 bg-gray-100 border border-gray-600 rounded-lg px-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:border-primary-500 resize-none"
                     />
                     <div className="flex flex-col gap-1">
                       <button
                         type="button"
                         onClick={saveItemEdit}
-                        className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-lg"
+                        className="px-3 py-1.5 bg-primary-600 hover:bg-primary-700 text-white text-xs font-semibold rounded-lg"
                       >
                         Save
                       </button>

@@ -1,4 +1,4 @@
-import { OnShapeIcon } from "@g3/ui";
+import { site } from "@g3/site-config";
 import { Loader2, Shield } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { FaGithub, FaGoogle, FaSlack, FaSteam } from "react-icons/fa";
@@ -31,7 +31,6 @@ const PROVIDER_LABELS: Record<string, string> = {
   slack: "Slack",
   github: "GitHub",
   steam: "Steam",
-  onshape: "OnShape",
 };
 
 export function DashboardPage() {
@@ -49,6 +48,16 @@ export function DashboardPage() {
   const [pinError, setPinError] = useState<string | null>(null);
 
   const [unlinkingProvider, setUnlinkingProvider] = useState<string | null>(null);
+  /** The ways the team signs in; a method it switched off can't be linked. */
+  const [methods, setMethods] = useState<Partial<Record<string, boolean>>>({});
+  useEffect(() => {
+    api.team["sign-in"]
+      .$get()
+      .then((res) => (res.ok ? res.json() : {}))
+      .then(setMethods)
+      .catch(() => {});
+  }, []);
+  const linkable = (provider: string) => methods[provider] !== false;
 
   async function handleConnectSlack() {
     setSlackError(null);
@@ -157,7 +166,7 @@ export function DashboardPage() {
     }
 
     const confirmed = window.confirm(
-      `Unlink ${PROVIDER_LABELS[provider] ?? provider}? You'll no longer be able to sign in with this method.`,
+      `Unlink ${PROVIDER_LABELS[provider] ?? provider}? You won't be able to sign in with it.`,
     );
     if (!confirmed) return;
 
@@ -224,7 +233,7 @@ export function DashboardPage() {
     <main className="flex-1 px-6 py-8 max-w-lg mx-auto w-full">
       <h1 className="text-5xl font-bold text-secondary-900 mb-4 text-center">Dashboard</h1>
 
-      <div className="bg-white border border-secondary-200 rounded-lg divide-y divide-secondary-100 mt-4">
+      <div className="bg-surface border border-secondary-200 rounded-lg divide-y divide-secondary-100 mt-4">
         <div className="px-5 py-4 flex items-center gap-4">
           <div className="w-12 h-12 rounded-full bg-primary-500 flex items-center justify-center text-lg font-semibold text-white shrink-0">
             {me.displayName.charAt(0).toUpperCase()}
@@ -291,15 +300,16 @@ export function DashboardPage() {
                   <div className="ml-2 flex items-center gap-2 shrink-0">
                     {(identity.provider === "steam" ||
                       identity.provider === "google" ||
-                      identity.provider === "github") && (
-                      <a
-                        href={`${import.meta.env.VITE_API_BASE_URL}/auth/${identity.provider}/link`}
-                        className="px-2 py-1 rounded bg-primary-600 hover:bg-primary-700 text-white text-xs font-bold transition-colors cursor-pointer"
-                        title={`Add another ${identity.provider} account`}
-                      >
-                        +
-                      </a>
-                    )}
+                      identity.provider === "github") &&
+                      linkable(identity.provider) && (
+                        <a
+                          href={`${import.meta.env.VITE_API_BASE_URL}/auth/${identity.provider}/link`}
+                          className="px-2 py-1 rounded bg-primary-600 hover:bg-primary-700 text-white text-xs font-bold transition-colors cursor-pointer"
+                          title={`Add another ${identity.provider} account`}
+                        >
+                          +
+                        </a>
+                      )}
                     {identity.provider !== "slack" && (
                       <button
                         type="button"
@@ -317,7 +327,7 @@ export function DashboardPage() {
           </div>
 
           <div className="mt-3 space-y-2">
-            {!me.identities.some((i) => i.provider === "google") && (
+            {linkable("google") && !me.identities.some((i) => i.provider === "google") && (
               <a
                 href={`${import.meta.env.VITE_API_BASE_URL}/auth/google/link`}
                 className="w-full flex items-center justify-center gap-2 rounded-lg bg-primary-600 hover:bg-primary-700 px-4 py-2 text-sm text-white transition-colors"
@@ -326,7 +336,7 @@ export function DashboardPage() {
                 Connect Google
               </a>
             )}
-            {!me.identities.some((i) => i.provider === "github") && (
+            {linkable("github") && !me.identities.some((i) => i.provider === "github") && (
               <a
                 href={`${import.meta.env.VITE_API_BASE_URL}/auth/github/link`}
                 className="w-full flex items-center justify-center gap-2 rounded-lg bg-primary-600 hover:bg-primary-700 px-4 py-2 text-sm text-white transition-colors"
@@ -335,7 +345,7 @@ export function DashboardPage() {
                 Connect GitHub
               </a>
             )}
-            {!me.identities.some((i) => i.provider === "steam") && (
+            {linkable("steam") && !me.identities.some((i) => i.provider === "steam") && (
               <a
                 href={`${import.meta.env.VITE_API_BASE_URL}/auth/steam/link`}
                 className="w-full flex items-center justify-center gap-2 rounded-lg bg-primary-600 hover:bg-primary-700 px-4 py-2 text-sm text-white transition-colors"
@@ -351,8 +361,10 @@ export function DashboardPage() {
                 <div className="rounded-lg bg-secondary-50 border border-secondary-200 px-4 py-3 space-y-2">
                   <p className="text-xs text-secondary-600 text-center">
                     DM this code to the {""}
-                    <span className="text-primary-500 font-medium">"G3 Bot" user in Slack</span>, or
-                    run <span className="font-mono text-primary-500">/link {slackCode}</span>
+                    <span className="text-primary-500 font-medium">
+                      "{site.slackBotName}" user in Slack
+                    </span>
+                    , or run <span className="font-mono text-primary-500">/link {slackCode}</span>
                   </p>
                   <p className="font-mono text-3xl font-bold text-secondary-900 text-center tracking-widest">
                     {slackCode}
@@ -379,22 +391,13 @@ export function DashboardPage() {
               )}
             </div>
           )}
-          {me.sessionType === "oauth" && !me.identities.some((i) => i.provider === "onshape") && (
-            <a
-              href={`${import.meta.env.VITE_API_BASE_URL}/auth/onshape`}
-              className="mt-3 w-full flex items-center justify-center gap-2 rounded-lg bg-primary-600 hover:bg-primary-700 px-4 py-2 text-sm text-white transition-colors"
-            >
-              <OnShapeIcon size={16} white />
-              Connect OnShape
-            </a>
-          )}
         </div>
 
         {me.sessionType === "oauth" && (
           <div className="px-5 py-4">
             <p className="text-xs text-secondary-500 uppercase tracking-wide mb-3">Kiosk PIN</p>
             {pin && showPin ? (
-              <div className="bg-white border border-secondary-300 rounded-lg p-3 text-center">
+              <div className="bg-surface border border-secondary-300 rounded-lg p-3 text-center">
                 <p className="text-2xl font-mono font-bold text-secondary-900 tracking-widest">
                   {pin}
                 </p>

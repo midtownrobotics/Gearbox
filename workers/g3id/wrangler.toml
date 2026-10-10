@@ -1,3 +1,5 @@
+# Production URLs, route patterns and TEAM_NUMBER here are written by `pnpm configure` from
+# packages/site-config/src/site.ts. Change them there, not here.
 name = "g3id"
 main = "src/index.ts"
 compatibility_date = "2026-05-17"
@@ -16,6 +18,11 @@ id = "c27ba19a75fb4eb6b93f9d2d47de6c0f"
 binding = "RATE_LIMIT"
 id = "45e7485d5f0e4f2abf76bd6400e64897"
 
+# The platform, for the team's log (src/lib/team-log.ts). The platform binds G3ID too.
+[[services]]
+binding = "PLATFORM"
+service = "platform"
+
 [vars]
 ENVIRONMENT = "development"
 GOOGLE_CLIENT_ID = "26070176131-lom1rtgi2tmahrd12md7452oieha1vbl.apps.googleusercontent.com"
@@ -25,12 +32,14 @@ GITHUB_REDIRECT_URI = "http://localhost:5173/api/auth/github/callback"
 SLACK_TEAM_ID = "T04LF3F0D"
 SLACK_APP_ID = "A08M9C82LEL"
 STEAM_REDIRECT_URI = "http://localhost:5173/api/auth/steam/callback"
-ONSHAPE_CLIENT_ID = "NREWPL5DFDUCQEIYYGYZ643CMR3FTTSUMI2XDWQ="
-ONSHAPE_REDIRECT_URI = "http://localhost:5173/api/auth/onshape/callback"
 FRONTEND_URL = "http://localhost:5173"
+# Local dev: every team's addresses go through the dev gateway (http://<number>-id.gearbox.localhost:8796).
+LOCAL_GATEWAY_URL = "http://localhost:8796"
 
 [env.production]
 name = "g3id-production"
+# No workers.dev address: the gateway is the only way in, so its identity headers can be trusted.
+workers_dev = false
 
 [[env.production.d1_databases]]
 binding = "DB"
@@ -46,18 +55,20 @@ id = "db4457ce43c9468eb9ec5a049afa65b1"
 binding = "RATE_LIMIT"
 id = "d36a0313dd774bf78bacd76250ec085a"
 
+[[env.production.services]]
+binding = "PLATFORM"
+service = "platform-production"
+
 [env.production.vars]
 ENVIRONMENT = "production"
 GOOGLE_CLIENT_ID = "26070176131-lom1rtgi2tmahrd12md7452oieha1vbl.apps.googleusercontent.com"
-GOOGLE_REDIRECT_URI = "https://api.g3id.g3robotics.com/auth/google/callback"
+GOOGLE_REDIRECT_URI = "https://id.frcgearbox.com/api/auth/google/callback"
 GITHUB_CLIENT_ID = "Iv23lii4BhJtKBycp2yB"
-GITHUB_REDIRECT_URI = "https://api.g3id.g3robotics.com/auth/github/callback"
+GITHUB_REDIRECT_URI = "https://id.frcgearbox.com/api/auth/github/callback"
 SLACK_TEAM_ID = "T04LF3F0D"
 SLACK_APP_ID = "A08M9C82LEL"
-STEAM_REDIRECT_URI = "https://api.g3id.g3robotics.com/auth/steam/callback"
-ONSHAPE_CLIENT_ID = "NREWPL5DFDUCQEIYYGYZ643CMR3FTTSUMI2XDWQ="
-ONSHAPE_REDIRECT_URI = "https://api.g3id.g3robotics.com/auth/onshape/callback"
-FRONTEND_URL = "https://g3id.g3robotics.com"
+STEAM_REDIRECT_URI = "https://id.frcgearbox.com/api/auth/steam/callback"
+FRONTEND_URL = "https://1648-id.frcgearbox.com"
 
 [observability]
 enabled = false
@@ -73,3 +84,14 @@ invocation_logs = true
 enabled = false
 persist = true
 head_sampling_rate = 1
+
+# The app's page, served by this worker in production; only /api/* runs the worker code, and
+# other paths fall back to index.html for the app's router. Wrangler builds the page before
+# every production deploy or upload (Cloudflare's Git builds too).
+[env.production.build]
+command = "pnpm --filter @g3/g3id build"
+
+[env.production.assets]
+directory = "../../apps/g3id/dist"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]

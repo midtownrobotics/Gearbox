@@ -2,10 +2,23 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="This is an educational tool used by high school robotics teams, specifically G3 robotics at mditown high school. It includes software for the production tracking, attendance, and other management tools. It uses math, science, ELA, reading, and other forms of school to help educate and teach. Education is our number one priority." />
+    <script>
+      // Light/dark for every app (the g3_theme cookie on the team's domain), set before first
+      // paint. The kiosk display (any page that isn't a scanned confirm page) is always dark.
+      (function () {
+        var saved = document.cookie.match(/(?:^|;\s*)g3_theme=(light|dark)/);
+        var dark = window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches;
+        var confirming = /[?&]action=/.test(location.search);
+        var theme = !confirming ? "dark" : saved ? saved[1] : dark ? "dark" : "light";
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.style.colorScheme = theme;
+      })();
+    </script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="description" content="This is an educational tool used by high school robotics teams. It includes software for the production tracking, attendance, and other management tools. It uses math, science, ELA, reading, and other forms of school to help educate and teach. Education is our number one priority." />
     <meta name="keywords" content="School, Education, SAT, ACT, Math, Science, Reading, ELA, Tools, Learning, Students, High School, Robotics, Teachers, Attendance" />
-    <title>G3 Attendance</title>
+    <title>Attendance</title>
   </head>
   <body>
     <div id="root"></div>

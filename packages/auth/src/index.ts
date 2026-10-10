@@ -1,3 +1,5 @@
+import { TEAM_HEADER } from "./g3id";
+
 export interface SessionBindings {
   SESSIONS: KVNamespace;
 }
@@ -21,3 +23,68 @@ export async function resolveUserId(
   }
   return null;
 }
+
+export {
+  type Member,
+  activeMembers,
+  sendTeamDM,
+  sendTeamMessage,
+  teamHasApp,
+  teamMembers,
+} from "./members";
+export {
+  type TeamExport,
+  deleteTeamRows,
+  exportTeamRows,
+  inTeam,
+  teamExport,
+  withTeam,
+} from "./scope";
+export { decryptSecret, encryptSecret } from "./secret-box";
+export { type TeamChange, changedFields, logTeamChange, settingLabels } from "./audit";
+export {
+  type IntegrationFact,
+  type IntegrationStatus,
+  type SettingValue,
+  type TeamSettingsState,
+  type TeamSettingsStore,
+  formSettings,
+  parseSettingValue,
+  teamSettingsRoutes,
+} from "./team-settings";
+
+/**
+ * Headers for calling another app's worker as the signed-in user (a service binding skips the
+ * gateway): their session cookie and the request's team, so the other app signs them in to the
+ * same team.
+ */
+export function forwardIdentity(c: {
+  req: { header(name: string): string | undefined };
+}): Record<string, string> {
+  const headers: Record<string, string> = { Cookie: c.req.header("Cookie") ?? "" };
+  const team = c.req.header(TEAM_HEADER);
+  if (team) headers[TEAM_HEADER] = team;
+  return headers;
+}
+
+export {
+  type G3AuthEnv,
+  type G3AuthVariables,
+  hasMentorAccess,
+  requireAdmin,
+  requireAuth,
+  requireAuthWithIdentities,
+  requireMentor,
+  requireOAuthSession,
+  requestTeamId,
+  TEAM_HEADER,
+} from "./g3id";
+
+export {
+  type AppIntegration,
+  type AppManifest,
+  type AppPlugin,
+  type AppRole,
+  type AppSetting,
+  defineManifest,
+} from "./manifest";

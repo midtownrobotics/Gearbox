@@ -1,3 +1,4 @@
+import { appUrl } from "@g3/site-config";
 import { Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api } from "../../lib/api";
@@ -44,9 +45,22 @@ export function AdminKioskPage() {
     }
   }
 
+  /** Whether the team allows kiosk PINs (its Sign-in page); null while asking. */
+  const [kioskOn, setKioskOn] = useState<boolean | null>(null);
+
   // biome-ignore lint/correctness/useExhaustiveDependencies: loadDevices changes on every render but we only want to load once on mount
   useEffect(() => {
-    loadDevices();
+    api.team["sign-in"]
+      .$get()
+      .then((res) => (res.ok ? res.json() : { pin: true }))
+      .then((methods) => {
+        setKioskOn(methods.pin !== false);
+        if (methods.pin !== false) loadDevices();
+      })
+      .catch(() => {
+        setKioskOn(true);
+        loadDevices();
+      });
   }, []);
 
   async function handleGenerateCode(e: React.FormEvent) {
@@ -92,12 +106,31 @@ export function AdminKioskPage() {
     }
   }
 
+  if (kioskOn === null) return null;
+  if (!kioskOn) {
+    return (
+      <main className="flex-1 px-6 py-8 max-w-2xl mx-auto w-full">
+        <h1 className="text-3xl font-bold text-secondary-900 mb-4">Kiosk Management</h1>
+        <p className="text-secondary-600">
+          Kiosk sign-in is off for your team, so kiosks can't be added or used. Turn it on from the{" "}
+          <a
+            href={`${appUrl("portal")}/admin/sign-in`}
+            className="font-semibold text-primary-600 underline"
+          >
+            Sign-in page
+          </a>
+          .
+        </p>
+      </main>
+    );
+  }
+
   return (
     <main className="flex-1 px-6 py-8 max-w-2xl mx-auto w-full">
       <h1 className="text-3xl font-bold text-secondary-900 mb-8">Kiosk Management</h1>
 
       <div className="space-y-8">
-        <div className="bg-white border border-secondary-200 rounded-lg p-6">
+        <div className="bg-surface border border-secondary-200 rounded-lg p-6">
           <h2 className="text-xl font-semibold text-secondary-900 mb-4">
             Generate Activation Code
           </h2>
@@ -115,7 +148,7 @@ export function AdminKioskPage() {
                 placeholder="e.g., Shop Register 1"
                 value={deviceName}
                 onChange={(e) => setDeviceName(e.target.value)}
-                className="w-full px-4 py-2 rounded-lg bg-white border border-secondary-300 text-secondary-900 placeholder-secondary-400 focus:outline-none focus:border-primary-500"
+                className="w-full px-4 py-2 rounded-lg bg-surface border border-secondary-300 text-secondary-900 placeholder-secondary-400 focus:outline-none focus:border-primary-500"
               />
             </div>
 
@@ -131,7 +164,7 @@ export function AdminKioskPage() {
           {codeError && <p className="mt-3 text-sm text-primary-500">{codeError}</p>}
 
           {code && (
-            <div className="mt-6 bg-white border border-secondary-300 rounded-lg p-4 space-y-3">
+            <div className="mt-6 bg-surface border border-secondary-300 rounded-lg p-4 space-y-3">
               <div>
                 <p className="text-xs text-secondary-600 mb-1">
                   Activation Code (expires in 30 min)
@@ -154,7 +187,7 @@ export function AdminKioskPage() {
           )}
         </div>
 
-        <div className="bg-white border border-secondary-200 rounded-lg p-6">
+        <div className="bg-surface border border-secondary-200 rounded-lg p-6">
           <h2 className="text-xl font-semibold text-secondary-900 mb-4">Active Devices</h2>
 
           {devicesError && <p className="text-sm text-primary-500 mb-4">{devicesError}</p>}
@@ -168,7 +201,7 @@ export function AdminKioskPage() {
               {devices.map((device) => (
                 <div
                   key={device.id}
-                  className="bg-white border border-secondary-300 rounded-lg p-4 flex items-center justify-between"
+                  className="bg-surface border border-secondary-300 rounded-lg p-4 flex items-center justify-between"
                 >
                   <div className="min-w-0 flex-1">
                     <p className="font-semibold text-secondary-900">{device.name}</p>

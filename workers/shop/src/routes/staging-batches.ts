@@ -1,3 +1,4 @@
+import { inTeam, requireAuth, withTeam } from "@g3/auth";
 import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
@@ -7,9 +8,10 @@ import {
   files,
   partInstanceFiles,
   partInstanceProcesses,
+  processes,
   stagingBatches,
 } from "../db/schema";
-import { requireAuth } from "../middleware/auth";
+import { finished, promoteNextSteps } from "../lib/steps";
 import type { AppEnv } from "../types";
 
 type ShopDb = ReturnType<typeof createShopDb>;
@@ -17,7 +19,7 @@ type BatchRow = typeof stagingBatches.$inferSelect;
 
 export type StagingBatch = Omit<BatchRow, "closedAt"> & { partInstanceIds: number[] };
 
-// D1 caps a statement at 100 bound parameters; the widest insert here has 5 columns.
+// D1 caps a statement at 100 bound parameters; the widest insert here has 6 columns.
 const CHUNK = 15;
 
 function chunks<T>(items: T[], size = CHUNK): T[][] {
@@ -55,11 +57,13 @@ const fileValidator = validator("json", (value, c): { fileId: number | null } =>
   return { fileId: fileId as number | null };
 });
 
-async function getOpenBatch(db: ShopDb, id: number): Promise<BatchRow | null> {
+async function getOpenBatch(db: ShopDb, teamId: string, id: number): Promise<BatchRow | null> {
   const row = await db
     .select()
     .from(stagingBatches)
-    .where(and(eq(stagingBatches.id, id), isNull(stagingBatches.closedAt)))
+    .where(
+      inTeam(stagingBatches, teamId, eq(stagingBatches.id, id), isNull(stagingBatches.closedAt)),
+    )
     .get();
   return row ?? null;
 }
@@ -70,7 +74,9 @@ async function stagedIn(db: ShopDb, batch: BatchRow): Promise<number[]> {
     .select({ id: partInstanceProcesses.partInstanceId })
     .from(partInstanceProcesses)
     .where(
-      and(
+      inTeam(
+        partInstanceProcesses,
+        batch.teamId,
         eq(partInstanceProcesses.batchId, batch.id),
         eq(partInstanceProcesses.processId, batch.processId),
         eq(partInstanceProcesses.status, "doing"),
@@ -83,18 +89,24 @@ async function stagedIn(db: ShopDb, batch: BatchRow): Promise<number[]> {
 /** Makes `fileId` the only file on these instances (or clears them when null). */
 async function putFileOn(
   db: ShopDb,
+  teamId: string,
   fileId: number | null,
   instanceIds: number[],
   userId: string,
 ): Promise<void> {
   const now = Date.now();
   for (const batch of chunks(instanceIds)) {
-    await db.delete(partInstanceFiles).where(inArray(partInstanceFiles.partInstanceId, batch));
+    await db
+      .delete(partInstanceFiles)
+      .where(inTeam(partInstanceFiles, teamId, inArray(partInstanceFiles.partInstanceId, batch)));
     if (fileId !== null) {
       await db
         .insert(partInstanceFiles)
         .values(
-          batch.map((id) => ({ fileId, partInstanceId: id, assignedBy: userId, createdAt: now })),
+          withTeam(
+            teamId,
+            batch.map((id) => ({ fileId, partInstanceId: id, assignedBy: userId, createdAt: now })),
+          ),
         )
         .onConflictDoNothing();
     }
@@ -103,6 +115,7 @@ async function putFileOn(
 
 async function logActions(
   db: ShopDb,
+  teamId: string,
   userId: string,
   processId: number,
   instanceIds: number[],
@@ -112,13 +125,16 @@ async function logActions(
   try {
     for (const batch of chunks(instanceIds)) {
       await db.insert(actions).values(
-        batch.map((partInstanceId) => ({
-          userId,
-          partInstanceId,
-          processId,
-          action,
-          createdAt: now,
-        })),
+        withTeam(
+          teamId,
+          batch.map((partInstanceId) => ({
+            userId,
+            partInstanceId,
+            processId,
+            action,
+            createdAt: now,
+          })),
+        ),
       );
     }
   } catch (err) {
@@ -135,10 +151,18 @@ export const stagingBatchesRouter = new Hono<AppEnv>()
       return c.json({ error: "processId query param is required." }, 400);
     }
     const db = createShopDb(c.env.SHOP_DB);
+    const teamId = c.get("teamId");
     const batches = await db
       .select()
       .from(stagingBatches)
-      .where(and(eq(stagingBatches.processId, processId), isNull(stagingBatches.closedAt)))
+      .where(
+        inTeam(
+          stagingBatches,
+          teamId,
+          eq(stagingBatches.processId, processId),
+          isNull(stagingBatches.closedAt),
+        ),
+      )
       .orderBy(asc(stagingBatches.createdAt))
       .all();
     if (batches.length === 0) return c.json([] as StagingBatch[]);
@@ -147,7 +171,9 @@ export const stagingBatchesRouter = new Hono<AppEnv>()
       .select({ batchId: partInstanceProcesses.batchId, id: partInstanceProcesses.partInstanceId })
       .from(partInstanceProcesses)
       .where(
-        and(
+        inTeam(
+          partInstanceProcesses,
+          teamId,
           eq(partInstanceProcesses.processId, processId),
           eq(partInstanceProcesses.status, "doing"),
           inArray(
@@ -155,7 +181,14 @@ export const stagingBatchesRouter = new Hono<AppEnv>()
             db
               .select({ id: stagingBatches.id })
               .from(stagingBatches)
-              .where(and(eq(stagingBatches.processId, processId), isNull(stagingBatches.closedAt))),
+              .where(
+                inTeam(
+                  stagingBatches,
+                  teamId,
+                  eq(stagingBatches.processId, processId),
+                  isNull(stagingBatches.closedAt),
+                ),
+              ),
           ),
         ),
       )
@@ -171,9 +204,16 @@ export const stagingBatchesRouter = new Hono<AppEnv>()
   .post("/", requireAuth, createValidator, async (c) => {
     const { processId } = c.req.valid("json");
     const db = createShopDb(c.env.SHOP_DB);
+    const teamId = c.get("teamId");
+    const process = await db
+      .select({ id: processes.id })
+      .from(processes)
+      .where(inTeam(processes, teamId, eq(processes.id, processId)))
+      .get();
+    if (!process) return c.json({ error: "Process not found." }, 404);
     const row = await db
       .insert(stagingBatches)
-      .values({ processId, createdBy: c.get("userId"), createdAt: Date.now() })
+      .values(withTeam(teamId, { processId, createdBy: c.get("userId"), createdAt: Date.now() }))
       .returning()
       .get();
     return c.json(row, 201);
@@ -182,7 +222,8 @@ export const stagingBatchesRouter = new Hono<AppEnv>()
   // the batch's file. A batch left empty because nothing could be staged is removed.
   .post("/:id/stage", requireAuth, instanceIdsValidator, async (c) => {
     const db = createShopDb(c.env.SHOP_DB);
-    const batch = await getOpenBatch(db, Number(c.req.param("id")));
+    const teamId = c.get("teamId");
+    const batch = await getOpenBatch(db, teamId, Number(c.req.param("id")));
     if (!batch) return c.json({ error: "Batch not found or already completed." }, 404);
     const { partInstanceIds } = c.req.valid("json");
 
@@ -192,7 +233,9 @@ export const stagingBatchesRouter = new Hono<AppEnv>()
         .update(partInstanceProcesses)
         .set({ status: "doing", batchId: batch.id })
         .where(
-          and(
+          inTeam(
+            partInstanceProcesses,
+            teamId,
             eq(partInstanceProcesses.processId, batch.processId),
             inArray(partInstanceProcesses.partInstanceId, ids),
             sql`(${partInstanceProcesses.status} = 'todo' OR (${partInstanceProcesses.status} = 'doing' AND ${partInstanceProcesses.batchId} IS NULL))`,
@@ -204,19 +247,22 @@ export const stagingBatchesRouter = new Hono<AppEnv>()
     }
 
     if (staged.length === 0 && (await stagedIn(db, batch)).length === 0) {
-      await db.delete(stagingBatches).where(eq(stagingBatches.id, batch.id));
+      await db
+        .delete(stagingBatches)
+        .where(inTeam(stagingBatches, teamId, eq(stagingBatches.id, batch.id)));
       return c.json({ error: "None of those instances could be staged." }, 409);
     }
 
     const userId = c.get("userId");
-    if (batch.fileId !== null) await putFileOn(db, batch.fileId, staged, userId);
-    await logActions(db, userId, batch.processId, staged, "started");
+    if (batch.fileId !== null) await putFileOn(db, teamId, batch.fileId, staged, userId);
+    await logActions(db, teamId, userId, batch.processId, staged, "started");
     return c.json({ staged: staged.length, requested: partInstanceIds.length });
   })
   // Sends instances back to To Do and drops the batch's file from them.
   .post("/:id/unstage", requireAuth, instanceIdsValidator, async (c) => {
     const db = createShopDb(c.env.SHOP_DB);
-    const batch = await getOpenBatch(db, Number(c.req.param("id")));
+    const teamId = c.get("teamId");
+    const batch = await getOpenBatch(db, teamId, Number(c.req.param("id")));
     if (!batch) return c.json({ error: "Batch not found or already completed." }, 404);
     const { partInstanceIds } = c.req.valid("json");
 
@@ -226,7 +272,9 @@ export const stagingBatchesRouter = new Hono<AppEnv>()
         .update(partInstanceProcesses)
         .set({ status: "todo", batchId: null })
         .where(
-          and(
+          inTeam(
+            partInstanceProcesses,
+            teamId,
             eq(partInstanceProcesses.batchId, batch.id),
             eq(partInstanceProcesses.status, "doing"),
             inArray(partInstanceProcesses.partInstanceId, ids),
@@ -236,11 +284,15 @@ export const stagingBatchesRouter = new Hono<AppEnv>()
         .all();
       unstaged.push(...rows.map((r) => r.id));
     }
-    await putFileOn(db, null, unstaged, c.get("userId"));
+    await putFileOn(db, teamId, null, unstaged, c.get("userId"));
 
     // A batch that empties out is gone; batches only exist while they hold work.
     const deleted = (await stagedIn(db, batch)).length === 0;
-    if (deleted) await db.delete(stagingBatches).where(eq(stagingBatches.id, batch.id));
+    if (deleted) {
+      await db
+        .delete(stagingBatches)
+        .where(inTeam(stagingBatches, teamId, eq(stagingBatches.id, batch.id)));
+    }
     return c.json({ unstaged: unstaged.length, batchDeleted: deleted });
   })
   // Sets (or clears) the batch's file and applies it to every staged instance.
@@ -249,22 +301,31 @@ export const stagingBatchesRouter = new Hono<AppEnv>()
       return c.json({ error: "Kiosks can't change a batch's file." }, 403);
     }
     const db = createShopDb(c.env.SHOP_DB);
-    const batch = await getOpenBatch(db, Number(c.req.param("id")));
+    const teamId = c.get("teamId");
+    const batch = await getOpenBatch(db, teamId, Number(c.req.param("id")));
     if (!batch) return c.json({ error: "Batch not found or already completed." }, 404);
     const { fileId } = c.req.valid("json");
 
     if (fileId !== null) {
-      const file = await db.select({ id: files.id }).from(files).where(eq(files.id, fileId)).get();
+      const file = await db
+        .select({ id: files.id })
+        .from(files)
+        .where(inTeam(files, teamId, eq(files.id, fileId)))
+        .get();
       if (!file) return c.json({ error: "File not found." }, 404);
     }
-    await db.update(stagingBatches).set({ fileId }).where(eq(stagingBatches.id, batch.id));
-    await putFileOn(db, fileId, await stagedIn(db, batch), c.get("userId"));
+    await db
+      .update(stagingBatches)
+      .set({ fileId })
+      .where(inTeam(stagingBatches, teamId, eq(stagingBatches.id, batch.id)));
+    await putFileOn(db, teamId, fileId, await stagedIn(db, batch), c.get("userId"));
     return c.json({ ok: true });
   })
   // Completes every staged instance (unlocking each one's next process) and closes the batch.
   .post("/:id/complete", requireAuth, async (c) => {
     const db = createShopDb(c.env.SHOP_DB);
-    const batch = await getOpenBatch(db, Number(c.req.param("id")));
+    const teamId = c.get("teamId");
+    const batch = await getOpenBatch(db, teamId, Number(c.req.param("id")));
     if (!batch) return c.json({ error: "Batch not found or already completed." }, 404);
     if (batch.fileId === null) {
       return c.json({ error: "Add a file to the batch before completing it." }, 409);
@@ -275,29 +336,31 @@ export const stagingBatchesRouter = new Hono<AppEnv>()
       .update(partInstanceProcesses)
       .set({ status: "done", completedAt: now })
       .where(
-        and(eq(partInstanceProcesses.batchId, batch.id), eq(partInstanceProcesses.status, "doing")),
+        inTeam(
+          partInstanceProcesses,
+          teamId,
+          eq(partInstanceProcesses.batchId, batch.id),
+          eq(partInstanceProcesses.status, "doing"),
+        ),
       )
       .returning({ id: partInstanceProcesses.partInstanceId })
       .all();
     if (done.length === 0) return c.json({ error: "Nothing is staged in this batch." }, 409);
 
     // Promote each instance's next step, mirroring the single-instance "done" route.
-    await db.run(sql`
-      UPDATE part_instance_processes SET status = 'todo'
-      WHERE status = 'waiting' AND id IN (
-        SELECT (
-          SELECT n.id FROM part_instance_processes n
-          WHERE n.part_instance_id = d.part_instance_id AND n."index" > d."index"
-          ORDER BY n."index" LIMIT 1
-        )
-        FROM part_instance_processes d
-        WHERE d.batch_id = ${batch.id} AND d.status = 'done' AND d.completed_at = ${now}
-      )
-    `);
+    await promoteNextSteps(
+      db,
+      teamId,
+      and(eq(finished.batchId, batch.id), eq(finished.completedAt, now)),
+    );
 
-    await db.update(stagingBatches).set({ closedAt: now }).where(eq(stagingBatches.id, batch.id));
+    await db
+      .update(stagingBatches)
+      .set({ closedAt: now })
+      .where(inTeam(stagingBatches, teamId, eq(stagingBatches.id, batch.id)));
     await logActions(
       db,
+      teamId,
       c.get("userId"),
       batch.processId,
       done.map((r) => r.id),
@@ -308,11 +371,14 @@ export const stagingBatchesRouter = new Hono<AppEnv>()
   // Only empty batches can be deleted; unstage everything first.
   .delete("/:id", requireAuth, async (c) => {
     const db = createShopDb(c.env.SHOP_DB);
-    const batch = await getOpenBatch(db, Number(c.req.param("id")));
+    const teamId = c.get("teamId");
+    const batch = await getOpenBatch(db, teamId, Number(c.req.param("id")));
     if (!batch) return c.json({ error: "Batch not found or already completed." }, 404);
     if ((await stagedIn(db, batch)).length > 0) {
       return c.json({ error: "Unstage everything in this batch before deleting it." }, 409);
     }
-    await db.delete(stagingBatches).where(eq(stagingBatches.id, batch.id));
+    await db
+      .delete(stagingBatches)
+      .where(inTeam(stagingBatches, teamId, eq(stagingBatches.id, batch.id)));
     return c.json({ ok: true });
   });

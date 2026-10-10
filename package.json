@@ -1,17 +1,28 @@
 {
-  "name": "g3-web-apps",
+  "name": "gearbox",
   "private": true,
-  "version": "0.0.0",
+  "version": "2026.10.0",
+  "license": "MIT",
+  "type": "module",
   "scripts": {
     "dev": "node scripts/print-dev-ports.js",
     "dev:silent": "pnpm -r --parallel --no-bail --if-present dev",
     "lint": "biome ci .",
+    "lint:tenancy": "node scripts/tenancy-lint.ts",
     "typecheck": "pnpm -r --if-present typecheck",
     "test": "pnpm -r --if-present test",
     "db:migrate:local": "pnpm -r --if-present db:migrate:local",
-    "db:migrate:remote": "pnpm -r --if-present db:migrate:remote"
+    "db:migrate:remote": "pnpm -r --if-present db:migrate:remote",
+    "configure": "node scripts/configure.ts",
+    "changeset": "changeset",
+    "release:version": "node scripts/release-version.ts",
+    "release:tag": "node scripts/release-tag.ts",
+    "release:preview": "node scripts/release-preview.ts",
+    "deploy": "pnpm --filter \"./workers/*\" --filter \"!@g3/worker-gateway\" --if-present run deploy && pnpm --filter @g3/worker-gateway run deploy"
   },
   "devDependencies": {
-    "@biomejs/biome": "^1.9.4"
+    "@biomejs/biome": "^1.9.4",
+    "@changesets/cli": "^3.0.3",
+    "typescript": "^5.8.0"
   }
 }

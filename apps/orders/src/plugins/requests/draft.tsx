@@ -1,10 +1,17 @@
+import { appOn } from "@g3/ui";
 import { applyTemplate } from "@g3/worker-orders/naming";
 import type { InferResponseType } from "hono/client";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { api, getErrorMessage } from "../../shared/api";
 import { useAuthUser } from "../../shared/auth";
-import { dateInputToMs, formatCents, formatDate, parseDollars } from "../../shared/format";
+import {
+  currentCurrency,
+  dateInputToMs,
+  formatCents,
+  formatDate,
+  parseDollars,
+} from "../../shared/format";
 import { PRIORITY, PRIORITY_ORDER } from "../../shared/priority";
 import { STATUS } from "../../shared/status-badge";
 import type { CatalogItem, Priority } from "../../shared/types";
@@ -37,6 +44,10 @@ export type Draft = {
   priceUnit: string | null;
   currency: string;
   quantity: string;
+  /** How many parts one of the quantity is: 4 for a pack of 4. */
+  packQuantity: string;
+  /** packQuantity was read from the product's name and the requester hasn't changed it. */
+  packGuessed: boolean;
   categoryId: string;
   categoryHint: string | null;
   priority: Priority;
@@ -75,8 +86,10 @@ export const blank = (url = ""): Draft => ({
   image: "",
   price: "",
   priceUnit: null,
-  currency: "USD",
+  currency: currentCurrency(),
   quantity: "1",
+  packQuantity: "1",
+  packGuessed: false,
   categoryId: "",
   categoryHint: null,
   priority: "normal",
@@ -102,15 +115,19 @@ const HINTS = {
 /**
  * Looks up a product link and fills a draft from it: the lookup's details, the name from the team
  * template, a budget category guess and the product's purchase history. A failed lookup comes
- * back as `lookupError` with everything else blank, to fill in by hand.
+ * back as `lookupError` with everything else blank, to fill in by hand. Lookups go through the
+ * team's edge box, so a team with Edge off gets the blank row (and the guesses) without one.
  */
 export async function lookUpDraft(url: string): Promise<Partial<Draft>> {
   let lookup: Lookup | null = null;
   let lookupError: string | null = null;
+  const canLookUp = await appOn("edge");
   try {
-    const res = await api.lookup.$get({ query: { url } });
-    if (!res.ok) throw new Error(await getErrorMessage(res));
-    lookup = await res.json();
+    if (canLookUp) {
+      const res = await api.lookup.$get({ query: { url } });
+      if (!res.ok) throw new Error(await getErrorMessage(res));
+      lookup = await res.json();
+    }
   } catch (err) {
     lookupError = err instanceof Error ? err.message : String(err);
   }
@@ -139,10 +156,11 @@ export async function lookUpDraft(url: string): Promise<Partial<Draft>> {
     image: lookup?.image ?? "",
     price: dollars(lookup?.price),
     priceUnit: lookup?.priceUnit ?? null,
-    currency: lookup?.currency ?? "USD",
+    currency: lookup?.currency ?? currentCurrency(),
     ...suggestionFields(suggestion),
     storePlatform: lookup?.source ?? null,
     storeVariantId: variantId,
+    ...(canLookUp ? {} : { linkNote: "Fill in the part's details from its page." }),
   };
 }
 
@@ -173,6 +191,9 @@ function suggestionFields(suggestion: Suggestion | null): Partial<Draft> {
         }`
       : null,
     history: suggestion?.history ?? [],
+    // The catalog's pack quantity for a product it knows, else what the name says.
+    packQuantity: String(suggestion?.packQuantity ?? suggestion?.packQuantityGuess ?? 1),
+    packGuessed: !suggestion?.packQuantity && !!suggestion?.packQuantityGuess,
     catalogCategory: suggestion?.catalogCategory ?? suggestion?.catalogCategoryGuess ?? "",
     catalogKnown: !!suggestion?.catalogCategory,
     catalogCategoryGuessed: !suggestion?.catalogCategory && !!suggestion?.catalogCategoryGuess,
@@ -195,6 +216,10 @@ export async function catalogDraft(item: CatalogItem): Promise<Partial<Draft>> {
     catalogCategory: item.category,
     catalogKnown: true,
     catalogCategoryGuessed: false,
+    // A part the catalog knows as a pack; otherwise the name's guess (if any) stands.
+    ...(item.packQuantity > 1
+      ? { packQuantity: String(item.packQuantity), packGuessed: false }
+      : {}),
     linkNote:
       item.linkKind === "search"
         ? "This link is the vendor's search for the part number. Paste the product page if you find it."
@@ -202,7 +227,7 @@ export async function catalogDraft(item: CatalogItem): Promise<Partial<Draft>> {
           ? "This link is only the vendor's homepage. Paste the product page if you find it."
           : null,
   };
-  if (item.linkKind === "product" && !priceIsFresh(item)) {
+  if (item.linkKind === "product" && !priceIsFresh(item) && (await appOn("edge"))) {
     const found = await lookUpDraft(item.url);
     // The catalog's store option (REV links can't carry it the way Shopify's ?variant= does).
     const option = !found.variant
@@ -281,17 +306,18 @@ export function variantPatch(
 }
 
 /** What's missing before a draft can be sent, or null when it's complete. */
-export function draftProblem(d: Draft, fallbackReason = ""): string | null {
+export function draftProblem(d: Draft): string | null {
   return (
     (!d.url && "Add the product link.") ||
     (!d.name.trim() && "Give it a name.") ||
     (Number.isNaN(parseDollars(d.price)) && "Price must be a dollar amount like 12.50.") ||
     (!(Number(d.quantity) >= 1) && "Quantity must be at least 1.") ||
+    (!(Number.isInteger(Number(d.packQuantity)) && Number(d.packQuantity) >= 1) &&
+      "Pack of must be a whole number, 1 or more.") ||
     (!d.categoryId && "Pick a budget category.") ||
     (!d.catalogItemId &&
       !d.catalogCategory.trim() &&
       "This part is new to the catalog: pick a catalog category for it.") ||
-    (!(d.reason.trim() || fallbackReason.trim()) && "Say why it's needed.") ||
     null
   );
 }
@@ -308,6 +334,7 @@ export function draftFields(d: Draft, fallbackReason = "") {
     unitPriceCents: parseDollars(d.price),
     currency: d.currency,
     quantity: Number(d.quantity),
+    packQuantity: Number(d.packQuantity),
     categoryId: Number(d.categoryId),
     reason: d.reason.trim() || fallbackReason.trim(),
     priority: d.priority,
@@ -361,6 +388,10 @@ export function DraftCard({
     unit !== null && !Number.isNaN(unit) && Number(d.quantity) > 0
       ? unit * Number(d.quantity)
       : null;
+  // How many parts arrive, when what's ordered is a pack.
+  const pack = Number(d.packQuantity);
+  const parts =
+    Number.isInteger(pack) && pack > 1 && Number(d.quantity) > 0 ? pack * Number(d.quantity) : null;
 
   return (
     <Card className="!p-4">
@@ -468,6 +499,25 @@ export function DraftCard({
                 onChange={(e) => onChange({ quantity: e.target.value })}
               />
             </Field>
+            <Field
+              label="Pack of"
+              hint={
+                d.packGuessed
+                  ? "Guessed from the name. Check it's right and change it if not."
+                  : parts !== null
+                    ? `= ${parts} parts when it arrives`
+                    : "Parts in one of these"
+              }
+              warn={d.packGuessed}
+            >
+              <input
+                type="number"
+                min={1}
+                className={inputClass}
+                value={d.packQuantity}
+                onChange={(e) => onChange({ packQuantity: e.target.value, packGuessed: false })}
+              />
+            </Field>
             <div className="col-span-2">
               <Field
                 label="Budget category"
@@ -538,7 +588,7 @@ export function DraftCard({
               </div>
             )}
             <div className="col-span-2 sm:col-span-4">
-              <Field label="Why do we need it?">
+              <Field label="Why do we need it?" hint="Optional">
                 <input
                   className={inputClass}
                   value={d.reason}

@@ -7,22 +7,22 @@
 .g3-nav-drawer {
   --g3-nav-bg: var(--g3-surface);
   --g3-nav-line: var(--g3-line);
-  --g3-nav-text: #57646c;
-  --g3-nav-strong: #0c0c0c;
+  /* Links are the theme's muted text, and the current page and titles its text. */
+  --g3-nav-text: var(--g3-muted);
+  --g3-nav-strong: var(--g3-text);
   --g3-nav-accent: var(--g3-accent);
   --g3-nav-control: var(--g3-surface);
-  --g3-nav-control-line: rgba(121, 138, 146, 0.35);
-  --g3-nav-muted: #8a979d;
+  --g3-nav-control-line: color-mix(in srgb, var(--g3-line), var(--g3-muted) 9%);
+  --g3-nav-muted: color-mix(in srgb, var(--g3-muted), var(--g3-surface) 32%);
   font-family: "Ubuntu", sans-serif;
 }
 
 html[data-theme="dark"] .g3-nav,
 html[data-theme="dark"] .g3-nav-drawer {
-  --g3-nav-text: #c4c4c4;
-  --g3-nav-strong: #ffffff;
-  --g3-nav-control: #303030;
-  --g3-nav-control-line: #555555;
-  --g3-nav-muted: #8a8a8a;
+  --g3-nav-text: color-mix(in srgb, var(--g3-muted), var(--g3-text) 41%);
+  --g3-nav-control: color-mix(in srgb, var(--g3-surface), var(--g3-text) 5%);
+  --g3-nav-control-line: color-mix(in srgb, var(--g3-line), var(--g3-text) 14%);
+  --g3-nav-muted: color-mix(in srgb, var(--g3-muted), var(--g3-surface) 20%);
 }
 
 .g3-nav {
@@ -197,17 +197,15 @@ html[data-theme="dark"] .g3-nav-drawer {
 
 /* With many pages, the switch shrinks to its icon until there's room for the words. */
 @media (max-width: 1279px) {
-  .g3-nav .g3-nav-theme:not(.is-labelled) .g3-nav-theme-label {
+  .g3-nav .g3-nav-theme:not(.is-labeled) .g3-nav-theme-label {
     display: none;
   }
-  .g3-nav .g3-nav-theme:not(.is-labelled) {
+  .g3-nav .g3-nav-theme:not(.is-labeled) {
     padding: 8px;
   }
 }
 
-/* All Apps, and text links apps put in the bar's actions (the user's name, Log in). */
-.g3-nav .g3-nav-all-apps,
-.g3-nav-drawer .g3-nav-all-apps,
+/* Text links in the bar: who's signed in ("Hello, …"), and ones apps add (Log in). */
 .g3-nav .g3-nav-text-link,
 .g3-nav-drawer .g3-nav-text-link {
   color: var(--g3-nav-text);
@@ -217,11 +215,25 @@ html[data-theme="dark"] .g3-nav-drawer {
   white-space: nowrap;
 }
 
-.g3-nav .g3-nav-all-apps:hover,
-.g3-nav-drawer .g3-nav-all-apps:hover,
 .g3-nav .g3-nav-text-link:hover,
 .g3-nav-drawer .g3-nav-text-link:hover {
   color: var(--g3-nav-strong);
+}
+
+/* Who's signed in is in the bar at every width. A long name is cut short ("Hello, Alexand…")
+   rather than squeezing the wordmark or the pages. */
+.g3-nav .g3-nav-hello {
+  min-width: 0;
+  max-width: 16rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Between a phone and a desktop the pages need most of the room. */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .g3-nav .g3-nav-hello {
+    max-width: 9rem;
+  }
 }
 
 .g3-nav .g3-nav-menu,
@@ -238,7 +250,12 @@ html[data-theme="dark"] .g3-nav-drawer {
   cursor: pointer;
 }
 
-/* Drawer (phones). */
+/* The menu button, at the left of every bar that has a menu. */
+.g3-nav:not(.is-flat) .g3-nav-menu {
+  display: flex;
+}
+
+/* The menu: a drawer with the team's apps, and on a phone the pages above them. */
 .g3-nav-drawer {
   position: fixed;
   inset: 0 auto 0 0;
@@ -293,6 +310,16 @@ html[data-theme="dark"] .g3-nav-drawer {
   border-top: 1px solid var(--g3-nav-line);
 }
 
+/* A group's name ("All Apps"): a heading, not a link. */
+.g3-nav-drawer-title {
+  padding: 0 8px 6px;
+  color: var(--g3-nav-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
 .g3-nav-drawer .g3-nav-item {
   display: block;
 }
@@ -325,6 +352,11 @@ html[data-theme="dark"] .g3-nav-drawer {
   border-top: 1px solid var(--g3-nav-line);
 }
 
+.g3-nav-version {
+  color: var(--g3-nav-muted);
+  font-size: 12px;
+}
+
 .g3-nav-scrim {
   position: fixed;
   inset: 0;
@@ -341,11 +373,16 @@ html[data-theme="dark"] .g3-nav-drawer {
     gap: 8px;
     padding: 0 12px;
   }
-  .g3-nav .g3-nav-menu {
-    display: flex;
+  .g3-nav-links {
+    display: none;
   }
-  .g3-nav-links,
+  /* On a phone the bar's other controls are in the menu. The greeting stays, in the room the
+     wordmark leaves. */
   .g3-nav:not(.is-flat) .g3-nav-end {
+    flex-shrink: 1;
+    min-width: 0;
+  }
+  .g3-nav:not(.is-flat) .g3-nav-end > :not(.g3-nav-hello) {
     display: none;
   }
   .g3-nav.is-flat .g3-nav-end {
@@ -353,10 +390,23 @@ html[data-theme="dark"] .g3-nav-drawer {
   }
 }
 
+/* A wide bar has the pages, the bar's own controls and the light/dark switch across it, so its
+   menu is only the app list (and there's a button only when there is a list). */
 @media (min-width: 768px) {
-  .g3-nav-drawer,
-  .g3-nav-scrim {
+  .g3-nav:not(.has-apps) .g3-nav-menu {
     display: none;
+  }
+  .g3-nav .g3-nav-menu {
+    margin: 0 -14px 0 -8px;
+  }
+  .g3-nav-drawer .g3-nav-drawer-pages,
+  .g3-nav-drawer-foot .g3-nav-actions,
+  .g3-nav-drawer-foot .g3-nav-theme {
+    display: none;
+  }
+  .g3-nav-drawer .g3-nav-drawer-apps {
+    padding-top: 0;
+    border-top: 0;
   }
 }
 

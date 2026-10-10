@@ -1,3 +1,4 @@
+import { useTeamNames } from "@g3/ui";
 import { useEffect, useState } from "react";
 import { api } from "../../shared/api";
 import { useBatteryCache } from "../../shared/battery-cache-context";
@@ -215,12 +216,12 @@ function UpcomingMatchesSection({
         Upcoming Matches
       </h2>
       <div
-        className="bg-white border border-gray-200 rounded-2xl overflow-hidden flex flex-col"
+        className="bg-surface border border-gray-200 rounded-2xl overflow-hidden flex flex-col"
         style={{ maxHeight: "400px" }}
       >
         <div className="overflow-y-auto flex-1">
           <table className="w-full text-sm">
-            <thead className="sticky top-0 bg-white border-b border-gray-200">
+            <thead className="sticky top-0 bg-surface border-b border-gray-200">
               <tr className="text-gray-600 text-xs uppercase tracking-wide">
                 <th className="text-left px-4 py-2 font-semibold">Match</th>
                 <th className="text-left px-4 py-2 font-semibold">Queue</th>
@@ -235,15 +236,15 @@ function UpcomingMatchesSection({
                 return (
                   <tr
                     key={m.label}
-                    className={`border-b border-gray-200/50 last:border-0 ${isOurMatch ? "bg-red-50" : ""}`}
+                    className={`border-b border-gray-200/50 last:border-0 ${isOurMatch ? "bg-primary-50" : ""}`}
                   >
                     <td
-                      className={`px-4 py-2.5 font-semibold ${isOurMatch ? "text-red-700" : "text-gray-900"}`}
+                      className={`px-4 py-2.5 font-semibold ${isOurMatch ? "text-primary-700" : "text-gray-900"}`}
                     >
                       {m.label}
                     </td>
                     <td
-                      className={`px-4 py-2.5 tabular-nums ${isOurMatch ? "text-red-600 font-semibold" : "text-gray-600"}`}
+                      className={`px-4 py-2.5 tabular-nums ${isOurMatch ? "text-primary-600 font-semibold" : "text-gray-600"}`}
                     >
                       {m.times.actualQueueTime
                         ? formatTime(m.times.actualQueueTime)
@@ -252,7 +253,7 @@ function UpcomingMatchesSection({
                           : "—"}
                     </td>
                     <td
-                      className={`px-4 py-2.5 tabular-nums ${isOurMatch ? "text-red-600 font-semibold" : "text-gray-600"}`}
+                      className={`px-4 py-2.5 tabular-nums ${isOurMatch ? "text-primary-600 font-semibold" : "text-gray-600"}`}
                     >
                       {formatTime(m.times.estimatedStartTime)}
                     </td>
@@ -301,7 +302,7 @@ function RankingSection({
   return (
     <div className="space-y-2">
       <h2 className="text-xs font-bold uppercase tracking-widest text-gray-600">Ranking</h2>
-      <div className="bg-white border border-gray-200 rounded-2xl p-5">
+      <div className="bg-surface border border-gray-200 rounded-2xl p-5">
         <div className="flex gap-6 items-start">
           {/* Left: rank info */}
           <div className="flex gap-6 shrink-0">
@@ -349,7 +350,7 @@ function RankingSection({
                         key={r.team}
                         className={`flex justify-between px-2.5 py-1.5 rounded text-sm ${
                           r.team === teamNumber
-                            ? "bg-red-100 text-red-700 font-semibold"
+                            ? "bg-primary-100 text-primary-700 font-semibold"
                             : "text-gray-700"
                         }`}
                       >
@@ -369,7 +370,7 @@ function RankingSection({
                         key={r.team}
                         className={`flex justify-between px-2.5 py-1.5 rounded text-sm ${
                           r.team === teamNumber
-                            ? "bg-red-100 text-red-700 font-semibold"
+                            ? "bg-primary-100 text-primary-700 font-semibold"
                             : "text-gray-700"
                         }`}
                       >
@@ -398,7 +399,7 @@ function BatteriesSection({ batteries }: { batteries: Battery[] }) {
   return (
     <div className="space-y-2">
       <h2 className="text-xs font-bold uppercase tracking-widest text-gray-600">Batteries</h2>
-      <div className="bg-white border border-gray-200 rounded-2xl p-5">
+      <div className="bg-surface border border-gray-200 rounded-2xl p-5">
         <div className="grid grid-cols-3 gap-3">
           <div className="bg-red-100 border border-red-300 rounded-xl p-3">
             <p className="text-xs font-bold uppercase tracking-widest text-red-600 mb-2">
@@ -564,6 +565,7 @@ function ChecklistSection({
 // ── Root ───────────────────────────────────────────────────────────────────
 
 export function PitMonitorPage() {
+  const names = useTeamNames();
   const { isFullscreen, setFullscreen } = useFullscreen();
   const { setBatteries: setCachedBatteries } = useBatteryCache();
   const [batteries, setBatteries] = useState<Battery[]>([]);
@@ -655,7 +657,7 @@ export function PitMonitorPage() {
       <div className="px-6 py-5 space-y-5">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-gray-200 pb-4">
-          <h1 className="text-2xl font-black tracking-tight">G3 Pit Monitor</h1>
+          <h1 className="text-2xl font-black tracking-tight">{names.appTitle("Pit")} Monitor</h1>
           <div className="flex items-center gap-4">
             {lastUpdated && (
               <p className="text-xs text-gray-600">Updated {lastUpdated.toLocaleTimeString()}</p>
@@ -695,7 +697,7 @@ export function PitMonitorPage() {
                 <h2 className="text-xs font-bold uppercase tracking-widest text-gray-600">
                   Monitor Feed
                 </h2>
-                <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
+                <div className="bg-surface border border-gray-200 rounded-2xl overflow-hidden">
                   <iframe
                     src={iframeUrl}
                     title="Custom monitor feed"

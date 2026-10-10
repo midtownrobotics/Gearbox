@@ -4,6 +4,11 @@ import { API } from "../utils/auth";
 import { type PageType, WINDOW_MS, msUntilNextWindow } from "../utils/token";
 import "./KioskPage.css";
 
+// Dark green and dark red modules on the white tile: the shared palette's 700s, which every
+// phone camera reads easily.
+const QR_SIGN_IN = "#15803d";
+const QR_SIGN_OUT = "#b91c1c";
+
 interface Props {
   types: PageType[];
 }
@@ -56,7 +61,6 @@ export default function KioskPage({ types }: Props) {
 
   return (
     <div className={`kiosk ${isCombined ? "kiosk--combined" : `kiosk--${types[0]}`}`}>
-      <div className="scanlines" aria-hidden="true" />
       <div className="kiosk__content">
         <div className={`kiosk__codes ${isCombined ? "kiosk__codes--combined" : ""}`}>
           {types.map((type) => {
@@ -71,8 +75,8 @@ export default function KioskPage({ types }: Props) {
                         className="kiosk__qr-code"
                         value={`${window.location.origin}/?action=${type}&w=${code}`}
                         size={460}
-                        bgColor="transparent"
-                        fgColor={isSignIn ? "#00ff88" : "#ff3344"}
+                        bgColor="#ffffff"
+                        fgColor={isSignIn ? QR_SIGN_IN : QR_SIGN_OUT}
                         level="M"
                       />
                     ) : (

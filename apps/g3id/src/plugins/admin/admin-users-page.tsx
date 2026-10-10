@@ -1,97 +1,97 @@
-import { OnShapeIcon } from "@g3/ui";
-import { GraduationCap, Loader2, Shield, ShieldOff } from "lucide-react";
-import { useEffect, useState } from "react";
-import { FaGithub, FaGoogle, FaKey, FaSlack, FaSteam } from "react-icons/fa";
-import { useNavigate } from "react-router-dom";
+import { GraduationCap, Loader2, Search, Shield, ShieldOff } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../../lib/api";
-
-type Identity = { provider: string; createdAt: number };
-
-type User = {
-  id: string;
-  email: string;
-  displayName: string;
-  status: string;
-  isAdmin: number;
-  isMentor: number;
-  createdAt: number;
-  lastLoginAt: number | null;
-  identities: Identity[];
-};
-
-function relativeTime(ts: number): string {
-  const diff = Math.floor(Date.now() / 1000) - ts;
-  if (diff < 60) return "just now";
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  if (diff < 86400 * 30) return `${Math.floor(diff / 86400)}d ago`;
-  return new Date(ts * 1000).toLocaleDateString();
-}
-
-const STATUS_STYLES: Record<string, string> = {
-  pending: "bg-amber-50 text-amber-700 border-amber-200",
-  active: "bg-green-50 text-green-700 border-green-200",
-  rejected: "bg-primary-50 text-primary-600 border-primary-200",
-};
-
-function ProviderIcon({ provider }: { provider: string }) {
-  const cls = "w-4 h-4";
-  switch (provider) {
-    case "google":
-      return (
-        <span className={`${cls} text-blue-700`} title="Google">
-          <FaGoogle />
-        </span>
-      );
-    case "slack":
-      return (
-        <span className={`${cls} text-primary-500`} title="Slack">
-          <FaSlack />
-        </span>
-      );
-    case "github":
-      return (
-        <span className={`${cls} text-secondary-700`} title="GitHub">
-          <FaGithub />
-        </span>
-      );
-    case "steam":
-      return (
-        <span className={`${cls} text-cyan-700`} title="Steam">
-          <FaSteam />
-        </span>
-      );
-    case "local":
-      return (
-        <span className={`${cls} text-amber-700`} title="Password">
-          <FaKey />
-        </span>
-      );
-    case "onshape":
-      return (
-        <span className={`${cls} text-green-700`} title="Onshape">
-          <OnShapeIcon size={16} onshape-green />
-        </span>
-      );
-    default:
-      return <span className="text-xs text-secondary-500">{provider}</span>;
-  }
-}
+import {
+  PROVIDERS,
+  ProviderIcon,
+  STATUS_STYLES,
+  type User,
+  matchesSearch,
+  relativeTime,
+} from "./users-shared";
 
 const FILTERS = ["pending", "active", "rejected", "all"] as const;
 type Filter = (typeof FILTERS)[number];
+
+/** The orders the list can be put in. Someone who has never logged in is always last. */
+const SORTS = {
+  "joined-new": { label: "Joined: newest first", by: "joined", descending: true },
+  "joined-old": { label: "Joined: oldest first", by: "joined", descending: false },
+  "name-az": { label: "Name: A to Z", by: "name", descending: false },
+  "name-za": { label: "Name: Z to A", by: "name", descending: true },
+  "login-new": { label: "Last login: most recent first", by: "login", descending: true },
+  "login-old": { label: "Last login: longest ago first", by: "login", descending: false },
+} as const;
+type Sort = keyof typeof SORTS;
+
+const ROLES = {
+  admin: { label: "Admins", has: (u: User) => u.isAdmin === 1 },
+  mentor: { label: "Mentors", has: (u: User) => u.isMentor === 1 },
+  none: { label: "Neither", has: (u: User) => u.isAdmin !== 1 && u.isMentor !== 1 },
+} as const;
+type Role = keyof typeof ROLES;
+
+function sortUsers(users: User[], sort: Sort): User[] {
+  const { by, descending } = SORTS[sort];
+  const direction = descending ? -1 : 1;
+  return [...users].sort((a, b) => {
+    if (by === "name") {
+      return (
+        direction * a.displayName.localeCompare(b.displayName, undefined, { sensitivity: "base" })
+      );
+    }
+    if (by === "joined") return direction * (a.createdAt - b.createdAt);
+    if (a.lastLoginAt === null || b.lastLoginAt === null) {
+      return Number(a.lastLoginAt === null) - Number(b.lastLoginAt === null);
+    }
+    return direction * (a.lastLoginAt - b.lastLoginAt);
+  });
+}
+
+const selectClass =
+  "rounded-lg bg-surface border border-secondary-300 px-3 py-1.5 text-sm text-secondary-900 focus:outline-none focus:border-primary-500";
+
+const isFilter = (v: string | null): v is Filter => FILTERS.includes(v as Filter);
+const isSort = (v: string | null): v is Sort => v !== null && v in SORTS;
+const isRole = (v: string | null): v is Role => v !== null && v in ROLES;
 
 export function AdminUsersPage() {
   const navigate = useNavigate();
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [users, setUsers] = useState<User[]>([]);
-  const [filter, setFilter] = useState<Filter>("pending");
+  // The tab, search, sort and filters live in the address, so coming back from someone's page
+  // finds the list as it was. Active people first.
+  const [params, setParams] = useSearchParams();
+  const status = params.get("status");
+  const filter: Filter = isFilter(status) ? status : "active";
+  const sortParam = params.get("sort");
+  const sort: Sort = isSort(sortParam) ? sortParam : "joined-new";
+  const roleParam = params.get("role");
+  const role: Role | "" = isRole(roleParam) ? roleParam : "";
+  const provider = params.get("signin") ?? "";
+  const query = params.get("q") ?? "";
+  const setParam = (key: string, value: string, fallback = "") =>
+    setParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (value === fallback) next.delete(key);
+        else next.set(key, value);
+        return next;
+      },
+      { replace: true },
+    );
+  const setFilter = (f: Filter) => setParam("status", f, "active");
+  const setSort = (s: Sort) => setParam("sort", s, "joined-new");
+  const setRole = (r: Role | "") => setParam("role", r);
+  const setProvider = (p: string) => setParam("signin", p);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const [approving, setApproving] = useState<Set<string>>(new Set());
   const [rejecting, setRejecting] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState<Set<string>>(new Set());
+  const [actionError, setActionError] = useState<string | null>(null);
   const [promoting, setPromoting] = useState<Set<string>>(new Set());
   const [togglingMentor, setTogglingMentor] = useState<Set<string>>(new Set());
   const [mergingUserId, setMergingUserId] = useState<string | null>(null);
@@ -160,9 +160,17 @@ export function AdminUsersPage() {
   async function handleDelete(userId: string) {
     if (!window.confirm("Permanently delete this user and all their data?")) return;
     setDeleting((prev) => new Set(prev).add(userId));
+    setActionError(null);
     try {
       const res = await api.admin.users[":id"].$delete({ param: { id: userId } });
       if (res.ok) setUsers((prev) => prev.filter((u) => u.id !== userId));
+      else {
+        // Say so: a delete that failed used to look like nothing had happened.
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        setActionError((res.status < 500 && body.error) || "Couldn't delete the user.");
+      }
+    } catch {
+      setActionError("Couldn't delete the user.");
     } finally {
       setDeleting((prev) => {
         const n = new Set(prev);
@@ -247,15 +255,37 @@ export function AdminUsersPage() {
     }
   }
 
-  const filtered = filter === "all" ? users : users.filter((u) => u.status === filter);
+  // The search, role and sign-in filters narrow every tab, so each tab's count is of what it would show.
+  const matching = useMemo(
+    () =>
+      users.filter(
+        (u) =>
+          (role === "" || ROLES[role].has(u)) &&
+          (provider === "" || u.identities.some((identity) => identity.provider === provider)) &&
+          matchesSearch(u, query),
+      ),
+    [users, role, provider, query],
+  );
+  const filtered = useMemo(
+    () =>
+      sortUsers(filter === "all" ? matching : matching.filter((u) => u.status === filter), sort),
+    [matching, filter, sort],
+  );
   const countFor = (f: Filter) =>
-    f === "all" ? users.length : users.filter((u) => u.status === f).length;
+    f === "all" ? matching.length : matching.filter((u) => u.status === f).length;
+  // The providers to offer: the usual ones, then any other that someone here signs in with.
+  const providers = [
+    ...new Set([
+      ...Object.keys(PROVIDERS),
+      ...users.flatMap((u) => u.identities.map((i) => i.provider)),
+    ]),
+  ];
 
   function exportActiveUsersToCSV() {
     const activeUsers = users.filter((u) => u.status === "active");
     if (activeUsers.length === 0) return;
 
-    const authMethods = ["Slack", "Google", "GitHub", "Steam", "OnShape"];
+    const authMethods = ["Slack", "Google", "GitHub", "Steam"];
     const headers = [
       "Name",
       "Email",
@@ -273,7 +303,6 @@ export function AdminUsersPage() {
         google: providerSet.has("google"),
         github: providerSet.has("github"),
         steam: providerSet.has("steam"),
-        onshape: providerSet.has("onshape"),
       };
       return [
         u.displayName,
@@ -286,7 +315,6 @@ export function AdminUsersPage() {
         authValues.google ? "TRUE" : "FALSE",
         authValues.github ? "TRUE" : "FALSE",
         authValues.steam ? "TRUE" : "FALSE",
-        authValues.onshape ? "TRUE" : "FALSE",
       ];
     });
 
@@ -315,8 +343,24 @@ export function AdminUsersPage() {
         </button>
       </div>
 
+      {/* Search: names, emails and the accounts people sign in with */}
+      <div className="relative mb-3">
+        <Search
+          size={16}
+          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-secondary-400"
+        />
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => setParam("q", e.target.value)}
+          placeholder="Search by name, email or sign-in account"
+          aria-label="Search users"
+          className="w-full rounded-lg bg-surface border border-secondary-300 py-2 pl-9 pr-3 text-sm text-secondary-900 placeholder-secondary-400 focus:outline-none focus:border-primary-500"
+        />
+      </div>
+
       {/* Filter tabs */}
-      <div className="flex gap-2 mb-6">
+      <div className="flex flex-wrap gap-2 mb-3">
         {FILTERS.map((f) => (
           <button
             key={f}
@@ -325,12 +369,57 @@ export function AdminUsersPage() {
             className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors capitalize ${
               filter === f
                 ? "bg-primary-500 text-white"
-                : "bg-white text-secondary-600 hover:text-secondary-900 border border-secondary-300"
+                : "bg-surface text-secondary-600 hover:text-secondary-900 border border-secondary-300"
             }`}
           >
             {f} <span className="opacity-60">({countFor(f)})</span>
+            {f === "pending" && filter !== "pending" && countFor(f) > 0 && (
+              <span className="ml-1.5 inline-block h-2 w-2 rounded-full bg-amber-500 align-middle" />
+            )}
           </button>
         ))}
+      </div>
+
+      {/* Sort, and filter by role and sign-in */}
+      <div className="flex flex-wrap gap-2 mb-6">
+        <select
+          value={sort}
+          onChange={(e) => setSort(e.target.value as Sort)}
+          className={selectClass}
+          aria-label="Sort by"
+        >
+          {Object.entries(SORTS).map(([key, { label }]) => (
+            <option key={key} value={key}>
+              {label}
+            </option>
+          ))}
+        </select>
+        <select
+          value={role}
+          onChange={(e) => setRole(e.target.value as Role | "")}
+          className={selectClass}
+          aria-label="Role"
+        >
+          <option value="">Any role</option>
+          {Object.entries(ROLES).map(([key, { label }]) => (
+            <option key={key} value={key}>
+              {label}
+            </option>
+          ))}
+        </select>
+        <select
+          value={provider}
+          onChange={(e) => setProvider(e.target.value)}
+          className={selectClass}
+          aria-label="Sign-in"
+        >
+          <option value="">Any sign-in</option>
+          {providers.map((key) => (
+            <option key={key} value={key}>
+              {PROVIDERS[key] ?? key}
+            </option>
+          ))}
+        </select>
       </div>
 
       {loading && (
@@ -341,9 +430,17 @@ export function AdminUsersPage() {
 
       {error && <p className="text-sm text-primary-500">{error}</p>}
 
+      {actionError && (
+        <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          {actionError}
+        </p>
+      )}
+
       {!loading && !error && filtered.length === 0 && (
         <p className="text-sm text-secondary-500 text-center py-16">
-          No {filter === "all" ? "" : filter} users.
+          {role || provider || query
+            ? "No users match."
+            : `No ${filter === "all" ? "" : `${filter} `}users.`}
         </p>
       )}
 
@@ -352,50 +449,57 @@ export function AdminUsersPage() {
           {filtered.map((user) => (
             <div
               key={user.id}
-              className="bg-white border border-secondary-200 rounded-lg overflow-hidden"
+              className="bg-surface border border-secondary-200 rounded-lg overflow-hidden"
             >
               {/* Main row */}
               <div className="px-4 py-3 flex items-center gap-3 flex-wrap">
-                {/* Avatar */}
-                <div className="w-9 h-9 rounded-full bg-primary-500 flex items-center justify-center text-sm font-semibold text-white shrink-0">
-                  {user.displayName.charAt(0).toUpperCase()}
-                </div>
+                {/* Avatar, name and identity icons: open the person's page */}
+                <Link
+                  to={`/admin/users/${user.id}`}
+                  state={{ from: `/admin/users${params.toString() ? `?${params}` : ""}` }}
+                  className="flex flex-1 min-w-0 items-center gap-3 rounded-md group"
+                >
+                  <div className="w-9 h-9 rounded-full bg-primary-500 flex items-center justify-center text-sm font-semibold text-white shrink-0">
+                    {user.displayName.charAt(0).toUpperCase()}
+                  </div>
 
-                {/* Name + identity icons */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-secondary-900 font-semibold">{user.displayName}</span>
-                    {user.isAdmin === 1 && (
-                      <span className="text-xs px-1.5 py-0.5 rounded bg-primary-50 text-primary-600 border border-primary-200">
-                        Admin
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-secondary-900 font-semibold group-hover:text-primary-600 group-hover:underline">
+                        {user.displayName}
                       </span>
-                    )}
-                    {user.isMentor === 1 && (
-                      <span className="text-xs px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
-                        Mentor
+                      {user.isAdmin === 1 && (
+                        <span className="text-xs px-1.5 py-0.5 rounded bg-primary-50 text-primary-600 border border-primary-200">
+                          Admin
+                        </span>
+                      )}
+                      {user.isMentor === 1 && (
+                        <span className="text-xs px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
+                          Mentor
+                        </span>
+                      )}
+                      <span
+                        className={`text-xs px-2 py-0.5 rounded-full border capitalize ${STATUS_STYLES[user.status] ?? "bg-surface text-secondary-600"}`}
+                      >
+                        {user.status}
                       </span>
-                    )}
-                    <span
-                      className={`text-xs px-2 py-0.5 rounded-full border capitalize ${STATUS_STYLES[user.status] ?? "bg-white text-secondary-600"}`}
-                    >
-                      {user.status}
-                    </span>
+                    </div>
+                    {/* Identity icons + timestamps */}
+                    <div className="flex items-center gap-2 mt-1">
+                      {user.identities.map((identity) => (
+                        <ProviderIcon key={identity.provider} provider={identity.provider} />
+                      ))}
+                      <span className="text-xs text-secondary-500">·</span>
+                      <span className="text-xs text-secondary-500" title="Last login">
+                        {user.lastLoginAt ? relativeTime(user.lastLoginAt) : "never logged in"}
+                      </span>
+                      <span className="text-xs text-secondary-500">·</span>
+                      <span className="text-xs text-secondary-500" title="Joined">
+                        joined {relativeTime(user.createdAt)}
+                      </span>
+                    </div>
                   </div>
-                  {/* Identity icons + timestamps */}
-                  <div className="flex items-center gap-2 mt-1">
-                    {user.identities.map((identity) => (
-                      <ProviderIcon key={identity.provider} provider={identity.provider} />
-                    ))}
-                    <span className="text-xs text-secondary-500">·</span>
-                    <span className="text-xs text-secondary-500" title="Last login">
-                      {user.lastLoginAt ? relativeTime(user.lastLoginAt) : "never logged in"}
-                    </span>
-                    <span className="text-xs text-secondary-500">·</span>
-                    <span className="text-xs text-secondary-500" title="Joined">
-                      joined {relativeTime(user.createdAt)}
-                    </span>
-                  </div>
-                </div>
+                </Link>
 
                 {/* Action buttons — full width on mobile (wraps to new line), inline on md+ */}
                 <div className="flex items-center gap-1.5 w-full md:w-auto pl-12 md:pl-0">
@@ -433,7 +537,7 @@ export function AdminUsersPage() {
                       onClick={() =>
                         user.isAdmin ? handleDemote(user.id) : handlePromote(user.id)
                       }
-                      className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white border border-secondary-300 hover:bg-primary-50 hover:text-primary-600 disabled:opacity-50 disabled:cursor-not-allowed text-secondary-600 transition-colors flex items-center gap-1"
+                      className="px-3 py-1.5 rounded-lg text-xs font-medium bg-surface border border-secondary-300 hover:bg-primary-50 hover:text-primary-600 disabled:opacity-50 disabled:cursor-not-allowed text-secondary-600 transition-colors flex items-center gap-1"
                     >
                       {promoting.has(user.id) ? (
                         <Loader2 size={11} className="animate-spin" />
@@ -453,7 +557,7 @@ export function AdminUsersPage() {
                       onClick={() =>
                         user.isMentor ? handleRevokeMentor(user.id) : handleGrantMentor(user.id)
                       }
-                      className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white border border-secondary-300 hover:bg-blue-50 hover:text-blue-800 disabled:opacity-50 disabled:cursor-not-allowed text-secondary-600 transition-colors flex items-center gap-1"
+                      className="px-3 py-1.5 rounded-lg text-xs font-medium bg-surface border border-secondary-300 hover:bg-primary-50 hover:text-primary-800 disabled:opacity-50 disabled:cursor-not-allowed text-secondary-600 transition-colors flex items-center gap-1"
                     >
                       {togglingMentor.has(user.id) ? (
                         <Loader2 size={11} className="animate-spin" />
@@ -470,7 +574,7 @@ export function AdminUsersPage() {
                         type="button"
                         disabled={deleting.has(user.id)}
                         onClick={() => handleDelete(user.id)}
-                        className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white border border-secondary-300 hover:bg-primary-50 hover:text-primary-600 disabled:opacity-50 disabled:cursor-not-allowed text-secondary-600 transition-colors flex items-center gap-1"
+                        className="px-3 py-1.5 rounded-lg text-xs font-medium bg-surface border border-secondary-300 hover:bg-primary-50 hover:text-primary-600 disabled:opacity-50 disabled:cursor-not-allowed text-secondary-600 transition-colors flex items-center gap-1"
                       >
                         {deleting.has(user.id) ? (
                           <Loader2 size={11} className="animate-spin" />
@@ -489,7 +593,7 @@ export function AdminUsersPage() {
                           setMergeTargetId("");
                         }
                       }}
-                      className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white border border-secondary-300 hover:bg-secondary-50 text-secondary-700 transition-colors"
+                      className="px-3 py-1.5 rounded-lg text-xs font-medium bg-surface border border-secondary-300 hover:bg-secondary-50 text-secondary-700 transition-colors"
                     >
                       {mergingUserId === user.id ? "Cancel" : "Merge"}
                     </button>
@@ -504,7 +608,7 @@ export function AdminUsersPage() {
                   <select
                     value={mergeTargetId}
                     onChange={(e) => setMergeTargetId(e.target.value)}
-                    className="flex-1 rounded-lg bg-white border border-secondary-300 px-3 py-1.5 text-sm text-secondary-900 focus:outline-none focus:border-primary-500"
+                    className="flex-1 rounded-lg bg-surface border border-secondary-300 px-3 py-1.5 text-sm text-secondary-900 focus:outline-none focus:border-primary-500"
                   >
                     <option value="">Select a user…</option>
                     {users

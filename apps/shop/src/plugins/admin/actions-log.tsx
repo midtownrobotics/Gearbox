@@ -120,7 +120,7 @@ export function ActionsLog({ data }: { data: ShopData }) {
   if (actions.length === 0)
     return (
       <p className="text-sm text-steel">
-        No actions recorded yet — they'll appear here as parts move through the shop.
+        No actions yet. They appear as parts move through the shop.
       </p>
     );
 

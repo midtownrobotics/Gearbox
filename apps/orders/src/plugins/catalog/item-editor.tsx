@@ -35,6 +35,7 @@ export function ItemEditor({
   const [vendor, setVendor] = useState(item?.vendor ?? "");
   const [sku, setSku] = useState(item?.sku ?? "");
   const [url, setUrl] = useState(item?.url ?? "");
+  const [packQuantity, setPackQuantity] = useState(String(item?.packQuantity ?? 1));
   const [options, setOptions] = useState(optionsText(item?.options ?? {}));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -47,9 +48,13 @@ export function ItemEditor({
       sku: sku.trim() || null,
       url: url.trim(),
       options: parseOptions(options),
+      packQuantity: Number(packQuantity),
     };
     if (!json.name || !json.category || !json.vendor || !json.url) {
       return setError("Name, category, vendor and link are all needed.");
+    }
+    if (!Number.isInteger(json.packQuantity) || json.packQuantity < 1) {
+      return setError("Pack of must be a whole number, 1 or more.");
     }
     setBusy(true);
     setError(null);
@@ -103,6 +108,16 @@ export function ItemEditor({
         </Field>
         <Field label="Part number">
           <input className={inputClass} value={sku} onChange={(e) => setSku(e.target.value)} />
+        </Field>
+        <Field label="Pack of" hint="Parts in one of these">
+          <input
+            type="number"
+            min={1}
+            max={10000}
+            className={inputClass}
+            value={packQuantity}
+            onChange={(e) => setPackQuantity(e.target.value)}
+          />
         </Field>
         <div className="col-span-2">
           <Field label="Category" hint="Missing one? Use “New category” first">

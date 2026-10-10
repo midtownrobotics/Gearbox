@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <script>
-      // Light/dark for every G3 app (the g3_theme cookie on .g3robotics.com), set before first
+      // Light/dark for every app (the g3_theme cookie on the team's domain), set before first
       // paint. @g3/ui's useTheme keeps it in sync after that.
       (function () {
         var saved = document.cookie.match(/(?:^|;\s*)g3_theme=(light|dark)/);
@@ -21,21 +21,19 @@
     <meta name="theme-color" content="#fefefe" />
     <meta
       name="description"
-      content="G3 Robotics scouting and strategy workspace."
+      content="A team's scouting and strategy workspace."
     />
-    <meta property="og:title" content="G3 Strategy" />
+    <meta property="og:title" content="Strategy" />
     <meta
       property="og:description"
       content="Plan the match. See the field differently."
     />
     <meta property="og:type" content="website" />
-    <meta property="og:image" content="https://scouting.g3robotics.com/og.png" />
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:image" content="https://scouting.g3robotics.com/og.png" />
+    <meta name="twitter:card" content="summary" />
     <link rel="icon" href="/favicon.ico" sizes="any" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-    <title>G3 Strategy</title>
+    <title>Strategy</title>
   </head>
   <body>
     <div id="root"></div>

@@ -1,9 +1,10 @@
-import { and, asc, eq, gt, inArray, sql } from "drizzle-orm";
+import { inTeam, requireAuth, withTeam } from "@g3/auth";
+import { and, asc, eq, gt, inArray } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
 import { createShopDb } from "../db";
 import { actions, partInstanceProcesses } from "../db/schema";
-import { requireAuth } from "../middleware/auth";
+import { finished, promoteNextSteps } from "../lib/steps";
 import type { AppEnv } from "../types";
 import { recordAction } from "./actions";
 
@@ -15,7 +16,7 @@ const updateProcessStatusValidator = validator("json", (value, c): { status: str
   return { status: v.status as string };
 });
 
-// D1 caps a statement at 100 bound parameters; the widest write here (actions) has 5 columns.
+// D1 caps a statement at 100 bound parameters; the widest write here (actions) has 6 columns.
 const BULK_CHUNK = 15;
 
 const bulkValidator = validator(
@@ -54,6 +55,7 @@ export const partInstanceProcessesRouter = new Hono<AppEnv>()
   .post("/bulk", requireAuth, bulkValidator, async (c) => {
     const { processId, partInstanceIds, to } = c.req.valid("json");
     const db = createShopDb(c.env.SHOP_DB);
+    const teamId = c.get("teamId");
     const now = Date.now();
     const from = to === "doing" ? "todo" : "doing";
     const moved: number[] = [];
@@ -64,7 +66,9 @@ export const partInstanceProcessesRouter = new Hono<AppEnv>()
         .update(partInstanceProcesses)
         .set(to === "done" ? { status: "done", completedAt: now } : { status: "doing" })
         .where(
-          and(
+          inTeam(
+            partInstanceProcesses,
+            teamId,
             eq(partInstanceProcesses.processId, processId),
             eq(partInstanceProcesses.status, from),
             inArray(partInstanceProcesses.partInstanceId, ids),
@@ -76,20 +80,18 @@ export const partInstanceProcessesRouter = new Hono<AppEnv>()
 
       if (to === "done" && rows.length > 0) {
         // Promote each completed instance's next step, mirroring the single-instance route.
-        const done = rows.map((r) => r.id);
-        await db.run(sql`
-          UPDATE part_instance_processes SET status = 'todo'
-          WHERE status = 'waiting' AND id IN (
-            SELECT (
-              SELECT n.id FROM part_instance_processes n
-              WHERE n.part_instance_id = d.part_instance_id AND n."index" > d."index"
-              ORDER BY n."index" LIMIT 1
-            )
-            FROM part_instance_processes d
-            WHERE d.process_id = ${processId} AND d.status = 'done'
-              AND d.completed_at = ${now} AND d.part_instance_id IN (${sql.join(done, sql`, `)})
-          )
-        `);
+        await promoteNextSteps(
+          db,
+          teamId,
+          and(
+            eq(finished.processId, processId),
+            eq(finished.completedAt, now),
+            inArray(
+              finished.partInstanceId,
+              rows.map((r) => r.id),
+            ),
+          ),
+        );
       }
     }
 
@@ -99,13 +101,16 @@ export const partInstanceProcessesRouter = new Hono<AppEnv>()
       const action: "started" | "completed" = to === "doing" ? "started" : "completed";
       for (let i = 0; i < moved.length; i += BULK_CHUNK) {
         await db.insert(actions).values(
-          moved.slice(i, i + BULK_CHUNK).map((partInstanceId) => ({
-            userId,
-            partInstanceId,
-            processId,
-            action,
-            createdAt: now,
-          })),
+          withTeam(
+            teamId,
+            moved.slice(i, i + BULK_CHUNK).map((partInstanceId) => ({
+              userId,
+              partInstanceId,
+              processId,
+              action,
+              createdAt: now,
+            })),
+          ),
         );
       }
     } catch (err) {
@@ -118,12 +123,19 @@ export const partInstanceProcessesRouter = new Hono<AppEnv>()
     const processId = c.req.query("processId");
     const partInstanceId = c.req.query("partInstanceId");
     const db = createShopDb(c.env.SHOP_DB);
+    const teamId = c.get("teamId");
 
     if (processId) {
       const rows = await db
         .select()
         .from(partInstanceProcesses)
-        .where(eq(partInstanceProcesses.processId, Number(processId)))
+        .where(
+          inTeam(
+            partInstanceProcesses,
+            teamId,
+            eq(partInstanceProcesses.processId, Number(processId)),
+          ),
+        )
         .all();
       return c.json(rows);
     }
@@ -132,7 +144,13 @@ export const partInstanceProcessesRouter = new Hono<AppEnv>()
       const rows = await db
         .select()
         .from(partInstanceProcesses)
-        .where(eq(partInstanceProcesses.partInstanceId, Number(partInstanceId)))
+        .where(
+          inTeam(
+            partInstanceProcesses,
+            teamId,
+            eq(partInstanceProcesses.partInstanceId, Number(partInstanceId)),
+          ),
+        )
         .all();
       return c.json(rows);
     }
@@ -144,11 +162,14 @@ export const partInstanceProcessesRouter = new Hono<AppEnv>()
     const processId = Number(c.req.param("processId"));
 
     const db = createShopDb(c.env.SHOP_DB);
+    const teamId = c.get("teamId");
     const row = await db
       .update(partInstanceProcesses)
       .set({ status: "done", completedAt: Date.now() })
       .where(
-        and(
+        inTeam(
+          partInstanceProcesses,
+          teamId,
           eq(partInstanceProcesses.partInstanceId, partInstanceId),
           eq(partInstanceProcesses.processId, processId),
         ),
@@ -163,7 +184,9 @@ export const partInstanceProcessesRouter = new Hono<AppEnv>()
       .select()
       .from(partInstanceProcesses)
       .where(
-        and(
+        inTeam(
+          partInstanceProcesses,
+          teamId,
           eq(partInstanceProcesses.partInstanceId, partInstanceId),
           gt(partInstanceProcesses.index, row.index),
         ),
@@ -176,10 +199,10 @@ export const partInstanceProcessesRouter = new Hono<AppEnv>()
       await db
         .update(partInstanceProcesses)
         .set({ status: "todo" })
-        .where(eq(partInstanceProcesses.id, next.id));
+        .where(inTeam(partInstanceProcesses, teamId, eq(partInstanceProcesses.id, next.id)));
     }
 
-    await recordAction(db, {
+    await recordAction(db, teamId, {
       userId: c.get("userId"),
       partInstanceId,
       processId,
@@ -193,11 +216,14 @@ export const partInstanceProcessesRouter = new Hono<AppEnv>()
     const processId = Number(c.req.param("processId"));
 
     const db = createShopDb(c.env.SHOP_DB);
+    const teamId = c.get("teamId");
     const row = await db
       .update(partInstanceProcesses)
       .set({ status: "doing" })
       .where(
-        and(
+        inTeam(
+          partInstanceProcesses,
+          teamId,
           eq(partInstanceProcesses.partInstanceId, partInstanceId),
           eq(partInstanceProcesses.processId, processId),
         ),
@@ -207,7 +233,7 @@ export const partInstanceProcessesRouter = new Hono<AppEnv>()
 
     if (!row) return c.json({ error: "Part instance process not found." }, 404);
 
-    await recordAction(db, {
+    await recordAction(db, teamId, {
       userId: c.get("userId"),
       partInstanceId,
       processId,
@@ -226,6 +252,7 @@ export const partInstanceProcessesRouter = new Hono<AppEnv>()
       const processId = Number(c.req.param("processId"));
 
       const db = createShopDb(c.env.SHOP_DB);
+      const teamId = c.get("teamId");
       const row = await db
         .update(partInstanceProcesses)
         .set({
@@ -233,7 +260,9 @@ export const partInstanceProcessesRouter = new Hono<AppEnv>()
           completedAt: status === "done" ? Date.now() : null,
         })
         .where(
-          and(
+          inTeam(
+            partInstanceProcesses,
+            teamId,
             eq(partInstanceProcesses.partInstanceId, partInstanceId),
             eq(partInstanceProcesses.processId, processId),
           ),
@@ -249,7 +278,9 @@ export const partInstanceProcessesRouter = new Hono<AppEnv>()
           .select()
           .from(partInstanceProcesses)
           .where(
-            and(
+            inTeam(
+              partInstanceProcesses,
+              teamId,
               eq(partInstanceProcesses.partInstanceId, partInstanceId),
               gt(partInstanceProcesses.index, row.index),
             ),
@@ -262,13 +293,13 @@ export const partInstanceProcessesRouter = new Hono<AppEnv>()
           await db
             .update(partInstanceProcesses)
             .set({ status: "waiting" })
-            .where(eq(partInstanceProcesses.id, next.id));
+            .where(inTeam(partInstanceProcesses, teamId, eq(partInstanceProcesses.id, next.id)));
         }
       }
 
       // Record action for "done" status; other transitions are considered manual adjustments
       if (status === "done") {
-        await recordAction(db, {
+        await recordAction(db, teamId, {
           userId: c.get("userId"),
           partInstanceId,
           processId,

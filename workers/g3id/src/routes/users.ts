@@ -2,6 +2,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import { Hono } from "hono";
 import { createDb } from "../db";
 import { coreUserIdentities, coreUserPins, coreUsers } from "../db/schema";
+import { teamOfUser } from "../lib/team";
 import { requireAdmin, requireAuth } from "../middleware/auth";
 import type { AppEnv } from "../types";
 
@@ -23,10 +24,18 @@ export type UserWithPin = BasicUserInfo & {
 export const usersRouter = new Hono<AppEnv>()
   .get("/attendance-eligible", requireAuth, async (c) => {
     const db = createDb(c.env.DB);
+    // The caller's own team's members only.
+    const team = await teamOfUser(db, c.get("userId") as string);
     const users = await db
       .select({ id: coreUsers.id, displayName: coreUsers.displayName })
       .from(coreUsers)
-      .where(and(eq(coreUsers.status, "active"), isNull(coreUsers.deletedAt)))
+      .where(
+        and(
+          eq(coreUsers.teamId, team),
+          eq(coreUsers.status, "active"),
+          isNull(coreUsers.deletedAt),
+        ),
+      )
       .all();
     return c.json({
       users: users.filter((user) => user.displayName.trim().toLowerCase() !== "admin"),
@@ -34,6 +43,7 @@ export const usersRouter = new Hono<AppEnv>()
   })
   .get("/", requireAdmin, async (c) => {
     const db = createDb(c.env.DB);
+    const team = await teamOfUser(db, c.get("userId") as string);
 
     const users = await db
       .select({
@@ -46,13 +56,14 @@ export const usersRouter = new Hono<AppEnv>()
         lastLoginAt: coreUsers.lastLoginAt,
       })
       .from(coreUsers)
-      .where(isNull(coreUsers.deletedAt))
+      .where(and(eq(coreUsers.teamId, team), isNull(coreUsers.deletedAt)))
       .all();
 
     const slackIdentities = await db
       .select({ userId: coreUserIdentities.userId, slackUserId: coreUserIdentities.providerId })
       .from(coreUserIdentities)
-      .where(eq(coreUserIdentities.provider, "slack"))
+      .innerJoin(coreUsers, eq(coreUsers.id, coreUserIdentities.userId))
+      .where(and(eq(coreUserIdentities.provider, "slack"), eq(coreUsers.teamId, team)))
       .all();
     const slackIds = new Map(
       slackIdentities.map((identity) => [identity.userId, identity.slackUserId] as const),
@@ -70,10 +81,12 @@ export const usersRouter = new Hono<AppEnv>()
     const pin = c.req.param("pin");
     const db = createDb(c.env.DB);
 
+    // PINs are unique only within a team: look in the caller's.
+    const teamId = await teamOfUser(db, c.get("userId") as string);
     const userPin = await db
       .select({ userId: coreUserPins.userId })
       .from(coreUserPins)
-      .where(eq(coreUserPins.pin, pin))
+      .where(and(eq(coreUserPins.teamId, teamId), eq(coreUserPins.pin, pin)))
       .get();
 
     if (!userPin) {

@@ -1,0 +1,76 @@
+import { deleteTeamRows, exportTeamRows, teamExport } from "@g3/auth";
+import { Hono } from "hono";
+import { createEdgeDb } from "../db";
+import {
+  edgeAudit,
+  edgeBoxes,
+  edgeStatus,
+  netBlocklistDomains,
+  netBlocklists,
+  netClients,
+  netGrants,
+  netSettings,
+  netSiteUsage,
+  netSiteUsageDaily,
+  netUsage,
+  netUsageHourly,
+} from "../db/schema";
+import { disconnectBox } from "../lib/agent";
+import { manifest } from "../manifest";
+import type { AppEnv } from "../types";
+
+/**
+ * For other workers only: the gateway never answers /internal. When an operator deletes a team
+ * (the platform's console), or 90 days after the team switches Edge off (the platform's app
+ * library), its box's key, link and data go too.
+ */
+export const internalRouter = new Hono<AppEnv>()
+  // The team's data, for its admins to download before switching Edge off (the platform's app
+  // library). The box key's hash is left out.
+  .get("/teams/:teamId/export", async (c) => {
+    const teamId = c.req.param("teamId");
+    const tables = await exportTeamRows(
+      createEdgeDb(c.env.EDGE_DB),
+      teamId,
+      [
+        edgeBoxes,
+        edgeStatus,
+        netSettings,
+        netClients,
+        netBlocklists,
+        netBlocklistDomains,
+        netGrants,
+        netUsage,
+        netUsageHourly,
+        netSiteUsage,
+        netSiteUsageDaily,
+        edgeAudit,
+      ],
+      { edge_boxes: ["keyHash"] },
+    );
+    return c.json(
+      teamExport(manifest, teamId, tables, [
+        "The box key isn't included: make a new one on the Edge Box page.",
+      ]),
+    );
+  })
+  .delete("/teams/:teamId", async (c) => {
+    const teamId = c.req.param("teamId");
+    // Rows before the rows they point at; the key first, so the box can't sign in again.
+    await deleteTeamRows(createEdgeDb(c.env.EDGE_DB), teamId, [
+      edgeBoxes,
+      netBlocklistDomains,
+      netGrants,
+      netBlocklists,
+      netUsage,
+      netUsageHourly,
+      netSiteUsage,
+      netSiteUsageDaily,
+      netClients,
+      netSettings,
+      edgeStatus,
+      edgeAudit,
+    ]);
+    await disconnectBox(c.env, teamId).catch(() => undefined);
+    return c.json({ ok: true });
+  });

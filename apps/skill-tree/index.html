@@ -1,210 +1,32 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="description" content="This is an educational tool used by high school robotics teams, specifically G3 robotics at mditown high school. It includes software for the production tracking, attendance, and other management tools. It uses math, science, ELA, reading, and other forms of school to help educate and teach. Education is our number one priority.">
-<meta name="keywords" content="School, Education, SAT, ACT, Math, Science, Reading, ELA, Tools, Learning, Students, High School, Robotics, Teachers, Attendance">
-<link rel="icon" href="/favicon.ico" sizes="any" />
-<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-<title>FRC Skill Trees</title>
-<link rel="stylesheet" href="style.css">
-</head>
-<body>
-
-<!-- Login screen — visible by default, hidden after auth is confirmed -->
-<div id="loginScreen" class="login-screen">
-  <div class="login-card">
-    <div class="login-logo">FRC <span>Skill</span> Trees</div>
-    <div class="login-sub">Sign in with G3ID</div>
-    <div id="loginError" class="login-error"></div>
-    <button id="loginBtn" onclick="doLogin()">Sign In with G3ID</button>
-  </div>
-</div>
-
-<header>
-  <div class="hr1">
-    <div class="logo">FRC <span>Skill</span> Trees</div>
-    <div class="nav">
-      <button class="nb act" id="navOv" onclick="go('ov')">Overview</button>
-      <button class="nb" id="navTr" onclick="go('tr')">Skill Trees</button>
-      <button class="nb" id="navMn" onclick="go('mn')" style="display:none">Admins</button>
-    </div>
-    <div class="hsep"></div>
-    <div class="legend">
-      <div class="li"><div class="ld ld-lo"></div>Locked</div>
-      <div class="li"><div class="ld ld-av"></div>Available</div>
-      <div class="li"><div class="ld ld-pr"></div>In Progress</div>
-      <div class="li"><div class="ld ld-dn"></div>Complete</div>
-    </div>
-    <a class="logout-btn" href="https://gearbox.g3robotics.com">All Apps</a>
-    <button class="logout-btn" onclick="doLogout()">Sign Out</button>
-  </div>
-  <div class="hr2">
-    <div class="tree-sel-wrap">
-      <label>Tree</label>
-      <select id="treeSel" onchange="onTreeSel()"></select>
-    </div>
-    <div class="sw">
-      <label>Student</label>
-      <select id="ssel"></select>
-    </div>
-  </div>
-</header>
-
-<div class="view act" id="vOv">
-  <div class="ov-wrap">
-    <div class="ov-title">Team Overview</div>
-    <div class="ov-sub">Skill tree progress for all students</div>
-    <div class="ov-grid" id="ovGrid"></div>
-    <div class="sum-title">Student Totals</div>
-    <div id="sumWrap"></div>
-  </div>
-</div>
-
-<div class="view" id="vTr">
-  <div class="tree-area" id="treeArea">
-    <div class="trees" id="treesC"></div>
-  </div>
-</div>
-
-<!-- Sub-tree overlay — opened when a category box is clicked -->
-<div class="subtree-backdrop" id="subtreeBackdrop" onclick="closeSubtree()"></div>
-<div class="subtree-overlay" id="subtreeOverlay">
-  <div class="subtree-head">
-    <button class="subtree-back" onclick="closeSubtree()">← Back</button>
-    <div class="subtree-title" id="subtreeTitle"></div>
-  </div>
-  <div class="subtree-scroll"><div class="subtree-canvas" id="subtreeCanvas"></div></div>
-</div>
-
-<div class="view" id="vMn">
-  <div class="ov-wrap">
-    <div class="ov-title">Admins</div>
-    <div class="ov-sub">Admins can update any student's progress.</div>
-
-    <!-- Bulk Progress Update Section -->
-    <div class="bulk-update-section" id="bulkUpdateSection" style="display:none">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-        <div class="section-title" style="margin:0;">Bulk Progress Update</div>
-        <button onclick="closeBulkUpdateSection()" style="background:none;border:none;color:var(--tx);font-size:20px;cursor:pointer;padding:0;">✕</button>
-      </div>
-      <div class="section-steps">
-        <div class="step" id="bulkStep1">
-          <div class="step-header">Step 1: Select Users</div>
-          <div class="step-content">
-            <div style="display:flex;gap:14px;margin-bottom:14px;">
-              <div class="bulk-form-group" style="flex:0 0 100px;">
-                <label>PIN:</label>
-                <input type="text" id="bulkPinInput" placeholder="123" maxlength="3" style="background:var(--bg-card);border:1px solid var(--border);color:var(--tx);font-family:'Rajdhani',sans-serif;font-size:13px;text-align:center;padding:8px 12px;border-radius:6px;transition:border-color 0.2s;width:100%;">
-              </div>
-              <div class="bulk-form-group" style="flex:1;">
-                <label>Search by Name:</label>
-                <div class="bulk-search-wrapper">
-                  <input type="text" id="bulkUserSearch" placeholder="Type a name...">
-                  <div id="bulkUserSearchResults" class="bulk-search-results" style="display:none"></div>
-                </div>
-              </div>
-            </div>
-            <div id="bulkSelectedUsers" class="bulk-selected-users"></div>
-            <button class="bulk-next-btn">Next: Select Skill</button>
-          </div>
-        </div>
-
-        <div class="step" id="bulkStep2">
-          <div class="step-header">Step 2: Select Skills & Status</div>
-          <div class="step-content">
-            <div id="bulkSkillSelectorGroup" style="display:none;">
-              <div class="bulk-form-group">
-                <label>Tree:</label>
-                <select id="bulkTreeSelect">
-                  <option value="">Choose a tree...</option>
-                </select>
-              </div>
-              <div class="bulk-form-group">
-                <label>Category:</label>
-                <select id="bulkSubtreeSelect">
-                  <option value="">Choose a category...</option>
-                </select>
-              </div>
-              <div class="bulk-form-group">
-                <label>Skill:</label>
-                <select id="bulkSkillSelect">
-                  <option value="">Choose a skill...</option>
-                </select>
-              </div>
-            </div>
-            <div class="bulk-form-group" id="bulkSelectedSkillsGroup" style="display:none;margin-top:20px;">
-              <label>Selected Skills:</label>
-              <div id="bulkSelectedSkillsList" style="max-height:200px;overflow-y:auto;margin-bottom:15px;"></div>
-            </div>
-            <div class="bulk-form-group">
-              <label>Status:</label>
-              <select id="bulkStatusSelect">
-                <option value="not-started">Not Started</option>
-                <option value="in-progress">In Progress</option>
-                <option value="complete" selected>Complete</option>
-              </select>
-            </div>
-            <div class="bulk-button-group">
-              <button class="bulk-back-btn">Back</button>
-              <button class="bulk-next-btn">Review & Apply</button>
-            </div>
-          </div>
-        </div>
-
-        <div class="step" id="bulkStep3">
-          <div class="step-header">Review Changes</div>
-          <div class="step-content">
-            <div class="bulk-review">
-              <div id="bulkReviewContent"></div>
-            </div>
-            <div class="bulk-button-group">
-              <button class="bulk-back-btn">Back</button>
-              <button class="bulk-apply-btn">Apply to All Users</button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div id="mnWrap"></div>
-  </div>
-</div>
-
-<div class="panel" id="panel">
-  <div class="p-head">
-    <div class="p-tag" id="pTag"></div>
-    <div class="p-title" id="pTitle"></div>
-    <button class="p-x" onclick="closePanel()">✕</button>
-  </div>
-  <div class="p-body">
-    <div><div class="sbadge" id="pBadge"><div class="sb-dot"></div><span id="pSt"></span></div></div>
-    <div class="sec-drop">
-      <button class="sec-header" onclick="toggleDropdown('desc')">Description <span class="sec-arrow">▼</span></button>
-      <div class="sec-content" id="descContent"><div class="p-desc" id="pDesc"></div></div>
-    </div>
-    <div id="pPreSec" class="sec-drop">
-      <button class="sec-header" onclick="toggleDropdown('prereq')">Prerequisites <span class="sec-arrow">▼</span></button>
-      <div class="sec-content" id="prereqContent"><div class="pr-list" id="pPre"></div></div>
-    </div>
-    <div id="pUpdateSec" class="sec-drop">
-      <button class="sec-header" onclick="toggleDropdown('update')">Update Progress <span class="sec-arrow">▼</span></button>
-      <div class="sec-content" id="updateContent">
-        <div class="st-btns">
-          <button class="st-btn sba" id="bNS" onclick="setSt('not-started')"><span>○</span> Not Started <span class="ck">✓</span></button>
-          <button class="st-btn sbp" id="bIP" onclick="setSt('in-progress')"><span>◑</span> In Progress  <span class="ck">✓</span></button>
-          <button class="st-btn sbc" id="bC"  onclick="setSt('complete')">   <span>●</span> Complete     <span class="ck">✓</span></button>
-        </div>
-      </div>
-    </div>
-  </div>
-  <div class="p-foot" id="pFoot"></div>
-</div>
-<div class="panel-overlay" id="panelOverlay" onclick="closePanel()"></div>
-
-<!-- app.js is an ES module; it imports trees.js and firebase.js internally -->
-<script type="module" src="app.js"></script>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <script>
+      // Light/dark for every app (the g3_theme cookie on the team's domain), set before first
+      // paint. @g3/ui's useTheme keeps it in sync after that.
+      (function () {
+        var saved = document.cookie.match(/(?:^|;\s*)g3_theme=(light|dark)/);
+        var dark = window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches;
+        var theme = saved ? saved[1] : dark ? "dark" : "light";
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.style.colorScheme = theme;
+        document.addEventListener("DOMContentLoaded", function () {
+          var meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) meta.content = theme === "dark" ? "#262626" : "#fefefe";
+        });
+      })();
+    </script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#fefefe" />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <title>Skill Tree</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
 </html>

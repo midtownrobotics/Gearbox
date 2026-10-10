@@ -7,6 +7,7 @@ import type { SwitchSound, SwitchState } from "@g3/worker-edge/switch-types";
 import { createSwitchModule } from ".";
 import type { AgentConfig } from "../../core/config";
 import type { WorkerClient } from "../../core/worker-client";
+import { SoundStoppedError } from "./player";
 
 const wave = new Uint8Array([
   0x52, 0x49, 0x46, 0x46, 0x24, 0, 0, 0, 0x57, 0x41, 0x56, 0x45, 0x66, 0x6d, 0x74, 0x20, 0x10, 0, 0,
@@ -14,7 +15,7 @@ const wave = new Uint8Array([
 ]);
 
 describe("switch module integration", () => {
-  test("uploads and tests audio, then plays it on a debounced door opening", async () => {
+  test("uploads and tests audio, then repeats it while the door is open and stops on close", async () => {
     const soundDir = await mkdtemp(join(tmpdir(), "g3-switch-integration-"));
     const config: AgentConfig = {
       workerUrl: "http://unused",
@@ -41,12 +42,43 @@ describe("switch module integration", () => {
       switchGpioValuePath: "unused",
     };
     const db = new Database(":memory:");
-    const module = createSwitchModule({
-      config,
-      db,
-      worker: {} as WorkerClient,
-      sync: { applied: 0 },
-    });
+    let played = 0;
+    let stopped = 0;
+    let finishManual = () => {};
+    let manualFinished = false;
+    // The door's sound plays until it's finished or stopped, like aplay.
+    let finishDoor = () => {};
+    let stopDoor = () => {};
+    const module = createSwitchModule(
+      {
+        config,
+        db,
+        worker: {} as WorkerClient,
+        sync: { applied: 0 },
+      },
+      {
+        async play(path) {
+          played++;
+          if (path) {
+            await new Promise<void>((resolve) => {
+              finishManual = resolve;
+            });
+            manualFinished = true;
+          }
+          if (!path) {
+            await new Promise<void>((resolve, reject) => {
+              finishDoor = resolve;
+              stopDoor = () => reject(new SoundStoppedError());
+            });
+          }
+          return path ?? join(soundDir, "welcome.wav");
+        },
+        stop() {
+          stopped++;
+          stopDoor();
+        },
+      },
+    );
     if (!module.routes) throw new Error("Switch routes are missing.");
 
     try {
@@ -62,6 +94,10 @@ describe("switch module integration", () => {
       const play = await module.routes.request("/sounds/welcome.wav/test", { method: "POST" });
       expect(play.status).toBe(200);
       expect(((await play.json()) as { sound: string }).sound).toEndWith("welcome.wav");
+      expect(manualFinished).toBe(false);
+      finishManual();
+      await Bun.sleep(0);
+      expect(manualFinished).toBe(true);
 
       await module.routes.request("/input", {
         method: "POST",
@@ -74,6 +110,42 @@ describe("switch module integration", () => {
       expect(state.grounded).toBe(false);
       expect(state.triggerCount).toBe(1);
       expect(state.lastSound).toEndWith("welcome.wav");
+      expect(played).toBe(2); // Manual test plus one door opening.
+
+      // The sound ends with the door still open: it starts again.
+      finishDoor();
+      await Bun.sleep(1_100);
+      expect(played).toBe(3);
+
+      await module.routes.request("/input", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ grounded: true }),
+      });
+      await Bun.sleep(30);
+      const closed = (await (await module.routes.request("/state")).json()) as SwitchState;
+      expect(closed.grounded).toBe(true);
+      expect(closed.triggerCount).toBe(1);
+      expect(stopped).toBe(1);
+      // Closed: it stopped, and nothing starts again.
+      await Bun.sleep(1_100);
+      expect(played).toBe(3);
+
+      await module.routes.request("/input", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ grounded: false }),
+      });
+      await Bun.sleep(30);
+      const reopened = (await (await module.routes.request("/state")).json()) as SwitchState;
+      expect(reopened.grounded).toBe(false);
+      expect(reopened.triggerCount).toBe(2);
+      expect(played).toBe(4);
+
+      // Stop sound ends the repeat too.
+      expect((await module.routes.request("/stop", { method: "POST" })).status).toBe(200);
+      await Bun.sleep(1_100);
+      expect(played).toBe(4);
 
       const remove = await module.routes.request("/sounds/welcome.wav", { method: "DELETE" });
       expect(remove.status).toBe(200);

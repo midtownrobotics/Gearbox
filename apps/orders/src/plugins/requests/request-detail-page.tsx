@@ -1,5 +1,5 @@
 import { type FormEvent, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { api, getErrorMessage } from "../../shared/api";
 import { useAuthUser } from "../../shared/auth";
 import { Deadline } from "../../shared/deadline";
@@ -17,7 +17,9 @@ import { Button, Card, ErrorBanner, Field, Loading, Page, inputClass } from "../
 import { useLoad } from "../../shared/use-load";
 import { useVendors } from "../../shared/vendors";
 import { RequestLists } from "../lists/request-lists";
+import { VendorCart } from "../ordering/ordering-page";
 import { RequestActions } from "./request-actions";
+import { promote, removeWish } from "./wishlist-page";
 
 const EVENT_LABELS: Record<string, string> = {
   created: "Requested",
@@ -30,11 +32,51 @@ export function RequestDetailPage() {
   const user = useAuthUser();
   const { vendorFor } = useVendors();
   const [editing, setEditing] = useState(false);
+  const navigate = useNavigate();
+  // Back to where the request was opened from (a list, Approvals, a filtered search); straight
+  // to Requests when the page was opened directly (a link in Slack, a new tab).
+  const cameFromApp = useLocation().key !== "default";
+  const [busy, setBusy] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
   const { data, error, reload } = useLoad(async () => {
     const res = await api.requests[":id"].$get({ param: { id } });
     if (!res.ok) throw new Error(await getErrorMessage(res));
     return res.json();
   }, [id]);
+  const wished = data?.status === "wishlist";
+  const back = (
+    <button
+      type="button"
+      onClick={() => (cameFromApp ? navigate(-1) : navigate(wished ? "/wishlist" : "/requests"))}
+      className="text-sm text-secondary-500 hover:text-secondary-800"
+    >
+      ← {cameFromApp ? "Back" : wished ? "Wishlist" : "All requests"}
+    </button>
+  );
+
+  /** Wishlist: promote it to a request (by this member) or remove it. Anyone can. */
+  async function wishAction(action: "promote" | "remove", title: string) {
+    const question =
+      action === "promote"
+        ? `Request ${title}? It goes to the mentors as your request.`
+        : `Remove ${title} from the wishlist?`;
+    if (!window.confirm(question)) return;
+    setBusy(true);
+    setActionError(null);
+    try {
+      if (action === "promote") {
+        await promote(Number(id));
+        reload();
+      } else {
+        await removeWish(Number(id));
+        navigate("/wishlist", { replace: true });
+      }
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
 
   if (error) {
     return (
@@ -53,17 +95,12 @@ export function RequestDetailPage() {
 
   const r = data;
   const estimate = r.unitPriceCents === null ? null : r.unitPriceCents * r.quantity;
-  const canEdit = r.status === "requested" && (user.isMentor || r.requesterId === user.userId);
+  // A wishlist item: anyone. A request: its requester or a mentor while it's waiting.
+  const canEdit =
+    wished || (r.status === "requested" && (user.isMentor || r.requesterId === user.userId));
 
   return (
-    <Page
-      title={`Request #${r.id}`}
-      actions={
-        <Link to="/requests" className="text-sm text-secondary-500 hover:text-secondary-800">
-          ← All requests
-        </Link>
-      }
-    >
+    <Page title={wished ? `Wishlist #${r.id}` : `Request #${r.id}`} actions={back}>
       <Card>
         <div className="flex flex-col md:flex-row gap-6">
           {r.image && (
@@ -96,7 +133,11 @@ export function RequestDetailPage() {
                   <span className="font-mono">{r.sku}</span>
                 </Row>
               )}
-              <Row label="Quantity">{r.quantity}</Row>
+              <Row label="Quantity">
+                {r.quantity}
+                {r.packQuantity > 1 &&
+                  ` × pack of ${r.packQuantity} (${r.quantity * r.packQuantity} parts)`}
+              </Row>
               <Row label="Price each">{formatCents(r.unitPriceCents, r.currency)}</Row>
               <Row label={r.orderId === null ? "Estimated total" : "Ordered total"}>
                 {formatCents(estimate, r.currency)}
@@ -109,15 +150,32 @@ export function RequestDetailPage() {
                   <Deadline request={r} vendor={vendorFor(r.vendor)} />
                 </Row>
               )}
-              <Row label="Requested by">{r.requesterName}</Row>
+              <Row label={wished ? "Added by" : "Requested by"}>{r.requesterName}</Row>
             </dl>
-            <div>
-              <p className="text-sm font-medium text-secondary-700">Why</p>
-              <p className="text-sm text-secondary-800 whitespace-pre-wrap">{r.reason}</p>
-            </div>
+            {r.reason && (
+              <div>
+                <p className="text-sm font-medium text-secondary-700">Why</p>
+                <p className="text-sm text-secondary-800 whitespace-pre-wrap">{r.reason}</p>
+              </div>
+            )}
           </div>
         </div>
         <div className="mt-5 space-y-3">
+          {actionError && <ErrorBanner message={actionError} />}
+          {wished && (
+            <div className="flex flex-wrap gap-2">
+              <Button disabled={busy} onClick={() => void wishAction("promote", r.title)}>
+                Promote to request
+              </Button>
+              <Button
+                variant="secondary"
+                disabled={busy}
+                onClick={() => void wishAction("remove", r.title)}
+              >
+                Remove from wishlist
+              </Button>
+            </div>
+          )}
           <RequestActions request={r} onChanged={reload} />
           {canEdit && !editing && (
             <Button variant="secondary" onClick={() => setEditing(true)}>
@@ -127,7 +185,13 @@ export function RequestDetailPage() {
         </div>
       </Card>
 
-      <RequestLists requestId={r.id} />
+      {/* Approved: its vendor's whole cart, to place it from here (mentors place orders). */}
+      {r.status === "approved" && user.isMentor && (
+        <VendorCart vendor={r.vendor} onChanged={reload} />
+      )}
+
+      {/* Lists are of requests: a wishlist item joins one once it's promoted. */}
+      {!wished && <RequestLists requestId={r.id} />}
 
       {editing && (
         <EditForm
@@ -179,6 +243,7 @@ function EditForm({ request, onDone }: { request: RequestDetail; onDone: () => v
     return (await res.json()).filter((c) => !c.isArchived || c.id === request.categoryId);
   }, []);
   const [quantity, setQuantity] = useState(String(request.quantity));
+  const [packQuantity, setPackQuantity] = useState(String(request.packQuantity));
   const [price, setPrice] = useState(
     request.unitPriceCents === null ? "" : (request.unitPriceCents / 100).toFixed(2),
   );
@@ -198,6 +263,7 @@ function EditForm({ request, onDone }: { request: RequestDetail; onDone: () => v
       param: { id: String(request.id) },
       json: {
         quantity: Number(quantity),
+        packQuantity: Number(packQuantity),
         unitPriceCents,
         categoryId: Number(categoryId),
         reason,
@@ -222,6 +288,17 @@ function EditForm({ request, onDone }: { request: RequestDetail; onDone: () => v
               className={inputClass}
               value={quantity}
               onChange={(e) => setQuantity(e.target.value)}
+              required
+            />
+          </Field>
+          <Field label="Pack of" hint="Parts in one of these">
+            <input
+              type="number"
+              min={1}
+              max={10000}
+              className={inputClass}
+              value={packQuantity}
+              onChange={(e) => setPackQuantity(e.target.value)}
               required
             />
           </Field>
@@ -268,12 +345,11 @@ function EditForm({ request, onDone }: { request: RequestDetail; onDone: () => v
             />
           </Field>
           <div className="sm:col-span-3">
-            <Field label="Why do we need it?">
+            <Field label="Why do we need it?" hint="Optional">
               <textarea
                 className={`${inputClass} min-h-20`}
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
-                required
                 maxLength={1000}
               />
             </Field>

@@ -1,7 +1,7 @@
 export interface AgentConfig {
-  /** Base URL of workers/edge, e.g. https://api.edge.g3robotics.com */
+  /** Base URL of workers/edge's API, e.g. https://edge.<domain>/api */
   workerUrl: string;
-  /** Shared key; must match EDGE_AGENT_KEY on the worker. */
+  /** The team's box key, made on the Edge app's Edge Box page. */
   agentKey: string;
   dbPath: string;
   httpPort: number;
@@ -19,7 +19,7 @@ export interface AgentConfig {
   collectIntervalSeconds: number;
   /** Shop drive storage: the mounted 10 GB image. */
   driveDir: string;
-  /** Where the shop drive's web page listens: the box's LAN address only (never the tunnel). */
+  /** Where the shop drive's web page listens: the box's LAN address only (never the worker link). */
   driveHost: string;
   drivePort: number;
   /** DigiKey API app for part lookup; optional (DigiKey links fail without it). */
@@ -31,7 +31,7 @@ export interface AgentConfig {
   /** WAV files played in rotation whenever the switch changes from on to off. */
   switchSounds: string[];
   switchAudioPlayer: string;
-  /** ALSA PCM target; defaults to the most recently connected BlueALSA A2DP device. */
+  /** ALSA PCM target; defaults to the Orange Pi 5 analog headphone jack. */
   switchAudioDevice: string;
   /** Directory managed by the switch module for uploaded WAV files. */
   switchSoundDir: string;
@@ -80,7 +80,7 @@ export function loadConfig(): AgentConfig {
       .map((path) => path.trim())
       .filter(Boolean),
     switchAudioPlayer: process.env.EDGE_SWITCH_AUDIO_PLAYER ?? "aplay",
-    switchAudioDevice: process.env.EDGE_SWITCH_AUDIO_DEVICE ?? "bluealsa",
+    switchAudioDevice: process.env.EDGE_SWITCH_AUDIO_DEVICE ?? "plughw:CARD=rockchipes8388,DEV=0",
     switchSoundDir: process.env.EDGE_SWITCH_SOUND_DIR ?? "/srv/g3-sounds",
     switchGpioValuePath: process.env.EDGE_SWITCH_GPIO_VALUE_PATH ?? "/sys/class/gpio/gpio92/value",
   };

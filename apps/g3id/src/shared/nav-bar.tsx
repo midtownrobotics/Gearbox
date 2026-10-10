@@ -1,4 +1,6 @@
-import { AppNavBar, activePath, linkWith } from "@g3/ui";
+import { idName } from "@g3/site-config";
+import { versionLabel } from "@g3/site-config/versions";
+import { AppNavBar, activePath, linkWith, useTeamApps } from "@g3/ui";
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { api } from "../lib/api";
@@ -8,12 +10,22 @@ const routerLink = linkWith(Link);
 
 /**
  * The shared G3 top bar. Signed out: Log in and Sign up. Signed in: Dash and Leaderboard, the
- * Admin pages for admins, and All Apps.
+ * Admin pages for admins, and the team's apps in the menu.
  */
 export function NavBar({ items }: { items: PluginNavItem[] }) {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  /** The team's sign-in methods: pages for one it switched off are hidden. */
+  const [methods, setMethods] = useState<Partial<Record<string, boolean>>>({});
   const location = useLocation();
+
+  useEffect(() => {
+    api.team["sign-in"]
+      .$get()
+      .then((res) => (res.ok ? res.json() : {}))
+      .then(setMethods)
+      .catch(() => {});
+  }, []);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: location is used to trigger re-fetch on navigation
   useEffect(() => {
@@ -29,8 +41,14 @@ export function NavBar({ items }: { items: PluginNavItem[] }) {
     });
   }, [location]);
 
+  // Pages for another app's data (the Leaderboard is Attendance's) go while the team has it off.
+  const teamApps = useTeamApps(isLoggedIn === true);
   const shown = items.filter((item) => {
     if (isLoggedIn === null) return false; // Loading
+    if (item.requiresApp && teamApps instanceof Set && !teamApps.has(item.requiresApp)) {
+      return false;
+    }
+    if (item.signInMethod && methods[item.signInMethod] === false) return false;
     const audience = item.audience ?? "signed-in";
     if (audience === "signed-out") return !isLoggedIn;
     if (audience === "admin") return isLoggedIn && isAdmin;
@@ -45,10 +63,12 @@ export function NavBar({ items }: { items: PluginNavItem[] }) {
 
   return (
     <AppNavBar
-      title="G3ID"
+      version={versionLabel(idName)}
+      title={idName}
       icon="/favicon.svg"
       link={routerLink}
       allApps={isLoggedIn === true}
+      signedIn={isLoggedIn}
       items={shown.map((item) => ({
         key: item.to,
         label: item.label,

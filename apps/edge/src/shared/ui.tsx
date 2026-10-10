@@ -32,7 +32,7 @@ export function Card({
   className = "",
 }: { title?: string; children: ReactNode; className?: string }) {
   return (
-    <section className={`bg-white border border-secondary-200 rounded-xl p-5 ${className}`}>
+    <section className={`bg-surface border border-secondary-200 rounded-xl p-5 ${className}`}>
       {title && (
         <h2 className="text-xs font-bold uppercase tracking-widest text-secondary-400 font-sans mb-3">
           {title}

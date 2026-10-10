@@ -11,11 +11,18 @@ export function PageLoading() {
 export function Page({
   title,
   actions,
+  wide = false,
   children,
-}: { title: string; actions?: ReactNode; children: ReactNode }) {
+}: {
+  title: string;
+  actions?: ReactNode;
+  /** Use the whole width of the screen (a table), not the reading column. */
+  wide?: boolean;
+  children: ReactNode;
+}) {
   return (
     <main className="flex-1 bg-page">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-5">
+      <div className={`${wide ? "" : "max-w-5xl mx-auto "}px-4 sm:px-6 py-6 space-y-5`}>
         <div className="flex items-end justify-between gap-4">
           <h1 className="text-4xl text-secondary-900">{title}</h1>
           {actions}
@@ -32,7 +39,7 @@ export function Card({
   className = "",
 }: { title?: string; children: ReactNode; className?: string }) {
   return (
-    <section className={`bg-white border border-secondary-200 rounded-xl p-5 ${className}`}>
+    <section className={`bg-surface border border-secondary-200 rounded-xl p-5 ${className}`}>
       {title && (
         <h2 className="text-xs font-bold uppercase tracking-widest text-secondary-400 font-sans mb-3">
           {title}
@@ -81,7 +88,7 @@ export function Loading() {
 }
 
 export const inputClass =
-  "w-full rounded-lg border border-secondary-300 bg-white px-3 py-2 text-sm text-secondary-900 focus:outline-none focus:border-primary-500";
+  "w-full rounded-lg border border-secondary-300 bg-surface px-3 py-2 text-sm text-secondary-900 focus:outline-none focus:border-primary-500";
 
 export function Button({
   variant = "primary",
@@ -92,8 +99,8 @@ export function Button({
 }) {
   const styles = {
     primary: "bg-primary-500 text-white hover:bg-primary-600",
-    secondary: "bg-white text-secondary-800 border border-secondary-300 hover:bg-secondary-50",
-    danger: "bg-white text-primary-700 border border-primary-300 hover:bg-primary-50",
+    secondary: "bg-surface text-secondary-800 border border-secondary-300 hover:bg-secondary-50",
+    danger: "bg-surface text-primary-700 border border-primary-300 hover:bg-primary-50",
   }[variant];
   return (
     <button

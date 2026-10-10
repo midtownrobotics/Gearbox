@@ -1,0 +1,120 @@
+# Production URLs, route patterns and TEAM_NUMBER here are written by `pnpm configure` from
+# packages/site-config/src/site.ts. Change them there, not here.
+#
+# The one worker on every subdomain: routes each request to its app's worker by hostname
+# (src/index.ts). Deploy it after the app workers it binds to.
+name = "gateway"
+main = "src/index.ts"
+compatibility_date = "2026-05-17"
+
+# Local dev (`pnpm dev`): one port for everything, with gearbox.localhost standing for the
+# platform's domain (http://gearbox.localhost:8796, http://<number>-<app>.gearbox.localhost:8796). Each binding reaches that
+# worker's own `wrangler dev`; pages come from the apps' Vite dev servers.
+[vars]
+LOCAL_DEV = "true"
+
+[[services]]
+binding = "PLATFORM"
+service = "platform"
+
+[[services]]
+binding = "G3ID"
+service = "g3id"
+
+[[services]]
+binding = "PORTAL"
+service = "portal"
+
+[[services]]
+binding = "SHOP"
+service = "shop"
+
+[[services]]
+binding = "PIT"
+service = "pit"
+
+[[services]]
+binding = "ORDERS"
+service = "orders"
+
+[[services]]
+binding = "EDGE"
+service = "edge"
+
+[[services]]
+binding = "SCOUTING"
+service = "scouting"
+
+[[services]]
+binding = "SKILL_TREE"
+service = "skill-tree"
+
+[[services]]
+binding = "ATTENDANCE"
+service = "attendance"
+
+[[services]]
+binding = "INVENTORY"
+service = "inventory"
+
+[env.production]
+name = "gateway-production"
+workers_dev = false
+
+# Every subdomain of both domains, and the platform's own domain. Each needs proxied DNS: a
+# wildcard (* → AAAA 100::) for names without their own record, and the platform domain itself.
+[[env.production.routes]]
+pattern = "*.g3robotics.com/*" # site
+zone_name = "g3robotics.com" # site
+
+[[env.production.routes]]
+pattern = "*.frcgearbox.com/*" # platform subdomains
+zone_name = "frcgearbox.com" # platform subdomains
+
+[[env.production.routes]]
+pattern = "frcgearbox.com/*" # platform
+zone_name = "frcgearbox.com" # platform
+
+[[env.production.services]]
+binding = "PLATFORM"
+service = "platform-production"
+
+[[env.production.services]]
+binding = "G3ID"
+service = "g3id-production"
+
+[[env.production.services]]
+binding = "PORTAL"
+service = "portal-production"
+
+[[env.production.services]]
+binding = "SHOP"
+service = "shop-production"
+
+[[env.production.services]]
+binding = "PIT"
+service = "pit-production"
+
+[[env.production.services]]
+binding = "ORDERS"
+service = "orders-production"
+
+[[env.production.services]]
+binding = "EDGE"
+service = "edge-production"
+
+[[env.production.services]]
+binding = "SCOUTING"
+service = "scouting-production"
+
+[[env.production.services]]
+binding = "SKILL_TREE"
+service = "skill-tree-production"
+
+[[env.production.services]]
+binding = "ATTENDANCE"
+service = "attendance-production"
+
+[[env.production.services]]
+binding = "INVENTORY"
+service = "inventory-production"

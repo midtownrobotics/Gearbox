@@ -1,4 +1,4 @@
-import { sendMessage } from "@g3/slack";
+import { inTeam, logTeamChange, requireAdmin, requireAuth, sendTeamMessage } from "@g3/auth";
 import { eq, inArray } from "drizzle-orm";
 import { Hono } from "hono";
 import { createShopDb } from "../db";
@@ -9,38 +9,36 @@ import {
   getOverviewStats,
   getReflectionStats,
 } from "../lib/daily-summary";
+import { onshapeConfig, saveOnshapeConfig } from "../lib/onshape-config";
 import { exportDrawingAsPDF, storeDrawingInR2 } from "../lib/onshape-export";
 import { registerOnShapeWebhook, unregisterOnShapeWebhooks } from "../lib/onshape-webhook";
-import { requireAdmin, requireAuth } from "../middleware/auth";
+import { SETTING, getSetting, setSetting } from "../lib/settings";
+import { shopUrl } from "../lib/urls";
 import type { AppEnv } from "../types";
 
-const RELEASE_CHANNEL_KEY = "slack_release_channel_id";
-const SUMMARY_CHANNEL_KEY = "slack_summary_channel_id";
+const RELEASE_CHANNEL_KEY = SETTING.slackReleaseChannel;
+const SUMMARY_CHANNEL_KEY = SETTING.slackSummaryChannel;
 
-async function getSetting(db: ReturnType<typeof createShopDb>, key: string) {
-  const row = await db
-    .select({ value: schema.adminSettings.value })
-    .from(schema.adminSettings)
-    .where(eq(schema.adminSettings.key, key))
-    .get();
-  return row?.value || null;
-}
-
-async function setSetting(db: ReturnType<typeof createShopDb>, key: string, value: string) {
-  const updatedAt = Math.floor(Date.now() / 1000);
-  await db
-    .insert(schema.adminSettings)
-    .values({ key, value, updatedAt })
-    .onConflictDoUpdate({ target: schema.adminSettings.key, set: { value, updatedAt } });
-}
+/** Where the team's Onshape webhook calls back: its own Shop address. */
+const eventsUrl = (env: AppEnv["Bindings"], teamId: string) =>
+  `${shopUrl(env, teamId)}/api/onshape/events`;
 
 export const adminPartsRouter = new Hono<AppEnv>()
   .get("/parts/pending", requireAuth, async (c) => {
     const db = createShopDb(c.env.SHOP_DB);
+    const teamId = c.get("teamId");
 
     // Get all parts from onshapeParts and partDefinitions
-    const onshapeParts = await db.select().from(schema.onshapeParts).all();
-    const definitions = await db.select().from(schema.partDefinitions).all();
+    const onshapeParts = await db
+      .select()
+      .from(schema.onshapeParts)
+      .where(inTeam(schema.onshapeParts, teamId))
+      .all();
+    const definitions = await db
+      .select()
+      .from(schema.partDefinitions)
+      .where(inTeam(schema.partDefinitions, teamId))
+      .all();
 
     // Normalize timestamps to seconds for consistent comparison
     const toSeconds = (ts: number) => (ts > 10000000000 ? Math.floor(ts / 1000) : ts);
@@ -76,7 +74,11 @@ export const adminPartsRouter = new Hono<AppEnv>()
     }
     const pendingParts = Array.from(partsByNumber.values());
 
-    const subsystems = await db.select().from(schema.subsystems).all();
+    const subsystems = await db
+      .select()
+      .from(schema.subsystems)
+      .where(inTeam(schema.subsystems, teamId))
+      .all();
 
     return c.json({
       parts: pendingParts,
@@ -93,12 +95,13 @@ export const adminPartsRouter = new Hono<AppEnv>()
 
     try {
       const db = createShopDb(c.env.SHOP_DB);
+      const teamId = c.get("teamId");
 
       // Get the OnShape part info
       const part = await db
         .select()
         .from(schema.onshapeParts)
-        .where(eq(schema.onshapeParts.partNumber, partNumber))
+        .where(inTeam(schema.onshapeParts, teamId, eq(schema.onshapeParts.partNumber, partNumber)))
         .get();
 
       if (!part) {
@@ -131,16 +134,13 @@ export const adminPartsRouter = new Hono<AppEnv>()
         );
       }
 
-      // Get document ID from database
-      const docIdSetting = await db
-        .select()
-        .from(schema.adminSettings)
-        .where(eq(schema.adminSettings.key, "onshape_document_id"))
-        .get();
-      const documentId = docIdSetting?.value;
+      const { documentId, credentials } = await onshapeConfig(c.env, db, teamId);
 
       if (!documentId) {
         return c.json({ error: "Document ID not configured" }, 400);
+      }
+      if (!credentials) {
+        return c.json({ error: "Onshape API keys not configured" }, 400);
       }
 
       // Fetch the drawing
@@ -148,11 +148,11 @@ export const adminPartsRouter = new Hono<AppEnv>()
         documentId,
         part.versionId,
         part.partDrawingEntityId,
-        c.env,
+        credentials,
       );
 
       // Store in R2 with revision in path (stamps the part-number barcode on the way in)
-      await storeDrawingInR2(partNumber, revision, pdfBuffer, c.env);
+      await storeDrawingInR2(c.env, teamId, partNumber, revision, pdfBuffer);
 
       return c.json({
         success: true,
@@ -181,7 +181,15 @@ export const adminPartsRouter = new Hono<AppEnv>()
       const db = createShopDb(c.env.SHOP_DB);
 
       // Delete all onshapeParts with this part number
-      await db.delete(schema.onshapeParts).where(eq(schema.onshapeParts.partNumber, partNumber));
+      await db
+        .delete(schema.onshapeParts)
+        .where(
+          inTeam(
+            schema.onshapeParts,
+            c.get("teamId"),
+            eq(schema.onshapeParts.partNumber, partNumber),
+          ),
+        );
 
       return c.json({
         success: true,
@@ -198,205 +206,113 @@ export const adminPartsRouter = new Hono<AppEnv>()
       );
     }
   })
+  /**
+   * The team's Onshape connection. The key, secret and webhook signing keys are never sent back:
+   * only whether they're set (and whether they're still the site team's worker secrets).
+   */
   .get("/onshape/config", requireAdmin, async (c) => {
-    const db = createShopDb(c.env.SHOP_DB);
-
-    const [docIdSetting, mainAssemblyIdSetting] = await Promise.all([
-      db
-        .select()
-        .from(schema.adminSettings)
-        .where(eq(schema.adminSettings.key, "onshape_document_id"))
-        .get(),
-      db
-        .select()
-        .from(schema.adminSettings)
-        .where(eq(schema.adminSettings.key, "onshape_main_assembly_id"))
-        .get(),
-    ]);
-
+    const config = await onshapeConfig(c.env, createShopDb(c.env.SHOP_DB), c.get("teamId"));
     return c.json({
-      documentId: docIdSetting?.value || "",
-      mainAssemblyId: mainAssemblyIdSetting?.value || "",
+      documentId: config.documentId ?? "",
+      mainAssemblyId: config.mainAssemblyId ?? "",
+      companyId: config.companyId ?? "",
+      hasApiKey: config.credentials !== null,
+      hasWebhookKeys: config.webhookKeys !== null,
+      fromWorkerSecrets: config.fromWorkerSecrets,
+      webhookUrl: eventsUrl(c.env, c.get("teamId")),
     });
   })
+  /**
+   * Saves the team's Onshape connection (secrets left empty stay as they are), then registers
+   * Shop's webhook on the document again, so it calls back on the team's own address.
+   */
   .post("/onshape/config", requireAdmin, async (c) => {
-    const body = await c.req.json<{ documentId?: string; mainAssemblyId?: string }>();
-
-    if (!body.documentId || !body.documentId.trim()) {
+    const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+    const text = (key: string) =>
+      typeof body[key] === "string" ? (body[key] as string).trim() : undefined;
+    const documentId = text("documentId");
+    if (!documentId) {
       return c.json({ error: "documentId is required" }, 400);
     }
 
     const db = createShopDb(c.env.SHOP_DB);
-    const now = Math.floor(Date.now() / 1000);
+    const teamId = c.get("teamId");
 
     try {
-      // Get old document ID for webhook cleanup
-      const existingDocId = await db
-        .select()
-        .from(schema.adminSettings)
-        .where(eq(schema.adminSettings.key, "onshape_document_id"))
-        .get();
-
-      const oldDocId = existingDocId?.value;
-
-      // Update or insert documentId
-      if (existingDocId) {
-        await db
-          .update(schema.adminSettings)
-          .set({
-            value: body.documentId.trim(),
-            updatedAt: now,
-          })
-          .where(eq(schema.adminSettings.key, "onshape_document_id"));
-      } else {
-        await db.insert(schema.adminSettings).values({
-          key: "onshape_document_id",
-          value: body.documentId.trim(),
-          updatedAt: now,
+      const before = await onshapeConfig(c.env, db, teamId);
+      await saveOnshapeConfig(c.env, db, teamId, {
+        documentId,
+        mainAssemblyId: text("mainAssemblyId"),
+        companyId: text("companyId"),
+        apiKey: text("apiKey"),
+        apiSecret: text("apiSecret"),
+        webhookKeyPrimary: text("webhookKeyPrimary"),
+        webhookKeySecondary: text("webhookKeySecondary"),
+      });
+      const config = await onshapeConfig(c.env, db, teamId);
+      // Which parts changed: the document and company by value, the keys whenever new ones were
+      // entered (their values never go in the log).
+      const changed = [
+        ...(before.documentId !== documentId ? ["Onshape document"] : []),
+        ...(text("mainAssemblyId") !== undefined &&
+        (before.mainAssemblyId ?? undefined) !== text("mainAssemblyId")
+          ? ["Main assembly"]
+          : []),
+        ...(text("companyId") !== undefined && (before.companyId ?? undefined) !== text("companyId")
+          ? ["Onshape company"]
+          : []),
+        ...(text("apiKey") || text("apiSecret") ? ["Onshape API keys"] : []),
+        ...(text("webhookKeyPrimary") || text("webhookKeySecondary")
+          ? ["Onshape webhook signing keys"]
+          : []),
+      ];
+      if (changed.length > 0) {
+        await logTeamChange(c.env, teamId, {
+          userId: c.get("userId"),
+          app: "shop",
+          what: "Onshape connection",
+          changed,
         });
       }
 
-      // Update or insert mainAssemblyId if provided
-      if (body.mainAssemblyId?.trim()) {
-        const existingMainAssemblyId = await db
-          .select()
-          .from(schema.adminSettings)
-          .where(eq(schema.adminSettings.key, "onshape_main_assembly_id"))
-          .get();
-
-        if (existingMainAssemblyId) {
-          await db
-            .update(schema.adminSettings)
-            .set({
-              value: body.mainAssemblyId.trim(),
-              updatedAt: now,
-            })
-            .where(eq(schema.adminSettings.key, "onshape_main_assembly_id"));
-        } else {
-          await db.insert(schema.adminSettings).values({
-            key: "onshape_main_assembly_id",
-            value: body.mainAssemblyId.trim(),
-            updatedAt: now,
-          });
+      // Replace our webhook: drop it from the old document (if it changed) and from this one, so
+      // saving re-registers it at the current address instead of adding a second one.
+      let webhook: "registered" | "failed" | "needs keys" = "needs keys";
+      if (config.credentials && config.companyId) {
+        const url = eventsUrl(c.env, teamId);
+        if (before.documentId && before.documentId !== documentId && before.credentials) {
+          console.log("[OnShape Config] Document ID changed, updating webhook registration");
+          await unregisterOnShapeWebhooks(before.documentId, before.credentials, url);
         }
-      }
-
-      // Unregister old webhook and register new one
-      if (oldDocId && oldDocId !== body.documentId.trim()) {
-        console.log("[OnShape Config] Document ID changed, updating webhook registration");
-        await unregisterOnShapeWebhooks(oldDocId, c.env);
-      }
-
-      try {
-        await registerOnShapeWebhook(body.documentId.trim(), c.env);
-      } catch (err) {
-        console.error("[OnShape Config] Webhook registration failed", err);
-        // Don't fail the config update if webhook registration fails
+        await unregisterOnShapeWebhooks(documentId, config.credentials, url);
+        try {
+          await registerOnShapeWebhook(documentId, config.credentials, config.companyId, url);
+          webhook = "registered";
+        } catch (err) {
+          console.error("[OnShape Config] Webhook registration failed", err);
+          // Don't fail the config update if webhook registration fails
+          webhook = "failed";
+        }
       }
 
       return c.json({
         success: true,
+        webhook,
         config: {
-          documentId: body.documentId.trim(),
-          mainAssemblyId: body.mainAssemblyId?.trim() || undefined,
+          documentId,
+          mainAssemblyId: config.mainAssemblyId ?? undefined,
         },
       });
     } catch (err) {
       return c.json({ error: err instanceof Error ? err.message : "Failed to update config" }, 500);
     }
   })
-  .get("/seed-test-parts", requireAuth, async (c) => {
-    const db = createShopDb(c.env.SHOP_DB);
-
-    // Clear existing onshapeParts
-    await db.delete(schema.onshapeParts);
-
-    const testParts = [
-      {
-        entityId: "4c962b683afb610b63d1a054",
-        partDrawingEntityId: "51596d90191a55399895169d",
-        onshapeReleaseId: "65f6368c45ffd946381a6638",
-        releaseId: null,
-        partNumber: "1648-26-P-0475",
-        versionId: "78963be1e83bad7857f14f95",
-        quantity: 2,
-        revision: "A",
-        name: "Main Shaft Assembly",
-        description: "Primary drive shaft for the drivetrain",
-      },
-      {
-        entityId: "afcc70bb4a69714fec574c78",
-        partDrawingEntityId: null,
-        onshapeReleaseId: "65f6368c45ffd946381a6638",
-        releaseId: null,
-        partNumber: "1648-26-P-0518",
-        versionId: "78963be1e83bad7857f14f95",
-        quantity: 4,
-        revision: "B",
-        name: "Bearing Mount Plate",
-        description: "Mounts bearings to the frame",
-      },
-      {
-        entityId: "4c962b683afb610b63d1a054",
-        partDrawingEntityId: "51596d90191a55399895169d",
-        onshapeReleaseId: "08bf1a10144fee2eb7a25b01",
-        releaseId: null,
-        partNumber: "1648-26-P-0475",
-        versionId: "d612752ee89b974a66c8de06",
-        quantity: 2,
-        revision: "C",
-        name: "Main Shaft Assembly",
-        description: "Updated drive shaft with improved tolerances",
-      },
-      {
-        entityId: "afcc70bb4a69714fec574c78",
-        partDrawingEntityId: null,
-        onshapeReleaseId: "08bf1a10144fee2eb7a25b01",
-        releaseId: null,
-        partNumber: "1648-26-P-0518",
-        versionId: "d612752ee89b974a66c8de06",
-        quantity: 4,
-        revision: "A",
-        name: "Bearing Mount Plate",
-        description: "Updated mounting plate design",
-      },
-      {
-        entityId: "4c962b683afb610b63d1a054",
-        partDrawingEntityId: "51596d90191a55399895169d",
-        onshapeReleaseId: "69e7a461bccdc595ecad5cc8",
-        releaseId: null,
-        partNumber: "1648-26-P-0475",
-        versionId: "21887b33ecbae4838890a78b",
-        quantity: 2,
-        revision: "D",
-        name: "Main Shaft Assembly",
-        description: "Final production revision",
-      },
-      {
-        entityId: "afcc70bb4a69714fec574c78",
-        partDrawingEntityId: null,
-        onshapeReleaseId: "69e7a461bccdc595ecad5cc8",
-        releaseId: null,
-        partNumber: "1648-26-P-0518",
-        versionId: "21887b33ecbae4838890a78b",
-        quantity: 4,
-        revision: "B",
-        name: "Bearing Mount Plate",
-        description: "Final production version",
-      },
-    ];
-
-    for (const part of testParts) {
-      await db.insert(schema.onshapeParts).values({ ...part, createdAt: Date.now() });
-    }
-
-    return c.json({ success: true, inserted: testParts.length });
-  })
   .get("/slack/config", requireAdmin, async (c) => {
     const db = createShopDb(c.env.SHOP_DB);
+    const teamId = c.get("teamId");
     const [release, summary] = await Promise.all([
-      getSetting(db, RELEASE_CHANNEL_KEY),
-      getSetting(db, SUMMARY_CHANNEL_KEY),
+      getSetting(db, teamId, RELEASE_CHANNEL_KEY),
+      getSetting(db, teamId, SUMMARY_CHANNEL_KEY),
     ]);
     return c.json({ slackReleaseChannelId: release ?? "", slackSummaryChannelId: summary ?? "" });
   })
@@ -414,8 +330,25 @@ export const adminPartsRouter = new Hono<AppEnv>()
     }
 
     try {
-      await setSetting(db, RELEASE_CHANNEL_KEY, release);
-      if (summary) await setSetting(db, SUMMARY_CHANNEL_KEY, summary);
+      const teamId = c.get("teamId");
+      const [oldRelease, oldSummary] = await Promise.all([
+        getSetting(db, teamId, RELEASE_CHANNEL_KEY),
+        getSetting(db, teamId, SUMMARY_CHANNEL_KEY),
+      ]);
+      await setSetting(db, teamId, RELEASE_CHANNEL_KEY, release);
+      if (summary) await setSetting(db, teamId, SUMMARY_CHANNEL_KEY, summary);
+      const changed = [
+        ...(oldRelease !== release ? ["Slack channel for releases"] : []),
+        ...(summary && oldSummary !== summary ? ["Slack channel for daily summaries"] : []),
+      ];
+      if (changed.length > 0) {
+        await logTeamChange(c.env, teamId, {
+          userId: c.get("userId"),
+          app: "shop",
+          what: "Shop's Slack channels",
+          changed,
+        });
+      }
       return c.json({ slackReleaseChannelId: release, slackSummaryChannelId: summary ?? "" });
     } catch (err) {
       return c.json(
@@ -454,21 +387,22 @@ export const adminPartsRouter = new Hono<AppEnv>()
     }
 
     const db = createShopDb(c.env.SHOP_DB);
-    const channel = await getSetting(db, SUMMARY_CHANNEL_KEY);
+    const teamId = c.get("teamId");
+    const channel = await getSetting(db, teamId, SUMMARY_CHANNEL_KEY);
     if (!channel) {
       return c.json({ error: "Set the daily summary channel in Slack Configuration first." }, 400);
     }
 
     let text: string;
     if (body.kind === "overview") {
-      text = formatOverview(await getOverviewStats(db), { dayLabel, now });
+      text = formatOverview(await getOverviewStats(db, teamId), { dayLabel, now });
     } else {
-      const stats = await getReflectionStats(db, since);
+      const stats = await getReflectionStats(db, teamId, since);
       const names = new Map<string, string>();
       const ids = stats.byUser.slice(0, 3).map((u) => u.userId);
       if (ids.length > 0) {
         const res = await c.env.G3ID.fetch(
-          new Request(`http://g3id/auth/users?ids=${encodeURIComponent(ids.join(","))}`, {
+          new Request(`http://g3id/api/auth/users?ids=${encodeURIComponent(ids.join(","))}`, {
             headers: { cookie: c.req.header("Cookie") ?? "" },
           }),
         );
@@ -481,59 +415,25 @@ export const adminPartsRouter = new Hono<AppEnv>()
       text = formatReflection(stats, { dayLabel, timeZone, names });
     }
 
-    try {
-      await sendMessage(channel, text, c.env);
-    } catch (err) {
-      const reason = err instanceof Error ? err.message : "Slack request failed";
+    // On the team's own Slack (G3ID holds its bot token).
+    const sent = await sendTeamMessage(c.env, teamId, channel, text);
+    if (!sent.ok) {
+      const reason = sent.error;
       const hint = reason.includes("not_in_channel") ? " Invite the Slack bot to the channel." : "";
       return c.json({ error: `Couldn't post to Slack: ${reason}.${hint}` }, 502);
     }
     return c.json({ text, channel });
   })
-  .post("/dev/test-drawing/:partNumber/:revision", async (c) => {
-    try {
-      const partNumber = c.req.param("partNumber");
-      const revision = c.req.param("revision");
-      const formData = await c.req.formData();
-      const file = formData.get("file") as unknown;
-
-      if (!file || typeof file !== "object" || !("arrayBuffer" in file)) {
-        return c.json({ error: "Missing file" }, 400);
-      }
-
-      const fileObj = file as File;
-      if (!fileObj.type.includes("pdf")) {
-        return c.json({ error: "Only PDF files are supported" }, 400);
-      }
-
-      const r2Key = `drawings/${partNumber}/${revision}/drawing.pdf`;
-      const arrayBuffer = await fileObj.arrayBuffer();
-      await c.env.DRAWINGS.put(r2Key, arrayBuffer, {
-        httpMetadata: { contentType: "application/pdf" },
-      });
-
-      return c.json({
-        success: true,
-        r2Key,
-        size: arrayBuffer.byteLength,
-      });
-    } catch (err) {
-      console.error("[Dev Test Drawing Error]", err);
-      return c.json(
-        { error: err instanceof Error ? err.message : "Failed to upload test drawing" },
-        500,
-      );
-    }
-  })
   .delete("/obsolete-instances", requireAdmin, async (c) => {
     try {
       const db = createShopDb(c.env.SHOP_DB);
+      const teamId = c.get("teamId");
 
       // First, get all stale instance IDs
       const staleInstances = await db
         .select({ id: schema.partInstances.id })
         .from(schema.partInstances)
-        .where(eq(schema.partInstances.isStale, 1));
+        .where(inTeam(schema.partInstances, teamId, eq(schema.partInstances.isStale, 1)));
 
       const staleInstanceIds = staleInstances.map((i) => i.id);
 
@@ -549,7 +449,9 @@ export const adminPartsRouter = new Hono<AppEnv>()
       // Delete associated actions (actions table has FK to part_instances)
       for (let i = 0; i < staleInstanceIds.length; i += batchSize) {
         const batch = staleInstanceIds.slice(i, i + batchSize);
-        await db.delete(schema.actions).where(inArray(schema.actions.partInstanceId, batch));
+        await db
+          .delete(schema.actions)
+          .where(inTeam(schema.actions, teamId, inArray(schema.actions.partInstanceId, batch)));
       }
 
       // Delete associated processes (part_instance_processes has FK to part_instances)
@@ -557,11 +459,19 @@ export const adminPartsRouter = new Hono<AppEnv>()
         const batch = staleInstanceIds.slice(i, i + batchSize);
         await db
           .delete(schema.partInstanceProcesses)
-          .where(inArray(schema.partInstanceProcesses.partInstanceId, batch));
+          .where(
+            inTeam(
+              schema.partInstanceProcesses,
+              teamId,
+              inArray(schema.partInstanceProcesses.partInstanceId, batch),
+            ),
+          );
       }
 
       // Finally delete the stale instances
-      await db.delete(schema.partInstances).where(eq(schema.partInstances.isStale, 1));
+      await db
+        .delete(schema.partInstances)
+        .where(inTeam(schema.partInstances, teamId, eq(schema.partInstances.isStale, 1)));
 
       return c.json({
         success: true,

@@ -42,6 +42,9 @@ export type PartInstance = {
   instanceNumber: number;
   isPriority: number;
   isStale: number;
+  /** When it was made obsolete and who did it; null when it isn't, or when that wasn't kept. */
+  obsoletedAt: number | null;
+  obsoletedBy: string | null;
   createdAt: number;
 };
 

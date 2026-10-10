@@ -1,3 +1,5 @@
+# Production URLs, route patterns and TEAM_NUMBER here are written by `pnpm configure` from
+# packages/site-config/src/site.ts. Change them there, not here.
 name = "shop"
 main = "src/index.ts"
 compatibility_date = "2026-05-17"
@@ -6,7 +8,7 @@ compatibility_date = "2026-05-17"
 binding = "G3ID"
 service = "g3id"
 
-# Printing goes through the edge box (workers/edge -> tunnel -> CUPS).
+# Printing goes through the edge box (workers/edge -> its link -> CUPS).
 [[services]]
 binding = "EDGE"
 service = "edge"
@@ -32,11 +34,19 @@ queue = "bom-fetch-jobs"
 [[queues.consumers]]
 queue = "bom-fetch-jobs"
 
+# Links to a team's pages (Slack posts) and its Onshape webhook address are its own
+# <number>-shop address; in dev they go through the local gateway (pnpm dev runs it).
+# Secrets (.dev.vars locally, `wrangler secret put` in prod):
+#   SECRETS_KEY: encrypts each team's Onshape keys in D1 (`openssl rand -base64 32`).
+#   ONSHAPE_*: the site team's Onshape keys from before teams, used until an admin saves its own.
+# Slack posts go out on each team's own Slack, through G3ID, so this worker has no Slack token.
 [vars]
-FRONTEND_URL = "http://localhost:5174"
+LOCAL_GATEWAY_URL = "http://localhost:8796"
 
 [env.production]
 name = "shop-production"
+# No workers.dev address: the gateway is the only way in, so its identity headers can be trusted.
+workers_dev = false
 
 [[env.production.services]]
 binding = "G3ID"
@@ -67,9 +77,17 @@ queue = "bom-fetch-jobs"
 [[env.production.queues.consumers]]
 queue = "bom-fetch-jobs"
 
-[env.production.vars]
-FRONTEND_URL = "https://shop.g3robotics.com"
-
 [observability.logs]
 enabled = true
 invocation_logs = true
+
+# The app's page, served by this worker in production; only /api/* runs the worker code, and
+# other paths fall back to index.html for the app's router. Wrangler builds the page before
+# every production deploy or upload (Cloudflare's Git builds too).
+[env.production.build]
+command = "pnpm --filter @g3/shop build"
+
+[env.production.assets]
+directory = "../../apps/shop/dist"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]

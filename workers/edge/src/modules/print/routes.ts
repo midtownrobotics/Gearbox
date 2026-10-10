@@ -1,7 +1,7 @@
+import { requireAdmin, requireAuth } from "@g3/auth";
 import { type Context, Hono } from "hono";
 import { validator } from "hono/validator";
 import { AgentError, agentFetch } from "../../lib/agent";
-import { requireAdmin, requireAuth } from "../../middleware/auth";
 import type { AppEnv } from "../../types";
 import {
   type DiscoveredPrinter,
@@ -22,9 +22,9 @@ type Ctx = Context<AppEnv>;
  * is stored here: CUPS on the box holds the printers and the queue, and if the
  * box is unreachable the request fails right away.
  */
-async function relay<T>(c: Ctx, path: string, init?: Parameters<typeof agentFetch>[2]) {
+async function relay<T>(c: Ctx, path: string, init?: Parameters<typeof agentFetch>[3]) {
   try {
-    const res = await agentFetch(c.env, `/print${path}`, init);
+    const res = await agentFetch(c.env, c.get("teamId"), `/print${path}`, init);
     const body = (await res.json().catch(() => ({}))) as T & { error?: string };
     if (!res.ok) {
       return {
@@ -43,7 +43,7 @@ async function relay<T>(c: Ctx, path: string, init?: Parameters<typeof agentFetc
 async function userNames(c: Ctx, ids: string[]) {
   if (ids.length === 0) return new Map<string, string>();
   const res = await c.env.G3ID.fetch(
-    new Request(`http://g3id/auth/users?ids=${encodeURIComponent(ids.join(","))}`, {
+    new Request(`http://g3id/api/auth/users?ids=${encodeURIComponent(ids.join(","))}`, {
       headers: { cookie: c.req.header("Cookie") ?? "" },
     }),
   );

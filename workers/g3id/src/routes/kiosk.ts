@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { createDb } from "../db";
 import { kioskActivationCodes, kioskDevices } from "../db/schema";
+import { methodOff } from "../lib/sign-in-methods";
 import { requireKioskToken } from "../middleware/auth";
 import type { AppEnv } from "../types";
 
@@ -32,6 +33,7 @@ export const kioskRouter = new Hono<AppEnv>()
     const activation = await db
       .select({
         id: kioskActivationCodes.id,
+        teamId: kioskActivationCodes.teamId,
         deviceName: kioskActivationCodes.deviceName,
         createdBy: kioskActivationCodes.createdBy,
         expiresAt: kioskActivationCodes.expiresAt,
@@ -53,11 +55,15 @@ export const kioskRouter = new Hono<AppEnv>()
       return c.json({ error: "Activation code expired." }, 400);
     }
 
+    const off = await methodOff(c.env, activation.teamId, "pin");
+    if (off) return c.json({ error: off }, 403);
+
     const token = generateToken();
 
     const result = await db
       .insert(kioskDevices)
       .values({
+        teamId: activation.teamId,
         name: activation.deviceName,
         token,
         createdBy: activation.createdBy,

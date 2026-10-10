@@ -1,3 +1,4 @@
+import { inTeam, requireAuth, requireMentor, withTeam } from "@g3/auth";
 import { and, asc, desc, eq, gte, inArray, isNotNull, lt } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
@@ -11,11 +12,14 @@ import {
 } from "../db/schema";
 import { chargesByCategory, lineTotal, orderFees } from "../lib/accounting";
 import { recordPrices } from "../lib/catalog";
+import { inChunks } from "../lib/chunks";
 import { csvDate, csvMoney, csvRow } from "../lib/csv";
 import { fiscalLabel, fiscalRange, fiscalYearOf } from "../lib/fiscal";
+import { type ReceiveDestination, parseDestination, sendToInventory } from "../lib/inventory";
+import { localTimeZone } from "../lib/local-time";
+import { calendarOf, teamSettings } from "../lib/settings";
 import { importSheet } from "../lib/sheet-import";
 import { vendorName } from "../lib/vendors";
-import { requireAuth, requireMentor } from "../middleware/auth";
 import type { AppEnv } from "../types";
 import { describeChanges } from "./requests";
 
@@ -91,18 +95,24 @@ const CSV_HEADER = [
 
 const RECENT_DAYS = 14;
 
-const receiveValidator = validator("json", (value, c): { ids: number[] } => {
-  const ids = (value as { ids?: unknown })?.ids;
-  if (
-    !Array.isArray(ids) ||
-    ids.length === 0 ||
-    ids.length > 200 ||
-    !ids.every((id) => Number.isInteger(id) && id > 0)
-  ) {
-    return c.json({ error: "ids must be 1–200 request ids." }, 400) as never;
-  }
-  return { ids: [...new Set(ids as number[])] };
-});
+const receiveValidator = validator(
+  "json",
+  (value, c): { ids: number[]; inventory?: ReceiveDestination | null } => {
+    const v = (value ?? {}) as { ids?: unknown; inventory?: unknown };
+    const ids = v.ids;
+    if (
+      !Array.isArray(ids) ||
+      ids.length === 0 ||
+      ids.length > 200 ||
+      !ids.every((id) => Number.isInteger(id) && id > 0)
+    ) {
+      return c.json({ error: "ids must be 1–200 request ids." }, 400) as never;
+    }
+    const inventory = parseDestination(v.inventory);
+    if (inventory && "error" in inventory) return c.json({ error: inventory.error }, 400) as never;
+    return { ids: [...new Set(ids as number[])], inventory };
+  },
+);
 
 const trackingValidator = validator("json", (value, c): { tracking: string | null } => {
   const t = (value as { tracking?: unknown })?.tracking;
@@ -114,34 +124,57 @@ const trackingValidator = validator("json", (value, c): { tracking: string | nul
 
 export const ordersRouter = new Hono<AppEnv>()
   /**
-   * For the Receiving page: vendor orders with items still on the way (oldest first), and orders
+   * For the Deliveries page: vendor orders with items still on the way (oldest first), and orders
    * fully received in the last two weeks (newest first), each with its lines and who received what.
    */
   .get("/receiving", requireAuth, async (c) => {
     const db = createOrdersDb(c.env.ORDERS_DB);
+    const teamId = c.get("teamId");
+    // The team's lines on a placed order. The orders and receipts below are picked by subquery, not
+    // by a list of ids: a team's history has far more lines than D1 binds in one statement
+    // (lib/chunks.ts).
+    const onOrder = and(
+      isNotNull(orderRequests.orderId),
+      inArray(orderRequests.status, ["ordered", "received"]),
+    );
     const lines = await db
       .select()
       .from(orderRequests)
-      .where(
-        and(
-          isNotNull(orderRequests.orderId),
-          inArray(orderRequests.status, ["ordered", "received"]),
-        ),
-      )
+      .where(inTeam(orderRequests, teamId, onOrder))
       .all();
-    const orderIds = [...new Set(lines.map((l) => l.orderId as number))];
-    if (orderIds.length === 0) return c.json({ open: [], recent: [] });
+    if (lines.length === 0) return c.json({ open: [], recent: [] });
     const [orders, receipts] = await Promise.all([
-      db.select().from(vendorOrders).where(inArray(vendorOrders.id, orderIds)).all(),
+      db
+        .select()
+        .from(vendorOrders)
+        .where(
+          inTeam(
+            vendorOrders,
+            teamId,
+            inArray(
+              vendorOrders.id,
+              db
+                .select({ id: orderRequests.orderId })
+                .from(orderRequests)
+                .where(inTeam(orderRequests, teamId, onOrder)),
+            ),
+          ),
+        )
+        .all(),
       db
         .select()
         .from(requestEvents)
         .where(
-          and(
+          inTeam(
+            requestEvents,
+            teamId,
             eq(requestEvents.action, "received"),
             inArray(
               requestEvents.requestId,
-              lines.map((l) => l.id),
+              db
+                .select({ id: orderRequests.id })
+                .from(orderRequests)
+                .where(inTeam(orderRequests, teamId, onOrder)),
             ),
           ),
         )
@@ -163,6 +196,7 @@ export const ordersRouter = new Hono<AppEnv>()
           sku: l.sku,
           url: l.url,
           quantity: l.quantity,
+          packQuantity: l.packQuantity,
           status: l.status as "ordered" | "received",
           requesterId: l.requesterId,
           requesterName: l.requesterName,
@@ -191,49 +225,98 @@ export const ordersRouter = new Hono<AppEnv>()
     });
   })
   /**
-   * Marks ordered items received. Mentors can receive anything; others only what they requested.
-   * Items not on order (or not yours) are skipped and reported.
+   * Marks ordered items received. Anyone signed in can: packages are opened by whoever is in the
+   * shop. Items not on order are skipped and reported. With `inventory` (where the parts
+   * are going), they're added to the Inventory app first; a team can make that required
+   * (lib/inventory.ts).
    */
   .post("/receive", requireAuth, receiveValidator, async (c) => {
-    const { ids } = c.req.valid("json");
+    const { ids, inventory } = c.req.valid("json");
     const db = createOrdersDb(c.env.ORDERS_DB);
-    const isMentor = c.get("userIsMentor");
+    const teamId = c.get("teamId");
     const userId = c.get("userId");
-    const rows = await db
-      .select({
-        id: orderRequests.id,
-        requesterId: orderRequests.requesterId,
-        status: orderRequests.status,
-      })
-      .from(orderRequests)
-      .where(inArray(orderRequests.id, ids))
-      .all();
-    const allowed = rows
-      .filter((r) => r.status === "ordered" && (isMentor || r.requesterId === userId))
-      .map((r) => r.id);
-    if (allowed.length === 0)
-      return c.json({ error: "None of those items are on order and yours to receive." }, 409);
+    const rows = await inChunks(ids, (chunk) =>
+      db
+        .select({
+          id: orderRequests.id,
+          status: orderRequests.status,
+          title: orderRequests.title,
+          vendor: orderRequests.vendor,
+          sku: orderRequests.sku,
+          url: orderRequests.url,
+          quantity: orderRequests.quantity,
+          packQuantity: orderRequests.packQuantity,
+          unitPriceCents: orderRequests.unitPriceCents,
+          lineTotalCents: orderRequests.lineTotalCents,
+          catalogItemId: orderRequests.catalogItemId,
+          orderId: orderRequests.orderId,
+        })
+        .from(orderRequests)
+        .where(inTeam(orderRequests, teamId, inArray(orderRequests.id, chunk)))
+        .all(),
+    );
+    const mine = rows.filter((r) => r.status === "ordered");
+    const allowed = mine.map((r) => r.id);
+    if (allowed.length === 0) return c.json({ error: "None of those items are on order." }, 409);
+    // Into Inventory first: if that can't be done, nothing is marked received.
+    const sent = await sendToInventory(c, db, mine, inventory ?? null);
+    if ("error" in sent) return c.json({ error: sent.error }, sent.status);
     const now = Date.now();
-    const received = await db
-      .update(orderRequests)
-      .set({ status: "received", updatedAt: now })
-      .where(and(inArray(orderRequests.id, allowed), eq(orderRequests.status, "ordered")))
-      .returning({ id: orderRequests.id })
-      .all();
-    for (let i = 0; i < received.length; i += 15) {
+    const received = await inChunks(allowed, (chunk) =>
+      db
+        .update(orderRequests)
+        .set({ status: "received", updatedAt: now })
+        .where(
+          inTeam(
+            orderRequests,
+            teamId,
+            inArray(orderRequests.id, chunk),
+            eq(orderRequests.status, "ordered"),
+          ),
+        )
+        .returning({ id: orderRequests.id })
+        .all(),
+    );
+    // Seven values an event: 14 a statement stays under D1's 100 bound parameters.
+    for (let i = 0; i < received.length; i += 14) {
       await db.insert(requestEvents).values(
-        received.slice(i, i + 15).map((r) => ({
-          requestId: r.id,
-          userId,
-          userName: c.get("userDisplayName"),
-          action: "received",
-          note: null,
-          createdAt: now,
-        })),
+        withTeam(
+          teamId,
+          received.slice(i, i + 14).map((r) => ({
+            requestId: r.id,
+            userId,
+            userName: c.get("userDisplayName"),
+            action: "received",
+            note: sent.added === null ? null : "Added to Inventory.",
+            createdAt: now,
+          })),
+        ),
+      );
+    }
+    // Where each went in Inventory, for the next delivery of the same part.
+    const byLocation = new Map<number, number[]>();
+    for (const { id } of received) {
+      const locationId = sent.locations.get(id);
+      if (locationId === undefined) continue;
+      byLocation.set(locationId, [...(byLocation.get(locationId) ?? []), id]);
+    }
+    for (const [inventoryLocationId, requestIds] of byLocation) {
+      await inChunks(requestIds, (chunk) =>
+        db
+          .update(orderRequests)
+          .set({ inventoryLocationId })
+          .where(inTeam(orderRequests, teamId, inArray(orderRequests.id, chunk)))
+          .returning({ id: orderRequests.id })
+          .all(),
       );
     }
     const done = received.map((r) => r.id);
-    return c.json({ received: done, skipped: ids.filter((id) => !done.includes(id)) });
+    return c.json({
+      received: done,
+      skipped: ids.filter((id) => !done.includes(id)),
+      /** How many went into Inventory; null when they weren't sent there. */
+      inventoryAdded: sent.added,
+    });
   })
   /** Sets or clears a placed order's tracking number. */
   .patch("/:id/tracking", requireMentor, trackingValidator, async (c) => {
@@ -241,7 +324,7 @@ export const ordersRouter = new Hono<AppEnv>()
     const row = await db
       .update(vendorOrders)
       .set({ tracking: c.req.valid("json").tracking })
-      .where(eq(vendorOrders.id, Number(c.req.param("id"))))
+      .where(inTeam(vendorOrders, c.get("teamId"), eq(vendorOrders.id, Number(c.req.param("id")))))
       .returning()
       .get();
     if (!row) return c.json({ error: "Order not found." }, 404);
@@ -263,6 +346,8 @@ export const ordersRouter = new Hono<AppEnv>()
         return c.json({ error: "That file is too large (5 MB max)." }, 400);
       const result = await importSheet(
         createOrdersDb(c.env.ORDERS_DB),
+        c.get("teamId"),
+        localTimeZone(c),
         text,
         c.req.valid("query").dryRun === "1",
       );
@@ -278,12 +363,22 @@ export const ordersRouter = new Hono<AppEnv>()
   .post("/", requireMentor, placeValidator, async (c) => {
     const body = c.req.valid("json");
     const db = createOrdersDb(c.env.ORDERS_DB);
+    const teamId = c.get("teamId");
     const ids = body.lines.map((l) => l.requestId);
-    const approved = await db
-      .select()
-      .from(orderRequests)
-      .where(and(inArray(orderRequests.id, ids), eq(orderRequests.status, "approved")))
-      .all();
+    const approved = await inChunks(ids, (chunk) =>
+      db
+        .select()
+        .from(orderRequests)
+        .where(
+          inTeam(
+            orderRequests,
+            teamId,
+            inArray(orderRequests.id, chunk),
+            eq(orderRequests.status, "approved"),
+          ),
+        )
+        .all(),
+    );
     if (approved.length === 0) {
       return c.json(
         { error: "None of those requests are approved and waiting to be ordered." },
@@ -294,15 +389,17 @@ export const ordersRouter = new Hono<AppEnv>()
     const now = Date.now();
     const order = await db
       .insert(vendorOrders)
-      .values({
-        vendor: body.vendor,
-        placedById: c.get("userId"),
-        placedByName: c.get("userDisplayName"),
-        shippingCents: body.shippingCents,
-        taxCents: body.taxCents,
-        tracking: body.tracking,
-        placedAt: now,
-      })
+      .values(
+        withTeam(teamId, {
+          vendor: body.vendor,
+          placedById: c.get("userId"),
+          placedByName: c.get("userDisplayName"),
+          shippingCents: body.shippingCents,
+          taxCents: body.taxCents,
+          tracking: body.tracking,
+          placedAt: now,
+        }),
+      )
       .returning()
       .get();
 
@@ -321,8 +418,15 @@ export const ordersRouter = new Hono<AppEnv>()
             orderId: order.id,
             updatedAt: now,
           })
-          // Still conditional on being approved, in case it was cancelled a moment ago.
-          .where(and(eq(orderRequests.id, line.requestId), eq(orderRequests.status, "approved"))),
+          // Still conditional on being approved, in case it was canceled a moment ago.
+          .where(
+            inTeam(
+              orderRequests,
+              teamId,
+              eq(orderRequests.id, line.requestId),
+              eq(orderRequests.status, "approved"),
+            ),
+          ),
       );
     }
     // The order's fees as charged to each category (split by item cost), stored with the order.
@@ -339,27 +443,30 @@ export const ordersRouter = new Hono<AppEnv>()
       { orderId: order.id, kind: "Shipping", categoryId, cents: c.shipping },
       { orderId: order.id, kind: "Tax", categoryId, cents: c.tax },
     ]);
-    for (let i = 0; i < fees.length; i += 20) {
-      statements.push(db.insert(orderCharges).values(fees.slice(i, i + 20)));
+    for (let i = 0; i < fees.length; i += 16) {
+      statements.push(db.insert(orderCharges).values(withTeam(teamId, fees.slice(i, i + 16))));
     }
-    // D1 caps bound parameters at 100 per statement; events have 6 columns.
-    for (let i = 0; i < lines.length; i += 15) {
+    // D1 caps bound parameters at 100 per statement; events have 7 columns, fees 5.
+    for (let i = 0; i < lines.length; i += 14) {
       statements.push(
         db.insert(requestEvents).values(
-          lines.slice(i, i + 15).map((line) => {
-            const changes = describeChanges(
-              byId.get(line.requestId) as (typeof approved)[number],
-              line,
-            );
-            return {
-              requestId: line.requestId,
-              userId: c.get("userId"),
-              userName: c.get("userDisplayName"),
-              action: "ordered",
-              note: `Placed in ${body.vendor} order #${order.id}.${changes ? ` Changed ${changes}.` : ""}`,
-              createdAt: now,
-            };
-          }),
+          withTeam(
+            teamId,
+            lines.slice(i, i + 14).map((line) => {
+              const changes = describeChanges(
+                byId.get(line.requestId) as (typeof approved)[number],
+                line,
+              );
+              return {
+                requestId: line.requestId,
+                userId: c.get("userId"),
+                userName: c.get("userDisplayName"),
+                action: "ordered",
+                note: `Placed in ${body.vendor} order #${order.id}.${changes ? ` Changed ${changes}.` : ""}`,
+                createdAt: now,
+              };
+            }),
+          ),
         ),
       );
     }
@@ -368,6 +475,7 @@ export const ordersRouter = new Hono<AppEnv>()
     // What we paid becomes the catalog price (good for 7 days before it's looked up again).
     await recordPrices(
       db,
+      teamId,
       lines.map((l) => ({
         catalogItemId: (byId.get(l.requestId) as (typeof approved)[number]).catalogItemId,
         unitPriceCents: l.unitPriceCents,
@@ -397,31 +505,49 @@ export const ordersRouter = new Hono<AppEnv>()
     }),
     async (c) => {
       const db = createOrdersDb(c.env.ORDERS_DB);
-      const current = fiscalYearOf(Date.now());
+      const teamId = c.get("teamId");
+      const settings = await teamSettings(db, teamId);
+      const timeZone = localTimeZone(c);
+      const calendar = calendarOf(settings, timeZone);
+      const current = fiscalYearOf(Date.now(), calendar);
       const fy = Number(c.req.valid("query").fy ?? current);
-      const [from, to] = fiscalRange(fy);
+      const [from, to] = fiscalRange(fy, calendar);
       const [orders, requests, categories, receipts, charges] = await Promise.all([
         db
           .select()
           .from(vendorOrders)
-          .where(and(gte(vendorOrders.placedAt, from), lt(vendorOrders.placedAt, to)))
+          .where(
+            inTeam(
+              vendorOrders,
+              teamId,
+              gte(vendorOrders.placedAt, from),
+              lt(vendorOrders.placedAt, to),
+            ),
+          )
           .orderBy(asc(vendorOrders.placedAt))
           .all(),
         db
           .select()
           .from(orderRequests)
-          .where(inArray(orderRequests.status, ["approved", "ordered", "received"]))
+          .where(
+            inTeam(
+              orderRequests,
+              teamId,
+              inArray(orderRequests.status, ["approved", "ordered", "received"]),
+            ),
+          )
           .orderBy(asc(orderRequests.id))
           .all(),
-        db.select().from(budgetCategories).all(),
+        db.select().from(budgetCategories).where(inTeam(budgetCategories, teamId)).all(),
         db
           .select()
           .from(requestEvents)
-          .where(eq(requestEvents.action, "received"))
+          .where(inTeam(requestEvents, teamId, eq(requestEvents.action, "received")))
           .orderBy(desc(requestEvents.createdAt))
           .all(),
-        db.select().from(orderCharges).all(),
+        db.select().from(orderCharges).where(inTeam(orderCharges, teamId)).all(),
       ]);
+      const date = (ms: number | null | undefined) => csvDate(ms, timeZone);
       const catLabel = new Map(categories.map((cat) => [cat.id, cat.code?.trim() || cat.name]));
       const received = new Map<number, { at: number; by: string }>();
       for (const e of receipts) {
@@ -433,7 +559,7 @@ export const ordersRouter = new Hono<AppEnv>()
       for (const order of orders) {
         const lines = requests.filter((r) => r.orderId === order.id);
         if (lines.length === 0) continue;
-        const placed = [csvDate(order.placedAt), order.placedByName, order.tracking];
+        const placed = [date(order.placedAt), order.placedByName, order.tracking];
         for (const r of lines) {
           const got = received.get(r.id);
           rows.push(
@@ -448,7 +574,7 @@ export const ordersRouter = new Hono<AppEnv>()
               csvMoney(lineTotal(r)),
               r.reason,
               ...placed,
-              csvDate(got?.at),
+              date(got?.at),
               got?.by,
             ]),
           );
@@ -482,7 +608,7 @@ export const ordersRouter = new Hono<AppEnv>()
               csvMoney(fee.cents),
               null,
               ...placed,
-              csvDate(last?.at),
+              date(last?.at),
               last?.by,
             ]),
           );
@@ -513,7 +639,7 @@ export const ordersRouter = new Hono<AppEnv>()
 
       return c.body(`${rows.join("\r\n")}\r\n`, 200, {
         "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": `attachment; filename="g3-orders-${fiscalLabel(fy).replace("–", "-")}.csv"`,
+        "Content-Disposition": `attachment; filename="orders-${fiscalLabel(fy, calendar.startMonth).replace("–", "-")}.csv"`,
       });
     },
   );

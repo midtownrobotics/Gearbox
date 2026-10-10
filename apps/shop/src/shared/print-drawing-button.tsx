@@ -1,3 +1,4 @@
+import { useAppOn } from "@g3/ui";
 import { useEffect, useState } from "react";
 import { api } from "./api";
 
@@ -12,7 +13,8 @@ type Status =
 /**
  * Prints a part revision's drawing on the shop printer (one-sided, black and
  * white). The shop worker sends the PDF from storage straight to the edge
- * box, so nothing is downloaded to this device.
+ * box, so nothing is downloaded to this device. Not shown while the team has
+ * Edge switched off.
  */
 export function PrintDrawingButton({
   partNumber,
@@ -33,6 +35,9 @@ export function PrintDrawingButton({
     const t = setTimeout(() => setStatus({ kind: "idle" }), status.kind === "sent" ? 4000 : 15000);
     return () => clearTimeout(t);
   }, [status]);
+
+  const edgeOn = useAppOn("edge");
+  if (edgeOn === false) return null;
 
   async function print() {
     setStatus({ kind: "sending" });
@@ -64,12 +69,12 @@ export function PrintDrawingButton({
       warning: "text-amber-800 bg-amber-50 border-amber-300",
     }[status.kind as "sent" | "warning"];
     return (
-      <div className="space-y-2">
+      <div className="flex flex-col gap-2">
         <button
           type="button"
           onClick={print}
           disabled={status.kind === "sending"}
-          className={`w-full px-6 py-4 text-lg font-semibold rounded-lg border transition-colors disabled:opacity-50 ${
+          className={`w-full flex-1 px-3 py-3 text-sm sm:text-base lg:px-6 lg:py-4 lg:text-lg font-semibold rounded-lg border transition-colors disabled:opacity-50 ${
             look ??
             "text-steel-dark bg-steel-tint border-steel/30 hover:bg-steel/20 hover:border-steel/50 active:bg-steel/30"
           }`}

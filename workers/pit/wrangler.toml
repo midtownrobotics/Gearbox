@@ -1,3 +1,5 @@
+# Production URLs, route patterns and TEAM_NUMBER here are written by `pnpm configure` from
+# packages/site-config/src/site.ts. Change them there, not here.
 name = "pit"
 main = "src/index.ts"
 compatibility_date = "2026-05-17"
@@ -18,12 +20,12 @@ migrations_dir = "src/db/migrations"
 
 [vars]
 FRONTEND_URL = "http://localhost:5175"
-TEAM_NUMBER = "1648"
-EVENT_KEY = "2026gacmp"
 # TBA_AUTH_KEY and NEXUS_API_KEY are secrets — set via `.dev.vars` locally and `wrangler secret put` in prod
 
 [env.production]
 name = "pit-production"
+# No workers.dev address: the gateway is the only way in, so its identity headers can be trusted.
+workers_dev = false
 
 [[env.production.services]]
 binding = "G3ID"
@@ -40,7 +42,16 @@ database_id = "f10a16be-9193-4888-ac18-099ccebe63c2"
 migrations_dir = "src/db/migrations"
 
 [env.production.vars]
-FRONTEND_URL = "https://pit.g3robotics.com"
-TEAM_NUMBER = "1648"
-EVENT_KEY = "2026gacmp"
+FRONTEND_URL = "https://1648-pit.frcgearbox.com"
 # TBA_AUTH_KEY and NEXUS_API_KEY are secrets — set via `wrangler secret put <NAME> --env production`
+
+# The app's page, served by this worker in production; only /api/* runs the worker code, and
+# other paths fall back to index.html for the app's router. Wrangler builds the page before
+# every production deploy or upload (Cloudflare's Git builds too).
+[env.production.build]
+command = "pnpm --filter @g3/pit build"
+
+[env.production.assets]
+directory = "../../apps/pit/dist"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]

@@ -1,9 +1,17 @@
-import { desc, eq, like, or } from "drizzle-orm";
+import {
+  changedFields,
+  inTeam,
+  logTeamChange,
+  requireAuth,
+  requireMentor,
+  settingLabels,
+  withTeam,
+} from "@g3/auth";
+import { desc, eq, ne, or, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
-import { type OrdersDb, createOrdersDb } from "../db";
+import { createOrdersDb } from "../db";
 import {
-  appSettings,
   budgetCategories,
   catalogCategories,
   catalogItems,
@@ -14,44 +22,96 @@ import {
 import { productKey } from "../lib/catalog";
 import { guessCatalogCategory, matchesKeyword } from "../lib/category-guess";
 import { DEFAULT_TEMPLATE, applyTemplate } from "../lib/naming";
+import { guessPackQuantity } from "../lib/pack-quantity";
+import { type TeamSettings, saveTeamSettings, teamSettings } from "../lib/settings";
+import { catalogReady } from "../lib/starter";
 import { vendorKey, vendorName } from "../lib/vendors";
-import { requireAuth, requireMentor } from "../middleware/auth";
+import { manifest } from "../manifest";
 import type { AppEnv } from "../types";
 
-const TEMPLATE_KEY = "naming_template";
-
-async function namingTemplate(db: OrdersDb) {
-  const row = await db.select().from(appSettings).where(eq(appSettings.key, TEMPLATE_KEY)).get();
-  return row?.value ?? DEFAULT_TEMPLATE;
+/** Whether this runtime can format money in a currency ("USD", "CAD", ...). */
+function isCurrency(code: string) {
+  if (!/^[A-Z]{3}$/.test(code)) return false;
+  try {
+    new Intl.NumberFormat("en-US", { style: "currency", currency: code });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
-const settingsValidator = validator("json", (value, c): { namingTemplate: string } => {
-  const t = (value as { namingTemplate?: unknown })?.namingTemplate;
-  if (typeof t !== "string" || !t.includes("{title}") || t.length > 200) {
-    return c.json(
-      { error: "The naming template must include {title} (up to 200 characters)." },
-      400,
-    ) as never;
+/** Any of the settings, checked; the ones left out stay as they are. Or why they can't be saved. */
+export function checkSettings(value: unknown): Partial<TeamSettings> | string {
+  const v = (value ?? {}) as Record<string, unknown>;
+  const out: Partial<TeamSettings> = {};
+  if (v.namingTemplate !== undefined) {
+    const t = v.namingTemplate;
+    if (typeof t !== "string" || !t.includes("{title}") || t.length > 200) {
+      return "The naming template must include {title} (up to 200 characters).";
+    }
+    out.namingTemplate = t.trim();
   }
-  return { namingTemplate: t.trim() };
+  if (v.inventoryRequired !== undefined) {
+    if (typeof v.inventoryRequired !== "boolean") {
+      return "inventoryRequired must be true or false.";
+    }
+    out.inventoryRequired = v.inventoryRequired;
+  }
+  if (v.currency !== undefined) {
+    if (typeof v.currency !== "string" || !isCurrency(v.currency.trim().toUpperCase())) {
+      return "currency must be a 3-letter currency code like USD.";
+    }
+    out.currency = v.currency.trim().toUpperCase();
+  }
+  if (v.fiscalYearStart !== undefined) {
+    const month = v.fiscalYearStart;
+    if (!Number.isInteger(month) || (month as number) < 1 || (month as number) > 12) {
+      return "fiscalYearStart must be a month from 1 to 12.";
+    }
+    out.fiscalYearStart = month as number;
+  }
+  return out;
+}
+
+const settingsValidator = validator("json", (value, c): Partial<TeamSettings> => {
+  const out = checkSettings(value);
+  if (typeof out === "string") return c.json({ error: out }, 400) as never;
+  if (Object.keys(out).length === 0) return c.json({ error: "Nothing to change." }, 400) as never;
+  return out;
 });
 
+/**
+ * The team's settings: everyone reads them (pages need the currency and calendar); mentors change
+ * them. Budgets and spending follow a new fiscal-year start right away, since they're
+ * worked out from when orders were placed.
+ */
 export const settingsRouter = new Hono<AppEnv>()
   .get("/", requireAuth, async (c) => {
     const db = createOrdersDb(c.env.ORDERS_DB);
     return c.json({
-      namingTemplate: await namingTemplate(db),
+      ...(await teamSettings(db, c.get("teamId"))),
       defaultNamingTemplate: DEFAULT_TEMPLATE,
     });
   })
   .put("/", requireMentor, settingsValidator, async (c) => {
-    const { namingTemplate: value } = c.req.valid("json");
     const db = createOrdersDb(c.env.ORDERS_DB);
-    await db
-      .insert(appSettings)
-      .values({ key: TEMPLATE_KEY, value })
-      .onConflictDoUpdate({ target: appSettings.key, set: { value } });
-    return c.json({ namingTemplate: value });
+    const teamId = c.get("teamId");
+    const input = c.req.valid("json");
+    const before = await teamSettings(db, teamId);
+    await saveTeamSettings(db, teamId, input);
+    const changed = changedFields(before, input);
+    if (changed.length > 0) {
+      await logTeamChange(c.env, teamId, {
+        userId: c.get("userId"),
+        app: "orders",
+        what: "Orders settings",
+        changed: settingLabels(manifest, changed),
+      });
+    }
+    return c.json({
+      ...(await teamSettings(db, teamId)),
+      defaultNamingTemplate: DEFAULT_TEMPLATE,
+    });
   });
 
 const ruleValidator = validator("json", (value, c): { keyword: string; categoryId: number } => {
@@ -68,13 +128,28 @@ const ruleValidator = validator("json", (value, c): { keyword: string; categoryI
 export const categoryRulesRouter = new Hono<AppEnv>()
   .get("/", requireAuth, async (c) => {
     const db = createOrdersDb(c.env.ORDERS_DB);
-    return c.json(await db.select().from(categoryRules).orderBy(categoryRules.keyword).all());
+    return c.json(
+      await db
+        .select()
+        .from(categoryRules)
+        .where(inTeam(categoryRules, c.get("teamId")))
+        .orderBy(categoryRules.keyword)
+        .all(),
+    );
   })
   .post("/", requireMentor, ruleValidator, async (c) => {
     const db = createOrdersDb(c.env.ORDERS_DB);
+    const teamId = c.get("teamId");
+    const body = c.req.valid("json");
+    const category = await db
+      .select({ id: budgetCategories.id })
+      .from(budgetCategories)
+      .where(inTeam(budgetCategories, teamId, eq(budgetCategories.id, body.categoryId)))
+      .get();
+    if (!category) return c.json({ error: "Pick a budget category." }, 400);
     const row = await db
       .insert(categoryRules)
-      .values({ ...c.req.valid("json"), createdAt: Date.now() })
+      .values(withTeam(teamId, { ...body, createdAt: Date.now() }))
       .returning()
       .get();
     return c.json(row, 201);
@@ -83,7 +158,9 @@ export const categoryRulesRouter = new Hono<AppEnv>()
     const db = createOrdersDb(c.env.ORDERS_DB);
     const row = await db
       .delete(categoryRules)
-      .where(eq(categoryRules.id, Number(c.req.param("id"))))
+      .where(
+        inTeam(categoryRules, c.get("teamId"), eq(categoryRules.id, Number(c.req.param("id")))),
+      )
       .returning()
       .get();
     if (!row) return c.json({ error: "Rule not found." }, 404);
@@ -130,12 +207,14 @@ const suggestValidator = validator("json", (value, c): SuggestInput => {
 export const suggestRouter = new Hono<AppEnv>().post(
   "/",
   requireAuth,
+  catalogReady,
   suggestValidator,
   async (c) => {
     const input = c.req.valid("json");
     const db = createOrdersDb(c.env.ORDERS_DB);
-    const [template, categories, rules, profile, past] = await Promise.all([
-      namingTemplate(db),
+    const teamId = c.get("teamId");
+    const [settings, categories, rules, profile, past] = await Promise.all([
+      teamSettings(db, teamId),
       db
         .select({
           id: budgetCategories.id,
@@ -143,12 +222,18 @@ export const suggestRouter = new Hono<AppEnv>().post(
           isArchived: budgetCategories.isArchived,
         })
         .from(budgetCategories)
+        .where(inTeam(budgetCategories, teamId))
         .all(),
-      db.select().from(categoryRules).orderBy(categoryRules.id).all(),
+      db
+        .select()
+        .from(categoryRules)
+        .where(inTeam(categoryRules, teamId))
+        .orderBy(categoryRules.id)
+        .all(),
       db
         .select()
         .from(vendors)
-        .where(eq(vendors.key, vendorKey(input.vendor)))
+        .where(inTeam(vendors, teamId, eq(vendors.key, vendorKey(input.vendor))))
         .get(),
       db
         .select({
@@ -165,6 +250,8 @@ export const suggestRouter = new Hono<AppEnv>().post(
           createdAt: orderRequests.createdAt,
         })
         .from(orderRequests)
+        // The wishlist was never requested: it isn't "bought before" or a category's history.
+        .where(inTeam(orderRequests, teamId, ne(orderRequests.status, "wishlist")))
         .orderBy(desc(orderRequests.createdAt))
         .all(),
     ]);
@@ -172,13 +259,25 @@ export const suggestRouter = new Hono<AppEnv>().post(
     const key = productKey(input.url);
     // The catalog's category for this product (any of its options), so the requester doesn't
     // have to pick one for a part the catalog already knows.
+    // An option's key is the product's with "?variant=<id>" after it. Compared by prefix, not with
+    // LIKE: D1 refuses LIKE patterns over 50 bytes, which a product link easily is.
+    const optionPrefix = `${key}?variant=`;
     const inCatalog = key
       ? await db
-          .select({ category: catalogItems.category })
+          .select({ category: catalogItems.category, packQuantity: catalogItems.packQuantity })
           .from(catalogItems)
           .where(
-            or(eq(catalogItems.productKey, key), like(catalogItems.productKey, `${key}?variant=%`)),
+            inTeam(
+              catalogItems,
+              teamId,
+              or(
+                eq(catalogItems.productKey, key),
+                sql`substr(${catalogItems.productKey}, 1, ${optionPrefix.length}) = ${optionPrefix}`,
+              ),
+            ),
           )
+          // The product itself before one of its options.
+          .orderBy(sql`${catalogItems.productKey} = ${key} desc`)
           .get()
       : undefined;
     // A part new to the catalog gets a category guessed from its name; the requester checks it.
@@ -186,9 +285,13 @@ export const suggestRouter = new Hono<AppEnv>().post(
       ? null
       : guessCatalogCategory(
           input.title,
-          (await db.select({ name: catalogCategories.name }).from(catalogCategories).all()).map(
-            (r) => r.name,
-          ),
+          (
+            await db
+              .select({ name: catalogCategories.name })
+              .from(catalogCategories)
+              .where(inTeam(catalogCategories, teamId))
+              .all()
+          ).map((r) => r.name),
         );
     const vendor = vendorKey(input.vendor);
     const sku = input.sku?.toLowerCase();
@@ -240,10 +343,18 @@ export const suggestRouter = new Hono<AppEnv>().post(
       }
     }
 
+    // How many parts one unit is: the catalog's, for a product it knows as a pack; else what the
+    // product's name says ("PK4", "10 pack"), which the requester checks.
+    const packQuantity = inCatalog && inCatalog.packQuantity > 1 ? inCatalog.packQuantity : null;
+    const packQuantityGuess =
+      packQuantity === null ? guessPackQuantity(`${input.title} ${input.variant ?? ""}`) : null;
+
     return c.json({
       catalogCategory: inCatalog?.category ?? null,
       catalogCategoryGuess,
-      name: applyTemplate(template, input),
+      packQuantity,
+      packQuantityGuess,
+      name: applyTemplate(settings.namingTemplate, input),
       vendor: input.vendor,
       category,
       history: history.map(({ categoryId, url, sku: _sku, vendor: _vendor, ...h }) => ({

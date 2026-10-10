@@ -17,7 +17,7 @@
     },
     "portal": {
       "port": 5178,
-      "name": "G3 Gearbox (Portal)",
+      "name": "Gearbox (Portal)",
       "url": "http://localhost:5178"
     },
     "skill-tree": {
@@ -44,6 +44,16 @@
       "port": 5184,
       "name": "Orders",
       "url": "http://localhost:5184"
+    },
+    "platform": {
+      "port": 5185,
+      "name": "Platform (sign-up)",
+      "url": "http://localhost:5185"
+    },
+    "inventory": {
+      "port": 5186,
+      "name": "Inventory",
+      "url": "http://localhost:5186"
     }
   },
   "workers": {
@@ -94,6 +104,24 @@
       "inspectorPort": 9236,
       "name": "Orders Worker",
       "url": "http://localhost:8794"
+    },
+    "platform": {
+      "port": 8795,
+      "inspectorPort": 9237,
+      "name": "Platform Worker",
+      "url": "http://localhost:8795"
+    },
+    "inventory": {
+      "port": 8797,
+      "inspectorPort": 9239,
+      "name": "Inventory Worker",
+      "url": "http://localhost:8797"
+    },
+    "gateway": {
+      "port": 8796,
+      "inspectorPort": 9238,
+      "name": "Gateway (team addresses)",
+      "url": "http://localhost:8796"
     }
   }
 }

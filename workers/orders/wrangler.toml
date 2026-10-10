@@ -1,3 +1,5 @@
+# Production URLs, route patterns and TEAM_NUMBER here are written by `pnpm configure` from
+# packages/site-config/src/site.ts. Change them there, not here.
 name = "orders"
 main = "src/index.ts"
 compatibility_date = "2026-05-17"
@@ -11,21 +13,29 @@ service = "g3id"
 binding = "EDGE"
 service = "edge"
 
+# Received parts can be put in Inventory (src/lib/inventory.ts). Orders works without it.
+[[services]]
+binding = "INVENTORY"
+service = "inventory"
+
 [[d1_databases]]
 binding = "ORDERS_DB"
 database_name = "g3-orders-local"
 database_id = "00000000-0000-0000-0000-000000000004"
 migrations_dir = "src/db/migrations"
 
+# Links to a team's pages (Slack messages, Share-A-Cart's sign-in callback) are its own
+# <number>-orders address; in dev they go through the local gateway (pnpm dev runs it). Approval
+# DMs go out on the team's own Slack, through G3ID, so this worker has no Slack token.
+# Secret: SECRETS_KEY encrypts each team's Share-A-Cart tokens in D1 (`openssl rand -base64 32`;
+# .dev.vars locally, `wrangler secret put` in prod).
 [vars]
-FRONTEND_URL = "http://localhost:5184"
-# How the browser reaches this worker (through the app's /api proxy in dev); used for OAuth callbacks.
-PUBLIC_API_URL = "http://localhost:5184/api"
-# Optional secrets (.dev.vars locally, `wrangler secret put` in prod):
-#   SLACK_BOT_TOKEN: DMs requesters when a mentor approves; without it nothing is sent.
+LOCAL_GATEWAY_URL = "http://localhost:8796"
 
 [env.production]
 name = "orders-production"
+# No workers.dev address: the gateway is the only way in, so its identity headers can be trusted.
+workers_dev = false
 
 [[env.production.services]]
 binding = "G3ID"
@@ -35,6 +45,11 @@ service = "g3id-production"
 binding = "EDGE"
 service = "edge-production"
 
+# Deploy the inventory worker before this one: a binding to a worker that doesn't exist fails.
+[[env.production.services]]
+binding = "INVENTORY"
+service = "inventory-production"
+
 # Create with `wrangler d1 create g3-orders-prod` and paste its ID here.
 [[env.production.d1_databases]]
 binding = "ORDERS_DB"
@@ -42,10 +57,14 @@ database_name = "g3-orders-prod"
 database_id = "987cdb22-15a0-4a3b-88c1-44330ef725f8"
 migrations_dir = "src/db/migrations"
 
-[[env.production.routes]]
-pattern = "api.orders.g3robotics.com"
-custom_domain = true
 
-[env.production.vars]
-FRONTEND_URL = "https://orders.g3robotics.com"
-PUBLIC_API_URL = "https://api.orders.g3robotics.com"
+# The app's page, served by this worker in production; only /api/* runs the worker code, and
+# other paths fall back to index.html for the app's router. Wrangler builds the page before
+# every production deploy or upload (Cloudflare's Git builds too).
+[env.production.build]
+command = "pnpm --filter @g3/orders build"
+
+[env.production.assets]
+directory = "../../apps/orders/dist"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]

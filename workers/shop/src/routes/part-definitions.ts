@@ -1,10 +1,15 @@
-import { and, asc, eq, inArray, ne, sql } from "drizzle-orm";
+import { inTeam, requireAuth, withTeam } from "@g3/auth";
+import { asc, eq, inArray, ne, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
 import { createShopDb } from "../db";
-import { partDefinitionProcessBlueprints, partDefinitions, processes } from "../db/schema";
+import {
+  partDefinitionProcessBlueprints,
+  partDefinitions,
+  processes,
+  subsystems,
+} from "../db/schema";
 import { fileStepError } from "../lib/process-rules";
-import { requireAuth } from "../middleware/auth";
 import type { AppEnv } from "../types";
 
 const updatePartValidator = validator(
@@ -63,7 +68,6 @@ const replaceBlueprintValidator = validator("json", (value, c): { processIds: nu
   const v = (value ?? {}) as { processIds?: unknown };
   if (
     !Array.isArray(v.processIds) ||
-    // 25 rows × 4 columns stays under D1's 100 bound-parameter cap for the single insert.
     v.processIds.length > 25 ||
     v.processIds.some((p) => !Number.isInteger(p) || p < 1)
   ) {
@@ -82,34 +86,119 @@ const reorderBlueprintValidator = validator("json", (value, c): { processIds: nu
   return { processIds: v.processIds as number[] };
 });
 
-async function fileStepViolation(
-  db: ReturnType<typeof createShopDb>,
+type ShopDb = ReturnType<typeof createShopDb>;
+
+/**
+ * What's wrong with a part's process list, or null: a process that isn't the team's, or File
+ * Producer steps without File Consumer ones (or the other way round).
+ */
+async function processListError(
+  db: ShopDb,
+  teamId: string,
   processIds: number[],
 ): Promise<string | null> {
   if (processIds.length === 0) return null;
   const steps = await db
-    .select({ name: processes.name, type: processes.type })
+    .select({ id: processes.id, name: processes.name, type: processes.type })
     .from(processes)
-    .where(inArray(processes.id, processIds))
+    .where(inTeam(processes, teamId, inArray(processes.id, processIds)))
     .all();
+  if (new Set(steps.map((s) => s.id)).size !== new Set(processIds).size) {
+    return "Some of those processes don't exist.";
+  }
   return fileStepError(steps);
+}
+
+async function isTeamSubsystem(db: ShopDb, teamId: string, id: number) {
+  return Boolean(
+    await db
+      .select({ id: subsystems.id })
+      .from(subsystems)
+      .where(inTeam(subsystems, teamId, eq(subsystems.id, id)))
+      .get(),
+  );
+}
+
+/** The team's part definition, if it is one. */
+async function teamPart(db: ShopDb, teamId: string, id: number) {
+  return db
+    .select({ id: partDefinitions.id })
+    .from(partDefinitions)
+    .where(inTeam(partDefinitions, teamId, eq(partDefinitions.id, id)))
+    .get();
+}
+
+/** A part definition's blueprint, in order. */
+function blueprintOf(db: ShopDb, teamId: string, partDefinitionId: number) {
+  return db
+    .select()
+    .from(partDefinitionProcessBlueprints)
+    .where(
+      inTeam(
+        partDefinitionProcessBlueprints,
+        teamId,
+        eq(partDefinitionProcessBlueprints.partDefinitionId, partDefinitionId),
+      ),
+    )
+    .orderBy(asc(partDefinitionProcessBlueprints.index))
+    .all();
+}
+
+/**
+ * Rewrites a part's blueprint in one batch. A delete + reinsert avoids tripping the
+ * (partDefinitionId, index) unique constraint that in-place index swaps would.
+ */
+async function replaceBlueprint(
+  db: ShopDb,
+  teamId: string,
+  partDefinitionId: number,
+  processIds: number[],
+) {
+  const now = Date.now();
+  const remove = db
+    .delete(partDefinitionProcessBlueprints)
+    .where(
+      inTeam(
+        partDefinitionProcessBlueprints,
+        teamId,
+        eq(partDefinitionProcessBlueprints.partDefinitionId, partDefinitionId),
+      ),
+    );
+  // Five values a row: 20 rows a statement stays under D1's 100 bound parameters.
+  const inserts = [];
+  for (let i = 0; i < processIds.length; i += 20) {
+    inserts.push(
+      db.insert(partDefinitionProcessBlueprints).values(
+        withTeam(
+          teamId,
+          processIds.slice(i, i + 20).map((processId, j) => ({
+            partDefinitionId,
+            processId,
+            index: i + j,
+            createdAt: now,
+          })),
+        ),
+      ),
+    );
+  }
+  await db.batch([remove, ...inserts]);
 }
 
 export const partDefinitionsRouter = new Hono<AppEnv>()
   .get("/", requireAuth, async (c) => {
     const db = createShopDb(c.env.SHOP_DB);
     const onshapePartNumber = c.req.query("onshapePartNumber");
-
-    if (onshapePartNumber) {
-      const rows = await db
-        .select()
-        .from(partDefinitions)
-        .where(eq(partDefinitions.onshapePartNumber, onshapePartNumber))
-        .all();
-      return c.json(rows);
-    }
-
-    const rows = await db.select().from(partDefinitions).all();
+    const rows = await db
+      .select()
+      .from(partDefinitions)
+      .where(
+        inTeam(
+          partDefinitions,
+          c.get("teamId"),
+          onshapePartNumber ? eq(partDefinitions.onshapePartNumber, onshapePartNumber) : undefined,
+        ),
+      )
+      .all();
     return c.json(rows);
   })
   .post("/", requireAuth, async (c) => {
@@ -146,13 +235,25 @@ export const partDefinitionsRouter = new Hono<AppEnv>()
     }
 
     const db = createShopDb(c.env.SHOP_DB);
+    const teamId = c.get("teamId");
     const now = Date.now();
+
+    if (!(await isTeamSubsystem(db, teamId, subsystemId))) {
+      return c.json({ error: "That subsystem doesn't exist." }, 400);
+    }
 
     if (processIds && processIds.length > 0 && (!material || !thickness)) {
       const needsInfo = await db
         .select({ name: processes.name })
         .from(processes)
-        .where(and(inArray(processes.id, processIds), eq(processes.requiresPartInfo, 1)))
+        .where(
+          inTeam(
+            processes,
+            teamId,
+            inArray(processes.id, processIds),
+            eq(processes.requiresPartInfo, 1),
+          ),
+        )
         .all();
       if (needsInfo.length > 0) {
         return c.json(
@@ -164,7 +265,7 @@ export const partDefinitionsRouter = new Hono<AppEnv>()
       }
     }
 
-    const fileError = await fileStepViolation(db, processIds ?? []);
+    const fileError = await processListError(db, teamId, processIds ?? []);
     if (fileError) return c.json({ error: fileError }, 400);
 
     // If obsoleteExisting is true, mark all existing parts with same number as obsolete
@@ -175,7 +276,9 @@ export const partDefinitionsRouter = new Hono<AppEnv>()
           .update(partDefinitions)
           .set({ isObsolete: 1 })
           .where(
-            and(
+            inTeam(
+              partDefinitions,
+              teamId,
               eq(partDefinitions.onshapePartNumber, onshapePartNumber),
               revision ? ne(partDefinitions.revision, revision) : sql`1=1`,
             ),
@@ -191,30 +294,38 @@ export const partDefinitionsRouter = new Hono<AppEnv>()
 
     const partDef = await db
       .insert(partDefinitions)
-      .values({
-        onshapePartNumber,
-        revision,
-        subsystemId,
-        name,
-        notes,
-        partDrawingUrl,
-        material,
-        thickness,
-        creator: c.get("userId"),
-        createdAt: now,
-      })
+      .values(
+        withTeam(teamId, {
+          onshapePartNumber,
+          revision,
+          subsystemId,
+          name,
+          notes,
+          partDrawingUrl,
+          material,
+          thickness,
+          creator: c.get("userId"),
+          createdAt: now,
+        }),
+      )
       .returning()
       .get();
 
     if (processIds && processIds.length > 0) {
-      await db.insert(partDefinitionProcessBlueprints).values(
-        processIds.map((processId, index) => ({
-          partDefinitionId: partDef.id,
-          processId,
-          index,
-          createdAt: now,
-        })),
-      );
+      // Five values a row: 20 rows a statement stays under D1's 100 bound parameters.
+      for (let i = 0; i < processIds.length; i += 20) {
+        await db.insert(partDefinitionProcessBlueprints).values(
+          withTeam(
+            teamId,
+            processIds.slice(i, i + 20).map((processId, j) => ({
+              partDefinitionId: partDef.id,
+              processId,
+              index: i + j,
+              createdAt: now,
+            })),
+          ),
+        );
+      }
     }
 
     return c.json(partDef, 201);
@@ -264,10 +375,17 @@ export const partDefinitionsRouter = new Hono<AppEnv>()
     }
 
     const db = createShopDb(c.env.SHOP_DB);
+    const teamId = c.get("teamId");
+    if (
+      updates.subsystemId !== undefined &&
+      !(await isTeamSubsystem(db, teamId, updates.subsystemId))
+    ) {
+      return c.json({ error: "That subsystem doesn't exist." }, 400);
+    }
     const row = await db
       .update(partDefinitions)
       .set(updates)
-      .where(eq(partDefinitions.id, id))
+      .where(inTeam(partDefinitions, teamId, eq(partDefinitions.id, id)))
       .returning()
       .get();
 
@@ -277,59 +395,25 @@ export const partDefinitionsRouter = new Hono<AppEnv>()
   .get("/:id/processes", requireAuth, async (c) => {
     const partDefinitionId = Number(c.req.param("id"));
     const db = createShopDb(c.env.SHOP_DB);
-    const rows = await db
-      .select()
-      .from(partDefinitionProcessBlueprints)
-      .where(eq(partDefinitionProcessBlueprints.partDefinitionId, partDefinitionId))
-      .orderBy(asc(partDefinitionProcessBlueprints.index))
-      .all();
-    return c.json(rows);
+    return c.json(await blueprintOf(db, c.get("teamId"), partDefinitionId));
   })
   // Replaces the whole blueprint (processes may be added, removed, or reordered). Existing
-  // instances keep their own pipelines; only instances created afterwards use the new one.
+  // instances keep their own pipelines; only instances created afterward use the new one.
   .put("/:id/processes", requireAuth, replaceBlueprintValidator, async (c) => {
     const partDefinitionId = Number(c.req.param("id"));
     const { processIds } = c.req.valid("json");
     const db = createShopDb(c.env.SHOP_DB);
+    const teamId = c.get("teamId");
 
-    const def = await db
-      .select({ id: partDefinitions.id })
-      .from(partDefinitions)
-      .where(eq(partDefinitions.id, partDefinitionId))
-      .get();
-    if (!def) return c.json({ error: "Part definition not found." }, 404);
-
-    const fileError = await fileStepViolation(db, processIds);
-    if (fileError) return c.json({ error: fileError }, 400);
-
-    const now = Date.now();
-    const remove = db
-      .delete(partDefinitionProcessBlueprints)
-      .where(eq(partDefinitionProcessBlueprints.partDefinitionId, partDefinitionId));
-    if (processIds.length === 0) {
-      await remove;
-    } else {
-      // Delete + reinsert in one batch so the (partDefinitionId, index) constraint never trips.
-      await db.batch([
-        remove,
-        db.insert(partDefinitionProcessBlueprints).values(
-          processIds.map((processId, index) => ({
-            partDefinitionId,
-            processId,
-            index,
-            createdAt: now,
-          })),
-        ),
-      ]);
+    if (!(await teamPart(db, teamId, partDefinitionId))) {
+      return c.json({ error: "Part definition not found." }, 404);
     }
 
-    const rows = await db
-      .select()
-      .from(partDefinitionProcessBlueprints)
-      .where(eq(partDefinitionProcessBlueprints.partDefinitionId, partDefinitionId))
-      .orderBy(asc(partDefinitionProcessBlueprints.index))
-      .all();
-    return c.json(rows);
+    const fileError = await processListError(db, teamId, processIds);
+    if (fileError) return c.json({ error: fileError }, 400);
+
+    await replaceBlueprint(db, teamId, partDefinitionId, processIds);
+    return c.json(await blueprintOf(db, teamId, partDefinitionId));
   })
   .patch("/:id/processes/reorder", requireAuth, reorderBlueprintValidator, async (c) => {
     const partDefinitionId = Number(c.req.param("id"));
@@ -340,11 +424,8 @@ export const partDefinitionsRouter = new Hono<AppEnv>()
     }
 
     const db = createShopDb(c.env.SHOP_DB);
-    const existing = await db
-      .select()
-      .from(partDefinitionProcessBlueprints)
-      .where(eq(partDefinitionProcessBlueprints.partDefinitionId, partDefinitionId))
-      .all();
+    const teamId = c.get("teamId");
+    const existing = await blueprintOf(db, teamId, partDefinitionId);
 
     const existingIds = existing.map((b) => b.processId).sort((a, b) => a - b);
     const givenIds = [...processIds].sort((a, b) => a - b);
@@ -358,39 +439,23 @@ export const partDefinitionsRouter = new Hono<AppEnv>()
       );
     }
 
-    // Rewrite the blueprint atomically. A delete + reinsert avoids tripping the
-    // (partDefinitionId, index) unique constraint that in-place index swaps would.
-    const now = Date.now();
-    await db.batch([
-      db
-        .delete(partDefinitionProcessBlueprints)
-        .where(eq(partDefinitionProcessBlueprints.partDefinitionId, partDefinitionId)),
-      db.insert(partDefinitionProcessBlueprints).values(
-        processIds.map((processId, index) => ({
-          partDefinitionId,
-          processId,
-          index,
-          createdAt: now,
-        })),
-      ),
-    ]);
-
-    const rows = await db
-      .select()
-      .from(partDefinitionProcessBlueprints)
-      .where(eq(partDefinitionProcessBlueprints.partDefinitionId, partDefinitionId))
-      .orderBy(asc(partDefinitionProcessBlueprints.index))
-      .all();
-    return c.json(rows);
+    await replaceBlueprint(db, teamId, partDefinitionId, processIds);
+    return c.json(await blueprintOf(db, teamId, partDefinitionId));
   })
   .post("/:id/processes", requireAuth, addBlueprintValidator, async (c) => {
     const partDefinitionId = Number(c.req.param("id"));
     const { index, processId } = c.req.valid("json");
 
     const db = createShopDb(c.env.SHOP_DB);
+    const teamId = c.get("teamId");
+    if (!(await teamPart(db, teamId, partDefinitionId))) {
+      return c.json({ error: "Part definition not found." }, 404);
+    }
+    const processError = await processListError(db, teamId, [processId]);
+    if (processError) return c.json({ error: processError }, 400);
     const row = await db
       .insert(partDefinitionProcessBlueprints)
-      .values({ partDefinitionId, processId, index, createdAt: Date.now() })
+      .values(withTeam(teamId, { partDefinitionId, processId, index, createdAt: Date.now() }))
       .returning()
       .get();
 
@@ -404,7 +469,9 @@ export const partDefinitionsRouter = new Hono<AppEnv>()
     await db
       .delete(partDefinitionProcessBlueprints)
       .where(
-        and(
+        inTeam(
+          partDefinitionProcessBlueprints,
+          c.get("teamId"),
           eq(partDefinitionProcessBlueprints.partDefinitionId, partDefinitionId),
           eq(partDefinitionProcessBlueprints.processId, processId),
         ),

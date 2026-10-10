@@ -1,7 +1,8 @@
-import { and, gte, inArray, isNotNull, lt } from "drizzle-orm";
+import { inTeam } from "@g3/auth";
+import { gte, inArray, isNotNull, lt } from "drizzle-orm";
 import type { OrdersDb } from "../db";
 import { orderCharges, orderRequests, vendorOrders } from "../db/schema";
-import { fiscalRange } from "./fiscal";
+import { type FiscalCalendar, fiscalRange } from "./fiscal";
 import { type OrderLine, chargesByCategory, lineTotal } from "./split";
 
 export {
@@ -38,15 +39,24 @@ export function orderFees(
  */
 export async function spentByCategory(
   db: OrdersDb,
+  teamId: string,
+  calendar: FiscalCalendar,
   fiscalYear: number,
 ): Promise<Map<number, number>> {
-  const [from, to] = fiscalRange(fiscalYear);
+  const [from, to] = fiscalRange(fiscalYear, calendar);
   const [orders, lines, charges] = await Promise.all([
     // An order counts in the fiscal year it was placed.
     db
       .select()
       .from(vendorOrders)
-      .where(and(gte(vendorOrders.placedAt, from), lt(vendorOrders.placedAt, to)))
+      .where(
+        inTeam(
+          vendorOrders,
+          teamId,
+          gte(vendorOrders.placedAt, from),
+          lt(vendorOrders.placedAt, to),
+        ),
+      )
       .all(),
     db
       .select({
@@ -58,13 +68,15 @@ export async function spentByCategory(
       })
       .from(orderRequests)
       .where(
-        and(
+        inTeam(
+          orderRequests,
+          teamId,
           isNotNull(orderRequests.orderId),
           inArray(orderRequests.status, ["ordered", "received"]),
         ),
       )
       .all(),
-    db.select().from(orderCharges).all(),
+    db.select().from(orderCharges).where(inTeam(orderCharges, teamId)).all(),
   ]);
   const spent = new Map<number, number>();
   const add = (categoryId: number, cents: number) =>

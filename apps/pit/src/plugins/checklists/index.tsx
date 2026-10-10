@@ -1,3 +1,4 @@
+import { appUrl } from "@g3/site-config";
 import { useIsOnline } from "@g3/ui";
 import { useNavigate } from "react-router-dom";
 import type { Plugin } from "../../shared/plugin-types";
@@ -27,13 +28,13 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
   }
 
   if (!user) {
-    const loginUrl = `${import.meta.env.VITE_G3ID_URL ?? "https://g3id.g3robotics.com"}/login?redirect=${encodeURIComponent(window.location.href)}`;
+    const loginUrl = `${appUrl("id")}/login?redirect=${encodeURIComponent(window.location.href)}`;
     return (
       <main className="min-h-screen bg-page flex flex-col items-center justify-center gap-4">
         <p className="text-gray-900 text-lg font-semibold">Sign in to use the Editor</p>
         <a
           href={loginUrl}
-          className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white text-sm font-semibold rounded-lg transition-colors"
+          className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold rounded-lg transition-colors"
         >
           Sign in →
         </a>
@@ -71,5 +72,5 @@ export const checklistsPlugin: Plugin = {
       ),
     },
   ],
-  navItems: [{ label: "Editor", to: "/editor", order: 2 }],
+  navItems: [{ label: "Editor", to: "/editor", order: 3 }],
 };

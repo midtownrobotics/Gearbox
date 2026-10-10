@@ -1,0 +1,78 @@
+import { defineManifest } from "@g3/auth";
+import packageJson from "../package.json";
+
+// What this app tells the platform about itself (roadmap 4.1; the type is in @g3/auth).
+export const manifest = defineManifest({
+  slug: "shop",
+  name: "Shop",
+  summary: "Parts through manufacturing: processes, part files, drawings and Onshape releases.",
+  roles: ["admin", "mentor", "member", "kiosk"],
+  integrations: ["slack", "onshape", "edge box"],
+  availability: "every team",
+  version: packageJson.version,
+  hooks: { seed: false, delete: true, export: true },
+  settings: [
+    {
+      key: "documentId",
+      label: "Onshape document",
+      type: "text",
+      default: null,
+      editedBy: "admin",
+      page: "/admin",
+      integration: "onshape",
+    },
+    {
+      key: "companyId",
+      label: "Onshape company",
+      type: "text",
+      default: null,
+      editedBy: "admin",
+      page: "/admin",
+      integration: "onshape",
+    },
+    {
+      key: "apiKey",
+      label: "Onshape API key",
+      type: "secret",
+      default: null,
+      editedBy: "admin",
+      page: "/admin",
+      integration: "onshape",
+    },
+    {
+      key: "secretKey",
+      label: "Onshape secret key",
+      type: "secret",
+      default: null,
+      editedBy: "admin",
+      page: "/admin",
+      integration: "onshape",
+    },
+    {
+      key: "webhookKeys",
+      label: "Onshape webhook signing keys",
+      type: "secret",
+      default: null,
+      editedBy: "admin",
+      page: "/admin",
+      integration: "onshape",
+    },
+    {
+      key: "slackReleaseChannelId",
+      label: "Slack channel for releases",
+      type: "text",
+      default: null,
+      editedBy: "admin",
+      page: "/admin",
+    },
+    {
+      key: "slackSummaryChannelId",
+      label: "Slack channel for daily summaries",
+      type: "text",
+      default: null,
+      editedBy: "admin",
+      page: "/admin",
+    },
+  ],
+  plugins: [],
+});

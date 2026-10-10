@@ -1,3 +1,5 @@
+import { site } from "@g3/site-config";
+import { useTeamNames } from "@g3/ui";
 import { Check, Copy, Loader2, Send } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -12,10 +14,12 @@ type PollStatus =
 
 type BotInfo = {
   appId: string;
-  teamId: string;
+  /** The team's Slack workspace; null if the team hasn't connected one. */
+  teamId: string | null;
 };
 
 export function SlackLoginPage() {
+  const names = useTeamNames();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const token = searchParams.get("token") ?? "";
@@ -115,7 +119,7 @@ export function SlackLoginPage() {
   function handleOpenSlack() {
     navigator.clipboard.writeText(formattedCode);
 
-    if (botInfo) {
+    if (botInfo?.teamId) {
       const slackUrl = `slack://app?team=${botInfo.teamId}&id=${botInfo.appId}&tab=messages`;
       window.location.href = slackUrl;
     }
@@ -128,7 +132,7 @@ export function SlackLoginPage() {
       <div className="w-full max-w-sm space-y-6 text-center">
         <div>
           <h1 className="text-5xl font-bold text-secondary-900">
-            <span className="text-primary-500">G3</span>ID
+            <span className="text-primary-500">{names.shortName}</span>ID
           </h1>
         </div>
 
@@ -154,9 +158,9 @@ export function SlackLoginPage() {
               <div className="space-y-2">
                 <p className="text-sm text-secondary-700">
                   Or DM this code to the {""}
-                  <span className="text-primary-500 font-medium">"G3 Bot"</span> user:
+                  <span className="text-primary-500 font-medium">"{site.slackBotName}"</span> user:
                 </p>
-                <div className="bg-white border border-secondary-200 rounded-xl px-6 py-4 flex items-center justify-center gap-3">
+                <div className="bg-surface border border-secondary-200 rounded-xl px-6 py-4 flex items-center justify-center gap-3">
                   <p className="text-5xl font-mono font-bold text-secondary-900 tracking-widest">
                     {formattedCode}
                   </p>
@@ -173,7 +177,7 @@ export function SlackLoginPage() {
 
               <div className="space-y-2">
                 <p className="text-sm text-secondary-700">Or run this command in any channel:</p>
-                <div className="bg-white border border-secondary-200 rounded-xl px-6 py-4 flex items-center justify-center gap-3">
+                <div className="bg-surface border border-secondary-200 rounded-xl px-6 py-4 flex items-center justify-center gap-3">
                   <p className="font-mono text-3xl font-bold text-primary-500 tracking-wide">
                     /signin {formattedCode}
                   </p>

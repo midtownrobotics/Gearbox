@@ -8,8 +8,6 @@ export function AdminPage() {
 
   const [eventKey, setEventKey] = useState("");
   const [nexusEventKey, setNexusEventKey] = useState("");
-  const [tbaAuthKey, setTbaAuthKey] = useState("");
-  const [nexusApiKey, setNexusApiKey] = useState("");
   const [iframeUrl, setIframeUrl] = useState("");
   const [teamNumber, setTeamNumber] = useState("");
   const [loading, setLoading] = useState(true);
@@ -31,8 +29,6 @@ export function AdminPage() {
         if (data) {
           setEventKey(data.eventKey);
           setNexusEventKey(data.nexusEventKey);
-          setTbaAuthKey(data.tbaAuthKey);
-          setNexusApiKey(data.nexusApiKey);
           setIframeUrl(data.iframeUrl ?? "");
           setTeamNumber(data.teamNumber);
         }
@@ -48,8 +44,6 @@ export function AdminPage() {
       json: {
         eventKey: eventKey.trim(),
         nexusEventKey: nexusEventKey.trim(),
-        tbaAuthKey: tbaAuthKey.trim(),
-        nexusApiKey: nexusApiKey.trim(),
         iframeUrl: iframeUrl.trim(),
       },
     });
@@ -90,12 +84,11 @@ export function AdminPage() {
           </p>
         )}
 
-        <div className="bg-white rounded-xl border border-gray-300 p-5 space-y-5">
+        <div className="bg-surface rounded-xl border border-gray-300 p-5 space-y-5">
           <div>
-            <h2 className="text-lg font-semibold text-gray-200">Event & API Configuration</h2>
+            <h2 className="text-lg font-semibold text-gray-200">Event</h2>
             <p className="text-sm text-gray-600 mt-0.5">
-              Team {teamNumber}. Nexus and TBA event keys can be different (especially for
-              offseason).
+              Team {teamNumber}. Nexus and TBA event keys can differ, especially in the offseason.
             </p>
           </div>
 
@@ -106,7 +99,7 @@ export function AdminPage() {
             value={eventKey}
             onChange={setEventKey}
             onSaved={() => setSaved(false)}
-            hint="The Blue Alliance event key (year + event code). Used for rankings, matches, and status."
+            hint="Year + event code. Used for rankings and matches."
           />
 
           <Field
@@ -116,37 +109,15 @@ export function AdminPage() {
             value={nexusEventKey}
             onChange={setNexusEventKey}
             onSaved={() => setSaved(false)}
-            hint="Nexus event key (can differ from TBA, especially for offseason). Leave blank to disable Nexus data."
-          />
-
-          <Field
-            id="tba-key"
-            label="TBA Auth Key"
-            placeholder="The Blue Alliance read API key"
-            value={tbaAuthKey}
-            onChange={setTbaAuthKey}
-            onSaved={() => setSaved(false)}
-            secret
-            hint="From thebluealliance.com/account. Powers rankings & match data."
-          />
-
-          <Field
-            id="nexus-key"
-            label="Nexus API Key"
-            placeholder="FRC Nexus API key"
-            value={nexusApiKey}
-            onChange={setNexusApiKey}
-            onSaved={() => setSaved(false)}
-            secret
-            hint="From frc.nexus. Powers live queuing/match status."
+            hint="Leave blank to turn off Nexus data."
           />
         </div>
 
-        <div className="bg-white rounded-xl border border-gray-300 p-5 space-y-5">
+        <div className="bg-surface rounded-xl border border-gray-300 p-5 space-y-5">
           <div>
             <h2 className="text-lg font-semibold text-gray-200">Pit Monitor Display</h2>
             <p className="text-sm text-gray-600 mt-0.5">
-              Customize the monitor page display with an embedded feed or dashboard.
+              Embed a feed or dashboard on the monitor page.
             </p>
           </div>
 
@@ -157,7 +128,7 @@ export function AdminPage() {
             value={iframeUrl}
             onChange={setIframeUrl}
             onSaved={() => setSaved(false)}
-            hint="URL to display in an iframe on the pit monitor page. Leave blank to disable. Should support embedding (no X-Frame-Options restriction)."
+            hint="A page that allows embedding. Leave blank for none."
           />
 
           <div className="flex items-center gap-3 pt-1">
@@ -165,7 +136,7 @@ export function AdminPage() {
               type="button"
               onClick={handleSave}
               disabled={saving}
-              className="px-4 py-2 bg-red-600 hover:bg-red-500 disabled:opacity-50 text-gray-900 text-sm font-semibold rounded-lg transition-colors"
+              className="px-4 py-2 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-sm font-semibold rounded-lg transition-colors"
             >
               {saving ? "Saving…" : "Save"}
             </button>
@@ -212,7 +183,7 @@ function Field({
             onChange(e.target.value);
             onSaved();
           }}
-          className="flex-1 bg-gray-100 border border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:border-red-500 font-mono"
+          className="flex-1 bg-gray-100 border border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:border-primary-500 font-mono"
         />
         {secret && (
           <button

@@ -1,3 +1,4 @@
+import { useTeamNames } from "@g3/ui";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
@@ -31,6 +32,27 @@ const TILES: Tile[] = [
       >
         <path d="M9 11l3 3L22 4" />
         <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+      </svg>
+    ),
+  },
+  {
+    to: "/logs",
+    label: "Logs",
+    desc: "Archived checklists",
+    icon: (
+      <svg
+        className={iconClass}
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <rect x="3" y="4" width="18" height="5" rx="1" />
+        <path d="M5 9v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9" />
+        <path d="M10 13h4" />
       </svg>
     ),
   },
@@ -120,6 +142,7 @@ const TILES: Tile[] = [
 ];
 
 export function HomePage() {
+  const names = useTeamNames();
   const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
@@ -136,8 +159,10 @@ export function HomePage() {
     <main className="min-h-screen bg-page text-gray-900">
       <div className="max-w-3xl mx-auto px-4 py-12 sm:py-16 space-y-10">
         <div className="text-center space-y-3">
-          <h1 className="text-5xl sm:text-6xl font-bold tracking-tight">G3 Pit Software</h1>
-          <p className="text-red-400 font-semibold text-lg tracking-widest uppercase">
+          <h1 className="text-5xl sm:text-6xl font-bold tracking-tight">
+            {names.appTitle("Pit")} Software
+          </h1>
+          <p className="text-primary-600 font-semibold text-lg tracking-widest uppercase">
             Pit Management and Operations
           </p>
         </div>
@@ -147,18 +172,18 @@ export function HomePage() {
             <Link
               key={tile.to}
               to={tile.to}
-              className="group bg-white hover:bg-gray-100 border border-gray-200 hover:border-red-600 rounded-2xl p-5 flex items-center gap-4 transition-colors"
+              className="group bg-surface hover:bg-gray-100 border border-gray-200 hover:border-primary-600 rounded-2xl p-5 flex items-center gap-4 transition-colors"
             >
-              <div className="shrink-0 w-12 h-12 rounded-xl bg-gray-100 group-hover:bg-red-600/20 flex items-center justify-center text-red-400 transition-colors">
+              <div className="shrink-0 w-12 h-12 rounded-xl bg-gray-100 group-hover:bg-primary-600/20 flex items-center justify-center text-primary-600 transition-colors">
                 {tile.icon}
               </div>
               <div className="min-w-0">
-                <p className="text-lg font-semibold text-gray-900 group-hover:text-red-400 transition-colors">
+                <p className="text-lg font-semibold text-gray-900 group-hover:text-primary-600 transition-colors">
                   {tile.label}
                 </p>
                 <p className="text-sm text-gray-600 truncate">{tile.desc}</p>
               </div>
-              <span className="ml-auto text-gray-600 group-hover:text-red-400 transition-colors">
+              <span className="ml-auto text-gray-600 group-hover:text-primary-600 transition-colors">
                 →
               </span>
             </Link>

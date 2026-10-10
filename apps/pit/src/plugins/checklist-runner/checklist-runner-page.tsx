@@ -151,7 +151,7 @@ export function ChecklistRunnerPage() {
         <button
           type="button"
           onClick={() => navigate("/checklists")}
-          className="text-red-400 hover:text-red-300 text-sm underline"
+          className="text-primary-600 hover:text-primary-700 text-sm underline"
         >
           Back
         </button>
@@ -228,7 +228,7 @@ export function ChecklistRunnerPage() {
             <button
               type="button"
               onClick={() => navigate(`/editor/${list.id}`)}
-              className="text-red-400 hover:text-red-300 underline"
+              className="text-primary-600 hover:text-primary-700 underline"
             >
               Add some in the Editor.
             </button>
@@ -261,12 +261,12 @@ export function ChecklistRunnerPage() {
                     type="button"
                     onClick={() => toggle(item)}
                     className={`w-full flex items-start gap-4 p-4 text-left rounded-xl transition-colors ${
-                      isChecked ? "bg-white opacity-60" : "bg-white hover:bg-gray-100"
+                      isChecked ? "bg-surface opacity-60" : "bg-surface hover:bg-gray-100"
                     }`}
                   >
                     <div
                       className={`mt-0.5 w-6 h-6 rounded-md border-2 shrink-0 flex items-center justify-center transition-colors ${
-                        isChecked ? "bg-red-600 border-red-600" : "border-gray-600"
+                        isChecked ? "bg-primary-600 border-primary-600" : "border-gray-600"
                       }`}
                     >
                       {isChecked && (
@@ -305,14 +305,14 @@ export function ChecklistRunnerPage() {
                           {confirmDeleteIssueId === issue.id ? (
                             <div className="flex items-center gap-3 py-0.5">
                               <span className="text-xs text-gray-600 flex-1 truncate">
-                                Delete "{issue.text}"?
+                                Resolve "{issue.text}"?
                               </span>
                               <button
                                 type="button"
                                 onClick={() => deleteIssue(issue)}
-                                className="px-2 py-0.5 bg-red-700 hover:bg-red-600 text-white text-xs font-semibold rounded"
+                                className="px-2 py-0.5 bg-primary-600 hover:bg-primary-700 text-white text-xs font-semibold rounded"
                               >
-                                Delete
+                                Resolve
                               </button>
                               <button
                                 type="button"

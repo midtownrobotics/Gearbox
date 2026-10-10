@@ -1,16 +1,17 @@
-import { type SQLWrapper, and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
+import { inTeam, requireAuth, withTeam } from "@g3/auth";
+import { type SQLWrapper, asc, desc, eq, inArray, isNull } from "drizzle-orm";
 import { Hono } from "hono";
 import { createMiddleware } from "hono/factory";
 import { validator } from "hono/validator";
 import { createShopDb } from "../db";
 import { files, partDefinitions, partInstanceFiles, partInstances } from "../db/schema";
-import { requireAuth } from "../middleware/auth";
+import { partFileKey } from "../lib/storage";
 import type { AppEnv } from "../types";
 
 // Cloudflare rejects request bodies over 100 MB before they reach the worker anyway.
 const MAX_FILE_BYTES = 100 * 1024 * 1024;
 // D1 caps a statement at 100 bound parameters; keep chunked writes under it.
-const PARAM_CHUNK = 20;
+const PARAM_CHUNK = 16;
 
 type ShopDb = ReturnType<typeof createShopDb>;
 type FileRow = typeof files.$inferSelect;
@@ -42,10 +43,6 @@ const setCountValidator = validator(
   },
 );
 
-function safeKeySegment(value: string): string {
-  return value.replace(/[^A-Za-z0-9._-]+/g, "_").slice(0, 120) || "_";
-}
-
 function chunks<T>(items: T[], size = PARAM_CHUNK): T[][] {
   const out: T[][] = [];
   for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
@@ -55,6 +52,7 @@ function chunks<T>(items: T[], size = PARAM_CHUNK): T[][] {
 /** Attaches each file's instance assignments. `fileIds` may be a subquery to avoid param caps. */
 async function withAssignments(
   db: ShopDb,
+  teamId: string,
   rows: FileRow[],
   fileIds?: number[] | SQLWrapper,
 ): Promise<PartFileWithAssignments[]> {
@@ -68,7 +66,13 @@ async function withAssignments(
     })
     .from(partInstanceFiles)
     .innerJoin(partInstances, eq(partInstances.id, partInstanceFiles.partInstanceId))
-    .where(fileIds ? inArray(partInstanceFiles.fileId, fileIds) : undefined)
+    .where(
+      inTeam(
+        partInstanceFiles,
+        teamId,
+        fileIds ? inArray(partInstanceFiles.fileId, fileIds) : undefined,
+      ),
+    )
     .orderBy(asc(partInstances.partDefinitionId), asc(partInstances.instanceNumber))
     .all();
   const byFile = new Map<number, FileAssignment[]>();
@@ -80,21 +84,31 @@ async function withAssignments(
   return rows.map(({ r2Key: _r2Key, ...f }) => ({ ...f, assignments: byFile.get(f.id) ?? [] }));
 }
 
-async function getFile(db: ShopDb, id: number): Promise<PartFileWithAssignments | null> {
-  const row = await db.select().from(files).where(eq(files.id, id)).get();
+async function getFile(
+  db: ShopDb,
+  teamId: string,
+  id: number,
+): Promise<PartFileWithAssignments | null> {
+  const row = await db
+    .select()
+    .from(files)
+    .where(inTeam(files, teamId, eq(files.id, id)))
+    .get();
   if (!row) return null;
-  const [withA] = await withAssignments(db, [row], [id]);
+  const [withA] = await withAssignments(db, teamId, [row], [id]);
   return withA;
 }
 
 /** This file's assignments on one part definition, lowest instance number first. */
-function assignmentsOn(db: ShopDb, fileId: number, partDefinitionId: number) {
+function assignmentsOn(db: ShopDb, teamId: string, fileId: number, partDefinitionId: number) {
   return db
     .select({ id: partInstanceFiles.id, instanceNumber: partInstances.instanceNumber })
     .from(partInstanceFiles)
     .innerJoin(partInstances, eq(partInstances.id, partInstanceFiles.partInstanceId))
     .where(
-      and(
+      inTeam(
+        partInstanceFiles,
+        teamId,
         eq(partInstanceFiles.fileId, fileId),
         eq(partInstances.partDefinitionId, partDefinitionId),
       ),
@@ -108,26 +122,34 @@ export const partFilesRouter = new Hono<AppEnv>()
   .get("/", requireAuth, async (c) => {
     const partDefinitionId = c.req.query("partDefinitionId");
     const db = createShopDb(c.env.SHOP_DB);
+    const teamId = c.get("teamId");
 
     if (partDefinitionId === undefined) {
-      const rows = await db.select().from(files).orderBy(desc(files.createdAt)).all();
-      return c.json(await withAssignments(db, rows));
+      const rows = await db
+        .select()
+        .from(files)
+        .where(inTeam(files, teamId))
+        .orderBy(desc(files.createdAt))
+        .all();
+      return c.json(await withAssignments(db, teamId, rows));
     }
 
     const fileIds = db
       .selectDistinct({ id: partInstanceFiles.fileId })
       .from(partInstanceFiles)
       .innerJoin(partInstances, eq(partInstances.id, partInstanceFiles.partInstanceId))
-      .where(eq(partInstances.partDefinitionId, Number(partDefinitionId)));
+      .where(
+        inTeam(partInstances, teamId, eq(partInstances.partDefinitionId, Number(partDefinitionId))),
+      );
     const rows = await db
       .select()
       .from(files)
-      .where(inArray(files.id, fileIds))
+      .where(inTeam(files, teamId, inArray(files.id, fileIds)))
       .orderBy(desc(files.createdAt))
       .all();
-    return c.json(await withAssignments(db, rows, fileIds));
+    return c.json(await withAssignments(db, teamId, rows, fileIds));
   })
-  // Multipart upload into the library. Assign instances afterwards with PUT /:id/assignments.
+  // Multipart upload into the library. Assign instances afterward with PUT /:id/assignments.
   .post("/", requireAuth, denyKiosk, async (c) => {
     const form = await c.req.formData();
     // Workers' FormData typings omit File, but multipart file fields arrive as File objects.
@@ -141,24 +163,27 @@ export const partFilesRouter = new Hono<AppEnv>()
     }
 
     const contentType = file.type || "application/octet-stream";
-    const r2Key = `part-files/${crypto.randomUUID()}-${safeKeySegment(file.name)}`;
+    const teamId = c.get("teamId");
+    const r2Key = partFileKey(teamId, file.name);
     await c.env.DRAWINGS.put(r2Key, file.stream(), { httpMetadata: { contentType } });
 
     const db = createShopDb(c.env.SHOP_DB);
     try {
       const row = await db
         .insert(files)
-        .values({
-          filename: file.name,
-          r2Key,
-          contentType,
-          fileSize: file.size,
-          uploadedBy: c.get("userId"),
-          createdAt: Date.now(),
-        })
+        .values(
+          withTeam(teamId, {
+            filename: file.name,
+            r2Key,
+            contentType,
+            fileSize: file.size,
+            uploadedBy: c.get("userId"),
+            createdAt: Date.now(),
+          }),
+        )
         .returning()
         .get();
-      return c.json(await getFile(db, row.id), 201);
+      return c.json(await getFile(db, teamId, row.id), 201);
     } catch (err) {
       await c.env.DRAWINGS.delete(r2Key);
       throw err;
@@ -167,7 +192,11 @@ export const partFilesRouter = new Hono<AppEnv>()
   .get("/:id/download", requireAuth, async (c) => {
     const id = Number(c.req.param("id"));
     const db = createShopDb(c.env.SHOP_DB);
-    const row = await db.select().from(files).where(eq(files.id, id)).get();
+    const row = await db
+      .select()
+      .from(files)
+      .where(inTeam(files, c.get("teamId"), eq(files.id, id)))
+      .get();
     if (!row) return c.json({ error: "File not found." }, 404);
 
     const object = await c.env.DRAWINGS.get(row.r2Key);
@@ -192,27 +221,52 @@ export const partFilesRouter = new Hono<AppEnv>()
     const id = Number(c.req.param("id"));
     const { partDefinitionId, count } = c.req.valid("json");
     const db = createShopDb(c.env.SHOP_DB);
+    const teamId = c.get("teamId");
 
     const [file, definition] = await Promise.all([
-      db.select({ id: files.id }).from(files).where(eq(files.id, id)).get(),
       db
-        .select({ id: partDefinitions.id })
+        .select({ id: files.id })
+        .from(files)
+        .where(inTeam(files, teamId, eq(files.id, id)))
+        .get(),
+      db
+        .select({
+          id: partDefinitions.id,
+          isObsolete: partDefinitions.isObsolete,
+          partNumber: partDefinitions.onshapePartNumber,
+          revision: partDefinitions.revision,
+        })
         .from(partDefinitions)
-        .where(eq(partDefinitions.id, partDefinitionId))
+        .where(inTeam(partDefinitions, teamId, eq(partDefinitions.id, partDefinitionId)))
         .get(),
     ]);
     if (!file) return c.json({ error: "File not found." }, 404);
     if (!definition) return c.json({ error: "Part not found." }, 404);
 
-    const current = await assignmentsOn(db, id, partDefinitionId);
+    const current = await assignmentsOn(db, teamId, id, partDefinitionId);
 
     if (count > current.length) {
+      // No file goes to an obsolete revision: one marked obsolete, or one whose every instance
+      // has been made obsolete. Taking a file off one is still allowed.
+      const instances = await db
+        .select({ isStale: partInstances.isStale })
+        .from(partInstances)
+        .where(inTeam(partInstances, teamId, eq(partInstances.partDefinitionId, partDefinitionId)))
+        .all();
+      const allObsolete = instances.length > 0 && instances.every((i) => i.isStale);
+      if (definition.isObsolete || allObsolete) {
+        const label = `${definition.partNumber}${definition.revision ? ` Rev ${definition.revision}` : ""}`;
+        return c.json({ error: `${label} is obsolete, so a file can't be assigned to it.` }, 409);
+      }
+
       const free = await db
         .select({ id: partInstances.id })
         .from(partInstances)
         .leftJoin(partInstanceFiles, eq(partInstanceFiles.partInstanceId, partInstances.id))
         .where(
-          and(
+          inTeam(
+            partInstances,
+            teamId,
             eq(partInstances.partDefinitionId, partDefinitionId),
             eq(partInstances.isStale, 0),
             isNull(partInstanceFiles.id),
@@ -229,24 +283,29 @@ export const partFilesRouter = new Hono<AppEnv>()
         await db
           .insert(partInstanceFiles)
           .values(
-            batch.map((i) => ({
-              fileId: id,
-              partInstanceId: i.id,
-              assignedBy: userId,
-              createdAt: now,
-            })),
+            withTeam(
+              teamId,
+              batch.map((i) => ({
+                fileId: id,
+                partInstanceId: i.id,
+                assignedBy: userId,
+                createdAt: now,
+              })),
+            ),
           )
           .onConflictDoNothing();
       }
     } else if (count < current.length) {
       const drop = current.slice(count).map((a) => a.id);
       for (const batch of chunks(drop)) {
-        await db.delete(partInstanceFiles).where(inArray(partInstanceFiles.id, batch));
+        await db
+          .delete(partInstanceFiles)
+          .where(inTeam(partInstanceFiles, teamId, inArray(partInstanceFiles.id, batch)));
       }
     }
 
-    const assigned = (await assignmentsOn(db, id, partDefinitionId)).length;
-    return c.json({ file: await getFile(db, id), requested: count, assigned });
+    const assigned = (await assignmentsOn(db, teamId, id, partDefinitionId)).length;
+    return c.json({ file: await getFile(db, teamId, id), requested: count, assigned });
   })
   .delete("/:id/assignments/:instanceId", requireAuth, denyKiosk, async (c) => {
     const id = Number(c.req.param("id"));
@@ -255,7 +314,12 @@ export const partFilesRouter = new Hono<AppEnv>()
     await db
       .delete(partInstanceFiles)
       .where(
-        and(eq(partInstanceFiles.fileId, id), eq(partInstanceFiles.partInstanceId, instanceId)),
+        inTeam(
+          partInstanceFiles,
+          c.get("teamId"),
+          eq(partInstanceFiles.fileId, id),
+          eq(partInstanceFiles.partInstanceId, instanceId),
+        ),
       );
     return c.json({ ok: true });
   })
@@ -263,13 +327,20 @@ export const partFilesRouter = new Hono<AppEnv>()
   .delete("/:id", requireAuth, denyKiosk, async (c) => {
     const id = Number(c.req.param("id"));
     const db = createShopDb(c.env.SHOP_DB);
-    const row = await db.select().from(files).where(eq(files.id, id)).get();
+    const teamId = c.get("teamId");
+    const row = await db
+      .select()
+      .from(files)
+      .where(inTeam(files, teamId, eq(files.id, id)))
+      .get();
     if (!row) return c.json({ error: "File not found." }, 404);
 
     await c.env.DRAWINGS.delete(row.r2Key);
     await db.batch([
-      db.delete(partInstanceFiles).where(eq(partInstanceFiles.fileId, id)),
-      db.delete(files).where(eq(files.id, id)),
+      db
+        .delete(partInstanceFiles)
+        .where(inTeam(partInstanceFiles, teamId, eq(partInstanceFiles.fileId, id))),
+      db.delete(files).where(inTeam(files, teamId, eq(files.id, id))),
     ]);
     return c.json({ ok: true });
   });

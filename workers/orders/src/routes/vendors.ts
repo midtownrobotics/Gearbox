@@ -1,15 +1,27 @@
-import { and, eq, gte, lt } from "drizzle-orm";
+import { hasMentorAccess, inTeam, requireAuth, requireMentor, withTeam } from "@g3/auth";
+import { eq, gte, lt } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
 import { createOrdersDb } from "../db";
-import { CREDIT_KINDS, orderRequests, vendorCredits, vendorOrders, vendors } from "../db/schema";
+import {
+  CREDIT_KINDS,
+  budgetCategories,
+  orderRequests,
+  vendorCredits,
+  vendorOrders,
+  vendors,
+} from "../db/schema";
 import { fiscalRange, fiscalYearOf } from "../lib/fiscal";
+import { localTimeZone } from "../lib/local-time";
+import { teamCalendar } from "../lib/settings";
 import { vendorKey } from "../lib/vendors";
-import { requireAuth, requireMentor } from "../middleware/auth";
 import type { AppEnv } from "../types";
 
 type Profile = Partial<
-  Omit<typeof vendors.$inferInsert, "key" | "updatedAt" | "taxExempt" | "teamAccountLogin"> & {
+  Omit<
+    typeof vendors.$inferInsert,
+    "teamId" | "key" | "updatedAt" | "taxExempt" | "teamAccountLogin"
+  > & {
     taxExempt: boolean;
     teamAccountLogin: boolean;
   }
@@ -116,21 +128,31 @@ export const vendorsRouter = new Hono<AppEnv>()
    */
   .get("/", requireAuth, async (c) => {
     const db = createOrdersDb(c.env.ORDERS_DB);
-    const [from, to] = fiscalRange(fiscalYearOf(Date.now()));
+    const teamId = c.get("teamId");
+    const calendar = await teamCalendar(db, teamId, localTimeZone(c));
+    const [from, to] = fiscalRange(fiscalYearOf(Date.now(), calendar), calendar);
     const [profiles, requests, credits, orders] = await Promise.all([
-      db.select().from(vendors).all(),
+      db.select().from(vendors).where(inTeam(vendors, teamId)).all(),
       db
         .select({ vendor: orderRequests.vendor, status: orderRequests.status })
         .from(orderRequests)
+        .where(inTeam(orderRequests, teamId))
         .all(),
-      db.select().from(vendorCredits).all(),
+      db.select().from(vendorCredits).where(inTeam(vendorCredits, teamId)).all(),
       db
         .select({ vendor: vendorOrders.vendor })
         .from(vendorOrders)
-        .where(and(gte(vendorOrders.placedAt, from), lt(vendorOrders.placedAt, to)))
+        .where(
+          inTeam(
+            vendorOrders,
+            teamId,
+            gte(vendorOrders.placedAt, from),
+            lt(vendorOrders.placedAt, to),
+          ),
+        )
         .all(),
     ]);
-    const mentor = c.get("userIsMentor");
+    const mentor = hasMentorAccess(c);
     const names = new Map<string, string>();
     for (const r of requests)
       if (!names.has(vendorKey(r.vendor))) names.set(vendorKey(r.vendor), r.vendor.trim());
@@ -185,16 +207,31 @@ export const vendorsRouter = new Hono<AppEnv>()
       ...(teamAccountLogin === undefined ? {} : { teamAccountLogin: teamAccountLogin ? 1 : 0 }),
     };
     const db = createOrdersDb(c.env.ORDERS_DB);
+    const teamId = c.get("teamId");
+    if (body.defaultCategoryId) {
+      const category = await db
+        .select({ id: budgetCategories.id })
+        .from(budgetCategories)
+        .where(inTeam(budgetCategories, teamId, eq(budgetCategories.id, body.defaultCategoryId)))
+        .get();
+      if (!category)
+        return c.json({ error: "defaultCategoryId must be a category id or null." }, 400);
+    }
     const now = Date.now();
     const row = await db
       .insert(vendors)
-      .values({
-        key,
-        name: body.name ?? decodeURIComponent(c.req.param("key")).trim(),
-        ...body,
-        updatedAt: now,
+      .values(
+        withTeam(teamId, {
+          key,
+          name: body.name ?? decodeURIComponent(c.req.param("key")).trim(),
+          ...body,
+          updatedAt: now,
+        }),
+      )
+      .onConflictDoUpdate({
+        target: [vendors.teamId, vendors.key],
+        set: { ...body, updatedAt: now },
       })
-      .onConflictDoUpdate({ target: vendors.key, set: { ...body, updatedAt: now } })
       .returning()
       .get();
     return c.json(row);
@@ -205,15 +242,17 @@ export const vendorsRouter = new Hono<AppEnv>()
     const db = createOrdersDb(c.env.ORDERS_DB);
     const row = await db
       .insert(vendorCredits)
-      .values({
-        vendorKey: vendor,
-        kind: body.kind,
-        label: body.label,
-        code: body.code ?? null,
-        balanceCents: body.balanceCents ?? null,
-        expiresAt: body.expiresAt ?? null,
-        createdAt: Date.now(),
-      })
+      .values(
+        withTeam(c.get("teamId"), {
+          vendorKey: vendor,
+          kind: body.kind,
+          label: body.label,
+          code: body.code ?? null,
+          balanceCents: body.balanceCents ?? null,
+          expiresAt: body.expiresAt ?? null,
+          createdAt: Date.now(),
+        }),
+      )
       .returning()
       .get();
     return c.json(row, 201);
@@ -225,7 +264,9 @@ export const vendorsRouter = new Hono<AppEnv>()
     const row = await db
       .update(vendorCredits)
       .set(body)
-      .where(eq(vendorCredits.id, Number(c.req.param("id"))))
+      .where(
+        inTeam(vendorCredits, c.get("teamId"), eq(vendorCredits.id, Number(c.req.param("id")))),
+      )
       .returning()
       .get();
     if (!row) return c.json({ error: "Credit not found." }, 404);
@@ -235,7 +276,9 @@ export const vendorsRouter = new Hono<AppEnv>()
     const db = createOrdersDb(c.env.ORDERS_DB);
     const row = await db
       .delete(vendorCredits)
-      .where(eq(vendorCredits.id, Number(c.req.param("id"))))
+      .where(
+        inTeam(vendorCredits, c.get("teamId"), eq(vendorCredits.id, Number(c.req.param("id")))),
+      )
       .returning()
       .get();
     if (!row) return c.json({ error: "Credit not found." }, 404);

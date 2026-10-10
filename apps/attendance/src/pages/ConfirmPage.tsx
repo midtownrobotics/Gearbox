@@ -1,3 +1,4 @@
+import { allAppsUrl as ALL_APPS_URL } from "@g3/site-config";
 import { useEffect, useState } from "react";
 import { API, redirectToLogin } from "../utils/auth";
 import type { PageType } from "../utils/token";
@@ -21,7 +22,6 @@ type Status =
     }
   | { kind: "error"; message: string };
 
-const ALL_APPS_URL = "https://gearbox.g3robotics.com";
 const REDIRECT_SECONDS = 5;
 
 function tokenValid(w: string): boolean {
@@ -136,8 +136,6 @@ export default function ConfirmPage({ action, w }: Props) {
 
   return (
     <div className={`select select--${variant}`}>
-      <div className="scanlines" aria-hidden="true" />
-
       <div className="select__inner">
         {status.kind === "loading" && (
           <div className="select__state">

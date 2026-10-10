@@ -1,5 +1,5 @@
 /* Light/dark mode shared by every G3 app. The theme is `html[data-theme]`, set before first paint
-   by each app's index.html from the `g3_theme` cookie (shared across *.g3robotics.com), so
+   by each app's index.html from the `g3_theme` cookie (shared across the team's subdomains), so
    switching in one app switches them all. Apps are styled light; this file and the generated
    theme-palette.css restyle them in dark mode without touching their classes. */
 @import "./theme-palette.css";
@@ -13,46 +13,39 @@ html[data-theme="dark"] {
   --color-primary-100: #3a1a20;
   --color-primary-200: #5a2430;
   --color-primary-300: #7d2d3d;
-
-  /* G3 Shop's own palette. */
-  --color-ink: #f4f4f5;
-  --color-mist: #171717;
-  --color-steel-dark: #b6c1c6;
-  --color-steel-tint: #1e1e1e;
-  --color-crimson-tint: #3a1a20;
 }
 
-html[data-theme="dark"] body {
-  color: var(--g3-text);
-}
-
-/* Cards and panels. `white` itself stays white so white text on colored buttons still works. */
+/* A card written as `bg-white` before `bg-surface` existed: the theme's surface in dark mode.
+   (New code uses `bg-surface`, which follows the team's color in both themes and keeps its hover
+   styles.) `white` itself stays white so white text on colored buttons still works. */
 html[data-theme="dark"] .bg-white,
-html[data-theme="dark"] .bg-paper,
 html[data-theme="dark"] .hover\:bg-white:hover {
   background-color: var(--g3-surface);
 }
 html[data-theme="dark"] .bg-white\/95 {
-  background-color: rgb(38 38 38 / 0.95);
+  background-color: color-mix(in srgb, var(--g3-surface) 95%, transparent);
 }
 html[data-theme="dark"] .bg-white\/90 {
-  background-color: rgb(38 38 38 / 0.9);
+  background-color: color-mix(in srgb, var(--g3-surface) 90%, transparent);
 }
 html[data-theme="dark"] .bg-white\/80 {
-  background-color: rgb(38 38 38 / 0.8);
+  background-color: color-mix(in srgb, var(--g3-surface) 80%, transparent);
 }
 
-/* Dark text that was readable on white: lighter on dark surfaces. */
-html[data-theme="dark"] :is(.text-primary-500, .text-primary-600, .text-crimson),
+/* Dark text that was readable on white: lighter on dark surfaces. Brand text takes the team's
+   dark accent (Team Appearance), and lighter tints of it for the darker shades. */
+html[data-theme="dark"] :is(.text-primary-500, .text-primary-600),
+html[data-theme="dark"] :is(.hover\:text-primary-500, .hover\:text-primary-600):hover,
 html[data-theme="dark"]
-  :is(.hover\:text-primary-500, .hover\:text-primary-600, .hover\:text-crimson):hover {
-  color: #e8677c;
+  :where(.group):hover
+  :is(.group-hover\:text-primary-500, .group-hover\:text-primary-600) {
+  color: var(--g3-accent, #e8677c);
 }
 html[data-theme="dark"] :is(.text-primary-700, .hover\:text-primary-700:hover) {
-  color: #f0a3b0;
+  color: color-mix(in srgb, var(--g3-accent, #e8677c), white 40%);
 }
 html[data-theme="dark"] :is(.text-primary-800, .text-primary-900) {
-  color: #f8d3d9;
+  color: color-mix(in srgb, var(--g3-accent, #e8677c), white 72%);
 }
 
 /* Near-black fills (selected chips, tooltips) turn near-white in dark mode, so their white text

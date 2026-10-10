@@ -1,9 +1,8 @@
 import { useIsOnline } from "./hooks/use-is-online";
 export { useIsOnline };
 
-export { OnShapeIcon } from "./components/onshape-icon";
+export { TeamIcon } from "./components/team-icon";
 export {
-  ALL_APPS_URL,
   activePath,
   AppNavBar,
   type AppNavItem,
@@ -12,4 +11,7 @@ export {
   linkWith,
   ThemeToggle,
 } from "./components/app-nav-bar";
-export { readTheme, setTheme, type Theme, useTheme } from "./theme";
+export { forceTheme, readTheme, setTheme, type Theme, useTheme } from "./theme";
+export { refreshTeamUiSettings, useTeamIcon, useTeamNames, useTeamUiSettings } from "./team-ui";
+export { forgetTeam, rememberedTeam, rememberTeam } from "./my-team";
+export { type SignedInUser, appOn, useAppOn, useSignedInUser, useTeamApps } from "./session";

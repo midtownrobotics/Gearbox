@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { api } from "../../shared/api";
 import { getErrorMessage } from "../../shared/api-error";
 import type { InstanceRow } from "../../shared/derive";
-import { processPath } from "../../shared/nav";
+import { processPath, shopViewPath } from "../../shared/nav";
 import { PrintDrawingButton } from "../../shared/print-drawing-button";
 import type { ShopData } from "../../shared/use-shop-data";
 import { useUserNames } from "../../shared/use-user-names";
@@ -55,8 +55,10 @@ export function PartCard({
   const [sendBackProcess, setSendBackProcess] = useState<number | null>(null);
   const [sendBackStatus, setSendBackStatus] = useState<"todo" | "doing" | "done">("todo");
 
-  const resolveName = useUserNames([row.definition.creator]);
   const isObsolete = !!row.instance.isStale;
+  const resolveName = useUserNames(
+    [row.definition.creator, row.instance.obsoletedBy].filter((id): id is string => !!id),
+  );
 
   const processName = (pid: number) =>
     data.processes.find((p) => p.id === pid)?.name ?? `Process #${pid}`;
@@ -170,7 +172,8 @@ export function PartCard({
     <div className="fixed inset-0 z-50 bg-paper overflow-y-auto">
       <div className="max-w-3xl mx-auto">
         {/* Header */}
-        <div className="sticky top-0 bg-paper border-b border-steel/20 flex items-start justify-between gap-3 px-5 py-4">
+        {/* Above the page's own layers (the drawing is one), so nothing shows over it. */}
+        <div className="sticky top-0 z-10 bg-paper border-b border-steel/20 flex items-start justify-between gap-3 px-5 py-4">
           <div className="min-w-0">
             <h2 className="font-display text-3xl text-ink truncate">
               {row.definition.name}{" "}
@@ -185,6 +188,15 @@ export function PartCard({
               <span className="inline-block mt-1.5 text-[10px] font-semibold uppercase tracking-wider text-steel-dark bg-steel-tint border border-steel/40 rounded-full px-2 py-0.5">
                 Obsolete · view only
               </span>
+            )}
+            {row.current && !isObsolete && (
+              <Link
+                to={shopViewPath(row.current.processId, row.instance.id)}
+                onClick={onClose}
+                className="mt-2 inline-flex rounded-lg border border-steel/30 bg-steel-tint px-3 py-1.5 text-sm font-semibold text-steel-dark transition-colors hover:border-steel/50 hover:bg-steel/20"
+              >
+                Switch to Shop View
+              </Link>
             )}
           </div>
           <button
@@ -232,6 +244,22 @@ export function PartCard({
                 value={new Date(row.definition.createdAt).toLocaleDateString()}
               />
               <Meta label="Created By" value={resolveName(row.definition.creator)} />
+              {isObsolete && (
+                <>
+                  <Meta
+                    label="Obsoleted"
+                    value={
+                      row.instance.obsoletedAt
+                        ? new Date(row.instance.obsoletedAt).toLocaleDateString()
+                        : "—"
+                    }
+                  />
+                  <Meta
+                    label="Obsoleted By"
+                    value={row.instance.obsoletedBy ? resolveName(row.instance.obsoletedBy) : "—"}
+                  />
+                </>
+              )}
               <dt className="text-steel">Priority</dt>
               <dd>
                 <label className="inline-flex items-center gap-2 cursor-pointer select-none">
@@ -248,14 +276,17 @@ export function PartCard({
             </dl>
           </Section>
 
-          <Section title="Files">
-            <PartFilesPanel
-              definition={row.definition}
-              definitions={data.definitions}
-              instances={data.instances}
-              currentInstanceId={row.instance.id}
-            />
-          </Section>
+          {/* An obsolete part is only looked at: no files to assign, nothing to change. */}
+          {!isObsolete && (
+            <Section title="Files">
+              <PartFilesPanel
+                definition={row.definition}
+                definitions={data.definitions}
+                instances={data.instances}
+                currentInstanceId={row.instance.id}
+              />
+            </Section>
+          )}
 
           {/* Status */}
           <Section title="Status">
@@ -322,37 +353,36 @@ export function PartCard({
             </p>
           )}
 
-          <div className={`grid grid-cols-1 gap-2 ${isObsolete ? "" : "sm:grid-cols-3"}`}>
-            <button
-              type="button"
-              onClick={addMoreInstances}
-              disabled={busy || isObsolete}
-              className="w-full py-2.5 rounded-lg border border-emerald-400/50 text-emerald-700 hover:bg-emerald-50 text-sm font-semibold transition-colors disabled:opacity-50"
-            >
-              + Add One
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setSendBackProcess(row.procs[0]?.processId ?? null);
-                setSendBackStatus("todo");
-                setShowSendBackModal(true);
-              }}
-              disabled={busy || isObsolete}
-              className="w-full py-2.5 rounded-lg border border-amber-400/50 text-amber-700 hover:bg-amber-50 text-sm font-semibold transition-colors disabled:opacity-50"
-            >
-              ↶ Send Back
-            </button>
-            <button
-              type="button"
-              onClick={transferProcesses}
-              disabled={busy}
-              className="w-full py-2.5 rounded-lg border border-steel/50 text-steel-dark hover:bg-steel-tint text-sm font-semibold transition-colors disabled:opacity-50"
-            >
-              Edit & Obsolete
-            </button>
-            {/* An already-obsolete part can't be made obsolete again — only transferred. */}
-            {!isObsolete && (
+          {!isObsolete && (
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+              <button
+                type="button"
+                onClick={addMoreInstances}
+                disabled={busy}
+                className="w-full py-2.5 rounded-lg border border-emerald-400/50 text-emerald-700 hover:bg-emerald-50 text-sm font-semibold transition-colors disabled:opacity-50"
+              >
+                + Add One
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSendBackProcess(row.procs[0]?.processId ?? null);
+                  setSendBackStatus("todo");
+                  setShowSendBackModal(true);
+                }}
+                disabled={busy}
+                className="w-full py-2.5 rounded-lg border border-amber-400/50 text-amber-700 hover:bg-amber-50 text-sm font-semibold transition-colors disabled:opacity-50"
+              >
+                ↶ Send Back
+              </button>
+              <button
+                type="button"
+                onClick={transferProcesses}
+                disabled={busy}
+                className="w-full py-2.5 rounded-lg border border-steel/50 text-steel-dark hover:bg-steel-tint text-sm font-semibold transition-colors disabled:opacity-50"
+              >
+                Edit & Obsolete
+              </button>
               <button
                 type="button"
                 onClick={makeObsolete}
@@ -361,8 +391,8 @@ export function PartCard({
               >
                 Make Obsolete
               </button>
-            )}
-          </div>
+            </div>
+          )}
 
           {/* Send Back Modal */}
           {showSendBackModal && (
