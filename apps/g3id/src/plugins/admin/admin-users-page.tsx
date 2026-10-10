@@ -143,6 +143,7 @@ export function AdminUsersPage() {
   const [approving, setApproving] = useState<Set<string>>(new Set());
   const [rejecting, setRejecting] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState<Set<string>>(new Set());
+  const [actionError, setActionError] = useState<string | null>(null);
   const [promoting, setPromoting] = useState<Set<string>>(new Set());
   const [togglingMentor, setTogglingMentor] = useState<Set<string>>(new Set());
   const [mergingUserId, setMergingUserId] = useState<string | null>(null);
@@ -211,9 +212,17 @@ export function AdminUsersPage() {
   async function handleDelete(userId: string) {
     if (!window.confirm("Permanently delete this user and all their data?")) return;
     setDeleting((prev) => new Set(prev).add(userId));
+    setActionError(null);
     try {
       const res = await api.admin.users[":id"].$delete({ param: { id: userId } });
       if (res.ok) setUsers((prev) => prev.filter((u) => u.id !== userId));
+      else {
+        // Say so: a delete that failed used to look like nothing had happened.
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        setActionError((res.status < 500 && body.error) || "Couldn't delete the user.");
+      }
+    } catch {
+      setActionError("Couldn't delete the user.");
     } finally {
       setDeleting((prev) => {
         const n = new Set(prev);
@@ -454,6 +463,12 @@ export function AdminUsersPage() {
       )}
 
       {error && <p className="text-sm text-primary-500">{error}</p>}
+
+      {actionError && (
+        <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          {actionError}
+        </p>
+      )}
 
       {!loading && !error && filtered.length === 0 && (
         <p className="text-sm text-secondary-500 text-center py-16">

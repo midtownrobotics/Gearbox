@@ -1,14 +1,16 @@
 import { sendDM } from "@g3/slack";
-import { and, desc, eq, gt, isNull, or } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, isNull, or } from "drizzle-orm";
 import { Hono } from "hono";
 import { createDb } from "../db";
 import {
   coreSessions,
   coreSlackLinkCodes,
   coreUserIdentities,
+  coreUserPins,
   coreUsers,
   kioskActivationCodes,
   kioskDevices,
+  slackInstallations,
   teamUiSettings,
 } from "../db/schema";
 import { removeInstallation, slackForTeam } from "../lib/slack-install";
@@ -233,12 +235,15 @@ export const adminRouter = new Hono<AppEnv>()
   })
   .delete("/users/:id", async (c) => {
     const id = c.req.param("id");
+    const actorId = c.get("userId") as string;
+    if (id === actorId) return c.json({ error: "You can't delete your own account." }, 400);
+    const team = c.get("adminTeamId") as string;
     const db = createDb(c.env.DB);
 
     const user = await db
       .select({ id: coreUsers.id, status: coreUsers.status })
       .from(coreUsers)
-      .where(memberOf(c.get("adminTeamId") as string, id))
+      .where(memberOf(team, id))
       .get();
 
     if (!user) return c.json({ error: "User not found." }, 404);
@@ -246,10 +251,48 @@ export const adminRouter = new Hono<AppEnv>()
       return c.json({ error: "Pending users must be rejected before deletion." }, 400);
     }
 
-    await db.delete(coreSlackLinkCodes).where(eq(coreSlackLinkCodes.userId, id));
-    await db.delete(coreSessions).where(eq(coreSessions.userId, id));
-    await db.delete(coreUserIdentities).where(eq(coreUserIdentities.userId, id));
-    await db.delete(coreUsers).where(memberOf(c.get("adminTeamId") as string, id));
+    // Accounts merged into this one long ago were left as empty shells pointing at it: they go
+    // with it.
+    const shells = await db
+      .select({ id: coreUsers.id })
+      .from(coreUsers)
+      .where(and(eq(coreUsers.teamId, team), eq(coreUsers.mergedIntoUserId, id)))
+      .all();
+    const ids = [id, ...shells.map((shell) => shell.id)];
+    const sessions = await db
+      .select({ id: coreSessions.id })
+      .from(coreSessions)
+      .where(inArray(coreSessions.userId, ids))
+      .all();
+
+    // Everything that points at the account goes before it, in one batch, so it is all deleted or
+    // none of it is. (One step at a time, an account with a kiosk PIN lost its sign-ins and then
+    // couldn't be deleted.)
+    await db.batch([
+      db.delete(coreSlackLinkCodes).where(inArray(coreSlackLinkCodes.userId, ids)),
+      db.delete(coreSessions).where(inArray(coreSessions.userId, ids)),
+      db.delete(coreUserPins).where(inArray(coreUserPins.userId, ids)),
+      db.delete(coreUserIdentities).where(inArray(coreUserIdentities.userId, ids)),
+      db.delete(kioskActivationCodes).where(inArray(kioskActivationCodes.createdBy, ids)),
+      // The team's kiosks and its Slack connection stay: the admin deleting the account takes
+      // over the kiosks it set up.
+      db
+        .update(kioskDevices)
+        .set({ createdBy: actorId })
+        .where(inArray(kioskDevices.createdBy, ids)),
+      db
+        .update(slackInstallations)
+        .set({ installedBy: null })
+        .where(inArray(slackInstallations.installedBy, ids)),
+      db.delete(coreUsers).where(and(eq(coreUsers.teamId, team), inArray(coreUsers.id, ids))),
+    ]);
+    // Sessions are looked up in KV; without their user they'd fail anyway, but don't leave them.
+    await Promise.all(
+      sessions.flatMap(({ id: session }) => [
+        c.env.SESSIONS.delete(`session:${session}`),
+        c.env.SESSIONS.delete(`session:${session}:meta`),
+      ]),
+    );
 
     return c.json({ message: "User deleted." });
   })
