@@ -32,7 +32,7 @@ import devPorts from "../../../.dev-ports.json";
 //
 // Local dev (roadmap 2.9; `LOCAL_DEV` in wrangler.toml's dev settings, `pnpm dev`): the gateway
 // runs on one port (8796), with gearbox.localhost standing for the platform's domain:
-// gearbox.localhost:8796 is the platform, 254-orders.gearbox.localhost:8796 team 254's Orders,
+// gearbox.localhost:8796 is the platform, 9999-orders.gearbox.localhost:8796 team 9999's Orders,
 // 1648-id.gearbox.localhost:8796 this team's G3ID. /api goes to each app's local worker, pages to its Vite dev server (.dev-ports.json).
 //
 // On the way it keeps teams apart (roadmap step 2.3):

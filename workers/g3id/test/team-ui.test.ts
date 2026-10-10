@@ -148,9 +148,9 @@ describe("team UI settings", () => {
       hiddenLinks: ["blueAlliance", "publicSite"] as TeamUiSettings["hiddenLinks"],
       links: {
         ...defaultTeamUiSettings.links,
-        frcEvents: "https://frc-events.firstinspires.org/team/254",
-        blueAlliance: "https://www.thebluealliance.com/team/254",
-        statbotics: "https://www.statbotics.io/team/254",
+        frcEvents: "https://frc-events.firstinspires.org/team/9999",
+        blueAlliance: "https://www.thebluealliance.com/team/9999",
+        statbotics: "https://www.statbotics.io/team/9999",
         match13: "",
       },
     };

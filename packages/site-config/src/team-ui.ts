@@ -150,7 +150,7 @@ export const defaultTeamUiSettings: TeamUiSettings = {
 
 /**
  * A team's appearance before its admins change anything: the site team's from site.ts (above), and
- * for any other team its own name, its number as the short name ("254 SHOP"), the FRC links for its
+ * for any other team its own name, its number as the short name ("9999 SHOP"), the FRC links for its
  * number, and the shared colors. `name` is the team's registered name, when known.
  */
 export function teamUiDefaults(teamId: string, name?: string): TeamUiSettings {

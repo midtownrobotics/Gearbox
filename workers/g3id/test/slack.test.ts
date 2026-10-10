@@ -368,7 +368,7 @@ describe("signing a team up", () => {
 describe("the session cookie", () => {
   it("is set for the domain the request came in on", () => {
     expect(sessionCookieOptions(`https://g3id.${site.domain}/api/auth/x`).domain).toBe(site.domain);
-    expect(sessionCookieOptions(`https://254-id.${site.platformDomain}/api/x`).domain).toBe(
+    expect(sessionCookieOptions(`https://9999-id.${site.platformDomain}/api/x`).domain).toBe(
       site.platformDomain,
     );
     // Local dev: the gateway's addresses share gearbox.localhost (browsers won't share "localhost").

@@ -196,7 +196,7 @@ const MOMENTS: { app: string; label: string; text: string }[] = [
   { app: "Orders", label: "Order approved", text: '4× 1/2" hex bearings' },
   { app: "Shop", label: "Part finished", text: "Intake side plate · 2 of 2 cut" },
   { app: "Pit", label: "Battery ready", text: "Battery 7 charged for Q42" },
-  { app: "Scouting", label: "Pick list updated", text: "Team 254 moved to the top tier" },
+  { app: "Scouting", label: "Pick list updated", text: "Team 9999 moved to the top tier" },
   { app: "Skill Tree", label: "Skill signed off", text: "CAD Basics · complete" },
 ];
 
