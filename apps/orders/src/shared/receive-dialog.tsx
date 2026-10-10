@@ -36,6 +36,11 @@ export function useIntake(): Intake | null {
   return intake;
 }
 
+/** After the setting changes: the next page to ask loads it again. */
+export function forgetIntake() {
+  loading = null;
+}
+
 /** Whether receiving should ask about Inventory: it's required, or Inventory is set up. */
 export function asksInventory(intake: Intake | null): boolean {
   return !!intake && (intake.required || (intake.options?.locations.length ?? 0) > 0);

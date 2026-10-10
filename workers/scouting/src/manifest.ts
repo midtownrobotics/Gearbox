@@ -23,7 +23,6 @@ export const manifest = defineManifest({
     },
   ],
   // Engagement (engagement.ts): each switched on and off on Scouting's Admin page.
-  settingsForm: false,
   plugins: [
     {
       key: "points",

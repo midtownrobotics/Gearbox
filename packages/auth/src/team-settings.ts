@@ -4,10 +4,11 @@ import { logTeamChange, settingLabels } from "./audit";
 import { type G3AuthEnv, hasMentorAccess, requireAuth } from "./g3id";
 import type { AppIntegration, AppManifest, AppSetting } from "./manifest";
 
-// The team's settings for one app, in one shape every app shares (roadmap 4.5), so the team's
-// dashboard (Portal's /admin/settings) builds its forms from the manifests alone. Each app mounts
-// `teamSettingsRoutes` at `/team-settings` and says how to read and save its own settings; this
-// checks who may change what, checks each value by its manifest type, and writes the team's log.
+// The team's settings for one app, in one shape every app shares (roadmap 4.5), by manifest key.
+// Each app mounts `teamSettingsRoutes` at `/team-settings` and says how to read and save its own
+// settings; this checks who may change what, checks each value by its manifest type, and writes
+// the team's log. The team's Integrations page reads each app's integrations from it. Settings are
+// edited on the apps' own pages, which save through their own routes; nothing saves here yet.
 
 export type SettingValue = string | number | boolean | null;
 

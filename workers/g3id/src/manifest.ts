@@ -16,6 +16,5 @@ export const manifest = defineManifest({
   // Team Appearance and Slack are edited on the team's home (Portal's /admin); members, kiosks
   // and roles stay here.
   settings: [],
-  settingsForm: false,
   plugins: [],
 });

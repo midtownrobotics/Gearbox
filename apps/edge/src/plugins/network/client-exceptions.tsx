@@ -1,5 +1,5 @@
-import { appUrl } from "@g3/site-config";
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { api, getErrorMessage } from "../../shared/api";
 import { useAuthUser } from "../../shared/auth";
 import { formatUntil } from "../../shared/format";
@@ -50,13 +50,10 @@ export function ClientExceptions({ mac }: { mac: string }) {
     <Card title="Exceptions">
       {!data.enforce && (
         <p className="text-sm text-secondary-500 mb-3">
-          Blocklists aren't being enforced right now (switch it on in your team's{" "}
-          <a
-            href={`${appUrl("portal")}/admin/settings`}
-            className="text-primary-500 hover:text-primary-700"
-          >
-            App settings
-          </a>
+          Blocklists aren't being enforced right now (see{" "}
+          <Link to="/network/controls" className="text-primary-500 hover:text-primary-700">
+            Controls
+          </Link>
           ), so exceptions have no effect until they are.
         </p>
       )}

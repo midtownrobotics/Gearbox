@@ -9,4 +9,4 @@
 "@g3/worker-platform": minor
 ---
 
-Team admins can change each app's settings, choose how members sign in, and see what the apps are connected to, from the team's admin pages.
+Team admins can choose how members sign in and see what the apps are connected to, from the team's admin pages.

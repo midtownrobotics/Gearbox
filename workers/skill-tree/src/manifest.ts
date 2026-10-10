@@ -13,6 +13,5 @@ export const manifest = defineManifest({
   hooks: { seed: true, delete: true, export: true },
   // The trees are the team's content (a tree set file), not settings.
   settings: [],
-  settingsForm: false,
   plugins: [],
 });

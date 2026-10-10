@@ -14,6 +14,5 @@ export const manifest = defineManifest({
   version: packageJson.version,
   hooks: { seed: false, delete: false, export: false },
   settings: [],
-  settingsForm: false,
   plugins: [],
 });

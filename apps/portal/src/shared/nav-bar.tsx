@@ -14,10 +14,7 @@ export function NavBar({ items }: { items: PluginNavItem[] }) {
   const me = useMe();
   const { pathname } = useLocation();
   const shown = items.filter(
-    (item) =>
-      (!item.requiresAuth || me) &&
-      (!item.requiresAdmin || me?.isAdmin) &&
-      (!item.requiresMentor || me?.isAdmin || me?.isMentor),
+    (item) => (!item.requiresAuth || me) && (!item.requiresAdmin || me?.isAdmin),
   );
   const active = activePath(
     pathname,

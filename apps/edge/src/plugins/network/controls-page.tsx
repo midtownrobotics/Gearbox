@@ -1,8 +1,8 @@
-import { appUrl } from "@g3/site-config";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { api, getErrorMessage } from "../../shared/api";
 import { formatUntil } from "../../shared/format";
+import { Toggle } from "../../shared/toggle";
 import { Card, ErrorBanner, Loading, Page } from "../../shared/ui";
 import { useLoad } from "../../shared/use-load";
 
@@ -65,26 +65,28 @@ export function ControlsPage() {
       {actionError && <ErrorBanner message={actionError} />}
 
       <Card>
-        <ul className="space-y-1 text-sm text-secondary-700">
-          <li>
-            Blocklists are{" "}
-            <span className="font-semibold">{data.enforce ? "enforced" : "not enforced"}</span>.
-          </li>
-          <li>
-            DNS hardening is{" "}
-            <span className="font-semibold">{data.dnsHardening ? "on" : "off"}</span>.
-          </li>
-        </ul>
-        <p className="mt-2 text-xs text-secondary-500">
-          Switch them on or off on your team's{" "}
-          <a
-            href={`${appUrl("portal")}/admin/settings`}
-            className="text-primary-500 hover:text-primary-700"
-          >
-            App settings
-          </a>{" "}
-          page.
-        </p>
+        <div className="space-y-4">
+          <Toggle
+            label="Enforce blocklists"
+            description="Block or throttle sites in the enabled lists, except on devices with an exception."
+            checked={data.enforce}
+            disabled={busy}
+            onChange={(enforce) =>
+              run(() => mutate(() => api.network.control.settings.$patch({ json: { enforce } })))
+            }
+          />
+          <Toggle
+            label="DNS hardening"
+            description="Stop devices getting around blocklists with encrypted DNS or iCloud Private Relay."
+            checked={data.dnsHardening}
+            disabled={busy}
+            onChange={(dnsHardening) =>
+              run(() =>
+                mutate(() => api.network.control.settings.$patch({ json: { dnsHardening } })),
+              )
+            }
+          />
+        </div>
       </Card>
 
       <Blocklists lists={data.blocklists} onChanged={reload} />

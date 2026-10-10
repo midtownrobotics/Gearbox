@@ -4,9 +4,8 @@ import type { AppName } from "@g3/site-config";
 // `workers/<app>/src/manifest.ts` (exported as `@g3/worker-<app>/manifest`); the platform
 // builds its app library from them (workers/platform/src/registry.ts), so a deploy is what changes
 // the library. It also says what the team can set (`settings`), which optional parts it has
-// (`plugins`) and which of the platform's hooks it answers. The team's dashboard (Portal's
-// /admin/settings, roadmap 4.5) builds a form from `settings` for each app with `settingsForm`,
-// which reads and saves them through the app's own `/team-settings` (`teamSettingsRoutes`).
+// (`plugins`) and which of the platform's hooks it answers. A setting for one app is edited on
+// that app's own pages (`page`), never on the team's home; the team's log names it by `label`.
 
 /** The roles an app gives a meaning to. */
 export type AppRole = "admin" | "mentor" | "member" | "kiosk";
@@ -50,19 +49,16 @@ export type AppSetting = {
   /** Who may change it. */
   editedBy: "admin" | "mentor";
   /**
-   * Where it's edited when the team's App settings page can't (an integration's keys, or an app
-   * without `settingsForm`): its path in the app, or `<app>:<path>` for a page in another app.
-   * A setting the App settings page edits has none: it's edited only there.
+   * The page that edits it: its path in the app, or `<app>:<path>` for a page in another app
+   * (Attendance's settings are on G3ID: `id:/admin/attendance`).
    */
-  page?: string;
+  page: string;
   /**
    * Part of connecting this integration (keys, a box key): set up on `page`, where saving does more
-   * than store it (registering a webhook, making a key). The dashboard lists it on its
-   * Integrations page, not in the app's settings form.
+   * than store it (registering a webhook, making a key). The team's Integrations page says
+   * whether it's connected.
    */
   integration?: AppIntegration;
-  /** Another app it's about: the dashboard leaves it out while the team has that app off. */
-  requiresApp?: AppName;
 };
 
 /** An optional part of an app a team switches on inside it (Scouting's engagement modules). */
@@ -105,11 +101,6 @@ export type AppManifest = {
   hooks: { seed: boolean; delete: boolean; export: boolean };
   /** The team's settings for this app (none for an app without any). */
   settings: AppSetting[];
-  /**
-   * It answers `GET`/`PUT /api/team-settings` (`teamSettingsRoutes`), so the team's dashboard has
-   * a form for its settings. False: they're only on its own pages.
-   */
-  settingsForm: boolean;
   /** Its optional parts, each switched on and off inside the app. */
   plugins: AppPlugin[];
 };

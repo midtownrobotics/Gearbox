@@ -63,6 +63,7 @@ export const manifest = defineManifest({
       type: "text",
       default: null,
       editedBy: "admin",
+      page: "/admin",
     },
     {
       key: "slackSummaryChannelId",
@@ -70,8 +71,8 @@ export const manifest = defineManifest({
       type: "text",
       default: null,
       editedBy: "admin",
+      page: "/admin",
     },
   ],
-  settingsForm: true,
   plugins: [],
 });

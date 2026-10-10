@@ -1,4 +1,4 @@
-import { requireAdmin, requireAuth, requireMentor } from "@g3/auth";
+import { requireAdmin, requireAuth } from "@g3/auth";
 import { type AppName, teamAppUrlVia } from "@g3/site-config";
 import { and, desc, eq, isNull, lte } from "drizzle-orm";
 import { Hono } from "hono";
@@ -115,10 +115,6 @@ async function library(env: AppEnv["Bindings"], teamId: string) {
         keepsDataWhenOff: !app.hooks.delete,
         /** Its data can be downloaded (its export hook). */
         exportable: app.hooks.export,
-        /** The team's settings for it, for the dashboard's forms (4.5). */
-        settings: app.settings,
-        /** It answers /team-settings, so the dashboard has a form for them. */
-        settingsForm: app.settingsForm,
       };
     });
 }
@@ -135,23 +131,6 @@ export const teamRouter = new Hono<AppEnv>()
       })),
       isAdmin: c.get("userIsAdmin"),
     });
-  })
-  // The settings of the team's apps that are on, for the App settings page (mentors and admins:
-  // each app lets only a setting's editors change it). A setting about another app is left out
-  // while that app is off.
-  .get("/settings", requireMentor, async (c) => {
-    const on = await enabledApps(db(c.env), c.get("teamId"));
-    return c.json(
-      on
-        .map((slug) => MANIFESTS[slug])
-        .map((app) => ({
-          slug: app.slug,
-          name: app.name,
-          settingsForm: app.settingsForm,
-          settings: app.settings.filter((s) => !s.requiresApp || on.includes(s.requiresApp)),
-        }))
-        .filter((app) => app.settings.some((s) => !s.integration)),
-    );
   })
   .use("/library", requireAdmin)
   .use("/library/*", requireAdmin)

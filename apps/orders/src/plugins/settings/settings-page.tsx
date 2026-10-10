@@ -1,12 +1,14 @@
-import { appUrl } from "@g3/site-config";
-import { useTeamNames } from "@g3/ui";
+import { useAppOn, useTeamNames } from "@g3/ui";
+import { DEFAULT_TEMPLATE, applyTemplate } from "@g3/worker-orders/naming";
 import { type FormEvent, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api, getErrorMessage } from "../../shared/api";
+import { forgetIntake } from "../../shared/receive-dialog";
 import {
   Button,
   Card,
   ErrorBanner,
+  Field,
   Loading,
   Page,
   SuccessBanner,
@@ -14,35 +16,211 @@ import {
 } from "../../shared/ui";
 import { useLoad } from "../../shared/use-load";
 
-/**
- * Mentors: who edits the catalog, Share-A-Cart, and budget category guesses. The team's currency,
- * fiscal year, request names and receiving into Inventory are on the team's App settings page.
- */
+const EXAMPLE = {
+  vendor: "West Coast Products",
+  sku: "WCP-1018",
+  title: "12t x 15mm Wide Aluminum Pulley (HTD 5mm, 8mm SplineXS Bore) | WCP",
+  variant: "8mm SplineXS",
+};
+
+/** Mentors: the team's money and calendar, who edits the catalog, and how requests are named. */
 export function SettingsPage() {
+  // Receiving into Inventory is only a setting while the team has Inventory on.
+  const inventoryOn = useAppOn("inventory");
   return (
     <Page title="Settings">
-      <TeamSettingsLink />
+      <MoneyAndCalendar />
       <TrustedStudents />
       <ShareACart />
+      {inventoryOn !== false && <InventoryOnReceive />}
+      <NamingTemplate />
       <CategoryRules />
     </Page>
   );
 }
 
-/** Where the team's Orders settings are now: the App settings page on the team's home. */
-function TeamSettingsLink() {
+const MONTHS = Array.from({ length: 12 }, (_, i) =>
+  new Date(Date.UTC(2026, i, 1)).toLocaleDateString("en-US", { month: "long", timeZone: "UTC" }),
+);
+
+/** The team's currency and fiscal calendar: what budgets, prices and fiscal years are in. */
+function MoneyAndCalendar() {
+  const settings = useLoad(async () => {
+    const res = await api.settings.$get();
+    if (!res.ok) throw new Error(await getErrorMessage(res));
+    return res.json();
+  }, []);
+  const [currency, setCurrency] = useState("");
+  const [start, setStart] = useState(7);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!settings.data) return;
+    setCurrency(settings.data.currency);
+    setStart(settings.data.fiscalYearStart);
+  }, [settings.data]);
+
+  async function save(e: FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    const res = await api.settings.$put({
+      json: { currency: currency.trim().toUpperCase(), fiscalYearStart: start },
+    });
+    setBusy(false);
+    if (!res.ok) return setError(await getErrorMessage(res));
+    // Every page reads these when it loads.
+    window.location.reload();
+  }
+
   return (
-    <Card title="Currency, fiscal year and request names">
-      <p className="text-sm text-secondary-600">
-        These are on your team's{" "}
-        <a
-          href={`${appUrl("portal")}/admin/settings`}
-          className="font-semibold text-primary-600 underline"
-        >
-          App settings
-        </a>{" "}
-        page, with whether receiving needs an Inventory place.
-      </p>
+    <Card title="Money and calendar">
+      {!settings.data ? (
+        <Loading />
+      ) : (
+        <form onSubmit={save} className="space-y-3">
+          <p className="text-sm text-secondary-600">
+            Budgets and spending are counted by fiscal year, starting on the 1st of the month below.
+            Changing it recounts every year.
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Currency" hint="A 3-letter code: USD, CAD, EUR, ...">
+              <input
+                className={`${inputClass} uppercase`}
+                value={currency}
+                maxLength={3}
+                onChange={(e) => setCurrency(e.target.value)}
+              />
+            </Field>
+            <Field label="Fiscal year starts in">
+              <select
+                className={inputClass}
+                value={start}
+                onChange={(e) => setStart(Number(e.target.value))}
+              >
+                {MONTHS.map((month, i) => (
+                  <option key={month} value={i + 1}>
+                    {month}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </div>
+          {error && <ErrorBanner message={error} />}
+          <Button type="submit" disabled={busy}>
+            Save
+          </Button>
+        </form>
+      )}
+    </Card>
+  );
+}
+
+/** Whether marking a part received has to say where it goes in the Inventory app. */
+function InventoryOnReceive() {
+  const names = useTeamNames();
+  const inventory = names.appTitle("Inventory");
+  const settings = useLoad(async () => {
+    const res = await api.settings.$get();
+    if (!res.ok) throw new Error(await getErrorMessage(res));
+    return res.json();
+  }, []);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function set(required: boolean) {
+    setBusy(true);
+    setError(null);
+    const res = await api.settings.$put({ json: { inventoryRequired: required } });
+    setBusy(false);
+    if (!res.ok) return setError(await getErrorMessage(res));
+    forgetIntake();
+    settings.reload();
+  }
+
+  return (
+    <Card title="Receiving and Inventory">
+      {!settings.data ? (
+        <Loading />
+      ) : (
+        <div className="space-y-3">
+          <label className="flex items-start gap-3 text-sm text-secondary-900">
+            <input
+              type="checkbox"
+              className="mt-0.5"
+              checked={settings.data.inventoryRequired}
+              disabled={busy}
+              onChange={(e) => void set(e.target.checked)}
+            />
+            <span>
+              <span className="font-semibold">
+                Require a place in {inventory} when marking parts received
+              </span>
+              <span className="mt-0.5 block text-secondary-600">
+                {settings.data.inventoryRequired
+                  ? `Whoever receives a part must say where it goes, and it's added to ${inventory}.`
+                  : `Optional. Parts received without a place aren't added to ${inventory}.`}
+              </span>
+            </span>
+          </label>
+          {error && <ErrorBanner message={error} />}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+function NamingTemplate() {
+  const settings = useLoad(async () => {
+    const res = await api.settings.$get();
+    if (!res.ok) throw new Error(await getErrorMessage(res));
+    return res.json();
+  }, []);
+  const [template, setTemplate] = useState("");
+  const [saved, setSaved] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    if (settings.data) setTemplate(settings.data.namingTemplate);
+  }, [settings.data]);
+
+  async function save(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setSaved(null);
+    const res = await api.settings.$put({ json: { namingTemplate: template } });
+    if (!res.ok) return setError(await getErrorMessage(res));
+    setSaved("Saved. New requests will be named this way.");
+  }
+
+  return (
+    <Card title="Request names">
+      {!settings.data ? (
+        <Loading />
+      ) : (
+        <form onSubmit={save} className="space-y-3">
+          <Field label="Template" hint="Tokens: {vendor} {sku} {title} {variant}.">
+            <input
+              className={`${inputClass} font-mono`}
+              value={template}
+              onChange={(e) => setTemplate(e.target.value)}
+            />
+          </Field>
+          <p className="text-sm text-secondary-600">
+            Example:{" "}
+            <span className="font-semibold text-secondary-900">
+              {applyTemplate(template || DEFAULT_TEMPLATE, EXAMPLE)}
+            </span>
+          </p>
+          {error && <ErrorBanner message={error} />}
+          {saved && <SuccessBanner message={saved} />}
+          <div className="flex gap-2">
+            <Button type="submit">Save</Button>
+            <Button variant="secondary" onClick={() => setTemplate(DEFAULT_TEMPLATE)}>
+              Reset to default
+            </Button>
+          </div>
+        </form>
+      )}
     </Card>
   );
 }

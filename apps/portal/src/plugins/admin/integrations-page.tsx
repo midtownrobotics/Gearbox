@@ -2,7 +2,12 @@ import { type AppName, apiPath, appUrl } from "@g3/site-config";
 import { type ReactNode, useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { g3id } from "../../lib/api";
-import { type IntegrationStatus, type LibraryApp, appSettings, platform } from "../../lib/platform";
+import {
+  type IntegrationStatus,
+  type LibraryApp,
+  appIntegrations,
+  platform,
+} from "../../lib/platform";
 
 // The services outside Gearbox the team's apps work with: whether each is connected, what's known
 // about the connection, what the team uses it for, and where it's set up. Slack is connected here
@@ -39,7 +44,10 @@ const SLACK_USES: Use[] = [
   { app: null, text: "Signing in: members get their sign-in code from the bot." },
   { app: null, text: "Admins hear when an app is switched on or off." },
   { app: "orders", text: "Orders tells people when their request is approved." },
-  { app: "shop", text: "Shop posts releases and daily summaries to the channels in App settings." },
+  {
+    app: "shop",
+    text: "Shop posts releases and daily summaries to the channels set on its Admin page.",
+  },
 ];
 
 const INTEGRATIONS: Integration[] = [
@@ -187,10 +195,8 @@ export function IntegrationsPage() {
         for (const i of INTEGRATIONS) {
           if (!i.owner || !on.has(i.owner)) continue;
           setStatuses((s) => ({ ...s, [i.key]: "loading" }));
-          appSettings(i.owner)
-            .then((state) =>
-              setStatuses((s) => ({ ...s, [i.key]: state.integrations[i.key] ?? "unknown" })),
-            )
+          appIntegrations(i.owner)
+            .then((state) => setStatuses((s) => ({ ...s, [i.key]: state[i.key] ?? "unknown" })))
             .catch(() => setStatuses((s) => ({ ...s, [i.key]: "unknown" })));
         }
       })

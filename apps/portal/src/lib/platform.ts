@@ -5,54 +5,11 @@ import { type AppName, apiPath } from "@g3/site-config";
 
 export type TeamApp = { slug: string; name: string; summary: string };
 
-/** One of an app's team settings, as its manifest describes it (AppSetting in @g3/auth). */
-export type AppSetting = {
-  key: string;
-  label: string;
-  type:
-    | "text"
-    | "number"
-    | "boolean"
-    | "choice"
-    | "month"
-    | "day of year"
-    | "url"
-    | "bytes"
-    | "secret";
-  default: SettingValue;
-  min?: number;
-  max?: number;
-  choices?: { value: string; label: string }[];
-  help?: string;
-  editedBy: "admin" | "mentor";
-  page?: string;
-  integration?: string;
-  requiresApp?: string;
-};
-
-export type SettingValue = string | number | boolean | null;
-
 /** Whether an integration is connected, and what there is to know about it (@g3/auth). */
 export type IntegrationStatus = {
   connected: boolean;
   detail?: string;
   facts?: { label: string; value?: string; at?: number }[];
-};
-
-/** What an app's /team-settings answers (TeamSettingsState in @g3/auth). */
-export type TeamSettingsState = {
-  values: Record<string, SettingValue>;
-  secretsSet: Record<string, boolean>;
-  integrations: Record<string, IntegrationStatus>;
-  canEdit: string[];
-};
-
-/** An app that's on and has settings (the platform's /team/settings). */
-export type SettingsApp = {
-  slug: string;
-  name: string;
-  settings: AppSetting[];
-  settingsForm: boolean;
 };
 
 export type LibraryApp = TeamApp & {
@@ -68,9 +25,6 @@ export type LibraryApp = TeamApp & {
   keepsDataWhenOff: boolean;
   /** Its data can be downloaded (offered before switching it off). */
   exportable: boolean;
-  settings: AppSetting[];
-  /** It answers /team-settings, so the dashboard has a form for its settings. */
-  settingsForm: boolean;
 };
 
 export type LogEntry = {
@@ -117,18 +71,16 @@ export async function platform<T>(path: string, init?: { method: string; body?: 
   return data as T;
 }
 
-/** An app's team settings (its own /team-settings, through the gateway's /api/~<app>). */
-export async function appSettings(
-  slug: string,
-  values?: Record<string, SettingValue>,
-): Promise<TeamSettingsState> {
-  const res = await fetch(`${apiPath(slug as AppName)}/team-settings`, {
-    method: values ? "PUT" : "GET",
-    credentials: "include",
-    headers: values ? { "Content-Type": "application/json" } : undefined,
-    body: values ? JSON.stringify({ values }) : undefined,
-  });
-  const data = (await res.json().catch(() => ({}))) as TeamSettingsState & { error?: string };
-  if (!res.ok) throw new Error(data.error ?? "Couldn't load its settings. Please try again.");
-  return data;
+/**
+ * What an app knows about the integrations it connects (its own /team-settings, through the
+ * gateway's /api/~<app>), by integration.
+ */
+export async function appIntegrations(slug: string): Promise<Record<string, IntegrationStatus>> {
+  const res = await fetch(`${apiPath(slug as AppName)}/team-settings`, { credentials: "include" });
+  const data = (await res.json().catch(() => ({}))) as {
+    integrations?: Record<string, IntegrationStatus>;
+    error?: string;
+  };
+  if (!res.ok) throw new Error(data.error ?? "Couldn't ask it. Please try again.");
+  return data.integrations ?? {};
 }
