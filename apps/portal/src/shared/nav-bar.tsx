@@ -24,6 +24,7 @@ export function NavBar({ items }: { items: PluginNavItem[] }) {
     <AppNavBar
       version={versionLabel("Portal")}
       title={wordmark("Gearbox")}
+      icon="/favicon.svg"
       link={routerLink}
       items={shown.map((item) => ({
         key: item.to,
