@@ -88,6 +88,17 @@ export type PartInstanceProcess = {
   batchId: number | null;
 };
 
+/** Where a released part and the release it came from live in Onshape. */
+export type OnshapePartLink = {
+  partNumber: string;
+  /** The revision the release gave it, or null when its BOM never filled one. */
+  revision: string | null;
+  /** The part in the released version, or null when the release left no part element. */
+  part: string | null;
+  /** The release package the part came from. */
+  release: string;
+};
+
 /** An open staging batch at a File Producer process and the instances staged in it. */
 export type StagingBatch = {
   id: number;

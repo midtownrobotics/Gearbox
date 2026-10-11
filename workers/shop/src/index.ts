@@ -13,6 +13,7 @@ import { drawingsRouter } from "./routes/drawings";
 import { internalRouter } from "./routes/internal";
 import { clearPresence, kioskPresenceRouter } from "./routes/kiosk-presence";
 import { onshapeExportRouter } from "./routes/onshape-export";
+import { onshapeLinksRouter } from "./routes/onshape-links";
 import { onshapeWebhooksRouter } from "./routes/onshape-webhooks";
 import { partDefinitionsRouter } from "./routes/part-definitions";
 import { partFilesRouter } from "./routes/part-files";
@@ -59,6 +60,7 @@ const app = base
   .route("/drawings", drawingsRouter)
   .route("/print", printRouter)
   .route("/onshape", onshapeExportRouter)
+  .route("/onshape", onshapeLinksRouter)
   .route("", partViewerRouter)
   // Proxy logout to g3id so the shop app can end sessions (and clean up kiosk
   // presence) without talking to the g3id worker directly.

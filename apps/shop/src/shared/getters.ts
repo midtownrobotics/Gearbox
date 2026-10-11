@@ -4,6 +4,7 @@ import type {
   Action,
   Blueprint,
   KioskPresence,
+  OnshapePartLink,
   PartDefinition,
   PartFile,
   PartInstance,
@@ -133,6 +134,16 @@ export async function fetchDrawingObjectUrl(
   const blob = await res.blob();
   if (!blob.type.includes("pdf")) return null;
   return URL.createObjectURL(blob);
+}
+
+/**
+ * Where the team's released parts are in Onshape, newest release first. Empty when the team has
+ * no Onshape document, so a page that links to it shows plain names instead.
+ */
+export async function fetchOnshapeLinks(): Promise<OnshapePartLink[]> {
+  const res = await api.onshape.links.$get();
+  if (!res.ok) throw new Error(`Failed to fetch Onshape links (${res.status})`);
+  return ((await res.json()) as { links: OnshapePartLink[] }).links;
 }
 
 /** Every file, or only files covering some instance of one part definition. */
