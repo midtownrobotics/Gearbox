@@ -101,15 +101,8 @@ function ByTeam({ className = "" }: { className?: string }) {
   );
 }
 
-/** A small gear in the team color: Gearbox's mark. */
+/** Gearbox's mark (the site's own icon, /favicon.svg). */
 export function GearMark({ small = false }: { small?: boolean }) {
   const size = small ? 18 : 26;
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
-      <path
-        fill="#a32035"
-        d="M10.3 1h3.4l.5 2.6c.7.2 1.4.5 2 .9l2.2-1.5 2.4 2.4-1.5 2.2c.4.6.7 1.3.9 2l2.6.5v3.4l-2.6.5c-.2.7-.5 1.4-.9 2l1.5 2.2-2.4 2.4-2.2-1.5c-.6.4-1.3.7-2 .9l-.5 2.6h-3.4l-.5-2.6c-.7-.2-1.4-.5-2-.9l-2.2 1.5-2.4-2.4 1.5-2.2c-.4-.6-.7-1.3-.9-2L1 13.7v-3.4l2.6-.5c.2-.7.5-1.4.9-2L3 5.6 5.4 3.2l2.2 1.5c.6-.4 1.3-.7 2-.9L10.3 1zM12 8a4 4 0 100 8 4 4 0 000-8z"
-      />
-    </svg>
-  );
+  return <img src="/favicon.svg" width={size} height={size} alt="" aria-hidden="true" />;
 }
