@@ -213,12 +213,17 @@ export function ChecklistRunnerListPage() {
           {issues.map((issue) => (
             <div key={issue.id} className="rounded-xl border border-amber-300 bg-surface px-4 py-3">
               <div className="flex flex-wrap items-start gap-3">
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm text-secondary-900">{issue.text}</p>
+                <Link
+                  to={`/checklists/${issue.listId}#item-${issue.itemId}`}
+                  className={`group min-w-0 flex-1 rounded ${focusRing}`}
+                >
+                  <p className="text-sm text-secondary-900 group-hover:text-primary-600">
+                    {issue.text}
+                  </p>
                   <p className="mt-1 text-xs text-secondary-500">
                     {issue.listName} · {issue.itemName}
                   </p>
-                </div>
+                </Link>
                 {confirmDeleteIssueId === issue.id ? (
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-sm text-secondary-600">Resolve this issue?</span>

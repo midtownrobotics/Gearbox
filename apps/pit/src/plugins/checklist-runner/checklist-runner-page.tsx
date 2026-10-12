@@ -5,16 +5,17 @@ import {
   Loading,
   Page,
   ProgressBar,
+  buttonClass,
   focusRing,
   inputClass,
 } from "@g3/ui";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import { api } from "../../shared/api";
 import { getErrorMessage } from "../../shared/api-error";
 import { fetchIssues } from "../../shared/getters/issues";
 import { fetchItems } from "../../shared/getters/items";
-import { fetchList } from "../../shared/getters/lists";
+import { fetchList, fetchLists } from "../../shared/getters/lists";
 import type { ChecklistIssue, ChecklistItem, ChecklistList } from "../../shared/getters/types";
 
 const POLL_INTERVAL_MS = 5000;
@@ -31,8 +32,10 @@ function BackLink() {
 
 export function ChecklistRunnerPage() {
   const { id } = useParams<{ id: string }>();
+  const { hash } = useLocation();
 
   const [list, setList] = useState<ChecklistList | null>(null);
+  const [lists, setLists] = useState<ChecklistList[]>([]);
   const [items, setItems] = useState<ChecklistItem[]>([]);
   const [issues, setIssues] = useState<ChecklistIssue[]>([]);
   const [loading, setLoading] = useState(true);
@@ -61,6 +64,17 @@ export function ChecklistRunnerPage() {
 
   useEffect(() => {
     if (!id) return;
+    // The page stays up when a link at the bottom opens another list, so start over.
+    setLoading(true);
+    setNotFound(false);
+    setBanner(null);
+    setAddingIssueForItemId(null);
+    setConfirmDeleteIssueId(null);
+    window.scrollTo(0, 0);
+    // Every list, in the Checklists page's order, for the links to the ones before and after.
+    fetchLists()
+      .then(setLists)
+      .catch(() => {});
     Promise.all([fetchList(id), fetchItems(id), fetchIssues(id)])
       .then(([listData, itemsData, issuesData]) => {
         if (!listData) {
@@ -94,6 +108,13 @@ export function ChecklistRunnerPage() {
       document.removeEventListener("visibilitychange", refresh);
     };
   }, [id, loading, notFound, loadData]);
+
+  // An issue on the Checklists page opens its list at the item it's on.
+  useEffect(() => {
+    if (!loading && hash.startsWith("#item-")) {
+      document.getElementById(hash.slice(1))?.scrollIntoView({ block: "center" });
+    }
+  }, [loading, hash]);
 
   async function toggle(item: ChecklistItem) {
     const next = !item.checked;
@@ -178,6 +199,10 @@ export function ChecklistRunnerPage() {
   const allDone = doneCount === totalCount && totalCount > 0;
   const anyChecked = checkableItems.some((i) => i.checked);
 
+  const position = lists.findIndex((l) => l.id === list.id);
+  const previous = position > 0 ? lists[position - 1] : null;
+  const next = position >= 0 && position < lists.length - 1 ? lists[position + 1] : null;
+
   const issuesByItemId = issues.reduce<Record<number, ChecklistIssue[]>>((acc, issue) => {
     if (!acc[issue.itemId]) acc[issue.itemId] = [];
     acc[issue.itemId].push(issue);
@@ -234,7 +259,11 @@ export function ChecklistRunnerPage() {
             const hasIssueSection = itemIssues.length > 0 || addingIssue;
 
             return (
-              <div key={item.id} className="rounded-xl border border-secondary-200 bg-surface">
+              <div
+                key={item.id}
+                id={`item-${item.id}`}
+                className="rounded-xl border border-secondary-200 bg-surface"
+              >
                 {/* Checkbox row */}
                 <button
                   type="button"
@@ -370,6 +399,32 @@ export function ChecklistRunnerPage() {
             onConfirm={handleReset}
           />
         </div>
+      )}
+
+      {(previous || next) && (
+        <nav
+          aria-label="Other checklists"
+          className="flex justify-between gap-2 border-t border-secondary-200 pt-4"
+        >
+          {previous && (
+            <Link
+              to={`/checklists/${previous.id}`}
+              className={`${buttonClass("secondary")} min-w-0 max-w-[48%]`}
+            >
+              <span aria-hidden="true">←</span>
+              <span className="truncate">{previous.name}</span>
+            </Link>
+          )}
+          {next && (
+            <Link
+              to={`/checklists/${next.id}`}
+              className={`${buttonClass("secondary")} ml-auto min-w-0 max-w-[48%]`}
+            >
+              <span className="truncate">{next.name}</span>
+              <span aria-hidden="true">→</span>
+            </Link>
+          )}
+        </nav>
       )}
     </Page>
   );
