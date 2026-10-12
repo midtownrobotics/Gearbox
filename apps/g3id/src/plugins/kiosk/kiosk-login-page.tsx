@@ -70,7 +70,7 @@ export function KioskLoginPage() {
       const redirect = searchParams.get("redirect") || "/";
       window.location.href = redirect;
     } catch (err) {
-      setError("Login failed");
+      setError("Sign-in failed");
       setPin("");
       loadingRef.current = false;
       setLoading(false);

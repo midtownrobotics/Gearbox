@@ -346,7 +346,7 @@ export function ProducerSections({
                 <div className="flex flex-wrap items-center gap-2 px-4 py-3 bg-mist/60 rounded-b-xl">
                   {kiosk.active ? (
                     <span className="text-xs text-steel-dark">
-                      Changing the file needs a regular login — kiosks can't upload.
+                      Changing the file needs a regular sign-in — kiosks can't upload.
                     </span>
                   ) : (
                     <>

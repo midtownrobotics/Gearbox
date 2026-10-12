@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 // Inventory: anyone signed in (kiosk sessions too) reads the table, adds entries and moves parts;
 // mentors and admins delete, merge and split; G3ID admins (never from a kiosk) arrange the team's
-// fields, locations, robots and subsystems on Settings. None of that arrangement is in the app:
+// fields, locations, robots and subsystems on its Admin page. None of that arrangement is in the app:
 // a database starts empty.
 //
 // The tests share one database and run in order.

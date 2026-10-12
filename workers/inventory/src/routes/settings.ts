@@ -30,7 +30,7 @@ import {
 } from "../lib/setup";
 import type { AppEnv } from "../types";
 
-// The Settings page: how a team has Inventory arranged. Its fields, its tree of locations, its
+// The Admin page: how a team has Inventory arranged. Its fields, its tree of locations, its
 // robots and subsystems are all the team's own, so all of it is made here (or loaded from a setup
 // file) and none of it is in the code. G3ID admins only, and never from a kiosk.
 

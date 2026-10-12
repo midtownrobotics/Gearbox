@@ -1,3 +1,4 @@
+import { ErrorBanner } from "@g3/ui";
 import { useEffect, useState } from "react";
 import { api } from "../../shared/api";
 import { getErrorMessage } from "../../shared/api-error";
@@ -58,7 +59,7 @@ export function AdminPage() {
 
   if (authLoading || loading) {
     return (
-      <main className="min-h-screen bg-page flex items-center justify-center">
+      <main className="flex-1 bg-page flex items-center justify-center">
         <p className="text-gray-600">Loading…</p>
       </main>
     );
@@ -66,7 +67,7 @@ export function AdminPage() {
 
   if (!isAdmin) {
     return (
-      <main className="min-h-screen bg-page flex flex-col items-center justify-center gap-2">
+      <main className="flex-1 bg-page flex flex-col items-center justify-center gap-2">
         <p className="text-gray-700 text-lg font-semibold">Access denied</p>
         <p className="text-gray-600 text-sm">You must be an admin to view this page.</p>
       </main>
@@ -74,19 +75,15 @@ export function AdminPage() {
   }
 
   return (
-    <main className="min-h-screen bg-page text-gray-900">
+    <main className="flex-1 bg-page text-gray-900">
       <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
-        <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Admin</h1>
 
-        {banner && (
-          <p className="text-red-400 text-sm bg-red-950 border border-red-800 rounded-lg px-4 py-2">
-            {banner}
-          </p>
-        )}
+        {banner && <ErrorBanner message={banner} />}
 
         <div className="bg-surface rounded-xl border border-gray-300 p-5 space-y-5">
           <div>
-            <h2 className="text-lg font-semibold text-gray-200">Event</h2>
+            <h2 className="text-lg font-semibold text-gray-900">Event</h2>
             <p className="text-sm text-gray-600 mt-0.5">
               Team {teamNumber}. Nexus and TBA event keys can differ, especially in the offseason.
             </p>
@@ -115,7 +112,7 @@ export function AdminPage() {
 
         <div className="bg-surface rounded-xl border border-gray-300 p-5 space-y-5">
           <div>
-            <h2 className="text-lg font-semibold text-gray-200">Pit Monitor Display</h2>
+            <h2 className="text-lg font-semibold text-gray-900">Pit Monitor Display</h2>
             <p className="text-sm text-gray-600 mt-0.5">
               Embed a feed or dashboard on the monitor page.
             </p>

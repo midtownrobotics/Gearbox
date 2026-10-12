@@ -10,7 +10,7 @@ import { MAX_DEPTH, MAX_TITLE, indexLocations, loadLocations } from "./locations
 
 // A setup file: how a team has Inventory arranged (its fields, its tree of locations, its robots
 // and subsystems), without any of its parts. The app itself holds none of this. A team builds its
-// setup on the Settings page, can save it to a file, and can load a file: its own, another team's,
+// setup on the Admin page, can save it to a file, and can load a file: its own, another team's,
 // or the starter that comes with the app (content/starter-setup.json).
 //
 // Loading only ever adds. What a file names that the team doesn't have yet is added; what the

@@ -1,3 +1,4 @@
+import { ErrorBanner } from "@g3/ui";
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../../shared/api";
@@ -96,7 +97,7 @@ export function ChecklistRunnerListPage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-page flex items-center justify-center">
+      <main className="flex-1 bg-page flex items-center justify-center">
         <p className="text-gray-600">Loading…</p>
       </main>
     );
@@ -108,7 +109,7 @@ export function ChecklistRunnerListPage() {
   const allDone = totalChecked === totalItems && totalItems > 0;
 
   return (
-    <main className="min-h-screen bg-page text-gray-900">
+    <main className="flex-1 bg-page text-gray-900">
       <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-3xl font-bold tracking-tight">Checklists</h1>
@@ -126,11 +127,7 @@ export function ChecklistRunnerListPage() {
           )}
         </div>
 
-        {banner && (
-          <p className="text-red-400 text-sm bg-red-950 border border-red-800 rounded-lg px-4 py-2">
-            {banner}
-          </p>
-        )}
+        {banner && <ErrorBanner message={banner} />}
 
         {archived && (
           <p className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-lg border border-green-300 bg-green-50 px-4 py-2 text-sm text-green-800">
@@ -151,7 +148,7 @@ export function ChecklistRunnerListPage() {
             </div>
             <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
               <div
-                className={`h-full rounded-full transition-all duration-300 ${allDone ? "bg-green-500" : "bg-red-500"}`}
+                className={`h-full rounded-full transition-all duration-300 ${allDone ? "bg-green-500" : "bg-primary-500"}`}
                 style={{ width: `${globalProgress * 100}%` }}
               />
             </div>
@@ -166,7 +163,7 @@ export function ChecklistRunnerListPage() {
               onClick={() => navigate("/editor")}
               className="text-primary-600 hover:text-primary-700 underline"
             >
-              Create one in the Editor.
+              Create one on Edit Checklists.
             </button>
           </p>
         ) : (
@@ -206,7 +203,7 @@ export function ChecklistRunnerListPage() {
                   {list.itemCount > 0 && (
                     <div className="mt-3 h-1 bg-gray-100 rounded-full overflow-hidden">
                       <div
-                        className={`h-full rounded-full transition-all duration-300 ${listDone ? "bg-green-500" : "bg-red-500"}`}
+                        className={`h-full rounded-full transition-all duration-300 ${listDone ? "bg-green-500" : "bg-primary-500"}`}
                         style={{ width: `${listProgress * 100}%` }}
                       />
                     </div>

@@ -9,5 +9,5 @@ export const adminPlugin: Plugin = {
     // Admin replaced Settings; keep old links working.
     { path: "/settings", element: <Navigate to="/admin" replace /> },
   ],
-  navItems: [{ label: "Admin", to: "/admin", order: 3 }],
+  navItems: [{ label: "Admin", to: "/admin", order: 5 }],
 };

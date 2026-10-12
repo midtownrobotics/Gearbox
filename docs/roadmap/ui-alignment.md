@@ -15,12 +15,12 @@ A survey of every difference, with sketches, is at <https://claude.ai/artifact/C
 | Step | Status | Apps | What is left |
 | --- | --- | --- | --- |
 | 1. Shared parts in `@g3/ui` | Done | Orders, Inventory, Skill Tree, Edge | Nothing |
-| 2. Fixes that need no decision | Not started | Pit, Shop, ID, Portal, Orders, Inventory | All of it, except Scouting's name (done) |
+| 2. Fixes that need no decision | Done | Pit, Shop, ID, Portal, Orders, Inventory, Edge | Nothing. Four things it found were passed to later steps (see step 2 below) |
 | 3. Edge onto the full set | Not started | Edge | Its hand-written buttons and inputs |
 | 4. ID and Portal onto the shared frame | Not started | ID, Portal | All of it |
 | 5. Pit, with its Overview | Not started | Pit | All of it |
 | 6. Shop | Not started | Shop | All of it |
-| 7. Browser pop-ups | Not started | Orders, Shop, ID, Edge, Skill Tree, Platform | 35 calls |
+| 7. Browser pop-ups | Not started | Orders, Shop, ID, Edge, Skill Tree, Platform | 33 calls |
 | 8. Scouting | Not started | Scouting | All of it, with its Phase 3 step in `roadmap.md` |
 
 ### What landed
@@ -28,6 +28,7 @@ A survey of every difference, with sketches, is at <https://claude.ai/artifact/C
 | Change | Step | Pull request |
 | --- | --- | --- |
 | The page parts moved from each app's `shared/ui.tsx` into `@g3/ui`: `Page`, `PageLoading`, `Card`, `Stat`, `Button`, `ConfirmButton`, `Field`, `inputClass`, `ErrorBanner`, `SuccessBanner`, `Loading`, `Dialog`, `Toggle`, `Badge` with `tones`, `ProgressBar`, `focusRing`. Orders, Inventory, Skill Tree and Edge import them and have no `shared/ui.tsx`. Errors, danger buttons and every other mark of a problem in those four apps are red where they were the team's color. Buttons and inputs show a focus ring. Scouting is called Scouting in its own bar and tab, where it said Strategy | 1, and the name from 2 | [#186](https://github.com/midtownrobotics/Gearbox/pull/186) |
+| Names: Orders' and Inventory's Settings page is Admin (at `/admin`; `/settings` still opens it), Pit's Admin page is titled Admin, Shop's Admin is last in the bar, and every "Log in" and "Log Out" is "Sign in" and "Sign out". Titles match their bar labels in Pit (Edit Checklists), ID (Account, Kiosk Devices, Attendance), Portal (Manage Apps, Appearance) and Edge (Overview, Drive). Bugs: Pit's unreadable headings, dark error blocks and red progress bars; pages a bar's height too tall in Pit, Shop and Portal; ID's kiosk revoke asks first; Orders' and Inventory's dates follow the viewer's language; Inventory's search and filters are in the address; unused icon libraries dropped from Pit and Shop | 2 | This PR |
 
 ## Decisions
 
@@ -53,7 +54,7 @@ What a page follows. The first group restates the decisions above as rules. The 
 
 - **First page.** An app's address opens the first page in its bar. That page either does the app's main job (Orders' Requests, the Inventory table) or shows live figures that each link to their page (Skill Tree's Overview, Edge's Network). A summary page is called Overview. Shop's Home becomes Overview and ID's Dash becomes Account.
 - **Page parts.** Pages are built from the parts in `@g3/ui` (below). An app doesn't keep its own `Page`, `Card`, `Button`, field or banner.
-- **Title.** The shared `Page` draws it. A page's title is its bar label, word for word.
+- **Title.** The shared `Page` draws it. A page's title is its bar label, word for word. Two pages are left out on purpose: Portal's home (the team's front door, titled with the team's name) and Pit's Monitor (a wall display that hides the bar, so its header names the team).
 - **Admin.** The page for an app's own settings is called Admin and is the last item in the bar.
 - **Filters.** A chosen filter chip is near-black. The team's color is for the page's main action.
 - **Red means a problem.** An error, a delete or danger button, a "no" status, an overdue or over-budget mark: all red (`ErrorBanner`, `Button variant="danger"`, `tones.danger`, `text-red-700`). The team's color (`primary-*`) never carries that meaning, because a team can choose any color.
@@ -74,7 +75,7 @@ What a page follows. The first group restates the decisions above as rules. The 
 - **The way back.** A link that names where it goes: "← All requests".
 - **The bar** lists only pages the member can use.
 - **Delete or Remove.** Delete when it is gone for good. Remove when it only leaves a list and still exists.
-- **Dates.** A named month ("Oct 7, 2026"), in the viewer's own language. Orders' and Inventory's helpers are fixed to US English today; one shared helper should replace them.
+- **Dates.** A named month ("Oct 7, 2026"), in the viewer's own language. Orders, Inventory and Edge each have their own helper for it; one shared helper should replace them.
 
 The repo's standing rules still apply to every page: the color rules, short page text and US English in `CLAUDE.md`.
 
@@ -126,13 +127,17 @@ One step, or one app of a step, per pull request. Sizes are rough, from line cou
 
 See "What landed".
 
-### 2. Fixes that need no decision (small)
+### 2. Fixes that need no decision (done)
 
-The list under "Bugs found" below, and the names:
+See "What landed" for what it did. It is listed here for what it decided and what it passed on.
 
-- **Admin.** Orders and Inventory rename Settings to Admin: the bar label, the page title and the address (`/settings` sends people on to `/admin`, as Shop's does). Update what points there: `page: "/settings"` in `workers/orders/src/manifest.ts`, the Orders entry in Portal's `integrations-page.tsx`, the link in Orders' `ordering-page.tsx`, and `CLAUDE.md`. Mentors who aren't admins use Orders' page too, so they will see a page called Admin; that was accepted. Pit's page title says Settings and becomes Admin. Shop's Admin moves after Leaderboard, to the end of the bar.
-- **Sign in.** ID's bar says "Log in", Portal's bar button says "Log in" and Shop's kiosk says "Log Out".
-- **Title is the bar label.** Pit: Editor opens "Checklists" (rename both to Edit Checklists), Monitor opens "G3 Pit Monitor". ID: Dash opens "Dashboard", Kiosk Devices opens "Kiosk Management", Settings opens "Attendance Settings". Portal: Manage apps opens "Apps". Edge: Overview opens "Network", Drive opens "Shop Drive".
+- **Admin.** Orders and Inventory call the page Admin, at `/admin`. Their old `/settings` address sends people on, keeping whatever followed it (Share-A-Cart's sign-in returns to Orders' page with a result in the address). The plugin folders are still named `settings`, and the workers' `/settings` routes didn't change: only the page moved.
+- **Names chosen where the rule left a choice.** ID's Dash is Account. ID's admin page for Attendance is "Attendance" in the bar and as its title (it was "Settings" opening "Attendance Settings"). Portal's "Manage apps" and its page are both "Manage Apps".
+- **Passed on:**
+  - Shop's Admin page turned out to be for every member: the Actions Log, Shop Settings and Kiosk Mode sections work for anyone signed in. Only its Onshape, Slack and Data Management sections, and the Slack buttons in its header, need an admin. So the page stays in the bar for everyone, and step 6 hides those sections from members who can't use them.
+  - ID's Users list still asks before deleting a user with a browser box (step 7).
+  - Scouting's Admin isn't last in its bar yet (step 8).
+  - There is still no shared date helper: Orders' and Inventory's own helpers now use the viewer's language, and that was all the bug needed.
 
 ### 3. Edge onto the full set (small)
 
@@ -144,9 +149,8 @@ Both already use the shared colors, written out on each page, about 6,300 lines 
 
 - Titles are 24px to 48px bold today; `Page` makes them one size. Both use a line under the title: that is `Page`'s `description`.
 - Portal's two switch copies (`plugins/admin/switch.tsx` and one inline in `apps-page.tsx`) become one bare switch in `@g3/ui`, which `Toggle` should then be built on.
-- ID uses a spinner for loading and `alert` for five errors; both go.
+- ID uses a spinner for loading and `alert` for three errors (all on the Account page); both go.
 - ID's filter buttons on Users are the team's color when chosen and become near-black chips. Keep their counts.
-- ID's Dash becomes Account.
 - The sign-in, kiosk and pending pages are narrow, centered cards. Keep that shape (`width="narrow"`); they are not ordinary pages.
 - Portal's home grid is the team's front door and keeps its own layout.
 
@@ -155,8 +159,8 @@ Both already use the shared colors, written out on each page, about 6,300 lines 
 Pit was written for a screen that was always dark, and about 4,400 lines still carry it.
 
 - `text-gray-*` and `border-gray-*` throughout (236 and 55 uses): use `secondary-*`.
-- `bg-gray-700 text-gray-200` buttons are `Button variant="secondary"`. `bg-red-950 text-red-400 border-red-800` blocks are `ErrorBanner`. `text-green-400` and `bg-green-900` are the `success` tone. `yellow-*` is `amber-*`.
-- Checklist progress bars are `bg-red-500` until complete: use `ProgressBar` (the team's color) and green only when done.
+- `bg-gray-700 text-gray-200` buttons are `Button variant="secondary"`. `text-green-400` and `bg-green-900` are the `success` tone. `yellow-*` is `amber-*`. (Step 2 already made its error blocks `ErrorBanner` and its progress bars the team's color.)
+- Its progress bars are written out in four places: use `ProgressBar`, green only when done.
 - Its pages are 672px wide (`width="narrow"`), and its targets are large for a pit tablet. Add the large button size to `Button` here.
 - **Home becomes Overview.** Take Home out of the bar (the wordmark already opens the first page). Replace the six tiles that repeat the bar with tiles that each carry a figure the app already has and open its page: checklist items checked since the last archive, open issues, batteries, the next match (`GET /archives/next-match`) and the last archive. Use the shared page title in place of the 60px centered heading and uppercase tagline. Admin stays in the bar only.
 - Pit works offline at events (`OfflineBanner`, `prefetchAll`). The Overview has to show what it last knew when offline, not an error.
@@ -169,13 +173,14 @@ About 10,000 lines of pages, the largest Tailwind app. It looks close to the maj
 - Its titles already match (`font-display text-4xl`), so `Page` changes nothing visible there. Widths vary by page from 672px to full; pick `Page`'s nearest.
 - Nine overlays with four backdrop shades become `Dialog`, except the two full-screen sheets and the Ingest side panel, which are their own shapes.
 - Home becomes Overview.
-- Its bar has no way to hide a page by role (`PluginNavItem` has only `requiresAuth`): add one, and hide Admin from members who can't use it.
+- Its Admin page is for every member, but four parts of it need an admin and fail for anyone else: the Onshape, Slack and Data Management sections and the Slack buttons in the header (`requireAdmin` in `workers/shop/src/routes/admin-parts.ts`). Hide those from members who can't use them.
+- The Admin page shows "Obsolete instances deleted successfully" in its error banner. Use `SuccessBanner`.
 - Kiosk mode makes controls larger (`touch ? "px-5 py-3" : "px-4 py-2"`): that is `Button`'s large size.
 - Drop `VersionFooter`: every app shows its version on the wordmark's tooltip and in the menu.
 
 ### 7. Browser pop-ups (spread across the steps)
 
-Outside Scouting there were 35: Orders 8 confirm and 3 prompt, Shop 7 confirm, 2 prompt and 1 alert, ID 2 confirm and 5 alert, Edge 3 confirm, Skill Tree 3 confirm, Platform 1 confirm. Replace each app's when the app is open for its own step. Orders and Skill Tree have no restyle step, so their pop-ups get a pull request of their own.
+Outside Scouting there are 33: Orders 8 confirm and 3 prompt, Shop 7 confirm, 2 prompt and 1 alert, ID 2 confirm and 3 alert, Edge 3 confirm, Skill Tree 3 confirm, Platform 1 confirm. Replace each app's when the app is open for its own step. Orders and Skill Tree have no restyle step, so their pop-ups get a pull request of their own.
 
 - A confirm becomes `ConfirmButton`.
 - A prompt (the reason a request is denied, a vendor credit's amount, a quantity on Shop's floor) becomes a small `Dialog` with a field.
@@ -194,22 +199,24 @@ Do it with Scouting's Phase 3 step in `roadmap.md`, so its pages are opened once
 
 ## Bugs found
 
-From reading the code on 11 October. None was confirmed in a running app; check each before fixing it.
+From reading the code on 11 October. None was confirmed in a running app, and one (Shop's Admin) turned out not to be a bug as written, so check each before fixing it.
 
 | Where | What | Status |
 | --- | --- | --- |
 | Orders, Inventory, Skill Tree, Edge | Errors and Delete took the team's color | Fixed in step 1 |
 | Scouting | Called Strategy in its bar and Scouting on Portal and in the All Apps menu | Fixed in step 1 |
 | Shop | Errors (`ErrorBanner` in `shared/ui.tsx`) and danger buttons take the team's color (`crimson`) | Open, step 6 |
-| Pit | Card headings in `text-gray-200` on the card can't be read in either theme: "Event" and "Pit Monitor Display" on its Admin page, "New Checklist" in the Editor | Open |
-| Pit, Shop, Portal | Every page is `min-h-screen` under the 56px bar, so even an empty page scrolls | Open |
-| Pit | Errors are a dark red block in light mode (`bg-red-950`, five places); checklist bars are red until complete | Open |
-| Shop | Admin is in the bar and on Home for every member | Open |
-| ID | Revoking a kiosk takes one click on a trash icon, with no question (`admin-kiosk-page.tsx`). Deleting a user asks with a browser box on the Users list and in the page on the user's own page | Open |
-| Pit | Two pages are titled "Checklists": the one you run and the one you edit | Open |
-| Orders, Inventory | Dates are always in US English (`toLocaleDateString("en-US", …)` in `shared/format.ts`) | Open |
-| Pit, Shop | `lucide-react` and `react-icons` are installed and never imported | Open |
-| Inventory | The table's search and filters are component state, so a reload or Back resets them. Orders keeps the same ones in the address | Open |
+| Pit | Card headings in `text-gray-200` on the card couldn't be read in either theme: "Event" and "Pit Monitor Display" on its Admin page, "New Checklist" and "Items" in Edit Checklists | Fixed in step 2 |
+| Pit, Shop, Portal | Every page was `min-h-screen` under the 56px bar, so even an empty page scrolled | Fixed in step 2. Shop's own `PageLoading` still is, while a page loads (step 6) |
+| Pit | Errors were a dark red block in light mode (`bg-red-950`, five places); checklist bars were red until complete | Fixed in step 2 |
+| Shop | Admin is in the bar and on Home for every member | Not a bug as first written: most of the page is for every member. Four parts of it need an admin (step 6) |
+| ID | Revoking a kiosk took one click on a trash icon, with no question | Fixed in step 2 |
+| ID | Deleting a user asks with a browser box on the Users list and in the page on the user's own page | Open, step 7 |
+| Pit | Two pages were titled "Checklists": the one you run and the one you edit | Fixed in step 2: the second is Edit Checklists |
+| Orders, Inventory | Dates were always in US English | Fixed in step 2. Prices are still formatted the US way (`Intl.NumberFormat("en-US", …)`), which wasn't part of this |
+| Pit, Shop | `lucide-react` and `react-icons` were installed and never imported | Fixed in step 2 |
+| Inventory | The table's search and filters reset on a reload or Back | Fixed in step 2: they are in the address (`q`, `status`, `location`, `robot`). An entry's "← All entries" link still opens the table without them |
+| Shop | Its Admin page shows "Obsolete instances deleted successfully" in the error banner | Open, step 6 |
 
 ## How to work on this
 

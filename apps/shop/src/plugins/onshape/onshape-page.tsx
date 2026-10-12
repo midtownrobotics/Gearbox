@@ -38,7 +38,7 @@ export function OnshapePage() {
 
   if (error)
     return (
-      <main className="min-h-screen bg-page">
+      <main className="flex-1 bg-page">
         <div className="max-w-6xl mx-auto px-6 py-8">
           <ErrorBanner message={error} />
         </div>
@@ -47,7 +47,7 @@ export function OnshapePage() {
   if (!releases) return <PageLoading />;
 
   return (
-    <main className="min-h-screen bg-page">
+    <main className="flex-1 bg-page">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-5">
         <div>
           <h1 className="font-display text-4xl text-ink">Onshape</h1>

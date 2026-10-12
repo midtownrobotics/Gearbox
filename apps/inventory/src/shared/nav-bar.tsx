@@ -7,7 +7,7 @@ import type { PluginNavItem } from "./plugin-types";
 
 const routerLink = linkWith(Link);
 
-/** The shared top bar with this app's pages; Settings only for admins. */
+/** The shared top bar with this app's pages; Admin only for admins. */
 export function NavBar({ items }: { items: PluginNavItem[] }) {
   const user = useAuthUser();
   const { pathname } = useLocation();

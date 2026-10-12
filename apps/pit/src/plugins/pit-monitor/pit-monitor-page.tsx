@@ -502,7 +502,7 @@ function ChecklistSection({
           </div>
           <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
             <div
-              className={`h-full rounded-full transition-all duration-500 ${allDone ? "bg-green-500" : "bg-red-500"}`}
+              className={`h-full rounded-full transition-all duration-500 ${allDone ? "bg-green-500" : "bg-primary-500"}`}
               style={{ width: `${globalPct}%` }}
             />
           </div>
@@ -524,7 +524,7 @@ function ChecklistSection({
                 </div>
                 <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
                   <div
-                    className={`h-full rounded-full transition-all duration-500 ${done ? "bg-green-500" : "bg-red-500"}`}
+                    className={`h-full rounded-full transition-all duration-500 ${done ? "bg-green-500" : "bg-primary-500"}`}
                     style={{ width: `${pct}%` }}
                   />
                 </div>
@@ -642,7 +642,7 @@ export function PitMonitorPage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-page flex items-center justify-center">
+      <main className="flex-1 bg-page flex items-center justify-center">
         <p className="text-gray-600 text-lg">Loading…</p>
       </main>
     );
@@ -653,7 +653,7 @@ export function PitMonitorPage() {
   const nexus = monitor?.nexus;
 
   return (
-    <main className="min-h-screen bg-page text-gray-900">
+    <main className="flex-1 bg-page text-gray-900">
       <div className="px-6 py-5 space-y-5">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-gray-200 pb-4">

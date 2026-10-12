@@ -92,7 +92,7 @@ const app = base
       displayName: c.get("userDisplayName"),
       /** G3ID mentors and admins: delete, merge and split entries. */
       isMentor: hasMentorAccess(c),
-      /** G3ID admins: the Settings page. */
+      /** G3ID admins: the Admin page. */
       isAdmin: c.get("userIsAdmin"),
     }),
   )

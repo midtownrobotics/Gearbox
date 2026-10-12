@@ -26,7 +26,7 @@ export function KioskRemovePage() {
       if (!res.ok) {
         setStatus("error");
         setNeedsLogin(true);
-        setError("Admin login required.");
+        setError("An admin has to sign in first.");
         return;
       }
       const data = (await res.json()) as { isAdmin?: boolean };
@@ -102,7 +102,7 @@ export function KioskRemovePage() {
                 onClick={handleLoginRedirect}
                 className="block w-full py-3 px-4 rounded-lg bg-primary-600 hover:bg-primary-500 text-on-primary font-semibold transition-colors"
               >
-                Proceed to Log In
+                Sign in
               </button>
 
               <Link
@@ -119,7 +119,7 @@ export function KioskRemovePage() {
               to="/kiosk/login"
               className="block w-full py-3 px-4 rounded-lg bg-secondary-100 hover:bg-secondary-200 text-secondary-900 font-semibold transition-colors"
             >
-              Back to Kiosk Login
+              Back to kiosk sign-in
             </Link>
           )}
         </div>
@@ -164,7 +164,7 @@ export function KioskRemovePage() {
         </div>
 
         <p className="text-xs text-secondary-500 text-center">
-          You will be logged out after the device is removed.
+          You will be signed out after the device is removed.
         </p>
       </div>
     </main>

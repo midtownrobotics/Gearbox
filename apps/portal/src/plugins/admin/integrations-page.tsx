@@ -77,7 +77,7 @@ const INTEGRATIONS: Integration[] = [
     summary: "Shared Amazon carts.",
     uses: [{ app: "orders", text: "Orders fills an Amazon cart in one click on the Carts page." }],
     owner: "orders",
-    page: "/settings",
+    page: "/admin",
   },
   {
     key: "the blue alliance",

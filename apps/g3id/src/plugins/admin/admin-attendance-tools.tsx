@@ -2,7 +2,7 @@ import { apiPath } from "@g3/site-config";
 import { Loader2, LogOut, Minus, Plus, Trash2 } from "lucide-react";
 import { type ReactNode, useState } from "react";
 
-// What admins do on the Attendance Settings page: sign out whoever is signed in, add or take away
+// What admins do on the Attendance page: sign out whoever is signed in, add or take away
 // a member's hours, and remove a member. Each change loads the page's members again.
 
 /** A member as the attendance worker's summary gives them. */

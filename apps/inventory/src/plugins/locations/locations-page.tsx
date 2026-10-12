@@ -201,7 +201,7 @@ function MoveContentsDialog({
 
 const smallButton =
   "whitespace-nowrap rounded-lg border border-secondary-300 bg-surface px-2.5 py-1 text-xs font-semibold text-secondary-800 hover:bg-secondary-50";
-/** A plain text button, like the ones beside each location on Settings. */
+/** A plain text button, like the ones beside each location on the Admin page. */
 const textButton =
   "-my-1 whitespace-nowrap py-1 text-xs text-secondary-500 hover:text-primary-600 disabled:opacity-50";
 
@@ -410,8 +410,8 @@ export function LocationsPage() {
           <p className="text-secondary-700">No locations have been set up yet.</p>
           <p className="mt-1 text-sm text-secondary-500">
             {isAdmin
-              ? "Add them on Settings, or load a setup file there."
-              : "An admin adds them on Settings."}
+              ? "Add them on the Admin page, or load a setup file there."
+              : "An admin adds them on the Admin page."}
           </p>
         </Card>
       ) : (

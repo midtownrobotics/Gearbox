@@ -3,7 +3,7 @@ import { asc } from "drizzle-orm";
 import type { Db } from "../db";
 import { type FieldType, fields } from "../db/schema";
 
-// The fields a team records about a part are the team's own: admins define them on the Settings
+// The fields a team records about a part are the team's own: admins define them on the Admin
 // page, and an entry's values are checked against them here.
 
 export type FieldValue = string | number | boolean;

@@ -29,7 +29,7 @@ export function ReleasePage() {
 
   if (error || release === null)
     return (
-      <main className="min-h-screen bg-page">
+      <main className="flex-1 bg-page">
         <div className="max-w-5xl mx-auto px-6 py-8 space-y-4">
           <Link to={back.to} className="text-sm text-crimson hover:underline">
             {back.label}
@@ -63,7 +63,7 @@ export function ReleasePage() {
   ];
 
   return (
-    <main className="min-h-screen bg-page">
+    <main className="flex-1 bg-page">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 space-y-6">
         <div className="space-y-2">
           <Link to={back.to} className="text-sm text-crimson hover:underline">

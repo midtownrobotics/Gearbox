@@ -19,7 +19,7 @@ export const manifest = defineManifest({
       default: "USD",
       help: "A 3-letter code (USD, CAD, EUR) for budgets and prices",
       editedBy: "mentor",
-      page: "/settings",
+      page: "/admin",
     },
     {
       key: "fiscalYearStart",
@@ -28,7 +28,7 @@ export const manifest = defineManifest({
       default: 7,
       help: "Budgets run from this month",
       editedBy: "mentor",
-      page: "/settings",
+      page: "/admin",
     },
     {
       key: "salesTaxPercent",
@@ -39,7 +39,7 @@ export const manifest = defineManifest({
       max: 100,
       help: "A percent of a new order's items, at vendors that charge tax",
       editedBy: "mentor",
-      page: "/settings",
+      page: "/admin",
     },
     {
       key: "namingTemplate",
@@ -48,7 +48,7 @@ export const manifest = defineManifest({
       default: "{vendor} {sku} – {title}",
       help: "Must include {title}",
       editedBy: "mentor",
-      page: "/settings",
+      page: "/admin",
     },
     {
       key: "inventoryRequired",
@@ -56,7 +56,7 @@ export const manifest = defineManifest({
       type: "boolean",
       default: false,
       editedBy: "mentor",
-      page: "/settings",
+      page: "/admin",
     },
   ],
   plugins: [],

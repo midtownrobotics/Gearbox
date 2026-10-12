@@ -30,9 +30,9 @@ export const authPlugin: Plugin = {
     { path: "/", element: <DashboardPage /> },
   ],
   navItems: [
-    { label: "Dash", to: "/", order: 0 },
+    { label: "Account", to: "/", order: 0 },
     { label: "Leaderboard", to: "/leaderboard", order: 1, requiresApp: "attendance" },
-    { label: "Log in", to: "/login", order: 2, audience: "signed-out" },
+    { label: "Sign in", to: "/login", order: 2, audience: "signed-out" },
     { label: "Sign up", to: "/signup", order: 3, audience: "signed-out" },
   ],
 };

@@ -1,3 +1,4 @@
+import { ErrorBanner } from "@g3/ui";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api } from "../../shared/api";
@@ -138,7 +139,7 @@ export function ChecklistRunnerPage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-page flex items-center justify-center">
+      <main className="flex-1 bg-page flex items-center justify-center">
         <p className="text-gray-600">Loading…</p>
       </main>
     );
@@ -146,7 +147,7 @@ export function ChecklistRunnerPage() {
 
   if (notFound || !list) {
     return (
-      <main className="min-h-screen bg-page flex flex-col items-center justify-center gap-4">
+      <main className="flex-1 bg-page flex flex-col items-center justify-center gap-4">
         <p className="text-gray-600">Checklist not found.</p>
         <button
           type="button"
@@ -173,7 +174,7 @@ export function ChecklistRunnerPage() {
   }, {});
 
   return (
-    <main className="min-h-screen bg-page text-gray-900">
+    <main className="flex-1 bg-page text-gray-900">
       <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
         <div className="flex items-center justify-between">
           <button
@@ -194,11 +195,7 @@ export function ChecklistRunnerPage() {
           )}
         </div>
 
-        {banner && (
-          <p className="text-red-400 text-sm bg-red-950 border border-red-800 rounded-lg px-4 py-2">
-            {banner}
-          </p>
-        )}
+        {banner && <ErrorBanner message={banner} />}
 
         <div>
           <h1 className="text-3xl font-bold tracking-tight">{list.name}</h1>
@@ -215,7 +212,7 @@ export function ChecklistRunnerPage() {
             </div>
             <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
               <div
-                className={`h-full rounded-full transition-all duration-300 ${allDone ? "bg-green-500" : "bg-red-500"}`}
+                className={`h-full rounded-full transition-all duration-300 ${allDone ? "bg-green-500" : "bg-primary-500"}`}
                 style={{ width: `${progress * 100}%` }}
               />
             </div>
@@ -230,7 +227,7 @@ export function ChecklistRunnerPage() {
               onClick={() => navigate(`/editor/${list.id}`)}
               className="text-primary-600 hover:text-primary-700 underline"
             >
-              Add some in the Editor.
+              Add some on Edit Checklists.
             </button>
           </p>
         ) : (

@@ -126,7 +126,7 @@ export function AppearancePage() {
 
   return (
     <main className="mx-auto w-full max-w-4xl px-6 py-8">
-      <h1 className="mb-2 text-3xl font-bold text-secondary-900">Team appearance</h1>
+      <h1 className="mb-2 text-3xl font-bold text-secondary-900">Appearance</h1>
       <p className="mb-8 text-secondary-600">How your team looks across Gearbox.</p>
       {error && (
         <p role="alert" className="mb-4 rounded-md border border-primary-500 p-3 text-primary-700">

@@ -174,7 +174,7 @@ export function AdminAttendancePage() {
 
   return (
     <main className="flex-1 px-4 py-8 max-w-3xl mx-auto w-full">
-      <h1 className="text-3xl font-bold text-secondary-900 mb-6">Attendance Settings</h1>
+      <h1 className="text-3xl font-bold text-secondary-900 mb-6">Attendance</h1>
 
       <div className="space-y-6">
         {error && <p className="text-sm text-red-700">{error}</p>}

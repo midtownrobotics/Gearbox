@@ -8,12 +8,14 @@ export function App() {
 
   return (
     <BrowserRouter>
-      <NavBar items={navItems} />
-      <Routes>
-        {allRoutes.map((r) => (
-          <Route key={r.path} path={r.path} element={r.element} />
-        ))}
-      </Routes>
+      <div className="flex min-h-screen flex-col bg-page">
+        <NavBar items={navItems} />
+        <Routes>
+          {allRoutes.map((r) => (
+            <Route key={r.path} path={r.path} element={r.element} />
+          ))}
+        </Routes>
+      </div>
     </BrowserRouter>
   );
 }
