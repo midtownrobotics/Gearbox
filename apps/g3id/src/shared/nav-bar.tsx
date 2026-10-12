@@ -9,7 +9,7 @@ import type { PluginNavItem } from "./plugin-types";
 const routerLink = linkWith(Link);
 
 /**
- * The shared G3 top bar. Signed out: Log in and Sign up. Signed in: Dash and Leaderboard, the
+ * The shared G3 top bar. Signed out: Sign in and Sign up. Signed in: Account and Leaderboard, the
  * Admin pages for admins, and the team's apps in the menu.
  */
 export function NavBar({ items }: { items: PluginNavItem[] }) {

@@ -114,7 +114,7 @@ export function KioskShell({ children }: { children: ReactNode }) {
           <div className="bg-paper rounded-2xl shadow-xl max-w-md w-full p-8 text-center space-y-5">
             <h2 className="font-display text-4xl text-ink">Still there?</h2>
             <p className="text-steel-dark">
-              You'll be logged out in <span className="font-bold text-crimson">{secondsLeft}</span>{" "}
+              You'll be signed out in <span className="font-bold text-crimson">{secondsLeft}</span>{" "}
               second{secondsLeft === 1 ? "" : "s"} due to inactivity.
             </p>
             <button

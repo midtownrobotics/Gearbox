@@ -96,7 +96,7 @@ export function AdminPage() {
   if (loading) return <PageLoading />;
 
   return (
-    <main className="min-h-screen bg-page">
+    <main className="flex-1 bg-page">
       <div className="max-w-4xl mx-auto px-6 py-8 space-y-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h1 className="font-display text-4xl text-ink">Admin</h1>
@@ -199,7 +199,7 @@ function KioskModeSettings() {
       {confirming ? (
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-sm font-medium text-ink">
-            You'll be logged out on this device. Continue?
+            You'll be signed out on this device. Continue?
           </span>
           <button
             type="button"

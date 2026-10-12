@@ -63,7 +63,7 @@ export const internalRouter = new Hono<AppEnv>()
     );
     return c.json(
       teamExport(manifest, teamId, tables, [
-        "Share-A-Cart's connection isn't included: connect the account again on Settings.",
+        "Share-A-Cart's connection isn't included: connect the account again on the Admin page.",
       ]),
     );
   })

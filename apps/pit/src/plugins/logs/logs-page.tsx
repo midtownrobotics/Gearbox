@@ -250,14 +250,14 @@ export function LogsPage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-page flex items-center justify-center">
+      <main className="flex-1 bg-page flex items-center justify-center">
         <p className="text-gray-600">Loading…</p>
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-page text-gray-900">
+    <main className="flex-1 bg-page text-gray-900">
       <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
         <h1 className="text-3xl font-bold tracking-tight">Logs</h1>
 

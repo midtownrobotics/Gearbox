@@ -355,13 +355,13 @@ export function SettingsPage() {
   const { places } = useInventory();
   if (!isAdmin) {
     return (
-      <Page title="Settings">
+      <Page title="Admin">
         <ErrorBanner message="Only admins can change Inventory's settings." />
       </Page>
     );
   }
   return (
-    <Page title="Settings">
+    <Page title="Admin">
       <SetupCard />
       <LocationsCard />
       <FieldsCard />

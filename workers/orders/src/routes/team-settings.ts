@@ -7,7 +7,7 @@ import type { AppEnv } from "../types";
 import { checkSettings } from "./fast-entry";
 
 // The team's Orders settings for the team's dashboard (roadmap 4.5), by manifest key, checked the
-// same way as the Settings page's. Share-A-Cart's connection is reported, and made on Settings.
+// same way as the Admin page's. Share-A-Cart's connection is reported, and made on the Admin page.
 export const teamSettingsRouter = teamSettingsRoutes<AppEnv>(manifest, "Orders settings", {
   async read(c) {
     const db = createOrdersDb(c.env.ORDERS_DB);

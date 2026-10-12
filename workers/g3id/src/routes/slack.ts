@@ -197,7 +197,7 @@ export const slackRouter = new Hono<AppEnv>()
           if (result.redirectUrl) {
             completeUrl += `&redirect=${encodeURIComponent(result.redirectUrl)}`;
           }
-          message = `${message}\n\n<${completeUrl}|Click here to return to your browser>\n\nFor your next login, if you clicked the "↗ Open Slack" button, the code has already been copied to your device and you can simply paste it below!! ↓↓↓↓↓↓`;
+          message = `${message}\n\n<${completeUrl}|Click here to return to your browser>\n\nFor your next sign-in, if you clicked the "↗ Open Slack" button, the code has already been copied to your device and you can simply paste it below!! ↓↓↓↓↓↓`;
         }
 
         await reply(c.env, workspaceId, slackUserId, message);

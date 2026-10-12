@@ -454,7 +454,7 @@ function VendorOrder({
                 {sacBusy ? "Building cart…" : "🛒 Share-A-Cart ↗"}
               </Button>
             ) : (
-              <Link to="/settings" className="text-xs underline text-secondary-500">
+              <Link to="/admin" className="text-xs underline text-secondary-500">
                 Connect Share-A-Cart for one-click carts
               </Link>
             ))}

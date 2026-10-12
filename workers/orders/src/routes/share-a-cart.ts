@@ -30,7 +30,7 @@ import type { AppEnv } from "../types";
 const callbackUrl = (env: AppEnv["Bindings"], teamId: string) =>
   `${ordersUrl(env, teamId)}/api/share-a-cart/callback`;
 const settingsPage = (env: AppEnv["Bindings"], teamId: string, params: string) =>
-  `${ordersUrl(env, teamId)}/settings?${params}`;
+  `${ordersUrl(env, teamId)}/admin?${params}`;
 
 /** The request's team and its database. */
 const teamOf = (c: Context<AppEnv>, teamId = c.get("teamId")): Team => ({

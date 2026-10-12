@@ -12,7 +12,7 @@ import { useShopData } from "./use-shop-data";
 
 const routerLink = linkWith(Link);
 
-/** The shared G3 top bar. In kiosk mode: no pages, just the machine and Log Out. */
+/** The shared G3 top bar. In kiosk mode: no pages, just the machine and Sign out. */
 export function NavBar({ items }: { items: PluginNavItem[] }) {
   const kiosk = useKiosk();
   const user = useAuthUser();
@@ -58,7 +58,7 @@ export function NavBar({ items }: { items: PluginNavItem[] }) {
               onClick={() => kioskLogout()}
               className="text-sm font-semibold text-on-primary bg-crimson hover:bg-crimson-dark rounded-lg px-3.5 py-2 transition-colors"
             >
-              Log Out
+              Sign out
             </button>
           </>
         )
@@ -69,7 +69,7 @@ export function NavBar({ items }: { items: PluginNavItem[] }) {
 
 function confirmExitKioskMode() {
   const answer = window.prompt(
-    'Exiting kiosk mode is for admins only. You will need an admin login to exit.\n\nType "I understand" to continue.',
+    'Exiting kiosk mode is for admins only. You will need to sign in as an admin to exit.\n\nType "I understand" to continue.',
   );
   if (answer?.trim().toLowerCase() !== "i understand") return;
   exitKioskMode();

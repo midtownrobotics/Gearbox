@@ -207,7 +207,7 @@ export function HomePage() {
 
   if (authState === "checking" || (authState === "authenticated" && teamApps === null)) {
     return (
-      <main className="min-h-screen bg-page flex items-center justify-center px-6">
+      <main className="flex-1 bg-page flex items-center justify-center px-6">
         <div className="text-center">
           <div className="animate-pulse">
             <p className="text-primary-600 font-semibold text-lg tracking-widest uppercase">
@@ -221,7 +221,7 @@ export function HomePage() {
 
   if (authState === "unauthenticated") {
     return (
-      <main className="min-h-screen bg-page flex items-center justify-center px-6">
+      <main className="flex-1 bg-page flex items-center justify-center px-6">
         <div className="max-w-md w-full space-y-6 text-center">
           <div>
             <p className="text-primary-600 font-semibold text-lg tracking-widest uppercase mb-2">
@@ -238,7 +238,7 @@ export function HomePage() {
               href={`${appUrl("id")}/login?redirect=${encodeURIComponent(window.location.href)}`}
               className="block w-full px-6 py-3 rounded-lg bg-primary-600 hover:bg-primary-700 text-on-primary font-semibold transition-colors"
             >
-              Sign In
+              Sign in
             </a>
             {teamUi.links.publicSite && !teamUi.hiddenLinks?.includes("publicSite") && (
               <a
@@ -257,7 +257,7 @@ export function HomePage() {
   }
 
   return (
-    <main className="min-h-screen bg-page px-6 py-12">
+    <main className="flex-1 bg-page px-6 py-12">
       <div className="max-w-2xl mx-auto">
         <div className="mb-10">
           <p className="text-primary-600 text-sm font-semibold uppercase tracking-widest mb-1">

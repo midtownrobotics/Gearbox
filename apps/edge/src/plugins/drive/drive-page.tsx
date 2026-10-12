@@ -11,7 +11,7 @@ const DRIVE_IP_URL = "http://192.168.50.1";
  */
 export function DrivePage() {
   return (
-    <Page title="Shop Drive">
+    <Page title="Drive">
       <Card>
         <div className="space-y-4">
           <p className="text-secondary-700">

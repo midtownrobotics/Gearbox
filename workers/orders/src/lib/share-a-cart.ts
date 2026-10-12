@@ -156,7 +156,7 @@ export async function finishConnect(team: Team, redirectUri: string, code: strin
   );
   await deleteSetting(team.db, team.teamId, PENDING_PREFIX + state);
   if (!pending || Date.now() - pending.createdAt > PENDING_TTL_MS) {
-    throw new SacError("That sign-in link expired. Start connecting again from Settings.");
+    throw new SacError("That sign-in link expired. Start connecting again from the Admin page.");
   }
   const c = await client(team, redirectUri);
   const t = await token(c, {
@@ -195,13 +195,11 @@ export async function disconnect(team: Team) {
 async function accessToken(team: Team, force = false): Promise<string> {
   const auth = await connection(team);
   if (!auth)
-    throw new SacError(
-      "Share-A-Cart isn't connected. A mentor can connect it on the Settings page.",
-    );
+    throw new SacError("Share-A-Cart isn't connected. A mentor can connect it on the Admin page.");
   if (!force && auth.expiresAt > Date.now() + 60_000) return auth.accessToken;
   const c = await getJson<Client>(team, KEY_CLIENT);
   if (!auth.refreshToken || !c) {
-    throw new SacError("The Share-A-Cart connection expired. Reconnect it on the Settings page.");
+    throw new SacError("The Share-A-Cart connection expired. Reconnect it on the Admin page.");
   }
   const t = await token(c, { grant_type: "refresh_token", refresh_token: auth.refreshToken });
   await putJson(team, KEY_AUTH, {
@@ -278,7 +276,7 @@ async function callTool(
   );
   if (init.status === 401 && !retried) return callTool(team, name, args, true);
   if (init.status === 401)
-    throw new SacError("Share-A-Cart rejected the team's sign-in. Reconnect it on Settings.");
+    throw new SacError("Share-A-Cart rejected the team's sign-in. Reconnect it on the Admin page.");
   if (!init.reply || init.reply.error) {
     throw new SacError(
       `Share-A-Cart didn't start a session (${init.reply?.error?.message ?? `HTTP ${init.status}`}).`,

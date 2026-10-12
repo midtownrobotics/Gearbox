@@ -1,3 +1,4 @@
+import { ErrorBanner } from "@g3/ui";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../../shared/api";
@@ -63,17 +64,17 @@ export function ChecklistsPage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-page flex items-center justify-center">
+      <main className="flex-1 bg-page flex items-center justify-center">
         <p className="text-gray-600">Loading…</p>
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-page text-gray-900">
+    <main className="flex-1 bg-page text-gray-900">
       <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold tracking-tight">Checklists</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Edit Checklists</h1>
           {!creating && (
             <button
               type="button"
@@ -88,15 +89,11 @@ export function ChecklistsPage() {
           )}
         </div>
 
-        {banner && (
-          <p className="text-red-400 text-sm bg-red-950 border border-red-800 rounded-lg px-4 py-2">
-            {banner}
-          </p>
-        )}
+        {banner && <ErrorBanner message={banner} />}
 
         {creating && (
           <div className="bg-surface rounded-xl border border-gray-300 p-5 space-y-3">
-            <span className="font-semibold text-gray-200">New Checklist</span>
+            <span className="font-semibold text-gray-900">New Checklist</span>
             <input
               type="text"
               placeholder="List name"
@@ -178,7 +175,7 @@ export function ChecklistsPage() {
                       e.stopPropagation();
                       navigate(`/editor/${list.id}`);
                     }}
-                    className="p-1.5 text-gray-600 hover:text-gray-200 rounded transition-colors"
+                    className="p-1.5 text-gray-600 hover:text-gray-900 rounded transition-colors"
                   >
                     ✎
                   </button>

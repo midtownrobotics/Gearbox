@@ -20,8 +20,8 @@ const SORTS = {
   "joined-old": { label: "Joined: oldest first", by: "joined", descending: false },
   "name-az": { label: "Name: A to Z", by: "name", descending: false },
   "name-za": { label: "Name: Z to A", by: "name", descending: true },
-  "login-new": { label: "Last login: most recent first", by: "login", descending: true },
-  "login-old": { label: "Last login: longest ago first", by: "login", descending: false },
+  "login-new": { label: "Last sign-in: most recent first", by: "login", descending: true },
+  "login-old": { label: "Last sign-in: longest ago first", by: "login", descending: false },
 } as const;
 type Sort = keyof typeof SORTS;
 
@@ -290,7 +290,7 @@ export function AdminUsersPage() {
       "Name",
       "Email",
       "Joined Date",
-      "Last Login",
+      "Last Sign-in",
       "Admin",
       "Mentor",
       ...authMethods,
@@ -490,7 +490,7 @@ export function AdminUsersPage() {
                         <ProviderIcon key={identity.provider} provider={identity.provider} />
                       ))}
                       <span className="text-xs text-secondary-500">·</span>
-                      <span className="text-xs text-secondary-500" title="Last login">
+                      <span className="text-xs text-secondary-500" title="Last sign-in">
                         {user.lastLoginAt ? relativeTime(user.lastLoginAt) : "never logged in"}
                       </span>
                       <span className="text-xs text-secondary-500">·</span>

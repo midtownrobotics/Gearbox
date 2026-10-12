@@ -159,7 +159,9 @@ function DetailsCard({ item, onChanged }: { item: ItemView; onChanged: () => Pro
   return (
     <Card title="Details">
       {fields.length === 0 ? (
-        <p className="text-sm text-secondary-500">No fields yet. An admin adds them on Settings.</p>
+        <p className="text-sm text-secondary-500">
+          No fields yet. An admin adds them on the Admin page.
+        </p>
       ) : (
         <dl className="grid grid-cols-[minmax(7rem,auto)_1fr] gap-x-6 gap-y-2 text-sm">
           {fields.map((field) => (

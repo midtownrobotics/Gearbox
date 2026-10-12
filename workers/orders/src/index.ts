@@ -49,7 +49,7 @@ const app = base
     const db = createOrdersDb(c.env.ORDERS_DB);
     const teamId = c.get("teamId");
     const now = Date.now();
-    // Remembered so mentors can find people to mark trusted on the Settings page.
+    // Remembered so mentors can find people to mark trusted on the Admin page.
     await db
       .insert(appUsers)
       .values(

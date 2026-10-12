@@ -29,14 +29,14 @@ export function OverviewPage() {
   const { data, error, reload } = useLoad(() => loadOverview(query), [query.from, query.to]);
   if (error)
     return (
-      <Page title="Network">
+      <Page title="Overview">
         <RangePicker range={null} />
         <ErrorBanner message={error} />
       </Page>
     );
   if (!data)
     return (
-      <Page title="Network">
+      <Page title="Overview">
         <Loading />
       </Page>
     );
@@ -48,7 +48,7 @@ export function OverviewPage() {
   const total = data.rangeUsed;
 
   return (
-    <Page title="Network">
+    <Page title="Overview">
       <RangePicker range={range} />
       <Card title={`Billing cycle · ${formatDate(cycle.start)} – ${formatDate(cycle.end - 1)}`}>
         {/* 0: the team hasn't set a cap (an admin sets it below). */}

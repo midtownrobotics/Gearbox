@@ -6,7 +6,7 @@ import type { FiscalCalendar } from "./fiscal";
 import { DEFAULT_TEMPLATE } from "./naming";
 
 // A team's settings: one row per key in app_settings, kept to the team. Mentors edit the ones in
-// TeamSettings on the Settings page (PUT /settings); the rest are the app's own bookkeeping
+// TeamSettings on the Admin page (PUT /settings); the rest are the app's own bookkeeping
 // (Share-A-Cart's connection, whether the starter catalog was copied).
 
 /** A new team's calendar and money until a mentor changes them. G3 has its own rows (0018). */

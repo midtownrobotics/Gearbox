@@ -7,7 +7,7 @@ export type AuthUser = {
   displayName: string;
   /** G3ID mentors and admins: delete, merge and split entries. */
   isMentor: boolean;
-  /** G3ID admins: the Settings page. */
+  /** G3ID admins: the Admin page. */
   isAdmin: boolean;
 };
 

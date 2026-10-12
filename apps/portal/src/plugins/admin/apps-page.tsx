@@ -101,7 +101,7 @@ export function AppsPage() {
 
   return (
     <main className="mx-auto w-full max-w-3xl px-6 py-8">
-      <h1 className="mb-2 text-3xl font-bold text-secondary-900">Apps</h1>
+      <h1 className="mb-2 text-3xl font-bold text-secondary-900">Manage Apps</h1>
       <p className="mb-6 text-secondary-600">
         Choose the apps your team uses. Sign-in and this home page are always on.
       </p>

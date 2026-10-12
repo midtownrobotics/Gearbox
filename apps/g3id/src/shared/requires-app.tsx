@@ -3,7 +3,7 @@ import { useAppOn, useTeamNames } from "@g3/ui";
 import type { ReactNode } from "react";
 
 /**
- * A page that shows another app's data (the Leaderboard and Attendance Settings are Attendance's):
+ * A page that shows another app's data (the Leaderboard and the Attendance admin page are Attendance's):
  * while the team has that app off, a note instead of the page.
  */
 export function RequiresApp({

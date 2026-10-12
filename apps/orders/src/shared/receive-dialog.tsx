@@ -6,7 +6,7 @@ import { api, getErrorMessage } from "./api";
 // Marking parts received, with where they go in the Inventory app: into storage at a location, or
 // straight into use on a robot. Each part has its own location, which starts as where Inventory
 // already keeps that part, or where it went the last time it was received. Mentors decide on
-// Settings whether a place has to be said. Inventory is optional: when it can't be reached or
+// Admin page whether a place has to be said. Inventory is optional: when it can't be reached or
 // hasn't been set up, receiving works without it.
 
 export type Intake = InferResponseType<typeof api.inventory.$get, 200>;
@@ -185,7 +185,7 @@ export function ReceiveDialog({
   /** Why the parts can't go into Inventory at all, when they must. */
   const blocked = !usable
     ? options
-      ? `${inventoryName} has no locations yet. An admin sets them up on its Settings page.`
+      ? `${inventoryName} has no locations yet. An admin sets them up on its Admin page.`
       : `${inventoryName} can't be reached right now.`
     : null;
   const canUse = !!options && options.robots.length > 0 && options.subsystems.length > 0;
@@ -309,7 +309,7 @@ export function ReceiveDialog({
           {send && blocked && (
             <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
               {blocked}
-              {intake.required && " A mentor can turn this requirement off on Orders' Settings."}
+              {intake.required && " A mentor can turn this requirement off on Orders' Admin page."}
             </p>
           )}
 

@@ -1,3 +1,4 @@
+import { ErrorBanner } from "@g3/ui";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api } from "../../shared/api";
@@ -178,7 +179,7 @@ export function ChecklistDetailPage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-page flex items-center justify-center">
+      <main className="flex-1 bg-page flex items-center justify-center">
         <p className="text-gray-600">Loading…</p>
       </main>
     );
@@ -186,7 +187,7 @@ export function ChecklistDetailPage() {
 
   if (notFound || !list) {
     return (
-      <main className="min-h-screen bg-page flex flex-col items-center justify-center gap-4">
+      <main className="flex-1 bg-page flex flex-col items-center justify-center gap-4">
         <p className="text-gray-600">Checklist not found.</p>
         <button
           type="button"
@@ -202,7 +203,7 @@ export function ChecklistDetailPage() {
   const sortedItems = [...items].sort((a, b) => a.index - b.index);
 
   return (
-    <main className="min-h-screen bg-page text-gray-900">
+    <main className="flex-1 bg-page text-gray-900">
       <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
         <button
           type="button"
@@ -212,11 +213,7 @@ export function ChecklistDetailPage() {
           ← Back to Checklists
         </button>
 
-        {banner && (
-          <p className="text-red-400 text-sm bg-red-950 border border-red-800 rounded-lg px-4 py-2">
-            {banner}
-          </p>
-        )}
+        {banner && <ErrorBanner message={banner} />}
 
         {/* List header */}
         <div className="space-y-2">
@@ -309,7 +306,7 @@ export function ChecklistDetailPage() {
 
         {/* Items header */}
         <div className="flex items-center justify-between pt-2 border-t border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-200">
+          <h2 className="text-lg font-semibold text-gray-900">
             Items <span className="text-gray-600 font-normal text-sm">({items.length})</span>
           </h2>
           {!adding && (

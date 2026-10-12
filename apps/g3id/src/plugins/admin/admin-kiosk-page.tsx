@@ -1,5 +1,5 @@
 import { appUrl } from "@g3/site-config";
-import { Trash2 } from "lucide-react";
+import { ConfirmButton } from "@g3/ui";
 import { useEffect, useState } from "react";
 import { api } from "../../lib/api";
 
@@ -96,13 +96,13 @@ export function AdminKioskPage() {
       });
 
       if (!res.ok) {
-        alert("Failed to revoke device");
+        setDevicesError("Couldn't revoke the device. Try again.");
         return;
       }
 
       await loadDevices();
     } catch {
-      alert("Failed to revoke device");
+      setDevicesError("Couldn't revoke the device. Check your connection and try again.");
     }
   }
 
@@ -110,7 +110,7 @@ export function AdminKioskPage() {
   if (!kioskOn) {
     return (
       <main className="flex-1 px-6 py-8 max-w-2xl mx-auto w-full">
-        <h1 className="text-3xl font-bold text-secondary-900 mb-4">Kiosk Management</h1>
+        <h1 className="text-3xl font-bold text-secondary-900 mb-4">Kiosk Devices</h1>
         <p className="text-secondary-600">
           Kiosk sign-in is off for your team, so kiosks can't be added or used. Turn it on from the{" "}
           <a
@@ -127,7 +127,7 @@ export function AdminKioskPage() {
 
   return (
     <main className="flex-1 px-6 py-8 max-w-2xl mx-auto w-full">
-      <h1 className="text-3xl font-bold text-secondary-900 mb-8">Kiosk Management</h1>
+      <h1 className="text-3xl font-bold text-secondary-900 mb-8">Kiosk Devices</h1>
 
       <div className="space-y-8">
         <div className="bg-surface border border-secondary-200 rounded-lg p-6">
@@ -201,7 +201,7 @@ export function AdminKioskPage() {
               {devices.map((device) => (
                 <div
                   key={device.id}
-                  className="bg-surface border border-secondary-300 rounded-lg p-4 flex items-center justify-between"
+                  className="bg-surface border border-secondary-300 rounded-lg p-4 flex flex-wrap items-center justify-between gap-3"
                 >
                   <div className="min-w-0 flex-1">
                     <p className="font-semibold text-secondary-900">{device.name}</p>
@@ -221,14 +221,11 @@ export function AdminKioskPage() {
                   </div>
 
                   {!device.revokedAt && (
-                    <button
-                      type="button"
-                      onClick={() => handleRevokeDevice(device.id)}
-                      className="ml-4 p-2 rounded-lg bg-primary-600 hover:bg-primary-500 text-on-primary transition-colors flex-shrink-0"
-                      title="Revoke device"
-                    >
-                      <Trash2 size={18} />
-                    </button>
+                    <ConfirmButton
+                      label="Revoke"
+                      question={`Revoke ${device.name}? It will need a new activation code to be a kiosk again.`}
+                      onConfirm={() => void handleRevokeDevice(device.id)}
+                    />
                   )}
                 </div>
               ))}

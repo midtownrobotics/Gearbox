@@ -269,7 +269,7 @@ function Cell({
 const day = (ms: number | null) => (ms === null ? "—" : formatDate(ms));
 /** A short date for a phone: 10/7/26. */
 const shortDay = (ms: number) =>
-  new Date(ms).toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "2-digit" });
+  new Date(ms).toLocaleDateString(undefined, { month: "numeric", day: "numeric", year: "2-digit" });
 
 /** When it was ordered or received (wide screens only; a phone leaves these columns out). */
 function Done({ at }: { at: number | null }) {

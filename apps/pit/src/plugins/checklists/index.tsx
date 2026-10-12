@@ -13,15 +13,15 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
 
   if (!isOnline) {
     return (
-      <main className="min-h-screen bg-page flex items-center justify-center">
-        <p className="text-gray-400">You must be online to use the editor.</p>
+      <main className="flex-1 bg-page flex items-center justify-center">
+        <p className="text-gray-400">You must be online to edit checklists.</p>
       </main>
     );
   }
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-page flex items-center justify-center">
+      <main className="flex-1 bg-page flex items-center justify-center">
         <p className="text-gray-400">Loading…</p>
       </main>
     );
@@ -30,8 +30,8 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
   if (!user) {
     const loginUrl = `${appUrl("id")}/login?redirect=${encodeURIComponent(window.location.href)}`;
     return (
-      <main className="min-h-screen bg-page flex flex-col items-center justify-center gap-4">
-        <p className="text-gray-900 text-lg font-semibold">Sign in to use the Editor</p>
+      <main className="flex-1 bg-page flex flex-col items-center justify-center gap-4">
+        <p className="text-gray-900 text-lg font-semibold">Sign in to edit checklists</p>
         <a
           href={loginUrl}
           className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-on-primary text-sm font-semibold rounded-lg transition-colors"
@@ -72,5 +72,5 @@ export const checklistsPlugin: Plugin = {
       ),
     },
   ],
-  navItems: [{ label: "Editor", to: "/editor", order: 3 }],
+  navItems: [{ label: "Edit Checklists", to: "/editor", order: 3 }],
 };

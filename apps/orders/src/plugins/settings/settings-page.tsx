@@ -29,7 +29,7 @@ export function SettingsPage() {
   // Receiving into Inventory is only a setting while the team has Inventory on.
   const inventoryOn = useAppOn("inventory");
   return (
-    <Page title="Settings">
+    <Page title="Admin">
       <MoneyAndCalendar />
       <TrustedStudents />
       <ShareACart />
@@ -41,7 +41,7 @@ export function SettingsPage() {
 }
 
 const MONTHS = Array.from({ length: 12 }, (_, i) =>
-  new Date(Date.UTC(2026, i, 1)).toLocaleDateString("en-US", { month: "long", timeZone: "UTC" }),
+  new Date(Date.UTC(2026, i, 1)).toLocaleDateString(undefined, { month: "long", timeZone: "UTC" }),
 );
 
 /** The team's currency, fiscal calendar and sales tax: what budgets, prices and new orders use. */

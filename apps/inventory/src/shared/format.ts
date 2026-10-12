@@ -5,7 +5,7 @@ export function formatCents(cents: number | null | undefined, currency = "USD"):
 }
 
 export function formatDate(ms: number): string {
-  return new Date(ms).toLocaleDateString("en-US", {
+  return new Date(ms).toLocaleDateString(undefined, {
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -13,7 +13,7 @@ export function formatDate(ms: number): string {
 }
 
 export function formatDateTime(ms: number): string {
-  return new Date(ms).toLocaleString("en-US", {
+  return new Date(ms).toLocaleString(undefined, {
     month: "short",
     day: "numeric",
     hour: "numeric",

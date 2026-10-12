@@ -15,7 +15,7 @@ export function PendingPage() {
               approved.
             </span>
             <span className="block">
-              Then come back to the login page and sign in with a new code.
+              Then come back to the sign-in page and sign in with a new code.
             </span>
           </p>
         </div>
@@ -25,7 +25,7 @@ export function PendingPage() {
           onClick={() => navigate("/login")}
           className="w-full rounded-lg bg-primary-500 hover:bg-primary-600 text-on-primary font-semibold py-2.5 text-sm transition-colors"
         >
-          I understand, take me to the login page
+          I understand, take me to the sign-in page
         </button>
       </div>
     </main>
