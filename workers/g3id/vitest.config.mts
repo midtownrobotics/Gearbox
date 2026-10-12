@@ -1,7 +1,7 @@
 import { workerTestConfig } from "@g3/testing/config";
 
 // Slack's API as G3ID's tests see it: installing (oauth.v2.access) answers for the workspace named
-// in the code ("ws:T123"), and messages go nowhere.
+// in the code ("ws:T123"), its channels are three made-up ones, and messages go nowhere.
 const slack = (request: Request) => {
   const url = new URL(request.url);
   if (url.hostname !== "slack.com") return new Response("Not stubbed", { status: 502 });
@@ -23,6 +23,20 @@ const slack = (request: Request) => {
     return Response.json({
       ok: true,
       user: { real_name: `Member ${user}`, profile: { email: `${user}@slack.test` } },
+    });
+  }
+  // A bot installed before it could read channels ("xoxb-old") is refused.
+  if (url.pathname === "/api/conversations.list") {
+    if (request.headers.get("Authorization") === "Bearer xoxb-old") {
+      return Response.json({ ok: false, error: "missing_scope" });
+    }
+    return Response.json({
+      ok: true,
+      channels: [
+        { id: "C0000000002", name: "shop", is_private: false, is_member: false },
+        { id: "C0000000001", name: "announcements", is_private: false, is_member: true },
+        { id: "G0000000003", name: "mentors", is_private: true, is_member: true },
+      ],
     });
   }
   if (url.pathname === "/api/conversations.open") {

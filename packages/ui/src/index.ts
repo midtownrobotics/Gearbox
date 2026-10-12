@@ -2,6 +2,7 @@ import { useIsOnline } from "./hooks/use-is-online";
 export { useIsOnline };
 
 export { TeamIcon } from "./components/team-icon";
+export { SlackChannelPicker, type SlackChannelOption } from "./components/slack-channel-picker";
 export {
   activePath,
   AppNavBar,

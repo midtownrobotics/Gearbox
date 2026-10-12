@@ -1,4 +1,4 @@
-import { useTeamNames } from "@g3/ui";
+import { SlackChannelPicker, useTeamNames } from "@g3/ui";
 import { useEffect, useState } from "react";
 import { api } from "../../shared/api";
 import { getErrorMessage } from "../../shared/api-error";
@@ -845,7 +845,7 @@ function SlackSettings() {
 
   async function handleSave() {
     if (!channelId.trim()) {
-      setBanner("Slack channel ID is required");
+      setBanner("Choose the release notification channel");
       return;
     }
 
@@ -864,7 +864,7 @@ function SlackSettings() {
         return;
       }
 
-      setBanner("Slack channel ID updated successfully");
+      setBanner("Slack channels saved successfully");
       setTimeout(() => setBanner(null), 3000);
     } catch (err) {
       setBanner(err instanceof Error ? err.message : "Failed to save config");
@@ -893,37 +893,27 @@ function SlackSettings() {
 
       <div className="space-y-1">
         <label htmlFor="channel-id" className="text-xs font-medium text-steel-dark">
-          Release Notification Channel ID *
+          Release notification channel *
         </label>
-        <input
+        <SlackChannelPicker
           id="channel-id"
-          type="text"
           value={channelId}
-          onChange={(e) => setChannelId(e.target.value)}
-          placeholder="e.g. C09QYMTSGKT"
-          className="w-full bg-paper border border-steel/40 rounded-lg px-3 py-2 text-sm text-ink placeholder-steel focus:outline-none focus:border-crimson"
+          onChange={(id) => setChannelId(id ?? "")}
+          clearable={false}
         />
-        <p className="text-xs text-steel">
-          Channel ID for release notifications. Click the channel's name in Slack to find it.
-        </p>
+        <p className="text-xs text-steel">Where new Onshape releases are posted.</p>
       </div>
 
       <div className="space-y-1">
         <label htmlFor="summary-channel-id" className="text-xs font-medium text-steel-dark">
-          Overview &amp; Reflection Channel ID
+          Overview &amp; Reflection channel
         </label>
-        <input
+        <SlackChannelPicker
           id="summary-channel-id"
-          type="text"
           value={summaryChannelId}
-          onChange={(e) => setSummaryChannelId(e.target.value)}
-          placeholder="e.g. C1709CVEF"
-          className="w-full bg-paper border border-steel/40 rounded-lg px-3 py-2 text-sm text-ink placeholder-steel focus:outline-none focus:border-crimson"
+          onChange={(id) => setSummaryChannelId(id ?? "")}
         />
-        <p className="text-xs text-steel">
-          Where the Overview and Reflection buttons post. The Slack bot must be a member of the
-          channel.
-        </p>
+        <p className="text-xs text-steel">Where the Overview and Reflection buttons post.</p>
       </div>
 
       <div className="flex gap-2 pt-2">
