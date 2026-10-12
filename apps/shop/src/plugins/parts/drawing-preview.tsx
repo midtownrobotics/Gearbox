@@ -131,13 +131,13 @@ export function DrawingPreview({
   if (state.kind === "ready" || state.kind === "rendering") {
     const containerClass = fullHeight
       ? "relative flex-1 overflow-hidden flex items-center justify-center"
-      : "relative h-44 rounded-xl border border-steel/30 overflow-hidden flex items-center justify-center";
+      : "relative h-44 rounded-xl border border-secondary-200 overflow-hidden flex items-center justify-center";
     return (
       <div className={containerClass}>
         <canvas ref={canvasRef} className="max-w-full max-h-full object-contain" />
         {state.kind === "rendering" && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-            <span className="text-xs text-paper">Rendering…</span>
+            <span className="text-xs text-surface">Rendering…</span>
           </div>
         )}
         {!hideOverlay && (
@@ -145,9 +145,9 @@ export function DrawingPreview({
             href={drawingUrl(partNumber, revision)}
             target="_blank"
             rel="noreferrer"
-            className="absolute inset-0 flex items-end justify-end p-2 bg-transparent hover:bg-ink/5 transition-colors"
+            className="absolute inset-0 flex items-end justify-end p-2 bg-transparent hover:bg-secondary-900/5 transition-colors"
           >
-            <span className="text-[11px] font-semibold text-paper bg-ink/70 rounded-md px-2 py-1">
+            <span className="text-[11px] font-semibold text-surface bg-secondary-900/70 rounded-md px-2 py-1">
               Open drawing ↗
             </span>
           </a>
@@ -157,8 +157,8 @@ export function DrawingPreview({
   }
 
   const emptyClass = fullHeight
-    ? "flex-1 border border-dashed border-steel/40 bg-mist flex flex-col items-center justify-center gap-1 text-steel"
-    : "h-44 rounded-xl border border-dashed border-steel/40 bg-mist flex flex-col items-center justify-center gap-1 text-steel";
+    ? "flex-1 border border-dashed border-secondary-300 bg-page flex flex-col items-center justify-center gap-1 text-secondary-400"
+    : "h-44 rounded-xl border border-dashed border-secondary-300 bg-page flex flex-col items-center justify-center gap-1 text-secondary-400";
   return (
     <div className={emptyClass}>
       <svg

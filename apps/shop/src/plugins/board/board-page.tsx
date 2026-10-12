@@ -1,3 +1,4 @@
+import { Button, ErrorBanner, Loading, Page, inputClass } from "@g3/ui";
 import { useEffect, useMemo, useState } from "react";
 import { Link, matchPath, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../../shared/api";
@@ -14,7 +15,6 @@ import {
 import { fetchKioskPresence } from "../../shared/getters";
 import { processPath } from "../../shared/nav";
 import type { KioskPresence, PartDefinition, ProcessType } from "../../shared/types";
-import { ErrorBanner, PageLoading } from "../../shared/ui";
 import { useKiosk } from "../../shared/use-auth";
 import { useShopData } from "../../shared/use-shop-data";
 import { useTouchDevice } from "../../shared/use-touch";
@@ -28,15 +28,15 @@ import { ScanDialog } from "./scan-dialog";
 
 const MOOD_TONES: Record<ShopMood["tone"], string> = {
   calm: "bg-emerald-50 border-emerald-300 text-emerald-800",
-  steady: "bg-steel-tint border-steel/40 text-steel-dark",
+  steady: "bg-inset border-secondary-300 text-secondary-500",
   warn: "bg-amber-50 border-amber-300 text-amber-800",
-  hot: "bg-crimson-tint border-crimson/40 text-crimson-dark",
+  hot: "bg-red-50 border-red-300 text-red-800",
 };
 
 const LOAD_STYLES = {
-  none: "bg-paper border-steel/30",
+  none: "bg-surface border-secondary-200",
   medium: "bg-amber-50 border-amber-300",
-  high: "bg-crimson-tint border-crimson/40",
+  high: "bg-red-50 border-red-300",
 };
 
 export function BoardPage() {
@@ -136,7 +136,12 @@ export function BoardPage() {
     }
   }
 
-  if (loading) return <PageLoading />;
+  if (loading)
+    return (
+      <Page title="Shop Floor">
+        <Loading />
+      </Page>
+    );
 
   const processName = (pid: number) =>
     data?.processes.find((p) => p.id === pid)?.name ?? `Process #${pid}`;
@@ -147,33 +152,30 @@ export function BoardPage() {
       : null;
 
   return (
-    <main className="flex-1 bg-page">
-      <div className="max-w-5xl mx-auto px-6 py-8 space-y-5">
-        {view !== "overview" && !kioskMachine && (
-          <Link
-            to="/board"
-            className={`inline-flex items-center gap-1.5 text-sm text-steel hover:text-ink transition-colors ${
-              touch ? "py-2" : ""
-            }`}
-          >
-            ← Back to Shop Floor
-          </Link>
-        )}
-
-        <div className="flex items-start justify-between gap-4">
-          {kioskMachine ? (
-            <h1 className="font-display text-4xl text-ink">{kioskMachine.name}</h1>
-          ) : (
+    <Page
+      title={kioskMachine?.name ?? (view === "overview" ? "Shop Floor" : processName(view))}
+      actions={
+        <div className="flex flex-wrap items-center gap-3">
+          {view !== "overview" && !kioskMachine && (
+            <Link
+              to="/board"
+              className={`text-sm text-secondary-500 hover:text-primary-600 ${touch ? "py-2" : ""}`}
+            >
+              ← Shop Floor
+            </Link>
+          )}
+          {!kioskMachine && (
             <select
+              aria-label="Machine"
               value={view === "overview" ? "overview" : String(view)}
               onChange={(e) =>
                 navigate(
                   e.target.value === "overview" ? "/board" : processPath(Number(e.target.value)),
                 )
               }
-              className="font-display text-4xl text-ink bg-paper border border-steel/40 focus:outline-none focus:ring-2 focus:ring-crimson rounded-lg px-1"
+              className={`${inputClass} !w-auto`}
             >
-              <option value="overview">Shop Floor</option>
+              <option value="overview">Every machine</option>
               {data?.processes.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}
@@ -181,18 +183,15 @@ export function BoardPage() {
               ))}
             </select>
           )}
-
           {kiosk.active && (
-            <button
-              type="button"
-              onClick={() => setScanOpen(true)}
-              className="shrink-0 px-5 py-3 rounded-xl bg-crimson hover:bg-crimson-dark text-on-primary text-lg font-semibold transition-colors"
-            >
+            <Button size="lg" className="shrink-0" onClick={() => setScanOpen(true)}>
               Scan
-            </button>
+            </Button>
           )}
         </div>
-
+      }
+    >
+      <>
         {error && <ErrorBanner message={error} />}
         {banner && <ErrorBanner message={banner} />}
 
@@ -220,67 +219,67 @@ export function BoardPage() {
             onChanged={refresh}
           />
         )}
-      </div>
 
-      {scanOpen && (
-        <ScanDialog
-          queue={queueRows}
-          all={rows}
-          onFound={(row) => {
-            setScanOpen(false);
-            setWorkingPartInstanceId(row.instance.id);
-          }}
-          onClose={() => setScanOpen(false)}
-        />
-      )}
+        {scanOpen && (
+          <ScanDialog
+            queue={queueRows}
+            all={rows}
+            onFound={(row) => {
+              setScanOpen(false);
+              setWorkingPartInstanceId(row.instance.id);
+            }}
+            onClose={() => setScanOpen(false)}
+          />
+        )}
 
-      {workingPartInstanceId &&
-        data &&
-        (() => {
-          const workingRow = rows.find((r) => r.instance.id === workingPartInstanceId);
-          return workingRow ? (
-            <PartWorkView
-              row={workingRow}
-              data={data}
-              onClose={() => setWorkingPartInstanceId(null)}
-              onMarkComplete={async () => {
-                if (workingRow.current) {
-                  await advance(workingRow, "done");
-                  setWorkingPartInstanceId(null);
-                }
-              }}
-              onChanged={refresh}
-            />
-          ) : null;
-        })()}
+        {workingPartInstanceId &&
+          data &&
+          (() => {
+            const workingRow = rows.find((r) => r.instance.id === workingPartInstanceId);
+            return workingRow ? (
+              <PartWorkView
+                row={workingRow}
+                data={data}
+                onClose={() => setWorkingPartInstanceId(null)}
+                onMarkComplete={async () => {
+                  if (workingRow.current) {
+                    await advance(workingRow, "done");
+                    setWorkingPartInstanceId(null);
+                  }
+                }}
+                onChanged={refresh}
+              />
+            ) : null;
+          })()}
 
-      {viewingPartInstanceId &&
-        data &&
-        (() => {
-          const viewingRow = rows.find((r) => r.instance.id === viewingPartInstanceId);
-          return viewingRow ? (
-            <PartDetailsView
-              row={viewingRow}
-              data={data}
-              onClose={() => setViewingPartInstanceId(null)}
-              onStartPart={async () => {
-                if (viewingRow.current) {
-                  await advance(viewingRow, "doing");
-                }
-              }}
-            />
-          ) : null;
-        })()}
+        {viewingPartInstanceId &&
+          data &&
+          (() => {
+            const viewingRow = rows.find((r) => r.instance.id === viewingPartInstanceId);
+            return viewingRow ? (
+              <PartDetailsView
+                row={viewingRow}
+                data={data}
+                onClose={() => setViewingPartInstanceId(null)}
+                onStartPart={async () => {
+                  if (viewingRow.current) {
+                    await advance(viewingRow, "doing");
+                  }
+                }}
+              />
+            ) : null;
+          })()}
 
-      {selectedRow && data && (
-        <PartCard
-          row={selectedRow}
-          data={data}
-          onClose={() => setSelectedInstanceId(null)}
-          onChanged={refresh}
-        />
-      )}
-    </main>
+        {selectedRow && data && (
+          <PartCard
+            row={selectedRow}
+            data={data}
+            onClose={() => setSelectedInstanceId(null)}
+            onChanged={refresh}
+          />
+        )}
+      </>
+    </Page>
   );
 }
 
@@ -333,7 +332,9 @@ function OverviewView({
 
       {/* Process boxes */}
       {loads.length === 0 ? (
-        <p className="text-steel text-sm">No processes defined yet — add some on the Admin page.</p>
+        <p className="text-secondary-400 text-sm">
+          No processes defined yet — add some on the Admin page.
+        </p>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
           {loads.map((load) => (
@@ -346,15 +347,17 @@ function OverviewView({
               }`}
             >
               <div className="flex items-center justify-between gap-2">
-                <span className="font-semibold text-ink truncate">{load.process.name}</span>
+                <span className="font-semibold text-secondary-900 truncate">
+                  {load.process.name}
+                </span>
                 <span
                   title={load.doing > 0 ? "Running" : "Idle"}
                   className={`w-2.5 h-2.5 rounded-full shrink-0 ${
-                    load.doing > 0 ? "bg-emerald-500 animate-pulse" : "bg-steel/40"
+                    load.doing > 0 ? "bg-emerald-500 animate-pulse" : "bg-secondary-300"
                   }`}
                 />
               </div>
-              <p className="text-xs text-steel-dark mt-2">
+              <p className="text-xs text-secondary-500 mt-2">
                 {load.doing} running · {load.todo} to do
               </p>
               {peopleAt(load.process.name).length > 0 && (
@@ -408,20 +411,20 @@ function BoardList({
 }) {
   return (
     <section className="space-y-2">
-      <h2 className="text-xs font-bold uppercase tracking-widest text-steel">
-        {title} <span className="text-crimson">{rows.length}</span>
+      <h2 className="font-sans text-xs font-bold uppercase tracking-widest text-secondary-400">
+        {title} <span className="text-primary-600">{rows.length}</span>
       </h2>
       {rows.length === 0 ? (
-        <p className="text-steel text-sm">{empty}</p>
+        <p className="text-secondary-400 text-sm">{empty}</p>
       ) : (
-        <div className="bg-paper border border-steel/30 rounded-xl divide-y divide-steel/15">
+        <div className="bg-surface border border-secondary-200 rounded-xl divide-y divide-secondary-200">
           {rows.map((row) => (
             <PartLine key={row.instance.id} row={row} touch={touch} navigate={navigate}>
               {row.current && (
                 <Link
                   to={processPath(row.current.processId)}
                   onClick={(e) => e.stopPropagation()}
-                  className="text-xs font-medium text-steel-dark bg-steel-tint border border-steel/30 hover:border-crimson/50 hover:text-crimson rounded-full px-2.5 py-0.5 shrink-0 transition-colors"
+                  className="text-xs font-medium text-secondary-500 bg-inset border border-secondary-200 hover:border-secondary-400 hover:text-primary-600 rounded-full px-2.5 py-0.5 shrink-0 transition-colors"
                 >
                   {processName(row.current.processId)}
                 </Link>
@@ -492,13 +495,13 @@ function ProcessView({
       ) : (
         <>
           <section className="space-y-2">
-            <h2 className="text-xs font-bold uppercase tracking-widest text-steel">
-              In Progress <span className="text-crimson">{inProgress.length}</span>
+            <h2 className="font-sans text-xs font-bold uppercase tracking-widest text-secondary-400">
+              In Progress <span className="text-primary-600">{inProgress.length}</span>
             </h2>
             {inProgress.length === 0 ? (
-              <p className="text-steel text-sm">Nothing in progress here.</p>
+              <p className="text-secondary-400 text-sm">Nothing in progress here.</p>
             ) : (
-              <div className="bg-paper border border-steel/30 rounded-xl divide-y divide-steel/15">
+              <div className="bg-surface border border-secondary-200 rounded-xl divide-y divide-secondary-200">
                 {inProgress.map((row) => (
                   <PartLine
                     key={row.instance.id}
@@ -516,9 +519,9 @@ function ProcessView({
                         }}
                         className={`w-full whitespace-nowrap text-xs bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold transition-colors ${btnSize}`}
                       >
-                        Mark as Complete
+                        Mark as complete
                       </button>
-                      <span className="pointer-events-none absolute bottom-full right-0 mb-1.5 hidden group-hover:block whitespace-nowrap bg-ink text-paper text-xs rounded-md px-2.5 py-1.5 shadow-lg">
+                      <span className="pointer-events-none absolute bottom-full right-0 mb-1.5 hidden group-hover:block whitespace-nowrap bg-secondary-900 text-surface text-xs rounded-md px-2.5 py-1.5 shadow-lg">
                         Do a quality check before marking this complete!
                       </span>
                     </span>
@@ -529,13 +532,13 @@ function ProcessView({
           </section>
 
           <section className="space-y-2">
-            <h2 className="text-xs font-bold uppercase tracking-widest text-steel">
-              To Do <span className="text-crimson">{todo.length}</span>
+            <h2 className="font-sans text-xs font-bold uppercase tracking-widest text-secondary-400">
+              To Do <span className="text-primary-600">{todo.length}</span>
             </h2>
             {todo.length === 0 ? (
-              <p className="text-steel text-sm">Nothing ready to start.</p>
+              <p className="text-secondary-400 text-sm">Nothing ready to start.</p>
             ) : (
-              <div className="bg-paper border border-steel/30 rounded-xl divide-y divide-steel/15">
+              <div className="bg-surface border border-secondary-200 rounded-xl divide-y divide-secondary-200">
                 {todo.map((row) => (
                   <PartLine
                     key={row.instance.id}
@@ -544,16 +547,16 @@ function ProcessView({
                     onOpenPart={() => onViewPart(row.instance.id)}
                     stack
                   >
-                    <button
-                      type="button"
+                    <Button
+                      size={touch ? "md" : "sm"}
+                      className="whitespace-nowrap"
                       onClick={(e) => {
                         e.stopPropagation();
                         onAdvance(row, "doing");
                       }}
-                      className={`whitespace-nowrap text-xs bg-crimson hover:bg-crimson-dark text-on-primary rounded-lg font-semibold transition-colors ${btnSize}`}
                     >
-                      Start Part
-                    </button>
+                      Start part
+                    </Button>
                     <span className="relative group">
                       <button
                         type="button"
@@ -563,9 +566,9 @@ function ProcessView({
                         }}
                         className={`w-full whitespace-nowrap text-xs bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold transition-colors ${btnSize}`}
                       >
-                        Mark as Complete
+                        Mark as complete
                       </button>
-                      <span className="pointer-events-none absolute bottom-full right-0 mb-1.5 hidden group-hover:block whitespace-nowrap bg-ink text-paper text-xs rounded-md px-2.5 py-1.5 shadow-lg">
+                      <span className="pointer-events-none absolute bottom-full right-0 mb-1.5 hidden group-hover:block whitespace-nowrap bg-secondary-900 text-surface text-xs rounded-md px-2.5 py-1.5 shadow-lg">
                         Do a quality check before marking this complete!
                       </span>
                     </span>
@@ -578,22 +581,22 @@ function ProcessView({
       )}
 
       <section className="space-y-2">
-        <h2 className="text-xs font-bold uppercase tracking-widest text-steel">
-          Upcoming <span className="text-crimson">{upcoming.length}</span>
+        <h2 className="font-sans text-xs font-bold uppercase tracking-widest text-secondary-400">
+          Upcoming <span className="text-primary-600">{upcoming.length}</span>
         </h2>
         {upcoming.length === 0 ? (
-          <p className="text-steel text-sm">Nothing else is headed this way.</p>
+          <p className="text-secondary-400 text-sm">Nothing else is headed this way.</p>
         ) : (
-          <div className="bg-paper border border-steel/30 rounded-xl divide-y divide-steel/15">
+          <div className="bg-surface border border-secondary-200 rounded-xl divide-y divide-secondary-200">
             {upcoming.map((row) => (
               <PartLine key={row.instance.id} row={row} touch={touch} muted>
                 {row.current && (
-                  <span className="text-xs text-steel shrink-0">
+                  <span className="text-xs text-secondary-400 shrink-0">
                     Stuck at{" "}
                     <Link
                       to={processPath(row.current.processId)}
                       onClick={(e) => e.stopPropagation()}
-                      className="font-semibold text-steel-dark hover:text-crimson underline transition-colors"
+                      className="font-semibold text-secondary-500 hover:text-primary-600 underline transition-colors"
                     >
                       {processName(row.current.processId)}
                     </Link>
@@ -637,7 +640,7 @@ function PartLine({
   const name = (
     <>
       {row.definition.name}
-      <span className="text-steel font-normal ml-1.5">#{row.instance.instanceNumber}</span>
+      <span className="text-secondary-400 font-normal ml-1.5">#{row.instance.instanceNumber}</span>
     </>
   );
 
@@ -647,7 +650,7 @@ function PartLine({
         stack
           ? "flex flex-col gap-2.5 sm:flex-row sm:items-center sm:gap-3"
           : "flex items-center gap-3"
-      } ${goToMachine ? "cursor-pointer hover:bg-mist/70 transition-colors" : ""} ${
+      } ${goToMachine ? "cursor-pointer hover:bg-secondary-50 transition-colors" : ""} ${
         touch ? "py-4" : "py-2.5"
       }`}
       onClick={() => {
@@ -667,18 +670,20 @@ function PartLine({
               onOpenPart();
             }}
             title="Open this part"
-            className={`block max-w-full truncate text-left text-sm font-medium text-crimson underline hover:text-crimson-dark transition-colors ${
+            className={`block max-w-full truncate text-left text-sm font-medium text-primary-600 underline hover:text-primary-700 transition-colors ${
               touch ? "py-1" : ""
             }`}
           >
             {name}
           </button>
         ) : (
-          <p className={`text-sm font-medium truncate ${muted ? "text-steel-dark" : "text-ink"}`}>
+          <p
+            className={`text-sm font-medium truncate ${muted ? "text-secondary-500" : "text-secondary-900"}`}
+          >
             {name}
           </p>
         )}
-        <p className="text-xs font-mono text-steel truncate">{partLabel(row)}</p>
+        <p className="text-xs font-mono text-secondary-400 truncate">{partLabel(row)}</p>
       </div>
       {stack ? (
         <div className="grid auto-cols-fr grid-flow-col gap-2 sm:flex sm:shrink-0 sm:items-center sm:gap-3">

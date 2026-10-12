@@ -1,10 +1,10 @@
+import { Button, Card, ErrorBanner, Field, Loading, Page, buttonClass, inputClass } from "@g3/ui";
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { api } from "../../shared/api";
 import { getErrorMessage } from "../../shared/api-error";
 import { partInfoRequiredBy, pipelineFileError } from "../../shared/derive";
 import type { PartDefinition, PartInstance } from "../../shared/types";
-import { ErrorBanner, PageLoading } from "../../shared/ui";
 import { useAuthUser } from "../../shared/use-auth";
 import { useShopData } from "../../shared/use-shop-data";
 import { useTouchDevice } from "../../shared/use-touch";
@@ -59,7 +59,12 @@ export function AddPartPage() {
   const [banner, setBanner] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  if (loading || !user) return <PageLoading />;
+  if (loading || !user)
+    return (
+      <Page title="Add Part" width="narrow">
+        <Loading />
+      </Page>
+    );
 
   function setProcessAt(index: number, processId: number) {
     setProcessIds((prev) => {
@@ -206,56 +211,52 @@ export function AddPartPage() {
   const processes = data?.processes ?? [];
 
   return (
-    <main className="flex-1 bg-page">
-      <div className="max-w-2xl mx-auto px-6 py-8 space-y-5">
-        <div>
-          <Link to="/parts" className="text-sm text-steel hover:text-ink transition-colors">
-            ← Back to Parts
-          </Link>
-          <h1 className="font-display text-4xl text-ink mt-2">
-            {transfer ? "Edit & Obsolete" : "Add Part"}
-          </h1>
-          {transfer && (
-            <p className="text-sm text-steel-dark mt-1">
-              The original moves to Obsolete once this part is created.
-            </p>
-          )}
-        </div>
-
+    <Page
+      title={transfer ? "Edit and Make Obsolete" : "Add Part"}
+      description={
+        transfer ? "The original moves to Obsolete once this part is created." : undefined
+      }
+      width="narrow"
+      actions={
+        <Link to="/parts" className="text-sm text-secondary-500 hover:text-primary-600">
+          ← Parts
+        </Link>
+      }
+    >
+      <>
         {banner && <ErrorBanner message={banner} />}
 
-        <div className="bg-paper border border-steel/30 rounded-xl p-6 space-y-4">
+        <Card className="space-y-4">
           {subsystems.length === 0 ? (
-            <p className="text-sm text-amber-700 bg-amber-50 border border-amber-300 rounded-lg px-4 py-2.5">
-              No subsystems exist yet — add one on the{" "}
+            <p className="text-sm text-amber-800 bg-amber-50 border border-amber-300 rounded-lg px-4 py-2.5">
+              A part needs a subsystem.{" "}
               <Link to="/admin" className="underline font-medium">
-                Admin page
+                Add one on Admin
               </Link>{" "}
               first.
             </p>
           ) : (
             <>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Field
+                <TextField
                   label="Onshape Part Number"
                   required
                   value={form.onshapePartNumber}
                   onChange={(v) => setForm({ ...form, onshapePartNumber: v })}
                   placeholder="P-0042"
                 />
-                <Field
+                <TextField
                   label="Onshape Revision"
                   required
                   value={form.revision}
                   onChange={(v) => setForm({ ...form, revision: v })}
                   placeholder="A"
                 />
-                <div className="space-y-1">
-                  <FieldLabel label="Subsystem" required />
+                <Field label="Subsystem *">
                   <select
                     value={form.subsystemId}
                     onChange={(e) => setForm({ ...form, subsystemId: Number(e.target.value) })}
-                    className="w-full bg-paper border border-steel/40 rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-crimson"
+                    className={inputClass}
                   >
                     <option value={0}>Select…</option>
                     {subsystems.map((s) => (
@@ -264,16 +265,15 @@ export function AddPartPage() {
                       </option>
                     ))}
                   </select>
-                </div>
-                <Field
+                </Field>
+                <TextField
                   label="Name"
                   required
                   value={form.name}
                   onChange={(v) => setForm({ ...form, name: v })}
                   placeholder="Same as Onshape"
                 />
-                <div className="space-y-1">
-                  <FieldLabel label="Quantity" required />
+                <Field label="Quantity *" hint="One part instance is made per quantity.">
                   <input
                     type="number"
                     min={1}
@@ -284,11 +284,10 @@ export function AddPartPage() {
                         quantity: Math.max(1, Math.floor(Number(e.target.value))),
                       })
                     }
-                    className="w-full bg-paper border border-steel/40 rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-crimson"
+                    className={inputClass}
                   />
-                  <p className="text-xs text-steel">One part instance is made per quantity.</p>
-                </div>
-                <Field
+                </Field>
+                <TextField
                   label="Notes"
                   value={form.notes}
                   onChange={(v) => setForm({ ...form, notes: v })}
@@ -296,7 +295,7 @@ export function AddPartPage() {
                 />
                 {infoRequiredBy.length > 0 && (
                   <>
-                    <Field
+                    <TextField
                       label="Material"
                       required
                       value={form.material}
@@ -304,7 +303,7 @@ export function AddPartPage() {
                       placeholder="e.g. 4140"
                       hint={`Required by ${infoRequiredBy.join(", ")}`}
                     />
-                    <Field
+                    <TextField
                       label="Thickness"
                       required
                       value={form.thickness}
@@ -315,28 +314,26 @@ export function AddPartPage() {
                 )}
               </div>
 
-              <label className="flex items-center gap-2 cursor-pointer select-none text-sm text-ink">
+              <label className="flex items-center gap-2 cursor-pointer select-none text-sm text-secondary-900">
                 <input
                   type="checkbox"
                   checked={form.isPriority}
                   onChange={(e) => setForm({ ...form, isPriority: e.target.checked })}
-                  className="accent-crimson w-4 h-4"
+                  className="accent-primary-500 w-4 h-4"
                 />
                 Priority part
               </label>
 
-              <hr className="border-steel/25" />
+              <hr className="border-secondary-200" />
 
               {/* Processes */}
               <div className="space-y-2">
                 <FieldLabel label="Processes" />
-                <p className="text-xs text-steel">
+                <p className="text-xs text-secondary-500">
                   The order here is the order the part moves through the shop.
                 </p>
                 {processes.length === 0 ? (
-                  <p className="text-sm text-steel">
-                    No processes exist yet — add some on the Admin page.
-                  </p>
+                  <p className="text-sm text-secondary-500">No processes yet. Add some on Admin.</p>
                 ) : (
                   <div className="space-y-2">
                     {processIds.map((pid, i) => (
@@ -345,13 +342,13 @@ export function AddPartPage() {
                         key={i}
                         className="flex items-center gap-2"
                       >
-                        <span className="w-6 text-sm font-mono text-steel text-right shrink-0">
+                        <span className="w-6 text-sm font-mono text-secondary-400 text-right shrink-0">
                           {i + 1}.
                         </span>
                         <select
                           value={pid}
                           onChange={(e) => setProcessAt(i, Number(e.target.value))}
-                          className="flex-1 bg-paper border border-steel/40 rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-crimson"
+                          className={`${inputClass} flex-1`}
                         >
                           <option value={0}>Remove</option>
                           {processes.map((p) => (
@@ -363,7 +360,7 @@ export function AddPartPage() {
                       </div>
                     ))}
                     <div className="flex items-center gap-2">
-                      <span className="w-6 text-sm font-mono text-steel text-right shrink-0">
+                      <span className="w-6 text-sm font-mono text-secondary-400 text-right shrink-0">
                         {processIds.length + 1}.
                       </span>
                       <select
@@ -372,7 +369,7 @@ export function AddPartPage() {
                           const pid = Number(e.target.value);
                           if (pid) setProcessIds((prev) => [...prev, pid]);
                         }}
-                        className="flex-1 bg-mist border border-dashed border-steel/40 rounded-lg px-3 py-2 text-sm text-steel-dark focus:outline-none focus:border-crimson"
+                        className={`${inputClass} flex-1 border-dashed !text-secondary-500`}
                       >
                         <option value={0}>Add a process…</option>
                         {processes.map((p) => (
@@ -386,46 +383,38 @@ export function AddPartPage() {
                 )}
               </div>
 
-              {formError && <p className="text-crimson-dark text-sm">{formError}</p>}
+              {formError && <p className="text-red-700 text-sm">{formError}</p>}
 
               <div className="flex gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={handleSubmit}
-                  disabled={submitting}
-                  className={`bg-crimson hover:bg-crimson-dark disabled:opacity-50 text-on-primary text-sm font-semibold rounded-lg transition-colors ${
-                    touch ? "px-6 py-3" : "px-5 py-2"
-                  }`}
-                >
-                  {submitting ? "Creating…" : transfer ? "Create & Retire Original" : "Create Part"}
-                </button>
-                <Link
-                  to="/parts"
-                  className={`bg-steel-tint hover:bg-steel/30 text-steel-dark text-sm font-medium rounded-lg transition-colors ${
-                    touch ? "px-6 py-3" : "px-5 py-2"
-                  }`}
-                >
+                <Button size={touch ? "lg" : "md"} onClick={handleSubmit} disabled={submitting}>
+                  {submitting
+                    ? "Creating…"
+                    : transfer
+                      ? "Create and make the original obsolete"
+                      : "Create part"}
+                </Button>
+                <Link to="/parts" className={buttonClass("secondary", touch ? "lg" : "md")}>
                   Cancel
                 </Link>
               </div>
             </>
           )}
-        </div>
-      </div>
-    </main>
+        </Card>
+      </>
+    </Page>
   );
 }
 
 function FieldLabel({ label, required }: { label: string; required?: boolean }) {
   return (
-    <span className="text-xs font-medium text-steel-dark">
+    <span className="text-sm font-medium text-secondary-700">
       {label}
-      {required && <span className="text-crimson"> *</span>}
+      {required && <span className="text-red-700"> *</span>}
     </span>
   );
 }
 
-function Field({
+function TextField({
   label,
   value,
   onChange,
@@ -441,16 +430,14 @@ function Field({
   hint?: string;
 }) {
   return (
-    <div className="space-y-1">
-      <FieldLabel label={label} required={required} />
+    <Field label={required ? `${label} *` : label} hint={hint}>
       <input
         type="text"
         value={value}
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full bg-paper border border-steel/40 rounded-lg px-3 py-2 text-sm text-ink placeholder-steel focus:outline-none focus:border-crimson"
+        className={inputClass}
       />
-      {hint && <p className="text-xs text-steel">{hint}</p>}
-    </div>
+    </Field>
   );
 }

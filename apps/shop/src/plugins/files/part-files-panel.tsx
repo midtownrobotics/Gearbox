@@ -1,3 +1,11 @@
+import {
+  Button,
+  type ButtonSize,
+  type ButtonVariant,
+  ConfirmButton,
+  ErrorBanner,
+  buttonClass,
+} from "@g3/ui";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { InstanceRow } from "../../shared/derive";
 import {
@@ -133,18 +141,18 @@ export function InProductionBadge({ rows }: { rows: InstanceRow[] }) {
   );
 }
 
-/** Confirms deleting something, warning loudly when production instances still use it. */
-export function confirmDelete(name: string, inProduction: InstanceRow[], extra = ""): boolean {
+/** What a Delete button asks first, with a warning when production instances still use it. */
+export function deleteQuestion(name: string, inProduction: InstanceRow[], extra = ""): string {
   const warning =
     inProduction.length > 0
-      ? `⚠ ${inProduction.length} instance${inProduction.length === 1 ? " that's" : "s that are"} still in production use${inProduction.length === 1 ? "s" : ""} it: ${describeUsage(inProduction)}.\n\n`
+      ? `${inProduction.length} instance${inProduction.length === 1 ? " that's" : "s that are"} still in production use${inProduction.length === 1 ? "s" : ""} it: ${describeUsage(inProduction)}. `
       : "";
-  return window.confirm(`${warning}Delete ${name}? ${extra}This can't be undone.`);
+  return `${warning}Delete ${name}? ${extra}This can't be undone.`;
 }
 
-export function confirmDeleteFile(file: PartFile, inProduction: InstanceRow[] = []): boolean {
+export function deleteFileQuestion(file: PartFile, inProduction: InstanceRow[] = []): string {
   const n = file.assignments.length;
-  return confirmDelete(
+  return deleteQuestion(
     file.filename,
     inProduction,
     n > 0 ? `It will be unassigned from ${n} instance${n === 1 ? "" : "s"}. ` : "",
@@ -254,29 +262,31 @@ export function PartFilesPanel({
 
   return (
     <div className="space-y-3">
-      <p className="text-sm text-steel-dark">
+      <p className="text-sm text-secondary-500">
         {active.length - free} of {active.length} active instance{active.length === 1 ? "" : "s"}{" "}
-        have a file · <span className="font-semibold text-ink">{free} without</span>
+        have a file · <span className="font-semibold text-secondary-900">{free} without</span>
         {currentNumber !== undefined && (
           <>
             {" "}
             · This instance (#{currentNumber}):{" "}
-            <span className="font-semibold text-ink">{currentFile?.filename ?? "no file"}</span>
+            <span className="font-semibold text-secondary-900">
+              {currentFile?.filename ?? "no file"}
+            </span>
           </>
         )}
       </p>
 
-      {error && <ErrorText message={error} />}
+      {error && <ErrorBanner message={error} />}
       {notices.map((n) => (
         <NoticeText key={n} message={n} />
       ))}
 
       {loading ? (
-        <p className="text-sm text-steel">Loading files…</p>
+        <p className="text-sm text-secondary-400">Loading files…</p>
       ) : files.length === 0 ? (
-        <p className="text-sm text-steel">No files assigned to this part.</p>
+        <p className="text-sm text-secondary-400">No files assigned to this part.</p>
       ) : (
-        <ul className="divide-y divide-steel/20 border border-steel/25 rounded-lg">
+        <ul className="divide-y divide-secondary-200 border border-secondary-200 rounded-lg">
           {files.map((file) => {
             const otherParts = [
               ...new Set(
@@ -289,26 +299,25 @@ export function PartFilesPanel({
               .filter((d): d is PartDefinition => !!d);
             return (
               <li key={file.id} className="px-3 py-2.5 space-y-2">
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3">
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-ink truncate" title={file.filename}>
+                    <p
+                      className="text-sm font-medium text-secondary-900 truncate"
+                      title={file.filename}
+                    >
                       {file.filename}
                     </p>
                     <FileMeta file={file} uploader={resolveName(file.uploadedBy)} />
                   </div>
                   <DownloadLink file={file} />
                   {!kiosk.active && (
-                    <button
-                      type="button"
+                    <ConfirmButton
+                      size="sm"
+                      label="Delete"
+                      question={deleteFileQuestion(file)}
                       disabled={busy}
-                      onClick={() => {
-                        if (confirmDeleteFile(file))
-                          run(() => deletePartFile(file.id).then(() => null));
-                      }}
-                      className="px-2.5 py-1 text-xs font-medium border border-crimson/40 text-crimson hover:bg-crimson-tint rounded transition-colors disabled:opacity-50 shrink-0"
-                    >
-                      Delete
-                    </button>
+                      onConfirm={() => run(() => deletePartFile(file.id).then(() => null))}
+                    />
                   )}
                 </div>
                 <AssignmentGroup
@@ -320,7 +329,7 @@ export function PartFilesPanel({
                   run={run}
                 />
                 {otherParts.length > 0 && (
-                  <p className="text-xs text-steel-dark">
+                  <p className="text-xs text-secondary-500">
                     Also covers:{" "}
                     {otherParts
                       .map(
@@ -341,18 +350,18 @@ export function PartFilesPanel({
       )}
 
       {!kiosk.active && (
-        <div className="flex flex-wrap items-center gap-2 p-2.5 bg-mist border border-steel/25 rounded-lg">
-          <span className="text-xs font-medium text-steel-dark">Assign</span>
+        <div className="flex flex-wrap items-center gap-2 p-2.5 bg-page border border-secondary-200 rounded-lg">
+          <span className="text-xs font-medium text-secondary-500">Assign</span>
           <CountInput value={addCount} onChange={setAddCount} />
-          <span className="text-xs text-steel-dark">instance{count === 1 ? "" : "s"} to</span>
+          <span className="text-xs text-secondary-500">instance{count === 1 ? "" : "s"} to</span>
           <UploadButton busy={busy} onFiles={handleUpload} label="new upload" />
-          <span className="text-xs text-steel">or</span>
+          <span className="text-xs text-secondary-400">or</span>
           <select
             value={existingId}
             onFocus={loadLibrary}
             onPointerDown={loadLibrary}
             onChange={(e) => setExistingId(e.target.value)}
-            className="bg-paper border border-steel/40 rounded-lg px-2.5 py-1.5 text-xs text-steel-dark focus:outline-none focus:border-crimson max-w-[14rem]"
+            className="bg-surface border border-secondary-300 rounded-lg px-2.5 py-1.5 text-xs text-secondary-500 focus:outline-none focus:border-primary-500 max-w-[14rem]"
           >
             <option value="">existing file…</option>
             {library === null ? (
@@ -367,14 +376,13 @@ export function PartFilesPanel({
                 ))
             )}
           </select>
-          <button
-            type="button"
+          <Button
+            size="sm"
             onClick={handleAttachExisting}
             disabled={busy || !existingId || count < 1}
-            className="px-3 py-1.5 text-xs font-semibold bg-crimson hover:bg-crimson-dark text-on-primary rounded-lg transition-colors disabled:opacity-50"
           >
             Assign
-          </button>
+          </Button>
         </div>
       )}
     </div>
@@ -407,14 +415,16 @@ export function AssignmentGroup({
 
   return (
     <div className="flex flex-wrap items-center gap-1.5">
-      {mine.length === 0 && <span className="text-xs text-steel">No instances of this part.</span>}
+      {mine.length === 0 && (
+        <span className="text-xs text-secondary-400">No instances of this part.</span>
+      )}
       {mine.map((a) => (
         <span
           key={a.partInstanceId}
           className={`inline-flex items-center gap-0.5 text-xs font-mono rounded-full pl-2 pr-1 py-0.5 border ${
             a.partInstanceId === highlightInstanceId
-              ? "bg-crimson-tint border-crimson/40 text-crimson-dark"
-              : "bg-steel-tint border-steel/30 text-steel-dark"
+              ? "bg-primary-50 border-primary-500 text-primary-700"
+              : "bg-inset border-secondary-200 text-secondary-500"
           }`}
         >
           #{a.instanceNumber}
@@ -426,7 +436,7 @@ export function AssignmentGroup({
               onClick={() =>
                 run(() => unassignFileInstance(file.id, a.partInstanceId).then(() => null))
               }
-              className="w-4 h-4 leading-none rounded-full text-steel hover:text-crimson hover:bg-crimson-tint disabled:opacity-50"
+              className="w-4 h-4 leading-none rounded-full text-secondary-400 hover:text-red-700 hover:bg-red-50 disabled:opacity-50"
             >
               ×
             </button>
@@ -435,16 +445,16 @@ export function AssignmentGroup({
       ))}
       {canEdit && (
         <span className="inline-flex items-center gap-1 ml-1">
-          <span className="text-xs text-steel">Count</span>
+          <span className="text-xs text-secondary-400">Count</span>
           <CountInput value={draft} onChange={setDraft} />
-          <button
-            type="button"
+          <Button
+            variant="secondary"
+            size="sm"
             disabled={busy || !changed}
             onClick={() => run(() => assignCount(file.id, definition, next))}
-            className="px-2 py-0.5 text-xs font-semibold border border-steel/40 text-steel-dark hover:text-ink hover:border-crimson/50 rounded transition-colors disabled:opacity-40"
           >
             Set
-          </button>
+          </Button>
         </span>
       )}
     </div>
@@ -461,7 +471,7 @@ export function CountInput({ value, onChange }: { value: string; onChange: (v: s
       onChange={(e) => {
         if (/^\d{0,4}$/.test(e.target.value)) onChange(e.target.value);
       }}
-      className="w-14 bg-paper border border-steel/40 rounded px-2 py-0.5 text-xs text-ink text-center focus:outline-none focus:border-crimson"
+      className="w-14 bg-surface border border-secondary-300 rounded px-2 py-0.5 text-xs text-secondary-900 text-center focus:outline-none focus:border-primary-500"
     />
   );
 }
@@ -470,16 +480,18 @@ export function UploadButton({
   busy,
   disabled,
   onFiles,
-  label = "+ Upload Files",
+  label = "Upload files",
   multiple = true,
-  className,
+  variant = "secondary",
+  size = "sm",
 }: {
   busy: boolean;
   disabled?: boolean;
   onFiles: (files: File[]) => void;
   label?: string;
   multiple?: boolean;
-  className?: string;
+  variant?: ButtonVariant;
+  size?: ButtonSize;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   return (
@@ -496,17 +508,14 @@ export function UploadButton({
           onFiles(picked);
         }}
       />
-      <button
-        type="button"
+      <Button
+        variant={variant}
+        size={size}
         onClick={() => inputRef.current?.click()}
         disabled={busy || disabled}
-        className={
-          className ??
-          "px-3 py-1.5 text-xs font-semibold border border-steel/40 bg-paper text-steel-dark hover:text-ink hover:border-crimson/50 rounded-lg transition-colors disabled:opacity-50"
-        }
       >
         {busy ? "Working…" : label}
-      </button>
+      </Button>
     </>
   );
 }
@@ -527,7 +536,7 @@ export function FileHeading({
   return (
     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
       <div className="min-w-0 sm:flex-1">
-        <p className="text-sm font-medium text-ink break-all sm:truncate" title={name}>
+        <p className="text-sm font-medium text-secondary-900 break-all sm:truncate" title={name}>
           {name}
         </p>
         {details}
@@ -539,7 +548,7 @@ export function FileHeading({
 
 export function FileMeta({ file, uploader }: { file: PartFile; uploader: string }) {
   return (
-    <p className="text-xs text-steel">
+    <p className="text-xs text-secondary-400">
       {formatBytes(file.fileSize)} · {new Date(file.createdAt).toLocaleDateString()} · {uploader}
     </p>
   );
@@ -550,18 +559,10 @@ export function DownloadLink({ file }: { file: PartFile }) {
     <a
       href={partFileDownloadUrl(file.id)}
       download={file.filename}
-      className="px-2.5 py-1 text-xs font-medium border border-steel/40 text-steel hover:text-ink rounded transition-colors shrink-0"
+      className={`${buttonClass("secondary", "sm")} shrink-0`}
     >
       Download
     </a>
-  );
-}
-
-export function ErrorText({ message }: { message: string }) {
-  return (
-    <p className="text-sm text-crimson-dark bg-crimson-tint border border-crimson/30 rounded-lg px-3 py-2">
-      {message}
-    </p>
   );
 }
 
