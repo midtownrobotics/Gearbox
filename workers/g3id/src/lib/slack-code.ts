@@ -4,6 +4,7 @@ import { createDb } from "../db";
 import { coreSlackLinkCodes, coreUserIdentities, coreUsers } from "../db/schema";
 import type { AppEnv } from "../types";
 import { newId } from "./id";
+import { dmAdmins } from "./member-dm";
 import { createSession } from "./session";
 import { slackForTeam, teamForWorkspace } from "./slack-install";
 import { teamUrl } from "./team";
@@ -336,5 +337,15 @@ export async function handleSlackCode(opts: {
   }
 
   await updateStatus("signup_pending");
+  // Every admin hears there's someone to approve, with a link to them. Never fails the sign-up.
+  try {
+    await dmAdmins(
+      env,
+      record.teamId,
+      `:wave: ${slackUser.displayName} (${email}) signed up and is waiting for approval: ${teamUrl(env, record.teamId, "id")}/admin/users/${userId}`,
+    );
+  } catch (err) {
+    console.error("[slack] telling admins about a sign-up failed", err);
+  }
   return { success: true, message: "✅ Account created! Your account is pending admin approval." };
 }

@@ -340,14 +340,32 @@ describe("signing a team up", () => {
       body: { teamId: team, redirect: null },
     });
     const next = (await second.json()) as { code: string; token: string };
+    const joiner = `U${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
     const joined = await handleSlackCode({
       code: next.code,
-      slackUserId: `U${crypto.randomUUID().slice(0, 8).toUpperCase()}`,
+      slackUserId: joiner,
       workspaceId: ws,
       type: "signin",
       env: testEnv,
     });
     expect(joined.message).toContain("pending admin approval");
+
+    // Every admin (the founder) hears there's someone to approve, with a link to them.
+    const pending = await testEnv.DB.prepare(
+      "SELECT id FROM core_users WHERE team_id = ? AND status = 'pending'",
+    )
+      .bind(team)
+      .first<{ id: string }>();
+    const dms = (await (await fetch("https://slack.com/__sent")).json()) as {
+      channel: string;
+      text: string;
+    }[];
+    const told = dms.find(
+      (m) => m.channel === `D-${founder}` && m.text.includes(pending?.id ?? "?"),
+    );
+    expect(told?.text).toContain("waiting for approval");
+    expect(told?.text).toContain(`${joiner.toLowerCase()}@slack.test`);
+    expect(dms.some((m) => m.channel === `D-${joiner}`)).toBe(false);
   });
 
   it("won't connect a workspace that's already another team's", async () => {

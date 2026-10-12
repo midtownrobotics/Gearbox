@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import "./styles.css";
 import { LogPage } from "./console/log-page";
+import { NotificationsPage } from "./console/notifications-page";
 import { OperatorsPage } from "./console/operators-page";
 import { ReportsPage } from "./console/reports-page";
 import { ConsoleShell } from "./console/shell";
@@ -28,6 +29,7 @@ createRoot(rootElement).render(
           <Route index element={<TeamsPage />} />
           <Route path="teams/:id" element={<TeamPage />} />
           <Route path="reports" element={<ReportsPage />} />
+          <Route path="notifications" element={<NotificationsPage />} />
           <Route path="operators" element={<OperatorsPage />} />
           <Route path="log" element={<LogPage />} />
         </Route>

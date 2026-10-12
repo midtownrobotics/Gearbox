@@ -55,6 +55,9 @@ export const OPERATOR_ACTIONS = [
   "reopen_report",
   "add_operator",
   "remove_operator",
+  // Migration 0007.
+  "create_notification",
+  "delete_notification",
 ] as const;
 
 /** The operator access log: every action, and each look at a team's members (migration 0003). */
@@ -106,3 +109,40 @@ export const teamAuditLog = sqliteTable("team_audit_log", {
   details: text("details").notNull().default("{}"),
   createdAt: integer("created_at").notNull(),
 });
+
+export const NOTIFICATION_TYPES = ["info", "warning", "critical"] as const;
+export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
+
+/** Notifications operators write for every team (migration 0007); not delivered yet. */
+export const notifications = sqliteTable("notifications", {
+  id: text("id").primaryKey(),
+  type: text("type", { enum: NOTIFICATION_TYPES }).notNull(),
+  /** A short description. */
+  summary: text("summary").notNull(),
+  body: text("body").notNull(),
+  /** When it stops being shown (unix seconds). */
+  expiresAt: integer("expires_at").notNull(),
+  createdBy: text("created_by").notNull(),
+  createdAt: integer("created_at").notNull(),
+});
+
+export const PORTAL_AUDIENCES = ["everyone", "admins", "nobody"] as const;
+export type PortalAudience = (typeof PORTAL_AUDIENCES)[number];
+
+/** Where a team wants each type of notification (migration 0008). */
+export const teamNotificationSettings = sqliteTable(
+  "team_notification_settings",
+  {
+    teamId: text("team_id").notNull(),
+    type: text("type", { enum: NOTIFICATION_TYPES }).notNull(),
+    /** Who sees it on the team's home page. */
+    portal: text("portal", { enum: PORTAL_AUDIENCES }).notNull(),
+    /** The Slack channel's id, if any. */
+    slackChannel: text("slack_channel"),
+    /** JSON: G3ID user ids to DM. */
+    slackUsers: text("slack_users").notNull().default("[]"),
+    updatedAt: integer("updated_at").notNull(),
+    updatedBy: text("updated_by"),
+  },
+  (t) => [primaryKey({ columns: [t.teamId, t.type] })],
+);

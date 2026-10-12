@@ -1,16 +1,20 @@
 import { requireAuth } from "@g3/auth";
-import { CONSOLE_HOSTS, teamKey } from "@g3/site-config";
+import { CONSOLE_HOSTS, DEV_DOMAIN, teamKey } from "@g3/site-config";
 import { and, count, desc, eq, inArray, like, lt } from "drizzle-orm";
-import { Hono } from "hono";
+import { type Context, Hono } from "hono";
 import { createMiddleware } from "hono/factory";
 import {
+  NOTIFICATION_TYPES,
+  type NotificationType,
   type OPERATOR_ACTIONS,
+  notifications,
   numberReports,
   operatorActions,
   operators,
   teams,
 } from "./db/schema";
 import { accounts, db, g3id, now } from "./lib";
+import { deliverToSlack } from "./notifications";
 import { DELETABLE, callHook } from "./registry";
 import type { AppEnv } from "./types";
 
@@ -21,7 +25,9 @@ import type { AppEnv } from "./types";
 // - hand a team to another of its members, who becomes an admin;
 // - suspend a team (the gateway stops answering its addresses) and reactivate it;
 // - follow up reports that a number was falsely registered (POST /reports);
-// - add and remove other operators.
+// - add and remove other operators;
+// - write notifications for every team (info, warning, critical), each until it expires; each
+//   team's settings say where they go (src/notifications.ts).
 // Every action is logged in `operator_actions` with the operator's reason, and so is each look at a
 // team's members (the privacy policy's operator access log, kept 12 months). The site's own team
 // (site.ts) can't be deleted or suspended. A team's number is its id ("frc<number>") everywhere,
@@ -50,11 +56,32 @@ type Member = {
   lastLoginAt: number | null;
 };
 
-/** A page of the console: its own address, or a local dev server. */
-function fromConsole(origin: string | undefined): boolean {
+/** In dev (the dev gateway is set), not in production or tests. */
+const isDev = (env: AppEnv["Bindings"]) => !!env.LOCAL_GATEWAY_URL;
+
+/** A page of the console: its own address, or a local dev server (and in dev, the dev gateway's). */
+function fromConsole(env: AppEnv["Bindings"], origin: string | undefined): boolean {
   if (!origin) return false;
   if (/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return true;
+  if (isDev(env) && origin.match(/^http:\/\/admin\.([^/:]+)(:\d+)?$/)?.[1] === DEV_DOMAIN) {
+    return true;
+  }
   return CONSOLE_HOSTS.some((host) => origin === `https://${host}`);
+}
+
+/**
+ * Whether the signed-in user is an operator: listed in `operators`, never on a kiosk. In dev, any
+ * team admin is one too, so the console can be tried without adding a row by hand.
+ */
+async function isOperator(c: Context<AppEnv>): Promise<boolean> {
+  if (c.get("sessionType") === "pin") return false;
+  if (isDev(c.env) && c.get("userIsAdmin")) return true;
+  const operator = await db(c.env)
+    .select({ userId: operators.userId })
+    .from(operators)
+    .where(eq(operators.userId, c.get("userId")))
+    .get();
+  return !!operator;
 }
 
 /**
@@ -63,16 +90,11 @@ function fromConsole(origin: string | undefined): boolean {
  * cookie.
  */
 const requireOperator = createMiddleware<AppEnv>(async (c, next) => {
-  if (c.req.method !== "GET" && !fromConsole(c.req.header("Origin"))) {
+  if (c.req.method !== "GET" && !fromConsole(c.env, c.req.header("Origin"))) {
     return c.json({ error: "Changes are only made from the console." }, 403);
   }
   if (c.get("sessionType") === "pin") return c.json({ error: "Not allowed from a kiosk." }, 403);
-  const operator = await db(c.env)
-    .select({ userId: operators.userId })
-    .from(operators)
-    .where(eq(operators.userId, c.get("userId")))
-    .get();
-  if (!operator) return c.json({ error: "Platform operators only." }, 403);
+  if (!(await isOperator(c))) return c.json({ error: "Platform operators only." }, 403);
   await next();
 });
 
@@ -121,6 +143,43 @@ function teamById(env: AppEnv["Bindings"], id: string) {
   return db(env).select().from(teams).where(eq(teams.id, id)).get();
 }
 
+/**
+ * DMs every operator on their own team's Slack (through G3ID, from each team's bot). Never
+ * throws: an operator whose team has no Slack, or hasn't linked theirs, isn't told.
+ */
+export async function tellOperators(env: AppEnv["Bindings"], text: string) {
+  try {
+    const list = await db(env).select({ userId: operators.userId }).from(operators).all();
+    const byId = await accounts(
+      env,
+      list.map((o) => o.userId),
+    );
+    const byTeam = new Map<string, string[]>();
+    for (const account of byId.values()) {
+      byTeam.set(account.teamId, [...(byTeam.get(account.teamId) ?? []), account.id]);
+    }
+    await Promise.all(
+      [...byTeam].map(async ([teamId, userIds]) => {
+        const res = await g3id(env, `/teams/${encodeURIComponent(teamId)}/slack/dm-members`, {
+          method: "POST",
+          body: { userIds, text },
+        });
+        if (!res.ok && res.status !== 404) {
+          console.error("[operators] DM failed", teamId, res.status, await res.text());
+        }
+      }),
+    );
+  } catch (err) {
+    console.error("[operators] DM failed", err);
+  }
+}
+
+/** How long a notification's short description and full text may be. */
+const SUMMARY_MAX = 140;
+const BODY_MAX = 10_000;
+/** How far ahead a notification's expiry may be. */
+const EXPIRY_MAX_S = 365 * 24 * 60 * 60;
+
 /** G3ID's error message, if it sent one. */
 async function errorOf(res: Response, fallback: string): Promise<string> {
   const body = (await res.json().catch(() => ({}))) as { error?: string };
@@ -131,18 +190,13 @@ export const consoleRouter = new Hono<AppEnv>()
   // Who's signed in, and whether they're an operator: the console's sign-in check. Comes before
   // the operators-only middleware below, which it never reaches (it answers without next()).
   .get("/me", requireAuth, async (c) => {
-    const operator = await db(c.env)
-      .select({ userId: operators.userId })
-      .from(operators)
-      .where(eq(operators.userId, c.get("userId")))
-      .get();
     return c.json({
       user: {
         id: c.get("userId"),
         displayName: c.get("userDisplayName"),
         email: c.get("userEmail"),
       },
-      isOperator: !!operator && c.get("sessionType") !== "pin",
+      isOperator: await isOperator(c),
     });
   })
   .use("*", requireAuth, requireOperator)
@@ -475,6 +529,88 @@ export const consoleRouter = new Hono<AppEnv>()
       .returning({ userId: operators.userId });
     if (removed.length === 0) return c.json({ error: "Not an operator." }, 404);
     await log(c.env, c.get("userId"), "remove_operator", { details: { userId } });
+    return c.json({ ok: true });
+  })
+  // Notifications, newest first.
+  .get("/notifications", async (c) => {
+    const list = await db(c.env)
+      .select()
+      .from(notifications)
+      .orderBy(desc(notifications.createdAt))
+      .limit(300)
+      .all();
+    const names = await accounts(
+      c.env,
+      list.map((n) => n.createdBy),
+    );
+    return c.json(
+      list.map((n) => ({
+        ...n,
+        createdByName: names.get(n.createdBy)?.displayName ?? n.createdBy,
+      })),
+    );
+  })
+  .post("/notifications", async (c) => {
+    const input = await c.req.json<{
+      type?: unknown;
+      summary?: unknown;
+      body?: unknown;
+      expiresAt?: unknown;
+    }>();
+    const type = input.type as NotificationType;
+    if (!NOTIFICATION_TYPES.includes(type)) {
+      return c.json({ error: "Choose Informational, Warning or Critical." }, 400);
+    }
+    const summary = typeof input.summary === "string" ? input.summary.trim() : "";
+    if (!summary || summary.length > SUMMARY_MAX) {
+      return c.json({ error: `Write a short description (up to ${SUMMARY_MAX} characters).` }, 400);
+    }
+    const body = typeof input.body === "string" ? input.body.trim() : "";
+    if (!body || body.length > BODY_MAX) {
+      return c.json({ error: `Write the full text (up to ${BODY_MAX} characters).` }, 400);
+    }
+    const expiresAt = input.expiresAt;
+    if (
+      typeof expiresAt !== "number" ||
+      !Number.isInteger(expiresAt) ||
+      expiresAt <= now() ||
+      expiresAt > now() + EXPIRY_MAX_S
+    ) {
+      return c.json({ error: "Choose when it expires: after now, within a year." }, 400);
+    }
+    const id = crypto.randomUUID();
+    await db(c.env)
+      .insert(notifications)
+      .values({
+        id,
+        type,
+        summary,
+        body,
+        expiresAt,
+        createdBy: c.get("userId"),
+        createdAt: now(),
+      });
+    await log(c.env, c.get("userId"), "create_notification", {
+      details: { notificationId: id, type, summary, expiresAt },
+    });
+    // Slack, to each team's chosen channels and people, after answering.
+    c.executionCtx.waitUntil(deliverToSlack(c.env, { type, summary, body }));
+    return c.json({ id }, 201);
+  })
+  .delete("/notifications/:id", async (c) => {
+    const removed = await db(c.env)
+      .delete(notifications)
+      .where(eq(notifications.id, c.req.param("id")))
+      .returning({
+        id: notifications.id,
+        type: notifications.type,
+        summary: notifications.summary,
+      });
+    if (removed.length === 0) return c.json({ error: "No such notification." }, 404);
+    const [n] = removed;
+    await log(c.env, c.get("userId"), "delete_notification", {
+      details: { notificationId: n.id, type: n.type, summary: n.summary },
+    });
     return c.json({ ok: true });
   })
   // The log, newest first.

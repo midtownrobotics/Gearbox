@@ -1,0 +1,181 @@
+@import "./colors.css";
+
+/* The Slack channel picker (components/slack-channel-picker.tsx). Plain CSS on the team's colors,
+   like the top bar, so it's the same in every app. */
+
+.g3-slack-picker {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 28rem;
+  font-size: 0.875rem;
+  color: var(--g3-text);
+}
+
+.g3-slack-chosen,
+.g3-slack-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.g3-slack-chosen {
+  padding: 6px 6px 6px 12px;
+  border: 1px solid var(--g3-line);
+  border-radius: 8px;
+  background: var(--g3-inset);
+}
+
+.g3-slack-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.g3-slack-hash {
+  display: inline-block;
+  width: 1.1em;
+  margin-right: 2px;
+  color: var(--g3-muted);
+  text-align: center;
+}
+
+.g3-slack-search {
+  padding: 0 6px 0 10px;
+  border: 1px solid var(--g3-line);
+  border-radius: 8px;
+  background: var(--g3-surface);
+}
+
+.g3-slack-search:focus-within {
+  border-color: var(--g3-accent);
+}
+
+.g3-slack-search input {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--g3-text);
+  font: inherit;
+}
+
+.g3-slack-search input::placeholder,
+.g3-slack-id::placeholder {
+  color: var(--g3-muted);
+}
+
+.g3-slack-button {
+  padding: 4px 10px;
+  border: 1px solid var(--g3-line);
+  border-radius: 6px;
+  background: var(--g3-surface);
+  color: var(--g3-text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.g3-slack-button:hover {
+  background: var(--g3-inset);
+}
+
+.g3-slack-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.g3-slack-options {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 40;
+  max-height: 16rem;
+  margin: 0;
+  padding: 4px;
+  overflow-y: auto;
+  list-style: none;
+  border: 1px solid var(--g3-line);
+  border-radius: 8px;
+  background: var(--g3-surface);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.15);
+}
+
+.g3-slack-option {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.g3-slack-option[aria-selected="true"] {
+  background: var(--g3-inset);
+}
+
+.g3-slack-option-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.g3-slack-option-note {
+  color: var(--g3-muted);
+  font-size: 0.75rem;
+}
+
+.g3-slack-empty {
+  padding: 6px 8px;
+  color: var(--g3-muted);
+}
+
+.g3-slack-id {
+  padding: 7px 10px;
+  border: 1px solid var(--g3-line);
+  border-radius: 8px;
+  background: var(--g3-surface);
+  color: var(--g3-text);
+  font: inherit;
+  font-family: ui-monospace, monospace;
+}
+
+/* Amber and red mean a warning and an error, in every team's colors. */
+.g3-slack-warning {
+  margin: 0;
+  color: #b45309;
+  font-size: 0.75rem;
+}
+
+.g3-slack-warning a {
+  color: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.g3-slack-warning code {
+  font-size: inherit;
+}
+
+.g3-slack-error {
+  margin: 0;
+  color: #b91c1c;
+  font-size: 0.75rem;
+}
+
+html[data-theme="dark"] .g3-slack-warning {
+  color: #fbbf24;
+}
+
+html[data-theme="dark"] .g3-slack-error {
+  color: #f87171;
+}

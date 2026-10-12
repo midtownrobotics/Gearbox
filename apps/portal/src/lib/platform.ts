@@ -84,3 +84,41 @@ export async function appIntegrations(slug: string): Promise<Record<string, Inte
   if (!res.ok) throw new Error(data.error ?? "Couldn't ask it. Please try again.");
   return data.integrations ?? {};
 }
+
+export type NotificationType = "info" | "warning" | "critical";
+export type PortalAudience = "everyone" | "admins" | "nobody";
+
+/** A platform notification, as the home page shows it. */
+export type TeamNotification = {
+  id: string;
+  type: NotificationType;
+  summary: string;
+  body: string;
+  createdAt: number;
+  expiresAt: number;
+};
+
+export type NotificationTypeSettings = {
+  portal: PortalAudience;
+  /** A Slack channel's id, or null. */
+  slackChannel: string | null;
+  /** G3ID user ids. */
+  slackUsers: string[];
+};
+
+export type NotificationSettings = Record<NotificationType, NotificationTypeSettings>;
+
+export type DmCandidate = { id: string; displayName: string; isAdmin: boolean; hasSlack: boolean };
+
+export const NOTIFICATION_TYPES: { type: NotificationType; label: string }[] = [
+  { type: "critical", label: "Critical" },
+  { type: "warning", label: "Warning" },
+  { type: "info", label: "Informational" },
+];
+
+/** Colors that mean the type: amber for a warning, red for critical. */
+export const NOTIFICATION_STYLES: Record<NotificationType, { badge: string; stripe: string }> = {
+  info: { badge: "bg-secondary-100 text-secondary-700", stripe: "border-l-secondary-300" },
+  warning: { badge: "bg-amber-100 text-amber-800", stripe: "border-l-amber-500" },
+  critical: { badge: "bg-red-100 text-red-800", stripe: "border-l-red-600" },
+};

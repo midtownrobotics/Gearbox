@@ -9,6 +9,7 @@ import {
   coreUsers,
   teams,
 } from "../db/schema";
+import { dmAdmins, dmMembers } from "../lib/member-dm";
 import { createSigninCode } from "../lib/slack-code";
 import { saveInstallation, slackForTeam } from "../lib/slack-install";
 import { siteTeamId } from "../lib/team";
@@ -84,8 +85,25 @@ export const internalRouter = new Hono<AppEnv>()
       )
       .orderBy(coreUsers.displayName)
       .all();
+    const withSlack = new Set(
+      (
+        await createDb(c.env.DB)
+          .select({ userId: coreUserIdentities.userId })
+          .from(coreUserIdentities)
+          .innerJoin(coreUsers, eq(coreUsers.id, coreUserIdentities.userId))
+          .where(
+            and(eq(coreUsers.teamId, c.req.param("id")), eq(coreUserIdentities.provider, "slack")),
+          )
+          .all()
+      ).map((r) => r.userId),
+    );
     return c.json(
-      members.map((m) => ({ ...m, isAdmin: m.isAdmin === 1, isMentor: m.isMentor === 1 })),
+      members.map((m) => ({
+        ...m,
+        isAdmin: m.isAdmin === 1,
+        isMentor: m.isMentor === 1,
+        hasSlack: withSlack.has(m.id),
+      })),
     );
   })
   // Accounts by id, with their team: the platform's operators (who may be on any team).
@@ -204,33 +222,29 @@ export const internalRouter = new Hono<AppEnv>()
     const text = typeof body.text === "string" ? body.text.trim() : "";
     if (!text || text.length > 4000)
       return c.json({ error: "text is required (up to 4000)." }, 400);
-    const teamId = c.req.param("id");
-    const teamSlack = await slackForTeam(c.env, teamId);
-    if (!teamSlack) return c.json({ error: "This team hasn't connected Slack." }, 404);
-    const admins = await createDb(c.env.DB)
-      .select({ slackId: coreUserIdentities.providerId })
-      .from(coreUsers)
-      .innerJoin(coreUserIdentities, eq(coreUserIdentities.userId, coreUsers.id))
-      .where(
-        and(
-          eq(coreUsers.teamId, teamId),
-          eq(coreUsers.isAdmin, 1),
-          eq(coreUsers.status, "active"),
-          eq(coreUserIdentities.provider, "slack"),
-        ),
-      )
-      .all();
-    const ids = [...new Set(admins.map((a) => a.slackId).filter((id): id is string => !!id))];
-    let sent = 0;
-    for (const id of ids) {
-      try {
-        await sendDM(id, text, teamSlack.slack);
-        sent++;
-      } catch (err) {
-        console.error("[slack] admin DM failed", id, err);
-      }
+    const result = await dmAdmins(c.env, c.req.param("id"), text);
+    if (!result) return c.json({ error: "This team hasn't connected Slack." }, 404);
+    return c.json({ ok: true, sent: result.sent, admins: result.members });
+  })
+  // A message from the team's own bot to some of its members (the platform's notifications, to
+  // the people a team admin chose). Only the team's active members with a linked Slack account
+  // are sent one; anyone else in `userIds` is skipped. 404 when the team has no Slack.
+  .post("/teams/:id/slack/dm-members", async (c) => {
+    const body = await c.req
+      .json<{ userIds?: unknown; text?: unknown }>()
+      .catch(() => ({}) as { userIds?: unknown; text?: unknown });
+    const text = typeof body.text === "string" ? body.text.trim() : "";
+    if (!text || text.length > 4000)
+      return c.json({ error: "text is required (up to 4000)." }, 400);
+    const userIds = Array.isArray(body.userIds)
+      ? [...new Set(body.userIds.filter((id): id is string => typeof id === "string"))]
+      : [];
+    if (userIds.length === 0 || userIds.length > 100) {
+      return c.json({ error: "userIds is required (up to 100)." }, 400);
     }
-    return c.json({ ok: true, sent, admins: ids.length });
+    const result = await dmMembers(c.env, c.req.param("id"), text, inArray(coreUsers.id, userIds));
+    if (!result) return c.json({ error: "This team hasn't connected Slack." }, 404);
+    return c.json({ ok: true, sent: result.sent, members: result.members });
   })
   // Which apps the team has on (the platform's app library), for an app whose feature needs
   // another (`teamHasApp` in @g3/auth). 503 when the platform can't say.
