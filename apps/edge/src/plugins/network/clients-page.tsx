@@ -1,4 +1,4 @@
-import { Card, ErrorBanner, Loading, Page } from "@g3/ui";
+import { Button, Card, ErrorBanner, Loading, Page } from "@g3/ui";
 import { Link, useSearchParams } from "react-router-dom";
 import { api, getErrorMessage } from "../../shared/api";
 import { formatAgo, formatBytes } from "../../shared/format";
@@ -69,13 +69,9 @@ export function ClientsPage() {
             {filterButton(false, `All (${all.length})`)}
             {filterButton(true, canFilter ? `Online now (${onlineCount})` : "Online now")}
           </div>
-          <button
-            type="button"
-            onClick={reload}
-            className="px-3 py-1.5 text-sm font-medium rounded-lg border border-secondary-200 bg-surface text-secondary-600 hover:bg-secondary-50"
-          >
+          <Button variant="secondary" size="sm" onClick={reload}>
             Refresh
-          </button>
+          </Button>
         </div>
       }
     >

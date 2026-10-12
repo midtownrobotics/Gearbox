@@ -13,7 +13,7 @@ export {
 } from "./components/app-nav-bar";
 // The parts every app's pages are built from (docs/roadmap/ui-alignment.md).
 export { Badge, tones } from "./components/badge";
-export { Button, ConfirmButton } from "./components/button";
+export { Button, type ButtonSize, ConfirmButton } from "./components/button";
 export { Card, Stat } from "./components/card";
 export { Dialog } from "./components/dialog";
 export { Field, inputClass } from "./components/field";

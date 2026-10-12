@@ -1,4 +1,4 @@
-import { Card, ErrorBanner } from "@g3/ui";
+import { Button, Card, ErrorBanner, inputClass } from "@g3/ui";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { api, getErrorMessage } from "../../shared/api";
@@ -45,7 +45,7 @@ export function ClientExceptions({ mac }: { mac: string }) {
     reload();
   }
 
-  const input = "border border-secondary-300 rounded-lg px-2 py-1 text-sm";
+  const input = `${inputClass} !w-auto`;
   return (
     <Card title="Exceptions">
       {!data.enforce && (
@@ -75,18 +75,16 @@ export function ClientExceptions({ mac }: { mac: string }) {
             ))}
           </select>
           <input
-            className={`${input} w-56`}
+            className={`${inputClass} !w-56`}
             value={reason}
             maxLength={200}
             placeholder="Reason (optional)"
             onChange={(e) => setReason(e.target.value)}
           />
           {DURATIONS.map((d) => (
-            <button
+            <Button
               key={d.value}
-              type="button"
               disabled={busy}
-              className="text-sm font-medium rounded-lg px-3 py-1.5 bg-primary-500 hover:bg-primary-600 text-on-primary disabled:opacity-50"
               onClick={() =>
                 run(() =>
                   api.network.control.grants.$post({
@@ -101,7 +99,7 @@ export function ClientExceptions({ mac }: { mac: string }) {
               }
             >
               {d.label}
-            </button>
+            </Button>
           ))}
         </div>
       )}
@@ -123,10 +121,10 @@ export function ClientExceptions({ mac }: { mac: string }) {
               <span className="text-xs text-secondary-400 flex-1 truncate">
                 {g.reason ? `“${g.reason}” · ` : ""}by {g.createdByName}
               </span>
-              <button
-                type="button"
+              <Button
+                variant="secondary"
+                size="sm"
                 disabled={busy}
-                className="text-sm font-medium rounded-lg px-3 py-1.5 text-secondary-600 hover:text-secondary-900 hover:bg-secondary-100"
                 onClick={() =>
                   run(() =>
                     api.network.control.grants[":id"].$delete({ param: { id: String(g.id) } }),
@@ -134,7 +132,7 @@ export function ClientExceptions({ mac }: { mac: string }) {
                 }
               >
                 Revoke
-              </button>
+              </Button>
             </li>
           ))}
         </ul>

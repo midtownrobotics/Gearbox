@@ -1,16 +1,26 @@
 import { type ButtonHTMLAttributes, useState } from "react";
 import { focusRing } from "./focus";
 
+export type ButtonSize = "sm" | "md";
+
+const SIZES: Record<ButtonSize, string> = {
+  sm: "px-3 py-1.5 text-sm",
+  md: "px-3.5 py-2 text-sm",
+};
+
 /**
  * A button: `primary` for the page's main action (the team's color), `secondary` for the others,
- * `danger` for one that deletes or can't be undone (red, whatever the team's color).
+ * `danger` for one that deletes or can't be undone (red, whatever the team's color). `sm` is for
+ * a button inside a row or beside a small field.
  */
 export function Button({
   variant = "primary",
+  size = "md",
   className = "",
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: "primary" | "secondary" | "danger";
+  size?: ButtonSize;
 }) {
   const styles = {
     primary: "bg-primary-500 text-on-primary hover:bg-primary-600",
@@ -21,7 +31,7 @@ export function Button({
     <button
       type="button"
       {...props}
-      className={`rounded-lg px-3.5 py-2 text-sm font-semibold disabled:opacity-50 ${focusRing} ${styles} ${className}`}
+      className={`rounded-lg font-semibold disabled:opacity-50 ${focusRing} ${SIZES[size]} ${styles} ${className}`}
     />
   );
 }
@@ -35,19 +45,21 @@ export function ConfirmButton({
   label,
   question,
   confirmLabel = label,
+  size = "md",
   disabled = false,
   onConfirm,
 }: {
   label: string;
   question: string;
   confirmLabel?: string;
+  size?: ButtonSize;
   disabled?: boolean;
   onConfirm: () => void;
 }) {
   const [asking, setAsking] = useState(false);
   if (!asking) {
     return (
-      <Button variant="danger" disabled={disabled} onClick={() => setAsking(true)}>
+      <Button variant="danger" size={size} disabled={disabled} onClick={() => setAsking(true)}>
         {label}
       </Button>
     );
@@ -58,6 +70,7 @@ export function ConfirmButton({
       <div className="flex gap-2">
         <Button
           variant="danger"
+          size={size}
           disabled={disabled}
           onClick={() => {
             setAsking(false);
@@ -66,7 +79,12 @@ export function ConfirmButton({
         >
           {confirmLabel}
         </Button>
-        <Button variant="secondary" disabled={disabled} onClick={() => setAsking(false)}>
+        <Button
+          variant="secondary"
+          size={size}
+          disabled={disabled}
+          onClick={() => setAsking(false)}
+        >
           Keep it
         </Button>
       </div>

@@ -1,4 +1,4 @@
-import { Card, ErrorBanner, Loading, Page, Stat, useTeamNames } from "@g3/ui";
+import { Button, Card, ErrorBanner, Loading, Page, Stat, inputClass, useTeamNames } from "@g3/ui";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { api, getErrorMessage } from "../../shared/api";
@@ -256,7 +256,7 @@ function SettingsRow({ capBytes, onSaved }: { capBytes: number; onSaved: () => v
     );
   }
 
-  const input = "border border-secondary-300 rounded-lg px-2 py-1 w-20 text-sm";
+  const input = `${inputClass} !w-20`;
   return (
     <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-secondary-600">
       <label className="flex items-center gap-1.5">
@@ -282,20 +282,10 @@ function SettingsRow({ capBytes, onSaved }: { capBytes: number; onSaved: () => v
           onChange={(e) => setDay(e.target.value)}
         />
       </label>
-      <button
-        type="button"
-        onClick={save}
-        className="bg-primary-500 hover:bg-primary-600 text-on-primary font-medium rounded-lg px-3 py-1"
-      >
-        Save
-      </button>
-      <button
-        type="button"
-        onClick={() => setEditing(false)}
-        className="text-secondary-500 hover:text-secondary-900"
-      >
+      <Button onClick={save}>Save</Button>
+      <Button variant="secondary" onClick={() => setEditing(false)}>
         Cancel
-      </button>
+      </Button>
       {error && <span className="text-primary-600">{error}</span>}
     </div>
   );
