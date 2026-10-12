@@ -1,4 +1,5 @@
 import { integer, sqliteTable, text, unique } from "drizzle-orm/sqlite-core";
+import type { ReleaseApprover, ReleaseComment } from "../lib/onshape-release";
 
 // Every table is one team's data (roadmap Phase 3, migration 0016): it has `team_id`, and every
 // query on it goes through inTeam/withTeam from @g3/auth. Files in R2 are under teams/<team>/
@@ -142,6 +143,17 @@ export const onshapeReleases = sqliteTable(
     releaseId: text("release_id").notNull(),
     timestamp: text("timestamp").notNull(),
     createdAt: integer("created_at").notNull(),
+    // From the release package (lib/onshape-release.ts); null until it's been read.
+    name: text("name"),
+    notes: text("notes"),
+    state: text("state"),
+    documentId: text("document_id"),
+    versionId: text("version_id"),
+    madeBy: text("made_by"),
+    madeAt: text("made_at"),
+    approvers: text("approvers", { mode: "json" }).$type<ReleaseApprover[]>(),
+    comments: text("comments", { mode: "json" }).$type<ReleaseComment[]>(),
+    detailsAt: integer("details_at"),
   },
   (t) => [unique().on(t.teamId, t.releaseId)],
 );

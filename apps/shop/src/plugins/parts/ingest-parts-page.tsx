@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { api } from "../../shared/api";
 import { getErrorMessage } from "../../shared/api-error";
 import { partInfoRequiredBy, pipelineFileError } from "../../shared/derive";
@@ -22,10 +23,31 @@ type PendingPart = {
   description: string | null;
 };
 
+type PendingRelease = { id: number; releaseId: string; name: string | null; timestamp: string };
+
 type PendingPartsData = {
   parts: PendingPart[];
+  releases: PendingRelease[];
   subsystems: Subsystem[];
 };
+
+/**
+ * Parts grouped by the release they came from: newest release first, parts by number within it,
+ * and parts from no known release last. The page indexes parts by position, so they're kept in
+ * this order once loaded.
+ */
+function byRelease(data: PendingPartsData): PendingPartsData {
+  const releases = new Map((data.releases ?? []).map((r) => [r.id, r]));
+  const at = (part: PendingPart) =>
+    (part.releaseId !== null && releases.get(part.releaseId)?.timestamp) || "";
+  const parts = [...data.parts].sort(
+    (a, b) =>
+      at(b).localeCompare(at(a)) ||
+      (a.releaseId ?? 0) - (b.releaseId ?? 0) ||
+      a.partNumber.localeCompare(b.partNumber, undefined, { numeric: true }),
+  );
+  return { ...data, releases: data.releases ?? [], parts };
+}
 
 type PartForm = {
   onshapePartNumber: string;
@@ -51,6 +73,39 @@ type LocalPartData = {
   material?: string;
   thickness?: string;
 };
+
+const INGEST_COLUMNS = 9;
+
+/** The row above a release's parts: its name and when it was released, linking to its page. */
+function ReleaseHeader({ release, count }: { release?: PendingRelease; count: number }) {
+  return (
+    <tr className="bg-mist/70">
+      <td colSpan={INGEST_COLUMNS} className="px-4 py-2">
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+          {release ? (
+            <Link
+              to={`/onshape/releases/${release.id}`}
+              className="font-semibold text-ink hover:text-crimson"
+            >
+              {release.name ?? `Release ${release.releaseId}`}
+            </Link>
+          ) : (
+            <span className="font-semibold text-steel-dark">Not from a release</span>
+          )}
+          {release && (
+            <span className="text-xs text-steel">
+              Released{" "}
+              {new Date(release.timestamp).toLocaleDateString(undefined, { dateStyle: "medium" })}
+            </span>
+          )}
+          <span className="text-xs text-steel">
+            {count} {count === 1 ? "part" : "parts"}
+          </span>
+        </div>
+      </td>
+    </tr>
+  );
+}
 
 function DrawingStatusCell({
   part,
@@ -399,7 +454,7 @@ export function IngestPartsPage() {
         return;
       }
       const result = (await res.json()) as PendingPartsData;
-      setPendingData(result);
+      setPendingData(byRelease(result));
       setCurrentIndex(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load pending parts");
@@ -482,208 +537,215 @@ export function IngestPartsPage() {
                 </thead>
                 <tbody className="divide-y divide-steel/25">
                   {pendingData.parts.map((part, idx) => (
-                    <tr
-                      key={`${part.onshapeReleaseId}-${part.partNumber}`}
-                      className="hover:bg-mist transition-colors"
-                    >
-                      <td className="px-4 py-3 text-ink font-medium font-mono text-xs">
-                        {part.partNumber}
-                      </td>
-                      <td className="px-4 py-3 text-steel text-xs">
-                        {(localPartData[part.partNumber]?.revision ?? part.revision) || "—"}
-                      </td>
-                      <td className="px-4 py-3 text-ink text-xs truncate max-w-xs">
-                        {(localPartData[part.partNumber]?.name ?? part.name) || "—"}
-                      </td>
-                      <td className="px-4 py-3 text-steel text-xs">
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          value={
-                            localPartData[part.partNumber]?.quantity === null
-                              ? ""
-                              : (localPartData[part.partNumber]?.quantity ?? part.quantity ?? "")
+                    <Fragment key={`${part.onshapeReleaseId}-${part.partNumber}`}>
+                      {(idx === 0 || pendingData.parts[idx - 1]?.releaseId !== part.releaseId) && (
+                        <ReleaseHeader
+                          release={pendingData.releases.find((r) => r.id === part.releaseId)}
+                          count={
+                            pendingData.parts.filter((p) => p.releaseId === part.releaseId).length
                           }
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            if (val === "" || /^\d+$/.test(val)) {
-                              setLocalPartData({
-                                ...localPartData,
-                                [part.partNumber]: {
-                                  ...localPartData[part.partNumber],
-                                  subsystemId: localPartData[part.partNumber]?.subsystemId || 0,
-                                  processIds: localPartData[part.partNumber]?.processIds || [],
-                                  revision: localPartData[part.partNumber]?.revision,
-                                  name: localPartData[part.partNumber]?.name,
-                                  quantity: val === "" ? null : Number(val),
-                                },
-                              });
-                            }
-                          }}
-                          onBlur={(e) => {
-                            if (e.target.value === "") {
-                              setLocalPartData({
-                                ...localPartData,
-                                [part.partNumber]: {
-                                  ...localPartData[part.partNumber],
-                                  subsystemId: localPartData[part.partNumber]?.subsystemId || 0,
-                                  processIds: localPartData[part.partNumber]?.processIds || [],
-                                  revision: localPartData[part.partNumber]?.revision,
-                                  name: localPartData[part.partNumber]?.name,
-                                  quantity: 1,
-                                },
-                              });
-                            }
-                          }}
-                          className="w-16 bg-paper border border-steel/40 rounded px-2 py-1 text-xs text-ink focus:outline-none focus:border-crimson"
                         />
-                      </td>
-                      <td className="px-4 py-3 text-steel text-xs">
-                        <select
-                          value={localPartData[part.partNumber]?.subsystemId || 0}
-                          onChange={(e) =>
-                            setLocalPartData({
-                              ...localPartData,
-                              [part.partNumber]: {
-                                ...localPartData[part.partNumber],
-                                subsystemId: Number(e.target.value),
-                                processIds: localPartData[part.partNumber]?.processIds || [],
-                                revision: localPartData[part.partNumber]?.revision,
-                                name: localPartData[part.partNumber]?.name,
-                                quantity: localPartData[part.partNumber]?.quantity,
-                              },
-                            })
-                          }
-                          className="bg-paper border border-steel/40 rounded px-2 py-1 text-xs text-ink focus:outline-none focus:border-crimson"
-                        >
-                          <option value={0}>— Select —</option>
-                          {pendingData.subsystems.map((s) => (
-                            <option key={s.id} value={s.id}>
-                              {s.name}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="px-4 py-3 text-steel text-xs">
-                        {data && (
-                          <ProcessSelector
-                            processes={data.processes}
-                            selectedProcessIds={localPartData[part.partNumber]?.processIds || []}
-                            onAddProcess={(procId) => {
-                              setLocalPartData({
-                                ...localPartData,
-                                [part.partNumber]: {
-                                  ...localPartData[part.partNumber],
-                                  subsystemId: localPartData[part.partNumber]?.subsystemId || 0,
-                                  processIds: [
-                                    ...(localPartData[part.partNumber]?.processIds || []),
-                                    procId,
-                                  ],
-                                  revision: localPartData[part.partNumber]?.revision,
-                                  name: localPartData[part.partNumber]?.name,
-                                  quantity: localPartData[part.partNumber]?.quantity,
-                                },
-                              });
+                      )}
+                      <tr className="hover:bg-mist transition-colors">
+                        <td className="px-4 py-3 text-ink font-medium font-mono text-xs">
+                          {part.partNumber}
+                        </td>
+                        <td className="px-4 py-3 text-steel text-xs">
+                          {(localPartData[part.partNumber]?.revision ?? part.revision) || "—"}
+                        </td>
+                        <td className="px-4 py-3 text-ink text-xs truncate max-w-xs">
+                          {(localPartData[part.partNumber]?.name ?? part.name) || "—"}
+                        </td>
+                        <td className="px-4 py-3 text-steel text-xs">
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            value={
+                              localPartData[part.partNumber]?.quantity === null
+                                ? ""
+                                : (localPartData[part.partNumber]?.quantity ?? part.quantity ?? "")
+                            }
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (val === "" || /^\d+$/.test(val)) {
+                                setLocalPartData({
+                                  ...localPartData,
+                                  [part.partNumber]: {
+                                    ...localPartData[part.partNumber],
+                                    subsystemId: localPartData[part.partNumber]?.subsystemId || 0,
+                                    processIds: localPartData[part.partNumber]?.processIds || [],
+                                    revision: localPartData[part.partNumber]?.revision,
+                                    name: localPartData[part.partNumber]?.name,
+                                    quantity: val === "" ? null : Number(val),
+                                  },
+                                });
+                              }
                             }}
-                            onReplaceProcess={(slotIdx, procId) => {
-                              const newProcessIds = [
-                                ...(localPartData[part.partNumber]?.processIds || []),
-                              ];
-                              newProcessIds[slotIdx] = procId;
-                              setLocalPartData({
-                                ...localPartData,
-                                [part.partNumber]: {
-                                  ...localPartData[part.partNumber],
-                                  subsystemId: localPartData[part.partNumber]?.subsystemId || 0,
-                                  processIds: newProcessIds,
-                                  revision: localPartData[part.partNumber]?.revision,
-                                  name: localPartData[part.partNumber]?.name,
-                                  quantity: localPartData[part.partNumber]?.quantity,
-                                },
-                              });
+                            onBlur={(e) => {
+                              if (e.target.value === "") {
+                                setLocalPartData({
+                                  ...localPartData,
+                                  [part.partNumber]: {
+                                    ...localPartData[part.partNumber],
+                                    subsystemId: localPartData[part.partNumber]?.subsystemId || 0,
+                                    processIds: localPartData[part.partNumber]?.processIds || [],
+                                    revision: localPartData[part.partNumber]?.revision,
+                                    name: localPartData[part.partNumber]?.name,
+                                    quantity: 1,
+                                  },
+                                });
+                              }
                             }}
-                            onRemoveProcess={(idx) => {
-                              setLocalPartData({
-                                ...localPartData,
-                                [part.partNumber]: {
-                                  ...localPartData[part.partNumber],
-                                  subsystemId: localPartData[part.partNumber]?.subsystemId || 0,
-                                  processIds: localPartData[part.partNumber].processIds.filter(
-                                    (_, i) => i !== idx,
-                                  ),
-                                  revision: localPartData[part.partNumber]?.revision,
-                                  name: localPartData[part.partNumber]?.name,
-                                  quantity: localPartData[part.partNumber]?.quantity,
-                                },
-                              });
-                            }}
-                            onOpenFull={() => setEditingProcessPartIdx(idx)}
+                            className="w-16 bg-paper border border-steel/40 rounded px-2 py-1 text-xs text-ink focus:outline-none focus:border-crimson"
                           />
-                        )}
-                        {data &&
-                          (() => {
-                            const fileError = pipelineFileError(
-                              localPartData[part.partNumber]?.processIds ?? [],
-                              data.processes,
-                            );
-                            return fileError ? (
-                              <p className="mt-1 text-crimson-dark">{fileError}</p>
-                            ) : null;
-                          })()}
-                      </td>
-                      <td className="px-4 py-3 text-steel text-xs">
-                        {data &&
-                        partInfoRequiredBy(
-                          localPartData[part.partNumber]?.processIds ?? [],
-                          data.processes,
-                        ).length > 0 ? (
-                          <div className="flex gap-1.5">
-                            <input
-                              type="text"
-                              value={localPartData[part.partNumber]?.material ?? ""}
-                              onChange={(e) =>
-                                updateLocal(part.partNumber, { material: e.target.value })
-                              }
-                              placeholder="Material"
-                              aria-label={`Material for ${part.partNumber}`}
-                              className="w-24 bg-paper border border-steel/40 rounded px-2 py-1 text-xs text-ink placeholder-steel focus:outline-none focus:border-crimson"
+                        </td>
+                        <td className="px-4 py-3 text-steel text-xs">
+                          <select
+                            value={localPartData[part.partNumber]?.subsystemId || 0}
+                            onChange={(e) =>
+                              setLocalPartData({
+                                ...localPartData,
+                                [part.partNumber]: {
+                                  ...localPartData[part.partNumber],
+                                  subsystemId: Number(e.target.value),
+                                  processIds: localPartData[part.partNumber]?.processIds || [],
+                                  revision: localPartData[part.partNumber]?.revision,
+                                  name: localPartData[part.partNumber]?.name,
+                                  quantity: localPartData[part.partNumber]?.quantity,
+                                },
+                              })
+                            }
+                            className="bg-paper border border-steel/40 rounded px-2 py-1 text-xs text-ink focus:outline-none focus:border-crimson"
+                          >
+                            <option value={0}>— Select —</option>
+                            {pendingData.subsystems.map((s) => (
+                              <option key={s.id} value={s.id}>
+                                {s.name}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="px-4 py-3 text-steel text-xs">
+                          {data && (
+                            <ProcessSelector
+                              processes={data.processes}
+                              selectedProcessIds={localPartData[part.partNumber]?.processIds || []}
+                              onAddProcess={(procId) => {
+                                setLocalPartData({
+                                  ...localPartData,
+                                  [part.partNumber]: {
+                                    ...localPartData[part.partNumber],
+                                    subsystemId: localPartData[part.partNumber]?.subsystemId || 0,
+                                    processIds: [
+                                      ...(localPartData[part.partNumber]?.processIds || []),
+                                      procId,
+                                    ],
+                                    revision: localPartData[part.partNumber]?.revision,
+                                    name: localPartData[part.partNumber]?.name,
+                                    quantity: localPartData[part.partNumber]?.quantity,
+                                  },
+                                });
+                              }}
+                              onReplaceProcess={(slotIdx, procId) => {
+                                const newProcessIds = [
+                                  ...(localPartData[part.partNumber]?.processIds || []),
+                                ];
+                                newProcessIds[slotIdx] = procId;
+                                setLocalPartData({
+                                  ...localPartData,
+                                  [part.partNumber]: {
+                                    ...localPartData[part.partNumber],
+                                    subsystemId: localPartData[part.partNumber]?.subsystemId || 0,
+                                    processIds: newProcessIds,
+                                    revision: localPartData[part.partNumber]?.revision,
+                                    name: localPartData[part.partNumber]?.name,
+                                    quantity: localPartData[part.partNumber]?.quantity,
+                                  },
+                                });
+                              }}
+                              onRemoveProcess={(idx) => {
+                                setLocalPartData({
+                                  ...localPartData,
+                                  [part.partNumber]: {
+                                    ...localPartData[part.partNumber],
+                                    subsystemId: localPartData[part.partNumber]?.subsystemId || 0,
+                                    processIds: localPartData[part.partNumber].processIds.filter(
+                                      (_, i) => i !== idx,
+                                    ),
+                                    revision: localPartData[part.partNumber]?.revision,
+                                    name: localPartData[part.partNumber]?.name,
+                                    quantity: localPartData[part.partNumber]?.quantity,
+                                  },
+                                });
+                              }}
+                              onOpenFull={() => setEditingProcessPartIdx(idx)}
                             />
-                            <input
-                              type="text"
-                              value={localPartData[part.partNumber]?.thickness ?? ""}
-                              onChange={(e) =>
-                                updateLocal(part.partNumber, { thickness: e.target.value })
-                              }
-                              placeholder='0.25"'
-                              aria-label={`Thickness for ${part.partNumber}`}
-                              className="w-16 bg-paper border border-steel/40 rounded px-2 py-1 text-xs text-ink placeholder-steel focus:outline-none focus:border-crimson"
-                            />
-                          </div>
-                        ) : (
-                          <span className="text-steel/60">—</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-steel text-center">
-                        <DrawingStatusCell part={part} localPartData={localPartData} />
-                      </td>
-                      <td className="px-4 py-3 text-right flex gap-2 justify-end">
-                        <button
-                          type="button"
-                          onClick={() => setCurrentIndex(idx)}
-                          className="text-xs font-medium text-crimson hover:text-crimson-dark underline"
-                        >
-                          Details
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDeletePart(part.partNumber)}
-                          disabled={deletingPartNumber === part.partNumber}
-                          className="text-xs font-medium text-steel hover:text-steel-dark disabled:opacity-50"
-                        >
-                          {deletingPartNumber === part.partNumber ? "Deleting…" : "Delete"}
-                        </button>
-                      </td>
-                    </tr>
+                          )}
+                          {data &&
+                            (() => {
+                              const fileError = pipelineFileError(
+                                localPartData[part.partNumber]?.processIds ?? [],
+                                data.processes,
+                              );
+                              return fileError ? (
+                                <p className="mt-1 text-crimson-dark">{fileError}</p>
+                              ) : null;
+                            })()}
+                        </td>
+                        <td className="px-4 py-3 text-steel text-xs">
+                          {data &&
+                          partInfoRequiredBy(
+                            localPartData[part.partNumber]?.processIds ?? [],
+                            data.processes,
+                          ).length > 0 ? (
+                            <div className="flex gap-1.5">
+                              <input
+                                type="text"
+                                value={localPartData[part.partNumber]?.material ?? ""}
+                                onChange={(e) =>
+                                  updateLocal(part.partNumber, { material: e.target.value })
+                                }
+                                placeholder="Material"
+                                aria-label={`Material for ${part.partNumber}`}
+                                className="w-24 bg-paper border border-steel/40 rounded px-2 py-1 text-xs text-ink placeholder-steel focus:outline-none focus:border-crimson"
+                              />
+                              <input
+                                type="text"
+                                value={localPartData[part.partNumber]?.thickness ?? ""}
+                                onChange={(e) =>
+                                  updateLocal(part.partNumber, { thickness: e.target.value })
+                                }
+                                placeholder='0.25"'
+                                aria-label={`Thickness for ${part.partNumber}`}
+                                className="w-16 bg-paper border border-steel/40 rounded px-2 py-1 text-xs text-ink placeholder-steel focus:outline-none focus:border-crimson"
+                              />
+                            </div>
+                          ) : (
+                            <span className="text-steel/60">—</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-steel text-center">
+                          <DrawingStatusCell part={part} localPartData={localPartData} />
+                        </td>
+                        <td className="px-4 py-3 text-right flex gap-2 justify-end">
+                          <button
+                            type="button"
+                            onClick={() => setCurrentIndex(idx)}
+                            className="text-xs font-medium text-crimson hover:text-crimson-dark underline"
+                          >
+                            Details
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeletePart(part.partNumber)}
+                            disabled={deletingPartNumber === part.partNumber}
+                            className="text-xs font-medium text-steel hover:text-steel-dark disabled:opacity-50"
+                          >
+                            {deletingPartNumber === part.partNumber ? "Deleting…" : "Delete"}
+                          </button>
+                        </td>
+                      </tr>
+                    </Fragment>
                   ))}
                 </tbody>
               </table>

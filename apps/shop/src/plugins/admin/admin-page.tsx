@@ -641,7 +641,9 @@ function OnShapeConfig() {
           placeholder="e.g. xyz789"
           className={inputCls}
         />
-        <p className="text-xs text-steel">Needed to read the release's bill of materials</p>
+        <p className="text-xs text-steel">
+          Optional: fills in how many of each part a release needs
+        </p>
       </div>
 
       <div className="space-y-1">

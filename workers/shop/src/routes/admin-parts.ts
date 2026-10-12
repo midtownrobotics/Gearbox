@@ -80,8 +80,24 @@ export const adminPartsRouter = new Hono<AppEnv>()
       .where(inTeam(schema.subsystems, teamId))
       .all();
 
+    // The releases the pending parts came from, so the page can group them by release.
+    const releaseIds = new Set(pendingParts.map((p) => p.releaseId));
+    const releases = (
+      await db
+        .select({
+          id: schema.onshapeReleases.id,
+          releaseId: schema.onshapeReleases.releaseId,
+          name: schema.onshapeReleases.name,
+          timestamp: schema.onshapeReleases.timestamp,
+        })
+        .from(schema.onshapeReleases)
+        .where(inTeam(schema.onshapeReleases, teamId))
+        .all()
+    ).filter((r) => releaseIds.has(r.id));
+
     return c.json({
       parts: pendingParts,
+      releases,
       subsystems,
     });
   })
