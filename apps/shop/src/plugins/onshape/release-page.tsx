@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import { drawingUrl, fetchOnshapeReleases } from "../../shared/getters";
 import type { OnshapeRelease } from "../../shared/types";
 import { ErrorBanner, PageLoading } from "../../shared/ui";
@@ -13,6 +13,11 @@ const buttonCls =
 
 export function ReleasePage() {
   const { id } = useParams();
+  // Opened from Ingest's release headers: the back link goes there instead of the list.
+  const fromIngest = (useLocation().state as { from?: string } | null)?.from === "ingest";
+  const back = fromIngest
+    ? { to: "/ingest", label: "← Ingest" }
+    : { to: "/onshape", label: "← Onshape" };
   const [release, setRelease] = useState<OnshapeRelease | null | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
 
@@ -26,8 +31,8 @@ export function ReleasePage() {
     return (
       <main className="min-h-screen bg-page">
         <div className="max-w-5xl mx-auto px-6 py-8 space-y-4">
-          <Link to="/onshape" className="text-sm text-crimson hover:underline">
-            ← Onshape
+          <Link to={back.to} className="text-sm text-crimson hover:underline">
+            {back.label}
           </Link>
           <ErrorBanner message={error ?? "There's no such release."} />
         </div>
@@ -61,8 +66,8 @@ export function ReleasePage() {
     <main className="min-h-screen bg-page">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 space-y-6">
         <div className="space-y-2">
-          <Link to="/onshape" className="text-sm text-crimson hover:underline">
-            ← Onshape
+          <Link to={back.to} className="text-sm text-crimson hover:underline">
+            {back.label}
           </Link>
           <div className="flex flex-wrap items-start justify-between gap-3">
             <h1 className="font-display text-4xl text-ink break-words">

@@ -85,6 +85,7 @@ function ReleaseHeader({ release, count }: { release?: PendingRelease; count: nu
           {release ? (
             <Link
               to={`/onshape/releases/${release.id}`}
+              state={{ from: "ingest" }}
               className="font-semibold text-ink hover:text-crimson"
             >
               {release.name ?? `Release ${release.releaseId}`}
