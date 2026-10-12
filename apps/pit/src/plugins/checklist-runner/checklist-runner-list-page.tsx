@@ -119,7 +119,7 @@ export function ChecklistRunnerListPage() {
                 setArchived(null);
                 setArchiving(true);
               }}
-              className="rounded-lg bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-700"
+              className="rounded-lg bg-primary-600 px-4 py-2.5 text-sm font-semibold text-on-primary transition-colors hover:bg-primary-700"
             >
               Archive and Reset
             </button>
@@ -239,7 +239,7 @@ export function ChecklistRunnerListPage() {
                       <button
                         type="button"
                         onClick={() => handleDeleteIssue(issue)}
-                        className="px-2 py-0.5 bg-primary-600 hover:bg-primary-700 text-white text-xs font-semibold rounded"
+                        className="px-2 py-0.5 bg-primary-600 hover:bg-primary-700 text-on-primary text-xs font-semibold rounded"
                       >
                         Resolve
                       </button>

@@ -235,7 +235,7 @@ export function FilePickerModal({
             type="button"
             disabled={!selected}
             onClick={() => selected && onPick(selected)}
-            className="px-4 py-2 text-sm font-semibold bg-crimson hover:bg-crimson-dark text-paper rounded-lg transition-colors disabled:opacity-50"
+            className="px-4 py-2 text-sm font-semibold bg-crimson hover:bg-crimson-dark text-on-primary rounded-lg transition-colors disabled:opacity-50"
           >
             {confirmLabel}
           </button>

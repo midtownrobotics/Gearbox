@@ -100,7 +100,7 @@ export function KioskRemovePage() {
               <button
                 type="button"
                 onClick={handleLoginRedirect}
-                className="block w-full py-3 px-4 rounded-lg bg-primary-600 hover:bg-primary-500 text-white font-semibold transition-colors"
+                className="block w-full py-3 px-4 rounded-lg bg-primary-600 hover:bg-primary-500 text-on-primary font-semibold transition-colors"
               >
                 Proceed to Log In
               </button>
@@ -147,7 +147,7 @@ export function KioskRemovePage() {
             type="button"
             onClick={handleRemoveDevice}
             disabled={loading}
-            className="w-full py-3 px-4 rounded-lg bg-primary-600 hover:bg-primary-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold transition-colors flex items-center justify-center gap-2"
+            className="w-full py-3 px-4 rounded-lg bg-primary-600 hover:bg-primary-500 disabled:opacity-50 disabled:cursor-not-allowed text-on-primary font-semibold transition-colors flex items-center justify-center gap-2"
           >
             {loading && <Loader2 size={18} className="animate-spin" />}
             {loading ? "Removing Device..." : "Remove Device"}

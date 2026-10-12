@@ -8,7 +8,7 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "";
 const button =
   "rounded-lg border border-secondary-300 px-3 py-2 text-sm font-medium text-secondary-700 hover:bg-secondary-50 disabled:opacity-50";
 const primaryButton =
-  "rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50";
+  "rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-on-primary hover:bg-primary-700 disabled:opacity-50";
 
 async function request(path: string, init?: RequestInit) {
   const response = await fetch(`${API_BASE}/switch${path}`, {

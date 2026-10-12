@@ -120,7 +120,7 @@ export function ConsumerSections({
             type="button"
             disabled={busy}
             onClick={() => move(group, "done")}
-            className={`${btn} font-semibold bg-emerald-600 hover:bg-emerald-700 text-paper rounded-lg transition-colors disabled:opacity-50`}
+            className={`${btn} font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors disabled:opacity-50`}
           >
             Mark all complete
           </button>
@@ -135,7 +135,7 @@ export function ConsumerSections({
           type="button"
           disabled={busy}
           onClick={() => move(group, "doing")}
-          className={`${btn} font-semibold bg-crimson hover:bg-crimson-dark text-paper rounded-lg transition-colors disabled:opacity-50`}
+          className={`${btn} font-semibold bg-crimson hover:bg-crimson-dark text-on-primary rounded-lg transition-colors disabled:opacity-50`}
         >
           Start all
         </button>

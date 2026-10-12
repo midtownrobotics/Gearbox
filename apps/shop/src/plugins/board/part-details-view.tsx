@@ -36,7 +36,7 @@ export function PartDetailsView({
         type="button"
         onClick={handleStartPart}
         disabled={busy}
-        className={`${shopButton} bg-crimson text-paper hover:bg-crimson-dark`}
+        className={`${shopButton} bg-crimson text-on-primary hover:bg-crimson-dark`}
       >
         Start Part
       </button>

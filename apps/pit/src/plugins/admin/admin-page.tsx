@@ -136,7 +136,7 @@ export function AdminPage() {
               type="button"
               onClick={handleSave}
               disabled={saving}
-              className="px-4 py-2 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-sm font-semibold rounded-lg transition-colors"
+              className="px-4 py-2 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-on-primary text-sm font-semibold rounded-lg transition-colors"
             >
               {saving ? "Saving…" : "Save"}
             </button>

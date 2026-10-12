@@ -828,7 +828,7 @@ export function IngestPartsPage() {
                     setIngestingAll(false);
                   }
                 }}
-                className="px-6 py-2 text-sm font-semibold text-paper bg-crimson hover:bg-crimson-dark disabled:bg-steel/30 disabled:cursor-not-allowed rounded-lg transition-colors"
+                className="px-6 py-2 text-sm font-semibold text-on-primary bg-crimson hover:bg-crimson-dark disabled:bg-steel/30 disabled:cursor-not-allowed rounded-lg transition-colors"
               >
                 {ingestingAll ? "Ingesting…" : "Ingest All"}
               </button>
@@ -1540,7 +1540,7 @@ function PartIngestCard({
                 setShowDuplicateConfirm(false);
                 performCreate(true);
               }}
-              className="text-xs font-medium rounded-lg px-3 py-1.5 bg-crimson hover:bg-crimson-dark text-paper"
+              className="text-xs font-medium rounded-lg px-3 py-1.5 bg-crimson hover:bg-crimson-dark text-on-primary"
             >
               Obsolete Old Revisions & Add
             </button>
@@ -1553,7 +1553,7 @@ function PartIngestCard({
           type="button"
           onClick={handleSubmit}
           disabled={submitting}
-          className={`bg-crimson hover:bg-crimson-dark disabled:opacity-50 text-paper text-sm font-semibold rounded-lg transition-colors ${
+          className={`bg-crimson hover:bg-crimson-dark disabled:opacity-50 text-on-primary text-sm font-semibold rounded-lg transition-colors ${
             touch ? "px-6 py-3" : "px-5 py-2"
           }`}
         >

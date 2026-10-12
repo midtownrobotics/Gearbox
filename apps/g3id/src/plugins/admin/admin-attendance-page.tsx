@@ -133,7 +133,7 @@ function AttendanceSettingsCard({ onSaved }: { onSaved: () => void }) {
           type="button"
           onClick={save}
           disabled={!changed || status === "saving"}
-          className="inline-flex items-center gap-2 rounded-lg bg-primary-500 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-600 disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex items-center gap-2 rounded-lg bg-primary-500 px-4 py-2 text-sm font-semibold text-on-primary hover:bg-primary-600 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {status === "saving" && <Loader2 size={14} className="animate-spin" />}
           {status === "saved" && !changed ? "Saved" : "Save"}

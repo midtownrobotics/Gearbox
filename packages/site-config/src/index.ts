@@ -3,17 +3,29 @@ import { site } from "./site.ts";
 // Everything apps and workers need from site.ts, already put together.
 
 export { site };
-export { type Hsv, hexToHsv, hsvToHex, isHexColor, withHueOf } from "./color.ts";
+export {
+  type Hsv,
+  contrastRatio,
+  hexToHsv,
+  hsvToHex,
+  isHexColor,
+  luminance,
+  withHueOf,
+} from "./color.ts";
 export {
   brandColor,
   builtInBrandColor,
+  buttonTextChoices,
+  buttonTextColor,
   completeAppOrder,
   defaultAppOrder,
   defaultTeamUiSettings,
+  fillColor,
   isPortalTileKey,
   portalAppLabels,
   teamUiDefaults,
   teamUiLinkLabels,
+  type ButtonText,
   type PortalTileKey,
   type TeamUiColors,
   type TeamUiSettings,

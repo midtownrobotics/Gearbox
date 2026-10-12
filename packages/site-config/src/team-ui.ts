@@ -1,3 +1,4 @@
+import { contrastRatio, isHexColor } from "./color.ts";
 import { site } from "./site.ts";
 import { teamLinks, teamLinksFor, toolLinks } from "./team-links.ts";
 
@@ -76,6 +77,8 @@ export type TeamUiSettings = {
   linkAccents: boolean;
   light: TeamUiColors;
   dark: TeamUiColors;
+  /** The text on buttons and other fills in the team's color, chosen for each theme. */
+  buttonText: Record<"light" | "dark", ButtonText>;
   links: Record<TeamUiLinkKey, string>;
   hiddenLinks: TeamUiLinkKey[];
   /** The order of Portal's tiles (every tile, once; `completeAppOrder` fills in new ones). */
@@ -90,11 +93,19 @@ export type TeamUiColors = {
   text: string;
   muted: string;
   /**
-   * The team's color in this theme. The light accent is also its brand color (`brandColor`):
-   * buttons, links and app icons take it in both themes.
+   * The team's color in this theme: its buttons and other fills (`fillColor`), links and
+   * highlights. The light accent is also its brand color (`brandColor`), which app icons take in
+   * both themes.
    */
   accent: string;
 };
+
+/**
+ * The text on a fill in the team's color: light (the dark palette's text color), dark (the light
+ * palette's), or whichever of the two stands out more against the fill.
+ */
+export type ButtonText = "auto" | "light" | "dark";
+export const buttonTextChoices: ButtonText[] = ["auto", "light", "dark"];
 
 /**
  * The brand color built into the apps: what the primary palette (`packages/ui/src/index.css`)
@@ -109,6 +120,38 @@ export const builtInBrandColor = "#a32035";
 export function brandColor(settings: Pick<TeamUiSettings, "light">): string {
   const accent = settings.light.accent.toLowerCase();
   return accent === defaultTeamUiSettings.light.accent ? builtInBrandColor : accent;
+}
+
+/**
+ * The color of buttons and other solid fills in one theme: that theme's accent (in light mode the
+ * brand color, so the default accent keeps the built-in palette).
+ */
+export function fillColor(
+  settings: Pick<TeamUiSettings, "light" | "dark">,
+  mode: "light" | "dark",
+): string {
+  return mode === "dark" ? settings.dark.accent.toLowerCase() : brandColor(settings);
+}
+
+/**
+ * The color of text on a fill in the team's color (buttons, selected tabs) in one theme, from the
+ * team's choice for that theme (`buttonText`). "auto" compares the two text colors against that
+ * theme's fill (`fillColor`); the light one wins a tie.
+ */
+export function buttonTextColor(
+  settings: Pick<TeamUiSettings, "light" | "dark"> & Partial<Pick<TeamUiSettings, "buttonText">>,
+  mode: "light" | "dark",
+): string {
+  const light = settings.dark.text;
+  const dark = settings.light.text;
+  // Settings from a page or a G3ID older than the choice have none: automatic.
+  const choice = settings.buttonText?.[mode] ?? "auto";
+  if (choice === "light") return light;
+  if (choice === "dark") return dark;
+  const fill = fillColor(settings, mode);
+  // A color still being typed in the editor can't be compared.
+  if (![fill, light, dark].every(isHexColor)) return light;
+  return contrastRatio(dark, fill) > contrastRatio(light, fill) ? dark : light;
 }
 
 export const defaultTeamUiSettings: TeamUiSettings = {
@@ -136,6 +179,7 @@ export const defaultTeamUiSettings: TeamUiSettings = {
     muted: "#a3a3a3",
     accent: "#e8677c",
   },
+  buttonText: { light: "auto", dark: "auto" },
   links: {
     publicSite: site.publicSiteUrl,
     slack: site.links.slack,

@@ -272,7 +272,7 @@ export function ChecklistRunnerPage() {
                       {isChecked && (
                         <svg
                           viewBox="0 0 12 10"
-                          className="w-3.5 h-3 fill-none stroke-white stroke-2"
+                          className="w-3.5 h-3 fill-none stroke-on-primary stroke-2"
                           strokeLinecap="round"
                           strokeLinejoin="round"
                           aria-hidden="true"
@@ -310,7 +310,7 @@ export function ChecklistRunnerPage() {
                               <button
                                 type="button"
                                 onClick={() => deleteIssue(issue)}
-                                className="px-2 py-0.5 bg-primary-600 hover:bg-primary-700 text-white text-xs font-semibold rounded"
+                                className="px-2 py-0.5 bg-primary-600 hover:bg-primary-700 text-on-primary text-xs font-semibold rounded"
                               >
                                 Resolve
                               </button>

@@ -371,7 +371,7 @@ export function PartFilesPanel({
             type="button"
             onClick={handleAttachExisting}
             disabled={busy || !existingId || count < 1}
-            className="px-3 py-1.5 text-xs font-semibold bg-crimson hover:bg-crimson-dark text-paper rounded-lg transition-colors disabled:opacity-50"
+            className="px-3 py-1.5 text-xs font-semibold bg-crimson hover:bg-crimson-dark text-on-primary rounded-lg transition-colors disabled:opacity-50"
           >
             Assign
           </button>

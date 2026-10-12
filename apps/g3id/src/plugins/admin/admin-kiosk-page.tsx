@@ -155,7 +155,7 @@ export function AdminKioskPage() {
             <button
               type="submit"
               disabled={codeLoading || !deviceName.trim()}
-              className="w-full py-2 px-4 rounded-lg bg-primary-600 hover:bg-primary-500 disabled:opacity-50 text-white font-semibold transition-colors"
+              className="w-full py-2 px-4 rounded-lg bg-primary-600 hover:bg-primary-500 disabled:opacity-50 text-on-primary font-semibold transition-colors"
             >
               {codeLoading ? "Generating..." : "Generate Code"}
             </button>
@@ -224,7 +224,7 @@ export function AdminKioskPage() {
                     <button
                       type="button"
                       onClick={() => handleRevokeDevice(device.id)}
-                      className="ml-4 p-2 rounded-lg bg-primary-600 hover:bg-primary-500 text-white transition-colors flex-shrink-0"
+                      className="ml-4 p-2 rounded-lg bg-primary-600 hover:bg-primary-500 text-on-primary transition-colors flex-shrink-0"
                       title="Revoke device"
                     >
                       <Trash2 size={18} />

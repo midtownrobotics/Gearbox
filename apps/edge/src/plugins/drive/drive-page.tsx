@@ -23,7 +23,7 @@ export function DrivePage() {
               href={DRIVE_URL}
               target="_blank"
               rel="noreferrer"
-              className="text-sm font-medium rounded-lg px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white"
+              className="text-sm font-medium rounded-lg px-4 py-2 bg-primary-500 hover:bg-primary-600 text-on-primary"
             >
               Open the drive
             </a>

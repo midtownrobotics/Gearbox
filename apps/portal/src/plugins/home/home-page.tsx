@@ -236,7 +236,7 @@ export function HomePage() {
           <div className="space-y-3 pt-6">
             <a
               href={`${appUrl("id")}/login?redirect=${encodeURIComponent(window.location.href)}`}
-              className="block w-full px-6 py-3 rounded-lg bg-primary-600 hover:bg-primary-700 text-white font-semibold transition-colors"
+              className="block w-full px-6 py-3 rounded-lg bg-primary-600 hover:bg-primary-700 text-on-primary font-semibold transition-colors"
             >
               Sign In
             </a>

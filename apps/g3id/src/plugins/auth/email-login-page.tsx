@@ -87,7 +87,7 @@ export function EmailLoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full flex items-center justify-center gap-2 rounded-lg bg-primary-500 hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-2.5 text-sm transition-colors"
+            className="w-full flex items-center justify-center gap-2 rounded-lg bg-primary-500 hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed text-on-primary font-semibold py-2.5 text-sm transition-colors"
           >
             {loading && <Loader2 size={16} className="animate-spin" />}
             {loading ? "Signing in…" : "Sign in"}

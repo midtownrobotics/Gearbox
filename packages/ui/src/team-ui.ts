@@ -1,9 +1,9 @@
 import {
-  type TeamUiColors,
   type TeamUiSettings,
   apiPath,
   brandColor,
   builtInBrandColor,
+  buttonTextColor,
   defaultTeamUiSettings,
   pageTeamId,
   pageTeamNumber,
@@ -28,18 +28,22 @@ function notify() {
 
 /**
  * The team's colors as the variables colors.css declares: both themes' (--g3-light-page,
- * --g3-dark-page), the showing theme's (--g3-page) and the brand color, which is the light accent
- * in both themes.
+ * --g3-dark-page), the showing theme's (--g3-page), its color for solid fills (--g3-brand, the
+ * theme's accent) and the text on them (--g3-on-brand).
  */
-function applyColors(colors: TeamUiColors) {
+function applyColors(showing: "light" | "dark") {
   const style = document.documentElement.style;
   for (const mode of ["light", "dark"] as const) {
     for (const [key, color] of Object.entries(current[mode])) {
       style.setProperty(`--g3-${mode}-${key}`, color);
     }
+    style.setProperty(`--g3-${mode}-on-brand`, buttonTextColor(current, mode));
   }
-  for (const [key, color] of Object.entries(colors)) style.setProperty(`--g3-${key}`, color);
-  style.setProperty("--g3-brand", current.light.accent);
+  for (const [key, color] of Object.entries(current[showing])) {
+    style.setProperty(`--g3-${key}`, color);
+  }
+  style.setProperty("--g3-brand", current[showing].accent);
+  style.setProperty("--g3-on-brand", buttonTextColor(current, showing));
 }
 
 // The neutral ramps apps write their grays with (text-secondary-600, border-gray-200).
@@ -94,7 +98,7 @@ function applyNeutrals(root: HTMLElement) {
 
 function applySettings() {
   const root = document.documentElement;
-  applyColors(root.dataset.theme === "dark" ? current.dark : current.light);
+  applyColors(root.dataset.theme === "dark" ? "dark" : "light");
   applyNeutrals(root);
   syncThemeColor();
   root.style.setProperty(
@@ -102,16 +106,17 @@ function applySettings() {
     current.displayFont === "system-ui" ? "system-ui" : `"${current.displayFont}", sans-serif`,
   );
   // The primary palette, from the team's brand color (its light accent). Tailwind utilities
-  // resolve these variables at runtime across all apps. Solid fills are the same in both themes;
-  // the tints behind banners and selected rows are dark in dark mode (the brand color sunk into
-  // the page), and brand text there takes the dark accent (theme.css).
+  // resolve these variables at runtime across all apps. In dark mode the tints behind banners and
+  // selected rows are dark (the brand color sunk into the page), and solid fills (500 and darker)
+  // and brand text take the dark accent, which theme.css builds from --g3-dark-accent: nothing
+  // is set for them here.
   const base = brandColor(current);
   const dark = root.dataset.theme === "dark";
   const steps = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900];
   const blends = [90, 75, 55, 35, 18, 0, 15, 30, 45, 60];
   const darkTints = [85, 75, 52, 27];
   for (let i = 0; i < steps.length; i++) {
-    if (base === builtInBrandColor) {
+    if (base === builtInBrandColor || (dark && steps[i] >= 500)) {
       root.style.removeProperty(`--color-primary-${steps[i]}`);
       continue;
     }

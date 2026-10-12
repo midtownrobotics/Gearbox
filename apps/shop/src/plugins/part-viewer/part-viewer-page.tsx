@@ -140,7 +140,7 @@ export function PartViewerPage() {
             <button
               type="button"
               onClick={() => setShowUploadForm(true)}
-              className="bg-primary-600 text-white px-4 py-2 rounded hover:bg-primary-700 font-medium text-sm"
+              className="bg-primary-600 text-on-primary px-4 py-2 rounded hover:bg-primary-700 font-medium text-sm"
             >
               Replace Drawing
             </button>
@@ -203,7 +203,7 @@ export function PartViewerPage() {
                 <button
                   type="submit"
                   disabled={!uploadFile || uploading}
-                  className="flex-1 text-sm bg-primary-600 text-white px-4 py-2 rounded hover:bg-primary-700 disabled:bg-gray-400"
+                  className="flex-1 text-sm bg-primary-600 text-on-primary px-4 py-2 rounded hover:bg-primary-700 disabled:bg-gray-400"
                 >
                   {uploading ? "Uploading..." : "Upload"}
                 </button>
@@ -235,7 +235,7 @@ export function PartViewerPage() {
               <button
                 type="button"
                 onClick={() => setShowUploadForm(true)}
-                className="w-full bg-primary-600 text-white px-4 py-2 rounded hover:bg-primary-700 font-medium mb-4"
+                className="w-full bg-primary-600 text-on-primary px-4 py-2 rounded hover:bg-primary-700 font-medium mb-4"
               >
                 Upload a Drawing
               </button>

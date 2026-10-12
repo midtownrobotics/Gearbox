@@ -235,7 +235,7 @@ export function DashboardPage() {
 
       <div className="bg-surface border border-secondary-200 rounded-lg divide-y divide-secondary-100 mt-4">
         <div className="px-5 py-4 flex items-center gap-4">
-          <div className="w-12 h-12 rounded-full bg-primary-500 flex items-center justify-center text-lg font-semibold text-white shrink-0">
+          <div className="w-12 h-12 rounded-full bg-primary-500 flex items-center justify-center text-lg font-semibold text-on-primary shrink-0">
             {me.displayName.charAt(0).toUpperCase()}
           </div>
           <div className="min-w-0">
@@ -304,7 +304,7 @@ export function DashboardPage() {
                       linkable(identity.provider) && (
                         <a
                           href={`${import.meta.env.VITE_API_BASE_URL}/auth/${identity.provider}/link`}
-                          className="px-2 py-1 rounded bg-primary-600 hover:bg-primary-700 text-white text-xs font-bold transition-colors cursor-pointer"
+                          className="px-2 py-1 rounded bg-primary-600 hover:bg-primary-700 text-on-primary text-xs font-bold transition-colors cursor-pointer"
                           title={`Add another ${identity.provider} account`}
                         >
                           +
@@ -315,7 +315,7 @@ export function DashboardPage() {
                         type="button"
                         onClick={() => handleUnlink(identity.id, identity.provider)}
                         disabled={unlinkingProvider === identity.id}
-                        className="px-2 py-1 rounded bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-xs text-white transition-colors cursor-pointer"
+                        className="px-2 py-1 rounded bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-xs text-on-primary transition-colors cursor-pointer"
                       >
                         {unlinkingProvider === identity.id ? "Unlinking…" : "Unlink"}
                       </button>
@@ -330,7 +330,7 @@ export function DashboardPage() {
             {linkable("google") && !me.identities.some((i) => i.provider === "google") && (
               <a
                 href={`${import.meta.env.VITE_API_BASE_URL}/auth/google/link`}
-                className="w-full flex items-center justify-center gap-2 rounded-lg bg-primary-600 hover:bg-primary-700 px-4 py-2 text-sm text-white transition-colors"
+                className="w-full flex items-center justify-center gap-2 rounded-lg bg-primary-600 hover:bg-primary-700 px-4 py-2 text-sm text-on-primary transition-colors"
               >
                 <FaGoogle size={16} />
                 Connect Google
@@ -339,7 +339,7 @@ export function DashboardPage() {
             {linkable("github") && !me.identities.some((i) => i.provider === "github") && (
               <a
                 href={`${import.meta.env.VITE_API_BASE_URL}/auth/github/link`}
-                className="w-full flex items-center justify-center gap-2 rounded-lg bg-primary-600 hover:bg-primary-700 px-4 py-2 text-sm text-white transition-colors"
+                className="w-full flex items-center justify-center gap-2 rounded-lg bg-primary-600 hover:bg-primary-700 px-4 py-2 text-sm text-on-primary transition-colors"
               >
                 <FaGithub size={16} />
                 Connect GitHub
@@ -348,7 +348,7 @@ export function DashboardPage() {
             {linkable("steam") && !me.identities.some((i) => i.provider === "steam") && (
               <a
                 href={`${import.meta.env.VITE_API_BASE_URL}/auth/steam/link`}
-                className="w-full flex items-center justify-center gap-2 rounded-lg bg-primary-600 hover:bg-primary-700 px-4 py-2 text-sm text-white transition-colors"
+                className="w-full flex items-center justify-center gap-2 rounded-lg bg-primary-600 hover:bg-primary-700 px-4 py-2 text-sm text-on-primary transition-colors"
               >
                 <FaSteam size={16} />
                 Connect Steam
@@ -379,7 +379,7 @@ export function DashboardPage() {
                   <button
                     type="button"
                     onClick={handleConnectSlack}
-                    className="w-full flex items-center justify-center gap-2 rounded-lg bg-primary-600 hover:bg-primary-700 px-4 py-2 text-sm text-white transition-colors cursor-pointer"
+                    className="w-full flex items-center justify-center gap-2 rounded-lg bg-primary-600 hover:bg-primary-700 px-4 py-2 text-sm text-on-primary transition-colors cursor-pointer"
                   >
                     <FaSlack size={16} />
                     Connect Slack
@@ -407,7 +407,7 @@ export function DashboardPage() {
                 type="button"
                 onClick={fetchPin}
                 disabled={pinLoading}
-                className="w-full px-4 py-2 rounded-lg bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-sm text-white transition-colors"
+                className="w-full px-4 py-2 rounded-lg bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-sm text-on-primary transition-colors"
               >
                 {pinLoading ? "Loading..." : "View PIN"}
               </button>

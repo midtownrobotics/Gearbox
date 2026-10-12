@@ -331,7 +331,7 @@ export function BatteriesPage() {
                     setAdding(true);
                     setBanner(null);
                   }}
-                  className="px-3 py-1.5 bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold rounded-lg transition-colors"
+                  className="px-3 py-1.5 bg-primary-600 hover:bg-primary-700 text-on-primary text-sm font-semibold rounded-lg transition-colors"
                 >
                   + Add Battery
                 </button>
@@ -418,7 +418,7 @@ export function BatteriesPage() {
               <button
                 type="button"
                 onClick={handleAddBattery}
-                className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold rounded-lg"
+                className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-on-primary text-sm font-semibold rounded-lg"
               >
                 Add
               </button>
@@ -501,7 +501,7 @@ export function BatteriesPage() {
                           <button
                             type="button"
                             onClick={() => handleSetVoltage(battery)}
-                            className="px-2 py-1 bg-primary-600 hover:bg-primary-700 text-white text-xs font-semibold rounded"
+                            className="px-2 py-1 bg-primary-600 hover:bg-primary-700 text-on-primary text-xs font-semibold rounded"
                           >
                             Set
                           </button>

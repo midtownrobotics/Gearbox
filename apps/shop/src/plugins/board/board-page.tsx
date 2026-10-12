@@ -186,7 +186,7 @@ export function BoardPage() {
             <button
               type="button"
               onClick={() => setScanOpen(true)}
-              className="shrink-0 px-5 py-3 rounded-xl bg-crimson hover:bg-crimson-dark text-paper text-lg font-semibold transition-colors"
+              className="shrink-0 px-5 py-3 rounded-xl bg-crimson hover:bg-crimson-dark text-on-primary text-lg font-semibold transition-colors"
             >
               Scan
             </button>
@@ -514,7 +514,7 @@ function ProcessView({
                           e.stopPropagation();
                           onAdvance(row, "done");
                         }}
-                        className={`w-full whitespace-nowrap text-xs bg-emerald-600 hover:bg-emerald-700 text-paper rounded-lg font-semibold transition-colors ${btnSize}`}
+                        className={`w-full whitespace-nowrap text-xs bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold transition-colors ${btnSize}`}
                       >
                         Mark as Complete
                       </button>
@@ -550,7 +550,7 @@ function ProcessView({
                         e.stopPropagation();
                         onAdvance(row, "doing");
                       }}
-                      className={`whitespace-nowrap text-xs bg-crimson hover:bg-crimson-dark text-paper rounded-lg font-semibold transition-colors ${btnSize}`}
+                      className={`whitespace-nowrap text-xs bg-crimson hover:bg-crimson-dark text-on-primary rounded-lg font-semibold transition-colors ${btnSize}`}
                     >
                       Start Part
                     </button>
@@ -561,7 +561,7 @@ function ProcessView({
                           e.stopPropagation();
                           onAdvance(row, "done");
                         }}
-                        className={`w-full whitespace-nowrap text-xs bg-emerald-600 hover:bg-emerald-700 text-paper rounded-lg font-semibold transition-colors ${btnSize}`}
+                        className={`w-full whitespace-nowrap text-xs bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold transition-colors ${btnSize}`}
                       >
                         Mark as Complete
                       </button>

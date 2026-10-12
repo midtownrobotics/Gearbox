@@ -56,7 +56,7 @@ export function NavBar({ items }: { items: PluginNavItem[] }) {
             <button
               type="button"
               onClick={() => kioskLogout()}
-              className="text-sm font-semibold text-paper bg-crimson hover:bg-crimson-dark rounded-lg px-3.5 py-2 transition-colors"
+              className="text-sm font-semibold text-on-primary bg-crimson hover:bg-crimson-dark rounded-lg px-3.5 py-2 transition-colors"
             >
               Log Out
             </button>

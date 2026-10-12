@@ -84,7 +84,7 @@ export function Button({
   variant?: "primary" | "secondary" | "danger";
 }) {
   const styles = {
-    primary: "bg-primary-500 text-white hover:bg-primary-600",
+    primary: "bg-primary-500 text-on-primary hover:bg-primary-600",
     secondary: "bg-surface text-secondary-800 border border-secondary-300 hover:bg-secondary-50",
     danger: "bg-surface text-primary-700 border border-primary-300 hover:bg-primary-50",
   }[variant];
