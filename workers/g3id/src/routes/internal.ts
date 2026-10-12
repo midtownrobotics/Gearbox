@@ -1,5 +1,5 @@
 import { sendDM, sendMessage } from "@g3/slack";
-import { type SQL, and, eq, inArray, isNull, ne } from "drizzle-orm";
+import { and, eq, inArray, isNull, ne } from "drizzle-orm";
 import { Hono } from "hono";
 import { createDb } from "../db";
 import {
@@ -9,6 +9,7 @@ import {
   coreUsers,
   teams,
 } from "../db/schema";
+import { dmAdmins, dmMembers } from "../lib/member-dm";
 import { createSigninCode } from "../lib/slack-code";
 import { saveInstallation, slackForTeam } from "../lib/slack-install";
 import { siteTeamId } from "../lib/team";
@@ -21,39 +22,6 @@ import type { AppEnv } from "../types";
 // The gateway never answers /api/internal, and production workers have no other public address.
 
 type NewTeam = { id: string; teamNumber: number; name: string };
-
-/**
- * DMs the team's active members matching `which` that have a linked Slack account, from the
- * team's own bot. Null when the team has no Slack.
- */
-async function dmMembers(env: AppEnv["Bindings"], teamId: string, text: string, which: SQL) {
-  const teamSlack = await slackForTeam(env, teamId);
-  if (!teamSlack) return null;
-  const rows = await createDb(env.DB)
-    .select({ slackId: coreUserIdentities.providerId })
-    .from(coreUsers)
-    .innerJoin(coreUserIdentities, eq(coreUserIdentities.userId, coreUsers.id))
-    .where(
-      and(
-        eq(coreUsers.teamId, teamId),
-        eq(coreUsers.status, "active"),
-        eq(coreUserIdentities.provider, "slack"),
-        which,
-      ),
-    )
-    .all();
-  const ids = [...new Set(rows.map((r) => r.slackId).filter((id): id is string => !!id))];
-  let sent = 0;
-  for (const id of ids) {
-    try {
-      await sendDM(id, text, teamSlack.slack);
-      sent++;
-    } catch (err) {
-      console.error("[slack] member DM failed", id, err);
-    }
-  }
-  return { sent, members: ids.length };
-}
 
 /** The team's members (?1 is the team's id). */
 const MEMBERS = "(SELECT id FROM core_users WHERE team_id = ?1)";
@@ -254,7 +222,7 @@ export const internalRouter = new Hono<AppEnv>()
     const text = typeof body.text === "string" ? body.text.trim() : "";
     if (!text || text.length > 4000)
       return c.json({ error: "text is required (up to 4000)." }, 400);
-    const result = await dmMembers(c.env, c.req.param("id"), text, eq(coreUsers.isAdmin, 1));
+    const result = await dmAdmins(c.env, c.req.param("id"), text);
     if (!result) return c.json({ error: "This team hasn't connected Slack." }, 404);
     return c.json({ ok: true, sent: result.sent, admins: result.members });
   })

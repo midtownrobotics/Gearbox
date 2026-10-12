@@ -1,5 +1,7 @@
 import { workerTestConfig } from "@g3/testing/config";
 
+const sent: { channel: string; text: string }[] = [];
+
 // Slack's API as G3ID's tests see it: installing (oauth.v2.access) answers for the workspace named
 // in the code ("ws:T123"), its channels are three made-up ones, and messages go nowhere.
 const slack = (request: Request) => {
@@ -39,9 +41,21 @@ const slack = (request: Request) => {
       ],
     });
   }
+  // A DM opens a channel named after the person ("D-U123"); each message is recorded, and a GET
+  // of /__sent gives them back.
   if (url.pathname === "/api/conversations.open") {
-    return Response.json({ ok: true, channel: { id: "D1", is_im: true } });
+    return request.json().then((body) => {
+      const { users } = body as { users: string };
+      return Response.json({ ok: true, channel: { id: `D-${users}`, is_im: true } });
+    });
   }
+  if (url.pathname === "/api/chat.postMessage") {
+    return request.json().then((body) => {
+      sent.push(body as { channel: string; text: string });
+      return Response.json({ ok: true });
+    });
+  }
+  if (url.pathname === "/__sent") return Response.json(sent);
   return Response.json({ ok: true });
 };
 
