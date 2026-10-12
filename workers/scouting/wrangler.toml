@@ -1,7 +1,9 @@
 # Production URLs, route patterns and TEAM_NUMBER here are written by `pnpm configure` from
 # packages/site-config/src/site.ts. Change them there, not here.
-name = "scouting-production"
-account_id = "e54a97a23069e7889e8e820c00e520d8"
+#
+# Like every worker: the top of this file is local dev (`pnpm dev`, tests), and production is
+# [env.production], deployed with `--env production` (the scripts and Cloudflare's Git builds).
+name = "scouting"
 main = "src/index.ts"
 compatibility_date = "2026-05-17"
 
@@ -13,12 +15,12 @@ binding = "AI"
 
 [[services]]
 binding = "G3ID"
-service = "g3id-production"
+service = "g3id"
 
 [[d1_databases]]
 binding = "SCOUTING_DB"
-database_name = "g3-scouting-prod"
-database_id = "e24f6c2e-72dd-4307-864f-8e1b5dc2c2aa"
+database_name = "g3-scouting-local"
+database_id = "00000000-0000-0000-0000-000000000002"
 migrations_dir = "src/db/migrations"
 
 [[r2_buckets]]
@@ -26,14 +28,10 @@ binding = "FIELD_MAPS"
 bucket_name = "g3-scouting"
 
 [vars]
-FRONTEND_URL = "https://1648-scouting.frcgearbox.com"
-LOCAL_AUTH_BYPASS = "false"
-# Configure SLACK_BOT_TOKEN as a Wrangler secret using the same token as G3ID.
-# Configure TBA_AUTH_KEY as a Wrangler secret for event schedules.
+FRONTEND_URL = "http://localhost:5182"
+LOCAL_AUTH_BYPASS = "true"
+# Secrets: SLACK_BOT_TOKEN (the same token as G3ID's) and TBA_AUTH_KEY (event schedules).
 
-
-# Keep a named production environment for Cloudflare Builds configurations
-# that invoke `wrangler deploy --env production`.
 [env.production]
 name = "scouting-production"
 # No workers.dev address: the gateway is the only way in, so its identity headers can be trusted.
@@ -71,6 +69,47 @@ LOCAL_AUTH_BYPASS = "false"
 command = "pnpm --filter @g3/scouting build"
 
 [env.production.assets]
+directory = "../../apps/scouting/dist"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]
+
+# ---- Staging: written by `pnpm configure` from [env.production]; don't edit below. ----
+
+[env.staging]
+name = "scouting-staging"
+workers_dev = false
+
+[env.staging.define]
+__G3_STAGING__ = "true"
+
+[env.staging.triggers]
+crons = ["*/5 * * * *"]
+
+[env.staging.ai]
+binding = "AI"
+
+[[env.staging.services]]
+binding = "G3ID"
+service = "g3id-staging"
+
+[[env.staging.d1_databases]]
+binding = "SCOUTING_DB"
+database_name = "g3-scouting-staging"
+database_id = "not-created-run-pnpm-staging-create"
+migrations_dir = "src/db/migrations"
+
+[[env.staging.r2_buckets]]
+binding = "FIELD_MAPS"
+bucket_name = "g3-scouting-staging"
+
+[env.staging.vars]
+FRONTEND_URL = "https://1648-scouting-dev.g3robotics.com"
+LOCAL_AUTH_BYPASS = "false"
+
+[env.staging.build]
+command = "GEARBOX_STAGING=1 pnpm --filter @g3/scouting build"
+
+[env.staging.assets]
 directory = "../../apps/scouting/dist"
 not_found_handling = "single-page-application"
 run_worker_first = ["/api/*"]
