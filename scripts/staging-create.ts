@@ -48,9 +48,16 @@ function wrangler(args: string[], { quiet = false } = {}): string {
 
 /**
  * Never interactive: what this script reads back is Wrangler's output, so a question it asked
- * there (usage metrics, which account) would wait unseen. Logged in already, or a token.
+ * there (usage metrics, which account) would wait unseen. Logged in already, or a token. No
+ * banner either: printing it checks npm for a newer Wrangler, and on a slow link to npm that
+ * download (megabytes) keeps Wrangler from exiting for minutes after it's done.
  */
-const WRANGLER_ENV = { ...process.env, CI: "1", WRANGLER_SEND_METRICS: "false" };
+const WRANGLER_ENV = {
+  ...process.env,
+  CI: "1",
+  WRANGLER_SEND_METRICS: "false",
+  WRANGLER_HIDE_BANNER: "true",
+};
 const TIMEOUT_MS = 120_000;
 
 // Signed in, and to which account: before anything else. Straight to the terminal.
