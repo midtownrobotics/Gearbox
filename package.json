@@ -16,6 +16,7 @@
     "db:migrate:staging": "pnpm -r --if-present db:migrate:staging",
     "configure": "node scripts/configure.ts",
     "staging:create": "node scripts/staging-create.ts",
+    "staging:copy-team": "node scripts/staging-copy-team.ts",
     "changeset": "changeset",
     "release:version": "node scripts/release-version.ts",
     "release:tag": "node scripts/release-tag.ts",

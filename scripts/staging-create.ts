@@ -11,86 +11,16 @@
 // --dry-run to only print what it would do.
 
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { root, scratch, wranglerOutput as wrangler, wranglerLive } from "./lib/wrangler.ts";
 
-const root = join(import.meta.dirname, "..");
 const dryRun = process.argv.includes("--dry-run");
 const MARK = "# ---- Staging:";
 
-/** Wrangler as a worker installs it. */
-const WRANGLER = join(root, "workers/g3id/node_modules/.bin/wrangler");
-
-/** An empty folder to run Wrangler in, so no worker's wrangler.toml applies. */
-const scratch = mkdtempSync(join(tmpdir(), "gearbox-staging-"));
-
-/**
- * Runs Wrangler and gives back what it printed. Its messages reach the terminal, unless `quiet`
- * (for an answer that's expected to fail).
- */
-function wrangler(args: string[], { quiet = false } = {}): string {
-  skipUpdateCheck();
-  try {
-    return execFileSync(WRANGLER, args, {
-      cwd: scratch,
-      encoding: "utf8",
-      env: WRANGLER_ENV,
-      stdio: ["ignore", "pipe", quiet ? "pipe" : "inherit"],
-      timeout: TIMEOUT_MS,
-    });
-  } catch (err) {
-    if ((err as { code?: string }).code === "ETIMEDOUT") {
-      throw new Error(`wrangler ${args.join(" ")} didn't finish in ${TIMEOUT_MS / 1000} s.`);
-    }
-    throw err;
-  }
-}
-
-/**
- * Wrangler checks npm for a newer version of itself (on its banner, and again after an error),
- * and on a slow link to npm that download (megabytes) keeps it from exiting for minutes after it's
- * done. The check skips npm while its cache (update-check's, in the temp folder) is under an hour
- * old, so this says it just checked.
- */
-function skipUpdateCheck() {
-  const dir = join(tmpdir(), "update-check");
-  mkdirSync(dir, { recursive: true });
-  writeFileSync(
-    join(dir, "wrangler-latest.json"),
-    JSON.stringify({ latest: WRANGLER_VERSION, lastUpdate: Date.now() }),
-  );
-}
-const WRANGLER_VERSION = (
-  JSON.parse(
-    readFileSync(join(root, "workers/g3id/node_modules/wrangler/package.json"), "utf8"),
-  ) as {
-    version: string;
-  }
-).version;
-
-/**
- * Never interactive: what this script reads back is Wrangler's output, so a question it asked
- * there (usage metrics, which account) would wait unseen. Logged in already, or a token. No
- * banner either: printing it checks npm for a newer Wrangler, and on a slow link to npm that
- * download (megabytes) keeps Wrangler from exiting for minutes after it's done.
- */
-const WRANGLER_ENV = {
-  ...process.env,
-  CI: "1",
-  WRANGLER_SEND_METRICS: "false",
-  WRANGLER_HIDE_BANNER: "true",
-};
-const TIMEOUT_MS = 120_000;
-
-// Signed in, and to which account: before anything else. Straight to the terminal.
+// Signed in, and to which account: before anything else.
 console.log("Checking the Wrangler login…");
-execFileSync(WRANGLER, ["whoami"], {
-  cwd: scratch,
-  env: WRANGLER_ENV,
-  stdio: "inherit",
-  timeout: TIMEOUT_MS,
-});
+wranglerLive(["whoami"]);
 
 /** Makes something, unless dry-running; "already exists" counts as made. */
 function make(what: string, args: string[]) {
@@ -200,25 +130,15 @@ for (const name of names.workers) {
   console.log(`making placeholder Worker ${name}…`);
   // Straight to the terminal, as if typed there: run with its output captured and
   // non-interactively, this deploy waited on Cloudflare and never finished.
-  skipUpdateCheck();
-  execFileSync(
-    WRANGLER,
-    [
-      "deploy",
-      "placeholder.js",
-      "--name",
-      name,
-      "--compatibility-date",
-      "2026-05-17",
-      "--no-bundle",
-    ],
-    {
-      cwd: scratch,
-      env: { ...process.env, WRANGLER_HIDE_BANNER: "true" },
-      stdio: "inherit",
-      timeout: TIMEOUT_MS,
-    },
-  );
+  wranglerLive([
+    "deploy",
+    "placeholder.js",
+    "--name",
+    name,
+    "--compatibility-date",
+    "2026-05-17",
+    "--no-bundle",
+  ]);
 }
 
 console.log(dryRun ? "Dry run: nothing was made." : "Staging's resources are ready.");
