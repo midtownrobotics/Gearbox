@@ -1,17 +1,37 @@
-import { ErrorBanner } from "@g3/ui";
-import { useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import {
+  Button,
+  Card,
+  ConfirmButton,
+  ErrorBanner,
+  Field,
+  Loading,
+  Page,
+  focusRing,
+  inputClass,
+} from "@g3/ui";
+import { useEffect, useState } from "react";
+import { Link, useParams } from "react-router-dom";
 import { api } from "../../shared/api";
 import { getErrorMessage } from "../../shared/api-error";
 import { fetchItems } from "../../shared/getters/items";
 import { fetchList } from "../../shared/getters/lists";
 import type { ChecklistItem, ChecklistList } from "../../shared/getters/types";
 
-type ItemEditState = { id: number; field: "name" | "description"; value: string } | null;
+/** The item or topic being edited: its name and, for an item, its description. */
+type ItemDraft = { id: number; name: string; description: string } | null;
+
+const arrowButton = `rounded p-1 leading-none text-secondary-500 hover:text-secondary-900 disabled:cursor-not-allowed disabled:opacity-20 ${focusRing}`;
+
+function BackLink() {
+  return (
+    <Link to="/editor" className="text-sm text-secondary-500 hover:text-primary-600">
+      ← All checklists
+    </Link>
+  );
+}
 
 export function ChecklistDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
 
   const [list, setList] = useState<ChecklistList | null>(null);
   const [items, setItems] = useState<ChecklistItem[]>([]);
@@ -19,20 +39,17 @@ export function ChecklistDetailPage() {
   const [notFound, setNotFound] = useState(false);
   const [banner, setBanner] = useState<string | null>(null);
 
-  const [editingListField, setEditingListField] = useState<"name" | "description" | null>(null);
-  const [listDraft, setListDraft] = useState("");
+  // The checklist's own name and description, as typed; null until the list has loaded.
+  const [listDraft, setListDraft] = useState<{ name: string; description: string } | null>(null);
+  const [savingList, setSavingList] = useState(false);
 
-  const [editingItem, setEditingItem] = useState<ItemEditState>(null);
+  const [editingItem, setEditingItem] = useState<ItemDraft>(null);
 
   const [adding, setAdding] = useState(false);
   const [addingType, setAddingType] = useState<"item" | "topic">("item");
   const [newItemName, setNewItemName] = useState("");
   const [newItemDesc, setNewItemDesc] = useState("");
   const [addError, setAddError] = useState("");
-
-  const [confirmDeleteItem, setConfirmDeleteItem] = useState<number | null>(null);
-
-  const editInputRef = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);
 
   async function load() {
     if (!id) return;
@@ -44,6 +61,9 @@ export function ChecklistDetailPage() {
         return;
       }
       setList(listData);
+      setListDraft(
+        (prev) => prev ?? { name: listData.name, description: listData.description ?? "" },
+      );
       setItems(itemsData);
     } catch {}
     setLoading(false);
@@ -51,40 +71,38 @@ export function ChecklistDetailPage() {
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: load captures id via closure, re-runs when id changes
   useEffect(() => {
+    setListDraft(null);
     load();
   }, [id]);
-  useEffect(() => {
-    if (editingListField || editingItem) editInputRef.current?.focus();
-  }, [editingListField, editingItem]);
 
-  async function saveListName() {
-    if (!list || !listDraft.trim()) return;
-    const res = await api.lists[":id"].name.$patch({
-      param: { id: String(list.id) },
-      json: { name: listDraft.trim() },
-    });
-    if (!res.ok) {
-      setBanner(await getErrorMessage(res as unknown as Response));
-      return;
+  async function saveList() {
+    if (!list || !listDraft) return;
+    const name = listDraft.name.trim();
+    const description = listDraft.description.trim() || null;
+    if (!name) return;
+    const param = { id: String(list.id) };
+    setSavingList(true);
+    try {
+      if (name !== list.name) {
+        const res = await api.lists[":id"].name.$patch({ param, json: { name } });
+        if (!res.ok) {
+          setBanner(await getErrorMessage(res as unknown as Response));
+          return;
+        }
+      }
+      if (description !== list.description) {
+        const res = await api.lists[":id"].description.$patch({ param, json: { description } });
+        if (!res.ok) {
+          setBanner(await getErrorMessage(res as unknown as Response));
+          return;
+        }
+      }
+      setBanner(null);
+      setListDraft({ name, description: description ?? "" });
+      await load();
+    } finally {
+      setSavingList(false);
     }
-    setEditingListField(null);
-    setBanner(null);
-    await load();
-  }
-
-  async function saveListDescription() {
-    if (!list) return;
-    const res = await api.lists[":id"].description.$patch({
-      param: { id: String(list.id) },
-      json: { description: listDraft.trim() || null },
-    });
-    if (!res.ok) {
-      setBanner(await getErrorMessage(res as unknown as Response));
-      return;
-    }
-    setEditingListField(null);
-    setBanner(null);
-    await load();
   }
 
   async function handleAddItem() {
@@ -122,26 +140,27 @@ export function ChecklistDetailPage() {
       setBanner(await getErrorMessage(res as unknown as Response));
       return;
     }
-    setConfirmDeleteItem(null);
+    setEditingItem(null);
     await load();
   }
 
-  async function saveItemEdit() {
+  async function saveItemEdit(item: ChecklistItem) {
     if (!list || !editingItem) return;
-    if (editingItem.field === "name") {
-      if (!editingItem.value.trim()) return;
-      const res = await api.lists[":id"].items[":itemId"].name.$patch({
-        param: { id: String(list.id), itemId: String(editingItem.id) },
-        json: { name: editingItem.value.trim() },
-      });
+    const name = editingItem.name.trim();
+    if (!name) return;
+    const param = { id: String(list.id), itemId: String(item.id) };
+    if (name !== item.name) {
+      const res = await api.lists[":id"].items[":itemId"].name.$patch({ param, json: { name } });
       if (!res.ok) {
         setBanner(await getErrorMessage(res as unknown as Response));
         return;
       }
-    } else {
+    }
+    const description = editingItem.description.trim() || null;
+    if (item.type === "item" && description !== item.description) {
       const res = await api.lists[":id"].items[":itemId"].description.$patch({
-        param: { id: String(list.id), itemId: String(editingItem.id) },
-        json: { description: editingItem.value.trim() || null },
+        param,
+        json: { description },
       });
       if (!res.ok) {
         setBanner(await getErrorMessage(res as unknown as Response));
@@ -179,172 +198,94 @@ export function ChecklistDetailPage() {
 
   if (loading) {
     return (
-      <main className="flex-1 bg-page flex items-center justify-center">
-        <p className="text-gray-600">Loading…</p>
-      </main>
+      <Page title="Edit Checklists" width="narrow" actions={<BackLink />}>
+        <Loading />
+      </Page>
     );
   }
 
-  if (notFound || !list) {
+  if (notFound || !list || !listDraft) {
     return (
-      <main className="flex-1 bg-page flex flex-col items-center justify-center gap-4">
-        <p className="text-gray-600">Checklist not found.</p>
-        <button
-          type="button"
-          onClick={() => navigate("/editor")}
-          className="text-primary-600 hover:text-primary-700 text-sm underline"
-        >
-          Back to Checklists
-        </button>
-      </main>
+      <Page title="Edit Checklists" width="narrow" actions={<BackLink />}>
+        <p className="text-sm text-secondary-500">Checklist not found.</p>
+      </Page>
     );
   }
 
   const sortedItems = [...items].sort((a, b) => a.index - b.index);
+  const listChanged =
+    listDraft.name.trim() !== list.name ||
+    (listDraft.description.trim() || null) !== list.description;
 
   return (
-    <main className="flex-1 bg-page text-gray-900">
-      <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
-        <button
-          type="button"
-          onClick={() => navigate("/editor")}
-          className="text-sm text-gray-600 hover:text-gray-700 transition-colors"
-        >
-          ← Back to Checklists
-        </button>
+    <Page title={list.name} width="narrow" actions={<BackLink />}>
+      {banner && <ErrorBanner message={banner} />}
 
-        {banner && <ErrorBanner message={banner} />}
+      <Card title="Checklist" className="space-y-3">
+        <Field label="Name">
+          <input
+            type="text"
+            value={listDraft.name}
+            onChange={(e) => setListDraft({ ...listDraft, name: e.target.value })}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") saveList();
+            }}
+            className={inputClass}
+          />
+        </Field>
+        <Field label="Description (optional)">
+          <textarea
+            value={listDraft.description}
+            onChange={(e) => setListDraft({ ...listDraft, description: e.target.value })}
+            rows={2}
+            className={`${inputClass} resize-none`}
+          />
+        </Field>
+        <div>
+          <Button
+            onClick={saveList}
+            disabled={savingList || !listChanged || !listDraft.name.trim()}
+          >
+            {savingList ? "Saving…" : "Save"}
+          </Button>
+        </div>
+      </Card>
 
-        {/* List header */}
-        <div className="space-y-2">
-          {editingListField === "name" ? (
-            <div className="flex gap-2">
-              <input
-                ref={editInputRef as React.RefObject<HTMLInputElement>}
-                value={listDraft}
-                onChange={(e) => setListDraft(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") saveListName();
-                  if (e.key === "Escape") setEditingListField(null);
-                }}
-                className="flex-1 bg-gray-100 border border-gray-600 rounded-lg px-3 py-2 text-xl font-bold text-gray-900 focus:outline-none focus:border-primary-500"
-              />
-              <button
-                type="button"
-                onClick={saveListName}
-                className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-on-primary text-sm font-semibold rounded-lg"
-              >
-                Save
-              </button>
-              <button
-                type="button"
-                onClick={() => setEditingListField(null)}
-                className="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-gray-200 text-sm rounded-lg"
-              >
-                ✕
-              </button>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              <h1 className="text-3xl font-bold tracking-tight">{list.name}</h1>
-              <button
-                type="button"
-                title="Rename"
-                onClick={() => {
-                  setEditingListField("name");
-                  setListDraft(list.name);
-                }}
-                className="p-1.5 text-gray-600 hover:text-gray-700 rounded transition-colors"
-              >
-                ✎
-              </button>
-            </div>
-          )}
-
-          {editingListField === "description" ? (
-            <div className="flex gap-2">
-              <textarea
-                ref={editInputRef as React.RefObject<HTMLTextAreaElement>}
-                value={listDraft}
-                onChange={(e) => setListDraft(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Escape") setEditingListField(null);
-                }}
-                rows={2}
-                className="flex-1 bg-gray-100 border border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:border-primary-500 resize-none"
-              />
-              <div className="flex flex-col gap-1">
-                <button
-                  type="button"
-                  onClick={saveListDescription}
-                  className="px-3 py-1.5 bg-primary-600 hover:bg-primary-700 text-on-primary text-xs font-semibold rounded-lg"
-                >
-                  Save
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setEditingListField(null)}
-                  className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-200 text-xs rounded-lg"
-                >
-                  ✕
-                </button>
-              </div>
-            </div>
-          ) : (
-            <button
-              type="button"
+      {/* Items header */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="font-sans text-xs font-bold uppercase tracking-widest text-secondary-400">
+          Items · {items.length}
+        </h2>
+        {!adding && (
+          <div className="flex gap-2">
+            <Button
+              variant="secondary"
               onClick={() => {
-                setEditingListField("description");
-                setListDraft(list.description ?? "");
+                setAdding(true);
+                setAddingType("topic");
+                setBanner(null);
               }}
-              className="text-sm text-gray-600 hover:text-gray-700 transition-colors text-left"
             >
-              {list.description ?? <span className="italic">Add description…</span>}
-            </button>
-          )}
-        </div>
+              Add a topic
+            </Button>
+            <Button
+              onClick={() => {
+                setAdding(true);
+                setAddingType("item");
+                setBanner(null);
+              }}
+            >
+              Add an item
+            </Button>
+          </div>
+        )}
+      </div>
 
-        {/* Items header */}
-        <div className="flex items-center justify-between pt-2 border-t border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">
-            Items <span className="text-gray-600 font-normal text-sm">({items.length})</span>
-          </h2>
-          {!adding && (
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setAdding(true);
-                  setAddingType("topic");
-                  setBanner(null);
-                }}
-                className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-200 text-sm font-semibold rounded-lg transition-colors"
-              >
-                + Add Topic
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setAdding(true);
-                  setAddingType("item");
-                  setBanner(null);
-                }}
-                className="px-3 py-1.5 bg-primary-600 hover:bg-primary-700 text-on-primary text-sm font-semibold rounded-lg transition-colors"
-              >
-                + Add Item
-              </button>
-            </div>
-          )}
-        </div>
-
-        {adding && (
-          <div className="bg-surface rounded-xl border border-gray-300 p-4 space-y-3">
-            <p className="text-xs font-semibold uppercase tracking-widest text-gray-600">
-              {addingType === "topic" ? "New Topic" : "New Item"}
-            </p>
+      {adding && (
+        <Card title={addingType === "topic" ? "New topic" : "New item"} className="space-y-3">
+          <Field label="Name">
             <input
               type="text"
-              placeholder={addingType === "topic" ? "Topic name" : "Item name"}
               value={newItemName}
               onChange={(e) => {
                 setNewItemName(e.target.value);
@@ -354,295 +295,160 @@ export function ChecklistDetailPage() {
                 if (e.key === "Enter") handleAddItem();
                 if (e.key === "Escape") setAdding(false);
               }}
-              className="w-full bg-gray-100 border border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:border-primary-500"
+              className={inputClass}
               // biome-ignore lint/a11y/noAutofocus: intentional — user just opened the add form
               autoFocus
             />
-            {addingType === "item" && (
+          </Field>
+          {addingType === "item" && (
+            <Field label="Description (optional)">
               <textarea
-                placeholder="Description (optional)"
                 value={newItemDesc}
                 onChange={(e) => setNewItemDesc(e.target.value)}
                 rows={2}
-                className="w-full bg-gray-100 border border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:border-primary-500 resize-none"
+                className={`${inputClass} resize-none`}
               />
-            )}
-            {addError && <p className="text-red-400 text-xs">{addError}</p>}
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={handleAddItem}
-                className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-on-primary text-sm font-semibold rounded-lg"
-              >
-                Add
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setAdding(false);
-                  setNewItemName("");
-                  setNewItemDesc("");
-                  setAddError("");
-                }}
-                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-200 text-sm rounded-lg"
-              >
-                Cancel
-              </button>
-            </div>
+            </Field>
+          )}
+          {addError && <p className="text-xs text-red-700">{addError}</p>}
+          <div className="flex gap-2">
+            <Button onClick={handleAddItem}>Add</Button>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setAdding(false);
+                setNewItemName("");
+                setNewItemDesc("");
+                setAddError("");
+              }}
+            >
+              Cancel
+            </Button>
           </div>
-        )}
+        </Card>
+      )}
 
-        {items.length === 0 && !adding && (
-          <p className="text-gray-600 text-sm text-center py-8">No items yet. Add one above.</p>
-        )}
+      {items.length === 0 && !adding && (
+        <p className="text-sm text-secondary-500">No items yet. Add one above.</p>
+      )}
 
-        <div className="space-y-2">
-          {sortedItems.map((item, pos) =>
-            item.type === "topic" ? (
-              <div
-                key={item.id}
-                className="rounded-lg border border-dashed border-gray-600 px-4 py-2.5"
-              >
-                {editingItem?.id === item.id && editingItem.field === "name" ? (
-                  <div className="flex gap-2">
+      <div className="space-y-2">
+        {sortedItems.map((item, pos) => {
+          const topic = item.type === "topic";
+          const editing = editingItem?.id === item.id ? editingItem : null;
+          return (
+            <div
+              key={item.id}
+              className={
+                topic
+                  ? "rounded-lg border border-dashed border-secondary-300 px-4 py-2.5"
+                  : "rounded-xl border border-secondary-200 bg-surface p-4"
+              }
+            >
+              {editing ? (
+                <div className="space-y-3">
+                  <Field label="Name">
                     <input
-                      ref={editInputRef as React.RefObject<HTMLInputElement>}
-                      value={editingItem.value}
-                      onChange={(e) => setEditingItem({ ...editingItem, value: e.target.value })}
+                      type="text"
+                      value={editing.name}
+                      onChange={(e) => setEditingItem({ ...editing, name: e.target.value })}
                       onKeyDown={(e) => {
-                        if (e.key === "Enter") saveItemEdit();
+                        if (e.key === "Enter") saveItemEdit(item);
                         if (e.key === "Escape") setEditingItem(null);
                       }}
-                      className="flex-1 bg-gray-100 border border-gray-600 rounded-lg px-3 py-1.5 text-sm font-semibold text-gray-900 focus:outline-none focus:border-primary-500"
+                      className={inputClass}
+                      // biome-ignore lint/a11y/noAutofocus: intentional — user just opened the edit form
+                      autoFocus
                     />
-                    <button
-                      type="button"
-                      onClick={saveItemEdit}
-                      className="px-3 py-1.5 bg-primary-600 hover:bg-primary-700 text-on-primary text-xs font-semibold rounded-lg"
-                    >
-                      Save
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setEditingItem(null)}
-                      className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-200 text-xs rounded-lg"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex flex-col gap-0.5 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => moveItem(item.id, "up")}
-                        disabled={pos === 0}
-                        className="p-1 text-gray-600 hover:text-gray-700 disabled:opacity-20 disabled:cursor-not-allowed rounded transition-colors leading-none"
-                        aria-label="Move up"
-                      >
-                        ▲
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => moveItem(item.id, "down")}
-                        disabled={pos === sortedItems.length - 1}
-                        className="p-1 text-gray-600 hover:text-gray-700 disabled:opacity-20 disabled:cursor-not-allowed rounded transition-colors leading-none"
-                        aria-label="Move down"
-                      >
-                        ▼
-                      </button>
-                    </div>
-                    <span className="text-xs font-bold uppercase tracking-widest text-gray-600 flex-1">
-                      {item.name}
-                    </span>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <button
-                        type="button"
-                        title="Rename"
-                        onClick={() =>
-                          setEditingItem({ id: item.id, field: "name", value: item.name })
+                  </Field>
+                  {!topic && (
+                    <Field label="Description (optional)">
+                      <textarea
+                        value={editing.description}
+                        onChange={(e) =>
+                          setEditingItem({ ...editing, description: e.target.value })
                         }
-                        className="p-1.5 text-gray-600 hover:text-gray-700 rounded transition-colors"
-                      >
-                        ✎
-                      </button>
-                      <button
-                        type="button"
-                        title="Delete"
-                        onClick={() => setConfirmDeleteItem(item.id)}
-                        className="p-1.5 text-gray-600 hover:text-red-400 rounded transition-colors"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {confirmDeleteItem === item.id && (
-                  <div className="mt-2 pt-2 border-t border-gray-300 flex items-center gap-3">
-                    <span className="text-xs text-gray-600">Delete this topic?</span>
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteItem(item.id)}
-                      className="px-3 py-1 bg-red-700 hover:bg-red-600 text-white text-xs font-semibold rounded-lg"
-                    >
-                      Delete
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setConfirmDeleteItem(null)}
-                      className="px-3 py-1 bg-gray-700 hover:bg-gray-600 text-gray-200 text-xs rounded-lg"
-                    >
+                        onKeyDown={(e) => {
+                          if (e.key === "Escape") setEditingItem(null);
+                        }}
+                        rows={2}
+                        className={`${inputClass} resize-none`}
+                      />
+                    </Field>
+                  )}
+                  <div className="flex flex-wrap gap-2">
+                    <Button onClick={() => saveItemEdit(item)} disabled={!editing.name.trim()}>
+                      Save
+                    </Button>
+                    <Button variant="secondary" onClick={() => setEditingItem(null)}>
                       Cancel
-                    </button>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div key={item.id} className="bg-surface rounded-xl border border-gray-300 p-4">
-                {editingItem?.id === item.id && editingItem.field === "name" ? (
-                  <div className="flex gap-2 mb-1">
-                    <input
-                      ref={editInputRef as React.RefObject<HTMLInputElement>}
-                      value={editingItem.value}
-                      onChange={(e) => setEditingItem({ ...editingItem, value: e.target.value })}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") saveItemEdit();
-                        if (e.key === "Escape") setEditingItem(null);
-                      }}
-                      className="flex-1 bg-gray-100 border border-gray-600 rounded-lg px-3 py-1.5 text-sm text-gray-900 focus:outline-none focus:border-primary-500"
+                    </Button>
+                    <ConfirmButton
+                      label="Delete"
+                      question={
+                        topic
+                          ? `Delete the topic ${item.name}? Its items stay.`
+                          : `Delete ${item.name}? Its open issues go with it.`
+                      }
+                      onConfirm={() => handleDeleteItem(item.id)}
                     />
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <div className="flex shrink-0 flex-col gap-0.5">
                     <button
                       type="button"
-                      onClick={saveItemEdit}
-                      className="px-3 py-1.5 bg-primary-600 hover:bg-primary-700 text-on-primary text-xs font-semibold rounded-lg"
+                      onClick={() => moveItem(item.id, "up")}
+                      disabled={pos === 0}
+                      className={arrowButton}
+                      aria-label="Move up"
                     >
-                      Save
+                      ▲
                     </button>
                     <button
                       type="button"
-                      onClick={() => setEditingItem(null)}
-                      className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-200 text-xs rounded-lg"
+                      onClick={() => moveItem(item.id, "down")}
+                      disabled={pos === sortedItems.length - 1}
+                      className={arrowButton}
+                      aria-label="Move down"
                     >
-                      ✕
+                      ▼
                     </button>
                   </div>
-                ) : (
-                  <div className="flex items-center justify-between gap-2">
-                    {/* Reorder buttons */}
-                    <div className="flex flex-col gap-0.5 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => moveItem(item.id, "up")}
-                        disabled={pos === 0}
-                        className="p-1 text-gray-600 hover:text-gray-700 disabled:opacity-20 disabled:cursor-not-allowed rounded transition-colors leading-none"
-                        aria-label="Move up"
-                      >
-                        ▲
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => moveItem(item.id, "down")}
-                        disabled={pos === sortedItems.length - 1}
-                        className="p-1 text-gray-600 hover:text-gray-700 disabled:opacity-20 disabled:cursor-not-allowed rounded transition-colors leading-none"
-                        aria-label="Move down"
-                      >
-                        ▼
-                      </button>
-                    </div>
-                    <span className="text-sm font-medium text-gray-900 flex-1">{item.name}</span>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <button
-                        type="button"
-                        title="Rename"
-                        onClick={() =>
-                          setEditingItem({ id: item.id, field: "name", value: item.name })
-                        }
-                        className="p-1.5 text-gray-600 hover:text-gray-700 rounded transition-colors"
-                      >
-                        ✎
-                      </button>
-                      <button
-                        type="button"
-                        title="Delete"
-                        onClick={() => setConfirmDeleteItem(item.id)}
-                        className="p-1.5 text-gray-600 hover:text-red-400 rounded transition-colors"
-                      >
-                        ✕
-                      </button>
-                    </div>
+                  <div className="min-w-0 flex-1">
+                    <p
+                      className={
+                        topic
+                          ? "text-xs font-bold uppercase tracking-widest text-secondary-500"
+                          : "text-sm font-medium text-secondary-900"
+                      }
+                    >
+                      {item.name}
+                    </p>
+                    {item.description && (
+                      <p className="mt-0.5 text-xs text-secondary-500">{item.description}</p>
+                    )}
                   </div>
-                )}
-
-                {editingItem?.id === item.id && editingItem.field === "description" ? (
-                  <div className="flex gap-2 mt-2">
-                    <textarea
-                      ref={editInputRef as React.RefObject<HTMLTextAreaElement>}
-                      value={editingItem.value}
-                      onChange={(e) => setEditingItem({ ...editingItem, value: e.target.value })}
-                      onKeyDown={(e) => {
-                        if (e.key === "Escape") setEditingItem(null);
-                      }}
-                      rows={2}
-                      className="flex-1 bg-gray-100 border border-gray-600 rounded-lg px-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:border-primary-500 resize-none"
-                    />
-                    <div className="flex flex-col gap-1">
-                      <button
-                        type="button"
-                        onClick={saveItemEdit}
-                        className="px-3 py-1.5 bg-primary-600 hover:bg-primary-700 text-on-primary text-xs font-semibold rounded-lg"
-                      >
-                        Save
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setEditingItem(null)}
-                        className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-200 text-xs rounded-lg"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
+                  <Button
+                    variant="secondary"
+                    size="sm"
                     onClick={() =>
                       setEditingItem({
                         id: item.id,
-                        field: "description",
-                        value: item.description ?? "",
+                        name: item.name,
+                        description: item.description ?? "",
                       })
                     }
-                    className="text-xs text-gray-600 hover:text-gray-600 transition-colors text-left mt-1 pl-8"
                   >
-                    {item.description ?? <span className="italic">Add description…</span>}
-                  </button>
-                )}
-
-                {confirmDeleteItem === item.id && (
-                  <div className="mt-3 pt-3 border-t border-gray-300 flex items-center gap-3">
-                    <span className="text-xs text-gray-600">Delete this item?</span>
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteItem(item.id)}
-                      className="px-3 py-1 bg-red-700 hover:bg-red-600 text-white text-xs font-semibold rounded-lg"
-                    >
-                      Delete
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setConfirmDeleteItem(null)}
-                      className="px-3 py-1 bg-gray-700 hover:bg-gray-600 text-gray-200 text-xs rounded-lg"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                )}
-              </div>
-            ),
-          )}
-        </div>
+                    Edit
+                  </Button>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
-    </main>
+    </Page>
   );
 }

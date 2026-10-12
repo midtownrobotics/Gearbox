@@ -1,42 +1,26 @@
+import {
+  Badge,
+  Button,
+  Card,
+  Chip,
+  ConfirmButton,
+  Dialog,
+  ErrorBanner,
+  Field,
+  Loading,
+  Page,
+  focusRing,
+  inputClass,
+} from "@g3/ui";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../../shared/api";
 import { getErrorMessage } from "../../shared/api-error";
+import { ElapsedTime, STATE_TONES, voltageColor } from "../../shared/battery-display";
 import { generateBatteryAndStatesPDF } from "../../shared/generate-state-labels";
 import { fetchBatteries } from "../../shared/getters/batteries";
 import type { Battery, BatteryState } from "../../shared/getters/types";
 
 const POLL_INTERVAL_MS = 10_000;
-
-const STATE_META: Record<
-  BatteryState,
-  { label: string; color: string; bg: string; border: string }
-> = {
-  "In Robot": {
-    label: "In Robot",
-    color: "text-red-600",
-    bg: "bg-red-100",
-    border: "border-red-300",
-  },
-  "Next Up": {
-    label: "Next Up",
-    color: "text-emerald-600",
-    bg: "bg-emerald-100",
-    border: "border-emerald-300",
-  },
-  Charging: {
-    label: "Charging",
-    color: "text-blue-600",
-    bg: "bg-blue-100",
-    border: "border-blue-300",
-  },
-  Idle: { label: "Idle", color: "text-gray-600", bg: "bg-gray-100", border: "border-gray-300" },
-  Broken: {
-    label: "Broken",
-    color: "text-yellow-600",
-    bg: "bg-yellow-100",
-    border: "border-yellow-300",
-  },
-};
 
 const STATE_ORDER: Record<BatteryState, number> = {
   "In Robot": 0,
@@ -48,40 +32,15 @@ const STATE_ORDER: Record<BatteryState, number> = {
 
 const STATES: BatteryState[] = ["Charging", "Next Up", "In Robot", "Idle", "Broken"];
 
-const STATE_BTN: Record<BatteryState, string> = {
-  "In Robot": "bg-red-600 hover:bg-red-700 text-white",
-  "Next Up": "bg-emerald-600 hover:bg-emerald-700 text-white",
-  Charging: "bg-blue-600 hover:bg-blue-700 text-white",
-  Idle: "bg-gray-600 hover:bg-gray-700 text-white",
-  Broken: "bg-yellow-600 hover:bg-yellow-700 text-white",
-};
+const STATE_LABELS = [
+  { code: "ST-IDLE", label: "Idle" },
+  { code: "ST-CHAR", label: "Charging" },
+  { code: "ST-NXUP", label: "Next Up" },
+  { code: "ST-BRKN", label: "Broken" },
+  { code: "ST-ROBT", label: "In Robot" },
+];
 
-function voltageColor(v: number): string {
-  if (v >= 12.5) return "text-green-400";
-  if (v >= 12.0) return "text-yellow-400";
-  return "text-red-400";
-}
-
-function ElapsedTime({ sinceMs }: { sinceMs: number }) {
-  const [text, setText] = useState(() => formatElapsed(sinceMs));
-  useEffect(() => {
-    const interval = setInterval(() => setText(formatElapsed(sinceMs)), 250);
-    return () => clearInterval(interval);
-  }, [sinceMs]);
-  return <>{text}</>;
-}
-
-function formatElapsed(sinceMs: number): string {
-  const ms = Date.now() - sinceMs;
-  const totalSeconds = Math.floor(ms / 1000);
-  const totalMinutes = Math.floor(totalSeconds / 60);
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-  const seconds = totalSeconds % 60;
-  if (hours > 0) return `${hours}h ${minutes}m`;
-  if (minutes > 0) return `${minutes}m ${seconds}s`;
-  return `${seconds}s`;
-}
+const textButton = `rounded text-xs font-semibold text-secondary-500 underline hover:text-secondary-900 ${focusRing}`;
 
 function sortBatteries(batteries: Battery[]): Battery[] {
   return [...batteries].sort((a, b) => {
@@ -91,17 +50,40 @@ function sortBatteries(batteries: Battery[]): Battery[] {
   });
 }
 
+/** One battery at the top of the page: the one in the robot, the next one, the longest charging. */
+function SummaryTile({
+  label,
+  battery,
+  voltage = false,
+}: { label: string; battery: Battery; voltage?: boolean }) {
+  return (
+    <div className={`rounded-xl border px-4 py-3 ${STATE_TONES[battery.state]}`}>
+      <p className="mb-1 text-xs font-bold uppercase tracking-widest">{label}</p>
+      <p className="text-base font-bold text-secondary-900">{battery.name}</p>
+      <p className="text-xs text-secondary-600">
+        <ElapsedTime sinceMs={battery.stateSince} />
+      </p>
+      {voltage && battery.voltage != null && (
+        <p className={`mt-0.5 font-mono text-xs ${voltageColor(battery.voltage)}`}>
+          {battery.voltage.toFixed(2)}V
+        </p>
+      )}
+    </div>
+  );
+}
+
 export function BatteriesPage() {
   const [batteries, setBatteries] = useState<Battery[]>([]);
   const [loading, setLoading] = useState(true);
   const [banner, setBanner] = useState<string | null>(null);
+  // Something to check that isn't an error: a voltage outside the range for a match.
+  const [warning, setWarning] = useState<string | null>(null);
 
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState("");
   const [addError, setAddError] = useState("");
 
   const [updatingIds, setUpdatingIds] = useState<Set<number>>(new Set());
-  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const [editingVoltageId, setEditingVoltageId] = useState<number | null>(null);
   const [voltageInput, setVoltageInput] = useState("");
 
@@ -166,7 +148,6 @@ export function BatteriesPage() {
 
   async function handleDeleteBattery(id: number) {
     setBatteries((prev) => prev.filter((b) => b.id !== id));
-    setConfirmDeleteId(null);
     const res = await api.batteries[":id"].$delete({ param: { id: String(id) } });
     if (!res.ok) {
       setBanner(await getErrorMessage(res as unknown as Response));
@@ -224,13 +205,12 @@ export function BatteriesPage() {
       return;
     }
     const voltage = voltageInput.trim() === "" ? null : v;
-    if (voltage !== null && (voltage < 12.8 || voltage > 14)) {
-      setBanner(
-        "Warning: voltage should be between 12.8V and 14V for a battery going in the robot.",
-      );
-    } else {
-      setBanner(null);
-    }
+    setBanner(null);
+    setWarning(
+      voltage !== null && (voltage < 12.8 || voltage > 14)
+        ? "Warning: voltage should be between 12.8V and 14V for a battery going in the robot."
+        : null,
+    );
     setEditingVoltageId(null);
     setVoltageInput("");
     setBatteries((prev) => prev.map((b) => (b.id === battery.id ? { ...b, voltage } : b)));
@@ -259,15 +239,19 @@ export function BatteriesPage() {
     }
   }
 
+  function closeLabels() {
+    setShowLabelsModal(false);
+    setSelectedForLabels(new Set());
+    setSelectedStates(new Set());
+  }
+
   async function handleGenerateLabels() {
     const batteriesToPrint = batteries.filter((b) => selectedForLabels.has(b.id));
     const statesToPrint = Array.from(selectedStates);
     setGeneratingLabels(true);
     try {
       await generateBatteryAndStatesPDF(batteriesToPrint, statesToPrint);
-      setShowLabelsModal(false);
-      setSelectedForLabels(new Set());
-      setSelectedStates(new Set());
+      closeLabels();
     } catch (err) {
       setBanner(err instanceof Error ? err.message : "Failed to generate labels");
     } finally {
@@ -297,9 +281,9 @@ export function BatteriesPage() {
 
   if (loading) {
     return (
-      <main className="flex-1 bg-page flex items-center justify-center">
-        <p className="text-gray-600">Loading…</p>
-      </main>
+      <Page title="Batteries" width="narrow">
+        <Loading />
+      </Page>
     );
   }
 
@@ -311,95 +295,49 @@ export function BatteriesPage() {
     .sort((a, b) => a.stateSince - b.stateSince)[0];
 
   return (
-    <main className="flex-1 bg-page text-gray-900">
-      <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
-        <div className="flex items-center justify-between gap-3 border-b border-gray-200 pb-4">
-          <h1 className="text-3xl font-bold tracking-tight">Batteries</h1>
+    <Page
+      title="Batteries"
+      width="narrow"
+      actions={
+        !adding && (
           <div className="flex gap-2">
-            {!adding && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => setShowLabelsModal(true)}
-                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors"
-                >
-                  📄 Print Labels
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAdding(true);
-                    setBanner(null);
-                  }}
-                  className="px-3 py-1.5 bg-primary-600 hover:bg-primary-700 text-on-primary text-sm font-semibold rounded-lg transition-colors"
-                >
-                  + Add Battery
-                </button>
-              </>
-            )}
+            <Button variant="secondary" onClick={() => setShowLabelsModal(true)}>
+              Print labels
+            </Button>
+            <Button
+              onClick={() => {
+                setAdding(true);
+                setBanner(null);
+              }}
+            >
+              Add a battery
+            </Button>
           </div>
+        )
+      }
+    >
+      {banner && <ErrorBanner message={banner} />}
+      {warning && (
+        <p className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
+          {warning}
+        </p>
+      )}
+
+      {/* Summary strip */}
+      {(inRobot || nextUp || longestCharging) && (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          {inRobot && <SummaryTile label="In Robot" battery={inRobot} voltage />}
+          {nextUp && <SummaryTile label="Next Up" battery={nextUp} voltage />}
+          {longestCharging && <SummaryTile label="Longest Charging" battery={longestCharging} />}
         </div>
+      )}
 
-        {banner && (
-          <p className="text-amber-800 text-sm bg-amber-100 border border-amber-300 rounded-lg px-4 py-2">
-            {banner}
-          </p>
-        )}
-
-        {/* Summary strip */}
-        {(inRobot || nextUp || longestCharging) && (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            {inRobot && (
-              <div className="bg-red-900/30 border border-red-700 rounded-xl px-4 py-3">
-                <p className="text-xs font-bold uppercase tracking-widest text-red-400 mb-1">
-                  In Robot
-                </p>
-                <p className="text-base font-bold text-gray-900">{inRobot.name}</p>
-                <p className="text-xs text-gray-600">
-                  <ElapsedTime sinceMs={inRobot.stateSince} />
-                </p>
-                {inRobot.voltage != null && (
-                  <p className={`text-xs font-mono mt-0.5 ${voltageColor(inRobot.voltage)}`}>
-                    {inRobot.voltage.toFixed(2)}V
-                  </p>
-                )}
-              </div>
-            )}
-            {nextUp && (
-              <div className="bg-emerald-900/30 border border-emerald-600 rounded-xl px-4 py-3">
-                <p className="text-xs font-bold uppercase tracking-widest text-emerald-400 mb-1">
-                  Next Up
-                </p>
-                <p className="text-base font-bold text-gray-900">{nextUp.name}</p>
-                <p className="text-xs text-gray-600">
-                  <ElapsedTime sinceMs={nextUp.stateSince} />
-                </p>
-                {nextUp.voltage != null && (
-                  <p className={`text-xs font-mono mt-0.5 ${voltageColor(nextUp.voltage)}`}>
-                    {nextUp.voltage.toFixed(2)}V
-                  </p>
-                )}
-              </div>
-            )}
-            {longestCharging && (
-              <div className="bg-blue-900/30 border border-blue-700 rounded-xl px-4 py-3">
-                <p className="text-xs font-bold uppercase tracking-widest text-blue-400 mb-1">
-                  Longest Charging
-                </p>
-                <p className="text-base font-bold text-gray-900">{longestCharging.name}</p>
-                <p className="text-xs text-gray-600">
-                  <ElapsedTime sinceMs={longestCharging.stateSince} />
-                </p>
-              </div>
-            )}
-          </div>
-        )}
-
-        {adding && (
-          <div className="bg-surface rounded-xl border border-gray-200 p-4 space-y-3">
+      {adding && (
+        <Card title="New battery" className="space-y-3">
+          <Field label="Name">
             <input
               type="text"
-              placeholder="Battery name (e.g. A1)"
+              placeholder="e.g. A1"
               value={newName}
               onChange={(e) => {
                 setNewName(e.target.value);
@@ -409,294 +347,224 @@ export function BatteriesPage() {
                 if (e.key === "Enter") handleAddBattery();
                 if (e.key === "Escape") setAdding(false);
               }}
-              className="w-full bg-gray-100 border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:border-primary-500"
+              className={inputClass}
               // biome-ignore lint/a11y/noAutofocus: intentional
               autoFocus
             />
-            {addError && <p className="text-red-600 text-xs">{addError}</p>}
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={handleAddBattery}
-                className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-on-primary text-sm font-semibold rounded-lg"
-              >
-                Add
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setAdding(false);
-                  setNewName("");
-                  setAddError("");
-                }}
-                className="px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-900 text-sm rounded-lg"
-              >
-                Cancel
-              </button>
-            </div>
+          </Field>
+          {addError && <p className="text-xs text-red-700">{addError}</p>}
+          <div className="flex gap-2">
+            <Button onClick={handleAddBattery}>Add</Button>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setAdding(false);
+                setNewName("");
+                setAddError("");
+              }}
+            >
+              Cancel
+            </Button>
           </div>
-        )}
+        </Card>
+      )}
 
-        {batteries.length === 0 && !adding && (
-          <p className="text-gray-500 text-sm text-center py-12">
-            No batteries yet. Add one above.
-          </p>
-        )}
+      {batteries.length === 0 && !adding && (
+        <p className="text-sm text-secondary-500">No batteries yet. Add one above.</p>
+      )}
 
-        <div className="space-y-3">
-          {sorted.map((battery) => {
-            const meta = STATE_META[battery.state];
-            return (
-              <div
-                key={battery.id}
-                className={`rounded-xl border ${meta.border} ${meta.bg} p-4 space-y-4`}
-              >
-                {/* Header */}
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-lg font-bold text-gray-900">{battery.name}</p>
-                    <p className={`text-sm font-semibold ${meta.color}`}>
-                      {battery.state}
-                      <span className="text-gray-500 font-normal ml-2">
-                        for <ElapsedTime sinceMs={battery.stateSince} />
-                      </span>
-                    </p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className="text-xs text-gray-600">
-                        Used in robot{" "}
-                        <span className="font-semibold text-gray-700">{battery.useCount}×</span>
-                      </span>
-                      {battery.useCount > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => handleResetUses(battery)}
-                          className="text-xs text-gray-600 hover:text-red-400 transition-colors underline"
-                        >
-                          reset
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3 shrink-0">
-                    {/* Voltage — shown for In Robot and Next Up */}
-                    {(battery.state === "In Robot" || battery.state === "Next Up") &&
-                      (editingVoltageId === battery.id ? (
-                        <div className="flex items-center gap-1.5">
-                          <input
-                            ref={voltageInputRef}
-                            type="number"
-                            step="0.01"
-                            placeholder="12.60"
-                            value={voltageInput}
-                            onChange={(e) => setVoltageInput(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") handleSetVoltage(battery);
-                              if (e.key === "Escape") {
-                                setEditingVoltageId(null);
-                                setVoltageInput("");
-                              }
-                            }}
-                            className="w-20 bg-gray-100 border border-gray-300 rounded px-2 py-1 text-sm text-gray-900 focus:outline-none focus:border-primary-500 [appearance:textfield]"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => handleSetVoltage(battery)}
-                            className="px-2 py-1 bg-primary-600 hover:bg-primary-700 text-on-primary text-xs font-semibold rounded"
-                          >
-                            Set
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setEditingVoltageId(null);
-                              setVoltageInput("");
-                            }}
-                            className="text-gray-500 hover:text-gray-300 text-xs px-1"
-                          >
-                            ✕
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditingVoltageId(battery.id);
-                            setVoltageInput(battery.voltage != null ? String(battery.voltage) : "");
-                          }}
-                          className="text-sm font-mono tabular-nums"
-                          title="Set voltage"
-                        >
-                          {battery.voltage != null ? (
-                            <span className={voltageColor(battery.voltage)}>
-                              {battery.voltage.toFixed(2)}V
-                            </span>
-                          ) : (
-                            <span className="text-gray-500 text-xs">Set V</span>
-                          )}
-                        </button>
-                      ))}
-
-                    {/* Delete */}
-                    {confirmDeleteId === battery.id ? (
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteBattery(battery.id)}
-                          className="px-2 py-1 bg-red-700 hover:bg-red-600 text-white text-xs font-semibold rounded"
-                        >
-                          Delete
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setConfirmDeleteId(null)}
-                          className="px-2 py-1 bg-gray-700 hover:bg-gray-600 text-gray-200 text-xs rounded"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    ) : (
+      <div className="space-y-3">
+        {sorted.map((battery) => {
+          const isUpdating = updatingIds.has(battery.id);
+          const tracksVoltage = battery.state === "In Robot" || battery.state === "Next Up";
+          return (
+            <Card key={battery.id} className="space-y-4">
+              {/* Header */}
+              <div className="flex flex-wrap items-start gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-lg font-bold text-secondary-900">{battery.name}</p>
+                  <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-secondary-500">
+                    <Badge colors={STATE_TONES[battery.state]}>{battery.state}</Badge>
+                    <span>
+                      for <ElapsedTime sinceMs={battery.stateSince} />
+                    </span>
+                  </p>
+                  <p className="mt-1 flex items-center gap-2 text-xs text-secondary-500">
+                    <span>
+                      Used in robot{" "}
+                      <span className="font-semibold text-secondary-700">{battery.useCount}×</span>
+                    </span>
+                    {battery.useCount > 0 && (
                       <button
                         type="button"
-                        onClick={() => setConfirmDeleteId(battery.id)}
-                        className="p-1.5 text-gray-600 hover:text-red-400 rounded transition-colors"
-                        title="Delete battery"
+                        onClick={() => handleResetUses(battery)}
+                        className={textButton}
                       >
-                        ✕
+                        Reset
                       </button>
                     )}
-                  </div>
+                  </p>
                 </div>
 
-                {/* State buttons */}
-                <div className="flex flex-wrap gap-2">
-                  {STATES.map((s) => {
-                    const isUpdating = updatingIds.has(battery.id);
-                    return (
-                      <button
-                        key={s}
-                        type="button"
-                        onClick={() => handleSetState(battery, s)}
-                        disabled={isUpdating}
-                        className={`px-3 py-1.5 text-sm font-semibold rounded-lg transition-colors ${
-                          isUpdating
-                            ? "opacity-40 cursor-not-allowed bg-gray-100 text-gray-500"
-                            : battery.state === s
-                              ? STATE_BTN[s]
-                              : "bg-gray-100 hover:bg-gray-200 text-gray-600 hover:text-gray-900"
-                        }`}
-                      >
-                        {s}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Labels Modal (Batteries + States) */}
-        {showLabelsModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-surface rounded-lg shadow-xl max-w-md w-full p-6 space-y-4">
-              <h2 className="text-xl font-bold text-gray-900">Print Labels</h2>
-              <p className="text-sm text-gray-600">
-                Select batteries and/or states to print on a single PDF.
-              </p>
-
-              {/* Batteries Section */}
-              <div>
-                <h3 className="text-sm font-semibold mb-2">Batteries</h3>
-                <div className="space-y-2 max-h-48 overflow-y-auto">
-                  {batteries.length === 0 ? (
-                    <p className="text-sm text-gray-500">No batteries available</p>
-                  ) : (
-                    batteries.map((battery) => (
-                      <label
-                        key={battery.id}
-                        className="flex items-center gap-3 cursor-pointer p-2 hover:bg-gray-100 rounded"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selectedForLabels.has(battery.id)}
-                          onChange={() => toggleBatterySelection(battery.id)}
-                          className="w-4 h-4"
-                        />
-                        <div className="flex-1">
-                          <p className="text-sm font-medium">{battery.name}</p>
-                          <p className="text-xs text-gray-500">
-                            BAT-{String(battery.id).padStart(4, "0")}
-                          </p>
-                        </div>
-                      </label>
-                    ))
-                  )}
-                </div>
-              </div>
-
-              {/* States Section */}
-              <div>
-                <h3 className="text-sm font-semibold mb-2">States</h3>
-                <div className="space-y-2">
-                  {[
-                    { code: "ST-IDLE", label: "Idle" },
-                    { code: "ST-CHAR", label: "Charging" },
-                    { code: "ST-NXUP", label: "Next Up" },
-                    { code: "ST-BRKN", label: "Broken" },
-                    { code: "ST-ROBT", label: "In Robot" },
-                  ].map((state) => (
-                    <label
-                      key={state.code}
-                      className="flex items-center gap-3 cursor-pointer p-2 hover:bg-gray-100 rounded"
-                    >
+                {/* Voltage — shown for In Robot and Next Up */}
+                {tracksVoltage &&
+                  (editingVoltageId === battery.id ? (
+                    <div className="flex items-center gap-2">
                       <input
-                        type="checkbox"
-                        checked={selectedStates.has(state.code)}
-                        onChange={() => toggleStateSelection(state.code)}
-                        className="w-4 h-4"
+                        ref={voltageInputRef}
+                        type="number"
+                        step="0.01"
+                        placeholder="12.60"
+                        aria-label="Voltage"
+                        value={voltageInput}
+                        onChange={(e) => setVoltageInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") handleSetVoltage(battery);
+                          if (e.key === "Escape") {
+                            setEditingVoltageId(null);
+                            setVoltageInput("");
+                          }
+                        }}
+                        className={`${inputClass} !w-24 [appearance:textfield]`}
                       />
-                      <div>
-                        <p className="text-sm font-medium">{state.label}</p>
-                        <p className="text-xs text-gray-500">{state.code}</p>
-                      </div>
-                    </label>
+                      <Button onClick={() => handleSetVoltage(battery)}>Set</Button>
+                      <Button
+                        variant="secondary"
+                        onClick={() => {
+                          setEditingVoltageId(null);
+                          setVoltageInput("");
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => {
+                        setEditingVoltageId(battery.id);
+                        setVoltageInput(battery.voltage != null ? String(battery.voltage) : "");
+                      }}
+                      title="Set voltage"
+                    >
+                      {battery.voltage != null ? (
+                        <span className={`font-mono tabular-nums ${voltageColor(battery.voltage)}`}>
+                          {battery.voltage.toFixed(2)}V
+                        </span>
+                      ) : (
+                        "Set voltage"
+                      )}
+                    </Button>
                   ))}
-                </div>
+
+                <ConfirmButton
+                  size="sm"
+                  label="Delete"
+                  question={`Delete ${battery.name}? This can't be undone.`}
+                  onConfirm={() => handleDeleteBattery(battery.id)}
+                />
               </div>
 
-              {(selectedForLabels.size > 0 || selectedStates.size > 0) && (
-                <p className="text-xs text-gray-600">
-                  {selectedForLabels.size} batteries, {selectedStates.size} states
-                </p>
+              {/* State buttons */}
+              <div className="flex flex-wrap gap-2">
+                {STATES.map((s) => (
+                  <Chip
+                    key={s}
+                    selected={battery.state === s}
+                    disabled={isUpdating}
+                    onClick={() => handleSetState(battery, s)}
+                    className="!py-1.5 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {s}
+                  </Chip>
+                ))}
+              </div>
+            </Card>
+          );
+        })}
+      </div>
+
+      {/* Labels pop-up (batteries and states) */}
+      {showLabelsModal && (
+        <Dialog title="Print labels" onClose={closeLabels}>
+          <p className="text-sm text-secondary-500">
+            Select batteries and/or states to print on a single PDF.
+          </p>
+
+          <div>
+            <h3 className="mb-2 font-sans text-sm font-semibold text-secondary-900">Batteries</h3>
+            <div className="max-h-48 space-y-1 overflow-y-auto">
+              {batteries.length === 0 ? (
+                <p className="text-sm text-secondary-500">No batteries available</p>
+              ) : (
+                batteries.map((battery) => (
+                  <label
+                    key={battery.id}
+                    className="flex cursor-pointer items-center gap-3 rounded-lg p-2 hover:bg-secondary-50"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedForLabels.has(battery.id)}
+                      onChange={() => toggleBatterySelection(battery.id)}
+                      className="h-4 w-4"
+                    />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-secondary-900">{battery.name}</p>
+                      <p className="text-xs text-secondary-500">
+                        BAT-{String(battery.id).padStart(4, "0")}
+                      </p>
+                    </div>
+                  </label>
+                ))
               )}
-
-              <div className="flex gap-3 justify-end pt-4 border-t border-gray-700">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowLabelsModal(false);
-                    setSelectedForLabels(new Set());
-                    setSelectedStates(new Set());
-                  }}
-                  className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white text-sm font-medium rounded-lg transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleGenerateLabels}
-                  disabled={
-                    (selectedForLabels.size === 0 && selectedStates.size === 0) || generatingLabels
-                  }
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
-                >
-                  {generatingLabels ? "Generating…" : "Generate PDF"}
-                </button>
-              </div>
             </div>
           </div>
-        )}
-      </div>
-    </main>
+
+          <div>
+            <h3 className="mb-2 font-sans text-sm font-semibold text-secondary-900">States</h3>
+            <div className="space-y-1">
+              {STATE_LABELS.map((state) => (
+                <label
+                  key={state.code}
+                  className="flex cursor-pointer items-center gap-3 rounded-lg p-2 hover:bg-secondary-50"
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedStates.has(state.code)}
+                    onChange={() => toggleStateSelection(state.code)}
+                    className="h-4 w-4"
+                  />
+                  <div>
+                    <p className="text-sm font-medium text-secondary-900">{state.label}</p>
+                    <p className="text-xs text-secondary-500">{state.code}</p>
+                  </div>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {(selectedForLabels.size > 0 || selectedStates.size > 0) && (
+            <p className="text-xs text-secondary-500">
+              {selectedForLabels.size} batteries, {selectedStates.size} states
+            </p>
+          )}
+
+          <div className="flex justify-end gap-2 border-t border-secondary-200 pt-4">
+            <Button variant="secondary" onClick={closeLabels}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleGenerateLabels}
+              disabled={
+                (selectedForLabels.size === 0 && selectedStates.size === 0) || generatingLabels
+              }
+            >
+              {generatingLabels ? "Generating…" : "Generate PDF"}
+            </Button>
+          </div>
+        </Dialog>
+      )}
+    </Page>
   );
 }

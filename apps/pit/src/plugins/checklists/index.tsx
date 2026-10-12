@@ -1,51 +1,39 @@
-import { appUrl } from "@g3/site-config";
-import { useIsOnline } from "@g3/ui";
-import { useNavigate } from "react-router-dom";
+import { Loading, Page, buttonClass, useIsOnline } from "@g3/ui";
 import type { Plugin } from "../../shared/plugin-types";
-import { useAuth } from "../../shared/use-auth";
+import { signInUrl, useAuth } from "../../shared/use-auth";
 import { ChecklistDetailPage } from "./checklist-detail-page";
 import { ChecklistsPage } from "./checklists-page";
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const isOnline = useIsOnline();
-  const navigate = useNavigate();
 
   if (!isOnline) {
     return (
-      <main className="flex-1 bg-page flex items-center justify-center">
-        <p className="text-gray-400">You must be online to edit checklists.</p>
-      </main>
+      <Page title="Edit Checklists" width="narrow">
+        <p className="text-sm text-secondary-500">You must be online to edit checklists.</p>
+      </Page>
     );
   }
 
   if (loading) {
     return (
-      <main className="flex-1 bg-page flex items-center justify-center">
-        <p className="text-gray-400">Loading…</p>
-      </main>
+      <Page title="Edit Checklists" width="narrow">
+        <Loading />
+      </Page>
     );
   }
 
   if (!user) {
-    const loginUrl = `${appUrl("id")}/login?redirect=${encodeURIComponent(window.location.href)}`;
     return (
-      <main className="flex-1 bg-page flex flex-col items-center justify-center gap-4">
-        <p className="text-gray-900 text-lg font-semibold">Sign in to edit checklists</p>
-        <a
-          href={loginUrl}
-          className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-on-primary text-sm font-semibold rounded-lg transition-colors"
-        >
-          Sign in →
-        </a>
-        <button
-          type="button"
-          onClick={() => navigate("/checklists")}
-          className="text-sm text-gray-500 hover:text-gray-300 transition-colors"
-        >
-          ← Back to Checklists
-        </button>
-      </main>
+      <Page title="Edit Checklists" width="narrow">
+        <p className="text-sm text-secondary-500">Sign in to edit checklists.</p>
+        <div>
+          <a href={signInUrl()} className={buttonClass()}>
+            Sign in
+          </a>
+        </div>
+      </Page>
     );
   }
 

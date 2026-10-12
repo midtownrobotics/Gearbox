@@ -1,3 +1,4 @@
+import { Badge, Button, ErrorBanner, Loading, Page, focusRing, tones } from "@g3/ui";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { archiveTitle, fetchArchive, fetchArchives } from "../../shared/getters/archives";
@@ -10,52 +11,42 @@ import type {
   ChecklistArchiveDetail,
 } from "../../shared/getters/types";
 
-// Logs: every archive of the checklists ("Archive and Reset" on the Checklists page), newest
+// Logs: every archive of the checklists ("Archive and reset" on the Checklists page), newest
 // first. A panel opens to everything that was in the checklists then, in one list.
 
 const whenFormat = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
 
 // Fixed colors because they mean something: red for a new problem, amber for one still waiting,
 // green for one that's done.
-const STATUS: Record<ArchivedIssueStatus, { label: string; className: string; icon: string }> = {
-  new: {
-    label: "New",
-    className: "bg-red-100 text-red-800",
-    icon: "M12 8v5M12 16.5v.5",
-  },
-  open: {
-    label: "Still Open",
-    className: "bg-amber-100 text-amber-800",
-    icon: "M12 7.5V12l3 2",
-  },
-  resolved: {
-    label: "Resolved",
-    className: "bg-green-100 text-green-800",
-    icon: "M8 12.5l2.5 2.5L16 9.5",
-  },
+const STATUS: Record<ArchivedIssueStatus, { label: string; colors: string; icon: string }> = {
+  new: { label: "New", colors: tones.danger, icon: "M12 8v5M12 16.5v.5" },
+  open: { label: "Still Open", colors: tones.warning, icon: "M12 7.5V12l3 2" },
+  resolved: { label: "Resolved", colors: tones.success, icon: "M8 12.5l2.5 2.5L16 9.5" },
 };
 
 function StatusBadge({ status }: { status: ArchivedIssueStatus }) {
-  const { label, className, icon } = STATUS[status];
+  const { label, colors, icon } = STATUS[status];
   return (
-    <span
-      className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full py-0.5 pl-1 pr-2 text-xs font-semibold ${className}`}
+    <Badge
+      colors={colors}
+      icon={
+        <svg
+          className="h-3.5 w-3.5"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <circle cx="12" cy="12" r="9" />
+          <path d={icon} />
+        </svg>
+      }
     >
-      <svg
-        className="h-4 w-4"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        aria-hidden="true"
-      >
-        <circle cx="12" cy="12" r="9" />
-        <path d={icon} />
-      </svg>
       {label}
-    </span>
+    </Badge>
   );
 }
 
@@ -67,7 +58,7 @@ function CheckMark({ checked, small }: { checked: boolean; small?: boolean }) {
       aria-label={checked ? "Checked" : "Not checked"}
       className={`flex shrink-0 items-center justify-center border-2 ${
         small ? "mt-0.5 h-4 w-4 rounded" : "h-5 w-5 rounded-md"
-      } ${checked ? "border-primary-600 bg-primary-600" : "border-gray-400"}`}
+      } ${checked ? "border-primary-500 bg-primary-500" : "border-secondary-400"}`}
     >
       {checked && (
         <svg
@@ -88,7 +79,7 @@ function IssueRow({ issue }: { issue: ArchivedIssue }) {
   return (
     <li className="flex items-start gap-2">
       <CheckMark checked={issue.status === "resolved"} small />
-      <span className="min-w-0 flex-1 text-sm leading-snug text-gray-700">{issue.text}</span>
+      <span className="min-w-0 flex-1 text-sm leading-snug text-secondary-700">{issue.text}</span>
       <StatusBadge status={issue.status} />
     </li>
   );
@@ -97,7 +88,7 @@ function IssueRow({ issue }: { issue: ArchivedIssue }) {
 function ItemRow({ item }: { item: ArchivedItem }) {
   if (item.type === "topic") {
     return (
-      <li className="px-4 pb-1 pt-3 text-xs font-bold uppercase tracking-widest text-gray-600">
+      <li className="px-4 pb-1 pt-3 text-xs font-bold uppercase tracking-widest text-secondary-500">
         {item.name}
       </li>
     );
@@ -106,7 +97,7 @@ function ItemRow({ item }: { item: ArchivedItem }) {
     <li className="px-4 py-2">
       <div className="flex items-center gap-3">
         <CheckMark checked={item.checked} />
-        <span className="min-w-0 text-sm font-medium text-gray-900">{item.name}</span>
+        <span className="min-w-0 text-sm font-medium text-secondary-900">{item.name}</span>
       </div>
       {item.issues.length > 0 && (
         <ul className="ml-8 mt-1.5 space-y-1.5">
@@ -125,20 +116,18 @@ function ListSection({ list }: { list: ArchivedList }) {
   const complete = items.length > 0 && done === items.length;
   return (
     <section>
-      <div className="flex items-center justify-between gap-3 border-b border-gray-200 bg-inset px-4 py-2">
-        <h3 className="min-w-0 truncate text-base font-semibold text-gray-900">{list.name}</h3>
-        <span
-          className={`shrink-0 rounded-full px-2 py-0.5 text-xs ${
-            complete ? "bg-green-100 text-green-800" : "bg-gray-200 text-gray-700"
-          }`}
-        >
+      <div className="flex items-center justify-between gap-3 border-b border-secondary-200 bg-inset px-4 py-2">
+        <h3 className="min-w-0 truncate font-sans text-base font-semibold text-secondary-900">
+          {list.name}
+        </h3>
+        <Badge colors={complete ? tones.success : tones.neutral}>
           {done}/{items.length}
-        </span>
+        </Badge>
       </div>
       {list.items.length === 0 ? (
-        <p className="px-4 py-2 text-sm text-gray-600">No items.</p>
+        <p className="px-4 py-2 text-sm text-secondary-500">No items.</p>
       ) : (
-        <ul className="divide-y divide-gray-100 py-1">
+        <ul className="divide-y divide-secondary-100 py-1">
           {list.items.map((item) => (
             <ItemRow key={item.id} item={item} />
           ))}
@@ -167,15 +156,15 @@ function ArchivePanel({ archive }: { archive: ChecklistArchive }) {
   }, [open, detail, archive.id]);
 
   return (
-    <div className="overflow-hidden rounded-xl border border-gray-300 bg-surface">
+    <div className="overflow-hidden rounded-xl border border-secondary-200 bg-surface">
       <button
         type="button"
         onClick={() => setOpen((was) => !was)}
         aria-expanded={open}
-        className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-gray-100"
+        className={`flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-secondary-50 ${focusRing}`}
       >
         <svg
-          className={`h-4 w-4 shrink-0 text-gray-600 transition-transform ${open ? "rotate-90" : ""}`}
+          className={`h-4 w-4 shrink-0 text-secondary-500 transition-transform ${open ? "rotate-90" : ""}`}
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
@@ -187,25 +176,25 @@ function ArchivePanel({ archive }: { archive: ChecklistArchive }) {
           <path d="M9 6l6 6-6 6" />
         </svg>
         <span className="min-w-0">
-          <span className="block text-base font-semibold text-gray-900">
+          <span className="block text-base font-semibold text-secondary-900">
             {archiveTitle(archive)}
           </span>
-          <span className="mt-0.5 block text-xs text-gray-600">
+          <span className="mt-0.5 block text-xs text-secondary-500">
             {whenFormat.format(archive.archivedAt * 1000)} · Archived by {archive.archivedByName}
           </span>
         </span>
       </button>
 
       {open && (
-        <div className="border-t border-gray-200">
+        <div className="border-t border-secondary-200">
           {failed ? (
-            <p className="px-4 py-3 text-sm text-red-600">
+            <p className="px-4 py-3 text-sm text-red-700">
               Couldn't load this archive. Close it and open it again to retry.
             </p>
           ) : !detail ? (
-            <p className="px-4 py-3 text-sm text-gray-600">Loading…</p>
+            <p className="px-4 py-3 text-sm text-secondary-400">Loading…</p>
           ) : detail.snapshot.lists.length === 0 ? (
-            <p className="px-4 py-3 text-sm text-gray-600">There were no checklists.</p>
+            <p className="px-4 py-3 text-sm text-secondary-500">There were no checklists.</p>
           ) : (
             detail.snapshot.lists.map((list) => <ListSection key={list.id} list={list} />)
           )}
@@ -250,52 +239,41 @@ export function LogsPage() {
 
   if (loading) {
     return (
-      <main className="flex-1 bg-page flex items-center justify-center">
-        <p className="text-gray-600">Loading…</p>
-      </main>
+      <Page title="Logs" width="narrow">
+        <Loading />
+      </Page>
     );
   }
 
   return (
-    <main className="flex-1 bg-page text-gray-900">
-      <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
-        <h1 className="text-3xl font-bold tracking-tight">Logs</h1>
+    <Page title="Logs" width="narrow">
+      {failed && (
+        <ErrorBanner message="Couldn't load the logs. Check your connection and try again." />
+      )}
 
-        {failed && (
-          <p className="rounded-lg border border-red-300 bg-red-50 px-4 py-2 text-sm text-red-800">
-            Couldn't load the logs. Check your connection and try again.
-          </p>
-        )}
+      {archives.length === 0 && !failed ? (
+        <p className="text-sm text-secondary-500">
+          Nothing archived yet. Use Archive and reset on{" "}
+          <Link to="/checklists" className="font-semibold text-primary-600 hover:underline">
+            Checklists
+          </Link>
+          .
+        </p>
+      ) : (
+        <div className="space-y-3">
+          {archives.map((archive) => (
+            <ArchivePanel key={archive.id} archive={archive} />
+          ))}
+        </div>
+      )}
 
-        {archives.length === 0 && !failed ? (
-          <p className="py-12 text-center text-gray-600">
-            Nothing archived yet. Use Archive and Reset on{" "}
-            <Link to="/checklists" className="text-primary-600 underline hover:text-primary-700">
-              Checklists
-            </Link>
-            .
-          </p>
-        ) : (
-          <div className="space-y-3">
-            {archives.map((archive) => (
-              <ArchivePanel key={archive.id} archive={archive} />
-            ))}
-          </div>
-        )}
-
-        {more && (
-          <div className="text-center">
-            <button
-              type="button"
-              onClick={showOlder}
-              disabled={loadingMore}
-              className="rounded-lg border border-gray-300 bg-surface px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-100 disabled:opacity-60"
-            >
-              {loadingMore ? "Loading…" : "Show older"}
-            </button>
-          </div>
-        )}
-      </div>
-    </main>
+      {more && (
+        <div className="text-center">
+          <Button variant="secondary" onClick={showOlder} disabled={loadingMore}>
+            {loadingMore ? "Loading…" : "Show older"}
+          </Button>
+        </div>
+      )}
+    </Page>
   );
 }
