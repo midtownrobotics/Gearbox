@@ -1,8 +1,9 @@
 import { teamAppUrl } from "@g3/site-config";
 import { forgetTeam, rememberedTeam } from "@g3/ui/my-team";
 import { useEffect, useRef, useState } from "react";
-import { FaArrowRight, FaSearch } from "react-icons/fa";
+import { FaArrowRight } from "react-icons/fa";
 import { Link, useSearchParams } from "react-router-dom";
+import disappointed from "./assets/erik-disappointed.png";
 import { Page } from "./layout";
 
 // Finding a team's home from the platform's site: "My team" (the team this browser last signed in
@@ -93,12 +94,18 @@ export function MyTeamButton({ large = false }: { large?: boolean }) {
   );
 }
 
-function Card({ children }: { children: React.ReactNode }) {
+function Card({ children, picture }: { children: React.ReactNode; picture?: string }) {
+  const card = (
+    <div className="w-full max-w-md space-y-6 rounded-2xl border border-line bg-surface p-8 shadow-sm">
+      {children}
+    </div>
+  );
+  if (!picture) return <section className="mx-auto max-w-md px-5 py-16 sm:py-24">{card}</section>;
+  // A picture beside the card, about its size (above it on a phone).
   return (
-    <section className="mx-auto max-w-md px-5 py-16 sm:py-24">
-      <div className="space-y-6 rounded-2xl border border-line bg-surface p-8 shadow-sm">
-        {children}
-      </div>
+    <section className="mx-auto flex max-w-4xl flex-col items-center gap-8 px-5 py-16 sm:flex-row sm:justify-center sm:py-24">
+      <img src={picture} alt="" className="w-40 shrink-0 sm:w-80" />
+      {card}
     </section>
   );
 }
@@ -147,10 +154,7 @@ export function TeamNotFoundPage() {
 
   return (
     <Page>
-      <Card>
-        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-inset text-secondary-500">
-          <FaSearch />
-        </div>
+      <Card picture={disappointed}>
         <div>
           <h1 className="text-2xl font-bold text-secondary-900">
             {teamNumber ? `Team ${teamNumber} isn't on Gearbox` : "We couldn't find that team"}
@@ -186,7 +190,7 @@ export function NotFoundPage() {
 
   return (
     <Page>
-      <Card>
+      <Card picture={disappointed}>
         <div>
           <p className="text-sm font-semibold uppercase tracking-widest text-primary-500">404</p>
           <h1 className="mt-1 text-2xl font-bold text-secondary-900">Nothing is here</h1>
