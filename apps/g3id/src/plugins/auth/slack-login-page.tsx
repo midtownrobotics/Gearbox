@@ -1,6 +1,6 @@
 import { site } from "@g3/site-config";
-import { useTeamNames } from "@g3/ui";
-import { Check, Copy, Loader2, Send } from "lucide-react";
+import { Button, ErrorBanner, useTeamNames } from "@g3/ui";
+import { Check, Copy, Send } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../../lib/api";
@@ -131,7 +131,7 @@ export function SlackLoginPage() {
     <main className="flex-1 flex items-center justify-center px-4">
       <div className="w-full max-w-sm space-y-6 text-center">
         <div>
-          <h1 className="text-5xl font-bold text-secondary-900">
+          <h1 className="text-4xl text-secondary-900">
             <span className="text-primary-500">{names.shortName}</span>ID
           </h1>
         </div>
@@ -144,14 +144,10 @@ export function SlackLoginPage() {
                   <p className="text-sm text-secondary-700">
                     EASIEST: Click to copy the code and open the Slack DM:
                   </p>
-                  <button
-                    type="button"
-                    onClick={handleOpenSlack}
-                    className="w-full rounded-lg bg-primary-500 hover:bg-primary-600 text-on-primary font-semibold py-2.5 text-sm transition-colors flex items-center justify-center gap-2"
-                  >
+                  <Button className="w-full" onClick={handleOpenSlack}>
                     <Send size={16} />
                     Open Slack
-                  </button>
+                  </Button>
                 </div>
               )}
 
@@ -193,25 +189,22 @@ export function SlackLoginPage() {
               </div>
             </div>
 
-            <div className="flex items-center justify-center gap-2 text-sm text-secondary-500 mb-2">
-              <Loader2 size={16} className="animate-spin" />
-              Waiting for Slack confirmation…
-            </div>
+            <p className="text-sm text-secondary-500">Waiting for Slack confirmation…</p>
           </>
         )}
 
         {isTerminal && (
           <div className="space-y-4">
-            <p className="text-sm text-primary-500">
-              {pollStatus.status === "expired" ? "This code has expired." : pollStatus.message}
-            </p>
-            <button
-              type="button"
-              onClick={() => navigate("/login")}
-              className="w-full rounded-lg bg-primary-500 hover:bg-primary-600 text-on-primary font-semibold py-2.5 text-sm transition-colors"
-            >
+            <ErrorBanner
+              message={
+                pollStatus.status === "expired"
+                  ? "This code has expired."
+                  : (pollStatus.message ?? "Sign-in failed.")
+              }
+            />
+            <Button className="w-full" onClick={() => navigate("/login")}>
               Try again
-            </button>
+            </Button>
           </div>
         )}
 

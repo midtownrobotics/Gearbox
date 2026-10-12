@@ -1,3 +1,4 @@
+import { tones } from "@g3/ui";
 import { FaGithub, FaGoogle, FaKey, FaSlack, FaSteam } from "react-icons/fa";
 
 // What the Users list and a member's page share.
@@ -30,10 +31,11 @@ export function relativeTime(ts: number): string {
   return new Date(ts * 1000).toLocaleDateString();
 }
 
+/** A member's status as a badge's colors (`Badge` from @g3/ui). */
 export const STATUS_STYLES: Record<string, string> = {
-  pending: "bg-amber-50 text-amber-700 border-amber-200",
-  active: "bg-green-50 text-green-700 border-green-200",
-  rejected: "bg-primary-50 text-primary-600 border-primary-200",
+  pending: tones.warning,
+  active: tones.success,
+  rejected: tones.danger,
 };
 
 export function ProviderIcon({ provider }: { provider: string }) {

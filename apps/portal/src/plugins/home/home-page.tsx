@@ -6,7 +6,14 @@ import {
   pageTeamNumber,
   portalAppLabels,
 } from "@g3/site-config";
-import { TeamIcon, rememberTeam, useTeamApps, useTeamNames, useTeamUiSettings } from "@g3/ui";
+import {
+  Loading,
+  TeamIcon,
+  rememberTeam,
+  useTeamApps,
+  useTeamNames,
+  useTeamUiSettings,
+} from "@g3/ui";
 import { useEffect } from "react";
 import type { IconType } from "react-icons";
 import { FaCube, FaGithub, FaGlobe, FaInstagram, FaSlack } from "react-icons/fa";
@@ -208,13 +215,7 @@ export function HomePage() {
   if (authState === "checking" || (authState === "authenticated" && teamApps === null)) {
     return (
       <main className="flex-1 bg-page flex items-center justify-center px-6">
-        <div className="text-center">
-          <div className="animate-pulse">
-            <p className="text-primary-600 font-semibold text-lg tracking-widest uppercase">
-              Loading...
-            </p>
-          </div>
-        </div>
+        <Loading />
       </main>
     );
   }

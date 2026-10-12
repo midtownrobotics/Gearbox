@@ -13,7 +13,17 @@ import {
   teamUiDefaults,
   teamUiLinkLabels,
 } from "@g3/site-config";
-import { refreshTeamUiSettings, useTeamNames } from "@g3/ui";
+import {
+  Button,
+  Card,
+  ErrorBanner,
+  Loading,
+  Page,
+  SuccessBanner,
+  inputClass,
+  refreshTeamUiSettings,
+  useTeamNames,
+} from "@g3/ui";
 import { type CSSProperties, useEffect, useRef, useState } from "react";
 import { FaTimes } from "react-icons/fa";
 import { g3id } from "../../lib/api";
@@ -32,8 +42,9 @@ const colorLabels: Record<Exclude<keyof TeamUiColors, "accent">, string> = {
   muted: "Muted text",
 };
 
-const fieldClass =
-  "w-full rounded-md border border-line bg-surface px-3 py-2 text-secondary-900 focus:outline-none focus:ring-2 focus:ring-primary-500";
+const fieldClass = inputClass;
+
+const description = "How your team looks across Gearbox.";
 
 export function AppearancePage() {
   const { idName } = useTeamNames();
@@ -121,26 +132,20 @@ export function AppearancePage() {
     }
   }
 
-  if (loading)
-    return <main className="mx-auto w-full max-w-4xl px-6 py-8">Loading team settings…</main>;
+  if (loading) {
+    return (
+      <Page title="Appearance" description={description}>
+        <Loading />
+      </Page>
+    );
+  }
 
   return (
-    <main className="mx-auto w-full max-w-4xl px-6 py-8">
-      <h1 className="mb-2 text-3xl font-bold text-secondary-900">Appearance</h1>
-      <p className="mb-8 text-secondary-600">How your team looks across Gearbox.</p>
-      {error && (
-        <p role="alert" className="mb-4 rounded-md border border-primary-500 p-3 text-primary-700">
-          {error}
-        </p>
-      )}
-      {message && (
-        <p role="status" className="mb-4 rounded-md border border-line p-3 text-secondary-900">
-          {message}
-        </p>
-      )}
-      <form onSubmit={save} onInvalidCapture={revealInvalid} className="space-y-8">
-        <section className="rounded-lg border border-line bg-surface p-5">
-          <h2 className="mb-4 text-xl font-semibold">Identity</h2>
+    <Page title="Appearance" description={description}>
+      {error && <ErrorBanner message={error} />}
+      {message && <SuccessBanner message={message} />}
+      <form onSubmit={save} onInvalidCapture={revealInvalid} className="space-y-5">
+        <Card title="Identity">
           <div className="grid gap-4 sm:grid-cols-2">
             <TextField
               label="Team name"
@@ -199,10 +204,9 @@ export function AppearancePage() {
               className="mt-4 h-16 max-w-40 object-contain"
             />
           )}
-        </section>
+        </Card>
 
-        <section className="rounded-lg border border-line bg-surface p-5">
-          <h2 className="mb-2 text-xl font-semibold">Colors</h2>
+        <Card title="Colors">
           <p className="mb-4 text-sm text-secondary-600">
             Your team's color in each theme. App icons use the light accent in both.
           </p>
@@ -250,10 +254,9 @@ export function AppearancePage() {
               ))}
             </div>
           </details>
-        </section>
+        </Card>
 
-        <section className="rounded-lg border border-line bg-surface p-5">
-          <h2 className="mb-1 text-xl font-semibold">Links</h2>
+        <Card title="Links">
           <p className="mb-4 text-sm text-secondary-600">Shown as tiles on your team's home.</p>
           <Links
             links={settings.links}
@@ -266,10 +269,9 @@ export function AppearancePage() {
               setMessage("");
             }}
           />
-        </section>
+        </Card>
 
-        <section className="rounded-lg border border-line bg-surface p-5">
-          <h2 className="mb-4 text-xl font-semibold">Apps grid order</h2>
+        <Card title="Apps grid order">
           <p className="mb-4 text-sm text-secondary-600">
             Drag tiles into the order they appear on the portal.
           </p>
@@ -279,27 +281,18 @@ export function AppearancePage() {
             idName={idName}
             onChange={(order) => update("appOrder", order)}
           />
-        </section>
+        </Card>
 
         <div className="flex flex-wrap items-center gap-3">
-          <button
-            type="submit"
-            disabled={saving}
-            className="rounded-md bg-primary-600 px-5 py-3 font-semibold text-on-primary disabled:opacity-50"
-          >
+          <Button type="submit" disabled={saving}>
             {saving ? "Saving…" : "Save team appearance"}
-          </button>
-          <button
-            type="button"
-            disabled={saving}
-            onClick={reset}
-            className="rounded-md border border-line bg-surface px-5 py-3 font-semibold text-secondary-900 disabled:opacity-50"
-          >
+          </Button>
+          <Button variant="secondary" disabled={saving} onClick={reset}>
             Reset to defaults
-          </button>
+          </Button>
         </div>
       </form>
-    </main>
+    </Page>
   );
 }
 
@@ -381,7 +374,7 @@ function Links({
           value=""
           disabled={disabled}
           onChange={(event) => add(event.target.value as TeamUiLinkKey)}
-          className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-secondary-900 focus:outline-none focus:ring-2 focus:ring-primary-500"
+          className={`${inputClass} !w-auto`}
         >
           <option value="" disabled>
             + Add a link
@@ -431,7 +424,7 @@ function LinkRow({
         placeholder="https://…"
         ref={input}
         onChange={(event) => onChange(event.target.value)}
-        className="min-w-0 flex-1 rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-secondary-900 focus:outline-none focus:ring-2 focus:ring-primary-500"
+        className={`${inputClass} min-w-0 flex-1`}
       />
       <button
         type="button"

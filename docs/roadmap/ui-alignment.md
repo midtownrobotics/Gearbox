@@ -17,10 +17,10 @@ A survey of every difference, with sketches, is at <https://claude.ai/artifact/C
 | 1. Shared parts in `@g3/ui` | Done | Orders, Inventory, Skill Tree, Edge | Nothing |
 | 2. Fixes that need no decision | Done | Pit, Shop, ID, Portal, Orders, Inventory, Edge | Nothing. Four things it found were passed to later steps (see step 2 below) |
 | 3. Edge onto the full set | Done | Edge | Nothing |
-| 4. ID and Portal onto the shared frame | Not started | ID, Portal | All of it |
+| 4. ID and Portal onto the shared frame | Done | ID, Portal | Nothing. A few things were left as they are on purpose (see step 4 below) |
 | 5. Pit, with its Overview | Not started | Pit | All of it |
 | 6. Shop | Not started | Shop | All of it |
-| 7. Browser pop-ups | Started: Edge's are done | Orders, Shop, ID, Skill Tree, Platform | 30 calls |
+| 7. Browser pop-ups | Started: Edge's and ID's are done | Orders, Shop, Skill Tree, Platform | 25 calls |
 | 8. Scouting | Not started | Scouting | All of it, with its Phase 3 step in `roadmap.md` |
 
 ### What landed
@@ -30,6 +30,7 @@ A survey of every difference, with sketches, is at <https://claude.ai/artifact/C
 | The page parts moved from each app's `shared/ui.tsx` into `@g3/ui`: `Page`, `PageLoading`, `Card`, `Stat`, `Button`, `ConfirmButton`, `Field`, `inputClass`, `ErrorBanner`, `SuccessBanner`, `Loading`, `Dialog`, `Toggle`, `Badge` with `tones`, `ProgressBar`, `focusRing`. Orders, Inventory, Skill Tree and Edge import them and have no `shared/ui.tsx`. Errors, danger buttons and every other mark of a problem in those four apps are red where they were the team's color. Buttons and inputs show a focus ring. Scouting is called Scouting in its own bar and tab, where it said Strategy | 1, and the name from 2 | [#186](https://github.com/midtownrobotics/Gearbox/pull/186) |
 | Names: Orders' and Inventory's Settings page is Admin (at `/admin`; `/settings` still opens it), Pit's Admin page is titled Admin, Shop's Admin is last in the bar, and every "Log in" and "Log Out" is "Sign in" and "Sign out". Titles match their bar labels in Pit (Edit Checklists), ID (Account, Kiosk Devices, Attendance), Portal (Manage Apps, Appearance) and Edge (Overview, Drive). Bugs: Pit's unreadable headings, dark error blocks and red progress bars; pages a bar's height too tall in Pit, Shop and Portal; ID's kiosk revoke asks first; Orders' and Inventory's dates follow the viewer's language; Inventory's search and filters are in the address; unused icon libraries dropped from Pit and Shop | 2 | [#187](https://github.com/midtownrobotics/Gearbox/pull/187) |
 | Edge's hand-written buttons and inputs are the shared `Button` and `inputClass`, and it has no button or input styles of its own. `Button` and `ConfirmButton` take `size="sm"`. Edge's three browser confirms (a new box key, deleting a blocklist, removing a printer) ask in the page, and deleting a door sound now asks too | 3, and Edge's part of 7 | [#188](https://github.com/midtownrobotics/Gearbox/pull/188) |
+| ID's and Portal's pages are built from the shared parts: `Page` for every ordinary page, `Card`, `Button`, `Field` and `inputClass`, the banners, `Badge` for a member's status. Their titles are the shared 36px title, on the sign-in and kiosk screens too. Errors that were in the team's color are red. ID's Users filters are near-black chips. ID's last browser pop-ups are gone: unlinking a sign-in and deleting a user from the list ask in the page, and three alerts are errors on the page. New shared parts: `Switch` (Portal's two copies and Edge's are one), `Chip`, `ConfirmQuestion`, `buttonClass` for a link that looks like a button, and `size="lg"` for touch screens | 4, and ID's part of 7 | This PR |
 
 ## Decisions
 
@@ -89,12 +90,13 @@ They are in `packages/ui/src/components/` and exported from `@g3/ui`.
 | `Page` | Every page: `title`, optional `description`, `actions` (buttons at the right of the title), `width` |
 | `PageLoading` | The whole screen while the app finds out who is signed in |
 | `Card`, `Stat` | A panel, with a small heading when it has a `title`; one figure with its label |
-| `Button` | `variant`: `primary`, `secondary`, `danger`. `size="sm"` inside a row. Takes every `<button>` prop |
-| `ConfirmButton` | A danger button that asks its `question` in the page before it acts. Its question takes a line of its own, so the row it sits in has to wrap (`flex flex-wrap`) |
+| `Button`, `buttonClass` | `variant`: `primary`, `secondary`, `danger`. `size="sm"` inside a row, `"lg"` on a touch screen. Takes every `<button>` prop; an icon before its label sits in line. `buttonClass(variant, size)` is the same look for an `<a>` or a router `Link` |
+| `ConfirmButton`, `ConfirmQuestion` | A danger button that asks its `question` in the page before it acts. Its question takes a line of its own, so the row it sits in has to wrap (`flex flex-wrap`). `ConfirmQuestion` is the question alone, for a switch or anything else that needs a yes; its `keepLabel` names what stays ("Keep it on") |
 | `Field`, `inputClass` | A label, a control and a hint; the class for an `<input>`, `<select>` or `<textarea>` |
 | `ErrorBanner`, `SuccessBanner`, `Loading` | Messages |
 | `Dialog` | A pop-up; `wide` for a larger one |
-| `Toggle` | An on/off switch with a label and description |
+| `Toggle`, `Switch` | An on/off switch with a label and description; the switch alone, for a row that already says what it switches |
+| `Chip` | One choice in a row of filters; the chosen one is near-black |
 | `Badge`, `tones` | A status label and the colors that mean something |
 | `ProgressBar` | A thin bar filled to a percent |
 | `focusRing` | The focus outline, for a control an app has to write by hand |
@@ -105,7 +107,7 @@ Rules for the parts:
 - **Tailwind finds their classes through `@source "./components"`** in `packages/ui/src/index.css`. Write class names as whole literal strings, as everywhere else; a name built from pieces is never generated.
 - **Dark mode comes for free** if a part is written with light-mode classes: `secondary-*`, `bg-surface`, `bg-inset`, `primary-*` with `text-on-primary` on a solid fill, and for text in a color that means something the 600 to 950 shades (`text-red-700`, `text-emerald-800`), which `theme-palette.css` lightens in dark mode.
 - **Changesets ignore `@g3/ui`.** A change to a part is recorded against each app whose pages it changes.
-- **Not there yet:** the large button size for touch screens (small is `size="sm"`), a bare switch without a label (Portal has two copies), filter chips, an empty state, a back link, a date helper, the Lucide icons. Add each with the first step that needs it.
+- **Not there yet:** an empty state, a back link, a date helper, the Lucide icons. Add each with the first step that needs it. Orders' and Skill Tree's filter pills and Edge's date-range chips are the same shape as `Chip` and can become it when those pages are next opened.
 
 ## Moving an app onto the parts
 
@@ -148,16 +150,15 @@ See "What landed". What it settled, for the steps after it:
 - A field narrower than its row overrides the shared class's full width with `!`: `${inputClass} !w-48`, or `!w-auto` for a `<select>`.
 - Edge's quiet text buttons ("Check again", "Revoke") became `secondary`, which has an outline. Its link-style actions inside a sentence ("Rename", "Edit") and its filter chips stayed as they were.
 
-### 4. ID and Portal onto the shared frame (medium)
+### 4. ID and Portal onto the shared frame (done)
 
-Both already use the shared colors, written out on each page, about 6,300 lines between them.
+See "What landed". What it settled, and what it left:
 
-- Titles are 24px to 48px bold today; `Page` makes them one size. Both use a line under the title: that is `Page`'s `description`.
-- Portal's two switch copies (`plugins/admin/switch.tsx` and one inline in `apps-page.tsx`) become one bare switch in `@g3/ui`, which `Toggle` should then be built on.
-- ID uses a spinner for loading and `alert` for three errors (all on the Account page); both go.
-- ID's filter buttons on Users are the team's color when chosen and become near-black chips. Keep their counts.
-- The sign-in, kiosk and pending pages are narrow, centered cards. Keep that shape (`width="narrow"`); they are not ordinary pages.
-- Portal's home grid is the team's front door and keeps its own layout.
+- **Widths.** Settings-like pages are `narrow`: ID's Account, Users, a user, Kiosk Devices and Attendance, and Portal's Manage Apps, Sign-in and Integrations. Portal's Appearance is the default width and ID's Leaderboard is `wide`.
+- **A card's heading is the shared small one.** Both apps had larger section headings (`text-xl`, `text-lg font-bold`); they are `Card title` now.
+- **The sign-in and kiosk screens keep their shape**: a narrow column centered on the screen, with no `Page`. They take the shared title size, buttons, fields and red errors. Kiosk screens use `size="lg"`.
+- **Approve is the primary button and Reject is `danger`.** Approve was green.
+- **Left as they are:** Portal's home grid and its two large front-door buttons; the kiosk's PIN keypad; the spinner that replaces an icon inside ID's small Attendance buttons while they work; the attendance reports' own grid and charts; Portal's joined buttons for the button text color, which show the team's color on purpose.
 
 ### 5. Pit, with its Overview (medium, or large with the overview)
 
@@ -185,7 +186,7 @@ About 10,000 lines of pages, the largest Tailwind app. It looks close to the maj
 
 ### 7. Browser pop-ups (spread across the steps)
 
-Outside Scouting there are 30: Orders 8 confirm and 3 prompt, Shop 7 confirm, 2 prompt and 1 alert, ID 2 confirm and 3 alert, Skill Tree 3 confirm, Platform 1 confirm. Edge's three are done. Replace each app's when the app is open for its own step. Orders and Skill Tree have no restyle step, so their pop-ups get a pull request of their own.
+Outside Scouting there are 25: Orders 8 confirm and 3 prompt, Shop 7 confirm, 2 prompt and 1 alert, Skill Tree 3 confirm, Platform 1 confirm. Edge's and ID's are done. Replace each app's when the app is open for its own step. Orders and Skill Tree have no restyle step, so their pop-ups get a pull request of their own.
 
 - A confirm becomes `ConfirmButton`.
 - A prompt (the reason a request is denied, a vendor credit's amount, a quantity on Shop's floor) becomes a small `Dialog` with a field.
@@ -216,7 +217,7 @@ From reading the code on 11 October. None was confirmed in a running app, and on
 | Pit | Errors were a dark red block in light mode (`bg-red-950`, five places); checklist bars were red until complete | Fixed in step 2 |
 | Shop | Admin is in the bar and on Home for every member | Not a bug as first written: most of the page is for every member. Four parts of it need an admin (step 6) |
 | ID | Revoking a kiosk took one click on a trash icon, with no question | Fixed in step 2 |
-| ID | Deleting a user asks with a browser box on the Users list and in the page on the user's own page | Open, step 7 |
+| ID | Deleting a user asked with a browser box on the Users list and in the page on the user's own page | Fixed in step 4: both ask in the page |
 | Pit | Two pages were titled "Checklists": the one you run and the one you edit | Fixed in step 2: the second is Edit Checklists |
 | Orders, Inventory | Dates were always in US English | Fixed in step 2. Prices are still formatted the US way (`Intl.NumberFormat("en-US", …)`), which wasn't part of this |
 | Pit, Shop | `lucide-react` and `react-icons` were installed and never imported | Fixed in step 2 |

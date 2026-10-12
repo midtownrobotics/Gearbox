@@ -1,4 +1,15 @@
 import { type AppName, apiPath, appUrl } from "@g3/site-config";
+import {
+  Badge,
+  Card,
+  ConfirmButton,
+  ErrorBanner,
+  Loading,
+  Page,
+  SuccessBanner,
+  buttonClass,
+  tones,
+} from "@g3/ui";
 import { type ReactNode, useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { g3id } from "../../lib/api";
@@ -100,17 +111,13 @@ function StatusBadge({ status }: { status: Status }) {
   if (status === "loading") return <span className={`${fixed} text-secondary-500`}>Checking…</span>;
   if (status === "unknown") return <span className={`${fixed} text-secondary-500`}>Unknown</span>;
   return (
-    <span
-      className={`${fixed} rounded-full px-2 py-0.5 font-semibold ${
-        status.connected ? "bg-green-100 text-green-800" : "bg-secondary-100 text-secondary-700"
-      }`}
-    >
+    <Badge colors={status.connected ? tones.success : tones.neutral}>
       {status.connected ? "Connected" : "Not connected"}
-    </span>
+    </Badge>
   );
 }
 
-function Card({
+function IntegrationCard({
   name,
   summary,
   status,
@@ -125,46 +132,47 @@ function Card({
 }) {
   const known = status && typeof status !== "string" ? status : null;
   return (
-    <li className="rounded-lg border border-line bg-surface p-5">
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0 flex-1">
-          <h2 className="font-semibold text-secondary-900">{name}</h2>
-          <p className="text-sm text-secondary-600">{summary}</p>
+    <li>
+      <Card>
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0 flex-1">
+            <h2 className="font-semibold text-secondary-900">{name}</h2>
+            <p className="text-sm text-secondary-600">{summary}</p>
+          </div>
+          {status && <StatusBadge status={status} />}
         </div>
-        {status && <StatusBadge status={status} />}
-      </div>
-      {known?.detail && <p className="mt-2 text-sm text-amber-700">{known.detail}</p>}
-      {known?.facts && known.facts.length > 0 && (
-        <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 rounded-md bg-inset px-3 py-2 text-sm">
-          {known.facts.map((fact) => (
-            <div key={fact.label} className="contents">
-              <dt className="text-secondary-500">{fact.label}</dt>
-              <dd className="min-w-0 break-words text-secondary-900">
-                {[fact.at ? when(fact.at) : null, fact.value].filter(Boolean).join(", ")}
-              </dd>
-            </div>
-          ))}
-        </dl>
-      )}
-      {uses.length > 0 && (
-        <div className="mt-3">
-          <p className="text-xs font-semibold uppercase tracking-wide text-secondary-500">
-            Used for
-          </p>
-          <ul className="mt-1 list-disc space-y-0.5 pl-5 text-sm text-secondary-700">
-            {uses.map((use) => (
-              <li key={use}>{use}</li>
+        {known?.detail && <p className="mt-2 text-sm text-amber-700">{known.detail}</p>}
+        {known?.facts && known.facts.length > 0 && (
+          <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 rounded-md bg-inset px-3 py-2 text-sm">
+            {known.facts.map((fact) => (
+              <div key={fact.label} className="contents">
+                <dt className="text-secondary-500">{fact.label}</dt>
+                <dd className="min-w-0 break-words text-secondary-900">
+                  {[fact.at ? when(fact.at) : null, fact.value].filter(Boolean).join(", ")}
+                </dd>
+              </div>
             ))}
-          </ul>
-        </div>
-      )}
-      {children && <div className="mt-3 flex flex-wrap items-center gap-2">{children}</div>}
+          </dl>
+        )}
+        {uses.length > 0 && (
+          <div className="mt-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-secondary-500">
+              Used for
+            </p>
+            <ul className="mt-1 list-disc space-y-0.5 pl-5 text-sm text-secondary-700">
+              {uses.map((use) => (
+                <li key={use}>{use}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {children && <div className="mt-3 flex flex-wrap items-center gap-2">{children}</div>}
+      </Card>
     </li>
   );
 }
 
-const linkButton =
-  "rounded-md bg-primary-600 px-3 py-1.5 text-sm font-semibold text-on-primary hover:bg-primary-700";
+const linkButton = buttonClass("primary", "sm");
 
 export function IntegrationsPage() {
   const [searchParams] = useSearchParams();
@@ -172,7 +180,6 @@ export function IntegrationsPage() {
   const [statuses, setStatuses] = useState<Record<string, Status>>({});
   const [slack, setSlack] = useState<SlackStatus | "loading" | "unknown">("loading");
   const [error, setError] = useState(searchParams.get("error") ?? "");
-  const [leavingSlack, setLeavingSlack] = useState(false);
   const [busy, setBusy] = useState(false);
 
   async function loadSlack() {
@@ -209,7 +216,6 @@ export function IntegrationsPage() {
     try {
       const res = await g3id.admin.slack.$delete();
       if (!res.ok) throw new Error();
-      setLeavingSlack(false);
       await loadSlack();
     } catch {
       setError("Couldn't disconnect Slack.");
@@ -241,41 +247,35 @@ export function IntegrationsPage() {
         };
 
   return (
-    <main className="mx-auto w-full max-w-2xl px-6 py-8">
-      <h1 className="mb-2 text-3xl font-bold text-secondary-900">Integrations</h1>
-      <p className="mb-6 text-secondary-600">
-        The services your team's apps work with, what each is used for, and where to set it up.
-      </p>
-      {error && (
-        <p role="alert" className="mb-4 rounded-md border border-red-500 p-3 text-red-700">
-          {error}
-        </p>
-      )}
+    <Page
+      title="Integrations"
+      description="The services your team's apps work with, what each is used for, and where to set it up."
+      width="narrow"
+    >
+      {error && <ErrorBanner message={error} />}
       {searchParams.get("connected") && typeof slack !== "string" && slack.connected && (
-        <p role="status" className="mb-4 rounded-md border border-line p-3 text-green-700">
-          Slack is connected.
-        </p>
+        <SuccessBanner message="Slack is connected." />
       )}
       <ul className="space-y-3">
-        <Card
+        <IntegrationCard
           name="Slack"
           summary="Your team's Slack workspace."
           status={slackStatus}
           uses={usesOf(SLACK_USES)}
         >
-          {typeof slack !== "string" && slack.canConnect && !leavingSlack && (
+          {typeof slack !== "string" && slack.canConnect && (
             <>
               <a href={`${apiPath("id")}/slack/install`} className={linkButton}>
                 {slack.connected ? "Reconnect" : "Connect Slack"}
               </a>
               {slack.connected && !slack.fromSettings && (
-                <button
-                  type="button"
-                  onClick={() => setLeavingSlack(true)}
-                  className="rounded-md border border-line px-3 py-1.5 text-sm text-secondary-700 hover:border-red-500 hover:text-red-700"
-                >
-                  Disconnect
-                </button>
+                <ConfirmButton
+                  size="sm"
+                  label="Disconnect"
+                  question="Disconnect Slack? Members can't sign in with Slack, and the apps can't message anyone, until it's connected again."
+                  disabled={busy}
+                  onConfirm={() => void disconnectSlack()}
+                />
               )}
             </>
           )}
@@ -284,38 +284,17 @@ export function IntegrationsPage() {
               Connecting a workspace isn't set up on this server yet.
             </p>
           )}
-          {leavingSlack && (
-            <div className="w-full space-y-3 rounded-md border border-line bg-inset p-3 text-sm">
-              <p className="text-secondary-900">
-                Disconnect Slack? Members can't sign in with Slack, and the apps can't message
-                anyone, until it's connected again.
-              </p>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={disconnectSlack}
-                  className="rounded-md bg-red-600 px-3 py-1.5 font-semibold text-white disabled:opacity-50"
-                >
-                  Disconnect
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setLeavingSlack(false)}
-                  className="px-3 py-1.5 text-secondary-600"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          )}
-        </Card>
+        </IntegrationCard>
 
-        {apps === null && !error && <li className="text-secondary-600">Loading…</li>}
+        {apps === null && !error && (
+          <li>
+            <Loading />
+          </li>
+        )}
         {shown.map((i) => {
           const ownerOn = i.owner !== null && on.has(i.owner);
           return (
-            <Card
+            <IntegrationCard
               key={i.key}
               name={i.name}
               summary={i.summary}
@@ -331,15 +310,15 @@ export function IntegrationsPage() {
                 <p className="text-sm text-secondary-600">
                   Switch on {ownerName(i.owner)} on the{" "}
                   <Link to="/admin" className="font-semibold text-primary-700 underline">
-                    Apps
+                    Manage Apps
                   </Link>{" "}
                   page to connect one.
                 </p>
               )}
-            </Card>
+            </IntegrationCard>
           );
         })}
       </ul>
-    </main>
+    </Page>
   );
 }
