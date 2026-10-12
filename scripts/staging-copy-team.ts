@@ -317,18 +317,38 @@ for (const db of DATABASES) {
     continue;
   }
   console.log(`  loading ${total} rows into staging…`);
-  wranglerLive(
-    [
-      "d1",
-      "execute",
-      db.binding,
-      ...(local ? ["--local"] : ["--env", "staging", "--remote"]),
-      "--yes",
-      "--file",
-      file,
-    ],
-    { cwd: join(root, "workers", db.worker), timeoutMs: 15 * 60_000 },
-  );
+  // All or nothing (a failed load leaves staging as it was), and it replaces what's there, so a
+  // load that fails on Cloudflare's side (D1_RESET_DO, "fetch failed") is simply tried again.
+  for (let attempt = 1; ; attempt++) {
+    try {
+      wranglerLive(
+        [
+          "d1",
+          "execute",
+          db.binding,
+          ...(local ? ["--local"] : ["--env", "staging", "--remote"]),
+          "--yes",
+          "--file",
+          file,
+        ],
+        { cwd: join(root, "workers", db.worker), timeoutMs: 15 * 60_000 },
+      );
+      break;
+    } catch (err) {
+      if (attempt >= ATTEMPTS) {
+        console.log(
+          `\n  Loading ${db.worker} failed ${ATTEMPTS} times; staging's ${db.worker} is as it was. Run this again later with --only ${DATABASES.map(
+            (d) => d.worker,
+          )
+            .slice(DATABASES.indexOf(db))
+            .join(",")} to finish.`,
+        );
+        throw err;
+      }
+      console.log(`  (the load didn't go through; trying again in ${attempt * 5} s)`);
+      sleep(5000 * attempt);
+    }
+  }
 }
 
 console.log(
