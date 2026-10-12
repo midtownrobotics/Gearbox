@@ -5,13 +5,16 @@ import type { BatteryState } from "./getters/types";
 // How a battery is shown wherever one is: its state's color, its voltage's, and how long it has
 // been in its state.
 
-/** Fixed colors because they mean something: each state keeps the one the pit crew knows. */
+/**
+ * Fixed colors because they mean something, the same as a status anywhere else: green for the one
+ * that's ready, amber for one that's waiting, blue for one in use, red for a problem.
+ */
 export const STATE_TONES: Record<BatteryState, string> = {
-  "In Robot": tones.danger,
   "Next Up": tones.success,
-  Charging: tones.info,
+  Charging: tones.warning,
+  "In Robot": tones.info,
   Idle: tones.neutral,
-  Broken: tones.warning,
+  Broken: tones.danger,
 };
 
 /** Green for a charged battery, amber for one getting low, red for one that shouldn't go in. */
