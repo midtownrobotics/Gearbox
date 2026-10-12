@@ -7,7 +7,8 @@
 //   each other (G3ID and the platform both ways), and a Worker can't be deployed while one it
 //   binds to is missing; the first real deploy replaces them.
 // Needs a Wrangler login (`wrangler login`) or CLOUDFLARE_API_TOKEN, and CLOUDFLARE_ACCOUNT_ID if
-// the login sees several accounts. Pass --dry-run to only print what it would do.
+// the login sees several accounts: Wrangler runs non-interactively here, so it can't ask. Pass
+// --dry-run to only print what it would do.
 
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
@@ -25,20 +26,41 @@ const WRANGLER = join(root, "workers/g3id/node_modules/.bin/wrangler");
 const scratch = mkdtempSync(join(tmpdir(), "gearbox-staging-"));
 
 /**
- * Runs Wrangler and gives back what it printed. Its messages and questions (a sign-in, which
- * account) reach the terminal, unless `quiet` (for an answer that's expected to fail).
+ * Runs Wrangler and gives back what it printed. Its messages reach the terminal, unless `quiet`
+ * (for an answer that's expected to fail).
  */
 function wrangler(args: string[], { quiet = false } = {}): string {
-  return execFileSync(WRANGLER, args, {
-    cwd: scratch,
-    encoding: "utf8",
-    stdio: ["inherit", "pipe", quiet ? "pipe" : "inherit"],
-  });
+  try {
+    return execFileSync(WRANGLER, args, {
+      cwd: scratch,
+      encoding: "utf8",
+      env: WRANGLER_ENV,
+      stdio: ["ignore", "pipe", quiet ? "pipe" : "inherit"],
+      timeout: TIMEOUT_MS,
+    });
+  } catch (err) {
+    if ((err as { code?: string }).code === "ETIMEDOUT") {
+      throw new Error(`wrangler ${args.join(" ")} didn't finish in ${TIMEOUT_MS / 1000} s.`);
+    }
+    throw err;
+  }
 }
 
-// Signed in, and to which account: before anything else, so a sign-in isn't hidden mid-way.
+/**
+ * Never interactive: what this script reads back is Wrangler's output, so a question it asked
+ * there (usage metrics, which account) would wait unseen. Logged in already, or a token.
+ */
+const WRANGLER_ENV = { ...process.env, CI: "1", WRANGLER_SEND_METRICS: "false" };
+const TIMEOUT_MS = 120_000;
+
+// Signed in, and to which account: before anything else. Straight to the terminal.
 console.log("Checking the Wrangler login…");
-process.stdout.write(wrangler(["whoami"]));
+execFileSync(WRANGLER, ["whoami"], {
+  cwd: scratch,
+  env: WRANGLER_ENV,
+  stdio: "inherit",
+  timeout: TIMEOUT_MS,
+});
 
 /** Makes something, unless dry-running; "already exists" counts as made. */
 function make(what: string, args: string[]) {
