@@ -9,6 +9,8 @@ export type Member = {
   status: "pending" | "active" | "rejected" | "merged";
   isAdmin: boolean;
   isMentor: boolean;
+  /** Has linked a Slack account (so the team's bot can DM them). */
+  hasSlack?: boolean;
 };
 
 /** The team's members (any status), or null when G3ID can't be reached. */

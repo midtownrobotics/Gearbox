@@ -43,6 +43,7 @@ type Integration = {
 const SLACK_USES: Use[] = [
   { app: null, text: "Signing in: members get their sign-in code from the bot." },
   { app: null, text: "Admins hear when an app is switched on or off." },
+  { app: null, text: "Gearbox notifications go to the channel and people set on Notifications." },
   { app: "orders", text: "Orders tells people when their request is approved." },
   {
     app: "shop",

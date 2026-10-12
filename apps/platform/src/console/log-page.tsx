@@ -42,6 +42,10 @@ function describe(action: Action): string {
       return `Added ${str(d.displayName || d.userId)} as an operator`;
     case "remove_operator":
       return `Removed operator ${str(d.userId)}`;
+    case "create_notification":
+      return `Created a ${str(d.type)} notification: ${str(d.summary)}`;
+    case "delete_notification":
+      return `Deleted a ${str(d.type)} notification: ${str(d.summary)}`;
     default:
       return action.action;
   }

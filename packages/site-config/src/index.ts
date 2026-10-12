@@ -141,8 +141,12 @@ export const CONSOLE_HOSTS = [`admin.${site.platformDomain}`] as const;
 
 /** The console's address (`teamId`, the operator's team, no longer changes it). */
 export function consoleUrl(_teamId?: string): string {
-  if (localGateway) return onGateway(localGateway, "admin");
-  return `https://admin.${site.platformDomain}`;
+  return consoleUrlVia(localGateway);
+}
+
+/** The console's address, or given the dev gateway, its address there (for workers). */
+export function consoleUrlVia(gateway: string | undefined): string {
+  return gateway ? onGateway(gateway, "admin") : `https://admin.${site.platformDomain}`;
 }
 
 /**

@@ -104,3 +104,50 @@ describe("messages to every admin", () => {
     expect(res.status).toBe(404);
   });
 });
+
+describe("messages to chosen members", () => {
+  it("DMs only the named active members of the team who have Slack", async () => {
+    const team = await createTeam();
+    await saveInstallation(testEnv, {
+      teamId: team,
+      workspaceId: `T${crypto.randomUUID().replace(/-/g, "").slice(0, 10).toUpperCase()}`,
+      workspaceName: "Their Slack",
+      botUserId: "UBOT",
+      botToken: "xoxb-theirs",
+      installedBy: null,
+    });
+    const chosen = await withSlack(team, {});
+    const pending = await withSlack(team, { status: "pending" });
+    await withSlack(team, {});
+    const noSlack = await createUser({ teamId: team });
+    const elsewhere = await withSlack(await createTeam(), {});
+    const res = await g3id(`/internal/teams/${team}/slack/dm-members`, {
+      method: "POST",
+      body: {
+        userIds: [chosen, pending, noSlack, elsewhere],
+        text: "Downtime Saturday.",
+      },
+    });
+    expect(await res.json()).toEqual({ ok: true, sent: 1, members: 1 });
+    expect(
+      (
+        await g3id(`/internal/teams/${team}/slack/dm-members`, {
+          method: "POST",
+          body: { text: "x" },
+        })
+      ).status,
+    ).toBe(400);
+  });
+
+  it("says which members have linked Slack", async () => {
+    const team = await createTeam();
+    const linked = await withSlack(team, {});
+    const plain = await createUser({ teamId: team });
+    const members = (await (await g3id(`/internal/teams/${team}/members`)).json()) as {
+      id: string;
+      hasSlack: boolean;
+    }[];
+    expect(members.find((m) => m.id === linked)?.hasSlack).toBe(true);
+    expect(members.find((m) => m.id === plain)?.hasSlack).toBe(false);
+  });
+});

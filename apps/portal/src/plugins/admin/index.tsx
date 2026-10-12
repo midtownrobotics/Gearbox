@@ -5,12 +5,14 @@ import { AdminOnly } from "./admin-only";
 import { AppearancePage } from "./appearance-page";
 import { AppsPage } from "./apps-page";
 import { IntegrationsPage } from "./integrations-page";
+import { NotificationsPage } from "./notifications-page";
 import { SignInPage } from "./sign-in-page";
 
 // The team's admin pages (roadmap 4.5), on its home: <number>.<platform>/admin. Only what's the
 // whole team's lives here: Apps is the platform's (which apps the team has on); Appearance and
-// Sign-in are G3ID's settings; and Integrations connects Slack (G3ID's) and shows what else each
-// app is connected to. A setting for one app stays on that app's own pages.
+// Sign-in are G3ID's settings; Integrations connects Slack (G3ID's) and shows what else each app
+// is connected to; and Notifications says where the platform's notifications go (the platform's).
+// A setting for one app stays on that app's own pages.
 
 const admin = (element: ReactNode) => <AdminOnly>{element}</AdminOnly>;
 
@@ -28,6 +30,7 @@ export const adminPlugin: Plugin = {
     { path: "/admin/sign-in", element: admin(<SignInPage />) },
     { path: "/admin/slack", element: <SlackMoved /> },
     { path: "/admin/integrations", element: admin(<IntegrationsPage />) },
+    { path: "/admin/notifications", element: admin(<NotificationsPage />) },
   ],
   navItems: [
     { label: "Manage apps", to: "/admin", order: 10, requiresAdmin: true, group: "Admin" },
@@ -43,6 +46,13 @@ export const adminPlugin: Plugin = {
       label: "Integrations",
       to: "/admin/integrations",
       order: 15,
+      requiresAdmin: true,
+      group: "Admin",
+    },
+    {
+      label: "Notifications",
+      to: "/admin/notifications",
+      order: 16,
       requiresAdmin: true,
       group: "Admin",
     },
