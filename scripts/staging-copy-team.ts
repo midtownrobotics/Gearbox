@@ -168,6 +168,32 @@ const ATTEMPTS = 4;
 
 /** Runs a read on one side and gives back its rows, trying again if the request fails. */
 function query(db: Database, side: "production" | "staging", sql: string): Row[] {
+  return statements(db, side, sql).flat();
+}
+
+/**
+ * Each table's foreign keys in production (`PRAGMA foreign_key_list`, one statement per table:
+ * D1 doesn't allow the pragma as a function inside a SELECT).
+ */
+function foreignKeys(db: Database, tables: string[]) {
+  if (!tables.length) return [];
+  const results = statements(
+    db,
+    "production",
+    tables.map((t) => `PRAGMA foreign_key_list(${quote(t)})`).join("; "),
+  );
+  return tables.flatMap((table, i) =>
+    (results[i] ?? []).map((k) => ({
+      table,
+      parent: String(k.table),
+      col: String(k.from),
+      parentCol: String(k.to),
+    })),
+  );
+}
+
+/** Runs one or more statements on one side and gives back each one's rows. */
+function statements(db: Database, side: "production" | "staging", sql: string): Row[][] {
   const where = local ? ["--local"] : ["--env", side, "--remote"];
   for (let attempt = 1; ; attempt++) {
     try {
@@ -176,7 +202,7 @@ function query(db: Database, side: "production" | "staging", sql: string): Row[]
         { cwd: join(root, "workers", db.worker), quiet: true },
       );
       const results = JSON.parse(out) as { results: Row[] }[];
-      return results.flatMap((r) => r.results);
+      return results.map((r) => r.results);
     } catch (err) {
       // Wrangler's own error, when it gave one ({"error": {"text": ...}} on its output).
       const printed = String((err as { stdout?: string }).stdout ?? "");
@@ -219,6 +245,32 @@ function rowsOf(db: Database, table: string, where: string): Row[] {
     rows.push(...page);
     if (page.length < PAGE) return rows;
   }
+}
+
+/**
+ * A table's rows with each one after the row of the same table it points at (a location after
+ * its parent location), for a table with a key to itself.
+ */
+function parentsFirst(rows: Row[], key: { col: string; parentCol: string } | undefined): Row[] {
+  if (!key) return rows;
+  const ids = new Set(rows.map((r) => r[key.parentCol]));
+  const placed = new Set<unknown>();
+  const out: Row[] = [];
+  let waiting = rows;
+  while (waiting.length) {
+    const next = waiting.filter((r) => {
+      const parent = r[key.col];
+      return parent === null || parent === undefined || !ids.has(parent) || placed.has(parent);
+    });
+    // A loop (none should exist) goes in as it is.
+    const batch = next.length ? next : waiting;
+    for (const r of batch) {
+      out.push(r);
+      placed.add(r[key.parentCol]);
+    }
+    waiting = waiting.filter((r) => !batch.includes(r));
+  }
+  return out;
 }
 
 const migrations = (db: Database, side: "production" | "staging") =>
@@ -274,14 +326,26 @@ for (const db of DATABASES) {
     if (db.keepOut?.[table]) where = `(${where}) AND ${db.keepOut[table]}`;
     plan.push({ table, where });
   }
-  // Linked tables after the team's own, in the order they're listed.
-  if (!whole) {
-    plan.sort((a, b) => {
-      const order = (t: string) =>
-        t === "teams" ? -1 : db.linked?.[t] ? 1 + Object.keys(db.linked).indexOf(t) : 0;
-      return order(a.table) - order(b.table);
-    });
+  // Parents before children, by the database's foreign keys: D1's loader checks each row's keys
+  // as it goes in (it doesn't keep `defer_foreign_keys` for a whole file), so a row can't go in
+  // before the row it points at. Deletes run the other way round.
+  const keys = foreignKeys(db, [...tables.keys()]);
+  const ordered: typeof plan = [];
+  const waiting = [...plan];
+  while (waiting.length) {
+    const ready = waiting.findIndex(
+      ({ table }) =>
+        !keys.some(
+          (k) =>
+            k.table === table && k.parent !== table && waiting.some((w) => w.table === k.parent),
+        ),
+    );
+    // A loop between tables (none today) keeps the order they were in.
+    ordered.push(...waiting.splice(ready === -1 ? 0 : ready, 1));
   }
+  plan.splice(0, plan.length, ...ordered);
+  /** A table's key to itself (a location's parent location), if it has one. */
+  const selfKey = (table: string) => keys.find((k) => k.table === table && k.parent === table);
 
   const sql: string[] = [
     "PRAGMA defer_foreign_keys = ON;",
@@ -295,7 +359,7 @@ for (const db of DATABASES) {
   }
   let total = 0;
   for (const { table, where } of plan) {
-    const rows = rowsOf(db, table, where);
+    const rows = parentsFirst(rowsOf(db, table, where), selfKey(table));
     const blank = new Set(db.blank?.[table] ?? []);
     for (const row of rows) {
       const cols = Object.keys(row);
