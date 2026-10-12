@@ -1,6 +1,6 @@
 @import "./colors.css";
 
-/* The shared top bar (components/app-nav-bar.tsx), from G3 Strategy's. Plain CSS so it renders
+/* The shared top bar (components/app-nav-bar.tsx), from Scouting's. Plain CSS so it renders
    the same in every app, Tailwind or not. */
 
 .g3-nav,

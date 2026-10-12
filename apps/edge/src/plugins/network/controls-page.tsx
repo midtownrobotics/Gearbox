@@ -1,9 +1,8 @@
+import { Card, ErrorBanner, Loading, Page, Toggle } from "@g3/ui";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { api, getErrorMessage } from "../../shared/api";
 import { formatUntil } from "../../shared/format";
-import { Toggle } from "../../shared/toggle";
-import { Card, ErrorBanner, Loading, Page } from "../../shared/ui";
 import { useLoad } from "../../shared/use-load";
 
 async function loadControls() {

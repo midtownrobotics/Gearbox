@@ -1,3 +1,4 @@
+import { Button, Card, ErrorBanner, Field, Loading, Page, inputClass } from "@g3/ui";
 import { type FormEvent, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { api, getErrorMessage } from "../../shared/api";
@@ -13,7 +14,6 @@ import {
 import { PRIORITY, PRIORITY_ORDER, PriorityBadge } from "../../shared/priority";
 import { STATUS, StatusBadge } from "../../shared/status-badge";
 import type { Priority, RequestDetail, RequestStatus } from "../../shared/types";
-import { Button, Card, ErrorBanner, Field, Loading, Page, inputClass } from "../../shared/ui";
 import { useLoad } from "../../shared/use-load";
 import { useVendors } from "../../shared/vendors";
 import { RequestLists } from "../lists/request-lists";

@@ -1,3 +1,4 @@
+import { Button, ErrorBanner, Loading, Page, SuccessBanner, inputClass } from "@g3/ui";
 import type { InferResponseType } from "hono/client";
 import { useState } from "react";
 import { Link } from "react-router-dom";
@@ -11,7 +12,6 @@ import {
   asksInventory,
   useIntake,
 } from "../../shared/receive-dialog";
-import { Button, ErrorBanner, Loading, Page, SuccessBanner, inputClass } from "../../shared/ui";
 import { useLoad } from "../../shared/use-load";
 
 type Receiving = InferResponseType<typeof api.orders.receiving.$get, 200>;

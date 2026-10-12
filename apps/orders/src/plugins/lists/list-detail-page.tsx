@@ -1,10 +1,3 @@
-import { type FormEvent, useMemo, useState } from "react";
-import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
-import { api, getErrorMessage } from "../../shared/api";
-import { useAuthUser } from "../../shared/auth";
-import { formatCents } from "../../shared/format";
-import { STATUS, StatusBadge } from "../../shared/status-badge";
-import type { OrderRequest, PartListDetail, RequestStatus } from "../../shared/types";
 import {
   Button,
   Card,
@@ -15,7 +8,14 @@ import {
   Stat,
   SuccessBanner,
   inputClass,
-} from "../../shared/ui";
+} from "@g3/ui";
+import { type FormEvent, useMemo, useState } from "react";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { api, getErrorMessage } from "../../shared/api";
+import { useAuthUser } from "../../shared/auth";
+import { formatCents } from "../../shared/format";
+import { STATUS, StatusBadge } from "../../shared/status-badge";
+import type { OrderRequest, PartListDetail, RequestStatus } from "../../shared/types";
 import { useLoad } from "../../shared/use-load";
 import type { RequestDone } from "../requests/request-page";
 import { RequestList } from "../requests/requests-page";

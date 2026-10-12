@@ -1,5 +1,5 @@
+import { inputClass } from "@g3/ui";
 import { type Places, labelOf, pathOf } from "./places";
-import { inputClass } from "./ui";
 
 /**
  * Picks a location from the tree, a level at a time: the top-level place, then what's inside it,

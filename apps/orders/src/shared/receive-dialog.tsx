@@ -1,8 +1,7 @@
-import { useTeamNames } from "@g3/ui";
+import { Button, ErrorBanner, Field, inputClass, useTeamNames } from "@g3/ui";
 import type { InferResponseType } from "hono/client";
 import { type FormEvent, useEffect, useId, useRef, useState } from "react";
 import { api, getErrorMessage } from "./api";
-import { Button, ErrorBanner, Field, inputClass } from "./ui";
 
 // Marking parts received, with where they go in the Inventory app: into storage at a location, or
 // straight into use on a robot. Each part has its own location, which starts as where Inventory

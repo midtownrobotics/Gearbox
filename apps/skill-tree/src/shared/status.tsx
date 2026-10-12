@@ -1,3 +1,4 @@
+import { Badge, tones } from "@g3/ui";
 import type { NodeState } from "./progress";
 
 // Each state reads by its label and icon, not color alone.
@@ -15,21 +16,21 @@ export const STATE: Record<
   available: {
     label: "Available",
     icon: "○",
-    className: "bg-sky-50 text-sky-800 border-sky-300",
+    className: tones.info,
     dot: "bg-sky-500",
     stroke: "stroke-sky-500",
   },
   "in-progress": {
     label: "In progress",
     icon: "◑",
-    className: "bg-amber-50 text-amber-800 border-amber-300",
+    className: tones.warning,
     dot: "bg-amber-500",
     stroke: "stroke-amber-500",
   },
   complete: {
     label: "Complete",
     icon: "✓",
-    className: "bg-emerald-50 text-emerald-800 border-emerald-300",
+    className: tones.success,
     dot: "bg-emerald-500",
     stroke: "stroke-emerald-500",
   },
@@ -40,12 +41,9 @@ export const STATES: NodeState[] = ["locked", "available", "in-progress", "compl
 export function StateBadge({ state }: { state: NodeState }) {
   const s = STATE[state];
   return (
-    <span
-      className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-semibold ${s.className}`}
-    >
-      <span aria-hidden>{s.icon}</span>
+    <Badge colors={s.className} icon={s.icon}>
       {s.label}
-    </span>
+    </Badge>
   );
 }
 

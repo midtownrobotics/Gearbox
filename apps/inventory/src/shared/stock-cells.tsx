@@ -75,7 +75,7 @@ export function QuantityCell({
         }}
       />
       {error && (
-        <span className={`mt-0.5 text-xs text-primary-700 ${compact ? "max-w-16" : "max-w-40"}`}>
+        <span className={`mt-0.5 text-xs text-red-700 ${compact ? "max-w-16" : "max-w-40"}`}>
           {error}
         </span>
       )}

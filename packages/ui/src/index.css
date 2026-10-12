@@ -4,6 +4,10 @@
 @import "./nav-bar.css";
 @import "./theme.css";
 
+/* The shared page parts (components/) are written with Tailwind classes. An app's own build only
+   looks through the app's files, so point it at them too. */
+@source "./components";
+
 @font-face {
   font-family: "Agency FB";
   src: url("./fonts/agency-fb.ttf") format("truetype");

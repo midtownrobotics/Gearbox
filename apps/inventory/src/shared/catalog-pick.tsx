@@ -1,7 +1,7 @@
+import { inputClass } from "@g3/ui";
 import { useMemo, useState } from "react";
 import { type CatalogPart, packOf, searchCatalog, useCatalog } from "./catalog";
 import { ago, formatCents } from "./format";
-import { inputClass } from "./ui";
 
 /** A catalog part's vendor, part number and what was last paid, on one line. */
 export function partLine(

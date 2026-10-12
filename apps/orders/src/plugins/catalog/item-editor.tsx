@@ -1,7 +1,7 @@
+import { Button, Card, ErrorBanner, Field, inputClass } from "@g3/ui";
 import { useState } from "react";
 import { api, getErrorMessage } from "../../shared/api";
 import type { CatalogItem } from "../../shared/types";
-import { Button, Card, ErrorBanner, Field, inputClass } from "../../shared/ui";
 
 /** "Length: 1/2\"" per line ↔ {"Length": "1/2\""}. */
 const optionsText = (options: Record<string, string>) =>

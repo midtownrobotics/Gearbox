@@ -695,7 +695,7 @@ function AnnouncementManager() {
       <form
         onSubmit={async (event) => {
           event.preventDefault();
-          if (!window.confirm(`Publish this announcement in ${names.appTitle("Strategy")}?`))
+          if (!window.confirm(`Publish this announcement in ${names.appTitle("Scouting")}?`))
             return;
           await api("/announcements", {
             method: "POST",

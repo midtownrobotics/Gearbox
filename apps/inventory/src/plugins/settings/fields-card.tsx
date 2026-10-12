@@ -1,16 +1,8 @@
+import { Button, Card, ConfirmButton, Dialog, ErrorBanner, Field, inputClass } from "@g3/ui";
 import type { FieldType, FieldView } from "@g3/worker-inventory";
 import { type FormEvent, useState } from "react";
 import { api, getErrorMessage } from "../../shared/api";
 import { useInventory } from "../../shared/inventory-data";
-import {
-  Button,
-  Card,
-  ConfirmButton,
-  Dialog,
-  ErrorBanner,
-  Field,
-  inputClass,
-} from "../../shared/ui";
 
 // The fields an entry is described by, beyond its name. They're the team's own: what one team
 // calls "Item type" another doesn't track at all.

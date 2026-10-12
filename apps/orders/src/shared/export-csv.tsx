@@ -1,6 +1,6 @@
+import { Button } from "@g3/ui";
 import { useState } from "react";
 import { api, getErrorMessage } from "./api";
-import { Button } from "./ui";
 
 /**
  * Downloads one fiscal year's purchasing spreadsheet (same columns as the team's order sheet).
@@ -35,7 +35,7 @@ export function ExportCsvButton({ fiscalYear }: { fiscalYear?: number }) {
 
   return (
     <div className="flex items-center gap-2">
-      {error && <span className="text-xs text-primary-700">{error}</span>}
+      {error && <span className="text-xs text-red-700">{error}</span>}
       <Button variant="secondary" onClick={download} disabled={busy}>
         {busy ? "Exporting…" : "Export CSV"}
       </Button>

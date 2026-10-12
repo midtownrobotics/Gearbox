@@ -1,8 +1,8 @@
+import { Card, Page, ProgressBar } from "@g3/ui";
 import { Link } from "react-router-dom";
 import { useAuthUser } from "../../shared/auth";
 import { countSkills, percent, treeSkills } from "../../shared/progress";
 import { useSkillData } from "../../shared/skill-data";
-import { Card, Page, ProgressBar } from "../../shared/ui";
 
 /** The whole team at a glance: how far along each tree is, and each student's progress. */
 export function OverviewPage() {
@@ -22,7 +22,7 @@ export function OverviewPage() {
   });
 
   return (
-    <Page title="Overview" wide>
+    <Page title="Overview" width="wide">
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {skillsByTree.map(({ tree, skills }, i) => {
           const done = rows.reduce((sum, row) => sum + row.perTree[i].complete, 0);

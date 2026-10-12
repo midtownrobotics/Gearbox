@@ -1,7 +1,7 @@
+import { Card, ErrorBanner, Loading, Page } from "@g3/ui";
 import { useState } from "react";
 import { api, getErrorMessage } from "../../shared/api";
 import { useAuthUser } from "../../shared/auth";
-import { Card, ErrorBanner, Loading, Page } from "../../shared/ui";
 import { useLoad } from "../../shared/use-load";
 import { PrinterAlerts } from "./alerts";
 import {

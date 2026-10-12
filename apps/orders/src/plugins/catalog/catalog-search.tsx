@@ -1,7 +1,7 @@
+import { inputClass } from "@g3/ui";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { formatCents } from "../../shared/format";
 import type { CatalogItem } from "../../shared/types";
-import { inputClass } from "../../shared/ui";
 import { useLoad } from "../../shared/use-load";
 import { type LoadedCatalog, loadCatalog } from "./catalog-data";
 import { searchIds } from "./search";
@@ -77,7 +77,7 @@ export function CatalogSearch({
       {open && query.trim() && (
         <ul className="absolute z-30 mt-1 w-full max-h-80 overflow-y-auto rounded-lg border border-secondary-200 bg-surface shadow-lg">
           {catalog.error ? (
-            <li className="px-3 py-2 text-sm text-primary-700">{catalog.error}</li>
+            <li className="px-3 py-2 text-sm text-red-700">{catalog.error}</li>
           ) : !catalog.data ? (
             <li className="px-3 py-2 text-sm text-secondary-500">Loading the catalog…</li>
           ) : results.length === 0 ? (

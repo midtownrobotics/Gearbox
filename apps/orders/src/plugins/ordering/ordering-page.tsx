@@ -1,3 +1,4 @@
+import { Button, ErrorBanner, Loading, Page, SuccessBanner, inputClass } from "@g3/ui";
 import { amazonAsin, isAmazonShortLink } from "@g3/worker-orders/product-key";
 import { chargesByCategory } from "@g3/worker-orders/split";
 import { useMemo, useState } from "react";
@@ -10,7 +11,6 @@ import { ExportCsvButton } from "../../shared/export-csv";
 import { formatCents, formatDay, parseDollars, startOfToday } from "../../shared/format";
 import { PRIORITY_ORDER, PriorityBadge } from "../../shared/priority";
 import type { OrderRequest, Vendor } from "../../shared/types";
-import { Button, ErrorBanner, Loading, Page, SuccessBanner, inputClass } from "../../shared/ui";
 import { useLoad } from "../../shared/use-load";
 import { useVendors } from "../../shared/vendors";
 
@@ -423,7 +423,7 @@ function VendorOrder({
           {group.vendor}
         </h2>
         {group.placeToday && (
-          <span className="rounded-full border border-primary-300 bg-primary-50 px-2 py-0.5 text-xs font-semibold text-primary-700">
+          <span className="rounded-full border border-red-300 bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-800">
             ⛔ Place today
           </span>
         )}
@@ -642,7 +642,7 @@ function VendorOrder({
                     <button
                       type="button"
                       onClick={() => trash(r)}
-                      className="rounded px-1.5 py-1 text-secondary-400 hover:bg-primary-50 hover:text-primary-600"
+                      className="rounded px-1.5 py-1 text-secondary-400 hover:bg-red-50 hover:text-red-600"
                       title="Remove from the order (cancels the request)"
                       aria-label={`Remove ${r.title}`}
                     >
@@ -798,7 +798,7 @@ function Nudges({ vendor, itemsTotal }: { vendor: Vendor | undefined; itemsTotal
   if (notes.length === 0) return null;
   const tones = {
     good: "text-emerald-800",
-    warn: "text-primary-700 font-semibold",
+    warn: "text-red-700 font-semibold",
     info: "text-secondary-700",
   };
   return (

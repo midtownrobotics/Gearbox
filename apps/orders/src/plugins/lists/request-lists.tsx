@@ -1,7 +1,7 @@
+import { Button, Card, ErrorBanner, inputClass } from "@g3/ui";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { api, getErrorMessage } from "../../shared/api";
-import { Button, Card, ErrorBanner, inputClass } from "../../shared/ui";
 import { useLoad } from "../../shared/use-load";
 
 /** On a request's page: the lists it's on, and adding it to another. */

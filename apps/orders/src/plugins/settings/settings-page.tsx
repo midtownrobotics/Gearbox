@@ -1,9 +1,3 @@
-import { useAppOn, useTeamNames } from "@g3/ui";
-import { DEFAULT_TEMPLATE, applyTemplate } from "@g3/worker-orders/naming";
-import { type FormEvent, useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
-import { api, getErrorMessage } from "../../shared/api";
-import { forgetIntake } from "../../shared/receive-dialog";
 import {
   Button,
   Card,
@@ -13,7 +7,14 @@ import {
   Page,
   SuccessBanner,
   inputClass,
-} from "../../shared/ui";
+  useAppOn,
+  useTeamNames,
+} from "@g3/ui";
+import { DEFAULT_TEMPLATE, applyTemplate } from "@g3/worker-orders/naming";
+import { type FormEvent, useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import { api, getErrorMessage } from "../../shared/api";
+import { forgetIntake } from "../../shared/receive-dialog";
 import { useLoad } from "../../shared/use-load";
 
 const EXAMPLE = {
