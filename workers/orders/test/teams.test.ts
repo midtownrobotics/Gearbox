@@ -11,7 +11,7 @@ import { fiscalLabel, fiscalRange, fiscalYearOf } from "../src/lib/fiscal";
 const database = (env as unknown as { ORDERS_DB: D1Database }).ORDERS_DB;
 const g3id = (env as unknown as { G3ID: Fetcher }).G3ID;
 
-type Me = { currency: string; fiscalYearStart: number };
+type Me = { currency: string; fiscalYearStart: number; salesTaxPercent: number };
 type Catalog = {
   categories: string[];
   items: { id: number; name: string; priceCents: number | null; requestCount: number }[];
@@ -52,11 +52,14 @@ describe("a team's settings", () => {
     expect(await jsonAs<Me>(student, "/me")).toMatchObject({
       currency: "USD",
       fiscalYearStart: 7,
+      salesTaxPercent: 8.9,
     });
+    // A new team is charged no sales tax until a mentor says what its rate is.
     const team = teamUsers(newTeamId());
     expect(await jsonAs<Me>(team.student, "/me")).toMatchObject({
       currency: "USD",
       fiscalYearStart: 7,
+      salesTaxPercent: 0,
     });
   });
 
@@ -70,6 +73,15 @@ describe("a team's settings", () => {
     expect((await put(team.kioskAdmin, change)).status).toBe(403);
     expect((await put(team.mentor, { currency: "dollars" })).status).toBe(400);
     expect((await put(team.mentor, { fiscalYearStart: 13 })).status).toBe(400);
+    for (const salesTaxPercent of [-1, 101, "8.9"]) {
+      expect((await put(team.mentor, { salesTaxPercent })).status).toBe(400);
+    }
+    expect((await put(team.student, { salesTaxPercent: 5 })).status).toBe(403);
+    expect(
+      await jsonAs(team.mentor, "/settings", { method: "PUT", body: { salesTaxPercent: 8.875 } }),
+    ).toMatchObject({ salesTaxPercent: 8.875 });
+    expect(await jsonAs<Me>(team.student, "/me")).toMatchObject({ salesTaxPercent: 8.875 });
+    expect(await jsonAs<Me>(other.student, "/me")).toMatchObject({ salesTaxPercent: 0 });
 
     expect(await jsonAs(team.mentor, "/settings", { method: "PUT", body: change })).toMatchObject({
       currency: "CAD",

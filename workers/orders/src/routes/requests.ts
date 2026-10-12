@@ -273,6 +273,44 @@ export function describeChanges(
   return parts.length ? parts.join(", ") : null;
 }
 
+/**
+ * Everything a mentor changed on an approved request, for its history: "qty 2 → 3, budget
+ * Mechanical → Tools", or null when nothing changed.
+ */
+async function describeEdit(
+  db: OrdersDb,
+  teamId: string,
+  before: typeof orderRequests.$inferSelect,
+  after: Partial<RequestFields>,
+  categoryName: string | undefined,
+): Promise<string | null> {
+  const parts: string[] = [];
+  const amounts = describeChanges(before, after);
+  if (amounts) parts.push(amounts);
+  if (after.packQuantity !== undefined && after.packQuantity !== before.packQuantity) {
+    parts.push(`pack of ${before.packQuantity} → ${after.packQuantity}`);
+  }
+  if (after.categoryId !== undefined && after.categoryId !== before.categoryId) {
+    const was = await db
+      .select({ name: budgetCategories.name })
+      .from(budgetCategories)
+      .where(inTeam(budgetCategories, teamId, eq(budgetCategories.id, before.categoryId)))
+      .get();
+    parts.push(`budget ${was?.name ?? "unknown"} → ${categoryName}`);
+  }
+  if (after.priority !== undefined && after.priority !== before.priority) {
+    parts.push(`priority ${before.priority} → ${after.priority}`);
+  }
+  if (after.needBy !== undefined && after.needBy !== before.needBy) {
+    // Need-by days are stored as 16:00 UTC that day: the same date in any zone.
+    const day = (ms: number | null) =>
+      ms === null ? "none" : new Date(ms).toISOString().slice(0, 10);
+    parts.push(`need by ${day(before.needBy)} → ${day(after.needBy)}`);
+  }
+  if (after.reason !== undefined && after.reason !== before.reason) parts.push("the reason");
+  return parts.length ? parts.join(", ") : null;
+}
+
 /** The team's request rows (those matching `conditions`) with their category name. */
 function selectRequests(db: OrdersDb, teamId: string, ...conditions: (SQL | undefined)[]) {
   return db
@@ -438,7 +476,11 @@ export const requestsRouter = new Hono<AppEnv>()
     if (listId) await addToList(db, teamId, listId, [row.id], c.get("userDisplayName"));
     return c.json(row, 201);
   })
-  /** Edit while still awaiting a mentor (including swapping in another item): the requester or any mentor. */
+  /**
+   * Edit while still awaiting a mentor (including swapping in another item): the requester or any
+   * mentor. Once approved and until it's ordered, only a mentor: it stays approved, as changed
+   * (a mistake, a new price), with a "reapproved" line in its history.
+   */
   .patch("/:id", requireAuth, catalogReady, requestValidator(true), async (c) => {
     const id = Number(c.req.param("id"));
     const { catalogItemId: picked, catalogCategory, catalogName, ...body } = c.req.valid("json");
@@ -453,13 +495,23 @@ export const requestsRouter = new Hono<AppEnv>()
     if (!current) return c.json({ error: "Request not found." }, 404);
     // Anyone edits a wishlist item; a request, its requester or a mentor while it's waiting.
     const wished = current.status === "wishlist";
+    const approved = current.status === "approved";
     if (!wished && current.requesterId !== c.get("userId") && !hasMentorAccess(c)) {
       return c.json({ error: "Only the requester or a mentor can edit this." }, 403);
     }
-    if (!wished && current.status !== "requested") {
-      return c.json({ error: "Only requests still awaiting a mentor can be edited." }, 409);
+    if (approved && !hasMentorAccess(c)) {
+      return c.json({ error: "Only a mentor can edit an approved request." }, 403);
     }
-    if (body.categoryId !== undefined && !(await openCategory(db, teamId, body.categoryId))) {
+    if (!wished && !approved && current.status !== "requested") {
+      return c.json({ error: "Only requests that haven't been ordered can be edited." }, 409);
+    }
+    // It can stay in its own category even if that's been archived since.
+    const movedTo =
+      body.categoryId !== undefined && body.categoryId !== current.categoryId
+        ? body.categoryId
+        : null;
+    const category = movedTo === null ? null : await openCategory(db, teamId, movedTo);
+    if (movedTo !== null && !category) {
       return c.json({ error: "That budget category doesn't exist or is archived." }, 400);
     }
     if (Object.keys(body).length === 0) return c.json({ error: "Nothing to update." }, 400);
@@ -497,15 +549,22 @@ export const requestsRouter = new Hono<AppEnv>()
     // A new link means a different item (a mentor fixing the wrong part or supplier): keep what
     // it was in the history.
     const replaced = body.url !== undefined && body.url !== current.url;
+    // Approved again as changed: the history says what changed, like an approval does.
+    const changes = approved ? await describeEdit(db, teamId, current, body, category?.name) : null;
     await db.insert(requestEvents).values(
       withTeam(teamId, {
         requestId: id,
         userId: c.get("userId"),
         userName: c.get("userDisplayName"),
-        action: replaced ? "replaced" : "edited",
-        note: replaced
-          ? `Was ${current.quantity}× ${current.title} from ${current.vendor}: ${current.url}`
-          : null,
+        action: approved ? "reapproved" : replaced ? "replaced" : "edited",
+        note:
+          [
+            changes && `Changed ${changes}.`,
+            replaced &&
+              `Was ${current.quantity}× ${current.title} from ${current.vendor}: ${current.url}`,
+          ]
+            .filter(Boolean)
+            .join(" ") || null,
         createdAt: now,
       }),
     );

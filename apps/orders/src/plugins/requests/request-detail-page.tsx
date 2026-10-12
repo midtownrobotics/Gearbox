@@ -25,6 +25,7 @@ const EVENT_LABELS: Record<string, string> = {
   created: "Requested",
   edited: "Edited",
   replaced: "Replaced item",
+  reapproved: "Re-approved",
 };
 
 export function RequestDetailPage() {
@@ -95,9 +96,18 @@ export function RequestDetailPage() {
 
   const r = data;
   const estimate = r.unitPriceCents === null ? null : r.unitPriceCents * r.quantity;
-  // A wishlist item: anyone. A request: its requester or a mentor while it's waiting.
+  // A wishlist item: anyone. A request: its requester or a mentor while it's waiting, and a
+  // mentor once it's approved, until it's ordered.
   const canEdit =
-    wished || (r.status === "requested" && (user.isMentor || r.requesterId === user.userId));
+    wished ||
+    (r.status === "requested" && (user.isMentor || r.requesterId === user.userId)) ||
+    (r.status === "approved" && user.isMentor);
+  // On the same line as the page's other buttons, where there's room.
+  const editButton = canEdit && !editing && (
+    <Button variant="secondary" onClick={() => setEditing(true)}>
+      Edit request
+    </Button>
+  );
 
   return (
     <Page title={wished ? `Wishlist #${r.id}` : `Request #${r.id}`} actions={back}>
@@ -174,20 +184,23 @@ export function RequestDetailPage() {
               >
                 Remove from wishlist
               </Button>
+              {editButton}
             </div>
           )}
-          <RequestActions request={r} onChanged={reload} />
-          {canEdit && !editing && (
-            <Button variant="secondary" onClick={() => setEditing(true)}>
-              Edit request
-            </Button>
-          )}
+          {/* Keyed so its quantity and price boxes follow an edit. */}
+          <RequestActions
+            key={r.updatedAt}
+            request={r}
+            onChanged={reload}
+            extra={wished ? undefined : editButton}
+          />
         </div>
       </Card>
 
-      {/* Approved: its vendor's whole cart, to place it from here (mentors place orders). */}
+      {/* Approved: its vendor's whole cart, to place it from here (mentors place orders). Keyed so
+          the cart follows an edit to this request. */}
       {r.status === "approved" && user.isMentor && (
-        <VendorCart vendor={r.vendor} onChanged={reload} />
+        <VendorCart key={r.updatedAt} vendor={r.vendor} onChanged={reload} />
       )}
 
       {/* Lists are of requests: a wishlist item joins one once it's promoted. */}
@@ -362,7 +375,7 @@ function EditForm({ request, onDone }: { request: RequestDetail; onDone: () => v
         )}
         <div className="mt-4 flex gap-2">
           <Button type="submit" disabled={busy}>
-            {busy ? "Saving…" : "Save"}
+            {busy ? "Saving…" : request.status === "approved" ? "Save and re-approve" : "Save"}
           </Button>
           <Button variant="secondary" onClick={onDone}>
             Cancel

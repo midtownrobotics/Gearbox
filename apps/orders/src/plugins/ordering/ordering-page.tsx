@@ -3,6 +3,7 @@ import { chargesByCategory } from "@g3/worker-orders/split";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, getErrorMessage } from "../../shared/api";
+import { useAuthUser } from "../../shared/auth";
 import { cartLinks } from "../../shared/cart";
 import { Deadline, isLate } from "../../shared/deadline";
 import { ExportCsvButton } from "../../shared/export-csv";
@@ -24,9 +25,6 @@ type LineEdit = { quantity: string; price: string };
 
 const vendorKey = (vendor: string) => vendor.trim().toLowerCase();
 const dollars = (cents: number | null) => (cents === null ? "" : (cents / 100).toFixed(2));
-
-/** The team's sales tax rate, charged by every vendor that doesn't have our exemption on file. */
-const TAX_RATE = 0.089;
 
 /** Whether the vendor has an unexpired tax-exempt certificate on file. */
 const isTaxExempt = (vendor: Vendor | undefined) =>
@@ -204,6 +202,8 @@ function VendorOrder({
   /** A line was canceled (trashed) instead of ordered. */
   onRemoved: (message: string) => void;
 }) {
+  // The team's sales tax rate (Settings), charged by every vendor without its exemption on file.
+  const { salesTaxPercent } = useAuthUser();
   const [sacBusy, setSacBusy] = useState(false);
   const [sacLink, setSacLink] = useState<string | null>(null);
   const [edits, setEdits] = useState<Record<number, LineEdit>>(() =>
@@ -248,9 +248,11 @@ function VendorOrder({
   );
   const shippingCents = parseDollars(shipping) ?? 0;
   const itemsTotal = parsed.reduce((n, l) => n + (l.ok ? l.quantity * (l.price as number) : 0), 0);
-  // Tax starts at 8.9% of the items (nothing at tax-exempt vendors) and follows the items total
-  // until someone types their own amount.
-  const defaultTaxCents = isTaxExempt(group.profile) ? 0 : Math.round(itemsTotal * TAX_RATE);
+  // Tax starts at the team's rate on the items (nothing at tax-exempt vendors) and follows the
+  // items total until someone types their own amount.
+  const defaultTaxCents = isTaxExempt(group.profile)
+    ? 0
+    : Math.round((itemsTotal * salesTaxPercent) / 100);
   const taxText = tax ?? dollars(defaultTaxCents);
   const taxCents = parseDollars(taxText) ?? 0;
   const feesOk = !Number.isNaN(shippingCents) && !Number.isNaN(taxCents);
@@ -682,7 +684,7 @@ function VendorOrder({
               title={
                 isTaxExempt(group.profile)
                   ? "Tax exempt: starts at $0"
-                  : "Starts at 8.9% of the items; type to change it"
+                  : `Starts at ${salesTaxPercent}% of the items; type to change it`
               }
             />
           </label>

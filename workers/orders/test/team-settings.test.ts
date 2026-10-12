@@ -21,6 +21,7 @@ describe("Orders' team settings", () => {
     expect(state.values).toEqual({
       currency: "USD",
       fiscalYearStart: 7,
+      salesTaxPercent: 0,
       namingTemplate: "{vendor} {sku} – {title}",
       inventoryRequired: false,
     });
