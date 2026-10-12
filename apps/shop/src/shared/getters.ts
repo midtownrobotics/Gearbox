@@ -5,6 +5,7 @@ import type {
   Blueprint,
   KioskPresence,
   OnshapePartLink,
+  OnshapeRelease,
   PartDefinition,
   PartFile,
   PartInstance,
@@ -144,6 +145,13 @@ export async function fetchOnshapeLinks(): Promise<OnshapePartLink[]> {
   const res = await api.onshape.links.$get();
   if (!res.ok) throw new Error(`Failed to fetch Onshape links (${res.status})`);
   return ((await res.json()) as { links: OnshapePartLink[] }).links;
+}
+
+/** The team's Onshape releases with their parts, newest first. */
+export async function fetchOnshapeReleases(): Promise<OnshapeRelease[]> {
+  const res = await api.onshape.releases.$get();
+  if (!res.ok) throw new Error(`Failed to fetch Onshape releases (${res.status})`);
+  return ((await res.json()) as { releases: OnshapeRelease[] }).releases;
 }
 
 /** Every file, or only files covering some instance of one part definition. */

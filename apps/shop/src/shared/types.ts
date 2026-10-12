@@ -125,3 +125,29 @@ export type PartFile = {
   createdAt: number;
   assignments: FileAssignment[];
 };
+
+/** One Onshape release, as GET /onshape/releases gives it. */
+export type OnshapeRelease = {
+  id: number;
+  releaseId: string;
+  /** From the release package; null for releases from before it was kept. */
+  name: string | null;
+  notes: string | null;
+  state: string | null;
+  madeBy: string | null;
+  madeAt: string | null;
+  /** When it was approved (ISO). */
+  releasedAt: string;
+  approvers: { name: string; approvedAt: string | null; rejectedAt: string | null }[];
+  comments: { by: string | null; message: string; at: string | null }[];
+  links: { release: string; document: string | null };
+  parts: {
+    id: number;
+    partNumber: string;
+    name: string | null;
+    description: string | null;
+    revision: string | null;
+    quantity: number | null;
+    links: { part: string | null; drawing: string | null };
+  }[];
+};
