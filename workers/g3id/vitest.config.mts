@@ -1,7 +1,9 @@
 import { workerTestConfig } from "@g3/testing/config";
 
+const sent: { channel: string; text: string }[] = [];
+
 // Slack's API as G3ID's tests see it: installing (oauth.v2.access) answers for the workspace named
-// in the code ("ws:T123"), and messages go nowhere.
+// in the code ("ws:T123"), its channels are three made-up ones, and messages go nowhere.
 const slack = (request: Request) => {
   const url = new URL(request.url);
   if (url.hostname !== "slack.com") return new Response("Not stubbed", { status: 502 });
@@ -25,9 +27,35 @@ const slack = (request: Request) => {
       user: { real_name: `Member ${user}`, profile: { email: `${user}@slack.test` } },
     });
   }
-  if (url.pathname === "/api/conversations.open") {
-    return Response.json({ ok: true, channel: { id: "D1", is_im: true } });
+  // A bot installed before it could read channels ("xoxb-old") is refused.
+  if (url.pathname === "/api/conversations.list") {
+    if (request.headers.get("Authorization") === "Bearer xoxb-old") {
+      return Response.json({ ok: false, error: "missing_scope" });
+    }
+    return Response.json({
+      ok: true,
+      channels: [
+        { id: "C0000000002", name: "shop", is_private: false, is_member: false },
+        { id: "C0000000001", name: "announcements", is_private: false, is_member: true },
+        { id: "G0000000003", name: "mentors", is_private: true, is_member: true },
+      ],
+    });
   }
+  // A DM opens a channel named after the person ("D-U123"); each message is recorded, and a GET
+  // of /__sent gives them back.
+  if (url.pathname === "/api/conversations.open") {
+    return request.json().then((body) => {
+      const { users } = body as { users: string };
+      return Response.json({ ok: true, channel: { id: `D-${users}`, is_im: true } });
+    });
+  }
+  if (url.pathname === "/api/chat.postMessage") {
+    return request.json().then((body) => {
+      sent.push(body as { channel: string; text: string });
+      return Response.json({ ok: true });
+    });
+  }
+  if (url.pathname === "/__sent") return Response.json(sent);
   return Response.json({ ok: true });
 };
 

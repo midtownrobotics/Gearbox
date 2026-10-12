@@ -1,10 +1,10 @@
-import { platformUrl, platformUrlVia, teamAppUrlVia } from "@g3/site-config";
+import { consoleUrlVia, platformUrl, platformUrlVia, teamAppUrlVia } from "@g3/site-config";
 import { withApiPrefix } from "@g3/site-config/worker";
 import { SLACK_BOT_SCOPES } from "@g3/slack";
 import { and, count, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import packageJson from "../package.json";
-import { consoleRouter } from "./console";
+import { consoleRouter, tellOperators } from "./console";
 import { numberReports, teams } from "./db/schema";
 import { db, g3id, now } from "./lib";
 import { clearSwitchedOff, enabledApps, logTeam, teamRouter } from "./team";
@@ -248,6 +248,14 @@ const routes = app
         message,
         createdAt: now(),
       });
+    // Every operator hears of it on Slack: the number and where to read it, never the reporter's
+    // details, which stay in the console.
+    c.executionCtx.waitUntil(
+      tellOperators(
+        c.env,
+        `:triangular_flag_on_post: New report about team ${teamNumber}. Read it in the console: ${consoleUrlVia(c.env.LOCAL_GATEWAY_URL || undefined)}/console/reports`,
+      ),
+    );
     return c.json({ ok: true }, 201);
   })
   // Step 3: the code the founder sends to the bot.

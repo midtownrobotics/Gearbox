@@ -49,6 +49,15 @@ To deploy staging by hand: `pnpm db:migrate:staging`, then `pnpm deploy:staging`
 6. **Deploy:** run the workflow (Actions → staging → Run workflow), or push to `main`.
 7. **The first operator:** as in "The operators' console" below, with `--env staging`.
 
+### Copying G3's data to staging
+
+`pnpm staging:copy-team` copies the site team's data (G3's) from production's databases into staging's, replacing what staging has for it, so a release and its migrations can be tried on real data first. Production is only read. Run `pnpm staging:copy-team -- --dry-run` first: it shows how many rows each table would bring and writes the SQL it would run. `--only g3id,orders` limits it to some databases.
+
+- **What's copied:** every table's rows for G3, the tables that belong to it through another (sign-ins through accounts, the skill trees through the tree set), Orders' starter catalog, and all of Scouting (only G3 has it).
+- **What isn't:** sessions, sign-in and kiosk codes, kiosks and PINs, the Slack installation, settings encrypted with production's `SECRETS_KEY` (Onshape's keys, Share-A-Cart), sign-in providers' tokens, the edge box's key, each student's browsing (Edge's site usage), caches, the platform's operator records, KV (everyone signs in again on staging) and R2 files (drawings and field maps show as missing). Staging's own sessions and kiosks for G3 are cleared.
+- **First:** staging must be on the same migrations as production; a database that isn't is skipped with a note. Deploy staging (or `pnpm db:migrate:staging`) and run it again.
+- **Only G3:** copying another team's data would go against the privacy draft (operators look at a team's data only to fix what it reports, and a removed member is gone within 30 days), so the script doesn't offer it. G3's copy on staging should be refreshed or cleared after a member is removed in production.
+
 Not set up yet: **Slack**. Team sign-up and Slack sign-in need a Slack app of staging's own (a Slack app has one events address); until then staging has no `SLACK_*` settings, and members sign in with Google, GitHub or Steam.
 
 ## Switching over from Pages and per-app API domains (once, done)
@@ -161,5 +170,5 @@ Portal no longer has G3's logo built in. After the release, a G3ID admin sets G3
 
 ## Other outside services
 
-- **Slack for other teams:** in the Slack app's settings, set its display name to **Gearbot** (`slackBotName` in `site.ts`), turn on distribution (Manage Distribution), add the redirect URL `https://id.frcgearbox.com/api/slack/oauth/callback`, give the bot the scopes `commands, chat:write, im:write, im:history, users:read, users:read.email`, and subscribe to the `app_uninstalled` and `tokens_revoked` events. Then set G3ID's secrets `SLACK_CLIENT_ID`, `SLACK_CLIENT_SECRET` (Basic Information → App Credentials) and `SECRETS_KEY` (`openssl rand -base64 32`; keep it, since it decrypts the stored tokens). Team admins connect their workspace on G3ID's Admin → Slack page; G3 can keep its current settings.
+- **Slack for other teams:** in the Slack app's settings, set its display name to **Gearbot** (`slackBotName` in `site.ts`), turn on distribution (Manage Distribution), add the redirect URL `https://id.frcgearbox.com/api/slack/oauth/callback`, give the bot the scopes `commands, chat:write, im:write, im:history, users:read, users:read.email, channels:read, groups:read` (the last two let admins choose channels by name; a workspace connected before they were added has to be connected again on the Integrations page, and until then the channel boxes take a channel ID), and subscribe to the `app_uninstalled` and `tokens_revoked` events. Then set G3ID's secrets `SLACK_CLIENT_ID`, `SLACK_CLIENT_SECRET` (Basic Information → App Credentials) and `SECRETS_KEY` (`openssl rand -base64 32`; keep it, since it decrypts the stored tokens). Team admins connect their workspace on G3ID's Admin → Slack page; G3 can keep its current settings.
 

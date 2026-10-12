@@ -4,6 +4,14 @@ import { and, desc, eq, isNull, lte } from "drizzle-orm";
 import { Hono } from "hono";
 import { type TEAM_ACTIONS, teamApps, teamAuditLog, teams } from "./db/schema";
 import { accounts, db, g3id, now } from "./lib";
+import {
+  changedParts,
+  dmCandidates,
+  notificationSettings,
+  parseSettings,
+  saveSettings,
+  visibleNotifications,
+} from "./notifications";
 import { ALWAYS_ON, MANIFESTS, callHook, fetchExport, inLibrary, isAppName } from "./registry";
 import type { AppEnv } from "./types";
 
@@ -17,6 +25,9 @@ import type { AppEnv } from "./types";
 // data for GRACE_S, so switching it on again brings everything back. After that the daily cron
 // (clearSwitchedOff) has the app delete the team's data. Before switching one off an admin can
 // download its data (its export hook), and every admin is told on Slack when one goes on or off.
+//
+// Members also read the platform's notifications here, and admins choose where each type goes
+// (src/notifications.ts).
 
 /** How long a switched-off app's data is kept (the privacy policy's 90 days). */
 export const GRACE_S = 90 * 24 * 60 * 60;
@@ -131,6 +142,52 @@ export const teamRouter = new Hono<AppEnv>()
       })),
       isAdmin: c.get("userIsAdmin"),
     });
+  })
+  // The platform's notifications this member sees on the home page (the team's settings say who
+  // sees each type).
+  .get("/notifications", requireAuth, async (c) =>
+    c.json(
+      await visibleNotifications(
+        c.env,
+        c.get("teamId"),
+        c.get("userIsAdmin") && c.get("sessionType") !== "pin",
+      ),
+    ),
+  )
+  .use("/notification-settings", requireAdmin)
+  // Where the team wants each type: the home page, Slack channels, and members to DM (the team's
+  // active members to choose from).
+  .get("/notification-settings", async (c) => {
+    const teamId = c.get("teamId");
+    const [settings, members] = await Promise.all([
+      notificationSettings(c.env, teamId),
+      dmCandidates(c.env, teamId),
+    ]);
+    if (!members) return c.json({ error: "Couldn't load your team's members." }, 502);
+    return c.json({ settings, members });
+  })
+  .put("/notification-settings", async (c) => {
+    const teamId = c.get("teamId");
+    const members = await dmCandidates(c.env, teamId);
+    if (!members) return c.json({ error: "Couldn't load your team's members." }, 502);
+    const parsed = parseSettings(
+      await c.req.json().catch(() => null),
+      new Set(members.map((m) => m.id)),
+    );
+    if (typeof parsed === "string") return c.json({ error: parsed }, 400);
+    const before = await notificationSettings(c.env, teamId);
+    await saveSettings(c.env, teamId, c.get("userId"), parsed);
+    const changed = changedParts(before, parsed);
+    if (changed.length) {
+      await logTeam(db(c.env), {
+        teamId,
+        userId: c.get("userId"),
+        action: "settings_changed",
+        app: "portal",
+        details: { what: "Notifications", changed },
+      });
+    }
+    return c.json({ settings: parsed });
   })
   .use("/library", requireAdmin)
   .use("/library/*", requireAdmin)

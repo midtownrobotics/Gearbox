@@ -3,6 +3,7 @@ import { exports } from "cloudflare:workers";
 import { site, teamKey } from "@g3/site-config";
 import { type TestUser, admin, asUser, kioskAdmin, student } from "@g3/testing/users";
 import { beforeAll, describe, expect, it } from "vitest";
+import { tellOperators } from "../src/console";
 import type { AppEnv } from "../src/types";
 
 // The operators' console (roadmap 2.8). G3ID is stubbed in vitest.config.mts: every team has a
@@ -323,5 +324,63 @@ describe("reports and operators", () => {
     }[];
     expect(actions.length).toBeGreaterThan(0);
     expect(actions[0].operatorName).toBe(`Name of ${operator.id}`);
+  });
+});
+
+describe("notifications", () => {
+  const inADay = () => Math.floor(Date.now() / 1000) + 86400;
+  const create = (user: TestUser, body: unknown, origin?: string | null) =>
+    call(user, "/notifications", { method: "POST", body, origin });
+
+  it("are written and deleted by operators only, and logged", async () => {
+    const input = {
+      type: "warning",
+      summary: "Down Saturday",
+      body: "From 8 to 10 am.",
+      expiresAt: inADay(),
+    };
+    expect((await create(student, input)).status).toBe(403);
+    expect((await create(kioskAdmin, input)).status).toBe(403);
+    expect((await create(operator, input, null)).status).toBe(403);
+    expect((await call(student, "/notifications")).status).toBe(403);
+
+    const res = await create(operator, input);
+    expect(res.status).toBe(201);
+    const { id } = (await res.json()) as { id: string };
+    const list = (await (await call(operator, "/notifications")).json()) as { id: string }[];
+    expect(list.find((n) => n.id === id)).toMatchObject({ ...input, createdBy: operator.id });
+    expect(
+      await row("SELECT action FROM operator_actions WHERE details LIKE ?", `%${id}%`),
+    ).toMatchObject({ action: "create_notification" });
+
+    expect((await call(student, `/notifications/${id}`, { method: "DELETE" })).status).toBe(403);
+    expect((await call(operator, `/notifications/${id}`, { method: "DELETE" })).status).toBe(200);
+    expect((await call(operator, `/notifications/${id}`, { method: "DELETE" })).status).toBe(404);
+    expect(await row("SELECT id FROM notifications WHERE id = ?", id)).toBeNull();
+  });
+
+  it("need a known type, a short description, the full text and an expiry", async () => {
+    const ok = { type: "critical", summary: "Read this", body: "Now.", expiresAt: inADay() };
+    expect((await create(operator, { ...ok, type: "urgent" })).status).toBe(400);
+    expect((await create(operator, { ...ok, summary: " " })).status).toBe(400);
+    expect((await create(operator, { ...ok, summary: "x".repeat(141) })).status).toBe(400);
+    expect((await create(operator, { ...ok, body: "" })).status).toBe(400);
+    const nowS = Math.floor(Date.now() / 1000);
+    expect((await create(operator, { ...ok, expiresAt: undefined })).status).toBe(400);
+    expect((await create(operator, { ...ok, expiresAt: nowS - 60 })).status).toBe(400);
+    expect((await create(operator, { ...ok, expiresAt: nowS + 400 * 86400 })).status).toBe(400);
+    expect((await create(operator, { ...ok, type: "info" })).status).toBe(201);
+  });
+});
+
+describe("telling operators", () => {
+  it("DMs every operator on their own team's Slack", async () => {
+    const text = `New report ${crypto.randomUUID()}`;
+    await tellOperators(testEnv, text);
+    // The G3ID stub puts every account on frc1648 and records what's sent.
+    const sent = (await (
+      await testEnv.G3ID.fetch("http://g3id/api/internal/teams/frc1648/slack/dm-members")
+    ).json()) as { userIds: string[]; text: string }[];
+    expect(sent.find((m) => m.text === text)?.userIds).toContain(operator.id);
   });
 });

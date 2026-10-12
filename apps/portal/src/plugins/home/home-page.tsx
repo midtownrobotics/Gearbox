@@ -33,6 +33,7 @@ import {
   Match13Icon,
   StatboticsIcon,
 } from "./link-icons";
+import { HomeNotifications } from "./notifications";
 
 // The team's apps show their own app icon, its accent in the team's primary color (TeamIcon).
 // Other links are drawn to match it: a black tile with a white symbol, and a ↗ in that color for
@@ -324,6 +325,8 @@ export function HomePage() {
               );
             })}
         </div>
+
+        <HomeNotifications />
       </div>
     </main>
   );
