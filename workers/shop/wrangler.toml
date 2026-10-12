@@ -91,3 +91,49 @@ command = "pnpm --filter @g3/shop build"
 directory = "../../apps/shop/dist"
 not_found_handling = "single-page-application"
 run_worker_first = ["/api/*"]
+
+# ---- Staging: written by `pnpm configure` from [env.production]; don't edit below. ----
+
+[env.staging]
+name = "shop-staging"
+workers_dev = false
+
+[env.staging.define]
+__G3_STAGING__ = "true"
+
+[[env.staging.services]]
+binding = "G3ID"
+service = "g3id-staging"
+
+[[env.staging.services]]
+binding = "EDGE"
+service = "edge-staging"
+
+[[env.staging.kv_namespaces]]
+binding = "SESSIONS"
+id = "85741df814134e55b70b4cbc725240dc"
+
+[[env.staging.d1_databases]]
+binding = "SHOP_DB"
+database_name = "g3-shop-staging"
+database_id = "cea974b5-9a78-4125-9831-557144f30cae"
+migrations_dir = "src/db/migrations"
+
+[[env.staging.r2_buckets]]
+binding = "DRAWINGS"
+bucket_name = "g3-bucket-staging"
+
+[[env.staging.queues.producers]]
+binding = "BOM_QUEUE"
+queue = "bom-fetch-jobs-staging"
+
+[[env.staging.queues.consumers]]
+queue = "bom-fetch-jobs-staging"
+
+[env.staging.build]
+command = "GEARBOX_STAGING=1 pnpm --filter @g3/shop build"
+
+[env.staging.assets]
+directory = "../../apps/shop/dist"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]

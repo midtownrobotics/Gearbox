@@ -10,6 +10,11 @@ name: release
 # Pushes go through a deploy key (secret RELEASE_DEPLOY_KEY) that's on the bypass list of the
 # main and public rulesets, since both only accept changes through pull requests. Its push to
 # public starts this workflow again, which then finds nothing to release.
+#
+# Then it deploys production (deploy.yml): migrations, every worker, the gateway. Only a run that
+# finds nothing left to release deploys, so what goes live is always a released commit: merging
+# the release PR commits the release, and that push starts this workflow again, which deploys it.
+# A push to public with no changesets deploys straight away.
 
 on:
   push:
@@ -23,6 +28,8 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    outputs:
+      released: ${{ steps.commit.outputs.released }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -72,3 +79,11 @@ jobs:
           git checkout -B main origin/main
           git merge --no-ff public -m "Merge release $version into main"
           git push origin main
+
+  deploy:
+    needs: release
+    if: needs.release.outputs.released != 'true'
+    uses: ./.github/workflows/deploy.yml
+    with:
+      environment: production
+    secrets: inherit

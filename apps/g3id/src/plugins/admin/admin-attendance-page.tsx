@@ -1,5 +1,5 @@
 import { apiPath } from "@g3/site-config";
-import { Loader2 } from "lucide-react";
+import { Button, Card, ErrorBanner, Loading, Page, inputClass } from "@g3/ui";
 import { useCallback, useEffect, useState } from "react";
 import { ManageMemberPanel, type MemberSummary, SignedInPanel } from "./admin-attendance-tools";
 
@@ -82,11 +82,9 @@ function AttendanceSettingsCard({ onSaved }: { onSaved: () => void }) {
     }
   }
 
-  const fieldClass =
-    "rounded-lg bg-surface border border-secondary-300 px-3 py-2 text-sm text-secondary-900 focus:outline-none focus:border-primary-500";
+  const fieldClass = `${inputClass} !w-auto`;
   return (
-    <section className="bg-surface border border-secondary-200 rounded-lg p-4">
-      <h2 className="text-lg font-bold text-secondary-900 mb-1">School year and sign-out limit</h2>
+    <Card title="School year and sign-out limit">
       <p className="text-sm text-secondary-600 mb-4">
         Hours count per school year. A session left open past the auto sign-out limit is closed and
         doesn't count.
@@ -113,7 +111,7 @@ function AttendanceSettingsCard({ onSaved }: { onSaved: () => void }) {
               max={31}
               value={settings.schoolYearStartDay}
               onChange={(e) => update({ schoolYearStartDay: Number(e.target.value) })}
-              className={`${fieldClass} w-20`}
+              className={`${inputClass} !w-20`}
               aria-label="School year start day"
             />
           </span>
@@ -126,21 +124,19 @@ function AttendanceSettingsCard({ onSaved }: { onSaved: () => void }) {
             max={24}
             value={settings.autoSignOutHours}
             onChange={(e) => update({ autoSignOutHours: Number(e.target.value) })}
-            className={`${fieldClass} w-24`}
+            className={`${inputClass} !w-24`}
           />
         </label>
-        <button
-          type="button"
-          onClick={save}
-          disabled={!changed || status === "saving"}
-          className="inline-flex items-center gap-2 rounded-lg bg-primary-500 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-600 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {status === "saving" && <Loader2 size={14} className="animate-spin" />}
-          {status === "saved" && !changed ? "Saved" : "Save"}
-        </button>
+        <Button onClick={save} disabled={!changed || status === "saving"}>
+          {status === "saving" ? "Saving…" : status === "saved" && !changed ? "Saved" : "Save"}
+        </Button>
       </div>
-      {error && <p className="mt-3 text-sm text-red-700">{error}</p>}
-    </section>
+      {error && (
+        <div className="mt-3">
+          <ErrorBanner message={error} />
+        </div>
+      )}
+    </Card>
   );
 }
 
@@ -173,25 +169,16 @@ export function AdminAttendancePage() {
   }, [load]);
 
   return (
-    <main className="flex-1 px-4 py-8 max-w-3xl mx-auto w-full">
-      <h1 className="text-3xl font-bold text-secondary-900 mb-6">Attendance Settings</h1>
-
-      <div className="space-y-6">
-        {error && <p className="text-sm text-red-700">{error}</p>}
-        {!members && !error && (
-          <div className="flex items-center justify-center py-16 gap-2 text-secondary-600">
-            <Loader2 size={20} className="animate-spin" />
-            <span>Loading attendance...</span>
-          </div>
-        )}
-        {members && (
-          <>
-            <SignedInPanel members={members} onChanged={load} />
-            <ManageMemberPanel members={members} onChanged={load} />
-          </>
-        )}
-        <AttendanceSettingsCard onSaved={load} />
-      </div>
-    </main>
+    <Page title="Attendance" width="narrow">
+      {error && <ErrorBanner message={error} />}
+      {!members && !error && <Loading />}
+      {members && (
+        <>
+          <SignedInPanel members={members} onChanged={load} />
+          <ManageMemberPanel members={members} onChanged={load} />
+        </>
+      )}
+      <AttendanceSettingsCard onSaved={load} />
+    </Page>
   );
 }

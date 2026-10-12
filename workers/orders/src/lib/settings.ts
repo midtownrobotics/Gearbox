@@ -6,7 +6,7 @@ import type { FiscalCalendar } from "./fiscal";
 import { DEFAULT_TEMPLATE } from "./naming";
 
 // A team's settings: one row per key in app_settings, kept to the team. Mentors edit the ones in
-// TeamSettings on the Settings page (PUT /settings); the rest are the app's own bookkeeping
+// TeamSettings on the Admin page (PUT /settings); the rest are the app's own bookkeeping
 // (Share-A-Cart's connection, whether the starter catalog was copied).
 
 /** A new team's calendar and money until a mentor changes them. G3 has its own rows (0018). */
@@ -14,6 +14,8 @@ export const DEFAULTS = {
   currency: "USD",
   /** July: FRC seasons and school years. */
   fiscalYearStart: 7,
+  /** No tax until a mentor says what the team is charged. */
+  salesTaxPercent: 0,
 };
 
 export type TeamSettings = {
@@ -21,6 +23,8 @@ export type TeamSettings = {
   currency: string;
   /** 1–12: the month the team's fiscal year (and budgets) start. */
   fiscalYearStart: number;
+  /** 0–100: the sales tax a new order starts with, as a percent of its items (the Carts page). */
+  salesTaxPercent: number;
   /** How new requests are named (lib/naming.ts). */
   namingTemplate: string;
   /** Whether receiving a part must say where it goes in Inventory (lib/inventory.ts). */
@@ -30,6 +34,7 @@ export type TeamSettings = {
 const KEYS = {
   currency: "currency",
   fiscalYearStart: "fiscal_year_start",
+  salesTaxPercent: "sales_tax_percent",
   namingTemplate: "naming_template",
   inventoryRequired: "inventory_required",
 } as const satisfies Record<keyof TeamSettings, string>;
@@ -72,10 +77,12 @@ export async function teamSettings(db: OrdersDb, teamId: string): Promise<TeamSe
     .all();
   const value = (key: string) => rows.find((r) => r.key === key)?.value;
   const start = Number(value(KEYS.fiscalYearStart));
+  const tax = Number(value(KEYS.salesTaxPercent));
   return {
     currency: value(KEYS.currency) ?? DEFAULTS.currency,
     fiscalYearStart:
       Number.isInteger(start) && start >= 1 && start <= 12 ? start : DEFAULTS.fiscalYearStart,
+    salesTaxPercent: tax >= 0 && tax <= 100 ? tax : DEFAULTS.salesTaxPercent,
     namingTemplate: value(KEYS.namingTemplate) ?? DEFAULT_TEMPLATE,
     inventoryRequired: value(KEYS.inventoryRequired) === "true",
   };

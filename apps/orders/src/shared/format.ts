@@ -21,7 +21,7 @@ export function parseDollars(value: string): number | null {
 
 /** A moment's date, where the viewer is. */
 export function formatDate(ms: number): string {
-  return new Date(ms).toLocaleDateString("en-US", {
+  return new Date(ms).toLocaleDateString(undefined, {
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -29,7 +29,7 @@ export function formatDate(ms: number): string {
 }
 
 export function formatDateTime(ms: number): string {
-  return new Date(ms).toLocaleString("en-US", {
+  return new Date(ms).toLocaleString(undefined, {
     month: "short",
     day: "numeric",
     hour: "numeric",
@@ -42,7 +42,7 @@ export function formatDateTime(ms: number): string {
  * same day wherever the team is.
  */
 export function formatDay(ms: number): string {
-  return new Date(ms).toLocaleDateString("en-US", {
+  return new Date(ms).toLocaleDateString(undefined, {
     month: "short",
     day: "numeric",
     year: "numeric",

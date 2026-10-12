@@ -1,3 +1,4 @@
+import { Button, Card, ErrorBanner, Page, SuccessBanner, inputClass } from "@g3/ui";
 import type { Setup, SetupSummary } from "@g3/worker-inventory";
 import { type ChangeEvent, type FormEvent, useRef, useState } from "react";
 import { api, getErrorMessage } from "../../shared/api";
@@ -5,7 +6,6 @@ import { useAuthUser } from "../../shared/auth";
 import { count } from "../../shared/format";
 import { useInventory } from "../../shared/inventory-data";
 import type { Named } from "../../shared/places";
-import { Button, Card, ErrorBanner, Page, SuccessBanner, inputClass } from "../../shared/ui";
 import { FieldsCard } from "./fields-card";
 import { LocationsCard } from "./locations-card";
 
@@ -94,7 +94,7 @@ function NamesCard({
                 </form>
               ) : deleting === row.id ? (
                 <div className="flex flex-wrap items-center gap-3">
-                  <span className="min-w-0 flex-1 text-sm text-primary-700">
+                  <span className="min-w-0 flex-1 text-sm text-red-700">
                     Delete the {what} “{row.name}”?
                   </span>
                   <button
@@ -355,13 +355,13 @@ export function SettingsPage() {
   const { places } = useInventory();
   if (!isAdmin) {
     return (
-      <Page title="Settings">
+      <Page title="Admin">
         <ErrorBanner message="Only admins can change Inventory's settings." />
       </Page>
     );
   }
   return (
-    <Page title="Settings">
+    <Page title="Admin">
       <SetupCard />
       <LocationsCard />
       <FieldsCard />

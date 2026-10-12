@@ -1,4 +1,14 @@
-import { GraduationCap, Loader2, Search, Shield, ShieldOff } from "lucide-react";
+import {
+  Badge,
+  Button,
+  Chip,
+  ConfirmQuestion,
+  ErrorBanner,
+  Loading,
+  Page,
+  inputClass,
+} from "@g3/ui";
+import { GraduationCap, Search, Shield, ShieldOff } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../../lib/api";
@@ -20,8 +30,8 @@ const SORTS = {
   "joined-old": { label: "Joined: oldest first", by: "joined", descending: false },
   "name-az": { label: "Name: A to Z", by: "name", descending: false },
   "name-za": { label: "Name: Z to A", by: "name", descending: true },
-  "login-new": { label: "Last login: most recent first", by: "login", descending: true },
-  "login-old": { label: "Last login: longest ago first", by: "login", descending: false },
+  "login-new": { label: "Last sign-in: most recent first", by: "login", descending: true },
+  "login-old": { label: "Last sign-in: longest ago first", by: "login", descending: false },
 } as const;
 type Sort = keyof typeof SORTS;
 
@@ -49,8 +59,7 @@ function sortUsers(users: User[], sort: Sort): User[] {
   });
 }
 
-const selectClass =
-  "rounded-lg bg-surface border border-secondary-300 px-3 py-1.5 text-sm text-secondary-900 focus:outline-none focus:border-primary-500";
+const selectClass = `${inputClass} !w-auto`;
 
 const isFilter = (v: string | null): v is Filter => FILTERS.includes(v as Filter);
 const isSort = (v: string | null): v is Sort => v !== null && v in SORTS;
@@ -157,8 +166,11 @@ export function AdminUsersPage() {
     }
   }
 
+  /** The user whose Delete was pressed: asked about under their row first. */
+  const [askingDelete, setAskingDelete] = useState<string | null>(null);
+
   async function handleDelete(userId: string) {
-    if (!window.confirm("Permanently delete this user and all their data?")) return;
+    setAskingDelete(null);
     setDeleting((prev) => new Set(prev).add(userId));
     setActionError(null);
     try {
@@ -290,7 +302,7 @@ export function AdminUsersPage() {
       "Name",
       "Email",
       "Joined Date",
-      "Last Login",
+      "Last Sign-in",
       "Admin",
       "Mentor",
       ...authMethods,
@@ -331,110 +343,86 @@ export function AdminUsersPage() {
   }
 
   return (
-    <main className="flex-1 px-4 py-8 max-w-2xl mx-auto w-full">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-secondary-900">Users</h1>
-        <button
-          type="button"
-          onClick={exportActiveUsersToCSV}
-          className="px-4 py-2 rounded-lg text-sm font-medium bg-primary-500 hover:bg-primary-600 text-white transition-colors"
-        >
-          Export Active Users (CSV)
-        </button>
-      </div>
-
-      {/* Search: names, emails and the accounts people sign in with */}
-      <div className="relative mb-3">
-        <Search
-          size={16}
-          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-secondary-400"
-        />
-        <input
-          type="search"
-          value={query}
-          onChange={(e) => setParam("q", e.target.value)}
-          placeholder="Search by name, email or sign-in account"
-          aria-label="Search users"
-          className="w-full rounded-lg bg-surface border border-secondary-300 py-2 pl-9 pr-3 text-sm text-secondary-900 placeholder-secondary-400 focus:outline-none focus:border-primary-500"
-        />
-      </div>
-
-      {/* Filter tabs */}
-      <div className="flex flex-wrap gap-2 mb-3">
-        {FILTERS.map((f) => (
-          <button
-            key={f}
-            type="button"
-            onClick={() => setFilter(f)}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors capitalize ${
-              filter === f
-                ? "bg-primary-500 text-white"
-                : "bg-surface text-secondary-600 hover:text-secondary-900 border border-secondary-300"
-            }`}
-          >
-            {f} <span className="opacity-60">({countFor(f)})</span>
-            {f === "pending" && filter !== "pending" && countFor(f) > 0 && (
-              <span className="ml-1.5 inline-block h-2 w-2 rounded-full bg-amber-500 align-middle" />
-            )}
-          </button>
-        ))}
-      </div>
-
-      {/* Sort, and filter by role and sign-in */}
-      <div className="flex flex-wrap gap-2 mb-6">
-        <select
-          value={sort}
-          onChange={(e) => setSort(e.target.value as Sort)}
-          className={selectClass}
-          aria-label="Sort by"
-        >
-          {Object.entries(SORTS).map(([key, { label }]) => (
-            <option key={key} value={key}>
-              {label}
-            </option>
-          ))}
-        </select>
-        <select
-          value={role}
-          onChange={(e) => setRole(e.target.value as Role | "")}
-          className={selectClass}
-          aria-label="Role"
-        >
-          <option value="">Any role</option>
-          {Object.entries(ROLES).map(([key, { label }]) => (
-            <option key={key} value={key}>
-              {label}
-            </option>
-          ))}
-        </select>
-        <select
-          value={provider}
-          onChange={(e) => setProvider(e.target.value)}
-          className={selectClass}
-          aria-label="Sign-in"
-        >
-          <option value="">Any sign-in</option>
-          {providers.map((key) => (
-            <option key={key} value={key}>
-              {PROVIDERS[key] ?? key}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {loading && (
-        <div className="flex justify-center py-16 text-secondary-500">
-          <Loader2 size={24} className="animate-spin" />
+    <Page
+      title="Users"
+      width="narrow"
+      actions={<Button onClick={exportActiveUsersToCSV}>Export active users (CSV)</Button>}
+    >
+      <div className="space-y-3">
+        {/* Search: names, emails and the accounts people sign in with */}
+        <div className="relative">
+          <Search
+            size={16}
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-secondary-400"
+          />
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setParam("q", e.target.value)}
+            placeholder="Search by name, email or sign-in account"
+            aria-label="Search users"
+            className={`${inputClass} pl-9`}
+          />
         </div>
-      )}
 
-      {error && <p className="text-sm text-primary-500">{error}</p>}
+        <div className="flex flex-wrap gap-2">
+          {FILTERS.map((f) => (
+            <Chip key={f} selected={filter === f} onClick={() => setFilter(f)}>
+              <span className="capitalize">{f}</span>{" "}
+              <span className="opacity-60">({countFor(f)})</span>
+              {f === "pending" && filter !== "pending" && countFor(f) > 0 && (
+                <span className="ml-1.5 inline-block h-2 w-2 rounded-full bg-amber-500 align-middle" />
+              )}
+            </Chip>
+          ))}
+        </div>
 
-      {actionError && (
-        <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-          {actionError}
-        </p>
-      )}
+        {/* Sort, and filter by role and sign-in */}
+        <div className="flex flex-wrap gap-2">
+          <select
+            value={sort}
+            onChange={(e) => setSort(e.target.value as Sort)}
+            className={selectClass}
+            aria-label="Sort by"
+          >
+            {Object.entries(SORTS).map(([key, { label }]) => (
+              <option key={key} value={key}>
+                {label}
+              </option>
+            ))}
+          </select>
+          <select
+            value={role}
+            onChange={(e) => setRole(e.target.value as Role | "")}
+            className={selectClass}
+            aria-label="Role"
+          >
+            <option value="">Any role</option>
+            {Object.entries(ROLES).map(([key, { label }]) => (
+              <option key={key} value={key}>
+                {label}
+              </option>
+            ))}
+          </select>
+          <select
+            value={provider}
+            onChange={(e) => setProvider(e.target.value)}
+            className={selectClass}
+            aria-label="Sign-in"
+          >
+            <option value="">Any sign-in</option>
+            {providers.map((key) => (
+              <option key={key} value={key}>
+                {PROVIDERS[key] ?? key}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {loading && <Loading />}
+      {error && <ErrorBanner message={error} />}
+      {actionError && <ErrorBanner message={actionError} />}
 
       {!loading && !error && filtered.length === 0 && (
         <p className="text-sm text-secondary-500 text-center py-16">
@@ -449,7 +437,7 @@ export function AdminUsersPage() {
           {filtered.map((user) => (
             <div
               key={user.id}
-              className="bg-surface border border-secondary-200 rounded-lg overflow-hidden"
+              className="bg-surface border border-secondary-200 rounded-xl overflow-hidden"
             >
               {/* Main row */}
               <div className="px-4 py-3 flex items-center gap-3 flex-wrap">
@@ -459,7 +447,7 @@ export function AdminUsersPage() {
                   state={{ from: `/admin/users${params.toString() ? `?${params}` : ""}` }}
                   className="flex flex-1 min-w-0 items-center gap-3 rounded-md group"
                 >
-                  <div className="w-9 h-9 rounded-full bg-primary-500 flex items-center justify-center text-sm font-semibold text-white shrink-0">
+                  <div className="w-9 h-9 rounded-full bg-primary-500 flex items-center justify-center text-sm font-semibold text-on-primary shrink-0">
                     {user.displayName.charAt(0).toUpperCase()}
                   </div>
 
@@ -478,11 +466,9 @@ export function AdminUsersPage() {
                           Mentor
                         </span>
                       )}
-                      <span
-                        className={`text-xs px-2 py-0.5 rounded-full border capitalize ${STATUS_STYLES[user.status] ?? "bg-surface text-secondary-600"}`}
-                      >
-                        {user.status}
-                      </span>
+                      <Badge colors={STATUS_STYLES[user.status]}>
+                        <span className="capitalize">{user.status}</span>
+                      </Badge>
                     </div>
                     {/* Identity icons + timestamps */}
                     <div className="flex items-center gap-2 mt-1">
@@ -490,8 +476,8 @@ export function AdminUsersPage() {
                         <ProviderIcon key={identity.provider} provider={identity.provider} />
                       ))}
                       <span className="text-xs text-secondary-500">·</span>
-                      <span className="text-xs text-secondary-500" title="Last login">
-                        {user.lastLoginAt ? relativeTime(user.lastLoginAt) : "never logged in"}
+                      <span className="text-xs text-secondary-500" title="Last sign-in">
+                        {user.lastLoginAt ? relativeTime(user.lastLoginAt) : "never signed in"}
                       </span>
                       <span className="text-xs text-secondary-500">·</span>
                       <span className="text-xs text-secondary-500" title="Joined">
@@ -501,91 +487,72 @@ export function AdminUsersPage() {
                   </div>
                 </Link>
 
-                {/* Action buttons — full width on mobile (wraps to new line), inline on md+ */}
-                <div className="flex items-center gap-1.5 w-full md:w-auto pl-12 md:pl-0">
+                {/* Action buttons: a line of their own on a phone, beside the name on wider screens */}
+                <div className="flex flex-wrap items-center gap-1.5 w-full md:w-auto pl-12 md:pl-0">
                   {user.status === "pending" && (
                     <>
-                      <button
-                        type="button"
+                      <Button
+                        size="sm"
                         disabled={approving.has(user.id) || rejecting.has(user.id)}
                         onClick={() => handleApprove(user.id)}
-                        className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-green-600 hover:bg-green-500 disabled:opacity-50 disabled:cursor-not-allowed text-white transition-colors flex items-center gap-1"
                       >
-                        {approving.has(user.id) ? (
-                          <Loader2 size={11} className="animate-spin" />
-                        ) : null}
-                        Approve
-                      </button>
-                      <button
-                        type="button"
+                        {approving.has(user.id) ? "Approving…" : "Approve"}
+                      </Button>
+                      <Button
+                        variant="danger"
+                        size="sm"
                         disabled={approving.has(user.id) || rejecting.has(user.id)}
                         onClick={() => handleReject(user.id)}
-                        className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-primary-700 hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed text-white transition-colors flex items-center gap-1"
                       >
-                        {rejecting.has(user.id) ? (
-                          <Loader2 size={11} className="animate-spin" />
-                        ) : null}
-                        Reject
-                      </button>
+                        {rejecting.has(user.id) ? "Rejecting…" : "Reject"}
+                      </Button>
                     </>
                   )}
 
                   {user.status === "active" && user.id !== currentUserId && (
-                    <button
-                      type="button"
+                    <Button
+                      variant="secondary"
+                      size="sm"
                       disabled={promoting.has(user.id)}
                       onClick={() =>
                         user.isAdmin ? handleDemote(user.id) : handlePromote(user.id)
                       }
-                      className="px-3 py-1.5 rounded-lg text-xs font-medium bg-surface border border-secondary-300 hover:bg-primary-50 hover:text-primary-600 disabled:opacity-50 disabled:cursor-not-allowed text-secondary-600 transition-colors flex items-center gap-1"
                     >
-                      {promoting.has(user.id) ? (
-                        <Loader2 size={11} className="animate-spin" />
-                      ) : user.isAdmin ? (
-                        <ShieldOff size={11} />
-                      ) : (
-                        <Shield size={11} />
-                      )}
+                      {user.isAdmin ? <ShieldOff size={14} /> : <Shield size={14} />}
                       {user.isAdmin ? "Demote" : "Promote"}
-                    </button>
+                    </Button>
                   )}
 
                   {user.status === "active" && user.id !== currentUserId && (
-                    <button
-                      type="button"
+                    <Button
+                      variant="secondary"
+                      size="sm"
                       disabled={togglingMentor.has(user.id)}
                       onClick={() =>
                         user.isMentor ? handleRevokeMentor(user.id) : handleGrantMentor(user.id)
                       }
-                      className="px-3 py-1.5 rounded-lg text-xs font-medium bg-surface border border-secondary-300 hover:bg-primary-50 hover:text-primary-800 disabled:opacity-50 disabled:cursor-not-allowed text-secondary-600 transition-colors flex items-center gap-1"
                     >
-                      {togglingMentor.has(user.id) ? (
-                        <Loader2 size={11} className="animate-spin" />
-                      ) : (
-                        <GraduationCap size={11} />
-                      )}
+                      <GraduationCap size={14} />
                       {user.isMentor ? "Unmentor" : "Mentor"}
-                    </button>
+                    </Button>
                   )}
 
                   {(user.status === "active" || user.status === "rejected") &&
                     user.id !== currentUserId && (
-                      <button
-                        type="button"
+                      <Button
+                        variant="danger"
+                        size="sm"
                         disabled={deleting.has(user.id)}
-                        onClick={() => handleDelete(user.id)}
-                        className="px-3 py-1.5 rounded-lg text-xs font-medium bg-surface border border-secondary-300 hover:bg-primary-50 hover:text-primary-600 disabled:opacity-50 disabled:cursor-not-allowed text-secondary-600 transition-colors flex items-center gap-1"
+                        onClick={() => setAskingDelete(askingDelete === user.id ? null : user.id)}
                       >
-                        {deleting.has(user.id) ? (
-                          <Loader2 size={11} className="animate-spin" />
-                        ) : null}
-                        Delete
-                      </button>
+                        {deleting.has(user.id) ? "Deleting…" : "Delete"}
+                      </Button>
                     )}
 
                   {user.status !== "active" && (
-                    <button
-                      type="button"
+                    <Button
+                      variant="secondary"
+                      size="sm"
                       onClick={() => {
                         if (mergingUserId === user.id) setMergingUserId(null);
                         else {
@@ -593,22 +560,33 @@ export function AdminUsersPage() {
                           setMergeTargetId("");
                         }
                       }}
-                      className="px-3 py-1.5 rounded-lg text-xs font-medium bg-surface border border-secondary-300 hover:bg-secondary-50 text-secondary-700 transition-colors"
                     >
                       {mergingUserId === user.id ? "Cancel" : "Merge"}
-                    </button>
+                    </Button>
                   )}
                 </div>
               </div>
 
+              {askingDelete === user.id && (
+                <div className="px-4 py-3 border-t border-secondary-200">
+                  <ConfirmQuestion
+                    size="sm"
+                    question={`Permanently delete ${user.displayName} and all their data?`}
+                    confirmLabel="Delete"
+                    onConfirm={() => void handleDelete(user.id)}
+                    onKeep={() => setAskingDelete(null)}
+                  />
+                </div>
+              )}
+
               {/* Merge panel */}
               {mergingUserId === user.id && (
-                <div className="px-4 py-3 border-t border-secondary-200 flex items-center gap-3">
+                <div className="px-4 py-3 border-t border-secondary-200 flex flex-wrap items-center gap-3">
                   <p className="text-xs text-secondary-600 shrink-0">Merge into:</p>
                   <select
                     value={mergeTargetId}
                     onChange={(e) => setMergeTargetId(e.target.value)}
-                    className="flex-1 rounded-lg bg-surface border border-secondary-300 px-3 py-1.5 text-sm text-secondary-900 focus:outline-none focus:border-primary-500"
+                    className={`${inputClass} min-w-48 flex-1`}
                   >
                     <option value="">Select a user…</option>
                     {users
@@ -623,21 +601,18 @@ export function AdminUsersPage() {
                         </option>
                       ))}
                   </select>
-                  <button
-                    type="button"
+                  <Button
                     disabled={!mergeTargetId || mergeLoading}
                     onClick={() => handleMerge(user.id)}
-                    className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-primary-500 hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed text-white transition-colors flex items-center gap-1.5 shrink-0"
                   >
-                    {mergeLoading && <Loader2 size={11} className="animate-spin" />}
-                    Confirm merge
-                  </button>
+                    {mergeLoading ? "Merging…" : "Confirm merge"}
+                  </Button>
                 </div>
               )}
             </div>
           ))}
         </div>
       )}
-    </main>
+    </Page>
   );
 }

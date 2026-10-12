@@ -1,3 +1,4 @@
+import { Card, Page, inputClass } from "@g3/ui";
 import { useCallback, useEffect, useState } from "react";
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useAuthUser } from "../../shared/auth";
@@ -11,7 +12,6 @@ import {
 } from "../../shared/progress";
 import { useSkillData } from "../../shared/skill-data";
 import { Legend } from "../../shared/status";
-import { Card, Page, inputClass } from "../../shared/ui";
 import { CategoryDrawer } from "./category-drawer";
 import { TreeGraph } from "./tree-graph";
 
@@ -97,7 +97,7 @@ export function TreesPage() {
   return (
     <Page
       title="Skill Trees"
-      wide
+      width="wide"
       actions={
         students.length > 0 && (
           <label className="flex items-center gap-2 text-sm font-medium text-secondary-700">

@@ -1,13 +1,13 @@
+import { PageLoading } from "@g3/ui";
 import { type ReactNode, createContext, useContext, useEffect, useState } from "react";
 import { api, redirectToLogin } from "./api";
-import { PageLoading } from "./ui";
 
 export type AuthUser = {
   userId: string;
   displayName: string;
   /** G3ID mentors and admins: delete, merge and split entries. */
   isMentor: boolean;
-  /** G3ID admins: the Settings page. */
+  /** G3ID admins: the Admin page. */
   isAdmin: boolean;
 };
 

@@ -1,3 +1,4 @@
+import { inputClass } from "@g3/ui";
 import { useSearchParams } from "react-router-dom";
 import { formatDayKey, todayKey } from "../../shared/format";
 
@@ -53,6 +54,9 @@ const PRESETS = [
   { label: "Last 30 days", days: 30 },
   { label: "Last 90 days", days: 90 },
 ];
+
+/** A date box the height of the chips beside it. */
+const dateInput = `${inputClass} !w-auto !px-2 !py-1`;
 
 const chip = (active: boolean) =>
   `rounded-full border px-3 py-1 text-sm font-medium ${
@@ -115,7 +119,7 @@ export function RangePicker({ range }: { range: PageRange | null }) {
             value={range.fromDay}
             max={range.toDay}
             onChange={(e) => e.target.value && setRange(e.target.value, range.toDay)}
-            className="rounded-md border border-secondary-300 bg-surface px-2 py-1 text-sm"
+            className={dateInput}
           />
           <span>to</span>
           <input
@@ -124,7 +128,7 @@ export function RangePicker({ range }: { range: PageRange | null }) {
             value={range.toDay}
             min={range.fromDay}
             onChange={(e) => e.target.value && setRange(range.fromDay, e.target.value)}
-            className="rounded-md border border-secondary-300 bg-surface px-2 py-1 text-sm"
+            className={dateInput}
           />
           {single && (
             <button

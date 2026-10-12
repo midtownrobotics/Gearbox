@@ -103,7 +103,7 @@ export function PartViewerPage() {
 
   if (!partNumber) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-page p-4">
+      <div className="flex items-center justify-center flex-1 bg-page p-4">
         <div className="bg-surface rounded-lg shadow-lg p-8 max-w-md w-full text-center">
           <div className="text-red-600 text-4xl mb-4">⚠️</div>
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Missing Part Number</h1>
@@ -117,7 +117,7 @@ export function PartViewerPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-page p-4">
+      <div className="flex items-center justify-center flex-1 bg-page p-4">
         <div className="bg-surface rounded-lg shadow-lg p-8 max-w-md w-full text-center">
           <div className="animate-spin text-primary-600 text-4xl mb-4">⏳</div>
           <h1 className="text-xl font-bold text-gray-900 mb-2">Loading Drawing</h1>
@@ -140,7 +140,7 @@ export function PartViewerPage() {
             <button
               type="button"
               onClick={() => setShowUploadForm(true)}
-              className="bg-primary-600 text-white px-4 py-2 rounded hover:bg-primary-700 font-medium text-sm"
+              className="bg-primary-600 text-on-primary px-4 py-2 rounded hover:bg-primary-700 font-medium text-sm"
             >
               Replace Drawing
             </button>
@@ -203,7 +203,7 @@ export function PartViewerPage() {
                 <button
                   type="submit"
                   disabled={!uploadFile || uploading}
-                  className="flex-1 text-sm bg-primary-600 text-white px-4 py-2 rounded hover:bg-primary-700 disabled:bg-gray-400"
+                  className="flex-1 text-sm bg-primary-600 text-on-primary px-4 py-2 rounded hover:bg-primary-700 disabled:bg-gray-400"
                 >
                   {uploading ? "Uploading..." : "Upload"}
                 </button>
@@ -235,7 +235,7 @@ export function PartViewerPage() {
               <button
                 type="button"
                 onClick={() => setShowUploadForm(true)}
-                className="w-full bg-primary-600 text-white px-4 py-2 rounded hover:bg-primary-700 font-medium mb-4"
+                className="w-full bg-primary-600 text-on-primary px-4 py-2 rounded hover:bg-primary-700 font-medium mb-4"
               >
                 Upload a Drawing
               </button>

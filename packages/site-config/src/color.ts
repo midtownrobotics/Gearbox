@@ -56,3 +56,18 @@ export function withHueOf(color: string, source: string): string {
   if (from.s === 0) return color.toLowerCase();
   return hsvToHex({ ...hexToHsv(color), h: from.h });
 }
+
+/** A `#rrggbb` color's relative luminance (WCAG): 0 for black, 1 for white. */
+export function luminance(hex: string): number {
+  const channel = (at: number) => {
+    const part = Number.parseInt(hex.slice(at, at + 2), 16) / 255;
+    return part <= 0.04045 ? part / 12.92 : ((part + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * channel(1) + 0.7152 * channel(3) + 0.0722 * channel(5);
+}
+
+/** The contrast between two `#rrggbb` colors (WCAG): 1 for the same color, 21 for black on white. */
+export function contrastRatio(a: string, b: string): number {
+  const [darker, lighter] = [luminance(a), luminance(b)].sort((x, y) => x - y);
+  return (lighter + 0.05) / (darker + 0.05);
+}

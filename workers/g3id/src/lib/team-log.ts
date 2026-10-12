@@ -42,6 +42,7 @@ const APPEARANCE_PARTS: Record<keyof TeamUiSettings, string> = {
   linkAccents: "Linked accents",
   light: "Light colors",
   dark: "Dark colors",
+  buttonText: "Button text color",
   links: "Links",
   hiddenLinks: "Hidden links",
   appOrder: "Apps grid order",

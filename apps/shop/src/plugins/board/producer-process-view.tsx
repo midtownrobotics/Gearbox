@@ -346,7 +346,7 @@ export function ProducerSections({
                 <div className="flex flex-wrap items-center gap-2 px-4 py-3 bg-mist/60 rounded-b-xl">
                   {kiosk.active ? (
                     <span className="text-xs text-steel-dark">
-                      Changing the file needs a regular login — kiosks can't upload.
+                      Changing the file needs a regular sign-in — kiosks can't upload.
                     </span>
                   ) : (
                     <>
@@ -355,7 +355,7 @@ export function ProducerSections({
                         multiple={false}
                         onFiles={([f]) => f && uploadBatchFile(batch.id, f)}
                         label="Upload file"
-                        className={`${btn} font-semibold bg-crimson hover:bg-crimson-dark text-paper rounded-lg transition-colors disabled:opacity-50`}
+                        className={`${btn} font-semibold bg-crimson hover:bg-crimson-dark text-on-primary rounded-lg transition-colors disabled:opacity-50`}
                       />
                       <button
                         type="button"
@@ -387,7 +387,7 @@ export function ProducerSections({
                       type="button"
                       disabled={busy || !file || staged.length === 0}
                       onClick={() => run(() => completeStagingBatch(batch.id))}
-                      className={`${btn} font-semibold bg-emerald-600 hover:bg-emerald-700 text-paper rounded-lg transition-colors disabled:opacity-50`}
+                      className={`${btn} font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors disabled:opacity-50`}
                     >
                       Mark {plural(staged.length, "instance")} complete
                     </button>
@@ -487,7 +487,7 @@ function TodoGroup({
             type="button"
             disabled={busy}
             onClick={() => onStage(rows)}
-            className={`${btn} font-semibold bg-crimson hover:bg-crimson-dark text-paper rounded-lg transition-colors disabled:opacity-50`}
+            className={`${btn} font-semibold bg-crimson hover:bg-crimson-dark text-on-primary rounded-lg transition-colors disabled:opacity-50`}
           >
             Stage all
           </button>

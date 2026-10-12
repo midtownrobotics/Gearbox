@@ -44,12 +44,12 @@ base.use(
 
 const app = base
   .get("/health", (c) => c.json({ status: "ok", service: "orders", version: packageJson.version }))
-  /** Who's signed in, and the team's settings every page needs (money, calendar). */
+  /** Who's signed in, and the team's settings pages need (money, calendar, sales tax). */
   .get("/me", requireAuth, catalogReady, async (c) => {
     const db = createOrdersDb(c.env.ORDERS_DB);
     const teamId = c.get("teamId");
     const now = Date.now();
-    // Remembered so mentors can find people to mark trusted on the Settings page.
+    // Remembered so mentors can find people to mark trusted on the Admin page.
     await db
       .insert(appUsers)
       .values(
@@ -67,6 +67,7 @@ const app = base
       canEditCatalog: await canEditCatalog(c),
       currency: settings.currency,
       fiscalYearStart: settings.fiscalYearStart,
+      salesTaxPercent: settings.salesTaxPercent,
     });
   })
   .route("/lookup", lookupRouter)

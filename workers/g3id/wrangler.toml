@@ -95,3 +95,47 @@ command = "pnpm --filter @g3/g3id build"
 directory = "../../apps/g3id/dist"
 not_found_handling = "single-page-application"
 run_worker_first = ["/api/*"]
+
+# ---- Staging: written by `pnpm configure` from [env.production]; don't edit below. ----
+
+[env.staging]
+name = "g3id-staging"
+workers_dev = false
+
+[env.staging.define]
+__G3_STAGING__ = "true"
+
+[[env.staging.d1_databases]]
+binding = "DB"
+database_name = "g3-auth-staging"
+database_id = "9b9a85a0-c406-454b-a904-71aca9b3373c"
+migrations_dir = "src/db/migrations"
+
+[[env.staging.kv_namespaces]]
+binding = "SESSIONS"
+id = "85741df814134e55b70b4cbc725240dc"
+
+[[env.staging.kv_namespaces]]
+binding = "RATE_LIMIT"
+id = "3c1cbf84a56c496b894f4b6ce3543317"
+
+[[env.staging.services]]
+binding = "PLATFORM"
+service = "platform-staging"
+
+[env.staging.vars]
+ENVIRONMENT = "staging"
+GOOGLE_CLIENT_ID = "26070176131-lom1rtgi2tmahrd12md7452oieha1vbl.apps.googleusercontent.com"
+GOOGLE_REDIRECT_URI = "https://id-dev.g3robotics.com/api/auth/google/callback"
+GITHUB_CLIENT_ID = "Iv23lii4BhJtKBycp2yB"
+GITHUB_REDIRECT_URI = "https://id-dev.g3robotics.com/api/auth/github/callback"
+STEAM_REDIRECT_URI = "https://id-dev.g3robotics.com/api/auth/steam/callback"
+FRONTEND_URL = "https://1648-id-dev.g3robotics.com"
+
+[env.staging.build]
+command = "GEARBOX_STAGING=1 pnpm --filter @g3/g3id build"
+
+[env.staging.assets]
+directory = "../../apps/g3id/dist"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]

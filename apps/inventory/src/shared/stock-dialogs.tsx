@@ -1,10 +1,10 @@
+import { Button, Dialog, ErrorBanner, Field, inputClass } from "@g3/ui";
 import type { ItemView, StockView } from "@g3/worker-inventory";
 import { type FormEvent, type ReactNode, useState } from "react";
 import { api, getErrorMessage } from "./api";
 import { useInventory } from "./inventory-data";
 import { LocationPicker } from "./location-picker";
 import { type Places, locationLabel, useLabel } from "./places";
-import { Button, Dialog, ErrorBanner, Field, inputClass } from "./ui";
 
 // The pop-ups for moving parts around: check out (storage → in use on a robot), check in (back to
 // storage), move (somewhere else, as they are) and add (parts that weren't counted before).
@@ -124,7 +124,7 @@ function UseFields({
   if (places.robots.length === 0 || places.subsystems.length === 0) {
     return (
       <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-        No robots or subsystems yet. An admin adds them on Settings.
+        No robots or subsystems yet. An admin adds them on the Admin page.
       </p>
     );
   }

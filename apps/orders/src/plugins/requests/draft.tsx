@@ -1,4 +1,4 @@
-import { appOn } from "@g3/ui";
+import { Button, Card, ErrorBanner, Field, Loading, appOn, inputClass } from "@g3/ui";
 import { applyTemplate } from "@g3/worker-orders/naming";
 import type { InferResponseType } from "hono/client";
 import { useState } from "react";
@@ -15,7 +15,6 @@ import {
 import { PRIORITY, PRIORITY_ORDER } from "../../shared/priority";
 import { STATUS } from "../../shared/status-badge";
 import type { CatalogItem, Priority } from "../../shared/types";
-import { Button, Card, ErrorBanner, Field, Loading, inputClass } from "../../shared/ui";
 
 // One item being filled in from a product link: New Request's rows, and a mentor's replacement
 // item on the Approvals page.
@@ -424,7 +423,7 @@ export function DraftCard({
             </button>
           </div>
           {d.lookupError && (
-            <p className="text-xs text-primary-700">{d.lookupError} Fill in the details by hand.</p>
+            <p className="text-xs text-red-700">{d.lookupError} Fill in the details by hand.</p>
           )}
           {d.linkNote && <p className="text-xs text-secondary-600">{d.linkNote}</p>}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -689,7 +688,7 @@ function CatalogCategoryPicker({
             Cancel
           </Button>
         </div>
-        {error && <p className="text-xs text-primary-700">{error}</p>}
+        {error && <p className="text-xs text-red-700">{error}</p>}
       </div>
     );
   }

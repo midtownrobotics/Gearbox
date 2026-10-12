@@ -1,5 +1,4 @@
-import { useTeamNames } from "@g3/ui";
-import { Loader2 } from "lucide-react";
+import { Button, ErrorBanner, inputClass, useTeamNames } from "@g3/ui";
 import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../../lib/api";
@@ -41,7 +40,7 @@ export function EmailLoginPage() {
     <main className="flex-1 flex items-center justify-center px-4">
       <div className="w-full max-w-sm space-y-6">
         <div className="text-center">
-          <h1 className="text-5xl font-bold text-secondary-900">
+          <h1 className="text-4xl text-secondary-900">
             <span className="text-primary-500">{names.shortName}</span>ID
           </h1>
           <p className="mt-2 text-secondary-600 text-sm">Sign in with email</p>
@@ -56,7 +55,7 @@ export function EmailLoginPage() {
               id="email"
               type="email"
               autoComplete="email"
-              className="w-full rounded-lg bg-surface border border-secondary-300 px-4 py-2.5 text-secondary-900 text-sm placeholder-secondary-400 focus:outline-none focus:border-primary-500"
+              className={inputClass}
               placeholder="you@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -73,7 +72,7 @@ export function EmailLoginPage() {
               id="password"
               type="password"
               autoComplete="current-password"
-              className="w-full rounded-lg bg-surface border border-secondary-300 px-4 py-2.5 text-secondary-900 text-sm placeholder-secondary-400 focus:outline-none focus:border-primary-500"
+              className={inputClass}
               placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -82,16 +81,11 @@ export function EmailLoginPage() {
             />
           </div>
 
-          {error && <p className="text-sm text-primary-500">{error}</p>}
+          {error && <ErrorBanner message={error} />}
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full flex items-center justify-center gap-2 rounded-lg bg-primary-500 hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-2.5 text-sm transition-colors"
-          >
-            {loading && <Loader2 size={16} className="animate-spin" />}
+          <Button type="submit" className="w-full" disabled={loading}>
             {loading ? "Signing in…" : "Sign in"}
-          </button>
+          </Button>
         </form>
 
         <p className="text-center text-sm">

@@ -1,3 +1,4 @@
+import { ErrorBanner, Page, PageLoading } from "@g3/ui";
 import {
   type ReactNode,
   createContext,
@@ -9,7 +10,6 @@ import {
 } from "react";
 import { api, getErrorMessage } from "./api";
 import type { Status, Student, Tree, TreeSetInfo } from "./progress";
-import { ErrorBanner, Page, PageLoading } from "./ui";
 
 // The team's trees and everyone's progress, loaded once and shared by every page. Progress is fetched
 // again when the tab is looked at and every minute while it stays open, so a student sees a

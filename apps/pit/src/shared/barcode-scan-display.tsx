@@ -124,21 +124,21 @@ export function BarcodeScanDisplay() {
         <div
           className={`rounded-2xl shadow-2xl px-8 py-6 pointer-events-auto ${
             feedback.type === "success"
-              ? "bg-green-100 border-2 border-green-300"
-              : "bg-red-100 border-2 border-red-300"
+              ? "border-2 border-emerald-300 bg-emerald-50"
+              : "border-2 border-red-300 bg-red-50"
           }`}
         >
           <div className="flex items-center gap-4">
             <div
               className={`text-4xl ${
-                feedback.type === "success" ? "text-green-600" : "text-red-600"
+                feedback.type === "success" ? "text-emerald-700" : "text-red-700"
               }`}
             >
               {feedback.type === "success" ? "✓" : "✗"}
             </div>
             <p
               className={`text-lg font-bold ${
-                feedback.type === "success" ? "text-green-700" : "text-red-700"
+                feedback.type === "success" ? "text-emerald-800" : "text-red-800"
               }`}
             >
               {feedback.message}
@@ -157,8 +157,8 @@ export function BarcodeScanDisplay() {
 
   return (
     <div className="fixed inset-0 flex items-center justify-center pointer-events-none z-50">
-      <div className="bg-blue-100 border-2 border-blue-300 rounded-2xl shadow-2xl px-8 py-6 pointer-events-auto max-w-lg">
-        <p className="text-sm text-blue-700 uppercase tracking-widest font-semibold mb-4 text-center">
+      <div className="border-2 border-sky-300 bg-sky-50 rounded-2xl shadow-2xl px-8 py-6 pointer-events-auto max-w-lg">
+        <p className="text-sm text-sky-800 uppercase tracking-widest font-semibold mb-4 text-center">
           Scanning Battery
         </p>
         <div className="flex items-center justify-center gap-8">
@@ -166,12 +166,12 @@ export function BarcodeScanDisplay() {
           <div className="flex flex-col items-center gap-3">
             <div
               className={`w-4 h-4 rounded-full ${
-                stateScanned ? "bg-green-500" : "bg-blue-500"
+                stateScanned ? "bg-emerald-500" : "bg-sky-500"
               } ${waitingForState && "animate-pulse"}`}
             />
             <div className="text-center">
-              <p className="text-xs text-blue-700 uppercase tracking-wide mb-1">State</p>
-              <p className="text-2xl font-bold text-gray-900">
+              <p className="text-xs text-sky-800 uppercase tracking-wide mb-1">State</p>
+              <p className="text-2xl font-bold text-secondary-900">
                 {scan.stateCode
                   ? getStateLabel(scan.stateCode)
                   : waitingForState
@@ -182,18 +182,18 @@ export function BarcodeScanDisplay() {
           </div>
 
           {/* Arrow */}
-          <div className="text-blue-600 text-3xl">↔</div>
+          <div className="text-sky-600 text-3xl">↔</div>
 
           {/* Battery */}
           <div className="flex flex-col items-center gap-3">
             <div
               className={`w-4 h-4 rounded-full ${
-                batteryScanned ? "bg-green-500" : "bg-blue-500"
+                batteryScanned ? "bg-emerald-500" : "bg-sky-500"
               } ${waitingForBattery && "animate-pulse"}`}
             />
             <div className="text-center">
-              <p className="text-xs text-blue-700 uppercase tracking-wide mb-1">Battery</p>
-              <p className="text-2xl font-bold text-gray-900">
+              <p className="text-xs text-sky-800 uppercase tracking-wide mb-1">Battery</p>
+              <p className="text-2xl font-bold text-secondary-900">
                 {scan.batteryCode
                   ? getBatteryName(Number.parseInt(scan.batteryCode.slice(4), 10))
                   : waitingForBattery

@@ -179,7 +179,7 @@ export function FilesPage() {
   const totalSize = drawings.reduce((sum, d) => sum + (d.fileSize || 0), 0);
 
   return (
-    <main className="min-h-screen bg-page">
+    <main className="flex-1 bg-page">
       <div className="max-w-full mx-auto px-6 py-8 space-y-5">
         <div className="flex items-center justify-between">
           <h1 className="font-display text-4xl text-ink">Files</h1>
@@ -245,7 +245,7 @@ export function FilesPage() {
                         type="button"
                         onClick={() => handlePrint(drawing)}
                         disabled={printingId === drawing.id}
-                        className="px-2.5 py-1 text-xs font-medium bg-crimson text-paper hover:bg-crimson-dark disabled:bg-steel/30 disabled:cursor-not-allowed rounded transition-colors shrink-0"
+                        className="px-2.5 py-1 text-xs font-medium bg-crimson text-on-primary hover:bg-crimson-dark disabled:bg-steel/30 disabled:cursor-not-allowed rounded transition-colors shrink-0"
                       >
                         {printingId === drawing.id ? "Printing…" : "Print"}
                       </button>

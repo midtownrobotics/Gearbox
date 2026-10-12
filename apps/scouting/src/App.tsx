@@ -2044,8 +2044,8 @@ export function App() {
   return (
     <div className="app-shell">
       <AppNavBar
-        title={names.wordmark("Strategy")}
-        version={versionLabel("Strategy")}
+        title={names.wordmark("Scouting")}
+        version={versionLabel("Scouting")}
         icon="/favicon.svg"
         homeHref="#"
         link={({ href, children, ...props }) => (

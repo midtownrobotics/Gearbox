@@ -1,6 +1,7 @@
+import { Card, Page, inputClass } from "@g3/ui";
 import type { StockView } from "@g3/worker-inventory";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useAuthUser } from "../../shared/auth";
 import { valueText } from "../../shared/field-inputs";
 import { count } from "../../shared/format";
@@ -8,6 +9,7 @@ import { useInventory } from "../../shared/inventory-data";
 import { LocationPicker } from "../../shared/location-picker";
 import { type Places, locationLabel, useLabel, withinLocation } from "../../shared/places";
 import { type Row, rowsOf } from "../../shared/rows";
+import { StatusBadge } from "../../shared/status-badge";
 import {
   CheckButton,
   LocationButton,
@@ -15,7 +17,6 @@ import {
   type StockAction,
   StockActionDialog,
 } from "../../shared/stock-cells";
-import { Card, Page, StatusBadge, inputClass } from "../../shared/ui";
 
 /** How many rows are drawn at first, and how many more each "Show more" adds. */
 const PAGE_ROWS = 200;
@@ -26,6 +27,30 @@ type Filters = {
   locationId: number | null;
   robotId: number | null;
 };
+
+/** The filters an address asks for; anything it doesn't say, or says wrongly, is off. */
+function filtersIn(params: URLSearchParams): Filters {
+  const status = params.get("status");
+  const id = (key: string) => {
+    const value = Number(params.get(key));
+    return params.get(key) && Number.isInteger(value) ? value : null;
+  };
+  return {
+    query: params.get("q") ?? "",
+    status: status === "storage" || status === "in_use" ? status : "",
+    locationId: id("location"),
+    robotId: id("robot"),
+  };
+}
+
+function addressOf(filters: Filters): URLSearchParams {
+  const params = new URLSearchParams();
+  if (filters.query) params.set("q", filters.query);
+  if (filters.status) params.set("status", filters.status);
+  if (filters.locationId !== null) params.set("location", String(filters.locationId));
+  if (filters.robotId !== null) params.set("robot", String(filters.robotId));
+  return params;
+}
 
 function useRows(filters: Filters) {
   const { items, fields, places } = useInventory();
@@ -183,19 +208,17 @@ function NarrowRows({
 export function TablePage() {
   const { items, fields, places } = useInventory();
   const user = useAuthUser();
-  const [filters, setFilters] = useState<Filters>({
-    query: "",
-    status: "",
-    locationId: null,
-    robotId: null,
-  });
+  // The search and filters live in the address, so a reload or coming back from an entry keeps
+  // them.
+  const [params, setParams] = useSearchParams();
+  const filters = useMemo(() => filtersIn(params), [params]);
   const [shown, setShown] = useState(PAGE_ROWS);
   const [action, setAction] = useState<StockAction | null>(null);
   const rows = useRows(filters);
   const narrow = useNarrow();
   const columns = fields.filter((field) => field.showInTable);
   const change = (next: Partial<Filters>) => {
-    setFilters((current) => ({ ...current, ...next }));
+    setParams(addressOf({ ...filters, ...next }), { replace: true });
     setShown(PAGE_ROWS);
   };
   const filtered =
@@ -204,11 +227,11 @@ export function TablePage() {
   return (
     <Page
       title="Inventory"
-      wide
+      width="wide"
       actions={
         <Link
           to="/new"
-          className="rounded-lg bg-primary-500 px-3.5 py-2 text-sm font-semibold text-white hover:bg-primary-600"
+          className="rounded-lg bg-primary-500 px-3.5 py-2 text-sm font-semibold text-on-primary hover:bg-primary-600"
         >
           Add an entry
         </Link>
@@ -220,8 +243,8 @@ export function TablePage() {
           <p className="mt-1 text-sm text-secondary-500">
             {places.locations.length === 0
               ? user.isAdmin
-                ? "Set up locations on Settings, then add entries here."
-                : "Once an admin sets up locations on Settings, anyone can add entries here."
+                ? "Set up locations on the Admin page, then add entries here."
+                : "Once an admin sets up locations on the Admin page, anyone can add entries here."
               : "Add the first entry with the button above."}
           </p>
         </Card>

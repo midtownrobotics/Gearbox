@@ -4,7 +4,7 @@ import { useSignedInUser, useTeamApps } from "../session";
 import { useTeamIcon, useTeamNames, useTeamUiSettings } from "../team-ui";
 import { useTheme } from "../theme";
 
-// The top bar every G3 app shares (from G3 Strategy's): the menu button, the app's wordmark, its
+// The top bar every G3 app shares (from Scouting's): the menu button, the app's wordmark, its
 // pages, who's signed in and the light/dark switch. The menu (a drawer) lists the team's apps
 // under "All Apps"; below 768px the pages move into it too, above them. It has its own CSS
 // (nav-bar.css), so it looks the same in apps that don't use Tailwind.

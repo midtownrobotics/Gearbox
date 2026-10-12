@@ -13,10 +13,8 @@
   "dependencies": {
     "@g3/ui": "workspace:*",
     "hono": "^4.7.0",
-    "lucide-react": "^1.16.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "react-icons": "^5.6.0",
     "react-router-dom": "^6.28.0"
   },
   "devDependencies": {

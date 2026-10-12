@@ -33,7 +33,7 @@ export const adminPlugin: Plugin = {
     { path: "/admin/notifications", element: admin(<NotificationsPage />) },
   ],
   navItems: [
-    { label: "Manage apps", to: "/admin", order: 10, requiresAdmin: true, group: "Admin" },
+    { label: "Manage Apps", to: "/admin", order: 10, requiresAdmin: true, group: "Admin" },
     {
       label: "Appearance",
       to: "/admin/appearance",

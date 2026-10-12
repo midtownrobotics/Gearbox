@@ -1,4 +1,5 @@
 import { appUrl } from "@g3/site-config";
+import { Button, Card, Dialog, ErrorBanner, Field, Loading, Page, inputClass } from "@g3/ui";
 import type { ItemView } from "@g3/worker-inventory";
 import { type FormEvent, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
@@ -9,6 +10,7 @@ import { type Draft, FieldInputs, ValueView, draftOf, valuesOf } from "../../sha
 import { count, formatDate, formatDateTime } from "../../shared/format";
 import { useInventory } from "../../shared/inventory-data";
 import { locationLabel, useLabel } from "../../shared/places";
+import { StatusBadge } from "../../shared/status-badge";
 import {
   CheckButton,
   LocationButton,
@@ -16,17 +18,6 @@ import {
   type StockAction,
   StockActionDialog,
 } from "../../shared/stock-cells";
-import {
-  Button,
-  Card,
-  Dialog,
-  ErrorBanner,
-  Field,
-  Loading,
-  Page,
-  StatusBadge,
-  inputClass,
-} from "../../shared/ui";
 import { useLoad } from "../../shared/use-load";
 import { ListingsCard } from "./listings-card";
 
@@ -168,7 +159,9 @@ function DetailsCard({ item, onChanged }: { item: ItemView; onChanged: () => Pro
   return (
     <Card title="Details">
       {fields.length === 0 ? (
-        <p className="text-sm text-secondary-500">No fields yet. An admin adds them on Settings.</p>
+        <p className="text-sm text-secondary-500">
+          No fields yet. An admin adds them on the Admin page.
+        </p>
       ) : (
         <dl className="grid grid-cols-[minmax(7rem,auto)_1fr] gap-x-6 gap-y-2 text-sm">
           {fields.map((field) => (

@@ -9,7 +9,7 @@ const G3ID_LOGIN = `${appUrl("id")}/login?redirect=${encodeURIComponent(typeof w
 
 const routerLink = linkWith(Link);
 
-/** The shared G3 top bar; signed out, it offers Log in. */
+/** The shared G3 top bar; signed out, it offers Sign in. */
 export function NavBar({ items }: { items: PluginNavItem[] }) {
   const me = useMe();
   const { pathname } = useLocation();
@@ -36,7 +36,7 @@ export function NavBar({ items }: { items: PluginNavItem[] }) {
       actions={
         me === null && (
           <a className="g3-nav-text-link" href={G3ID_LOGIN}>
-            Log in
+            Sign in
           </a>
         )
       }

@@ -1,3 +1,4 @@
+import { ErrorBanner } from "@g3/ui";
 import { useEffect, useState } from "react";
 import { api, getErrorMessage } from "../../shared/api";
 import { useAuthUser } from "../../shared/auth";
@@ -15,7 +16,6 @@ import {
 } from "../../shared/progress";
 import { useSkillData } from "../../shared/skill-data";
 import { STATE, StateBadge } from "../../shared/status";
-import { ErrorBanner } from "../../shared/ui";
 import { useLoad } from "../../shared/use-load";
 import { TreeGraph } from "./tree-graph";
 

@@ -55,3 +55,37 @@ command = "pnpm --filter @g3/pit build"
 directory = "../../apps/pit/dist"
 not_found_handling = "single-page-application"
 run_worker_first = ["/api/*"]
+
+# ---- Staging: written by `pnpm configure` from [env.production]; don't edit below. ----
+
+[env.staging]
+name = "pit-staging"
+workers_dev = false
+
+[env.staging.define]
+__G3_STAGING__ = "true"
+
+[[env.staging.services]]
+binding = "G3ID"
+service = "g3id-staging"
+
+[[env.staging.kv_namespaces]]
+binding = "SESSIONS"
+id = "85741df814134e55b70b4cbc725240dc"
+
+[[env.staging.d1_databases]]
+binding = "PIT_DB"
+database_name = "g3-pit-staging"
+database_id = "237ff642-f72c-4f72-a0a1-563fa4a8f39f"
+migrations_dir = "src/db/migrations"
+
+[env.staging.vars]
+FRONTEND_URL = "https://1648-pit-dev.g3robotics.com"
+
+[env.staging.build]
+command = "GEARBOX_STAGING=1 pnpm --filter @g3/pit build"
+
+[env.staging.assets]
+directory = "../../apps/pit/dist"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]

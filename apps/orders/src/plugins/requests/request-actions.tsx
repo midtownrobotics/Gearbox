@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { Button, ErrorBanner, inputClass } from "@g3/ui";
+import { type ReactNode, useState } from "react";
 import { api, getErrorMessage } from "../../shared/api";
 import { useAuthUser } from "../../shared/auth";
 import { formatCents, parseDollars } from "../../shared/format";
 import { ReceiveDialog, asksInventory, useIntake } from "../../shared/receive-dialog";
 import type { OrderRequest } from "../../shared/types";
-import { Button, ErrorBanner, inputClass } from "../../shared/ui";
 
 type Action = "approve" | "deny" | "receive" | "cancel";
 
@@ -46,15 +46,18 @@ const dollars = (cents: number | null) => (cents === null ? "" : (cents / 100).t
 /**
  * Buttons for the allowed status changes. When approving, the quantity and price can be adjusted
  * first; `compact` (the Approvals queue) leaves out the note box and asks why when denying.
+ * `extra` is the page's own buttons, on the same line after these.
  */
 export function RequestActions({
   request,
   onChanged,
   compact = false,
+  extra,
 }: {
   request: OrderRequest;
   onChanged: () => void;
   compact?: boolean;
+  extra?: ReactNode;
 }) {
   const user = useAuthUser();
   const actions = allowedActions(request, user);
@@ -66,7 +69,8 @@ export function RequestActions({
   const [receiving, setReceiving] = useState(false);
   const intake = useIntake();
 
-  if (actions.length === 0) return null;
+  if (actions.length === 0)
+    return extra ? <div className="flex flex-wrap gap-2">{extra}</div> : null;
   const canApprove = actions.includes("approve");
 
   async function run(action: Action) {
@@ -158,6 +162,7 @@ export function RequestActions({
             {busy === a ? "…" : LABELS[a]}
           </Button>
         ))}
+        {extra}
       </div>
       {error && <ErrorBanner message={error} />}
       {receiving && intake && (

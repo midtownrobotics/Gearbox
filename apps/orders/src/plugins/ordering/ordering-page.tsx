@@ -1,15 +1,16 @@
+import { Button, ErrorBanner, Loading, Page, SuccessBanner, inputClass } from "@g3/ui";
 import { amazonAsin, isAmazonShortLink } from "@g3/worker-orders/product-key";
 import { chargesByCategory } from "@g3/worker-orders/split";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, getErrorMessage } from "../../shared/api";
+import { useAuthUser } from "../../shared/auth";
 import { cartLinks } from "../../shared/cart";
 import { Deadline, isLate } from "../../shared/deadline";
 import { ExportCsvButton } from "../../shared/export-csv";
 import { formatCents, formatDay, parseDollars, startOfToday } from "../../shared/format";
 import { PRIORITY_ORDER, PriorityBadge } from "../../shared/priority";
 import type { OrderRequest, Vendor } from "../../shared/types";
-import { Button, ErrorBanner, Loading, Page, SuccessBanner, inputClass } from "../../shared/ui";
 import { useLoad } from "../../shared/use-load";
 import { useVendors } from "../../shared/vendors";
 
@@ -24,9 +25,6 @@ type LineEdit = { quantity: string; price: string };
 
 const vendorKey = (vendor: string) => vendor.trim().toLowerCase();
 const dollars = (cents: number | null) => (cents === null ? "" : (cents / 100).toFixed(2));
-
-/** The team's sales tax rate, charged by every vendor that doesn't have our exemption on file. */
-const TAX_RATE = 0.089;
 
 /** Whether the vendor has an unexpired tax-exempt certificate on file. */
 const isTaxExempt = (vendor: Vendor | undefined) =>
@@ -204,6 +202,8 @@ function VendorOrder({
   /** A line was canceled (trashed) instead of ordered. */
   onRemoved: (message: string) => void;
 }) {
+  // The team's sales tax rate (Settings), charged by every vendor without its exemption on file.
+  const { salesTaxPercent } = useAuthUser();
   const [sacBusy, setSacBusy] = useState(false);
   const [sacLink, setSacLink] = useState<string | null>(null);
   const [edits, setEdits] = useState<Record<number, LineEdit>>(() =>
@@ -248,9 +248,11 @@ function VendorOrder({
   );
   const shippingCents = parseDollars(shipping) ?? 0;
   const itemsTotal = parsed.reduce((n, l) => n + (l.ok ? l.quantity * (l.price as number) : 0), 0);
-  // Tax starts at 8.9% of the items (nothing at tax-exempt vendors) and follows the items total
-  // until someone types their own amount.
-  const defaultTaxCents = isTaxExempt(group.profile) ? 0 : Math.round(itemsTotal * TAX_RATE);
+  // Tax starts at the team's rate on the items (nothing at tax-exempt vendors) and follows the
+  // items total until someone types their own amount.
+  const defaultTaxCents = isTaxExempt(group.profile)
+    ? 0
+    : Math.round((itemsTotal * salesTaxPercent) / 100);
   const taxText = tax ?? dollars(defaultTaxCents);
   const taxCents = parseDollars(taxText) ?? 0;
   const feesOk = !Number.isNaN(shippingCents) && !Number.isNaN(taxCents);
@@ -421,7 +423,7 @@ function VendorOrder({
           {group.vendor}
         </h2>
         {group.placeToday && (
-          <span className="rounded-full border border-primary-300 bg-primary-50 px-2 py-0.5 text-xs font-semibold text-primary-700">
+          <span className="rounded-full border border-red-300 bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-800">
             ⛔ Place today
           </span>
         )}
@@ -441,7 +443,7 @@ function VendorOrder({
                   ? `${cart.manual} item(s) can't be added automatically; add those by hand.`
                   : "Opens the store with these items and quantities in the cart"
               }
-              className="rounded-lg bg-primary-500 px-3 py-1.5 text-sm font-semibold text-white hover:bg-primary-600"
+              className="rounded-lg bg-primary-500 px-3 py-1.5 text-sm font-semibold text-on-primary hover:bg-primary-600"
             >
               🛒 Add {link.count} to {link.label} ↗
             </a>
@@ -452,7 +454,7 @@ function VendorOrder({
                 {sacBusy ? "Building cart…" : "🛒 Share-A-Cart ↗"}
               </Button>
             ) : (
-              <Link to="/settings" className="text-xs underline text-secondary-500">
+              <Link to="/admin" className="text-xs underline text-secondary-500">
                 Connect Share-A-Cart for one-click carts
               </Link>
             ))}
@@ -640,7 +642,7 @@ function VendorOrder({
                     <button
                       type="button"
                       onClick={() => trash(r)}
-                      className="rounded px-1.5 py-1 text-secondary-400 hover:bg-primary-50 hover:text-primary-600"
+                      className="rounded px-1.5 py-1 text-secondary-400 hover:bg-red-50 hover:text-red-600"
                       title="Remove from the order (cancels the request)"
                       aria-label={`Remove ${r.title}`}
                     >
@@ -682,7 +684,7 @@ function VendorOrder({
               title={
                 isTaxExempt(group.profile)
                   ? "Tax exempt: starts at $0"
-                  : "Starts at 8.9% of the items; type to change it"
+                  : `Starts at ${salesTaxPercent}% of the items; type to change it`
               }
             />
           </label>
@@ -796,7 +798,7 @@ function Nudges({ vendor, itemsTotal }: { vendor: Vendor | undefined; itemsTotal
   if (notes.length === 0) return null;
   const tones = {
     good: "text-emerald-800",
-    warn: "text-primary-700 font-semibold",
+    warn: "text-red-700 font-semibold",
     info: "text-secondary-700",
   };
   return (

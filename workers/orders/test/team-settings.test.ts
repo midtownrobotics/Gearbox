@@ -4,7 +4,7 @@ import { callAs, jsonAs } from "@g3/testing/worker";
 import { describe, expect, it } from "vitest";
 
 // The team's dashboard reads and saves Orders' settings through /team-settings (teamSettingsRoutes
-// in @g3/auth): the same settings as the Settings page, by manifest key.
+// in @g3/auth): the same settings as the Admin page, by manifest key.
 
 type State = {
   values: Record<string, unknown>;
@@ -21,6 +21,7 @@ describe("Orders' team settings", () => {
     expect(state.values).toEqual({
       currency: "USD",
       fiscalYearStart: 7,
+      salesTaxPercent: 0,
       namingTemplate: "{vendor} {sku} – {title}",
       inventoryRequired: false,
     });

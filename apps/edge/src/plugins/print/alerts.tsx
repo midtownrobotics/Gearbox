@@ -13,7 +13,7 @@ export function PrinterAlerts({
           key={a.message}
           className={`text-sm font-medium rounded-lg px-2.5 py-1 border ${
             a.severity === "error"
-              ? "text-primary-700 bg-primary-50 border-primary-200"
+              ? "text-red-800 bg-red-50 border-red-200"
               : "text-amber-800 bg-amber-50 border-amber-200"
           }`}
         >

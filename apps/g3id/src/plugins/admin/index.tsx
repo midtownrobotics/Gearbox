@@ -45,7 +45,7 @@ export const adminPlugin: Plugin = {
       signInMethod: "pin",
     },
     {
-      label: "Settings",
+      label: "Attendance",
       to: "/admin/attendance",
       order: 12,
       audience: "admin",

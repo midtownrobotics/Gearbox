@@ -370,7 +370,7 @@ function AssignToPart({
           setTarget(EMPTY_TARGET);
           setOpen(false);
         }}
-        className="px-2.5 py-1 text-xs font-semibold bg-crimson hover:bg-crimson-dark text-paper rounded-lg transition-colors disabled:opacity-50"
+        className="px-2.5 py-1 text-xs font-semibold bg-crimson hover:bg-crimson-dark text-on-primary rounded-lg transition-colors disabled:opacity-50"
       >
         Assign
       </button>

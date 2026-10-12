@@ -1,7 +1,7 @@
+import { PageLoading } from "@g3/ui";
 import { type ReactNode, createContext, useContext, useEffect, useState } from "react";
 import { api, redirectToLogin } from "./api";
 import { setTeamCurrency } from "./format";
-import { PageLoading } from "./ui";
 
 export type AuthUser = {
   userId: string;
@@ -14,6 +14,8 @@ export type AuthUser = {
   currency: string;
   /** 1–12: the month the team's fiscal year starts. */
   fiscalYearStart: number;
+  /** 0–100: the sales tax a new order starts with, as a percent of its items. */
+  salesTaxPercent: number;
 };
 
 const AuthUserContext = createContext<AuthUser | null>(null);

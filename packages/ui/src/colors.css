@@ -1,6 +1,6 @@
 /* The color scheme every app shares, light and dark: the defaults here, and a team's own from Team
    Appearance once they load (team-ui.ts sets the same variables on <html>). Plain CSS variables
-   so apps without the shared Tailwind theme (G3 Strategy, the attendance kiosk) can use them too;
+   so apps without the shared Tailwind theme (Scouting, the attendance kiosk) can use them too;
    Tailwind apps also get bg-page, bg-surface, bg-inset and border-line (see index.css). */
 :root {
   /* Both themes' colors, whichever is showing: for styles written for one theme (a rule under
@@ -20,6 +20,10 @@
   --g3-dark-text: #f4f4f5;
   --g3-dark-muted: #a3a3a3;
   --g3-dark-accent: #e8677c;
+  /* Text on a fill in the theme's accent, for each theme: light (the dark palette's text) or
+     dark (the light palette's), as the team chose or whichever stands out more. */
+  --g3-light-on-brand: var(--g3-dark-text);
+  --g3-dark-on-brand: var(--g3-light-text);
 
   /* Behind everything. */
   --g3-page: var(--g3-light-page);
@@ -32,9 +36,9 @@
   --g3-muted: var(--g3-light-muted);
   /* Text and outlines in the team's color, in a shade for each theme. */
   --g3-accent: var(--g3-light-accent);
-  /* The team's brand color (its light accent), the same in both themes: for solid fills that
-     carry white text. */
+  /* Solid fills in the team's color (the theme's accent too), whose text is --g3-on-brand. */
   --g3-brand: var(--g3-light-accent);
+  --g3-on-brand: var(--g3-light-on-brand);
 }
 
 html[data-theme="dark"] {
@@ -45,6 +49,8 @@ html[data-theme="dark"] {
   --g3-text: var(--g3-dark-text);
   --g3-muted: var(--g3-dark-muted);
   --g3-accent: var(--g3-dark-accent);
+  --g3-brand: var(--g3-dark-accent);
+  --g3-on-brand: var(--g3-dark-on-brand);
 }
 
 html,

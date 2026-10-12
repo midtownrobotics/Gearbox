@@ -29,7 +29,9 @@ const DEV_WORKERS: Partial<Record<AppName | "platform", string>> = {
  * - in dev, proxies `apiPath(app)` (/api/~<app>) to each app's local worker, as the gateway does in
  *   production;
  * - in dev, points site-config's addresses (`appUrl`, `teamAppUrl`, `allAppsUrl`, ...) at the
- *   local dev gateway (`localGateway`), so links stay on your machine.
+ *   local dev gateway (`localGateway`), so links stay on your machine;
+ * - with GEARBOX_STAGING=1 (each worker's [env.staging.build]), makes a staging build: its
+ *   addresses are staging's (`isStaging`), and every page has a "Staging" banner.
  */
 export function siteConfig(
   options: { app?: AppName; productionEnv?: Record<string, string> } = {},
@@ -39,8 +41,29 @@ export function siteConfig(
     JSON.parse(readFileSync(join(root, ".dev-ports.json"), "utf8")) as {
       workers: Record<string, { port: number; url: string }>;
     };
+  const staging = () => process.env.GEARBOX_STAGING === "1";
   return {
     name: "g3-site-config",
+    // Staging: a banner on every page, so nobody mistakes it for the real apps. Amber for a
+    // warning; fixed at the bottom, clear of each app's sticky top bar.
+    transformIndexHtml: {
+      order: "post",
+      handler: (html, ctx) =>
+        staging() && !ctx.server
+          ? [
+              {
+                tag: "div",
+                attrs: {
+                  role: "note",
+                  style:
+                    "position:fixed;bottom:12px;left:50%;transform:translateX(-50%);z-index:2147483647;padding:4px 12px;border-radius:999px;background:#f59e0b;color:#1f1300;font:600 12px/1.4 system-ui,sans-serif;box-shadow:0 2px 8px rgb(0 0 0 / .25);pointer-events:none",
+                },
+                children: "Staging: not the real apps",
+                injectTo: "body",
+              },
+            ]
+          : html,
+    },
     config(config, { mode }) {
       const appDir = config.root ?? process.cwd();
       const readVersion = (dir: string) =>
@@ -71,6 +94,7 @@ export function siteConfig(
         config.server.proxy = { ...proxies, ...config.server.proxy };
         return { define };
       }
+      if (staging()) Object.assign(define, { __G3_STAGING__: "true" });
       // Vite reads VITE_* from the process environment, ahead of .env files.
       for (const [key, value] of Object.entries(options.productionEnv ?? {})) {
         process.env[key] ??= value;

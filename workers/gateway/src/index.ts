@@ -4,6 +4,9 @@ import {
   DEV_DOMAIN,
   TEAM_HOST_APPS,
   isAllowedOrigin,
+  isStaging,
+  platformHost,
+  platformLabel,
   portalAppLabels,
   site,
   teamAppUrl,
@@ -34,6 +37,11 @@ import devPorts from "../../../.dev-ports.json";
 // runs on one port (8796), with gearbox.localhost standing for the platform's domain:
 // gearbox.localhost:8796 is the platform, 9999-orders.gearbox.localhost:8796 team 9999's Orders,
 // 1648-id.gearbox.localhost:8796 this team's G3ID. /api goes to each app's local worker, pages to its Vite dev server (.dev-ports.json).
+//
+// Staging (roadmap 0.2, `define` in wrangler.toml's [env.staging]): the same, with every platform
+// address staging's (`platformHost` in @g3/site-config): 1648-orders-dev.g3robotics.com, the
+// platform at dev.g3robotics.com. Its routes are only those names, and G3's retired addresses stay
+// production's.
 //
 // On the way it keeps teams apart (roadmap step 2.3):
 // - A team-number host only answers for a team the platform has (signed up and active), and an
@@ -88,10 +96,10 @@ type Route = { app: Worker; team: string | null };
 
 /** Platform hosts: the same for every team. */
 const PLATFORM_ROUTES = new Map<string, Route>([
-  [site.platformDomain, { app: "platform", team: null }],
-  [`www.${site.platformDomain}`, { app: "platform", team: null }],
+  [platformHost(""), { app: "platform", team: null }],
+  [platformHost("www"), { app: "platform", team: null }],
   ...CONSOLE_HOSTS.map((host): [string, Route] => [host, { app: "platform", team: null }]),
-  [`id.${site.platformDomain}`, { app: "id", team: null }],
+  [platformHost("id"), { app: "id", team: null }],
 ]);
 
 /**
@@ -99,19 +107,24 @@ const PLATFORM_ROUTES = new Map<string, Route>([
  * (<web>.<domain>) and its older API address (api.<web>.<domain>), and the sign-in callback and
  * console hosts. Each maps to the address to use instead.
  */
-const RETIRED_HOSTS = new Map<string, string>([
-  ...(Object.keys(site.apps) as AppName[]).flatMap((app): [string, string][] => {
-    const { web } = site.apps[app];
-    // An app made since the move never had an address there.
-    if (web === null) return [];
-    return [
-      [`${web}.${site.domain}`, teamAppUrl(teamKey, app)],
-      [`api.${web}.${site.domain}`, `${teamAppUrl(teamKey, app)}/api`],
-    ];
-  }),
-  [`id.${site.domain}`, `https://id.${site.platformDomain}`],
-  [`admin.${site.domain}`, `https://admin.${site.platformDomain}`],
-]);
+const RETIRED_HOSTS = new Map<string, string>(
+  // Staging has none: they're production's.
+  isStaging
+    ? []
+    : [
+        ...(Object.keys(site.apps) as AppName[]).flatMap((app): [string, string][] => {
+          const { web } = site.apps[app];
+          // An app made since the move never had an address there.
+          if (web === null) return [];
+          return [
+            [`${web}.${site.domain}`, teamAppUrl(teamKey, app)],
+            [`api.${web}.${site.domain}`, `${teamAppUrl(teamKey, app)}/api`],
+          ];
+        }),
+        [`id.${site.domain}`, `https://${platformHost("id")}`],
+        [`admin.${site.domain}`, `https://${platformHost("admin")}`],
+      ],
+);
 
 /** A retired address's replacement (see RETIRED_HOSTS), or null. */
 export function retiredHost(hostname: string): string | null {
@@ -145,8 +158,8 @@ const TEAM_HOST_APP = new Map<string, AppName>(
 export function route(hostname: string): Route | "unknown app" | null {
   const known = PLATFORM_ROUTES.get(hostname);
   if (known) return known;
-  if (!hostname.endsWith(`.${site.platformDomain}`)) return null;
-  const label = hostname.slice(0, -site.platformDomain.length - 1);
+  const label = platformLabel(hostname);
+  if (!label) return null;
   const match = label.match(/^([1-9]\d*)(?:-(.+))?$/);
   if (!match) return null;
   const app = match[2] === undefined ? "portal" : TEAM_HOST_APP.get(match[2]);
@@ -244,14 +257,15 @@ function wantsPage(request: Request, url: URL): boolean {
 
 /** The platform's own site: https://<platform>, or in dev the gateway's gearbox.localhost. */
 function platformOrigin(url: URL, local: boolean): string {
-  if (!local) return `https://${site.platformDomain}`;
+  if (!local) return `https://${platformHost("")}`;
   return `${url.protocol}//${DEV_DOMAIN}${url.port ? `:${url.port}` : ""}`;
 }
 
 /** The team's home for a team address: <number>-<app>.<domain> → <number>.<domain>. */
-function homeOf(url: URL): string {
+function homeOf(url: URL, local: boolean): string {
   const [first, ...rest] = url.hostname.split(".");
   const number = first.split("-")[0];
+  if (!local) return `https://${platformHost(number)}`;
   return `${url.protocol}//${[number, ...rest].join(".")}${url.port ? `:${url.port}` : ""}`;
 }
 
@@ -315,9 +329,9 @@ const json = (status: number, error: string) => Response.json({ error }, { statu
  * the platform's domain (and so does plain localhost).
  */
 export function fromLocalHost(hostname: string): string | null {
-  if (hostname === DEV_DOMAIN || hostname === "localhost") return site.platformDomain;
+  if (hostname === DEV_DOMAIN || hostname === "localhost") return platformHost("");
   if (hostname.endsWith(`.${DEV_DOMAIN}`)) {
-    return `${hostname.slice(0, -DEV_DOMAIN.length - 1)}.${site.platformDomain}`;
+    return platformHost(hostname.slice(0, -DEV_DOMAIN.length - 1));
   }
   return null;
 }
@@ -350,7 +364,7 @@ export default {
     const host = localHost ?? url.hostname;
     const target = route(host);
     // Any other name on the platform's domain is nothing: the platform's not-found page.
-    if (target === null && host.endsWith(`.${site.platformDomain}`)) {
+    if (target === null && platformLabel(host) !== null) {
       return nothingHere(request, url, local, "Nothing is here.");
     }
     if (target === null) {
@@ -380,7 +394,7 @@ export default {
       }
       if (apps === null) return noSuchTeam(request, url, team, local);
     }
-    if (!appEnabled(apps, target.app)) return notEnabled(request, target.app, homeOf(url));
+    if (!appEnabled(apps, target.app)) return notEnabled(request, target.app, homeOf(url, local));
 
     const isApi = url.pathname === "/api" || url.pathname.startsWith("/api/");
     const headers = new Headers(request.headers);
@@ -424,7 +438,7 @@ export default {
     if (other) {
       if (!(other[1] in BINDINGS)) return json(404, "No such app.");
       app = other[1] as Worker;
-      if (!appEnabled(apps, app)) return notEnabled(request, app, homeOf(url));
+      if (!appEnabled(apps, app)) return notEnabled(request, app, homeOf(url, local));
       url.pathname = `/api${other[2] ?? "/"}`;
     }
     if (url.pathname === "/api/internal" || url.pathname.startsWith("/api/internal/")) {

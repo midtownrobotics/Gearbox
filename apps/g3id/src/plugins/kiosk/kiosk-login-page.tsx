@@ -70,7 +70,7 @@ export function KioskLoginPage() {
       const redirect = searchParams.get("redirect") || "/";
       window.location.href = redirect;
     } catch (err) {
-      setError("Login failed");
+      setError("Sign-in failed");
       setPin("");
       loadingRef.current = false;
       setLoading(false);
@@ -95,7 +95,7 @@ export function KioskLoginPage() {
     <div className="flex-1 bg-secondary-50 flex items-start justify-center px-4 pt-8">
       <div className="w-full max-w-xs space-y-3">
         <div className="text-center mb-2">
-          <h1 className="text-3xl font-bold text-secondary-900">Enter PIN</h1>
+          <h1 className="text-4xl text-secondary-900">Enter PIN</h1>
         </div>
 
         <div className="flex justify-center gap-3">
@@ -109,7 +109,7 @@ export function KioskLoginPage() {
           ))}
         </div>
 
-        {error && <p className="text-primary-500 text-center text-sm font-medium">{error}</p>}
+        {error && <p className="text-red-700 text-center text-sm font-medium">{error}</p>}
 
         <div className="grid grid-cols-3 gap-2">
           {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (

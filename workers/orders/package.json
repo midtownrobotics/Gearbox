@@ -14,9 +14,11 @@
     "dev": "wrangler dev --port 8794 --inspector-port 9236",
     "build": "wrangler deploy --env production --dry-run",
     "deploy": "wrangler deploy --env production",
+    "deploy:staging": "wrangler deploy --env staging",
     "typecheck": "tsc --noEmit",
     "db:migrate:local": "wrangler d1 migrations apply ORDERS_DB --local",
     "db:migrate:remote": "wrangler d1 migrations apply ORDERS_DB --env production --remote",
+    "db:migrate:staging": "wrangler d1 migrations apply ORDERS_DB --env staging --remote",
     "test": "vitest run"
   },
   "dependencies": {

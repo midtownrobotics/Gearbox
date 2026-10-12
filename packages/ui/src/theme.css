@@ -13,6 +13,13 @@ html[data-theme="dark"] {
   --color-primary-100: #3a1a20;
   --color-primary-200: #5a2430;
   --color-primary-300: #7d2d3d;
+  /* Solid fills (buttons, selected tabs) take the dark accent, and darker shades of it. Their
+     text is text-on-primary. */
+  --color-primary-500: var(--g3-dark-accent);
+  --color-primary-600: color-mix(in srgb, var(--g3-dark-accent), black 15%);
+  --color-primary-700: color-mix(in srgb, var(--g3-dark-accent), black 30%);
+  --color-primary-800: color-mix(in srgb, var(--g3-dark-accent), black 45%);
+  --color-primary-900: color-mix(in srgb, var(--g3-dark-accent), black 60%);
 }
 
 /* A card written as `bg-white` before `bg-surface` existed: the theme's surface in dark mode.

@@ -22,9 +22,32 @@ Each app worker uploads `apps/<app>/dist` with it, so its `wrangler.toml` has a 
 
 Apply D1 migrations before deploying a worker that needs them (`pnpm db:migrate:remote`).
 
-A worker with a service binding to another worker can't be deployed until that worker exists. `pnpm run deploy` goes in the right order. Orders binds Inventory (received parts are added to it), so the first time, Inventory goes first: create its database (`wrangler d1 create g3-inventory-prod`), paste the id into `workers/inventory/wrangler.toml`, apply its migration (`pnpm --filter @g3/worker-inventory run db:migrate:remote`) and deploy it (`pnpm --filter @g3/worker-inventory run deploy`), before Orders and the gateway. With Workers Builds, add a build for the `inventory-production` Worker like the other apps'.
+A worker with a service binding to another worker can't be deployed until that worker exists. `pnpm run deploy` goes in the right order. Orders binds Inventory (received parts are added to it), so the first time, Inventory goes first: create its database (`wrangler d1 create g3-inventory-prod`), paste the id into `workers/inventory/wrangler.toml`, apply its migration (`pnpm --filter @g3/worker-inventory run db:migrate:remote`) and deploy it (`pnpm --filter @g3/worker-inventory run deploy`), before Orders and the gateway. 
 
-**Production deploys itself:** Cloudflare's Git integration (Workers Builds) deploys each Worker when the `public` branch changes, which happens when the release PR is merged. So anything that must happen before a deploy (a migration, a setting, an outside service moved) must happen before that merge. The builds need no extra setup: their `wrangler deploy` / `wrangler versions upload --env production` runs the same build command. Leave their build command empty.
+**Production deploys itself:** merging the release PR into `public` runs `.github/workflows/release.yml`, which commits the release and then deploys it through `.github/workflows/deploy.yml`: the D1 migrations (`pnpm db:migrate:remote`), every app's worker (`pnpm run deploy`, each building its page first) and the gateway last. Staging deploys from `main` through the same workflow. It needs a GitHub environment named `production` with the secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` (one token can serve both environments). Anything that must happen before a deploy other than migrations (a setting, an outside service moved, a secret) must still happen before merging the release PR. Cloudflare's Git integration (Workers Builds) is no longer used: each production Worker's build must be disconnected (the Worker → Settings → Builds → Disconnect), or it would deploy too, without migrations first.
+
+## Staging
+
+Staging is a second copy of everything, deployed from `main` on every push by `.github/workflows/staging.yml` through the same `deploy.yml` as production (migrations, then each app's worker, then the gateway). Its addresses are production's with `-dev` on the first part, on g3robotics.com: `1648-orders-dev.g3robotics.com`, a team's home at `1648-dev.g3robotics.com`, sign-in callbacks at `id-dev.g3robotics.com`, the console at `admin-dev.g3robotics.com` and the platform at `dev.g3robotics.com` (`site.staging` in `site.ts`). A different domain from production's, so the two never share a cookie; every page has a "Staging" banner.
+
+Each worker's `[env.staging]` is written by `pnpm configure` from its `[env.production]` (below the "Staging" line at the end of each `wrangler.toml`): `-staging` worker names, databases and buckets, staging's addresses, and the ids in `infra/staging/resources.json`. Change `[env.production]` and run `pnpm configure`; never edit the staging part. Production's gateway answers only G3's retired addresses on g3robotics.com, by exact name, and staging's gateway only `*-dev.g3robotics.com` and `dev.g3robotics.com`.
+
+To deploy staging by hand: `pnpm db:migrate:staging`, then `pnpm deploy:staging` (or one worker's `deploy:staging`).
+
+### Setting staging up (once)
+
+1. **Resources:** `pnpm staging:create` (with a Wrangler login; `-- --dry-run` first to see what it would make). It makes each staging D1 database, the KV namespaces (Sessions and Rate limit), Shop's and Scouting's R2 buckets and Shop's queue, writes their ids into `infra/staging/resources.json` and the `wrangler.toml` files, and deploys an empty placeholder for each staging Worker so the first deploy can bind them to each other. Commit the changed files.
+2. **DNS** on g3robotics.com: a proxied wildcard record `*` → AAAA `100::`, if there isn't one already (it covers `dev` and every `-dev` name). Hostnames with their own records (`www`) keep them.
+3. **GitHub:** an environment named `staging` (Settings → Environments) with the secrets `CLOUDFLARE_API_TOKEN` (a token with the "Edit Cloudflare Workers" template plus D1 edit) and `CLOUDFLARE_ACCOUNT_ID`, and the same two in one named `production`.
+4. **Secrets** on the staging Workers (`wrangler secret put <NAME> --env staging` in each worker's folder):
+   - `SECRETS_KEY` on `g3id`, `orders` and `shop`: a new value for each (`openssl rand -base64 32`), never production's.
+   - `GOOGLE_CLIENT_SECRET`, `GITHUB_CLIENT_SECRET` and `STEAM_API_KEY` on `g3id` (production's values: the same sign-in apps).
+   - `TBA_AUTH_KEY` and `NEXUS_API_KEY` on `pit` and `scouting`.
+5. **Sign-in providers:** add `https://id-dev.g3robotics.com/api/auth/google/callback` to the Google client and `https://id-dev.g3robotics.com/api/auth/github/callback` to the GitHub app.
+6. **Deploy:** run the workflow (Actions → staging → Run workflow), or push to `main`.
+7. **The first operator:** as in "The operators' console" below, with `--env staging`.
+
+Not set up yet: **Slack**. Team sign-up and Slack sign-in need a Slack app of staging's own (a Slack app has one events address); until then staging has no `SLACK_*` settings, and members sign in with Google, GitHub or Steam.
 
 ## Switching over from Pages and per-app API domains (once, done)
 

@@ -1,8 +1,11 @@
 import {
+  type ButtonText,
   type Hsv,
   type TeamUiColors,
   type TeamUiLinkKey,
   type TeamUiSettings,
+  buttonTextChoices,
+  buttonTextColor,
   hexToHsv,
   hsvToHex,
   isHexColor,
@@ -10,7 +13,17 @@ import {
   teamUiDefaults,
   teamUiLinkLabels,
 } from "@g3/site-config";
-import { refreshTeamUiSettings, useTeamNames } from "@g3/ui";
+import {
+  Button,
+  Card,
+  ErrorBanner,
+  Loading,
+  Page,
+  SuccessBanner,
+  inputClass,
+  refreshTeamUiSettings,
+  useTeamNames,
+} from "@g3/ui";
 import { type CSSProperties, useEffect, useRef, useState } from "react";
 import { FaTimes } from "react-icons/fa";
 import { g3id } from "../../lib/api";
@@ -29,8 +42,9 @@ const colorLabels: Record<Exclude<keyof TeamUiColors, "accent">, string> = {
   muted: "Muted text",
 };
 
-const fieldClass =
-  "w-full rounded-md border border-line bg-surface px-3 py-2 text-secondary-900 focus:outline-none focus:ring-2 focus:ring-primary-500";
+const fieldClass = inputClass;
+
+const description = "How your team looks across Gearbox.";
 
 export function AppearancePage() {
   const { idName } = useTeamNames();
@@ -118,26 +132,20 @@ export function AppearancePage() {
     }
   }
 
-  if (loading)
-    return <main className="mx-auto w-full max-w-4xl px-6 py-8">Loading team settings…</main>;
+  if (loading) {
+    return (
+      <Page title="Appearance" description={description}>
+        <Loading />
+      </Page>
+    );
+  }
 
   return (
-    <main className="mx-auto w-full max-w-4xl px-6 py-8">
-      <h1 className="mb-2 text-3xl font-bold text-secondary-900">Team appearance</h1>
-      <p className="mb-8 text-secondary-600">How your team looks across Gearbox.</p>
-      {error && (
-        <p role="alert" className="mb-4 rounded-md border border-primary-500 p-3 text-primary-700">
-          {error}
-        </p>
-      )}
-      {message && (
-        <p role="status" className="mb-4 rounded-md border border-line p-3 text-secondary-900">
-          {message}
-        </p>
-      )}
-      <form onSubmit={save} onInvalidCapture={revealInvalid} className="space-y-8">
-        <section className="rounded-lg border border-line bg-surface p-5">
-          <h2 className="mb-4 text-xl font-semibold">Identity</h2>
+    <Page title="Appearance" description={description}>
+      {error && <ErrorBanner message={error} />}
+      {message && <SuccessBanner message={message} />}
+      <form onSubmit={save} onInvalidCapture={revealInvalid} className="space-y-5">
+        <Card title="Identity">
           <div className="grid gap-4 sm:grid-cols-2">
             <TextField
               label="Team name"
@@ -196,12 +204,11 @@ export function AppearancePage() {
               className="mt-4 h-16 max-w-40 object-contain"
             />
           )}
-        </section>
+        </Card>
 
-        <section className="rounded-lg border border-line bg-surface p-5">
-          <h2 className="mb-2 text-xl font-semibold">Colors</h2>
+        <Card title="Colors">
           <p className="mb-4 text-sm text-secondary-600">
-            Your team's color in each theme. Buttons and app icons use the light accent in both.
+            Your team's color in each theme. App icons use the light accent in both.
           </p>
           <AccentColors
             light={settings.light}
@@ -209,6 +216,10 @@ export function AppearancePage() {
             linked={settings.linkAccents}
             onLinkedChange={(linked) => update("linkAccents", linked)}
             onChange={updateAccents}
+            buttonText={settings.buttonText}
+            onButtonTextChange={(mode, choice) =>
+              update("buttonText", { ...settings.buttonText, [mode]: choice })
+            }
           />
           <details className="mt-5 rounded-md border border-line">
             <summary className="cursor-pointer px-4 py-3 font-semibold">More options</summary>
@@ -225,7 +236,7 @@ export function AppearancePage() {
                     <ThemePreview
                       mode={mode}
                       colors={settings[mode]}
-                      brand={settings.light.accent}
+                      buttonText={buttonTextColor(settings, mode)}
                       shortName={settings.shortName}
                     />
                     <div className="grid content-start gap-4 sm:grid-cols-2 md:col-span-2">
@@ -243,10 +254,9 @@ export function AppearancePage() {
               ))}
             </div>
           </details>
-        </section>
+        </Card>
 
-        <section className="rounded-lg border border-line bg-surface p-5">
-          <h2 className="mb-1 text-xl font-semibold">Links</h2>
+        <Card title="Links">
           <p className="mb-4 text-sm text-secondary-600">Shown as tiles on your team's home.</p>
           <Links
             links={settings.links}
@@ -259,10 +269,9 @@ export function AppearancePage() {
               setMessage("");
             }}
           />
-        </section>
+        </Card>
 
-        <section className="rounded-lg border border-line bg-surface p-5">
-          <h2 className="mb-4 text-xl font-semibold">Apps grid order</h2>
+        <Card title="Apps grid order">
           <p className="mb-4 text-sm text-secondary-600">
             Drag tiles into the order they appear on the portal.
           </p>
@@ -272,27 +281,18 @@ export function AppearancePage() {
             idName={idName}
             onChange={(order) => update("appOrder", order)}
           />
-        </section>
+        </Card>
 
         <div className="flex flex-wrap items-center gap-3">
-          <button
-            type="submit"
-            disabled={saving}
-            className="rounded-md bg-primary-600 px-5 py-3 font-semibold text-white disabled:opacity-50"
-          >
+          <Button type="submit" disabled={saving}>
             {saving ? "Saving…" : "Save team appearance"}
-          </button>
-          <button
-            type="button"
-            disabled={saving}
-            onClick={reset}
-            className="rounded-md border border-line bg-surface px-5 py-3 font-semibold text-secondary-900 disabled:opacity-50"
-          >
+          </Button>
+          <Button variant="secondary" disabled={saving} onClick={reset}>
             Reset to defaults
-          </button>
+          </Button>
         </div>
       </form>
-    </main>
+    </Page>
   );
 }
 
@@ -374,7 +374,7 @@ function Links({
           value=""
           disabled={disabled}
           onChange={(event) => add(event.target.value as TeamUiLinkKey)}
-          className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-secondary-900 focus:outline-none focus:ring-2 focus:ring-primary-500"
+          className={`${inputClass} !w-auto`}
         >
           <option value="" disabled>
             + Add a link
@@ -424,7 +424,7 @@ function LinkRow({
         placeholder="https://…"
         ref={input}
         onChange={(event) => onChange(event.target.value)}
-        className="min-w-0 flex-1 rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-secondary-900 focus:outline-none focus:ring-2 focus:ring-primary-500"
+        className={`${inputClass} min-w-0 flex-1`}
       />
       <button
         type="button"
@@ -499,15 +499,15 @@ function ColorField({
 
 /**
  * A theme's colors together, as the apps use them: a top bar and a card on the page, with text,
- * muted text, an inset box, a link in the accent and a button in the brand color (the light
- * accent, in both themes).
+ * muted text, an inset box, a link in the accent and a button filled with it, with this theme's
+ * button text color.
  */
 function ThemePreview({
   mode,
   colors,
-  brand,
+  buttonText,
   shortName,
-}: { mode: Mode; colors: TeamUiColors; brand: string; shortName: string }) {
+}: { mode: Mode; colors: TeamUiColors; buttonText: string; shortName: string }) {
   return (
     <div
       role="img"
@@ -547,8 +547,11 @@ function ThemePreview({
               A link
             </span>
             <span
-              className="rounded-md px-3 py-1.5 font-semibold text-white"
-              style={{ background: `color-mix(in srgb, ${brand}, black 15%)` }}
+              className="rounded-md px-3 py-1.5 font-semibold"
+              style={{
+                background: `color-mix(in srgb, ${colors.accent}, black 15%)`,
+                color: buttonText,
+              }}
             >
               Button
             </span>
@@ -589,10 +592,17 @@ function shadeOf(entered: Hsv, previous: Hsv): Hsv {
   return entered.s === 0 ? { ...entered, h: previous.h } : entered;
 }
 
+const buttonTextLabels: Record<ButtonText, string> = {
+  auto: "Automatic",
+  light: "Light",
+  dark: "Dark",
+};
+
 /**
  * The team's accent in each theme. Linked, a color entered in either box gives the other its
  * hue, and the other keeps its own saturation and brightness; unlinked, the two are chosen freely.
- * Either way the sliders under a box change only that box, and never its hue.
+ * Either way the sliders under a box change only that box, and never its hue. Under each is that
+ * theme's text color on buttons, which are filled with its accent.
  */
 function AccentColors({
   light,
@@ -600,12 +610,16 @@ function AccentColors({
   linked,
   onLinkedChange,
   onChange,
+  buttonText,
+  onButtonTextChange,
 }: {
   light: TeamUiColors;
   dark: TeamUiColors;
   linked: boolean;
   onLinkedChange: (linked: boolean) => void;
   onChange: (accents: Partial<Record<Mode, string>>) => void;
+  buttonText: TeamUiSettings["buttonText"];
+  onButtonTextChange: (mode: Mode, choice: ButtonText) => void;
 }) {
   const palettes = { light, dark };
   // Each accent as the sliders see it. A hex code alone forgets the hue of a color slid down to
@@ -654,6 +668,16 @@ function AccentColors({
           const shade = shades[mode];
           const label = mode === "light" ? "Light mode accent" : "Dark mode accent";
           const shown = hsvToHex(shade);
+          // A theme's buttons are filled with its accent (as last entered whole).
+          const onButton = buttonTextColor(
+            {
+              light: { ...light, accent: hsvToHex(shades.light) },
+              dark: { ...dark, accent: hsvToHex(shades.dark) },
+              buttonText,
+            },
+            mode,
+          );
+          const groupLabel = `${mode === "light" ? "Light" : "Dark"} mode button text color`;
           return (
             <div key={mode}>
               <label className="block text-sm font-medium">
@@ -704,17 +728,48 @@ function AccentColors({
                   </label>
                 );
               })}
-              {/* The accent as it will sit on this theme's own backgrounds. */}
+              {/* The accent as it will sit on this theme's own backgrounds, and this theme's
+                  text on a button. */}
               <div
-                className="mt-3 grid grid-cols-2 overflow-hidden rounded-md border text-center text-sm font-semibold"
+                className="mt-3 grid grid-cols-3 overflow-hidden rounded-md border text-center text-sm font-semibold"
                 style={{ borderColor: palette.line, color: shown }}
               >
-                <span className="px-3 py-2" style={{ background: palette.page }}>
+                <span className="px-2 py-2" style={{ background: palette.page }}>
                   On the page
                 </span>
-                <span className="px-3 py-2" style={{ background: palette.surface }}>
+                <span className="px-2 py-2" style={{ background: palette.surface }}>
                   On cards
                 </span>
+                <span className="px-2 py-2" style={{ background: shown, color: onButton }}>
+                  On a button
+                </span>
+              </div>
+              <p className="mt-3 text-sm font-medium" id={`button-text-${mode}`}>
+                Button text color
+              </p>
+              <div
+                role="group"
+                aria-label={groupLabel}
+                className="mt-1 grid grid-cols-3 overflow-hidden rounded-lg border border-line"
+              >
+                {buttonTextChoices.map((choice) => {
+                  const on = choice === buttonText[mode];
+                  return (
+                    <button
+                      key={choice}
+                      type="button"
+                      aria-pressed={on}
+                      onClick={() => onButtonTextChange(mode, choice)}
+                      className={`border-l border-line px-3 py-2.5 text-sm font-semibold transition-colors first:border-l-0 ${
+                        on
+                          ? "bg-primary-600 text-on-primary"
+                          : "bg-surface text-secondary-700 hover:bg-inset hover:text-secondary-900"
+                      }`}
+                    >
+                      {buttonTextLabels[choice]}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           );

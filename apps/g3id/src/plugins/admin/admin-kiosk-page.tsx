@@ -1,5 +1,5 @@
 import { appUrl } from "@g3/site-config";
-import { Trash2 } from "lucide-react";
+import { Button, Card, ConfirmButton, ErrorBanner, Field, Loading, Page, inputClass } from "@g3/ui";
 import { useEffect, useState } from "react";
 import { api } from "../../lib/api";
 
@@ -96,21 +96,20 @@ export function AdminKioskPage() {
       });
 
       if (!res.ok) {
-        alert("Failed to revoke device");
+        setDevicesError("Couldn't revoke the device. Try again.");
         return;
       }
 
       await loadDevices();
     } catch {
-      alert("Failed to revoke device");
+      setDevicesError("Couldn't revoke the device. Check your connection and try again.");
     }
   }
 
   if (kioskOn === null) return null;
   if (!kioskOn) {
     return (
-      <main className="flex-1 px-6 py-8 max-w-2xl mx-auto w-full">
-        <h1 className="text-3xl font-bold text-secondary-900 mb-4">Kiosk Management</h1>
+      <Page title="Kiosk Devices" width="narrow">
         <p className="text-secondary-600">
           Kiosk sign-in is off for your team, so kiosks can't be added or used. Turn it on from the{" "}
           <a
@@ -121,121 +120,103 @@ export function AdminKioskPage() {
           </a>
           .
         </p>
-      </main>
+      </Page>
     );
   }
 
   return (
-    <main className="flex-1 px-6 py-8 max-w-2xl mx-auto w-full">
-      <h1 className="text-3xl font-bold text-secondary-900 mb-8">Kiosk Management</h1>
+    <Page title="Kiosk Devices" width="narrow">
+      <Card title="Add a kiosk">
+        <form onSubmit={handleGenerateCode} className="space-y-4">
+          <Field label="Device name">
+            <input
+              type="text"
+              placeholder="e.g., Shop Register 1"
+              value={deviceName}
+              onChange={(e) => setDeviceName(e.target.value)}
+              className={inputClass}
+            />
+          </Field>
 
-      <div className="space-y-8">
-        <div className="bg-surface border border-secondary-200 rounded-lg p-6">
-          <h2 className="text-xl font-semibold text-secondary-900 mb-4">
-            Generate Activation Code
-          </h2>
-          <form onSubmit={handleGenerateCode} className="space-y-4">
+          <Button type="submit" className="w-full" disabled={codeLoading || !deviceName.trim()}>
+            {codeLoading ? "Making a code…" : "Make an activation code"}
+          </Button>
+        </form>
+
+        {codeError && (
+          <div className="mt-3">
+            <ErrorBanner message={codeError} />
+          </div>
+        )}
+
+        {code && (
+          <div className="mt-4 rounded-lg border border-secondary-300 p-4 space-y-3">
             <div>
-              <label
-                htmlFor="device-name"
-                className="block text-sm font-medium text-secondary-700 mb-2"
-              >
-                Device Name
-              </label>
-              <input
-                id="device-name"
-                type="text"
-                placeholder="e.g., Shop Register 1"
-                value={deviceName}
-                onChange={(e) => setDeviceName(e.target.value)}
-                className="w-full px-4 py-2 rounded-lg bg-surface border border-secondary-300 text-secondary-900 placeholder-secondary-400 focus:outline-none focus:border-primary-500"
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={codeLoading || !deviceName.trim()}
-              className="w-full py-2 px-4 rounded-lg bg-primary-600 hover:bg-primary-500 disabled:opacity-50 text-white font-semibold transition-colors"
-            >
-              {codeLoading ? "Generating..." : "Generate Code"}
-            </button>
-          </form>
-
-          {codeError && <p className="mt-3 text-sm text-primary-500">{codeError}</p>}
-
-          {code && (
-            <div className="mt-6 bg-surface border border-secondary-300 rounded-lg p-4 space-y-3">
-              <div>
-                <p className="text-xs text-secondary-600 mb-1">
-                  Activation Code (expires in 30 min)
-                </p>
-                <p className="text-3xl font-mono font-bold text-primary-500 tracking-widest text-center">
-                  {code.code}
-                </p>
-              </div>
-              <p className="text-xs text-secondary-600 text-center">
-                Expires: {new Date(code.expiresAt * 1000).toLocaleString()}
+              <p className="text-xs text-secondary-600 mb-1">Activation code (expires in 30 min)</p>
+              <p className="text-3xl font-mono font-bold text-primary-500 tracking-widest text-center">
+                {code.code}
               </p>
-              <button
-                type="button"
-                onClick={() => setCode(null)}
-                className="w-full py-2 text-sm text-secondary-700 hover:text-secondary-900 transition-colors"
-              >
-                Generate Another Code
-              </button>
             </div>
-          )}
-        </div>
+            <p className="text-xs text-secondary-600 text-center">
+              Expires: {new Date(code.expiresAt * 1000).toLocaleString()}
+            </p>
+            <Button variant="secondary" className="w-full" onClick={() => setCode(null)}>
+              Make another code
+            </Button>
+          </div>
+        )}
+      </Card>
 
-        <div className="bg-surface border border-secondary-200 rounded-lg p-6">
-          <h2 className="text-xl font-semibold text-secondary-900 mb-4">Active Devices</h2>
+      <Card title="Devices">
+        {devicesError && (
+          <div className="mb-3">
+            <ErrorBanner message={devicesError} />
+          </div>
+        )}
 
-          {devicesError && <p className="text-sm text-primary-500 mb-4">{devicesError}</p>}
-
-          {devicesLoading ? (
-            <p className="text-secondary-600 text-sm">Loading devices...</p>
-          ) : devices.length === 0 ? (
-            <p className="text-secondary-600 text-sm">No devices registered yet</p>
-          ) : (
-            <div className="space-y-3">
-              {devices.map((device) => (
-                <div
-                  key={device.id}
-                  className="bg-surface border border-secondary-300 rounded-lg p-4 flex items-center justify-between"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-secondary-900">{device.name}</p>
-                    <p className="text-xs text-secondary-600 mt-1">
-                      Created {new Date(device.createdAt * 1000).toLocaleDateString()}
+        {devicesLoading ? (
+          <Loading />
+        ) : devices.length === 0 ? (
+          <p className="text-sm text-secondary-500">
+            No kiosks yet. Make an activation code above and enter it on the device.
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {devices.map((device) => (
+              <div
+                key={device.id}
+                className="border border-secondary-200 rounded-lg p-4 flex flex-wrap items-center justify-between gap-3"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold text-secondary-900">{device.name}</p>
+                  <p className="text-xs text-secondary-600 mt-1">
+                    Created {new Date(device.createdAt * 1000).toLocaleDateString()}
+                  </p>
+                  {device.lastUsedAt && (
+                    <p className="text-xs text-secondary-600">
+                      Last used {new Date(device.lastUsedAt * 1000).toLocaleString()}
                     </p>
-                    {device.lastUsedAt && (
-                      <p className="text-xs text-secondary-600">
-                        Last used {new Date(device.lastUsedAt * 1000).toLocaleString()}
-                      </p>
-                    )}
-                    {device.revokedAt && (
-                      <p className="text-xs text-primary-500 font-medium">
-                        Revoked {new Date(device.revokedAt * 1000).toLocaleString()}
-                      </p>
-                    )}
-                  </div>
-
-                  {!device.revokedAt && (
-                    <button
-                      type="button"
-                      onClick={() => handleRevokeDevice(device.id)}
-                      className="ml-4 p-2 rounded-lg bg-primary-600 hover:bg-primary-500 text-white transition-colors flex-shrink-0"
-                      title="Revoke device"
-                    >
-                      <Trash2 size={18} />
-                    </button>
+                  )}
+                  {device.revokedAt && (
+                    <p className="text-xs text-red-700 font-medium">
+                      Revoked {new Date(device.revokedAt * 1000).toLocaleString()}
+                    </p>
                   )}
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    </main>
+
+                {!device.revokedAt && (
+                  <ConfirmButton
+                    size="sm"
+                    label="Revoke"
+                    question={`Revoke ${device.name}? It will need a new activation code to be a kiosk again.`}
+                    onConfirm={() => void handleRevokeDevice(device.id)}
+                  />
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+    </Page>
   );
 }

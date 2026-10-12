@@ -1,6 +1,6 @@
+import { PageLoading } from "@g3/ui";
 import { type ReactNode, createContext, useContext, useEffect, useState } from "react";
 import { api, redirectToLogin } from "./api";
-import { PageLoading } from "./ui";
 
 export type AuthUser = {
   userId: string;

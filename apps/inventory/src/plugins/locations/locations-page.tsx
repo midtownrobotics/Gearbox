@@ -1,3 +1,4 @@
+import { Button, Card, Dialog, ErrorBanner, Field, Page, inputClass } from "@g3/ui";
 import type { LocationRow } from "@g3/worker-inventory";
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
@@ -8,17 +9,8 @@ import { useInventory } from "../../shared/inventory-data";
 import { LocationPicker } from "../../shared/location-picker";
 import { type Places, labelOf, locationLabel, useLabel } from "../../shared/places";
 import { type Row, rowsOf } from "../../shared/rows";
+import { StatusBadge } from "../../shared/status-badge";
 import { type StockAction, StockActionDialog } from "../../shared/stock-cells";
-import {
-  Button,
-  Card,
-  Dialog,
-  ErrorBanner,
-  Field,
-  Page,
-  StatusBadge,
-  inputClass,
-} from "../../shared/ui";
 
 // The inventory the other way round: every location, as nested panels that open, with what's
 // kept in each. For rearranging: an entry, or everything in a location, moves somewhere else
@@ -209,7 +201,7 @@ function MoveContentsDialog({
 
 const smallButton =
   "whitespace-nowrap rounded-lg border border-secondary-300 bg-surface px-2.5 py-1 text-xs font-semibold text-secondary-800 hover:bg-secondary-50";
-/** A plain text button, like the ones beside each location on Settings. */
+/** A plain text button, like the ones beside each location on the Admin page. */
 const textButton =
   "-my-1 whitespace-nowrap py-1 text-xs text-secondary-500 hover:text-primary-600 disabled:opacity-50";
 
@@ -399,7 +391,7 @@ export function LocationsPage() {
   return (
     <Page
       title="Locations"
-      wide
+      width="wide"
       actions={
         top.length > 0 && (
           <div className="flex gap-2">
@@ -418,8 +410,8 @@ export function LocationsPage() {
           <p className="text-secondary-700">No locations have been set up yet.</p>
           <p className="mt-1 text-sm text-secondary-500">
             {isAdmin
-              ? "Add them on Settings, or load a setup file there."
-              : "An admin adds them on Settings."}
+              ? "Add them on the Admin page, or load a setup file there."
+              : "An admin adds them on the Admin page."}
           </p>
         </Card>
       ) : (

@@ -113,14 +113,14 @@ export function PartsPage() {
       : null;
 
   return (
-    <main className="min-h-screen bg-page">
+    <main className="flex-1 bg-page">
       <div className="max-w-5xl mx-auto px-6 py-8 space-y-8">
         <div className="flex items-center justify-between gap-3">
           <h1 className="font-display text-4xl text-ink">Parts</h1>
           <button
             type="button"
             onClick={handleAddPartClick}
-            className={`bg-crimson hover:bg-crimson-dark text-paper text-sm font-semibold rounded-lg transition-colors ${
+            className={`bg-crimson hover:bg-crimson-dark text-on-primary text-sm font-semibold rounded-lg transition-colors ${
               touch ? "px-5 py-3" : "px-4 py-2"
             }`}
           >
@@ -153,7 +153,7 @@ export function PartsPage() {
                   navigate(`/part?p=${encodeURIComponent(lookupPartNumber.trim())}`);
                 }
               }}
-              className="px-4 py-2 bg-crimson hover:bg-crimson-dark text-paper text-sm font-semibold rounded-lg transition-colors"
+              className="px-4 py-2 bg-crimson hover:bg-crimson-dark text-on-primary text-sm font-semibold rounded-lg transition-colors"
             >
               View
             </button>
@@ -223,7 +223,7 @@ export function PartsPage() {
             <button
               type="button"
               onClick={() => setShowRestrictedModal(false)}
-              className="w-full py-2 rounded-lg bg-crimson text-paper text-sm font-semibold hover:bg-crimson-dark transition-colors"
+              className="w-full py-2 rounded-lg bg-crimson text-on-primary text-sm font-semibold hover:bg-crimson-dark transition-colors"
             >
               OK
             </button>

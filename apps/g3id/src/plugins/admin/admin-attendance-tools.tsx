@@ -1,8 +1,9 @@
 import { apiPath } from "@g3/site-config";
+import { ConfirmQuestion, ErrorBanner, buttonClass, inputClass } from "@g3/ui";
 import { Loader2, LogOut, Minus, Plus, Trash2 } from "lucide-react";
 import { type ReactNode, useState } from "react";
 
-// What admins do on the Attendance Settings page: sign out whoever is signed in, add or take away
+// What admins do on the Attendance page: sign out whoever is signed in, add or take away
 // a member's hours, and remove a member. Each change loads the page's members again.
 
 /** A member as the attendance worker's summary gives them. */
@@ -27,10 +28,9 @@ async function send<T>(path: string, init: RequestInit): Promise<T> {
 
 const memberPath = (id: string) => `/admin/members/${encodeURIComponent(id)}`;
 
-const quietButton =
-  "inline-flex items-center gap-1.5 rounded-lg border border-secondary-300 bg-surface px-3 py-1.5 text-sm font-medium text-secondary-700 hover:bg-secondary-50 disabled:cursor-not-allowed disabled:opacity-50";
-const signOutButton =
-  "inline-flex items-center gap-1.5 rounded-lg border border-red-300 bg-red-50 px-3 py-1.5 text-sm font-semibold text-red-700 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50";
+// The shared small buttons, with room for an icon or a spinner beside the label.
+const quietButton = `${buttonClass("secondary", "sm")} disabled:opacity-50`;
+const signOutButton = `${buttonClass("danger", "sm")} disabled:opacity-50`;
 
 type Changed = () => Promise<void>;
 
@@ -40,9 +40,11 @@ function Panel({
   children,
 }: { title: string; action?: ReactNode; children: ReactNode }) {
   return (
-    <section className="rounded-lg border border-secondary-200 bg-surface p-4">
+    <section className="rounded-xl border border-secondary-200 bg-surface p-5">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-        <h2 className="text-lg font-bold text-secondary-900">{title}</h2>
+        <h2 className="text-xs font-bold uppercase tracking-widest text-secondary-400 font-sans">
+          {title}
+        </h2>
         {action}
       </div>
       {children}
@@ -119,12 +121,16 @@ export function SignedInPanel({
             onClick={() => setAsking(true)}
           >
             <LogOut size={14} />
-            Sign Out All
+            Sign out all
           </button>
         )
       }
     >
-      {error && <p className="mb-3 text-sm text-red-700">{error}</p>}
+      {error && (
+        <div className="mb-3">
+          <ErrorBanner message={error} />
+        </div>
+      )}
       {signedIn.length === 0 ? (
         <p className="text-sm text-secondary-600">No one is signed in.</p>
       ) : (
@@ -159,8 +165,7 @@ export function SignedInPanel({
   );
 }
 
-const fieldClass =
-  "rounded-lg border border-secondary-300 bg-surface px-3 py-1.5 text-sm text-secondary-900 focus:border-primary-500 focus:outline-none";
+const fieldClass = `${inputClass} !w-auto`;
 
 /** Adds or takes away a member's hours for the school year, or removes the member. */
 export function ManageMemberPanel({
@@ -253,7 +258,7 @@ export function ManageMemberPanel({
           aria-label="Hours to add or subtract"
           value={hours}
           onChange={(e) => setHours(e.target.value)}
-          className={`${fieldClass} attendance-hours-input w-24`}
+          className={`${inputClass} attendance-hours-input !w-24`}
         />
         <button
           type="button"
@@ -292,32 +297,22 @@ export function ManageMemberPanel({
         )}
       </div>
       {asking && member && (
-        <div className="mt-3 space-y-2 rounded-lg border border-red-200 bg-red-50 p-3">
-          <p className="text-sm text-red-700">
-            Remove {member.displayName} and all of their attendance history? This can't be undone.
-          </p>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              className={signOutButton}
-              disabled={busy !== null}
-              onClick={remove}
-            >
-              {busy === "remove" && <Loader2 size={14} className="animate-spin" />}
-              Remove {member.displayName}
-            </button>
-            <button
-              type="button"
-              className={quietButton}
-              disabled={busy !== null}
-              onClick={() => setAsking(false)}
-            >
-              Keep
-            </button>
-          </div>
+        <div className="mt-3">
+          <ConfirmQuestion
+            size="sm"
+            question={`Remove ${member.displayName} and all of their attendance history? This can't be undone.`}
+            confirmLabel={busy === "remove" ? "Removing…" : `Remove ${member.displayName}`}
+            disabled={busy !== null}
+            onConfirm={remove}
+            onKeep={() => setAsking(false)}
+          />
         </div>
       )}
-      {error && <p className="mt-3 text-sm text-red-700">{error}</p>}
+      {error && (
+        <div className="mt-3">
+          <ErrorBanner message={error} />
+        </div>
+      )}
       {done && (
         <p role="status" className="mt-3 text-sm text-secondary-700">
           {done}

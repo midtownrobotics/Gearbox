@@ -1,3 +1,4 @@
+import { Button, Card, ErrorBanner, Field, Loading, Page, inputClass } from "@g3/ui";
 import { type FormEvent, useState } from "react";
 import { api, getErrorMessage } from "../../shared/api";
 import {
@@ -8,7 +9,6 @@ import {
   parseDollars,
 } from "../../shared/format";
 import type { VendorProfile } from "../../shared/types";
-import { Button, Card, ErrorBanner, Field, Loading, Page, inputClass } from "../../shared/ui";
 import { useLoad } from "../../shared/use-load";
 import { useVendors } from "../../shared/vendors";
 

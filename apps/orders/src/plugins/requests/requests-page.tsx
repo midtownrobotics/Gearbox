@@ -1,3 +1,4 @@
+import { Card, ErrorBanner, Loading, Page, inputClass } from "@g3/ui";
 import { type ReactNode, useMemo } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api, getErrorMessage } from "../../shared/api";
@@ -7,7 +8,6 @@ import { formatCents, formatDate } from "../../shared/format";
 import { PriorityBadge } from "../../shared/priority";
 import { StatusBadge } from "../../shared/status-badge";
 import type { OrderRequest, RequestListRow, RequestStatus } from "../../shared/types";
-import { Card, ErrorBanner, Loading, Page, inputClass } from "../../shared/ui";
 import { useLoad } from "../../shared/use-load";
 import { useVendors } from "../../shared/vendors";
 import { requestSearch } from "../lists/search";
@@ -91,7 +91,7 @@ export function RequestsPage() {
   const total = groups.reduce((n, g) => n + g.rows.length, 0);
 
   return (
-    <Page title="Requests" wide>
+    <Page title="Requests" width="full">
       <div className="space-y-3">
         <input
           type="search"
@@ -187,7 +187,7 @@ export function RequestTable({
           g.rows.length > 0 && (
             <section key={g.key} className="col-span-full grid grid-cols-subgrid">
               {g.label && (
-                <h2 className="col-span-full bg-primary-600 px-2 py-1 text-xs font-semibold uppercase tracking-wide text-white">
+                <h2 className="col-span-full bg-primary-600 px-2 py-1 text-xs font-semibold uppercase tracking-wide text-on-primary">
                   {g.label} · {g.rows.length}
                 </h2>
               )}
@@ -269,7 +269,7 @@ function Cell({
 const day = (ms: number | null) => (ms === null ? "—" : formatDate(ms));
 /** A short date for a phone: 10/7/26. */
 const shortDay = (ms: number) =>
-  new Date(ms).toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "2-digit" });
+  new Date(ms).toLocaleDateString(undefined, { month: "numeric", day: "numeric", year: "2-digit" });
 
 /** When it was ordered or received (wide screens only; a phone leaves these columns out). */
 function Done({ at }: { at: number | null }) {

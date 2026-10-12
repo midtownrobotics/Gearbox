@@ -75,7 +75,7 @@ export function QuantityCell({
         }}
       />
       {error && (
-        <span className={`mt-0.5 text-xs text-primary-700 ${compact ? "max-w-16" : "max-w-40"}`}>
+        <span className={`mt-0.5 text-xs text-red-700 ${compact ? "max-w-16" : "max-w-40"}`}>
           {error}
         </span>
       )}
@@ -132,7 +132,7 @@ export function CheckButton({
       onClick={() => onPick(out ? "out" : "in")}
       className={`whitespace-nowrap rounded-lg px-3 py-1 text-sm font-semibold ${
         out
-          ? "bg-primary-500 text-white hover:bg-primary-600"
+          ? "bg-primary-500 text-on-primary hover:bg-primary-600"
           : "border border-secondary-300 bg-surface text-secondary-800 hover:bg-secondary-50"
       }`}
     >

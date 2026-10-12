@@ -1,9 +1,3 @@
-import { useAppOn, useTeamNames } from "@g3/ui";
-import { DEFAULT_TEMPLATE, applyTemplate } from "@g3/worker-orders/naming";
-import { type FormEvent, useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
-import { api, getErrorMessage } from "../../shared/api";
-import { forgetIntake } from "../../shared/receive-dialog";
 import {
   Button,
   Card,
@@ -13,7 +7,14 @@ import {
   Page,
   SuccessBanner,
   inputClass,
-} from "../../shared/ui";
+  useAppOn,
+  useTeamNames,
+} from "@g3/ui";
+import { DEFAULT_TEMPLATE, applyTemplate } from "@g3/worker-orders/naming";
+import { type FormEvent, useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import { api, getErrorMessage } from "../../shared/api";
+import { forgetIntake } from "../../shared/receive-dialog";
 import { useLoad } from "../../shared/use-load";
 
 const EXAMPLE = {
@@ -28,7 +29,7 @@ export function SettingsPage() {
   // Receiving into Inventory is only a setting while the team has Inventory on.
   const inventoryOn = useAppOn("inventory");
   return (
-    <Page title="Settings">
+    <Page title="Admin">
       <MoneyAndCalendar />
       <TrustedStudents />
       <ShareACart />
@@ -40,10 +41,10 @@ export function SettingsPage() {
 }
 
 const MONTHS = Array.from({ length: 12 }, (_, i) =>
-  new Date(Date.UTC(2026, i, 1)).toLocaleDateString("en-US", { month: "long", timeZone: "UTC" }),
+  new Date(Date.UTC(2026, i, 1)).toLocaleDateString(undefined, { month: "long", timeZone: "UTC" }),
 );
 
-/** The team's currency and fiscal calendar: what budgets, prices and fiscal years are in. */
+/** The team's currency, fiscal calendar and sales tax: what budgets, prices and new orders use. */
 function MoneyAndCalendar() {
   const settings = useLoad(async () => {
     const res = await api.settings.$get();
@@ -52,20 +53,27 @@ function MoneyAndCalendar() {
   }, []);
   const [currency, setCurrency] = useState("");
   const [start, setStart] = useState(7);
+  const [tax, setTax] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     if (!settings.data) return;
     setCurrency(settings.data.currency);
     setStart(settings.data.fiscalYearStart);
+    setTax(String(settings.data.salesTaxPercent));
   }, [settings.data]);
 
   async function save(e: FormEvent) {
     e.preventDefault();
+    // Left empty, there's no tax.
+    const salesTaxPercent = Number(tax.trim() || 0);
+    if (!(salesTaxPercent >= 0 && salesTaxPercent <= 100)) {
+      return setError("The sales tax rate must be a percent from 0 to 100.");
+    }
     setBusy(true);
     setError(null);
     const res = await api.settings.$put({
-      json: { currency: currency.trim().toUpperCase(), fiscalYearStart: start },
+      json: { currency: currency.trim().toUpperCase(), fiscalYearStart: start, salesTaxPercent },
     });
     setBusy(false);
     if (!res.ok) return setError(await getErrorMessage(res));
@@ -83,7 +91,7 @@ function MoneyAndCalendar() {
             Budgets and spending are counted by fiscal year, starting on the 1st of the month below.
             Changing it recounts every year.
           </p>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-3">
             <Field label="Currency" hint="A 3-letter code: USD, CAD, EUR, ...">
               <input
                 className={`${inputClass} uppercase`}
@@ -104,6 +112,18 @@ function MoneyAndCalendar() {
                   </option>
                 ))}
               </select>
+            </Field>
+            <Field
+              label="Default sales tax rate (%)"
+              hint="A new order's tax starts at this much of its items, except at tax-exempt vendors"
+            >
+              <input
+                className={inputClass}
+                inputMode="decimal"
+                value={tax}
+                onChange={(e) => setTax(e.target.value)}
+                placeholder="0"
+              />
             </Field>
           </div>
           {error && <ErrorBanner message={error} />}
@@ -372,7 +392,7 @@ function ShareACart() {
         ) : (
           <a
             href={connectUrl}
-            className="inline-block rounded-lg bg-primary-500 px-3.5 py-2 font-semibold text-white hover:bg-primary-600"
+            className="inline-block rounded-lg bg-primary-500 px-3.5 py-2 font-semibold text-on-primary hover:bg-primary-600"
           >
             Connect the team's Share-A-Cart account
           </a>

@@ -212,7 +212,7 @@ export const requestEvents = sqliteTable(
       .references(() => orderRequests.id),
     userId: text("user_id").notNull(),
     userName: text("user_name").notNull(),
-    /** "created", "edited", or the status moved to. */
+    /** "created", "edited", "reapproved" (a mentor's edit once approved), or the status moved to. */
     action: text("action").notNull(),
     note: text("note"),
     createdAt: integer("created_at").notNull(),

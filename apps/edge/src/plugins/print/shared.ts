@@ -9,12 +9,6 @@ export async function loadPrinters() {
 
 export type PrinterRow = Awaited<ReturnType<typeof loadPrinters>>[number];
 
-export const button =
-  "text-sm font-medium rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50";
-export const primaryButton = `${button} bg-primary-500 hover:bg-primary-600 text-white`;
-export const plainButton = `${button} text-secondary-600 hover:text-secondary-900 hover:bg-secondary-100`;
-export const input = "border border-secondary-300 rounded-lg px-2 py-1 text-sm bg-surface";
-
 /** Plain-English problems this printer reports (out of paper, jam, ...), errors first. */
 export function alertsFor(p: PrinterRow) {
   return printerAlerts(p.stateReasons);

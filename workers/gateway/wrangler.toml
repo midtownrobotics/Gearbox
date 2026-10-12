@@ -61,19 +61,97 @@ service = "inventory"
 name = "gateway-production"
 workers_dev = false
 
-# Every subdomain of both domains, and the platform's own domain. Each needs proxied DNS: a
-# wildcard (* → AAAA 100::) for names without their own record, and the platform domain itself.
+# Routes (written by `pnpm configure`): the platform's domain and every name under it, and on G3's
+# own domain only its retired addresses, by exact name, so staging's names there
+# (<label>-dev.g3robotics.com) are never production's. Each needs proxied DNS: a wildcard
+# (* → AAAA 100::) for names without their own record, and the platform domain itself.
 [[env.production.routes]]
-pattern = "*.g3robotics.com/*" # site
-zone_name = "g3robotics.com" # site
+pattern = "*.frcgearbox.com/*"
+zone_name = "frcgearbox.com"
 
 [[env.production.routes]]
-pattern = "*.frcgearbox.com/*" # platform subdomains
-zone_name = "frcgearbox.com" # platform subdomains
+pattern = "frcgearbox.com/*"
+zone_name = "frcgearbox.com"
 
 [[env.production.routes]]
-pattern = "frcgearbox.com/*" # platform
-zone_name = "frcgearbox.com" # platform
+pattern = "g3id.g3robotics.com/*"
+zone_name = "g3robotics.com"
+
+[[env.production.routes]]
+pattern = "api.g3id.g3robotics.com/*"
+zone_name = "g3robotics.com"
+
+[[env.production.routes]]
+pattern = "gearbox.g3robotics.com/*"
+zone_name = "g3robotics.com"
+
+[[env.production.routes]]
+pattern = "api.gearbox.g3robotics.com/*"
+zone_name = "g3robotics.com"
+
+[[env.production.routes]]
+pattern = "shop.g3robotics.com/*"
+zone_name = "g3robotics.com"
+
+[[env.production.routes]]
+pattern = "api.shop.g3robotics.com/*"
+zone_name = "g3robotics.com"
+
+[[env.production.routes]]
+pattern = "pit.g3robotics.com/*"
+zone_name = "g3robotics.com"
+
+[[env.production.routes]]
+pattern = "api.pit.g3robotics.com/*"
+zone_name = "g3robotics.com"
+
+[[env.production.routes]]
+pattern = "orders.g3robotics.com/*"
+zone_name = "g3robotics.com"
+
+[[env.production.routes]]
+pattern = "api.orders.g3robotics.com/*"
+zone_name = "g3robotics.com"
+
+[[env.production.routes]]
+pattern = "edge.g3robotics.com/*"
+zone_name = "g3robotics.com"
+
+[[env.production.routes]]
+pattern = "api.edge.g3robotics.com/*"
+zone_name = "g3robotics.com"
+
+[[env.production.routes]]
+pattern = "scouting.g3robotics.com/*"
+zone_name = "g3robotics.com"
+
+[[env.production.routes]]
+pattern = "api.scouting.g3robotics.com/*"
+zone_name = "g3robotics.com"
+
+[[env.production.routes]]
+pattern = "skilltree.g3robotics.com/*"
+zone_name = "g3robotics.com"
+
+[[env.production.routes]]
+pattern = "api.skilltree.g3robotics.com/*"
+zone_name = "g3robotics.com"
+
+[[env.production.routes]]
+pattern = "attendance.g3robotics.com/*"
+zone_name = "g3robotics.com"
+
+[[env.production.routes]]
+pattern = "api.attendance.g3robotics.com/*"
+zone_name = "g3robotics.com"
+
+[[env.production.routes]]
+pattern = "id.g3robotics.com/*"
+zone_name = "g3robotics.com"
+
+[[env.production.routes]]
+pattern = "admin.g3robotics.com/*"
+zone_name = "g3robotics.com"
 
 [[env.production.services]]
 binding = "PLATFORM"
@@ -118,3 +196,64 @@ service = "attendance-production"
 [[env.production.services]]
 binding = "INVENTORY"
 service = "inventory-production"
+
+# ---- Staging: written by `pnpm configure` from [env.production]; don't edit below. ----
+
+[env.staging]
+name = "gateway-staging"
+workers_dev = false
+
+[env.staging.define]
+__G3_STAGING__ = "true"
+
+[[env.staging.services]]
+binding = "PLATFORM"
+service = "platform-staging"
+
+[[env.staging.services]]
+binding = "G3ID"
+service = "g3id-staging"
+
+[[env.staging.services]]
+binding = "PORTAL"
+service = "portal-staging"
+
+[[env.staging.services]]
+binding = "SHOP"
+service = "shop-staging"
+
+[[env.staging.services]]
+binding = "PIT"
+service = "pit-staging"
+
+[[env.staging.services]]
+binding = "ORDERS"
+service = "orders-staging"
+
+[[env.staging.services]]
+binding = "EDGE"
+service = "edge-staging"
+
+[[env.staging.services]]
+binding = "SCOUTING"
+service = "scouting-staging"
+
+[[env.staging.services]]
+binding = "SKILL_TREE"
+service = "skill-tree-staging"
+
+[[env.staging.services]]
+binding = "ATTENDANCE"
+service = "attendance-staging"
+
+[[env.staging.services]]
+binding = "INVENTORY"
+service = "inventory-staging"
+
+[[env.staging.routes]]
+pattern = "*-dev.g3robotics.com/*"
+zone_name = "g3robotics.com"
+
+[[env.staging.routes]]
+pattern = "dev.g3robotics.com/*"
+zone_name = "g3robotics.com"

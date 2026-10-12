@@ -110,6 +110,38 @@ describe("requests", () => {
     expect(detail.events.map((e) => e.action)).toEqual(["created", "approved"]);
   });
 
+  it("lets a mentor edit an approved request, which is approved again as changed", async () => {
+    const { id: categoryId } = await newCategory(`Reapprove ${crypto.randomUUID()}`);
+    const request = await newRequest(categoryId);
+    const edit = (user: typeof student, body: Record<string, unknown>) =>
+      callAs(user, `/requests/${request.id}`, { method: "PATCH", body });
+    await jsonAs(mentor, `/requests/${request.id}/approve`, { method: "POST", body: {} });
+
+    // Once approved it's the mentors' to change: not the requester's, and never a kiosk's.
+    expect((await edit(student, { quantity: 9 })).status).toBe(403);
+    expect((await edit(otherStudent, { quantity: 9 })).status).toBe(403);
+    expect((await edit(kioskAdmin, { quantity: 9 })).status).toBe(403);
+
+    const res = await edit(mentor, { quantity: 5, unitPriceCents: 500 });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      status: "approved",
+      quantity: 5,
+      unitPriceCents: 500,
+    });
+
+    const detail = await jsonAs<{ events: { action: string; note: string | null }[] }>(
+      student,
+      `/requests/${request.id}`,
+    );
+    expect(detail.events.map((e) => e.action)).toEqual(["created", "approved", "reapproved"]);
+    expect(detail.events[2].note).toBe("Changed qty 2 → 5, price $4.50 → $5.00.");
+
+    // Not after it's left the approved pile.
+    await jsonAs(mentor, `/requests/${request.id}/cancel`, { method: "POST", body: {} });
+    expect((await edit(mentor, { quantity: 6 })).status).toBe(409);
+  });
+
   it("lets only the requester or a mentor cancel", async () => {
     const { id: categoryId } = await newCategory("Electrical");
     const request = await newRequest(categoryId);

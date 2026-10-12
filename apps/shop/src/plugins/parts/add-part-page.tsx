@@ -206,7 +206,7 @@ export function AddPartPage() {
   const processes = data?.processes ?? [];
 
   return (
-    <main className="min-h-screen bg-page">
+    <main className="flex-1 bg-page">
       <div className="max-w-2xl mx-auto px-6 py-8 space-y-5">
         <div>
           <Link to="/parts" className="text-sm text-steel hover:text-ink transition-colors">
@@ -393,7 +393,7 @@ export function AddPartPage() {
                   type="button"
                   onClick={handleSubmit}
                   disabled={submitting}
-                  className={`bg-crimson hover:bg-crimson-dark disabled:opacity-50 text-paper text-sm font-semibold rounded-lg transition-colors ${
+                  className={`bg-crimson hover:bg-crimson-dark disabled:opacity-50 text-on-primary text-sm font-semibold rounded-lg transition-colors ${
                     touch ? "px-6 py-3" : "px-5 py-2"
                   }`}
                 >

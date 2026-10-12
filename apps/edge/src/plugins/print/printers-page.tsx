@@ -1,19 +1,10 @@
+import { Button, Card, ConfirmButton, ErrorBanner, Loading, Page, inputClass } from "@g3/ui";
 import { useState } from "react";
 import { api, getErrorMessage } from "../../shared/api";
 import { useAuthUser } from "../../shared/auth";
-import { Card, ErrorBanner, Loading, Page } from "../../shared/ui";
 import { useLoad } from "../../shared/use-load";
 import { PrinterAlerts } from "./alerts";
-import {
-  type PrinterRow,
-  alertsFor,
-  input,
-  loadPrinters,
-  networkError,
-  plainButton,
-  primaryButton,
-  printerStatus,
-} from "./shared";
+import { type PrinterRow, alertsFor, loadPrinters, networkError, printerStatus } from "./shared";
 
 type Discovered = {
   uri: string;
@@ -147,9 +138,9 @@ function PrinterItem({
       {isAdmin && (
         <div className="flex flex-wrap gap-1">
           {!p.isDefault && (
-            <button
-              type="button"
-              className={plainButton}
+            <Button
+              variant="secondary"
+              size="sm"
               disabled={busy !== null}
               onClick={() =>
                 act(`default-${p.name}`, () =>
@@ -160,11 +151,11 @@ function PrinterItem({
               }
             >
               Make default
-            </button>
+            </Button>
           )}
-          <button
-            type="button"
-            className={plainButton}
+          <Button
+            variant="secondary"
+            size="sm"
             disabled={busy !== null}
             onClick={() =>
               act(`test-${p.name}`, () =>
@@ -175,11 +166,11 @@ function PrinterItem({
             }
           >
             {busy === `test-${p.name}` ? "Sending…" : "Print test page"}
-          </button>
+          </Button>
           {(p.state === "stopped" || !p.acceptingJobs) && (
-            <button
-              type="button"
-              className={plainButton}
+            <Button
+              variant="secondary"
+              size="sm"
               disabled={busy !== null}
               onClick={() =>
                 act(`resume-${p.name}`, () =>
@@ -190,20 +181,15 @@ function PrinterItem({
               }
             >
               Resume
-            </button>
+            </Button>
           )}
-          <button
-            type="button"
-            className={`${plainButton} text-primary-600`}
+          <ConfirmButton
+            size="sm"
+            label="Remove"
+            question={`Remove ${p.description ?? p.name} from the edge box?`}
             disabled={busy !== null}
-            onClick={() => {
-              if (window.confirm(`Remove ${p.description ?? p.name} from the edge box?`)) {
-                void act(`remove-${p.name}`, () => printerApi.$delete(param));
-              }
-            }}
-          >
-            Remove
-          </button>
+            onConfirm={() => void act(`remove-${p.name}`, () => printerApi.$delete(param))}
+          />
         </div>
       )}
     </li>
@@ -273,9 +259,9 @@ function AddPrinter({ onAdded, existing }: { onAdded: () => void; existing: Prin
     <Card title="Add a printer">
       <div className="space-y-4">
         <div className="flex flex-wrap items-center gap-3">
-          <button type="button" className={primaryButton} onClick={discover} disabled={searching}>
+          <Button size="sm" onClick={discover} disabled={searching}>
             {searching ? "Searching the shop network…" : "Find printers"}
-          </button>
+          </Button>
           <span className="text-sm text-secondary-500">
             Looks for printers on the shop network. Takes about 10 seconds.
           </span>
@@ -301,14 +287,13 @@ function AddPrinter({ onAdded, existing }: { onAdded: () => void; existing: Prin
                     {d.addedAs ? (
                       <span className="text-sm text-secondary-400">Added</span>
                     ) : (
-                      <button
-                        type="button"
-                        className={primaryButton}
+                      <Button
+                        size="sm"
                         disabled={adding !== null}
                         onClick={() => add(d.uri, label)}
                       >
                         {adding === d.uri ? "Setting up…" : "Add"}
-                      </button>
+                      </Button>
                     )}
                   </li>
                 );
@@ -324,14 +309,14 @@ function AddPrinter({ onAdded, existing }: { onAdded: () => void; existing: Prin
         >
           <span className="text-sm text-secondary-600">Or by address:</span>
           <input
-            className={`${input} w-64`}
+            className={`${inputClass} !w-64`}
             value={address}
             placeholder="192.168.50.140 or ipp://…"
             onChange={(e) => setAddress(e.target.value)}
           />
-          <button type="submit" className={plainButton} disabled={!manualUri || adding !== null}>
+          <Button variant="secondary" type="submit" disabled={!manualUri || adding !== null}>
             {adding === manualUri ? "Setting up…" : "Add"}
-          </button>
+          </Button>
         </form>
         <p className="text-xs text-secondary-400">Setting up a printer can take up to a minute.</p>
         {error && <ErrorBanner message={error} />}

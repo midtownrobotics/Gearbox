@@ -1,3 +1,4 @@
+import { Button, Card, Dialog, ErrorBanner, Field, inputClass } from "@g3/ui";
 import type { ItemView, ListingView } from "@g3/worker-inventory";
 import { type FormEvent, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -17,7 +18,6 @@ import { CatalogPick } from "../../shared/catalog-pick";
 import { ago, formatCents } from "../../shared/format";
 import { useInventory } from "../../shared/inventory-data";
 import { locationLabel, useLabel } from "../../shared/places";
-import { Button, Card, Dialog, ErrorBanner, Field, inputClass } from "../../shared/ui";
 import { useTakenParts } from "../table/new-entry-page";
 
 // The ways to buy an entry: one panel per vendor's listing. Equivalent parts from different
@@ -96,7 +96,7 @@ function ListingPanel({
           {part && (
             <a
               href={requestUrl(part)}
-              className="rounded-lg bg-primary-500 px-3 py-1 text-sm font-semibold text-white hover:bg-primary-600"
+              className="rounded-lg bg-primary-500 px-3 py-1 text-sm font-semibold text-on-primary hover:bg-primary-600"
             >
               Request
             </a>

@@ -307,7 +307,7 @@ export function PartCard({
                         title={`Go to ${processName(proc.processId)} on the shop floor`}
                         className={`text-xs font-semibold px-2.5 py-1 rounded-full border transition-colors hover:border-crimson ${
                           isCurrent
-                            ? "bg-crimson border-crimson text-paper hover:bg-crimson-dark"
+                            ? "bg-crimson border-crimson text-on-primary hover:bg-crimson-dark"
                             : isDone
                               ? "bg-mist border-steel/30 text-steel/70 line-through"
                               : "bg-paper border-steel/50 text-ink"

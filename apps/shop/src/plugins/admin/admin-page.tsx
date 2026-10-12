@@ -96,7 +96,7 @@ export function AdminPage() {
   if (loading) return <PageLoading />;
 
   return (
-    <main className="min-h-screen bg-page">
+    <main className="flex-1 bg-page">
       <div className="max-w-4xl mx-auto px-6 py-8 space-y-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h1 className="font-display text-4xl text-ink">Admin</h1>
@@ -156,7 +156,7 @@ export function AdminPage() {
             type="button"
             onClick={deleteObsoleteInstances}
             disabled={deletingObsolete}
-            className="px-4 py-2 bg-crimson hover:bg-crimson-dark text-paper font-semibold rounded-lg transition-colors disabled:opacity-50"
+            className="px-4 py-2 bg-crimson hover:bg-crimson-dark text-on-primary font-semibold rounded-lg transition-colors disabled:opacity-50"
           >
             {deletingObsolete ? "Deleting…" : "Delete Obsolete Instances"}
           </button>
@@ -199,7 +199,7 @@ function KioskModeSettings() {
       {confirming ? (
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-sm font-medium text-ink">
-            You'll be logged out on this device. Continue?
+            You'll be signed out on this device. Continue?
           </span>
           <button
             type="button"
@@ -208,7 +208,7 @@ function KioskModeSettings() {
               setBusy(true);
               enableKioskMode();
             }}
-            className="px-3.5 py-2 bg-crimson hover:bg-crimson-dark text-paper text-sm font-semibold rounded-lg transition-colors disabled:opacity-50"
+            className="px-3.5 py-2 bg-crimson hover:bg-crimson-dark text-on-primary text-sm font-semibold rounded-lg transition-colors disabled:opacity-50"
           >
             {busy ? "Switching…" : "Yes, enable kiosk mode"}
           </button>
@@ -225,7 +225,7 @@ function KioskModeSettings() {
         <button
           type="button"
           onClick={() => setConfirming(true)}
-          className="px-3.5 py-2 bg-crimson hover:bg-crimson-dark text-paper text-sm font-semibold rounded-lg transition-colors"
+          className="px-3.5 py-2 bg-crimson hover:bg-crimson-dark text-on-primary text-sm font-semibold rounded-lg transition-colors"
         >
           Enable Kiosk Mode on This Device
         </button>
@@ -295,7 +295,7 @@ function NameList({
         <button
           type="button"
           onClick={onAdd}
-          className="px-3.5 py-2 bg-crimson hover:bg-crimson-dark text-paper text-sm font-semibold rounded-lg transition-colors"
+          className="px-3.5 py-2 bg-crimson hover:bg-crimson-dark text-on-primary text-sm font-semibold rounded-lg transition-colors"
         >
           Add
         </button>
@@ -416,7 +416,7 @@ function ProcessList({
         <button
           type="button"
           onClick={onAdd}
-          className="px-3.5 py-2 bg-crimson hover:bg-crimson-dark text-paper text-sm font-semibold rounded-lg transition-colors"
+          className="px-3.5 py-2 bg-crimson hover:bg-crimson-dark text-on-primary text-sm font-semibold rounded-lg transition-colors"
         >
           Add
         </button>
@@ -729,7 +729,7 @@ function OnShapeConfig() {
           type="button"
           onClick={handleSave}
           disabled={saving}
-          className="px-4 py-2 bg-crimson hover:bg-crimson-dark disabled:opacity-50 text-paper text-sm font-semibold rounded-lg transition-colors"
+          className="px-4 py-2 bg-crimson hover:bg-crimson-dark disabled:opacity-50 text-on-primary text-sm font-semibold rounded-lg transition-colors"
         >
           {saving ? "Saving…" : "Save"}
         </button>
@@ -790,7 +790,7 @@ function DailySlackButtons() {
             onClick={() => send(kind)}
             disabled={sending !== null}
             title={`Post the ${SUMMARY_KINDS[kind].label} to Slack: ${SUMMARY_KINDS[kind].blurb}`}
-            className="px-4 py-2 bg-crimson hover:bg-crimson-dark disabled:opacity-50 text-paper text-sm font-semibold rounded-lg transition-colors"
+            className="px-4 py-2 bg-crimson hover:bg-crimson-dark disabled:opacity-50 text-on-primary text-sm font-semibold rounded-lg transition-colors"
           >
             {sending === kind ? "Sending…" : `Send ${SUMMARY_KINDS[kind].label}`}
           </button>
@@ -928,7 +928,7 @@ function SlackSettings() {
           type="button"
           onClick={handleSave}
           disabled={saving}
-          className="px-4 py-2 bg-crimson hover:bg-crimson-dark disabled:opacity-50 text-paper text-sm font-semibold rounded-lg transition-colors"
+          className="px-4 py-2 bg-crimson hover:bg-crimson-dark disabled:opacity-50 text-on-primary text-sm font-semibold rounded-lg transition-colors"
         >
           {saving ? "Saving…" : "Save"}
         </button>
