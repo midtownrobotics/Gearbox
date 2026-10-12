@@ -101,7 +101,7 @@ describe("a team's notification settings", () => {
     ).toBe(400);
     const saved = settings(
       { info: "everyone", warning: "admins", critical: "nobody" },
-      { critical: { slackChannel: "c0123456789", slackUsers: ["u-founder"] } },
+      { critical: { slackChannel: "C0123456789", slackUsers: ["u-founder"] } },
     );
     expect((await put(saved)).status).toBe(200);
     const body = (await (await call(team.admin, "/team/notification-settings")).json()) as {

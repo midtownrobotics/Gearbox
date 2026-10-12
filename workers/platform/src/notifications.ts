@@ -98,9 +98,10 @@ export function parseSettings(
     if ((channel !== null && typeof channel !== "string") || !users) {
       return "Send the Slack channel and people for every type.";
     }
-    const slackChannel = channel?.trim().toUpperCase() || null;
-    if (slackChannel && !/^[CG][A-Z0-9]{6,}$/.test(slackChannel)) {
-      return "A Slack channel ID starts with C or G, like C0123456789.";
+    // A Slack channel ID as Slack gives it: C or G, then 8 or more capitals and digits.
+    const slackChannel = channel?.trim() || null;
+    if (slackChannel && !/^[CG][A-Z0-9]{8,}$/.test(slackChannel)) {
+      return "That isn't a Slack channel ID. Choose the channel by name.";
     }
     const slackUsers = [...new Set(users.filter((u): u is string => typeof u === "string"))];
     if (slackUsers.some((u) => !memberIds.has(u)))

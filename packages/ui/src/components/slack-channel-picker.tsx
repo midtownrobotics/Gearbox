@@ -54,7 +54,8 @@ function loadChannels(): Promise<Listing> {
   return listing;
 }
 
-const CHANNEL_ID = /^[CG][A-Z0-9]{6,}$/;
+/** A Slack channel ID: C or G, then 8 or more capitals and digits (C0123456789). */
+const CHANNEL_ID = /^[CG][A-Z0-9]{8,}$/;
 const SHOWN = 50;
 
 export function SlackChannelPicker({
@@ -288,7 +289,7 @@ function Fallback({
   const [text, setText] = useState(value ?? "");
   useEffect(() => setText(value ?? ""), [value]);
   const integrations = `${appUrl("portal")}/admin/integrations`;
-  const valid = !text.trim() || CHANNEL_ID.test(text.trim().toUpperCase());
+  const valid = !text.trim() || CHANNEL_ID.test(text.trim());
   return (
     <div className="g3-slack-picker">
       <p className="g3-slack-warning">
@@ -305,12 +306,16 @@ function Fallback({
         value={text}
         onChange={(e) => {
           setText(e.target.value);
-          const id = e.target.value.trim().toUpperCase();
+          const id = e.target.value.trim();
           if (!id) onChange(null);
           else if (CHANNEL_ID.test(id)) onChange(id);
         }}
       />
-      {!valid && <p className="g3-slack-error">A channel ID starts with C or G.</p>}
+      {!valid && (
+        <p className="g3-slack-error">
+          That isn't a channel ID. Copy it from the channel's details in Slack.
+        </p>
+      )}
     </div>
   );
 }
