@@ -70,6 +70,14 @@ export function checkSettings(value: unknown): Partial<TeamSettings> | string {
     }
     out.fiscalYearStart = month as number;
   }
+  if (v.salesTaxPercent !== undefined) {
+    const percent = v.salesTaxPercent;
+    if (typeof percent !== "number" || !(percent >= 0 && percent <= 100)) {
+      return "salesTaxPercent must be a percent from 0 to 100.";
+    }
+    // To a thousandth of a percent (8.875).
+    out.salesTaxPercent = Math.round(percent * 1000) / 1000;
+  }
   return out;
 }
 

@@ -43,7 +43,7 @@ const MONTHS = Array.from({ length: 12 }, (_, i) =>
   new Date(Date.UTC(2026, i, 1)).toLocaleDateString("en-US", { month: "long", timeZone: "UTC" }),
 );
 
-/** The team's currency and fiscal calendar: what budgets, prices and fiscal years are in. */
+/** The team's currency, fiscal calendar and sales tax: what budgets, prices and new orders use. */
 function MoneyAndCalendar() {
   const settings = useLoad(async () => {
     const res = await api.settings.$get();
@@ -52,20 +52,27 @@ function MoneyAndCalendar() {
   }, []);
   const [currency, setCurrency] = useState("");
   const [start, setStart] = useState(7);
+  const [tax, setTax] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     if (!settings.data) return;
     setCurrency(settings.data.currency);
     setStart(settings.data.fiscalYearStart);
+    setTax(String(settings.data.salesTaxPercent));
   }, [settings.data]);
 
   async function save(e: FormEvent) {
     e.preventDefault();
+    // Left empty, there's no tax.
+    const salesTaxPercent = Number(tax.trim() || 0);
+    if (!(salesTaxPercent >= 0 && salesTaxPercent <= 100)) {
+      return setError("The sales tax rate must be a percent from 0 to 100.");
+    }
     setBusy(true);
     setError(null);
     const res = await api.settings.$put({
-      json: { currency: currency.trim().toUpperCase(), fiscalYearStart: start },
+      json: { currency: currency.trim().toUpperCase(), fiscalYearStart: start, salesTaxPercent },
     });
     setBusy(false);
     if (!res.ok) return setError(await getErrorMessage(res));
@@ -83,7 +90,7 @@ function MoneyAndCalendar() {
             Budgets and spending are counted by fiscal year, starting on the 1st of the month below.
             Changing it recounts every year.
           </p>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-3">
             <Field label="Currency" hint="A 3-letter code: USD, CAD, EUR, ...">
               <input
                 className={`${inputClass} uppercase`}
@@ -104,6 +111,18 @@ function MoneyAndCalendar() {
                   </option>
                 ))}
               </select>
+            </Field>
+            <Field
+              label="Default sales tax rate (%)"
+              hint="A new order's tax starts at this much of its items, except at tax-exempt vendors"
+            >
+              <input
+                className={inputClass}
+                inputMode="decimal"
+                value={tax}
+                onChange={(e) => setTax(e.target.value)}
+                placeholder="0"
+              />
             </Field>
           </div>
           {error && <ErrorBanner message={error} />}

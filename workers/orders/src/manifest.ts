@@ -31,6 +31,17 @@ export const manifest = defineManifest({
       page: "/settings",
     },
     {
+      key: "salesTaxPercent",
+      label: "Default sales tax rate",
+      type: "number",
+      default: 0,
+      min: 0,
+      max: 100,
+      help: "A percent of a new order's items, at vendors that charge tax",
+      editedBy: "mentor",
+      page: "/settings",
+    },
+    {
       key: "namingTemplate",
       label: "Request names",
       type: "text",

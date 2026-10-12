@@ -14,6 +14,8 @@ export type AuthUser = {
   currency: string;
   /** 1–12: the month the team's fiscal year starts. */
   fiscalYearStart: number;
+  /** 0–100: the sales tax a new order starts with, as a percent of its items. */
+  salesTaxPercent: number;
 };
 
 const AuthUserContext = createContext<AuthUser | null>(null);
