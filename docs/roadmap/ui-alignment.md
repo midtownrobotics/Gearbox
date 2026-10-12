@@ -27,7 +27,7 @@ A survey of every difference, with sketches, is at <https://claude.ai/artifact/C
 
 | Change | Step | Pull request |
 | --- | --- | --- |
-| The page parts moved from each app's `shared/ui.tsx` into `@g3/ui`: `Page`, `PageLoading`, `Card`, `Stat`, `Button`, `ConfirmButton`, `Field`, `inputClass`, `ErrorBanner`, `SuccessBanner`, `Loading`, `Dialog`, `Toggle`, `Badge` with `tones`, `ProgressBar`, `focusRing`. Orders, Inventory, Skill Tree and Edge import them and have no `shared/ui.tsx`. Errors, danger buttons and every other mark of a problem in those four apps are red where they were the team's color. Buttons and inputs show a focus ring. Scouting is called Scouting in its own bar and tab, where it said Strategy | 1, and the name from 2 | This PR |
+| The page parts moved from each app's `shared/ui.tsx` into `@g3/ui`: `Page`, `PageLoading`, `Card`, `Stat`, `Button`, `ConfirmButton`, `Field`, `inputClass`, `ErrorBanner`, `SuccessBanner`, `Loading`, `Dialog`, `Toggle`, `Badge` with `tones`, `ProgressBar`, `focusRing`. Orders, Inventory, Skill Tree and Edge import them and have no `shared/ui.tsx`. Errors, danger buttons and every other mark of a problem in those four apps are red where they were the team's color. Buttons and inputs show a focus ring. Scouting is called Scouting in its own bar and tab, where it said Strategy | 1, and the name from 2 | [#186](https://github.com/midtownrobotics/Gearbox/pull/186) |
 
 ## Decisions
 
