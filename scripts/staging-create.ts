@@ -93,11 +93,11 @@ execFileSync(WRANGLER, ["whoami"], {
 });
 
 /** Makes something, unless dry-running; "already exists" counts as made. */
-function make(what: string, args: string[], { quiet = true } = {}) {
+function make(what: string, args: string[]) {
   if (dryRun) return console.log(`would make ${what}`);
   console.log(`making ${what}…`);
   try {
-    wrangler(args, { quiet });
+    wrangler(args, { quiet: true });
   } catch (err) {
     const text = String((err as { stderr?: string }).stderr ?? err);
     if (/already exists|already taken|already owned/i.test(text)) return;
@@ -193,8 +193,16 @@ for (const name of names.workers) {
   } catch {
     // Doesn't exist yet.
   }
-  make(
-    `placeholder Worker ${name}`,
+  if (dryRun) {
+    console.log(`would make placeholder Worker ${name}`);
+    continue;
+  }
+  console.log(`making placeholder Worker ${name}…`);
+  // Straight to the terminal, as if typed there: run with its output captured and
+  // non-interactively, this deploy waited on Cloudflare and never finished.
+  skipUpdateCheck();
+  execFileSync(
+    WRANGLER,
     [
       "deploy",
       "placeholder.js",
@@ -204,7 +212,12 @@ for (const name of names.workers) {
       "2026-05-17",
       "--no-bundle",
     ],
-    { quiet: false },
+    {
+      cwd: scratch,
+      env: { ...process.env, WRANGLER_HIDE_BANNER: "true" },
+      stdio: "inherit",
+      timeout: TIMEOUT_MS,
+    },
   );
 }
 
