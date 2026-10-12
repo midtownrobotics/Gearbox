@@ -163,15 +163,37 @@ const DATABASES: Database[] = [
 
 type Row = Record<string, unknown>;
 
-/** Runs SQL on one side and gives back its rows. */
+/** How many times a read is tried: a request to Cloudflare sometimes fails ("fetch failed"). */
+const ATTEMPTS = 4;
+
+/** Runs a read on one side and gives back its rows, trying again if the request fails. */
 function query(db: Database, side: "production" | "staging", sql: string): Row[] {
   const where = local ? ["--local"] : ["--env", side, "--remote"];
-  const out = wranglerOutput(["d1", "execute", db.binding, ...where, "--json", "--command", sql], {
-    cwd: join(root, "workers", db.worker),
-  });
-  const results = JSON.parse(out) as { results: Row[] }[];
-  return results.flatMap((r) => r.results);
+  for (let attempt = 1; ; attempt++) {
+    try {
+      const out = wranglerOutput(
+        ["d1", "execute", db.binding, ...where, "--json", "--command", sql],
+        { cwd: join(root, "workers", db.worker), quiet: true },
+      );
+      const results = JSON.parse(out) as { results: Row[] }[];
+      return results.flatMap((r) => r.results);
+    } catch (err) {
+      // Wrangler's own error, when it gave one ({"error": {"text": ...}} on its output).
+      const printed = String((err as { stdout?: string }).stdout ?? "");
+      const reason =
+        printed.match(/"text":\s*"([^"]+)"/)?.[1] ??
+        (err instanceof Error ? err.message : String(err));
+      if (attempt >= ATTEMPTS) {
+        throw new Error(`Reading ${db.worker} (${side}) failed ${ATTEMPTS} times: ${reason}`);
+      }
+      console.log(`  (${reason}; trying again)`);
+      sleep(2000 * attempt);
+    }
+  }
 }
+
+/** Waits, without anything else to do in the meantime. */
+const sleep = (ms: number) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 
 const quote = (name: string) => `"${name.replace(/"/g, '""')}"`;
 
