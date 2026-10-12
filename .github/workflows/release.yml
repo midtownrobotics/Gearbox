@@ -14,7 +14,8 @@ name: release
 # Then it deploys production (deploy.yml): migrations, every worker, the gateway. Only a run that
 # finds nothing left to release deploys, so what goes live is always a released commit: merging
 # the release PR commits the release, and that push starts this workflow again, which deploys it.
-# A push to public with no changesets deploys straight away.
+# A push to public with no changesets deploys straight away. While the repository variable
+# PRODUCTION_BRANCH is "main", production deploys from main instead (staging.yml) and this doesn't.
 
 on:
   push:
@@ -82,7 +83,9 @@ jobs:
 
   deploy:
     needs: release
-    if: needs.release.outputs.released != 'true'
+    # Not while production deploys from main (PRODUCTION_BRANCH, staging.yml): public is behind
+    # main, so deploying it would put older code back.
+    if: needs.release.outputs.released != 'true' && vars.PRODUCTION_BRANCH != 'main'
     uses: ./.github/workflows/deploy.yml
     with:
       environment: production
