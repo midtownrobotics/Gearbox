@@ -409,7 +409,7 @@ export function ChecklistRunnerPage() {
           {previous && (
             <Link
               to={`/checklists/${previous.id}`}
-              className={`${buttonClass("secondary")} min-w-0 max-w-[48%]`}
+              className={`${buttonClass()} min-w-0 max-w-[48%]`}
             >
               <span aria-hidden="true">←</span>
               <span className="truncate">{previous.name}</span>
@@ -418,7 +418,7 @@ export function ChecklistRunnerPage() {
           {next && (
             <Link
               to={`/checklists/${next.id}`}
-              className={`${buttonClass("secondary")} ml-auto min-w-0 max-w-[48%]`}
+              className={`${buttonClass()} ml-auto min-w-0 max-w-[48%]`}
             >
               <span className="truncate">{next.name}</span>
               <span aria-hidden="true">→</span>
