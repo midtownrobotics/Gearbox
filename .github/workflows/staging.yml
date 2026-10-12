@@ -1,50 +1,16 @@
 name: staging
 
-# Roadmap 0.2: every push to main deploys staging (<label>-dev.g3robotics.com), migrations first,
-# then each app's worker, then the gateway. Production deploys from `public` through Cloudflare's
-# Git integration, as before. Needs the CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID secrets
-# (docs/deploy.md, "Staging"), and staging's resources (`pnpm staging:create`, once).
+# Roadmap 0.2: every push to main deploys staging (<label>-dev.g3robotics.com) through
+# deploy.yml. Production deploys from public, through release.yml.
 
 on:
   push:
     branches: [main]
   workflow_dispatch:
 
-# One deploy at a time; a newer push waits for the one running instead of cutting it off midway.
-concurrency:
-  group: staging
-  cancel-in-progress: false
-
 jobs:
   deploy:
-    runs-on: ubuntu-latest
-    environment: staging
-    env:
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
-
-      - run: pnpm install --frozen-lockfile
-
-      # Staging's ids are written in each wrangler.toml; stop before deploying if they're stale.
-      - name: Site config is applied
-        run: pnpm configure --check
-
-      # Before any worker that needs them.
-      - name: Migrations
-        run: pnpm db:migrate:staging
-
-      # Each app's worker builds its page first ([env.staging.build], GEARBOX_STAGING=1), then the
-      # gateway.
-      - name: Deploy
-        run: pnpm deploy:staging
+    uses: ./.github/workflows/deploy.yml
+    with:
+      environment: staging
+    secrets: inherit

@@ -41,7 +41,7 @@ As of 10 October 2026, five of the six Phase 0 steps are done on `main`, Phase 1
 
 | Phase | Status | What is left |
 | --- | --- | --- |
-| 0. Groundwork | In progress: staging's config, deploy workflow and setup script are in (0.2) | Making staging's resources and secrets, and its first deploy (0.2) |
+| 0. Groundwork | In progress: staging's config, resources and the deploy workflow for both environments are in (0.2) | Staging's secrets and its first deploy (0.2) |
 | 1. Remove G3 from the platform | Done | Nothing |
 | 2. Tenancy core | Done | Nothing |
 | 3. Team-scoped apps | In progress: the shared pieces, Skill Tree, Pit, Attendance, Inventory, Orders, Shop, Edge and Portal are done | Scouting |
@@ -53,7 +53,7 @@ As of 10 October 2026, five of the six Phase 0 steps are done on `main`, Phase 1
 
 | Change | Roadmap step | Pull request |
 | --- | --- | --- |
-| Staging in the repo: every worker's `[env.staging]` (written by `pnpm configure` from production's), a staging build switch with a banner on every page, addresses at `<label>-dev.g3robotics.com`, a deploy workflow from `main` (migrations, workers, gateway) and `pnpm staging:create` for its resources. The production gateway keeps only G3's retired addresses on g3robotics.com | 0.2 (the resources, secrets and first deploy are left) | This PR |
+| Staging in the repo: every worker's `[env.staging]` (written by `pnpm configure` from production's), a staging build switch with a banner on every page, addresses at `<label>-dev.g3robotics.com`, one deploy workflow (migrations, workers, gateway) for staging from `main` and production from each release on `public`, replacing Cloudflare's Workers Builds, and `pnpm staging:create` for staging's resources. The production gateway keeps only G3's retired addresses on g3robotics.com | 0.2 (the secrets and first deploy are left) | This PR |
 | Orders' default sales tax rate is a team setting on its Settings page: the 8.9% a new order's tax started at was still fixed in the Carts page. It's now G3's row (migration `0020`), and a new team starts at 0% | Phase 3: Orders (a setting left in code) | This PR |
 | Inventory, a new app: what a team owns, where it's kept (a tree of locations) and what's in use on a robot, with check out and check in, vendor listings tied to Orders' catalog, merge and split, and a history per entry. Its fields, locations, robots and subsystems are a team's own: made on Settings or loaded from a setup file, with none in code or migrations. Orders can put received parts into it, required or not by a team setting | Built to the Phase 3 pattern from the start: tenancy sheet settled, settings out of code, a starter file in place of the seed hook (4.3) | [#154](https://github.com/midtownrobotics/Gearbox/pull/154) |
 | App library: a manifest per app, which apps each team has on (`team_apps` on the platform), seed hooks on switching on, 90 days' grace then delete on switching off (a daily cron), the gateway's "not enabled", Portal from subscriptions, and the team's admin pages on its home (Apps, Appearance and Slack, the last two moved from G3ID). Teams already here keep every app; new teams start with none | 4.1 to 4.4 (no export), 4.6, 4.7, part of 4.5 | [#163](https://github.com/midtownrobotics/Gearbox/pull/163) |
@@ -229,7 +229,7 @@ Seven choices were confirmed on 3 October 2026, and one more on 6 October, widen
 | Certificates | The free certificate for `*.frcgearbox.com`, one wildcard DNS record, one wildcard route | A Custom Domain and its own certificate per hostname |
 | Frontends | Each app's Worker serves its own built frontend (Workers static assets) behind the gateway | Nine Cloudflare Pages projects |
 | Attendance storage | D1 | The Firebase project `g3-attendance` |
-| Deploys | Cloudflare's Git integration (Workers Builds): `public` deploys to production. A staging environment from `main` is still to come (0.2) | `wrangler deploy` by hand and Pages Git builds |
+| Deploys | GitHub Actions (`.github/workflows/deploy.yml`): `main` deploys to staging and `public` to production, migrations first. Decided 12 October 2026, replacing Cloudflare's Git integration (Workers Builds), which deployed each Worker on its own with no migrations step | `wrangler deploy` by hand and Pages Git builds |
 | Variant apps | Reviewed pull requests merged into this repo | New |
 | Staging address | Production's addresses with `-dev` on the first part, on g3robotics.com: `1648-orders-dev.g3robotics.com`, the platform at `dev.g3robotics.com` (decided 11 October 2026, after G3's cutover). One level deep, so the free certificate covers it, and a domain apart from production's, so they never share a cookie; G3's retired addresses there stay production's | New |
 | Edge box link | A Durable Object (SQLite-backed, hibernating WebSockets) holds each edge box's connection, one object per team's box, on the existing Workers Paid plan. Confirmed 6 October 2026 for G3's box, then for every team that runs Edge | The Cloudflare Tunnel to `edge-agent.g3robotics.com` |
@@ -258,13 +258,13 @@ Phase 0 changes nothing a user can see. It makes the later phases safe to ship, 
 | Step | Change | Where | Status |
 | --- | --- | --- | --- |
 | 0.1 | Add a Workers test setup and baseline tests for sign-in, sessions, roles, kiosk PINs and each worker's main routes | every `workers/*`, `packages/testing`, `.github/workflows/ci.yml` | Done |
-| 0.2 | Add a staging environment to every worker: `main` deploys to staging and `public` to production, with migrations before workers. Production already deploys from `public` through Cloudflare's Git integration. Staging runs on `<label>-dev.g3robotics.com`. **Done in the repo:** `[env.staging]` in every `wrangler.toml`, written by `pnpm configure` from `[env.production]`; a staging build switch in `@g3/site-config` (`isStaging`, `platformHost`) with a banner on every page; `.github/workflows/staging.yml` (migrations, workers, gateway on every push to `main`); `pnpm staging:create` for the resources. **Left:** running it, the secrets and DNS (`docs/deploy.md`, "Staging"), and a Slack app for staging | each `wrangler.toml`, `scripts/configure.ts`, `.github/workflows/staging.yml` | In progress |
+| 0.2 | Add a staging environment to every worker: `main` deploys to staging and `public` to production, with migrations before workers. Both deploy through GitHub Actions (`deploy.yml`; production moved off Cloudflare's Git integration on 12 October). Staging runs on `<label>-dev.g3robotics.com`. **Done in the repo:** `[env.staging]` in every `wrangler.toml`, written by `pnpm configure` from `[env.production]`; a staging build switch in `@g3/site-config` (`isStaging`, `platformHost`) with a banner on every page; `.github/workflows/deploy.yml` (migrations, workers, gateway), called on every push to `main` (`staging.yml`) and for each release on `public` (`release.yml`); `pnpm staging:create`, run: staging's databases, namespaces, buckets, queue and placeholder Workers exist. **Left:** the secrets, DNS and GitHub environments (`docs/deploy.md`, "Staging"), disconnecting the Workers Builds, the first deploy, and a Slack app for staging | each `wrangler.toml`, `scripts/configure.ts`, `.github/workflows/staging.yml` | In progress |
 | 0.3 | Replace the seven copies of the auth middleware with one in `packages/auth` | `packages/auth/src/g3id.ts` | Done |
 | 0.4 | Put the domain in one config module and remove the hardcoded references. Drop `*.pages.dev` from the CORS allowlists | `packages/site-config/src/site.ts`, `scripts/configure.ts` | Done |
 | 0.5 | Move Attendance from Firestore to D1 and import G3's attendance history | `workers/attendance` | Done |
 | 0.6 | Remove the `apps/admin` and `workers/api` stubs and the stale files in `docs/`, add the MIT license at the repo root, and make `CLAUDE.md` the architecture reference | `apps/admin`, `workers/api`, `docs/` | Done |
 
-**What is left.** Staging's resources, secrets and first deploy (0.2), then its own Slack app.
+**What is left.** Staging's secrets and first deploy (0.2), then its own Slack app.
 
 **Done when:** a merge to `main` reaches staging with nobody running Wrangler, and CI fails when a sign-in or role test breaks.
 
@@ -639,7 +639,7 @@ The risk that matters most is one team seeing another team's data. Most of the s
 | Teams outside the United States | Open to all where wording can manage it. The conditions are in the Terms and privacy section |
 | Code license | MIT for the whole repo |
 | Review of the terms | Offline, before applications open. Drafting proceeds now |
-| How `public` reaches Cloudflare | Cloudflare's Git integration (Workers Builds) deploys each Worker when `public` changes, so merging the release PR deploys. Step 0.2's deploy part is covered; what's left is the staging environment |
+| How `public` reaches Cloudflare | GitHub Actions: the release workflow commits the release, then deploys it through `deploy.yml` (migrations, workers, gateway), the same way `main` deploys staging. Cloudflare's Git integration (Workers Builds) was used until 12 October 2026 |
 | Edge | An optional app any team can run with its own box (changed 6 October 2026, once the box no longer needed a tunnel). Its plan is the Edge section, not a phase |
 | Single-team apps | A public category: listed for every team, run only by the author team. Teams discuss them off the platform |
 | Contact address | contact@frcgearbox.com, as written in both drafts |

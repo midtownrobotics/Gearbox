@@ -2,7 +2,7 @@
 # packages/site-config/src/site.ts. Change them there, not here.
 #
 # Like every worker: the top of this file is local dev (`pnpm dev`, tests), and production is
-# [env.production], deployed with `--env production` (the scripts and Cloudflare's Git builds).
+# [env.production], deployed with `--env production` (the scripts and the deploy workflow).
 name = "scouting"
 main = "src/index.ts"
 compatibility_date = "2026-05-17"
