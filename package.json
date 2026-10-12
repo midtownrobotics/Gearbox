@@ -13,12 +13,15 @@
     "test": "pnpm -r --if-present test",
     "db:migrate:local": "pnpm -r --if-present db:migrate:local",
     "db:migrate:remote": "pnpm -r --if-present db:migrate:remote",
+    "db:migrate:staging": "pnpm -r --if-present db:migrate:staging",
     "configure": "node scripts/configure.ts",
+    "staging:create": "node scripts/staging-create.ts",
     "changeset": "changeset",
     "release:version": "node scripts/release-version.ts",
     "release:tag": "node scripts/release-tag.ts",
     "release:preview": "node scripts/release-preview.ts",
-    "deploy": "pnpm --filter \"./workers/*\" --filter \"!@g3/worker-gateway\" --if-present run deploy && pnpm --filter @g3/worker-gateway run deploy"
+    "deploy": "pnpm --filter \"./workers/*\" --filter \"!@g3/worker-gateway\" --if-present run deploy && pnpm --filter @g3/worker-gateway run deploy",
+    "deploy:staging": "pnpm --filter \"./workers/*\" --filter \"!@g3/worker-gateway\" --if-present run deploy:staging && pnpm --filter @g3/worker-gateway run deploy:staging"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",

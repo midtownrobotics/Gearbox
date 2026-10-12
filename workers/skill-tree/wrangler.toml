@@ -47,3 +47,33 @@ command = "pnpm --filter @g3/skill-tree build"
 directory = "../../apps/skill-tree/dist"
 not_found_handling = "single-page-application"
 run_worker_first = ["/api/*"]
+
+# ---- Staging: written by `pnpm configure` from [env.production]; don't edit below. ----
+
+[env.staging]
+name = "skill-tree-staging"
+workers_dev = false
+
+[env.staging.define]
+__G3_STAGING__ = "true"
+
+[[env.staging.services]]
+binding = "G3ID"
+service = "g3id-staging"
+
+[[env.staging.d1_databases]]
+binding = "SKILL_DB"
+database_name = "g3-skill-tree-staging"
+database_id = "not-created-run-pnpm-staging-create"
+migrations_dir = "src/db/migrations"
+
+[env.staging.vars]
+FRONTEND_URL = "https://1648-skill-tree-dev.g3robotics.com"
+
+[env.staging.build]
+command = "GEARBOX_STAGING=1 pnpm --filter @g3/skill-tree build"
+
+[env.staging.assets]
+directory = "../../apps/skill-tree/dist"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]

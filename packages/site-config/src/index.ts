@@ -38,6 +38,37 @@ export type AppName = keyof typeof site.apps;
 export const teamKey = `frc${site.team.number}`;
 
 declare const __G3_LOCAL_GATEWAY__: string | undefined;
+declare const __G3_STAGING__: boolean | undefined;
+
+/**
+ * A staging build (roadmap 0.2): set by the siteConfig() Vite plugin when GEARBOX_STAGING=1, and
+ * for workers by `define` in their wrangler.toml's [env.staging]. Every address below is then
+ * staging's (site.staging).
+ */
+export const isStaging: boolean = typeof __G3_STAGING__ === "boolean" && __G3_STAGING__;
+
+/** The domain the platform's addresses are on: frcgearbox.com, or staging's. */
+export const hostDomain: string = isStaging ? site.staging.domain : site.platformDomain;
+const hostSuffix: string = isStaging ? site.staging.suffix : "";
+
+/**
+ * A platform address by its label: "1648-orders" → 1648-orders.frcgearbox.com (on staging
+ * 1648-orders-dev.g3robotics.com); "" → the platform itself (frcgearbox.com, dev.g3robotics.com).
+ */
+export function platformHost(label: string): string {
+  if (!hostSuffix) return label ? `${label}.${hostDomain}` : hostDomain;
+  return `${label ? `${label}${hostSuffix}` : hostSuffix.replace(/^-/, "")}.${hostDomain}`;
+}
+
+/** A platform address's label (see platformHost), or null for any other hostname. */
+export function platformLabel(hostname: string): string | null {
+  if (hostname === platformHost("")) return "";
+  if (!hostname.endsWith(`.${hostDomain}`)) return null;
+  const first = hostname.slice(0, -hostDomain.length - 1);
+  if (first.includes(".")) return null;
+  if (!hostSuffix) return first;
+  return first.endsWith(hostSuffix) ? first.slice(0, -hostSuffix.length) : null;
+}
 
 /**
  * Local dev: the dev gateway (http://localhost:8796, roadmap 2.9), set for pages by the
@@ -63,7 +94,7 @@ function onGateway(gateway: string, host: string): string {
 
 /** The platform's address, or given the dev gateway, its address there (http://gearbox.localhost:8796). */
 export function platformUrlVia(gateway: string | undefined): string {
-  return gateway ? onGateway(gateway, "") : `https://${site.platformDomain}`;
+  return gateway ? onGateway(gateway, "") : `https://${platformHost("")}`;
 }
 
 /**
@@ -127,7 +158,7 @@ export function teamAppUrlVia(gateway: string | undefined, teamId: string, app: 
   const number = teamId.replace(/^frc/, "");
   const host = app === "portal" ? number : `${number}-${TEAM_HOST_APPS[app]}`;
   if (gateway) return onGateway(gateway, host);
-  return `https://${host}.${site.platformDomain}`;
+  return `https://${platformHost(host)}`;
 }
 
 /** The team a hostname belongs to (its key, "frc<number>"), or null for any other hostname. */
@@ -135,9 +166,10 @@ export function teamOfHost(hostname: string): string | null {
   // Plain localhost (each app on its own dev port) is the site's team.
   if (hostname === "localhost") return teamKey;
   // A team address on the platform's domain, or the dev gateway's (gearbox.localhost) for it.
-  const parent = [site.platformDomain, DEV_DOMAIN].find((d) => hostname.endsWith(`.${d}`));
-  if (!parent) return null;
-  const label = hostname.slice(0, -parent.length - 1);
+  const label = hostname.endsWith(`.${DEV_DOMAIN}`)
+    ? hostname.slice(0, -DEV_DOMAIN.length - 1)
+    : platformLabel(hostname);
+  if (!label) return null;
   const number = label.match(/^([1-9]\d*)(?:-|$)/)?.[1];
   return number ? `frc${number}` : null;
 }
@@ -149,12 +181,16 @@ export const platformUrl = platformUrlVia(localGateway);
  * The platform operators' console (roadmap 2.8), served by the platform worker at
  * admin.<platform domain>, where every operator's session cookie is.
  */
-export const CONSOLE_HOSTS = [`admin.${site.platformDomain}`] as const;
+export const CONSOLE_HOSTS = [platformHost("admin")] as const;
 
 /** The console's address (`teamId`, the operator's team, no longer changes it). */
 export function consoleUrl(_teamId?: string): string {
-  if (localGateway) return onGateway(localGateway, "admin");
-  return `https://admin.${site.platformDomain}`;
+  return consoleUrlVia(localGateway);
+}
+
+/** The console's address, or given the dev gateway, its address there (for workers). */
+export function consoleUrlVia(gateway: string | undefined): string {
+  return gateway ? onGateway(gateway, "admin") : `https://${platformHost("admin")}`;
 }
 
 /**
@@ -163,7 +199,7 @@ export function consoleUrl(_teamId?: string): string {
  * sign-in's state. (`teamId` no longer changes it.)
  */
 export function signInCallbackApiUrl(_teamId?: string): string {
-  return `https://id.${site.platformDomain}/api`;
+  return `https://${platformHost("id")}/api`;
 }
 
 /** The app list every app links back to. */
@@ -181,16 +217,12 @@ export const idName = `${site.team.shortName}ID`;
 export { teamLinks, teamLinksFor, toolLinks } from "./team-links.ts";
 
 /**
- * CORS: which browser origins may call the workers with credentials. The platform's domain and its
- * subdomains over https, and localhost for development. Nothing else (no *.pages.dev previews:
+ * CORS: which browser origins may call the workers with credentials. The platform's addresses
+ * (platformHost; staging's on staging) over https, and localhost for development. Nothing else (no *.pages.dev previews:
  * anyone can publish one).
  */
 export function isAllowedOrigin(origin: string): boolean {
-  const domain = site.platformDomain;
-  if (
-    origin === `https://${domain}` ||
-    (origin.startsWith("https://") && origin.endsWith(`.${domain}`))
-  ) {
+  if (origin.startsWith("https://") && platformLabel(origin.slice("https://".length)) !== null) {
     return true;
   }
   return /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
