@@ -11,7 +11,7 @@
 // --dry-run to only print what it would do.
 
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -30,6 +30,7 @@ const scratch = mkdtempSync(join(tmpdir(), "gearbox-staging-"));
  * (for an answer that's expected to fail).
  */
 function wrangler(args: string[], { quiet = false } = {}): string {
+  skipUpdateCheck();
   try {
     return execFileSync(WRANGLER, args, {
       cwd: scratch,
@@ -45,6 +46,28 @@ function wrangler(args: string[], { quiet = false } = {}): string {
     throw err;
   }
 }
+
+/**
+ * Wrangler checks npm for a newer version of itself (on its banner, and again after an error),
+ * and on a slow link to npm that download (megabytes) keeps it from exiting for minutes after it's
+ * done. The check skips npm while its cache (update-check's, in the temp folder) is under an hour
+ * old, so this says it just checked.
+ */
+function skipUpdateCheck() {
+  const dir = join(tmpdir(), "update-check");
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(
+    join(dir, "wrangler-latest.json"),
+    JSON.stringify({ latest: WRANGLER_VERSION, lastUpdate: Date.now() }),
+  );
+}
+const WRANGLER_VERSION = (
+  JSON.parse(
+    readFileSync(join(root, "workers/g3id/node_modules/wrangler/package.json"), "utf8"),
+  ) as {
+    version: string;
+  }
+).version;
 
 /**
  * Never interactive: what this script reads back is Wrangler's output, so a question it asked
@@ -70,11 +93,11 @@ execFileSync(WRANGLER, ["whoami"], {
 });
 
 /** Makes something, unless dry-running; "already exists" counts as made. */
-function make(what: string, args: string[]) {
+function make(what: string, args: string[], { quiet = true } = {}) {
   if (dryRun) return console.log(`would make ${what}`);
   console.log(`making ${what}…`);
   try {
-    wrangler(args, { quiet: true });
+    wrangler(args, { quiet });
   } catch (err) {
     const text = String((err as { stderr?: string }).stderr ?? err);
     if (/already exists|already taken|already owned/i.test(text)) return;
@@ -170,15 +193,19 @@ for (const name of names.workers) {
   } catch {
     // Doesn't exist yet.
   }
-  make(`placeholder Worker ${name}`, [
-    "deploy",
-    "placeholder.js",
-    "--name",
-    name,
-    "--compatibility-date",
-    "2026-05-17",
-    "--no-bundle",
-  ]);
+  make(
+    `placeholder Worker ${name}`,
+    [
+      "deploy",
+      "placeholder.js",
+      "--name",
+      name,
+      "--compatibility-date",
+      "2026-05-17",
+      "--no-bundle",
+    ],
+    { quiet: false },
+  );
 }
 
 console.log(dryRun ? "Dry run: nothing was made." : "Staging's resources are ready.");

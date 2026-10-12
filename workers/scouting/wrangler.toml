@@ -95,7 +95,7 @@ service = "g3id-staging"
 [[env.staging.d1_databases]]
 binding = "SCOUTING_DB"
 database_name = "g3-scouting-staging"
-database_id = "not-created-run-pnpm-staging-create"
+database_id = "b077b2e9-f541-45a9-96a2-1fb8d11f8e77"
 migrations_dir = "src/db/migrations"
 
 [[env.staging.r2_buckets]]

@@ -64,7 +64,7 @@ service = "g3id-staging"
 [[env.staging.d1_databases]]
 binding = "SKILL_DB"
 database_name = "g3-skill-tree-staging"
-database_id = "not-created-run-pnpm-staging-create"
+database_id = "54699b76-3f9a-4b44-8d82-42e0f79478a6"
 migrations_dir = "src/db/migrations"
 
 [env.staging.vars]

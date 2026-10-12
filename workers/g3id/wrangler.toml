@@ -108,16 +108,16 @@ __G3_STAGING__ = "true"
 [[env.staging.d1_databases]]
 binding = "DB"
 database_name = "g3-auth-staging"
-database_id = "not-created-run-pnpm-staging-create"
+database_id = "9b9a85a0-c406-454b-a904-71aca9b3373c"
 migrations_dir = "src/db/migrations"
 
 [[env.staging.kv_namespaces]]
 binding = "SESSIONS"
-id = "not-created-run-pnpm-staging-create"
+id = "85741df814134e55b70b4cbc725240dc"
 
 [[env.staging.kv_namespaces]]
 binding = "RATE_LIMIT"
-id = "not-created-run-pnpm-staging-create"
+id = "3c1cbf84a56c496b894f4b6ce3543317"
 
 [[env.staging.services]]
 binding = "PLATFORM"

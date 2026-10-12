@@ -84,7 +84,7 @@ service = "g3id-staging"
 [[env.staging.d1_databases]]
 binding = "EDGE_DB"
 database_name = "g3-edge-staging"
-database_id = "not-created-run-pnpm-staging-create"
+database_id = "87e3d587-a2d2-427a-b17f-4c063b9a9623"
 migrations_dir = "src/db/migrations"
 
 [[env.staging.durable_objects.bindings]]

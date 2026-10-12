@@ -164,7 +164,7 @@ service = "skill-tree-staging"
 [[env.staging.d1_databases]]
 binding = "PLATFORM_DB"
 database_name = "gearbox-platform-staging"
-database_id = "not-created-run-pnpm-staging-create"
+database_id = "a99a45ba-1a2d-41a0-8796-c9eca909251d"
 migrations_dir = "src/db/migrations"
 
 [env.staging.triggers]

@@ -69,7 +69,7 @@ service = "g3id-staging"
 [[env.staging.d1_databases]]
 binding = "ATTENDANCE_DB"
 database_name = "g3-attendance-staging"
-database_id = "not-created-run-pnpm-staging-create"
+database_id = "c90e7e44-b5dd-49f4-815a-ecf04e826a67"
 migrations_dir = "src/db/migrations"
 
 [env.staging.triggers]

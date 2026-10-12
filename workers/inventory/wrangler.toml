@@ -63,7 +63,7 @@ service = "g3id-staging"
 [[env.staging.d1_databases]]
 binding = "INVENTORY_DB"
 database_name = "g3-inventory-staging"
-database_id = "not-created-run-pnpm-staging-create"
+database_id = "be213150-37ba-482b-9d39-b2c8a76be0df"
 migrations_dir = "src/db/migrations"
 
 [env.staging.vars]

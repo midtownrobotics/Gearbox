@@ -71,12 +71,12 @@ service = "g3id-staging"
 
 [[env.staging.kv_namespaces]]
 binding = "SESSIONS"
-id = "not-created-run-pnpm-staging-create"
+id = "85741df814134e55b70b4cbc725240dc"
 
 [[env.staging.d1_databases]]
 binding = "PIT_DB"
 database_name = "g3-pit-staging"
-database_id = "not-created-run-pnpm-staging-create"
+database_id = "237ff642-f72c-4f72-a0a1-563fa4a8f39f"
 migrations_dir = "src/db/migrations"
 
 [env.staging.vars]

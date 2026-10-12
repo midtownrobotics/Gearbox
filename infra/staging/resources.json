@@ -1,4 +1,18 @@
 {
-  "d1": {},
-  "kv": {}
+  "d1": {
+    "g3-attendance-staging": "c90e7e44-b5dd-49f4-815a-ecf04e826a67",
+    "g3-edge-staging": "87e3d587-a2d2-427a-b17f-4c063b9a9623",
+    "g3-auth-staging": "9b9a85a0-c406-454b-a904-71aca9b3373c",
+    "g3-inventory-staging": "be213150-37ba-482b-9d39-b2c8a76be0df",
+    "g3-orders-staging": "f7b87836-b529-4c8f-a4d5-a460979e16f2",
+    "g3-pit-staging": "237ff642-f72c-4f72-a0a1-563fa4a8f39f",
+    "gearbox-platform-staging": "a99a45ba-1a2d-41a0-8796-c9eca909251d",
+    "g3-scouting-staging": "b077b2e9-f541-45a9-96a2-1fb8d11f8e77",
+    "g3-shop-staging": "cea974b5-9a78-4125-9831-557144f30cae",
+    "g3-skill-tree-staging": "54699b76-3f9a-4b44-8d82-42e0f79478a6"
+  },
+  "kv": {
+    "SESSIONS": "85741df814134e55b70b4cbc725240dc",
+    "RATE_LIMIT": "3c1cbf84a56c496b894f4b6ce3543317"
+  }
 }

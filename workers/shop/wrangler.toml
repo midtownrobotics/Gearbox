@@ -111,12 +111,12 @@ service = "edge-staging"
 
 [[env.staging.kv_namespaces]]
 binding = "SESSIONS"
-id = "not-created-run-pnpm-staging-create"
+id = "85741df814134e55b70b4cbc725240dc"
 
 [[env.staging.d1_databases]]
 binding = "SHOP_DB"
 database_name = "g3-shop-staging"
-database_id = "not-created-run-pnpm-staging-create"
+database_id = "cea974b5-9a78-4125-9831-557144f30cae"
 migrations_dir = "src/db/migrations"
 
 [[env.staging.r2_buckets]]
