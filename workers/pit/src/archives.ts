@@ -7,7 +7,7 @@ import { checklistArchives, checklistIssues, checklistItems, checklistLists } fr
 import { getSetting, teamNumberOf } from "./settings";
 import type { AppEnv } from "./types";
 
-// Checklist archives: "Archive and Reset" saves the checklists as they stand (what's checked,
+// Checklist archives: "Archive and reset" saves the checklists as they stand (what's checked,
 // which issues are open and which were resolved since the archive before), then unchecks
 // everything. Open issues are left alone. The Logs page reads the archives back.
 
@@ -263,7 +263,8 @@ export const archiveRoutes = new Hono<AppEnv>()
   })
 
   // The team's next official match at that event ("" when there's no event or nobody can say).
-  // Asks The Blue Alliance or Nexus, so the pop-up calls it only when it opens.
+  // Asks The Blue Alliance or Nexus, so pages call it sparingly: the Archive pop-up when it
+  // opens, the Overview every two minutes.
   .get("/next-match", requireAuth, async (c) => {
     const team = c.get("teamId");
     const { eventKey, nexusEventKey, event } = await currentEvent(createDb(c.env.PIT_DB), team);

@@ -1,6 +1,15 @@
-import { ErrorBanner } from "@g3/ui";
+import {
+  Button,
+  ConfirmButton,
+  ErrorBanner,
+  Loading,
+  Page,
+  ProgressBar,
+  focusRing,
+  inputClass,
+} from "@g3/ui";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { api } from "../../shared/api";
 import { getErrorMessage } from "../../shared/api-error";
 import { fetchIssues } from "../../shared/getters/issues";
@@ -10,9 +19,18 @@ import type { ChecklistIssue, ChecklistItem, ChecklistList } from "../../shared/
 
 const POLL_INTERVAL_MS = 5000;
 
+const textButton = `block rounded text-xs font-semibold text-secondary-500 hover:text-secondary-900 ${focusRing}`;
+
+function BackLink() {
+  return (
+    <Link to="/checklists" className="text-sm text-secondary-500 hover:text-primary-600">
+      ← All checklists
+    </Link>
+  );
+}
+
 export function ChecklistRunnerPage() {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
 
   const [list, setList] = useState<ChecklistList | null>(null);
   const [items, setItems] = useState<ChecklistItem[]>([]);
@@ -139,24 +157,17 @@ export function ChecklistRunnerPage() {
 
   if (loading) {
     return (
-      <main className="flex-1 bg-page flex items-center justify-center">
-        <p className="text-gray-600">Loading…</p>
-      </main>
+      <Page title="Checklists" width="narrow" actions={<BackLink />}>
+        <Loading />
+      </Page>
     );
   }
 
   if (notFound || !list) {
     return (
-      <main className="flex-1 bg-page flex flex-col items-center justify-center gap-4">
-        <p className="text-gray-600">Checklist not found.</p>
-        <button
-          type="button"
-          onClick={() => navigate("/checklists")}
-          className="text-primary-600 hover:text-primary-700 text-sm underline"
-        >
-          Back
-        </button>
-      </main>
+      <Page title="Checklists" width="narrow" actions={<BackLink />}>
+        <p className="text-sm text-secondary-500">Checklist not found.</p>
+      </Page>
     );
   }
 
@@ -174,239 +185,192 @@ export function ChecklistRunnerPage() {
   }, {});
 
   return (
-    <main className="flex-1 bg-page text-gray-900">
-      <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
-        <div className="flex items-center justify-between">
-          <button
-            type="button"
-            onClick={() => navigate("/checklists")}
-            className="text-sm text-gray-600 hover:text-gray-700 transition-colors"
-          >
-            ← Back
-          </button>
-          {anyChecked && (
-            <button
-              type="button"
-              onClick={handleReset}
-              className="text-sm text-gray-600 hover:text-red-400 transition-colors"
-            >
-              Reset
-            </button>
-          )}
-        </div>
+    <Page
+      title={list.name}
+      description={list.description ?? undefined}
+      width="narrow"
+      actions={<BackLink />}
+    >
+      {banner && <ErrorBanner message={banner} />}
 
-        {banner && <ErrorBanner message={banner} />}
-
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">{list.name}</h1>
-          {list.description && <p className="text-sm text-gray-600 mt-1">{list.description}</p>}
-        </div>
-
-        {totalCount > 0 && (
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-sm">
-              <span className={allDone ? "text-green-400 font-semibold" : "text-gray-600"}>
-                {allDone ? "All done!" : `${doneCount} of ${totalCount} complete`}
-              </span>
-              <span className="text-gray-600 text-xs">{Math.round(progress * 100)}%</span>
-            </div>
-            <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-              <div
-                className={`h-full rounded-full transition-all duration-300 ${allDone ? "bg-green-500" : "bg-primary-500"}`}
-                style={{ width: `${progress * 100}%` }}
-              />
-            </div>
+      {totalCount > 0 && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between text-sm">
+            <span className={allDone ? "font-semibold text-emerald-700" : "text-secondary-600"}>
+              {allDone ? "All done!" : `${doneCount} of ${totalCount} complete`}
+            </span>
+            <span className="text-xs text-secondary-500">{Math.round(progress * 100)}%</span>
           </div>
-        )}
+          <ProgressBar percent={progress * 100} done={allDone} className="!h-2" />
+        </div>
+      )}
 
-        {items.length === 0 ? (
-          <p className="text-gray-600 text-sm text-center py-8">
-            No items.{" "}
-            <button
-              type="button"
-              onClick={() => navigate(`/editor/${list.id}`)}
-              className="text-primary-600 hover:text-primary-700 underline"
-            >
-              Add some on Edit Checklists.
-            </button>
-          </p>
-        ) : (
-          <div className="space-y-2">
-            {items.map((item) => {
-              if (item.type === "topic") {
-                return (
-                  <div key={item.id} className="pt-3 pb-1 first:pt-0">
-                    <p className="text-xs font-bold uppercase tracking-widest text-gray-600 border-b border-gray-200 pb-2">
-                      {item.name}
-                    </p>
-                  </div>
-                );
-              }
-
-              const isChecked = item.checked;
-              const itemIssues = issuesByItemId[item.id] ?? [];
-
+      {items.length === 0 ? (
+        <p className="text-sm text-secondary-500">
+          No items.{" "}
+          <Link
+            to={`/editor/${list.id}`}
+            className="font-semibold text-primary-600 hover:underline"
+          >
+            Add some on Edit Checklists.
+          </Link>
+        </p>
+      ) : (
+        <div className="space-y-2">
+          {items.map((item) => {
+            if (item.type === "topic") {
               return (
-                <div
-                  key={item.id}
-                  className={`rounded-xl border transition-all ${
-                    isChecked ? "border-gray-200" : "border-gray-300"
-                  }`}
-                >
-                  {/* Checkbox row */}
-                  <button
-                    type="button"
-                    onClick={() => toggle(item)}
-                    className={`w-full flex items-start gap-4 p-4 text-left rounded-xl transition-colors ${
-                      isChecked ? "bg-surface opacity-60" : "bg-surface hover:bg-gray-100"
-                    }`}
-                  >
-                    <div
-                      className={`mt-0.5 w-6 h-6 rounded-md border-2 shrink-0 flex items-center justify-center transition-colors ${
-                        isChecked ? "bg-primary-600 border-primary-600" : "border-gray-600"
-                      }`}
-                    >
-                      {isChecked && (
-                        <svg
-                          viewBox="0 0 12 10"
-                          className="w-3.5 h-3 fill-none stroke-on-primary stroke-2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          aria-hidden="true"
-                        >
-                          <polyline points="1,5 4,8 11,1" />
-                        </svg>
-                      )}
-                    </div>
-                    <div className="min-w-0">
-                      <p
-                        className={`text-base font-medium transition-colors ${isChecked ? "line-through text-gray-600" : "text-gray-900"}`}
-                      >
-                        {item.name}
-                      </p>
-                      {item.description && (
-                        <p
-                          className={`text-sm mt-0.5 ${isChecked ? "text-gray-600" : "text-gray-600"}`}
-                        >
-                          {item.description}
-                        </p>
-                      )}
-                    </div>
-                  </button>
-
-                  {/* Issues section */}
-                  {(itemIssues.length > 0 || addingIssueForItemId === item.id) && (
-                    <div className="px-4 pb-3 space-y-1.5 border-t border-gray-200 pt-2">
-                      {itemIssues.map((issue) => (
-                        <div key={issue.id}>
-                          {confirmDeleteIssueId === issue.id ? (
-                            <div className="flex items-center gap-3 py-0.5">
-                              <span className="text-xs text-gray-600 flex-1 truncate">
-                                Resolve "{issue.text}"?
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => deleteIssue(issue)}
-                                className="px-2 py-0.5 bg-primary-600 hover:bg-primary-700 text-on-primary text-xs font-semibold rounded"
-                              >
-                                Resolve
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setConfirmDeleteIssueId(null)}
-                                className="px-2 py-0.5 bg-gray-700 hover:bg-gray-600 text-gray-200 text-xs rounded"
-                              >
-                                Cancel
-                              </button>
-                            </div>
-                          ) : (
-                            <div className="flex items-start gap-2 group/issue">
-                              <button
-                                type="button"
-                                onClick={() => setConfirmDeleteIssueId(issue.id)}
-                                className="mt-0.5 w-4 h-4 rounded border border-gray-400 hover:bg-gray-300 shrink-0 transition-colors"
-                                title="Mark resolved"
-                              />
-                              <p className="text-sm flex-1 leading-snug text-gray-900">
-                                {issue.text}
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      ))}
-
-                      {addingIssueForItemId === item.id ? (
-                        <div className="flex gap-2 pt-1">
-                          <input
-                            type="text"
-                            placeholder="Describe the issue…"
-                            value={newIssueText}
-                            onChange={(e) => setNewIssueText(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") handleAddIssue(item.id);
-                              if (e.key === "Escape") {
-                                setAddingIssueForItemId(null);
-                                setNewIssueText("");
-                              }
-                            }}
-                            className="flex-1 bg-gray-100 border border-gray-600 rounded-lg px-3 py-1.5 text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:border-yellow-300"
-                            // biome-ignore lint/a11y/noAutofocus: intentional — user just opened the issue form
-                            autoFocus
-                          />
-                          <button
-                            type="button"
-                            onClick={() => handleAddIssue(item.id)}
-                            className="px-3 py-1.5 bg-yellow-100 hover:bg-yellow-100 text-gray-900 text-xs font-semibold rounded-lg"
-                          >
-                            Add
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setAddingIssueForItemId(null);
-                              setNewIssueText("");
-                            }}
-                            className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-200 text-xs rounded-lg"
-                          >
-                            ✕
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setAddingIssueForItemId(item.id);
-                            setNewIssueText("");
-                          }}
-                          className="text-xs text-gray-600 hover:text-gray-900 transition-colors pt-0.5"
-                        >
-                          + Add issue
-                        </button>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Add issue trigger when no issues exist yet */}
-                  {itemIssues.length === 0 && addingIssueForItemId !== item.id && (
-                    <div className="px-4 pb-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setAddingIssueForItemId(item.id);
-                          setNewIssueText("");
-                        }}
-                        className="text-xs text-gray-700 hover:text-gray-900 transition-colors"
-                      >
-                        + Add issue
-                      </button>
-                    </div>
-                  )}
+                <div key={item.id} className="pb-1 pt-3 first:pt-0">
+                  <p className="border-b border-secondary-200 pb-2 text-xs font-bold uppercase tracking-widest text-secondary-500">
+                    {item.name}
+                  </p>
                 </div>
               );
-            })}
-          </div>
-        )}
-      </div>
-    </main>
+            }
+
+            const isChecked = item.checked;
+            const itemIssues = issuesByItemId[item.id] ?? [];
+            const addingIssue = addingIssueForItemId === item.id;
+            const hasIssueSection = itemIssues.length > 0 || addingIssue;
+
+            return (
+              <div key={item.id} className="rounded-xl border border-secondary-200 bg-surface">
+                {/* Checkbox row */}
+                <button
+                  type="button"
+                  onClick={() => toggle(item)}
+                  className={`flex w-full items-start gap-4 rounded-xl p-4 text-left ${focusRing} ${
+                    isChecked ? "opacity-60" : "hover:bg-secondary-50"
+                  }`}
+                >
+                  <div
+                    className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md border-2 ${
+                      isChecked ? "border-primary-500 bg-primary-500" : "border-secondary-400"
+                    }`}
+                  >
+                    {isChecked && (
+                      <svg
+                        viewBox="0 0 12 10"
+                        className="h-3 w-3.5 fill-none stroke-on-primary stroke-2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                      >
+                        <polyline points="1,5 4,8 11,1" />
+                      </svg>
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <p
+                      className={`text-base font-medium ${isChecked ? "text-secondary-500 line-through" : "text-secondary-900"}`}
+                    >
+                      {item.name}
+                    </p>
+                    {item.description && (
+                      <p className="mt-0.5 text-sm text-secondary-500">{item.description}</p>
+                    )}
+                  </div>
+                </button>
+
+                {/* Issues, and the way to add one */}
+                <div
+                  className={
+                    hasIssueSection
+                      ? "space-y-2 border-t border-secondary-200 px-4 pb-3 pt-2"
+                      : "px-4 pb-2"
+                  }
+                >
+                  {itemIssues.map((issue) =>
+                    confirmDeleteIssueId === issue.id ? (
+                      <div key={issue.id} className="flex flex-wrap items-center gap-2">
+                        <span className="min-w-0 flex-1 truncate text-sm text-secondary-600">
+                          Resolve "{issue.text}"?
+                        </span>
+                        <Button size="sm" onClick={() => deleteIssue(issue)}>
+                          Resolve
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => setConfirmDeleteIssueId(null)}
+                        >
+                          Keep it open
+                        </Button>
+                      </div>
+                    ) : (
+                      <div key={issue.id} className="flex items-start gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setConfirmDeleteIssueId(issue.id)}
+                          className={`mt-0.5 h-5 w-5 shrink-0 rounded border border-amber-300 bg-amber-50 hover:bg-amber-100 ${focusRing}`}
+                          title="Mark resolved"
+                          aria-label={`Mark resolved: ${issue.text}`}
+                        />
+                        <p className="flex-1 text-sm leading-snug text-secondary-900">
+                          {issue.text}
+                        </p>
+                      </div>
+                    ),
+                  )}
+
+                  {addingIssue ? (
+                    <div className="flex gap-2 pt-1">
+                      <input
+                        type="text"
+                        placeholder="Describe the issue…"
+                        value={newIssueText}
+                        onChange={(e) => setNewIssueText(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") handleAddIssue(item.id);
+                          if (e.key === "Escape") {
+                            setAddingIssueForItemId(null);
+                            setNewIssueText("");
+                          }
+                        }}
+                        className={`${inputClass} min-w-0 flex-1`}
+                        // biome-ignore lint/a11y/noAutofocus: intentional — user just opened the issue form
+                        autoFocus
+                      />
+                      <Button onClick={() => handleAddIssue(item.id)}>Add</Button>
+                      <Button
+                        variant="secondary"
+                        onClick={() => {
+                          setAddingIssueForItemId(null);
+                          setNewIssueText("");
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAddingIssueForItemId(item.id);
+                        setNewIssueText("");
+                      }}
+                      className={textButton}
+                    >
+                      Add an issue
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {anyChecked && (
+        <div className="flex flex-wrap gap-2 border-t border-secondary-200 pt-4">
+          <ConfirmButton
+            label="Reset this list"
+            question="Uncheck every item on this list? Nothing is saved to Logs."
+            confirmLabel="Uncheck every item"
+            onConfirm={handleReset}
+          />
+        </div>
+      )}
+    </Page>
   );
 }

@@ -5,5 +5,12 @@ export function OfflineBanner() {
 
   if (isOnline) return;
 
-  return <div className="text-center py-2 text-md bg-gray-1000">You are in offline mode.</div>;
+  return (
+    <p
+      role="status"
+      className="border-b border-amber-300 bg-amber-50 px-4 py-2 text-center text-sm text-amber-800"
+    >
+      You are in offline mode.
+    </p>
+  );
 }

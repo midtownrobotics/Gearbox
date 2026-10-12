@@ -18,7 +18,7 @@ A survey of every difference, with sketches, is at <https://claude.ai/artifact/C
 | 2. Fixes that need no decision | Done | Pit, Shop, ID, Portal, Orders, Inventory, Edge | Nothing. Four things it found were passed to later steps (see step 2 below) |
 | 3. Edge onto the full set | Done | Edge | Nothing |
 | 4. ID and Portal onto the shared frame | Done | ID, Portal | Nothing. A few things were left as they are on purpose (see step 4 below) |
-| 5. Pit, with its Overview | Not started | Pit | All of it |
+| 5. Pit, with its Overview | Done | Pit | Nothing. Its icons and one color question were left open (see step 5 below) |
 | 6. Shop | Not started | Shop | All of it |
 | 7. Browser pop-ups | Started: Edge's and ID's are done | Orders, Shop, Skill Tree, Platform | 25 calls |
 | 8. Scouting | Not started | Scouting | All of it, with its Phase 3 step in `roadmap.md` |
@@ -31,6 +31,7 @@ A survey of every difference, with sketches, is at <https://claude.ai/artifact/C
 | Names: Orders' and Inventory's Settings page is Admin (at `/admin`; `/settings` still opens it), Pit's Admin page is titled Admin, Shop's Admin is last in the bar, and every "Log in" and "Log Out" is "Sign in" and "Sign out". Titles match their bar labels in Pit (Edit Checklists), ID (Account, Kiosk Devices, Attendance), Portal (Manage Apps, Appearance) and Edge (Overview, Drive). Bugs: Pit's unreadable headings, dark error blocks and red progress bars; pages a bar's height too tall in Pit, Shop and Portal; ID's kiosk revoke asks first; Orders' and Inventory's dates follow the viewer's language; Inventory's search and filters are in the address; unused icon libraries dropped from Pit and Shop | 2 | [#187](https://github.com/midtownrobotics/Gearbox/pull/187) |
 | Edge's hand-written buttons and inputs are the shared `Button` and `inputClass`, and it has no button or input styles of its own. `Button` and `ConfirmButton` take `size="sm"`. Edge's three browser confirms (a new box key, deleting a blocklist, removing a printer) ask in the page, and deleting a door sound now asks too | 3, and Edge's part of 7 | [#188](https://github.com/midtownrobotics/Gearbox/pull/188) |
 | ID's and Portal's pages are built from the shared parts: `Page` for every ordinary page, `Card`, `Button`, `Field` and `inputClass`, the banners, `Badge` for a member's status. Their titles are the shared 36px title, on the sign-in and kiosk screens too. Errors that were in the team's color are red. ID's Users filters are near-black chips. ID's last browser pop-ups are gone: unlinking a sign-in and deleting a user from the list ask in the page, and three alerts are errors on the page. New shared parts: `Switch` (Portal's two copies and Edge's are one), `Chip`, `ConfirmQuestion`, `buttonClass` for a link that looks like a button, and `size="lg"` for touch screens | 4, and ID's part of 7 | [#189](https://github.com/midtownrobotics/Gearbox/pull/189) |
+| Pit's pages are built from the shared parts, and no `gray-*` class is left in the app: `Page` at the narrow width, `Card`, `Button`, `Field`, the banners, `Dialog` for its two pop-ups, `Badge` and `Chip` for a battery's state, `ProgressBar` for its bars. Home is Overview: four tiles that each show a figure and open its page (checklist items checked, open issues, the Next Up battery with the one In Robot under it, and the next match or the last archive). With no connection it shows what it last knew. `ProgressBar` takes `done`, which turns it green. Resetting one checklist asks first, an open issue's Resolve button is always shown, and the checklist editor's rows have one Edit button | 5 | This PR |
 
 ## Decisions
 
@@ -98,7 +99,7 @@ They are in `packages/ui/src/components/` and exported from `@g3/ui`.
 | `Toggle`, `Switch` | An on/off switch with a label and description; the switch alone, for a row that already says what it switches |
 | `Chip` | One choice in a row of filters; the chosen one is near-black |
 | `Badge`, `tones` | A status label and the colors that mean something |
-| `ProgressBar` | A thin bar filled to a percent |
+| `ProgressBar` | A thin bar filled to a percent; `done` turns it green. A thicker one overrides the height (`className="!h-2"`) |
 | `focusRing` | The focus outline, for a control an app has to write by hand |
 
 Rules for the parts:
@@ -120,7 +121,7 @@ What step 1 did for four apps, as a recipe for the rest:
 5. Sweep for the team's color used to mean a problem (`text-primary-700`, `bg-primary-50` with `border-primary-200` around an error) and make it red. Leave it where it means "selected" or is a link.
 6. Delete what the app no longer uses.
 
-Then check: `pnpm biome check --write`, `pnpm --filter @g3/<app> typecheck`, `pnpm --filter @g3/<app> build`, and look at the pages in both themes through the dev gateway (`pnpm dev`, then `http://1648-<app>.gearbox.localhost:8796`). Step 1 was checked by type-check, lint and build only; nobody looked at it in a browser before it was opened for review.
+Then check: `pnpm biome check --write`, `pnpm --filter @g3/<app> typecheck`, `pnpm --filter @g3/<app> build`, and look at the pages in both themes through the dev gateway (`pnpm dev`, then `http://1648-<app>.gearbox.localhost:8796`). Step 1 was checked by type-check, lint and build only; nobody looked at it in a browser before it was opened for review. Step 5's pages were looked at in a local browser with made-up answers standing in for the worker (so without signing in), in both themes and at a phone's width.
 
 ## Steps
 
@@ -160,16 +161,30 @@ See "What landed". What it settled, and what it left:
 - **Approve is the primary button and Reject is `danger`.** Approve was green.
 - **Left as they are:** Portal's home grid and its two large front-door buttons; the kiosk's PIN keypad; the spinner that replaces an icon inside ID's small Attendance buttons while they work; the attendance reports' own grid and charts; Portal's joined buttons for the button text color, which show the team's color on purpose.
 
-### 5. Pit, with its Overview (medium, or large with the overview)
+### 5. Pit, with its Overview (done)
 
-Pit was written for a screen that was always dark, and about 4,400 lines still carry it.
+See "What landed". What it settled, and what it left:
 
-- `text-gray-*` and `border-gray-*` throughout (236 and 55 uses): use `secondary-*`.
-- `bg-gray-700 text-gray-200` buttons are `Button variant="secondary"`. `text-green-400` and `bg-green-900` are the `success` tone. `yellow-*` is `amber-*`. (Step 2 already made its error blocks `ErrorBanner` and its progress bars the team's color.)
-- Its progress bars are written out in four places: use `ProgressBar`, green only when done.
-- Its pages are 672px wide (`width="narrow"`), and its targets are large for a pit tablet. Add the large button size to `Button` here.
-- **Home becomes Overview.** Take Home out of the bar (the wordmark already opens the first page). Replace the six tiles that repeat the bar with tiles that each carry a figure the app already has and open its page: checklist items checked since the last archive, open issues, batteries, the next match (`GET /archives/next-match`) and the last archive. Use the shared page title in place of the 60px centered heading and uppercase tagline. Admin stays in the bar only.
-- Pit works offline at events (`OfflineBanner`, `prefetchAll`). The Overview has to show what it last knew when offline, not an error.
+- **Overview is first in the bar**, at Pit's own address (`/`). The survey said both "take Home out of the bar" and drew Overview in it; the rule (an app opens on the first page in its bar) and the sketch won.
+- **The Overview's tiles** (`apps/pit/src/plugins/overview/`):
+  - Checklists: items checked, with a bar.
+  - Open issues: how many, and how many are new since the last archive. It opens Checklists at its issues.
+  - Batteries: the Next Up battery is the main value, with its voltage; the In Robot one is under it, with how long it has been in. Both are labeled. Erik chose this on 12 October: the next battery is what the crew needs at a glance.
+  - Next match, with the last archive under it. Away from an event, or when nobody can say the next match, this tile is the last archive and opens Logs.
+- **No connection.** Each tile's figure is asked for on its own and keeps what it last had; one nobody has answered shows "—", never an error. `prefetchAll` asks for the issues and archives as the app opens, so their saved copies are there whichever page was opened first. A visitor is asked to sign in only once the worker has said nobody is signed in (`signedOut` in `shared/use-auth.ts`), not when it couldn't be reached.
+- **Widths.** Every page is `narrow`. The Monitor keeps the full width and its own header.
+- **Sizes.** `size="lg"` only for "Archive and reset" and the pop-up's Archive button, which were large before. The rest are the default size, which is no smaller than they were.
+- **A chosen option is near-black**: a battery's state (`Chip`) and the Match, Practice, Other choice in the Archive pop-up. The team's color is the main action.
+- **Behavior that changed to fit the rules:**
+  - Resetting one checklist asks first (`ConfirmButton`). It unchecked every item on one tap.
+  - An open issue's Resolve button is always shown. It only appeared on hover, which a tablet doesn't have.
+  - The checklist editor has a Checklist card (Name, Description, Save) and one Edit button per row, which opens the row's name, description and Delete. It had a rename mark, a delete mark and a click on the description.
+  - Button labels are sentence case, so "Archive and Reset" is "Archive and reset".
+- **Left as they are:**
+  - A battery's state colors: In Robot red, Next Up green, Charging blue, Idle gray, Broken amber (`STATE_TONES` in `apps/pit/src/shared/battery-display.tsx`). Under "red means a problem", Broken would be red and In Robot blue. The pit crew knows the colors as they are, so changing them is Erik's call.
+  - The Monitor's layout, and its red, amber and green for On Deck, Now Queuing and Queuing Soon: a wall display read from across the pit.
+  - The reorder arrows (▲ ▼) and the → on a row. They wait for the Lucide icons, which no step has added yet.
+  - The installed app's splash colors (the `manifest` in `apps/pit/vite.config.ts`), which are still the dark ones.
 
 ### 6. Shop (large)
 
@@ -223,6 +238,9 @@ From reading the code on 11 October. None was confirmed in a running app, and on
 | Pit, Shop | `lucide-react` and `react-icons` were installed and never imported | Fixed in step 2 |
 | Inventory | The table's search and filters reset on a reload or Back | Fixed in step 2: they are in the address (`q`, `status`, `location`, `robot`). An entry's "← All entries" link still opens the table without them |
 | Shop | Its Admin page shows "Obsolete instances deleted successfully" in the error banner | Open, step 6 |
+| Pit | An open issue's Resolve mark only showed on hover, so a tablet never showed it | Fixed in step 5 |
+| Pit | The offline notice had no background (`bg-gray-1000` isn't a class) | Fixed in step 5 |
+| Pit | An item checked with no connection looks checked but is never saved, and is unchecked again on a reload: `toggle` in `checklist-runner-page.tsx` doesn't handle a request that never reaches the worker | Open. Not part of a restyle |
 
 ## How to work on this
 

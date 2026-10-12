@@ -3,7 +3,7 @@ import { call, callAs, jsonAs } from "@g3/testing/worker";
 import { describe, expect, it } from "vitest";
 import { nexusNextMatch, tbaMatchLabel } from "../src/archives";
 
-// Checklist archives: "Archive and Reset" saves the checklists as they stand, unchecks every item
+// Checklist archives: "Archive and reset" saves the checklists as they stand, unchecks every item
 // and leaves open issues; the Logs page reads the archives back. A resolved issue is kept until
 // the next archive has said so. Each test has a team of its own, so "the archive before" is always
 // one the test made.
