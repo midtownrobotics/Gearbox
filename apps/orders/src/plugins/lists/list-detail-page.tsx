@@ -153,7 +153,7 @@ export function ListDetailPage() {
         {/* New Request (search, or paste a link) for this list: what's requested goes on it. */}
         <Link
           to={`/catalog?list=${list.id}`}
-          className="rounded-lg bg-primary-500 px-3.5 py-2 text-sm font-semibold text-white hover:bg-primary-600"
+          className="rounded-lg bg-primary-500 px-3.5 py-2 text-sm font-semibold text-on-primary hover:bg-primary-600"
         >
           Request parts
         </Link>

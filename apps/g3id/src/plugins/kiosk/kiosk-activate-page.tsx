@@ -89,7 +89,7 @@ export function KioskActivatePage() {
           <button
             type="submit"
             disabled={loading || code.length !== 6}
-            className="w-full py-3 px-4 rounded-lg bg-primary-600 hover:bg-primary-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold transition-colors"
+            className="w-full py-3 px-4 rounded-lg bg-primary-600 hover:bg-primary-500 disabled:opacity-50 disabled:cursor-not-allowed text-on-primary font-semibold transition-colors"
           >
             {loading ? "Activating..." : "Activate Device"}
           </button>

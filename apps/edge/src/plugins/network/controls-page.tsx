@@ -24,7 +24,7 @@ async function mutate(
 }
 
 const button = "text-sm font-medium rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50";
-const primaryButton = `${button} bg-primary-500 hover:bg-primary-600 text-white`;
+const primaryButton = `${button} bg-primary-500 hover:bg-primary-600 text-on-primary`;
 const plainButton = `${button} text-secondary-600 hover:text-secondary-900 hover:bg-secondary-100`;
 
 export function ControlsPage() {

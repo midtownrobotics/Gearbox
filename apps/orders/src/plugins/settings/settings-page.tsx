@@ -391,7 +391,7 @@ function ShareACart() {
         ) : (
           <a
             href={connectUrl}
-            className="inline-block rounded-lg bg-primary-500 px-3.5 py-2 font-semibold text-white hover:bg-primary-600"
+            className="inline-block rounded-lg bg-primary-500 px-3.5 py-2 font-semibold text-on-primary hover:bg-primary-600"
           >
             Connect the team's Share-A-Cart account
           </a>

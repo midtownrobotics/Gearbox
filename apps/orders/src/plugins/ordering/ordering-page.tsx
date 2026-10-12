@@ -443,7 +443,7 @@ function VendorOrder({
                   ? `${cart.manual} item(s) can't be added automatically; add those by hand.`
                   : "Opens the store with these items and quantities in the cart"
               }
-              className="rounded-lg bg-primary-500 px-3 py-1.5 text-sm font-semibold text-white hover:bg-primary-600"
+              className="rounded-lg bg-primary-500 px-3 py-1.5 text-sm font-semibold text-on-primary hover:bg-primary-600"
             >
               🛒 Add {link.count} to {link.label} ↗
             </a>

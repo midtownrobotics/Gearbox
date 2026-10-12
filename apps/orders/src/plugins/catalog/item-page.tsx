@@ -16,7 +16,7 @@ const LINK_LABEL = {
 };
 
 const primaryLink =
-  "rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-700";
+  "rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-on-primary hover:bg-primary-700";
 const secondaryLink =
   "rounded-lg border border-secondary-300 bg-surface px-4 py-2 text-sm font-semibold text-secondary-800 hover:bg-secondary-50";
 

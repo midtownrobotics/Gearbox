@@ -164,7 +164,7 @@ function Card({
 }
 
 const linkButton =
-  "rounded-md bg-primary-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-primary-700";
+  "rounded-md bg-primary-600 px-3 py-1.5 text-sm font-semibold text-on-primary hover:bg-primary-700";
 
 export function IntegrationsPage() {
   const [searchParams] = useSearchParams();

@@ -2,6 +2,7 @@ import {
   type TeamUiColors,
   type TeamUiSettings,
   builtInBrandColor,
+  buttonTextChoices,
   completeAppOrder,
   defaultTeamUiSettings,
   isHexColor,
@@ -34,6 +35,15 @@ function isColors(value: unknown): value is TeamUiColors {
       const color = value[field];
       return typeof color === "string" && isHexColor(color);
     })
+  );
+}
+
+/** A choice of button text for each theme, and nothing else. */
+function isButtonText(value: unknown): value is TeamUiSettings["buttonText"] {
+  return (
+    isRecord(value) &&
+    hasKeys(value, ["light", "dark"]) &&
+    Object.values(value).every((choice) => (buttonTextChoices as unknown[]).includes(choice))
   );
 }
 
@@ -70,6 +80,7 @@ export function isTeamUiSettings(value: unknown): value is TeamUiSettings {
     typeof value.linkAccents === "boolean" &&
     isColors(value.light) &&
     isColors(value.dark) &&
+    isButtonText(value.buttonText) &&
     Array.isArray(value.hiddenLinks) &&
     new Set(value.hiddenLinks).size === value.hiddenLinks.length &&
     value.hiddenLinks.every(
@@ -130,6 +141,8 @@ export function readTeamUiSettings(
     const settings = {
       ...stored,
       linkAccents: "linkAccents" in stored ? stored.linkAccents : defaults.linkAccents,
+      // Saved before button text was a choice: automatic.
+      buttonText: "buttonText" in stored ? stored.buttonText : defaults.buttonText,
       links: { ...defaults.links, ...value.links },
       hiddenLinks: "hiddenLinks" in value ? value.hiddenLinks : [],
       // Saved before the grid could be reordered: the default order. Saved before a tile

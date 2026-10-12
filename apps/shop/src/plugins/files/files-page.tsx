@@ -245,7 +245,7 @@ export function FilesPage() {
                         type="button"
                         onClick={() => handlePrint(drawing)}
                         disabled={printingId === drawing.id}
-                        className="px-2.5 py-1 text-xs font-medium bg-crimson text-paper hover:bg-crimson-dark disabled:bg-steel/30 disabled:cursor-not-allowed rounded transition-colors shrink-0"
+                        className="px-2.5 py-1 text-xs font-medium bg-crimson text-on-primary hover:bg-crimson-dark disabled:bg-steel/30 disabled:cursor-not-allowed rounded transition-colors shrink-0"
                       >
                         {printingId === drawing.id ? "Printing…" : "Print"}
                       </button>

@@ -23,7 +23,7 @@ export function PendingPage() {
         <button
           type="button"
           onClick={() => navigate("/login")}
-          className="w-full rounded-lg bg-primary-500 hover:bg-primary-600 text-white font-semibold py-2.5 text-sm transition-colors"
+          className="w-full rounded-lg bg-primary-500 hover:bg-primary-600 text-on-primary font-semibold py-2.5 text-sm transition-colors"
         >
           I understand, take me to the login page
         </button>

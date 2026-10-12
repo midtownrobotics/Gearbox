@@ -147,7 +147,7 @@ export function SlackLoginPage() {
                   <button
                     type="button"
                     onClick={handleOpenSlack}
-                    className="w-full rounded-lg bg-primary-500 hover:bg-primary-600 text-white font-semibold py-2.5 text-sm transition-colors flex items-center justify-center gap-2"
+                    className="w-full rounded-lg bg-primary-500 hover:bg-primary-600 text-on-primary font-semibold py-2.5 text-sm transition-colors flex items-center justify-center gap-2"
                   >
                     <Send size={16} />
                     Open Slack
@@ -208,7 +208,7 @@ export function SlackLoginPage() {
             <button
               type="button"
               onClick={() => navigate("/login")}
-              className="w-full rounded-lg bg-primary-500 hover:bg-primary-600 text-white font-semibold py-2.5 text-sm transition-colors"
+              className="w-full rounded-lg bg-primary-500 hover:bg-primary-600 text-on-primary font-semibold py-2.5 text-sm transition-colors"
             >
               Try again
             </button>

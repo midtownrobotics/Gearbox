@@ -20,7 +20,7 @@ export function SignupPage() {
 
         <a
           href={`${apiBase}/auth/slack/initiate`}
-          className="w-full flex items-center justify-center gap-3 rounded-lg bg-primary-500 hover:bg-primary-600 px-4 py-3 text-sm text-white font-medium transition-colors"
+          className="w-full flex items-center justify-center gap-3 rounded-lg bg-primary-500 hover:bg-primary-600 px-4 py-3 text-sm text-on-primary font-medium transition-colors"
         >
           <FaSlack size={20} />
           Sign up with Slack

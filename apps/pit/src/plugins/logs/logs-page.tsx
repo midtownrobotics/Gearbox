@@ -72,7 +72,7 @@ function CheckMark({ checked, small }: { checked: boolean; small?: boolean }) {
       {checked && (
         <svg
           viewBox="0 0 12 10"
-          className={`fill-none stroke-white stroke-2 ${small ? "h-2 w-2.5" : "h-2.5 w-3"}`}
+          className={`fill-none stroke-on-primary stroke-2 ${small ? "h-2 w-2.5" : "h-2.5 w-3"}`}
           strokeLinecap="round"
           strokeLinejoin="round"
           aria-hidden="true"

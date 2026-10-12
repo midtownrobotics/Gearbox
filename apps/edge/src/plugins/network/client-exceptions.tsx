@@ -86,7 +86,7 @@ export function ClientExceptions({ mac }: { mac: string }) {
               key={d.value}
               type="button"
               disabled={busy}
-              className="text-sm font-medium rounded-lg px-3 py-1.5 bg-primary-500 hover:bg-primary-600 text-white disabled:opacity-50"
+              className="text-sm font-medium rounded-lg px-3 py-1.5 bg-primary-500 hover:bg-primary-600 text-on-primary disabled:opacity-50"
               onClick={() =>
                 run(() =>
                   api.network.control.grants.$post({

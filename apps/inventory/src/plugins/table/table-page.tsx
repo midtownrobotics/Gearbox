@@ -208,7 +208,7 @@ export function TablePage() {
       actions={
         <Link
           to="/new"
-          className="rounded-lg bg-primary-500 px-3.5 py-2 text-sm font-semibold text-white hover:bg-primary-600"
+          className="rounded-lg bg-primary-500 px-3.5 py-2 text-sm font-semibold text-on-primary hover:bg-primary-600"
         >
           Add an entry
         </Link>

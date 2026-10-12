@@ -94,7 +94,7 @@ export function PartWorkView({
         onClick={onMarkComplete}
         disabled={busy}
         // On its own row under the others when the panel is under the drawing.
-        className={`${shopButton} col-span-full bg-emerald-600 text-paper hover:bg-emerald-700`}
+        className={`${shopButton} col-span-full bg-emerald-600 text-white hover:bg-emerald-700`}
       >
         Mark Complete
       </button>

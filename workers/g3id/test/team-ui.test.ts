@@ -2,8 +2,11 @@ import {
   type TeamUiSettings,
   brandColor,
   builtInBrandColor,
+  buttonTextColor,
+  contrastRatio,
   defaultAppOrder,
   defaultTeamUiSettings,
+  fillColor,
   hexToHsv,
   hsvToHex,
   teamKey,
@@ -42,6 +45,7 @@ describe("team UI settings", () => {
       shortName: "Changed",
       linkAccents: false,
       light: { ...defaultTeamUiSettings.light, accent: "#123456" },
+      buttonText: { light: "dark", dark: "light" },
       links: { ...defaultTeamUiSettings.links, github: "https://github.com/example" },
     };
     const put = (cookie?: string) =>
@@ -65,6 +69,9 @@ describe("team UI settings", () => {
       { ...base, light: { ...base.light, accent: "red" } },
       { ...base, dark: { ...base.dark, accent: "#12345" } },
       { ...base, linkAccents: "yes" },
+      { ...base, buttonText: { light: "white", dark: "auto" } },
+      { ...base, buttonText: { light: "auto" } },
+      { ...base, buttonText: { light: "auto", dark: "auto", both: "auto" } },
       // The brand color is the light accent now: an editor from before can't save its own.
       { ...base, primaryColor: "#123456" },
       { ...base, links: { ...base.links, github: "javascript:alert(1)" } },
@@ -169,6 +176,7 @@ describe("team UI settings", () => {
     const {
       hiddenLinks: _hidden,
       linkAccents: _linked,
+      buttonText: _buttonText,
       links,
       ...appearance
     } = defaultTeamUiSettings;
@@ -197,6 +205,7 @@ describe("team UI settings", () => {
     const current = {
       ...legacy,
       linkAccents: true,
+      buttonText: { light: "auto", dark: "auto" },
       links: { ...legacy.links, ...teamLinks, ...toolLinks },
       hiddenLinks: [],
       appOrder: defaultAppOrder,
@@ -305,5 +314,54 @@ describe("accent colors", () => {
     expect(withHueOf("#808080", "#ff0000")).toBe("#808080");
     expect(withHueOf("#a71433", "#777777")).toBe("#a71433");
     expect(withHueOf("#A71433", "#000000")).toBe("#a71433");
+  });
+});
+
+describe("button text color", () => {
+  const { light, dark } = defaultTeamUiSettings;
+  // Both themes' accents the same color, so each theme's buttons are filled with it.
+  const withAccent = (accent: string, buttonText = defaultTeamUiSettings.buttonText) => ({
+    light: { ...light, accent },
+    dark: { ...dark, accent },
+    buttonText,
+  });
+
+  it("measures the contrast between two colors", () => {
+    expect(contrastRatio("#000000", "#ffffff")).toBeCloseTo(21);
+    expect(contrastRatio("#ffffff", "#000000")).toBeCloseTo(21);
+    expect(contrastRatio("#777777", "#777777")).toBe(1);
+  });
+
+  it("is the text color that stands out more against the theme's accent, when automatic", () => {
+    // A theme's buttons are filled with its accent (the built-in brand color for the default).
+    expect(fillColor(defaultTeamUiSettings, "light")).toBe(builtInBrandColor);
+    expect(fillColor(defaultTeamUiSettings, "dark")).toBe(dark.accent);
+    // The default light accent is dark: light text, which is the dark palette's text color. The
+    // default dark accent is bright: dark text, which is the light palette's.
+    expect(buttonTextColor(defaultTeamUiSettings, "light")).toBe(dark.text);
+    expect(buttonTextColor(defaultTeamUiSettings, "dark")).toBe(light.text);
+    expect(buttonTextColor(withAccent("#ffcc00"), "light")).toBe(light.text);
+    expect(buttonTextColor(withAccent("#123456"), "dark")).toBe(dark.text);
+    // Each theme against its own accent.
+    const split = { light: { ...light, accent: "#123456" }, dark: { ...dark, accent: "#ffcc00" } };
+    expect(buttonTextColor(split, "light")).toBe(dark.text);
+    expect(buttonTextColor(split, "dark")).toBe(light.text);
+  });
+
+  it("is the team's choice for each theme, whatever the contrast", () => {
+    const chosen = withAccent("#ffcc00", { light: "light", dark: "dark" });
+    expect(buttonTextColor(chosen, "light")).toBe(dark.text);
+    expect(buttonTextColor(chosen, "dark")).toBe(light.text);
+    const mixed = withAccent("#123456", { light: "dark", dark: "auto" });
+    expect(buttonTextColor(mixed, "light")).toBe(light.text);
+    expect(buttonTextColor(mixed, "dark")).toBe(dark.text);
+  });
+
+  it("is automatic for settings from before it was a choice, and light for a color half typed", () => {
+    expect(buttonTextColor({ light: { ...light, accent: "#ffcc00" }, dark }, "light")).toBe(
+      light.text,
+    );
+    expect(buttonTextColor(withAccent("#ffc"), "light")).toBe(dark.text);
+    expect(buttonTextColor(withAccent("#ffc"), "dark")).toBe(dark.text);
   });
 });

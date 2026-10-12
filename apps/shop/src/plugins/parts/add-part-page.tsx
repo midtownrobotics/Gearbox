@@ -393,7 +393,7 @@ export function AddPartPage() {
                   type="button"
                   onClick={handleSubmit}
                   disabled={submitting}
-                  className={`bg-crimson hover:bg-crimson-dark disabled:opacity-50 text-paper text-sm font-semibold rounded-lg transition-colors ${
+                  className={`bg-crimson hover:bg-crimson-dark disabled:opacity-50 text-on-primary text-sm font-semibold rounded-lg transition-colors ${
                     touch ? "px-6 py-3" : "px-5 py-2"
                   }`}
                 >

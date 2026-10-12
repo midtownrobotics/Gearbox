@@ -286,7 +286,7 @@ function SettingsRow({ capBytes, onSaved }: { capBytes: number; onSaved: () => v
       <button
         type="button"
         onClick={save}
-        className="bg-primary-500 hover:bg-primary-600 text-white font-medium rounded-lg px-3 py-1"
+        className="bg-primary-500 hover:bg-primary-600 text-on-primary font-medium rounded-lg px-3 py-1"
       >
         Save
       </button>

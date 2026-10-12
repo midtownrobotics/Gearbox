@@ -12,7 +12,7 @@ export function AdminOnly({ children }: { children: ReactNode }) {
         <p className="mb-4 text-secondary-700">Sign in to manage your team.</p>
         <a
           href={`${appUrl("id")}/login?redirect=${encodeURIComponent(window.location.href)}`}
-          className="inline-block rounded-lg bg-primary-600 px-5 py-2 font-semibold text-white hover:bg-primary-700"
+          className="inline-block rounded-lg bg-primary-600 px-5 py-2 font-semibold text-on-primary hover:bg-primary-700"
         >
           Sign in
         </a>

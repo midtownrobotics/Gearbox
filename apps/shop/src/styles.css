@@ -16,9 +16,9 @@
   --color-mist: var(--g3-page);
 }
 
-/* On a dark surface the tint is the brand color sunk into the page, muted text is a little
-   lighter, and text in the brand color takes the dark accent. Solid crimson fills keep the brand
-   color, so their white text stays readable. */
+/* On a dark surface the tint is the team's color sunk into the page and muted text is a little
+   lighter. Crimson is the theme's accent (--g3-brand follows the theme), so fills and text in it
+   take the dark accent; text on a crimson fill is text-on-primary, the team's button text color. */
 html[data-theme="dark"] {
   --color-crimson-tint: color-mix(in srgb, var(--g3-brand), var(--g3-page) 75%);
   --color-steel-dark: color-mix(in srgb, var(--g3-muted), var(--g3-text) 25%);

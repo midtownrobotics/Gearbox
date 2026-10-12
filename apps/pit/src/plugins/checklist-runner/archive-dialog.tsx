@@ -204,7 +204,7 @@ export function ArchiveDialog({
                 onClick={() => setType(option)}
                 className={`border-l border-gray-300 px-3 py-2.5 text-sm font-semibold transition-colors first:border-l-0 ${
                   on
-                    ? "bg-primary-600 text-white"
+                    ? "bg-primary-600 text-on-primary"
                     : "bg-surface text-gray-700 hover:bg-gray-100 hover:text-gray-900"
                 }`}
               >
@@ -238,7 +238,7 @@ export function ArchiveDialog({
           type="button"
           onClick={archive}
           disabled={saving || (selected === "match" && findingMatch && !matchEdited)}
-          className="w-full rounded-lg bg-primary-600 px-4 py-3 text-base font-semibold text-white transition-colors hover:bg-primary-700 disabled:opacity-60"
+          className="w-full rounded-lg bg-primary-600 px-4 py-3 text-base font-semibold text-on-primary transition-colors hover:bg-primary-700 disabled:opacity-60"
         >
           {saving ? "Archiving…" : "Archive"}
         </button>

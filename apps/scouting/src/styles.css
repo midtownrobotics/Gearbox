@@ -1501,7 +1501,7 @@ textarea:focus {
 }
 .counter-intervals button.active {
   border-color: var(--g3-brand);
-  color: white;
+  color: var(--g3-on-brand);
   background: var(--g3-brand);
 }
 .slider-input {
@@ -1514,7 +1514,7 @@ textarea:focus {
   padding: 8px;
   border-radius: 7px;
   text-align: center;
-  color: white;
+  color: var(--g3-on-brand);
   background: var(--g3-brand);
   font-weight: 700;
 }
@@ -2107,7 +2107,7 @@ textarea:focus {
   font-size: 20px;
 }
 .comparison-row > strong.winner {
-  color: white;
+  color: var(--g3-on-brand);
   background: var(--g3-brand);
 }
 .comparison-row > span {
@@ -2508,7 +2508,7 @@ body.analysis-path-open {
   height: 28px;
   border-radius: 50%;
   background: var(--g3-brand);
-  color: white;
+  color: var(--g3-on-brand);
   font-size: 12px;
   font-weight: 700;
 }
@@ -3212,7 +3212,7 @@ html[data-theme="dark"] .manual-editor-grid textarea {
   min-height: 46px;
   border: 1px solid var(--g3-brand);
   border-radius: 8px;
-  color: #fff;
+  color: var(--g3-on-brand);
   background: var(--g3-brand);
   transition: background 160ms ease, border-color 160ms ease;
 }
@@ -3428,7 +3428,7 @@ html[data-theme="dark"] .manual-editor-grid textarea {
   min-width: 28px;
   height: 28px;
   border-radius: 50%;
-  color: white;
+  color: var(--g3-on-brand);
   background: var(--g3-brand);
   font-size: 12px;
 }
@@ -5030,7 +5030,7 @@ aside nav button.active {
 
 .primary-button,
 .auth-screen a {
-  color: #fefefe;
+  color: var(--g3-on-brand);
   background: var(--g3-brand);
 }
 
@@ -5855,7 +5855,7 @@ body,
 
 .primary-button,
 .auth-screen a {
-  color: #fefefe;
+  color: var(--g3-on-brand);
   background: var(--g3-brand);
 }
 
@@ -6465,7 +6465,7 @@ html[data-theme="dark"] .status-toast.error span {
 
 .route-input-tabs button.active {
   border-color: var(--g3-brand);
-  color: white;
+  color: var(--g3-on-brand);
   background: var(--g3-brand);
 }
 
@@ -7273,7 +7273,7 @@ html[data-theme="dark"] .counter-intervals button {
 
 html[data-theme="dark"] .counter-intervals button.active {
   border-color: var(--color-primary-400, #c52b49);
-  color: white;
+  color: var(--g3-on-brand);
   background: var(--g3-brand);
 }
 

@@ -115,7 +115,7 @@ export function AdminUserPage() {
       {user && (
         <div className="space-y-6">
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-full bg-primary-500 flex items-center justify-center text-xl font-semibold text-white shrink-0">
+            <div className="w-14 h-14 rounded-full bg-primary-500 flex items-center justify-center text-xl font-semibold text-on-primary shrink-0">
               {user.displayName.charAt(0).toUpperCase()}
             </div>
             <div className="min-w-0">

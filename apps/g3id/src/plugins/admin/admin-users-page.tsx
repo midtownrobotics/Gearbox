@@ -337,7 +337,7 @@ export function AdminUsersPage() {
         <button
           type="button"
           onClick={exportActiveUsersToCSV}
-          className="px-4 py-2 rounded-lg text-sm font-medium bg-primary-500 hover:bg-primary-600 text-white transition-colors"
+          className="px-4 py-2 rounded-lg text-sm font-medium bg-primary-500 hover:bg-primary-600 text-on-primary transition-colors"
         >
           Export Active Users (CSV)
         </button>
@@ -368,7 +368,7 @@ export function AdminUsersPage() {
             onClick={() => setFilter(f)}
             className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors capitalize ${
               filter === f
-                ? "bg-primary-500 text-white"
+                ? "bg-primary-500 text-on-primary"
                 : "bg-surface text-secondary-600 hover:text-secondary-900 border border-secondary-300"
             }`}
           >
@@ -459,7 +459,7 @@ export function AdminUsersPage() {
                   state={{ from: `/admin/users${params.toString() ? `?${params}` : ""}` }}
                   className="flex flex-1 min-w-0 items-center gap-3 rounded-md group"
                 >
-                  <div className="w-9 h-9 rounded-full bg-primary-500 flex items-center justify-center text-sm font-semibold text-white shrink-0">
+                  <div className="w-9 h-9 rounded-full bg-primary-500 flex items-center justify-center text-sm font-semibold text-on-primary shrink-0">
                     {user.displayName.charAt(0).toUpperCase()}
                   </div>
 
@@ -520,7 +520,7 @@ export function AdminUsersPage() {
                         type="button"
                         disabled={approving.has(user.id) || rejecting.has(user.id)}
                         onClick={() => handleReject(user.id)}
-                        className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-primary-700 hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed text-white transition-colors flex items-center gap-1"
+                        className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-primary-700 hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed text-on-primary transition-colors flex items-center gap-1"
                       >
                         {rejecting.has(user.id) ? (
                           <Loader2 size={11} className="animate-spin" />
@@ -627,7 +627,7 @@ export function AdminUsersPage() {
                     type="button"
                     disabled={!mergeTargetId || mergeLoading}
                     onClick={() => handleMerge(user.id)}
-                    className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-primary-500 hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed text-white transition-colors flex items-center gap-1.5 shrink-0"
+                    className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-primary-500 hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed text-on-primary transition-colors flex items-center gap-1.5 shrink-0"
                   >
                     {mergeLoading && <Loader2 size={11} className="animate-spin" />}
                     Confirm merge

@@ -17,6 +17,8 @@
   --color-surface: var(--g3-surface);
   --color-inset: var(--g3-inset);
   --color-line: var(--g3-line);
+  /* Text on a fill in the team's color (bg-primary-500 and darker): text-on-primary. */
+  --color-on-primary: var(--g3-on-brand);
 }
 
 @theme {

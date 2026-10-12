@@ -187,7 +187,7 @@ export function RequestTable({
           g.rows.length > 0 && (
             <section key={g.key} className="col-span-full grid grid-cols-subgrid">
               {g.label && (
-                <h2 className="col-span-full bg-primary-600 px-2 py-1 text-xs font-semibold uppercase tracking-wide text-white">
+                <h2 className="col-span-full bg-primary-600 px-2 py-1 text-xs font-semibold uppercase tracking-wide text-on-primary">
                   {g.label} · {g.rows.length}
                 </h2>
               )}

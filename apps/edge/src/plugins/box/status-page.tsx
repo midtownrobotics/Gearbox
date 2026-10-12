@@ -145,7 +145,7 @@ function BoxKeyCard({ hasBox }: { hasBox: boolean }) {
         type="button"
         disabled={busy}
         onClick={() => void makeKey()}
-        className={`${button} mt-3 bg-primary-500 hover:bg-primary-600 text-white`}
+        className={`${button} mt-3 bg-primary-500 hover:bg-primary-600 text-on-primary`}
       >
         {box.data ? "Make a new key" : "Make the box's key"}
       </button>

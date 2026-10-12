@@ -120,7 +120,7 @@ export function KioskShell({ children }: { children: ReactNode }) {
             <button
               type="button"
               onClick={stay}
-              className="w-full py-4 rounded-xl bg-crimson hover:bg-crimson-dark text-paper text-lg font-semibold transition-colors"
+              className="w-full py-4 rounded-xl bg-crimson hover:bg-crimson-dark text-on-primary text-lg font-semibold transition-colors"
             >
               I'm still here
             </button>

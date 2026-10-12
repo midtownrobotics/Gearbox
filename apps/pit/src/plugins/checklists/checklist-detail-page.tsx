@@ -235,7 +235,7 @@ export function ChecklistDetailPage() {
               <button
                 type="button"
                 onClick={saveListName}
-                className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold rounded-lg"
+                className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-on-primary text-sm font-semibold rounded-lg"
               >
                 Save
               </button>
@@ -280,7 +280,7 @@ export function ChecklistDetailPage() {
                 <button
                   type="button"
                   onClick={saveListDescription}
-                  className="px-3 py-1.5 bg-primary-600 hover:bg-primary-700 text-white text-xs font-semibold rounded-lg"
+                  className="px-3 py-1.5 bg-primary-600 hover:bg-primary-700 text-on-primary text-xs font-semibold rounded-lg"
                 >
                   Save
                 </button>
@@ -332,7 +332,7 @@ export function ChecklistDetailPage() {
                   setAddingType("item");
                   setBanner(null);
                 }}
-                className="px-3 py-1.5 bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold rounded-lg transition-colors"
+                className="px-3 py-1.5 bg-primary-600 hover:bg-primary-700 text-on-primary text-sm font-semibold rounded-lg transition-colors"
               >
                 + Add Item
               </button>
@@ -375,7 +375,7 @@ export function ChecklistDetailPage() {
               <button
                 type="button"
                 onClick={handleAddItem}
-                className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold rounded-lg"
+                className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-on-primary text-sm font-semibold rounded-lg"
               >
                 Add
               </button>
@@ -421,7 +421,7 @@ export function ChecklistDetailPage() {
                     <button
                       type="button"
                       onClick={saveItemEdit}
-                      className="px-3 py-1.5 bg-primary-600 hover:bg-primary-700 text-white text-xs font-semibold rounded-lg"
+                      className="px-3 py-1.5 bg-primary-600 hover:bg-primary-700 text-on-primary text-xs font-semibold rounded-lg"
                     >
                       Save
                     </button>
@@ -518,7 +518,7 @@ export function ChecklistDetailPage() {
                     <button
                       type="button"
                       onClick={saveItemEdit}
-                      className="px-3 py-1.5 bg-primary-600 hover:bg-primary-700 text-white text-xs font-semibold rounded-lg"
+                      className="px-3 py-1.5 bg-primary-600 hover:bg-primary-700 text-on-primary text-xs font-semibold rounded-lg"
                     >
                       Save
                     </button>
@@ -593,7 +593,7 @@ export function ChecklistDetailPage() {
                       <button
                         type="button"
                         onClick={saveItemEdit}
-                        className="px-3 py-1.5 bg-primary-600 hover:bg-primary-700 text-white text-xs font-semibold rounded-lg"
+                        className="px-3 py-1.5 bg-primary-600 hover:bg-primary-700 text-on-primary text-xs font-semibold rounded-lg"
                       >
                         Save
                       </button>

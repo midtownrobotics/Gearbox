@@ -561,7 +561,7 @@ function ItemRow({
       <button
         type="button"
         onClick={() => composer.add(item)}
-        className="rounded-lg bg-primary-500 px-3 py-1 text-sm font-semibold text-white hover:bg-primary-600"
+        className="rounded-lg bg-primary-500 px-3 py-1 text-sm font-semibold text-on-primary hover:bg-primary-600"
       >
         {composer.wishlist ? "Add" : "Request"}
       </button>
