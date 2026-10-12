@@ -1,4 +1,4 @@
-import { Card, ErrorBanner, Loading, Page, Stat } from "@g3/ui";
+import { Button, Card, ConfirmButton, ErrorBanner, Loading, Page, Stat } from "@g3/ui";
 import { useCallback, useEffect, useState } from "react";
 import { api, getErrorMessage } from "../../shared/api";
 import { useAuthUser } from "../../shared/auth";
@@ -85,8 +85,6 @@ export function StatusPage() {
   );
 }
 
-const button = "text-sm font-medium rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50";
-
 /**
  * The team's box key (admins): made here and shown once, then set as EDGE_AGENT_KEY in the box's
  * /etc/g3-edge/agent.env. Making a new one disconnects a box still on the old one.
@@ -105,12 +103,6 @@ function BoxKeyCard({ hasBox }: { hasBox: boolean }) {
   if (!user.isAdmin) return null;
 
   async function makeKey() {
-    if (
-      box.data &&
-      !window.confirm("Make a new key? The box disconnects until its agent.env has the new one.")
-    ) {
-      return;
-    }
     setBusy(true);
     setError(null);
     const res = await api.box.key.$post();
@@ -141,14 +133,21 @@ function BoxKeyCard({ hasBox }: { hasBox: boolean }) {
               : "Make a key for your team's box. Its agent signs in with it."}
         </p>
       )}
-      <button
-        type="button"
-        disabled={busy}
-        onClick={() => void makeKey()}
-        className={`${button} mt-3 bg-primary-500 hover:bg-primary-600 text-on-primary`}
-      >
-        {box.data ? "Make a new key" : "Make the box's key"}
-      </button>
+      <div className="mt-3">
+        {box.data ? (
+          <ConfirmButton
+            size="sm"
+            label="Make a new key"
+            question="Make a new key? The box disconnects until its agent.env has the new one."
+            disabled={busy}
+            onConfirm={() => void makeKey()}
+          />
+        ) : (
+          <Button size="sm" disabled={busy} onClick={() => void makeKey()}>
+            Make the box's key
+          </Button>
+        )}
+      </div>
     </Card>
   );
 }
@@ -223,14 +222,9 @@ function ConnectionCard() {
               Checked {formatDateTime(data.checkedAt)}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={recheck}
-            disabled={checking}
-            className="text-sm font-medium rounded-lg px-3 py-1.5 text-secondary-600 hover:text-secondary-900 hover:bg-secondary-100 disabled:opacity-50"
-          >
+          <Button variant="secondary" size="sm" onClick={recheck} disabled={checking}>
             {checking ? "Checking…" : "Check again"}
-          </button>
+          </Button>
         </div>
       )}
     </Card>
@@ -314,13 +308,9 @@ function AddressesCard({
               </div>
             ))}
           </div>
-          <button
-            type="button"
-            onClick={reload}
-            className="text-sm font-medium rounded-lg px-3 py-1.5 text-secondary-600 hover:text-secondary-900 hover:bg-secondary-100"
-          >
+          <Button variant="secondary" size="sm" onClick={reload}>
             Refresh
-          </button>
+          </Button>
         </div>
       )}
       {data && (

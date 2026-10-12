@@ -1,4 +1,4 @@
-import { Card, ErrorBanner, Loading, Page, Stat } from "@g3/ui";
+import { Button, Card, ErrorBanner, Loading, Page, Stat, inputClass } from "@g3/ui";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, getErrorMessage } from "../../shared/api";
@@ -220,7 +220,7 @@ function RenameForm({
       }}
     >
       <input
-        className="border border-secondary-300 rounded-lg px-2 py-1 w-64"
+        className={`${inputClass} !w-64`}
         value={name}
         maxLength={64}
         placeholder="Name (blank to use hostname)"
@@ -228,19 +228,10 @@ function RenameForm({
         // biome-ignore lint/a11y/noAutofocus: inline edit field opened by the user
         autoFocus
       />
-      <button
-        type="submit"
-        className="bg-primary-500 hover:bg-primary-600 text-on-primary font-medium rounded-lg px-3 py-1"
-      >
-        Save
-      </button>
-      <button
-        type="button"
-        onClick={() => setEditing(false)}
-        className="text-secondary-500 hover:text-secondary-900"
-      >
+      <Button type="submit">Save</Button>
+      <Button variant="secondary" onClick={() => setEditing(false)}>
         Cancel
-      </button>
+      </Button>
       {error && <span className="text-primary-600">{error}</span>}
     </form>
   );

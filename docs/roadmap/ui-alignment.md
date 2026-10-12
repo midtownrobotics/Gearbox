@@ -16,11 +16,11 @@ A survey of every difference, with sketches, is at <https://claude.ai/artifact/C
 | --- | --- | --- | --- |
 | 1. Shared parts in `@g3/ui` | Done | Orders, Inventory, Skill Tree, Edge | Nothing |
 | 2. Fixes that need no decision | Done | Pit, Shop, ID, Portal, Orders, Inventory, Edge | Nothing. Four things it found were passed to later steps (see step 2 below) |
-| 3. Edge onto the full set | Not started | Edge | Its hand-written buttons and inputs |
+| 3. Edge onto the full set | Done | Edge | Nothing |
 | 4. ID and Portal onto the shared frame | Not started | ID, Portal | All of it |
 | 5. Pit, with its Overview | Not started | Pit | All of it |
 | 6. Shop | Not started | Shop | All of it |
-| 7. Browser pop-ups | Not started | Orders, Shop, ID, Edge, Skill Tree, Platform | 33 calls |
+| 7. Browser pop-ups | Started: Edge's are done | Orders, Shop, ID, Skill Tree, Platform | 30 calls |
 | 8. Scouting | Not started | Scouting | All of it, with its Phase 3 step in `roadmap.md` |
 
 ### What landed
@@ -29,6 +29,7 @@ A survey of every difference, with sketches, is at <https://claude.ai/artifact/C
 | --- | --- | --- |
 | The page parts moved from each app's `shared/ui.tsx` into `@g3/ui`: `Page`, `PageLoading`, `Card`, `Stat`, `Button`, `ConfirmButton`, `Field`, `inputClass`, `ErrorBanner`, `SuccessBanner`, `Loading`, `Dialog`, `Toggle`, `Badge` with `tones`, `ProgressBar`, `focusRing`. Orders, Inventory, Skill Tree and Edge import them and have no `shared/ui.tsx`. Errors, danger buttons and every other mark of a problem in those four apps are red where they were the team's color. Buttons and inputs show a focus ring. Scouting is called Scouting in its own bar and tab, where it said Strategy | 1, and the name from 2 | [#186](https://github.com/midtownrobotics/Gearbox/pull/186) |
 | Names: Orders' and Inventory's Settings page is Admin (at `/admin`; `/settings` still opens it), Pit's Admin page is titled Admin, Shop's Admin is last in the bar, and every "Log in" and "Log Out" is "Sign in" and "Sign out". Titles match their bar labels in Pit (Edit Checklists), ID (Account, Kiosk Devices, Attendance), Portal (Manage Apps, Appearance) and Edge (Overview, Drive). Bugs: Pit's unreadable headings, dark error blocks and red progress bars; pages a bar's height too tall in Pit, Shop and Portal; ID's kiosk revoke asks first; Orders' and Inventory's dates follow the viewer's language; Inventory's search and filters are in the address; unused icon libraries dropped from Pit and Shop | 2 | [#187](https://github.com/midtownrobotics/Gearbox/pull/187) |
+| Edge's hand-written buttons and inputs are the shared `Button` and `inputClass`, and it has no button or input styles of its own. `Button` and `ConfirmButton` take `size="sm"`. Edge's three browser confirms (a new box key, deleting a blocklist, removing a printer) ask in the page, and deleting a door sound now asks too | 3, and Edge's part of 7 | This PR |
 
 ## Decisions
 
@@ -88,8 +89,8 @@ They are in `packages/ui/src/components/` and exported from `@g3/ui`.
 | `Page` | Every page: `title`, optional `description`, `actions` (buttons at the right of the title), `width` |
 | `PageLoading` | The whole screen while the app finds out who is signed in |
 | `Card`, `Stat` | A panel, with a small heading when it has a `title`; one figure with its label |
-| `Button` | `variant`: `primary`, `secondary`, `danger`. Takes every `<button>` prop |
-| `ConfirmButton` | A danger button that asks its `question` in the page before it acts |
+| `Button` | `variant`: `primary`, `secondary`, `danger`. `size="sm"` inside a row. Takes every `<button>` prop |
+| `ConfirmButton` | A danger button that asks its `question` in the page before it acts. Its question takes a line of its own, so the row it sits in has to wrap (`flex flex-wrap`) |
 | `Field`, `inputClass` | A label, a control and a hint; the class for an `<input>`, `<select>` or `<textarea>` |
 | `ErrorBanner`, `SuccessBanner`, `Loading` | Messages |
 | `Dialog` | A pop-up; `wide` for a larger one |
@@ -104,7 +105,7 @@ Rules for the parts:
 - **Tailwind finds their classes through `@source "./components"`** in `packages/ui/src/index.css`. Write class names as whole literal strings, as everywhere else; a name built from pieces is never generated.
 - **Dark mode comes for free** if a part is written with light-mode classes: `secondary-*`, `bg-surface`, `bg-inset`, `primary-*` with `text-on-primary` on a solid fill, and for text in a color that means something the 600 to 950 shades (`text-red-700`, `text-emerald-800`), which `theme-palette.css` lightens in dark mode.
 - **Changesets ignore `@g3/ui`.** A change to a part is recorded against each app whose pages it changes.
-- **Not there yet:** button sizes (small for a row, large for touch), a bare switch without a label (Portal has two copies), filter chips, an empty state, a back link, a date helper, the Lucide icons. Add each with the first step that needs it.
+- **Not there yet:** the large button size for touch screens (small is `size="sm"`), a bare switch without a label (Portal has two copies), filter chips, an empty state, a back link, a date helper, the Lucide icons. Add each with the first step that needs it.
 
 ## Moving an app onto the parts
 
@@ -139,9 +140,13 @@ See "What landed" for what it did. It is listed here for what it decided and wha
   - Scouting's Admin isn't last in its bar yet (step 8).
   - There is still no shared date helper: Orders' and Inventory's own helpers now use the viewer's language, and that was all the bug needed.
 
-### 3. Edge onto the full set (small)
+### 3. Edge onto the full set (done)
 
-Edge had the oldest copy of the parts, with no `Button` or `Field`, so it has about 40 hand-written buttons and its own input classes (`const input = "border border-secondary-300 rounded-lg px-2 py-1 text-sm"` in `controls-page.tsx` is one). Replace them with `Button` and `inputClass`. Its three `window.confirm` calls (the box key, a blocklist, a printer) become `ConfirmButton` here.
+See "What landed". What it settled, for the steps after it:
+
+- A button beside a field is the default size, so the two are the same height. A button in a list row or a card's corner is `size="sm"`.
+- A field narrower than its row overrides the shared class's full width with `!`: `${inputClass} !w-48`, or `!w-auto` for a `<select>`.
+- Edge's quiet text buttons ("Check again", "Revoke") became `secondary`, which has an outline. Its link-style actions inside a sentence ("Rename", "Edit") and its filter chips stayed as they were.
 
 ### 4. ID and Portal onto the shared frame (medium)
 
@@ -180,7 +185,7 @@ About 10,000 lines of pages, the largest Tailwind app. It looks close to the maj
 
 ### 7. Browser pop-ups (spread across the steps)
 
-Outside Scouting there are 33: Orders 8 confirm and 3 prompt, Shop 7 confirm, 2 prompt and 1 alert, ID 2 confirm and 3 alert, Edge 3 confirm, Skill Tree 3 confirm, Platform 1 confirm. Replace each app's when the app is open for its own step. Orders and Skill Tree have no restyle step, so their pop-ups get a pull request of their own.
+Outside Scouting there are 30: Orders 8 confirm and 3 prompt, Shop 7 confirm, 2 prompt and 1 alert, ID 2 confirm and 3 alert, Skill Tree 3 confirm, Platform 1 confirm. Edge's three are done. Replace each app's when the app is open for its own step. Orders and Skill Tree have no restyle step, so their pop-ups get a pull request of their own.
 
 - A confirm becomes `ConfirmButton`.
 - A prompt (the reason a request is denied, a vendor credit's amount, a quantity on Shop's floor) becomes a small `Dialog` with a field.
