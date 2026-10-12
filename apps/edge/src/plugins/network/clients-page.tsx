@@ -1,7 +1,7 @@
+import { Card, ErrorBanner, Loading, Page } from "@g3/ui";
 import { Link, useSearchParams } from "react-router-dom";
 import { api, getErrorMessage } from "../../shared/api";
 import { formatAgo, formatBytes } from "../../shared/format";
-import { Card, ErrorBanner, Loading, Page } from "../../shared/ui";
 import { useLoad } from "../../shared/use-load";
 import { OnlineDot, PresenceNote } from "./online";
 

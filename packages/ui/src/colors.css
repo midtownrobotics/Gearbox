@@ -1,6 +1,6 @@
 /* The color scheme every app shares, light and dark: the defaults here, and a team's own from Team
    Appearance once they load (team-ui.ts sets the same variables on <html>). Plain CSS variables
-   so apps without the shared Tailwind theme (G3 Strategy, the attendance kiosk) can use them too;
+   so apps without the shared Tailwind theme (Scouting, the attendance kiosk) can use them too;
    Tailwind apps also get bg-page, bg-surface, bg-inset and border-line (see index.css). */
 :root {
   /* Both themes' colors, whichever is showing: for styles written for one theme (a rule under

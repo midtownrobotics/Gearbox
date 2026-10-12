@@ -1,3 +1,4 @@
+import { Button, Card, Dialog, ErrorBanner, Field, Page, inputClass } from "@g3/ui";
 import type { LocationRow } from "@g3/worker-inventory";
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
@@ -8,17 +9,8 @@ import { useInventory } from "../../shared/inventory-data";
 import { LocationPicker } from "../../shared/location-picker";
 import { type Places, labelOf, locationLabel, useLabel } from "../../shared/places";
 import { type Row, rowsOf } from "../../shared/rows";
+import { StatusBadge } from "../../shared/status-badge";
 import { type StockAction, StockActionDialog } from "../../shared/stock-cells";
-import {
-  Button,
-  Card,
-  Dialog,
-  ErrorBanner,
-  Field,
-  Page,
-  StatusBadge,
-  inputClass,
-} from "../../shared/ui";
 
 // The inventory the other way round: every location, as nested panels that open, with what's
 // kept in each. For rearranging: an entry, or everything in a location, moves somewhere else
@@ -399,7 +391,7 @@ export function LocationsPage() {
   return (
     <Page
       title="Locations"
-      wide
+      width="wide"
       actions={
         top.length > 0 && (
           <div className="flex gap-2">

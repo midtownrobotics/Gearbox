@@ -1,7 +1,7 @@
+import { Card, ErrorBanner, Loading, Page } from "@g3/ui";
 import { Link, useParams } from "react-router-dom";
 import { api, getErrorMessage } from "../../shared/api";
 import { formatBytes, formatDayKey } from "../../shared/format";
-import { Card, ErrorBanner, Loading, Page } from "../../shared/ui";
 import { useLoad } from "../../shared/use-load";
 import { BarChart, ChartLegend } from "./bar-chart";
 import { InsightStats, WhenCharts } from "./insights";

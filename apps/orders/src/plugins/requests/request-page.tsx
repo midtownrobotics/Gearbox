@@ -1,5 +1,5 @@
+import { Page } from "@g3/ui";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import { Page } from "../../shared/ui";
 import { useRequestComposer } from "./request-composer";
 
 /** Where a page that opens /request came from, so it goes back there when it's done. */

@@ -32,7 +32,7 @@
     },
     "scouting": {
       "port": 5182,
-      "name": "Strategy Tools",
+      "name": "Scouting",
       "url": "http://localhost:5182"
     },
     "edge": {

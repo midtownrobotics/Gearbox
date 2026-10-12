@@ -1,9 +1,9 @@
+import { Card, ErrorBanner } from "@g3/ui";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { api, getErrorMessage } from "../../shared/api";
 import { useAuthUser } from "../../shared/auth";
 import { formatUntil } from "../../shared/format";
-import { Card, ErrorBanner } from "../../shared/ui";
 import { useLoad } from "../../shared/use-load";
 
 const DURATIONS = [

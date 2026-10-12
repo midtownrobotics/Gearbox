@@ -9,13 +9,15 @@ export function App() {
   return (
     <BrowserRouter>
       <ProtectedRoute>
-        <NavBar items={navItems} />
-        <Routes>
-          <Route path="/" element={<Navigate to="/network" replace />} />
-          {routes.map((r) => (
-            <Route key={r.path} path={r.path} element={r.element} />
-          ))}
-        </Routes>
+        <div className="flex min-h-screen flex-col bg-page">
+          <NavBar items={navItems} />
+          <Routes>
+            <Route path="/" element={<Navigate to="/network" replace />} />
+            {routes.map((r) => (
+              <Route key={r.path} path={r.path} element={r.element} />
+            ))}
+          </Routes>
+        </div>
       </ProtectedRoute>
     </BrowserRouter>
   );

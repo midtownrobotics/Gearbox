@@ -1,8 +1,8 @@
+import { Card, ErrorBanner, Loading, Page, Stat } from "@g3/ui";
 import { useCallback, useEffect, useState } from "react";
 import { api, getErrorMessage } from "../../shared/api";
 import { useAuthUser } from "../../shared/auth";
 import { formatAgo, formatDateTime, formatDuration } from "../../shared/format";
-import { Card, ErrorBanner, Loading, Page, Stat } from "../../shared/ui";
 import { useLoad } from "../../shared/use-load";
 
 async function loadStatus() {

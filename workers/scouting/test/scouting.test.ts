@@ -2,7 +2,7 @@ import { admin, kioskAdmin, student } from "@g3/testing/users";
 import { call, callAs, jsonAs } from "@g3/testing/worker";
 import { describe, expect, it } from "vitest";
 
-// G3 Strategy (scouting), served under /scouting. Strategy leads (G3ID admins, or people a G3ID
+// Scouting, served under /scouting. Strategy leads (G3ID admins, or people a G3ID
 // admin made a lead) manage forms; anyone signed in scouts and keeps tier lists.
 
 const form = {

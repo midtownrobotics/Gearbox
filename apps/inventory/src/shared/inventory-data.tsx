@@ -1,3 +1,4 @@
+import { ErrorBanner, Page, PageLoading } from "@g3/ui";
 import type { FieldView, ItemView } from "@g3/worker-inventory";
 import {
   type ReactNode,
@@ -10,7 +11,6 @@ import {
 } from "react";
 import { api, getErrorMessage } from "./api";
 import { type Places, indexPlaces } from "./places";
-import { ErrorBanner, Page, PageLoading } from "./ui";
 
 // Everything the pages show, loaded once and shared: the entries with their stock, and the team's
 // fields and places. Fetched again when the tab is looked at and every minute while it stays open,

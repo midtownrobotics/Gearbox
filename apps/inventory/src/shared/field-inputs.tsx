@@ -1,6 +1,6 @@
+import { Field, inputClass } from "@g3/ui";
 import type { FieldValue, FieldValues, FieldView } from "@g3/worker-inventory";
 import { formatDate } from "./format";
-import { Field, inputClass } from "./ui";
 
 // The team's own fields: how a value is shown, and the input for each kind of field.
 

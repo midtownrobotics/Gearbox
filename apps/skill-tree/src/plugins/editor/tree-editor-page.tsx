@@ -1,10 +1,10 @@
+import { Button, Card, ErrorBanner, Field, Page, inputClass } from "@g3/ui";
 import { type FormEvent, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../../shared/api";
 import { useAuthUser } from "../../shared/auth";
 import type { Category, Skill, Tree } from "../../shared/progress";
 import { useSkillData } from "../../shared/skill-data";
-import { Button, Card, ErrorBanner, Field, Page, inputClass } from "../../shared/ui";
 import { useSave } from "./use-save";
 
 /** Mentors: one tree's name and gate, its categories, and each category's skills. */

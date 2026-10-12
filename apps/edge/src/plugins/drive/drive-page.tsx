@@ -1,4 +1,4 @@
-import { Card, Page } from "../../shared/ui";
+import { Card, Page } from "@g3/ui";
 
 const DRIVE_URL = "http://drive.local";
 const DRIVE_IP_URL = "http://192.168.50.1";

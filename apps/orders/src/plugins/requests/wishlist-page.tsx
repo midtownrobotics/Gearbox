@@ -1,9 +1,9 @@
+import { ErrorBanner, Loading, Page, SuccessBanner, inputClass } from "@g3/ui";
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api, getErrorMessage } from "../../shared/api";
 import { useAuthUser } from "../../shared/auth";
 import type { RequestListRow } from "../../shared/types";
-import { ErrorBanner, Loading, Page, SuccessBanner, inputClass } from "../../shared/ui";
 import { useLoad } from "../../shared/use-load";
 import { requestSearch } from "../lists/search";
 import { RequestTable } from "./requests-page";
@@ -70,7 +70,7 @@ export function WishlistPage() {
   return (
     <Page
       title="Wishlist"
-      wide
+      width="full"
       actions={
         <Link
           to="/catalog?wishlist=1"

@@ -19,6 +19,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { Button, Card, ConfirmButton, Dialog, ErrorBanner, Field, inputClass } from "@g3/ui";
 import type { LocationRow } from "@g3/worker-inventory";
 import { type FormEvent, useCallback, useMemo, useState } from "react";
 import { api, getErrorMessage } from "../../shared/api";
@@ -26,15 +27,6 @@ import { count } from "../../shared/format";
 import { useInventory } from "../../shared/inventory-data";
 import { LocationPicker } from "../../shared/location-picker";
 import { MAX_DEPTH, type Places, pathOf } from "../../shared/places";
-import {
-  Button,
-  Card,
-  ConfirmButton,
-  Dialog,
-  ErrorBanner,
-  Field,
-  inputClass,
-} from "../../shared/ui";
 
 // The team's tree of locations: top-level places (a room, a trailer), each with places inside it
 // (a cabinet, a shelf), down to four levels.

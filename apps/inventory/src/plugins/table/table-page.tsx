@@ -1,3 +1,4 @@
+import { Card, Page, inputClass } from "@g3/ui";
 import type { StockView } from "@g3/worker-inventory";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
@@ -8,6 +9,7 @@ import { useInventory } from "../../shared/inventory-data";
 import { LocationPicker } from "../../shared/location-picker";
 import { type Places, locationLabel, useLabel, withinLocation } from "../../shared/places";
 import { type Row, rowsOf } from "../../shared/rows";
+import { StatusBadge } from "../../shared/status-badge";
 import {
   CheckButton,
   LocationButton,
@@ -15,7 +17,6 @@ import {
   type StockAction,
   StockActionDialog,
 } from "../../shared/stock-cells";
-import { Card, Page, StatusBadge, inputClass } from "../../shared/ui";
 
 /** How many rows are drawn at first, and how many more each "Show more" adds. */
 const PAGE_ROWS = 200;
@@ -204,7 +205,7 @@ export function TablePage() {
   return (
     <Page
       title="Inventory"
-      wide
+      width="wide"
       actions={
         <Link
           to="/new"

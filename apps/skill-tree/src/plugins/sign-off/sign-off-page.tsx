@@ -1,9 +1,9 @@
+import { Button, Card, ErrorBanner, Field, Page, SuccessBanner, inputClass } from "@g3/ui";
 import { type FormEvent, useState } from "react";
 import { api, getErrorMessage } from "../../shared/api";
 import { useAuthUser } from "../../shared/auth";
 import { STATUS_LABEL, type Status } from "../../shared/progress";
 import { useSkillData } from "../../shared/skill-data";
-import { Button, Card, ErrorBanner, Field, Page, SuccessBanner, inputClass } from "../../shared/ui";
 
 /** Kiosk PINs are three digits; a full one is looked up without pressing Enter. */
 const PIN_LENGTH = 3;

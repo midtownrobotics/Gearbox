@@ -1,4 +1,4 @@
-import { useTeamNames } from "@g3/ui";
+import { Card, ErrorBanner, Loading, Page, Stat, useTeamNames } from "@g3/ui";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { api, getErrorMessage } from "../../shared/api";
@@ -12,7 +12,6 @@ import {
   formatHourRange,
   todayKey,
 } from "../../shared/format";
-import { Card, ErrorBanner, Loading, Page, Stat } from "../../shared/ui";
 import { useLoad } from "../../shared/use-load";
 import { BarChart, ChartLegend } from "./bar-chart";
 import { InsightStats, WhenCharts } from "./insights";

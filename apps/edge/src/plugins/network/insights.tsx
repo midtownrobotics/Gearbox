@@ -1,6 +1,6 @@
+import { Stat } from "@g3/ui";
 import { useState } from "react";
 import { formatBytes, formatDayKey } from "../../shared/format";
-import { Stat } from "../../shared/ui";
 import { BarChart } from "./bar-chart";
 
 // What a range's usage says (the worker's `usageStats`): the total, the average day, the busiest

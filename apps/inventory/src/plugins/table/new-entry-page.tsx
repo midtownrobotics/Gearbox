@@ -1,3 +1,4 @@
+import { Button, Card, ErrorBanner, Field, Page, inputClass } from "@g3/ui";
 import { type FormEvent, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api, getErrorMessage } from "../../shared/api";
@@ -6,7 +7,6 @@ import { CatalogPick, partLine } from "../../shared/catalog-pick";
 import { type Draft, FieldInputs, draftOf, valuesOf } from "../../shared/field-inputs";
 import { useInventory } from "../../shared/inventory-data";
 import { LocationPicker } from "../../shared/location-picker";
-import { Button, Card, ErrorBanner, Field, Page, inputClass } from "../../shared/ui";
 
 /** Catalog parts already on an entry (a part is on one entry at most), by the entry's name. */
 export function useTakenParts(): Map<number, string> {

@@ -1,9 +1,9 @@
+import { Card, ErrorBanner, Loading, Page } from "@g3/ui";
 import type { PrinterAlert } from "@g3/worker-edge/print-types";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, getErrorMessage } from "../../shared/api";
 import { formatAgo, formatBytes } from "../../shared/format";
-import { Card, ErrorBanner, Loading, Page } from "../../shared/ui";
 import { useLoad } from "../../shared/use-load";
 import { PrinterAlerts } from "./alerts";
 import {

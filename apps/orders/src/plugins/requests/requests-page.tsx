@@ -1,3 +1,4 @@
+import { Card, ErrorBanner, Loading, Page, inputClass } from "@g3/ui";
 import { type ReactNode, useMemo } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api, getErrorMessage } from "../../shared/api";
@@ -7,7 +8,6 @@ import { formatCents, formatDate } from "../../shared/format";
 import { PriorityBadge } from "../../shared/priority";
 import { StatusBadge } from "../../shared/status-badge";
 import type { OrderRequest, RequestListRow, RequestStatus } from "../../shared/types";
-import { Card, ErrorBanner, Loading, Page, inputClass } from "../../shared/ui";
 import { useLoad } from "../../shared/use-load";
 import { useVendors } from "../../shared/vendors";
 import { requestSearch } from "../lists/search";
@@ -91,7 +91,7 @@ export function RequestsPage() {
   const total = groups.reduce((n, g) => n + g.rows.length, 0);
 
   return (
-    <Page title="Requests" wide>
+    <Page title="Requests" width="full">
       <div className="space-y-3">
         <input
           type="search"

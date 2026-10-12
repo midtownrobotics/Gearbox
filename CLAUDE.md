@@ -35,6 +35,18 @@ These apps are being turned from one team's tools into a hosted platform that ma
 
 **Keep the roadmap current.** When a change completes or advances a step, update `docs/roadmap/roadmap.md` in the same PR: the step's Status, the Progress table, and a row in "What landed". If a change makes part of the plan wrong, fix the plan there and say so in the PR description. A roadmap-only change takes an empty changeset.
 
+## UI Alignment (read before changing a page)
+
+The apps are being brought into one design language. The plan of record is `docs/roadmap/ui-alignment.md`: the decisions, the rules a page follows, each step's status and what each app still needs. **Read it before changing how a page looks or behaves**, and update its Progress table in the same PR as a step.
+
+**Rules that follow from it:**
+- **Build pages from the shared parts in `@g3/ui`** (`packages/ui/src/components/`): `Page` (title, `description`, `actions`, `width`), `PageLoading`, `Card`, `Stat`, `Button` (`primary`, `secondary`, `danger`), `ConfirmButton`, `Field` with `inputClass`, `ErrorBanner`, `SuccessBanner`, `Loading`, `Dialog`, `Toggle`, `Badge` with `tones`, `ProgressBar`, `focusRing`. Orders, Inventory, Skill Tree and Edge are built from them; the other apps move onto them step by step. Don't add an app's own copy of one: a part two apps need goes in `@g3/ui`. Tailwind finds their classes through `@source "./components"` in `packages/ui/src/index.css`.
+- **Red means a problem, in every app**: an error, a delete or danger button, a "no" status, an overdue or over-budget mark (`ErrorBanner`, `Button variant="danger"`, `tones.danger`, `text-red-700`). The team's color (`primary-*`) never stands for one, since a team can choose any color.
+- **An app opens on its most-used page**, the first in its bar. No page exists only to list other pages. A summary page is called Overview.
+- **An app's settings page is called Admin** and is last in the bar. A page's title is its bar label.
+- **Ask in the page** (`ConfirmButton`, a `Dialog`), never with `window.confirm`, `window.prompt` or `alert`.
+- **"Sign in" and "Sign out"**, not "Log in" or "Log Out". A chosen filter chip is near-black, not the team's color.
+
 ## Repository Structure
 
 **Monorepo using pnpm workspaces:**
@@ -250,7 +262,7 @@ Design brief: `docs/edge.md`. On-site Orange Pi 5 (hostname `orangepi5`, login u
 
 ### Shared navbar and light/dark mode
 
-- Every app's top bar is `AppNavBar` from `@g3/ui` (`packages/ui/src/components/app-nav-bar.tsx`, styled by its own plain CSS in `nav-bar.css` so it renders the same in G3 Strategy, which doesn't use the shared Tailwind theme). Each app's `shared/nav-bar.tsx` is a thin wrapper: it filters pages by permission, marks the current one (`activePath`: the most specific link covering the URL), and passes react-router links via `linkWith(Link)`. The menu button (top left) is there at every width and opens a drawer: under the heading "All Apps", the team's home ("Portal") and then its apps that are on, in the order of the home's grid, with the one you're in marked. Below 768px the pages move into the drawer too, above the apps and a dividing line; above it they stay across the bar, and the drawer is only the apps. There is no separate All Apps link.
+- Every app's top bar is `AppNavBar` from `@g3/ui` (`packages/ui/src/components/app-nav-bar.tsx`, styled by its own plain CSS in `nav-bar.css` so it renders the same in Scouting, which doesn't use the shared Tailwind theme). Each app's `shared/nav-bar.tsx` is a thin wrapper: it filters pages by permission, marks the current one (`activePath`: the most specific link covering the URL), and passes react-router links via `linkWith(Link)`. The menu button (top left) is there at every width and opens a drawer: under the heading "All Apps", the team's home ("Portal") and then its apps that are on, in the order of the home's grid, with the one you're in marked. Below 768px the pages move into the drawer too, above the apps and a dividing line; above it they stay across the bar, and the drawer is only the apps. There is no separate All Apps link.
 - **Who's signed in and which apps are on** come from `packages/ui/src/session.ts`, asked once per page load and shared: `useSignedInUser()` (G3ID's `/auth/me` through `apiPath("id")`) and `useTeamApps()` (the platform's `/team/apps`; "all" when it can't say). The bar greets the user ("Hello, <name>!", a link to ID's dashboard) at its right end at every width, on a phone too, where the bar's other controls are in the drawer; a name that doesn't fit is cut short with "…". Never for a kiosk PIN session. `AppNavBar`'s props: `allApps={false}` for no app list (Shop's kiosk mode), `account={false}` for no greeting (the same), and `signedIn` for an app that signs people in and out without reloading (ID passes what it knows, so the bar follows). An app passes `actions` only for controls of its own (Portal's Log in, Shop's kiosk badge).
 - Light/dark is one setting for all apps: the `g3_theme` cookie on `.g3robotics.com` (shared across ports on localhost), applied as `html[data-theme]` before first paint by a small script in each app's `index.html`; `useTheme`/`setTheme` (`packages/ui/src/theme.ts`) change it, and open tabs pick up a change on focus. No cookie → the system setting.
 - One color scheme for every app (`packages/ui/src/colors.css`): page `#f4f6f7` / dark `#171717`, surface (cards, top bar) `#ffffff` / `#262626`, inset `#eef1f3` / `#1e1e1e`, line, text, muted and accent, as `--g3-*` CSS variables that switch with the theme. Those are the defaults; a team's own colors (Team Appearance) replace them at runtime. Tailwind apps use them as `bg-page`, `bg-surface`, `bg-inset`, `border-line`; every page's root background is `bg-page` and every card's `bg-surface`. `--g3-brand` is the team's color for solid fills (the showing theme's accent, so the same as `--g3-accent`) and `--g3-on-brand` the text on them (the team's button text color for the showing theme); `--g3-light-*` and `--g3-dark-*` are both themes' colors whichever is showing, for a rule written for one theme.
@@ -450,6 +462,8 @@ See `docs/deploy.md`. In short: `pnpm run deploy` builds each app and deploys it
 ## Key Files to Know
 
 - `docs/roadmap/roadmap.md` — The multi-team platform roadmap: phases, each step's status, confirmed hosting decisions, open questions
+- `docs/roadmap/ui-alignment.md` — The plan for one design language across the apps: decisions, rules, each step's status
+- `packages/ui/src/components/` — The shared page parts every app's pages are built from (`@g3/ui`)
 - `docs/legal/` — Draft Terms of Service and Privacy Policy for the hosted platform (not in force)
 - `workers/g3id/src/middleware/auth.ts` — G3ID's own auth middleware (requireAuth, requireAdmin, requireKioskToken)
 - `packages/auth/src/g3id.ts` — Sign-in for every other worker (`@g3/auth`: requireAuth, requireAdmin, requireMentor, requireOAuthSession, `G3AuthVariables`); app-specific checks (Edge's agent key, Orders' catalog editors, Scouting's local bypass) stay in that worker's `middleware/auth.ts`

@@ -1,7 +1,7 @@
+import { Card, ErrorBanner, Loading, Page, Stat } from "@g3/ui";
 import { useRef, useState } from "react";
 import { getErrorMessage } from "../../shared/api";
 import { formatDateTime } from "../../shared/format";
-import { Card, ErrorBanner, Loading, Page, Stat } from "../../shared/ui";
 import { useLoad } from "../../shared/use-load";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "";

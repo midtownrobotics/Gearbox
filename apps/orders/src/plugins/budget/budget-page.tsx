@@ -1,3 +1,4 @@
+import { Button, Card, ErrorBanner, Loading, Page, inputClass } from "@g3/ui";
 import { fiscalLabel } from "@g3/worker-orders/fiscal";
 import { type FormEvent, useState } from "react";
 import { api, getErrorMessage } from "../../shared/api";
@@ -5,7 +6,6 @@ import { useAuthUser } from "../../shared/auth";
 import { ExportCsvButton } from "../../shared/export-csv";
 import { formatCents, parseDollars } from "../../shared/format";
 import type { Category } from "../../shared/types";
-import { Button, Card, ErrorBanner, Loading, Page, inputClass } from "../../shared/ui";
 import { useLoad } from "../../shared/use-load";
 import { ImportSheet } from "./import-sheet";
 
@@ -177,12 +177,12 @@ function SummaryTable({ categories, fiscalYear }: { categories: Category[]; fisc
                 <td className="py-1.5 pr-3 text-right">{formatCents(c.spentCents)}</td>
                 <td className="py-1.5 pr-3 text-right">{money(c.budgetCents)}</td>
                 <td
-                  className={`py-1.5 pr-3 text-right ${over(c.spentCents, c.budgetCents) ? "text-primary-700 font-semibold" : ""}`}
+                  className={`py-1.5 pr-3 text-right ${over(c.spentCents, c.budgetCents) ? "text-red-700 font-semibold" : ""}`}
                 >
                   {pct(c.spentCents, c.budgetCents)}
                 </td>
                 <td
-                  className={`py-1.5 text-right ${over(c.spentCents, c.budgetCents) ? "text-primary-700 font-semibold" : ""}`}
+                  className={`py-1.5 text-right ${over(c.spentCents, c.budgetCents) ? "text-red-700 font-semibold" : ""}`}
                 >
                   {over(c.spentCents, c.budgetCents) && <span aria-hidden>⚠ </span>}
                   {money(remaining(c.spentCents, c.budgetCents))}
@@ -195,7 +195,7 @@ function SummaryTable({ categories, fiscalYear }: { categories: Category[]; fisc
               <td className="py-2 pr-3 text-right">{formatCents(spent)}</td>
               <td className="py-2 pr-3 text-right">{formatCents(budget)}</td>
               <td className="py-2 pr-3 text-right">{pct(spent, budget || null)}</td>
-              <td className={`py-2 text-right ${spent > budget ? "text-primary-700" : ""}`}>
+              <td className={`py-2 text-right ${spent > budget ? "text-red-700" : ""}`}>
                 {money(budget - spent)}
               </td>
             </tr>
@@ -265,7 +265,7 @@ function CategoryRow({
         ))}
       </div>
       {c.budgetCents !== null && (
-        <p className={`text-xs ${over ? "text-primary-700 font-semibold" : "text-secondary-500"}`}>
+        <p className={`text-xs ${over ? "text-red-700 font-semibold" : "text-secondary-500"}`}>
           {over
             ? `⚠ Over budget by ${formatCents(c.spentCents - c.budgetCents)}`
             : `${formatCents(c.budgetCents - c.spentCents)} left${

@@ -1,10 +1,10 @@
+import { Button, ErrorBanner, inputClass } from "@g3/ui";
 import { type ReactNode, useState } from "react";
 import { api, getErrorMessage } from "../../shared/api";
 import { useAuthUser } from "../../shared/auth";
 import { formatCents, parseDollars } from "../../shared/format";
 import { ReceiveDialog, asksInventory, useIntake } from "../../shared/receive-dialog";
 import type { OrderRequest } from "../../shared/types";
-import { Button, ErrorBanner, inputClass } from "../../shared/ui";
 
 type Action = "approve" | "deny" | "receive" | "cancel";
 
