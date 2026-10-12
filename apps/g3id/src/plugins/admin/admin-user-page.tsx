@@ -1,4 +1,5 @@
-import { ArrowLeft, GraduationCap, Loader2, Shield, ShieldOff } from "lucide-react";
+import { Badge, Button, Card, ConfirmQuestion, ErrorBanner, Loading, Page } from "@g3/ui";
+import { GraduationCap, Shield, ShieldOff } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { api } from "../../lib/api";
@@ -19,9 +20,6 @@ const longDate = (ts: number) =>
     month: "long",
     day: "numeric",
   });
-
-const buttonClass =
-  "px-3 py-1.5 rounded-lg text-sm font-medium bg-surface border border-secondary-300 hover:bg-primary-50 hover:text-primary-600 disabled:opacity-50 disabled:cursor-not-allowed text-secondary-700 transition-colors flex items-center gap-1.5";
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -93,40 +91,26 @@ export function AdminUserPage() {
   const self = user?.id === me;
 
   return (
-    <main className="flex-1 px-4 py-8 max-w-2xl mx-auto w-full">
-      <Link
-        to={back}
-        className="mb-6 inline-flex items-center gap-1.5 text-sm text-secondary-600 hover:text-primary-600"
-      >
-        <ArrowLeft size={14} /> Users
+    <Page title={user?.displayName ?? "User"} width="narrow">
+      <Link to={back} className="text-sm text-secondary-500 hover:text-primary-600">
+        ← All users
       </Link>
 
-      {!user && !error && (
-        <div className="flex justify-center py-16 text-secondary-500">
-          <Loader2 size={24} className="animate-spin" />
-        </div>
-      )}
-      {error && (
-        <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-          {error}
-        </p>
-      )}
+      {!user && !error && <Loading />}
+      {error && <ErrorBanner message={error} />}
 
       {user && (
-        <div className="space-y-6">
+        <>
           <div className="flex items-center gap-4">
             <div className="w-14 h-14 rounded-full bg-primary-500 flex items-center justify-center text-xl font-semibold text-on-primary shrink-0">
               {user.displayName.charAt(0).toUpperCase()}
             </div>
             <div className="min-w-0">
-              <h1 className="text-2xl font-bold text-secondary-900">{user.displayName}</h1>
               <p className="truncate text-sm text-secondary-600">{user.email}</p>
               <div className="mt-1 flex flex-wrap items-center gap-2">
-                <span
-                  className={`text-xs px-2 py-0.5 rounded-full border capitalize ${STATUS_STYLES[user.status] ?? "bg-surface text-secondary-600"}`}
-                >
-                  {user.status}
-                </span>
+                <Badge colors={STATUS_STYLES[user.status]}>
+                  <span className="capitalize">{user.status}</span>
+                </Badge>
                 {user.isAdmin === 1 && (
                   <span className="text-xs px-1.5 py-0.5 rounded bg-primary-50 text-primary-600 border border-primary-200">
                     Admin
@@ -141,7 +125,7 @@ export function AdminUserPage() {
             </div>
           </div>
 
-          <section className="bg-surface border border-secondary-200 rounded-lg px-5 py-3">
+          <Card className="!py-3">
             <dl className="divide-y divide-secondary-200">
               <Row label="Joined">{longDate(user.createdAt)}</Row>
               <Row label="Last signed in">
@@ -153,10 +137,9 @@ export function AdminUserPage() {
                 {user.kioskPinSince ? `Since ${longDate(user.kioskPinSince)}` : "None"}
               </Row>
             </dl>
-          </section>
+          </Card>
 
-          <section className="bg-surface border border-secondary-200 rounded-lg px-5 py-4">
-            <h2 className="mb-3 text-sm font-semibold text-secondary-900">Signs in with</h2>
+          <Card title="Signs in with">
             {user.identities.length === 0 ? (
               <p className="text-sm text-secondary-500">No linked accounts.</p>
             ) : (
@@ -182,42 +165,39 @@ export function AdminUserPage() {
                 ))}
               </ul>
             )}
-          </section>
+          </Card>
 
           {!self && (
             <section className="flex flex-wrap gap-2">
               {user.status === "pending" && (
                 <>
-                  <button
-                    type="button"
+                  <Button
                     disabled={busy !== null}
                     onClick={() =>
                       act("approve", () => api.admin.users[":id"].approve.$post(param), {
                         status: "active",
                       })
                     }
-                    className="px-3 py-1.5 rounded-lg text-sm font-semibold bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white transition-colors"
                   >
                     Approve
-                  </button>
-                  <button
-                    type="button"
+                  </Button>
+                  <Button
+                    variant="danger"
                     disabled={busy !== null}
                     onClick={() =>
                       act("reject", () => api.admin.users[":id"].reject.$post(param), {
                         status: "rejected",
                       })
                     }
-                    className={buttonClass}
                   >
                     Reject
-                  </button>
+                  </Button>
                 </>
               )}
               {user.status === "active" && (
                 <>
-                  <button
-                    type="button"
+                  <Button
+                    variant="secondary"
                     disabled={busy !== null}
                     onClick={() =>
                       user.isAdmin
@@ -228,13 +208,12 @@ export function AdminUserPage() {
                             isAdmin: 1,
                           })
                     }
-                    className={buttonClass}
                   >
                     {user.isAdmin ? <ShieldOff size={14} /> : <Shield size={14} />}
                     {user.isAdmin ? "Remove admin" : "Make admin"}
-                  </button>
-                  <button
-                    type="button"
+                  </Button>
+                  <Button
+                    variant="secondary"
                     disabled={busy !== null}
                     onClick={() =>
                       user.isMentor
@@ -249,54 +228,35 @@ export function AdminUserPage() {
                             isMentor: 1,
                           })
                     }
-                    className={buttonClass}
                   >
                     <GraduationCap size={14} />
                     {user.isMentor ? "Remove mentor" : "Make mentor"}
-                  </button>
+                  </Button>
                 </>
               )}
               {user.status !== "pending" && !confirmDelete && (
-                <button
-                  type="button"
+                <Button
+                  variant="danger"
                   disabled={busy !== null}
                   onClick={() => setConfirmDelete(true)}
-                  className={`${buttonClass} hover:text-red-700 hover:bg-red-50`}
                 >
                   Delete
-                </button>
+                </Button>
               )}
             </section>
           )}
 
           {confirmDelete && (
-            <div className="space-y-3 rounded-lg border border-red-200 bg-red-50 p-4 text-sm">
-              <p className="text-red-800">
-                Delete {user.displayName}? Their account, sign-ins and kiosk PIN are removed for
-                good. This can't be undone.
-              </p>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  disabled={busy !== null}
-                  onClick={() => act("delete", () => api.admin.users[":id"].$delete(param))}
-                  className="px-3 py-1.5 rounded-lg font-semibold bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white flex items-center gap-1.5"
-                >
-                  {busy === "delete" && <Loader2 size={14} className="animate-spin" />}
-                  Delete
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setConfirmDelete(false)}
-                  className="px-3 py-1.5 text-secondary-600"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
+            <ConfirmQuestion
+              question={`Delete ${user.displayName}? Their account, sign-ins and kiosk PIN are removed for good. This can't be undone.`}
+              confirmLabel={busy === "delete" ? "Deleting…" : "Delete"}
+              disabled={busy !== null}
+              onConfirm={() => act("delete", () => api.admin.users[":id"].$delete(param))}
+              onKeep={() => setConfirmDelete(false)}
+            />
           )}
-        </div>
+        </>
       )}
-    </main>
+    </Page>
   );
 }

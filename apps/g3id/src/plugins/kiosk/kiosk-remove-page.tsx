@@ -1,4 +1,5 @@
-import { AlertCircle, Loader2 } from "lucide-react";
+import { Button, ErrorBanner, Loading, buttonClass } from "@g3/ui";
+import { AlertCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../../lib/api";
@@ -77,10 +78,7 @@ export function KioskRemovePage() {
   if (status === "checking") {
     return (
       <main className="flex-1 px-6 py-8 max-w-lg mx-auto w-full flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <Loader2 size={48} className="text-primary-500 mx-auto animate-spin" />
-          <p className="text-secondary-900 text-lg font-semibold">Checking credentials...</p>
-        </div>
+        <Loading />
       </main>
     );
   }
@@ -88,22 +86,18 @@ export function KioskRemovePage() {
   if (status === "error") {
     return (
       <main className="flex-1 px-6 py-8 max-w-lg mx-auto w-full flex items-center justify-center">
-        <div className="bg-surface border border-secondary-200 rounded-lg p-8 space-y-6 w-full text-center">
+        <div className="bg-surface border border-secondary-200 rounded-xl p-8 space-y-6 w-full text-center">
           <div className="space-y-2">
-            <AlertCircle size={48} className="text-primary-500 mx-auto" />
-            <h1 className="text-2xl font-bold text-secondary-900">Admin Access Required</h1>
+            <AlertCircle size={48} className="text-red-600 mx-auto" />
+            <h1 className="text-4xl text-secondary-900">Admin Access Required</h1>
             <p className="text-secondary-600">{error}</p>
           </div>
 
           {needsLogin && (
             <>
-              <button
-                type="button"
-                onClick={handleLoginRedirect}
-                className="block w-full py-3 px-4 rounded-lg bg-primary-600 hover:bg-primary-500 text-on-primary font-semibold transition-colors"
-              >
+              <Button size="lg" className="w-full" onClick={handleLoginRedirect}>
                 Sign in
-              </button>
+              </Button>
 
               <Link
                 to="/kiosk/login"
@@ -115,10 +109,7 @@ export function KioskRemovePage() {
           )}
 
           {!needsLogin && (
-            <Link
-              to="/kiosk/login"
-              className="block w-full py-3 px-4 rounded-lg bg-secondary-100 hover:bg-secondary-200 text-secondary-900 font-semibold transition-colors"
-            >
+            <Link to="/kiosk/login" className={`${buttonClass("secondary", "lg")} w-full`}>
               Back to kiosk sign-in
             </Link>
           )}
@@ -129,38 +120,35 @@ export function KioskRemovePage() {
 
   return (
     <main className="flex-1 px-6 py-8 max-w-lg mx-auto w-full flex items-center justify-center">
-      <div className="bg-surface border border-secondary-200 rounded-lg p-8 space-y-6 w-full">
+      <div className="bg-surface border border-secondary-200 rounded-xl p-8 space-y-6 w-full">
         <div className="text-center space-y-2">
-          <AlertCircle size={48} className="text-primary-500 mx-auto" />
-          <h1 className="text-2xl font-bold text-secondary-900">Remove Kiosk Device</h1>
+          <AlertCircle size={48} className="text-red-600 mx-auto" />
+          <h1 className="text-4xl text-secondary-900">Remove Kiosk Device</h1>
           <p className="text-secondary-600">This permanently removes the device.</p>
         </div>
 
-        {error && (
-          <div className="bg-primary-50 border border-primary-200 rounded-lg p-4">
-            <p className="text-primary-500 text-sm">{error}</p>
-          </div>
-        )}
+        {error && <ErrorBanner message={error} />}
 
         <div className="space-y-3">
-          <button
-            type="button"
+          <Button
+            variant="danger"
+            size="lg"
+            className="w-full"
             onClick={handleRemoveDevice}
             disabled={loading}
-            className="w-full py-3 px-4 rounded-lg bg-primary-600 hover:bg-primary-500 disabled:opacity-50 disabled:cursor-not-allowed text-on-primary font-semibold transition-colors flex items-center justify-center gap-2"
           >
-            {loading && <Loader2 size={18} className="animate-spin" />}
-            {loading ? "Removing Device..." : "Remove Device"}
-          </button>
+            {loading ? "Removing…" : "Remove device"}
+          </Button>
 
-          <button
-            type="button"
+          <Button
+            variant="secondary"
+            size="lg"
+            className="w-full"
             onClick={() => navigate("/dashboard")}
             disabled={loading}
-            className="w-full py-3 px-4 rounded-lg bg-secondary-100 hover:bg-secondary-200 disabled:opacity-50 text-secondary-900 font-semibold transition-colors"
           >
-            Cancel
-          </button>
+            Keep it
+          </Button>
         </div>
 
         <p className="text-xs text-secondary-500 text-center">

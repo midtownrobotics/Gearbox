@@ -1,4 +1,4 @@
-import { useTeamNames } from "@g3/ui";
+import { buttonClass, useTeamNames } from "@g3/ui";
 import { FaSlack } from "react-icons/fa";
 import { Link } from "react-router-dom";
 
@@ -10,7 +10,7 @@ export function SignupPage() {
     <main className="flex-1 flex items-center justify-center px-4 bg-secondary-50">
       <div className="w-full max-w-sm space-y-6">
         <div className="text-center">
-          <h1 className="text-5xl font-bold text-secondary-900">
+          <h1 className="text-4xl text-secondary-900">
             Join <span className="text-primary-500">{names.shortName}</span>ID
           </h1>
           <p className="mt-2 text-secondary-700 text-sm">
@@ -18,10 +18,7 @@ export function SignupPage() {
           </p>
         </div>
 
-        <a
-          href={`${apiBase}/auth/slack/initiate`}
-          className="w-full flex items-center justify-center gap-3 rounded-lg bg-primary-500 hover:bg-primary-600 px-4 py-3 text-sm text-on-primary font-medium transition-colors"
-        >
+        <a href={`${apiBase}/auth/slack/initiate`} className={`${buttonClass()} w-full`}>
           <FaSlack size={20} />
           Sign up with Slack
         </a>

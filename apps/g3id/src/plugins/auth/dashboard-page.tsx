@@ -1,5 +1,16 @@
 import { site } from "@g3/site-config";
-import { Loader2, Shield } from "lucide-react";
+import {
+  Badge,
+  Button,
+  Card,
+  ConfirmButton,
+  ErrorBanner,
+  Loading,
+  Page,
+  buttonClass,
+  tones,
+} from "@g3/ui";
+import { Shield } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { FaGithub, FaGoogle, FaSlack, FaSteam } from "react-icons/fa";
 import { Link, useNavigate } from "react-router-dom";
@@ -33,6 +44,13 @@ const PROVIDER_LABELS: Record<string, string> = {
   steam: "Steam",
 };
 
+/** A member's status as a badge's colors. */
+const STATUS_TONES: Record<string, string> = {
+  active: tones.success,
+  pending: tones.warning,
+  rejected: tones.danger,
+};
+
 export function DashboardPage() {
   const navigate = useNavigate();
   const [me, setMe] = useState<Me | null>(null);
@@ -48,6 +66,8 @@ export function DashboardPage() {
   const [pinError, setPinError] = useState<string | null>(null);
 
   const [unlinkingProvider, setUnlinkingProvider] = useState<string | null>(null);
+  /** Why unlinking a sign-in didn't work. */
+  const [unlinkError, setUnlinkError] = useState<string | null>(null);
   /** The ways the team signs in; a method it switched off can't be linked. */
   const [methods, setMethods] = useState<Partial<Record<string, boolean>>>({});
   useEffect(() => {
@@ -159,24 +179,20 @@ export function DashboardPage() {
     }
   }
 
-  async function handleUnlink(identityId: string, provider: string) {
+  async function handleUnlink(identityId: string) {
     if (!me || me.identities.length <= 1) {
-      alert("You must keep at least one sign-in method linked.");
+      setUnlinkError("You must keep at least one sign-in method linked.");
       return;
     }
 
-    const confirmed = window.confirm(
-      `Unlink ${PROVIDER_LABELS[provider] ?? provider}? You won't be able to sign in with it.`,
-    );
-    if (!confirmed) return;
-
+    setUnlinkError(null);
     setUnlinkingProvider(identityId);
     try {
       const res = await api.auth.identities[":identityId"].$delete({
         param: { identityId },
       });
       if (!res.ok) {
-        alert("Failed to unlink account");
+        setUnlinkError("Couldn't unlink that account. Try again.");
         return;
       }
       setMe((prev) =>
@@ -188,7 +204,7 @@ export function DashboardPage() {
           : prev,
       );
     } catch {
-      alert("Failed to unlink account");
+      setUnlinkError("Couldn't unlink that account. Check your connection and try again.");
     } finally {
       setUnlinkingProvider(null);
     }
@@ -215,232 +231,211 @@ export function DashboardPage() {
 
   if (error) {
     return (
-      <main className="flex-1 flex items-center justify-center px-4">
-        <p className="text-sm text-primary-500">{error}</p>
-      </main>
+      <Page title="Account" width="narrow">
+        <ErrorBanner message={error} />
+      </Page>
     );
   }
 
   if (!me) {
     return (
-      <main className="flex-1 flex items-center justify-center px-4">
-        <Loader2 size={24} className="animate-spin text-secondary-500" />
-      </main>
+      <Page title="Account" width="narrow">
+        <Loading />
+      </Page>
     );
   }
 
   return (
-    <main className="flex-1 px-6 py-8 max-w-lg mx-auto w-full">
-      <h1 className="text-5xl font-bold text-secondary-900 mb-4 text-center">Account</h1>
+    <Page title="Account" width="narrow">
+      <Card className="flex items-center gap-4">
+        <div className="w-12 h-12 rounded-full bg-primary-500 flex items-center justify-center text-lg font-semibold text-on-primary shrink-0">
+          {me.displayName.charAt(0).toUpperCase()}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-secondary-900 font-semibold truncate">{me.displayName}</p>
+          <p className="text-secondary-600 text-sm truncate">{me.email}</p>
+        </div>
+        <Badge colors={STATUS_TONES[me.status] ?? tones.neutral}>
+          <span className="capitalize">{me.status}</span>
+        </Badge>
+      </Card>
 
-      <div className="bg-surface border border-secondary-200 rounded-lg divide-y divide-secondary-100 mt-4">
-        <div className="px-5 py-4 flex items-center gap-4">
-          <div className="w-12 h-12 rounded-full bg-primary-500 flex items-center justify-center text-lg font-semibold text-on-primary shrink-0">
-            {me.displayName.charAt(0).toUpperCase()}
+      <Card title="Linked accounts">
+        {unlinkError && (
+          <div className="mb-3">
+            <ErrorBanner message={unlinkError} />
           </div>
-          <div className="min-w-0">
-            <p className="text-secondary-900 font-semibold truncate">{me.displayName}</p>
-            <p className="text-secondary-600 text-sm truncate">{me.email}</p>
-          </div>
-          <span className="ml-auto text-xs px-2.5 py-0.5 rounded-full border capitalize bg-green-50 text-green-700 border-green-200 shrink-0">
-            {me.status}
-          </span>
+        )}
+        <div className="space-y-2">
+          {me.identities.map((identity) => {
+            let displayText: string | null = null;
+            let profileUrl: string | null = null;
+
+            if (identity.provider === "github" && identity.providerEmail) {
+              displayText = identity.providerEmail;
+              profileUrl = `https://github.com/${identity.providerEmail}`;
+            } else if (
+              identity.provider === "steam" &&
+              (identity.providerEmail || identity.providerId)
+            ) {
+              displayText = (identity.providerEmail || identity.providerId) ?? null;
+              if (displayText) {
+                profileUrl = `https://steamcommunity.com/profiles/${displayText}`;
+              }
+            } else if (identity.provider === "google" && identity.providerEmail) {
+              displayText = identity.providerEmail;
+            }
+            const label = PROVIDER_LABELS[identity.provider] ?? identity.provider;
+
+            return (
+              <div
+                key={identity.id}
+                className="flex flex-wrap items-center justify-between gap-2 text-sm"
+              >
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="text-secondary-900">{label}</p>
+                    {displayText &&
+                      (profileUrl ? (
+                        <a
+                          href={profileUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-primary-500 hover:text-primary-600 text-xs truncate"
+                        >
+                          {displayText}
+                        </a>
+                      ) : (
+                        <span className="text-secondary-400 text-xs truncate">{displayText}</span>
+                      ))}
+                  </div>
+                  <p className="text-secondary-500 text-xs">
+                    Added {new Date(identity.createdAt * 1000).toLocaleDateString()}
+                  </p>
+                </div>
+                {(identity.provider === "steam" ||
+                  identity.provider === "google" ||
+                  identity.provider === "github") &&
+                  linkable(identity.provider) && (
+                    <a
+                      href={`${import.meta.env.VITE_API_BASE_URL}/auth/${identity.provider}/link`}
+                      className={`${buttonClass("secondary", "sm")} ml-auto`}
+                    >
+                      Add another
+                    </a>
+                  )}
+                {identity.provider !== "slack" && me.identities.length > 1 && (
+                  <ConfirmButton
+                    size="sm"
+                    label={unlinkingProvider === identity.id ? "Unlinking…" : "Unlink"}
+                    confirmLabel="Unlink"
+                    question={`Unlink ${label}? You won't be able to sign in with it.`}
+                    disabled={unlinkingProvider === identity.id}
+                    onConfirm={() => void handleUnlink(identity.id)}
+                  />
+                )}
+              </div>
+            );
+          })}
         </div>
 
-        <div className="px-5 py-4">
-          <p className="text-xs text-secondary-500 uppercase tracking-wide mb-3">Linked Accounts</p>
-          <div className="space-y-2">
-            {me.identities.map((identity) => {
-              let displayText: string | null = null;
-              let profileUrl: string | null = null;
-
-              if (identity.provider === "github" && identity.providerEmail) {
-                displayText = identity.providerEmail;
-                profileUrl = `https://github.com/${identity.providerEmail}`;
-              } else if (
-                identity.provider === "steam" &&
-                (identity.providerEmail || identity.providerId)
-              ) {
-                displayText = (identity.providerEmail || identity.providerId) ?? null;
-                if (displayText) {
-                  profileUrl = `https://steamcommunity.com/profiles/${displayText}`;
-                }
-              } else if (identity.provider === "google" && identity.providerEmail) {
-                displayText = identity.providerEmail;
-              }
-
-              return (
-                <div
-                  key={identity.provider}
-                  className="flex items-center justify-between text-sm group"
-                >
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="text-secondary-900">
-                        {PROVIDER_LABELS[identity.provider] ?? identity.provider}
-                      </p>
-                      {displayText &&
-                        (profileUrl ? (
-                          <a
-                            href={profileUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-primary-500 hover:text-primary-600 text-xs truncate"
-                          >
-                            {displayText}
-                          </a>
-                        ) : (
-                          <span className="text-secondary-400 text-xs truncate">{displayText}</span>
-                        ))}
-                    </div>
-                    <p className="text-secondary-500 text-xs">
-                      Added {new Date(identity.createdAt * 1000).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <div className="ml-2 flex items-center gap-2 shrink-0">
-                    {(identity.provider === "steam" ||
-                      identity.provider === "google" ||
-                      identity.provider === "github") &&
-                      linkable(identity.provider) && (
-                        <a
-                          href={`${import.meta.env.VITE_API_BASE_URL}/auth/${identity.provider}/link`}
-                          className="px-2 py-1 rounded bg-primary-600 hover:bg-primary-700 text-on-primary text-xs font-bold transition-colors cursor-pointer"
-                          title={`Add another ${identity.provider} account`}
-                        >
-                          +
-                        </a>
-                      )}
-                    {identity.provider !== "slack" && (
-                      <button
-                        type="button"
-                        onClick={() => handleUnlink(identity.id, identity.provider)}
-                        disabled={unlinkingProvider === identity.id}
-                        className="px-2 py-1 rounded bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-xs text-on-primary transition-colors cursor-pointer"
-                      >
-                        {unlinkingProvider === identity.id ? "Unlinking…" : "Unlink"}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          <div className="mt-3 space-y-2">
-            {linkable("google") && !me.identities.some((i) => i.provider === "google") && (
-              <a
-                href={`${import.meta.env.VITE_API_BASE_URL}/auth/google/link`}
-                className="w-full flex items-center justify-center gap-2 rounded-lg bg-primary-600 hover:bg-primary-700 px-4 py-2 text-sm text-on-primary transition-colors"
-              >
-                <FaGoogle size={16} />
-                Connect Google
-              </a>
-            )}
-            {linkable("github") && !me.identities.some((i) => i.provider === "github") && (
-              <a
-                href={`${import.meta.env.VITE_API_BASE_URL}/auth/github/link`}
-                className="w-full flex items-center justify-center gap-2 rounded-lg bg-primary-600 hover:bg-primary-700 px-4 py-2 text-sm text-on-primary transition-colors"
-              >
-                <FaGithub size={16} />
-                Connect GitHub
-              </a>
-            )}
-            {linkable("steam") && !me.identities.some((i) => i.provider === "steam") && (
-              <a
-                href={`${import.meta.env.VITE_API_BASE_URL}/auth/steam/link`}
-                className="w-full flex items-center justify-center gap-2 rounded-lg bg-primary-600 hover:bg-primary-700 px-4 py-2 text-sm text-on-primary transition-colors"
-              >
-                <FaSteam size={16} />
-                Connect Steam
-              </a>
-            )}
-          </div>
-          {!me.identities.some((i) => i.provider === "slack") && (
-            <div className="mt-3">
-              {slackCode ? (
-                <div className="rounded-lg bg-secondary-50 border border-secondary-200 px-4 py-3 space-y-2">
-                  <p className="text-xs text-secondary-600 text-center">
-                    DM this code to the {""}
-                    <span className="text-primary-500 font-medium">
-                      "{site.slackBotName}" user in Slack
-                    </span>
-                    , or run <span className="font-mono text-primary-500">/link {slackCode}</span>
-                  </p>
-                  <p className="font-mono text-3xl font-bold text-secondary-900 text-center tracking-widest">
-                    {slackCode}
-                  </p>
-                  <div className="flex items-center justify-center gap-1.5 text-xs text-secondary-500">
-                    <Loader2 size={12} className="animate-spin" />
-                    Waiting…
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <button
-                    type="button"
-                    onClick={handleConnectSlack}
-                    className="w-full flex items-center justify-center gap-2 rounded-lg bg-primary-600 hover:bg-primary-700 px-4 py-2 text-sm text-on-primary transition-colors cursor-pointer"
-                  >
-                    <FaSlack size={16} />
-                    Connect Slack
-                  </button>
-                  {slackError && (
-                    <p className="mt-1 text-xs text-primary-500 text-center">{slackError}</p>
-                  )}
-                </>
-              )}
-            </div>
+        <div className="mt-3 space-y-2">
+          {linkable("google") && !me.identities.some((i) => i.provider === "google") && (
+            <a
+              href={`${import.meta.env.VITE_API_BASE_URL}/auth/google/link`}
+              className={`${buttonClass()} w-full`}
+            >
+              <FaGoogle size={16} />
+              Connect Google
+            </a>
+          )}
+          {linkable("github") && !me.identities.some((i) => i.provider === "github") && (
+            <a
+              href={`${import.meta.env.VITE_API_BASE_URL}/auth/github/link`}
+              className={`${buttonClass()} w-full`}
+            >
+              <FaGithub size={16} />
+              Connect GitHub
+            </a>
+          )}
+          {linkable("steam") && !me.identities.some((i) => i.provider === "steam") && (
+            <a
+              href={`${import.meta.env.VITE_API_BASE_URL}/auth/steam/link`}
+              className={`${buttonClass()} w-full`}
+            >
+              <FaSteam size={16} />
+              Connect Steam
+            </a>
           )}
         </div>
-
-        {me.sessionType === "oauth" && (
-          <div className="px-5 py-4">
-            <p className="text-xs text-secondary-500 uppercase tracking-wide mb-3">Kiosk PIN</p>
-            {pin && showPin ? (
-              <div className="bg-surface border border-secondary-300 rounded-lg p-3 text-center">
-                <p className="text-2xl font-mono font-bold text-secondary-900 tracking-widest">
-                  {pin}
+        {!me.identities.some((i) => i.provider === "slack") && (
+          <div className="mt-3">
+            {slackCode ? (
+              <div className="rounded-lg bg-secondary-50 border border-secondary-200 px-4 py-3 space-y-2">
+                <p className="text-xs text-secondary-600 text-center">
+                  DM this code to the {""}
+                  <span className="text-primary-500 font-medium">
+                    "{site.slackBotName}" user in Slack
+                  </span>
+                  , or run <span className="font-mono text-primary-500">/link {slackCode}</span>
                 </p>
+                <p className="font-mono text-3xl font-bold text-secondary-900 text-center tracking-widest">
+                  {slackCode}
+                </p>
+                <p className="text-center text-xs text-secondary-500">Waiting…</p>
               </div>
             ) : (
-              <button
-                type="button"
-                onClick={fetchPin}
-                disabled={pinLoading}
-                className="w-full px-4 py-2 rounded-lg bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-sm text-on-primary transition-colors"
-              >
-                {pinLoading ? "Loading..." : "View PIN"}
-              </button>
-            )}
-            {pinError && !pin && (
-              <p className="text-xs text-primary-500 text-center mt-2">{pinError}</p>
+              <>
+                <Button className="w-full" onClick={handleConnectSlack}>
+                  <FaSlack size={16} />
+                  Connect Slack
+                </Button>
+                {slackError && (
+                  <p className="mt-1 text-xs text-red-700 text-center">{slackError}</p>
+                )}
+              </>
             )}
           </div>
         )}
+      </Card>
 
-        <div className="px-5 py-4 flex items-center justify-between">
-          <p className="text-xs text-secondary-500">
-            Member since {new Date(me.createdAt * 1000).toLocaleDateString()}
-          </p>
-          <div className="flex items-center gap-3">
-            {me.isAdmin ? (
-              <Link
-                to="/admin/users"
-                className="text-xs text-primary-500 hover:text-primary-600 transition-colors flex items-center gap-1"
-              >
-                <Shield size={12} /> Admin
-              </Link>
-            ) : null}
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="text-xs text-secondary-500 hover:text-primary-600 transition-colors"
+      {me.sessionType === "oauth" && (
+        <Card title="Kiosk PIN">
+          {pin && showPin ? (
+            <p className="rounded-lg border border-secondary-300 p-3 text-center text-2xl font-mono font-bold text-secondary-900 tracking-widest">
+              {pin}
+            </p>
+          ) : (
+            <Button className="w-full" disabled={pinLoading} onClick={fetchPin}>
+              {pinLoading ? "Loading…" : "View PIN"}
+            </Button>
+          )}
+          {pinError && !pin && <p className="text-xs text-red-700 text-center mt-2">{pinError}</p>}
+        </Card>
+      )}
+
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-secondary-500">
+          Member since {new Date(me.createdAt * 1000).toLocaleDateString()}
+        </p>
+        <div className="flex items-center gap-3">
+          {me.isAdmin ? (
+            <Link
+              to="/admin/users"
+              className="text-xs text-primary-500 hover:text-primary-600 transition-colors flex items-center gap-1"
             >
-              Sign out
-            </button>
-          </div>
+              <Shield size={12} /> Admin
+            </Link>
+          ) : null}
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="text-xs text-secondary-500 hover:text-primary-600 transition-colors"
+          >
+            Sign out
+          </button>
         </div>
       </div>
-    </main>
+    </Page>
   );
 }
