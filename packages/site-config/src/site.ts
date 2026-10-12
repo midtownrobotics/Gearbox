@@ -25,6 +25,14 @@ export const site = {
   platformDomain: "frcgearbox.com",
 
   /**
+   * Staging (roadmap 0.2), deployed from `main`: every platform address with `suffix` on its first
+   * label, on `domain` (1648-orders-dev.g3robotics.com, its platform at dev.g3robotics.com). A
+   * domain apart from production's, so the two never share a cookie; the free certificate covers
+   * it, since it's one level deep.
+   */
+  staging: { domain: "g3robotics.com", suffix: "-dev" },
+
+  /**
    * Each app, and its old, retired subdomain on `domain` (`web`; null for an app made after the
    * move, which never had one).
    */

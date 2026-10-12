@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "wrangler dev --port 8796 --inspector-port 9238",
     "deploy": "wrangler deploy --env production",
+    "deploy:staging": "wrangler deploy --env staging",
     "build": "wrangler deploy --env production --dry-run",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"

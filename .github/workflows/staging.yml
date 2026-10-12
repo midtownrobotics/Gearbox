@@ -1,0 +1,16 @@
+name: staging
+
+# Roadmap 0.2: every push to main deploys staging (<label>-dev.g3robotics.com) through
+# deploy.yml. Production deploys from public, through release.yml.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/deploy.yml
+    with:
+      environment: staging
+    secrets: inherit

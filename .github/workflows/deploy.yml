@@ -1,0 +1,59 @@
+name: deploy
+
+# Deploys every worker to one environment (roadmap 0.2): migrations first, then each app's
+# worker (each builds its page first, [env.<environment>.build]), then the gateway, which binds
+# to them. Called by staging.yml (main → staging) and release.yml (public → production, once a
+# release is committed). Needs the CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID secrets in a
+# GitHub environment named like the one deployed to (docs/deploy.md).
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: "staging or production"
+        required: true
+        type: string
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    # One deploy per environment at a time; a newer one waits instead of cutting this off midway.
+    concurrency:
+      group: deploy-${{ inputs.environment }}
+      cancel-in-progress: false
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      # No banner: printing it checks npm for a newer Wrangler, which isn't needed here.
+      WRANGLER_HIDE_BANNER: "true"
+    steps:
+      - name: Check the environment
+        if: inputs.environment != 'staging' && inputs.environment != 'production'
+        run: |
+          echo "Unknown environment: ${{ inputs.environment }}"
+          exit 1
+
+      # The commit that started the run: for production, the release commit release.yml pushed.
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # wrangler.toml must match site.ts (and staging's part production's); stop before deploying.
+      - name: Site config is applied
+        run: pnpm configure --check
+
+      - name: Migrations
+        run: pnpm ${{ inputs.environment == 'production' && 'db:migrate:remote' || 'db:migrate:staging' }}
+
+      - name: Deploy
+        run: pnpm run ${{ inputs.environment == 'production' && 'deploy' || 'deploy:staging' }}

@@ -9,9 +9,11 @@
   "scripts": {
     "dev": "wrangler dev --port 8791 --inspector-port 9233",
     "deploy": "wrangler deploy --env production",
+    "deploy:staging": "wrangler deploy --env staging",
     "typecheck": "tsc --noEmit",
     "db:migrate:local": "wrangler d1 migrations apply ATTENDANCE_DB --local",
     "db:migrate:remote": "wrangler d1 migrations apply ATTENDANCE_DB --env production --remote",
+    "db:migrate:staging": "wrangler d1 migrations apply ATTENDANCE_DB --env staging --remote",
     "test": "vitest run",
     "build": "wrangler deploy --env production --dry-run"
   },
