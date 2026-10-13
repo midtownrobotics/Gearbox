@@ -1,4 +1,4 @@
-import { Button, Card, ErrorBanner, Field, Page, inputClass } from "@g3/ui";
+import { Button, Card, ConfirmButton, ErrorBanner, Field, Page, inputClass } from "@g3/ui";
 import { type FormEvent, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../../shared/api";
@@ -106,10 +106,7 @@ function TreeSettings({ tree, others }: { tree: Tree; others: Tree[] }) {
   }
 
   async function remove() {
-    const sure = window.confirm(
-      `Delete “${tree.name}”, its categories and skills, and everyone's progress on them? This can't be undone.`,
-    );
-    if (sure && (await save(() => api.trees[":id"].$delete({ param })))) navigate("/edit");
+    if (await save(() => api.trees[":id"].$delete({ param }))) navigate("/edit");
   }
 
   return (
@@ -160,13 +157,16 @@ function TreeSettings({ tree, others }: { tree: Tree; others: Tree[] }) {
           </select>
         </Field>
         {error && <ErrorBanner message={error} />}
-        <div className="flex justify-between gap-3">
+        <div className="flex flex-wrap justify-between gap-3">
           <Button type="submit" disabled={saving || !name.trim()}>
             Save
           </Button>
-          <Button variant="danger" disabled={saving} onClick={remove}>
-            Delete tree
-          </Button>
+          <ConfirmButton
+            label="Delete tree"
+            question={`Delete “${tree.name}”, its categories and skills, and everyone's progress on them? This can't be undone.`}
+            disabled={saving}
+            onConfirm={remove}
+          />
         </div>
       </form>
     </Card>
@@ -185,10 +185,7 @@ function CategoryEditor({ category, others }: { category: Category; others: Cate
   }
 
   function remove() {
-    const sure = window.confirm(
-      `Delete “${category.name}”, its ${category.skills.length} skills, and everyone's progress on them? This can't be undone.`,
-    );
-    if (sure) void save(() => api.categories[":id"].$delete({ param }));
+    void save(() => api.categories[":id"].$delete({ param }));
   }
 
   return (
@@ -205,13 +202,16 @@ function CategoryEditor({ category, others }: { category: Category; others: Cate
         </Field>
         <Requires label="Opens after" options={others} value={requires} onChange={setRequires} />
         {error && <ErrorBanner message={error} />}
-        <div className="flex justify-between gap-3">
+        <div className="flex flex-wrap justify-between gap-3">
           <Button type="submit" variant="secondary" disabled={saving || !name.trim()}>
             Save category
           </Button>
-          <Button variant="danger" disabled={saving} onClick={remove}>
-            Delete category
-          </Button>
+          <ConfirmButton
+            label="Delete category"
+            question={`Delete “${category.name}”, its ${category.skills.length} skills, and everyone's progress on them? This can't be undone.`}
+            disabled={saving}
+            onConfirm={remove}
+          />
         </div>
       </form>
       <h3 className="mb-1 mt-5 font-sans text-xs font-bold uppercase tracking-widest text-secondary-400">
@@ -249,10 +249,7 @@ function SkillEditor({ skill, others }: { skill: Skill; others: Skill[] }) {
   }
 
   function remove() {
-    const sure = window.confirm(
-      `Delete “${skill.name}” and everyone's progress on it? This can't be undone.`,
-    );
-    if (sure) void save(() => api.skills[":id"].$delete({ param }));
+    void save(() => api.skills[":id"].$delete({ param }));
   }
 
   if (!open) {
@@ -309,9 +306,12 @@ function SkillEditor({ skill, others }: { skill: Skill; others: Skill[] }) {
               Cancel
             </Button>
           </div>
-          <Button variant="danger" disabled={saving} onClick={remove}>
-            Delete skill
-          </Button>
+          <ConfirmButton
+            label="Delete skill"
+            question={`Delete “${skill.name}” and everyone's progress on it? This can't be undone.`}
+            disabled={saving}
+            onConfirm={remove}
+          />
         </div>
       </form>
     </li>

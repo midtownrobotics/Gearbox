@@ -9,6 +9,8 @@ export function OperatorsPage() {
   const operators = useLoad(() => read<Operator[]>(consoleApi.operators.$get()), []);
   const [userId, setUserId] = useState("");
   const [error, setError] = useState<string | null>(null);
+  // The operator whose Remove was clicked, while the row asks.
+  const [removing, setRemoving] = useState<string | null>(null);
 
   async function run(action: () => Promise<unknown>) {
     setError(null);
@@ -35,17 +37,34 @@ export function OperatorsPage() {
               <span className="text-secondary-500">
                 {o.teamId?.replace(/^frc/, "Team ")} · since {formatDate(o.createdAt)}
               </span>
-              {!o.isYou && (
+              {!o.isYou && removing !== o.userId && (
                 <button
                   type="button"
                   className={`${buttonClass()} ml-auto`}
-                  onClick={() =>
-                    window.confirm(`Remove ${o.displayName ?? o.userId} as an operator?`) &&
-                    run(() => send("DELETE", `/operators/${o.userId}`))
-                  }
+                  onClick={() => setRemoving(o.userId)}
                 >
                   Remove
                 </button>
+              )}
+              {removing === o.userId && (
+                <span className="ml-auto flex flex-wrap items-center gap-2">
+                  <span className="text-secondary-900">
+                    Remove {o.displayName ?? o.userId} as an operator?
+                  </span>
+                  <button
+                    type="button"
+                    className={buttonClass("danger")}
+                    onClick={() => {
+                      setRemoving(null);
+                      run(() => send("DELETE", `/operators/${o.userId}`));
+                    }}
+                  >
+                    Remove
+                  </button>
+                  <button type="button" className={buttonClass()} onClick={() => setRemoving(null)}>
+                    Keep them
+                  </button>
+                </span>
               )}
             </li>
           ))}

@@ -2,6 +2,7 @@ import { ErrorBanner, Loading, Page, SuccessBanner, inputClass } from "@g3/ui";
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api, getErrorMessage } from "../../shared/api";
+import { ConfirmDialog } from "../../shared/ask";
 import { useAuthUser } from "../../shared/auth";
 import type { RequestListRow } from "../../shared/types";
 import { useLoad } from "../../shared/use-load";
@@ -43,12 +44,14 @@ export function WishlistPage() {
   const find = useMemo(() => requestSearch(data ?? []), [data]);
   const shown = find(query);
 
+  // The row whose Promote or Remove was clicked, while a pop-up asks.
+  const [asking, setAsking] = useState<{
+    item: RequestListRow;
+    action: "promote" | "remove";
+  } | null>(null);
+
   async function act(item: RequestListRow, action: "promote" | "remove") {
-    const question =
-      action === "promote"
-        ? `Request ${item.title}? It goes to the mentors as your request.`
-        : `Remove ${item.title} from the wishlist?`;
-    if (!window.confirm(question)) return;
+    setAsking(null);
     setBusy(item.id);
     setActionError(null);
     try {
@@ -110,7 +113,7 @@ export function WishlistPage() {
                 type="button"
                 className={rowButton}
                 disabled={busy !== null}
-                onClick={() => void act(item, "promote")}
+                onClick={() => setAsking({ item, action: "promote" })}
               >
                 {busy === item.id ? "…" : "Promote"}
               </button>
@@ -118,13 +121,27 @@ export function WishlistPage() {
                 type="button"
                 className={rowButton}
                 disabled={busy !== null}
-                onClick={() => void act(item, "remove")}
+                onClick={() => setAsking({ item, action: "remove" })}
               >
                 Remove
               </button>
             </>
           )}
         />
+      )}
+      {asking && (
+        <ConfirmDialog
+          title={asking.action === "promote" ? "Promote to a request" : "Remove from the wishlist"}
+          confirmLabel={asking.action === "promote" ? "Request it" : "Remove it"}
+          keepLabel={asking.action === "promote" ? "Cancel" : "Keep it"}
+          danger={asking.action === "remove"}
+          onConfirm={() => void act(asking.item, asking.action)}
+          onClose={() => setAsking(null)}
+        >
+          {asking.action === "promote"
+            ? `Request ${asking.item.title}? It goes to the mentors as your request.`
+            : `Remove ${asking.item.title} from the wishlist?`}
+        </ConfirmDialog>
       )}
     </Page>
   );

@@ -24,7 +24,7 @@ export {
 } from "./components/button";
 export { Card, Stat } from "./components/card";
 export { Chip } from "./components/chip";
-export { Dialog } from "./components/dialog";
+export { Dialog, type DialogSize } from "./components/dialog";
 export { Field, inputClass } from "./components/field";
 export { focusRing } from "./components/focus";
 export { ErrorBanner, Loading, SuccessBanner } from "./components/messages";

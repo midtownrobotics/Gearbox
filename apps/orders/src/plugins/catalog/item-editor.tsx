@@ -1,4 +1,4 @@
-import { Button, Card, ErrorBanner, Field, inputClass } from "@g3/ui";
+import { Button, Card, ConfirmButton, ErrorBanner, Field, inputClass } from "@g3/ui";
 import { useState } from "react";
 import { api, getErrorMessage } from "../../shared/api";
 import type { CatalogItem } from "../../shared/types";
@@ -67,7 +67,7 @@ export function ItemEditor({
   }
 
   async function remove() {
-    if (!item || !window.confirm(`Delete “${item.name}” from the catalog?`)) return;
+    if (!item) return;
     setBusy(true);
     const res = await api.catalog.items[":id"].$delete({ param: { id: String(item.id) } });
     setBusy(false);
@@ -156,9 +156,15 @@ export function ItemEditor({
           Cancel
         </Button>
         {item && (
-          <Button variant="danger" onClick={remove} disabled={busy} className="ml-auto">
-            Delete
-          </Button>
+          <>
+            <span className="flex-1" />
+            <ConfirmButton
+              label="Delete"
+              question={`Delete “${item.name}” from the catalog? This can't be undone.`}
+              disabled={busy}
+              onConfirm={remove}
+            />
+          </>
         )}
       </div>
     </Card>
