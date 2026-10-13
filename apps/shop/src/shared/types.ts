@@ -189,6 +189,8 @@ export type OnshapeRelease = {
     description: string | null;
     revision: string | null;
     quantity: number | null;
+    /** A later release holds this part number at another revision. */
+    obsolete: boolean;
     links: { part: string | null; drawing: string | null };
   }[];
 };

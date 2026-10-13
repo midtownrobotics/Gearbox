@@ -19,7 +19,8 @@ export const onshapeLinksRouter = new Hono<AppEnv>()
   /**
    * The team's Onshape releases, newest first, each with what the release package said about it
    * (lib/onshape-release.ts; null for releases from before that was kept), its parts, and links to
-   * the document, each part and each drawing as they were at that release.
+   * the document, each part and each drawing as they were at that release. A part a later release
+   * has replaced is `obsolete`.
    */
   .get("/releases", requireAuth, async (c) => {
     const db = createShopDb(c.env.SHOP_DB);
@@ -44,6 +45,23 @@ export const onshapeLinksRouter = new Hono<AppEnv>()
     for (const part of parts) {
       if (part.releaseId === null) continue;
       byRelease.set(part.releaseId, [...(byRelease.get(part.releaseId) ?? []), part]);
+    }
+
+    // A part is obsolete once a later release holds its part number at another revision. Releases
+    // are newest first, so by the time one is reached `later` has every release after it.
+    const later = new Map<string, Set<string | null>>();
+    const obsolete = new Set<number>();
+    for (const release of releases) {
+      const own = byRelease.get(release.id) ?? [];
+      for (const part of own) {
+        const revisions = [...(later.get(part.partNumber) ?? [])];
+        if (revisions.some((r) => r === null || part.revision === null || r !== part.revision)) {
+          obsolete.add(part.id);
+        }
+      }
+      for (const part of own) {
+        later.set(part.partNumber, (later.get(part.partNumber) ?? new Set()).add(part.revision));
+      }
     }
 
     return c.json({
@@ -77,6 +95,7 @@ export const onshapeLinksRouter = new Hono<AppEnv>()
             description: part.description,
             revision: part.revision,
             quantity: part.quantity,
+            obsolete: obsolete.has(part.id),
             links: {
               part: at(part.versionId ?? versionId, part.entityId),
               drawing: at(part.versionId ?? versionId, part.partDrawingEntityId),

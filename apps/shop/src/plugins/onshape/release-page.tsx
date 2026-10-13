@@ -1,20 +1,27 @@
-import { ErrorBanner, Loading, Page, buttonClass } from "@g3/ui";
+import { Badge, ErrorBanner, Loading, Page, buttonClass } from "@g3/ui";
 import { useEffect, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { drawingUrl, fetchOnshapeReleases } from "../../shared/getters";
+import { partPath } from "../../shared/nav";
 import type { OnshapeRelease } from "../../shared/types";
-import { ExternalLink, linkCls, td, th, when } from "./release-ui";
+import { linkClass } from "../batches/batch-ui";
+import { ExternalLink, NarrowPart, td, th, when } from "./release-ui";
 
 // One Onshape release (/onshape/releases/:id, the row id from GET /onshape/releases): who made and
 // approved it, its notes, its parts with links to Onshape at that release, and its comments.
 
+/** In a link's column when a part has no such link, so the columns stay where they are. */
+const none = <span className="text-secondary-400">–</span>;
+
 export function ReleasePage() {
   const { id } = useParams();
-  // Opened from Ingest's release headers: the back link goes there instead of the list.
-  const fromIngest = (useLocation().state as { from?: string } | null)?.from === "ingest";
+  // Opened from Ingest's release headers: the back link goes there instead of the list. Opened
+  // from the list: it goes back to the list sorted and searched as it was (`list`, its address).
+  const opened = useLocation().state as { from?: string; list?: string } | null;
+  const fromIngest = opened?.from === "ingest";
   const back = (
     <Link
-      to={fromIngest ? "/ingest" : "/onshape"}
+      to={fromIngest ? "/ingest" : `/onshape${opened?.list ?? ""}`}
       className="text-sm text-secondary-500 hover:text-primary-600"
     >
       {fromIngest ? "← Ingest" : "← Onshape"}
@@ -111,25 +118,38 @@ export function ReleasePage() {
           {release.parts.length === 0 ? (
             <p className="text-sm text-secondary-400">No parts were recorded for this release.</p>
           ) : (
-            <div className="overflow-x-auto rounded-xl border border-secondary-200 bg-surface">
-              <table className="w-full text-sm">
+            <div className="overflow-x-auto rounded-xl border border-secondary-200 bg-surface text-sm">
+              <table className="hidden w-full md:table">
                 <thead className="bg-page">
                   <tr>
                     <th className={th}>Part number</th>
                     <th className={th}>Name</th>
                     <th className={th}>Rev</th>
                     <th className={`${th} text-right`}>Qty</th>
-                    <th className={th}>Open</th>
+                    <th className={th}>Part</th>
+                    <th className={th}>Drawing</th>
+                    <th className={th}>Onshape</th>
                   </tr>
                 </thead>
                 <tbody>
                   {release.parts.map((part) => (
                     <tr key={part.id} className="border-t border-secondary-200">
                       <td className={`${td} font-mono whitespace-nowrap`}>
-                        <span className="text-secondary-900">{part.partNumber}</span>
+                        <span
+                          className={
+                            part.obsolete ? "text-secondary-500 line-through" : "text-secondary-900"
+                          }
+                        >
+                          {part.partNumber}
+                        </span>
                       </td>
                       <td className={`${td} text-secondary-900`}>
-                        {part.name && part.name !== part.partNumber ? part.name : ""}
+                        <span className="flex flex-wrap items-center gap-x-2 gap-y-1 empty:hidden">
+                          {part.name && part.name !== part.partNumber && (
+                            <span className={part.obsolete ? "line-through" : ""}>{part.name}</span>
+                          )}
+                          {part.obsolete && <Badge>Obsolete</Badge>}
+                        </span>
                         {part.description && (
                           <span className="block text-xs text-secondary-400">
                             {part.description}
@@ -141,32 +161,36 @@ export function ReleasePage() {
                         {part.quantity ?? "–"}
                       </td>
                       <td className={`${td} whitespace-nowrap`}>
-                        <span className="flex gap-3">
-                          <Link
-                            to={`/part?p=${encodeURIComponent(part.partNumber)}`}
-                            className={linkCls}
+                        <Link to={partPath(part.partNumber)} className={linkClass}>
+                          Open
+                        </Link>
+                      </td>
+                      <td className={`${td} whitespace-nowrap`}>
+                        {part.links.drawing && part.revision ? (
+                          <a
+                            href={drawingUrl(part.partNumber, part.revision)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className={linkClass}
                           >
-                            Part
-                          </Link>
-                          {part.links.drawing && part.revision && (
-                            <a
-                              href={drawingUrl(part.partNumber, part.revision)}
-                              target="_blank"
-                              rel="noreferrer"
-                              className={linkCls}
-                            >
-                              Drawing
-                            </a>
-                          )}
-                          {part.links.part && (
-                            <ExternalLink href={part.links.part}>Onshape</ExternalLink>
-                          )}
-                        </span>
+                            Open
+                          </a>
+                        ) : (
+                          none
+                        )}
+                      </td>
+                      <td className={`${td} whitespace-nowrap`}>
+                        {part.links.part ? (
+                          <ExternalLink href={part.links.part}>Open</ExternalLink>
+                        ) : (
+                          none
+                        )}
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+              <NarrowParts parts={release.parts} />
             </div>
           )}
         </section>
@@ -188,5 +212,49 @@ export function ReleasePage() {
         )}
       </>
     </Page>
+  );
+}
+
+/**
+ * The parts on a phone, where the table's columns don't fit: each part, then a line with its
+ * three links, each always in the same third.
+ */
+function NarrowParts({ parts }: { parts: OnshapeRelease["parts"] }) {
+  const missing = (text: string) => <span className="text-secondary-400">{text}</span>;
+  return (
+    <ul className="divide-y divide-secondary-200 md:hidden">
+      {parts.map((part) => (
+        // Every other part is shaded, so each pair of lines reads as one.
+        <li key={part.id} className="even:bg-inset">
+          <NarrowPart part={part} name={part.name || part.partNumber}>
+            {part.description && (
+              <span className="block text-xs text-secondary-400">{part.description}</span>
+            )}
+          </NarrowPart>
+          <div className="grid grid-cols-3 gap-x-3 border-t border-dashed border-secondary-200 px-3 py-1.5 text-xs">
+            <Link to={partPath(part.partNumber)} className={linkClass}>
+              Part
+            </Link>
+            {part.links.drawing && part.revision ? (
+              <a
+                href={drawingUrl(part.partNumber, part.revision)}
+                target="_blank"
+                rel="noreferrer"
+                className={linkClass}
+              >
+                Drawing
+              </a>
+            ) : (
+              missing("No drawing")
+            )}
+            {part.links.part ? (
+              <ExternalLink href={part.links.part}>Onshape</ExternalLink>
+            ) : (
+              missing("Not in Onshape")
+            )}
+          </div>
+        </li>
+      ))}
+    </ul>
   );
 }

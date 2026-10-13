@@ -1,32 +1,32 @@
-import { ErrorBanner, Loading, Page, inputClass } from "@g3/ui";
-import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { ErrorBanner, Loading, Page, Switch, inputClass } from "@g3/ui";
+import { useEffect, useId, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { fetchOnshapeReleases } from "../../shared/getters";
 import type { OnshapeRelease } from "../../shared/types";
-import { day, td, th, when } from "./release-ui";
+import {
+  PART_SORTS,
+  SORTS,
+  type Sort,
+  type SortKey,
+  shownGroup,
+  sortGroups,
+  sortLines,
+  startingDir,
+} from "./release-rows";
+import { ReleasesTable } from "./releases-table";
 
-// The team's Onshape releases as a table, newest first: what each was called, when, who made and
-// approved it. A row opens the release's own page (release-page.tsx) with its parts.
-
-const has = (text: string | null | undefined, q: string) => !!text?.toLowerCase().includes(q);
-
-function matches(release: OnshapeRelease, query: string) {
-  const q = query.trim().toLowerCase();
-  if (!q) return true;
-  return [
-    release.name,
-    release.notes,
-    release.madeBy,
-    ...release.approvers.map((a) => a.name),
-    ...release.parts.flatMap((p) => [p.partNumber, p.name]),
-  ].some((f) => has(f, q));
-}
+// The team's Onshape releases and their parts as one table (releases-table.tsx). Sorted by one of
+// a release's columns (when it was released, who made it, who approved it) it lists each release
+// once with its parts; sorted by one of a part's columns it lists every part on a line of its
+// own. A release's date opens its own page (release-page.tsx). The sort, the search and whether
+// obsolete parts are shown live in the address, so coming back from a release finds the table as
+// it was.
 
 export function OnshapePage() {
-  const navigate = useNavigate();
   const [releases, setReleases] = useState<OnshapeRelease[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [query, setQuery] = useState("");
+  const [params, setParams] = useSearchParams();
+  const obsoleteLabel = useId();
 
   useEffect(() => {
     fetchOnshapeReleases()
@@ -34,7 +34,51 @@ export function OnshapePage() {
       .catch((e) => setError(e instanceof Error ? e.message : "Failed to load releases."));
   }, []);
 
-  const shown = useMemo(() => (releases ?? []).filter((r) => matches(r, query)), [releases, query]);
+  const query = params.get("q") ?? "";
+  const showObsolete = params.get("obsolete") !== "hide";
+  const key = SORTS.find((s) => s === params.get("sort")) ?? "released";
+  const dirParam = params.get("dir");
+  const sort: Sort = {
+    key,
+    dir: dirParam === "asc" || dirParam === "desc" ? dirParam : startingDir(key),
+  };
+  const { dir } = sort;
+
+  /** Changes the address in place; a null value takes the name out of it. */
+  const setParam = (changes: Record<string, string | null>) =>
+    setParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        for (const [name, value] of Object.entries(changes)) {
+          if (value === null) next.delete(name);
+          else next.set(name, value);
+        }
+        return next;
+      },
+      { replace: true },
+    );
+
+  const sortBy = (next: SortKey) => {
+    const nextDir = next !== key ? startingDir(next) : dir === "asc" ? "desc" : "asc";
+    setParam({
+      sort: next === "released" ? null : next,
+      dir: nextDir === startingDir(next) ? null : nextDir,
+    });
+  };
+
+  const groups = useMemo(
+    () => (releases ?? []).flatMap((r) => shownGroup(r, query, showObsolete) ?? []),
+    [releases, query, showObsolete],
+  );
+  const flat = PART_SORTS.includes(key);
+  const grouped = useMemo(
+    () => (flat ? [] : sortGroups(groups, { key, dir })),
+    [groups, flat, key, dir],
+  );
+  const lines = useMemo(
+    () => (flat ? sortLines(groups, { key, dir }) : []),
+    [groups, flat, key, dir],
+  );
 
   if (error || !releases)
     return (
@@ -43,10 +87,16 @@ export function OnshapePage() {
       </Page>
     );
 
+  const partCount = groups.reduce((n, g) => n + g.parts.length, 0);
+  const hidden = showObsolete
+    ? 0
+    : releases.reduce((n, r) => n + r.parts.filter((p) => p.obsolete).length, 0);
+  const empty = flat ? lines.length === 0 : groups.length === 0;
+
   return (
     <Page
       title="Onshape"
-      description="Every approved release. Open one to see its parts and comments."
+      description="Every approved release and its parts. Open a release for its notes, comments and links."
       width="wide"
     >
       {releases.length === 0 ? (
@@ -55,70 +105,43 @@ export function OnshapePage() {
         </p>
       ) : (
         <>
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search releases, people or part numbers"
-            className={inputClass}
-          />
-
-          {shown.length === 0 ? (
-            <p className="text-secondary-500 text-sm">No releases match "{query}".</p>
-          ) : (
-            <div className="overflow-x-auto rounded-xl border border-secondary-200 bg-surface">
-              <table className="w-full text-sm">
-                <thead className="bg-page">
-                  <tr>
-                    <th className={th}>Release</th>
-                    <th className={th}>Released</th>
-                    <th className={th}>Made by</th>
-                    <th className={th}>Approved by</th>
-                    <th className={`${th} text-right`}>Parts</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {shown.map((release) => {
-                    const to = `/onshape/releases/${release.id}`;
-                    const approved = release.approvers.filter((a) => a.approvedAt);
-                    return (
-                      <tr
-                        key={release.id}
-                        onClick={() => navigate(to)}
-                        className="cursor-pointer border-t border-secondary-200 hover:bg-secondary-50"
-                      >
-                        <td className={td}>
-                          <Link
-                            to={to}
-                            onClick={(e) => e.stopPropagation()}
-                            className="font-semibold text-secondary-900 break-words hover:text-primary-600"
-                          >
-                            {release.name ?? (
-                              <span className="font-mono font-normal text-secondary-500">
-                                {release.releaseId}
-                              </span>
-                            )}
-                          </Link>
-                        </td>
-                        <td
-                          className={`${td} text-secondary-900 whitespace-nowrap`}
-                          title={when(release.releasedAt) ?? undefined}
-                        >
-                          {day(release.releasedAt) ?? release.releasedAt}
-                        </td>
-                        <td className={`${td} text-secondary-900`}>{release.madeBy ?? "–"}</td>
-                        <td className={`${td} text-secondary-900`}>
-                          {approved.length > 0 ? approved.map((a) => a.name).join(", ") : "–"}
-                        </td>
-                        <td className={`${td} text-secondary-900 text-right tabular-nums`}>
-                          {release.parts.length}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+          <div className="space-y-3">
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setParam({ q: e.target.value || null })}
+              placeholder="Search releases, people or parts"
+              className={inputClass}
+            />
+            <div className="flex items-center gap-2 text-sm text-secondary-900">
+              <Switch
+                checked={showObsolete}
+                onChange={(on) => setParam({ obsolete: on ? null : "hide" })}
+                aria-labelledby={obsoleteLabel}
+              />
+              <span id={obsoleteLabel}>Show obsolete parts</span>
             </div>
+          </div>
+
+          {empty ? (
+            <p className="text-secondary-500 text-sm">
+              {query.trim() ? `Nothing matches "${query.trim()}".` : "No parts to show."}
+            </p>
+          ) : (
+            <>
+              <ReleasesTable
+                grouped={grouped}
+                lines={lines}
+                flat={flat}
+                sort={sort}
+                onSort={sortBy}
+              />
+              <p className="text-xs text-secondary-400">
+                {partCount} {partCount === 1 ? "part" : "parts"} in {groups.length}{" "}
+                {groups.length === 1 ? "release" : "releases"}
+                {hidden > 0 && ` · ${hidden} obsolete not shown`}
+              </p>
+            </>
           )}
         </>
       )}
