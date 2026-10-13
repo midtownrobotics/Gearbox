@@ -1,9 +1,9 @@
+import { Badge, Card, ErrorBanner, Loading, Page, Stat } from "@g3/ui";
 import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../../shared/api";
 import { getErrorMessage } from "../../shared/api-error";
 import { PrintDrawingButton } from "../../shared/print-drawing-button";
-import { ErrorBanner, PageLoading } from "../../shared/ui";
 
 interface PartDefinition {
   id: number;
@@ -163,44 +163,32 @@ export function PartDetailPage() {
     }
   }
 
-  if (!partNumber) {
-    return (
-      <main className="flex-1 bg-page">
-        <div className="max-w-4xl mx-auto px-6 py-8">
-          <ErrorBanner message="Part number is required. Use ?p=PART_NUMBER in the URL." />
-        </div>
-      </main>
-    );
-  }
+  const title = partNumber ? `Part: ${partNumber}` : "Part";
 
-  if (loading) return <PageLoading />;
-
-  if (error) {
+  if (!partNumber || loading || error) {
     return (
-      <main className="flex-1 bg-page">
-        <div className="max-w-4xl mx-auto px-6 py-8">
+      <Page title={title}>
+        {!partNumber ? (
+          <ErrorBanner message="No part number. Look one up on the Parts page." />
+        ) : error ? (
           <ErrorBanner message={error} />
-        </div>
-      </main>
+        ) : (
+          <Loading />
+        )}
+      </Page>
     );
   }
 
   if (definitions.length === 0) {
     return (
-      <main className="flex-1 bg-page">
-        <div className="max-w-4xl mx-auto px-6 py-8 space-y-5">
-          <h1 className="font-display text-4xl text-ink">Part: {partNumber}</h1>
-          <div className="bg-paper border border-steel/30 rounded-xl p-6">
-            <p className="text-sm text-steel">
-              No definitions found for this part number. Make sure this part has been{" "}
-              <a href="/ingest" className="text-crimson hover:text-crimson-dark underline">
-                ingested
-              </a>{" "}
-              and check back.
-            </p>
-          </div>
-        </div>
-      </main>
+      <Page title={title}>
+        <p className="text-sm text-secondary-500">
+          Nothing has this part number yet.{" "}
+          <Link to="/ingest" className="font-semibold text-primary-600 hover:underline">
+            Check Ingest for it.
+          </Link>
+        </p>
+      </Page>
     );
   }
 
@@ -224,13 +212,13 @@ export function PartDetailPage() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case "doing":
-        return "text-blue-700 bg-blue-50";
+        return "text-sky-800 bg-sky-50";
       case "todo":
-        return "text-yellow-700 bg-yellow-50";
+        return "text-amber-800 bg-amber-50";
       case "done":
-        return "text-emerald-700 bg-emerald-50";
+        return "text-emerald-800 bg-emerald-50";
       default:
-        return "text-steel bg-mist";
+        return "text-secondary-500 bg-page";
     }
   };
 
@@ -238,59 +226,54 @@ export function PartDetailPage() {
 
   if (!activeDef) {
     return (
-      <main className="flex-1 bg-page">
-        <div className="max-w-4xl mx-auto px-6 py-8 space-y-5">
-          <h1 className="font-display text-4xl text-ink">Part: {partNumber}</h1>
-          <div className="bg-paper border border-steel/30 rounded-xl p-6">
-            <p className="text-sm text-steel">No active definition found for this part.</p>
-          </div>
-        </div>
-      </main>
+      <Page title={title}>
+        <p className="text-sm text-secondary-500">Every revision of this part is obsolete.</p>
+      </Page>
     );
   }
 
   const activeInstances = instances.filter((i) => i.partDefinitionId === activeDef.id);
 
   return (
-    <main className="flex-1 bg-page">
-      <div className="max-w-4xl mx-auto px-6 py-8 space-y-5">
-        <h1 className="font-display text-4xl text-ink">Part: {partNumber}</h1>
-
+    <Page title={title}>
+      <>
         {/* Part Details */}
         <section className="space-y-3">
           <div className="space-y-3">
             {[activeDef].map((def) => (
               <div
                 key={def.id}
-                className="bg-paper border border-steel/30 rounded-xl p-5 space-y-3"
+                className="bg-surface border border-secondary-200 rounded-xl p-5 space-y-3"
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2">
-                      <h3 className="font-semibold text-ink text-lg">{def.name || "—"}</h3>
-                      {def.isObsolete ? (
-                        <span className="text-xs font-semibold px-2 py-1 bg-red-50 text-red-700 border border-red-200 rounded">
-                          Obsolete
-                        </span>
-                      ) : null}
+                      <h2 className="font-sans font-semibold text-secondary-900 text-lg">
+                        {def.name || "—"}
+                      </h2>
+                      {def.isObsolete ? <Badge>Obsolete</Badge> : null}
                     </div>
-                    <p className="text-xs text-steel mb-2">Revision: {def.revision || "—"}</p>
-                    {def.notes && <p className="text-sm text-steel-dark mb-2">{def.notes}</p>}
+                    <p className="text-xs text-secondary-400 mb-2">
+                      Revision: {def.revision || "—"}
+                    </p>
+                    {def.notes && <p className="text-sm text-secondary-500 mb-2">{def.notes}</p>}
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 pt-3 border-t border-steel/25">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 pt-3 border-t border-secondary-200">
                   <div>
-                    <p className="text-xs text-steel font-semibold">Subsystem</p>
-                    <p className="text-sm text-ink">{getSubsystemName(def.subsystemId)}</p>
+                    <p className="text-xs text-secondary-400 font-semibold">Subsystem</p>
+                    <p className="text-sm text-secondary-900">
+                      {getSubsystemName(def.subsystemId)}
+                    </p>
                   </div>
                   <div>
-                    <p className="text-xs text-steel font-semibold">Instances</p>
-                    <p className="text-sm text-ink">{activeInstances.length}</p>
+                    <p className="text-xs text-secondary-400 font-semibold">Instances</p>
+                    <p className="text-sm text-secondary-900">{activeInstances.length}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-steel font-semibold">Created</p>
-                    <p className="text-sm text-ink">
+                    <p className="text-xs text-secondary-400 font-semibold">Created</p>
+                    <p className="text-sm text-secondary-900">
                       {new Date(
                         typeof def.createdAt === "string"
                           ? Number.parseInt(def.createdAt)
@@ -301,15 +284,15 @@ export function PartDetailPage() {
                 </div>
 
                 {(def.partDrawingUrl || def.revision) && (
-                  <div className="pt-3 border-t border-steel/25 flex flex-wrap items-center gap-4">
+                  <div className="pt-3 border-t border-secondary-200 flex flex-wrap items-center gap-4">
                     {def.partDrawingUrl && (
                       <a
                         href={def.partDrawingUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-xs font-medium text-crimson hover:text-crimson-dark underline"
+                        className="text-xs font-medium text-primary-600 hover:text-primary-700 underline"
                       >
-                        View Drawing →
+                        View drawing →
                       </a>
                     )}
                     {def.revision && (
@@ -322,10 +305,10 @@ export function PartDetailPage() {
                 )}
 
                 {/* Instances for this definition */}
-                <div className="pt-3 border-t border-steel/25 space-y-2">
-                  <p className="text-xs font-semibold text-steel-dark">Instances:</p>
+                <div className="pt-3 border-t border-secondary-200 space-y-2">
+                  <p className="text-xs font-semibold text-secondary-500">Instances:</p>
                   {activeInstances.length === 0 ? (
-                    <p className="text-xs text-steel">No instances for this part</p>
+                    <p className="text-xs text-secondary-400">No instances for this part</p>
                   ) : (
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                       {activeInstances.map((inst) => {
@@ -334,12 +317,12 @@ export function PartDetailPage() {
                           <a
                             key={inst.id}
                             href={`/board?instance=${inst.id}`}
-                            className="bg-mist border border-steel/20 rounded p-2 hover:border-crimson/40 hover:bg-steel-tint transition-colors cursor-pointer"
+                            className="bg-page border border-secondary-200 rounded p-2 hover:border-secondary-400 hover:bg-inset transition-colors cursor-pointer"
                           >
-                            <p className="text-xs font-medium text-ink">
+                            <p className="text-xs font-medium text-secondary-900">
                               Instance {inst.instanceNumber}
                             </p>
-                            <div className="text-xs text-steel mt-1 space-y-0.5">
+                            <div className="text-xs text-secondary-400 mt-1 space-y-0.5">
                               {currentProcess ? (
                                 <p
                                   className={`font-semibold rounded px-1.5 py-0.5 ${getStatusColor(currentProcess.status)}`}
@@ -347,13 +330,13 @@ export function PartDetailPage() {
                                   {getProcessName(currentProcess.processId)}
                                 </p>
                               ) : (
-                                <p className="text-steel">No processes</p>
+                                <p className="text-secondary-400">No processes</p>
                               )}
                               {inst.isPriority ? (
-                                <p className="text-emerald-700 font-semibold">Priority</p>
+                                <p className="text-amber-700 font-semibold">Priority</p>
                               ) : null}
                               {inst.isStale ? (
-                                <p className="text-red-700 font-semibold">Stale</p>
+                                <p className="text-secondary-500 font-semibold">Obsolete</p>
                               ) : null}
                             </div>
                           </a>
@@ -368,26 +351,14 @@ export function PartDetailPage() {
         </section>
 
         {/* Summary */}
-        <section className="bg-paper border border-steel/30 rounded-xl p-5">
-          <h2 className="font-semibold text-ink mb-3">Summary</h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
-            <div>
-              <p className="text-xs text-steel font-semibold">Revision</p>
-              <p className="text-lg text-ink font-semibold">{activeDef.revision || "—"}</p>
-            </div>
-            <div>
-              <p className="text-xs text-steel font-semibold">Subsystem</p>
-              <p className="text-lg text-ink font-semibold">
-                {getSubsystemName(activeDef.subsystemId)}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-steel font-semibold">Instances</p>
-              <p className="text-lg text-ink font-semibold">{activeInstances.length}</p>
-            </div>
+        <Card title="Summary">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <Stat label="Revision" value={activeDef.revision || "—"} />
+            <Stat label="Subsystem" value={getSubsystemName(activeDef.subsystemId)} />
+            <Stat label="Instances" value={activeInstances.length} />
           </div>
-        </section>
-      </div>
-    </main>
+        </Card>
+      </>
+    </Page>
   );
 }

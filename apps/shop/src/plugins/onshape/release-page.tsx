@@ -1,23 +1,25 @@
+import { ErrorBanner, Loading, Page, buttonClass } from "@g3/ui";
 import { useEffect, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { drawingUrl, fetchOnshapeReleases } from "../../shared/getters";
 import type { OnshapeRelease } from "../../shared/types";
-import { ErrorBanner, PageLoading } from "../../shared/ui";
 import { ExternalLink, linkCls, td, th, when } from "./release-ui";
 
 // One Onshape release (/onshape/releases/:id, the row id from GET /onshape/releases): who made and
 // approved it, its notes, its parts with links to Onshape at that release, and its comments.
 
-const buttonCls =
-  "rounded-lg border border-steel/40 px-3 py-1.5 text-sm font-medium text-steel-dark hover:bg-steel/10";
-
 export function ReleasePage() {
   const { id } = useParams();
   // Opened from Ingest's release headers: the back link goes there instead of the list.
   const fromIngest = (useLocation().state as { from?: string } | null)?.from === "ingest";
-  const back = fromIngest
-    ? { to: "/ingest", label: "← Ingest" }
-    : { to: "/onshape", label: "← Onshape" };
+  const back = (
+    <Link
+      to={fromIngest ? "/ingest" : "/onshape"}
+      className="text-sm text-secondary-500 hover:text-primary-600"
+    >
+      {fromIngest ? "← Ingest" : "← Onshape"}
+    </Link>
+  );
   const [release, setRelease] = useState<OnshapeRelease | null | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
 
@@ -27,18 +29,16 @@ export function ReleasePage() {
       .catch((e) => setError(e instanceof Error ? e.message : "Failed to load the release."));
   }, [id]);
 
-  if (error || release === null)
+  if (error || !release)
     return (
-      <main className="flex-1 bg-page">
-        <div className="max-w-5xl mx-auto px-6 py-8 space-y-4">
-          <Link to={back.to} className="text-sm text-crimson hover:underline">
-            {back.label}
-          </Link>
+      <Page title="Release" actions={back}>
+        {error || release === null ? (
           <ErrorBanner message={error ?? "There's no such release."} />
-        </div>
-      </main>
+        ) : (
+          <Loading />
+        )}
+      </Page>
     );
-  if (!release) return <PageLoading />;
 
   const approved = release.approvers.filter((a) => a.approvedAt);
   const rejected = release.approvers.filter((a) => a.rejectedAt);
@@ -63,61 +63,57 @@ export function ReleasePage() {
   ];
 
   return (
-    <main className="flex-1 bg-page">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 space-y-6">
-        <div className="space-y-2">
-          <Link to={back.to} className="text-sm text-crimson hover:underline">
-            {back.label}
-          </Link>
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <h1 className="font-display text-4xl text-ink break-words">
-              {release.name ?? "Release"}
-            </h1>
-            <div className="flex flex-wrap gap-2">
-              <a
-                href={release.links.release}
-                target="_blank"
-                rel="noreferrer"
-                className={buttonCls}
-              >
-                Open in Onshape
-              </a>
-              {release.links.document && (
-                <a
-                  href={release.links.document}
-                  target="_blank"
-                  rel="noreferrer"
-                  className={buttonCls}
-                >
-                  View document at this release
-                </a>
-              )}
-            </div>
-          </div>
-          {release.notes && release.notes !== release.name && (
-            <p className="text-ink whitespace-pre-line">{release.notes}</p>
+    <Page
+      title={release.name ?? "Release"}
+      description={
+        release.notes && release.notes !== release.name ? (
+          <span className="whitespace-pre-line">{release.notes}</span>
+        ) : undefined
+      }
+      actions={
+        <div className="flex flex-wrap items-center gap-3">
+          {back}
+          <a
+            href={release.links.release}
+            target="_blank"
+            rel="noreferrer"
+            className={buttonClass("secondary", "sm")}
+          >
+            Open in Onshape
+          </a>
+          {release.links.document && (
+            <a
+              href={release.links.document}
+              target="_blank"
+              rel="noreferrer"
+              className={buttonClass("secondary", "sm")}
+            >
+              View document at this release
+            </a>
           )}
         </div>
-
-        <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1.5 rounded-xl border border-steel/25 bg-paper px-4 py-3 text-sm">
+      }
+    >
+      <>
+        <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1.5 rounded-xl border border-secondary-200 bg-surface px-4 py-3 text-sm">
           {facts.map(([label, value]) => (
             <div key={`${label}${value}`} className="contents">
-              <dt className="text-steel">{label}</dt>
-              <dd className="min-w-0 break-words text-ink">{value}</dd>
+              <dt className="text-secondary-400">{label}</dt>
+              <dd className="min-w-0 break-words text-secondary-900">{value}</dd>
             </div>
           ))}
         </dl>
 
         <section className="space-y-2">
-          <h2 className="text-lg font-semibold text-ink">
+          <h2 className="font-sans text-lg font-semibold text-secondary-900">
             {release.parts.length} {release.parts.length === 1 ? "part" : "parts"}
           </h2>
           {release.parts.length === 0 ? (
-            <p className="text-sm text-steel">No parts were recorded for this release.</p>
+            <p className="text-sm text-secondary-400">No parts were recorded for this release.</p>
           ) : (
-            <div className="overflow-x-auto rounded-xl border border-steel/25 bg-paper">
+            <div className="overflow-x-auto rounded-xl border border-secondary-200 bg-surface">
               <table className="w-full text-sm">
-                <thead className="bg-mist">
+                <thead className="bg-page">
                   <tr>
                     <th className={th}>Part number</th>
                     <th className={th}>Name</th>
@@ -128,18 +124,20 @@ export function ReleasePage() {
                 </thead>
                 <tbody>
                   {release.parts.map((part) => (
-                    <tr key={part.id} className="border-t border-steel/15">
+                    <tr key={part.id} className="border-t border-secondary-200">
                       <td className={`${td} font-mono whitespace-nowrap`}>
-                        <span className="text-ink">{part.partNumber}</span>
+                        <span className="text-secondary-900">{part.partNumber}</span>
                       </td>
-                      <td className={`${td} text-ink`}>
+                      <td className={`${td} text-secondary-900`}>
                         {part.name && part.name !== part.partNumber ? part.name : ""}
                         {part.description && (
-                          <span className="block text-xs text-steel">{part.description}</span>
+                          <span className="block text-xs text-secondary-400">
+                            {part.description}
+                          </span>
                         )}
                       </td>
-                      <td className={`${td} text-ink`}>{part.revision ?? "–"}</td>
-                      <td className={`${td} text-ink text-right tabular-nums`}>
+                      <td className={`${td} text-secondary-900`}>{part.revision ?? "–"}</td>
+                      <td className={`${td} text-secondary-900 text-right tabular-nums`}>
                         {part.quantity ?? "–"}
                       </td>
                       <td className={`${td} whitespace-nowrap`}>
@@ -175,20 +173,20 @@ export function ReleasePage() {
 
         {release.comments.length > 0 && (
           <section className="space-y-2">
-            <h2 className="text-lg font-semibold text-ink">Comments</h2>
-            <ul className="divide-y divide-steel/15 rounded-xl border border-steel/25 bg-paper">
+            <h2 className="font-sans text-lg font-semibold text-secondary-900">Comments</h2>
+            <ul className="divide-y divide-secondary-200 rounded-xl border border-secondary-200 bg-surface">
               {release.comments.map((comment, i) => (
                 // biome-ignore lint/suspicious/noArrayIndexKey: comments are shown as stored, never reordered
                 <li key={i} className="px-4 py-3 text-sm">
-                  <span className="font-medium text-ink">{comment.by ?? "Someone"}</span>
-                  {comment.at && <span className="text-steel"> · {when(comment.at)}</span>}
-                  <p className="mt-0.5 whitespace-pre-line text-ink">{comment.message}</p>
+                  <span className="font-medium text-secondary-900">{comment.by ?? "Someone"}</span>
+                  {comment.at && <span className="text-secondary-400"> · {when(comment.at)}</span>}
+                  <p className="mt-0.5 whitespace-pre-line text-secondary-900">{comment.message}</p>
                 </li>
               ))}
             </ul>
           </section>
         )}
-      </div>
-    </main>
+      </>
+    </Page>
   );
 }

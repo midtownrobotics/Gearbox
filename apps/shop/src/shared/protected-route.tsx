@@ -1,7 +1,7 @@
+import { PageLoading } from "@g3/ui";
 import type { ReactNode } from "react";
 import { redirectToLogin } from "./api-error";
 import { KioskShell } from "./kiosk-shell";
-import { PageLoading } from "./ui";
 import { AuthUserContext, useAuth } from "./use-auth";
 
 export function ProtectedRoute({ children }: { children: ReactNode }) {

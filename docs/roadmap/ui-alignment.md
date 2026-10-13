@@ -19,8 +19,8 @@ A survey of every difference, with sketches, is at <https://claude.ai/artifact/C
 | 3. Edge onto the full set | Done | Edge | Nothing |
 | 4. ID and Portal onto the shared frame | Done | ID, Portal | Nothing. A few things were left as they are on purpose (see step 4 below) |
 | 5. Pit, with its Overview | Done | Pit | Nothing. Its few icon marks wait for the Lucide icons (see step 5 below) |
-| 6. Shop | Not started | Shop | All of it |
-| 7. Browser pop-ups | Started: Edge's and ID's are done | Orders, Shop, Skill Tree, Platform | 25 calls |
+| 6. Shop | Done | Shop | Nothing. The shop view's large buttons and the green Complete buttons stay Shop's own (see step 6 below) |
+| 7. Browser pop-ups | Started: Edge's, ID's and Shop's are done | Orders, Skill Tree, Platform | 15 calls |
 | 8. Scouting | Not started | Scouting | All of it, with its Phase 3 step in `roadmap.md` |
 
 ### What landed
@@ -32,6 +32,7 @@ A survey of every difference, with sketches, is at <https://claude.ai/artifact/C
 | Edge's hand-written buttons and inputs are the shared `Button` and `inputClass`, and it has no button or input styles of its own. `Button` and `ConfirmButton` take `size="sm"`. Edge's three browser confirms (a new box key, deleting a blocklist, removing a printer) ask in the page, and deleting a door sound now asks too | 3, and Edge's part of 7 | [#188](https://github.com/midtownrobotics/Gearbox/pull/188) |
 | ID's and Portal's pages are built from the shared parts: `Page` for every ordinary page, `Card`, `Button`, `Field` and `inputClass`, the banners, `Badge` for a member's status. Their titles are the shared 36px title, on the sign-in and kiosk screens too. Errors that were in the team's color are red. ID's Users filters are near-black chips. ID's last browser pop-ups are gone: unlinking a sign-in and deleting a user from the list ask in the page, and three alerts are errors on the page. New shared parts: `Switch` (Portal's two copies and Edge's are one), `Chip`, `ConfirmQuestion`, `buttonClass` for a link that looks like a button, and `size="lg"` for touch screens | 4, and ID's part of 7 | [#189](https://github.com/midtownrobotics/Gearbox/pull/189) |
 | Pit's pages are built from the shared parts, and no `gray-*` class is left in the app: `Page` at the narrow width, `Card`, `Button`, `Field`, the banners, `Dialog` for its two pop-ups, `Badge` and `Chip` for a battery's state, `ProgressBar` for its bars. Home is Overview: four tiles that each show a figure and open its page (checklist items checked, open issues, the Next Up battery with the one In Robot under it, and the next match or the last archive). With no connection it shows what it last knew. A battery's state takes the shared status colors: Next Up green, Charging amber, In Robot blue, Broken red. `ProgressBar` takes `done`, which turns it green. Resetting one checklist asks first, an open issue's Resolve button is always shown, and the checklist editor's rows have one Edit button | 5 | [#190](https://github.com/midtownrobotics/Gearbox/pull/190) |
+| Shop's pages are built from the shared parts, and its own color names (`crimson`, `ink`, `paper`, `steel`, `mist`) are gone: `Page` on every page, `Card`, `Button`, `Field` and `inputClass`, the banners, `Dialog` for its pop-ups, `Chip` for the Filters button. Errors, delete buttons and an overloaded machine are red where they were the team's color. Home is Overview: four tiles that each show a figure and open its page (parts in progress, ready to start, complete, and released parts waiting on Ingest). Members who aren't admins no longer see the parts of Admin that only work for an admin. Shop's ten browser pop-ups ask in the page. The version footer is gone | 6, and Shop's part of 7 | [#193](https://github.com/midtownrobotics/Gearbox/pull/193) |
 
 ## Decisions
 
@@ -186,25 +187,35 @@ See "What landed". What it settled, and what it left:
   - The reorder arrows (▲ ▼) and the → on a row. They wait for the Lucide icons, which no step has added yet.
   - The installed app's splash colors (the `manifest` in `apps/pit/vite.config.ts`), which are still the dark ones.
 
-### 6. Shop (large)
+### 6. Shop (done)
 
-About 10,000 lines of pages, the largest Tailwind app. It looks close to the majority already; the work is in the code.
+See "What landed". What it settled, and what it left:
 
-- Its color names in `apps/shop/src/styles.css` map onto the shared ones: `crimson` is `primary-500` (`crimson-dark` `primary-600`, `crimson-tint` `primary-50`), `ink` is `secondary-900`, `paper` is `surface`, `steel-dark` is `secondary-500`, `steel` is a lighter muted gray near `secondary-400`, `steel-tint` is `inset`, `mist` is `page`. Check each in both themes; the mixes aren't exact.
-- Its titles already match (`font-display text-4xl`), so `Page` changes nothing visible there. Widths vary by page from 672px to full; pick `Page`'s nearest.
-- Nine overlays with four backdrop shades become `Dialog`, except the two full-screen sheets and the Ingest side panel, which are their own shapes.
-- Home becomes Overview.
-- Its Admin page is for every member, but four parts of it need an admin and fail for anyone else: the Onshape, Slack and Data Management sections and the Slack buttons in the header (`requireAdmin` in `workers/shop/src/routes/admin-parts.ts`). Hide those from members who can't use them.
-- The Admin page shows "Obsolete instances deleted successfully" in its error banner. Use `SuccessBanner`.
-- Kiosk mode makes controls larger (`touch ? "px-5 py-3" : "px-4 py-2"`): that is `Button`'s large size.
-- Drop `VersionFooter`: every app shows its version on the wordmark's tooltip and in the menu.
+- **Colors.** Shop has no color names of its own: `apps/shop/src/styles.css` is the two imports every app has. Each `crimson` was read and became the team's color (`primary-*`) or red. Red: error messages, Delete and Make obsolete, a failed print, a required field's mark, an overloaded machine on the Shop Floor. A part number that already exists is amber, since it is something to check and not an error.
+- **Overview** (`apps/shop/src/plugins/overview/`) is Shop's first page, at its own address. Four tiles, each a figure that opens its page: In progress and Ready to start (Shop Floor; the second opens the busiest machine), Complete (Parts), and To ingest (Ingest). The greeting, the date and the three links to other pages are gone: no page exists only to list pages. A kiosk never showed Home (it opens its machine's queue), so the machine section it had was never drawn and went too.
+- **Widths.** Default for most pages. `narrow` for Leaderboard, Add Part, one part on Ingest and uploading a drawing. `wide` for Files and Onshape. `full` for Ingest's table and a drawing.
+- **Titles.** Ingest's page was titled "Ingest Parts"; it is "Ingest", like its bar label. The Shop Floor's title was a menu of machines; the title is now the machine's name (or "Shop Floor") and the menu is beside it.
+- **Admin.** A member who isn't an admin doesn't see Data Management, Onshape Configuration, Slack Configuration or the two Slack buttons. Deleting obsolete instances says so in a green banner. The Slack channels' "saved" message stays until the next change (it vanished after three seconds).
+- **Pop-ups are `Dialog`:** the file picker, Scan, the two Send back choices, "Parts come from Onshape", the kiosk's "Still there?" and leaving kiosk mode. They close by ✕, Escape and their buttons, not by a click outside (the file picker used to).
+- **Browser pop-ups, all ten:**
+  - Seven confirms. Deleting obsolete instances, making a part obsolete and removing a batch's file are `ConfirmButton`. So is the one question three Delete buttons shared (a drawing, and a file in two places). Posting a Slack summary asks under its buttons. Ingest's two asked before leaving with changes that aren't ingested: a link now asks in a `Dialog`, and the browser's Back button no longer asks, since the question couldn't stop the page leaving (see the bugs table).
+  - Two prompts: "Stage some" and leaving kiosk mode are a `Dialog` with a field.
+  - One alert: a bad count is an error in that dialog.
+- **Also asks now:** deleting a part that is waiting on Ingest, which took one click.
+- **Button labels are sentence case** ("Add a part", "Mark as complete", "Ingest all"), with no "+" or arrow before them.
+- **Left as they are:**
+  - The shop view (a part over the whole screen at its machine) keeps its own large buttons (`shopButton` in `plugins/board/shop-view.tsx`): they grow with the screen, which `size="lg"` doesn't. It and the part card are full-screen sheets, and Ingest's process picker is a side panel: their own shapes.
+  - The green "Mark as complete" buttons. `Button` has no variant for "done"; add one to `@g3/ui` if another app needs it.
+  - Small controls inside table rows (Ingest's quantity and process menus, the files' count box) keep their compact size, with the shared colors.
+  - Admin's sections open and close; `Card` doesn't. The Leaderboard's medal colors.
+  - The bar's wordmark still comes from the site's team (`wordmark("Shop")` in `shared/nav-bar.tsx`), not the page's team.
 
 ### 7. Browser pop-ups (spread across the steps)
 
-Outside Scouting there are 25: Orders 8 confirm and 3 prompt, Shop 7 confirm, 2 prompt and 1 alert, Skill Tree 3 confirm, Platform 1 confirm. Edge's and ID's are done. Replace each app's when the app is open for its own step. Orders and Skill Tree have no restyle step, so their pop-ups get a pull request of their own.
+Outside Scouting there are 15: Orders 8 confirm and 3 prompt, Skill Tree 3 confirm, Platform 1 confirm. Edge's, ID's and Shop's are done. Replace each app's when the app is open for its own step. Orders and Skill Tree have no restyle step, so their pop-ups get a pull request of their own.
 
 - A confirm becomes `ConfirmButton`.
-- A prompt (the reason a request is denied, a vendor credit's amount, a quantity on Shop's floor) becomes a small `Dialog` with a field.
+- A prompt (the reason a request is denied, a vendor credit's amount) becomes a small `Dialog` with a field.
 - An alert becomes `ErrorBanner`.
 - Orders has two hand copies of `Dialog` (`replace-item.tsx`, `receive-dialog.tsx`) at their own widths. Give `Dialog` the widths they need and use it.
 
@@ -226,18 +237,21 @@ From reading the code on 11 October. None was confirmed in a running app, and on
 | --- | --- | --- |
 | Orders, Inventory, Skill Tree, Edge | Errors and Delete took the team's color | Fixed in step 1 |
 | Scouting | Called Strategy in its bar and Scouting on Portal and in the All Apps menu | Fixed in step 1 |
-| Shop | Errors (`ErrorBanner` in `shared/ui.tsx`) and danger buttons take the team's color (`crimson`) | Open, step 6 |
+| Shop | Errors (`ErrorBanner` in `shared/ui.tsx`) and danger buttons took the team's color (`crimson`) | Fixed in step 6 |
 | Pit | Card headings in `text-gray-200` on the card couldn't be read in either theme: "Event" and "Pit Monitor Display" on its Admin page, "New Checklist" and "Items" in Edit Checklists | Fixed in step 2 |
-| Pit, Shop, Portal | Every page was `min-h-screen` under the 56px bar, so even an empty page scrolled | Fixed in step 2. Shop's own `PageLoading` still is, while a page loads (step 6) |
+| Pit, Shop, Portal | Every page was `min-h-screen` under the 56px bar, so even an empty page scrolled | Fixed in step 2, and in step 6 for Shop's pages while they load |
 | Pit | Errors were a dark red block in light mode (`bg-red-950`, five places); checklist bars were red until complete | Fixed in step 2 |
-| Shop | Admin is in the bar and on Home for every member | Not a bug as first written: most of the page is for every member. Four parts of it need an admin (step 6) |
+| Shop | Admin is in the bar and on Home for every member | Not a bug as first written: most of the page is for every member. Four parts of it need an admin, and step 6 hides them from everyone else |
 | ID | Revoking a kiosk took one click on a trash icon, with no question | Fixed in step 2 |
 | ID | Deleting a user asked with a browser box on the Users list and in the page on the user's own page | Fixed in step 4: both ask in the page |
 | Pit | Two pages were titled "Checklists": the one you run and the one you edit | Fixed in step 2: the second is Edit Checklists |
 | Orders, Inventory | Dates were always in US English | Fixed in step 2. Prices are still formatted the US way (`Intl.NumberFormat("en-US", …)`), which wasn't part of this |
 | Pit, Shop | `lucide-react` and `react-icons` were installed and never imported | Fixed in step 2 |
 | Inventory | The table's search and filters reset on a reload or Back | Fixed in step 2: they are in the address (`q`, `status`, `location`, `robot`). An entry's "← All entries" link still opens the table without them |
-| Shop | Its Admin page shows "Obsolete instances deleted successfully" in the error banner | Open, step 6 |
+| Shop | Its Admin page shows "Obsolete instances deleted successfully" in the error banner | Fixed in step 6 |
+| Shop | Six error and warning messages used classes that don't exist (`bg-crimson-50`, `border-crimson-200`), so they had no background or border: Admin's Onshape, Slack and summary messages, and three on Ingest | Fixed in step 6 |
+| Shop | The drawing viewer (`/part/:partNumber/view`) was a screen tall under the bar, so it always scrolled | Fixed in step 6 |
+| Shop | Ingest asked "leave without saving?" on the browser's Back button, but the page had already left, and answering no put the address of the page before in the bar | The question is gone in step 6. Open: Back still loses what was filled in. Not part of a restyle |
 | Pit | An open issue's Resolve mark only showed on hover, so a tablet never showed it | Fixed in step 5 |
 | Pit | The offline notice had no background (`bg-gray-1000` isn't a class) | Fixed in step 5 |
 | Pit | An item checked with no connection looks checked but is never saved, and is unchecked again on a reload: `toggle` in `checklist-runner-page.tsx` doesn't handle a request that never reaches the worker | Open. Not part of a restyle |

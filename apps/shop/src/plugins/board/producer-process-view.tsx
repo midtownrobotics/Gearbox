@@ -1,3 +1,12 @@
+import {
+  Button,
+  type ButtonSize,
+  ConfirmButton,
+  Dialog,
+  ErrorBanner,
+  Field,
+  inputClass,
+} from "@g3/ui";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { type InstanceRow, partInfoLabel, partLabel } from "../../shared/derive";
 import {
@@ -16,7 +25,7 @@ import type { OnshapePartLink, PartDefinition, PartFile, StagingBatch } from "..
 import { useAuthUser, useKiosk } from "../../shared/use-auth";
 import { useUserNames } from "../../shared/use-user-names";
 import { FilePickerModal } from "../files/file-picker-modal";
-import { DownloadLink, ErrorText, UploadButton } from "../files/part-files-panel";
+import { DownloadLink, UploadButton } from "../files/part-files-panel";
 
 const MAX_FILE_BYTES = 100 * 1024 * 1024;
 
@@ -202,6 +211,7 @@ export function ProducerSections({
   }
 
   const btn = touch ? "px-4 py-2.5 text-sm" : "px-3 py-1.5 text-xs";
+  const size: ButtonSize = touch ? "md" : "sm";
   const pickerBatch = batches.find((b) => b.id === pickerBatchId) ?? null;
   const batchLabel = (b: StagingBatch) =>
     `Batch ${b.id} · ${b.createdBy === "migration" ? "carried over" : resolveName(b.createdBy)}`;
@@ -225,17 +235,17 @@ export function ProducerSections({
           onClose={() => setPickerBatchId(null)}
         />
       )}
-      {error && <ErrorText message={error} />}
+      {error && <ErrorBanner message={error} />}
 
       {/* Staging batches */}
       <section className="space-y-2">
         <div className="flex items-center justify-between gap-2">
-          <h2 className="text-xs font-bold uppercase tracking-widest text-steel">
-            Staging batches <span className="text-crimson">{batches.length}</span>
+          <h2 className="font-sans text-xs font-bold uppercase tracking-widest text-secondary-400">
+            Staging batches <span className="text-primary-600">{batches.length}</span>
           </h2>
         </div>
         {batches.length === 0 ? (
-          <p className="text-steel text-sm">
+          <p className="text-secondary-400 text-sm">
             No open batches. Staging from To Do below starts one.
           </p>
         ) : (
@@ -246,39 +256,43 @@ export function ProducerSections({
             return (
               <div
                 key={batch.id}
-                className={`bg-paper border rounded-xl divide-y divide-steel/15 ${
-                  isTarget ? "border-crimson/50 ring-1 ring-crimson/20" : "border-steel/30"
+                className={`bg-surface border rounded-xl divide-y divide-secondary-200 ${
+                  isTarget
+                    ? "border-primary-500 ring-1 ring-primary-500/20"
+                    : "border-secondary-200"
                 }`}
               >
-                <div className="px-4 py-2.5 bg-mist/60 rounded-t-xl space-y-1.5">
+                <div className="px-4 py-2.5 bg-secondary-50 rounded-t-xl space-y-1.5">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-sm font-semibold text-ink">{batchLabel(batch)}</span>
-                    <span className="text-xs text-steel">
+                    <span className="text-sm font-semibold text-secondary-900">
+                      {batchLabel(batch)}
+                    </span>
+                    <span className="text-xs text-secondary-400">
                       started {formatStarted(batch.createdAt)} · {plural(staged.length, "instance")}
                     </span>
                     <span className="flex-1" />
                     {isTarget ? (
-                      <span className="text-[10px] font-semibold uppercase tracking-wide text-crimson">
+                      <span className="text-[10px] font-semibold uppercase tracking-wide text-primary-600">
                         Staging here
                       </span>
                     ) : (
                       <button
                         type="button"
                         onClick={() => setTarget(String(batch.id))}
-                        className="text-xs text-steel-dark hover:text-crimson underline"
+                        className="text-xs text-secondary-500 hover:text-primary-600 underline"
                       >
                         Stage here
                       </button>
                     )}
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-xs font-bold uppercase tracking-wide text-steel">
+                    <span className="text-xs font-bold uppercase tracking-wide text-secondary-400">
                       File
                     </span>
                     {file ? (
                       <>
                         <span
-                          className="text-sm font-semibold text-ink truncate min-w-0 flex-1"
+                          className="text-sm font-semibold text-secondary-900 truncate min-w-0 flex-1"
                           title={file.filename}
                         >
                           {file.filename}
@@ -286,24 +300,24 @@ export function ProducerSections({
                         <DownloadLink file={file} />
                       </>
                     ) : (
-                      <span className="text-sm text-steel-dark flex-1">No file yet</span>
+                      <span className="text-sm text-secondary-500 flex-1">No file yet</span>
                     )}
                   </div>
                 </div>
 
                 {staged.length === 0 ? (
                   <div className="flex flex-wrap items-center gap-2 px-4 py-3">
-                    <span className="text-sm text-steel flex-1">
+                    <span className="text-sm text-secondary-400 flex-1">
                       Empty — stage instances from To Do below.
                     </span>
-                    <button
-                      type="button"
+                    <Button
+                      variant="danger"
+                      size={size}
                       disabled={busy}
                       onClick={() => run(() => deleteStagingBatch(batch.id))}
-                      className={`${btn} font-semibold border border-steel/40 text-steel-dark hover:text-crimson hover:border-crimson/50 rounded-lg transition-colors disabled:opacity-50`}
                     >
                       Delete batch
-                    </button>
+                    </Button>
                   </div>
                 ) : (
                   groupByPart(staged).map(({ key, rows: groupRows }) => (
@@ -312,8 +326,9 @@ export function ProducerSections({
                       rows={groupRows}
                       touch={touch}
                       actions={
-                        <button
-                          type="button"
+                        <Button
+                          variant="secondary"
+                          size={size}
                           disabled={busy}
                           onClick={() =>
                             run(() =>
@@ -323,10 +338,9 @@ export function ProducerSections({
                               ),
                             )
                           }
-                          className={`${btn} font-semibold border border-steel/40 text-steel-dark hover:text-ink rounded-lg transition-colors disabled:opacity-50`}
                         >
                           Unstage all
-                        </button>
+                        </Button>
                       }
                       renderRow={(r) => (
                         <>
@@ -343,9 +357,9 @@ export function ProducerSections({
                   ))
                 )}
 
-                <div className="flex flex-wrap items-center gap-2 px-4 py-3 bg-mist/60 rounded-b-xl">
+                <div className="flex flex-wrap items-center gap-2 px-4 py-3 bg-secondary-50 rounded-b-xl">
                   {kiosk.active ? (
-                    <span className="text-xs text-steel-dark">
+                    <span className="text-xs text-secondary-500">
                       Changing the file needs a regular sign-in — kiosks can't upload.
                     </span>
                   ) : (
@@ -355,30 +369,26 @@ export function ProducerSections({
                         multiple={false}
                         onFiles={([f]) => f && uploadBatchFile(batch.id, f)}
                         label="Upload file"
-                        className={`${btn} font-semibold bg-crimson hover:bg-crimson-dark text-on-primary rounded-lg transition-colors disabled:opacity-50`}
+                        variant="primary"
+                        size={size}
                       />
-                      <button
-                        type="button"
+                      <Button
+                        variant="secondary"
+                        size={size}
                         disabled={busy}
                         onClick={() => setPickerBatchId(batch.id)}
-                        className={`${btn} font-semibold border border-crimson/50 text-crimson hover:bg-crimson-tint rounded-lg transition-colors disabled:opacity-50`}
                       >
                         Choose existing file
-                      </button>
+                      </Button>
                       {file && (
-                        <button
-                          type="button"
+                        <ConfirmButton
+                          size={size}
+                          label="Remove file"
+                          confirmLabel="Remove it"
+                          question={`Remove ${file.filename} from batch ${batch.id}? The file stays in the library.`}
                           disabled={busy}
-                          onClick={() => {
-                            const message = `Remove ${file.filename} from batch ${batch.id}? The file stays in the library.`;
-                            if (window.confirm(message)) {
-                              run(() => setStagingBatchFile(batch.id, null));
-                            }
-                          }}
-                          className={`${btn} font-semibold border border-steel/40 text-steel-dark hover:text-crimson hover:border-crimson/50 rounded-lg transition-colors disabled:opacity-50`}
-                        >
-                          Remove file
-                        </button>
+                          onConfirm={() => run(() => setStagingBatchFile(batch.id, null))}
+                        />
                       )}
                     </>
                   )}
@@ -391,7 +401,7 @@ export function ProducerSections({
                     >
                       Mark {plural(staged.length, "instance")} complete
                     </button>
-                    <span className="pointer-events-none absolute bottom-full right-0 mb-1.5 hidden group-hover:block whitespace-nowrap bg-ink text-paper text-xs rounded-md px-2.5 py-1.5 shadow-lg">
+                    <span className="pointer-events-none absolute bottom-full right-0 mb-1.5 hidden group-hover:block whitespace-nowrap bg-secondary-900 text-surface text-xs rounded-md px-2.5 py-1.5 shadow-lg">
                       {!file
                         ? "Add a file to this batch first"
                         : "Moves every instance in this batch to its next process"}
@@ -407,16 +417,16 @@ export function ProducerSections({
       {/* To Do */}
       <section className="space-y-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-xs font-bold uppercase tracking-widest text-steel">
-            To Do <span className="text-crimson">{todoCount}</span>
+          <h2 className="font-sans text-xs font-bold uppercase tracking-widest text-secondary-400">
+            To Do <span className="text-primary-600">{todoCount}</span>
           </h2>
           {todoCount > 0 && (
-            <label className="flex items-center gap-1.5 text-xs text-steel-dark">
+            <label className="flex items-center gap-1.5 text-xs text-secondary-500">
               Stage into
               <select
                 value={target}
                 onChange={(e) => setTarget(e.target.value)}
-                className="bg-paper border border-steel/40 rounded-lg px-2 py-1 text-xs text-ink focus:outline-none focus:border-crimson"
+                className={`${inputClass} !w-auto !px-2 !py-1 !text-xs`}
               >
                 {batches.map((b) => (
                   <option key={b.id} value={b.id}>
@@ -429,16 +439,16 @@ export function ProducerSections({
           )}
         </div>
         {todoGroups.length === 0 ? (
-          <p className="text-steel text-sm">Nothing ready to stage.</p>
+          <p className="text-secondary-400 text-sm">Nothing ready to stage.</p>
         ) : (
-          <div className="bg-paper border border-steel/30 rounded-xl divide-y divide-steel/15">
+          <div className="bg-surface border border-secondary-200 rounded-xl divide-y divide-secondary-200">
             {todoGroups.map(({ key, rows: groupRows }) => (
               <TodoGroup
                 key={key}
                 rows={groupRows}
                 touch={touch}
                 busy={busy}
-                btn={btn}
+                size={size}
                 onStage={stage}
               />
             ))}
@@ -453,27 +463,27 @@ function TodoGroup({
   rows,
   touch,
   busy,
-  btn,
+  size,
   onStage,
 }: {
   rows: InstanceRow[];
   touch: boolean;
   busy: boolean;
-  btn: string;
+  size: ButtonSize;
   onStage: (targets: InstanceRow[]) => void;
 }) {
+  const max = rows.length;
+  // How many to stage, while the pop-up that asks is open.
+  const [count, setCount] = useState<string | null>(null);
+  const [countError, setCountError] = useState(false);
+
   function stageSome() {
-    const max = rows.length;
-    const answer = window.prompt(
-      `How many ${rows[0].definition.name} instances do you want to stage? (max ${max})`,
-      String(max),
-    );
-    if (answer === null) return;
-    const n = Number(answer.trim());
+    const n = Number((count ?? "").trim());
     if (!Number.isInteger(n) || n < 1 || n > max) {
-      window.alert(`Enter a whole number from 1 to ${max}.`);
+      setCountError(true);
       return;
     }
+    setCount(null);
     onStage(rows.slice(0, n));
   }
 
@@ -483,22 +493,56 @@ function TodoGroup({
       touch={touch}
       actions={
         <>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => onStage(rows)}
-            className={`${btn} font-semibold bg-crimson hover:bg-crimson-dark text-on-primary rounded-lg transition-colors disabled:opacity-50`}
-          >
+          <Button size={size} disabled={busy} onClick={() => onStage(rows)}>
             Stage all
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            variant="secondary"
+            size={size}
             disabled={busy}
-            onClick={stageSome}
-            className={`${btn} font-semibold border border-crimson/50 text-crimson hover:bg-crimson-tint rounded-lg transition-colors disabled:opacity-50`}
+            onClick={() => {
+              setCountError(false);
+              setCount(String(max));
+            }}
           >
-            Stage Some
-          </button>
+            Stage some
+          </Button>
+          {count !== null && (
+            <Dialog title="Stage some" onClose={() => setCount(null)}>
+              <form
+                noValidate
+                className="space-y-4"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  stageSome();
+                }}
+              >
+                <Field label={`How many ${rows[0].definition.name} instances? (1 to ${max})`}>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    max={max}
+                    value={count}
+                    onChange={(e) => {
+                      setCount(e.target.value);
+                      setCountError(false);
+                    }}
+                    className={inputClass}
+                    // biome-ignore lint/a11y/noAutofocus: the pop-up was just opened to type this
+                    autoFocus
+                  />
+                </Field>
+                {countError && <ErrorBanner message={`Enter a whole number from 1 to ${max}.`} />}
+                <div className="flex flex-wrap gap-2">
+                  <Button type="submit">Stage</Button>
+                  <Button variant="secondary" onClick={() => setCount(null)}>
+                    Cancel
+                  </Button>
+                </div>
+              </form>
+            </Dialog>
+          )}
         </>
       }
       renderRow={(r) => (
@@ -532,7 +576,7 @@ function PartGroup({
     <>
       {first.definition.name}
       {showInfo && partInfoLabel(first.definition) && (
-        <span className="font-normal text-steel-dark"> — {partInfoLabel(first.definition)}</span>
+        <span className="font-normal text-secondary-500"> — {partInfoLabel(first.definition)}</span>
       )}
     </>
   );
@@ -546,14 +590,14 @@ function PartGroup({
               target="_blank"
               rel="noreferrer"
               title="Open this part in Onshape"
-              className="block max-w-full truncate text-sm font-semibold text-crimson underline hover:text-crimson-dark transition-colors"
+              className="block max-w-full truncate text-sm font-semibold text-primary-600 underline hover:text-primary-700 transition-colors"
             >
               {name}
             </a>
           ) : (
-            <p className="text-sm font-semibold text-ink truncate">{name}</p>
+            <p className="text-sm font-semibold text-secondary-900 truncate">{name}</p>
           )}
-          <p className="text-xs font-mono text-steel truncate">
+          <p className="text-xs font-mono text-secondary-400 truncate">
             {partLabel(first)} · {plural(rows.length, "instance")}
             {onshape && (
               <>
@@ -563,7 +607,7 @@ function PartGroup({
                   target="_blank"
                   rel="noreferrer"
                   title="Open the release this part came from in Onshape"
-                  className="text-steel-dark underline hover:text-crimson transition-colors"
+                  className="text-secondary-500 underline hover:text-primary-600 transition-colors"
                 >
                   Release
                 </a>
@@ -573,13 +617,15 @@ function PartGroup({
         </div>
         <div className="flex items-center gap-1.5 shrink-0">{actions}</div>
       </div>
-      <ul className="mt-1.5 ml-2 border-l-2 border-steel/25">
+      <ul className="mt-1.5 ml-2 border-l-2 border-secondary-200">
         {rows.map((r) => (
           <li
             key={r.instance.id}
-            className={`flex items-center gap-2 pl-3 pr-1 text-xs hover:bg-mist/70 ${touch ? "py-1.5" : "py-0.5"}`}
+            className={`flex items-center gap-2 pl-3 pr-1 text-xs hover:bg-secondary-50 ${touch ? "py-1.5" : "py-0.5"}`}
           >
-            <span className="font-mono text-ink w-10 shrink-0">#{r.instance.instanceNumber}</span>
+            <span className="font-mono text-secondary-900 w-10 shrink-0">
+              #{r.instance.instanceNumber}
+            </span>
             {r.instance.isPriority ? (
               <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-700 bg-amber-50 border border-amber-300 rounded px-1">
                 Priority
@@ -607,7 +653,7 @@ function RowButton({
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className="px-2 py-0.5 text-[11px] font-semibold text-steel-dark border border-steel/30 hover:border-crimson/50 hover:text-crimson rounded transition-colors disabled:opacity-50 shrink-0"
+      className="px-2 py-0.5 text-[11px] font-semibold text-secondary-500 border border-secondary-200 hover:border-secondary-400 hover:text-primary-600 rounded transition-colors disabled:opacity-50 shrink-0"
     >
       {children}
     </button>

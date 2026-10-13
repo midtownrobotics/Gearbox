@@ -4,7 +4,6 @@ import { BoardPage } from "./plugins/board/board-page";
 import { NavBar } from "./shared/nav-bar";
 import { ProtectedRoute } from "./shared/protected-route";
 import { useKiosk } from "./shared/use-auth";
-import { VersionFooter } from "./shared/version-footer";
 
 export function App() {
   return (
@@ -40,7 +39,6 @@ function AppContent() {
           <Route key={r.path} path={r.path} element={r.element} />
         ))}
       </Routes>
-      <VersionFooter />
     </div>
   );
 }

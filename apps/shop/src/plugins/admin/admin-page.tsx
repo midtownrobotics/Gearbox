@@ -1,16 +1,31 @@
-import { SlackChannelPicker, useTeamNames } from "@g3/ui";
+import {
+  Button,
+  ConfirmButton,
+  ErrorBanner,
+  Field,
+  Loading,
+  Page,
+  SlackChannelPicker,
+  SuccessBanner,
+  focusRing,
+  inputClass,
+  useTeamNames,
+} from "@g3/ui";
 import { useEffect, useState } from "react";
 import { api } from "../../shared/api";
 import { getErrorMessage } from "../../shared/api-error";
 import { enableKioskMode } from "../../shared/kiosk";
 import { PROCESS_TYPE_LABELS, type Process, type ProcessType } from "../../shared/types";
-import { ErrorBanner, PageLoading } from "../../shared/ui";
+import { useAuthUser } from "../../shared/use-auth";
 import { useShopData } from "../../shared/use-shop-data";
 import { ActionsLog } from "./actions-log";
 
 export function AdminPage() {
   const { data, loading, error, refresh } = useShopData();
+  // The Onshape, Slack and data sections and the Slack buttons only work for an admin.
+  const isAdmin = useAuthUser()?.isAdmin ?? false;
   const [banner, setBanner] = useState<string | null>(null);
+  const [done, setDone] = useState<string | null>(null);
   const [deletingObsolete, setDeletingObsolete] = useState(false);
 
   const [newSubsystem, setNewSubsystem] = useState("");
@@ -80,39 +95,37 @@ export function AdminPage() {
   }
 
   async function deleteObsoleteInstances() {
-    if (!window.confirm("Delete all obsolete instances? This cannot be undone.")) return;
     setDeletingObsolete(true);
+    setDone(null);
     const res = await api.admin["obsolete-instances"].$delete();
     if (!res.ok) {
       setBanner(await getErrorMessage(res as unknown as Response));
       setDeletingObsolete(false);
       return;
     }
-    setBanner("Obsolete instances deleted successfully");
+    setBanner(null);
+    setDone("Obsolete instances deleted.");
     setDeletingObsolete(false);
     await refresh();
   }
 
-  if (loading) return <PageLoading />;
+  if (loading)
+    return (
+      <Page title="Admin">
+        <Loading />
+      </Page>
+    );
 
   return (
-    <main className="flex-1 bg-page">
-      <div className="max-w-4xl mx-auto px-6 py-8 space-y-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h1 className="font-display text-4xl text-ink">Admin</h1>
-          <DailySlackButtons />
-        </div>
-
+    <Page title="Admin" actions={isAdmin && <DailySlackButtons />}>
+      <>
         {error && <ErrorBanner message={error} />}
         {banner && <ErrorBanner message={banner} />}
+        {done && <SuccessBanner message={done} />}
 
         {/* Section 1: Actions Log */}
         <Section title="Actions Log" defaultOpen={false}>
-          {data ? (
-            <ActionsLog data={data} />
-          ) : (
-            <p className="text-sm text-steel">Loading shop data…</p>
-          )}
+          {data ? <ActionsLog data={data} /> : <Loading />}
         </Section>
 
         {/* Section 2: Shop Settings */}
@@ -151,36 +164,43 @@ export function AdminPage() {
         </Section>
 
         {/* Section 3: Data Management */}
-        <Section title="Data Management" defaultOpen={false}>
-          <button
-            type="button"
-            onClick={deleteObsoleteInstances}
-            disabled={deletingObsolete}
-            className="px-4 py-2 bg-crimson hover:bg-crimson-dark text-on-primary font-semibold rounded-lg transition-colors disabled:opacity-50"
-          >
-            {deletingObsolete ? "Deleting…" : "Delete Obsolete Instances"}
-          </button>
-          <p className="text-xs text-steel mt-2">
-            Permanently removes all obsolete part instances, freeing their numbers for reuse.
-          </p>
-        </Section>
+        {isAdmin && (
+          <Section title="Data Management" defaultOpen={false}>
+            <div className="flex flex-wrap items-center gap-2">
+              <ConfirmButton
+                label={deletingObsolete ? "Deleting…" : "Delete obsolete instances"}
+                question="Delete every obsolete part instance? This can't be undone."
+                confirmLabel="Delete them"
+                disabled={deletingObsolete}
+                onConfirm={deleteObsoleteInstances}
+              />
+            </div>
+            <p className="text-xs text-secondary-500 mt-2">
+              Their numbers become free to use again.
+            </p>
+          </Section>
+        )}
 
         {/* Section 4: Kiosk Mode */}
         <Section title="Kiosk Mode" defaultOpen={false}>
           <KioskModeSettings />
         </Section>
 
-        {/* Section 5: OnShape Configuration */}
-        <Section title="OnShape Configuration" defaultOpen={false}>
-          {data ? <OnShapeConfig /> : <p className="text-sm text-steel">Loading…</p>}
-        </Section>
+        {/* Section 5: Onshape */}
+        {isAdmin && (
+          <Section title="Onshape Configuration" defaultOpen={false}>
+            {data ? <OnShapeConfig /> : <Loading />}
+          </Section>
+        )}
 
-        {/* Section 6: Slack Configuration */}
-        <Section title="Slack Configuration" defaultOpen={false}>
-          <SlackSettings />
-        </Section>
-      </div>
-    </main>
+        {/* Section 6: Slack */}
+        {isAdmin && (
+          <Section title="Slack Configuration" defaultOpen={false}>
+            <SlackSettings />
+          </Section>
+        )}
+      </>
+    </Page>
   );
 }
 
@@ -191,44 +211,31 @@ function KioskModeSettings() {
 
   return (
     <div className="space-y-3 max-w-xl">
-      <p className="text-sm text-steel-dark">
+      <p className="text-sm text-secondary-500">
         Kiosk mode makes this device a shared station where members sign in with their 3-digit PIN.
         It signs you out and takes the device through {names.idName} kiosk activation. Name the
         kiosk after a machine (“Mill”) to open that machine's queue.
       </p>
       {confirming ? (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm font-medium text-ink">
+          <span className="text-sm font-medium text-secondary-900">
             You'll be signed out on this device. Continue?
           </span>
-          <button
-            type="button"
+          <Button
             disabled={busy}
             onClick={() => {
               setBusy(true);
               enableKioskMode();
             }}
-            className="px-3.5 py-2 bg-crimson hover:bg-crimson-dark text-on-primary text-sm font-semibold rounded-lg transition-colors disabled:opacity-50"
           >
             {busy ? "Switching…" : "Yes, enable kiosk mode"}
-          </button>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => setConfirming(false)}
-            className="px-3.5 py-2 bg-steel-tint hover:bg-steel/30 text-steel-dark text-sm font-medium rounded-lg transition-colors"
-          >
+          </Button>
+          <Button variant="secondary" disabled={busy} onClick={() => setConfirming(false)}>
             Cancel
-          </button>
+          </Button>
         </div>
       ) : (
-        <button
-          type="button"
-          onClick={() => setConfirming(true)}
-          className="px-3.5 py-2 bg-crimson hover:bg-crimson-dark text-on-primary text-sm font-semibold rounded-lg transition-colors"
-        >
-          Enable Kiosk Mode on This Device
-        </button>
+        <Button onClick={() => setConfirming(true)}>Enable kiosk mode on this device</Button>
       )}
     </div>
   );
@@ -245,14 +252,17 @@ function Section({
 }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <section className="bg-paper border border-steel/30 rounded-xl">
+    <section className="bg-surface border border-secondary-200 rounded-xl">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center justify-between px-5 py-3.5 text-left"
+        aria-expanded={open}
+        className={`w-full flex items-center justify-between rounded-xl px-5 py-3.5 text-left ${focusRing}`}
       >
-        <span className="font-display text-2xl text-ink">{title}</span>
-        <span className={`text-steel text-sm transition-transform ${open ? "rotate-180" : ""}`}>
+        <h2 className="text-2xl text-secondary-900">{title}</h2>
+        <span
+          className={`text-secondary-400 text-sm transition-transform ${open ? "rotate-180" : ""}`}
+        >
           ▼
         </span>
       </button>
@@ -278,8 +288,8 @@ function NameList({
 }) {
   return (
     <div className="space-y-3">
-      <h3 className="text-sm font-bold uppercase tracking-wider text-steel-dark">
-        {title} <span className="text-steel font-normal">({items.length})</span>
+      <h3 className="font-sans text-sm font-bold uppercase tracking-wider text-secondary-500">
+        {title} <span className="text-secondary-400 font-normal">({items.length})</span>
       </h3>
       <div className="flex gap-2">
         <input
@@ -290,29 +300,23 @@ function NameList({
           onKeyDown={(e) => {
             if (e.key === "Enter") onAdd();
           }}
-          className="flex-1 bg-paper border border-steel/40 rounded-lg px-3 py-2 text-sm text-ink placeholder-steel focus:outline-none focus:border-crimson"
+          className={`${inputClass} flex-1`}
         />
-        <button
-          type="button"
-          onClick={onAdd}
-          className="px-3.5 py-2 bg-crimson hover:bg-crimson-dark text-on-primary text-sm font-semibold rounded-lg transition-colors"
-        >
-          Add
-        </button>
+        <Button onClick={onAdd}>Add</Button>
       </div>
       <div className="space-y-1.5">
-        {items.length === 0 && <p className="text-steel text-sm">None yet.</p>}
+        {items.length === 0 && <p className="text-secondary-400 text-sm">None yet.</p>}
         {items.map((item) => (
           <div
             key={item.id}
-            className="flex items-center gap-2 bg-mist border border-steel/20 rounded-lg px-3.5 py-2 text-sm text-ink"
+            className="flex items-center gap-2 bg-page border border-secondary-200 rounded-lg px-3.5 py-2 text-sm text-secondary-900"
           >
             <span className="flex-1 truncate">{item.name}</span>
             <button
               type="button"
               disabled
               title="Removal isn't available yet"
-              className="text-steel/50 cursor-not-allowed px-1"
+              className="text-secondary-300 cursor-not-allowed px-1"
               aria-label={`Remove ${item.name}`}
             >
               ✕
@@ -340,7 +344,7 @@ function ProcessTypeSelect({
       value={value}
       aria-label={label}
       onChange={(e) => onChange(e.target.value as ProcessType)}
-      className="bg-paper border border-steel/40 rounded-lg px-2 py-1 text-xs text-steel-dark focus:outline-none focus:border-crimson"
+      className="bg-surface border border-secondary-300 rounded-lg px-2 py-1 text-xs text-secondary-500 focus:outline-none focus:border-primary-500"
     >
       {PROCESS_TYPE_OPTIONS.map(([type, typeLabel]) => (
         <option key={type} value={type}>
@@ -361,13 +365,13 @@ function PartInfoToggle({
   return (
     <label
       title="Require additional part information (material + thickness) at ingest"
-      className="flex items-center gap-1.5 text-xs text-steel-dark cursor-pointer select-none shrink-0"
+      className="flex items-center gap-1.5 text-xs text-secondary-500 cursor-pointer select-none shrink-0"
     >
       <input
         type="checkbox"
         checked={checked}
         onChange={(e) => onChange(e.target.checked)}
-        className="accent-crimson w-3.5 h-3.5"
+        className="accent-primary-500 w-3.5 h-3.5"
       />
       Part info
     </label>
@@ -397,8 +401,8 @@ function ProcessList({
 }) {
   return (
     <div className="space-y-3">
-      <h3 className="text-sm font-bold uppercase tracking-wider text-steel-dark">
-        Processes <span className="text-steel font-normal">({processes.length})</span>
+      <h3 className="font-sans text-sm font-bold uppercase tracking-wider text-secondary-500">
+        Processes <span className="text-secondary-400 font-normal">({processes.length})</span>
       </h3>
       <div className="flex gap-2">
         <input
@@ -409,24 +413,18 @@ function ProcessList({
           onKeyDown={(e) => {
             if (e.key === "Enter") onAdd();
           }}
-          className="flex-1 min-w-0 bg-paper border border-steel/40 rounded-lg px-3 py-2 text-sm text-ink placeholder-steel focus:outline-none focus:border-crimson"
+          className={`${inputClass} flex-1 min-w-0`}
         />
         <ProcessTypeSelect value={draftType} onChange={setDraftType} label="New process type" />
         <PartInfoToggle checked={draftNeedsInfo} onChange={setDraftNeedsInfo} />
-        <button
-          type="button"
-          onClick={onAdd}
-          className="px-3.5 py-2 bg-crimson hover:bg-crimson-dark text-on-primary text-sm font-semibold rounded-lg transition-colors"
-        >
-          Add
-        </button>
+        <Button onClick={onAdd}>Add</Button>
       </div>
       <div className="space-y-1.5">
-        {processes.length === 0 && <p className="text-steel text-sm">None yet.</p>}
+        {processes.length === 0 && <p className="text-secondary-400 text-sm">None yet.</p>}
         {processes.map((p) => (
           <div
             key={p.id}
-            className="flex items-center gap-2 bg-mist border border-steel/20 rounded-lg px-3.5 py-2 text-sm text-ink"
+            className="flex items-center gap-2 bg-page border border-secondary-200 rounded-lg px-3.5 py-2 text-sm text-secondary-900"
           >
             <span className="flex-1 truncate">{p.name}</span>
             <PartInfoToggle
@@ -454,9 +452,6 @@ type OnShapeStatus = {
   fromWorkerSecrets: boolean;
   webhookUrl: string;
 };
-
-const inputCls =
-  "w-full bg-paper border border-steel/40 rounded-lg px-3 py-2 text-sm text-ink placeholder-steel focus:outline-none focus:border-crimson";
 
 /**
  * The team's Onshape connection: the document Shop follows, and the team's own API keys and
@@ -571,26 +566,23 @@ function OnShapeConfig() {
 
   return (
     <div className="space-y-4 max-w-xl">
-      {banner && (
-        <div
-          className={`text-sm rounded-lg px-3 py-2 ${
-            banner.ok
-              ? "text-emerald-700 bg-emerald-50 border border-emerald-300"
-              : "text-crimson-dark bg-crimson-50 border border-crimson-200"
-          }`}
-        >
-          {banner.text}
-        </div>
-      )}
+      {banner &&
+        (banner.ok ? (
+          <SuccessBanner message={banner.text} />
+        ) : (
+          <ErrorBanner message={banner.text} />
+        ))}
 
       {status?.fromWorkerSecrets && (
-        <p className="text-xs text-steel">
+        <p className="text-xs text-secondary-500">
           Using the built-in keys. Save your team's own to replace them.
         </p>
       )}
 
-      <div className="p-3 bg-mist rounded-lg border border-steel/25 space-y-2">
-        <p className="text-xs font-medium text-steel-dark">Quick Add from URL</p>
+      <div className="p-3 bg-page rounded-lg border border-secondary-200 space-y-2">
+        <p className="text-sm font-medium text-secondary-700">
+          Fill in from the document's address
+        </p>
         <div className="flex gap-2">
           <input
             type="text"
@@ -600,139 +592,98 @@ function OnShapeConfig() {
               if (e.key === "Enter") parseUrl();
             }}
             placeholder="https://cad.onshape.com/documents/[...]/e/[...]"
-            className="flex-1 bg-paper border border-steel/40 rounded-lg px-3 py-2 text-sm text-ink placeholder-steel focus:outline-none focus:border-crimson"
+            className={`${inputClass} flex-1`}
           />
-          <button
-            type="button"
-            onClick={parseUrl}
-            className="px-3 py-2 bg-paper border border-steel/40 hover:bg-steel-tint text-ink text-sm font-medium rounded-lg transition-colors"
-          >
-            Parse
-          </button>
+          <Button variant="secondary" onClick={parseUrl}>
+            Fill in
+          </Button>
         </div>
       </div>
 
-      <div className="space-y-1">
-        <label htmlFor="doc-id" className="text-xs font-medium text-steel-dark">
-          Document ID *
-        </label>
+      <Field
+        label="Document ID"
+        hint="From the document's address: cad.onshape.com/documents/[DOCUMENT_ID]/..."
+      >
         <input
-          id="doc-id"
           type="text"
           value={documentId}
           onChange={(e) => setDocumentId(e.target.value)}
           placeholder="e.g. abc123def456"
-          className={inputCls}
+          className={inputClass}
         />
-        <p className="text-xs text-steel">
-          From OnShape URL: cad.onshape.com/documents/[DOCUMENT_ID]/...
-        </p>
-      </div>
+      </Field>
 
-      <div className="space-y-1">
-        <label htmlFor="main-asm-id" className="text-xs font-medium text-steel-dark">
-          Main Assembly ID
-        </label>
+      <Field
+        label="Main Assembly ID"
+        hint="Optional: fills in how many of each part a release needs"
+      >
         <input
-          id="main-asm-id"
           type="text"
           value={mainAssemblyId}
           onChange={(e) => setMainAssemblyId(e.target.value)}
           placeholder="e.g. xyz789"
-          className={inputCls}
+          className={inputClass}
         />
-        <p className="text-xs text-steel">
-          Optional: fills in how many of each part a release needs
-        </p>
-      </div>
+      </Field>
 
-      <div className="space-y-1">
-        <label htmlFor="company-id" className="text-xs font-medium text-steel-dark">
-          Company ID
-        </label>
+      <Field label="Company ID">
         <input
-          id="company-id"
           type="text"
           value={companyId}
           onChange={(e) => setCompanyId(e.target.value)}
           placeholder="The Onshape company (or classroom) that owns the document"
-          className={inputCls}
+          className={inputClass}
         />
-      </div>
+      </Field>
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <div className="space-y-1">
-          <label htmlFor="api-key" className="text-xs font-medium text-steel-dark">
-            API access key
-          </label>
+        <Field label="API access key" hint={keptHint(status?.hasApiKey)}>
           <input
-            id="api-key"
             type="password"
             autoComplete="off"
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
-            className={inputCls}
+            className={inputClass}
           />
-          <p className="text-xs text-steel">{keptHint(status?.hasApiKey)}</p>
-        </div>
-        <div className="space-y-1">
-          <label htmlFor="api-secret" className="text-xs font-medium text-steel-dark">
-            API secret key
-          </label>
+        </Field>
+        <Field label="API secret key" hint={keptHint(status?.hasApiKey)}>
           <input
-            id="api-secret"
             type="password"
             autoComplete="off"
             value={apiSecret}
             onChange={(e) => setApiSecret(e.target.value)}
-            className={inputCls}
+            className={inputClass}
           />
-          <p className="text-xs text-steel">{keptHint(status?.hasApiKey)}</p>
-        </div>
-        <div className="space-y-1">
-          <label htmlFor="webhook-primary" className="text-xs font-medium text-steel-dark">
-            Webhook signing key (primary)
-          </label>
+        </Field>
+        <Field label="Webhook signing key (primary)" hint={keptHint(status?.hasWebhookKeys)}>
           <input
-            id="webhook-primary"
             type="password"
             autoComplete="off"
             value={webhookKeyPrimary}
             onChange={(e) => setWebhookKeyPrimary(e.target.value)}
-            className={inputCls}
+            className={inputClass}
           />
-          <p className="text-xs text-steel">{keptHint(status?.hasWebhookKeys)}</p>
-        </div>
-        <div className="space-y-1">
-          <label htmlFor="webhook-secondary" className="text-xs font-medium text-steel-dark">
-            Webhook signing key (secondary)
-          </label>
+        </Field>
+        <Field label="Webhook signing key (secondary)" hint={keptHint(status?.hasWebhookKeys)}>
           <input
-            id="webhook-secondary"
             type="password"
             autoComplete="off"
             value={webhookKeySecondary}
             onChange={(e) => setWebhookKeySecondary(e.target.value)}
-            className={inputCls}
+            className={inputClass}
           />
-          <p className="text-xs text-steel">{keptHint(status?.hasWebhookKeys)}</p>
-        </div>
+        </Field>
       </div>
       {status && (
-        <p className="text-xs text-steel break-all">
+        <p className="text-xs text-secondary-400 break-all">
           Saving registers Shop's webhook on the document, calling back on {status.webhookUrl}
         </p>
       )}
 
       <div className="flex gap-2 pt-2">
-        <button
-          type="button"
-          onClick={handleSave}
-          disabled={saving}
-          className="px-4 py-2 bg-crimson hover:bg-crimson-dark disabled:opacity-50 text-on-primary text-sm font-semibold rounded-lg transition-colors"
-        >
+        <Button onClick={handleSave} disabled={saving}>
           {saving ? "Saving…" : "Save"}
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -745,11 +696,11 @@ const SUMMARY_KINDS = {
 
 function DailySlackButtons() {
   const [sending, setSending] = useState<keyof typeof SUMMARY_KINDS | null>(null);
+  const [asking, setAsking] = useState<keyof typeof SUMMARY_KINDS | null>(null);
   const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
 
   async function send(kind: keyof typeof SUMMARY_KINDS) {
-    const { label, blurb } = SUMMARY_KINDS[kind];
-    if (!window.confirm(`Post the ${label} (${blurb}) to the Slack summary channel?`)) return;
+    setAsking(null);
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
     setSending(kind);
@@ -784,29 +735,46 @@ function DailySlackButtons() {
     <div className="flex flex-col items-end gap-2 max-w-md">
       <div className="flex gap-2">
         {(Object.keys(SUMMARY_KINDS) as (keyof typeof SUMMARY_KINDS)[]).map((kind) => (
-          <button
+          <Button
             key={kind}
-            type="button"
-            onClick={() => send(kind)}
+            variant="secondary"
+            onClick={() => {
+              setResult(null);
+              setAsking(kind);
+            }}
             disabled={sending !== null}
-            title={`Post the ${SUMMARY_KINDS[kind].label} to Slack: ${SUMMARY_KINDS[kind].blurb}`}
-            className="px-4 py-2 bg-crimson hover:bg-crimson-dark disabled:opacity-50 text-on-primary text-sm font-semibold rounded-lg transition-colors"
           >
             {sending === kind ? "Sending…" : `Send ${SUMMARY_KINDS[kind].label}`}
-          </button>
+          </Button>
         ))}
       </div>
-      {result && (
-        <div
-          className={`w-full text-xs rounded-lg px-3 py-2 whitespace-pre-wrap ${
-            result.ok
-              ? "text-emerald-800 bg-emerald-50 border border-emerald-300"
-              : "text-crimson-dark bg-crimson-50 border border-crimson-200"
-          }`}
-        >
-          {result.ok ? `Sent:\n${result.text}` : result.text}
+      {asking && (
+        <div className="w-full space-y-2 rounded-lg border border-secondary-200 bg-surface p-3">
+          <p className="text-sm text-secondary-900">
+            Post the {SUMMARY_KINDS[asking].label} ({SUMMARY_KINDS[asking].blurb}) to the Slack
+            summary channel?
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" onClick={() => send(asking)}>
+              Post it
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => setAsking(null)}>
+              Don't post
+            </Button>
+          </div>
         </div>
       )}
+      {result &&
+        (result.ok ? (
+          <p
+            role="status"
+            className="w-full whitespace-pre-wrap rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs text-emerald-800"
+          >
+            {`Sent:\n${result.text}`}
+          </p>
+        ) : (
+          <ErrorBanner message={result.text} />
+        ))}
     </div>
   );
 }
@@ -816,6 +784,7 @@ function SlackSettings() {
   const [summaryChannelId, setSummaryChannelId] = useState("");
   const [saving, setSaving] = useState(false);
   const [banner, setBanner] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
@@ -850,6 +819,7 @@ function SlackSettings() {
     }
 
     setSaving(true);
+    setSaved(false);
     try {
       // biome-ignore lint/suspicious/noExplicitAny: workaround for Hono client type generation
       const res = await (api as any).admin.slack.config.$post({
@@ -864,8 +834,8 @@ function SlackSettings() {
         return;
       }
 
-      setBanner("Slack channels saved successfully");
-      setTimeout(() => setBanner(null), 3000);
+      setBanner(null);
+      setSaved(true);
     } catch (err) {
       setBanner(err instanceof Error ? err.message : "Failed to save config");
     } finally {
@@ -873,26 +843,15 @@ function SlackSettings() {
     }
   }
 
-  if (!loaded) {
-    return <p className="text-sm text-steel">Loading…</p>;
-  }
+  if (!loaded) return banner ? <ErrorBanner message={banner} /> : <Loading />;
 
   return (
     <div className="space-y-4 max-w-xl">
-      {banner && (
-        <div
-          className={`text-sm rounded-lg px-3 py-2 ${
-            banner.includes("successfully")
-              ? "text-emerald-700 bg-emerald-50 border border-emerald-300"
-              : "text-crimson-dark bg-crimson-50 border border-crimson-200"
-          }`}
-        >
-          {banner}
-        </div>
-      )}
+      {banner && <ErrorBanner message={banner} />}
+      {saved && <SuccessBanner message="Slack channels saved." />}
 
       <div className="space-y-1">
-        <label htmlFor="channel-id" className="text-xs font-medium text-steel-dark">
+        <label htmlFor="channel-id" className="block text-sm font-medium text-secondary-700">
           Release notification channel *
         </label>
         <SlackChannelPicker
@@ -901,11 +860,14 @@ function SlackSettings() {
           onChange={(id) => setChannelId(id ?? "")}
           clearable={false}
         />
-        <p className="text-xs text-steel">Where new Onshape releases are posted.</p>
+        <p className="text-xs text-secondary-500">Where new Onshape releases are posted.</p>
       </div>
 
       <div className="space-y-1">
-        <label htmlFor="summary-channel-id" className="text-xs font-medium text-steel-dark">
+        <label
+          htmlFor="summary-channel-id"
+          className="block text-sm font-medium text-secondary-700"
+        >
           Overview &amp; Reflection channel
         </label>
         <SlackChannelPicker
@@ -913,25 +875,18 @@ function SlackSettings() {
           value={summaryChannelId}
           onChange={(id) => setSummaryChannelId(id ?? "")}
         />
-        <p className="text-xs text-steel">Where the Overview and Reflection buttons post.</p>
+        <p className="text-xs text-secondary-500">
+          Where the Overview and Reflection buttons post.
+        </p>
       </div>
 
       <div className="flex gap-2 pt-2">
-        <button
-          type="button"
-          onClick={loadConfig}
-          className="px-4 py-2 bg-steel-tint hover:bg-steel/30 text-steel-dark text-sm font-medium rounded-lg transition-colors"
-        >
+        <Button variant="secondary" onClick={loadConfig}>
           Reload
-        </button>
-        <button
-          type="button"
-          onClick={handleSave}
-          disabled={saving}
-          className="px-4 py-2 bg-crimson hover:bg-crimson-dark disabled:opacity-50 text-on-primary text-sm font-semibold rounded-lg transition-colors"
-        >
+        </Button>
+        <Button onClick={handleSave} disabled={saving}>
           {saving ? "Saving…" : "Save"}
-        </button>
+        </Button>
       </div>
     </div>
   );

@@ -1,3 +1,4 @@
+import { Button, Dialog } from "@g3/ui";
 import { useState } from "react";
 
 import { api } from "../../shared/api";
@@ -86,7 +87,7 @@ export function PartWorkView({
           disabled={busy}
           className={`${shopButton} border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100`}
         >
-          ↶ Send Back
+          Send back
         </button>
       )}
       <button
@@ -96,14 +97,13 @@ export function PartWorkView({
         // On its own row under the others when the panel is under the drawing.
         className={`${shopButton} col-span-full bg-emerald-600 text-white hover:bg-emerald-700`}
       >
-        Mark Complete
+        Mark complete
       </button>
 
       {showRevertModal && (
-        <div className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center p-4">
-          <div className="bg-paper rounded-lg shadow-lg max-w-sm w-full p-6 space-y-4">
-            <h3 className="text-lg font-bold text-ink">Send Back</h3>
-            <p className="text-sm text-steel">Move this part back to which status?</p>
+        <Dialog title="Send back" onClose={() => setShowRevertModal(false)}>
+          <>
+            <p className="text-sm text-secondary-500">Move this part back to which status?</p>
 
             <div className="space-y-2">
               {(["todo", "doing"] as const).map((s) => (
@@ -114,33 +114,23 @@ export function PartWorkView({
                     value={s}
                     checked={revertStatus === s}
                     onChange={() => setRevertStatus(s)}
-                    className="accent-amber-500"
+                    className="accent-primary-500"
                   />
-                  <span className="text-sm text-ink capitalize">{s}</span>
+                  <span className="text-sm text-secondary-900 capitalize">{s}</span>
                 </label>
               ))}
             </div>
 
-            <div className="flex gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setShowRevertModal(false)}
-                disabled={busy}
-                className="flex-1 py-2 rounded-lg border border-steel/50 text-steel-dark hover:bg-steel-tint text-sm font-semibold transition-colors disabled:opacity-50"
-              >
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={() => handleRevert()} disabled={busy}>
+                Send back
+              </Button>
+              <Button variant="secondary" onClick={() => setShowRevertModal(false)} disabled={busy}>
                 Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => handleRevert()}
-                disabled={busy}
-                className="flex-1 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold transition-colors disabled:opacity-50"
-              >
-                Send Back
-              </button>
+              </Button>
             </div>
-          </div>
-        </div>
+          </>
+        </Dialog>
       )}
     </ShopView>
   );

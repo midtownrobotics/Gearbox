@@ -1,8 +1,9 @@
+import { Button, ErrorBanner } from "@g3/ui";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { type InstanceRow, partLabel } from "../../shared/derive";
 import { bulkMoveInstances, fetchPartFiles } from "../../shared/getters";
 import type { PartFile } from "../../shared/types";
-import { DownloadLink, ErrorText, formatInstanceRanges } from "../files/part-files-panel";
+import { DownloadLink, formatInstanceRanges } from "../files/part-files-panel";
 
 type FileGroup = { key: string; file: PartFile | null; rows: InstanceRow[] };
 
@@ -91,14 +92,14 @@ export function ConsumerSections({
     action: (group: FileGroup) => React.ReactNode,
   ) => (
     <section className="space-y-2">
-      <h2 className="text-xs font-bold uppercase tracking-widest text-steel">
+      <h2 className="font-sans text-xs font-bold uppercase tracking-widest text-secondary-400">
         {title}{" "}
-        <span className="text-crimson">{groups.reduce((n, g) => n + g.rows.length, 0)}</span>
+        <span className="text-primary-600">{groups.reduce((n, g) => n + g.rows.length, 0)}</span>
       </h2>
       {groups.length === 0 ? (
-        <p className="text-steel text-sm">{empty}</p>
+        <p className="text-secondary-400 text-sm">{empty}</p>
       ) : (
-        <div className="bg-paper border border-steel/30 rounded-xl divide-y divide-steel/15">
+        <div className="bg-surface border border-secondary-200 rounded-xl divide-y divide-secondary-200">
           {groups.map((group) => (
             <FileGroupBlock key={group.key} group={group} touch={touch}>
               {group.file && <DownloadLink file={group.file} />}
@@ -112,7 +113,7 @@ export function ConsumerSections({
 
   return (
     <>
-      {error && <ErrorText message={error} />}
+      {error && <ErrorBanner message={error} />}
 
       {section("In Progress", doing, "Nothing in progress here.", (group) => (
         <span className="relative group">
@@ -124,21 +125,16 @@ export function ConsumerSections({
           >
             Mark all complete
           </button>
-          <span className="pointer-events-none absolute bottom-full right-0 mb-1.5 hidden group-hover:block whitespace-nowrap bg-ink text-paper text-xs rounded-md px-2.5 py-1.5 shadow-lg">
+          <span className="pointer-events-none absolute bottom-full right-0 mb-1.5 hidden group-hover:block whitespace-nowrap bg-secondary-900 text-surface text-xs rounded-md px-2.5 py-1.5 shadow-lg">
             Do a quality check before marking these complete!
           </span>
         </span>
       ))}
 
       {section("To Do", todo, "Nothing ready to start.", (group) => (
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => move(group, "doing")}
-          className={`${btn} font-semibold bg-crimson hover:bg-crimson-dark text-on-primary rounded-lg transition-colors disabled:opacity-50`}
-        >
+        <Button size={touch ? "md" : "sm"} disabled={busy} onClick={() => move(group, "doing")}>
           Start all
-        </button>
+        </Button>
       ))}
     </>
   );
@@ -163,25 +159,28 @@ function FileGroupBlock({
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <div className="flex-1 min-w-0">
           {group.file ? (
-            <p className="text-sm font-semibold text-ink truncate" title={group.file.filename}>
+            <p
+              className="text-sm font-semibold text-secondary-900 truncate"
+              title={group.file.filename}
+            >
               {group.file.filename}
             </p>
           ) : (
             <p className="text-sm font-semibold text-amber-800">No file assigned</p>
           )}
-          <p className="text-xs text-steel">{plural(group.rows.length, "instance")}</p>
+          <p className="text-xs text-secondary-400">{plural(group.rows.length, "instance")}</p>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">{children}</div>
       </div>
-      <ul className="mt-1.5 ml-2 border-l-2 border-steel/25">
+      <ul className="mt-1.5 ml-2 border-l-2 border-secondary-200">
         {[...byPart.values()].map((list) => (
           <li
             key={list[0].definition.id}
             className={`flex items-center gap-2 pl-3 pr-1 text-xs ${touch ? "py-1.5" : "py-0.5"}`}
           >
-            <span className="text-ink truncate">{list[0].definition.name}</span>
-            <span className="font-mono text-steel shrink-0">{partLabel(list[0])}</span>
-            <span className="font-mono text-steel-dark shrink-0">
+            <span className="text-secondary-900 truncate">{list[0].definition.name}</span>
+            <span className="font-mono text-secondary-400 shrink-0">{partLabel(list[0])}</span>
+            <span className="font-mono text-secondary-500 shrink-0">
               {formatInstanceRanges(list.map((r) => r.instance.instanceNumber))}
             </span>
             {list.some((r) => r.instance.isPriority) && (

@@ -1,17 +1,26 @@
-import { useAppOn, useTeamNames } from "@g3/ui";
+import {
+  Button,
+  ConfirmButton,
+  ErrorBanner,
+  Loading,
+  Page,
+  buttonClass,
+  inputClass,
+  useAppOn,
+  useTeamNames,
+} from "@g3/ui";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../../shared/api";
 import { getErrorMessage } from "../../shared/api-error";
 import { buildInstanceRows } from "../../shared/derive";
 import { deleteDrawing } from "../../shared/getters";
-import { ErrorBanner, PageLoading } from "../../shared/ui";
 import { useAuthUser } from "../../shared/use-auth";
 import { useKiosk } from "../../shared/use-auth";
 import { useShopData } from "../../shared/use-shop-data";
 import {
   FileHeading,
   InProductionBadge,
-  confirmDelete,
+  deleteQuestion,
   formatBytes,
   productionRows,
 } from "./part-files-panel";
@@ -49,14 +58,6 @@ export function FilesPage() {
     drawingUsage.get(`${d.partNumber}\u0000${d.revision}`) ?? [];
 
   async function handleDeleteDrawing(drawing: Drawing) {
-    if (
-      !confirmDelete(
-        `the drawing for ${drawing.partNumber} Rev ${drawing.revision}`,
-        usageOfDrawing(drawing),
-      )
-    ) {
-      return;
-    }
     setDeletingKey(drawing.r2Key);
     try {
       await deleteDrawing(drawing.partNumber, drawing.revision);
@@ -174,35 +175,37 @@ export function FilesPage() {
     );
   }, [drawings, search]);
 
-  if (loading) return <PageLoading />;
+  if (loading)
+    return (
+      <Page title="Files" width="wide">
+        <Loading />
+      </Page>
+    );
 
   const totalSize = drawings.reduce((sum, d) => sum + (d.fileSize || 0), 0);
 
   return (
-    <main className="flex-1 bg-page">
-      <div className="max-w-full mx-auto px-6 py-8 space-y-5">
-        <div className="flex items-center justify-between">
-          <h1 className="font-display text-4xl text-ink">Files</h1>
-          {user?.isAdmin && canPrint && (
-            <button
-              type="button"
-              onClick={handleTestPrint}
-              disabled={testPrinting}
-              className="px-4 py-2 text-sm font-medium border border-steel/40 text-steel-dark bg-steel-tint hover:bg-steel/20 hover:border-steel/50 active:bg-steel/30 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors"
-            >
-              {testPrinting ? "Testing…" : "Test Print"}
-            </button>
-          )}
-        </div>
-
+    <Page
+      title="Files"
+      width="wide"
+      actions={
+        user?.isAdmin &&
+        canPrint && (
+          <Button variant="secondary" onClick={handleTestPrint} disabled={testPrinting}>
+            {testPrinting ? "Testing…" : "Test print"}
+          </Button>
+        )
+      }
+    >
+      <>
         {error && <ErrorBanner message={error} />}
 
         <PartFilesSection data={data} inProduction={inProduction} />
 
         <section className="space-y-3 pt-4">
           <div>
-            <h2 className="font-display text-2xl text-ink">Drawings</h2>
-            <p className="text-xs text-steel">
+            <h2 className="text-2xl text-secondary-900">Drawings</h2>
+            <p className="text-xs text-secondary-500">
               {drawings.length} drawing{drawings.length === 1 ? "" : "s"} · {formatBytes(totalSize)}
             </p>
           </div>
@@ -212,26 +215,24 @@ export function FilesPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by filename or part number…"
-            className="w-full bg-paper border border-steel/40 rounded-lg px-3 py-2 text-sm text-ink placeholder-steel focus:outline-none focus:border-crimson"
+            className={inputClass}
           />
 
           {visibleDrawings.length === 0 ? (
-            <div className="bg-paper border border-steel/30 rounded-lg p-6 text-center">
-              <p className="text-steel text-sm">
-                {drawings.length === 0
-                  ? "No drawings stored yet."
-                  : "No drawings match your search."}
-              </p>
-            </div>
+            <p className="text-secondary-500 text-sm">
+              {drawings.length === 0
+                ? "No drawings yet. A release's drawings are saved when its parts are ingested."
+                : "No drawings match your search."}
+            </p>
           ) : (
-            <ul className="bg-paper border border-steel/30 rounded-lg divide-y divide-steel/20">
+            <ul className="bg-surface border border-secondary-200 rounded-lg divide-y divide-secondary-200">
               {visibleDrawings.map((drawing) => (
                 <li key={drawing.r2Key} className="px-4 py-3">
                   <FileHeading
                     name={drawing.filename}
                     details={
-                      <p className="text-xs text-steel">
-                        <span className="font-mono text-steel-dark">
+                      <p className="text-xs text-secondary-400">
+                        <span className="font-mono text-secondary-500">
                           {drawing.partNumber} · Rev {drawing.revision}
                         </span>{" "}
                         · {formatBytes(drawing.fileSize || 0)} ·{" "}
@@ -241,31 +242,34 @@ export function FilesPage() {
                   >
                     <InProductionBadge rows={usageOfDrawing(drawing)} />
                     {canPrint && (
-                      <button
-                        type="button"
+                      <Button
+                        size="sm"
+                        className="shrink-0"
                         onClick={() => handlePrint(drawing)}
                         disabled={printingId === drawing.id}
-                        className="px-2.5 py-1 text-xs font-medium bg-crimson text-on-primary hover:bg-crimson-dark disabled:bg-steel/30 disabled:cursor-not-allowed rounded transition-colors shrink-0"
                       >
                         {printingId === drawing.id ? "Printing…" : "Print"}
-                      </button>
+                      </Button>
                     )}
                     <a
                       href={`${import.meta.env.VITE_API_BASE_URL ?? ""}/parts/${drawing.partNumber}/${drawing.revision}/drawing`}
                       download={drawing.filename}
-                      className="px-2.5 py-1 text-xs font-medium border border-steel/40 text-steel hover:text-ink rounded transition-colors shrink-0"
+                      className={`${buttonClass("secondary", "sm")} shrink-0`}
                     >
                       Download
                     </a>
                     {!kiosk.active && (
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteDrawing(drawing)}
+                      <ConfirmButton
+                        size="sm"
+                        label={deletingKey === drawing.r2Key ? "Deleting…" : "Delete"}
+                        confirmLabel="Delete"
+                        question={deleteQuestion(
+                          `the drawing for ${drawing.partNumber} Rev ${drawing.revision}`,
+                          usageOfDrawing(drawing),
+                        )}
                         disabled={deletingKey === drawing.r2Key}
-                        className="px-2.5 py-1 text-xs font-medium border border-crimson/40 text-crimson hover:bg-crimson-tint rounded transition-colors disabled:opacity-50 shrink-0"
-                      >
-                        {deletingKey === drawing.r2Key ? "Deleting…" : "Delete"}
-                      </button>
+                        onConfirm={() => handleDeleteDrawing(drawing)}
+                      />
                     )}
                   </FileHeading>
                 </li>
@@ -273,7 +277,7 @@ export function FilesPage() {
             </ul>
           )}
         </section>
-      </div>
-    </main>
+      </>
+    </Page>
   );
 }

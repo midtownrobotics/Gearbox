@@ -1,3 +1,13 @@
+import {
+  Button,
+  ConfirmButton,
+  Dialog,
+  ErrorBanner,
+  Field,
+  SuccessBanner,
+  buttonClass,
+  inputClass,
+} from "@g3/ui";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../../shared/api";
@@ -86,7 +96,6 @@ export function PartCard({
   }
 
   async function makeObsolete() {
-    if (!window.confirm("Mark this part as obsolete? It will move to the Obsolete table.")) return;
     setBusy(true);
     const res = await api["part-instances"][":id"].$patch({
       param: { id: String(row.instance.id) },
@@ -169,23 +178,23 @@ export function PartCard({
 
   return (
     // Full-screen takeover — close via the X button in the corner.
-    <div className="fixed inset-0 z-50 bg-paper overflow-y-auto">
+    <div className="fixed inset-0 z-50 bg-surface overflow-y-auto">
       <div className="max-w-3xl mx-auto">
         {/* Header */}
         {/* Above the page's own layers (the drawing is one), so nothing shows over it. */}
-        <div className="sticky top-0 z-10 bg-paper border-b border-steel/20 flex items-start justify-between gap-3 px-5 py-4">
+        <div className="sticky top-0 z-10 bg-surface border-b border-secondary-200 flex items-start justify-between gap-3 px-5 py-4">
           <div className="min-w-0">
-            <h2 className="font-display text-3xl text-ink truncate">
+            <h2 className="text-3xl text-secondary-900 truncate">
               {row.definition.name}{" "}
-              <span className="text-steel text-2xl">
+              <span className="text-secondary-400 text-2xl">
                 #{activePosition} of {totalInstances}
               </span>
             </h2>
-            <p className="text-sm text-steel-dark font-mono">
+            <p className="text-sm text-secondary-500 font-mono">
               {row.definition.onshapePartNumber} · Rev {row.definition.revision}
             </p>
             {isObsolete && (
-              <span className="inline-block mt-1.5 text-[10px] font-semibold uppercase tracking-wider text-steel-dark bg-steel-tint border border-steel/40 rounded-full px-2 py-0.5">
+              <span className="inline-block mt-1.5 text-[10px] font-semibold uppercase tracking-wider text-secondary-500 bg-inset border border-secondary-300 rounded-full px-2 py-0.5">
                 Obsolete · view only
               </span>
             )}
@@ -193,9 +202,9 @@ export function PartCard({
               <Link
                 to={shopViewPath(row.current.processId, row.instance.id)}
                 onClick={onClose}
-                className="mt-2 inline-flex rounded-lg border border-steel/30 bg-steel-tint px-3 py-1.5 text-sm font-semibold text-steel-dark transition-colors hover:border-steel/50 hover:bg-steel/20"
+                className={`${buttonClass("secondary", "sm")} mt-2`}
               >
-                Switch to Shop View
+                Switch to shop view
               </Link>
             )}
           </div>
@@ -203,18 +212,14 @@ export function PartCard({
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="text-steel hover:text-ink text-3xl leading-none p-2 shrink-0"
+            className="text-secondary-400 hover:text-secondary-900 text-3xl leading-none p-2 shrink-0"
           >
             ✕
           </button>
         </div>
 
         <div className="px-5 pb-8 pt-4 space-y-4">
-          {banner && (
-            <p className="text-crimson-dark text-sm bg-crimson-tint border border-crimson/30 rounded-lg px-3 py-2">
-              {banner}
-            </p>
-          )}
+          {banner && <ErrorBanner message={banner} />}
 
           {/* The released drawing, when R2 has one for this revision. */}
           <div className="space-y-2">
@@ -260,7 +265,7 @@ export function PartCard({
                   />
                 </>
               )}
-              <dt className="text-steel">Priority</dt>
+              <dt className="text-secondary-400">Priority</dt>
               <dd>
                 <label className="inline-flex items-center gap-2 cursor-pointer select-none">
                   <input
@@ -268,9 +273,9 @@ export function PartCard({
                     checked={!!row.instance.isPriority}
                     disabled={busy || isObsolete}
                     onChange={(e) => setPriority(e.target.checked)}
-                    className="accent-crimson w-4 h-4 disabled:opacity-50"
+                    className="accent-primary-500 w-4 h-4 disabled:opacity-50"
                   />
-                  <span className="text-ink">Priority</span>
+                  <span className="text-secondary-900">Priority</span>
                 </label>
               </dd>
             </dl>
@@ -291,7 +296,7 @@ export function PartCard({
           {/* Status */}
           <Section title="Status">
             {row.procs.length === 0 ? (
-              <p className="text-sm text-steel">
+              <p className="text-sm text-secondary-400">
                 No processes — the blueprint was empty when this instance was made.
               </p>
             ) : (
@@ -301,16 +306,16 @@ export function PartCard({
                   const isCurrent = row.current?.id === proc.id;
                   return (
                     <div key={proc.id} className="flex items-center">
-                      {i > 0 && <span className="w-4 h-px bg-steel/40 mx-1" />}
+                      {i > 0 && <span className="w-4 h-px bg-secondary-300 mx-1" />}
                       <Link
                         to={processPath(proc.processId)}
                         title={`Go to ${processName(proc.processId)} on the shop floor`}
-                        className={`text-xs font-semibold px-2.5 py-1 rounded-full border transition-colors hover:border-crimson ${
+                        className={`text-xs font-semibold px-2.5 py-1 rounded-full border transition-colors hover:border-secondary-400 ${
                           isCurrent
-                            ? "bg-crimson border-crimson text-on-primary hover:bg-crimson-dark"
+                            ? "bg-primary-500 border-primary-500 text-on-primary hover:bg-primary-600"
                             : isDone
-                              ? "bg-mist border-steel/30 text-steel/70 line-through"
-                              : "bg-paper border-steel/50 text-ink"
+                              ? "bg-page border-secondary-200 text-secondary-400 line-through"
+                              : "bg-surface border-secondary-300 text-secondary-900"
                         }`}
                       >
                         {processName(proc.processId)}
@@ -326,11 +331,11 @@ export function PartCard({
               </div>
             )}
             {row.current && row.state === "doing" && (
-              <p className="text-xs text-steel-dark mt-2">
+              <p className="text-xs text-secondary-500 mt-2">
                 Currently {row.state === "doing" ? "in progress" : "queued"} at{" "}
                 <Link
                   to={processPath(row.current.processId)}
-                  className="font-semibold text-ink hover:text-crimson underline transition-colors"
+                  className="font-semibold text-secondary-900 hover:text-primary-600 underline transition-colors"
                 >
                   {processName(row.current.processId)}
                 </Link>
@@ -339,91 +344,64 @@ export function PartCard({
             )}
           </Section>
 
-          {addInstanceFeedback && (
-            <p
-              className={`text-sm rounded-lg px-3 py-2 border text-center ${
-                addInstanceFeedback === "success"
-                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                  : "bg-crimson-tint text-crimson-dark border-crimson/30"
-              }`}
-            >
-              {addInstanceFeedback === "success"
-                ? "✓ Part instance added successfully"
-                : addInstanceError}
-            </p>
+          {addInstanceFeedback === "success" && (
+            <SuccessBanner message="Added one more instance of this part." />
+          )}
+          {addInstanceFeedback && addInstanceFeedback !== "success" && (
+            <ErrorBanner message={addInstanceError ?? "Couldn't add an instance."} />
           )}
 
           {!isObsolete && (
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-              <button
-                type="button"
-                onClick={addMoreInstances}
-                disabled={busy}
-                className="w-full py-2.5 rounded-lg border border-emerald-400/50 text-emerald-700 hover:bg-emerald-50 text-sm font-semibold transition-colors disabled:opacity-50"
-              >
-                + Add One
-              </button>
-              <button
-                type="button"
+            <div className="flex flex-wrap gap-2">
+              <Button variant="secondary" onClick={addMoreInstances} disabled={busy}>
+                Add one more
+              </Button>
+              <Button
+                variant="secondary"
                 onClick={() => {
                   setSendBackProcess(row.procs[0]?.processId ?? null);
                   setSendBackStatus("todo");
                   setShowSendBackModal(true);
                 }}
                 disabled={busy}
-                className="w-full py-2.5 rounded-lg border border-amber-400/50 text-amber-700 hover:bg-amber-50 text-sm font-semibold transition-colors disabled:opacity-50"
               >
-                ↶ Send Back
-              </button>
-              <button
-                type="button"
-                onClick={transferProcesses}
+                Send back
+              </Button>
+              <Button variant="secondary" onClick={transferProcesses} disabled={busy}>
+                Edit and make obsolete
+              </Button>
+              <ConfirmButton
+                label="Make obsolete"
+                question="Make this part obsolete? It moves to the Obsolete table."
                 disabled={busy}
-                className="w-full py-2.5 rounded-lg border border-steel/50 text-steel-dark hover:bg-steel-tint text-sm font-semibold transition-colors disabled:opacity-50"
-              >
-                Edit & Obsolete
-              </button>
-              <button
-                type="button"
-                onClick={makeObsolete}
-                disabled={busy}
-                className="w-full py-2.5 rounded-lg border border-crimson/50 text-crimson hover:bg-crimson-tint text-sm font-semibold transition-colors disabled:opacity-50 sm:col-span-3"
-              >
-                Make Obsolete
-              </button>
+                onConfirm={makeObsolete}
+              />
             </div>
           )}
 
           {/* Send Back Modal */}
           {showSendBackModal && (
-            <div className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center p-4">
-              <div className="bg-paper rounded-lg shadow-lg max-w-sm w-full p-6 space-y-4">
-                <h3 className="text-lg font-bold text-ink">Send Part Back</h3>
-
-                <div>
-                  <label
-                    htmlFor="send-back-process"
-                    className="block text-sm font-semibold text-steel mb-2"
-                  >
-                    Process
-                  </label>
+            <Dialog title="Send back" onClose={() => setShowSendBackModal(false)}>
+              <>
+                <Field label="Process">
                   <select
-                    id="send-back-process"
                     value={sendBackProcess ?? ""}
                     onChange={(e) => setSendBackProcess(Number(e.target.value) || null)}
-                    className="w-full bg-paper border border-steel/40 rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-crimson"
+                    className={inputClass}
                   >
-                    <option value="">Select a process...</option>
+                    <option value="">Select a process…</option>
                     {row.procs.map((proc) => (
                       <option key={proc.id} value={proc.processId}>
                         {processName(proc.processId)}
                       </option>
                     ))}
                   </select>
-                </div>
+                </Field>
 
                 <fieldset>
-                  <legend className="block text-sm font-semibold text-steel mb-2">Status</legend>
+                  <legend className="mb-1 block text-sm font-medium text-secondary-700">
+                    Status
+                  </legend>
                   <div className="space-y-2">
                     {(["todo", "doing", "done"] as const).map((s) => (
                       <label key={s} className="flex items-center gap-2 cursor-pointer">
@@ -433,34 +411,28 @@ export function PartCard({
                           value={s}
                           checked={sendBackStatus === s}
                           onChange={() => setSendBackStatus(s)}
-                          className="accent-crimson"
+                          className="accent-primary-500"
                         />
-                        <span className="text-sm text-ink capitalize">{s}</span>
+                        <span className="text-sm text-secondary-900 capitalize">{s}</span>
                       </label>
                     ))}
                   </div>
                 </fieldset>
 
-                <div className="flex gap-2 pt-2">
-                  <button
-                    type="button"
+                <div className="flex flex-wrap gap-2">
+                  <Button onClick={sendBack} disabled={busy || !sendBackProcess}>
+                    Send back
+                  </Button>
+                  <Button
+                    variant="secondary"
                     onClick={() => setShowSendBackModal(false)}
                     disabled={busy}
-                    className="flex-1 py-2 rounded-lg border border-steel/50 text-steel-dark hover:bg-steel-tint text-sm font-semibold transition-colors disabled:opacity-50"
                   >
                     Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={sendBack}
-                    disabled={busy || !sendBackProcess}
-                    className="flex-1 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold transition-colors disabled:opacity-50"
-                  >
-                    Send Back
-                  </button>
+                  </Button>
                 </div>
-              </div>
-            </div>
+              </>
+            </Dialog>
           )}
         </div>
       </div>
@@ -471,14 +443,18 @@ export function PartCard({
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   const [open, setOpen] = useState(true);
   return (
-    <section className="border border-steel/25 rounded-xl">
+    <section className="border border-secondary-200 rounded-xl">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
         className="w-full flex items-center justify-between px-4 py-2.5 text-left"
       >
-        <span className="text-sm font-bold uppercase tracking-wider text-steel-dark">{title}</span>
-        <span className={`text-steel text-xs transition-transform ${open ? "rotate-180" : ""}`}>
+        <span className="text-sm font-bold uppercase tracking-wider text-secondary-500">
+          {title}
+        </span>
+        <span
+          className={`text-secondary-400 text-xs transition-transform ${open ? "rotate-180" : ""}`}
+        >
           ▼
         </span>
       </button>
@@ -490,8 +466,8 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function Meta({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
     <>
-      <dt className="text-steel">{label}</dt>
-      <dd className={`text-ink break-words ${mono ? "font-mono" : ""}`}>{value}</dd>
+      <dt className="text-secondary-400">{label}</dt>
+      <dd className={`text-secondary-900 break-words ${mono ? "font-mono" : ""}`}>{value}</dd>
     </>
   );
 }

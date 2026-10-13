@@ -1,3 +1,4 @@
+import { Button, ConfirmButton, ErrorBanner, inputClass } from "@g3/ui";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { InstanceRow } from "../../shared/derive";
 import { deletePartFile, fetchPartFiles } from "../../shared/getters";
@@ -9,14 +10,13 @@ import {
   AssignmentGroup,
   CountInput,
   DownloadLink,
-  ErrorText,
   FileHeading,
   FileMeta,
   InProductionBadge,
   NoticeText,
   UploadButton,
   assignCount,
-  confirmDeleteFile,
+  deleteFileQuestion,
   formatBytes,
   freeInstancesByPart,
   isObsoleteRevision,
@@ -127,8 +127,8 @@ export function PartFilesSection({
     <section className="space-y-3">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="font-display text-2xl text-ink">Part Files</h2>
-          <p className="text-xs text-steel">
+          <h2 className="text-2xl text-secondary-900">Part Files</h2>
+          <p className="text-xs text-secondary-400">
             {files.length} file{files.length === 1 ? "" : "s"} · {formatBytes(totalSize)}
           </p>
         </div>
@@ -147,7 +147,7 @@ export function PartFilesSection({
         )}
       </div>
 
-      {error && <ErrorText message={error} />}
+      {error && <ErrorBanner message={error} />}
       {notices.map((n) => (
         <NoticeText key={n} message={n} />
       ))}
@@ -157,17 +157,17 @@ export function PartFilesSection({
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         placeholder="Search by filename, part number, or part name…"
-        className="w-full bg-paper border border-steel/40 rounded-lg px-3 py-2 text-sm text-ink placeholder-steel focus:outline-none focus:border-crimson"
+        className={inputClass}
       />
 
       {visible.length === 0 ? (
-        <div className="bg-paper border border-steel/30 rounded-lg p-6 text-center">
-          <p className="text-steel text-sm">
+        <div className="bg-surface border border-secondary-200 rounded-lg p-6 text-center">
+          <p className="text-secondary-400 text-sm">
             {files.length === 0 ? "No part files uploaded yet." : "No files match your search."}
           </p>
         </div>
       ) : (
-        <ul className="bg-paper border border-steel/30 rounded-lg divide-y divide-steel/20">
+        <ul className="bg-surface border border-secondary-200 rounded-lg divide-y divide-secondary-200">
           {visible.map((file) => {
             const partIds = [...new Set(file.assignments.map((a) => a.partDefinitionId))];
             return (
@@ -179,32 +179,29 @@ export function PartFilesSection({
                   <InProductionBadge rows={usageOf(file)} />
                   <DownloadLink file={file} />
                   {!kiosk.active && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (confirmDeleteFile(file, usageOf(file))) {
-                          run(() => deletePartFile(file.id).then(() => null));
-                        }
-                      }}
+                    <ConfirmButton
+                      size="sm"
+                      label="Delete"
+                      question={deleteFileQuestion(file, usageOf(file))}
                       disabled={busy}
-                      className="px-2.5 py-1 text-xs font-medium border border-crimson/40 text-crimson hover:bg-crimson-tint rounded transition-colors disabled:opacity-50 shrink-0"
-                    >
-                      Delete
-                    </button>
+                      onConfirm={() => run(() => deletePartFile(file.id).then(() => null))}
+                    />
                   )}
                 </FileHeading>
 
                 {partIds.length === 0 && (
-                  <p className="text-xs text-steel">Not assigned to any instances.</p>
+                  <p className="text-xs text-secondary-400">Not assigned to any instances.</p>
                 )}
                 {partIds.map((id) => {
                   const d = definitionById.get(id);
                   if (!d) return null;
                   return (
-                    <div key={id} className="pl-3 border-l-2 border-steel/25 space-y-1">
-                      <p className="text-xs font-semibold text-ink">
+                    <div key={id} className="pl-3 border-l-2 border-secondary-200 space-y-1">
+                      <p className="text-xs font-semibold text-secondary-900">
                         <span className="font-mono">{partLabelOf(d)}</span>
-                        {d.name && <span className="font-normal text-steel-dark"> — {d.name}</span>}
+                        {d.name && (
+                          <span className="font-normal text-secondary-500"> — {d.name}</span>
+                        )}
                       </p>
                       <AssignmentGroup
                         file={file}
@@ -292,8 +289,7 @@ function PartTargetFields({
   const match = value.partNumber.trim()
     ? resolvePartTarget({ ...value, count: "1" }, definitions, instances)
     : null;
-  const inputClass =
-    "bg-paper border border-steel/40 rounded-lg px-2.5 py-1.5 text-xs text-ink placeholder-steel focus:outline-none focus:border-crimson";
+  const compact = `${inputClass} !w-36 !px-2.5 !py-1.5 !text-xs font-mono`;
 
   return (
     <div className="flex flex-wrap items-center gap-1.5">
@@ -303,11 +299,11 @@ function PartTargetFields({
         onChange={(e) => onChange({ ...value, partNumber: e.target.value })}
         placeholder="Part number"
         aria-label="Part number"
-        className={`${inputClass} w-36 font-mono`}
+        className={compact}
       />
       <CountInput value={value.count} onChange={(count) => onChange({ ...value, count })} />
-      <span className="text-xs text-steel-dark">instances</span>
-      <span className="text-xs text-steel w-full sm:w-auto">
+      <span className="text-xs text-secondary-500">instances</span>
+      <span className="text-xs text-secondary-400 w-full sm:w-auto">
         {match === null
           ? optionalHint
           : "error" in match
@@ -341,9 +337,9 @@ function AssignToPart({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="text-xs text-steel-dark hover:text-crimson underline"
+        className="text-xs text-secondary-500 hover:text-primary-600 underline"
       >
-        + Assign to a part by number
+        Assign to a part by number
       </button>
     );
   }
@@ -357,8 +353,8 @@ function AssignToPart({
         instances={instances}
         freeCount={freeCount}
       />
-      <button
-        type="button"
+      <Button
+        size="sm"
         disabled={busy}
         onClick={() => {
           const resolved = resolvePartTarget(target, definitions, instances);
@@ -370,20 +366,19 @@ function AssignToPart({
           setTarget(EMPTY_TARGET);
           setOpen(false);
         }}
-        className="px-2.5 py-1 text-xs font-semibold bg-crimson hover:bg-crimson-dark text-on-primary rounded-lg transition-colors disabled:opacity-50"
       >
         Assign
-      </button>
-      <button
-        type="button"
+      </Button>
+      <Button
+        variant="secondary"
+        size="sm"
         onClick={() => {
           setTarget(EMPTY_TARGET);
           setOpen(false);
         }}
-        className="px-2 py-1 text-xs text-steel hover:text-ink"
       >
         Cancel
-      </button>
+      </Button>
     </div>
   );
 }
