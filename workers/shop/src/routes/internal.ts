@@ -11,10 +11,10 @@ import {
   onshapeReleases,
   partDefinitionProcessBlueprints,
   partDefinitions,
-  partInstanceFiles,
   partInstanceProcesses,
   partInstances,
   processes,
+  stagingBatchRemovals,
   stagingBatches,
   subsystems,
 } from "../db/schema";
@@ -55,8 +55,8 @@ export const internalRouter = new Hono<AppEnv>()
       partDefinitionProcessBlueprints,
       partInstances,
       partInstanceProcesses,
-      partInstanceFiles,
       stagingBatches,
+      stagingBatchRemovals,
       files,
       drawings,
       onshapeReleases,
@@ -107,7 +107,7 @@ export const internalRouter = new Hono<AppEnv>()
     // Rows before the rows they point at.
     await deleteTeamRows(db, teamId, [
       actions,
-      partInstanceFiles,
+      stagingBatchRemovals,
       partInstanceProcesses,
       stagingBatches,
       files,

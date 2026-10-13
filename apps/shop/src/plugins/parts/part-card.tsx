@@ -12,11 +12,13 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../../shared/api";
 import { getErrorMessage } from "../../shared/api-error";
-import type { InstanceRow } from "../../shared/derive";
+import { batchAt, batchesById, currentBatch } from "../../shared/batches";
+import { type InstanceRow, STATUS_LABELS } from "../../shared/derive";
 import { processPath, shopViewPath } from "../../shared/nav";
 import { PrintDrawingButton } from "../../shared/print-drawing-button";
 import type { ShopData } from "../../shared/use-shop-data";
 import { useUserNames } from "../../shared/use-user-names";
+import { BatchLink, linkClass } from "../batches/batch-ui";
 import { PartFilesPanel } from "../files/part-files-panel";
 import { DrawingPreview } from "./drawing-preview";
 
@@ -66,6 +68,10 @@ export function PartCard({
   const [sendBackStatus, setSendBackStatus] = useState<"todo" | "doing" | "done">("todo");
 
   const isObsolete = !!row.instance.isStale;
+  // A step its batch moves can't be moved from here: the batch's own view does that.
+  const batchById = batchesById(data.batches);
+  const inBatch = currentBatch(row, batchById);
+  const sendBackBatch = sendBackProcess === null ? null : batchAt(row, sendBackProcess, batchById);
   const resolveName = useUserNames(
     [row.definition.creator, row.instance.obsoletedBy].filter((id): id is string => !!id),
   );
@@ -198,7 +204,7 @@ export function PartCard({
                 Obsolete · view only
               </span>
             )}
-            {row.current && !isObsolete && (
+            {row.current && !isObsolete && !inBatch && (
               <Link
                 to={shopViewPath(row.current.processId, row.instance.id)}
                 onClick={onClose}
@@ -206,6 +212,11 @@ export function PartCard({
               >
                 Switch to shop view
               </Link>
+            )}
+            {inBatch && !isObsolete && (
+              <p className="mt-2 text-sm text-secondary-500">
+                Moves with its batch, <BatchLink batch={inBatch} />.
+              </p>
             )}
           </div>
           <button
@@ -286,8 +297,7 @@ export function PartCard({
             <Section title="Files">
               <PartFilesPanel
                 definition={row.definition}
-                definitions={data.definitions}
-                instances={data.instances}
+                data={data}
                 currentInstanceId={row.instance.id}
               />
             </Section>
@@ -393,10 +403,22 @@ export function PartCard({
                     {row.procs.map((proc) => (
                       <option key={proc.id} value={proc.processId}>
                         {processName(proc.processId)}
+                        {batchAt(row, proc.processId, batchById) ? " (moves with its batch)" : ""}
                       </option>
                     ))}
                   </select>
                 </Field>
+
+                {sendBackBatch && (
+                  <p className="text-sm text-amber-800 bg-amber-50 border border-amber-300 rounded-lg px-3 py-2">
+                    At {processName(sendBackBatch.processId)}
+                    {sendBackBatch.consumerProcessId !== null &&
+                      ` and ${processName(sendBackBatch.consumerProcessId)}`}{" "}
+                    this part moves with its batch. Open{" "}
+                    <BatchLink batch={sendBackBatch} className={linkClass} /> to send the part back
+                    from it, or to send the whole batch back.
+                  </p>
+                )}
 
                 <fieldset>
                   <legend className="mb-1 block text-sm font-medium text-secondary-700">
@@ -413,14 +435,14 @@ export function PartCard({
                           onChange={() => setSendBackStatus(s)}
                           className="accent-primary-500"
                         />
-                        <span className="text-sm text-secondary-900 capitalize">{s}</span>
+                        <span className="text-sm text-secondary-900">{STATUS_LABELS[s]}</span>
                       </label>
                     ))}
                   </div>
                 </fieldset>
 
                 <div className="flex flex-wrap gap-2">
-                  <Button onClick={sendBack} disabled={busy || !sendBackProcess}>
+                  <Button onClick={sendBack} disabled={busy || !sendBackProcess || !!sendBackBatch}>
                     Send back
                   </Button>
                   <Button
@@ -440,7 +462,8 @@ export function PartCard({
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+/** A panel of a part's or a batch's full-screen view, which opens and closes. */
+export function Section({ title, children }: { title: string; children: React.ReactNode }) {
   const [open, setOpen] = useState(true);
   return (
     <section className="border border-secondary-200 rounded-xl">
@@ -463,7 +486,12 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-function Meta({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+/** One labeled fact in such a panel's list. */
+export function Meta({
+  label,
+  value,
+  mono,
+}: { label: string; value: React.ReactNode; mono?: boolean }) {
   return (
     <>
       <dt className="text-secondary-400">{label}</dt>

@@ -7,27 +7,32 @@ import {
   Field,
   inputClass,
 } from "@g3/ui";
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { batchMembers, processNamer } from "../../shared/batches";
 import { type InstanceRow, partInfoLabel, partLabel } from "../../shared/derive";
 import {
-  completeStagingBatch,
-  createStagingBatch,
-  deleteStagingBatch,
+  bulkMoveInstances,
+  createBatch,
+  deleteBatch,
   fetchOnshapeLinks,
-  fetchPartFiles,
-  fetchStagingBatches,
-  setStagingBatchFile,
   stageIntoBatch,
   unstageFromBatch,
-  uploadPartFile,
 } from "../../shared/getters";
-import type { OnshapePartLink, PartDefinition, PartFile, StagingBatch } from "../../shared/types";
-import { useAuthUser, useKiosk } from "../../shared/use-auth";
+import type { Batch, OnshapePartLink, PartDefinition } from "../../shared/types";
+import { useAuthUser } from "../../shared/use-auth";
+import type { ShopData } from "../../shared/use-shop-data";
 import { useUserNames } from "../../shared/use-user-names";
-import { FilePickerModal } from "../files/file-picker-modal";
-import { DownloadLink, UploadButton } from "../files/part-files-panel";
-
-const MAX_FILE_BYTES = 100 * 1024 * 1024;
+import { BatchMoveButtons } from "../batches/batch-actions";
+import { BatchFileControls, BatchFileLine } from "../batches/batch-file";
+import {
+  BatchLink,
+  BatchStatusBadge,
+  CompleteButton,
+  PriorityTag,
+  formatTime,
+  plural,
+} from "../batches/batch-ui";
+import { NoticeText } from "../files/file-ui";
 
 /**
  * What a part header shows besides its name: material and thickness on a process that requires
@@ -74,79 +79,67 @@ function onshapeLinkFor(
   return released.find((l) => l.revision === definition.revision) ?? released[0] ?? null;
 }
 
-const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
-
-const formatStarted = (ms: number) =>
-  new Date(ms).toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
+const sectionHeading = "font-sans text-xs font-bold uppercase tracking-widest text-secondary-400";
+const listCard = "bg-surface border border-secondary-200 rounded-xl divide-y divide-secondary-200";
 
 /**
- * Shop-floor view for a File Producer process. Several staging batches can be open at once,
- * each owned by whoever started it and sharing one file. Stage To Do instances into a batch,
- * give the batch a file, then complete it to move every instance to its next process.
+ * Shop-floor view for a File Producer process. A part goes through it on its own, like at any
+ * other process, or in a batch: parts that share one file and move as one. Stage parts into a
+ * batch, give the batch its file, then start and complete the batch.
  */
 export function ProducerSections({
   processId,
   rows,
   touch,
-  definitions,
+  data,
   showPartInfo,
   onChanged,
+  onAdvance,
+  onOpenPart,
 }: {
   processId: number;
   rows: InstanceRow[];
   touch: boolean;
-  definitions: PartDefinition[];
+  data: ShopData;
   showPartInfo: boolean;
   onChanged: () => Promise<void>;
+  /** Starts or completes one part that's in no batch. */
+  onAdvance: (row: InstanceRow, to: "doing" | "done") => Promise<void>;
+  /** Opens a part's shop view. */
+  onOpenPart: (row: InstanceRow) => void;
 }) {
-  const kiosk = useKiosk();
   const user = useAuthUser();
-  const [files, setFiles] = useState<PartFile[]>([]);
-  const [batches, setBatches] = useState<StagingBatch[]>([]);
+  const processName = processNamer(data);
   const [onshapeLinks, setOnshapeLinks] = useState<OnshapePartLink[]>([]);
-  const [loaded, setLoaded] = useState(false);
   const [target, setTarget] = useState<string>("");
-  const [pickerBatchId, setPickerBatchId] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  // Batches still here: not started, or in progress.
+  const batches = useMemo(
+    () => data.batches.filter((b) => b.processId === processId && b.producerStatus !== "done"),
+    [data.batches, processId],
+  );
   const resolveName = useUserNames(batches.map((b) => b.createdBy));
 
-  const load = useCallback(async () => {
-    try {
-      // Onshape only decides whether part names are links, so losing it doesn't fail the view.
-      const [nextFiles, nextBatches, nextLinks] = await Promise.all([
-        fetchPartFiles(),
-        fetchStagingBatches(processId),
-        fetchOnshapeLinks().catch(() => []),
-      ]);
-      setFiles(nextFiles);
-      setBatches(nextBatches);
-      setOnshapeLinks(nextLinks);
-      setLoaded(true);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load staging batches.");
-    }
-  }, [processId]);
-
+  // Onshape only decides whether part names are links, so losing it doesn't fail the view.
   useEffect(() => {
-    load();
-  }, [load]);
+    fetchOnshapeLinks()
+      .then(setOnshapeLinks)
+      .catch(() => {});
+  }, []);
 
   // Default the stage target to your newest batch, else the newest batch, else a new one.
   // Only when nothing valid is chosen: "a new batch" is a deliberate pick and must stick.
   // Skipped mid-action: a just-created batch is selected before the list reloads to include it.
   useEffect(() => {
-    if (!loaded || busy) return;
+    if (busy) return;
     if (target === NEW_BATCH || batches.some((b) => String(b.id) === target)) return;
     const mine = batches.filter((b) => b.createdBy === user?.userId);
     const pick = mine[mine.length - 1] ?? batches[batches.length - 1];
     setTarget(pick ? String(pick.id) : NEW_BATCH);
-  }, [batches, busy, loaded, target, user?.userId]);
+  }, [batches, busy, target, user?.userId]);
 
   const header = useMemo<PartHeaderContext>(() => {
     const links = new Map<string, OnshapePartLink[]>();
@@ -158,100 +151,98 @@ export function ProducerSections({
     return { showInfo: showPartInfo, links };
   }, [onshapeLinks, showPartInfo]);
 
-  const fileById = useMemo(() => new Map(files.map((f) => [f.id, f])), [files]);
   const rowById = useMemo(() => new Map(rows.map((r) => [r.instance.id, r])), [rows]);
-  const inABatch = useMemo(() => new Set(batches.flatMap((b) => b.partInstanceIds)), [batches]);
 
-  // To Do includes anything in progress here that isn't in a batch, so it can be batched.
-  const todoGroups = groupByPart(
-    rows.filter(
-      (r) =>
-        r.current?.processId === processId &&
-        (r.current.status === "todo" ||
-          (r.current.status === "doing" && !inABatch.has(r.instance.id))),
-    ),
-  );
-  const todoCount = todoGroups.reduce((n, g) => n + g.rows.length, 0);
+  // Parts here on their own: in no batch.
+  const alone = (status: "todo" | "doing") =>
+    groupByPart(
+      rows.filter(
+        (r) =>
+          r.current?.processId === processId &&
+          r.current.status === status &&
+          r.current.batchId === null,
+      ),
+    );
+  const doingGroups = alone("doing");
+  const todoGroups = alone("todo");
+  const count = (groups: PartGroup[]) => groups.reduce((n, g) => n + g.rows.length, 0);
 
-  async function run(action: () => Promise<void>) {
+  async function run(action: () => Promise<unknown>) {
     setBusy(true);
     setError(null);
+    setNotice(null);
     try {
       await action();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
-      await Promise.all([onChanged(), load()]);
+      await onChanged();
       setBusy(false);
     }
   }
 
+  /** One part on its own; the page it's on reloads and says what went wrong. */
+  async function advance(row: InstanceRow, to: "doing" | "done") {
+    setBusy(true);
+    await onAdvance(row, to);
+    setBusy(false);
+  }
+
   function stage(targets: InstanceRow[]) {
     const chosen = target;
+    const partInstanceIds = targets.map((r) => r.instance.id);
     run(async () => {
-      const batchId =
-        chosen === NEW_BATCH || !chosen ? await createStagingBatch(processId) : Number(chosen);
-      setTarget(String(batchId));
-      await stageIntoBatch(
-        batchId,
-        targets.map((r) => r.instance.id),
-      );
+      let refused: string[];
+      if (chosen === NEW_BATCH || !chosen) {
+        const made = await createBatch({ processId, partInstanceIds });
+        setTarget(String(made.batch.id));
+        refused = made.refused;
+      } else {
+        refused = await stageIntoBatch(Number(chosen), partInstanceIds);
+      }
+      if (refused.length > 0) setNotice(refused.join(" "));
     });
   }
 
-  function uploadBatchFile(batchId: number, file: File) {
-    if (file.size > MAX_FILE_BYTES) {
-      setError(`${file.name} is over the 100 MB limit.`);
-      return;
-    }
-    run(async () => {
-      const uploaded = await uploadPartFile(file);
-      await setStagingBatchFile(batchId, uploaded.id);
-    });
-  }
-
-  const btn = touch ? "px-4 py-2.5 text-sm" : "px-3 py-1.5 text-xs";
   const size: ButtonSize = touch ? "md" : "sm";
-  const pickerBatch = batches.find((b) => b.id === pickerBatchId) ?? null;
-  const batchLabel = (b: StagingBatch) =>
-    `Batch ${b.id} · ${b.createdBy === "migration" ? "carried over" : resolveName(b.createdBy)}`;
+  const optionLabel = (b: Batch) =>
+    `${b.label}${b.name === null && b.label !== `Batch ${b.number}` ? ` · Batch ${b.number}` : ""}`;
+  const stageButton = (r: InstanceRow) => (
+    <RowButton disabled={busy} onClick={() => stage([r])}>
+      Stage
+    </RowButton>
+  );
 
   return (
     <PartHeader.Provider value={header}>
-      {pickerBatch && (
-        <FilePickerModal
-          files={files.filter((f) => f.id !== pickerBatch.fileId)}
-          definitions={definitions}
-          title={`${pickerBatch.fileId ? "Replace the file for" : "Choose a file for"} batch ${pickerBatch.id}`}
-          confirmLabel={pickerBatch.fileId ? "Replace file" : "Use this file"}
-          onPick={(file) => {
-            setPickerBatchId(null);
-            run(() => setStagingBatchFile(pickerBatch.id, file.id));
-          }}
-          onUploadNew={(file) => {
-            setPickerBatchId(null);
-            uploadBatchFile(pickerBatch.id, file);
-          }}
-          onClose={() => setPickerBatchId(null)}
-        />
-      )}
       {error && <ErrorBanner message={error} />}
+      {notice && <NoticeText message={notice} />}
 
-      {/* Staging batches */}
+      {/* Batches */}
       <section className="space-y-2">
-        <div className="flex items-center justify-between gap-2">
-          <h2 className="font-sans text-xs font-bold uppercase tracking-widest text-secondary-400">
-            Staging batches <span className="text-primary-600">{batches.length}</span>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className={sectionHeading}>
+            Batches <span className="text-primary-600">{batches.length}</span>
           </h2>
+          <Button
+            variant="secondary"
+            size={size}
+            disabled={busy}
+            onClick={() =>
+              run(async () => setTarget(String((await createBatch({ processId })).batch.id)))
+            }
+          >
+            New batch
+          </Button>
         </div>
         {batches.length === 0 ? (
           <p className="text-secondary-400 text-sm">
-            No open batches. Staging from To Do below starts one.
+            No batches here. Instances that share one file go in a batch: stage them from To Do
+            below.
           </p>
         ) : (
           batches.map((batch) => {
-            const staged = batch.partInstanceIds.flatMap((id) => rowById.get(id) ?? []);
-            const file = batch.fileId ? (fileById.get(batch.fileId) ?? null) : null;
+            const staged = batchMembers(batch).flatMap((m) => rowById.get(m.partInstanceId) ?? []);
             const isTarget = target === String(batch.id);
             return (
               <div
@@ -264,11 +255,16 @@ export function ProducerSections({
               >
                 <div className="px-4 py-2.5 bg-secondary-50 rounded-t-xl space-y-1.5">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-sm font-semibold text-secondary-900">
-                      {batchLabel(batch)}
+                    <span className="min-w-0 truncate text-sm font-semibold">
+                      <BatchLink batch={batch} />
                     </span>
+                    <BatchStatusBadge batch={batch} processName={processName} />
                     <span className="text-xs text-secondary-400">
-                      started {formatStarted(batch.createdAt)} · {plural(staged.length, "instance")}
+                      {batch.label !== `Batch ${batch.number}` && `Batch ${batch.number} · `}
+                      {batch.createdBy === "migration"
+                        ? "carried over"
+                        : resolveName(batch.createdBy)}{" "}
+                      · {formatTime(batch.createdAt)} · {plural(staged.length, "instance")}
                     </span>
                     <span className="flex-1" />
                     {isTarget ? (
@@ -289,35 +285,22 @@ export function ProducerSections({
                     <span className="text-xs font-bold uppercase tracking-wide text-secondary-400">
                       File
                     </span>
-                    {file ? (
-                      <>
-                        <span
-                          className="text-sm font-semibold text-secondary-900 truncate min-w-0 flex-1"
-                          title={file.filename}
-                        >
-                          {file.filename}
-                        </span>
-                        <DownloadLink file={file} />
-                      </>
-                    ) : (
-                      <span className="text-sm text-secondary-500 flex-1">No file yet</span>
-                    )}
+                    <BatchFileLine batch={batch} />
                   </div>
                 </div>
 
                 {staged.length === 0 ? (
                   <div className="flex flex-wrap items-center gap-2 px-4 py-3">
                     <span className="text-sm text-secondary-400 flex-1">
-                      Empty — stage instances from To Do below.
+                      Empty. Stage instances into it from To Do below.
                     </span>
-                    <Button
-                      variant="danger"
+                    <ConfirmButton
                       size={size}
+                      label="Delete batch"
+                      question={`Delete ${batch.label}?${batch.file ? " Its file stays in the library." : ""}`}
                       disabled={busy}
-                      onClick={() => run(() => deleteStagingBatch(batch.id))}
-                    >
-                      Delete batch
-                    </Button>
+                      onConfirm={() => run(() => deleteBatch(batch.id))}
+                    />
                   </div>
                 ) : (
                   groupByPart(staged).map(({ key, rows: groupRows }) => (
@@ -343,69 +326,38 @@ export function ProducerSections({
                         </Button>
                       }
                       renderRow={(r) => (
-                        <>
-                          <span className="flex-1" />
-                          <RowButton
-                            disabled={busy}
-                            onClick={() => run(() => unstageFromBatch(batch.id, [r.instance.id]))}
-                          >
-                            Unstage
-                          </RowButton>
-                        </>
+                        <RowButton
+                          disabled={busy}
+                          onClick={() => run(() => unstageFromBatch(batch.id, [r.instance.id]))}
+                        >
+                          Unstage
+                        </RowButton>
                       )}
                     />
                   ))
                 )}
 
-                <div className="flex flex-wrap items-center gap-2 px-4 py-3 bg-secondary-50 rounded-b-xl">
-                  {kiosk.active ? (
-                    <span className="text-xs text-secondary-500">
-                      Changing the file needs a regular sign-in — kiosks can't upload.
-                    </span>
-                  ) : (
-                    <>
-                      <UploadButton
-                        busy={busy}
-                        multiple={false}
-                        onFiles={([f]) => f && uploadBatchFile(batch.id, f)}
-                        label="Upload file"
-                        variant="primary"
-                        size={size}
-                      />
-                      <Button
-                        variant="secondary"
-                        size={size}
-                        disabled={busy}
-                        onClick={() => setPickerBatchId(batch.id)}
-                      >
-                        Choose existing file
-                      </Button>
-                      {file && (
-                        <ConfirmButton
-                          size={size}
-                          label="Remove file"
-                          confirmLabel="Remove it"
-                          question={`Remove ${file.filename} from batch ${batch.id}? The file stays in the library.`}
-                          disabled={busy}
-                          onConfirm={() => run(() => setStagingBatchFile(batch.id, null))}
-                        />
-                      )}
-                    </>
-                  )}
-                  <span className="relative group ml-auto">
-                    <button
-                      type="button"
-                      disabled={busy || !file || staged.length === 0}
-                      onClick={() => run(() => completeStagingBatch(batch.id))}
-                      className={`${btn} font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors disabled:opacity-50`}
-                    >
-                      Mark {plural(staged.length, "instance")} complete
-                    </button>
-                    <span className="pointer-events-none absolute bottom-full right-0 mb-1.5 hidden group-hover:block whitespace-nowrap bg-secondary-900 text-surface text-xs rounded-md px-2.5 py-1.5 shadow-lg">
-                      {!file
-                        ? "Add a file to this batch first"
-                        : "Moves every instance in this batch to its next process"}
-                    </span>
+                <div className="flex flex-wrap items-start gap-2 px-4 py-3 bg-secondary-50 rounded-b-xl">
+                  <BatchFileControls
+                    batch={batch}
+                    batches={data.batches}
+                    busy={busy}
+                    size={size}
+                    run={run}
+                  />
+                  <span className="ml-auto flex flex-wrap items-center gap-2">
+                    <BatchMoveButtons
+                      batch={batch}
+                      arrived
+                      nextName={
+                        batch.consumerProcessId === null
+                          ? null
+                          : processName(batch.consumerProcessId)
+                      }
+                      busy={busy}
+                      size={touch ? "touch" : "sm"}
+                      run={run}
+                    />
                   </span>
                 </div>
               </div>
@@ -414,13 +366,65 @@ export function ProducerSections({
         )}
       </section>
 
-      {/* To Do */}
+      {/* In Progress: parts on their own */}
+      <section className="space-y-2">
+        <h2 className={sectionHeading}>
+          In Progress <span className="text-primary-600">{count(doingGroups)}</span>
+        </h2>
+        {doingGroups.length === 0 ? (
+          <p className="text-secondary-400 text-sm">Nothing in progress here outside a batch.</p>
+        ) : (
+          <div className={listCard}>
+            {doingGroups.map(({ key, rows: groupRows }) => (
+              <PartGroup
+                key={key}
+                rows={groupRows}
+                touch={touch}
+                onOpenPart={onOpenPart}
+                actions={
+                  <>
+                    <Button size={size} disabled={busy} onClick={() => stage(groupRows)}>
+                      Stage all
+                    </Button>
+                    <CompleteButton
+                      size={touch ? "touch" : "sm"}
+                      hint="Do a quality check before marking these complete!"
+                      disabled={busy}
+                      onClick={() =>
+                        run(() =>
+                          bulkMoveInstances(
+                            processId,
+                            groupRows.map((r) => r.instance.id),
+                            "done",
+                          ),
+                        )
+                      }
+                    >
+                      Mark all complete
+                    </CompleteButton>
+                  </>
+                }
+                renderRow={(r) => (
+                  <>
+                    {stageButton(r)}
+                    <RowButton complete disabled={busy} onClick={() => advance(r, "done")}>
+                      Mark as complete
+                    </RowButton>
+                  </>
+                )}
+              />
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* To Do: parts on their own */}
       <section className="space-y-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="font-sans text-xs font-bold uppercase tracking-widest text-secondary-400">
-            To Do <span className="text-primary-600">{todoCount}</span>
+          <h2 className={sectionHeading}>
+            To Do <span className="text-primary-600">{count(todoGroups)}</span>
           </h2>
-          {todoCount > 0 && (
+          {count(todoGroups) + count(doingGroups) > 0 && (
             <label className="flex items-center gap-1.5 text-xs text-secondary-500">
               Stage into
               <select
@@ -430,7 +434,7 @@ export function ProducerSections({
               >
                 {batches.map((b) => (
                   <option key={b.id} value={b.id}>
-                    {batchLabel(b)}
+                    {optionLabel(b)}
                   </option>
                 ))}
                 <option value={NEW_BATCH}>A new batch</option>
@@ -439,9 +443,9 @@ export function ProducerSections({
           )}
         </div>
         {todoGroups.length === 0 ? (
-          <p className="text-secondary-400 text-sm">Nothing ready to stage.</p>
+          <p className="text-secondary-400 text-sm">Nothing ready to start.</p>
         ) : (
-          <div className="bg-surface border border-secondary-200 rounded-xl divide-y divide-secondary-200">
+          <div className={listCard}>
             {todoGroups.map(({ key, rows: groupRows }) => (
               <TodoGroup
                 key={key}
@@ -450,6 +454,27 @@ export function ProducerSections({
                 busy={busy}
                 size={size}
                 onStage={stage}
+                onOpenPart={onOpenPart}
+                onStartAll={() =>
+                  run(() =>
+                    bulkMoveInstances(
+                      processId,
+                      groupRows.map((r) => r.instance.id),
+                      "doing",
+                    ),
+                  )
+                }
+                renderRow={(r) => (
+                  <>
+                    {stageButton(r)}
+                    <RowButton disabled={busy} onClick={() => advance(r, "doing")}>
+                      Start part
+                    </RowButton>
+                    <RowButton complete disabled={busy} onClick={() => advance(r, "done")}>
+                      Mark as complete
+                    </RowButton>
+                  </>
+                )}
               />
             ))}
           </div>
@@ -465,12 +490,18 @@ function TodoGroup({
   busy,
   size,
   onStage,
+  onStartAll,
+  onOpenPart,
+  renderRow,
 }: {
   rows: InstanceRow[];
   touch: boolean;
   busy: boolean;
   size: ButtonSize;
   onStage: (targets: InstanceRow[]) => void;
+  onStartAll: () => void;
+  onOpenPart: (row: InstanceRow) => void;
+  renderRow: (row: InstanceRow) => React.ReactNode;
 }) {
   const max = rows.length;
   // How many to stage, while the pop-up that asks is open.
@@ -491,6 +522,7 @@ function TodoGroup({
     <PartGroup
       rows={rows}
       touch={touch}
+      onOpenPart={onOpenPart}
       actions={
         <>
           <Button size={size} disabled={busy} onClick={() => onStage(rows)}>
@@ -506,6 +538,9 @@ function TodoGroup({
             }}
           >
             Stage some
+          </Button>
+          <Button variant="secondary" size={size} disabled={busy} onClick={onStartAll}>
+            Start all
           </Button>
           {count !== null && (
             <Dialog title="Stage some" onClose={() => setCount(null)}>
@@ -545,29 +580,27 @@ function TodoGroup({
           )}
         </>
       }
-      renderRow={(r) => (
-        <>
-          <span className="flex-1" />
-          <RowButton disabled={busy} onClick={() => onStage([r])}>
-            Stage
-          </RowButton>
-        </>
-      )}
+      renderRow={renderRow}
     />
   );
 }
 
-/** A part header with its bulk actions, then one thin indented row per instance. */
+/**
+ * A part header with its bulk actions, then one thin indented row per instance with that row's
+ * own buttons. With `onOpenPart` an instance's number opens its shop view.
+ */
 function PartGroup({
   rows,
   touch,
   actions,
   renderRow,
+  onOpenPart,
 }: {
   rows: InstanceRow[];
   touch: boolean;
   actions: React.ReactNode;
   renderRow: (row: InstanceRow) => React.ReactNode;
+  onOpenPart?: (row: InstanceRow) => void;
 }) {
   const { showInfo, links } = useContext(PartHeader);
   const first = rows[0];
@@ -615,7 +648,7 @@ function PartGroup({
             )}
           </p>
         </div>
-        <div className="flex items-center gap-1.5 shrink-0">{actions}</div>
+        <div className="flex flex-wrap items-center gap-1.5 sm:shrink-0">{actions}</div>
       </div>
       <ul className="mt-1.5 ml-2 border-l-2 border-secondary-200">
         {rows.map((r) => (
@@ -623,14 +656,22 @@ function PartGroup({
             key={r.instance.id}
             className={`flex items-center gap-2 pl-3 pr-1 text-xs hover:bg-secondary-50 ${touch ? "py-1.5" : "py-0.5"}`}
           >
-            <span className="font-mono text-secondary-900 w-10 shrink-0">
-              #{r.instance.instanceNumber}
-            </span>
-            {r.instance.isPriority ? (
-              <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-700 bg-amber-50 border border-amber-300 rounded px-1">
-                Priority
+            {onOpenPart ? (
+              <button
+                type="button"
+                onClick={() => onOpenPart(r)}
+                title="Open this part"
+                className="w-10 shrink-0 text-left font-mono text-primary-600 underline hover:text-primary-700"
+              >
+                #{r.instance.instanceNumber}
+              </button>
+            ) : (
+              <span className="font-mono text-secondary-900 w-10 shrink-0">
+                #{r.instance.instanceNumber}
               </span>
-            ) : null}
+            )}
+            {r.instance.isPriority ? <PriorityTag /> : null}
+            <span className="flex-1" />
             {renderRow(r)}
           </li>
         ))}
@@ -639,12 +680,15 @@ function PartGroup({
   );
 }
 
+/** A small button on an instance's row; `complete` is the green one that completes it. */
 function RowButton({
   disabled,
+  complete = false,
   onClick,
   children,
 }: {
   disabled: boolean;
+  complete?: boolean;
   onClick: () => void;
   children: React.ReactNode;
 }) {
@@ -653,7 +697,11 @@ function RowButton({
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className="px-2 py-0.5 text-[11px] font-semibold text-secondary-500 border border-secondary-200 hover:border-secondary-400 hover:text-primary-600 rounded transition-colors disabled:opacity-50 shrink-0"
+      className={`px-2 py-0.5 text-[11px] font-semibold border rounded transition-colors disabled:opacity-50 shrink-0 ${
+        complete
+          ? "bg-emerald-600 border-emerald-600 text-white hover:bg-emerald-700 hover:border-emerald-700"
+          : "text-secondary-500 border-secondary-200 hover:border-secondary-400 hover:text-primary-600"
+      }`}
     >
       {children}
     </button>

@@ -1,5 +1,6 @@
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { plugins } from "./plugins.config";
+import { BatchSheet } from "./plugins/batches/batch-sheet";
 import { BoardPage } from "./plugins/board/board-page";
 import { NavBar } from "./shared/nav-bar";
 import { ProtectedRoute } from "./shared/protected-route";
@@ -26,6 +27,7 @@ function AppContent() {
       <div className="flex min-h-screen flex-col bg-page">
         <NavBar items={navItems} />
         <BoardPage />
+        <BatchSheet />
       </div>
     );
   }
@@ -39,6 +41,8 @@ function AppContent() {
           <Route key={r.path} path={r.path} element={r.element} />
         ))}
       </Routes>
+      {/* A batch's detail view, over whichever page asked for it (`?batch=`). */}
+      <BatchSheet />
     </div>
   );
 }

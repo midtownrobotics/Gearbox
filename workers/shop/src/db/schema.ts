@@ -100,7 +100,7 @@ export const partInstanceProcesses = sqliteTable(
       .default("waiting"),
     completedAt: integer("completed_at"),
     createdAt: integer("created_at").notNull(),
-    // Set while (and after) this step is produced as part of a File Producer staging batch.
+    // On a File Producer step: the batch this instance is in. Cleared when it leaves the batch.
     batchId: integer("batch_id").references(() => stagingBatches.id, { onDelete: "set null" }),
   },
   (t) => [unique().on(t.partInstanceId, t.index)],
@@ -198,33 +198,62 @@ export const files = sqliteTable("files", {
   fileSize: integer("file_size").notNull(),
   uploadedBy: text("uploaded_by").notNull(),
   createdAt: integer("created_at").notNull(),
+  // Set for good when an obsolete instance it was made for is deleted, so the file stays
+  // obsolete. Until then that is worked out from its batches (lib/batches.ts).
+  obsoletedAt: integer("obsoleted_at"),
 });
 
-// One file per instance at most; a file can cover many instances across parts.
-export const partInstanceFiles = sqliteTable("part_instance_files", {
+export const BATCH_STATUSES = ["todo", "doing", "done"] as const;
+export type BatchStatus = (typeof BATCH_STATUSES)[number];
+
+/**
+ * Instances that share one file, moved as one unit: first through the File Producer process that
+ * makes the file (`producerStatus`), then through the File Consumer process that uses it
+ * (`consumerStatus`). An instance is in a batch while its step at `processId` carries the batch's
+ * id (`partInstanceProcesses.batchId`); a batch is the only thing that links an instance to a
+ * file. Rules in lib/batches.ts.
+ */
+export const stagingBatches = sqliteTable(
+  "staging_batches",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    teamId: teamId(),
+    /** "Batch 7": counted up within the team. */
+    number: integer("number").notNull(),
+    /** The name someone gave it; null for the automatic one (lib/batches.ts `batchLabel`). */
+    name: text("name"),
+    /** The File Producer process it was made at. */
+    processId: integer("process_id")
+      .notNull()
+      .references(() => processes.id),
+    /** The File Consumer process its parts go to next. Null while nothing is in it. */
+    consumerProcessId: integer("consumer_process_id").references(() => processes.id),
+    fileId: integer("file_id").references(() => files.id, { onDelete: "set null" }),
+    producerStatus: text("producer_status", { enum: BATCH_STATUSES }).notNull().default("todo"),
+    /** Only means something once `producerStatus` is done. */
+    consumerStatus: text("consumer_status", { enum: BATCH_STATUSES }).notNull().default("todo"),
+    createdBy: text("created_by").notNull(),
+    createdAt: integer("created_at").notNull(),
+    /** When it finished its File Producer process. */
+    closedAt: integer("closed_at"),
+    /** When it finished its File Consumer process. */
+    completedAt: integer("completed_at"),
+  },
+  (t) => [unique().on(t.teamId, t.number)],
+);
+
+/** An instance that was sent back out of a batch after its file was made: kept as a record. */
+export const stagingBatchRemovals = sqliteTable("staging_batch_removals", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   teamId: teamId(),
-  fileId: integer("file_id")
+  batchId: integer("batch_id")
     .notNull()
-    .references(() => files.id, { onDelete: "cascade" }),
+    .references(() => stagingBatches.id, { onDelete: "cascade" }),
   partInstanceId: integer("part_instance_id")
     .notNull()
-    .unique()
     .references(() => partInstances.id, { onDelete: "cascade" }),
-  assignedBy: text("assigned_by").notNull(),
-  createdAt: integer("created_at").notNull(),
-});
-
-export const stagingBatches = sqliteTable("staging_batches", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  teamId: teamId(),
-  processId: integer("process_id")
-    .notNull()
-    .references(() => processes.id),
-  fileId: integer("file_id").references(() => files.id, { onDelete: "set null" }),
-  createdBy: text("created_by").notNull(),
-  createdAt: integer("created_at").notNull(),
-  closedAt: integer("closed_at"),
+  removedBy: text("removed_by").notNull(),
+  removedAt: integer("removed_at").notNull(),
 });
 
 export const adminSettings = sqliteTable(

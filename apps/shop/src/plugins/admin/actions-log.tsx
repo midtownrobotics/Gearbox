@@ -1,9 +1,12 @@
 import { ErrorBanner, inputClass } from "@g3/ui";
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { fetchActions } from "../../shared/getters";
+import { processPath } from "../../shared/nav";
 import type { Action } from "../../shared/types";
 import type { ShopData } from "../../shared/use-shop-data";
 import { useUserNames } from "../../shared/use-user-names";
+import { InstanceLink } from "../batches/batch-ui";
 
 const ACTION_LABELS: Record<Action["action"], string> = {
   started: "Marked In Progress",
@@ -56,6 +59,8 @@ export function ActionsLog({ data }: { data: ShopData }) {
         userName: resolveName(a.userId),
         partLabel,
         partNumber: definition?.onshapePartNumber ?? "",
+        // Its details view, unless the part has since been deleted or made obsolete.
+        opens: !!instance && !instance.isStale && !!definition && !definition.isObsolete,
         definitionId: definition?.id ?? null,
         processName: processById.get(a.processId)?.name ?? `Process #${a.processId}`,
       };
@@ -248,14 +253,26 @@ export function ActionsLog({ data }: { data: ShopData }) {
                 </td>
                 <td className="px-3 py-2 text-secondary-900">{r.userName}</td>
                 <td className="px-3 py-2">
-                  <span className="text-secondary-900">{r.partLabel}</span>
+                  {r.opens ? (
+                    <InstanceLink instanceId={r.action.partInstanceId}>{r.partLabel}</InstanceLink>
+                  ) : (
+                    <span className="text-secondary-900">{r.partLabel}</span>
+                  )}
                   {r.partNumber && (
                     <span className="ml-1.5 font-mono text-xs text-secondary-400">
                       {r.partNumber}
                     </span>
                   )}
                 </td>
-                <td className="px-3 py-2 text-secondary-500">{r.processName}</td>
+                <td className="px-3 py-2">
+                  <Link
+                    to={processPath(r.action.processId)}
+                    title={`Go to ${r.processName} on the shop floor`}
+                    className="text-secondary-500 hover:text-primary-600 underline transition-colors"
+                  >
+                    {r.processName}
+                  </Link>
+                </td>
                 <td className="px-3 py-2">
                   <span
                     className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${

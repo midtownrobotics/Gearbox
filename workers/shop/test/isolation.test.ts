@@ -12,8 +12,8 @@ import { app } from "../src/index";
 import { drawingKey, teamPrefix } from "../src/lib/storage";
 import { eventually, onshapeEvent } from "./onshape";
 
-// Two teams, each with its own subsystem, process, part with instances and a staging batch, a
-// part file, a drawing in R2 (and an uploaded one), a part from its Onshape webhook, its Onshape
+// Two teams, each with its own subsystem, processes, part with instances, a batch with a part
+// file and an instance sent back out of it, a drawing in R2 (and an uploaded one), a part from its Onshape webhook, its Onshape
 // and Slack settings, and a kiosk at the shop. Every route, called as team A's admin, mentor,
 // student and kiosk session with team B's ids, must show none of B's and change nothing of B's,
 // in D1 or in R2.
@@ -33,8 +33,8 @@ const TABLES = [
   "onshape_parts",
   "drawings",
   "files",
-  "part_instance_files",
   "staging_batches",
+  "staging_batch_removals",
   "admin_settings",
 ];
 
@@ -81,12 +81,15 @@ async function seed(team: TeamUsers): Promise<Seeded> {
     { method: "POST", body: { name: `Sub ${tag}` } },
     201,
   );
-  const process = await jsonAs<Id>(
-    student,
-    "/processes",
-    { method: "POST", body: { name: `Proc ${tag}` } },
-    201,
-  );
+  const makeProcess = (name: string, type: string) =>
+    jsonAs<Id>(
+      student,
+      "/processes",
+      { method: "POST", body: { name: `${name} ${tag}`, type } },
+      201,
+    );
+  const process = await makeProcess("Proc", "file_producer");
+  const consumer = await makeProcess("Use", "file_consumer");
   const part = await jsonAs<Id>(
     student,
     "/part-definitions",
@@ -97,7 +100,7 @@ async function seed(team: TeamUsers): Promise<Seeded> {
         revision: "A",
         subsystemId: subsystem.id,
         name: `Part ${tag}`,
-        processIds: [process.id],
+        processIds: [process.id, consumer.id],
       },
     },
     201,
@@ -105,10 +108,10 @@ async function seed(team: TeamUsers): Promise<Seeded> {
   const instances = await jsonAs<Id[]>(
     student,
     "/part-instances",
-    { method: "POST", body: { partDefinitionId: part.id, quantity: 3 } },
+    { method: "POST", body: { partDefinitionId: part.id, quantity: 5 } },
     201,
   );
-  // One instance started, one staged in a batch.
+  // One instance started on its own.
   await jsonAs(
     student,
     `/part-instance-processes/${instances[0].id}/processes/${process.id}/doing`,
@@ -116,24 +119,44 @@ async function seed(team: TeamUsers): Promise<Seeded> {
       method: "POST",
     },
   );
-  const batch = await jsonAs<Id>(
-    student,
-    "/staging-batches",
-    { method: "POST", body: { processId: process.id } },
-    201,
-  );
-  await jsonAs(student, `/staging-batches/${batch.id}/stage`, {
-    method: "POST",
-    body: { partInstanceIds: [instances[1].id] },
-  });
-  // A part file, assigned to an instance.
+  // A part file on a batch of two, made, with one of them sent back out of it.
   const form = new FormData();
   form.set("file", new File([`file ${tag}`], `cut-${tag}.dxf`, { type: "application/dxf" }));
   const file = await jsonAs<Id>(student, "/part-files", { method: "POST", body: form }, 201);
-  await jsonAs(student, `/part-files/${file.id}/assignments`, {
-    method: "PUT",
-    body: { partDefinitionId: part.id, count: 1 },
+  const made = await jsonAs<{ batch: Id }>(
+    student,
+    "/staging-batches",
+    {
+      method: "POST",
+      body: {
+        processId: process.id,
+        name: `Batch ${tag}`,
+        fileId: file.id,
+        partInstanceIds: [instances[1].id, instances[3].id],
+      },
+    },
+    201,
+  );
+  await jsonAs(student, `/staging-batches/${made.batch.id}/status`, {
+    method: "POST",
+    body: { at: "producer", to: "done" },
   });
+  await jsonAs(
+    student,
+    `/staging-batches/${made.batch.id}/instances/${instances[3].id}/send-back`,
+    {
+      method: "POST",
+    },
+  );
+  // And an open batch with one staged in it.
+  const batch = (
+    await jsonAs<{ batch: Id }>(
+      student,
+      "/staging-batches",
+      { method: "POST", body: { processId: process.id, partInstanceIds: [instances[4].id] } },
+      201,
+    )
+  ).batch;
   // A released drawing in R2, and one uploaded by hand.
   await bucket.put(drawingKey(team.teamId, partNumber, "A"), `%PDF drawing ${tag}`);
   const upload = new FormData();
@@ -155,7 +178,8 @@ async function seed(team: TeamUsers): Promise<Seeded> {
   };
   return {
     params: (path, name) => {
-      if (name === "partInstanceId" || name === "instanceId") return String(instances[0].id);
+      if (name === "instanceId") return String(instances[4].id);
+      if (name === "partInstanceId") return String(instances[0].id);
       if (name === "processId") return String(process.id);
       if (name === "partNumber") return partNumber;
       if (name === "revision") return "A";
@@ -219,11 +243,17 @@ it("keeps every team's shop to itself", async () => {
           to: "doing",
         },
         "PATCH /part-instance-processes/:partInstanceId/processes/:processId": { status: "done" },
-        "PUT /part-files/:id/assignments": { partDefinitionId: d.part, count: 3 },
-        "POST /staging-batches": { processId: d.process },
+        "POST /staging-batches": {
+          processId: d.process,
+          fileId: d.file,
+          partInstanceIds: [d.instance],
+        },
+        "PATCH /staging-batches/:id": { name: "Mine" },
         "POST /staging-batches/:id/stage": { partInstanceIds: [d.instance] },
         "POST /staging-batches/:id/unstage": { partInstanceIds: [d.instance] },
         "PUT /staging-batches/:id/file": { fileId: d.file },
+        "POST /staging-batches/:id/status": { at: "producer", to: "done" },
+        "POST /staging-batches/:id/send-back": { to: "producer" },
         "POST /admin/slack/config": { slackReleaseChannelId: "CMINE" },
         "POST /admin/onshape/config": { documentId: "mine" },
         "POST /admin/slack/daily-summary": { kind: "overview", since: Date.now() - 1000 },

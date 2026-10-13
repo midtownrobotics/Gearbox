@@ -3,7 +3,7 @@ import { useState } from "react";
 
 import { api } from "../../shared/api";
 import { getErrorMessage } from "../../shared/api-error";
-import type { InstanceRow } from "../../shared/derive";
+import { type InstanceRow, STATUS_LABELS } from "../../shared/derive";
 import type { ShopData } from "../../shared/use-shop-data";
 import { ShopView, shopButton, shopButtonPlain } from "./shop-view";
 
@@ -116,7 +116,7 @@ export function PartWorkView({
                     onChange={() => setRevertStatus(s)}
                     className="accent-primary-500"
                   />
-                  <span className="text-sm text-secondary-900 capitalize">{s}</span>
+                  <span className="text-sm text-secondary-900">{STATUS_LABELS[s]}</span>
                 </label>
               ))}
             </div>

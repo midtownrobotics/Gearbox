@@ -4,9 +4,21 @@ import { Hono } from "hono";
 import { validator } from "hono/validator";
 import { createShopDb } from "../db";
 import { actions, partInstanceProcesses } from "../db/schema";
+import { governedInstances, governedMessage, governingBatch } from "../lib/batches";
 import { finished, promoteNextSteps } from "../lib/steps";
 import type { AppEnv } from "../types";
 import { recordAction } from "./actions";
+
+type ShopDb = ReturnType<typeof createShopDb>;
+
+/**
+ * Why this step can't be moved on its own, or null: the instance is in a batch that moves it
+ * (lib/batches.ts).
+ */
+async function batchRefusal(db: ShopDb, teamId: string, partInstanceId: number, processId: number) {
+  const batch = await governingBatch(db, teamId, partInstanceId, processId);
+  return batch ? governedMessage(db, teamId, batch) : null;
+}
 
 const updateProcessStatusValidator = validator("json", (value, c): { status: string } => {
   const v = (value ?? {}) as { status?: unknown };
@@ -50,15 +62,18 @@ export const partInstanceProcessesRouter = new Hono<AppEnv>()
   /**
    * Moves many instances' step at one process in a few set-based statements: To Do → In
    * Progress ("doing"), or In Progress → done, which also unlocks each instance's next step.
-   * Instances not in the expected starting status are skipped. Returns how many moved.
+   * Instances not in the expected starting status are skipped, and so are those a batch moves
+   * there. Returns how many moved.
    */
   .post("/bulk", requireAuth, bulkValidator, async (c) => {
-    const { processId, partInstanceIds, to } = c.req.valid("json");
+    const { processId, partInstanceIds: asked, to } = c.req.valid("json");
     const db = createShopDb(c.env.SHOP_DB);
     const teamId = c.get("teamId");
     const now = Date.now();
     const from = to === "doing" ? "todo" : "doing";
     const moved: number[] = [];
+    const inBatch = await governedInstances(db, teamId, asked, processId);
+    const partInstanceIds = asked.filter((id) => !inBatch.has(id));
 
     for (let i = 0; i < partInstanceIds.length; i += BULK_CHUNK) {
       const ids = partInstanceIds.slice(i, i + BULK_CHUNK);
@@ -117,7 +132,7 @@ export const partInstanceProcessesRouter = new Hono<AppEnv>()
       console.error("Failed to record actions:", err);
     }
 
-    return c.json({ moved: moved.length, requested: partInstanceIds.length });
+    return c.json({ moved: moved.length, requested: asked.length });
   })
   .get("/", requireAuth, async (c) => {
     const processId = c.req.query("processId");
@@ -163,6 +178,8 @@ export const partInstanceProcessesRouter = new Hono<AppEnv>()
 
     const db = createShopDb(c.env.SHOP_DB);
     const teamId = c.get("teamId");
+    const refusal = await batchRefusal(db, teamId, partInstanceId, processId);
+    if (refusal) return c.json({ error: refusal }, 409);
     const row = await db
       .update(partInstanceProcesses)
       .set({ status: "done", completedAt: Date.now() })
@@ -217,6 +234,8 @@ export const partInstanceProcessesRouter = new Hono<AppEnv>()
 
     const db = createShopDb(c.env.SHOP_DB);
     const teamId = c.get("teamId");
+    const refusal = await batchRefusal(db, teamId, partInstanceId, processId);
+    if (refusal) return c.json({ error: refusal }, 409);
     const row = await db
       .update(partInstanceProcesses)
       .set({ status: "doing" })
@@ -253,6 +272,8 @@ export const partInstanceProcessesRouter = new Hono<AppEnv>()
 
       const db = createShopDb(c.env.SHOP_DB);
       const teamId = c.get("teamId");
+      const refusal = await batchRefusal(db, teamId, partInstanceId, processId);
+      if (refusal) return c.json({ error: refusal }, 409);
       const row = await db
         .update(partInstanceProcesses)
         .set({

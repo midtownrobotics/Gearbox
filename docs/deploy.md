@@ -139,6 +139,14 @@ After the release:
 - **Old copies in R2:** once drawings and part files open, `pnpm --filter @g3/worker-shop r2:move-to-team -- --delete-old` removes the originals (only those whose copy is there).
 - **Slack:** Shop's `SLACK_BOT_TOKEN` and `SLACK_SIGNING_SECRET` secrets are no longer used; delete them. Release and summary posts go to the channels set on the Admin page, on the team's own Slack.
 
+## Shop's batches (once)
+
+Shop's migration `0019_batches.sql` goes with the Shop that tracks a batch as one unit. The deploy applies it with the rest; by hand it is `pnpm --filter @g3/worker-shop run db:migrate:remote`, right before deploying Shop's worker.
+
+- **What it does to the data:** every batch gets a number (the one it was known by), a status at its File Producer process and one at its File Consumer process, from where its parts were. A file that was assigned straight to instances becomes a batch of them, one for each file, File Producer process and status there. An instance that had a file but hadn't reached its File Producer process, or has none, loses the link; the file stays in the library, under Unused. `part_instance_files` is dropped.
+- **Between the migration and the new worker,** the Shop that's still running can't list files or open a File Producer or File Consumer process's page. Do both together, when the shop isn't working.
+- **Afterward,** a file made for a part that is now obsolete is under Obsolete on the Files page and can't go on another batch.
+
 ## Edge for every team (once, roadmap Phase 3)
 
 Each team's box now signs in with its own key, stored hashed in Edge's database, in place of the shared `EDGE_AGENT_KEY` secret. G3's box keeps the key it has. Before merging the release PR that brings it:
