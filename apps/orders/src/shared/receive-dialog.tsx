@@ -1,6 +1,6 @@
-import { Button, ErrorBanner, Field, inputClass, useTeamNames } from "@g3/ui";
+import { Button, Dialog, ErrorBanner, Field, inputClass, useTeamNames } from "@g3/ui";
 import type { InferResponseType } from "hono/client";
-import { type FormEvent, useEffect, useId, useRef, useState } from "react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
 import { api, getErrorMessage } from "./api";
 
 // Marking parts received, with where they go in the Inventory app: into storage at a location, or
@@ -120,7 +120,6 @@ export function ReceiveDialog({
   onClose: () => void;
   onReceived: (result: { received: number; toInventory: boolean }) => void;
 }) {
-  const titleId = useId();
   const inventoryName = useTeamNames().appTitle("Inventory");
   const options = intake.options;
   const usable = !!options && options.locations.length > 0;
@@ -141,14 +140,6 @@ export function ReceiveDialog({
   const [error, setError] = useState<string | null>(null);
   /** Parts whose location was picked by hand: a default arriving late doesn't replace those. */
   const touched = useRef(new Set<number>());
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
 
   // Where each part starts: with its entry in Inventory, or where it went last time. A part
   // with neither starts blank.
@@ -274,153 +265,137 @@ export function ReceiveDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-secondary-900/50 p-4 sm:p-8">
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        className="w-full max-w-xl rounded-xl bg-surface shadow-xl"
-      >
-        <header className="flex items-center justify-between border-b border-secondary-200 px-5 py-3">
-          <h2 id={titleId} className="text-lg font-semibold text-secondary-900">
-            {many ? `Mark ${lines.length} items received` : "Mark received"}
-          </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg px-2 py-1 text-secondary-400 hover:text-secondary-900"
-            aria-label="Close"
-          >
-            ✕
-          </button>
-        </header>
-        <form onSubmit={receive} className="space-y-4 p-5">
-          {intake.required ? (
-            <p className="text-sm text-secondary-600">
-              Say where {many ? "these go" : "this goes"}, so {inventoryName} stays right.
-            </p>
-          ) : (
-            <label className="flex items-center gap-2 text-sm text-secondary-700">
-              <input type="checkbox" checked={send} onChange={(e) => setSend(e.target.checked)} />
-              Add {many ? "them" : "it"} to {inventoryName}
-            </label>
-          )}
+    <Dialog
+      title={many ? `Mark ${lines.length} items received` : "Mark received"}
+      size="xl"
+      onClose={onClose}
+    >
+      <form onSubmit={receive} className="space-y-4">
+        {intake.required ? (
+          <p className="text-sm text-secondary-600">
+            Say where {many ? "these go" : "this goes"}, so {inventoryName} stays right.
+          </p>
+        ) : (
+          <label className="flex items-center gap-2 text-sm text-secondary-700">
+            <input type="checkbox" checked={send} onChange={(e) => setSend(e.target.checked)} />
+            Add {many ? "them" : "it"} to {inventoryName}
+          </label>
+        )}
 
-          {send && blocked && (
-            <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-              {blocked}
-              {intake.required && " A mentor can turn this requirement off on Orders' Admin page."}
-            </p>
-          )}
+        {send && blocked && (
+          <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            {blocked}
+            {intake.required && " A mentor can turn this requirement off on Orders' Admin page."}
+          </p>
+        )}
 
-          {send && options && usable && (
-            <>
-              <div className="flex gap-4 text-sm text-secondary-700">
-                <label className="flex items-center gap-2">
-                  <input type="radio" checked={!inUse} onChange={() => setInUse(false)} />
-                  Into storage
-                </label>
-                <label
-                  className={`flex items-center gap-2 ${canUse ? "" : "opacity-50"}`}
-                  title={
-                    canUse ? undefined : `No robots or subsystems are set up in ${inventoryName}`
-                  }
-                >
-                  <input
-                    type="radio"
-                    checked={inUse}
-                    disabled={!canUse}
-                    onChange={() => setInUse(true)}
-                  />
-                  Straight into use
-                </label>
+        {send && options && usable && (
+          <>
+            <div className="flex gap-4 text-sm text-secondary-700">
+              <label className="flex items-center gap-2">
+                <input type="radio" checked={!inUse} onChange={() => setInUse(false)} />
+                Into storage
+              </label>
+              <label
+                className={`flex items-center gap-2 ${canUse ? "" : "opacity-50"}`}
+                title={
+                  canUse ? undefined : `No robots or subsystems are set up in ${inventoryName}`
+                }
+              >
+                <input
+                  type="radio"
+                  checked={inUse}
+                  disabled={!canUse}
+                  onChange={() => setInUse(true)}
+                />
+                Straight into use
+              </label>
+            </div>
+            {inUse && (
+              <div className="grid gap-4 sm:grid-cols-2">
+                {pick("Robot", options.robots, robotId, setRobotId)}
+                {pick("Subsystem", options.subsystems, subsystemId, setSubsystemId)}
               </div>
-              {inUse && (
-                <div className="grid gap-4 sm:grid-cols-2">
-                  {pick("Robot", options.robots, robotId, setRobotId)}
-                  {pick("Subsystem", options.subsystems, subsystemId, setSubsystemId)}
-                </div>
-              )}
+            )}
 
-              <div>
-                <p className="text-sm font-medium text-secondary-700">
-                  How many parts, and where {many ? "each goes" : "they go"}
-                </p>
-                <p className="text-xs text-secondary-500">
-                  Packs count as the parts in them. Edit a number if it isn't what arrived.
-                </p>
-                <ul className="mt-2 max-h-80 divide-y divide-secondary-100 overflow-y-auto rounded-lg border border-secondary-200">
-                  {lines.map((line) => {
-                    const why = reason(line);
-                    return (
-                      <li key={line.id} className="space-y-1.5 px-3 py-2">
-                        <div className="flex items-center gap-3 text-sm">
-                          <input
-                            type="number"
-                            inputMode="numeric"
-                            min={1}
-                            step={1}
-                            aria-label={`Parts of ${line.title}`}
-                            className={`${inputClass} !w-20 !py-1`}
-                            value={quantities[line.id] ?? String(partsOf(line))}
-                            onChange={(e) =>
-                              setQuantities({ ...quantities, [line.id]: e.target.value })
-                            }
-                          />
-                          <span
-                            className="min-w-0 flex-1 truncate text-secondary-900"
-                            title={line.title}
-                          >
-                            {line.title}
-                            {line.packQuantity > 1 && (
-                              <span className="text-secondary-500">
-                                {" "}
-                                ({line.quantity} × pack of {line.packQuantity})
-                              </span>
-                            )}
-                          </span>
-                        </div>
-                        <LocationPicker
-                          locations={options.locations}
-                          value={places[line.id] ?? null}
-                          onChange={(locationId) => pickPlace(line.id, locationId)}
-                          label={`Location for ${line.title}`}
-                          emptyLabel={many ? "Same as the rest (below)" : "Pick a location…"}
+            <div>
+              <p className="text-sm font-medium text-secondary-700">
+                How many parts, and where {many ? "each goes" : "they go"}
+              </p>
+              <p className="text-xs text-secondary-500">
+                Packs count as the parts in them. Edit a number if it isn't what arrived.
+              </p>
+              <ul className="mt-2 max-h-80 divide-y divide-secondary-100 overflow-y-auto rounded-lg border border-secondary-200">
+                {lines.map((line) => {
+                  const why = reason(line);
+                  return (
+                    <li key={line.id} className="space-y-1.5 px-3 py-2">
+                      <div className="flex items-center gap-3 text-sm">
+                        <input
+                          type="number"
+                          inputMode="numeric"
+                          min={1}
+                          step={1}
+                          aria-label={`Parts of ${line.title}`}
+                          className={`${inputClass} !w-20 !py-1`}
+                          value={quantities[line.id] ?? String(partsOf(line))}
+                          onChange={(e) =>
+                            setQuantities({ ...quantities, [line.id]: e.target.value })
+                          }
                         />
-                        {why && <p className="text-xs text-secondary-500">{why}</p>}
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
+                        <span
+                          className="min-w-0 flex-1 truncate text-secondary-900"
+                          title={line.title}
+                        >
+                          {line.title}
+                          {line.packQuantity > 1 && (
+                            <span className="text-secondary-500">
+                              {" "}
+                              ({line.quantity} × pack of {line.packQuantity})
+                            </span>
+                          )}
+                        </span>
+                      </div>
+                      <LocationPicker
+                        locations={options.locations}
+                        value={places[line.id] ?? null}
+                        onChange={(locationId) => pickPlace(line.id, locationId)}
+                        label={`Location for ${line.title}`}
+                        emptyLabel={many ? "Same as the rest (below)" : "Pick a location…"}
+                      />
+                      {why && <p className="text-xs text-secondary-500">{why}</p>}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
 
-              {many && (
-                <Field
-                  label="The rest go to"
-                  hint="For parts above that don't have a place of their own."
-                >
-                  <LocationPicker
-                    locations={options.locations}
-                    value={restId}
-                    onChange={setRestId}
-                    label="Location for the rest"
-                  />
-                </Field>
-              )}
-            </>
-          )}
+            {many && (
+              <Field
+                label="The rest go to"
+                hint="For parts above that don't have a place of their own."
+              >
+                <LocationPicker
+                  locations={options.locations}
+                  value={restId}
+                  onChange={setRestId}
+                  label="Location for the rest"
+                />
+              </Field>
+            )}
+          </>
+        )}
 
-          {error && <ErrorBanner message={error} />}
-          <div className="flex justify-end gap-2">
-            <Button variant="secondary" disabled={busy} onClick={onClose}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={busy || (send && intake.required && !!blocked)}>
-              {busy ? "Saving…" : "Received"}
-            </Button>
-          </div>
-        </form>
-      </div>
-    </div>
+        {error && <ErrorBanner message={error} />}
+        <div className="flex justify-end gap-2">
+          <Button variant="secondary" disabled={busy} onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit" disabled={busy || (send && intake.required && !!blocked)}>
+            {busy ? "Saving…" : "Received"}
+          </Button>
+        </div>
+      </form>
+    </Dialog>
   );
 }

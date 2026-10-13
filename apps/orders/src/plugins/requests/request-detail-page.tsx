@@ -1,7 +1,8 @@
-import { Button, Card, ErrorBanner, Field, Loading, Page, inputClass } from "@g3/ui";
+import { Button, Card, ConfirmButton, ErrorBanner, Field, Loading, Page, inputClass } from "@g3/ui";
 import { type FormEvent, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { api, getErrorMessage } from "../../shared/api";
+import { ConfirmDialog } from "../../shared/ask";
 import { useAuthUser } from "../../shared/auth";
 import { Deadline } from "../../shared/deadline";
 import {
@@ -39,6 +40,8 @@ export function RequestDetailPage() {
   const cameFromApp = useLocation().key !== "default";
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  // Promoting a wishlist item asks first, in a pop-up.
+  const [promoting, setPromoting] = useState(false);
   const { data, error, reload } = useLoad(async () => {
     const res = await api.requests[":id"].$get({ param: { id } });
     if (!res.ok) throw new Error(await getErrorMessage(res));
@@ -56,12 +59,8 @@ export function RequestDetailPage() {
   );
 
   /** Wishlist: promote it to a request (by this member) or remove it. Anyone can. */
-  async function wishAction(action: "promote" | "remove", title: string) {
-    const question =
-      action === "promote"
-        ? `Request ${title}? It goes to the mentors as your request.`
-        : `Remove ${title} from the wishlist?`;
-    if (!window.confirm(question)) return;
+  async function wishAction(action: "promote" | "remove") {
+    setPromoting(false);
     setBusy(true);
     setActionError(null);
     try {
@@ -174,17 +173,27 @@ export function RequestDetailPage() {
           {actionError && <ErrorBanner message={actionError} />}
           {wished && (
             <div className="flex flex-wrap gap-2">
-              <Button disabled={busy} onClick={() => void wishAction("promote", r.title)}>
+              <Button disabled={busy} onClick={() => setPromoting(true)}>
                 Promote to request
               </Button>
-              <Button
-                variant="secondary"
-                disabled={busy}
-                onClick={() => void wishAction("remove", r.title)}
-              >
-                Remove from wishlist
-              </Button>
               {editButton}
+              <ConfirmButton
+                label="Remove from wishlist"
+                confirmLabel="Remove it"
+                question={`Remove ${r.title} from the wishlist?`}
+                disabled={busy}
+                onConfirm={() => void wishAction("remove")}
+              />
+              {promoting && (
+                <ConfirmDialog
+                  title="Promote to a request"
+                  confirmLabel="Request it"
+                  onConfirm={() => void wishAction("promote")}
+                  onClose={() => setPromoting(false)}
+                >
+                  Request {r.title}? It goes to the mentors as your request.
+                </ConfirmDialog>
+              )}
             </div>
           )}
           {/* Keyed so its quantity and price boxes follow an edit. */}

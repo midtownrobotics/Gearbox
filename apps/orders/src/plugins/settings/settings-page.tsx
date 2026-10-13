@@ -1,6 +1,7 @@
 import {
   Button,
   Card,
+  ConfirmButton,
   ErrorBanner,
   Field,
   Loading,
@@ -359,7 +360,6 @@ function ShareACart() {
   }, []);
 
   async function disconnect() {
-    if (!window.confirm("Disconnect the team's Share-A-Cart account?")) return;
     const res = await api["share-a-cart"].disconnect.$post();
     if (!res.ok) return setError(await getErrorMessage(res));
     status.reload();
@@ -385,9 +385,11 @@ function ShareACart() {
                 ? ` on ${new Date(status.data.connectedAt).toLocaleDateString()}`
                 : ""}
             </span>
-            <Button variant="secondary" onClick={disconnect}>
-              Disconnect
-            </Button>
+            <ConfirmButton
+              label="Disconnect"
+              question="Disconnect the team's Share-A-Cart account? Amazon carts can't be built until someone connects one again."
+              onConfirm={disconnect}
+            />
           </div>
         ) : (
           <a

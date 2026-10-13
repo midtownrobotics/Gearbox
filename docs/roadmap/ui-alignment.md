@@ -20,7 +20,7 @@ A survey of every difference, with sketches, is at <https://claude.ai/artifact/C
 | 4. ID and Portal onto the shared frame | Done | ID, Portal | Nothing. A few things were left as they are on purpose (see step 4 below) |
 | 5. Pit, with its Overview | Done | Pit | Nothing. Its few icon marks wait for the Lucide icons (see step 5 below) |
 | 6. Shop | Done | Shop | Nothing. The shop view's large buttons and the green Complete buttons stay Shop's own (see step 6 below) |
-| 7. Browser pop-ups | Started: Edge's, ID's and Shop's are done | Orders, Skill Tree, Platform | 15 calls |
+| 7. Browser pop-ups | Done | Orders, Skill Tree, Platform, Pit (and Edge, ID and Shop in their own steps) | Nothing outside Scouting, whose 24 go with step 8 |
 | 8. Scouting | Not started | Scouting | All of it, with its Phase 3 step in `roadmap.md` |
 
 ### What landed
@@ -33,6 +33,7 @@ A survey of every difference, with sketches, is at <https://claude.ai/artifact/C
 | ID's and Portal's pages are built from the shared parts: `Page` for every ordinary page, `Card`, `Button`, `Field` and `inputClass`, the banners, `Badge` for a member's status. Their titles are the shared 36px title, on the sign-in and kiosk screens too. Errors that were in the team's color are red. ID's Users filters are near-black chips. ID's last browser pop-ups are gone: unlinking a sign-in and deleting a user from the list ask in the page, and three alerts are errors on the page. New shared parts: `Switch` (Portal's two copies and Edge's are one), `Chip`, `ConfirmQuestion`, `buttonClass` for a link that looks like a button, and `size="lg"` for touch screens | 4, and ID's part of 7 | [#189](https://github.com/midtownrobotics/Gearbox/pull/189) |
 | Pit's pages are built from the shared parts, and no `gray-*` class is left in the app: `Page` at the narrow width, `Card`, `Button`, `Field`, the banners, `Dialog` for its two pop-ups, `Badge` and `Chip` for a battery's state, `ProgressBar` for its bars. Home is Overview: four tiles that each show a figure and open its page (checklist items checked, open issues, the Next Up battery with the one In Robot under it, and the next match or the last archive). With no connection it shows what it last knew. A battery's state takes the shared status colors: Next Up green, Charging amber, In Robot blue, Broken red. `ProgressBar` takes `done`, which turns it green. Resetting one checklist asks first, an open issue's Resolve button is always shown, and the checklist editor's rows have one Edit button | 5 | [#190](https://github.com/midtownrobotics/Gearbox/pull/190) |
 | Shop's pages are built from the shared parts, and its own color names (`crimson`, `ink`, `paper`, `steel`, `mist`) are gone: `Page` on every page, `Card`, `Button`, `Field` and `inputClass`, the banners, `Dialog` for its pop-ups, `Chip` for the Filters button. Errors, delete buttons and an overloaded machine are red where they were the team's color. Home is Overview: four tiles that each show a figure and open its page (parts in progress, ready to start, complete, and released parts waiting on Ingest). Members who aren't admins no longer see the parts of Admin that only work for an admin. Shop's ten browser pop-ups ask in the page. The version footer is gone | 6, and Shop's part of 7 | [#193](https://github.com/midtownrobotics/Gearbox/pull/193) |
+| No app outside Scouting opens a browser pop-up. Orders' eight confirms and three prompts, Skill Tree's three confirms and Platform's one ask in the page; an alert in Pit that nobody could reach is an error the page shows. Orders' two hand copies of `Dialog` (Replace item, Mark received) are the shared one, which takes a `size` for their widths | 7 | [#197](https://github.com/midtownrobotics/Gearbox/pull/197) |
 
 ## Decisions
 
@@ -96,7 +97,7 @@ They are in `packages/ui/src/components/` and exported from `@g3/ui`.
 | `ConfirmButton`, `ConfirmQuestion` | A danger button that asks its `question` in the page before it acts. Its question takes a line of its own, so the row it sits in has to wrap (`flex flex-wrap`). `ConfirmQuestion` is the question alone, for a switch or anything else that needs a yes; its `keepLabel` names what stays ("Keep it on") |
 | `Field`, `inputClass` | A label, a control and a hint; the class for an `<input>`, `<select>` or `<textarea>` |
 | `ErrorBanner`, `SuccessBanner`, `Loading` | Messages |
-| `Dialog` | A pop-up; `wide` for a larger one |
+| `Dialog` | A pop-up. `size` is how wide it may grow: `md` (a question; the default), `xl`, `2xl` (`wide` means this) or `3xl` (a form with columns) |
 | `Toggle`, `Switch` | An on/off switch with a label and description; the switch alone, for a row that already says what it switches |
 | `Chip` | One choice in a row of filters; the chosen one is near-black |
 | `Badge`, `tones` | A status label and the colors that mean something |
@@ -109,7 +110,7 @@ Rules for the parts:
 - **Tailwind finds their classes through `@source "./components"`** in `packages/ui/src/index.css`. Write class names as whole literal strings, as everywhere else; a name built from pieces is never generated.
 - **Dark mode comes for free** if a part is written with light-mode classes: `secondary-*`, `bg-surface`, `bg-inset`, `primary-*` with `text-on-primary` on a solid fill, and for text in a color that means something the 600 to 950 shades (`text-red-700`, `text-emerald-800`), which `theme-palette.css` lightens in dark mode.
 - **Changesets ignore `@g3/ui`.** A change to a part is recorded against each app whose pages it changes.
-- **Not there yet:** an empty state, a back link, a date helper, the Lucide icons. Add each with the first step that needs it. Orders' and Skill Tree's filter pills and Edge's date-range chips are the same shape as `Chip` and can become it when those pages are next opened.
+- **Not there yet:** an empty state, a back link, a date helper, the Lucide icons. Add each with the first step that needs it. Orders' `ConfirmDialog` and `AnswerDialog` (step 7) belong here too once a second app wants one. Orders' and Skill Tree's filter pills and Edge's date-range chips are the same shape as `Chip` and can become it when those pages are next opened.
 
 ## Moving an app onto the parts
 
@@ -210,14 +211,18 @@ See "What landed". What it settled, and what it left:
   - Admin's sections open and close; `Card` doesn't. The Leaderboard's medal colors.
   - The bar's wordmark still comes from the site's team (`wordmark("Shop")` in `shared/nav-bar.tsx`), not the page's team.
 
-### 7. Browser pop-ups (spread across the steps)
+### 7. Browser pop-ups (done)
 
-Outside Scouting there are 15: Orders 8 confirm and 3 prompt, Skill Tree 3 confirm, Platform 1 confirm. Edge's, ID's and Shop's are done. Replace each app's when the app is open for its own step. Orders and Skill Tree have no restyle step, so their pop-ups get a pull request of their own.
+See "What landed". Edge's went with step 3, ID's with step 4 and Shop's with step 6; this is how the rest were done, as the pattern for Scouting's:
 
-- A confirm becomes `ConfirmButton`.
-- A prompt (the reason a request is denied, a vendor credit's amount) becomes a small `Dialog` with a field.
-- An alert becomes `ErrorBanner`.
-- Orders has two hand copies of `Dialog` (`replace-item.tsx`, `receive-dialog.tsx`) at their own widths. Give `Dialog` the widths they need and use it.
+- **A delete with room to ask in its own row is `ConfirmButton`:** Orders' catalog part, list and Share-A-Cart connection, removing a wishlist item from its page, and Skill Tree's tree, category and skill. The row has to wrap (`flex flex-wrap`).
+- **Canceling a request** asks in the row with `ConfirmQuestion`, since Cancel request sits among other buttons.
+- **A button in a table row, or a yes that isn't a delete, asks in a pop-up:** `ConfirmDialog` in `apps/orders/src/shared/ask.tsx` (promoting a wishlist item, removing one from the Wishlist table, removing a vendor credit, placing an order).
+- **An answer that has to be typed is a pop-up with one field:** `AnswerDialog` in the same file (why a request is denied, why a line is taken off an order, a credit's new balance). A bad answer is an error in the pop-up.
+- Both are Orders' own, built from `Dialog`. Move them to `@g3/ui` when a second app needs one.
+- **Platform's console** has its own shell and no shared parts, so removing an operator asks in the row with the shell's own buttons.
+- **Pit's** label maker called `alert` when nothing was chosen. Its button is disabled then, so nobody saw it; it now raises an error, which the page shows.
+- **What changed besides where the question is:** Share-A-Cart's Disconnect and the wishlist page's "Remove from wishlist" are red buttons, since both now ask as deletes do. Denying from the Approvals queue and taking a line off an order show what is about to happen above the box.
 
 ### 8. Scouting (largest)
 

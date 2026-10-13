@@ -24,8 +24,7 @@ export async function generateBatteryAndStatesPDF(
   selectedStates: string[],
 ): Promise<void> {
   if (batteries.length === 0 && selectedStates.length === 0) {
-    alert("No batteries or states selected");
-    return;
+    throw new Error("Choose at least one battery or state.");
   }
 
   const pdf = new jsPDF({

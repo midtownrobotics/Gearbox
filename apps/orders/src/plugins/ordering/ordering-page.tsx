@@ -4,6 +4,7 @@ import { chargesByCategory } from "@g3/worker-orders/split";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, getErrorMessage } from "../../shared/api";
+import { AnswerDialog, ConfirmDialog } from "../../shared/ask";
 import { useAuthUser } from "../../shared/auth";
 import { cartLinks } from "../../shared/cart";
 import { Deadline, isLate } from "../../shared/deadline";
@@ -281,12 +282,13 @@ function VendorOrder({
     });
   const allSelected = selected.size === group.items.length;
 
+  // The line being taken off, and whether the order is being placed, while a pop-up asks.
+  const [removing, setRemoving] = useState<OrderRequest | null>(null);
+  const [placing, setPlacing] = useState(false);
+
   /** Takes a line off the order list by canceling the request (the requester sees why). */
-  async function trash(r: OrderRequest) {
-    const reason = window.prompt(
-      `Remove “${r.title}” and cancel ${r.requesterName}'s request? Say why (shown to them):`,
-    );
-    if (reason === null) return;
+  async function trash(r: OrderRequest, reason: string) {
+    setRemoving(null);
     setError(null);
     const res = await api.requests[":id"][":action"].$post({
       param: { id: String(r.id), action: "cancel" },
@@ -301,22 +303,18 @@ function VendorOrder({
     onRemoved(`Removed “${r.title}” (request canceled).`);
   }
 
-  async function place() {
+  /** Asks first: placing an order counts it against the budget. */
+  function askToPlace() {
     if (!valid) {
       return setError(
         "Every line needs a quantity and a price; shipping and tax must be dollar amounts.",
       );
     }
-    const what =
-      inOrder.length === group.items.length
-        ? "this order"
-        : `an order of ${inOrder.length} item(s)`;
-    if (
-      !window.confirm(
-        `Place ${what} with ${group.vendor} for ${formatCents(itemsTotal + shippingCents + taxCents)}?`,
-      )
-    )
-      return;
+    setPlacing(true);
+  }
+
+  async function place() {
+    setPlacing(false);
     setBusy(true);
     setError(null);
     const res = await api.orders.$post({
@@ -641,7 +639,7 @@ function VendorOrder({
                   <td className="py-1.5 pr-3 text-right">
                     <button
                       type="button"
-                      onClick={() => trash(r)}
+                      onClick={() => setRemoving(r)}
                       className="rounded px-1.5 py-1 text-secondary-400 hover:bg-red-50 hover:text-red-600"
                       title="Remove from the order (cancels the request)"
                       aria-label={`Remove ${r.title}`}
@@ -710,13 +708,44 @@ function VendorOrder({
               )}
             </p>
           </div>
-          <Button disabled={busy || !valid} onClick={place}>
+          <Button disabled={busy || !valid} onClick={askToPlace}>
             {busy
               ? "Placing…"
               : selected.size > 0
                 ? `Place order (${selected.size})`
                 : "Place order"}
           </Button>
+          {placing && (
+            <ConfirmDialog
+              title="Place order"
+              confirmLabel="Place order"
+              keepLabel="Not yet"
+              onConfirm={place}
+              onClose={() => setPlacing(false)}
+            >
+              Place{" "}
+              {inOrder.length === group.items.length
+                ? "this order"
+                : `an order of ${inOrder.length} item${inOrder.length === 1 ? "" : "s"}`}{" "}
+              with {group.vendor} for {formatCents(itemsTotal + shippingCents + taxCents)}?
+            </ConfirmDialog>
+          )}
+          {removing && (
+            <AnswerDialog
+              title="Remove from the order"
+              label="Why (shown to them, optional)"
+              multiline
+              confirmLabel="Remove and cancel the request"
+              danger
+              onSubmit={(reason) => {
+                void trash(removing, reason);
+                return undefined;
+              }}
+              onClose={() => setRemoving(null)}
+            >
+              Remove “{removing.title}” and cancel {removing.requesterName}'s request?
+            </AnswerDialog>
+          )}
         </div>
         {charges && charges.size > 0 && (
           <p className="text-xs text-secondary-600 tabular-nums">

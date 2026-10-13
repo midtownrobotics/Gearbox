@@ -1,6 +1,7 @@
 import { Button, Card, ErrorBanner, Field, Loading, Page, inputClass } from "@g3/ui";
 import { type FormEvent, useState } from "react";
 import { api, getErrorMessage } from "../../shared/api";
+import { AnswerDialog, ConfirmDialog } from "../../shared/ask";
 import {
   dateInputToMs,
   formatCents,
@@ -368,14 +369,13 @@ function Credits({ vendor: v, onChanged }: { vendor: VendorProfile; onChanged: (
     onChanged();
   }
 
-  async function setCreditBalance(id: number, current: number | null) {
-    const answer = window.prompt(
-      "New balance ($):",
-      current === null ? "" : (current / 100).toFixed(2),
-    );
-    if (answer === null) return;
-    const balanceCents = parseDollars(answer);
-    if (Number.isNaN(balanceCents)) return setError("Balance must be a dollar amount.");
+  type Credit = (typeof v.credits)[number];
+  // The credit whose balance is being typed, or that is being removed, while a pop-up asks.
+  const [updating, setUpdating] = useState<Credit | null>(null);
+  const [removing, setRemoving] = useState<Credit | null>(null);
+
+  async function setCreditBalance(id: number, balanceCents: number | null) {
+    setUpdating(null);
     const res = await api.vendors.credits[":id"].$patch({
       param: { id: String(id) },
       json: { balanceCents },
@@ -385,7 +385,7 @@ function Credits({ vendor: v, onChanged }: { vendor: VendorProfile; onChanged: (
   }
 
   async function remove(id: number) {
-    if (!window.confirm("Remove this credit?")) return;
+    setRemoving(null);
     const res = await api.vendors.credits[":id"].$delete({ param: { id: String(id) } });
     if (!res.ok) return setError(await getErrorMessage(res));
     onChanged();
@@ -409,20 +409,48 @@ function Credits({ vendor: v, onChanged }: { vendor: VendorProfile; onChanged: (
               <button
                 type="button"
                 className="text-xs underline text-secondary-500"
-                onClick={() => setCreditBalance(cr.id, cr.balanceCents)}
+                onClick={() => setUpdating(cr)}
               >
                 Update balance
               </button>
               <button
                 type="button"
                 className="text-xs underline text-secondary-500"
-                onClick={() => remove(cr.id)}
+                onClick={() => setRemoving(cr)}
               >
                 Remove
               </button>
             </li>
           ))}
         </ul>
+      )}
+      {updating && (
+        <AnswerDialog
+          title="Update balance"
+          label={`What's left on ${updating.label} ($)`}
+          initial={updating.balanceCents === null ? "" : (updating.balanceCents / 100).toFixed(2)}
+          inputMode="decimal"
+          confirmLabel="Save"
+          onSubmit={(answer) => {
+            const balanceCents = parseDollars(answer);
+            if (Number.isNaN(balanceCents)) return "Balance must be a dollar amount.";
+            void setCreditBalance(updating.id, balanceCents);
+            return undefined;
+          }}
+          onClose={() => setUpdating(null)}
+        />
+      )}
+      {removing && (
+        <ConfirmDialog
+          title="Remove credit"
+          confirmLabel="Remove it"
+          keepLabel="Keep it"
+          danger
+          onConfirm={() => void remove(removing.id)}
+          onClose={() => setRemoving(null)}
+        >
+          Remove {removing.label} from {v.name}?
+        </ConfirmDialog>
       )}
       <form onSubmit={add} className="flex flex-wrap gap-2 items-start">
         <select

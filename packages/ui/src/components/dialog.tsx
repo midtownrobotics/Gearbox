@@ -1,13 +1,32 @@
 import { type ReactNode, useEffect, useId } from "react";
 import { focusRing } from "./focus";
 
-/** A pop-up over the page, closed by ✕, Escape or its own buttons. */
+/** How wide a pop-up may grow: a question, a short form, a list, or a form with columns. */
+export type DialogSize = "md" | "xl" | "2xl" | "3xl";
+
+const SIZES: Record<DialogSize, string> = {
+  md: "max-w-md",
+  xl: "max-w-xl",
+  "2xl": "max-w-2xl",
+  "3xl": "max-w-3xl",
+};
+
+/**
+ * A pop-up over the page, closed by ✕, Escape or its own buttons. `wide` is `size="2xl"`.
+ */
 export function Dialog({
   title,
   onClose,
   wide = false,
+  size = wide ? "2xl" : "md",
   children,
-}: { title: string; onClose: () => void; wide?: boolean; children: ReactNode }) {
+}: {
+  title: string;
+  onClose: () => void;
+  wide?: boolean;
+  size?: DialogSize;
+  children: ReactNode;
+}) {
   const titleId = useId();
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -22,7 +41,7 @@ export function Dialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className={`w-full ${wide ? "max-w-2xl" : "max-w-md"} rounded-xl bg-surface shadow-xl`}
+        className={`w-full ${SIZES[size]} rounded-xl bg-surface shadow-xl`}
       >
         <header className="flex items-center justify-between border-b border-secondary-200 px-5 py-3">
           <h2 id={titleId} className="text-lg font-semibold text-secondary-900">

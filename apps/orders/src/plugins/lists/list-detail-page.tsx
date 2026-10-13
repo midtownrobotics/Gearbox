@@ -1,6 +1,7 @@
 import {
   Button,
   Card,
+  ConfirmButton,
   ErrorBanner,
   Field,
   Loading,
@@ -315,7 +316,6 @@ function ListSettings({ list, onDone }: { list: PartListDetail; onDone: () => vo
   }
 
   async function remove() {
-    if (!window.confirm(`Delete "${list.name}"? Its requests aren't deleted.`)) return;
     setBusy(true);
     const res = await api.lists[":id"].$delete({ param });
     setBusy(false);
@@ -363,9 +363,12 @@ function ListSettings({ list, onDone }: { list: PartListDetail; onDone: () => vo
         >
           {list.isArchived ? "Unarchive" : "Archive"}
         </Button>
-        <Button variant="danger" disabled={busy} onClick={remove}>
-          Delete list
-        </Button>
+        <ConfirmButton
+          label="Delete list"
+          question={`Delete "${list.name}"? Its requests aren't deleted.`}
+          disabled={busy}
+          onConfirm={remove}
+        />
       </div>
     </form>
   );
