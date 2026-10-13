@@ -2,7 +2,9 @@ import { api } from "./api";
 import { getErrorMessage } from "./api-error";
 import type {
   Action,
+  Batch,
   Blueprint,
+  DuplicatePlan,
   KioskPresence,
   OnshapePartLink,
   OnshapeRelease,
@@ -11,7 +13,6 @@ import type {
   PartInstance,
   PartInstanceProcess,
   Process,
-  StagingBatch,
   Subsystem,
 } from "./types";
 
@@ -154,11 +155,9 @@ export async function fetchOnshapeReleases(): Promise<OnshapeRelease[]> {
   return ((await res.json()) as { releases: OnshapeRelease[] }).releases;
 }
 
-/** Every file, or only files covering some instance of one part definition. */
-export async function fetchPartFiles(partDefinitionId?: number): Promise<PartFile[]> {
-  const res = await api["part-files"].$get({
-    query: partDefinitionId === undefined ? {} : { partDefinitionId: String(partDefinitionId) },
-  });
+/** Every file in the library, newest first. */
+export async function fetchPartFiles(): Promise<PartFile[]> {
+  const res = await api["part-files"].$get();
   if (!res.ok) throw new Error(await getErrorMessage(res as unknown as Response));
   return res.json() as Promise<PartFile[]>;
 }
@@ -176,34 +175,9 @@ export async function uploadPartFile(file: File): Promise<PartFile> {
   return res.json() as Promise<PartFile>;
 }
 
-/** Deletes the file and unassigns every instance it covered. */
+/** Deletes the file; a batch that had it has no file. */
 export async function deletePartFile(id: number): Promise<void> {
   const res = await api["part-files"][":id"].$delete({ param: { id: String(id) } });
-  if (!res.ok) throw new Error(await getErrorMessage(res as unknown as Response));
-}
-
-/**
- * Sets how many instances of a part this file covers. Growing only takes instances that have
- * no file yet, so `assigned` can come back lower than `requested`.
- */
-export async function setFileAssignmentCount(
-  id: number,
-  partDefinitionId: number,
-  count: number,
-): Promise<{ requested: number; assigned: number }> {
-  const res = await api["part-files"][":id"].assignments.$put({
-    param: { id: String(id) },
-    json: { partDefinitionId, count },
-  });
-  if (!res.ok) throw new Error(await getErrorMessage(res as unknown as Response));
-  const body = (await res.json()) as { requested: number; assigned: number };
-  return { requested: body.requested, assigned: body.assigned };
-}
-
-export async function unassignFileInstance(id: number, partInstanceId: number): Promise<void> {
-  const res = await api["part-files"][":id"].assignments[":instanceId"].$delete({
-    param: { id: String(id), instanceId: String(partInstanceId) },
-  });
   if (!res.ok) throw new Error(await getErrorMessage(res as unknown as Response));
 }
 
@@ -211,28 +185,58 @@ export function partFileDownloadUrl(id: number): string {
   return `${import.meta.env.VITE_API_BASE_URL ?? ""}/part-files/${id}/download`;
 }
 
-export async function fetchStagingBatches(processId: number): Promise<StagingBatch[]> {
-  const res = await api["staging-batches"].$get({ query: { processId: String(processId) } });
+/** Every batch, oldest first, with its file and instances. */
+export async function fetchBatches(): Promise<Batch[]> {
+  const res = await api["staging-batches"].$get();
   if (!res.ok) throw new Error(await getErrorMessage(res as unknown as Response));
-  return res.json() as Promise<StagingBatch[]>;
+  return res.json() as Promise<Batch[]>;
 }
 
-export async function createStagingBatch(processId: number): Promise<number> {
-  const res = await api["staging-batches"].$post({ json: { processId } });
+/**
+ * A new batch at a File Producer process: empty, or with a file, or holding these instances.
+ * `refused` says why any of them didn't go in; when none did, nothing is made and this throws.
+ */
+export async function createBatch(batch: {
+  processId: number;
+  name?: string | null;
+  fileId?: number | null;
+  partInstanceIds?: number[];
+}): Promise<{ batch: Batch; refused: string[] }> {
+  const res = await api["staging-batches"].$post({
+    json: {
+      processId: batch.processId,
+      name: batch.name ?? null,
+      fileId: batch.fileId ?? null,
+      partInstanceIds: batch.partInstanceIds ?? [],
+    },
+  });
   if (!res.ok) throw new Error(await getErrorMessage(res as unknown as Response));
-  return ((await res.json()) as { id: number }).id;
+  return res.json() as Promise<{ batch: Batch; refused: string[] }>;
 }
 
-/** Stages instances into a batch; they pick up the batch's file. */
-export async function stageIntoBatch(id: number, partInstanceIds: number[]): Promise<void> {
+/** Names a batch; null or empty gives it back its automatic name. */
+export async function renameBatch(id: number, name: string | null): Promise<void> {
+  const res = await api["staging-batches"][":id"].$patch({
+    param: { id: String(id) },
+    json: { name },
+  });
+  if (!res.ok) throw new Error(await getErrorMessage(res as unknown as Response));
+}
+
+/**
+ * Adds instances to a batch; they take on its status. Resolves to why any were left out, and
+ * throws when none went in.
+ */
+export async function stageIntoBatch(id: number, partInstanceIds: number[]): Promise<string[]> {
   const res = await api["staging-batches"][":id"].stage.$post({
     param: { id: String(id) },
     json: { partInstanceIds },
   });
   if (!res.ok) throw new Error(await getErrorMessage(res as unknown as Response));
+  return ((await res.json()) as { refused: string[] }).refused;
 }
 
-/** Sends instances back to To Do; they lose the batch's file. */
+/** Takes instances out of a batch that's still being prepared, back to To Do. */
 export async function unstageFromBatch(id: number, partInstanceIds: number[]): Promise<void> {
   const res = await api["staging-batches"][":id"].unstage.$post({
     param: { id: String(id) },
@@ -241,8 +245,8 @@ export async function unstageFromBatch(id: number, partInstanceIds: number[]): P
   if (!res.ok) throw new Error(await getErrorMessage(res as unknown as Response));
 }
 
-/** Sets (or clears, with null) a batch's file on every instance staged in it. */
-export async function setStagingBatchFile(id: number, fileId: number | null): Promise<void> {
+/** Sets (or clears, with null) a batch's file. */
+export async function setBatchFile(id: number, fileId: number | null): Promise<void> {
   const res = await api["staging-batches"][":id"].file.$put({
     param: { id: String(id) },
     json: { fileId },
@@ -250,12 +254,55 @@ export async function setStagingBatchFile(id: number, fileId: number | null): Pr
   if (!res.ok) throw new Error(await getErrorMessage(res as unknown as Response));
 }
 
-export async function completeStagingBatch(id: number): Promise<void> {
-  const res = await api["staging-batches"][":id"].complete.$post({ param: { id: String(id) } });
+/** Starts or completes a batch, as one, at its File Producer or File Consumer process. */
+export async function moveBatch(
+  id: number,
+  at: "producer" | "consumer",
+  to: "doing" | "done",
+): Promise<void> {
+  const res = await api["staging-batches"][":id"].status.$post({
+    param: { id: String(id) },
+    json: { at, to },
+  });
   if (!res.ok) throw new Error(await getErrorMessage(res as unknown as Response));
 }
 
-export async function deleteStagingBatch(id: number): Promise<void> {
+/** Sends a whole batch back to To Do at one of its two processes. */
+export async function sendBatchBack(id: number, to: "producer" | "consumer"): Promise<void> {
+  const res = await api["staging-batches"][":id"]["send-back"].$post({
+    param: { id: String(id) },
+    json: { to },
+  });
+  if (!res.ok) throw new Error(await getErrorMessage(res as unknown as Response));
+}
+
+/** Sends one instance back to be made again; its batch keeps a record of it. */
+export async function sendInstanceBack(id: number, partInstanceId: number): Promise<void> {
+  const res = await api["staging-batches"][":id"].instances[":instanceId"]["send-back"].$post({
+    param: { id: String(id), instanceId: String(partInstanceId) },
+  });
+  if (!res.ok) throw new Error(await getErrorMessage(res as unknown as Response));
+}
+
+export async function fetchDuplicatePlan(id: number): Promise<DuplicatePlan> {
+  const res = await api["staging-batches"][":id"].duplicate.$get({ param: { id: String(id) } });
+  if (!res.ok) throw new Error(await getErrorMessage(res as unknown as Response));
+  return res.json() as Promise<DuplicatePlan>;
+}
+
+/** Copies a batch. When there aren't the parts for it any more, resolves to the plan instead. */
+export async function duplicateBatch(id: number): Promise<{ batch: Batch } | DuplicatePlan> {
+  const res = await api["staging-batches"][":id"].duplicate.$post({ param: { id: String(id) } });
+  if (res.ok) return res.json() as Promise<{ batch: Batch }>;
+  const body = (await (res as unknown as Response)
+    .clone()
+    .json()
+    .catch(() => null)) as { plan?: DuplicatePlan } | null;
+  if (body?.plan) return body.plan;
+  throw new Error(await getErrorMessage(res as unknown as Response));
+}
+
+export async function deleteBatch(id: number): Promise<void> {
   const res = await api["staging-batches"][":id"].$delete({ param: { id: String(id) } });
   if (!res.ok) throw new Error(await getErrorMessage(res as unknown as Response));
 }

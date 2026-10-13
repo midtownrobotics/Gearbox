@@ -12,3 +12,8 @@ export function shopViewPath(processId: number, instanceId: number): string {
 export function detailsViewPath(instanceId: number): string {
   return `/parts?instance=${instanceId}`;
 }
+
+/** Everything with one part number: its revision in production and its instances. */
+export function partPath(partNumber: string): string {
+  return `/part?p=${encodeURIComponent(partNumber)}`;
+}

@@ -124,13 +124,7 @@ describe("obsolete parts", () => {
   type Instance = Id & { isStale: number; obsoletedAt: number | null; obsoletedBy: string | null };
   const post = (body: unknown) => ({ method: "POST", body });
   const patch = (body: unknown) => ({ method: "PATCH", body });
-  const assign = (file: Id, part: Id, count: number) =>
-    callAs(student, `/part-files/${file.id}/assignments`, {
-      method: "PUT",
-      body: { partDefinitionId: part.id, count },
-    });
-
-  /** A part of its own with `quantity` instances, and a file. */
+  /** A part of its own with `quantity` instances. */
   async function seed(quantity: number) {
     const tag = crypto.randomUUID().slice(0, 8);
     const subsystem = await jsonAs<Id>(student, "/subsystems", post({ name: `Arm ${tag}` }), 201);
@@ -153,10 +147,7 @@ describe("obsolete parts", () => {
       post({ partDefinitionId: part.id, quantity }),
       201,
     );
-    const form = new FormData();
-    form.set("file", new File(["G-code"], `plate-${tag}.nc`, { type: "text/plain" }));
-    const file = await jsonAs<Id>(student, "/part-files", { method: "POST", body: form }, 201);
-    return { part, instances, file };
+    return { part, instances };
   }
 
   it("keeps when a part was made obsolete and by whom", async () => {
@@ -187,22 +178,5 @@ describe("obsolete parts", () => {
       patch({ isStale: false }),
     );
     expect(back).toMatchObject({ isStale: 0, obsoletedAt: null, obsoletedBy: null });
-  });
-
-  it("won't assign a file to a part whose every instance is obsolete", async () => {
-    const { part, instances, file } = await seed(2);
-    expect(await (await assign(file, part, 1)).json()).toMatchObject({ assigned: 1 });
-
-    // One obsolete instance of two: the part is still live.
-    await jsonAs(student, `/part-instances/${instances[1].id}`, patch({ isStale: true }));
-    expect((await assign(file, part, 1)).status).toBe(200);
-
-    await jsonAs(student, `/part-instances/${instances[0].id}`, patch({ isStale: true }));
-    const refused = await assign(file, part, 2);
-    expect(refused.status).toBe(409);
-    expect(((await refused.json()) as { error: string }).error).toMatch(/Rev A is obsolete/);
-
-    // Taking the file off it is still allowed.
-    expect(await (await assign(file, part, 0)).json()).toMatchObject({ assigned: 0 });
   });
 });

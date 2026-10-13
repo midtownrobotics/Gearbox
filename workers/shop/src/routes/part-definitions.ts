@@ -106,7 +106,9 @@ async function processListError(
   if (new Set(steps.map((s) => s.id)).size !== new Set(processIds).size) {
     return "Some of those processes don't exist.";
   }
-  return fileStepError(steps);
+  // In the order the part goes through them, which is what the rule is about.
+  const byId = new Map(steps.map((s) => [s.id, s]));
+  return fileStepError(processIds.flatMap((id) => byId.get(id) ?? []));
 }
 
 async function isTeamSubsystem(db: ShopDb, teamId: string, id: number) {
@@ -438,6 +440,8 @@ export const partDefinitionsRouter = new Hono<AppEnv>()
         400,
       );
     }
+    const orderError = await processListError(db, teamId, processIds);
+    if (orderError) return c.json({ error: orderError }, 400);
 
     await replaceBlueprint(db, teamId, partDefinitionId, processIds);
     return c.json(await blueprintOf(db, teamId, partDefinitionId));

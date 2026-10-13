@@ -99,23 +99,7 @@ export type OnshapePartLink = {
   release: string;
 };
 
-/** An open staging batch at a File Producer process and the instances staged in it. */
-export type StagingBatch = {
-  id: number;
-  processId: number;
-  fileId: number | null;
-  createdBy: string;
-  createdAt: number;
-  partInstanceIds: number[];
-};
-
-export type FileAssignment = {
-  partInstanceId: number;
-  partDefinitionId: number;
-  instanceNumber: number;
-};
-
-/** A stored file and the instances it covers (possibly none, across any parts). */
+/** A stored file. It reaches instances only through a batch. */
 export type PartFile = {
   id: number;
   filename: string;
@@ -123,7 +107,64 @@ export type PartFile = {
   fileSize: number;
   uploadedBy: string;
   createdAt: number;
-  assignments: FileAssignment[];
+  /** Made for an instance that's now obsolete: it can't go on another batch. */
+  obsolete: boolean;
+};
+
+export type BatchStatus = "todo" | "doing" | "done";
+
+/** An instance in a batch, or one that was sent back out of it (`removedAt`). */
+export type BatchInstance = {
+  partInstanceId: number;
+  partDefinitionId: number;
+  instanceNumber: number;
+  removedAt: number | null;
+  removedBy: string | null;
+};
+
+/**
+ * Instances that share one file, moved as one unit: through the File Producer process that makes
+ * the file (`producerStatus`), then the File Consumer process that uses it (`consumerStatus`,
+ * which only means something once the first is done).
+ */
+export type Batch = {
+  id: number;
+  /** "Batch 7": counted up within the team. */
+  number: number;
+  /** The name someone gave it, or null for the automatic one. `label` is the one to show. */
+  name: string | null;
+  label: string;
+  processId: number;
+  /** Null while nothing is in it. */
+  consumerProcessId: number | null;
+  fileId: number | null;
+  file: PartFile | null;
+  producerStatus: BatchStatus;
+  consumerStatus: BatchStatus;
+  createdBy: string;
+  createdAt: number;
+  /** When it finished its File Producer process. */
+  closedAt: number | null;
+  /** When it finished its File Consumer process. */
+  completedAt: number | null;
+  instances: BatchInstance[];
+};
+
+/** What a copy of a batch would take, and whether there are enough free parts for it. */
+export type DuplicatePlan = {
+  ok: boolean;
+  /** Why it can't be copied, when it isn't for want of parts. */
+  reason: string | null;
+  parts: {
+    partDefinitionId: number;
+    name: string | null;
+    partNumber: string;
+    revision: string | null;
+    needed: number;
+    available: number;
+    partInstanceIds: number[];
+    instanceNumbers: number[];
+  }[];
 };
 
 /** One Onshape release, as GET /onshape/releases gives it. */

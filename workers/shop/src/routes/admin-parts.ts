@@ -1,8 +1,9 @@
 import { inTeam, logTeamChange, requireAdmin, requireAuth, sendTeamMessage } from "@g3/auth";
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, isNull } from "drizzle-orm";
 import { Hono } from "hono";
 import { createShopDb } from "../db";
 import * as schema from "../db/schema";
+import { obsoleteFileIds } from "../lib/batches";
 import {
   formatOverview,
   formatReflection,
@@ -460,7 +461,24 @@ export const adminPartsRouter = new Hono<AppEnv>()
         });
       }
 
-      const batchSize = 100;
+      // A file made for one of them stays obsolete after they're gone (lib/batches.ts).
+      const theirFiles = [...(await obsoleteFileIds(db, teamId))];
+      for (let i = 0; i < theirFiles.length; i += 80) {
+        await db
+          .update(schema.files)
+          .set({ obsoletedAt: Date.now() })
+          .where(
+            inTeam(
+              schema.files,
+              teamId,
+              inArray(schema.files.id, theirFiles.slice(i, i + 80)),
+              isNull(schema.files.obsoletedAt),
+            ),
+          );
+      }
+
+      // D1 caps a statement at 100 bound parameters.
+      const batchSize = 80;
 
       // Delete associated actions (actions table has FK to part_instances)
       for (let i = 0; i < staleInstanceIds.length; i += batchSize) {

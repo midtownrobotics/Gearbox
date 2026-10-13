@@ -12,19 +12,23 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../../shared/api";
 import { getErrorMessage } from "../../shared/api-error";
+import { type DrawingState, drawingKey, drawingStates } from "../../shared/batches";
 import { buildInstanceRows } from "../../shared/derive";
-import { deleteDrawing } from "../../shared/getters";
+import { deleteDrawing, drawingUrl } from "../../shared/getters";
 import { useAuthUser } from "../../shared/use-auth";
 import { useKiosk } from "../../shared/use-auth";
 import { useShopData } from "../../shared/use-shop-data";
-import {
-  FileHeading,
-  InProductionBadge,
-  deleteQuestion,
-  formatBytes,
-  productionRows,
-} from "./part-files-panel";
-import { PartFilesSection } from "./part-files-section";
+import { PartNameLink, linkClass } from "../batches/batch-ui";
+import { FileHeading, formatBytes } from "./file-ui";
+import { PartFilesSection, Subsection } from "./part-files-section";
+
+/** The drawing subsections, in the order the page shows them, with what each holds. */
+const DRAWING_STATES: { state: DrawingState; title: string; empty: string }[] = [
+  { state: "not-started", title: "Not Started", empty: "No drawing's part is waiting to start." },
+  { state: "in-progress", title: "In Progress", empty: "No drawing's part is being made." },
+  { state: "complete", title: "Complete", empty: "No drawing's part is complete yet." },
+  { state: "obsolete", title: "Obsolete", empty: "No drawing is for an obsolete revision." },
+];
 
 type Drawing = {
   id: number;
@@ -45,17 +49,24 @@ export function FilesPage() {
   const [deletingKey, setDeletingKey] = useState<string | null>(null);
   const kiosk = useKiosk();
   const { data } = useShopData();
-  const inProduction = useMemo(() => (data ? productionRows(buildInstanceRows(data)) : []), [data]);
-  const drawingUsage = useMemo(() => {
-    const map = new Map<string, typeof inProduction>();
-    for (const r of inProduction) {
-      const key = `${r.definition.onshapePartNumber}\u0000${r.definition.revision}`;
-      map.set(key, [...(map.get(key) ?? []), r]);
-    }
-    return map;
-  }, [inProduction]);
-  const usageOfDrawing = (d: Drawing) =>
-    drawingUsage.get(`${d.partNumber}\u0000${d.revision}`) ?? [];
+  const rows = useMemo(() => (data ? buildInstanceRows(data) : []), [data]);
+  /** The part a drawing is of, when the shop has that revision. */
+  const partOf = (d: Drawing) =>
+    data?.definitions.find(
+      (p) => p.onshapePartNumber === d.partNumber && p.revision === d.revision,
+    );
+  // Where each drawing's part is in production. One for a part nobody has made is not started.
+  const states = useMemo(() => (data ? drawingStates(data) : new Map()), [data]);
+  const stateOf = (d: Drawing): DrawingState =>
+    states.get(drawingKey(d.partNumber, d.revision)) ?? "not-started";
+  /** How many instances of a drawing's revision are still being made. */
+  const stillMaking = (d: Drawing) =>
+    rows.filter(
+      (r) =>
+        r.definition.onshapePartNumber === d.partNumber &&
+        r.definition.revision === d.revision &&
+        r.state !== "complete",
+    ).length;
 
   async function handleDeleteDrawing(drawing: Drawing) {
     setDeletingKey(drawing.r2Key);
@@ -200,7 +211,7 @@ export function FilesPage() {
       <>
         {error && <ErrorBanner message={error} />}
 
-        <PartFilesSection data={data} inProduction={inProduction} />
+        <PartFilesSection data={data} rows={rows} />
 
         <section className="space-y-3 pt-4">
           <div>
@@ -218,63 +229,90 @@ export function FilesPage() {
             className={inputClass}
           />
 
-          {visibleDrawings.length === 0 ? (
+          {drawings.length === 0 ? (
             <p className="text-secondary-500 text-sm">
-              {drawings.length === 0
-                ? "No drawings yet. A release's drawings are saved when its parts are ingested."
-                : "No drawings match your search."}
+              No drawings yet. A release's drawings are saved when its parts are ingested.
             </p>
+          ) : visibleDrawings.length === 0 ? (
+            <p className="text-secondary-500 text-sm">No drawings match your search.</p>
           ) : (
-            <ul className="bg-surface border border-secondary-200 rounded-lg divide-y divide-secondary-200">
-              {visibleDrawings.map((drawing) => (
-                <li key={drawing.r2Key} className="px-4 py-3">
-                  <FileHeading
-                    name={drawing.filename}
-                    details={
-                      <p className="text-xs text-secondary-400">
-                        <span className="font-mono text-secondary-500">
-                          {drawing.partNumber} · Rev {drawing.revision}
-                        </span>{" "}
-                        · {formatBytes(drawing.fileSize || 0)} ·{" "}
-                        {new Date(drawing.createdAt * 1000).toLocaleDateString()}
-                      </p>
-                    }
-                  >
-                    <InProductionBadge rows={usageOfDrawing(drawing)} />
-                    {canPrint && (
-                      <Button
-                        size="sm"
-                        className="shrink-0"
-                        onClick={() => handlePrint(drawing)}
-                        disabled={printingId === drawing.id}
-                      >
-                        {printingId === drawing.id ? "Printing…" : "Print"}
-                      </Button>
-                    )}
-                    <a
-                      href={`${import.meta.env.VITE_API_BASE_URL ?? ""}/parts/${drawing.partNumber}/${drawing.revision}/drawing`}
-                      download={drawing.filename}
-                      className={`${buttonClass("secondary", "sm")} shrink-0`}
-                    >
-                      Download
-                    </a>
-                    {!kiosk.active && (
-                      <ConfirmButton
-                        size="sm"
-                        label={deletingKey === drawing.r2Key ? "Deleting…" : "Delete"}
-                        confirmLabel="Delete"
-                        question={deleteQuestion(
-                          `the drawing for ${drawing.partNumber} Rev ${drawing.revision}`,
-                          usageOfDrawing(drawing),
-                        )}
-                        disabled={deletingKey === drawing.r2Key}
-                        onConfirm={() => handleDeleteDrawing(drawing)}
-                      />
-                    )}
-                  </FileHeading>
-                </li>
-              ))}
-            </ul>
+            DRAWING_STATES.map(({ state, title, empty }) => {
+              const list = visibleDrawings.filter((d) => stateOf(d) === state);
+              // A search shows only the subsections that have a match.
+              if (search.trim() && list.length === 0) return null;
+              return (
+                <Subsection key={state} title={title} count={list.length} empty={empty}>
+                  {list.map((drawing) => {
+                    const making = stillMaking(drawing);
+                    const part = partOf(drawing);
+                    return (
+                      <li key={drawing.r2Key} className="px-4 py-3">
+                        <FileHeading
+                          name={
+                            <a
+                              href={drawingUrl(drawing.partNumber, drawing.revision)}
+                              target="_blank"
+                              rel="noreferrer"
+                              title="Open this drawing"
+                              className={linkClass}
+                            >
+                              {drawing.filename}
+                            </a>
+                          }
+                          title={drawing.filename}
+                          details={
+                            <p className="text-xs text-secondary-400">
+                              {part?.name && (
+                                <>
+                                  <PartNameLink definition={part} />{" "}
+                                </>
+                              )}
+                              <span className="font-mono text-secondary-500">
+                                {drawing.partNumber} · Rev {drawing.revision}
+                              </span>{" "}
+                              · {formatBytes(drawing.fileSize || 0)} ·{" "}
+                              {new Date(drawing.createdAt * 1000).toLocaleDateString()}
+                            </p>
+                          }
+                        >
+                          {canPrint && (
+                            <Button
+                              size="sm"
+                              className="shrink-0"
+                              onClick={() => handlePrint(drawing)}
+                              disabled={printingId === drawing.id}
+                            >
+                              {printingId === drawing.id ? "Printing…" : "Print"}
+                            </Button>
+                          )}
+                          <a
+                            href={drawingUrl(drawing.partNumber, drawing.revision)}
+                            download={drawing.filename}
+                            className={`${buttonClass("secondary", "sm")} shrink-0`}
+                          >
+                            Download
+                          </a>
+                          {!kiosk.active && (
+                            <ConfirmButton
+                              size="sm"
+                              label={deletingKey === drawing.r2Key ? "Deleting…" : "Delete"}
+                              confirmLabel="Delete"
+                              question={`${
+                                making > 0
+                                  ? `${making} instance${making === 1 ? " that's" : "s that are"} still being made use${making === 1 ? "s" : ""} it. `
+                                  : ""
+                              }Delete the drawing for ${drawing.partNumber} Rev ${drawing.revision}? This can't be undone.`}
+                              disabled={deletingKey === drawing.r2Key}
+                              onConfirm={() => handleDeleteDrawing(drawing)}
+                            />
+                          )}
+                        </FileHeading>
+                      </li>
+                    );
+                  })}
+                </Subsection>
+              );
+            })
           )}
         </section>
       </>

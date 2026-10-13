@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, matchPath, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../../shared/api";
 import { getErrorMessage } from "../../shared/api-error";
+import { batchAt, batchesById, currentBatch } from "../../shared/batches";
 import {
   type InstanceRow,
   type ShopMood,
@@ -14,13 +15,14 @@ import {
 } from "../../shared/derive";
 import { fetchKioskPresence } from "../../shared/getters";
 import { processPath } from "../../shared/nav";
-import type { KioskPresence, PartDefinition, ProcessType } from "../../shared/types";
+import type { Batch, KioskPresence, ProcessType } from "../../shared/types";
 import { useKiosk } from "../../shared/use-auth";
-import { useShopData } from "../../shared/use-shop-data";
+import { type ShopData, useShopData } from "../../shared/use-shop-data";
 import { useTouchDevice } from "../../shared/use-touch";
 import { useUserNames } from "../../shared/use-user-names";
+import { BatchLink, useInstancePath } from "../batches/batch-ui";
 import { PartCard } from "../parts/part-card";
-import { ConsumerSections } from "./consumer-process-view";
+import { ConsumerBatchCard, batchesHere } from "./consumer-process-view";
 import { PartDetailsView } from "./part-details-view";
 import { PartWorkView } from "./part-work-view";
 import { ProducerSections } from "./producer-process-view";
@@ -67,6 +69,7 @@ export function BoardPage() {
   const [scanOpen, setScanOpen] = useState(false);
 
   const rows = useMemo(() => (data ? buildInstanceRows(data) : []), [data]);
+  const batchById = useMemo(() => batchesById(data?.batches ?? []), [data]);
   const loads = useMemo(() => (data ? processLoads(rows, data.processes) : []), [rows, data]);
   // What a scan is matched against: the station's own queue, or everything on the overview.
   const queueRows = useMemo(
@@ -75,13 +78,17 @@ export function BoardPage() {
     [rows, view],
   );
 
-  // Handle instance query parameter from part detail page
+  // A link to a part's details (`?instance=`, from its part number's page or a batch) opens its
+  // card. The address is then put back as it was, so closing the card doesn't leave it to open
+  // again.
   useEffect(() => {
-    const instanceParam = searchParams.get("instance");
-    if (instanceParam) {
-      setSelectedInstanceId(Number(instanceParam));
-    }
-  }, [searchParams]);
+    const instance = searchParams.get("instance");
+    if (!instance) return;
+    setSelectedInstanceId(Number(instance));
+    const rest = new URLSearchParams(searchParams);
+    rest.delete("instance");
+    setSearchParams(rest, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   // A link to a part's shop view (`?part=`, from its details view) opens it: the work view if it's
   // being worked on, else the one with Start Part. The address is then put back as it was, so
@@ -198,27 +205,29 @@ export function BoardPage() {
         {view === "overview" && data ? (
           <OverviewView
             rows={rows}
+            batchById={batchById}
             loads={loads}
             processName={processName}
             touch={touch}
             navigate={navigate}
             presence={presence}
           />
-        ) : (
+        ) : data ? (
           <ProcessView
             processId={view as number}
             rows={rows}
+            data={data}
+            batchById={batchById}
             processName={processName}
             onAdvance={advance}
             touch={touch}
             onOpenWorkView={setWorkingPartInstanceId}
             onViewPart={setViewingPartInstanceId}
-            processType={data?.processes.find((p) => p.id === view)?.type ?? "regular"}
-            requiresPartInfo={!!data?.processes.find((p) => p.id === view)?.requiresPartInfo}
-            definitions={data?.definitions ?? []}
+            processType={data.processes.find((p) => p.id === view)?.type ?? "regular"}
+            requiresPartInfo={!!data.processes.find((p) => p.id === view)?.requiresPartInfo}
             onChanged={refresh}
           />
-        )}
+        ) : null}
 
         {scanOpen && (
           <ScanDialog
@@ -226,7 +235,15 @@ export function BoardPage() {
             all={rows}
             onFound={(row) => {
               setScanOpen(false);
-              setWorkingPartInstanceId(row.instance.id);
+              // A part its batch moves has no buttons of its own: its batch's view has them.
+              const batch = currentBatch(row, batchById);
+              if (batch) {
+                const next = new URLSearchParams(searchParams);
+                next.set("batch", String(batch.id));
+                setSearchParams(next);
+              } else {
+                setWorkingPartInstanceId(row.instance.id);
+              }
             }}
             onClose={() => setScanOpen(false)}
           />
@@ -296,6 +313,7 @@ function getCookedness(totalQueue: number): string {
 
 function OverviewView({
   rows,
+  batchById,
   loads,
   processName,
   touch,
@@ -303,6 +321,7 @@ function OverviewView({
   presence,
 }: {
   rows: InstanceRow[];
+  batchById: Map<number, Batch>;
   loads: ReturnType<typeof processLoads>;
   processName: (pid: number) => string;
   touch: boolean;
@@ -377,6 +396,7 @@ function OverviewView({
       <BoardList
         title="In Progress"
         rows={inProgress}
+        batchById={batchById}
         empty="Nothing is being worked on right now."
         processName={processName}
         touch={touch}
@@ -385,6 +405,7 @@ function OverviewView({
       <BoardList
         title="Not Started"
         rows={notStarted}
+        batchById={batchById}
         empty="Nothing is waiting to start."
         processName={processName}
         touch={touch}
@@ -397,6 +418,7 @@ function OverviewView({
 function BoardList({
   title,
   rows,
+  batchById,
   empty,
   processName,
   touch,
@@ -404,6 +426,7 @@ function BoardList({
 }: {
   title: string;
   rows: InstanceRow[];
+  batchById: Map<number, Batch>;
   empty: string;
   processName: (pid: number) => string;
   touch: boolean;
@@ -419,7 +442,14 @@ function BoardList({
       ) : (
         <div className="bg-surface border border-secondary-200 rounded-xl divide-y divide-secondary-200">
           {rows.map((row) => (
-            <PartLine key={row.instance.id} row={row} touch={touch} navigate={navigate}>
+            <PartLine
+              key={row.instance.id}
+              row={row}
+              touch={touch}
+              navigate={navigate}
+              batch={currentBatch(row, batchById)}
+              detailsLink
+            >
               {row.current && (
                 <Link
                   to={processPath(row.current.processId)}
@@ -442,6 +472,8 @@ function BoardList({
 function ProcessView({
   processId,
   rows,
+  data,
+  batchById,
   processName,
   onAdvance,
   touch,
@@ -449,11 +481,12 @@ function ProcessView({
   onViewPart,
   processType,
   requiresPartInfo,
-  definitions,
   onChanged,
 }: {
   processId: number;
   rows: InstanceRow[];
+  data: ShopData;
+  batchById: Map<number, Batch>;
   processName: (pid: number) => string;
   onAdvance: (row: InstanceRow, to: "doing" | "done") => Promise<void>;
   touch: boolean;
@@ -461,47 +494,69 @@ function ProcessView({
   onViewPart: (instanceId: number) => void;
   processType: ProcessType;
   requiresPartInfo: boolean;
-  definitions: PartDefinition[];
   onChanged: () => Promise<void>;
 }) {
   // Parts whose pipeline includes this process and haven't finished it yet.
   const here = rows.filter((r) => r.procs.some((p) => p.processId === processId));
-  const inProgress = here.filter(
-    (r) => r.current?.processId === processId && r.current.status === "doing",
-  );
-  const todo = sortPriorityFirst(
-    here.filter((r) => r.current?.processId === processId && r.current.status === "todo"),
-  );
+  // A part its batch moves here isn't listed on its own: the batch is, as one unit.
+  const alone = (status: "todo" | "doing") =>
+    here.filter(
+      (r) =>
+        r.current?.processId === processId &&
+        r.current.status === status &&
+        !batchAt(r, processId, batchById),
+    );
+  const inProgress = alone("doing");
+  const todo = sortPriorityFirst(alone("todo"));
+  const batches =
+    processType === "file_consumer"
+      ? batchesHere(processId, data, new Map(here.map((r) => [r.instance.id, r])))
+      : [];
+  const batchesDoing = batches.filter((b) => b.batch.consumerStatus === "doing");
+  const batchesTodo = batches.filter((b) => b.batch.consumerStatus === "todo");
+  const inBatches = (list: typeof batches) => list.reduce((n, b) => n + b.live.length, 0);
   // Still stuck at an earlier process; the row at this process is "waiting".
   const upcoming = here.filter((r) =>
     r.procs.some((p) => p.processId === processId && p.status === "waiting"),
   );
 
   const btnSize = touch ? "px-4 py-2.5" : "px-3 py-1.5";
+  const batchCards = (list: typeof batches) =>
+    list.map((item) => (
+      <ConsumerBatchCard key={item.batch.id} item={item} touch={touch} onChanged={onChanged} />
+    ));
 
   return (
     <div className="space-y-6">
-      {processType === "file_consumer" ? (
-        <ConsumerSections processId={processId} rows={here} touch={touch} onChanged={onChanged} />
-      ) : processType === "file_producer" ? (
+      {processType === "file_producer" ? (
         <ProducerSections
           processId={processId}
           rows={here}
           touch={touch}
-          definitions={definitions}
+          data={data}
           showPartInfo={requiresPartInfo}
           onChanged={onChanged}
+          onAdvance={onAdvance}
+          onOpenPart={(row) =>
+            row.current?.status === "doing"
+              ? onOpenWorkView(row.instance.id)
+              : onViewPart(row.instance.id)
+          }
         />
       ) : (
         <>
           <section className="space-y-2">
             <h2 className="font-sans text-xs font-bold uppercase tracking-widest text-secondary-400">
-              In Progress <span className="text-primary-600">{inProgress.length}</span>
+              In Progress{" "}
+              <span className="text-primary-600">
+                {inProgress.length + inBatches(batchesDoing)}
+              </span>
             </h2>
-            {inProgress.length === 0 ? (
+            {inProgress.length + batchesDoing.length === 0 ? (
               <p className="text-secondary-400 text-sm">Nothing in progress here.</p>
             ) : (
               <div className="bg-surface border border-secondary-200 rounded-xl divide-y divide-secondary-200">
+                {batchCards(batchesDoing)}
                 {inProgress.map((row) => (
                   <PartLine
                     key={row.instance.id}
@@ -533,12 +588,13 @@ function ProcessView({
 
           <section className="space-y-2">
             <h2 className="font-sans text-xs font-bold uppercase tracking-widest text-secondary-400">
-              To Do <span className="text-primary-600">{todo.length}</span>
+              To Do <span className="text-primary-600">{todo.length + inBatches(batchesTodo)}</span>
             </h2>
-            {todo.length === 0 ? (
+            {todo.length + batchesTodo.length === 0 ? (
               <p className="text-secondary-400 text-sm">Nothing ready to start.</p>
             ) : (
               <div className="bg-surface border border-secondary-200 rounded-xl divide-y divide-secondary-200">
+                {batchCards(batchesTodo)}
                 {todo.map((row) => (
                   <PartLine
                     key={row.instance.id}
@@ -589,7 +645,14 @@ function ProcessView({
         ) : (
           <div className="bg-surface border border-secondary-200 rounded-xl divide-y divide-secondary-200">
             {upcoming.map((row) => (
-              <PartLine key={row.instance.id} row={row} touch={touch} muted>
+              <PartLine
+                key={row.instance.id}
+                row={row}
+                touch={touch}
+                muted
+                batch={batchAt(row, processId, batchById)}
+                detailsLink
+              >
                 {row.current && (
                   <span className="text-xs text-secondary-400 shrink-0">
                     Stuck at{" "}
@@ -614,9 +677,10 @@ function ProcessView({
 // ── Shared bits ───────────────────────────────────────────────────────────────
 
 /**
- * One part in a list. With `onOpenPart` its name is the link that opens it. With `stack` its
- * buttons (`children`) go on a row of their own under the name on a narrow screen, where they'd
- * otherwise leave no room for it.
+ * One part in a list. With `onOpenPart` its name is the link that opens its shop view; with
+ * `detailsLink` it opens the part's details instead. `batch` names the batch the part moves with,
+ * which opens it. With `stack` its buttons (`children`) go on a row of their own under the name on
+ * a narrow screen, where they'd otherwise leave no room for it.
  */
 function PartLine({
   row,
@@ -624,6 +688,8 @@ function PartLine({
   touch,
   navigate,
   onOpenPart,
+  detailsLink,
+  batch,
   stack,
   children,
 }: {
@@ -632,9 +698,12 @@ function PartLine({
   touch?: boolean;
   navigate?: (path: string) => void;
   onOpenPart?: () => void;
+  detailsLink?: boolean;
+  batch?: Batch | null;
   stack?: boolean;
   children?: React.ReactNode;
 }) {
+  const instancePath = useInstancePath();
   // On the overview, a row goes to the machine its part is at.
   const goToMachine = navigate && row.current ? navigate : null;
   const name = (
@@ -676,6 +745,17 @@ function PartLine({
           >
             {name}
           </button>
+        ) : detailsLink ? (
+          <Link
+            to={instancePath(row.instance.id)}
+            onClick={(e) => e.stopPropagation()}
+            title="Open this part's details"
+            className={`block max-w-full truncate text-sm font-medium text-primary-600 underline hover:text-primary-700 transition-colors ${
+              touch ? "py-1" : ""
+            }`}
+          >
+            {name}
+          </Link>
         ) : (
           <p
             className={`text-sm font-medium truncate ${muted ? "text-secondary-500" : "text-secondary-900"}`}
@@ -683,7 +763,18 @@ function PartLine({
             {name}
           </p>
         )}
-        <p className="text-xs font-mono text-secondary-400 truncate">{partLabel(row)}</p>
+        <p className="text-xs font-mono text-secondary-400 truncate">
+          {partLabel(row)}
+          {batch && (
+            <span className="font-sans">
+              {" · in "}
+              <BatchLink
+                batch={batch}
+                className="text-secondary-500 underline hover:text-primary-600 transition-colors"
+              />
+            </span>
+          )}
+        </p>
       </div>
       {stack ? (
         <div className="grid auto-cols-fr grid-flow-col gap-2 sm:flex sm:shrink-0 sm:items-center sm:gap-3">

@@ -15,6 +15,9 @@ export type InstanceRow = {
 
 export type InstanceState = "todo" | "doing" | "waiting" | "complete" | "no-processes";
 
+/** What a step's stored status is called on a page. */
+export const STATUS_LABELS = { todo: "To Do", doing: "In Progress", done: "Complete" } as const;
+
 export const STATE_META: Record<InstanceState, { label: string; badge: string }> = {
   todo: { label: "To Do", badge: "bg-inset text-secondary-500 border-secondary-300" },
   doing: { label: "In Progress", badge: "bg-amber-50 text-amber-700 border-amber-300" },
@@ -58,6 +61,16 @@ export function buildInstanceRows(
     rows.push({ instance, definition, procs, current, state });
   }
   return rows;
+}
+
+/**
+ * A revision that is no longer made: one marked obsolete, or one whose every instance has been
+ * made obsolete.
+ */
+export function isObsoleteRevision(definition: PartDefinition, instances: PartInstance[]): boolean {
+  if (definition.isObsolete) return true;
+  const own = instances.filter((i) => i.partDefinitionId === definition.id);
+  return own.length > 0 && own.every((i) => i.isStale);
 }
 
 export function partLabel(row: InstanceRow): string {

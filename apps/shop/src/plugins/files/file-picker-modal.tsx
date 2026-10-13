@@ -1,8 +1,9 @@
 import { Button, Dialog, focusRing, inputClass } from "@g3/ui";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { PartDefinition, PartFile } from "../../shared/types";
+import { batchMembers } from "../../shared/batches";
+import type { Batch, PartFile } from "../../shared/types";
 import { useUserNames } from "../../shared/use-user-names";
-import { UploadButton, formatBytes, formatInstanceRanges, partLabelOf } from "./part-files-panel";
+import { UploadButton, formatBytes } from "./file-ui";
 
 type SortKey = "newest" | "oldest" | "name" | "type" | "size";
 
@@ -19,10 +20,13 @@ export function fileExtension(filename: string): string {
   return dot > 0 && dot < filename.length - 1 ? filename.slice(dot + 1).toLowerCase() : "";
 }
 
-/** Searchable, filterable list of library files; resolves one choice via `onPick`. */
+/**
+ * Searchable, filterable list of the library's files; resolves one choice via `onPick`. Obsolete
+ * files aren't offered: one can't go on another batch.
+ */
 export function FilePickerModal({
-  files,
-  definitions,
+  files: everyFile,
+  batches,
   title = "Choose a file",
   confirmLabel = "Use this file",
   onPick,
@@ -30,7 +34,8 @@ export function FilePickerModal({
   onClose,
 }: {
   files: PartFile[];
-  definitions: PartDefinition[];
+  /** Says which batches already use each file. */
+  batches: Batch[];
   title?: string;
   confirmLabel?: string;
   onPick: (file: PartFile) => void;
@@ -43,13 +48,13 @@ export function FilePickerModal({
   const [sort, setSort] = useState<SortKey>("newest");
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  const files = useMemo(() => everyFile.filter((f) => !f.obsolete), [everyFile]);
+  const obsolete = everyFile.length - files.length;
   const resolveName = useUserNames(files.map((f) => f.uploadedBy));
 
   useEffect(() => {
     searchRef.current?.focus();
   }, []);
-
-  const definitionById = useMemo(() => new Map(definitions.map((d) => [d.id, d])), [definitions]);
 
   const typeCounts = useMemo(() => {
     const counts = new Map<string, number>();
@@ -60,17 +65,14 @@ export function FilePickerModal({
     return [...counts.entries()].sort(([a], [b]) => a.localeCompare(b));
   }, [files]);
 
-  /** "Part 1 · Rev A #1–6; Part 2 · Rev B #1–3" */
-  const coverage = (f: PartFile) => {
-    const byPart = new Map<number, number[]>();
-    for (const a of f.assignments) {
-      byPart.set(a.partDefinitionId, [...(byPart.get(a.partDefinitionId) ?? []), a.instanceNumber]);
+  const usedBy = useMemo(() => {
+    const map = new Map<number, Batch[]>();
+    for (const b of batches) {
+      if (b.fileId === null || batchMembers(b).length === 0) continue;
+      map.set(b.fileId, [...(map.get(b.fileId) ?? []), b]);
     }
-    return [...byPart.entries()].map(([id, numbers]) => {
-      const d = definitionById.get(id);
-      return `${d ? `${d.name || partLabelOf(d)} (${partLabelOf(d)})` : `Part #${id}`} ${formatInstanceRanges(numbers)}`;
-    });
-  };
+    return map;
+  }, [batches]);
 
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -78,13 +80,7 @@ export function FilePickerModal({
       if (type !== "all" && fileExtension(f.filename) !== type) return false;
       if (!q) return true;
       if (f.filename.toLowerCase().includes(q)) return true;
-      return f.assignments.some((a) => {
-        const d = definitionById.get(a.partDefinitionId);
-        return (
-          !!d &&
-          (d.onshapePartNumber.toLowerCase().includes(q) || d.name?.toLowerCase().includes(q))
-        );
-      });
+      return (usedBy.get(f.id) ?? []).some((b) => b.label.toLowerCase().includes(q));
     });
     const byName = (a: PartFile, b: PartFile) => a.filename.localeCompare(b.filename);
     const compare: Record<SortKey, (a: PartFile, b: PartFile) => number> = {
@@ -96,7 +92,7 @@ export function FilePickerModal({
       size: (a, b) => b.fileSize - a.fileSize,
     };
     return list.sort(compare[sort]);
-  }, [files, search, type, sort, definitionById]);
+  }, [files, search, type, sort, usedBy]);
 
   const selected = files.find((f) => f.id === selectedId) ?? null;
   const control = `${inputClass} !w-auto`;
@@ -109,7 +105,7 @@ export function FilePickerModal({
           type="search"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search filename, part number, or part name…"
+          placeholder="Search by file or batch name…"
           className={`${inputClass} flex-1 min-w-[12rem]`}
         />
         <select
@@ -142,12 +138,12 @@ export function FilePickerModal({
       <ul className="max-h-[50vh] overflow-y-auto divide-y divide-secondary-200 rounded-lg border border-secondary-200">
         {visible.length === 0 && (
           <li className="px-4 py-8 text-center text-sm text-secondary-500">
-            {files.length === 0 ? "No files uploaded yet." : "No files match."}
+            {files.length === 0 ? "No files to choose from. Upload one." : "No files match."}
           </li>
         )}
         {visible.map((f) => {
           const ext = fileExtension(f.filename);
-          const covers = coverage(f);
+          const used = usedBy.get(f.id) ?? [];
           const isSelected = f.id === selectedId;
           return (
             <li key={f.id}>
@@ -173,17 +169,25 @@ export function FilePickerModal({
                 </div>
                 <p className="text-xs text-secondary-400 mt-0.5">
                   {formatBytes(f.fileSize)} · {new Date(f.createdAt).toLocaleDateString()} ·{" "}
-                  {resolveName(f.uploadedBy)} · {f.assignments.length} instance
-                  {f.assignments.length === 1 ? "" : "s"}
+                  {resolveName(f.uploadedBy)}
                 </p>
                 <p className="text-xs text-secondary-500 mt-0.5 truncate">
-                  {covers.length === 0 ? "Not assigned to any instances" : covers.join("; ")}
+                  {used.length === 0
+                    ? "Not in a batch"
+                    : `In ${used.map((b) => b.label).join(", ")}`}
                 </p>
               </button>
             </li>
           );
         })}
       </ul>
+
+      {obsolete > 0 && (
+        <p className="text-xs text-secondary-500">
+          {obsolete} obsolete file{obsolete === 1 ? " isn't" : "s aren't"} listed: a file made for
+          an obsolete part can't go on another batch.
+        </p>
+      )}
 
       <div className="flex flex-wrap items-center gap-2">
         {onUploadNew && (
