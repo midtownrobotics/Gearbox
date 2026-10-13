@@ -9,13 +9,14 @@ import {
   type Sort,
   type SortKey,
   approvedBy,
+  releaseName,
 } from "./release-rows";
 import { NarrowPart, PartNumber, td, th, when } from "./release-ui";
 
 // The Onshape page's table, drawn two ways. From 768px it is a table: a release's cells run down
 // beside its parts, or, with parts on lines of their own, are repeated on every line. Below that
 // nothing scrolls sideways: a release is a shaded band with its parts under it, or each part is
-// two lines, the part and then its release. Both sort by the same six columns.
+// two lines, the part and then its release. Both sort by the same seven columns.
 
 type Props = {
   /** Releases with their parts; used unless `flat`. */
@@ -59,7 +60,7 @@ function WideTable({ grouped, lines, flat, sort, onSort }: Props) {
     <table className="hidden w-full md:table">
       <thead className="bg-page">
         <tr>
-          <th scope="colgroup" colSpan={3} className={`${th} pb-0`}>
+          <th scope="colgroup" colSpan={4} className={`${th} pb-0`}>
             Release
           </th>
           <th scope="colgroup" colSpan={3} className={`${th} ${partsEdge} pb-0`}>
@@ -67,6 +68,7 @@ function WideTable({ grouped, lines, flat, sort, onSort }: Props) {
           </th>
         </tr>
         <tr>
+          {header("name", "Name")}
           {header("released", "Released")}
           {header("madeBy", "Made by")}
           {header("approvedBy", "Approved by")}
@@ -113,6 +115,7 @@ function NarrowList({ grouped, lines, flat, sort, onSort }: Props) {
   );
   const releaseSorts = (
     <div className="flex flex-wrap gap-x-4">
+      {button("name", "Name")}
       {button("released", "Released")}
       {button("madeBy", "Made by")}
       {button("approvedBy", "Approved by")}
@@ -140,7 +143,9 @@ function NarrowList({ grouped, lines, flat, sort, onSort }: Props) {
               <NarrowPart part={part} name={<PartName part={part} />} />
               <p className="border-t border-dashed border-t-secondary-200 px-3 py-1.5 text-xs text-secondary-500">
                 <ReleaseLink release={release} />
-                {[release.name, people(release)].map((text) => (text ? ` · ${text}` : "")).join("")}
+                {[released(release), people(release)]
+                  .map((text) => (text ? ` · ${text}` : ""))
+                  .join("")}
               </p>
             </li>
           ))}
@@ -150,9 +155,7 @@ function NarrowList({ grouped, lines, flat, sort, onSort }: Props) {
           <section key={release.id} className={groupEdge}>
             <div className="bg-inset px-3 py-2">
               <ReleaseLink release={release} className="font-medium" />
-              {release.name && (
-                <span className="block break-words text-secondary-900">{release.name}</span>
-              )}
+              <span className="block text-secondary-900">{released(release)}</span>
               {people(release) && (
                 <span className="block text-xs text-secondary-500">{people(release)}</span>
               )}
@@ -220,7 +223,10 @@ function SortButton({
   );
 }
 
-/** When a release was released, which names it and opens its page. */
+/** When a release was released: "Oct 5, 2026, 9:05 AM". */
+const released = (release: OnshapeRelease) => when(release.releasedAt) ?? release.releasedAt;
+
+/** A release's name, which opens its page. */
 function ReleaseLink({ release, className = "" }: { release: OnshapeRelease; className?: string }) {
   // The release's back link returns to the table as it is now.
   const { search } = useLocation();
@@ -229,9 +235,9 @@ function ReleaseLink({ release, className = "" }: { release: OnshapeRelease; cla
       to={`/onshape/releases/${release.id}`}
       state={{ list: search }}
       title="Open this release"
-      className={`${linkClass} whitespace-nowrap ${className}`}
+      className={`${linkClass} break-words ${className}`}
     >
-      {when(release.releasedAt) ?? release.releasedAt}
+      {releaseName(release)}
     </Link>
   );
 }
@@ -243,7 +249,7 @@ function PartName({ part }: { part: Part }) {
   );
 }
 
-/** A release's own cells: when it was released, who made it, who approved it. */
+/** A release's own cells: its name, when it was released, who made it, who approved it. */
 function ReleaseCells({
   release,
   edge,
@@ -257,9 +263,10 @@ function ReleaseCells({
     <>
       <td rowSpan={rows} className={`${td} ${edge}`}>
         <ReleaseLink release={release} />
-        {release.name && (
-          <span className="block break-words text-xs text-secondary-500">{release.name}</span>
-        )}
+      </td>
+      {/* On one line once there's room: seven columns are a tight fit just above a phone's width. */}
+      <td rowSpan={rows} className={`${td} ${edge} text-secondary-900 lg:whitespace-nowrap`}>
+        {released(release)}
       </td>
       <td rowSpan={rows} className={`${td} ${edge} text-secondary-900`}>
         {release.madeBy ?? "–"}

@@ -16,9 +16,9 @@ import {
 import { ReleasesTable } from "./releases-table";
 
 // The team's Onshape releases and their parts as one table (releases-table.tsx). Sorted by one of
-// a release's columns (when it was released, who made it, who approved it) it lists each release
-// once with its parts; sorted by one of a part's columns it lists every part on a line of its
-// own. A release's date opens its own page (release-page.tsx). The sort, the search and whether
+// a release's columns (its name, when it was released, who made it, who approved it) it lists each
+// release once with its parts; sorted by one of a part's columns it lists every part on a line of
+// its own. A release's name opens its own page (release-page.tsx). The sort, the search and whether
 // obsolete parts are shown live in the address, so coming back from a release finds the table as
 // it was.
 
