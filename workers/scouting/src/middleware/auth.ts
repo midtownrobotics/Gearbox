@@ -1,4 +1,4 @@
-import { type G3AuthEnv, requireAuth as requireG3IdAuth } from "@g3/auth";
+import { type G3AuthEnv, requestTeamId, requireAuth as requireG3IdAuth } from "@g3/auth";
 import type { Context } from "hono";
 import { createMiddleware } from "hono/factory";
 import type { AppEnv } from "../types";
@@ -12,6 +12,7 @@ export const requireAuth = createMiddleware<AppEnv>(async (c, next) => {
   if (c.env.LOCAL_AUTH_BYPASS !== "true") {
     return requireG3IdAuth(c as unknown as Context<G3AuthEnv>, next);
   }
+  c.set("teamId", requestTeamId(c));
   c.set("userId", "local-scout");
   c.set("userDisplayName", "Local Scout");
   c.set("userEmail", "scout@localhost");

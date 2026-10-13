@@ -25,6 +25,38 @@ type App = {
 };
 
 const APPS: App[] = [
+  {
+    dir: "workers/scouting",
+    teamTables: {
+      autoRoutines: "auto_routines",
+      boylebucksAccounts: "boylebucks_accounts",
+      boylebucksLedger: "boylebucks_ledger",
+      fieldMapPublishers: "field_map_publishers",
+      fieldMaps: "field_maps",
+      gameBets: "game_bets",
+      gameParlayLegs: "game_parlay_legs",
+      gameParlays: "game_parlays",
+      manualEvents: "manual_events",
+      manualMatches: "manual_matches",
+      manualScanCache: "manual_scan_cache",
+      manualScanUsage: "manual_scan_usage",
+      manualTeams: "manual_teams",
+      robotImages: "robot_images",
+      robotTeams: "robot_teams",
+      scoutingEngagementSettings: "scouting_engagement_settings",
+      scoutingFormSubmissions: "scouting_form_submissions",
+      scoutingForms: "scouting_forms",
+      scoutingMatchAssignments: "scouting_match_assignments",
+      serviceHelpers: "service_helpers",
+      serviceTickets: "service_tickets",
+      strategyAdmins: "strategy_admins",
+      strategyAnnouncements: "strategy_announcements",
+      strategyEventConfig: "strategy_event_config",
+      strategyPresence: "strategy_presence",
+      teamCommentsTable: "team_comments",
+      tierLists: "tier_lists",
+    },
+  },
   // Every other table hangs off the team's tree set and is reached by the set's id.
   { dir: "workers/skill-tree", teamTables: { treeSets: "tree_sets" } },
   {
@@ -222,6 +254,23 @@ for (const app of APPS) {
         for (const name of sqlNames) {
           if (new RegExp(`\\b${name}\\b`).test(template)) {
             problems.push(`${at(node)}: raw SQL on team table ${name}; use Drizzle with inTeam`);
+          }
+        }
+        // Complex scoped projections may interpolate a Drizzle table rather than spell its SQL
+        // name. Those sources still need their own team filter, including inside subqueries.
+        if (ts.isTemplateExpression(node.template)) {
+          let statement: ts.Node = node;
+          while (statement.parent && !ts.isStatement(statement)) statement = statement.parent;
+          const code = statement.getText(source);
+          for (const span of node.template.templateSpans) {
+            const value = span.expression;
+            if (
+              ts.isIdentifier(value) &&
+              value.text in tables &&
+              !new RegExp(`inTeam\\(\\s*${value.text}\\s*,`).test(code)
+            ) {
+              problems.push(`${at(node)}: SQL source ${value.text} without inTeam()`);
+            }
           }
         }
       }

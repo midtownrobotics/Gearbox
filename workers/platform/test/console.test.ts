@@ -37,6 +37,7 @@ const TEAM_APP_BINDINGS = [
   "ORDERS",
   "PIT",
   "SHOP",
+  "SCOUTING",
   "SKILL_TREE",
 ] as const;
 

@@ -31,8 +31,8 @@ const json = (body: unknown, status = 200) =>
   });
 
 /** Slack DMs and channel posts apps asked G3ID to send, by team (tests read them back). */
-const slackDms = new Map<string, Record<string, string>[]>();
-const slackMessages = new Map<string, Record<string, string>[]>();
+const slackDms = new Map<string, Record<string, unknown>[]>();
+const slackMessages = new Map<string, Record<string, unknown>[]>();
 /** Lines apps added to a team's log (`logTeamChange`), and messages sent to all its admins. */
 const teamLogs = new Map<string, Record<string, unknown>[]>();
 const adminDms = new Map<string, Record<string, unknown>[]>();
@@ -95,12 +95,14 @@ export const g3idStub: ServiceStub = async (request) => {
   }
   // A DM or channel post from the team's Slack bot: recorded, never sent. Tests read them back
   // (stub only) with GET /api/internal/teams/:id/slack/dms or .../slack/messages on env.G3ID.
-  const slack = url.pathname.match(/^\/internal\/teams\/([^/]+)\/slack\/(dm|message)s?$/);
+  const slack = url.pathname.match(
+    /^\/internal\/teams\/([^/]+)\/slack\/(dm-members|dm|message)s?$/,
+  );
   if (slack) {
-    const store = slack[2] === "dm" ? slackDms : slackMessages;
+    const store = slack[2].startsWith("dm") ? slackDms : slackMessages;
     const teamId = decodeURIComponent(slack[1]);
     if (request.method === "GET") return json(store.get(teamId) ?? []);
-    const body = (await request.json()) as Record<string, string>;
+    const body = (await request.json()) as Record<string, unknown>;
     store.set(teamId, [...(store.get(teamId) ?? []), body]);
     return json({ ok: true });
   }

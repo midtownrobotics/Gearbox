@@ -78,6 +78,8 @@ We count teams and the apps they use so we can plan capacity. Those counts do no
 
 Some things are public by design: your team's name, number and branding on its sign-in page, and the apps your team has submitted to the library.
 
+Scouting forms, reports, schedules, uploaded files and points are private to the owning team. Team deletion or the app's scheduled deletion removes its database records and uploaded files.
+
 Scouting engagement is off by default. An admin can enable points and match predictions and can separately enable team points standings. Standings show members' names, balances, points earned and points used to signed-in teammates. A member's prediction history is shown only to that member through the activity page. Disabling activities pauses new awards and prediction result processing and keeps existing balances and history under the same retention rules as other team data.
 
 ## 6. Other services involved

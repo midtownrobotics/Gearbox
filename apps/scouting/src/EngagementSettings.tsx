@@ -1,3 +1,4 @@
+import { Button, Card, ErrorBanner, Field, SuccessBanner, inputClass } from "@g3/ui";
 import { useState } from "react";
 import { api } from "./api";
 
@@ -39,86 +40,74 @@ export function EngagementSettingsPanel({
     }
   }
   return (
-    <section className="engagement-settings">
-      <h2>Optional engagement</h2>
-      <p>Choose which activities your team uses.</p>
-      <label>
-        <input
-          type="checkbox"
-          disabled={saving}
-          checked={draft.enabled}
-          onChange={(e) => setDraft({ ...draft, enabled: e.target.checked })}
-        />{" "}
-        Enable scouting points and activities
-      </label>
-      <p>
-        Match scouting reports earn 10 points. Turning this off hides it and pauses points; balances
-        and picks are kept.
-      </p>
-      <fieldset disabled={!draft.enabled || saving}>
-        <legend>Activities and naming</legend>
-        <label>
-          Points name
-          <input
-            type="text"
-            value={draft.pointsLabel}
-            maxLength={40}
-            required
-            onChange={(e) => setDraft({ ...draft, pointsLabel: e.target.value })}
-          />
-        </label>
+    <div className="scouting-shared-settings">
+      <Card title="Optional engagement" className="space-y-4">
         <label>
           <input
             type="checkbox"
-            checked={draft.predictionsEnabled}
-            onChange={(e) => setDraft({ ...draft, predictionsEnabled: e.target.checked })}
+            disabled={saving}
+            checked={draft.enabled}
+            onChange={(e) => setDraft({ ...draft, enabled: e.target.checked })}
           />{" "}
-          Match predictions
+          Enable scouting points and activities
         </label>
-        <p>
-          Members spend points on match picks and win points back for correct ones. Points have no
-          monetary value.
-        </p>
-        <label>
-          <input
-            type="checkbox"
-            disabled={!draft.predictionsEnabled}
-            checked={draft.combinationsEnabled}
-            onChange={(e) => setDraft({ ...draft, combinationsEnabled: e.target.checked })}
-          />{" "}
-          Combined picks across multiple matches
-        </label>
-        <label>
-          <input
-            type="checkbox"
-            checked={draft.leaderboardEnabled}
-            onChange={(e) => setDraft({ ...draft, leaderboardEnabled: e.target.checked })}
-          />{" "}
-          Team points standings
-        </label>
-        <p>
-          Standings share members’ names, point balances, points earned and points used with
-          signed-in teammates.
-        </p>
-      </fieldset>
-      {error && (
-        <p className="form-message error" role="alert">
-          {error}
-        </p>
-      )}
-      {message && (
-        <p className="form-message" role="status">
-          {message}
-        </p>
-      )}
-      <button
-        type="button"
-        className="primary-button"
-        disabled={saving || !draft.pointsLabel.trim()}
-        onClick={save}
-      >
-        {saving ? "Saving…" : "Save engagement settings"}
-      </button>
-    </section>
+        <p>Reports earn 10 points. Disabling activities pauses points and keeps existing picks.</p>
+        <fieldset
+          className="space-y-4 rounded-lg border border-line p-4"
+          disabled={!draft.enabled || saving}
+        >
+          <legend>Activities and naming</legend>
+          <Field label="Points name">
+            <input
+              className={inputClass}
+              type="text"
+              value={draft.pointsLabel}
+              maxLength={40}
+              required
+              onChange={(e) => setDraft({ ...draft, pointsLabel: e.target.value })}
+            />
+          </Field>
+          <label>
+            <input
+              type="checkbox"
+              checked={draft.predictionsEnabled}
+              onChange={(e) => setDraft({ ...draft, predictionsEnabled: e.target.checked })}
+            />{" "}
+            Match predictions
+          </label>
+          <p>Points have no monetary value.</p>
+          <label>
+            <input
+              type="checkbox"
+              disabled={!draft.predictionsEnabled}
+              checked={draft.combinationsEnabled}
+              onChange={(e) => setDraft({ ...draft, combinationsEnabled: e.target.checked })}
+            />{" "}
+            Combined picks across multiple matches
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={draft.leaderboardEnabled}
+              onChange={(e) => setDraft({ ...draft, leaderboardEnabled: e.target.checked })}
+            />{" "}
+            Team points standings
+          </label>
+          <p>
+            Standings share members’ names, point balances, points earned and points used with
+            signed-in teammates.
+          </p>
+        </fieldset>
+        {error && (
+          <div role="alert">
+            <ErrorBanner message={error} />
+          </div>
+        )}
+        {message && <SuccessBanner message={message} />}
+        <Button type="button" disabled={saving || !draft.pointsLabel.trim()} onClick={save}>
+          {saving ? "Saving…" : "Save engagement settings"}
+        </Button>
+      </Card>
+    </div>
   );
 }

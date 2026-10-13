@@ -37,6 +37,7 @@ const BINDINGS: Partial<Record<AppName, keyof AppEnv["Bindings"]>> = {
   orders: "ORDERS",
   pit: "PIT",
   shop: "SHOP",
+  scouting: "SCOUTING",
   skillTree: "SKILL_TREE",
 };
 

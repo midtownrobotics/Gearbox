@@ -21,12 +21,14 @@ A survey of every difference, with sketches, is at <https://claude.ai/artifact/C
 | 5. Pit, with its Overview | Done | Pit | Nothing. Its few icon marks wait for the Lucide icons (see step 5 below) |
 | 6. Shop | Done | Shop | Nothing. The shop view's large buttons and the green Complete buttons stay Shop's own (see step 6 below) |
 | 7. Browser pop-ups | Done | Orders, Skill Tree, Platform, Pit (and Edge, ID and Shop in their own steps) | Nothing outside Scouting, whose 24 go with step 8 |
-| 8. Scouting | Not started | Scouting | All of it, with its Phase 3 step in `roadmap.md` |
+| 8. Scouting | Done in this branch | Scouting | Pages use the shared frame, standard controls and cards; page URLs and in-page questions are in place. Redundant Scouting descriptions and empty-description placeholders are removed; prediction rules are expandable. Match Predictions now has shared summary stats and chips, clearer match choices, pick slips and history. Service Tickets uses shared cards throughout and the shared page spacing without legacy page overrides. Specialized drawing and touch layouts are preserved. Team-scoping is complete; release verification remains |
 
 ### What landed
 
+
 | Change | Step | Pull request |
 | --- | --- | --- |
+| Scouting pages use shared Page, Card, Button and input styles; engagement Admin uses Field and banners. React Router provides page URLs, reload and Back; libraries appear directly in a group, and Admin is last. All browser questions and alerts use the shared QuestionProvider and Dialog. Supporting descriptions, hints, placeholders and empty states use readable body type; large team numbers are limited to the scouting entry. Canvas tools, touch controls, imports, roles and API payloads are preserved. The [Scouting UI validation](scouting-ui-validation.md) covers all eight pages, populated editors, long content, empty/error/loading states, dialogs and fullscreen in both themes across phone, tablet and desktop widths; navigation and report-submission workflows also pass | 8: UI and navigation | This branch |
 | The page parts moved from each app's `shared/ui.tsx` into `@g3/ui`: `Page`, `PageLoading`, `Card`, `Stat`, `Button`, `ConfirmButton`, `Field`, `inputClass`, `ErrorBanner`, `SuccessBanner`, `Loading`, `Dialog`, `Toggle`, `Badge` with `tones`, `ProgressBar`, `focusRing`. Orders, Inventory, Skill Tree and Edge import them and have no `shared/ui.tsx`. Errors, danger buttons and every other mark of a problem in those four apps are red where they were the team's color. Buttons and inputs show a focus ring. Scouting is called Scouting in its own bar and tab, where it said Strategy | 1, and the name from 2 | [#186](https://github.com/midtownrobotics/Gearbox/pull/186) |
 | Names: Orders' and Inventory's Settings page is Admin (at `/admin`; `/settings` still opens it), Pit's Admin page is titled Admin, Shop's Admin is last in the bar, and every "Log in" and "Log Out" is "Sign in" and "Sign out". Titles match their bar labels in Pit (Edit Checklists), ID (Account, Kiosk Devices, Attendance), Portal (Manage Apps, Appearance) and Edge (Overview, Drive). Bugs: Pit's unreadable headings, dark error blocks and red progress bars; pages a bar's height too tall in Pit, Shop and Portal; ID's kiosk revoke asks first; Orders' and Inventory's dates follow the viewer's language; Inventory's search and filters are in the address; unused icon libraries dropped from Pit and Shop | 2 | [#187](https://github.com/midtownrobotics/Gearbox/pull/187) |
 | Edge's hand-written buttons and inputs are the shared `Button` and `inputClass`, and it has no button or input styles of its own. `Button` and `ConfirmButton` take `size="sm"`. Edge's three browser confirms (a new box key, deleting a blocklist, removing a printer) ask in the page, and deleting a door sound now asks too | 3, and Edge's part of 7 | [#188](https://github.com/midtownrobotics/Gearbox/pull/188) |
@@ -224,15 +226,11 @@ See "What landed". Edge's went with step 3, ID's with step 4 and Shop's with ste
 - **Pit's** label maker called `alert` when nothing was chosen. Its button is disabled then, so nobody saw it; it now raises an error, which the page shows.
 - **What changed besides where the question is:** Share-A-Cart's Disconnect and the wishlist page's "Remove from wishlist" are red buttons, since both now ask as deletes do. Denying from the Approvals queue and taking a line off an order show what is about to happen above the box.
 
-### 8. Scouting (largest)
+### 8. Scouting (done in this branch)
 
-Do it with Scouting's Phase 3 step in `roadmap.md`, so its pages are opened once.
+Completed with Scouting's Phase 3 step. Pages use shared frames, cards, controls and team colors; specialized canvas and touch layouts remain layered below shared styles. React Router provides page links, reload and Back. Auto Library, Tier Lists and Field Maps are grouped directly in the bar, Admin is last, and browser pop-ups are replaced by shared in-page dialogs.
 
-- Its own stylesheet of 8,149 lines, with four sets of base colors stacked on one another, and about 6,000 lines of pages in eight files.
-- Its pages have no addresses: the page is a state variable in `App.tsx`. Give each page an address with the router the other apps use, so links, reload and Back work.
-- 24 browser pop-ups.
-- "Other Tools" is a page that only lists three other pages. Under the first-page rule it goes: put Auto Library, Tier Lists and Field Maps in the bar, grouped.
-- Its Admin moves to the end of the bar.
+Service Tickets and optional Predictions have responsive forms and cards. Redundant descriptions are removed, and the available points label uses the team's configured points name. See [UI validation](scouting-ui-validation.md) and [team isolation](scouting-tenancy.md) for coverage and release ordering.
 
 ## Bugs found
 

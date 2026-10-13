@@ -1,4 +1,17 @@
-import { Coins, Loader2, RefreshCw, Trophy } from "lucide-react";
+import {
+  Badge,
+  Button,
+  Card,
+  Chip,
+  ErrorBanner,
+  Field,
+  Loading,
+  Page as SharedPage,
+  Stat,
+  inputClass,
+  tones,
+} from "@g3/ui";
+import { Coins, Loader2, RefreshCw, Trophy, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import type { EngagementSettings } from "./EngagementSettings";
 import { api } from "./api";
@@ -80,7 +93,7 @@ function statusLabel(status: "open" | "won" | "lost" | "push") {
   return { open: "Pending", won: "Correct", lost: "Incorrect", push: "Points returned" }[status];
 }
 
-export function MatchPredictions() {
+export function MatchPredictions({ predictionsEnabled = true }: { predictionsEnabled?: boolean }) {
   const [data, setData] = useState<MatchPredictionsData | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -176,63 +189,80 @@ export function MatchPredictions() {
 
   if (loading)
     return (
-      <section className="page game-page game-loading">
-        <Loader2 className="spin" /> Loading match predictions…
-      </section>
+      <SharedPage
+        title={predictionsEnabled ? "Match Predictions" : "Scouting Points"}
+        width="wide"
+        className="scouting-page-frame"
+        contentClassName="predictions-workspace"
+      >
+        <Loading />
+      </SharedPage>
     );
 
   return (
-    <section className="page game-page">
-      <div className="game-hero">
-        <div>
-          <h1>{data?.settings.predictionsEnabled ? "Match Predictions" : "Scouting Points"}</h1>
-          <span>{data?.eventKey ? `Event: ${data.eventKey}` : "No active event"}</span>
+    <SharedPage
+      title={
+        (data?.settings.predictionsEnabled ?? predictionsEnabled)
+          ? "Match Predictions"
+          : "Scouting Points"
+      }
+      width="wide"
+      className="scouting-page-frame"
+      contentClassName="predictions-workspace"
+      description={data?.eventKey ? `Event: ${data.eventKey}` : undefined}
+    >
+      {error && (
+        <div role="alert">
+          <ErrorBanner message={error} />
         </div>
-        <div className="game-balance" aria-label={`${data?.account.balance ?? 0} ${pointsLabel}`}>
-          <Coins size={18} />
-          <span>
-            <strong>
-              {data?.account.balance ?? 0} {pointsLabel}
-            </strong>
-            <small>Balance</small>
-          </span>
-        </div>
-      </div>
-
-      {error && <div className="form-message error">{error}</div>}
+      )}
       {data?.statsError && (
-        <div className="form-message error">Predictions paused: {data.statsError}</div>
+        <div role="alert">
+          <ErrorBanner message={`Predictions paused: ${data.statsError}`} />
+        </div>
       )}
 
-      <p>Earn points by completing match scouting reports. Points have no monetary value.</p>
-      {data?.settings.predictionsEnabled && (
-        <p>
-          Each pick costs points. Choose the alliance that will lead after the score adjustment
-          shown. A correct pick pays out at the multiplier; a combined pick needs every part right.
-        </p>
+      {data && (
+        <Card>
+          <div className="grid gap-5 sm:grid-cols-3">
+            <Stat
+              label={`Available ${pointsLabel}`}
+              value={data.account.balance.toLocaleString()}
+            />
+            <Stat label="Earned scouting" value={data.account.earned.toLocaleString()} />
+            <Stat label="Used on picks" value={data.account.wagered.toLocaleString()} />
+          </div>
+        </Card>
       )}
-      <div className="game-tabs" role="tablist" aria-label="Prediction sections">
+      {data?.settings.predictionsEnabled && (
+        <details className="text-sm text-secondary-500">
+          <summary className="cursor-pointer">How picks work</summary>
+          <p className="mt-2">
+            Pick the alliance that leads after the score adjustment. Every match in a combined pick
+            must be correct. Points have no monetary value.
+          </p>
+        </details>
+      )}
+      <div className="flex flex-wrap gap-2" role="tablist" aria-label="Prediction sections">
         {data?.settings.predictionsEnabled && (
-          <button
-            type="button"
+          <Chip
             role="tab"
             aria-selected={section === "predictions"}
-            className={section === "predictions" ? "active" : ""}
+            selected={section === "predictions"}
             onClick={() => setSection("predictions")}
           >
             Match Picks
-          </button>
+          </Chip>
         )}
         {data?.settings.leaderboardEnabled && (
-          <button
-            type="button"
+          <Chip
             role="tab"
             aria-selected={section === "leaderboard"}
-            className={section === "leaderboard" ? "active" : ""}
+            selected={section === "leaderboard"}
             onClick={() => setSection("leaderboard")}
           >
             {pointsLabel} Standings
-          </button>
+          </Chip>
         )}
       </div>
 
@@ -241,12 +271,19 @@ export function MatchPredictions() {
           <div className="game-main">
             <div className="game-section-heading">
               <h2>Upcoming Matches</h2>
-              <button type="button" className="secondary-button" onClick={load}>
+              <Button variant="secondary" type="button" onClick={load}>
                 <RefreshCw size={16} /> Refresh
-              </button>
+              </Button>
             </div>
             {!data?.matches.length && !data?.statsError && (
-              <div className="forms-empty">No upcoming matches are available.</div>
+              <Card className="space-y-2">
+                <h3 className="text-base font-semibold text-secondary-900">No upcoming matches</h3>
+                <p className="text-sm text-secondary-500">
+                  {data.eventKey
+                    ? "Check back when the next matches are scheduled."
+                    : "Choose an event in Admin to load matches for your team."}
+                </p>
+              </Card>
             )}
             <div className="game-match-list">
               {data?.matches.map((match) => {
@@ -257,7 +294,7 @@ export function MatchPredictions() {
                     </header>
                     <div className="predictions-columns" aria-hidden="true">
                       <span>Matchup</span>
-                      <span>Score adjustment / reward</span>
+                      <span>Adjustment / return</span>
                     </div>
                     <div className="predictions-row red">
                       <div className="predictions-team">
@@ -266,6 +303,8 @@ export function MatchPredictions() {
                       </div>
                       <button
                         type="button"
+                        aria-pressed={isSelected(match.key, "spread", "red")}
+                        aria-label={`Pick Red for ${match.label}, adjustment ${signed(match.markets.spread.red)}`}
                         className={isSelected(match.key, "spread", "red") ? "selected" : ""}
                         onClick={() =>
                           choose({
@@ -289,6 +328,8 @@ export function MatchPredictions() {
                       </div>
                       <button
                         type="button"
+                        aria-pressed={isSelected(match.key, "spread", "blue")}
+                        aria-label={`Pick Blue for ${match.label}, adjustment ${signed(match.markets.spread.blue)}`}
                         className={isSelected(match.key, "spread", "blue") ? "selected" : ""}
                         onClick={() =>
                           choose({
@@ -312,7 +353,7 @@ export function MatchPredictions() {
           </div>
 
           <aside className="game-sidebar">
-            <section className="game-slip">
+            <Card className="game-slip">
               <h2>Your picks {slip.length > 1 ? `(${slip.length} matches)` : ""}</h2>
               {slip.length ? (
                 <>
@@ -334,7 +375,7 @@ export function MatchPredictions() {
                           }
                           aria-label={`Remove ${leg.match.label}`}
                         >
-                          ×
+                          <X size={16} />
                         </button>
                       </div>
                     ))}
@@ -343,9 +384,9 @@ export function MatchPredictions() {
                     <span>Reward multiplier</span>
                     <strong>{americanToDecimal(slipOdds).toFixed(2)}x</strong>
                   </div>
-                  <label>
-                    Points to use
+                  <Field label="Points to use">
                     <input
+                      className={inputClass}
                       type="number"
                       min="1"
                       max={Math.min(10_000, data?.account.balance ?? 0)}
@@ -353,7 +394,7 @@ export function MatchPredictions() {
                       value={stake}
                       onChange={(event) => setStake(Math.floor(Number(event.target.value)))}
                     />
-                  </label>
+                  </Field>
                   <div className="game-return">
                     Points returned if correct
                     <strong>
@@ -366,9 +407,9 @@ export function MatchPredictions() {
                       {pointsLabel}
                     </strong>
                   </div>
-                  <button
+                  <Button
+                    variant="primary"
                     type="button"
-                    className="primary-button"
                     disabled={
                       placing ||
                       !Number.isInteger(stake) ||
@@ -380,12 +421,12 @@ export function MatchPredictions() {
                   >
                     {placing ? <Loader2 className="spin" size={17} /> : <Coins size={17} />} Submit{" "}
                     {slip.length > 1 ? "combined pick" : "pick"}
-                  </button>
+                  </Button>
                 </>
               ) : (
                 <p>Select an alliance to make a pick.</p>
               )}
-            </section>
+            </Card>
           </aside>
         </div>
       ) : data?.settings.leaderboardEnabled ? (
@@ -393,7 +434,13 @@ export function MatchPredictions() {
           <h2>
             <Trophy size={19} /> {pointsLabel} Standings
           </h2>
-          <div className="game-leaderboard-table">
+          <div
+            className="game-leaderboard-table"
+            role="region"
+            aria-label="Team points standings"
+            // biome-ignore lint/a11y/noNoninteractiveTabindex: allow keyboard scrolling of standings
+            tabIndex={0}
+          >
             <div className="game-leaderboard-head">
               <span>Rank</span>
               <span>Name</span>
@@ -405,13 +452,13 @@ export function MatchPredictions() {
               <div className="game-leaderboard-row" key={`${player.display_name}-${index}`}>
                 <b>#{index + 1}</b>
                 <strong>{player.display_name}</strong>
-                <span>
+                <span data-label="Balance">
                   {player.balance} {pointsLabel}
                 </span>
-                <span>
+                <span data-label="Earned">
                   {player.earned} {pointsLabel}
                 </span>
-                <span>
+                <span data-label="Used on picks">
                   {player.wagered} {pointsLabel}
                 </span>
               </div>
@@ -428,9 +475,19 @@ export function MatchPredictions() {
             <div className="game-history-grid">
               {data.parlays.map((parlay) => (
                 <div key={parlay.id}>
-                  <span className={`bet-status ${parlay.status}`}>
+                  <Badge
+                    colors={
+                      parlay.status === "won"
+                        ? tones.success
+                        : parlay.status === "lost"
+                          ? tones.danger
+                          : parlay.status === "open"
+                            ? tones.warning
+                            : tones.neutral
+                    }
+                  >
                     {statusLabel(parlay.status)}
-                  </span>
+                  </Badge>
                   <strong>Combined pick / {parlay.legs.length} matches</strong>
                   <span>{parlay.legs.map((leg) => leg.match_label).join(", ")}</span>
                   <b>
@@ -442,7 +499,19 @@ export function MatchPredictions() {
               ))}
               {data.bets.map((bet) => (
                 <div key={bet.id}>
-                  <span className={`bet-status ${bet.status}`}>{statusLabel(bet.status)}</span>
+                  <Badge
+                    colors={
+                      bet.status === "won"
+                        ? tones.success
+                        : bet.status === "lost"
+                          ? tones.danger
+                          : bet.status === "open"
+                            ? tones.warning
+                            : tones.neutral
+                    }
+                  >
+                    {statusLabel(bet.status)}
+                  </Badge>
                   <strong>{bet.match_label}</strong>
                   <span>
                     {bet.selection === "red" ? "Red" : "Blue"}{" "}
@@ -458,6 +527,6 @@ export function MatchPredictions() {
             </div>
           </section>
         )}
-    </section>
+    </SharedPage>
   );
 }

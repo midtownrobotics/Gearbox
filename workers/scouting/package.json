@@ -15,12 +15,12 @@
     "db:migrate:local": "wrangler d1 migrations apply SCOUTING_DB --local",
     "db:migrate:remote": "wrangler d1 migrations apply SCOUTING_DB --env production --remote",
     "db:migrate:staging": "wrangler d1 migrations apply SCOUTING_DB --env staging --remote",
-    "test": "vitest run"
+    "test": "node test/migration.cjs && vitest run"
   },
   "dependencies": {
     "@g3/auth": "workspace:*",
     "@g3/site-config": "workspace:*",
-    "@g3/slack": "workspace:*",
+    "drizzle-orm": "catalog:",
     "hono": "catalog:"
   },
   "devDependencies": {

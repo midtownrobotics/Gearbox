@@ -1,6 +1,17 @@
 import { pageTeamId, pageTeamNumber, teamKey } from "@g3/site-config";
 import { versionLabel } from "@g3/site-config/versions";
-import { AppNavBar, useTeamNames, useTeamUiSettings } from "@g3/ui";
+import {
+  AppNavBar,
+  Button,
+  Card,
+  PageLoading,
+  Page as SharedPage,
+  inputClass,
+  linkWith,
+  useQuestions,
+  useTeamNames,
+  useTeamUiSettings,
+} from "@g3/ui";
 import {
   ArrowRight,
   Camera,
@@ -32,6 +43,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { Analysis } from "./Analysis";
 import { type EngagementSettings, EngagementSettingsPanel } from "./EngagementSettings";
 import { MatchPredictions } from "./Game";
@@ -48,16 +60,7 @@ import {
 } from "./local-field-maps";
 import { type ParsedTrajectory, parseTrajectoryFile, trajectoryToPng } from "./trajectory-files";
 
-type Page =
-  | "forms"
-  | "predictions"
-  | "admin"
-  | "analysis"
-  | "service"
-  | "autos"
-  | "other"
-  | "tiers"
-  | "maps";
+type Page = "forms" | "predictions" | "admin" | "analysis" | "service" | "autos" | "tiers" | "maps";
 type User = {
   userId: string;
   displayName: string;
@@ -228,30 +231,6 @@ function EmptyState({
   );
 }
 
-function OtherTools({ go }: { go: (page: Page) => void }) {
-  const tools = [
-    { page: "autos" as const, label: "Auto Library" },
-    { page: "tiers" as const, label: "Tier Lists" },
-    { page: "maps" as const, label: "Field Maps" },
-  ];
-  return (
-    <section className="page other-tools-page">
-      <div className="page-heading">
-        <div>
-          <h1>Other Tools</h1>
-        </div>
-      </div>
-      <div className="tool-grid">
-        {tools.map((tool) => (
-          <button type="button" className="tool-card" key={tool.page} onClick={() => go(tool.page)}>
-            <h2>{tool.label}</h2>
-          </button>
-        ))}
-      </div>
-    </section>
-  );
-}
-
 function TierLists() {
   const [lists, setLists] = useState<TierList[]>([]);
   const [current, setCurrent] = useState<TierList>({
@@ -324,53 +303,54 @@ function TierLists() {
   }
 
   return (
-    <section className="page tier-lists-page">
-      <div className="page-heading">
-        <div>
-          <h1>Tier Lists</h1>
-        </div>
-        <div className="heading-actions">
-          <select
-            aria-label="Select tier list"
-            value={current.id ?? "new"}
-            onChange={(event) => {
-              const selected = lists.find((list) => list.id === event.target.value);
-              if (selected) setCurrent(selected);
-            }}
-          >
-            <option value="new">New unsaved list</option>
-            {lists.map((list) => (
-              <option key={list.id} value={list.id}>
-                {list.name}
-              </option>
-            ))}
-          </select>
-          <button
-            type="button"
-            className="secondary-button"
-            onClick={() =>
-              setCurrent({
-                name: "Untitled tier list",
-                description: "",
-                tiers: defaultTiers.map((tier) => ({
-                  ...tier,
-                  id: crypto.randomUUID(),
-                  items: [],
-                })),
-              })
-            }
-          >
-            <Plus size={17} /> New
-          </button>
-          <button type="button" className="primary-button" onClick={save} disabled={saving}>
-            {saving ? <Loader2 size={17} className="spin" /> : <Save size={17} />} Save list
-          </button>
-        </div>
+    <SharedPage
+      title={<>Tier Lists</>}
+      width="wide"
+      className="scouting-page-frame"
+      contentClassName="page tier-lists-page"
+      actions=<div className="heading-actions">
+        <select
+          className={inputClass}
+          aria-label="Select tier list"
+          value={current.id ?? "new"}
+          onChange={(event) => {
+            const selected = lists.find((list) => list.id === event.target.value);
+            if (selected) setCurrent(selected);
+          }}
+        >
+          <option value="new">New unsaved list</option>
+          {lists.map((list) => (
+            <option key={list.id} value={list.id}>
+              {list.name}
+            </option>
+          ))}
+        </select>
+        <Button
+          variant="secondary"
+          type="button"
+          onClick={() =>
+            setCurrent({
+              name: "Untitled tier list",
+              description: "",
+              tiers: defaultTiers.map((tier) => ({
+                ...tier,
+                id: crypto.randomUUID(),
+                items: [],
+              })),
+            })
+          }
+        >
+          <Plus size={17} /> New
+        </Button>
+        <Button variant="primary" type="button" onClick={save} disabled={saving}>
+          {saving ? <Loader2 size={17} className="spin" /> : <Save size={17} />} Save list
+        </Button>
       </div>
-      <div className="editor-card">
+    >
+      <Card className="editor-card">
         <div className="list-meta">
           <input
-            className="title-input"
+            className={`title-input ${inputClass}`}
             value={current.name}
             onChange={(event) => setCurrent({ ...current, name: event.target.value })}
             aria-label="Tier list name"
@@ -379,6 +359,7 @@ function TierLists() {
         </div>
         <div className="add-row">
           <input
+            className={inputClass}
             value={newItem}
             onChange={(event) => setNewItem(event.target.value)}
             onKeyDown={(event) => event.key === "Enter" && addItem()}
@@ -456,8 +437,8 @@ function TierLists() {
         >
           <Plus size={16} /> Add tier
         </button>
-      </div>
-    </section>
+      </Card>
+    </SharedPage>
   );
 }
 
@@ -942,9 +923,14 @@ function MapCanvas({
         <button type="button" onClick={undo} title="Undo (Ctrl+Z)">
           <RotateCcw size={16} /> Undo
         </button>
-        <button type="button" className="clear-drawings-button" onClick={clearDrawings}>
+        <Button
+          variant="danger"
+          type="button"
+          className="clear-drawings-button"
+          onClick={clearDrawings}
+        >
           <Trash2 size={17} /> Clear drawings
-        </button>
+        </Button>
       </div>
       <div className={`canvas-shell ${hasImage ? "has-image" : ""}`}>
         <canvas
@@ -976,28 +962,40 @@ function MapCanvas({
         )}
       </div>
       <div className="map-details">
-        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Map name *" />
         <input
+          className={inputClass}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Map name *"
+        />
+        <input
+          className={inputClass}
           value={eventName}
           onChange={(e) => setEventName(e.target.value)}
           placeholder="Event or match"
         />
-        <input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notes" />
-        <button
+        <input
+          className={inputClass}
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="Notes"
+        />
+        <Button
+          variant="primary"
           type="button"
-          className="primary-button"
           disabled={!hasImage || !name || saving}
           onClick={save}
         >
           {saving ? <Loader2 size={17} className="spin" /> : <Save size={17} />}
           {editingMap ? "Save changes" : "Save annotated map"}
-        </button>
+        </Button>
       </div>
     </div>
   );
 }
 
 function FieldMaps({ user }: { user: User }) {
+  const questions = useQuestions();
   const names = useTeamNames();
   const [maps, setMaps] = useState<FieldMap[]>([]);
   const [editingMap, setEditingMap] = useState<FieldMap | null>(null);
@@ -1048,7 +1046,7 @@ function FieldMaps({ user }: { user: User }) {
   }, [load]);
 
   async function remove(map: FieldMap) {
-    if (!window.confirm(`Delete “${map.name}”? This cannot be undone.`)) return;
+    if (!(await questions.confirm(`Delete “${map.name}”? This cannot be undone.`))) return;
     if (map.shared) await api(`/field-maps/${map.id}`, { method: "DELETE" });
     else await deleteLocalFieldMap(map.id);
     await load();
@@ -1085,7 +1083,7 @@ function FieldMaps({ user }: { user: User }) {
   }
 
   async function revokeAccess(email: string) {
-    if (!window.confirm(`Remove field-map publishing access for ${email}?`)) return;
+    if (!(await questions.confirm(`Remove field-map publishing access for ${email}?`))) return;
     await api(`/field-map-publishers/${encodeURIComponent(email)}`, { method: "DELETE" });
     await load();
   }
@@ -1099,20 +1097,21 @@ function FieldMaps({ user }: { user: User }) {
   }
 
   return (
-    <section className="page">
-      <div className="page-heading">
-        <div>
-          <h1>Field Maps</h1>
-        </div>
-      </div>
+    <SharedPage
+      title={<>Field Maps</>}
+      width="wide"
+      className="scouting-page-frame"
+      contentClassName="page"
+    >
       <MapCanvas onSaved={load} editingMap={editingMap} />
       {user.isAdmin && (
-        <div className="map-sharing-access">
+        <Card className="map-sharing-access">
           <div>
             <h2>Map sharing access</h2>
           </div>
           <form onSubmit={grantAccess}>
             <select
+              className={inputClass}
               required
               value={publisherUserId}
               onChange={(event) => setPublisherUserId(event.target.value)}
@@ -1129,9 +1128,9 @@ function FieldMaps({ user }: { user: User }) {
                   </option>
                 ))}
             </select>
-            <button type="submit" className="primary-button">
+            <Button variant="primary" type="submit">
               <Plus size={16} /> Give access
-            </button>
+            </Button>
           </form>
           {publishers.length > 0 && (
             <div className="publisher-list">
@@ -1149,7 +1148,7 @@ function FieldMaps({ user }: { user: User }) {
               ))}
             </div>
           )}
-        </div>
+        </Card>
       )}
       {mapMessage && <div className="save-status success">{mapMessage}</div>}
       <div className="section-title">
@@ -1178,7 +1177,7 @@ function FieldMaps({ user }: { user: User }) {
                   {map.shared ? "Shared with team" : map.eventName || "Personal map"}
                 </span>
                 <h3>{map.name}</h3>
-                <p>{map.notes || "No notes added."}</p>
+                {map.notes && <p>{map.notes}</p>}
                 <footer>
                   <span>{timeAgo(map.updatedAt)}</span>
                   {!map.shared && canShare && (
@@ -1195,7 +1194,8 @@ function FieldMaps({ user }: { user: User }) {
                     </button>
                   )}
                   {(!map.shared || user.isAdmin || map.createdBy === user.userId) && (
-                    <button
+                    <Button
+                      variant="danger"
                       type="button"
                       aria-label={`Delete ${map.name}`}
                       onClick={(event) => {
@@ -1204,7 +1204,7 @@ function FieldMaps({ user }: { user: User }) {
                       }}
                     >
                       <Trash2 size={15} />
-                    </button>
+                    </Button>
                   )}
                 </footer>
               </div>
@@ -1214,11 +1214,12 @@ function FieldMaps({ user }: { user: User }) {
       ) : (
         <EmptyState icon={MapIcon} title="No saved maps yet" />
       )}
-    </section>
+    </SharedPage>
   );
 }
 
 function AutoLibrary() {
+  const questions = useQuestions();
   const [autos, setAutos] = useState<AutoRoutine[]>([]);
   const [search, setSearch] = useState("");
   const [formOpen, setFormOpen] = useState(false);
@@ -1304,15 +1305,16 @@ function AutoLibrary() {
   }
 
   return (
-    <section className="page">
-      <div className="page-heading">
-        <div>
-          <h1>Auto Library</h1>
-        </div>
-      </div>
+    <SharedPage
+      title={<>Auto Library</>}
+      width="wide"
+      className="scouting-page-frame"
+      contentClassName="page"
+    >
       <div className="library-bar">
         <Search size={17} />
         <input
+          className={inputClass}
           value={search}
           onChange={(event) => setSearch(event.target.value)}
           placeholder="Search by routine or team…"
@@ -1327,7 +1329,7 @@ function AutoLibrary() {
         </div>
       )}
       {formOpen && (
-        <div className="form-panel">
+        <Card className="form-panel">
           <div className="form-panel-heading">
             <div>
               <h2>Add an autonomous routine</h2>
@@ -1340,6 +1342,7 @@ function AutoLibrary() {
             <label>
               Routine name *
               <input
+                className={inputClass}
                 required
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -1349,7 +1352,7 @@ function AutoLibrary() {
             <label>
               Team number
               <input
-                className="team-number-input"
+                className={`team-number-input ${inputClass}`}
                 inputMode="numeric"
                 pattern="[0-9]+"
                 title={`Enter a team number using digits only, such as ${pageTeamNumber}.`}
@@ -1384,9 +1387,6 @@ function AutoLibrary() {
               </div>
               {routeInput === "upload" ? (
                 <>
-                  <span className="field-help">
-                    A .traj or .path file will be plotted automatically.
-                  </span>
                   <label className="trajectory-upload">
                     <Upload size={17} />
                     {trajectory ? trajectory.name : "Upload trajectory"}
@@ -1404,16 +1404,16 @@ function AutoLibrary() {
               )}
             </div>
             <div className="wide form-actions">
-              <button type="button" className="secondary-button" onClick={() => setFormOpen(false)}>
+              <Button variant="secondary" type="button" onClick={() => setFormOpen(false)}>
                 Cancel
-              </button>
-              <button type="submit" className="primary-button" disabled={saving}>
+              </Button>
+              <Button variant="primary" type="submit" disabled={saving}>
                 {saving ? <Loader2 size={17} className="spin" /> : <Save size={17} />}
                 {saving ? "Saving…" : "Save routine"}
-              </button>
+              </Button>
             </div>
           </form>
-        </div>
+        </Card>
       )}
       {filtered.length ? (
         <>
@@ -1445,13 +1445,14 @@ function AutoLibrary() {
                     <span>{auto.team ? `Team ${auto.team}` : "Unassigned team"}</span>
                     <h3>{auto.name}</h3>
                   </div>
-                  <button
+                  <Button
+                    variant="danger"
                     type="button"
                     aria-label={`Delete ${auto.name}`}
-                    onClick={(event) => {
+                    onClick={async (event) => {
                       event.stopPropagation();
                       if (
-                        window.confirm(
+                        await questions.confirm(
                           `Delete “${auto.name}”? This removes it for everyone and cannot be undone.`,
                         )
                       ) {
@@ -1460,9 +1461,9 @@ function AutoLibrary() {
                     }}
                   >
                     <Trash2 size={15} />
-                  </button>
+                  </Button>
                 </header>
-                <p>{auto.description || "No description added."}</p>
+                {auto.description && <p>{auto.description}</p>}
                 {auto.steps.length > 0 && (
                   <ol>
                     {auto.steps.map((step, index) => (
@@ -1481,9 +1482,9 @@ function AutoLibrary() {
           </div>
           {!search && (
             <div className="build-auto-row">
-              <button type="button" className="primary-button" onClick={() => setFormOpen(true)}>
+              <Button variant="primary" type="button" onClick={() => setFormOpen(true)}>
                 <Plus size={17} /> Build an auto entry
-              </button>
+              </Button>
             </div>
           )}
         </>
@@ -1493,9 +1494,9 @@ function AutoLibrary() {
           title={search ? "No routines match" : ""}
           action={
             !search && (
-              <button type="button" className="primary-button" onClick={() => setFormOpen(true)}>
+              <Button variant="primary" type="button" onClick={() => setFormOpen(true)}>
                 <Plus size={17} /> Build an auto entry
-              </button>
+              </Button>
             )
           }
         />
@@ -1531,7 +1532,7 @@ function AutoLibrary() {
           </div>
         </div>
       )}
-    </section>
+    </SharedPage>
   );
 }
 
@@ -1638,7 +1639,6 @@ function AutoRouteDrawing({ onChange }: { onChange: (file: File | null) => void 
   return (
     <div className="auto-drawing">
       <div className="auto-drawing-toolbar">
-        <span>Draw the robot path on the field</span>
         <div className="drawing-colors" aria-label="Route color">
           {["#ff334f", "#36a3ff", "#35d06f", "#ffd43b"].map((option) => (
             <button
@@ -1659,9 +1659,14 @@ function AutoRouteDrawing({ onChange }: { onChange: (file: File | null) => void 
         >
           <RotateCcw size={15} /> Undo
         </button>
-        <button type="button" disabled={!strokes.length} onClick={() => replaceStrokes([])}>
+        <Button
+          variant="danger"
+          type="button"
+          disabled={!strokes.length}
+          onClick={() => replaceStrokes([])}
+        >
           <Trash2 size={15} /> Clear
-        </button>
+        </Button>
       </div>
       <canvas
         ref={canvasRef}
@@ -1719,6 +1724,7 @@ function TrajectoryPreview({ trajectory }: { trajectory: ParsedTrajectory }) {
 }
 
 function RobotLibrary() {
+  const questions = useQuestions();
   const [robots, setRobots] = useState<RobotTeam[]>([]);
   const [search, setSearch] = useState("");
   const [formOpen, setFormOpen] = useState(false);
@@ -1771,9 +1777,9 @@ function RobotLibrary() {
 
   async function remove(robot: RobotTeam) {
     if (
-      !window.confirm(
+      !(await questions.confirm(
         `Delete ${robot.teamName} and all of its robot pictures? This removes them for everyone.`,
-      )
+      ))
     )
       return;
     await api(`/robots/${robot.id}`, { method: "DELETE" });
@@ -1786,15 +1792,16 @@ function RobotLibrary() {
   );
 
   return (
-    <section className="page robot-library-page">
-      <div className="page-heading">
-        <div>
-          <h1>Robot Library</h1>
-        </div>
-      </div>
+    <SharedPage
+      title={<>Robot Library</>}
+      width="wide"
+      className="scouting-page-frame"
+      contentClassName="page robot-library-page"
+    >
       <div className="library-bar">
         <Search size={17} />
         <input
+          className={inputClass}
           value={search}
           onChange={(event) => setSearch(event.target.value)}
           placeholder="Search by team…"
@@ -1802,7 +1809,7 @@ function RobotLibrary() {
         <span>{filtered.length} teams</span>
       </div>
       {formOpen && (
-        <div className="form-panel">
+        <Card className="form-panel">
           <div className="form-panel-heading">
             <h2>Add a team robot</h2>
             <button type="button" aria-label="Close form" onClick={() => setFormOpen(false)}>
@@ -1814,6 +1821,7 @@ function RobotLibrary() {
             <label className="wide">
               Team number *
               <input
+                className={inputClass}
                 required
                 inputMode="numeric"
                 pattern="[0-9]+"
@@ -1825,6 +1833,7 @@ function RobotLibrary() {
             <label className="wide">
               Summary
               <textarea
+                className={inputClass}
                 value={summary}
                 onChange={(event) => setSummary(event.target.value)}
                 placeholder="Drivetrain, mechanisms, notable features, and configuration"
@@ -1843,16 +1852,16 @@ function RobotLibrary() {
               />
             </label>
             <div className="wide form-actions">
-              <button type="button" className="secondary-button" onClick={() => setFormOpen(false)}>
+              <Button variant="secondary" type="button" onClick={() => setFormOpen(false)}>
                 Cancel
-              </button>
-              <button type="submit" className="primary-button" disabled={saving}>
+              </Button>
+              <Button variant="primary" type="submit" disabled={saving}>
                 {saving ? <Loader2 size={17} className="spin" /> : <Save size={17} />}
                 {saving ? "Saving…" : "Save team"}
-              </button>
+              </Button>
             </div>
           </form>
-        </div>
+        </Card>
       )}
       {filtered.length ? (
         <>
@@ -1877,7 +1886,8 @@ function RobotLibrary() {
                   <h2>{robot.teamName}</h2>
                   <span>{robot.images.length} pictures</span>
                 </div>
-                <button
+                <Button
+                  variant="danger"
                   type="button"
                   aria-label={`Delete ${robot.teamName}`}
                   onClick={(event) => {
@@ -1886,15 +1896,15 @@ function RobotLibrary() {
                   }}
                 >
                   <Trash2 size={16} />
-                </button>
+                </Button>
               </article>
             ))}
           </div>
           {!search && (
             <div className="build-auto-row">
-              <button type="button" className="primary-button" onClick={() => setFormOpen(true)}>
+              <Button variant="primary" type="button" onClick={() => setFormOpen(true)}>
                 <Plus size={17} /> Add a team
-              </button>
+              </Button>
             </div>
           )}
         </>
@@ -1904,9 +1914,9 @@ function RobotLibrary() {
           title={search ? "No teams match" : ""}
           action={
             !search && (
-              <button type="button" className="primary-button" onClick={() => setFormOpen(true)}>
+              <Button variant="primary" type="button" onClick={() => setFormOpen(true)}>
                 <Plus size={17} /> Add a team
-              </button>
+              </Button>
             )
           }
         />
@@ -1923,7 +1933,7 @@ function RobotLibrary() {
             <header>
               <div>
                 <h2 id="robot-team-title">{selected.teamName}</h2>
-                <p>{selected.summary || "No summary added."}</p>
+                {selected.summary && <p>{selected.summary}</p>}
               </div>
               <button type="button" aria-label="Close team" onClick={() => setSelected(null)}>
                 <X size={20} />
@@ -1952,7 +1962,7 @@ function RobotLibrary() {
           </div>
         </div>
       )}
-    </section>
+    </SharedPage>
   );
 }
 
@@ -1960,7 +1970,21 @@ void RobotLibrary;
 
 export function App() {
   const names = useTeamNames();
-  const [page, setPage] = useState<Page>("forms");
+  const location = useLocation();
+  const navigate = useNavigate();
+  const paths: Record<Page, string> = {
+    forms: "/",
+    predictions: "/predictions",
+    admin: "/admin",
+    analysis: "/analysis",
+    service: "/service",
+    autos: "/autos",
+    tiers: "/tiers",
+    maps: "/maps",
+  };
+  const page =
+    (Object.keys(paths) as Page[]).find((key) => paths[key] === location.pathname) ?? "forms";
+  const setPage = (next: Page) => navigate(paths[next]);
   const [analysisReportId, setAnalysisReportId] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -1992,14 +2016,7 @@ export function App() {
     };
   }, [page, user]);
 
-  if (loading) {
-    return (
-      <div className="auth-screen">
-        <Loader2 className="spin" />
-        <span>Opening scouting workspace…</span>
-      </div>
-    );
-  }
+  if (loading) return <PageLoading />;
 
   if (!user) {
     const returnTo = window.location.href;
@@ -2009,7 +2026,6 @@ export function App() {
           <TeamLogo size={38} />
         </div>
         <h1>Scouting starts with {names.idName}</h1>
-        <p>Sign in with your team account to open shared tier lists, field maps, and autos.</p>
         <a href={`${G3ID_URL}/login?redirect=${encodeURIComponent(returnTo)}`}>
           <LogIn size={18} /> Sign in with {names.idName}
         </a>
@@ -2023,10 +2039,12 @@ export function App() {
       id: "predictions" as const,
       label: user.engagement.predictionsEnabled ? "Match Predictions" : "Scouting Points",
     },
-    { id: "admin" as const, label: "Admin" },
     { id: "analysis" as const, label: "Analysis" },
     { id: "service" as const, label: "Service Tickets" },
-    { id: "other" as const, label: "Other Tools" },
+    { id: "autos" as const, label: "Auto Library" },
+    { id: "tiers" as const, label: "Tier Lists" },
+    { id: "maps" as const, label: "Field Maps" },
+    { id: "admin" as const, label: "Admin" },
   ];
   const navItems = user.isAdmin
     ? adminNav
@@ -2040,37 +2058,30 @@ export function App() {
       ];
 
   const nav = navItems.filter((item) => item.id !== "predictions" || user.engagement.enabled);
-  const visiblePage = page === "predictions" && !user.engagement.enabled ? "forms" : page;
+  if (
+    !nav.some((item) => item.id === page) ||
+    (location.pathname !== paths[page] && location.pathname !== "/forms")
+  )
+    return <Navigate to="/" replace />;
+  if (location.pathname === "/forms") return <Navigate to="/" replace />;
+  const visiblePage = page;
   return (
-    <div className="app-shell">
+    <div className="app-shell flex min-h-screen flex-col bg-page">
       <AppNavBar
         title={names.wordmark("Scouting")}
         version={versionLabel("Scouting")}
         icon="/favicon.svg"
-        homeHref="#"
-        link={({ href, children, ...props }) => (
-          <a
-            href={href}
-            {...props}
-            onClick={(e) => {
-              e.preventDefault();
-              setPage("forms");
-              props.onClick?.();
-            }}
-          >
-            {children}
-          </a>
-        )}
+        homeHref="/"
+        link={linkWith(Link)}
         items={nav.map(({ id, label }) => ({
           key: id,
           label,
-          onSelect: () => setPage(id),
-          active:
-            visiblePage === id ||
-            (id === "other" && ["autos", "tiers", "maps"].includes(visiblePage)),
+          href: paths[id],
+          group: ["autos", "tiers", "maps"].includes(id) ? "Libraries" : undefined,
+          active: visiblePage === id,
         }))}
       />
-      <main>
+      <div className="scouting-content flex flex-1 flex-col">
         <AnnouncementBanner />
         {visiblePage === "forms" && (
           <ScoutingForms
@@ -2078,23 +2089,26 @@ export function App() {
             canManageServiceCrew={user.isAdmin || user.isHelper}
           />
         )}
-        {visiblePage === "predictions" && <MatchPredictions />}
-        {visiblePage === "admin" && user.isG3IdAdmin && (
-          <EngagementSettingsPanel
-            settings={user.engagement}
-            onSaved={(engagement) => setUser({ ...user, engagement })}
-          />
+        {visiblePage === "predictions" && (
+          <MatchPredictions predictionsEnabled={user.engagement.predictionsEnabled} />
         )}
         {visiblePage === "admin" && user.isAdmin && (
           <ScoutingAdminPage
             isG3IdAdmin={user.isG3IdAdmin}
+            engagement={
+              user.isG3IdAdmin ? (
+                <EngagementSettingsPanel
+                  settings={user.engagement}
+                  onSaved={(engagement) => setUser({ ...user, engagement })}
+                />
+              ) : undefined
+            }
             onOpenSubmission={(submissionId) => {
               setAnalysisReportId(submissionId);
               setPage("analysis");
             }}
           />
         )}
-        {visiblePage === "other" && <OtherTools go={setPage} />}
         {visiblePage === "tiers" && <TierLists />}
         {visiblePage === "maps" && <FieldMaps user={user} />}
         {visiblePage === "autos" && <AutoLibrary />}
@@ -2102,7 +2116,7 @@ export function App() {
           <Analysis initialReportId={analysisReportId} />
         )}
         {visiblePage === "service" && (user.isAdmin || user.isHelper) && <Operations />}
-      </main>
+      </div>
     </div>
   );
 }
