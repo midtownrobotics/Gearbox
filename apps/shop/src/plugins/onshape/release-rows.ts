@@ -4,13 +4,24 @@ import type { OnshapeRelease } from "../../shared/types";
 // the obsolete switch leave, sorted by one of a release's columns (each release once, with its
 // parts) or by one of a part's (every part on a line of its own).
 
+/** What a release is called. Releases from before names were kept have none. */
+export const releaseName = (release: OnshapeRelease) => release.name ?? "Name not found";
+
 export type Part = OnshapeRelease["parts"][number];
 /** A release and the parts of it that are shown. */
 export type Group = { release: OnshapeRelease; parts: Part[] };
 /** One part with the release it came in. */
 export type Line = { release: OnshapeRelease; part: Part };
 
-export const SORTS = ["released", "madeBy", "approvedBy", "part", "number", "quantity"] as const;
+export const SORTS = [
+  "name",
+  "released",
+  "madeBy",
+  "approvedBy",
+  "part",
+  "number",
+  "quantity",
+] as const;
 export type SortKey = (typeof SORTS)[number];
 export type Sort = { key: SortKey; dir: "asc" | "desc" };
 
@@ -69,11 +80,13 @@ const newestFirst = (a: OnshapeRelease, b: OnshapeRelease) =>
 export function sortGroups(groups: Group[], { key, dir }: Sort): Group[] {
   const d = dir === "asc" ? 1 : -1;
   return [...groups].sort(({ release: a }, { release: b }) =>
-    key === "madeBy"
-      ? byText(a.madeBy, b.madeBy, d) || newestFirst(a, b)
-      : key === "approvedBy"
-        ? byText(approvedBy(a), approvedBy(b), d) || newestFirst(a, b)
-        : -d * newestFirst(a, b),
+    key === "name"
+      ? byText(a.name, b.name, d) || newestFirst(a, b)
+      : key === "madeBy"
+        ? byText(a.madeBy, b.madeBy, d) || newestFirst(a, b)
+        : key === "approvedBy"
+          ? byText(approvedBy(a), approvedBy(b), d) || newestFirst(a, b)
+          : -d * newestFirst(a, b),
   );
 }
 
