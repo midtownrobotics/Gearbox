@@ -129,6 +129,7 @@ GOOGLE_CLIENT_ID = "26070176131-lom1rtgi2tmahrd12md7452oieha1vbl.apps.googleuser
 GOOGLE_REDIRECT_URI = "https://id-dev.g3robotics.com/api/auth/google/callback"
 GITHUB_CLIENT_ID = "Iv23lii4BhJtKBycp2yB"
 GITHUB_REDIRECT_URI = "https://id-dev.g3robotics.com/api/auth/github/callback"
+SLACK_APP_ID = "A0C87N8CPJB"
 STEAM_REDIRECT_URI = "https://id-dev.g3robotics.com/api/auth/steam/callback"
 FRONTEND_URL = "https://1648-id-dev.g3robotics.com"
 
