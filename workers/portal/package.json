@@ -16,7 +16,7 @@
     "@g3/testing": "workspace:*",
     "typescript": "^5.8.0",
     "vitest": "catalog:",
-    "wrangler": "^4.129.0"
+    "wrangler": "catalog:"
   },
   "exports": {
     "./manifest": "./src/manifest.ts"
