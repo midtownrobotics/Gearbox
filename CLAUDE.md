@@ -187,7 +187,7 @@ Design brief: `docs/edge.md`. On-site Orange Pi 5 (hostname `orangepi5`, login u
 ### G3 Schedule (the team's meetings, events and deadlines)
 
 - Being built (not released yet): the app, its worker, its database and its place on the platform are set up, with little content. `apps/schedule` is a plugin-based UI (from `apps/inventory`) whose one page is Calendar (`/calendar`, empty); `workers/schedule` (Hono, Drizzle, D1 `SCHEDULE_DB`) answers `/health` and `/me`.
-- Team-scoped from the start: `events` (migration `0001`; a title, start and optional end in Unix seconds, who made it) carries `team_id`, and every query goes through `inTeam`/`withTeam` (in the tenancy lint). It has delete and export hooks (the platform's `SCHEDULE` binding) and `test/isolation.test.ts`. A new table goes in the tenancy lint, both hooks' table lists and the isolation test's snapshot. Available to every team in the app library.
+- Team-scoped from the start: `events` (migration `0001`; a title, start and optional end in Unix seconds, who made it) carries `team_id`, and every query goes through `inTeam`/`withTeam` (in the tenancy lint). It has delete and export hooks (the platform's `SCHEDULE` binding) and `test/isolation.test.ts`. A new table goes in the tenancy lint, both hooks' table lists and the isolation test's snapshot. Available to every team in the app library, and switched on for every team signed up before it (the platform's migration `0009`).
 
 ### Versions and releases
 

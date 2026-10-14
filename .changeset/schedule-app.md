@@ -4,4 +4,4 @@
 "@g3/worker-platform": patch
 ---
 
-Schedule is a new app for the team's meetings, events and deadlines. Admins can switch it on in the app library; its Calendar page is still empty.
+Schedule is a new app for the team's meetings, events and deadlines. It's switched on for every team that's already signed up, and new teams can switch it on in the app library. Its Calendar page is still empty.
