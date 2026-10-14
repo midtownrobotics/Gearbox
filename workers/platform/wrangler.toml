@@ -183,6 +183,7 @@ migrations_dir = "src/db/migrations"
 crons = ["15 7 * * *"]
 
 [env.staging.vars]
+SLACK_CLIENT_ID = "4695117013.12279756431623"
 
 [env.staging.build]
 command = "GEARBOX_STAGING=1 pnpm --filter @g3/platform build"

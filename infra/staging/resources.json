@@ -14,5 +14,9 @@
   "kv": {
     "SESSIONS": "85741df814134e55b70b4cbc725240dc",
     "RATE_LIMIT": "3c1cbf84a56c496b894f4b6ce3543317"
+  },
+  "slack": {
+    "clientId": "4695117013.12279756431623",
+    "appId": "A0C87N8CPJB"
   }
 }
