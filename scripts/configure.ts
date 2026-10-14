@@ -99,7 +99,12 @@ function stagingUrl(url: string): string {
   return `https://${host}${pathname === "/" && !url.endsWith("/") ? "" : pathname}`;
 }
 
-type Resources = { d1: Record<string, string>; kv: Record<string, string> };
+type Resources = {
+  d1: Record<string, string>;
+  kv: Record<string, string>;
+  /** Staging's own Slack app (not production's): its client and app ids, which aren't secrets. */
+  slack?: { clientId?: string; appId?: string };
+};
 const NOT_CREATED = "not-created-run-pnpm-staging-create";
 
 /** A TOML file as the lines before its first table, then each table with its lines. */
@@ -155,8 +160,14 @@ function stagingSections(tables: { name: string; lines: string[] }[], resources:
       line = line.replace(/"(https:\/\/[^"]+)"/, (_, url) => `"${stagingUrl(url)}"`);
       line = line.replace(/^ENVIRONMENT = "production"/, 'ENVIRONMENT = "staging"');
       line = line.replace(/^command = "/, 'command = "GEARBOX_STAGING=1 ');
-      // No Slack on staging yet: it needs its own Slack app.
-      if (/^SLACK_/.test(line)) continue;
+      // Staging has its own Slack app (infra/staging/resources.json): its client and app ids
+      // replace production's, and production's workspace (SLACK_TEAM_ID) isn't staging's.
+      const slack = line.match(/^SLACK_(CLIENT_ID|APP_ID) = /);
+      if (slack) {
+        const id = slack[1] === "CLIENT_ID" ? resources.slack?.clientId : resources.slack?.appId;
+        if (!id) continue;
+        line = `${slack[0]}"${id}"`;
+      } else if (/^SLACK_/.test(line)) continue;
       lines.push(line);
     }
     while (lines.length && lines[lines.length - 1] === "") lines.pop();

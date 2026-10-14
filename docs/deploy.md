@@ -58,7 +58,28 @@ To deploy staging by hand: `pnpm db:migrate:staging`, then `pnpm deploy:staging`
 - **First:** staging must be on the same migrations as production; a database that isn't is skipped with a note. Deploy staging (or `pnpm db:migrate:staging`) and run it again.
 - **Only G3:** copying another team's data would go against the privacy draft (operators look at a team's data only to fix what it reports, and a removed member is gone within 30 days), so the script doesn't offer it. G3's copy on staging should be refreshed or cleared after a member is removed in production.
 
-Not set up yet: **Slack**. Team sign-up and Slack sign-in need a Slack app of staging's own (a Slack app has one events address); until then staging has no `SLACK_*` settings, and members sign in with Google, GitHub or Steam.
+### Slack on staging
+
+Staging has its own Slack app ("Gearbot Staging"), installed in G3's workspace: a Slack app has one events address, so production's can't serve staging too, and in G3's workspace the staging copy of G3's accounts (`pnpm staging:copy-team`) keeps its Slack sign-ins. Its client and app IDs are in `infra/staging/resources.json` (`slack`), which `pnpm configure` writes into staging's config; production's workspace setting (`SLACK_TEAM_ID`) isn't used there, so G3 connects staging's Slack on its Integrations page.
+
+1. **The app's settings** (api.slack.com/apps → the staging app):
+   - **OAuth & Permissions:** redirect URLs `https://id-dev.g3robotics.com/api/slack/oauth/callback` and `https://dev.g3robotics.com/api/signup/slack/callback`; bot token scopes `commands`, `chat:write`, `im:write`, `im:history`, `users:read`, `users:read.email`, `channels:read`, `groups:read` (`SLACK_BOT_SCOPES` in `@g3/slack`).
+   - **Event Subscriptions:** on, request URL `https://id-dev.g3robotics.com/api/slack/events` (staging must be deployed for Slack to verify it); bot events `message.im`, `app_uninstalled`, `tokens_revoked`.
+   - **Slash Commands:** `/signin-staging` → `https://id-dev.g3robotics.com/api/slack/commands/signin`, `/link-staging` → `https://id-dev.g3robotics.com/api/slack/commands/link` (not `/signin` and `/link`, which production's app has in the same workspace).
+   - **App Home:** Messages Tab on, and "Allow users to send Slash commands and messages from the messages tab" on, so members can DM it their code.
+   - **Manage Distribution:** on, only to try another team's sign-up on staging (it installs the app in that team's workspace).
+2. **Secrets** (from the app's Basic Information page), with `export WRANGLER_HIDE_BANNER=true` first:
+   ```bash
+   cd workers/g3id
+   pnpm exec wrangler secret put SLACK_CLIENT_ID --env staging       # the client ID
+   pnpm exec wrangler secret put SLACK_CLIENT_SECRET --env staging
+   pnpm exec wrangler secret put SLACK_SIGNING_SECRET --env staging
+   cd ../platform
+   pnpm exec wrangler secret put SLACK_CLIENT_SECRET --env staging
+   ```
+3. **Connect it:** on staging, sign in as an admin, open the home's Admin → Integrations, and Connect Slack. Members can then sign in with Slack there by DMing their code to Gearbot Staging.
+
+Pages still name the bot "Gearbot" (`slackBotName`); on staging it's Gearbot Staging.
 
 ## Switching over from Pages and per-app API domains (once, done)
 
