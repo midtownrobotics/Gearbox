@@ -1762,7 +1762,7 @@ export function ScoutingForms({
   return (
     <SharedPage
       title={<>Scouting Forms</>}
-      width="wide"
+      width={isFullscreen ? "full" : "wide"}
       className="scouting-page-frame"
       contentClassName={`page scouting-forms-page ${isFullscreen ? "scouting-forms-fullscreen" : ""}`}
       description={
