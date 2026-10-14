@@ -51,8 +51,8 @@ The apps are being brought into one design language. The plan of record is `docs
 
 **Monorepo using pnpm workspaces:**
 
-- `apps/` — React frontends (g3id, portal, shop, pit, skill-tree, attendance, scouting, edge, orders, inventory, platform)
-- `workers/` — Cloudflare Workers: one per app (g3id, portal, shop, pit, skill-tree, attendance, scouting, edge, orders, inventory, platform), each serving its app's page and its API at `/api`, plus `gateway`, which routes `*.<domain>` to them
+- `apps/` — React frontends (g3id, portal, shop, pit, skill-tree, attendance, scouting, edge, orders, inventory, schedule, platform)
+- `workers/` — Cloudflare Workers: one per app (g3id, portal, shop, pit, skill-tree, attendance, scouting, edge, orders, inventory, schedule, platform), each serving its app's page and its API at `/api`, plus `gateway`, which routes `*.<domain>` to them
 - `packages/` — Shared libraries (auth, ui, slack)
 - `devices/` — Software that runs on physical hardware (edge-agent: Bun, compiled to an arm64 binary)
 - `infra/edge/` — Hand-applied system config for the shop edge box
@@ -183,6 +183,11 @@ Design brief: `docs/edge.md`. On-site Orange Pi 5 (hostname `orangepi5`, login u
 - **Ordering locations:** on the Admin page, admins drag a location by its handle to put it in order among the ones in the same place (`apps/inventory/src/plugins/settings/locations-card.tsx`, with `@dnd-kit`: one sortable list per place, drops limited to the locations beside the one dragged, and arrow keys that step to the next one beside it). It saves through `PUT /locations/order` with that place's ids in their new order; other places keep theirs. Moving a location into another place is still Edit's job. Use `@dnd-kit` for any other drag-to-reorder list.
 - **Received orders:** Orders posts `/intake` (wire types: `@g3/worker-inventory/intake-types`) with the receiving person's session. A delivery finds its entry by listing (catalog id, else vendor + SKU, else link) or becomes a new entry, and is added once per `sourceKey` (`intake_receipts`). Each delivery can name its own `locationId`; every place is checked before anything is added. `POST /intake/places` answers where parts that are about to arrive are already kept (the entry's storage row), changing nothing.
 - `apps/inventory`: plugin-based UI (from `apps/skill-tree`): Inventory (`/inventory`: the table; type a quantity to record a count, click a location to move, Check out / Check in pop-ups in `shared/stock-dialogs.tsx`; below 768px each row is two lines instead, like Orders' Requests table: the entry and its Check out / Check in button, then location, quantity and status, without the team's own columns (`NarrowRows` in `plugins/table/table-page.tsx`)), Add an entry (`/new`), Locations (`/locations`, above), an entry's page (`/items/:id`: details, where it is, vendor listings, history, merge and delete for mentors), Admin (`/admin`, admins). Everything is loaded once and shared (`shared/inventory-data.tsx`), refreshed on focus and every minute.
+
+### G3 Schedule (the team's meetings, events and deadlines)
+
+- Being built (not released yet): the app, its worker, its database and its place on the platform are set up, with little content. `apps/schedule` is a plugin-based UI (from `apps/inventory`) whose one page is Calendar (`/calendar`, empty); `workers/schedule` (Hono, Drizzle, D1 `SCHEDULE_DB`) answers `/health` and `/me`.
+- Team-scoped from the start: `events` (migration `0001`; a title, start and optional end in Unix seconds, who made it) carries `team_id`, and every query goes through `inTeam`/`withTeam` (in the tenancy lint). It has delete and export hooks (the platform's `SCHEDULE` binding) and `test/isolation.test.ts`. A new table goes in the tenancy lint, both hooks' table lists and the isolation test's snapshot. Available to every team in the app library.
 
 ### Versions and releases
 
@@ -409,6 +414,7 @@ Apps:
 - `apps/orders` → 5184
 - `apps/platform` → 5185
 - `apps/inventory` → 5186
+- `apps/schedule` → 5187
 
 Workers (Wrangler):
 - `workers/g3id` → 8787 (inspector: 9229)
@@ -421,6 +427,7 @@ Workers (Wrangler):
 - `workers/orders` → 8794 (inspector: 9236)
 - `workers/platform` → 8795 (inspector: 9237)
 - `workers/inventory` → 8797 (inspector: 9239)
+- `workers/schedule` → 8798 (inspector: 9240)
 - `workers/gateway` → 8796 (inspector: 9238): every team's addresses on `*.gearbox.localhost:8796` (below)
 - `devices/edge-agent` (mock) → 8700
 

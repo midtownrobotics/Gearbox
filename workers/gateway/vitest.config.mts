@@ -70,6 +70,7 @@ export default workerTestConfig({
         "SKILL_TREE",
         "ATTENDANCE",
         "INVENTORY",
+        "SCHEDULE",
       ].map((binding) => [binding, echo(binding)]),
     ),
     G3ID: g3id,

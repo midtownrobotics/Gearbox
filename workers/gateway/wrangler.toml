@@ -57,6 +57,10 @@ service = "attendance"
 binding = "INVENTORY"
 service = "inventory"
 
+[[services]]
+binding = "SCHEDULE"
+service = "schedule"
+
 [env.production]
 name = "gateway-production"
 workers_dev = false
@@ -197,6 +201,10 @@ service = "attendance-production"
 binding = "INVENTORY"
 service = "inventory-production"
 
+[[env.production.services]]
+binding = "SCHEDULE"
+service = "schedule-production"
+
 # ---- Staging: written by `pnpm configure` from [env.production]; don't edit below. ----
 
 [env.staging]
@@ -249,6 +257,10 @@ service = "attendance-staging"
 [[env.staging.services]]
 binding = "INVENTORY"
 service = "inventory-staging"
+
+[[env.staging.services]]
+binding = "SCHEDULE"
+service = "schedule-staging"
 
 [[env.staging.routes]]
 pattern = "*-dev.g3robotics.com/*"

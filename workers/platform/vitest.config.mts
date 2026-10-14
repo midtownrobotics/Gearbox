@@ -171,6 +171,7 @@ export default workerTestConfig({
     INVENTORY: teamApp(),
     ORDERS: teamApp(),
     PIT: teamApp(),
+    SCHEDULE: teamApp(),
     SHOP: teamApp(),
     SKILL_TREE: teamApp(),
   },

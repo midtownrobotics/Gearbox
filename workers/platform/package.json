@@ -25,6 +25,7 @@
     "@g3/worker-edge": "workspace:*",
     "@g3/worker-g3id": "workspace:*",
     "@g3/worker-inventory": "workspace:*",
+    "@g3/worker-schedule": "workspace:*",
     "@g3/worker-orders": "workspace:*",
     "@g3/worker-pit": "workspace:*",
     "@g3/worker-portal": "workspace:*",

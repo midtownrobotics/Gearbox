@@ -9,7 +9,8 @@
     "gearbox-platform-staging": "a99a45ba-1a2d-41a0-8796-c9eca909251d",
     "g3-scouting-staging": "b077b2e9-f541-45a9-96a2-1fb8d11f8e77",
     "g3-shop-staging": "cea974b5-9a78-4125-9831-557144f30cae",
-    "g3-skill-tree-staging": "54699b76-3f9a-4b44-8d82-42e0f79478a6"
+    "g3-skill-tree-staging": "54699b76-3f9a-4b44-8d82-42e0f79478a6",
+    "g3-schedule-staging": "353b7713-4b00-47d8-8e7d-ac1e6dd598fb"
   },
   "kv": {
     "SESSIONS": "85741df814134e55b70b4cbc725240dc",

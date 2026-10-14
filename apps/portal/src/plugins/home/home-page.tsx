@@ -22,6 +22,7 @@ import idIcon from "../../assets/app-icons/id.svg";
 import inventoryIcon from "../../assets/app-icons/inventory.svg";
 import ordersIcon from "../../assets/app-icons/orders.svg";
 import pitIcon from "../../assets/app-icons/pit.svg";
+import scheduleIcon from "../../assets/app-icons/schedule.svg";
 import scoutingIcon from "../../assets/app-icons/scouting.svg";
 import shopIcon from "../../assets/app-icons/shop.svg";
 import skillsIcon from "../../assets/app-icons/skills.svg";
@@ -91,6 +92,12 @@ const APPS: App[] = [
     label: "Inventory",
     href: appUrl("inventory"),
     tile: inventoryIcon,
+  },
+  {
+    key: "schedule",
+    label: "Schedule",
+    href: appUrl("schedule"),
+    tile: scheduleIcon,
   },
   {
     key: "edge",
