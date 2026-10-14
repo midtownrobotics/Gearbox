@@ -15,6 +15,9 @@ catalog:
   "@cloudflare/workers-types": 4.20260702.1
   drizzle-orm: 0.44.7
   vitest: 4.1.11
+  # One Wrangler for every worker: each version's local runtime writes its own format into the
+  # local databases (.wrangler/state), and an older one can't open what a newer one wrote.
+  wrangler: 4.129.0
 
 # pnpm v10 (Cloudflare Pages CI)
 onlyBuiltDependencies:
