@@ -260,6 +260,23 @@ export function DashboardPage() {
         </Badge>
       </Card>
 
+      {me.isAdmin && me.sessionType !== "pin" && (
+        <Card className="flex flex-wrap items-center justify-between gap-4 border-primary-200">
+          <div className="flex items-center gap-3">
+            <Shield className="h-6 w-6 shrink-0 text-primary-600" />
+            <div>
+              <h2 className="text-xl text-secondary-900">Admin</h2>
+              <p className="text-sm text-secondary-600">
+                Manage trusted students and app permissions.
+              </p>
+            </div>
+          </div>
+          <Link to="/admin" className={buttonClass("primary")}>
+            Manage permissions
+          </Link>
+        </Card>
+      )}
+
       <Card title="Linked accounts">
         {unlinkError && (
           <div className="mb-3">

@@ -68,7 +68,9 @@ export function AdminPage() {
   if (!isAdmin) {
     return (
       <Page title="Admin" width="narrow">
-        <p className="text-sm text-secondary-500">Only admins can change Pit's settings.</p>
+        <p className="text-sm text-secondary-500">
+          Only trusted students can change Pit's settings.
+        </p>
       </Page>
     );
   }

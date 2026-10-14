@@ -356,7 +356,7 @@ export function SettingsPage() {
   if (!isAdmin) {
     return (
       <Page title="Admin">
-        <ErrorBanner message="Only admins can change Inventory's settings." />
+        <ErrorBanner message="Only trusted students can change Inventory's settings." />
       </Page>
     );
   }

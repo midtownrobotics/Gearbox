@@ -70,15 +70,25 @@ export function forwardIdentity(c: {
 export {
   type G3AuthEnv,
   type G3AuthVariables,
+  appAuthContext,
   hasMentorAccess,
   requireAdmin,
   requireAuth,
   requireAuthWithIdentities,
   requireMentor,
+  requireIdentityAdmin,
   requireOAuthSession,
   requestTeamId,
   TEAM_HEADER,
 } from "./g3id";
+
+export {
+  permissionApps,
+  isPermissionApp,
+  type PermissionApp,
+  type AppPermission,
+  type PermissionMember,
+} from "./permissions";
 
 export {
   type AppIntegration,

@@ -348,7 +348,7 @@ describe("signing a team up", () => {
       type: "signin",
       env: testEnv,
     });
-    expect(joined.message).toContain("pending admin approval");
+    expect(joined.message).toContain("pending trusted student approval");
 
     // Every admin (the founder) hears there's someone to approve, with a link to them.
     const pending = await testEnv.DB.prepare(

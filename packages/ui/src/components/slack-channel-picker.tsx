@@ -21,10 +21,14 @@ type Listing =
   | { state: "unavailable"; code: string; error: string };
 
 /** Asked once per page load and shared by every picker on the page. */
-let listing: Promise<Listing> | null = null;
+const listings = new Map<string, Promise<Listing>>();
 
-function loadChannels(): Promise<Listing> {
-  listing ??= fetch(`${apiPath("id")}/admin/slack/channels`, { credentials: "include" })
+function loadChannels(app: string): Promise<Listing> {
+  const cached = listings.get(app);
+  if (cached) return cached;
+  const listing = fetch(`${apiPath("id")}/admin/slack/channels?app=${encodeURIComponent(app)}`, {
+    credentials: "include",
+  })
     .then(async (res) => {
       const data = (await res.json().catch(() => ({}))) as {
         channels?: SlackChannelOption[];
@@ -49,8 +53,9 @@ function loadChannels(): Promise<Listing> {
   // Try again next time if it failed for a reason that might pass.
   listing.then((l) => {
     if (l.state === "unavailable" && l.code !== "no_slack" && l.code !== "reconnect")
-      listing = null;
+      listings.delete(app);
   });
+  listings.set(app, listing);
   return listing;
 }
 
@@ -64,6 +69,7 @@ export function SlackChannelPicker({
   id,
   clearable = true,
   disabled,
+  app = "id",
 }: {
   /** The chosen channel's ID, or "" / null for none. */
   value: string | null;
@@ -73,6 +79,8 @@ export function SlackChannelPicker({
   /** Whether "Remove" is offered (false when a channel is required). */
   clearable?: boolean;
   disabled?: boolean;
+  /** The app whose settings are being edited; channel listing checks its trusted student role. */
+  app?: "id" | "shop" | "portal";
 }) {
   const [list, setList] = useState<Listing>({ state: "loading" });
   const [editing, setEditing] = useState(false);
@@ -86,11 +94,11 @@ export function SlackChannelPicker({
 
   useEffect(() => {
     let live = true;
-    loadChannels().then((l) => live && setList(l));
+    loadChannels(app).then((l) => live && setList(l));
     return () => {
       live = false;
     };
-  }, []);
+  }, [app]);
 
   const channels = list.state === "ready" ? list.channels : [];
   const chosen = value ? channels.find((c) => c.id === value) : undefined;

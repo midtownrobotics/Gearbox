@@ -1,3 +1,4 @@
+import { appAuthContext } from "@g3/auth";
 import { hasMentorAccess, requireAuth, withTeam } from "@g3/auth";
 import { corsOrigin } from "@g3/site-config";
 import { withApiPrefix } from "@g3/site-config/worker";
@@ -26,6 +27,7 @@ import { vendorsRouter } from "./routes/vendors";
 import type { AppEnv } from "./types";
 
 const base = new Hono<AppEnv>();
+base.use("*", appAuthContext("orders"));
 
 base.onError((err, c) => {
   console.error(err);

@@ -17,6 +17,7 @@ export const requireAuth = createMiddleware<AppEnv>(async (c, next) => {
   c.set("userDisplayName", "Local Scout");
   c.set("userEmail", "scout@localhost");
   c.set("userIsAdmin", true);
+  c.set("userIsIdentityAdmin", true);
   c.set("userIsMentor", false);
   c.set("sessionType", "oauth");
   c.set("kioskDeviceId", null);

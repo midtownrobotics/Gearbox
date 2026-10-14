@@ -94,7 +94,7 @@ export function SignupPage() {
           </ol>
           <p className="text-sm text-secondary-500">
             You'll need permission to add apps to your team's Slack workspace. The person who signs
-            up becomes the team's first admin.
+            up becomes the team's first trusted student.
           </p>
         </div>
         <div className="space-y-4">
@@ -375,7 +375,7 @@ function SendCode({
       <p className="text-sm text-secondary-600">
         Send this code to {site.slackBotName} in{" "}
         {workspace ? <strong>{workspace}</strong> : "your Slack"}: open a direct message with it and
-        paste the code. You'll be your team's first admin.
+        paste the code. You'll be your team's first trusted student.
       </p>
       {code ? (
         <p className="rounded-lg bg-inset py-4 text-center font-mono text-4xl tracking-[0.3em] text-secondary-900">

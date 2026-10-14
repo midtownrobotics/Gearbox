@@ -24,7 +24,6 @@ import {
   Pencil,
   Plus,
   Save,
-  Shield,
   Trash2,
   Users,
   X,
@@ -70,8 +69,6 @@ export type ScoutingForm = {
   isActive: boolean;
   kind: "scouting" | "pit";
 };
-type UserOption = { id: string; displayName: string; email: string; status: string };
-type StrategyAdmin = { user_id: string; display_name: string; email: string };
 
 const TYPES: { type: FieldType; label: string }[] = [
   { type: "shortText", label: "Text entry — short" },
@@ -626,86 +623,6 @@ function Editor({
         <Plus size={17} /> Add question
       </button>
     </Card>
-  );
-}
-
-function AdminManager({ isG3IdAdmin }: { isG3IdAdmin: boolean }) {
-  const questions = useQuestions();
-  const names = useTeamNames();
-  const [admins, setAdmins] = useState<StrategyAdmin[]>([]);
-  const [users, setUsers] = useState<UserOption[]>([]);
-  const [userId, setUserId] = useState("");
-  const load = useCallback(async () => {
-    const result = await api<{ admins: StrategyAdmin[]; users: UserOption[] }>("/strategy-admins");
-    setAdmins(result.admins);
-    setUsers(result.users);
-  }, []);
-  useEffect(() => {
-    load().catch(() => undefined);
-  }, [load]);
-  return (
-    <details className="strategy-admins" open>
-      <summary>
-        <Shield size={17} /> Add Strategy Lead
-      </summary>
-      {isG3IdAdmin && (
-        <form
-          onSubmit={async (event) => {
-            event.preventDefault();
-            if (!(await questions.confirm("Make this person a Strategy lead?"))) return;
-            await api("/strategy-admins", { method: "POST", body: JSON.stringify({ userId }) });
-            setUserId("");
-            await load();
-          }}
-        >
-          <select
-            className={inputClass}
-            required
-            value={userId}
-            onChange={(event) => setUserId(event.target.value)}
-          >
-            <option value="">Select a {names.idName} user</option>
-            {users
-              .filter((user) => user.status === "active")
-              .map((user) => {
-                const isLead = admins.some((admin) => admin.user_id === user.id);
-                return (
-                  <option key={user.id} value={user.id} disabled={isLead}>
-                    {isLead ? "🛡 Strategy lead · " : ""}
-                    {user.displayName} ({user.email})
-                  </option>
-                );
-              })}
-          </select>
-          <Button variant="primary" type="submit">
-            <Plus size={16} /> Add Strategy Lead
-          </Button>
-        </form>
-      )}
-      <div className="strategy-admin-list">
-        {admins.map((admin) => (
-          <span key={admin.user_id}>
-            {admin.display_name}
-            <small>{admin.email}</small>
-            {isG3IdAdmin && (
-              <button
-                type="button"
-                onClick={async () => {
-                  if (
-                    !(await questions.confirm(`Remove ${admin.display_name} as a Strategy lead?`))
-                  )
-                    return;
-                  await api(`/strategy-admins/${admin.user_id}`, { method: "DELETE" });
-                  await load();
-                }}
-              >
-                <X size={14} />
-              </button>
-            )}
-          </span>
-        ))}
-      </div>
-    </details>
   );
 }
 
@@ -1870,7 +1787,7 @@ export function ScoutingAdminPage({
       {engagement}
       <ManualModeManager />
       <EventStatus isAdmin isG3IdAdmin={isG3IdAdmin} onOpenSubmission={onOpenSubmission} />
-      <AdminManager isG3IdAdmin={isG3IdAdmin} />
+
       <LiveStrategy />
       <AnnouncementManager />
     </SharedPage>

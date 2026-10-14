@@ -114,7 +114,7 @@ export const emailAuthRouter = new Hono<AppEnv>()
     }
 
     if (user.status === "pending") {
-      return c.json({ error: "Your account is awaiting admin approval." }, 403);
+      return c.json({ error: "Your account is awaiting trusted student approval." }, 403);
     }
     if (user.status !== "active") {
       return c.json({ error: "Your account is not active." }, 403);
@@ -180,7 +180,7 @@ export const emailAuthRouter = new Hono<AppEnv>()
       .get();
 
     if (!admin || admin.isAdmin !== 1) {
-      return c.json({ error: "Admin access required." }, 403);
+      return c.json({ error: "Trusted student access required." }, 403);
     }
 
     const email = c.req.query("email")?.toLowerCase().trim();

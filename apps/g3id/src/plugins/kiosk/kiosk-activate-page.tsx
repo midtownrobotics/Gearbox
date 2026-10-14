@@ -62,7 +62,7 @@ export function KioskActivatePage() {
       <div className="w-full max-w-md space-y-8">
         <div className="text-center">
           <h1 className="text-4xl text-secondary-900 mb-2">Activate Kiosk</h1>
-          <p className="text-secondary-600">Enter the 6-digit code from your admin</p>
+          <p className="text-secondary-600">Enter the 6-digit code from your trusted student</p>
         </div>
 
         <form onSubmit={handleActivate} className="space-y-6">

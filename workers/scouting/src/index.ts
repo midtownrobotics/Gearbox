@@ -1,3 +1,4 @@
+import { appAuthContext } from "@g3/auth";
 import { inTeam, requestTeamId, withTeam } from "@g3/auth";
 import { corsOrigin } from "@g3/site-config";
 import { withApiPrefix } from "@g3/site-config/worker";
@@ -566,7 +567,7 @@ app.put("/event-context", requireAuth, async (c) => {
   const nexusEventKey = text(body.nexusEventKey, 30).toLowerCase() || eventKey;
   const nexusApiKey = text(body.nexusApiKey, 300);
   if ((tbaAuthKey || nexusApiKey) && !c.get("userIsAdmin"))
-    return c.json({ error: "Only a team admin can update API keys." }, 403);
+    return c.json({ error: "Only a team trusted student can update API keys." }, 403);
   if (activeConfig?.schedule_mode !== "manual" && eventKey && !/^\d{4}[a-z0-9]+$/.test(eventKey))
     return c.json({ error: "Enter a valid TBA event key, such as 2026gadal." }, 400);
   const tbaConfigChanged =
@@ -1189,7 +1190,8 @@ app.get("/field-map-permissions", requireAuth, async (c) =>
 );
 
 app.get("/field-map-publishers", requireAuth, async (c) => {
-  if (!c.get("userIsAdmin")) return c.json({ error: "Admin access required." }, 403);
+  if (!c.get("userIsIdentityAdmin"))
+    return c.json({ error: "Only ID's trusted students can assign permissions." }, 403);
   const rows = await all<{ email: string; created_at: number }>(
     dbOf(c),
     sql`SELECT email, created_at FROM (SELECT * FROM ${fieldMapPublishers} WHERE ${inTeam(fieldMapPublishers, c.get("teamId"))}) AS scoped_field_map_publishers ORDER BY email`,
@@ -1197,19 +1199,48 @@ app.get("/field-map-publishers", requireAuth, async (c) => {
   return c.json({ publishers: rows.results });
 });
 
+app.get("/permission-management", requireAuth, async (c) => {
+  if (!c.get("userIsIdentityAdmin"))
+    return c.json({ error: "Only ID's trusted students can assign permissions." }, 403);
+  const db = dbOf(c);
+  const [leads, publishers, helpers] = await Promise.all([
+    db
+      .select({ userId: strategyAdmins.user_id })
+      .from(strategyAdmins)
+      .where(inTeam(strategyAdmins, c.get("teamId")))
+      .all(),
+    db
+      .select({ email: fieldMapPublishers.email })
+      .from(fieldMapPublishers)
+      .where(inTeam(fieldMapPublishers, c.get("teamId")))
+      .all(),
+    db
+      .select({ userId: serviceHelpers.user_id, skills: serviceHelpers.skills_json })
+      .from(serviceHelpers)
+      .where(inTeam(serviceHelpers, c.get("teamId")))
+      .all(),
+  ]);
+  return c.json({ leads, publishers, helpers });
+});
+
 app.get("/strategy-admins", requireAuth, async (c) => {
-  if (!(await isStrategyAdmin(c))) return c.json({ error: "Strategy lead access required." }, 403);
+  if (!c.get("userIsIdentityAdmin"))
+    return c.json({ error: "Strategy lead access required." }, 403);
   const admins = await all<Record<string, unknown>>(
     dbOf(c),
     sql`SELECT user_id, email, display_name, created_at FROM (SELECT * FROM ${strategyAdmins} WHERE ${inTeam(strategyAdmins, c.get("teamId"))}) AS scoped_strategy_admins ORDER BY display_name`,
   );
-  const users = c.get("userIsAdmin") ? await getG3IdUsers(c) : null;
-  return c.json({ admins: admins.results, users: users ?? [], canManage: c.get("userIsAdmin") });
+  const users = c.get("userIsIdentityAdmin") ? await getG3IdUsers(c) : null;
+  return c.json({
+    admins: admins.results,
+    users: users ?? [],
+    canManage: c.get("userIsIdentityAdmin"),
+  });
 });
 
 app.post("/strategy-admins", requireAuth, async (c) => {
-  if (!c.get("userIsAdmin"))
-    return c.json({ error: "Only a team admin can assign Strategy leads." }, 403);
+  if (!c.get("userIsIdentityAdmin"))
+    return c.json({ error: "Only ID's trusted students can assign permissions." }, 403);
   const body = await c.req.json<{ userId?: unknown }>();
   const userId = text(body.userId, 200);
   const users = await getG3IdUsers(c);
@@ -1240,8 +1271,8 @@ app.post("/strategy-admins", requireAuth, async (c) => {
 });
 
 app.delete("/strategy-admins/:userId", requireAuth, async (c) => {
-  if (!c.get("userIsAdmin"))
-    return c.json({ error: "Only a team admin can remove Strategy leads." }, 403);
+  if (!c.get("userIsIdentityAdmin"))
+    return c.json({ error: "Only ID's trusted students can assign permissions." }, 403);
   await dbOf(c)
     .delete(strategyAdmins)
     .where(inTeam(strategyAdmins, c.get("teamId"), sql`user_id = ${c.req.param("userId")}`))
@@ -1434,7 +1465,8 @@ app.delete("/analysis/reports/:id/permanent", requireAuth, async (c) => {
 });
 
 app.get("/field-map-publisher-options", requireAuth, async (c) => {
-  if (!c.get("userIsAdmin")) return c.json({ error: "Admin access required." }, 403);
+  if (!c.get("userIsIdentityAdmin"))
+    return c.json({ error: "Only ID's trusted students can assign permissions." }, 403);
   const users = await getG3IdUsers(c);
   if (!users) return c.json({ error: "Could not load the team's accounts." }, 502);
   return c.json({
@@ -1446,7 +1478,8 @@ app.get("/field-map-publisher-options", requireAuth, async (c) => {
 });
 
 app.post("/field-map-publishers", requireAuth, async (c) => {
-  if (!c.get("userIsAdmin")) return c.json({ error: "Admin access required." }, 403);
+  if (!c.get("userIsIdentityAdmin"))
+    return c.json({ error: "Only ID's trusted students can assign permissions." }, 403);
   const body = await c.req.json<{ userId?: unknown }>();
   const userId = text(body.userId, 200);
   if (!userId) return c.json({ error: "Select an account." }, 400);
@@ -1470,7 +1503,8 @@ app.post("/field-map-publishers", requireAuth, async (c) => {
 });
 
 app.delete("/field-map-publishers/:email", requireAuth, async (c) => {
-  if (!c.get("userIsAdmin")) return c.json({ error: "Admin access required." }, 403);
+  if (!c.get("userIsIdentityAdmin"))
+    return c.json({ error: "Only ID's trusted students can assign permissions." }, 403);
   await dbOf(c)
     .delete(fieldMapPublishers)
     .where(
@@ -1547,7 +1581,7 @@ app.delete("/field-maps/:id", requireAuth, async (c) => {
   );
   if (!map) return c.json({ error: "Map not found." }, 404);
   if (!c.get("userIsAdmin") && map.created_by !== c.get("userId")) {
-    return c.json({ error: "Only the publisher or an admin can delete this map." }, 403);
+    return c.json({ error: "Only the publisher or a trusted student can delete this map." }, 403);
   }
   await Promise.all([
     c.env.FIELD_MAPS.delete(map.r2_key),
@@ -1816,7 +1850,8 @@ app.put("/service-tickets/:id", requireAuth, async (c) => {
 });
 
 app.post("/service-helpers", requireAuth, async (c) => {
-  if (!(await isStrategyAdmin(c))) return c.json({ error: "Strategy lead access required." }, 403);
+  if (!c.get("userIsIdentityAdmin"))
+    return c.json({ error: "Strategy lead access required." }, 403);
   const body = await c.req.json<Record<string, unknown>>();
   const users = await getG3IdUsers(c);
   const user = users?.find(
@@ -1852,7 +1887,8 @@ app.post("/service-helpers", requireAuth, async (c) => {
 });
 
 app.delete("/service-helpers/:id", requireAuth, async (c) => {
-  if (!(await isStrategyAdmin(c))) return c.json({ error: "Strategy lead access required." }, 403);
+  if (!c.get("userIsIdentityAdmin"))
+    return c.json({ error: "Strategy lead access required." }, 403);
   await dbOf(c)
     .delete(serviceHelpers)
     .where(inTeam(serviceHelpers, c.get("teamId"), sql`user_id = ${c.req.param("id")}`))
@@ -1861,6 +1897,7 @@ app.delete("/service-helpers/:id", requireAuth, async (c) => {
 });
 
 const worker = new Hono<AppEnv>();
+worker.use("*", appAuthContext("scouting"));
 worker.use("*", async (c, next) => {
   await adoptLegacyRows(c.env.SCOUTING_DB);
   await next();

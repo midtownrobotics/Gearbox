@@ -25,14 +25,14 @@ const EXAMPLE = {
   variant: "8mm SplineXS",
 };
 
-/** Mentors: the team's money and calendar, who edits the catalog, and how requests are named. */
+/** App staff: the team's money and calendar, integrations, and how requests are named. */
 export function SettingsPage() {
   // Receiving into Inventory is only a setting while the team has Inventory on.
   const inventoryOn = useAppOn("inventory");
   return (
     <Page title="Admin">
       <MoneyAndCalendar />
-      <TrustedStudents />
+
       <ShareACart />
       {inventoryOn !== false && <InventoryOnReceive />}
       <NamingTemplate />
@@ -398,104 +398,6 @@ function ShareACart() {
           >
             Connect the team's Share-A-Cart account
           </a>
-        )}
-      </div>
-    </Card>
-  );
-}
-
-/**
- * Trusted students: besides mentors, the only people who add catalog categories and add, edit
- * or delete catalog parts. The trusted ones show as chips; others are found by name (anyone who
- * has opened G3 Orders), so a team of 60 stays one line plus a search box.
- */
-function TrustedStudents() {
-  const names = useTeamNames();
-  const people = useLoad(async () => {
-    const res = await api.trusted.$get();
-    if (!res.ok) throw new Error(await getErrorMessage(res));
-    return res.json();
-  }, []);
-  const [query, setQuery] = useState("");
-  const [error, setError] = useState<string | null>(null);
-
-  async function setTrusted(id: string, trusted: boolean) {
-    setError(null);
-    const res = await api.trusted[":id"].$put({ param: { id }, json: { trusted } });
-    if (!res.ok) return setError(await getErrorMessage(res));
-    setQuery("");
-    people.reload();
-  }
-
-  const all = people.data ?? [];
-  const trusted = all.filter((p) => p.trusted);
-  const q = query.trim().toLowerCase();
-  const matches = q
-    ? all.filter((p) => !p.trusted && p.name.toLowerCase().includes(q)).slice(0, 6)
-    : [];
-  return (
-    <Card title="Trusted students">
-      <div className="space-y-3 text-sm">
-        <p className="text-secondary-600">They can edit the catalog, like mentors.</p>
-        {error && <ErrorBanner message={error} />}
-        {!people.data ? (
-          <Loading />
-        ) : (
-          <>
-            <div className="flex flex-wrap gap-1.5">
-              {trusted.length === 0 && <span className="text-secondary-500">None yet.</span>}
-              {trusted.map((p) => (
-                <span
-                  key={p.id}
-                  className="inline-flex items-center gap-1 rounded-full bg-secondary-100 pl-3 pr-1 py-0.5 text-secondary-800"
-                >
-                  {p.name}
-                  <button
-                    type="button"
-                    onClick={() => setTrusted(p.id, false)}
-                    className="rounded-full px-1.5 text-secondary-400 hover:text-primary-600"
-                    aria-label={`Remove ${p.name}`}
-                    title="Remove"
-                  >
-                    ✕
-                  </button>
-                </span>
-              ))}
-            </div>
-            <div className="relative max-w-sm">
-              <input
-                className={inputClass}
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && matches.length === 1) setTrusted(matches[0].id, true);
-                }}
-                placeholder="Add a student by name…"
-                aria-label="Add a trusted student"
-              />
-              {q && (
-                <ul className="absolute z-10 mt-1 w-full rounded-lg border border-secondary-200 bg-surface shadow-lg">
-                  {matches.length === 0 ? (
-                    <li className="px-3 py-2 text-secondary-500">
-                      No one by that name has opened {names.appTitle("Orders")} yet.
-                    </li>
-                  ) : (
-                    matches.map((p) => (
-                      <li key={p.id}>
-                        <button
-                          type="button"
-                          onClick={() => setTrusted(p.id, true)}
-                          className="w-full px-3 py-2 text-left hover:bg-secondary-50"
-                        >
-                          {p.name}
-                        </button>
-                      </li>
-                    ))
-                  )}
-                </ul>
-              )}
-            </div>
-          </>
         )}
       </div>
     </Card>

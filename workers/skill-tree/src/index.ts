@@ -1,3 +1,4 @@
+import { appAuthContext } from "@g3/auth";
 import { deleteTeamRows, hasMentorAccess, inTeam, requireAuth, teamExport } from "@g3/auth";
 import { corsOrigin } from "@g3/site-config";
 import { withApiPrefix } from "@g3/site-config/worker";
@@ -14,6 +15,7 @@ import { categoriesRouter, skillsRouter, treesRouter } from "./routes/trees";
 import type { AppEnv } from "./types";
 
 const base = new Hono<AppEnv>();
+base.use("*", appAuthContext("skill-tree"));
 
 base.onError((err, c) => {
   console.error("[skill-tree]", err);

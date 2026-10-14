@@ -90,10 +90,14 @@ async function tellAdmins(env: AppEnv["Bindings"], teamId: string, text: string)
       body: { text },
     });
     if (!res.ok && res.status !== 404) {
-      console.error("[apps] telling admins", res.status, await res.text().catch(() => ""));
+      console.error(
+        "[apps] telling trusted students",
+        res.status,
+        await res.text().catch(() => ""),
+      );
     }
   } catch (err) {
-    console.error("[apps] telling admins", err);
+    console.error("[apps] telling trusted students", err);
   }
 }
 

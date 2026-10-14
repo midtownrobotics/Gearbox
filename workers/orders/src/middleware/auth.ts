@@ -8,8 +8,9 @@ import type { AppEnv } from "../types";
 
 // Sign-in and roles come from @g3/auth; this is the catalog's own rule.
 
-/** Whether this user may edit the catalog: mentors (and admins), and students mentors trusted. */
+/** Catalog editing: app mentor/trusted-student access, or an editor assigned by ID. Never PIN. */
 export async function canEditCatalog(c: Context<AppEnv>) {
+  if (c.get("sessionType") === "pin") return false;
   if (hasMentorAccess(c)) return true;
   const row = await createOrdersDb(c.env.ORDERS_DB)
     .select({ trusted: appUsers.trusted })

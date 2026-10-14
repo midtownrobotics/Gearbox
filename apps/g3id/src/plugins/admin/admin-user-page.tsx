@@ -1,5 +1,4 @@
 import { Badge, Button, Card, ConfirmQuestion, ErrorBanner, Loading, Page } from "@g3/ui";
-import { GraduationCap, Shield, ShieldOff } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { api } from "../../lib/api";
@@ -113,7 +112,7 @@ export function AdminUserPage() {
                 </Badge>
                 {user.isAdmin === 1 && (
                   <span className="text-xs px-1.5 py-0.5 rounded bg-primary-50 text-primary-600 border border-primary-200">
-                    Admin
+                    Trusted student
                   </span>
                 )}
                 {user.isMentor === 1 && (
@@ -194,45 +193,14 @@ export function AdminUserPage() {
                   </Button>
                 </>
               )}
+
               {user.status === "active" && (
-                <>
-                  <Button
-                    variant="secondary"
-                    disabled={busy !== null}
-                    onClick={() =>
-                      user.isAdmin
-                        ? act("admin", () => api.admin.users[":id"].demote.$post(param), {
-                            isAdmin: 0,
-                          })
-                        : act("admin", () => api.admin.users[":id"].promote.$post(param), {
-                            isAdmin: 1,
-                          })
-                    }
-                  >
-                    {user.isAdmin ? <ShieldOff size={14} /> : <Shield size={14} />}
-                    {user.isAdmin ? "Remove admin" : "Make admin"}
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    disabled={busy !== null}
-                    onClick={() =>
-                      user.isMentor
-                        ? act(
-                            "mentor",
-                            () => api.admin.users[":id"]["revoke-mentor"].$post(param),
-                            {
-                              isMentor: 0,
-                            },
-                          )
-                        : act("mentor", () => api.admin.users[":id"]["grant-mentor"].$post(param), {
-                            isMentor: 1,
-                          })
-                    }
-                  >
-                    <GraduationCap size={14} />
-                    {user.isMentor ? "Remove mentor" : "Make mentor"}
-                  </Button>
-                </>
+                <Link
+                  to={`/admin?member=${encodeURIComponent(user.id)}`}
+                  className="text-sm font-medium text-primary-600 underline"
+                >
+                  Manage permissions
+                </Link>
               )}
               {user.status !== "pending" && !confirmDelete && (
                 <Button

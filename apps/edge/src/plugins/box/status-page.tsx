@@ -72,7 +72,7 @@ export function StatusPage() {
           <p className="text-secondary-500">
             {data.hasBox
               ? "The agent hasn't checked in yet."
-              : "Your team hasn't set up an edge box. An admin makes its key below."}
+              : "Your team hasn't set up an edge box. A trusted student makes its key below."}
           </p>
         )}
       </Card>

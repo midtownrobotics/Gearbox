@@ -75,7 +75,7 @@ function ExitKioskDialog({ onClose }: { onClose: () => void }) {
         }}
       >
         <p className="text-sm text-secondary-600">
-          Only an admin can exit kiosk mode. You'll be asked to sign in as one.
+          Only a trusted student can exit kiosk mode. You'll be asked to sign in as one.
         </p>
         <Field label='Type "I understand" to continue'>
           <input

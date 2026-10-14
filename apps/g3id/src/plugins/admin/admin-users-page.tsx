@@ -8,7 +8,7 @@ import {
   Page,
   inputClass,
 } from "@g3/ui";
-import { GraduationCap, Search, Shield, ShieldOff } from "lucide-react";
+import { Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../../lib/api";
@@ -36,7 +36,7 @@ const SORTS = {
 type Sort = keyof typeof SORTS;
 
 const ROLES = {
-  admin: { label: "Admins", has: (u: User) => u.isAdmin === 1 },
+  admin: { label: "Trusted students", has: (u: User) => u.isAdmin === 1 },
   mentor: { label: "Mentors", has: (u: User) => u.isMentor === 1 },
   none: { label: "Neither", has: (u: User) => u.isAdmin !== 1 && u.isMentor !== 1 },
 } as const;
@@ -101,8 +101,6 @@ export function AdminUsersPage() {
   const [rejecting, setRejecting] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState<Set<string>>(new Set());
   const [actionError, setActionError] = useState<string | null>(null);
-  const [promoting, setPromoting] = useState<Set<string>>(new Set());
-  const [togglingMentor, setTogglingMentor] = useState<Set<string>>(new Set());
   const [mergingUserId, setMergingUserId] = useState<string | null>(null);
   const [mergeTargetId, setMergeTargetId] = useState("");
   const [mergeLoading, setMergeLoading] = useState(false);
@@ -192,62 +190,6 @@ export function AdminUsersPage() {
     }
   }
 
-  async function handlePromote(userId: string) {
-    setPromoting((prev) => new Set(prev).add(userId));
-    try {
-      const res = await api.admin.users[":id"].promote.$post({ param: { id: userId } });
-      if (res.ok) updateUser(userId, { isAdmin: 1 });
-    } finally {
-      setPromoting((prev) => {
-        const n = new Set(prev);
-        n.delete(userId);
-        return n;
-      });
-    }
-  }
-
-  async function handleDemote(userId: string) {
-    setPromoting((prev) => new Set(prev).add(userId));
-    try {
-      const res = await api.admin.users[":id"].demote.$post({ param: { id: userId } });
-      if (res.ok) updateUser(userId, { isAdmin: 0 });
-    } finally {
-      setPromoting((prev) => {
-        const n = new Set(prev);
-        n.delete(userId);
-        return n;
-      });
-    }
-  }
-
-  async function handleGrantMentor(userId: string) {
-    setTogglingMentor((prev) => new Set(prev).add(userId));
-    try {
-      const res = await api.admin.users[":id"]["grant-mentor"].$post({ param: { id: userId } });
-      if (res.ok) updateUser(userId, { isMentor: 1 });
-    } finally {
-      setTogglingMentor((prev) => {
-        const n = new Set(prev);
-        n.delete(userId);
-        return n;
-      });
-    }
-  }
-
-  async function handleRevokeMentor(userId: string) {
-    setTogglingMentor((prev) => new Set(prev).add(userId));
-    try {
-      const res = await api.admin.users[":id"]["revoke-mentor"].$post({ param: { id: userId } });
-      if (res.ok) updateUser(userId, { isMentor: 0 });
-    } finally {
-      setTogglingMentor((prev) => {
-        const n = new Set(prev);
-        n.delete(userId);
-        return n;
-      });
-    }
-  }
-
   async function handleMerge(userId: string) {
     if (!mergeTargetId) return;
     setMergeLoading(true);
@@ -303,7 +245,7 @@ export function AdminUsersPage() {
       "Email",
       "Joined Date",
       "Last Sign-in",
-      "Admin",
+      "Trusted student",
       "Mentor",
       ...authMethods,
     ];
@@ -458,7 +400,7 @@ export function AdminUsersPage() {
                       </span>
                       {user.isAdmin === 1 && (
                         <span className="text-xs px-1.5 py-0.5 rounded bg-primary-50 text-primary-600 border border-primary-200">
-                          Admin
+                          Trusted student
                         </span>
                       )}
                       {user.isMentor === 1 && (
@@ -507,34 +449,6 @@ export function AdminUsersPage() {
                         {rejecting.has(user.id) ? "Rejecting…" : "Reject"}
                       </Button>
                     </>
-                  )}
-
-                  {user.status === "active" && user.id !== currentUserId && (
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      disabled={promoting.has(user.id)}
-                      onClick={() =>
-                        user.isAdmin ? handleDemote(user.id) : handlePromote(user.id)
-                      }
-                    >
-                      {user.isAdmin ? <ShieldOff size={14} /> : <Shield size={14} />}
-                      {user.isAdmin ? "Demote" : "Promote"}
-                    </Button>
-                  )}
-
-                  {user.status === "active" && user.id !== currentUserId && (
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      disabled={togglingMentor.has(user.id)}
-                      onClick={() =>
-                        user.isMentor ? handleRevokeMentor(user.id) : handleGrantMentor(user.id)
-                      }
-                    >
-                      <GraduationCap size={14} />
-                      {user.isMentor ? "Unmentor" : "Mentor"}
-                    </Button>
                   )}
 
                   {(user.status === "active" || user.status === "rejected") &&

@@ -5,6 +5,7 @@ import type { Plugin } from "../../shared/plugin-types";
 import { RequiresApp } from "../../shared/requires-app";
 import { AdminAttendancePage } from "./admin-attendance-page";
 import { AdminKioskPage } from "./admin-kiosk-page";
+import { AdminPermissionsPage } from "./admin-permissions-page";
 import { AdminUserPage } from "./admin-user-page";
 import { AdminUsersPage } from "./admin-users-page";
 
@@ -20,6 +21,8 @@ function MovedToHome({ to }: { to: string }) {
 export const adminPlugin: Plugin = {
   name: "admin",
   routes: [
+    { path: "/admin", element: <AdminPermissionsPage /> },
+    { path: "/admin/permissions", element: <AdminPermissionsPage /> },
     { path: "/admin/users", element: <AdminUsersPage /> },
     { path: "/admin/users/:id", element: <AdminUserPage /> },
     { path: "/admin/kiosk", element: <AdminKioskPage /> },
@@ -35,6 +38,7 @@ export const adminPlugin: Plugin = {
     { path: "/admin/team-ui", element: <MovedToHome to="/admin/appearance" /> },
   ],
   navItems: [
+    { label: "Admin", to: "/admin", order: 50, audience: "admin", group: "Admin" },
     { label: "Users", to: "/admin/users", order: 10, audience: "admin", group: "Admin" },
     {
       label: "Kiosk Devices",
@@ -51,6 +55,7 @@ export const adminPlugin: Plugin = {
       audience: "admin",
       group: "Admin",
       requiresApp: "attendance",
+      permissionApp: "attendance",
     },
   ],
 };

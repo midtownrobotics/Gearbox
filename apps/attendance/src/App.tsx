@@ -51,7 +51,7 @@ function KioskGate({ types }: { types: PageType[] }) {
           <>
             <p className="kiosk-gate__title">ADMIN ACCESS REQUIRED</p>
             <p className="kiosk-gate__text">
-              Sign in with an admin {names.idName} account to run this kiosk.
+              Sign in with a trusted student {names.idName} account to run this kiosk.
             </p>
           </>
         )}

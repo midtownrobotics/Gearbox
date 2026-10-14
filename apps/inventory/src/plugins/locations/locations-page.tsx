@@ -411,7 +411,7 @@ export function LocationsPage() {
           <p className="mt-1 text-sm text-secondary-500">
             {isAdmin
               ? "Add them on the Admin page, or load a setup file there."
-              : "An admin adds them on the Admin page."}
+              : "A trusted student adds them on the Admin page."}
           </p>
         </Card>
       ) : (

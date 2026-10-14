@@ -207,7 +207,9 @@ export function PartsPage() {
                 <li>Get the release approved.</li>
                 <li>Give it its manufacturing processes on Ingest.</li>
               </ol>
-              <p className="text-sm text-secondary-600">Only an admin can add a part by hand.</p>
+              <p className="text-sm text-secondary-600">
+                Only a trusted student can add a part by hand.
+              </p>
               <Button onClick={() => setShowRestrictedModal(false)}>OK</Button>
             </>
           </Dialog>

@@ -1,9 +1,11 @@
+import { isPermissionApp } from "@g3/auth";
 import { and, eq, inArray } from "drizzle-orm";
 import { Hono } from "hono";
 import { deleteCookie, getCookie } from "hono/cookie";
 import { createDb } from "../db";
 import { coreUserIdentities, coreUserPins, coreUsers, kioskDevices } from "../db/schema";
 import { deleteCookieOptions } from "../lib/cookie";
+import { effectivePermissions } from "../lib/permissions";
 import { regeneratePinForUser } from "../lib/pin";
 import { deleteSession, isPinSession } from "../lib/session";
 import { slackForTeam } from "../lib/slack-install";
@@ -33,6 +35,10 @@ export const authRouter = new Hono<AppEnv>()
       .get();
 
     if (!user) return c.json({ error: "User not found." }, 404);
+    if (user.status !== "active") return c.json({ error: "Account is not active." }, 403);
+    const requestedApp = c.req.query("app");
+    if (requestedApp && !isPermissionApp(requestedApp))
+      return c.json({ error: "Unknown app." }, 400);
 
     const includeIdentities = c.req.query("includeIdentities") !== "false";
     const identities = includeIdentities
@@ -70,8 +76,14 @@ export const authRouter = new Hono<AppEnv>()
       }
     }
 
-    const isAdmin = sessionType === "pin" ? false : user.isAdmin === 1;
-    const isMentor = sessionType === "pin" ? false : user.isMentor === 1;
+    const permissions = await effectivePermissions(
+      db,
+      user,
+      isPermissionApp(requestedApp) ? requestedApp : undefined,
+    );
+    const isAdmin = sessionType === "pin" ? false : permissions.isAdmin;
+    const isMentor = sessionType === "pin" ? false : permissions.isMentor;
+    const isIdentityAdmin = sessionType !== "pin" && user.isAdmin === 1;
 
     let kioskDeviceName: string | undefined;
     if (kioskDeviceId) {
@@ -87,6 +99,7 @@ export const authRouter = new Hono<AppEnv>()
       ...user,
       identities,
       isAdmin,
+      isIdentityAdmin,
       isMentor,
       sessionType,
       ...(kioskDeviceId && { kioskDeviceId }),

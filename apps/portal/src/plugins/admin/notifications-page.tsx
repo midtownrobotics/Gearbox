@@ -17,12 +17,12 @@ import {
 
 const AUDIENCES: { value: PortalAudience; label: string }[] = [
   { value: "everyone", label: "Everyone" },
-  { value: "admins", label: "Admins" },
+  { value: "admins", label: "Trusted students" },
   { value: "nobody", label: "Nobody" },
 ];
 
 const TYPE_HINTS: Record<NotificationType, string> = {
-  critical: "Needs an admin's attention right away.",
+  critical: "Needs a trusted student's attention right away.",
   warning: "Planned downtime and version changes.",
   info: "Updates, surveys and other news.",
 };
@@ -192,6 +192,7 @@ function TypeCard({
           Slack channel
         </label>
         <SlackChannelPicker
+          app="portal"
           id={`channel-${type}`}
           value={value.slackChannel}
           onChange={(slackChannel) => onChange({ slackChannel })}
@@ -252,7 +253,7 @@ function PeopleList({
         {available.map((m) => (
           <option key={m.id} value={m.id} disabled={!m.hasSlack}>
             {m.displayName}
-            {m.isAdmin ? " (admin)" : ""}
+            {m.isAdmin ? " (trusted student)" : ""}
             {m.hasSlack ? "" : " (no Slack linked)"}
           </option>
         ))}

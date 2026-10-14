@@ -9,7 +9,7 @@ import {
   tones,
   useQuestions,
 } from "@g3/ui";
-import { CheckCircle, Hand, MessageSquarePlus, Plus, Trash2 } from "lucide-react";
+import { CheckCircle, Hand, MessageSquarePlus, Plus } from "lucide-react";
 import { type SyntheticEvent, useCallback, useEffect, useState } from "react";
 import { TeamLookupInput } from "./TeamLookupInput";
 import { api } from "./api";
@@ -49,8 +49,6 @@ export function Operations({ embedded = false }: { embedded?: boolean }) {
   });
   const [ticketView, setTicketView] = useState<"active" | "closed">("active");
   const [ticket, setTicket] = useState({ teamName: "", issueType: "mechanical", description: "" });
-  const [helperId, setHelperId] = useState("");
-  const [skills, setSkills] = useState("");
   const load = useCallback(
     async (view: "active" | "closed" = ticketView) => {
       const result = await api<Partial<Data>>(`/operations?status=${view}`);
@@ -248,94 +246,6 @@ export function Operations({ embedded = false }: { embedded?: boolean }) {
           </Card>
         )}
       </div>
-      {data.isAdmin && (
-        <Card title="Approved service helpers" className="space-y-4">
-          <form
-            className="grid min-w-0 items-end gap-4 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
-            onSubmit={async (event) => {
-              event.preventDefault();
-              if (
-                !(await questions.confirm(
-                  "Approve this member for the service crew? They will receive ticket alerts in Slack.",
-                ))
-              )
-                return;
-              await api("/service-helpers", {
-                method: "POST",
-                body: JSON.stringify({ userId: helperId, skills: skills.split(",") }),
-              });
-              await load();
-            }}
-          >
-            <Field label="Member">
-              <select
-                aria-label="Member"
-                className={inputClass}
-                required
-                value={helperId}
-                onChange={(e) => setHelperId(e.target.value)}
-              >
-                <option value="">Member</option>
-                {data.users
-                  .filter((u) => u.status === "active")
-                  .map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.displayName}
-                    </option>
-                  ))}
-              </select>
-            </Field>
-            <Field label="Skills">
-              <input
-                aria-label="Skills"
-                className={inputClass}
-                value={skills}
-                onChange={(e) => setSkills(e.target.value)}
-                placeholder="Mechanical, electrical, programming"
-              />
-            </Field>
-            <div className="sm:col-span-2 lg:col-span-1">
-              <Button variant="primary" type="submit">
-                Approve helper
-              </Button>
-            </div>
-          </form>
-          <div className="space-y-2">
-            {data.helpers.map((helper) => (
-              <div
-                key={helper.user_id}
-                className="flex min-w-0 items-center justify-between gap-3 rounded-lg border border-line p-3"
-              >
-                <span className="min-w-0 text-sm text-secondary-900 [overflow-wrap:anywhere]">
-                  {helper.display_name}
-                </span>
-                <Button
-                  variant="danger"
-                  type="button"
-                  size="sm"
-                  className="shrink-0"
-                  aria-label={`Remove ${helper.display_name} from the service crew`}
-                  onClick={async () => {
-                    if (
-                      !(await questions.confirm(
-                        `Remove ${helper.display_name} from the service crew?`,
-                      ))
-                    )
-                      return;
-                    await api(`/service-helpers/${helper.user_id}`, { method: "DELETE" });
-                    await load();
-                  }}
-                >
-                  <Trash2 size={14} />
-                </Button>
-              </div>
-            ))}
-          </div>
-          {!data.helpers.length && (
-            <p className="text-sm text-secondary-500">No approved service helpers.</p>
-          )}
-        </Card>
-      )}
     </SharedPage>
   );
 }

@@ -21,8 +21,8 @@ export function RequiresApp({
   return (
     <main className="flex-1 px-6 py-12 max-w-xl mx-auto w-full text-center">
       <p className="text-secondary-700">
-        This page needs {title}, which your team has switched off. An admin can switch it on from
-        the{" "}
+        This page needs {title}, which your team has switched off. A trusted student can switch it
+        on from the{" "}
         <a href={`${appUrl("portal")}/admin`} className="font-semibold text-primary-600 underline">
           Apps page
         </a>

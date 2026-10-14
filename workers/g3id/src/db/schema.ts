@@ -2,15 +2,17 @@ import { sql } from "drizzle-orm";
 import {
   type AnySQLiteColumn,
   check,
+  foreignKey,
   index,
   integer,
+  primaryKey,
   sqliteTable,
   text,
   unique,
 } from "drizzle-orm/sqlite-core";
 
 // Teams (migration 0013). Every account belongs to exactly one team; there is no memberships
-// table, and roles stay on the user (isAdmin, isMentor, status).
+// table. ID roles stay on the user; app_permissions holds explicit app role overrides.
 export const teams = sqliteTable("teams", {
   /** The team's key, "frc" + its number (`teamKey` in @g3/site-config). */
   id: text("id").primaryKey(),
@@ -65,6 +67,32 @@ export const coreUsers = sqliteTable(
       sql`${table.status} IN ('pending', 'active', 'rejected', 'merged')`,
     ),
     index("core_users_team_id_idx").on(table.teamId),
+    unique("core_users_team_id_id_uniq").on(table.teamId, table.id),
+  ],
+);
+
+/** Explicit app roles override the member's ID roles; absent rows preserve existing access. */
+export const appPermissions = sqliteTable(
+  "app_permissions",
+  {
+    teamId: text("team_id").notNull(),
+    userId: text("user_id").notNull(),
+    app: text("app").notNull(),
+    trustedStudent: integer("trusted_student").notNull(),
+    mentorAccess: integer("mentor_access").notNull(),
+    updatedAt: integer("updated_at").notNull(),
+    updatedBy: text("updated_by").references(() => coreUsers.id, { onDelete: "set null" }),
+  },
+  (table) => [
+    primaryKey({ columns: [table.teamId, table.userId, table.app] }),
+    foreignKey({
+      columns: [table.teamId, table.userId],
+      foreignColumns: [coreUsers.teamId, coreUsers.id],
+    })
+      .onDelete("cascade")
+      .onUpdate("cascade"),
+    check("app_permissions_trusted_check", sql`${table.trustedStudent} IN (0, 1)`),
+    check("app_permissions_mentor_check", sql`${table.mentorAccess} IN (0, 1)`),
   ],
 );
 

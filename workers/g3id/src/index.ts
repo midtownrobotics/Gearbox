@@ -4,6 +4,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import packageJson from "../package.json";
 import { adminRouter } from "./routes/admin";
+import { appChannelsRouter } from "./routes/app-channels";
 import { authRouter } from "./routes/auth";
 import { emailAuthRouter } from "./routes/auth/email";
 import { githubAuthRouter } from "./routes/auth/github";
@@ -13,6 +14,7 @@ import { slackAuthRouter } from "./routes/auth/slack";
 import { steamAuthRouter } from "./routes/auth/steam";
 import { internalRouter } from "./routes/internal";
 import { kioskRouter } from "./routes/kiosk";
+import { permissionsRouter } from "./routes/permissions";
 import { adminSignInRouter, teamSignInRouter } from "./routes/sign-in-methods";
 import { slackRouter } from "./routes/slack";
 import { teamUiRouter } from "./routes/team-ui";
@@ -47,6 +49,8 @@ const app = base
   .route("/auth", slackAuthRouter)
   .route("/auth", steamAuthRouter)
   .route("/admin/team/sign-in", adminSignInRouter)
+  .route("/admin/permissions", permissionsRouter)
+  .route("/admin/slack/channels", appChannelsRouter)
   .route("/admin", adminRouter)
   .route("/team/sign-in", teamSignInRouter)
   .route("/team/ui", teamUiRouter)
@@ -57,4 +61,5 @@ const app = base
   .route("/slack", slackRouter);
 
 export type G3IDApp = typeof app;
+export type { PermissionMember, AppPermission, PermissionApp } from "@g3/auth";
 export default { fetch: withApiPrefix(app.fetch) };

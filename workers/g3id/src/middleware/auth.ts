@@ -24,7 +24,7 @@ export const requireAdmin = createMiddleware<AppEnv>(async (c, next) => {
       try {
         const parsed = JSON.parse(metaData) as { sessionType?: string };
         if (parsed.sessionType === "pin") {
-          return c.json({ error: "Admin access not allowed from kiosk." }, 403);
+          return c.json({ error: "Trusted student access not allowed from kiosk." }, 403);
         }
       } catch {
         // Ignore parse errors

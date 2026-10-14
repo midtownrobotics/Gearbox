@@ -89,7 +89,6 @@ type FieldMap = {
   shared?: boolean;
   createdBy?: string;
 };
-type G3IdAccount = { id: string; email: string; displayName: string };
 type AutoRoutine = {
   id: string;
   name: string;
@@ -996,13 +995,9 @@ function MapCanvas({
 
 function FieldMaps({ user }: { user: User }) {
   const questions = useQuestions();
-  const names = useTeamNames();
   const [maps, setMaps] = useState<FieldMap[]>([]);
   const [editingMap, setEditingMap] = useState<FieldMap | null>(null);
   const [canShare, setCanShare] = useState(false);
-  const [publishers, setPublishers] = useState<{ email: string; created_at: number }[]>([]);
-  const [publisherOptions, setPublisherOptions] = useState<G3IdAccount[]>([]);
-  const [publisherUserId, setPublisherUserId] = useState("");
   const [mapMessage, setMapMessage] = useState("");
   const load = useCallback(async () => {
     const [stored, shared, permission] = await Promise.all([
@@ -1032,15 +1027,7 @@ function FieldMaps({ user }: { user: User }) {
         })),
       ];
     });
-    if (user.isAdmin) {
-      const [access, options] = await Promise.all([
-        api<{ publishers: { email: string; created_at: number }[] }>("/field-map-publishers"),
-        api<{ users: G3IdAccount[] }>("/field-map-publisher-options"),
-      ]);
-      setPublishers(access.publishers);
-      setPublisherOptions(options.users);
-    }
-  }, [user.isAdmin]);
+  }, []);
   useEffect(() => {
     load().catch(() => undefined);
   }, [load]);
@@ -1072,22 +1059,6 @@ function FieldMaps({ user }: { user: User }) {
     }
   }
 
-  async function grantAccess(event: SyntheticEvent) {
-    event.preventDefault();
-    await api("/field-map-publishers", {
-      method: "POST",
-      body: JSON.stringify({ userId: publisherUserId }),
-    });
-    setPublisherUserId("");
-    await load();
-  }
-
-  async function revokeAccess(email: string) {
-    if (!(await questions.confirm(`Remove field-map publishing access for ${email}?`))) return;
-    await api(`/field-map-publishers/${encodeURIComponent(email)}`, { method: "DELETE" });
-    await load();
-  }
-
   function edit(map: FieldMap) {
     setEditingMap(map);
     window.setTimeout(
@@ -1104,52 +1075,7 @@ function FieldMaps({ user }: { user: User }) {
       contentClassName="page"
     >
       <MapCanvas onSaved={load} editingMap={editingMap} />
-      {user.isAdmin && (
-        <Card className="map-sharing-access">
-          <div>
-            <h2>Map sharing access</h2>
-          </div>
-          <form onSubmit={grantAccess}>
-            <select
-              className={inputClass}
-              required
-              value={publisherUserId}
-              onChange={(event) => setPublisherUserId(event.target.value)}
-              aria-label={`${names.idName} account`}
-            >
-              <option value="">Select a {names.idName} account</option>
-              {publisherOptions
-                .filter(
-                  (account) => !publishers.some((publisher) => publisher.email === account.email),
-                )
-                .map((account) => (
-                  <option key={account.id} value={account.id}>
-                    {account.displayName} ({account.email})
-                  </option>
-                ))}
-            </select>
-            <Button variant="primary" type="submit">
-              <Plus size={16} /> Give access
-            </Button>
-          </form>
-          {publishers.length > 0 && (
-            <div className="publisher-list">
-              {publishers.map((publisher) => (
-                <span key={publisher.email}>
-                  {publisher.email}
-                  <button
-                    type="button"
-                    aria-label={`Remove ${publisher.email}`}
-                    onClick={() => revokeAccess(publisher.email)}
-                  >
-                    <X size={14} />
-                  </button>
-                </span>
-              ))}
-            </div>
-          )}
-        </Card>
-      )}
+
       {mapMessage && <div className="save-status success">{mapMessage}</div>}
       <div className="section-title">
         <div>

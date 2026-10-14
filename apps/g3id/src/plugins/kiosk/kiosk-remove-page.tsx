@@ -27,14 +27,14 @@ export function KioskRemovePage() {
       if (!res.ok) {
         setStatus("error");
         setNeedsLogin(true);
-        setError("An admin has to sign in first.");
+        setError("A trusted student has to sign in first.");
         return;
       }
       const data = (await res.json()) as { isAdmin?: boolean };
       if (!data.isAdmin) {
         setStatus("error");
         setNeedsLogin(false);
-        setError("Admin access required to remove this device.");
+        setError("Trusted student access required to remove this device.");
         return;
       }
       setKioskDeviceId(deviceId);

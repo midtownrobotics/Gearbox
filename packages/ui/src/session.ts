@@ -12,36 +12,40 @@ export type SignedInUser = {
   kiosk: boolean;
 };
 
-let user: Promise<SignedInUser | null> | null = null;
+const user = new Map<string, Promise<SignedInUser | null>>();
 /** What the last answer was, once it's in: a "signed out" isn't trusted after someone signs in. */
-let userWas: SignedInUser | null | undefined;
+const userWas = new Map<string, SignedInUser | null | undefined>();
 
-function loadUser(sure: boolean): Promise<SignedInUser | null> {
-  if (!user || (sure && userWas === null)) {
-    userWas = undefined;
-    user = fetch(`${apiPath("id")}/auth/me?includeIdentities=false`, { credentials: "include" })
-      .then(async (res) => {
-        if (!res.ok) return null;
-        const me = (await res.json()) as {
-          id: string;
-          displayName?: string;
-          isAdmin?: boolean;
-          sessionType?: string;
-        };
-        return {
-          id: me.id,
-          displayName: me.displayName ?? "",
-          isAdmin: me.isAdmin === true,
-          kiosk: me.sessionType === "pin",
-        };
-      })
-      .catch(() => null)
-      .then((value) => {
-        userWas = value;
-        return value;
-      });
-  }
-  return user;
+function loadUser(sure: boolean, app = "id"): Promise<SignedInUser | null> {
+  const cached = user.get(app);
+  if (cached && !(sure && userWas.get(app) === null)) return cached;
+  userWas.set(app, undefined);
+  const pending = fetch(
+    `${apiPath("id")}/auth/me?includeIdentities=false&app=${encodeURIComponent(app)}`,
+    { credentials: "include" },
+  )
+    .then(async (res) => {
+      if (!res.ok) return null;
+      const me = (await res.json()) as {
+        id: string;
+        displayName?: string;
+        isAdmin?: boolean;
+        sessionType?: string;
+      };
+      return {
+        id: me.id,
+        displayName: me.displayName ?? "",
+        isAdmin: me.isAdmin === true,
+        kiosk: me.sessionType === "pin",
+      };
+    })
+    .catch(() => null)
+    .then((value) => {
+      userWas.set(app, value);
+      return value;
+    });
+  user.set(app, pending);
+  return pending;
 }
 
 /**
@@ -51,21 +55,25 @@ function loadUser(sure: boolean): Promise<SignedInUser | null> {
  * app already knows (null while it's finding out), so the answer follows it; other apps leave it
  * out.
  */
-export function useSignedInUser(signedIn?: boolean | null): SignedInUser | null | undefined {
+export function useSignedInUser(
+  signedIn?: boolean | null,
+  app = "id",
+): SignedInUser | null | undefined {
   const [value, setValue] = useState<SignedInUser | null | undefined>(undefined);
   useEffect(() => {
     if (signedIn === null) return setValue(undefined);
     if (signedIn === false) {
       // Whoever signs in next is asked about afresh.
-      user = null;
+      user.clear();
+      userWas.clear();
       return setValue(null);
     }
     let live = true;
-    loadUser(signedIn === true).then((loaded) => live && setValue(loaded));
+    loadUser(signedIn === true, app).then((loaded) => live && setValue(loaded));
     return () => {
       live = false;
     };
-  }, [signedIn]);
+  }, [signedIn, app]);
   return value;
 }
 

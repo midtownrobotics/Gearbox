@@ -1,4 +1,4 @@
-import { SlackApiError, listChannels, sendDM } from "@g3/slack";
+import { sendDM } from "@g3/slack";
 import { and, desc, eq, gt, inArray, isNull, or } from "drizzle-orm";
 import { Hono } from "hono";
 import { createDb } from "../db";
@@ -35,24 +35,6 @@ export const adminRouter = new Hono<AppEnv>()
   // The team's Slack channels, so its admins choose one by name (Shop's channels, the platform's
   // notifications). 404 without Slack; 409 when the team's connection is from before the bot could
   // read channels and has to be connected again.
-  .get("/slack/channels", async (c) => {
-    const teamSlack = await slackForTeam(c.env, c.get("adminTeamId") as string);
-    if (!teamSlack) {
-      return c.json({ code: "no_slack", error: "Your team hasn't connected Slack." }, 404);
-    }
-    try {
-      return c.json({ channels: await listChannels(teamSlack.slack) });
-    } catch (err) {
-      if (err instanceof SlackApiError && err.code === "missing_scope") {
-        return c.json(
-          { code: "reconnect", error: "Connect Slack again so Gearbox can list your channels." },
-          409,
-        );
-      }
-      console.error("[slack] listing channels failed", err);
-      return c.json({ code: "slack_error", error: "Slack didn't answer. Please try again." }, 502);
-    }
-  })
   // The admin's own team's appearance.
   .get("/team/ui", async (c) => {
     const db = createDb(c.env.DB);
@@ -379,7 +361,7 @@ export const adminRouter = new Hono<AppEnv>()
       .set({ isAdmin: 1, updatedAt: Math.floor(Date.now() / 1000) })
       .where(memberOf(c.get("adminTeamId") as string, id));
 
-    return c.json({ message: "User promoted to admin." });
+    return c.json({ message: "User promoted to trusted student." });
   })
   .post("/users/:id/demote", async (c) => {
     const id = c.req.param("id");

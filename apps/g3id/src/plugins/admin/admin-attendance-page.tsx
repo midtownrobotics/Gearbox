@@ -154,7 +154,7 @@ export function AdminAttendancePage() {
       const res = await fetch(`${ATTENDANCE_API_URL}/admin/summary`, { credentials: "include" });
       if (!res.ok) {
         throw new Error(
-          res.status === 403 ? "Admin access required." : "Failed to load attendance.",
+          res.status === 403 ? "Trusted student access required." : "Failed to load attendance.",
         );
       }
       setMembers(((await res.json()) as { members: MemberSummary[] }).members);

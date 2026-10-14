@@ -855,6 +855,7 @@ function SlackSettings() {
           Release notification channel *
         </label>
         <SlackChannelPicker
+          app="shop"
           id="channel-id"
           value={channelId}
           onChange={(id) => setChannelId(id ?? "")}
@@ -871,6 +872,7 @@ function SlackSettings() {
           Overview &amp; Reflection channel
         </label>
         <SlackChannelPicker
+          app="shop"
           id="summary-channel-id"
           value={summaryChannelId}
           onChange={(id) => setSummaryChannelId(id ?? "")}

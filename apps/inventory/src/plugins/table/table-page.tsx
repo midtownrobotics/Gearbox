@@ -244,7 +244,7 @@ export function TablePage() {
             {places.locations.length === 0
               ? user.isAdmin
                 ? "Set up locations on the Admin page, then add entries here."
-                : "Once an admin sets up locations on the Admin page, anyone can add entries here."
+                : "Once a trusted student sets up locations on the Admin page, anyone can add entries here."
               : "Add the first entry with the button above."}
           </p>
         </Card>

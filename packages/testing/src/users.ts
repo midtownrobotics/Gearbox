@@ -16,6 +16,7 @@ export type TestUser = {
   email: string;
   isAdmin: boolean;
   isMentor: boolean;
+  appPermissions?: Record<string, { trustedStudent: boolean; mentorAccess: boolean }>;
   /** "pin" is a kiosk PIN session: G3ID never reports admin or mentor for one. */
   sessionType: "oauth" | "pin";
   kioskDeviceId?: number;

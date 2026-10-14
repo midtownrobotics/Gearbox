@@ -17,6 +17,8 @@ export interface PluginNavItem {
   signInMethod?: "pin";
   /** Shown only while the team has this app on (the Leaderboard: Attendance). */
   requiresApp?: string;
+  /** For an app's settings hosted in ID: visibility follows that app's trusted students. */
+  permissionApp?: "attendance";
 }
 
 export interface Plugin {

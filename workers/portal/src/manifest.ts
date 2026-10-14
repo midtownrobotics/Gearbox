@@ -6,7 +6,7 @@ import packageJson from "../package.json";
 export const manifest = defineManifest({
   slug: "portal",
   name: "Home",
-  summary: "The team's home: its apps and links, and the admin pages.",
+  summary: "The team's home: its apps and links, and the trusted student pages.",
   roles: ["admin", "member"],
   integrations: [],
   availability: "every team",

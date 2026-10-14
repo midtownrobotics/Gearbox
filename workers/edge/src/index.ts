@@ -1,3 +1,4 @@
+import { appAuthContext } from "@g3/auth";
 import { requireAuth } from "@g3/auth";
 import { corsOrigin } from "@g3/site-config";
 import { withApiPrefix } from "@g3/site-config/worker";
@@ -19,6 +20,7 @@ import { teamSettingsRouter } from "./routes/team-settings";
 import type { AppEnv } from "./types";
 
 const base = new Hono<AppEnv>();
+base.use("*", appAuthContext("edge"));
 
 base.onError((err, c) => {
   console.error(err);

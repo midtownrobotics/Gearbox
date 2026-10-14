@@ -6,4 +6,4 @@ import { type SignedInUser, useSignedInUser } from "@g3/ui";
 export type Me = SignedInUser;
 
 /** The signed-in user, null when signed out, undefined while it's being asked. */
-export const useMe = (): Me | null | undefined => useSignedInUser();
+export const useMe = (): Me | null | undefined => useSignedInUser(undefined, "portal");

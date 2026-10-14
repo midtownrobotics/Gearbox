@@ -1,6 +1,7 @@
 import { teamKey } from "@g3/site-config";
 import type { Context, MiddlewareHandler } from "hono";
 import { createMiddleware } from "hono/factory";
+import type { PermissionApp } from "./permissions";
 
 // Sign-in for every worker except G3ID itself: ask G3ID (the G3ID service binding) who the
 // request's session cookie belongs to. G3ID never reports admin or mentor for a kiosk PIN session,
@@ -26,6 +27,7 @@ type G3IdMe = {
   displayName: string;
   email: string;
   isAdmin?: boolean;
+  isIdentityAdmin?: boolean;
   isMentor?: boolean;
   sessionType?: "oauth" | "pin";
   kioskDeviceId?: number;
@@ -40,9 +42,13 @@ export type G3AuthVariables = {
   userId: string;
   userDisplayName: string;
   userEmail: string;
-  /** G3ID admin. Never true on a kiosk PIN session. */
+  /** Trusted student in this worker's app. Never true on a kiosk PIN session. */
   userIsAdmin: boolean;
-  /** G3ID mentor flag (admins aren't mentors unless also flagged). Never true on a PIN session. */
+  /** Permission assignments are reserved for ID's trusted students, independent of app roles. */
+  userIsIdentityAdmin: boolean;
+  /** Set by the worker, never read from client headers or request bodies. */
+  permissionApp?: PermissionApp;
+  /** Mentor access in this worker's app, separate from trusted student access. Never true on PIN. */
   userIsMentor: boolean;
   /** "pin" when signed in with a PIN on a shop kiosk. */
   sessionType: "oauth" | "pin";
@@ -59,9 +65,13 @@ export type G3AuthEnv = {
 };
 
 async function loadUser(c: Context<G3AuthEnv>, identities: boolean) {
+  const query = new URLSearchParams();
+  if (!identities) query.set("includeIdentities", "false");
+  const app = c.get("permissionApp");
+  if (app) query.set("app", app);
   const res = await c.env.G3ID.fetch(
-    new Request(`http://g3id/api/auth/me${identities ? "" : "?includeIdentities=false"}`, {
-      headers: { cookie: c.req.header("Cookie") ?? "" },
+    new Request(`http://g3id/api/auth/me?${query}`, {
+      headers: { cookie: c.req.header("Cookie") ?? "", [TEAM_HEADER]: requestTeamId(c) },
     }),
   );
   if (!res.ok) return null;
@@ -73,8 +83,10 @@ async function loadUser(c: Context<G3AuthEnv>, identities: boolean) {
   c.set("userId", user.id);
   c.set("userDisplayName", user.displayName);
   c.set("userEmail", user.email);
-  c.set("userIsAdmin", user.isAdmin === true);
-  c.set("userIsMentor", user.isMentor === true);
+  const kiosk = user.sessionType === "pin";
+  c.set("userIsAdmin", !kiosk && user.isAdmin === true);
+  c.set("userIsIdentityAdmin", !kiosk && (user.isIdentityAdmin ?? user.isAdmin) === true);
+  c.set("userIsMentor", !kiosk && user.isMentor === true);
   c.set("sessionType", user.sessionType ?? "oauth");
   c.set("kioskDeviceId", user.kioskDeviceId ?? null);
   c.set("kioskDeviceName", user.kioskDeviceName ?? null);
@@ -86,6 +98,23 @@ async function loadUser(c: Context<G3AuthEnv>, identities: boolean) {
 }
 
 const unauthorized = (c: Context) => c.json({ error: "Unauthorized." }, 401);
+
+/** Each worker declares which app's permissions it enforces before mounting its routes. */
+export const appAuthContext = (app: PermissionApp): MiddlewareHandler<G3AuthEnv> =>
+  createMiddleware<G3AuthEnv>(async (c, next) => {
+    c.set("permissionApp", app);
+    await next();
+  });
+
+/** Only ID's trusted students assign permissions, even when an app has its own trusted students. */
+export const requireIdentityAdmin: MiddlewareHandler<G3AuthEnv> = createMiddleware<G3AuthEnv>(
+  async (c, next) => {
+    if (!(await loadUser(c, false))) return unauthorized(c);
+    if (!c.get("userIsIdentityAdmin"))
+      return c.json({ error: "Only ID's trusted students can assign permissions." }, 403);
+    await next();
+  },
+);
 
 /** Any signed-in user (401 otherwise). */
 export const requireAuth: MiddlewareHandler<G3AuthEnv> = createMiddleware<G3AuthEnv>(
@@ -103,11 +132,11 @@ export const requireAuthWithIdentities: MiddlewareHandler<G3AuthEnv> = createMid
   },
 );
 
-/** G3ID admins only (403 otherwise). */
+/** Trusted students in the worker's declared app (403 otherwise). */
 export const requireAdmin: MiddlewareHandler<G3AuthEnv> = createMiddleware<G3AuthEnv>(
   async (c, next) => {
     if (!(await loadUser(c, false))) return unauthorized(c);
-    if (!c.get("userIsAdmin")) return c.json({ error: "Admin access required." }, 403);
+    if (!c.get("userIsAdmin")) return c.json({ error: "Trusted student access required." }, 403);
     await next();
   },
 );
@@ -116,7 +145,7 @@ export const requireAdmin: MiddlewareHandler<G3AuthEnv> = createMiddleware<G3Aut
 export const hasMentorAccess = (c: { get(key: "userIsMentor" | "userIsAdmin"): boolean }) =>
   c.get("userIsMentor") || c.get("userIsAdmin");
 
-/** G3ID mentors and admins only (403 otherwise). */
+/** Mentor access or trusted student access in this app (403 otherwise). */
 export const requireMentor: MiddlewareHandler<G3AuthEnv> = createMiddleware<G3AuthEnv>(
   async (c, next) => {
     if (!(await loadUser(c, false))) return unauthorized(c);

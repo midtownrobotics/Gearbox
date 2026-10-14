@@ -137,7 +137,7 @@ async function seed(team: TeamUsers): Promise<Seeded> {
     method: "POST",
     body: { requestIds: [ordered.id, waiting.id] },
   });
-  await jsonAs(mentor, `/trusted/${encodeURIComponent(student.id)}`, {
+  await jsonAs(team.admin, `/trusted/${encodeURIComponent(student.id)}`, {
     method: "PUT",
     body: { trusted: true },
   });

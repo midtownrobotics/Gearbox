@@ -1,3 +1,4 @@
+import { appAuthContext } from "@g3/auth";
 import { consoleUrlVia, platformUrl, platformUrlVia, teamAppUrlVia } from "@g3/site-config";
 import { withApiPrefix } from "@g3/site-config/worker";
 import { SLACK_BOT_SCOPES } from "@g3/slack";
@@ -26,6 +27,7 @@ import type { AppEnv } from "./types";
 // other providers: accounts are G3ID's.
 
 const app = new Hono<AppEnv>();
+app.use("*", appAuthContext("portal"));
 
 app.onError((err, c) => {
   console.error(err);

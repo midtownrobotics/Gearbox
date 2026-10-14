@@ -14,7 +14,7 @@ engagementRoutes.get("/engagement-settings", requireAuth, async (c) =>
 
 engagementRoutes.put("/engagement-settings", requireAuth, async (c) => {
   if (!c.get("userIsAdmin") || c.get("sessionType") === "pin")
-    return c.json({ error: "Only a team admin can change engagement settings." }, 403);
+    return c.json({ error: "Only a team trusted student can change engagement settings." }, 403);
   const settings = parseEngagementSettings(await c.req.json().catch(() => null));
   if (!settings)
     return c.json(

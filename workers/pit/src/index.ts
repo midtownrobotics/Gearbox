@@ -1,3 +1,4 @@
+import { appAuthContext } from "@g3/auth";
 import {
   deleteTeamRows,
   exportTeamRows,
@@ -32,6 +33,7 @@ import { SETTING_KEYS, type SettingKey, getSetting, teamNumberOf } from "./setti
 import type { AppEnv } from "./types";
 
 const base = new Hono<AppEnv>();
+base.use("*", appAuthContext("pit"));
 
 base.onError((err, c) => {
   console.error("[pit]", err);

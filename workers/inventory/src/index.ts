@@ -1,3 +1,4 @@
+import { appAuthContext } from "@g3/auth";
 import { deleteTeamRows, exportTeamRows, hasMentorAccess, requireAuth, teamExport } from "@g3/auth";
 import { corsOrigin } from "@g3/site-config";
 import { withApiPrefix } from "@g3/site-config/worker";
@@ -32,6 +33,7 @@ import { stockRouter } from "./routes/stock";
 import type { AppEnv } from "./types";
 
 const base = new Hono<AppEnv>();
+base.use("*", appAuthContext("inventory"));
 
 base.onError((err, c) => {
   console.error("[inventory]", err);

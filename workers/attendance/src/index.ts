@@ -1,3 +1,4 @@
+import { appAuthContext } from "@g3/auth";
 import {
   activeMembers,
   deleteTeamRows,
@@ -31,6 +32,7 @@ import type { AppEnv } from "./types";
 const MAX_MANUAL_HOURS = 1000;
 
 const base = new Hono<AppEnv>();
+base.use("*", appAuthContext("attendance"));
 
 base.onError((err, c) => {
   const msg = err instanceof Error ? err.message : String(err);
