@@ -47,6 +47,7 @@ export const site = {
     skillTree: { web: "skilltree" },
     attendance: { web: "attendance" },
     inventory: { web: null },
+    schedule: { web: null },
   },
 
   /** The team's public website, linked from the apps. */

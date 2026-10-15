@@ -26,6 +26,7 @@ export const portalAppLabels = {
   scouting: "Scouting",
   orders: "Orders",
   inventory: "Inventory",
+  schedule: "Schedule",
   edge: "Edge",
 } as const;
 

@@ -77,6 +77,7 @@ const BINDINGS = {
   skillTree: "SKILL_TREE",
   attendance: "ATTENDANCE",
   inventory: "INVENTORY",
+  schedule: "SCHEDULE",
 } as const satisfies Record<Worker, string>;
 
 /** Headers only the gateway sets. */
@@ -349,6 +350,7 @@ const DEV_APPS: Record<Worker, keyof typeof devPorts.apps> = {
   skillTree: "skill-tree",
   attendance: "attendance",
   inventory: "inventory",
+  schedule: "schedule",
 };
 
 function devPage(request: Request, url: URL, app: Worker): Promise<Response> {

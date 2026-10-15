@@ -36,6 +36,7 @@ const slackMessages = new Map<string, Record<string, unknown>[]>();
 /** Lines apps added to a team's log (`logTeamChange`), and messages sent to all its admins. */
 const teamLogs = new Map<string, Record<string, unknown>[]>();
 const adminDms = new Map<string, Record<string, unknown>[]>();
+const memberDms = new Map<string, Record<string, unknown>[]>();
 
 /**
  * G3ID as other workers see it: /auth/me answers for the user in the test cookie (users.ts), like
@@ -106,17 +107,20 @@ export const g3idStub: ServiceStub = async (request) => {
     store.set(teamId, [...(store.get(teamId) ?? []), body]);
     return json({ ok: true });
   }
-  // A line for the team's log (`logTeamChange`), or a message to every admin (the platform, when
-  // an app is switched on or off): recorded. Tests read them back (stub only) with a GET to the
-  // same path on env.G3ID.
-  const team = url.pathname.match(/^\/internal\/teams\/([^/]+)\/(audit|slack\/dm-admins)$/);
+  // A line for the team's log (`logTeamChange`), a message to every admin (the platform, when
+  // an app is switched on or off) or to members by id (`sendMemberDM`): recorded. Tests read them
+  // back (stub only) with a GET to the same path on env.G3ID.
+  const team = url.pathname.match(
+    /^\/internal\/teams\/([^/]+)\/(audit|slack\/dm-admins|slack\/dm-members)$/,
+  );
   if (team) {
-    const store = team[2] === "audit" ? teamLogs : adminDms;
+    const store =
+      team[2] === "audit" ? teamLogs : team[2] === "slack/dm-admins" ? adminDms : memberDms;
     const teamId = decodeURIComponent(team[1]);
     if (request.method === "GET") return json(store.get(teamId) ?? []);
     const body = (await request.json()) as Record<string, unknown>;
     store.set(teamId, [...(store.get(teamId) ?? []), body]);
-    return json({ ok: true });
+    return json({ ok: true, sent: Array.isArray(body.userIds) ? body.userIds.length : undefined });
   }
   return json({ error: `G3ID stub has no ${url.pathname}` }, 404);
 };

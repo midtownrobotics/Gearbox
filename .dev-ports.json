@@ -54,6 +54,11 @@
       "port": 5186,
       "name": "Inventory",
       "url": "http://localhost:5186"
+    },
+    "schedule": {
+      "port": 5187,
+      "name": "Schedule",
+      "url": "http://localhost:5187"
     }
   },
   "workers": {
@@ -116,6 +121,12 @@
       "inspectorPort": 9239,
       "name": "Inventory Worker",
       "url": "http://localhost:8797"
+    },
+    "schedule": {
+      "port": 8798,
+      "inspectorPort": 9240,
+      "name": "Schedule Worker",
+      "url": "http://localhost:8798"
     },
     "gateway": {
       "port": 8796,

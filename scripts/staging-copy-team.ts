@@ -120,6 +120,12 @@ const DATABASES: Database[] = [
   },
   { worker: "pit", binding: "PIT_DB" },
   {
+    worker: "schedule",
+    binding: "SCHEDULE_DB",
+    // Each member's friends are private to them, so a rehearsal goes without.
+    skip: ["friends"],
+  },
+  {
     worker: "shop",
     binding: "SHOP_DB",
     // Onshape's keys, encrypted with production's key.
