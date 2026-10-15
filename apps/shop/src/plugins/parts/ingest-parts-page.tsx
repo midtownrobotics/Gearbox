@@ -1666,7 +1666,6 @@ function LabeledText({
     <Field label={required ? `${label} *` : label} hint={hint}>
       <TextField
         kind={kind}
-        required={required}
         value={value}
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
