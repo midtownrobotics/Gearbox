@@ -9,9 +9,11 @@ import {
 import {
   Loading,
   TeamIcon,
-  redirectToSignIn,
+  buttonClass,
   rememberTeam,
+  signInUrl,
   useTeamApps,
+  useTeamNames,
   useTeamUiSettings,
 } from "@g3/ui";
 import { useEffect } from "react";
@@ -201,6 +203,46 @@ function publicSiteMark(logoUrl: string): { logoSrc?: string; icon?: IconType } 
 
 const isApp = (key: PortalTileKey) => key in portalAppLabels;
 
+/** The team's home for someone signed out: sign in, join the team, or see its public site. */
+function FrontDoor() {
+  const teamUi = useTeamUiSettings();
+  const names = useTeamNames();
+  const publicSite =
+    teamUi.links.publicSite && !teamUi.hiddenLinks?.includes("publicSite")
+      ? teamUi.links.publicSite
+      : null;
+  return (
+    <main className="flex flex-1 items-center justify-center bg-page px-6 py-12">
+      <div className="w-full max-w-sm space-y-8 text-center">
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-widest text-primary-500">
+            Team {pageTeamNumber}
+          </p>
+          <h1 className="mt-1 text-4xl text-secondary-900">{names.name}</h1>
+        </div>
+        <div className="space-y-3">
+          <a href={signInUrl()} className={`${buttonClass("primary", "lg")} w-full`}>
+            Sign in
+          </a>
+          <a href={`${appUrl("id")}/signup`} className={`${buttonClass("secondary", "lg")} w-full`}>
+            Sign up
+          </a>
+          {publicSite && (
+            <a
+              href={publicSite}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`${buttonClass("secondary", "lg")} w-full`}
+            >
+              Public team site
+            </a>
+          )}
+        </div>
+      </div>
+    </main>
+  );
+}
+
 export function HomePage() {
   const teamUi = useTeamUiSettings();
   const me = useMe();
@@ -233,11 +275,8 @@ export function HomePage() {
     );
   }
 
-  // Signed out: off to sign in, like every app (ID's sign-in page has the public site's link).
-  if (authState === "unauthenticated") {
-    redirectToSignIn();
-    return null;
-  }
+  // Signed out: the team's front door. Portal is the one place that doesn't go straight to sign in.
+  if (authState === "unauthenticated") return <FrontDoor />;
 
   return (
     <main className="flex-1 bg-page px-6 py-12">
