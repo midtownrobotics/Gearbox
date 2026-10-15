@@ -84,6 +84,7 @@ const routes = app
       name?: unknown;
       country?: unknown;
       acceptTerms?: unknown;
+      acceptBeta?: unknown;
     }>();
     const teamNumber = Number(body.teamNumber);
     const name = typeof body.name === "string" ? body.name.trim() : "";
@@ -99,6 +100,12 @@ const routes = app
     if (!/^[A-Z]{2}$/.test(country)) return c.json({ error: "Choose your country." }, 400);
     if (body.acceptTerms !== true) {
       return c.json({ error: "Accept the terms of service and privacy policy to continue." }, 400);
+    }
+    if (body.acceptBeta !== true) {
+      return c.json(
+        { error: "Confirm you understand Gearbox is an early open beta to continue." },
+        400,
+      );
     }
 
     const id = `frc${teamNumber}`;
@@ -310,7 +317,8 @@ const routes = app
           updatedAt: now(),
         })
         .where(and(eq(teams.id, team.id), eq(teams.status, "pending")));
-      const home = `${teamAppUrlVia(c.env.LOCAL_GATEWAY_URL, team.id, "portal")}/`;
+      // The founder's first stop: where Gearbox's notifications go (then the team's apps).
+      const home = `${teamAppUrlVia(c.env.LOCAL_GATEWAY_URL, team.id, "portal")}/admin/notifications?welcome=1`;
       return c.json({
         status: "done" as const,
         // G3ID sets the session cookie on the team's own domain, then opens the team's home.
@@ -359,6 +367,21 @@ const routes = app
       app,
       details: { what, changed },
     });
+    return c.json({ ok: true });
+  })
+  // The team's name changed in its Team Appearance (G3ID sends it): the registry's name follows,
+  // so the console, the team's addresses and anything else that asks here say what the team says.
+  .put("/internal/teams/:id/name", async (c) => {
+    const body = (await c.req.json().catch(() => null)) as { name?: unknown } | null;
+    const name = typeof body?.name === "string" ? body.name.trim() : "";
+    if (!name || name.length > 100) return c.json({ error: "Give the team's name." }, 400);
+    const updated = await db(c.env)
+      .update(teams)
+      .set({ name, updatedAt: now() })
+      .where(eq(teams.id, c.req.param("id")))
+      .returning({ id: teams.id })
+      .get();
+    if (!updated) return c.json({ error: "No such team." }, 404);
     return c.json({ ok: true });
   })
   // Resets the public demo now (local dev, and operators by hand): the gateway never answers it.

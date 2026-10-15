@@ -17,7 +17,7 @@ import { methodOff } from "../lib/sign-in-methods";
 import { removeInstallation, slackForTeam } from "../lib/slack-install";
 import { teamOfUser, teamUrl } from "../lib/team";
 import { appearanceChanges, logToTeam } from "../lib/team-log";
-import { isTeamUiSettings, loadTeamUi, teamIdName } from "../lib/team-ui";
+import { isTeamUiSettings, loadTeamUi, renameTeam } from "../lib/team-ui";
 import { requireAdmin } from "../middleware/auth";
 import type { AppEnv } from "../types";
 
@@ -78,6 +78,9 @@ export const adminRouter = new Hono<AppEnv>()
         target: teamUiSettings.teamId,
         set: { settingsJson: JSON.stringify(body), updatedAt: now, updatedBy: c.get("userId") },
       });
+    if (body.name.trim() !== before.name.trim()) {
+      await renameTeam(c.env, db, team, body.name.trim());
+    }
     const changed = appearanceChanges(before, body);
     if (changed.length > 0) {
       await logToTeam(c.env, team, {
@@ -197,7 +200,7 @@ export const adminRouter = new Hono<AppEnv>()
     if (slackIdentity?.providerId && teamSlack) {
       await sendDM(
         slackIdentity.providerId,
-        `✅ Your ${await teamIdName(db, user.teamId)} account has been approved! Click <${teamUrl(c.env, user.teamId, "id")}/login|here> to go to the login page and *sign in with Slack*. Yes, you will have to repeat the code sending process.`,
+        `✅ Your ID account has been approved! Click <${teamUrl(c.env, user.teamId, "id")}/login|here> to go to the sign-in page and *sign in with Slack*. Yes, you will have to repeat the code sending process.`,
         teamSlack.slack,
       );
     }

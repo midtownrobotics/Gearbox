@@ -75,7 +75,7 @@ const APPS: App[] = [
   },
   {
     name: "Attendance",
-    demo: "id",
+    demo: "attendance",
     icon: attendanceIcon,
     blurb:
       "Members scan a QR code at the door to check in and out. Hours roll up into a season leaderboard, and missed check-outs fix themselves.",
@@ -425,7 +425,7 @@ function Apps() {
               <p className="mt-1 flex-1 text-sm text-secondary-600">{app.blurb}</p>
               {app.demo && (
                 <a
-                  href={`${teamAppUrl(demoTeamId, app.demo)}/${app.name === "Attendance" ? "leaderboard" : ""}`}
+                  href={teamAppUrl(demoTeamId, app.demo)}
                   className="mt-3 self-start text-sm font-semibold text-primary-600 hover:text-primary-700"
                 >
                   See it in the demo →

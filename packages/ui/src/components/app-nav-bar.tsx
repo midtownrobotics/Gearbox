@@ -9,7 +9,7 @@ import {
 } from "@g3/site-config";
 import { type ComponentType, type ReactNode, useEffect, useState } from "react";
 import { useSignedInUser, useTeamApps } from "../session";
-import { useTeamIcon, useTeamNames, useTeamUiSettings } from "../team-ui";
+import { useTeamIcon, useTeamUiSettings } from "../team-ui";
 import { useTheme } from "../theme";
 
 // The top bar every G3 app shares (from Scouting's): the menu button, the app's wordmark, its
@@ -110,10 +110,9 @@ export function AppNavBar({
   const [open, setOpen] = useState(false);
   const teamUi = useTeamUiSettings();
   const brandedTitle = title.replace(
-    new RegExp(`^${site.team.shortName}(?=\\b|ID)`, "i"),
+    new RegExp(`^${site.team.shortName}\\b`, "i"),
     teamUi.shortName,
   );
-  const names = useTeamNames();
   const user = useSignedInUser(signedIn);
   const enabled = useTeamApps(allApps && !!user);
   // The app's icon, with its accent in the team's color.
@@ -131,7 +130,7 @@ export function AppNavBar({
                 .filter((key) => enabled === "all" || enabled.has(key))
                 .map((key) => ({
                   key,
-                  label: key === "id" ? names.idName : portalAppLabels[key],
+                  label: portalAppLabels[key],
                   href: appUrl(key),
                 }))
             : []),
@@ -143,7 +142,7 @@ export function AppNavBar({
   const flat = items.length === 0 && !hasApps;
   const hello =
     account && user && !user.kiosk ? (
-      <a className="g3-nav-text-link g3-nav-hello" href={`${appUrl("id")}/`}>
+      <a className="g3-nav-text-link g3-nav-hello" href={`${appUrl("portal")}/account`}>
         Hello, {user.displayName}!
       </a>
     ) : null;

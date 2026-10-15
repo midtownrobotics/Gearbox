@@ -1,7 +1,7 @@
 import { allAppsUrl as ALL_APPS_URL } from "@g3/site-config";
 import { useEffect, useState } from "react";
-import { API, redirectToLogin } from "../utils/auth";
-import type { PageType } from "../utils/token";
+import { API, redirectToLogin } from "../shared/api";
+import type { PageType } from "../shared/token";
 import "./ConfirmPage.css";
 
 interface Props {

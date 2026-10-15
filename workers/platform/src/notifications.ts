@@ -186,11 +186,22 @@ export async function dmCandidates(env: Bindings, teamId: string) {
     }));
 }
 
-/** The Slack text: its type and short description in bold, then the full text. */
-function slackText(n: { type: NotificationType; summary: string; body: string }) {
+/**
+ * The Slack text, sent by the team's own bot, so it says plainly that it's Gearbox's: "Gearbox
+ * Critical Notification" with the type's mark, then the short description and the full text as a
+ * quote. Kept under Slack's 4,000 characters (the text is cut).
+ */
+export function slackText(n: { type: NotificationType; summary: string; body: string }) {
   const mark = { info: ":information_source:", warning: ":warning:", critical: ":rotating_light:" };
-  const text = `${mark[n.type]} *Gearbox ${LABELS[n.type].toLowerCase()}: ${n.summary}*\n\n${n.body}`;
-  return text.length > 3900 ? `${text.slice(0, 3899)}…` : text;
+  const head = `${mark[n.type]}  *Gearbox ${LABELS[n.type]} Notification*\n`;
+  // A quote bar down the side of every line of the notification itself, then cut to fit.
+  let quoted = `*${n.summary.trim()}*\n${n.body.trim()}`
+    .split("\n")
+    .map((line) => `>${line}`)
+    .join("\n");
+  const room = 3900 - head.length;
+  if (quoted.length > room) quoted = `${quoted.slice(0, room - 1)}…`;
+  return `${head}${quoted}`;
 }
 
 /**

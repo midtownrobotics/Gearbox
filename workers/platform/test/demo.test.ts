@@ -32,6 +32,7 @@ describe("the public demo", () => {
         name: "Not the demo",
         country: "US",
         acceptTerms: true,
+        acceptBeta: true,
       }),
     });
     expect(signup.status).toBe(400);

@@ -14,6 +14,9 @@ import { useHistory } from "./history";
 import { Tools, useTools } from "./tools";
 
 /** One event's schedule: the viewer's own day, or everyone's (where editors paint blocks). */
+/** "A and B", "A, B, and C" in the viewer's language. */
+const andList = new Intl.ListFormat(undefined, { style: "long", type: "conjunction" });
+
 export function SchedulePage() {
   const id = useParams().id ?? "";
   const user = useAuthUser();
@@ -320,9 +323,10 @@ function MyDay({
             {mine.map((range) => {
               const role = roles.get(range.roleId);
               const look = roleBlock(role?.color ?? "gray");
-              const with_ = sharing(cells, others, day, range.start, range.end, range.roleId).map(
-                (userId) => names.get(userId),
-              );
+              // Friends on the same role then, by name (one whose name isn't known yet is left out).
+              const with_ = sharing(cells, others, day, range.start, range.end, range.roleId)
+                .map((userId) => names.get(userId))
+                .filter((name): name is string => !!name);
               return (
                 <li
                   key={range.start}
@@ -333,7 +337,9 @@ function MyDay({
                     <span className="font-semibold">{role?.name ?? "Role"}</span>
                     <span className="text-sm">{spanLabel(range.start, range.end)}</span>
                   </div>
-                  {with_.length > 0 && <p className="mt-0.5 text-xs">With {with_.join(", ")}</p>}
+                  {with_.length > 0 && (
+                    <p className="mt-0.5 text-xs">With {andList.format(with_)}</p>
+                  )}
                 </li>
               );
             })}

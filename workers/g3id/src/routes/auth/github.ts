@@ -10,7 +10,13 @@ import { decodeState, encodeState } from "../../lib/oauth-state";
 import { sanitizeRedirect } from "../../lib/redirect";
 import { createSession } from "../../lib/session";
 import { methodOff } from "../../lib/sign-in-methods";
-import { providerRedirectUri, requestTeamId, teamFrontend, teamOfUser } from "../../lib/team";
+import {
+  providerRedirectUri,
+  requestTeamId,
+  teamFrontend,
+  teamOfUser,
+  teamUrl,
+} from "../../lib/team";
 import type { AppEnv } from "../../types";
 
 function buildGithubUrl(env: AppEnv["Bindings"], state: string, redirectUri: string): string {
@@ -291,12 +297,13 @@ export const githubAuthRouter = new Hono<AppEnv>()
         .get();
 
       if (existingIdentity) {
-        if (existingIdentity.userId === linkUserId) return c.redirect(app("/dashboard"));
+        if (existingIdentity.userId === linkUserId)
+          return c.redirect(`${teamUrl(c.env, st.team, "portal")}/account`);
         return err("This GitHub account is already linked to a different account.");
       }
 
       await db.insert(coreUserIdentities).values({ ...identityValues, userId: linkUserId });
-      return c.redirect(app("/dashboard"));
+      return c.redirect(`${teamUrl(c.env, st.team, "portal")}/account`);
     }
 
     // --- Sign-in flow ---
@@ -327,7 +334,7 @@ export const githubAuthRouter = new Hono<AppEnv>()
 
       const sessionId = await createSession(user.id, c.env);
       setCookie(c, "g3_session", sessionId, sessionCookieOptions(c.req.url));
-      return c.redirect(redirectTo ?? app("/dashboard"));
+      return c.redirect(redirectTo ?? `${teamUrl(c.env, st.team, "portal")}/`);
     }
 
     // No GitHub identity found — account must already exist

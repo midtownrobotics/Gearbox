@@ -16,6 +16,8 @@ export function App() {
             {routes.map((r) => (
               <Route key={r.path} path={r.path} element={r.element} />
             ))}
+            {/* An address that isn't a page: the app's home. */}
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </div>
       </ProtectedRoute>

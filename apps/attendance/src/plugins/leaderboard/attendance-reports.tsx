@@ -1,4 +1,3 @@
-import { apiPath } from "@g3/site-config";
 import { ChevronDown, ChevronUp, Download, Loader2 } from "lucide-react";
 import {
   type PointerEvent,
@@ -12,6 +11,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { API } from "../../shared/api";
 import {
   type DayCell,
   HEAT_LEVELS,
@@ -32,9 +32,7 @@ import {
 
 // The Leaderboard page, for every member: who signed in on which meeting day (with how many each
 // day, and each member's hours and meetings attended, which the rows can be put in order of), and
-// everyone's hours as they added up. Drawn as plain HTML and SVG, with the chart colors in styles.css (`.att-report`).
-
-const ATTENDANCE_API_URL = apiPath("attendance");
+// everyone's hours as they added up. Drawn as plain HTML and SVG, with the chart colors in index.css (`.att-report`).
 
 /** How many members the hours chart names; the rest are drawn in gray. */
 const NAMED = 6;
@@ -743,7 +741,7 @@ export function AttendanceReports() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch(`${ATTENDANCE_API_URL}/report`, { credentials: "include" });
+        const res = await fetch(`${API}/report`, { credentials: "include" });
         if (!res.ok) throw new Error();
         setData((await res.json()) as ReportData);
       } catch {

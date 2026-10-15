@@ -2,7 +2,7 @@ import { env } from "cloudflare:test";
 import { exports } from "cloudflare:workers";
 import { type TestUser, asUser, teamUsers } from "@g3/testing/users";
 import { describe, expect, it } from "vitest";
-import { deliverToSlack } from "../src/notifications";
+import { deliverToSlack, slackText } from "../src/notifications";
 import type { AppEnv } from "../src/types";
 
 // Delivering the console's notifications: each team's settings (its admin pages), what its home
@@ -167,11 +167,25 @@ describe("Slack delivery", () => {
     const posts = await sent(team.teamId, "/slack/message");
     expect(posts).toHaveLength(1);
     expect(posts[0]).toMatchObject({ channel: "C0123456789" });
-    expect(posts[0].text).toContain("Read now");
+    // Plainly Gearbox's, with the notification quoted.
+    expect(posts[0].text).toBe(
+      ":rotating_light:  *Gearbox Critical Notification*\n>*Read now*\n>Details",
+    );
     expect(await sent(team.teamId, "/slack/dm-members")).toMatchObject([
       { userIds: ["u-founder"] },
     ]);
     expect(await sent(quiet.teamId, "/slack/message")).toEqual([]);
     expect(await sent(suspended.teamId, "/slack/message")).toEqual([]);
+  });
+});
+
+describe("a notification's Slack text", () => {
+  it("stays under Slack's limit, keeping its heading and quote bars", () => {
+    const text = slackText({ type: "info", summary: "Long", body: "word ".repeat(2000) });
+    expect(text.length).toBeLessThanOrEqual(3900);
+    expect(
+      text.startsWith(":information_source:  *Gearbox Informational Notification*\n>*Long*"),
+    ).toBe(true);
+    expect(text.endsWith("…")).toBe(true);
   });
 });

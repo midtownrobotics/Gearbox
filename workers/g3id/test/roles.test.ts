@@ -21,6 +21,18 @@ describe("roles", () => {
     expect(me).toMatchObject({ isAdmin: true, isMentor: true });
   });
 
+  it("lets an admin make themselves a mentor and stop being one", async () => {
+    const adminId = await createUser({ isAdmin: true });
+    const admin = await sessionCookie(adminId);
+    const post = (path: string) => g3id(path, { method: "POST", cookie: admin });
+    const me = async () => (await g3id("/auth/me", { cookie: admin })).json();
+
+    expect((await post(`/admin/users/${adminId}/grant-mentor`)).status).toBe(200);
+    expect(await me()).toMatchObject({ isAdmin: true, isMentor: true });
+    expect((await post(`/admin/users/${adminId}/revoke-mentor`)).status).toBe(200);
+    expect(await me()).toMatchObject({ isAdmin: true, isMentor: false });
+  });
+
   it("lets admins promote, demote and grant mentor, but not demote themselves", async () => {
     const adminId = await createUser({ isAdmin: true });
     const admin = await sessionCookie(adminId);

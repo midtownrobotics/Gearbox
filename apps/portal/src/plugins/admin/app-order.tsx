@@ -23,12 +23,10 @@ import {
   teamUiLinkLabels,
 } from "@g3/site-config";
 
-const labelOf = (key: PortalTileKey, idName: string) =>
-  key === "id"
-    ? idName
-    : key in portalAppLabels
-      ? portalAppLabels[key as keyof typeof portalAppLabels]
-      : teamUiLinkLabels[key as keyof typeof teamUiLinkLabels];
+const labelOf = (key: PortalTileKey) =>
+  key in portalAppLabels
+    ? portalAppLabels[key as keyof typeof portalAppLabels]
+    : teamUiLinkLabels[key as keyof typeof teamUiLinkLabels];
 
 /**
  * The order of Portal's grid (Team Appearance): drag a tile by its handle, or focus the handle and
@@ -38,14 +36,11 @@ const labelOf = (key: PortalTileKey, idName: string) =>
 export function AppOrder({
   settings,
   shownLinks,
-  idName,
   onChange,
 }: {
   settings: TeamUiSettings;
   /** The links listed in the Links section: the others aren't listed here. */
   shownLinks: TeamUiLinkKey[];
-  /** The sign-in app's name for this team ("G3ID"). */
-  idName: string;
   onChange: (order: PortalTileKey[]) => void;
 }) {
   const order = completeAppOrder(settings.appOrder);
@@ -78,7 +73,7 @@ export function AppOrder({
       <SortableContext items={shown} strategy={verticalListSortingStrategy}>
         <ol className="divide-y divide-line rounded-md border border-line">
           {shown.map((key, i) => (
-            <Tile key={key} id={key} place={i + 1} label={labelOf(key, idName)} />
+            <Tile key={key} id={key} place={i + 1} label={labelOf(key)} />
           ))}
         </ol>
       </SortableContext>

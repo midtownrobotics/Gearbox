@@ -1,4 +1,4 @@
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { plugins } from "./plugins.config";
 import { NavBar } from "./shared/nav-bar";
 
@@ -14,6 +14,8 @@ export function App() {
           {allRoutes.map((r) => (
             <Route key={r.path} path={r.path} element={r.element} />
           ))}
+          {/* An address that isn't a page: the app's home. */}
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </div>
     </BrowserRouter>

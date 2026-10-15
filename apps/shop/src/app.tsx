@@ -1,4 +1,4 @@
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { plugins } from "./plugins.config";
 import { BatchSheet } from "./plugins/batches/batch-sheet";
 import { BoardPage } from "./plugins/board/board-page";
@@ -40,6 +40,8 @@ function AppContent() {
         {allRoutes.map((r) => (
           <Route key={r.path} path={r.path} element={r.element} />
         ))}
+        {/* An address that isn't a page: the app's home. */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       {/* A batch's detail view, over whichever page asked for it (`?batch=`). */}
       <BatchSheet />

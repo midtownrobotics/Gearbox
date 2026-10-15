@@ -1,5 +1,5 @@
-import { site } from "@g3/site-config";
-import { Button, ErrorBanner, useTeamNames } from "@g3/ui";
+import { appUrl, site } from "@g3/site-config";
+import { Button, ErrorBanner, NotYourTeam, useTeamNames } from "@g3/ui";
 import { Check, Copy, Send } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -67,7 +67,8 @@ export function SlackLoginPage() {
           if (redirect) {
             window.location.href = redirect;
           } else {
-            navigate("/dashboard");
+            // Nowhere asked for: the team's home.
+            window.location.href = `${appUrl("portal")}/`;
           }
           return;
         }
@@ -131,9 +132,7 @@ export function SlackLoginPage() {
     <main className="flex-1 flex items-center justify-center px-4">
       <div className="w-full max-w-sm space-y-6 text-center">
         <div>
-          <h1 className="text-4xl text-secondary-900">
-            <span className="text-primary-500">{names.shortName}</span>ID
-          </h1>
+          <h1 className="text-4xl text-secondary-900">{names.name}</h1>
         </div>
 
         {!isTerminal && (
@@ -217,6 +216,7 @@ export function SlackLoginPage() {
             ← Go back
           </button>
         )}
+        <NotYourTeam />
       </div>
     </main>
   );

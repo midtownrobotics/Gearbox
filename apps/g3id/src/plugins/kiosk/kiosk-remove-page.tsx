@@ -144,7 +144,7 @@ export function KioskRemovePage() {
             variant="secondary"
             size="lg"
             className="w-full"
-            onClick={() => navigate("/dashboard")}
+            onClick={() => navigate("/kiosk/login")}
             disabled={loading}
           >
             Keep it

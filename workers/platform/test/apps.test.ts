@@ -276,3 +276,67 @@ describe("the team's log of settings changes", () => {
     expect((await post("frc1", { app: "orders", what: "x" })).status).toBe(404);
   });
 });
+
+describe("a team's name from its Team Appearance", () => {
+  const rename = (teamId: string, body: unknown) =>
+    exports.default.fetch(
+      new Request(`http://platform/api/internal/teams/${teamId}/name`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+    );
+
+  it("is the registry's name, which the gateway's team lookup gives", async () => {
+    const team = await newTeam();
+    expect((await rename(team.teamId, { name: "  Renamed Robotics " })).status).toBe(200);
+    expect(await json<{ name: string }>(null, `/teams/${team.teamId}`)).toMatchObject({
+      name: "Renamed Robotics",
+    });
+  });
+
+  it("refuses an empty or too long name, or a team that isn't here", async () => {
+    const team = await newTeam();
+    expect((await rename(team.teamId, { name: " " })).status).toBe(400);
+    expect((await rename(team.teamId, { name: "x".repeat(101) })).status).toBe(400);
+    expect((await rename("frc1", { name: "Nobody" })).status).toBe(404);
+  });
+});
+
+describe("the team's operator access", () => {
+  /** A line in the operators' log about a team, as the console writes it. */
+  async function operatorDid(teamId: string, action: string, reason: string | null, at: number) {
+    await testEnv.PLATFORM_DB.prepare(
+      `INSERT INTO operator_actions (id, operator_user_id, action, team_id, reason, details, created_at)
+       VALUES (?1, 'operator-secret-id', ?2, ?3, ?4, '{}', ?5)`,
+    )
+      .bind(crypto.randomUUID(), action, teamId, reason, at)
+      .run();
+  }
+
+  it("shows the team's admins what operators did with it, newest first, never which operator", async () => {
+    const team = await newTeam();
+    const other = await newTeam();
+    await operatorDid(team.teamId, "view_team", null, 100);
+    await operatorDid(team.teamId, "suspend_team", "Checking a report", 200);
+    // A report about the team's number isn't access to its data; another team's lines aren't its.
+    await operatorDid(team.teamId, "resolve_report", null, 300);
+    await operatorDid(other.teamId, "view_team", null, 400);
+
+    const res = await call(team.admin, "/team/operator-access");
+    expect(res.status).toBe(200);
+    const text = await res.text();
+    expect(text).not.toContain("operator-secret-id");
+    expect(JSON.parse(text)).toMatchObject([
+      { action: "suspend_team", reason: "Checking a report", createdAt: 200 },
+      { action: "view_team", reason: null, createdAt: 100 },
+    ]);
+  });
+
+  it("is only for the team's admins", async () => {
+    const team = await newTeam();
+    expect((await call(team.student, "/team/operator-access")).status).toBe(403);
+    expect((await call(team.mentor, "/team/operator-access")).status).toBe(403);
+    expect((await call(null, "/team/operator-access")).status).toBe(401);
+  });
+});

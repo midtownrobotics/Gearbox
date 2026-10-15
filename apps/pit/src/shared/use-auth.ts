@@ -1,13 +1,7 @@
-import { appUrl } from "@g3/site-config";
 import { useEffect, useState } from "react";
 import { api } from "./api";
 
 type AuthState = { id: string; displayName: string; isAdmin: boolean; email: string } | null;
-
-/** Where to sign in, coming back to the page that's open. */
-export function signInUrl(): string {
-  return `${appUrl("id")}/login?redirect=${encodeURIComponent(window.location.href)}`;
-}
 
 /**
  * Who is signed in. `signedOut` is only true once the worker has said nobody is: with no

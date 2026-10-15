@@ -1,11 +1,7 @@
-import { apiPath } from "@g3/site-config";
 import { Button, Card, ErrorBanner, Loading, Page, inputClass } from "@g3/ui";
 import { useCallback, useEffect, useState } from "react";
-import { ManageMemberPanel, type MemberSummary, SignedInPanel } from "./admin-attendance-tools";
-
-// The attendance worker's API, reached from this page's own address (`/api/~attendance`: the
-// gateway sends it to Attendance for the same team), with the same session cookie.
-const ATTENDANCE_API_URL = apiPath("attendance");
+import { API } from "../../shared/api";
+import { ManageMemberPanel, type MemberSummary, SignedInPanel } from "./admin-tools";
 
 type AttendanceSettings = {
   schoolYearStartMonth: number;
@@ -38,7 +34,7 @@ function AttendanceSettingsCard({ onSaved }: { onSaved: () => void }) {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch(`${ATTENDANCE_API_URL}/admin/settings`, {
+        const res = await fetch(`${API}/admin/settings`, {
           credentials: "include",
         });
         if (!res.ok) throw new Error();
@@ -64,7 +60,7 @@ function AttendanceSettingsCard({ onSaved }: { onSaved: () => void }) {
     setStatus("saving");
     setError(null);
     try {
-      const res = await fetch(`${ATTENDANCE_API_URL}/admin/settings`, {
+      const res = await fetch(`${API}/admin/settings`, {
         method: "PUT",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -144,14 +140,14 @@ function AttendanceSettingsCard({ onSaved }: { onSaved: () => void }) {
  * What admins do by hand about attendance: sign people out, adjust a member's hours or remove
  * them, and the team's settings. The reports are on the Leaderboard page, for every member.
  */
-export function AdminAttendancePage() {
+export function AdminPage() {
   const [members, setMembers] = useState<MemberSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Also called after every change made here, with what's showing left in place meanwhile.
   const load = useCallback(async () => {
     try {
-      const res = await fetch(`${ATTENDANCE_API_URL}/admin/summary`, { credentials: "include" });
+      const res = await fetch(`${API}/admin/summary`, { credentials: "include" });
       if (!res.ok) {
         throw new Error(
           res.status === 403 ? "Admin access required." : "Failed to load attendance.",
@@ -169,7 +165,7 @@ export function AdminAttendancePage() {
   }, [load]);
 
   return (
-    <Page title="Attendance" width="narrow">
+    <Page title="Admin" width="narrow">
       {error && <ErrorBanner message={error} />}
       {!members && !error && <Loading />}
       {members && (

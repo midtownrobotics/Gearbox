@@ -13,6 +13,7 @@ import {
 import { eq } from "drizzle-orm";
 import type { Db } from "../db";
 import { teamUiSettings, teams } from "../db/schema";
+import type { AppEnv } from "../types";
 
 const fields: (keyof TeamUiColors)[] = [
   "page",
@@ -175,7 +176,32 @@ export async function loadTeamUi(db: Db, teamId: string) {
   };
 }
 
-/** The team's name for its sign-in app ("G3ID"), from its appearance: for messages it's sent. */
-export async function teamIdName(db: Db, teamId: string): Promise<string> {
-  return `${(await loadTeamUi(db, teamId)).settings.shortName}ID`;
+/**
+ * The team's name changed in its Team Appearance: G3ID's copy of the team and the platform's
+ * registry take it too, so every page and the operators' console call the team what it calls
+ * itself. The platform's copy is best effort: a save is never refused because it couldn't be told.
+ */
+export async function renameTeam(
+  env: AppEnv["Bindings"],
+  db: Db,
+  teamId: string,
+  name: string,
+): Promise<void> {
+  await db
+    .update(teams)
+    .set({ name, updatedAt: Math.floor(Date.now() / 1000) })
+    .where(eq(teams.id, teamId));
+  if (!env.PLATFORM) return;
+  try {
+    const res = await env.PLATFORM.fetch(
+      new Request(`http://platform/api/internal/teams/${encodeURIComponent(teamId)}/name`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      }),
+    );
+    if (!res.ok) console.error("[rename] platform", res.status, await res.text().catch(() => ""));
+  } catch (err) {
+    console.error("[rename] platform", err);
+  }
 }

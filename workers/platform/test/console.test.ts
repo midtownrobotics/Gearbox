@@ -195,6 +195,7 @@ describe("teams", () => {
           name: "The Real Team",
           country: "US",
           acceptTerms: true,
+          acceptBeta: true,
         }),
       }),
     );

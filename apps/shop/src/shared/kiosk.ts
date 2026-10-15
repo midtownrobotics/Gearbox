@@ -1,4 +1,5 @@
 import { appUrl } from "@g3/site-config";
+import { redirectToSignIn } from "@g3/ui";
 import { api } from "./api";
 
 /** localStorage flag marking this browser as a dedicated shop kiosk device. */
@@ -43,8 +44,7 @@ export async function exitKioskMode(): Promise<void> {
   } catch {
     // Ignore — we're leaving anyway.
   }
-  const redirect = encodeURIComponent(window.location.origin);
-  window.location.href = `${g3idUrl()}/login?redirect=${redirect}`;
+  redirectToSignIn(window.location.origin);
 }
 
 /** Log the current user out of the kiosk and pull the PIN pad back up. */

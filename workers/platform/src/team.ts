@@ -1,8 +1,8 @@
 import { requireAdmin, requireAuth } from "@g3/auth";
 import { type AppName, teamAppUrlVia } from "@g3/site-config";
-import { and, desc, eq, isNull, lte } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, lte } from "drizzle-orm";
 import { Hono } from "hono";
-import { type TEAM_ACTIONS, teamApps, teamAuditLog, teams } from "./db/schema";
+import { type TEAM_ACTIONS, operatorActions, teamApps, teamAuditLog, teams } from "./db/schema";
 import { accounts, db, g3id, now } from "./lib";
 import {
   changedParts,
@@ -28,6 +28,19 @@ import type { AppEnv } from "./types";
 //
 // Members also read the platform's notifications here, and admins choose where each type goes
 // (src/notifications.ts).
+
+/**
+ * What an operator did with the team that its admins see (the privacy policy's operator access
+ * log): opening its member list, and changing who owns it or whether it's suspended. Reports about
+ * its number aren't access to its data, and stay with the operators.
+ */
+const TEAM_VISIBLE_OPERATOR_ACTIONS = [
+  "view_team",
+  "transfer_owner",
+  "suspend_team",
+  "reactivate_team",
+  "renumber_team",
+] as const;
 
 /** How long a switched-off app's data is kept (the privacy policy's 90 days). */
 export const GRACE_S = 90 * 24 * 60 * 60;
@@ -192,6 +205,7 @@ export const teamRouter = new Hono<AppEnv>()
   .use("/library", requireAdmin)
   .use("/library/*", requireAdmin)
   .use("/log", requireAdmin)
+  .use("/operator-access", requireAdmin)
   .get("/library", async (c) => c.json(await library(c.env, c.get("teamId"))))
   .put("/library/:slug", async (c) => {
     const teamId = c.get("teamId");
@@ -310,6 +324,39 @@ export const teamRouter = new Hono<AppEnv>()
         appName: r.app && isAppName(r.app) ? MANIFESTS[r.app].name : r.app,
         userName: r.userId ? (names.get(r.userId)?.displayName ?? null) : null,
         details: JSON.parse(r.details) as Record<string, unknown>,
+        createdAt: r.createdAt,
+      })),
+    );
+  })
+  // Every time a Gearbox operator opened the team's data or changed it, with their reason: never
+  // which operator (they're volunteers), only that one did.
+  .get("/operator-access", async (c) => {
+    const rows = await db(c.env)
+      .select()
+      .from(operatorActions)
+      .where(
+        and(
+          eq(operatorActions.teamId, c.get("teamId")),
+          inArray(operatorActions.action, [...TEAM_VISIBLE_OPERATOR_ACTIONS]),
+        ),
+      )
+      .orderBy(desc(operatorActions.createdAt))
+      .limit(200)
+      .all();
+    // A handover names the members it was between (the team's own people, not the operator).
+    const handovers = rows.map((r) => JSON.parse(r.details) as { from?: string; to?: string });
+    const names = await accounts(
+      c.env,
+      handovers.flatMap((d) => [d.from ?? null, d.to ?? null]),
+    ).catch(() => new Map<string, { displayName: string }>());
+    const nameOf = (id?: string) => (id ? (names.get(id)?.displayName ?? null) : null);
+    return c.json(
+      rows.map((r, i) => ({
+        id: r.id,
+        action: r.action,
+        reason: r.reason,
+        from: nameOf(handovers[i].from),
+        to: nameOf(handovers[i].to),
         createdAt: r.createdAt,
       })),
     );

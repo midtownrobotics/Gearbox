@@ -8,8 +8,12 @@ import {
 } from "@g3/site-config";
 import {
   Loading,
+  NotYourTeam,
+  PublicSiteLink,
   TeamIcon,
+  buttonClass,
   rememberTeam,
+  signInUrl,
   useTeamApps,
   useTeamNames,
   useTeamUiSettings,
@@ -17,8 +21,8 @@ import {
 import { useEffect } from "react";
 import type { IconType } from "react-icons";
 import { FaCube, FaGithub, FaGlobe, FaInstagram, FaSlack } from "react-icons/fa";
+import attendanceIcon from "../../assets/app-icons/attendance.svg";
 import edgeIcon from "../../assets/app-icons/edge.svg";
-import idIcon from "../../assets/app-icons/id.svg";
 import inventoryIcon from "../../assets/app-icons/inventory.svg";
 import ordersIcon from "../../assets/app-icons/orders.svg";
 import pitIcon from "../../assets/app-icons/pit.svg";
@@ -50,13 +54,6 @@ type App = {
 } & ({ tile: string } | { icon?: IconType; logoSrc?: string });
 
 const APPS: App[] = [
-  {
-    // The sign-in app: named after the team ("G3ID") below.
-    key: "id",
-    label: "ID",
-    href: appUrl("id"),
-    tile: idIcon,
-  },
   {
     key: "shop",
     label: "Shop",
@@ -100,6 +97,12 @@ const APPS: App[] = [
     tile: scheduleIcon,
   },
   {
+    key: "attendance",
+    label: "Attendance",
+    href: appUrl("attendance"),
+    tile: attendanceIcon,
+  },
+  {
     key: "edge",
     label: "Edge",
     href: appUrl("edge"),
@@ -128,6 +131,7 @@ const APPS: App[] = [
     linkKey: "publicSite",
     href: "",
     icon: FaGlobe,
+    external: true,
   },
   {
     label: "Slack",
@@ -194,9 +198,37 @@ function publicSiteMark(logoUrl: string): { logoSrc?: string; icon?: IconType } 
 
 const isApp = (key: PortalTileKey) => key in portalAppLabels;
 
+/** The team's home for someone signed out: sign in, join the team, or see its public site. */
+function FrontDoor() {
+  const names = useTeamNames();
+  return (
+    <main className="flex flex-1 items-center justify-center bg-page px-6 py-12">
+      <div className="w-full max-w-sm space-y-8 text-center">
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-widest text-primary-500">
+            Team {pageTeamNumber}
+          </p>
+          <h1 className="mt-1 text-4xl text-secondary-900">{names.name}</h1>
+        </div>
+        <div className="space-y-3">
+          <a href={signInUrl()} className={`${buttonClass("primary", "lg")} w-full`}>
+            Sign in
+          </a>
+          <a href={`${appUrl("id")}/signup`} className={`${buttonClass("secondary", "lg")} w-full`}>
+            Sign up
+          </a>
+        </div>
+        <div className="space-y-2">
+          <PublicSiteLink />
+          <NotYourTeam />
+        </div>
+      </div>
+    </main>
+  );
+}
+
 export function HomePage() {
   const teamUi = useTeamUiSettings();
-  const names = useTeamNames();
   const me = useMe();
   const teamApps = useTeamApps(!!me);
   const authState = me === undefined ? "checking" : me ? "authenticated" : "unauthenticated";
@@ -210,7 +242,6 @@ export function HomePage() {
   const apps = [...APPS]
     .sort((a, b) => rank(a) - rank(b))
     .map((app) => {
-      if (app.label === "ID") return { ...app, label: names.idName };
       if (!app.linkKey) return app;
       return {
         ...app,
@@ -228,42 +259,8 @@ export function HomePage() {
     );
   }
 
-  if (authState === "unauthenticated") {
-    return (
-      <main className="flex-1 bg-page flex items-center justify-center px-6">
-        <div className="max-w-md w-full space-y-6 text-center">
-          <div>
-            <p className="text-primary-600 font-semibold text-lg tracking-widest uppercase mb-2">
-              FRC Team {pageTeamNumber}
-            </p>
-            <h1 className="text-4xl font-bold text-secondary-900 mb-2">
-              {teamUi.shortName} Gearbox
-            </h1>
-            <p className="text-secondary-600">FIRST Robotics Competition</p>
-          </div>
-
-          <div className="space-y-3 pt-6">
-            <a
-              href={`${appUrl("id")}/login?redirect=${encodeURIComponent(window.location.href)}`}
-              className="block w-full px-6 py-3 rounded-lg bg-primary-600 hover:bg-primary-700 text-on-primary font-semibold transition-colors"
-            >
-              Sign in
-            </a>
-            {teamUi.links.publicSite && !teamUi.hiddenLinks?.includes("publicSite") && (
-              <a
-                href={teamUi.links.publicSite}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block w-full px-6 py-3 rounded-lg bg-secondary-200 hover:bg-secondary-300 text-secondary-900 font-semibold transition-colors"
-              >
-                Not a member? Visit public site
-              </a>
-            )}
-          </div>
-        </div>
-      </main>
-    );
-  }
+  // Signed out: the team's front door. Portal is the one place that doesn't go straight to sign in.
+  if (authState === "unauthenticated") return <FrontDoor />;
 
   return (
     <main className="flex-1 bg-page px-6 py-12">

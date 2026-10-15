@@ -60,10 +60,20 @@ const slack = (request: Request) => {
 };
 
 // The platform, for the team's log (src/lib/team-log.ts): records each line by team, read back
-// with GET /api/internal/teams/:id/audit.
+// with GET /api/internal/teams/:id/audit. And the registry's name for a team (renameTeam in
+// src/lib/team-ui.ts), read back with GET /api/internal/teams/:id/name.
 const logged = new Map<string, unknown[]>();
+const names = new Map<string, unknown>();
 const platform = async (request: Request) => {
-  const team = new URL(request.url).pathname.match(/^\/api\/internal\/teams\/([^/]+)\/audit$/);
+  const path = new URL(request.url).pathname;
+  const named = path.match(/^\/api\/internal\/teams\/([^/]+)\/name$/);
+  if (named) {
+    const id = decodeURIComponent(named[1]);
+    if (request.method === "GET") return Response.json(names.get(id) ?? null);
+    names.set(id, ((await request.json()) as { name: unknown }).name);
+    return Response.json({ ok: true });
+  }
+  const team = path.match(/^\/api\/internal\/teams\/([^/]+)\/audit$/);
   if (!team) return Response.json({ error: "Not stubbed" }, { status: 404 });
   const id = decodeURIComponent(team[1]);
   if (request.method === "GET") return Response.json(logged.get(id) ?? []);

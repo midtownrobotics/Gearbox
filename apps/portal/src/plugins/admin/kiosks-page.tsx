@@ -1,7 +1,8 @@
 import { appUrl } from "@g3/site-config";
 import { Button, Card, ConfirmButton, ErrorBanner, Field, Loading, Page, TextField } from "@g3/ui";
 import { useEffect, useState } from "react";
-import { api } from "../../lib/api";
+import { Link } from "react-router-dom";
+import { g3id as api } from "../../lib/api";
 
 type ActivationCode = {
   code: string;
@@ -17,7 +18,7 @@ type KioskDevice = {
   revokedAt?: number;
 };
 
-export function AdminKioskPage() {
+export function KiosksPage() {
   const [deviceName, setDeviceName] = useState("");
   const [code, setCode] = useState<ActivationCode | null>(null);
   const [codeError, setCodeError] = useState<string | null>(null);
@@ -112,12 +113,9 @@ export function AdminKioskPage() {
       <Page title="Kiosk Devices" width="narrow">
         <p className="text-secondary-600">
           Kiosk sign-in is off for your team, so kiosks can't be added or used. Turn it on from the{" "}
-          <a
-            href={`${appUrl("portal")}/admin/sign-in`}
-            className="font-semibold text-primary-600 underline"
-          >
+          <Link to="/admin/sign-in" className="font-semibold text-primary-600 underline">
             Sign-in page
-          </a>
+          </Link>
           .
         </p>
       </Page>
@@ -156,6 +154,11 @@ export function AdminKioskPage() {
                 {code.code}
               </p>
             </div>
+            <p className="text-sm text-secondary-700 text-center">
+              On the kiosk, go to{" "}
+              <span className="font-mono break-all">{appUrl("id")}/kiosk/activate</span> and enter
+              this code.
+            </p>
             <p className="text-xs text-secondary-600 text-center">
               Expires: {new Date(code.expiresAt * 1000).toLocaleString()}
             </p>

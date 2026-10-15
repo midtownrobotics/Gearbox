@@ -189,7 +189,7 @@ function ActionForm({
           maxLength={500}
           value={reason}
           onChange={(e) => setReason(e.target.value)}
-          placeholder="Why? (kept in the log)"
+          placeholder="Why? (kept in the log, and shown to the team's admins)"
           className={fieldClass}
         />
         {error && <Notice>{error}</Notice>}

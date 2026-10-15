@@ -37,6 +37,17 @@ export type LogEntry = {
   createdAt: number;
 };
 
+/** A time a Gearbox operator opened or changed the team (never which operator). */
+export type OperatorAccess = {
+  id: string;
+  action: "view_team" | "transfer_owner" | "suspend_team" | "reactivate_team" | "renumber_team";
+  reason: string | null;
+  /** A handover's members. */
+  from: string | null;
+  to: string | null;
+  createdAt: number;
+};
+
 /** Downloads an app's data for the team as a JSON file (the platform's export, logged there). */
 export async function downloadAppData(slug: string) {
   const res = await fetch(

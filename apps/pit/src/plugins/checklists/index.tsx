@@ -1,6 +1,6 @@
-import { Loading, Page, buttonClass, useIsOnline } from "@g3/ui";
+import { Loading, Page, useIsOnline } from "@g3/ui";
 import type { Plugin } from "../../shared/plugin-types";
-import { signInUrl, useAuth } from "../../shared/use-auth";
+import { useAuth } from "../../shared/use-auth";
 import { ChecklistDetailPage } from "./checklist-detail-page";
 import { ChecklistsPage } from "./checklists-page";
 
@@ -27,12 +27,7 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
   if (!user) {
     return (
       <Page title="Edit Checklists" width="narrow">
-        <p className="text-sm text-secondary-500">Sign in to edit checklists.</p>
-        <div>
-          <a href={signInUrl()} className={buttonClass()}>
-            Sign in
-          </a>
-        </div>
+        <p className="text-sm text-secondary-500">Couldn't check who's signed in. Try again.</p>
       </Page>
     );
   }

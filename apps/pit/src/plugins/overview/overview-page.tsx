@@ -1,4 +1,4 @@
-import { Page, ProgressBar, Stat, buttonClass, focusRing } from "@g3/ui";
+import { Page, ProgressBar, Stat, focusRing } from "@g3/ui";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { ElapsedTime, voltageColor } from "../../shared/battery-display";
@@ -13,7 +13,6 @@ import {
   type ChecklistIssueSummary,
   type ChecklistList,
 } from "../../shared/getters/types";
-import { signInUrl, useAuth } from "../../shared/use-auth";
 
 // Overview: the pit at a glance. Each tile is a figure from one of the other pages and opens it.
 
@@ -236,23 +235,9 @@ function MatchTile({
 }
 
 export function OverviewPage() {
-  const { signedOut } = useAuth();
   const { lists, issues, batteries, lastArchive, nextMatch, loaded } = useFigures();
   // A figure nobody has answered: still being asked for, or it couldn't be.
   const unknown = loaded ? "—" : "…";
-
-  if (signedOut) {
-    return (
-      <Page title="Overview" width="narrow">
-        <p className="text-sm text-secondary-500">Sign in to see your team's pit.</p>
-        <div>
-          <a href={signInUrl()} className={buttonClass()}>
-            Sign in
-          </a>
-        </div>
-      </Page>
-    );
-  }
 
   return (
     <Page title="Overview" width="narrow">

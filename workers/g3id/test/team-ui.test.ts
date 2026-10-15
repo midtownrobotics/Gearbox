@@ -147,6 +147,34 @@ describe("team UI settings", () => {
     });
   });
 
+  it("renames the team here and in the platform's registry when its name changes", async () => {
+    const team = await createTeam();
+    const admin = await sessionCookie(await createUser({ teamId: team, isAdmin: true }));
+    const registryName = async () =>
+      (
+        await (testEnv.PLATFORM as Fetcher).fetch(`http://platform/api/internal/teams/${team}/name`)
+      ).json();
+    const save = (name: string) =>
+      g3id("/admin/team/ui", {
+        method: "PUT",
+        cookie: admin,
+        body: { ...teamUiDefaults(team), name },
+      });
+
+    expect((await save("  Renamed Robotics ")).status).toBe(200);
+    // The sign-in page's team (G3ID's copy) and the platform's registry both say the new name.
+    expect(await (await g3id(`/teams/${team}`)).json()).toMatchObject({ name: "Renamed Robotics" });
+    expect(await registryName()).toBe("Renamed Robotics");
+
+    // A save that keeps the name doesn't tell the platform again.
+    await (testEnv.PLATFORM as Fetcher).fetch(`http://platform/api/internal/teams/${team}/name`, {
+      method: "PUT",
+      body: JSON.stringify({ name: "untouched" }),
+    });
+    expect((await save("Renamed Robotics")).status).toBe(200);
+    expect(await registryName()).toBe("untouched");
+  });
+
   it("saves new portal URLs, preserves hidden URLs, accepts removed links, and restores all defaults", async () => {
     const admin = await sessionCookie(await createUser({ isAdmin: true }));
     const settings = {
