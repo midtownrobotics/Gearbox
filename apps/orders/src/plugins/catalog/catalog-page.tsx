@@ -243,6 +243,11 @@ export function CatalogPage() {
             aria-label="Search the catalog, or paste a product link"
             autoFocus
           />
+          <p className="text-xs text-amber-900 bg-amber-50 border border-amber-300 rounded-lg px-3 py-2">
+            We are aware of the issue with not being able to find the Edge box. We are working on
+            solutions that do not require physical hardware. We will keep everybody updated. Thank
+            you for your patience!
+          </p>
           {link && <p className="text-sm text-secondary-500">Opening a request for that link…</p>}
           <div className={`flex flex-wrap items-center gap-2 ${link ? "hidden" : ""}`}>
             <select
