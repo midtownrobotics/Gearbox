@@ -94,39 +94,45 @@ export default function KioskPage({ types }: Props) {
   }, []);
 
   const secondsLeft = Math.ceil(msUntilNextWindow() / 1000);
-  // The last code keeps working for a while, so it stays up until it's too old to scan.
-  const live = code && now - code.at < STALE_MS ? code : null;
   const shown = problem ? PROBLEMS[problem] : null;
+  // The last code stays up only while a scan of it would still work: it isn't too old yet, and
+  // the trouble is only this display's (its connection or its sign-in). After a server error a
+  // scan may fail too, so the codes go and the error takes their place.
+  const fresh = code && now - code.at < STALE_MS ? code : null;
+  const live = fresh && problem !== "server" ? fresh : null;
+  const errorOnly = shown && !live;
 
   return (
     <div className={`kiosk ${isCombined ? "kiosk--combined" : `kiosk--${types[0]}`}`}>
-      <div className="kiosk__content">
-        <div className={`kiosk__codes ${isCombined ? "kiosk__codes--combined" : ""}`}>
-          {types.map((type) => {
-            const isSignIn = type === "signin";
-            return (
-              <section className={`kiosk__code kiosk__code--${type}`} key={type}>
-                <h2 className="kiosk__label">{isSignIn ? "SIGN IN" : "SIGN OUT"}</h2>
-                <div className="kiosk__qr-wrapper">
-                  <div className="kiosk__qr-frame" key={`${type}-${live?.w ?? "none"}`}>
-                    {live ? (
-                      <QRCodeSVG
-                        className="kiosk__qr-code"
-                        value={`${window.location.origin}/?action=${type}&w=${live.w}`}
-                        size={460}
-                        bgColor="#ffffff"
-                        fgColor={isSignIn ? QR_SIGN_IN : QR_SIGN_OUT}
-                        level="M"
-                      />
-                    ) : (
-                      <div className="kiosk__qr-loading">{code && shown ? "NOT WORKING" : "…"}</div>
-                    )}
+      <div className={`kiosk__content${errorOnly ? " kiosk__content--problem" : ""}`}>
+        {!errorOnly && (
+          <div className={`kiosk__codes ${isCombined ? "kiosk__codes--combined" : ""}`}>
+            {types.map((type) => {
+              const isSignIn = type === "signin";
+              return (
+                <section className={`kiosk__code kiosk__code--${type}`} key={type}>
+                  <h2 className="kiosk__label">{isSignIn ? "SIGN IN" : "SIGN OUT"}</h2>
+                  <div className="kiosk__qr-wrapper">
+                    <div className="kiosk__qr-frame" key={`${type}-${live?.w ?? "none"}`}>
+                      {live ? (
+                        <QRCodeSVG
+                          className="kiosk__qr-code"
+                          value={`${window.location.origin}/?action=${type}&w=${live.w}`}
+                          size={460}
+                          bgColor="#ffffff"
+                          fgColor={isSignIn ? QR_SIGN_IN : QR_SIGN_OUT}
+                          level="M"
+                        />
+                      ) : (
+                        <div className="kiosk__qr-loading">…</div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </section>
-            );
-          })}
-        </div>
+                </section>
+              );
+            })}
+          </div>
+        )}
 
         {shown ? (
           <div className="kiosk__problem" role="alert">

@@ -192,6 +192,10 @@
 
 /* When the display can't get a fresh code: what's wrong, in place of the countdown. Amber is a
    warning, fixed since the display is always dark. */
+.kiosk__content--problem {
+  justify-content: center;
+}
+
 .kiosk__problem {
   flex: none;
   display: flex;
