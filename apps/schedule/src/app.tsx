@@ -1,5 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { plugins } from "./plugins.config";
+import { OpenClosest } from "./plugins/schedules/open-closest";
 import { ProtectedRoute } from "./shared/auth";
 import { NavBar } from "./shared/nav-bar";
 
@@ -12,11 +13,12 @@ export function App() {
         <div className="flex min-h-screen flex-col bg-page">
           <NavBar items={navItems} />
           <Routes>
-            <Route path="/" element={<Navigate to="/schedules" replace />} />
+            {/* Opening the app: the schedule closest to now. */}
+            <Route path="/" element={<OpenClosest />} />
             {routes.map((r) => (
               <Route key={r.path} path={r.path} element={r.element} />
             ))}
-            <Route path="*" element={<Navigate to="/schedules" replace />} />
+            <Route path="*" element={<Navigate to="/schedules/all" replace />} />
           </Routes>
         </div>
       </ProtectedRoute>

@@ -40,7 +40,7 @@ export function SchedulePage() {
 
 function BackLink() {
   return (
-    <Link to="/schedules" className="text-sm text-secondary-500 hover:text-secondary-900">
+    <Link to="/schedules/all" className="text-sm text-secondary-500 hover:text-secondary-900">
       ← All schedules
     </Link>
   );

@@ -185,7 +185,7 @@ function DetailsCard({ detail, reload }: CardProps) {
             onConfirm={() =>
               void save(
                 () => unwrap(api.schedules[":id"].$delete({ param })),
-                () => navigate("/schedules"),
+                () => navigate("/schedules/all"),
               )
             }
           />

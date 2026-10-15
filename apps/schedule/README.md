@@ -8,7 +8,9 @@ for [`workers/schedule`](../../workers/schedule).
 
 ## Pages
 
-- **Schedules** (`/schedules`): the team's events. Editors see drafts too and make new ones.
+- **Schedules**: opening the app, or Schedules in the bar (`/schedules`), goes to the schedule
+  closest to now (on today, else the next to start; past ones left out). Every schedule is
+  listed at `/schedules/all` ("← All schedules"); editors see drafts there too and make new ones.
 - **A schedule** (`/schedules/:id`): **My schedule** (the viewer's runs of roles for a day, who
   shares each, and the event's periods beside) or **Everyone** (the grid: a row per attendee, a
   column per 15 minutes, the periods across the top and a mark at "now"). Editors drag across people and times to paint: each mouse button has its own tool (a role,
