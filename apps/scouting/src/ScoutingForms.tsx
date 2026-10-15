@@ -1,5 +1,15 @@
 import { pageTeamNumber } from "@g3/site-config";
-import { TextField, useTeamNames } from "@g3/ui";
+import {
+  Button,
+  Card,
+  ErrorBanner,
+  Loading,
+  Page as SharedPage,
+  TextField,
+  inputClass,
+  useQuestions,
+  useTeamNames,
+} from "@g3/ui";
 import {
   AlertCircle,
   ArrowDown,
@@ -21,6 +31,7 @@ import {
   X,
 } from "lucide-react";
 import {
+  type ReactNode,
   type RefObject,
   type SyntheticEvent,
   useCallback,
@@ -152,8 +163,7 @@ function FieldInput({
     return (
       <TextField
         multiline
-        variant="plain"
-        kind="label"
+        kind="observation"
         id={inputId}
         required={field.required}
         value={String(value ?? "")}
@@ -163,6 +173,7 @@ function FieldInput({
   if (field.type === "mcq")
     return (
       <select
+        className={inputClass}
         id={inputId}
         required={field.required}
         value={String(value ?? "")}
@@ -201,8 +212,7 @@ function FieldInput({
   }
   return (
     <TextField
-      variant="plain"
-      kind="label"
+      kind="answer"
       id={inputId}
       required={field.required}
       value={String(value ?? "")}
@@ -317,6 +327,7 @@ function EntryForm({
         <TeamLookupInput
           value={teamName}
           onChange={setTeamName}
+          size="lg"
           inputMode="numeric"
           readOnly={form.kind === "scouting"}
         />
@@ -348,9 +359,9 @@ function EntryForm({
           );
         })}
       </div>
-      <button
+      <Button
+        variant="primary"
         type="submit"
-        className="primary-button"
         disabled={
           saving || (form.kind === "scouting" && (context?.hasSubmittedCurrentMatch || !teamName))
         }
@@ -363,7 +374,7 @@ function EntryForm({
             : form.kind === "scouting" && !teamName
               ? "Waiting for team"
               : "Submit report"}
-      </button>
+      </Button>
       {message && (
         <div className={`status-toast ${messageType}`} role="status" aria-live="polite">
           {messageType === "success" ? <CheckCircle2 size={21} /> : <AlertCircle size={21} />}
@@ -385,6 +396,7 @@ function Editor({
   save,
   close,
 }: { form: ScoutingForm; save: (form: ScoutingForm) => Promise<void>; close: () => void }) {
+  const questions = useQuestions();
   const [draft, setDraft] = useState({
     ...form,
     fields: form.fields.map((field) => ({ ...field, required: false })),
@@ -417,22 +429,22 @@ function Editor({
     });
   }
   return (
-    <div className="form-designer editor-card">
+    <Card className="form-designer editor-card">
       <div className="form-designer-toolbar">
         <div>
           <h2>Edit {draft.name}</h2>
         </div>
-        <button type="button" className="secondary-button" onClick={close}>
+        <Button variant="secondary" type="button" onClick={close}>
           <X size={16} /> Close
-        </button>
-        <button
+        </Button>
+        <Button
+          variant="primary"
           type="button"
-          className="primary-button"
           onClick={async () => {
             if (
-              !window.confirm(
+              !(await questions.confirm(
                 `Save these changes to ${draft.name}? Scouts will see the updated form immediately.`,
-              )
+              ))
             )
               return;
             setSaving(true);
@@ -448,7 +460,7 @@ function Editor({
           disabled={saving}
         >
           <Save size={16} /> {saving ? "Saving…" : "Save changes"}
-        </button>
+        </Button>
       </div>
       {saveError && (
         <div className="editor-save-error" role="alert">
@@ -491,13 +503,13 @@ function Editor({
               <span>{index + 1}</span>
             </button>
             <TextField
-              variant="plain"
-              kind="label"
+              kind="question"
               value={field.label}
               onChange={(event) => patch(field.id, { label: event.target.value })}
               placeholder="Question"
             />
             <select
+              className={inputClass}
               value={field.type}
               onChange={(event) => patch(field.id, { type: event.target.value as FieldType })}
             >
@@ -509,8 +521,7 @@ function Editor({
             </select>
             {(field.type === "mcq" || field.type === "multiSelect") && (
               <TextField
-                variant="plain"
-                kind="label"
+                kind="choices"
                 className="question-options-input"
                 value={optionDrafts[field.id] ?? field.options.join(", ")}
                 onChange={(event) => {
@@ -573,7 +584,8 @@ function Editor({
               >
                 <ArrowDown size={18} />
               </button>
-              <button
+              <Button
+                variant="danger"
                 type="button"
                 className="delete-field-button"
                 onClick={() =>
@@ -586,7 +598,7 @@ function Editor({
                 title="Delete question"
               >
                 <Trash2 size={16} />
-              </button>
+              </Button>
             </div>
           </div>
         ))}
@@ -615,11 +627,12 @@ function Editor({
       >
         <Plus size={17} /> Add question
       </button>
-    </div>
+    </Card>
   );
 }
 
 function AdminManager({ isG3IdAdmin }: { isG3IdAdmin: boolean }) {
+  const questions = useQuestions();
   const names = useTeamNames();
   const [admins, setAdmins] = useState<StrategyAdmin[]>([]);
   const [users, setUsers] = useState<UserOption[]>([]);
@@ -641,13 +654,18 @@ function AdminManager({ isG3IdAdmin }: { isG3IdAdmin: boolean }) {
         <form
           onSubmit={async (event) => {
             event.preventDefault();
-            if (!window.confirm("Make this person a Strategy lead?")) return;
+            if (!(await questions.confirm("Make this person a Strategy lead?"))) return;
             await api("/strategy-admins", { method: "POST", body: JSON.stringify({ userId }) });
             setUserId("");
             await load();
           }}
         >
-          <select required value={userId} onChange={(event) => setUserId(event.target.value)}>
+          <select
+            className={inputClass}
+            required
+            value={userId}
+            onChange={(event) => setUserId(event.target.value)}
+          >
             <option value="">Select a {names.idName} user</option>
             {users
               .filter((user) => user.status === "active")
@@ -661,9 +679,9 @@ function AdminManager({ isG3IdAdmin }: { isG3IdAdmin: boolean }) {
                 );
               })}
           </select>
-          <button className="primary-button" type="submit">
+          <Button variant="primary" type="submit">
             <Plus size={16} /> Add Strategy Lead
-          </button>
+          </Button>
         </form>
       )}
       <div className="strategy-admin-list">
@@ -675,7 +693,10 @@ function AdminManager({ isG3IdAdmin }: { isG3IdAdmin: boolean }) {
               <button
                 type="button"
                 onClick={async () => {
-                  if (!window.confirm(`Remove ${admin.display_name} as a Strategy lead?`)) return;
+                  if (
+                    !(await questions.confirm(`Remove ${admin.display_name} as a Strategy lead?`))
+                  )
+                    return;
                   await api(`/strategy-admins/${admin.user_id}`, { method: "DELETE" });
                   await load();
                 }}
@@ -691,6 +712,7 @@ function AdminManager({ isG3IdAdmin }: { isG3IdAdmin: boolean }) {
 }
 
 function AnnouncementManager() {
+  const questions = useQuestions();
   const names = useTeamNames();
   const [message, setMessage] = useState("");
   const [durationSeconds, setDurationSeconds] = useState("60");
@@ -703,7 +725,11 @@ function AnnouncementManager() {
       <form
         onSubmit={async (event) => {
           event.preventDefault();
-          if (!window.confirm(`Publish this announcement in ${names.appTitle("Scouting")}?`))
+          if (
+            !(await questions.confirm(
+              `Publish this announcement in ${names.appTitle("Scouting")}?`,
+            ))
+          )
             return;
           await api("/announcements", {
             method: "POST",
@@ -714,7 +740,6 @@ function AnnouncementManager() {
         }}
       >
         <TextField
-          variant="plain"
           kind="note"
           required
           maxLength={500}
@@ -726,6 +751,7 @@ function AnnouncementManager() {
           placeholder="Announcement"
         />
         <select
+          className={inputClass}
           value={durationSeconds}
           onChange={(event) => setDurationSeconds(event.target.value)}
         >
@@ -734,9 +760,9 @@ function AnnouncementManager() {
           <option value="300">5 minutes</option>
           <option value="600">10 minutes</option>
         </select>
-        <button type="submit" className="primary-button">
+        <Button variant="primary" type="submit">
           Announce
-        </button>
+        </Button>
       </form>
       {sent && <span className="announcement-sent">Announcement published.</span>}
     </section>
@@ -765,7 +791,7 @@ function LiveStrategy() {
     return () => window.clearInterval(interval);
   }, []);
   return (
-    <section className="live-strategy">
+    <Card className="live-strategy">
       <h2>See Live Users</h2>
       {users.map((user) => (
         <div key={user.user_id}>
@@ -776,11 +802,12 @@ function LiveStrategy() {
         </div>
       ))}
       {!users.length && <div className="forms-empty">No one is currently online.</div>}
-    </section>
+    </Card>
   );
 }
 
 function ServiceIssueReport() {
+  const questions = useQuestions();
   const [open, setOpen] = useState(false);
   const [report, setReport] = useState({ teamName: "", issueType: "mechanical", description: "" });
   const [message, setMessage] = useState("");
@@ -797,9 +824,9 @@ function ServiceIssueReport() {
       onSubmit={async (event) => {
         event.preventDefault();
         if (
-          !window.confirm(
+          !(await questions.confirm(
             `Alert the service crew about a ${report.issueType} issue for team ${report.teamName}?`,
-          )
+          ))
         )
           return;
         try {
@@ -817,8 +844,7 @@ function ServiceIssueReport() {
         <strong>Robot breakdown ticket</strong>
       </div>
       <TextField
-        variant="plain"
-        kind="teamName"
+        typeable
         className="team-number-input"
         required
         inputMode="numeric"
@@ -831,6 +857,7 @@ function ServiceIssueReport() {
         placeholder="Team number"
       />
       <select
+        className={inputClass}
         value={report.issueType}
         onChange={(event) => setReport({ ...report, issueType: event.target.value })}
       >
@@ -840,18 +867,17 @@ function ServiceIssueReport() {
         <option value="other">Other</option>
       </select>
       <TextField
-        variant="plain"
         kind="note"
         value={report.description}
         onChange={(event) => setReport({ ...report, description: event.target.value })}
         placeholder="What appears to be broken?"
       />
-      <button type="submit" className="primary-button">
+      <Button variant="primary" type="submit">
         Alert helpers
-      </button>
-      <button type="button" className="secondary-button" onClick={() => setOpen(false)}>
+      </Button>
+      <Button variant="secondary" type="button" onClick={() => setOpen(false)}>
         Cancel
-      </button>
+      </Button>
       {message && (
         <div className={`status-toast ${messageType}`} role="status" aria-live="polite">
           {messageType === "success" ? <CheckCircle2 size={21} /> : <AlertCircle size={21} />}
@@ -1033,6 +1059,7 @@ async function prepareScheduleFiles(files: File[]) {
 }
 
 function ManualModeManager() {
+  const questions = useQuestions();
   const names = useTeamNames();
   const [context, setContext] = useState<EventContext | null>(null);
   const [scheduleText, setScheduleText] = useState("");
@@ -1143,20 +1170,20 @@ function ManualModeManager() {
 
   if (context?.scheduleMode !== "manual")
     return (
-      <section className="manual-mode-switch">
-        <button
+      <Card className="manual-mode-switch">
+        <Button
+          variant="primary"
           type="button"
-          className="primary-button"
           onClick={async () => {
             if (
-              !window.confirm(
+              !(await questions.confirm(
                 "Switch off TBA and use a temporary, manually managed event schedule?",
-              )
+              ))
             )
               return;
-            const name = window.prompt("Competition name");
+            const name = await questions.prompt("Competition name");
             if (!name) return;
-            const date = window.prompt(
+            const date = await questions.prompt(
               "Competition end date (YYYY-MM-DD)",
               new Date().toISOString().slice(0, 10),
             );
@@ -1177,26 +1204,25 @@ function ManualModeManager() {
           disabled={busy}
         >
           Switch to all-manual mode
-        </button>
-        <p>Use a temporary event database when TBA is unavailable.</p>
-      </section>
+        </Button>
+      </Card>
     );
 
   return (
-    <section className="manual-schedule-panel">
+    <Card className="manual-schedule-panel">
       <header>
         <div>
           <strong>All-manual mode</strong>
           <span>{context.manualEvent?.event_name}</span>
         </div>
-        <button
+        <Button
+          variant="primary"
           type="button"
-          className="primary-button"
           onClick={async () => {
             if (
-              !window.confirm(
+              !(await questions.confirm(
                 "Switch back to TBA mode and delete this event's temporary manual teams and schedule? Scouting submissions are retained.",
-              )
+              ))
             )
               return;
             await api("/manual-mode", { method: "DELETE" });
@@ -1207,7 +1233,7 @@ function ManualModeManager() {
           }}
         >
           Switch back to TBA mode
-        </button>
+        </Button>
       </header>
       <p>This schedule is deleted three days after the competition ends.</p>
       <p className="manual-scan-help">
@@ -1224,9 +1250,9 @@ function ManualModeManager() {
           Take a photo
           <input ref={cameraRef} type="file" accept="image/*" capture="environment" />
         </label>
-        <button
+        <Button
+          variant="secondary"
           type="button"
-          className="secondary-button"
           disabled={busy}
           onClick={async () => {
             const selectedFiles = [
@@ -1293,17 +1319,16 @@ function ManualModeManager() {
           }}
         >
           Scan selected pages
-        </button>
+        </Button>
       </div>
       <div className="manual-match-editor">
         <div className="manual-editor-heading">
           <div>
             <strong>Review matches</strong>
-            <small>Correct missing cells, then save.</small>
           </div>
-          <button
+          <Button
+            variant="secondary"
             type="button"
-            className="secondary-button"
             onClick={() =>
               setEditorRows([
                 ...editorRows,
@@ -1321,7 +1346,7 @@ function ManualModeManager() {
             }
           >
             <Plus size={16} /> Add match
-          </button>
+          </Button>
         </div>
         <div className="manual-table-scroll">
           <table className="manual-match-table">
@@ -1362,7 +1387,8 @@ function ManualModeManager() {
                     ),
                   )}
                   <td>
-                    <button
+                    <Button
+                      variant="danger"
                       type="button"
                       className="icon-button"
                       aria-label={`Delete match ${row[0] || rowIndex + 1}`}
@@ -1371,7 +1397,7 @@ function ManualModeManager() {
                       }
                     >
                       <Trash2 size={16} />
-                    </button>
+                    </Button>
                   </td>
                 </tr>
               ))}
@@ -1394,8 +1420,7 @@ function ManualModeManager() {
             <small>One per line: match, time, red 1–3, blue 1–3</small>
             <TextField
               multiline
-              variant="plain"
-              kind="label"
+              typeable
               rows={12}
               value={scheduleText}
               onChange={(e) => setScheduleText(e.target.value)}
@@ -1407,8 +1432,7 @@ function ManualModeManager() {
             <small>Optional: team number, team name</small>
             <TextField
               multiline
-              variant="plain"
-              kind="title"
+              kind="teamNames"
               rows={12}
               value={teamText}
               onChange={(e) => setTeamText(e.target.value)}
@@ -1417,11 +1441,11 @@ function ManualModeManager() {
           </label>
         </div>
       </details>
-      <button type="button" className="primary-button" disabled={busy} onClick={saveSchedule}>
+      <Button variant="primary" type="button" disabled={busy} onClick={saveSchedule}>
         <Save size={17} /> Save manual schedule
-      </button>
+      </Button>
       {message && <p role="status">{message}</p>}
-    </section>
+    </Card>
   );
 }
 
@@ -1431,9 +1455,11 @@ function EventStatus({
   onOpenSubmission,
 }: {
   isAdmin: boolean;
+  engagement?: ReactNode;
   isG3IdAdmin: boolean;
   onOpenSubmission: (submissionId: string) => void;
 }) {
+  const questions = useQuestions();
   const [context, setContext] = useState<EventContext | null>(null);
   const [eventKey, setEventKey] = useState("");
   const [matchNumber, setMatchNumber] = useState("");
@@ -1490,7 +1516,7 @@ function EventStatus({
   return (
     <div className="event-context">
       {isAdmin && (
-        <section className="event-admin-panel">
+        <Card className="event-admin-panel">
           <header>
             <h2>Event Configuration</h2>
           </header>
@@ -1501,11 +1527,11 @@ function EventStatus({
             onSubmit={async (event) => {
               event.preventDefault();
               if (
-                !window.confirm(
+                !(await questions.confirm(
                   context?.scheduleMode === "manual"
                     ? "Update the current manual match?"
                     : "Update the active TBA event and current match?",
-                )
+                ))
               )
                 return;
               await updateEvent(matchNumber);
@@ -1537,9 +1563,10 @@ function EventStatus({
                 </button>
               </div>
               {context?.scheduleMode !== "manual" && (
-                <button
+                <Button
+                  variant="secondary"
                   type="button"
-                  className="secondary-button use-tba-match"
+                  className="use-tba-match"
                   disabled={saving || !context?.tbaCurrentMatch}
                   onClick={async () => {
                     const nextMatch = context?.tbaCurrentMatch?.matchNumber;
@@ -1549,14 +1576,13 @@ function EventStatus({
                   }}
                 >
                   Set to current TBA match
-                </button>
+                </Button>
               )}
             </label>
             {context?.scheduleMode !== "manual" && (
               <label>
                 <strong>TBA Event Key</strong>
                 <TextField
-                  variant="plain"
                   kind="event"
                   value={eventKey}
                   onChange={(event) => setEventKey(event.target.value)}
@@ -1569,20 +1595,21 @@ function EventStatus({
                 <strong>TBA Auth Key</strong>
                 <div className="secret-field">
                   <input
+                    className={inputClass}
                     id="tba-key"
                     type={showTbaAuthKey ? "text" : "password"}
                     value={tbaAuthKey}
                     onChange={(event) => setTbaAuthKey(event.target.value)}
                     placeholder={context?.hasTbaAuthKey ? "Configured" : "Required"}
                   />
-                  <button
+                  <Button
+                    variant="secondary"
                     type="button"
-                    className="secondary-button"
                     onClick={() => setShowTbaAuthKey((shown) => !shown)}
                     aria-label={showTbaAuthKey ? "Hide TBA auth key" : "Show TBA auth key"}
                   >
                     {showTbaAuthKey ? "Hide" : "Show"}
-                  </button>
+                  </Button>
                 </div>
               </label>
             )}
@@ -1590,7 +1617,6 @@ function EventStatus({
               <label>
                 <strong>Nexus Event Key</strong>
                 <TextField
-                  variant="plain"
                   kind="event"
                   value={nexusEventKey}
                   onChange={(event) => setNexusEventKey(event.target.value)}
@@ -1603,26 +1629,27 @@ function EventStatus({
                 <strong>Nexus API Key</strong>
                 <div className="secret-field">
                   <input
+                    className={inputClass}
                     id="nexus-key"
                     type={showNexusApiKey ? "text" : "password"}
                     value={nexusApiKey}
                     onChange={(event) => setNexusApiKey(event.target.value)}
                     placeholder={context?.hasNexusApiKey ? "Configured" : "Optional"}
                   />
-                  <button
+                  <Button
+                    variant="secondary"
                     type="button"
-                    className="secondary-button"
                     onClick={() => setShowNexusApiKey((shown) => !shown)}
                     aria-label={showNexusApiKey ? "Hide Nexus API key" : "Show Nexus API key"}
                   >
                     {showNexusApiKey ? "Hide" : "Show"}
-                  </button>
+                  </Button>
                 </div>
               </label>
             )}
-            <button className="primary-button" type="submit" disabled={saving}>
+            <Button variant="primary" type="submit" disabled={saving}>
               {saving ? "Updating…" : "Update event"}
-            </button>
+            </Button>
           </form>
           {context?.currentMatch && <p>Current: {context.currentMatch.label}</p>}
           <section className="match-submission-status">
@@ -1670,7 +1697,7 @@ function EventStatus({
               </div>
             ))}
           </details>
-        </section>
+        </Card>
       )}
       <div className="next-match-status">
         <CalendarClock size={20} />
@@ -1692,6 +1719,8 @@ export function ScoutingForms({
   canManageServiceCrew: boolean;
 }) {
   const names = useTeamNames();
+  const [loadError, setLoadError] = useState("");
+  const [loading, setLoading] = useState(true);
   const [forms, setForms] = useState<ScoutingForm[]>([]);
   const [selected, setSelected] = useState<ScoutingForm | null>(null);
   const [editing, setEditing] = useState(false);
@@ -1699,13 +1728,18 @@ export function ScoutingForms({
   const [context, setContext] = useState<EventContext | null>(null);
   const load = useCallback(async () => {
     const result = await api<{ forms: ScoutingForm[] }>("/scouting-forms");
+    setLoadError("");
     setForms(result.forms);
     setSelected(
       (current) => result.forms.find((form) => form.id === current?.id) ?? result.forms[0] ?? null,
     );
   }, []);
   useEffect(() => {
-    load().catch(() => undefined);
+    load()
+      .catch((cause) =>
+        setLoadError(cause instanceof Error ? cause.message : "Could not load scouting forms."),
+      )
+      .finally(() => setLoading(false));
   }, [load]);
   useEffect(() => {
     const loadMatch = () =>
@@ -1731,26 +1765,36 @@ export function ScoutingForms({
     };
   }, [isFullscreen]);
   return (
-    <section
-      className={`page scouting-forms-page ${isFullscreen ? "scouting-forms-fullscreen" : ""}`}
+    <SharedPage
+      title={<>Scouting Forms</>}
+      width={isFullscreen ? "full" : "wide"}
+      className="scouting-page-frame"
+      contentClassName={`page scouting-forms-page ${isFullscreen ? "scouting-forms-fullscreen" : ""}`}
+      description={
+        context?.nextTeamMatch
+          ? `Next ${names.shortName} match: ${context.nextTeamMatch.label}`
+          : undefined
+      }
+      actions=<Button
+        variant="secondary"
+        type="button"
+        className="scouting-fullscreen-toggle"
+        onClick={() => setIsFullscreen((current) => !current)}
+        aria-pressed={isFullscreen}
+      >
+        {isFullscreen ? <Minimize2 size={17} /> : <Maximize2 size={17} />}
+        {isFullscreen ? "Exit full screen" : "Full screen"}
+      </Button>
     >
-      <div className="page-heading">
-        <div className="scouting-heading-title">
-          <h1>Scouting Forms</h1>
-          <span>
-            Next {names.shortName} match: {context?.nextTeamMatch?.label ?? "Unavailable"}
-          </span>
+      {loading && <Loading />}
+      {loadError && (
+        <div role="alert">
+          <ErrorBanner message={loadError} />
         </div>
-        <button
-          type="button"
-          className="secondary-button scouting-fullscreen-toggle"
-          onClick={() => setIsFullscreen((current) => !current)}
-          aria-pressed={isFullscreen}
-        >
-          {isFullscreen ? <Minimize2 size={17} /> : <Maximize2 size={17} />}
-          {isFullscreen ? "Exit full screen" : "Full screen"}
-        </button>
-      </div>
+      )}
+      {!loading && !loadError && !forms.length && (
+        <p className="text-sm text-secondary-500">No scouting forms are available.</p>
+      )}
       <div className="form-choice-grid">
         {forms.map((form) => (
           <div
@@ -1808,29 +1852,32 @@ export function ScoutingForms({
         ))}
       {selected?.kind === "pit" &&
         (canManageServiceCrew ? <Operations embedded /> : <ServiceIssueReport />)}
-    </section>
+    </SharedPage>
   );
 }
 
 export function ScoutingAdminPage({
+  engagement,
   isG3IdAdmin,
   onOpenSubmission,
 }: {
+  engagement?: ReactNode;
   isG3IdAdmin: boolean;
   onOpenSubmission: (submissionId: string) => void;
 }) {
   return (
-    <section className="page scouting-admin-page">
-      <div className="page-heading">
-        <div>
-          <h1>Admin</h1>
-        </div>
-      </div>
+    <SharedPage
+      title={<>Admin</>}
+      width="wide"
+      className="scouting-page-frame"
+      contentClassName="page scouting-admin-page"
+    >
+      {engagement}
       <ManualModeManager />
       <EventStatus isAdmin isG3IdAdmin={isG3IdAdmin} onOpenSubmission={onOpenSubmission} />
       <AdminManager isG3IdAdmin={isG3IdAdmin} />
       <LiveStrategy />
       <AnnouncementManager />
-    </section>
+    </SharedPage>
   );
 }

@@ -61,6 +61,7 @@ const APPS: App[] = [
   },
   {
     name: "Scouting",
+    demo: "scouting",
     icon: scoutingIcon,
     blurb:
       "Your own match and pit forms, pick lists and strategy tools, shared with the whole team. Turn on a points game to keep scouts engaged.",
@@ -435,7 +436,7 @@ function Apps() {
         ))}
       </div>
       <p className="mt-6 text-sm text-secondary-600">
-        Turn on only the ones your team needs. Every app but Scouting is in the{" "}
+        Turn on only the ones your team needs, and try every one of them in the{" "}
         <a href="#demo" className="font-semibold text-primary-600 hover:text-primary-700">
           demo
         </a>

@@ -13,6 +13,7 @@ export function TeamLookupInput({
   placeholder = "Team number or name",
   inputMode = "search",
   readOnly = false,
+  size = "md",
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -20,6 +21,7 @@ export function TeamLookupInput({
   placeholder?: string;
   inputMode?: "numeric" | "search";
   readOnly?: boolean;
+  size?: "md" | "lg";
 }) {
   const [query, setQuery] = useState(value);
   const [teams, setTeams] = useState<TeamSuggestion[]>([]);
@@ -72,9 +74,8 @@ export function TeamLookupInput({
   return (
     <div className="team-lookup">
       <TextField
-        variant="plain"
         typeable
-        className="team-number-input"
+        className={`team-number-input ${size === "lg" ? "!text-3xl" : ""}`}
         list={listId}
         required={required}
         value={query}

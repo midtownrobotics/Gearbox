@@ -21,6 +21,7 @@ const WORD_APPS = {
   inventory: "INVENTORY",
   schedule: "SCHEDULE",
   edge: "EDGE",
+  scouting: "SCOUTING",
 } as const;
 
 export type DemoEnv = Record<(typeof WORD_APPS)[keyof typeof WORD_APPS], Fetcher> & {
@@ -50,6 +51,15 @@ async function demoVocabulary(env: DemoEnv): Promise<Set<string>> {
   );
   vocabulary = { words, until: Date.now() + VOCABULARY_MS };
   return words;
+}
+
+/** A form field's value: the JSON in it, when it holds some (Scouting sends answers that way). */
+function parsedOrText(value: string): unknown {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return value;
+  }
 }
 
 const refuse = (status: number, error: string) =>
@@ -83,6 +93,22 @@ export async function checkDemoRequest(
 
   if (request.body === null) return null;
   const type = request.headers.get("Content-Type") ?? "";
+  // A form (Scouting's reports): its text is checked like JSON's, and any file in it refused.
+  if (type.includes("multipart/form-data") || type.includes("application/x-www-form-urlencoded")) {
+    let form: FormData;
+    try {
+      form = await request.clone().formData();
+    } catch {
+      return refuse(400, "That form couldn't be read.");
+    }
+    // By field name, so the names are checked as keys (`teamName`) and the values as text.
+    const fields: Record<string, unknown[]> = {};
+    for (const [key, value] of form.entries()) {
+      if (typeof value !== "string") return refuse(415, DEMO_REFUSALS.upload);
+      fields[key] = [...(fields[key] ?? []), parsedOrText(value)];
+    }
+    return disallowedText(fields, words) === null ? null : refuse(400, DEMO_REFUSALS.text);
+  }
   if (!type.includes("application/json")) {
     // Nothing to read is fine (a DELETE); anything else is an upload.
     const text = type === "" ? await request.clone().text() : "x";

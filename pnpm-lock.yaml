@@ -542,6 +542,9 @@ importers:
       react-dom:
         specifier: ^19.0.0
         version: 19.2.6(react@19.2.6)
+      react-router-dom:
+        specifier: ^6.28.0
+        version: 6.30.3(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
     devDependencies:
       '@g3/site-config':
         specifier: workspace:*
@@ -1202,12 +1205,15 @@ importers:
       '@g3/auth':
         specifier: workspace:*
         version: link:../../packages/auth
+      '@g3/demo':
+        specifier: workspace:*
+        version: link:../../packages/demo
       '@g3/site-config':
         specifier: workspace:*
         version: link:../../packages/site-config
-      '@g3/slack':
-        specifier: workspace:*
-        version: link:../../packages/slack
+      drizzle-orm:
+        specifier: 'catalog:'
+        version: 0.44.7(@cloudflare/workers-types@4.20260702.1)(bun-types@1.4.2)
       hono:
         specifier: 'catalog:'
         version: 4.12.19

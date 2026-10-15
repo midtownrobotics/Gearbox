@@ -1,5 +1,6 @@
-import { teamKey } from "@g3/site-config";
-
+import { inTeam } from "@g3/auth";
+import { createDb } from "./db";
+import { scoutingEngagementSettings } from "./db/schema";
 export type EngagementSettings = {
   enabled: boolean;
   predictionsEnabled: boolean;
@@ -16,19 +17,16 @@ export const defaultEngagementSettings: EngagementSettings = {
   pointsLabel: "Scout Points",
 };
 
-// Today site-config identifies the team; the gateway's verified team context replaces it
-// during the tenancy migration. Settings already have one row per team.
-export async function getEngagementSettings(db: D1Database): Promise<EngagementSettings> {
-  const row = await db
-    .prepare("SELECT * FROM scouting_engagement_settings WHERE team_key = ?")
-    .bind(teamKey)
-    .first<{
-      enabled: number;
-      predictions_enabled: number;
-      combinations_enabled: number;
-      leaderboard_enabled: number;
-      points_label: string;
-    }>();
+// Callers supply the authenticated team; scheduled work supplies its explicit team.
+export async function getEngagementSettings(
+  db: D1Database,
+  teamId: string,
+): Promise<EngagementSettings> {
+  const row = await createDb(db)
+    .select()
+    .from(scoutingEngagementSettings)
+    .where(inTeam(scoutingEngagementSettings, teamId))
+    .get();
   return row
     ? {
         enabled: Boolean(row.enabled),

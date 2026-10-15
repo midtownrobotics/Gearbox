@@ -136,6 +136,44 @@ export const SAFE_TEXT = {
   ],
   /** A list of choices or names, one per line. */
   lines: ["Hardware\nMotion\nTools", "Small\nMedium\nLarge", "Shelf A\nShelf B\nShelf C"],
+  /** Scouting: a pick-list entry, a tier, a strategy map, a match, an auto routine. */
+  strategy: [
+    "Strong defender",
+    "Fast cycler",
+    "Reliable climber",
+    "Good auto",
+    "Pick for playoffs",
+  ],
+  tier: ["First pick", "Second pick", "Defense", "Backup"],
+  map: ["Auto routes", "Defense plan", "Shooting spots"],
+  match: ["Qual 12", "Qual 47", "Practice 3", "Playoff 5"],
+  routine: ["3-piece center", "2-piece amp side", "Leave and score"],
+  /** A scouting form's question, and answers to one. */
+  question: [
+    "How many pieces in auto?",
+    "Did they leave the starting zone?",
+    "Climb level",
+    "Defense rating",
+  ],
+  answer: [
+    "Scored twice",
+    "Played defense",
+    "Climbed at the end",
+    "Stopped moving",
+    "Fast and accurate",
+  ],
+  observation: [
+    "Quick cycles, scored most of their shots.",
+    "Strong defense in the second half.",
+    "Climbed with time to spare.",
+    "Missed a few pickups but recovered.",
+  ],
+  /** Team numbers and names, one "number,name" per line. */
+  teamNames: ["9999,Gearbox Demo", "4242,Practice Field Robotics\n5151,The Sample Bots"],
+  skills: ["Mechanical, electrical", "Programming", "Mechanical, programming"],
+  points: ["Scout Points", "Scouting Stars", "Gear Points"],
+  /** Answers to a scouting question, comma separated. */
+  choices: ["Yes, No", "Low, Mid, High", "Left, Center, Right", "None, Some, Lots"],
   /** A part's sizes and types, one "Name: value" per line. */
   options: ['Length: 1/2"', "Bore: 1/2 in hex", "Color: Black", "Size: 1/4 in"],
   device: ["Driver station", "Practice laptop", "CAD desktop", "Scouting tablet", "Shop printer"],

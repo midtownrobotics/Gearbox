@@ -78,12 +78,7 @@ function ExitKioskDialog({ onClose }: { onClose: () => void }) {
           Only an admin can exit kiosk mode. You'll be asked to sign in as one.
         </p>
         <Field label='Type "I understand" to continue'>
-          <TextField
-            typeable
-            value={typed}
-            onChange={(e) => setTyped(e.target.value)}
-            autoFocus
-          />
+          <TextField typeable value={typed} onChange={(e) => setTyped(e.target.value)} autoFocus />
         </Field>
         <div className="flex flex-wrap gap-2">
           <Button type="submit" variant="danger" disabled={!understood}>

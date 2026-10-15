@@ -31,6 +31,7 @@ export { nextSafe, type SafeTextKind } from "@g3/demo";
 export { focusRing } from "./components/focus";
 export { ErrorBanner, Loading, SuccessBanner } from "./components/messages";
 export { Page, PageLoading, type PageWidth } from "./components/page";
+export { QuestionProvider, useQuestions } from "./components/questions";
 export { ProgressBar } from "./components/progress-bar";
 export { Switch, Toggle } from "./components/toggle";
 export { forceTheme, readTheme, setTheme, type Theme, useTheme } from "./theme";

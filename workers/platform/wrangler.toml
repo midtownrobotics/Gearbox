@@ -48,6 +48,10 @@ binding = "SHOP"
 service = "shop"
 
 [[services]]
+binding = "SCOUTING"
+service = "scouting"
+
+[[services]]
 binding = "SKILL_TREE"
 service = "skill-tree"
 
@@ -100,6 +104,10 @@ service = "schedule-production"
 [[env.production.services]]
 binding = "SHOP"
 service = "shop-production"
+
+[[env.production.services]]
+binding = "SCOUTING"
+service = "scouting-production"
 
 [[env.production.services]]
 binding = "SKILL_TREE"
@@ -169,6 +177,10 @@ service = "schedule-staging"
 [[env.staging.services]]
 binding = "SHOP"
 service = "shop-staging"
+
+[[env.staging.services]]
+binding = "SCOUTING"
+service = "scouting-staging"
 
 [[env.staging.services]]
 binding = "SKILL_TREE"

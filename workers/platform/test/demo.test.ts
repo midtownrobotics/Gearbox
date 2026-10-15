@@ -56,8 +56,9 @@ describe("the public demo", () => {
     expect(after.demoed).toBe(before.demoed + 1);
 
     const team = (await (await call(`/teams/${demoTeamId}`)).json()) as { apps: string[] };
-    expect(team.apps).toEqual(expect.arrayContaining(["orders", "skillTree", "schedule"]));
-    expect(team.apps).not.toContain("scouting");
+    expect(team.apps).toEqual(
+      expect.arrayContaining(["orders", "skillTree", "schedule", "scouting"]),
+    );
   });
 
   it("is reset only at midnight Eastern once it exists, in summer and winter", async () => {

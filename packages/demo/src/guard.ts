@@ -5,7 +5,7 @@ import type { AppName } from "@g3/site-config";
 // someone calling the API by hand:
 // - Routes that reach outside the platform or lock visitors out (connecting Slack, kiosks, keys,
 //   switching apps off, deleting the shared accounts) are refused for every role.
-// - Uploads (anything but JSON) are refused.
+// - Uploads are refused: any file, and any body that isn't JSON or a form of text.
 // - Every string in a JSON body must be made of words the demo already has (`vocabulary`), or be
 //   a machine value: a number, an id, a date, a color, a lowercase code like "in-progress".
 
@@ -43,6 +43,8 @@ export const DEMO_BLOCKED: readonly Blocked[] = [
   { app: "shop", method: "*", path: /^\/print\// },
   { app: "orders", method: "*", path: /^\/share-a-cart\/(connect|callback|disconnect)/ },
   { app: "orders", method: "POST", path: /^\/orders\/import/ },
+  // Scouting: reading a photographed schedule runs Workers AI.
+  { app: "scouting", method: "POST", path: /^\/scouting\/manual-schedule\/extract/ },
   // Integration keys and every app's settings form (no page saves through it yet).
   { app: "shop", method: "PUT", path: /^\/team-settings/ },
   { app: "orders", method: "PUT", path: /^\/team-settings/ },

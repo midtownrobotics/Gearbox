@@ -52,12 +52,29 @@ describe("the public demo", () => {
     expect(res.status).toBe(415);
   });
 
+  it("checks a form's text, and refuses a file in one", async () => {
+    const url = `${demo("scouting")}/api/scouting/scouting-forms/form_scouting/submissions`;
+    const post = (form: FormData) => gateway(url, { method: "POST", body: form });
+    const safe = new FormData();
+    safe.set("answers", JSON.stringify({ climb: "Mid", notes: "Looks good" }));
+    safe.set("teamName", "99901");
+    expect((await post(safe)).status).toBe(200);
+    const typed = new FormData();
+    typed.set("answers", JSON.stringify({ notes: "Anything I like" }));
+    expect((await post(typed)).status).toBe(400);
+    const file = new FormData();
+    file.set("drawing", new File(["png"], "map.png", { type: "image/png" }));
+    expect((await post(file)).status).toBe(415);
+  });
+
   it("refuses what reaches outside the demo, for any method", async () => {
     expect((await gateway(`${demo("id")}/api/slack/install`)).status).toBe(403);
     expect((await send(`${demo("")}/api/~platform/team/library/orders`, "PUT", {})).status).toBe(
       403,
     );
     expect((await send(`${demo("edge")}/api/box/key`, "POST", {})).status).toBe(403);
+    const scan = `${demo("scouting")}/api/scouting/manual-schedule/extract`;
+    expect((await send(scan, "POST", {})).status).toBe(403);
   });
 
   it("lets reading through untouched", async () => {

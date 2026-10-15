@@ -1,4 +1,5 @@
 import { pageTeamNumber } from "@g3/site-config";
+import { Button, Page as SharedPage, inputClass, useQuestions } from "@g3/ui";
 import {
   BarChart3,
   ChevronDown,
@@ -98,6 +99,7 @@ function imageHasAutoPath(image: HTMLImageElement) {
 }
 
 export function Analysis({ initialReportId }: { initialReportId?: string | null }) {
+  const questions = useQuestions();
   const [team, setTeam] = useState("");
   const [searched, setSearched] = useState("");
   const [reports, setReports] = useState<Report[]>([]);
@@ -193,12 +195,12 @@ export function Analysis({ initialReportId }: { initialReportId?: string | null 
 
   async function permanentlyDeleteReport(report: Report) {
     if (
-      !window.confirm(
+      !(await questions.confirm(
         `Permanently delete this report for team ${report.teamName}? This cannot be undone.`,
-      )
+      ))
     )
       return;
-    if (!window.confirm("Confirm permanent deletion one more time.")) return;
+    if (!(await questions.confirm("Confirm permanent deletion one more time."))) return;
     await api(`/analysis/reports/${report.id}/permanent`, { method: "DELETE" });
     setReports((items) => items.filter((item) => item.id !== report.id));
     setReportsB((items) => items.filter((item) => item.id !== report.id));
@@ -327,13 +329,15 @@ export function Analysis({ initialReportId }: { initialReportId?: string | null 
     ]);
   }
   return (
-    <section className="page analysis-page">
-      <div className="page-heading">
-        <div>
-          <h1>Analysis</h1>
-          <span>{searched ? `Team ${searched}` : `${reports.length} scouting reports`}</span>
-        </div>
-      </div>
+    <SharedPage
+      title={<>Analysis</>}
+      width="wide"
+      className="scouting-page-frame"
+      contentClassName="page analysis-page"
+      description=<span>
+        {searched ? `Team ${searched}` : `${reports.length} scouting reports`}
+      </span>
+    >
       <form className="analysis-search" onSubmit={search}>
         <Search size={19} />
         <TeamLookupInput
@@ -353,13 +357,14 @@ export function Analysis({ initialReportId }: { initialReportId?: string | null 
             />
           </>
         )}
-        <button type="submit" className="primary-button">
-          {loading ? "Loadingâ€¦" : tab === "compare" ? "Compare" : team ? "Find team" : "Show all"}
-        </button>
+        <Button variant="primary" type="submit">
+          {loading ? "Loading…" : tab === "compare" ? "Compare" : team ? "Find team" : "Show all"}
+        </Button>
         {(team || searched || teamB || searchedB) && (
-          <button
+          <Button
+            variant="secondary"
             type="button"
-            className="secondary-button analysis-clear"
+            className="analysis-clear"
             onClick={() => {
               setTeam("");
               setTeamB("");
@@ -370,7 +375,7 @@ export function Analysis({ initialReportId }: { initialReportId?: string | null 
             title="Clear team filters"
           >
             <X size={17} />
-          </button>
+          </Button>
         )}
       </form>
       {loadError && (
@@ -415,6 +420,7 @@ export function Analysis({ initialReportId }: { initialReportId?: string | null 
               <label className="competition-filter">
                 Competition
                 <select
+                  className={inputClass}
                   value={competition}
                   onChange={(event) => setCompetition(event.target.value)}
                 >
@@ -430,6 +436,7 @@ export function Analysis({ initialReportId }: { initialReportId?: string | null 
             <label className="competition-filter">
               Sort reports
               <select
+                className={inputClass}
                 value={reportSort}
                 onChange={(event) =>
                   setReportSort(event.target.value as "team" | "match" | "newest" | "starred")
@@ -546,7 +553,8 @@ export function Analysis({ initialReportId }: { initialReportId?: string | null 
                           >
                             <Star size={16} fill="currentColor" />
                           </button>
-                          <button
+                          <Button
+                            variant="danger"
                             type="button"
                             className="delete-report-button"
                             onClick={() => permanentlyDeleteReport(report)}
@@ -554,7 +562,7 @@ export function Analysis({ initialReportId }: { initialReportId?: string | null 
                             title="Remove bad data"
                           >
                             <Trash2 size={17} />
-                          </button>
+                          </Button>
                         </header>
                         <dl>
                           {report.fields
@@ -640,7 +648,11 @@ export function Analysis({ initialReportId }: { initialReportId?: string | null 
           {competitions.length > 0 && (
             <label className="competition-filter">
               Competition
-              <select value={competition} onChange={(event) => setCompetition(event.target.value)}>
+              <select
+                className={inputClass}
+                value={competition}
+                onChange={(event) => setCompetition(event.target.value)}
+              >
                 <option value="all">All competitions</option>
                 {competitions.map((eventKey) => (
                   <option value={eventKey} key={eventKey}>
@@ -688,7 +700,8 @@ export function Analysis({ initialReportId }: { initialReportId?: string | null 
                       {new Date(report.createdAt).toLocaleDateString()}
                     </span>
                   </div>
-                  <button
+                  <Button
+                    variant="danger"
                     type="button"
                     className="delete-report-button"
                     onClick={() => permanentlyDeleteReport(report)}
@@ -696,7 +709,7 @@ export function Analysis({ initialReportId }: { initialReportId?: string | null 
                     title="Remove bad data"
                   >
                     <Trash2 size={17} />
-                  </button>
+                  </Button>
                 </article>
               );
             })}
@@ -738,10 +751,7 @@ export function Analysis({ initialReportId }: { initialReportId?: string | null 
                 <strong className={winner === "left" ? "winner" : ""}>
                   {left?.toFixed(1) ?? "—"}
                 </strong>
-                <span>
-                  {label}
-                  <small>average reported value</small>
-                </span>
+                <span>{label}</span>
                 <strong className={winner === "right" ? "winner" : ""}>
                   {right?.toFixed(1) ?? "—"}
                 </strong>
@@ -786,6 +796,6 @@ export function Analysis({ initialReportId }: { initialReportId?: string | null 
           </div>
         </div>
       )}
-    </section>
+    </SharedPage>
   );
 }

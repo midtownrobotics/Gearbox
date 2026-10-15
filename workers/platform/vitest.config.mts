@@ -182,6 +182,7 @@ export default workerTestConfig({
     PIT: teamApp(),
     SCHEDULE: teamApp(),
     SHOP: teamApp(),
+    SCOUTING: teamApp(),
     SKILL_TREE: teamApp(),
   },
   outbound: slack,
