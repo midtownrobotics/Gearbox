@@ -3,6 +3,7 @@ import { useState } from "react";
 import { api } from "../../shared/api";
 import { getErrorMessage } from "../../shared/api-error";
 import type { InstanceRow } from "../../shared/derive";
+import { useCanQualityCheck } from "../../shared/use-auth";
 import type { ShopData } from "../../shared/use-shop-data";
 import { ShopView, shopButton, shopButtonPlain } from "./shop-view";
 
@@ -25,6 +26,11 @@ export function PartWorkView({
   const [showRevertModal, setShowRevertModal] = useState(false);
   const [revertStatus, setRevertStatus] = useState<"todo" | "doing">("todo");
   const currentProcess = row.current;
+  // A quality check is signed off by a shop manager or an admin only.
+  const canQualityCheck = useCanQualityCheck();
+  const isQualityCheck =
+    data.processes.find((p) => p.id === currentProcess?.processId)?.type === "quality_control";
+  const blocked = isQualityCheck && !canQualityCheck;
 
   async function handleRevert() {
     if (!currentProcess) return;
@@ -92,11 +98,12 @@ export function PartWorkView({
       <button
         type="button"
         onClick={onMarkComplete}
-        disabled={busy}
+        disabled={busy || blocked}
+        title={blocked ? "Only a shop manager can mark a quality check complete." : undefined}
         // On its own row under the others when the panel is under the drawing.
-        className={`${shopButton} col-span-full bg-emerald-600 text-paper hover:bg-emerald-700`}
+        className={`${shopButton} col-span-full bg-emerald-600 text-paper hover:bg-emerald-700 disabled:bg-steel/40 disabled:cursor-not-allowed`}
       >
-        Mark Complete
+        {blocked ? "Needs a shop manager" : "Mark Complete"}
       </button>
 
       {showRevertModal && (

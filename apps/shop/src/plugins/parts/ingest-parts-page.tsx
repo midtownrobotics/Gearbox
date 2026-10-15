@@ -4,6 +4,7 @@ import { getErrorMessage } from "../../shared/api-error";
 import { partInfoRequiredBy, pipelineFileError } from "../../shared/derive";
 import type { Process, Subsystem } from "../../shared/types";
 import { ErrorBanner, PageLoading } from "../../shared/ui";
+import { useAuthUser } from "../../shared/use-auth";
 import { useShopData } from "../../shared/use-shop-data";
 import { useTouchDevice } from "../../shared/use-touch";
 
@@ -304,6 +305,7 @@ function ProcessPanel({
 
 export function IngestPartsPage() {
   const { data, loading } = useShopData();
+  const user = useAuthUser();
   const touch = useTouchDevice();
   const [pendingData, setPendingData] = useState<PendingPartsData | null>(null);
   const [pendingLoading, setPendingLoading] = useState(true);
@@ -453,12 +455,27 @@ export function IngestPartsPage() {
     );
   }
 
+  // The team's quality check, which the worker puts at the end of every part.
+  const qualityStep = user?.qualityCheck.required
+    ? (data?.processes.find(
+        (p) => p.id === user.qualityCheck.processId && p.type === "quality_control",
+      ) ?? null)
+    : null;
+  // The quality check isn't picked by hand while it's required: it's on every part already.
+  const pickable = (data?.processes ?? []).filter((p) => p.id !== qualityStep?.id);
+  const qualityNote = qualityStep ? (
+    <p className="text-sm text-steel">
+      {qualityStep.name} is the team's quality check, added to the end of every part.
+    </p>
+  ) : null;
+
   // If currentIndex is null, show list view; otherwise show detail view
   if (currentIndex === null) {
     return (
       <main className="min-h-screen bg-page">
         <div className="max-w-full mx-auto px-6 py-8 space-y-5">
           <h1 className="font-display text-4xl text-ink">Ingest Parts</h1>
+          {qualityNote}
 
           <div className="bg-paper border border-steel/30 rounded-xl overflow-hidden">
             <div className="overflow-x-auto">
@@ -567,7 +584,7 @@ export function IngestPartsPage() {
                       <td className="px-4 py-3 text-steel text-xs">
                         {data && (
                           <ProcessSelector
-                            processes={data.processes}
+                            processes={pickable}
                             selectedProcessIds={localPartData[part.partNumber]?.processIds || []}
                             onAddProcess={(procId) => {
                               setLocalPartData({
@@ -776,7 +793,7 @@ export function IngestPartsPage() {
             <div className="fixed inset-0 bg-black/30 z-40 flex justify-end">
               <ProcessPanel
                 partNumber={pendingData.parts[editingProcessPartIdx]?.partNumber}
-                processes={data.processes}
+                processes={pickable}
                 selectedProcessIds={
                   localPartData[pendingData.parts[editingProcessPartIdx].partNumber]?.processIds ||
                   []
@@ -844,7 +861,7 @@ export function IngestPartsPage() {
           <PartIngestCard
             part={currentPart}
             subsystems={pendingData.subsystems}
-            processes={data.processes}
+            processes={pickable}
             localPartData={localPartData[currentPart.partNumber]}
             onUpdateLocalPartData={(partData) => updateLocal(currentPart.partNumber, partData)}
             onRemoveFromLocal={() => {

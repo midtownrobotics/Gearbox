@@ -11,6 +11,7 @@ import {
   processes,
   stagingBatches,
 } from "../db/schema";
+import { qualityCheckBlock } from "../lib/quality";
 import { finished, promoteNextSteps } from "../lib/steps";
 import type { AppEnv } from "../types";
 
@@ -330,6 +331,13 @@ export const stagingBatchesRouter = new Hono<AppEnv>()
     if (batch.fileId === null) {
       return c.json({ error: "Add a file to the batch before completing it." }, 409);
     }
+    const blocked = await qualityCheckBlock(
+      db,
+      teamId,
+      { id: c.get("userId"), isAdmin: c.get("userIsAdmin") },
+      [batch.processId],
+    );
+    if (blocked) return c.json({ error: blocked }, 403);
 
     const now = Date.now();
     const done = await db

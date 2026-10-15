@@ -14,7 +14,7 @@ import { eventually, onshapeEvent } from "./onshape";
 
 // Two teams, each with its own subsystem, process, part with instances and a staging batch, a
 // part file, a drawing in R2 (and an uploaded one), a part from its Onshape webhook, its Onshape
-// and Slack settings, and a kiosk at the shop. Every route, called as team A's admin, mentor,
+// and Slack settings, a shop manager, a required quality check, and a kiosk at the shop. Every route, called as team A's admin, mentor,
 // student and kiosk session with team B's ids, must show none of B's and change nothing of B's,
 // in D1 or in R2.
 
@@ -36,6 +36,7 @@ const TABLES = [
   "part_instance_files",
   "staging_batches",
   "admin_settings",
+  "shop_managers",
 ];
 
 type Id = { id: number };
@@ -145,6 +146,21 @@ async function seed(team: TeamUsers): Promise<Seeded> {
   const uploaded = await jsonAs<Id>(student, "/drawings/upload", { method: "POST", body: upload });
   // Someone at the team's kiosk.
   await jsonAs(kioskAdmin, "/kiosk-presence/heartbeat", { method: "POST" });
+  // Its own shop manager and quality check.
+  await jsonAs(admin, `/admin/quality/managers/${student.id}`, {
+    method: "PUT",
+    body: { manager: true },
+  });
+  const check = await jsonAs<Id>(
+    admin,
+    "/processes",
+    { method: "POST", body: { name: `QC ${tag}`, type: "quality_control" } },
+    201,
+  );
+  await jsonAs(admin, "/admin/quality/settings", {
+    method: "PUT",
+    body: { requireQualityCheck: true, qualityProcessId: check.id },
+  });
 
   const ids: Record<string, number> = {
     "part-definitions": part.id,
@@ -160,6 +176,7 @@ async function seed(team: TeamUsers): Promise<Seeded> {
       if (name === "partNumber") return partNumber;
       if (name === "revision") return "A";
       if (name === "drawingId") return String(uploaded.id);
+      if (name === "userId") return student.id;
       const id = ids[path.split("/")[1]];
       return id === undefined ? undefined : String(id);
     },
@@ -170,6 +187,7 @@ async function seed(team: TeamUsers): Promise<Seeded> {
       part: part.id,
       instance: instances[2].id,
       file: file.id,
+      check: check.id,
     },
   };
 }
@@ -227,6 +245,8 @@ it("keeps every team's shop to itself", async () => {
         "POST /admin/slack/config": { slackReleaseChannelId: "CMINE" },
         "POST /admin/onshape/config": { documentId: "mine" },
         "POST /admin/slack/daily-summary": { kind: "overview", since: Date.now() - 1000 },
+        "PUT /admin/quality/managers/:userId": { manager: true },
+        "PUT /admin/quality/settings": { requireQualityCheck: true, qualityProcessId: d.check },
       };
     },
   });

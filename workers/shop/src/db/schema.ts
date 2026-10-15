@@ -52,7 +52,12 @@ export const partInstances = sqliteTable(
   (t) => [unique().on(t.partDefinitionId, t.instanceNumber)],
 );
 
-export const PROCESS_TYPES = ["regular", "file_producer", "file_consumer"] as const;
+export const PROCESS_TYPES = [
+  "regular",
+  "file_producer",
+  "file_consumer",
+  "quality_control",
+] as const;
 export type ProcessType = (typeof PROCESS_TYPES)[number];
 
 export const processes = sqliteTable("processes", {
@@ -64,6 +69,23 @@ export const processes = sqliteTable("processes", {
   requiresPartInfo: integer("requires_part_info").notNull().default(0),
   createdAt: integer("created_at").notNull(),
 });
+
+/**
+ * The team's shop managers: who may check off its Quality Control steps. The team's G3ID admins
+ * may too, without a row here (but not from a kiosk, where G3ID reports no roles).
+ */
+export const shopManagers = sqliteTable(
+  "shop_managers",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    teamId: teamId(),
+    /** Their G3ID user id. */
+    userId: text("user_id").notNull(),
+    addedBy: text("added_by").notNull(),
+    addedAt: integer("added_at").notNull(),
+  },
+  (t) => [unique().on(t.teamId, t.userId)],
+);
 
 export const partDefinitionProcessBlueprints = sqliteTable(
   "part_definition_process_blueprints",

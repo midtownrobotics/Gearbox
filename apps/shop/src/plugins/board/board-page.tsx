@@ -15,7 +15,7 @@ import { fetchKioskPresence } from "../../shared/getters";
 import { processPath } from "../../shared/nav";
 import type { KioskPresence, PartDefinition, ProcessType } from "../../shared/types";
 import { ErrorBanner, PageLoading } from "../../shared/ui";
-import { useKiosk } from "../../shared/use-auth";
+import { useCanQualityCheck, useKiosk } from "../../shared/use-auth";
 import { useShopData } from "../../shared/use-shop-data";
 import { useTouchDevice } from "../../shared/use-touch";
 import { useUserNames } from "../../shared/use-user-names";
@@ -45,6 +45,8 @@ export function BoardPage() {
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const kiosk = useKiosk();
+  // A Quality Control process is only checked off by a shop manager or an admin.
+  const canQualityCheck = useCanQualityCheck();
   // Kiosks are tablets — always use the finger-friendly layout there.
   const touch = useTouchDevice() || kiosk.active;
 
@@ -215,6 +217,7 @@ export function BoardPage() {
             onOpenWorkView={setWorkingPartInstanceId}
             onViewPart={setViewingPartInstanceId}
             processType={data?.processes.find((p) => p.id === view)?.type ?? "regular"}
+            canQualityCheck={canQualityCheck}
             requiresPartInfo={!!data?.processes.find((p) => p.id === view)?.requiresPartInfo}
             definitions={data?.definitions ?? []}
             onChanged={refresh}
@@ -445,6 +448,7 @@ function ProcessView({
   onOpenWorkView,
   onViewPart,
   processType,
+  canQualityCheck,
   requiresPartInfo,
   definitions,
   onChanged,
@@ -457,6 +461,7 @@ function ProcessView({
   onOpenWorkView: (instanceId: number) => void;
   onViewPart: (instanceId: number) => void;
   processType: ProcessType;
+  canQualityCheck: boolean;
   requiresPartInfo: boolean;
   definitions: PartDefinition[];
   onChanged: () => Promise<void>;
@@ -475,6 +480,13 @@ function ProcessView({
   );
 
   const btnSize = touch ? "px-4 py-2.5" : "px-3 py-1.5";
+  // At a quality check, only a shop manager or an admin signs a part off.
+  const blocked = processType === "quality_control" && !canQualityCheck;
+  const completeHint = blocked
+    ? "Only a shop manager can mark a quality check complete."
+    : processType === "quality_control"
+      ? "Check the part before marking it complete!"
+      : "Do a quality check before marking this complete!";
 
   return (
     <div className="space-y-6">
@@ -507,21 +519,12 @@ function ProcessView({
                     onOpenPart={() => onOpenWorkView(row.instance.id)}
                     stack
                   >
-                    <span className="relative group">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onAdvance(row, "done");
-                        }}
-                        className={`w-full whitespace-nowrap text-xs bg-emerald-600 hover:bg-emerald-700 text-paper rounded-lg font-semibold transition-colors ${btnSize}`}
-                      >
-                        Mark as Complete
-                      </button>
-                      <span className="pointer-events-none absolute bottom-full right-0 mb-1.5 hidden group-hover:block whitespace-nowrap bg-ink text-paper text-xs rounded-md px-2.5 py-1.5 shadow-lg">
-                        Do a quality check before marking this complete!
-                      </span>
-                    </span>
+                    <CompleteButton
+                      blocked={blocked}
+                      hint={completeHint}
+                      size={btnSize}
+                      onClick={() => onAdvance(row, "done")}
+                    />
                   </PartLine>
                 ))}
               </div>
@@ -554,21 +557,12 @@ function ProcessView({
                     >
                       Start Part
                     </button>
-                    <span className="relative group">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onAdvance(row, "done");
-                        }}
-                        className={`w-full whitespace-nowrap text-xs bg-emerald-600 hover:bg-emerald-700 text-paper rounded-lg font-semibold transition-colors ${btnSize}`}
-                      >
-                        Mark as Complete
-                      </button>
-                      <span className="pointer-events-none absolute bottom-full right-0 mb-1.5 hidden group-hover:block whitespace-nowrap bg-ink text-paper text-xs rounded-md px-2.5 py-1.5 shadow-lg">
-                        Do a quality check before marking this complete!
-                      </span>
-                    </span>
+                    <CompleteButton
+                      blocked={blocked}
+                      hint={completeHint}
+                      size={btnSize}
+                      onClick={() => onAdvance(row, "done")}
+                    />
                   </PartLine>
                 ))}
               </div>
@@ -609,6 +603,38 @@ function ProcessView({
 }
 
 // ── Shared bits ───────────────────────────────────────────────────────────────
+
+/** Finishes a part's step here. Disabled at a quality check for anyone who can't sign one off. */
+function CompleteButton({
+  blocked,
+  hint,
+  size,
+  onClick,
+}: {
+  blocked: boolean;
+  hint: string;
+  size: string;
+  onClick: () => void;
+}) {
+  return (
+    <span className="relative group">
+      <button
+        type="button"
+        disabled={blocked}
+        onClick={(e) => {
+          e.stopPropagation();
+          onClick();
+        }}
+        className={`w-full whitespace-nowrap text-xs bg-emerald-600 hover:bg-emerald-700 text-paper rounded-lg font-semibold transition-colors disabled:bg-steel/40 disabled:cursor-not-allowed ${size}`}
+      >
+        Mark as Complete
+      </button>
+      <span className="pointer-events-none absolute bottom-full right-0 mb-1.5 hidden group-hover:block whitespace-nowrap bg-ink text-paper text-xs rounded-md px-2.5 py-1.5 shadow-lg">
+        {hint}
+      </span>
+    </span>
+  );
+}
 
 /**
  * One part in a list. With `onOpenPart` its name is the link that opens it. With `stack` its

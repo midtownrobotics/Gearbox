@@ -9,6 +9,10 @@ export type AuthUser = {
   sessionType: "oauth" | "pin";
   kioskDeviceId: number | null;
   kioskDeviceName: string | null;
+  /** A shop manager: they may check off Quality Control steps, as admins may. */
+  isShopManager: boolean;
+  /** The team's quality check: whether every part ends with one, and which process it is. */
+  qualityCheck: { required: boolean; processId: number | null };
 };
 
 type AuthState =
@@ -38,6 +42,12 @@ export const AuthUserContext = createContext<AuthUser | null>(null);
 
 export function useAuthUser(): AuthUser | null {
   return useContext(AuthUserContext);
+}
+
+/** Whether this person may mark a Quality Control step complete. */
+export function useCanQualityCheck(): boolean {
+  const user = useAuthUser();
+  return !!user && (user.isAdmin || user.isShopManager);
 }
 
 /** True when the app should present the kiosk experience: either the session

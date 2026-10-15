@@ -10,6 +10,7 @@ import {
   subsystems,
 } from "../db/schema";
 import { fileStepError } from "../lib/process-rules";
+import { withQualityStep } from "../lib/quality";
 import type { AppEnv } from "../types";
 
 const updatePartValidator = validator(
@@ -242,7 +243,10 @@ export const partDefinitionsRouter = new Hono<AppEnv>()
       return c.json({ error: "That subsystem doesn't exist." }, 400);
     }
 
-    if (processIds && processIds.length > 0 && (!material || !thickness)) {
+    // With a quality check required, it's the last step of every part.
+    const pipeline = await withQualityStep(db, teamId, processIds ?? []);
+
+    if (pipeline.length > 0 && (!material || !thickness)) {
       const needsInfo = await db
         .select({ name: processes.name })
         .from(processes)
@@ -250,7 +254,7 @@ export const partDefinitionsRouter = new Hono<AppEnv>()
           inTeam(
             processes,
             teamId,
-            inArray(processes.id, processIds),
+            inArray(processes.id, pipeline),
             eq(processes.requiresPartInfo, 1),
           ),
         )
@@ -265,7 +269,7 @@ export const partDefinitionsRouter = new Hono<AppEnv>()
       }
     }
 
-    const fileError = await processListError(db, teamId, processIds ?? []);
+    const fileError = await processListError(db, teamId, pipeline);
     if (fileError) return c.json({ error: fileError }, 400);
 
     // If obsoleteExisting is true, mark all existing parts with same number as obsolete
@@ -311,13 +315,13 @@ export const partDefinitionsRouter = new Hono<AppEnv>()
       .returning()
       .get();
 
-    if (processIds && processIds.length > 0) {
+    if (pipeline.length > 0) {
       // Five values a row: 20 rows a statement stays under D1's 100 bound parameters.
-      for (let i = 0; i < processIds.length; i += 20) {
+      for (let i = 0; i < pipeline.length; i += 20) {
         await db.insert(partDefinitionProcessBlueprints).values(
           withTeam(
             teamId,
-            processIds.slice(i, i + 20).map((processId, j) => ({
+            pipeline.slice(i, i + 20).map((processId, j) => ({
               partDefinitionId: partDef.id,
               processId,
               index: i + j,
@@ -409,10 +413,11 @@ export const partDefinitionsRouter = new Hono<AppEnv>()
       return c.json({ error: "Part definition not found." }, 404);
     }
 
-    const fileError = await processListError(db, teamId, processIds);
+    const pipeline = await withQualityStep(db, teamId, processIds);
+    const fileError = await processListError(db, teamId, pipeline);
     if (fileError) return c.json({ error: fileError }, 400);
 
-    await replaceBlueprint(db, teamId, partDefinitionId, processIds);
+    await replaceBlueprint(db, teamId, partDefinitionId, pipeline);
     return c.json(await blueprintOf(db, teamId, partDefinitionId));
   })
   .patch("/:id/processes/reorder", requireAuth, reorderBlueprintValidator, async (c) => {
@@ -439,7 +444,12 @@ export const partDefinitionsRouter = new Hono<AppEnv>()
       );
     }
 
-    await replaceBlueprint(db, teamId, partDefinitionId, processIds);
+    await replaceBlueprint(
+      db,
+      teamId,
+      partDefinitionId,
+      await withQualityStep(db, teamId, processIds),
+    );
     return c.json(await blueprintOf(db, teamId, partDefinitionId));
   })
   .post("/:id/processes", requireAuth, addBlueprintValidator, async (c) => {

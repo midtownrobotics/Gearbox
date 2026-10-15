@@ -1,9 +1,10 @@
 import { inTeam, requireAuth, withTeam } from "@g3/auth";
 import { and, asc, eq, gt, inArray } from "drizzle-orm";
-import { Hono } from "hono";
+import { type Context, Hono } from "hono";
 import { validator } from "hono/validator";
 import { createShopDb } from "../db";
 import { actions, partInstanceProcesses } from "../db/schema";
+import { qualityCheckBlock } from "../lib/quality";
 import { finished, promoteNextSteps } from "../lib/steps";
 import type { AppEnv } from "../types";
 import { recordAction } from "./actions";
@@ -18,6 +19,9 @@ const updateProcessStatusValidator = validator("json", (value, c): { status: str
 
 // D1 caps a statement at 100 bound parameters; the widest write here (actions) has 6 columns.
 const BULK_CHUNK = 15;
+
+/** Who's asking, for the Quality Control check. */
+const user = (c: Context<AppEnv>) => ({ id: c.get("userId"), isAdmin: c.get("userIsAdmin") });
 
 const bulkValidator = validator(
   "json",
@@ -56,6 +60,12 @@ export const partInstanceProcessesRouter = new Hono<AppEnv>()
     const { processId, partInstanceIds, to } = c.req.valid("json");
     const db = createShopDb(c.env.SHOP_DB);
     const teamId = c.get("teamId");
+
+    if (to === "done") {
+      const blocked = await qualityCheckBlock(db, teamId, user(c), [processId]);
+      if (blocked) return c.json({ error: blocked }, 403);
+    }
+
     const now = Date.now();
     const from = to === "doing" ? "todo" : "doing";
     const moved: number[] = [];
@@ -163,6 +173,9 @@ export const partInstanceProcessesRouter = new Hono<AppEnv>()
 
     const db = createShopDb(c.env.SHOP_DB);
     const teamId = c.get("teamId");
+    const blocked = await qualityCheckBlock(db, teamId, user(c), [processId]);
+    if (blocked) return c.json({ error: blocked }, 403);
+
     const row = await db
       .update(partInstanceProcesses)
       .set({ status: "done", completedAt: Date.now() })
@@ -253,6 +266,11 @@ export const partInstanceProcessesRouter = new Hono<AppEnv>()
 
       const db = createShopDb(c.env.SHOP_DB);
       const teamId = c.get("teamId");
+      if (status === "done") {
+        const blocked = await qualityCheckBlock(db, teamId, user(c), [processId]);
+        if (blocked) return c.json({ error: blocked }, 403);
+      }
+
       const row = await db
         .update(partInstanceProcesses)
         .set({

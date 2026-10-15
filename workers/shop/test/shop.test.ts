@@ -1,4 +1,4 @@
-import { admin, kioskAdmin, student } from "@g3/testing/users";
+import { admin, kioskAdmin, mentor, student } from "@g3/testing/users";
 import { call, callAs, jsonAs } from "@g3/testing/worker";
 import { describe, expect, it } from "vitest";
 
@@ -204,5 +204,239 @@ describe("obsolete parts", () => {
 
     // Taking the file off it is still allowed.
     expect(await (await assign(file, part, 0)).json()).toMatchObject({ assigned: 0 });
+  });
+});
+
+describe("quality control", () => {
+  type Id = { id: number };
+  const post = (body?: unknown) => ({ method: "POST" as const, body });
+  const put = (body: unknown) => ({ method: "PUT" as const, body });
+
+  /** A Quality Control step, a plain step, and a part with both (the check last). */
+  async function seed({ required = false }: { required?: boolean } = {}) {
+    const tag = crypto.randomUUID().slice(0, 8);
+    const subsystem = await jsonAs<Id>(student, "/subsystems", post({ name: `Drive ${tag}` }), 201);
+    const mill = await jsonAs<Id>(student, "/processes", post({ name: `Mill ${tag}` }), 201);
+    const check = await jsonAs<Id>(
+      admin,
+      "/processes",
+      post({ name: `QC ${tag}`, type: "quality_control" }),
+      201,
+    );
+    if (required) {
+      await jsonAs(
+        admin,
+        "/admin/quality/settings",
+        put({ requireQualityCheck: true, qualityProcessId: check.id }),
+      );
+    }
+    const part = await jsonAs<Id>(
+      student,
+      "/part-definitions",
+      post({
+        onshapePartNumber: `QC-${tag}`,
+        revision: "A",
+        subsystemId: subsystem.id,
+        name: "Plate",
+        processIds: required ? [mill.id] : [mill.id, check.id],
+      }),
+      201,
+    );
+    const instances = await jsonAs<Id[]>(
+      student,
+      "/part-instances",
+      post({ partDefinitionId: part.id, quantity: 2 }),
+      201,
+    );
+    return { tag, mill, check, part, instances };
+  }
+
+  it("only lets an admin make a process a quality check", async () => {
+    const tag = crypto.randomUUID().slice(0, 8);
+    expect(
+      (await callAs(student, "/processes", post({ name: `QC ${tag}`, type: "quality_control" })))
+        .status,
+    ).toBe(403);
+    const check = await jsonAs<{ id: number; type: string }>(
+      admin,
+      "/processes",
+      post({ name: `QC ${tag}`, type: "quality_control" }),
+      201,
+    );
+    expect(check.type).toBe("quality_control");
+    // Nor can a student take the type away again.
+    expect(
+      (
+        await callAs(student, `/processes/${check.id}`, {
+          method: "PATCH",
+          body: { type: "regular" },
+        })
+      ).status,
+    ).toBe(403);
+  });
+
+  it("keeps checking a quality step off to shop managers and admins", async () => {
+    const { mill, check, instances } = await seed();
+    const [first, second] = instances;
+
+    // The step before it is anyone's to finish.
+    expect(
+      (
+        await callAs(
+          student,
+          `/part-instance-processes/${first.id}/processes/${mill.id}/done`,
+          post(),
+        )
+      ).status,
+    ).toBe(200);
+    expect(
+      (
+        await callAs(
+          student,
+          `/part-instance-processes/${first.id}/processes/${check.id}/done`,
+          post(),
+        )
+      ).status,
+    ).toBe(403);
+    // Not through the bulk route or a plain status change either.
+    expect(
+      (
+        await callAs(
+          student,
+          "/part-instance-processes/bulk",
+          post({ processId: check.id, partInstanceIds: [first.id], to: "done" }),
+        )
+      ).status,
+    ).toBe(403);
+    expect(
+      (
+        await callAs(student, `/part-instance-processes/${first.id}/processes/${check.id}`, {
+          method: "PATCH",
+          body: { status: "done" },
+        })
+      ).status,
+    ).toBe(403);
+    // Starting it is fine: it's the sign-off that's kept back.
+    expect(
+      (
+        await callAs(
+          student,
+          `/part-instance-processes/${first.id}/processes/${check.id}/doing`,
+          post(),
+        )
+      ).status,
+    ).toBe(200);
+
+    // An admin may, and so may a shop manager they add.
+    expect(
+      (
+        await callAs(
+          admin,
+          `/part-instance-processes/${first.id}/processes/${check.id}/done`,
+          post(),
+        )
+      ).status,
+    ).toBe(200);
+    await jsonAs(admin, `/admin/quality/managers/${student.id}`, put({ manager: true }));
+    expect(await jsonAs<{ isShopManager: boolean }>(student, "/me")).toMatchObject({
+      isShopManager: true,
+    });
+    await jsonAs(
+      student,
+      `/part-instance-processes/${second.id}/processes/${mill.id}/done`,
+      post(),
+    );
+    expect(
+      (
+        await callAs(
+          student,
+          `/part-instance-processes/${second.id}/processes/${check.id}/done`,
+          post(),
+        )
+      ).status,
+    ).toBe(200);
+
+    // Taking it away again puts the step back out of reach.
+    await jsonAs(admin, `/admin/quality/managers/${student.id}`, put({ manager: false }));
+    expect(await jsonAs<{ isShopManager: boolean }>(student, "/me")).toMatchObject({
+      isShopManager: false,
+    });
+  });
+
+  it("only makes the team's own members shop managers, and only for admins", async () => {
+    expect((await callAs(student, "/admin/quality")).status).toBe(403);
+    expect((await callAs(kioskAdmin, "/admin/quality")).status).toBe(403);
+    expect(
+      (await callAs(student, `/admin/quality/managers/${student.id}`, put({ manager: true })))
+        .status,
+    ).toBe(403);
+    expect(
+      (await callAs(admin, "/admin/quality/managers/nobody-at-all", put({ manager: true }))).status,
+    ).toBe(404);
+
+    await jsonAs(admin, `/admin/quality/managers/${mentor.id}`, put({ manager: true }));
+    const page = await jsonAs<{
+      people: { id: string; isManager: boolean }[];
+      peopleLoaded: boolean;
+    }>(admin, "/admin/quality");
+    expect(page.peopleLoaded).toBe(true);
+    expect(page.people.find((p) => p.id === mentor.id)?.isManager).toBe(true);
+    expect(page.people.find((p) => p.id === student.id)?.isManager).toBe(false);
+    await jsonAs(admin, `/admin/quality/managers/${mentor.id}`, put({ manager: false }));
+  });
+
+  it("forgets the required check when its process stops being one", async () => {
+    const { check } = await seed({ required: true });
+    expect(await jsonAs<{ qualityCheck: unknown }>(admin, "/me")).toMatchObject({
+      qualityCheck: { required: true, processId: check.id },
+    });
+    await jsonAs(admin, `/processes/${check.id}`, { method: "PATCH", body: { type: "regular" } });
+    expect(await jsonAs<{ qualityCheck: unknown }>(admin, "/me")).toMatchObject({
+      qualityCheck: { required: false, processId: null },
+    });
+  });
+
+  it("puts a required quality check at the end of every part", async () => {
+    const { mill, check, part } = await seed({ required: true });
+    const blueprint = await jsonAs<{ processId: number; index: number }[]>(
+      student,
+      `/part-definitions/${part.id}/processes`,
+    );
+    expect(blueprint.map((b) => b.processId)).toEqual([mill.id, check.id]);
+
+    // Asked for in the middle, it still ends up last.
+    await jsonAs(
+      student,
+      `/part-definitions/${part.id}/processes`,
+      put({ processIds: [check.id, mill.id] }),
+    );
+    expect(
+      (
+        await jsonAs<{ processId: number }[]>(student, `/part-definitions/${part.id}/processes`)
+      ).map((b) => b.processId),
+    ).toEqual([mill.id, check.id]);
+
+    // And a new instance's pipeline ends with it.
+    const [instance] = await jsonAs<Id[]>(
+      student,
+      "/part-instances",
+      post({ partDefinitionId: part.id, quantity: 1 }),
+      201,
+    );
+    const steps = await jsonAs<{ processId: number; index: number; status: string }[]>(
+      student,
+      `/part-instance-processes?partInstanceId=${instance.id}`,
+    );
+    expect(steps.sort((a, b) => a.index - b.index).map((s) => s.processId)).toEqual([
+      mill.id,
+      check.id,
+    ]);
+
+    // Turning it off again leaves new parts alone.
+    await jsonAs(admin, "/admin/quality/settings", put({ requireQualityCheck: false }));
+    await jsonAs(student, `/part-definitions/${part.id}/processes`, put({ processIds: [mill.id] }));
+    expect(
+      await jsonAs<{ processId: number }[]>(student, `/part-definitions/${part.id}/processes`),
+    ).toHaveLength(1);
   });
 });

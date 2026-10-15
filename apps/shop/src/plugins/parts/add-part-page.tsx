@@ -71,6 +71,13 @@ export function AddPartPage() {
   }
 
   const infoRequiredBy = partInfoRequiredBy(processIds, data?.processes ?? []);
+  // The team's quality check, which the worker puts at the end of every part.
+  const qualityStep = user.qualityCheck.required
+    ? (data?.processes.find(
+        (p) => p.id === user.qualityCheck.processId && p.type === "quality_control",
+      ) ?? null)
+    : null;
+  const pickable = (data?.processes ?? []).filter((p) => p.id !== qualityStep?.id);
 
   async function handleSubmit() {
     if (
@@ -354,7 +361,7 @@ export function AddPartPage() {
                           className="flex-1 bg-paper border border-steel/40 rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-crimson"
                         >
                           <option value={0}>Remove</option>
-                          {processes.map((p) => (
+                          {pickable.map((p) => (
                             <option key={p.id} value={p.id}>
                               {p.name}
                             </option>
@@ -375,13 +382,21 @@ export function AddPartPage() {
                         className="flex-1 bg-mist border border-dashed border-steel/40 rounded-lg px-3 py-2 text-sm text-steel-dark focus:outline-none focus:border-crimson"
                       >
                         <option value={0}>Add a process…</option>
-                        {processes.map((p) => (
+                        {pickable.map((p) => (
                           <option key={p.id} value={p.id}>
                             {p.name}
                           </option>
                         ))}
                       </select>
                     </div>
+                    {qualityStep && (
+                      <div className="flex items-center gap-2">
+                        <span className="w-6 shrink-0" />
+                        <p className="flex-1 bg-mist border border-steel/30 rounded-lg px-3 py-2 text-sm text-steel-dark">
+                          Last: {qualityStep.name} — the team's quality check, on every part.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

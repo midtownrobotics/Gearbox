@@ -4,12 +4,13 @@ export type Subsystem = {
   createdAt: number;
 };
 
-export type ProcessType = "regular" | "file_producer" | "file_consumer";
+export type ProcessType = "regular" | "file_producer" | "file_consumer" | "quality_control";
 
 export const PROCESS_TYPE_LABELS: Record<ProcessType, string> = {
   regular: "Regular",
   file_producer: "File Producer",
   file_consumer: "File Consumer",
+  quality_control: "Quality Control",
 };
 
 export type Process = {

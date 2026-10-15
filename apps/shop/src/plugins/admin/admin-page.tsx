@@ -1,5 +1,5 @@
 import { useTeamNames } from "@g3/ui";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api } from "../../shared/api";
 import { getErrorMessage } from "../../shared/api-error";
 import { enableKioskMode } from "../../shared/kiosk";
@@ -150,7 +150,12 @@ export function AdminPage() {
           </div>
         </Section>
 
-        {/* Section 3: Data Management */}
+        {/* Section 3: Quality Control */}
+        <Section title="Quality Control" defaultOpen={false}>
+          <QualityControlSettings />
+        </Section>
+
+        {/* Section 4: Data Management */}
         <Section title="Data Management" defaultOpen={false}>
           <button
             type="button"
@@ -165,22 +170,208 @@ export function AdminPage() {
           </p>
         </Section>
 
-        {/* Section 4: Kiosk Mode */}
+        {/* Section 5: Kiosk Mode */}
         <Section title="Kiosk Mode" defaultOpen={false}>
           <KioskModeSettings />
         </Section>
 
-        {/* Section 5: OnShape Configuration */}
+        {/* Section 6: OnShape Configuration */}
         <Section title="OnShape Configuration" defaultOpen={false}>
           {data ? <OnShapeConfig /> : <p className="text-sm text-steel">Loading…</p>}
         </Section>
 
-        {/* Section 6: Slack Configuration */}
+        {/* Section 7: Slack Configuration */}
         <Section title="Slack Configuration" defaultOpen={false}>
           <SlackSettings />
         </Section>
       </div>
     </main>
+  );
+}
+
+type QualityState = {
+  requireQualityCheck: boolean;
+  qualityProcessId: number | null;
+  qualityProcesses: { id: number; name: string }[];
+  people: {
+    id: string;
+    displayName: string;
+    isAdmin: boolean;
+    isMentor: boolean;
+    isManager: boolean;
+  }[];
+  peopleLoaded: boolean;
+};
+
+/**
+ * Who may check off a Quality Control process, and whether every part ends with a quality check.
+ * Admins can always check one off; anyone else has to be a shop manager here.
+ */
+function QualityControlSettings() {
+  const [state, setState] = useState<QualityState | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [banner, setBanner] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+
+  const load = useCallback(async () => {
+    const res = await api.admin.quality.$get();
+    if (!res.ok) {
+      setBanner(await getErrorMessage(res as unknown as Response));
+      return;
+    }
+    setState((await res.json()) as QualityState);
+  }, []);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: load once
+  useEffect(() => {
+    void load();
+  }, []);
+
+  async function setManager(userId: string, manager: boolean) {
+    setBusy(true);
+    // Show the change at once; the reload behind it confirms.
+    setState((prev) =>
+      prev
+        ? {
+            ...prev,
+            people: prev.people.map((p) => (p.id === userId ? { ...p, isManager: manager } : p)),
+          }
+        : prev,
+    );
+    const res = await api.admin.quality.managers[":userId"].$put({
+      param: { userId },
+      json: { manager },
+    });
+    setBanner(res.ok ? null : await getErrorMessage(res as unknown as Response));
+    await load();
+    setBusy(false);
+  }
+
+  async function saveCheck(next: {
+    requireQualityCheck?: boolean;
+    qualityProcessId?: number | null;
+  }) {
+    setBusy(true);
+    const res = await api.admin.quality.settings.$put({ json: next });
+    setBanner(res.ok ? null : await getErrorMessage(res as unknown as Response));
+    await load();
+    setBusy(false);
+  }
+
+  if (!state) return <p className="text-sm text-steel">Loading…</p>;
+
+  const steps = state.qualityProcesses;
+  const managers = state.people.filter((p) => p.isManager);
+  const term = search.trim().toLowerCase();
+  const listed = term
+    ? state.people.filter((p) => p.displayName.toLowerCase().includes(term))
+    : state.people;
+
+  return (
+    <div className="space-y-6">
+      {banner && <ErrorBanner message={banner} />}
+
+      <div className="space-y-3">
+        <h3 className="text-sm font-bold uppercase tracking-wider text-steel-dark">
+          Shop Managers <span className="text-steel font-normal">({managers.length})</span>
+        </h3>
+        <p className="text-xs text-steel">
+          Shop managers and admins are the only people who can mark a Quality Control process
+          complete. Add an admin here too if they work at a kiosk, where a PIN sign-in carries no
+          admin.
+        </p>
+        {!state.peopleLoaded && (
+          <p className="text-xs text-amber-700">
+            The team's member list didn't load, so only the current shop managers are shown.
+          </p>
+        )}
+        {state.people.length > 5 && (
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search people"
+            aria-label="Search people"
+            className={inputCls}
+          />
+        )}
+        <div className="space-y-1.5 max-h-72 overflow-y-auto">
+          {listed.length === 0 && <p className="text-steel text-sm">Nobody to show.</p>}
+          {listed.map((person) => (
+            <label
+              key={person.id}
+              className="flex items-center gap-2 bg-mist border border-steel/20 rounded-lg px-3.5 py-2 text-sm text-ink cursor-pointer select-none"
+            >
+              <input
+                type="checkbox"
+                checked={person.isManager}
+                disabled={busy}
+                onChange={(e) => setManager(person.id, e.target.checked)}
+                className="accent-crimson w-4 h-4"
+              />
+              <span className="flex-1 truncate">{person.displayName}</span>
+              {person.isAdmin ? (
+                <span className="text-xs text-steel shrink-0">Admin</span>
+              ) : person.isMentor ? (
+                <span className="text-xs text-steel shrink-0">Mentor</span>
+              ) : null}
+            </label>
+          ))}
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        <h3 className="text-sm font-bold uppercase tracking-wider text-steel-dark">
+          Require A Quality Check
+        </h3>
+        {steps.length === 0 ? (
+          <p className="text-xs text-steel">
+            Add a process with the type Quality Control under Shop Settings first.
+          </p>
+        ) : (
+          <>
+            <label className="flex items-center gap-2 text-sm text-ink cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={state.requireQualityCheck}
+                disabled={busy}
+                onChange={(e) =>
+                  saveCheck({
+                    requireQualityCheck: e.target.checked,
+                    qualityProcessId: state.qualityProcessId ?? steps[0]?.id ?? null,
+                  })
+                }
+                className="accent-crimson w-4 h-4"
+              />
+              Every part ends with a quality check
+            </label>
+            <div className="space-y-1 max-w-xs">
+              <label htmlFor="quality-process" className="text-xs font-medium text-steel-dark">
+                Quality check process
+              </label>
+              <select
+                id="quality-process"
+                value={state.qualityProcessId ?? ""}
+                disabled={busy}
+                onChange={(e) => saveCheck({ qualityProcessId: Number(e.target.value) || null })}
+                className={inputCls}
+              >
+                <option value="">— Select —</option>
+                {steps.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-steel">
+                It goes at the end of every part's processes from now on. Parts already being made
+                keep the steps they have.
+              </p>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
   );
 }
 

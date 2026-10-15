@@ -87,6 +87,7 @@ const APPS: App[] = [
       partInstanceFiles: "part_instance_files",
       stagingBatches: "staging_batches",
       adminSettings: "admin_settings",
+      shopManagers: "shop_managers",
     },
   },
   {
