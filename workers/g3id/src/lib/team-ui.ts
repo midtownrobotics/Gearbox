@@ -98,6 +98,9 @@ export function isTeamUiSettings(value: unknown): value is TeamUiSettings {
   );
 }
 
+/** The default dark accent, now and when records still had `primaryColor`. */
+const unchosenDarkAccents = new Set(["#e8677c", defaultTeamUiSettings.dark.accent]);
+
 /**
  * A record saved when the brand color was a setting of its own (`primaryColor`), as one saved
  * now, where the light accent is the brand color. A brand color the team chose becomes its light
@@ -117,7 +120,7 @@ function withoutPrimaryColor(value: Record<string, unknown>): Record<string, unk
     !isColors(dark)
   )
     return rest;
-  const darkUnchosen = dark.accent.toLowerCase() === defaultTeamUiSettings.dark.accent;
+  const darkUnchosen = unchosenDarkAccents.has(dark.accent.toLowerCase());
   return {
     ...rest,
     light: { ...light, accent: primaryColor },

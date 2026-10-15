@@ -12,18 +12,18 @@
   --g3-light-line: #dde2e5;
   --g3-light-text: #0c0c0c;
   --g3-light-muted: #57646c;
-  --g3-light-accent: #a71433;
+  --g3-light-accent: #a32035;
   --g3-dark-page: #171717;
   --g3-dark-surface: #262626;
   --g3-dark-inset: #1e1e1e;
   --g3-dark-line: #3a3a3a;
   --g3-dark-text: #f4f4f5;
   --g3-dark-muted: #a3a3a3;
-  --g3-dark-accent: #e8677c;
+  --g3-dark-accent: #bd263e;
   /* Text on a fill in the theme's accent, for each theme: light (the dark palette's text) or
      dark (the light palette's), as the team chose or whichever stands out more. */
   --g3-light-on-brand: var(--g3-dark-text);
-  --g3-dark-on-brand: var(--g3-light-text);
+  --g3-dark-on-brand: var(--g3-dark-text);
 
   /* Behind everything. */
   --g3-page: var(--g3-light-page);

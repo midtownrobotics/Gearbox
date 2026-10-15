@@ -6,40 +6,40 @@ import { MyTeamButton } from "./team-pages";
 
 // The platform's header and footer, shared by its pages.
 
+/** The top bar, styled like every app's (nav-bar.css): the wordmark in the theme's accent. */
 export function Header() {
   return (
-    <header className="sticky top-0 z-10 border-b border-line bg-surface/90 backdrop-blur">
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5">
-        <Link to="/" className="flex items-center gap-2">
-          <GearMark />
-          <span className="text-lg font-bold tracking-tight text-secondary-900">Gearbox</span>
-          <ByTeam className="hidden sm:flex" />
+    <header className="g3-nav is-flat">
+      <div className="g3-nav-brand items-center gap-3">
+        <Link to="/" className="g3-nav-wordmark">
+          <img className="g3-nav-icon" src="/favicon.svg" alt="" />
+          GEARBOX
         </Link>
-        <nav className="flex items-center gap-6 text-sm">
-          <a href="/#apps" className="hidden text-secondary-600 hover:text-secondary-900 sm:block">
-            Apps
-          </a>
-          <a href="/#demo" className="hidden text-secondary-600 hover:text-secondary-900 sm:block">
-            Demo
-          </a>
-          <a href="/#how" className="hidden text-secondary-600 hover:text-secondary-900 sm:block">
-            Set up
-          </a>
-          <a
-            href="/#customize"
-            className="hidden text-secondary-600 hover:text-secondary-900 sm:block"
-          >
-            Make it yours
-          </a>
-          <MyTeamButton />
-          <Link
-            to="/signup"
-            className="hidden rounded-lg bg-primary-600 px-4 py-2 font-semibold text-white transition-colors hover:bg-primary-500 sm:block"
-          >
-            Sign up your team
-          </Link>
-        </nav>
+        <ByTeam className="hidden sm:flex" />
       </div>
+      <nav className="g3-nav-end">
+        <a href="/#apps" className="g3-nav-text-link hidden md:block">
+          Apps
+        </a>
+        <a href="/#demo" className="g3-nav-text-link hidden md:block">
+          Demo
+        </a>
+        <a href="/#how" className="g3-nav-text-link hidden md:block">
+          Set up
+        </a>
+        <a href="/#customize" className="g3-nav-text-link hidden md:block">
+          Make it yours
+        </a>
+        <span className="text-sm">
+          <MyTeamButton />
+        </span>
+        <Link
+          to="/signup"
+          className="hidden rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-on-primary transition-colors hover:bg-primary-500 sm:block"
+        >
+          Sign up your team
+        </Link>
+      </nav>
     </header>
   );
 }

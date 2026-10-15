@@ -281,7 +281,7 @@ describe("team UI settings", () => {
         ...defaultTeamUiSettings,
         light: { ...defaultTeamUiSettings.light, accent: "#0b5fa5" },
         // The default dark accent, turned to #0b5fa5's hue.
-        dark: { ...defaultTeamUiSettings.dark, accent: "#67ade8" },
+        dark: { ...defaultTeamUiSettings.dark, accent: "#2678bd" },
       });
       // So buttons, links and icons stay the color the team chose.
       expect(brandColor(settings)).toBe("#0b5fa5");
@@ -318,8 +318,8 @@ describe("accent colors", () => {
     expect(hsvToHex({ h: 240, s: 1, v: 1 })).toBe("#0000ff");
     expect(hsvToHex({ h: 360, s: 0.5, v: 1 })).toBe("#ff8080");
     for (const hex of [
-      "#a71433",
-      "#e8677c",
+      "#a32035",
+      "#bd263e",
       "#123456",
       "#0a7d55",
       "#ffcc00",
@@ -364,10 +364,9 @@ describe("button text color", () => {
     // A theme's buttons are filled with its accent (the built-in brand color for the default).
     expect(fillColor(defaultTeamUiSettings, "light")).toBe(builtInBrandColor);
     expect(fillColor(defaultTeamUiSettings, "dark")).toBe(dark.accent);
-    // The default light accent is dark: light text, which is the dark palette's text color. The
-    // default dark accent is bright: dark text, which is the light palette's.
+    // Both default accents are dark: light text, which is the dark palette's text color.
     expect(buttonTextColor(defaultTeamUiSettings, "light")).toBe(dark.text);
-    expect(buttonTextColor(defaultTeamUiSettings, "dark")).toBe(light.text);
+    expect(buttonTextColor(defaultTeamUiSettings, "dark")).toBe(dark.text);
     expect(buttonTextColor(withAccent("#ffcc00"), "light")).toBe(light.text);
     expect(buttonTextColor(withAccent("#123456"), "dark")).toBe(dark.text);
     // Each theme against its own accent.

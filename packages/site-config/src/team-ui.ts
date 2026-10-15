@@ -172,7 +172,7 @@ export const defaultTeamUiSettings: TeamUiSettings = {
     line: "#dde2e5",
     text: "#0c0c0c",
     muted: "#57646c",
-    accent: "#a71433",
+    accent: "#a32035",
   },
   dark: {
     page: "#171717",
@@ -181,7 +181,7 @@ export const defaultTeamUiSettings: TeamUiSettings = {
     line: "#3a3a3a",
     text: "#f4f4f5",
     muted: "#a3a3a3",
-    accent: "#e8677c",
+    accent: "#bd263e",
   },
   buttonText: { light: "auto", dark: "auto" },
   links: {

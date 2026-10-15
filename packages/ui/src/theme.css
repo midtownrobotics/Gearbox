@@ -46,13 +46,13 @@ html[data-theme="dark"] :is(.hover\:text-primary-500, .hover\:text-primary-600):
 html[data-theme="dark"]
   :where(.group):hover
   :is(.group-hover\:text-primary-500, .group-hover\:text-primary-600) {
-  color: var(--g3-accent, #e8677c);
+  color: var(--g3-accent, #bd263e);
 }
 html[data-theme="dark"] :is(.text-primary-700, .hover\:text-primary-700:hover) {
-  color: color-mix(in srgb, var(--g3-accent, #e8677c), white 40%);
+  color: color-mix(in srgb, var(--g3-accent, #bd263e), white 40%);
 }
 html[data-theme="dark"] :is(.text-primary-800, .text-primary-900) {
-  color: color-mix(in srgb, var(--g3-accent, #e8677c), white 72%);
+  color: color-mix(in srgb, var(--g3-accent, #bd263e), white 72%);
 }
 
 /* Near-black fills (selected chips, tooltips) turn near-white in dark mode, so their white text
