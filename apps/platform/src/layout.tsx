@@ -50,7 +50,7 @@ export function Footer() {
       <div className="mx-auto flex max-w-6xl flex-col gap-6 px-5 py-10 text-sm text-secondary-500 sm:flex-row sm:items-center sm:justify-between">
         <div className="space-y-1">
           <p className="flex items-center gap-2 font-semibold text-secondary-900">
-            <GearMark small /> Gearbox <ByTeam />
+            <GearboxMark small /> Gearbox <ByTeam />
           </p>
           <p>
             Free, open source (MIT), and run by volunteers from {site.team.name}, FRC Team{" "}
@@ -105,7 +105,7 @@ function ByTeam({ className = "" }: { className?: string }) {
 }
 
 /** Gearbox's mark (the site's own icon, /favicon.svg). */
-export function GearMark({ small = false }: { small?: boolean }) {
+export function GearboxMark({ small = false }: { small?: boolean }) {
   const size = small ? 18 : 26;
   return <img src="/favicon.svg" width={size} height={size} alt="" aria-hidden="true" />;
 }
