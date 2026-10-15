@@ -24,7 +24,6 @@ import {
   TextField,
   inputClass,
   refreshTeamUiSettings,
-  useTeamNames,
 } from "@g3/ui";
 import type { SafeTextKind } from "@g3/ui";
 import { type CSSProperties, useEffect, useRef, useState } from "react";
@@ -50,7 +49,6 @@ const fieldClass = inputClass;
 const description = "How your team looks across Gearbox.";
 
 export function AppearancePage() {
-  const { idName } = useTeamNames();
   const [settings, setSettings] = useState<TeamUiSettings>(() => teamUiDefaults(pageTeamId));
   // The team's own defaults (its name and number), from G3ID: what "Reset to defaults" restores.
   const [defaults, setDefaults] = useState<TeamUiSettings>(() => teamUiDefaults(pageTeamId));
@@ -284,7 +282,6 @@ export function AppearancePage() {
           <AppOrder
             settings={settings}
             shownLinks={linkRows}
-            idName={idName}
             onChange={(order) => update("appOrder", order)}
           />
         </Card>

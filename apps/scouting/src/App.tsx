@@ -20,7 +20,6 @@ import {
   Image,
   ImagePlus,
   Loader2,
-  LogIn,
   Map as MapIcon,
   Maximize2,
   Minimize2,
@@ -50,7 +49,7 @@ import { type EngagementSettings, EngagementSettingsPanel } from "./EngagementSe
 import { MatchPredictions } from "./Game";
 import { Operations } from "./Operations";
 import { ScoutingAdminPage, ScoutingForms } from "./ScoutingForms";
-import { API_URL, G3ID_URL, api } from "./api";
+import { API_URL, api } from "./api";
 import { clearInputError, showTeamNumberError } from "./input-validation";
 import {
   deleteLocalFieldMap,
@@ -1000,7 +999,6 @@ function MapCanvas({
 
 function FieldMaps({ user }: { user: User }) {
   const questions = useQuestions();
-  const names = useTeamNames();
   const [maps, setMaps] = useState<FieldMap[]>([]);
   const [editingMap, setEditingMap] = useState<FieldMap | null>(null);
   const [canShare, setCanShare] = useState(false);
@@ -1119,9 +1117,9 @@ function FieldMaps({ user }: { user: User }) {
               required
               value={publisherUserId}
               onChange={(event) => setPublisherUserId(event.target.value)}
-              aria-label={`${names.idName} account`}
+              aria-label="Account"
             >
-              <option value="">Select a {names.idName} account</option>
+              <option value="">Select an account</option>
               {publisherOptions
                 .filter(
                   (account) => !publishers.some((publisher) => publisher.email === account.email),
@@ -2024,17 +2022,15 @@ export function App() {
 
   if (loading) return <PageLoading />;
 
+  // Signed out sends the page to sign in (api.ts); this is only when Scouting couldn't be reached.
   if (!user) {
-    const returnTo = window.location.href;
     return (
       <div className="auth-screen">
         <div className="auth-mark">
           <TeamLogo size={38} />
         </div>
-        <h1>Scouting starts with {names.idName}</h1>
-        <a href={`${G3ID_URL}/login?redirect=${encodeURIComponent(returnTo)}`}>
-          <LogIn size={18} /> Sign in with {names.idName}
-        </a>
+        <h1>Couldn't reach Scouting</h1>
+        <a href={window.location.href}>Try again</a>
       </div>
     );
   }

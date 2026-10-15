@@ -28,6 +28,7 @@ A survey of every difference, with sketches, is at <https://claude.ai/artifact/C
 
 | Change | Step | Pull request |
 | --- | --- | --- |
+| Signed out, the same everywhere: every app (Portal, Pit and Scouting too, which showed their own Sign in pages) goes straight to ID's sign-in page and back. The sign-in app is "ID" ("G3 ID" in its bar and tab); its sign-in pages show the team's name from Team Appearance, the public site link and "Not team N? Find your team"; the banner names the app ("Signing in to G3 Skill Tree") | Decisions of 15 October | This PR |
 | `TextField`: every app's text boxes, Scouting's included, are one shared part with five looks, so the public demo can offer safe text in each (roadmap 5.7). A lint in CI keeps new ones on it. Nothing looks different outside the demo | 1 (a new part) | This PR |
 | Scouting fullscreen removes the shared page's width limit while open, covering the navbar and side gutters on wide screens; exiting restores the normal page width | 8: Fullscreen correction | This branch |
 | Scouting pages use shared Page, Card, Button and input styles; engagement Admin uses Field and banners. React Router provides page URLs, reload and Back; libraries appear directly in a group, and Admin is last. All browser questions and alerts use the shared QuestionProvider and Dialog. Supporting descriptions, hints, placeholders and empty states use readable body type; large team numbers are limited to the scouting entry. Canvas tools, touch controls, imports, roles and API payloads are preserved. The [Scouting UI validation](scouting-ui-validation.md) covers all eight pages, populated editors, long content, empty/error/loading states, dialogs and fullscreen in both themes across phone, tablet and desktop widths; navigation and report-submission workflows also pass | 8: UI and navigation | This branch |
@@ -54,6 +55,8 @@ Erik chose these on 12 October 2026. They are settled; don't reopen them in a pu
 | Icons | One set, Lucide, for controls, through `@g3/ui` |
 | Wording | "Sign in" and "Sign out" |
 | Scouting | Restyled with its team-scoping step (Phase 3). Its name is Scouting everywhere |
+| Signed out (15 October) | Every app sends a signed-out visitor straight to ID's sign-in page (`redirectToSignIn` in `@g3/ui`), coming back afterward; none shows a "Sign in" page of its own. Apps that work offline (Pit, Scouting) only do it when the server says nobody is signed in |
+| The sign-in app's name (15 October) | "ID" in text, "G3 ID" as its wordmark and tab title, like any app; not "G3ID" |
 
 ## The design language
 

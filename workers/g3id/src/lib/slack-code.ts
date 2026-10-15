@@ -8,7 +8,6 @@ import { dmAdmins } from "./member-dm";
 import { createSession } from "./session";
 import { slackForTeam, teamForWorkspace } from "./slack-install";
 import { teamUrl } from "./team";
-import { teamIdName } from "./team-ui";
 
 export function generateCode(): string {
   return (crypto.getRandomValues(new Uint32Array(1))[0] % 10000).toString().padStart(4, "0");
@@ -179,7 +178,6 @@ export async function handleSlackCode(opts: {
 
   // --- Link flow ---
   if (type === "link") {
-    const idName = await teamIdName(db, record.teamId);
     const userId = record.userId;
     if (!userId) {
       await updateStatus("failed", "Invalid code.");
@@ -202,10 +200,10 @@ export async function handleSlackCode(opts: {
         await updateStatus("linked");
         return {
           success: true,
-          message: `✅ Your Slack account is already linked to your ${idName}.`,
+          message: "✅ Your Slack account is already linked to your ID account.",
         };
       }
-      const msg = `This Slack account is already linked to a different ${idName} account.`;
+      const msg = "This Slack account is already linked to a different ID account.";
       await updateStatus("failed", msg);
       return { success: false, message: `❌ ${msg}` };
     }
@@ -221,7 +219,7 @@ export async function handleSlackCode(opts: {
     });
 
     await updateStatus("linked");
-    return { success: true, message: `✅ Slack account linked successfully to your ${idName}.` };
+    return { success: true, message: "✅ Slack account linked successfully to your ID account." };
   }
 
   // --- Sign-in / sign-up flow ---

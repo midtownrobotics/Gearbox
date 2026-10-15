@@ -4,6 +4,7 @@ import { Check, Copy, Send } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../../lib/api";
+import { NotYourTeam } from "../../shared/not-your-team";
 
 type PollStatus =
   | { status: "pending" }
@@ -131,9 +132,7 @@ export function SlackLoginPage() {
     <main className="flex-1 flex items-center justify-center px-4">
       <div className="w-full max-w-sm space-y-6 text-center">
         <div>
-          <h1 className="text-4xl text-secondary-900">
-            <span className="text-primary-500">{names.shortName}</span>ID
-          </h1>
+          <h1 className="text-4xl text-secondary-900">{names.name}</h1>
         </div>
 
         {!isTerminal && (
@@ -217,6 +216,7 @@ export function SlackLoginPage() {
             ← Go back
           </button>
         )}
+        <NotYourTeam />
       </div>
     </main>
   );

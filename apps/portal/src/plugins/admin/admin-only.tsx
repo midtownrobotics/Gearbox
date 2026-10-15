@@ -1,5 +1,4 @@
-import { appUrl } from "@g3/site-config";
-import { buttonClass } from "@g3/ui";
+import { redirectToSignIn } from "@g3/ui";
 import type { ReactNode } from "react";
 import { useMe } from "../../shared/me";
 
@@ -8,17 +7,8 @@ export function AdminOnly({ children }: { children: ReactNode }) {
   const me = useMe();
   if (me === undefined) return null;
   if (me === null) {
-    return (
-      <main className="mx-auto w-full max-w-2xl flex-1 px-6 py-12 text-center">
-        <p className="mb-4 text-secondary-700">Sign in to manage your team.</p>
-        <a
-          href={`${appUrl("id")}/login?redirect=${encodeURIComponent(window.location.href)}`}
-          className={buttonClass()}
-        >
-          Sign in
-        </a>
-      </main>
-    );
+    redirectToSignIn();
+    return null;
   }
   if (!me.isAdmin) {
     return (

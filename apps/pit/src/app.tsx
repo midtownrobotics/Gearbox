@@ -1,3 +1,4 @@
+import { redirectToSignIn } from "@g3/ui";
 import { useEffect } from "react";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { plugins } from "./plugins.config";
@@ -7,9 +8,15 @@ import { FullscreenProvider, useFullscreen } from "./shared/fullscreen-context";
 import { NavBar } from "./shared/nav-bar";
 import { OfflineBanner } from "./shared/offline-banner";
 import { prefetchAll } from "./shared/prefetch";
+import { useAuth } from "./shared/use-auth";
 
 function AppContent() {
   const { isFullscreen } = useFullscreen();
+  // Signed out (the worker said so; not just offline, where the pit keeps working): off to sign in.
+  const { signedOut } = useAuth();
+  useEffect(() => {
+    if (signedOut) redirectToSignIn();
+  }, [signedOut]);
   const allRoutes = plugins.flatMap((p) => p.routes);
   const navItems = plugins.flatMap((p) => p.navItems ?? []).sort((a, b) => a.order - b.order);
 

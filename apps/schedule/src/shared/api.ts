@@ -1,4 +1,4 @@
-import { appUrl } from "@g3/site-config";
+import { redirectToSignIn } from "@g3/ui";
 import type { ScheduleApp } from "@g3/worker-schedule";
 import { type InferResponseType, hc } from "hono/client";
 
@@ -6,15 +6,9 @@ export const api = hc<ScheduleApp>(import.meta.env.VITE_API_BASE_URL ?? "", {
   init: { credentials: "include" },
 });
 
-export function g3idUrl(): string {
-  // The page's team's G3ID (the dev gateway's in dev).
-  return appUrl("id");
-}
-
-/** Send the user to g3id login, returning here afterward. */
+/** Off to the team's ID sign-in page, coming back here (the same for every app). */
 export function redirectToLogin(): void {
-  const redirect = encodeURIComponent(window.location.href);
-  window.location.href = `${g3idUrl()}/login?redirect=${redirect}`;
+  redirectToSignIn();
 }
 
 export async function getErrorMessage(res: {
@@ -23,7 +17,7 @@ export async function getErrorMessage(res: {
 }): Promise<string> {
   if (res.status === 401) {
     redirectToLogin();
-    return "Redirecting to login...";
+    return "Redirecting to sign in…";
   }
   try {
     const body = (await res.json()) as { error?: string };

@@ -1,15 +1,13 @@
-import { appUrl, wordmark } from "@g3/site-config";
+import { wordmark } from "@g3/site-config";
 import { versionLabel } from "@g3/site-config/versions";
 import { AppNavBar, activePath, linkWith } from "@g3/ui";
 import { Link, useLocation } from "react-router-dom";
 import { useMe } from "./me";
 import type { PluginNavItem } from "./plugin-types";
 
-const G3ID_LOGIN = `${appUrl("id")}/login?redirect=${encodeURIComponent(typeof window !== "undefined" ? window.location.href : "")}`;
-
 const routerLink = linkWith(Link);
 
-/** The shared G3 top bar; signed out, it offers Sign in. */
+/** The shared top bar with Portal's pages. */
 export function NavBar({ items }: { items: PluginNavItem[] }) {
   const me = useMe();
   const { pathname } = useLocation();
@@ -33,13 +31,6 @@ export function NavBar({ items }: { items: PluginNavItem[] }) {
         active: item.to === active,
         group: item.group,
       }))}
-      actions={
-        me === null && (
-          <a className="g3-nav-text-link" href={G3ID_LOGIN}>
-            Sign in
-          </a>
-        )
-      }
     />
   );
 }

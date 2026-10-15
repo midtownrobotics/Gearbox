@@ -1,4 +1,4 @@
-import { idName } from "@g3/site-config";
+import { wordmark } from "@g3/site-config";
 import { versionLabel } from "@g3/site-config/versions";
 import { AppNavBar, activePath, linkWith } from "@g3/ui";
 import { useEffect, useState } from "react";
@@ -58,8 +58,8 @@ export function NavBar({ items }: { items: PluginNavItem[] }) {
 
   return (
     <AppNavBar
-      version={versionLabel(idName)}
-      title={idName}
+      version={versionLabel("ID")}
+      title={wordmark("ID")}
       icon="/favicon.svg"
       link={routerLink}
       allApps={isLoggedIn === true}

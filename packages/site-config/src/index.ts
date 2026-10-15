@@ -237,9 +237,6 @@ export const wordmark = (app: string) => `${site.team.shortName} ${app}`.toUpper
 /** An app's name in text: "G3 Shop". */
 export const appTitle = (app: string) => `${site.team.shortName} ${app}`;
 
-/** The sign-in service's name, as people see it ("G3ID"). */
-export const idName = `${site.team.shortName}ID`;
-
 export { teamLinks, teamLinksFor, toolLinks } from "./team-links.ts";
 
 /**

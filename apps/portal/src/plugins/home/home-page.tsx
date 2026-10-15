@@ -9,9 +9,9 @@ import {
 import {
   Loading,
   TeamIcon,
+  redirectToSignIn,
   rememberTeam,
   useTeamApps,
-  useTeamNames,
   useTeamUiSettings,
 } from "@g3/ui";
 import { useEffect } from "react";
@@ -203,7 +203,6 @@ const isApp = (key: PortalTileKey) => key in portalAppLabels;
 
 export function HomePage() {
   const teamUi = useTeamUiSettings();
-  const names = useTeamNames();
   const me = useMe();
   const teamApps = useTeamApps(!!me);
   const authState = me === undefined ? "checking" : me ? "authenticated" : "unauthenticated";
@@ -217,7 +216,6 @@ export function HomePage() {
   const apps = [...APPS]
     .sort((a, b) => rank(a) - rank(b))
     .map((app) => {
-      if (app.label === "ID") return { ...app, label: names.idName };
       if (!app.linkKey) return app;
       return {
         ...app,
@@ -235,41 +233,10 @@ export function HomePage() {
     );
   }
 
+  // Signed out: off to sign in, like every app (ID's sign-in page has the public site's link).
   if (authState === "unauthenticated") {
-    return (
-      <main className="flex-1 bg-page flex items-center justify-center px-6">
-        <div className="max-w-md w-full space-y-6 text-center">
-          <div>
-            <p className="text-primary-600 font-semibold text-lg tracking-widest uppercase mb-2">
-              FRC Team {pageTeamNumber}
-            </p>
-            <h1 className="text-4xl font-bold text-secondary-900 mb-2">
-              {teamUi.shortName} Gearbox
-            </h1>
-            <p className="text-secondary-600">FIRST Robotics Competition</p>
-          </div>
-
-          <div className="space-y-3 pt-6">
-            <a
-              href={`${appUrl("id")}/login?redirect=${encodeURIComponent(window.location.href)}`}
-              className="block w-full px-6 py-3 rounded-lg bg-primary-600 hover:bg-primary-700 text-on-primary font-semibold transition-colors"
-            >
-              Sign in
-            </a>
-            {teamUi.links.publicSite && !teamUi.hiddenLinks?.includes("publicSite") && (
-              <a
-                href={teamUi.links.publicSite}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block w-full px-6 py-3 rounded-lg bg-secondary-200 hover:bg-secondary-300 text-secondary-900 font-semibold transition-colors"
-              >
-                Not a member? Visit public site
-              </a>
-            )}
-          </div>
-        </div>
-      </main>
-    );
+    redirectToSignIn();
+    return null;
   }
 
   return (

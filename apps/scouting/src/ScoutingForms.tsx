@@ -633,7 +633,6 @@ function Editor({
 
 function AdminManager({ isG3IdAdmin }: { isG3IdAdmin: boolean }) {
   const questions = useQuestions();
-  const names = useTeamNames();
   const [admins, setAdmins] = useState<StrategyAdmin[]>([]);
   const [users, setUsers] = useState<UserOption[]>([]);
   const [userId, setUserId] = useState("");
@@ -666,7 +665,7 @@ function AdminManager({ isG3IdAdmin }: { isG3IdAdmin: boolean }) {
             value={userId}
             onChange={(event) => setUserId(event.target.value)}
           >
-            <option value="">Select a {names.idName} user</option>
+            <option value="">Select a member</option>
             {users
               .filter((user) => user.status === "active")
               .map((user) => {

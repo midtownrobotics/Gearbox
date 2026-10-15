@@ -10,7 +10,6 @@ import {
   TextField,
   focusRing,
   inputClass,
-  useTeamNames,
 } from "@g3/ui";
 import { useEffect, useState } from "react";
 import { api } from "../../shared/api";
@@ -206,7 +205,6 @@ export function AdminPage() {
 }
 
 function KioskModeSettings() {
-  const names = useTeamNames();
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -214,8 +212,8 @@ function KioskModeSettings() {
     <div className="space-y-3 max-w-xl">
       <p className="text-sm text-secondary-500">
         Kiosk mode makes this device a shared station where members sign in with their 3-digit PIN.
-        It signs you out and takes the device through {names.idName} kiosk activation. Name the
-        kiosk after a machine (“Mill”) to open that machine's queue.
+        It signs you out and takes the device through kiosk activation in ID. Name the kiosk after a
+        machine (“Mill”) to open that machine's queue.
       </p>
       {confirming ? (
         <div className="flex flex-wrap items-center gap-2">

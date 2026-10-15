@@ -276,3 +276,29 @@ describe("the team's log of settings changes", () => {
     expect((await post("frc1", { app: "orders", what: "x" })).status).toBe(404);
   });
 });
+
+describe("a team's name from its Team Appearance", () => {
+  const rename = (teamId: string, body: unknown) =>
+    exports.default.fetch(
+      new Request(`http://platform/api/internal/teams/${teamId}/name`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+    );
+
+  it("is the registry's name, which the gateway's team lookup gives", async () => {
+    const team = await newTeam();
+    expect((await rename(team.teamId, { name: "  Renamed Robotics " })).status).toBe(200);
+    expect(await json<{ name: string }>(null, `/teams/${team.teamId}`)).toMatchObject({
+      name: "Renamed Robotics",
+    });
+  });
+
+  it("refuses an empty or too long name, or a team that isn't here", async () => {
+    const team = await newTeam();
+    expect((await rename(team.teamId, { name: " " })).status).toBe(400);
+    expect((await rename(team.teamId, { name: "x".repeat(101) })).status).toBe(400);
+    expect((await rename("frc1", { name: "Nobody" })).status).toBe(404);
+  });
+});

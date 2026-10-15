@@ -132,11 +132,10 @@ function applySettings() {
   }
   // The tab's icon takes the team's color too (team-icon.ts).
   applyTabIcons(base);
-  // index.html's title is the app's own name ("Orders"; "ID" for the sign-in app); the team's
-  // short name goes in front: "G3 Orders", "G3ID".
+  // index.html's title is the app's own name ("Orders", "ID"); the team's short name goes in
+  // front: "G3 Orders", "G3 ID".
   originalTitle ??= document.title;
-  document.title =
-    originalTitle === "ID" ? `${current.shortName}ID` : `${current.shortName} ${originalTitle}`;
+  document.title = `${current.shortName} ${originalTitle}`;
 }
 
 /** Refreshes the public settings after a save or after a minute away from this tab. */
@@ -227,7 +226,7 @@ export function useTeamIcon(src: string | undefined): string | undefined {
 /**
  * The page's team's names, for text a team sees (roadmap 2.10): from its Team Appearance settings,
  * and its number from the page's address. Use these, not site-config's build-time wordmark,
- * appTitle, idName and site.team, which only know the site's team.
+ * appTitle and site.team, which only know the site's team.
  */
 export function useTeamNames() {
   const settings = useTeamUiSettings();
@@ -240,8 +239,6 @@ export function useTeamNames() {
     wordmark: (app: string) => `${shortName} ${app}`.toUpperCase(),
     /** "G3 Shop". */
     appTitle: (app: string) => `${shortName} ${app}`,
-    /** The sign-in app's name: "G3ID". */
-    idName: `${shortName}ID`,
     links: settings.links,
   };
 }

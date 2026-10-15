@@ -361,6 +361,21 @@ const routes = app
     });
     return c.json({ ok: true });
   })
+  // The team's name changed in its Team Appearance (G3ID sends it): the registry's name follows,
+  // so the console, the team's addresses and anything else that asks here say what the team says.
+  .put("/internal/teams/:id/name", async (c) => {
+    const body = (await c.req.json().catch(() => null)) as { name?: unknown } | null;
+    const name = typeof body?.name === "string" ? body.name.trim() : "";
+    if (!name || name.length > 100) return c.json({ error: "Give the team's name." }, 400);
+    const updated = await db(c.env)
+      .update(teams)
+      .set({ name, updatedAt: now() })
+      .where(eq(teams.id, c.req.param("id")))
+      .returning({ id: teams.id })
+      .get();
+    if (!updated) return c.json({ error: "No such team." }, 404);
+    return c.json({ ok: true });
+  })
   // Resets the public demo now (local dev, and operators by hand): the gateway never answers it.
   .post("/internal/demo/reset", async (c) => c.json({ failed: await resetDemo(c.env) }))
   .route("/console", consoleRouter)

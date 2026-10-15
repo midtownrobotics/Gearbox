@@ -1,4 +1,4 @@
-import { forceTheme, useTeamNames } from "@g3/ui";
+import { forceTheme } from "@g3/ui";
 import { useEffect, useState } from "react";
 import { API, type Me, redirectToLogin } from "../shared/api";
 import type { PageType } from "../shared/token";
@@ -7,7 +7,6 @@ import KioskPage from "./KioskPage";
 // The kiosk display (QR + live code) is admin-only. Members never need it — they
 // just scan it. Non-admins are redirected to G3ID; logged-in non-admins are denied.
 export function KioskGate({ types }: { types: PageType[] }) {
-  const names = useTeamNames();
   const [state, setState] = useState<"loading" | "ok" | "denied">("loading");
 
   // The kiosk display is always dark (it's usually a shop TV), whatever the shared setting says.
@@ -48,9 +47,7 @@ export function KioskGate({ types }: { types: PageType[] }) {
         ) : (
           <>
             <p className="kiosk-gate__title">ADMIN ACCESS REQUIRED</p>
-            <p className="kiosk-gate__text">
-              Sign in with an admin {names.idName} account to run this kiosk.
-            </p>
+            <p className="kiosk-gate__text">Sign in with an admin account to run this kiosk.</p>
           </>
         )}
       </div>
