@@ -1,6 +1,5 @@
 import { env } from "cloudflare:test";
 import { exports } from "cloudflare:workers";
-import { teamAppUrlVia } from "@g3/site-config";
 import { type TestUser, asUser, teamUsers } from "@g3/testing/users";
 import { describe, expect, it } from "vitest";
 import { deliverToSlack, slackText } from "../src/notifications";
@@ -168,11 +167,9 @@ describe("Slack delivery", () => {
     const posts = await sent(team.teamId, "/slack/message");
     expect(posts).toHaveLength(1);
     expect(posts[0]).toMatchObject({ channel: "C0123456789" });
-    // Plainly Gearbox's, with the notification quoted and a link to the team's settings.
-    expect(posts[0].text).toContain(":rotating_light:  *Gearbox · Critical*");
-    expect(posts[0].text).toContain(">*Read now*\n>Details");
-    expect(posts[0].text).toContain(
-      `${teamAppUrlVia(testEnv.LOCAL_GATEWAY_URL, team.teamId, "portal")}/admin/notifications|Choose where these go>`,
+    // Plainly Gearbox's, with the notification quoted.
+    expect(posts[0].text).toBe(
+      ":rotating_light:  *Gearbox Critical Notification*\n>*Read now*\n>Details",
     );
     expect(await sent(team.teamId, "/slack/dm-members")).toMatchObject([
       { userIds: ["u-founder"] },
@@ -183,14 +180,12 @@ describe("Slack delivery", () => {
 });
 
 describe("a notification's Slack text", () => {
-  it("stays under Slack's limit, keeping its heading, quote bars and link", () => {
-    const text = slackText(
-      { type: "info", summary: "Long", body: "word ".repeat(2000) },
-      "https://1648.example.com/admin/notifications",
-    );
+  it("stays under Slack's limit, keeping its heading and quote bars", () => {
+    const text = slackText({ type: "info", summary: "Long", body: "word ".repeat(2000) });
     expect(text.length).toBeLessThanOrEqual(3900);
-    expect(text.startsWith(":information_source:  *Gearbox · Informational*\n>*Long*")).toBe(true);
-    expect(text).toContain("…");
-    expect(text.endsWith("|Choose where these go>_")).toBe(true);
+    expect(
+      text.startsWith(":information_source:  *Gearbox Informational Notification*\n>*Long*"),
+    ).toBe(true);
+    expect(text.endsWith("…")).toBe(true);
   });
 });
