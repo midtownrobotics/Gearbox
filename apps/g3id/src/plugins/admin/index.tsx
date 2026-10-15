@@ -1,21 +1,8 @@
-import { appUrl } from "@g3/site-config";
-import { useEffect } from "react";
-import { useLocation } from "react-router-dom";
+import { Moved } from "../../shared/moved";
 import type { Plugin } from "../../shared/plugin-types";
-import { RequiresApp } from "../../shared/requires-app";
-import { AdminAttendancePage } from "./admin-attendance-page";
 import { AdminKioskPage } from "./admin-kiosk-page";
 import { AdminUserPage } from "./admin-user-page";
 import { AdminUsersPage } from "./admin-users-page";
-
-/** A page that moved to the team's admin pages on its home (roadmap 4.5): old links go there. */
-function MovedToHome({ to }: { to: string }) {
-  const { search } = useLocation();
-  useEffect(() => {
-    window.location.replace(`${appUrl("portal")}${to}${search}`);
-  }, [to, search]);
-  return null;
-}
 
 export const adminPlugin: Plugin = {
   name: "admin",
@@ -23,16 +10,10 @@ export const adminPlugin: Plugin = {
     { path: "/admin/users", element: <AdminUsersPage /> },
     { path: "/admin/users/:id", element: <AdminUserPage /> },
     { path: "/admin/kiosk", element: <AdminKioskPage /> },
-    {
-      path: "/admin/attendance",
-      element: (
-        <RequiresApp app="attendance" name="Attendance">
-          <AdminAttendancePage />
-        </RequiresApp>
-      ),
-    },
-    { path: "/admin/slack", element: <MovedToHome to="/admin/integrations" /> },
-    { path: "/admin/team-ui", element: <MovedToHome to="/admin/appearance" /> },
+    // Pages that moved: to the team's admin pages on its home (roadmap 4.5), and to Attendance.
+    { path: "/admin/slack", element: <Moved app="portal" to="/admin/integrations" /> },
+    { path: "/admin/team-ui", element: <Moved app="portal" to="/admin/appearance" /> },
+    { path: "/admin/attendance", element: <Moved app="attendance" to="/admin" /> },
   ],
   navItems: [
     { label: "Users", to: "/admin/users", order: 10, audience: "admin", group: "Admin" },
@@ -43,14 +24,6 @@ export const adminPlugin: Plugin = {
       audience: "admin",
       group: "Admin",
       signInMethod: "pin",
-    },
-    {
-      label: "Attendance",
-      to: "/admin/attendance",
-      order: 12,
-      audience: "admin",
-      group: "Admin",
-      requiresApp: "attendance",
     },
   ],
 };

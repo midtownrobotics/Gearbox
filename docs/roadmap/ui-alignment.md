@@ -272,5 +272,5 @@ From reading the code on 11 October. None was confirmed in a running app, and on
 
 ## Out of scope
 
-- **Attendance.** A wall kiosk and a one-tap phone screen, with no top bar. It takes the shared wording and nothing else.
+- **Attendance.** Its own pages (Leaderboard, My Attendance, QR Codes, Admin) use the shared bar and parts like any app. The QR code displays and the one-tap phone screen members reach by scanning have no bar; they take the shared wording and nothing else.
 - **The Platform site.** Its public pages belong to no team and keep the built-in colors. The operators' console takes in-page questions (step 7) and the date helper, and otherwise stays as it is.

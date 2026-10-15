@@ -11,9 +11,11 @@
     "test": "exit 0"
   },
   "dependencies": {
+    "lucide-react": "^1.16.0",
     "qrcode.react": "^4.2.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "react-router-dom": "^6.28.0"
   },
   "devDependencies": {
     "@g3/site-config": "workspace:*",

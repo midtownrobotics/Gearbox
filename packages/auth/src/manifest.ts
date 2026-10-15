@@ -50,7 +50,7 @@ export type AppSetting = {
   editedBy: "admin" | "mentor";
   /**
    * The page that edits it: its path in the app, or `<app>:<path>` for a page in another app
-   * (Attendance's settings are on G3ID: `id:/admin/attendance`).
+   * (`portal:/admin/integrations`).
    */
   page: string;
   /**

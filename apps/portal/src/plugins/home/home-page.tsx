@@ -17,6 +17,7 @@ import {
 import { useEffect } from "react";
 import type { IconType } from "react-icons";
 import { FaCube, FaGithub, FaGlobe, FaInstagram, FaSlack } from "react-icons/fa";
+import attendanceIcon from "../../assets/app-icons/attendance.svg";
 import edgeIcon from "../../assets/app-icons/edge.svg";
 import idIcon from "../../assets/app-icons/id.svg";
 import inventoryIcon from "../../assets/app-icons/inventory.svg";
@@ -98,6 +99,12 @@ const APPS: App[] = [
     label: "Schedule",
     href: appUrl("schedule"),
     tile: scheduleIcon,
+  },
+  {
+    key: "attendance",
+    label: "Attendance",
+    href: appUrl("attendance"),
+    tile: attendanceIcon,
   },
   {
     key: "edge",

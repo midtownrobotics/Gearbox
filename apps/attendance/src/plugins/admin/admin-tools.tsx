@@ -1,9 +1,9 @@
-import { apiPath } from "@g3/site-config";
 import { ConfirmQuestion, ErrorBanner, buttonClass, inputClass } from "@g3/ui";
 import { Loader2, LogOut, Minus, Plus, Trash2 } from "lucide-react";
 import { type ReactNode, useState } from "react";
+import { API } from "../../shared/api";
 
-// What admins do on the Attendance page: sign out whoever is signed in, add or take away
+// What admins do on the Admin page: sign out whoever is signed in, add or take away
 // a member's hours, and remove a member. Each change loads the page's members again.
 
 /** A member as the attendance worker's summary gives them. */
@@ -16,11 +16,9 @@ export type MemberSummary = {
   totalHours: number;
 };
 
-const ATTENDANCE_API_URL = apiPath("attendance");
-
 /** Calls the attendance worker, and gives its answer or throws its error. */
 async function send<T>(path: string, init: RequestInit): Promise<T> {
-  const res = await fetch(`${ATTENDANCE_API_URL}${path}`, { credentials: "include", ...init });
+  const res = await fetch(`${API}${path}`, { credentials: "include", ...init });
   const data = (await res.json().catch(() => ({}))) as T & { error?: string };
   if (!res.ok) throw new Error(data.error ?? "Attendance update failed.");
   return data;

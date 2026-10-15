@@ -1,9 +1,8 @@
+import { Moved } from "../../shared/moved";
 import type { Plugin } from "../../shared/plugin-types";
-import { RequiresApp } from "../../shared/requires-app";
 import { DashboardPage } from "./dashboard-page";
 import { DemoPage } from "./demo-page";
 import { EmailLoginPage } from "./email-login-page";
-import { LeaderboardPage } from "./leaderboard-page";
 import { LoginPage } from "./login-page";
 import { OAuthErrorPage } from "./oauth-error-page";
 import { PendingPage } from "./pending-page";
@@ -21,19 +20,12 @@ export const authPlugin: Plugin = {
     { path: "/signup", element: <SignupPage /> },
     { path: "/signup/pending", element: <PendingPage /> },
     { path: "/dashboard", element: <DashboardPage /> },
-    {
-      path: "/leaderboard",
-      element: (
-        <RequiresApp app="attendance" name="Attendance">
-          <LeaderboardPage />
-        </RequiresApp>
-      ),
-    },
+    // Moved to Attendance.
+    { path: "/leaderboard", element: <Moved app="attendance" to="/leaderboard" /> },
     { path: "/", element: <DashboardPage /> },
   ],
   navItems: [
     { label: "Account", to: "/", order: 0 },
-    { label: "Leaderboard", to: "/leaderboard", order: 1, requiresApp: "attendance" },
     { label: "Sign in", to: "/login", order: 2, audience: "signed-out" },
     { label: "Sign up", to: "/signup", order: 3, audience: "signed-out" },
   ],
