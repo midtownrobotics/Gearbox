@@ -1,4 +1,4 @@
-import { Button, ConfirmQuestion, ErrorBanner, inputClass } from "@g3/ui";
+import { Button, ConfirmQuestion, ErrorBanner, TextField, inputClass } from "@g3/ui";
 import { type ReactNode, useState } from "react";
 import { api, getErrorMessage } from "../../shared/api";
 import { AnswerDialog } from "../../shared/ask";
@@ -126,8 +126,9 @@ export function RequestActions({
           </label>
           <label className="flex items-center gap-1.5 text-secondary-600">
             Each $
-            <input
-              className={`${inputClass} !w-24 !py-1.5`}
+            <TextField
+              typeable
+              className="!w-24 !py-1.5"
               inputMode="decimal"
               value={price}
               onChange={(e) => setPrice(e.target.value)}
@@ -140,8 +141,10 @@ export function RequestActions({
         </div>
       )}
       {!compact && (canApprove || actions.includes("cancel")) && (
-        <textarea
-          className={`${inputClass} min-h-16`}
+        <TextField
+          multiline
+          kind="note"
+          className="min-h-16"
           value={note}
           onChange={(e) => setNote(e.target.value)}
           placeholder={

@@ -1,4 +1,11 @@
-import { allAppsUrl, appUrl, completeAppOrder, portalAppLabels, site } from "@g3/site-config";
+import {
+  allAppsUrl,
+  appUrl,
+  completeAppOrder,
+  isDemoPage,
+  portalAppLabels,
+  site,
+} from "@g3/site-config";
 import { type ComponentType, type ReactNode, useEffect, useState } from "react";
 import { useSignedInUser, useTeamApps } from "../session";
 import { useTeamIcon, useTeamNames, useTeamUiSettings } from "../team-ui";
@@ -214,6 +221,15 @@ export function AppNavBar({
 
   return (
     <>
+      {isDemoPage && (
+        <div className="g3-demo-banner" role="note">
+          <span>
+            This is the public demo. Everything resets at midnight Eastern, and anyone can see what
+            you change.
+          </span>
+          <a href={`${appUrl("id")}/demo`}>Switch role</a>
+        </div>
+      )}
       <header className={`g3-nav${flat ? " is-flat" : ""}${hasApps ? " has-apps" : ""}`}>
         {!flat && (
           <button

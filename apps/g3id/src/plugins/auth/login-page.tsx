@@ -1,7 +1,7 @@
 import { ErrorBanner, buttonClass } from "@g3/ui";
 import { useEffect, useState } from "react";
 import { FaGithub, FaGoogle, FaSlack, FaSteam } from "react-icons/fa";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../../lib/api";
 
 const apiBase = import.meta.env.VITE_API_BASE_URL ?? "";
@@ -23,6 +23,11 @@ export function LoginPage() {
   // Each team signs in on its own address; this is the team this one is for.
   const [team, setTeam] = useState<{ name: string; teamNumber: number } | null>(null);
   const [methods, setMethods] = useState<Partial<Record<string, boolean>>>({});
+  const navigate = useNavigate();
+  // The public demo has no accounts to sign in to: its visitors pick a role.
+  useEffect(() => {
+    if (methods.demo) navigate(`/demo${rp}`, { replace: true });
+  }, [methods.demo, navigate, rp]);
   useEffect(() => {
     api.teams.current
       .$get()

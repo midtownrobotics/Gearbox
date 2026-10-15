@@ -1,5 +1,5 @@
 import { appUrl } from "@g3/site-config";
-import { Button, Card, ConfirmButton, ErrorBanner, Field, Loading, Page, inputClass } from "@g3/ui";
+import { Button, Card, ConfirmButton, ErrorBanner, Field, Loading, Page, TextField } from "@g3/ui";
 import { useEffect, useState } from "react";
 import { api } from "../../lib/api";
 
@@ -129,12 +129,11 @@ export function AdminKioskPage() {
       <Card title="Add a kiosk">
         <form onSubmit={handleGenerateCode} className="space-y-4">
           <Field label="Device name">
-            <input
-              type="text"
+            <TextField
+              kind="device"
               placeholder="e.g., Shop Register 1"
               value={deviceName}
               onChange={(e) => setDeviceName(e.target.value)}
-              className={inputClass}
             />
           </Field>
 

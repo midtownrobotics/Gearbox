@@ -17,12 +17,14 @@ const echo = (app: string) => (request: Request) => {
   });
 };
 
-// Two teams, and G3ID knows a session for a member of each (an admin of 1648, a student of 9999).
-const teams = ["frc1648", "frc9999"];
+// Two teams, and G3ID knows a session for a member of each (an admin of 1648, a student of 4242).
+// The public demo's team (frc9999) has every app.
+const teams = ["frc1648", "frc4242", "frc9999"];
 const sessions: Record<string, object> = {
   ours: { id: "u-ours", teamId: "frc1648", sessionType: "oauth", isAdmin: true, isMentor: false },
-  theirs: { id: "u-theirs", teamId: "frc9999", sessionType: "oauth", isAdmin: false },
-  kiosk: { id: "u-kiosk", teamId: "frc9999", sessionType: "pin", isAdmin: false },
+  theirs: { id: "u-theirs", teamId: "frc4242", sessionType: "oauth", isAdmin: false },
+  kiosk: { id: "u-kiosk", teamId: "frc4242", sessionType: "pin", isAdmin: false },
+  visitor: { id: "demo-9999-01", teamId: "frc9999", sessionType: "oauth", isAdmin: false },
 };
 
 const g3id = (request: Request) => {
@@ -35,7 +37,7 @@ const g3id = (request: Request) => {
   return echo("G3ID")(request);
 };
 
-// The platform knows which teams exist, and which apps they have on: 9999 has only sign-in, its
+// The platform knows which teams exist, and which apps they have on: 4242 has only sign-in, its
 // home and Orders; 1648's answer has no app list (a platform from before the app library), so it
 // has every app.
 const platform = (request: Request) => {
@@ -43,7 +45,7 @@ const platform = (request: Request) => {
   if (team !== undefined) {
     if (!teams.includes(team)) return Response.json({ error: "No such team." }, { status: 404 });
     return Response.json(
-      team === "frc9999" ? { id: team, apps: ["id", "portal", "orders"] } : { id: team },
+      team === "frc4242" ? { id: team, apps: ["id", "portal", "orders"] } : { id: team },
     );
   }
   return echo("PLATFORM")(request);

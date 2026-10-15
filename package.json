@@ -9,6 +9,7 @@
     "dev:silent": "pnpm -r --parallel --no-bail --if-present dev",
     "lint": "biome ci .",
     "lint:tenancy": "node scripts/tenancy-lint.ts",
+    "lint:text-fields": "node scripts/text-field-lint.ts",
     "typecheck": "pnpm -r --if-present typecheck",
     "test": "pnpm -r --if-present test",
     "db:migrate:local": "pnpm -r --if-present db:migrate:local",

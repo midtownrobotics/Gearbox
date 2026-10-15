@@ -1,4 +1,4 @@
-import { Button, ErrorBanner, buttonClass, inputClass } from "@g3/ui";
+import { Button, ErrorBanner, TextField, buttonClass } from "@g3/ui";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
@@ -73,15 +73,15 @@ export function KioskActivatePage() {
             >
               Activation Code
             </label>
-            <input
+            <TextField
+              typeable
               id="activation-code"
-              type="text"
               inputMode="numeric"
               maxLength={6}
               placeholder="000000"
               value={code}
               onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-              className={`${inputClass} !px-4 !py-3 text-center !text-2xl tracking-widest`}
+              className="!px-4 !py-3 text-center !text-2xl tracking-widest"
             />
           </div>
 

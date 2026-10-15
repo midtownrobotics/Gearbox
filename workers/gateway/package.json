@@ -12,6 +12,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@g3/demo": "workspace:*",
     "@g3/site-config": "workspace:*"
   },
   "devDependencies": {

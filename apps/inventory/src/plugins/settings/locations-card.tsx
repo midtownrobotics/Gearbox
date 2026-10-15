@@ -19,7 +19,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Button, Card, ConfirmButton, Dialog, ErrorBanner, Field, inputClass } from "@g3/ui";
+import { Button, Card, ConfirmButton, Dialog, ErrorBanner, Field, TextField } from "@g3/ui";
 import type { LocationRow } from "@g3/worker-inventory";
 import { type FormEvent, useCallback, useMemo, useState } from "react";
 import { api, getErrorMessage } from "../../shared/api";
@@ -65,8 +65,9 @@ function AddDialog({ parent, onClose }: { parent: LocationRow | null; onClose: (
     <Dialog title={parent ? `Add inside ${parent.name}` : "Add locations"} onClose={onClose}>
       <form onSubmit={add} className="space-y-4">
         <Field label="Names" hint="One on each line. Names already there are skipped.">
-          <textarea
-            className={inputClass}
+          <TextField
+            multiline
+            kind="lines"
             rows={6}
             placeholder={"Shelf A\nShelf B"}
             value={text}
@@ -116,8 +117,8 @@ function EditDialog({ row, onClose }: { row: LocationRow; onClose: () => void })
         }}
       >
         <Field label="Name">
-          <input
-            className={inputClass}
+          <TextField
+            kind="location"
             required
             maxLength={80}
             value={name}

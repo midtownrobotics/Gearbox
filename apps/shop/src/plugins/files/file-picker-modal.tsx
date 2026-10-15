@@ -1,4 +1,4 @@
-import { Button, Dialog, focusRing, inputClass } from "@g3/ui";
+import { Button, Dialog, TextField, focusRing, inputClass } from "@g3/ui";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { batchMembers } from "../../shared/batches";
 import type { Batch, PartFile } from "../../shared/types";
@@ -100,13 +100,13 @@ export function FilePickerModal({
   return (
     <Dialog title={title} onClose={onClose} wide>
       <div className="flex flex-wrap gap-2">
-        <input
+        <TextField
           ref={searchRef}
           type="search"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search by file or batch name…"
-          className={`${inputClass} flex-1 min-w-[12rem]`}
+          className="flex-1 min-w-[12rem]"
         />
         <select
           value={type}

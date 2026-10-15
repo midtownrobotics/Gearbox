@@ -1,0 +1,20 @@
+{
+  "name": "@g3/demo",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@g3/site-config": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.0",
+    "vitest": "catalog:"
+  }
+}

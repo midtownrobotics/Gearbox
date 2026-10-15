@@ -1,4 +1,13 @@
-import { Button, Card, ConfirmButton, Dialog, ErrorBanner, Field, inputClass } from "@g3/ui";
+import {
+  Button,
+  Card,
+  ConfirmButton,
+  Dialog,
+  ErrorBanner,
+  Field,
+  TextField,
+  inputClass,
+} from "@g3/ui";
 import type { FieldType, FieldView } from "@g3/worker-inventory";
 import { type FormEvent, useState } from "react";
 import { api, getErrorMessage } from "../../shared/api";
@@ -68,8 +77,8 @@ function FieldDialog({ field, onClose }: { field: FieldView | null; onClose: () 
     <Dialog title={field ? `Edit ${field.name}` : "Add a field"} onClose={onClose}>
       <form onSubmit={save} className="space-y-4">
         <Field label="Name">
-          <input
-            className={inputClass}
+          <TextField
+            kind="label"
             required
             maxLength={80}
             value={name}
@@ -92,8 +101,9 @@ function FieldDialog({ field, onClose }: { field: FieldView | null; onClose: () 
         </Field>
         {type === "choice" && (
           <Field label="Choices" hint="One on each line.">
-            <textarea
-              className={inputClass}
+            <TextField
+              multiline
+              kind="lines"
               rows={6}
               value={choices}
               onChange={(e) => setChoices(e.target.value)}

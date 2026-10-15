@@ -1,3 +1,4 @@
+import { TextField } from "@g3/ui";
 import { useState } from "react";
 import { api } from "./api";
 
@@ -59,8 +60,9 @@ export function EngagementSettingsPanel({
         <legend>Activities and naming</legend>
         <label>
           Points name
-          <input
-            type="text"
+          <TextField
+            variant="plain"
+            kind="label"
             value={draft.pointsLabel}
             maxLength={40}
             required

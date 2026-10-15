@@ -66,23 +66,23 @@ describe("gateway", () => {
   });
 });
 
-// Teams: G3ID (stubbed in vitest.config.mts) knows teams 1648 and 9999, and sessions "ours" (an admin
-// of 1648), "theirs" (a member of 9999) and "kiosk" (a 9999 kiosk PIN session).
+// Teams: G3ID (stubbed in vitest.config.mts) knows teams 1648 and 4242, and sessions "ours" (an admin
+// of 1648), "theirs" (a member of 4242) and "kiosk" (a 4242 kiosk PIN session).
 const ours = site.team.number;
 const team = (host: string) => `https://${host}.${site.platformDomain}`;
 
 describe("team addresses", () => {
   it("sends <number>-<app> to the app and <number> to the team's home, for that team", async () => {
-    expect(await routed(`${team("9999-orders")}/api/requests`)).toMatchObject({
+    expect(await routed(`${team("4242-orders")}/api/requests`)).toMatchObject({
       app: "ORDERS",
       path: "/api/requests",
-      team: "frc9999",
+      team: "frc4242",
     });
     expect(await routed(`${team(`${ours}-skill-tree`)}/`)).toMatchObject({
       app: "SKILL_TREE",
       team: `frc${ours}`,
     });
-    expect(await routed(`${team("9999")}/`)).toMatchObject({ app: "PORTAL", team: "frc9999" });
+    expect(await routed(`${team("4242")}/`)).toMatchObject({ app: "PORTAL", team: "frc4242" });
     expect(await routed(`${team(`${ours}-id`)}/login`)).toMatchObject({
       app: "G3ID",
       team: `frc${ours}`,
@@ -106,7 +106,7 @@ describe("team addresses", () => {
 
   it("answers 404 for a team or app that doesn't exist", async () => {
     expect((await gateway(`${team("999-orders")}/`)).status).toBe(404);
-    expect((await gateway(`${team("9999-nope")}/`)).status).toBe(404);
+    expect((await gateway(`${team("4242-nope")}/`)).status).toBe(404);
   });
 
   it("sends a browser on a team that isn't there to the platform's team-not-found page", async () => {
@@ -124,7 +124,7 @@ describe("team addresses", () => {
 
   it("sends a browser on any other name on the platform's domain to the not-found page", async () => {
     const html = { headers: { Accept: "text/html" }, redirect: "manual" as const };
-    for (const host of ["nope", "9999-nope", "www2"]) {
+    for (const host of ["nope", "4242-nope", "www2"]) {
       const res = await gateway(`${team(host)}/`, html);
       expect(res.status).toBe(302);
       expect(res.headers.get("Location")).toBe(
@@ -149,7 +149,7 @@ describe("sessions and identity", () => {
       roles: "admin",
       cookie: "theme=dark; g3_session=ours",
     });
-    expect(await api(`${team("9999-orders")}/api/me`, "kiosk")).toMatchObject({
+    expect(await api(`${team("4242-orders")}/api/me`, "kiosk")).toMatchObject({
       user: "u-kiosk",
       sessionType: "pin",
       roles: "",
@@ -161,7 +161,7 @@ describe("sessions and identity", () => {
       user: null,
       cookie: "theme=dark",
     });
-    expect(await api(`${team("9999-orders")}/api/me`, "ours")).toMatchObject({
+    expect(await api(`${team("4242-orders")}/api/me`, "ours")).toMatchObject({
       user: null,
       cookie: "theme=dark",
     });
@@ -176,19 +176,19 @@ describe("sessions and identity", () => {
 
   it("removes identity headers a client sends", async () => {
     const echoed = await api(`${team(`${ours}-orders`)}/api/me`, undefined, {
-      headers: { "X-User-Id": "u-ours", "X-User-Roles": "admin", "X-Team-Id": "frc9999" },
+      headers: { "X-User-Id": "u-ours", "X-User-Roles": "admin", "X-Team-Id": "frc4242" },
     });
     expect(echoed).toMatchObject({ user: null, roles: null, team: `frc${ours}` });
   });
 });
 
 describe("requests from other pages", () => {
-  const from = (origin: string, url = `${team("9999-orders")}/api/requests`, method = "POST") =>
+  const from = (origin: string, url = `${team("4242-orders")}/api/requests`, method = "POST") =>
     gateway(url, { method, headers: { Origin: origin } });
 
   it("lets the team's own pages, the site's other pages and localhost call its API", async () => {
-    expect((await from(team("9999-shop"))).status).toBe(200);
-    expect((await from(team("9999"))).status).toBe(200);
+    expect((await from(team("4242-shop"))).status).toBe(200);
+    expect((await from(team("4242"))).status).toBe(200);
     expect((await from(team(`${ours}-shop`), `${team(`${ours}-orders`)}/api/x`)).status).toBe(200);
     expect((await from(`https://www.${site.platformDomain}`)).status).toBe(200);
     expect((await from("http://localhost:5184")).status).toBe(200);
@@ -212,7 +212,7 @@ describe("requests from other pages", () => {
   });
 
   it("doesn't check pages, only /api", async () => {
-    expect((await from("https://evil.example", `${team("9999-orders")}/`, "GET")).status).toBe(200);
+    expect((await from("https://evil.example", `${team("4242-orders")}/`, "GET")).status).toBe(200);
   });
 });
 
@@ -223,7 +223,7 @@ describe("https", () => {
     for (const url of [
       `http://${site.platformDomain}/signup?id=1`,
       `http://${ours}-orders.${site.platformDomain}/api/requests`,
-      `http://9999-orders.${site.platformDomain}/lists`,
+      `http://4242-orders.${site.platformDomain}/lists`,
     ]) {
       const res = toHttps(new URL(url));
       expect(res?.status).toBe(308);
@@ -240,32 +240,32 @@ describe("calling another app's API", () => {
       path: "/api/leaderboard",
       team: `frc${ours}`,
     });
-    expect(await routed(`${team("9999")}/api/~id/users`)).toMatchObject({
+    expect(await routed(`${team("4242")}/api/~id/users`)).toMatchObject({
       app: "G3ID",
       path: "/api/users",
-      team: "frc9999",
+      team: "frc4242",
     });
   });
 
   it("answers 404 for an app that doesn't exist", async () => {
-    expect((await gateway(`${team("9999")}/api/~nope/x`)).status).toBe(404);
+    expect((await gateway(`${team("4242")}/api/~nope/x`)).status).toBe(404);
   });
 });
 
-// Team 9999 has switched on only Orders (vitest.config.mts); sign-in and its home are always on.
+// Team 4242 has switched on only Orders (vitest.config.mts); sign-in and its home are always on.
 describe("apps a team hasn't switched on", () => {
   it("answers their pages with a page saying so, linking the team's admin pages", async () => {
-    const res = await gateway(`${team("9999-shop")}/parts`, { headers: { Accept: "text/html" } });
+    const res = await gateway(`${team("4242-shop")}/parts`, { headers: { Accept: "text/html" } });
     expect(res.status).toBe(404);
     const page = await res.text();
     expect(page).toContain("Shop isn't switched on for this team.");
-    expect(page).toContain(`href="${team("9999")}/admin"`);
+    expect(page).toContain(`href="${team("4242")}/admin"`);
   });
 
   it("answers their API, and calls to it from the team's other pages, with JSON", async () => {
     for (const url of [
-      `${team("9999-shop")}/api/parts`,
-      `${team("9999-orders")}/api/~shop/parts`,
+      `${team("4242-shop")}/api/parts`,
+      `${team("4242-orders")}/api/~shop/parts`,
     ]) {
       const res = await gateway(url);
       expect(res.status).toBe(404);
@@ -274,13 +274,13 @@ describe("apps a team hasn't switched on", () => {
   });
 
   it("still serves the apps it has on, sign-in, its home and the platform's API", async () => {
-    expect((await routed(`${team("9999-orders")}/`)).app).toBe("ORDERS");
-    expect((await routed(`${team("9999-id")}/`)).app).toBe("G3ID");
-    expect((await routed(`${team("9999")}/admin`)).app).toBe("PORTAL");
-    expect(await routed(`${team("9999")}/api/~platform/team/apps`)).toMatchObject({
+    expect((await routed(`${team("4242-orders")}/`)).app).toBe("ORDERS");
+    expect((await routed(`${team("4242-id")}/`)).app).toBe("G3ID");
+    expect((await routed(`${team("4242")}/admin`)).app).toBe("PORTAL");
+    expect(await routed(`${team("4242")}/api/~platform/team/apps`)).toMatchObject({
       app: "PLATFORM",
       path: "/api/team/apps",
-      team: "frc9999",
+      team: "frc4242",
     });
   });
 });
@@ -290,7 +290,7 @@ describe("the platform's sign-in callback host", () => {
     const echoed = await routed(
       `https://id.${site.platformDomain}/api/auth/google/callback?code=x`,
       {
-        headers: { "X-Team-Id": "frc9999", Cookie: "g3_session=theirs" },
+        headers: { "X-Team-Id": "frc4242", Cookie: "g3_session=theirs" },
       },
     );
     expect(echoed).toMatchObject({
@@ -331,14 +331,14 @@ describe("the platform", () => {
   });
 
   it("only uses team-number addresses on the platform's domain", async () => {
-    const res = await gateway(`https://9999-orders.${site.domain}/`);
+    const res = await gateway(`https://4242-orders.${site.domain}/`);
     expect(await res.json()).toMatchObject({ app: "origin" });
   });
 
   it("never answers workers' internal routes", async () => {
     for (const url of [
       `${team(`${ours}-id`)}/api/internal/teams`,
-      `${team("9999")}/api/~id/internal/teams`,
+      `${team("4242")}/api/~id/internal/teams`,
       `https://${site.platformDomain}/api/internal/x`,
     ]) {
       expect((await gateway(url, { method: "POST" })).status).toBe(404);
@@ -362,7 +362,7 @@ describe("local dev (gearbox.localhost on the gateway's dev port)", () => {
       port: "5173",
       path: "/login",
     });
-    expect(await body(await dev("9999-orders.gearbox.localhost", "/lists"))).toMatchObject({
+    expect(await body(await dev("4242-orders.gearbox.localhost", "/lists"))).toMatchObject({
       port: "5184",
     });
     // Plain localhost is the platform too.
@@ -370,10 +370,10 @@ describe("local dev (gearbox.localhost on the gateway's dev port)", () => {
   });
 
   it("sends /api to the app's worker, for the team the address names", async () => {
-    expect(await body(await dev("9999-orders.gearbox.localhost", "/api/requests"))).toMatchObject({
+    expect(await body(await dev("4242-orders.gearbox.localhost", "/api/requests"))).toMatchObject({
       app: "ORDERS",
       path: "/api/requests",
-      team: "frc9999",
+      team: "frc4242",
     });
     expect(await body(await dev(`${ours}-shop.gearbox.localhost`, "/api/parts"))).toMatchObject({
       app: "SHOP",
@@ -383,13 +383,13 @@ describe("local dev (gearbox.localhost on the gateway's dev port)", () => {
   });
 
   it("stays on http and checks Origins as the addresses they stand for", async () => {
-    expect((await dev("9999-orders.gearbox.localhost")).status).not.toBe(308);
+    expect((await dev("4242-orders.gearbox.localhost")).status).not.toBe(308);
     const from = (origin: string) =>
-      dev("9999-orders.gearbox.localhost", "/api/requests", {
+      dev("4242-orders.gearbox.localhost", "/api/requests", {
         method: "POST",
         headers: { Origin: origin },
       });
-    expect((await from("http://9999-shop.gearbox.localhost:8796")).status).toBe(200);
+    expect((await from("http://4242-shop.gearbox.localhost:8796")).status).toBe(200);
     expect((await from(`http://${ours}-orders.gearbox.localhost:8796`)).status).toBe(403);
   });
 });

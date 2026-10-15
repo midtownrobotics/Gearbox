@@ -1,4 +1,5 @@
 import { deleteTeamRows, hasMentorAccess, inTeam, requireAuth, teamExport } from "@g3/auth";
+import { isDemoTeam } from "@g3/demo";
 import { corsOrigin } from "@g3/site-config";
 import { withApiPrefix } from "@g3/site-config/worker";
 import { eq } from "drizzle-orm";
@@ -7,6 +8,7 @@ import { cors } from "hono/cors";
 import packageJson from "../package.json";
 import { createDb } from "./db";
 import { skillProgress, skills, treeSets } from "./db/schema";
+import { demoWords, loadDemo } from "./demo";
 import { currentTreeSet, exportTreeSet } from "./lib/tree-set";
 import { manifest } from "./manifest";
 import { progressRouter, studentsRouter } from "./routes/students";
@@ -81,6 +83,14 @@ const app = base
     await currentTreeSet(createDb(c.env.SKILL_DB), c.req.param("teamId"));
     return c.json({ ok: true });
   })
+  // The public demo (roadmap Phase 5): its sample data, after the nightly reset deleted the
+  // team's, and the words in it, which the gateway lets demo visitors send.
+  .post("/internal/teams/:teamId/demo", async (c) => {
+    const teamId = c.req.param("teamId");
+    if (!isDemoTeam(teamId)) return c.json({ error: "Only the demo team." }, 403);
+    return c.json(await loadDemo(createDb(c.env.SKILL_DB), teamId));
+  })
+  .get("/internal/demo/words", (c) => c.json({ words: demoWords() }))
   .get("/me", requireAuth, (c) =>
     c.json({
       userId: c.get("userId"),

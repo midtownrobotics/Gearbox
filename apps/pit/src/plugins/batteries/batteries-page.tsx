@@ -9,6 +9,7 @@ import {
   Field,
   Loading,
   Page,
+  TextField,
   focusRing,
   inputClass,
 } from "@g3/ui";
@@ -335,8 +336,8 @@ export function BatteriesPage() {
       {adding && (
         <Card title="New battery" className="space-y-3">
           <Field label="Name">
-            <input
-              type="text"
+            <TextField
+              kind="code"
               placeholder="e.g. A1"
               value={newName}
               onChange={(e) => {
@@ -347,8 +348,6 @@ export function BatteriesPage() {
                 if (e.key === "Enter") handleAddBattery();
                 if (e.key === "Escape") setAdding(false);
               }}
-              className={inputClass}
-              // biome-ignore lint/a11y/noAutofocus: intentional
               autoFocus
             />
           </Field>

@@ -1,4 +1,4 @@
-import { Button, Card, ErrorBanner, Field, Loading, appOn, inputClass } from "@g3/ui";
+import { Button, Card, ErrorBanner, Field, Loading, TextField, appOn, inputClass } from "@g3/ui";
 import { applyTemplate } from "@g3/worker-orders/naming";
 import type { InferResponseType } from "hono/client";
 import { useState } from "react";
@@ -404,8 +404,9 @@ export function DraftCard({
         ) : null}
         <div className="min-w-0 flex-1 space-y-3">
           <div className="flex items-start gap-2">
-            <input
-              className={`${inputClass} font-semibold`}
+            <TextField
+              kind="partName"
+              className="font-semibold"
               value={d.name}
               onChange={(e) => onChange({ name: e.target.value, nameEdited: true })}
               placeholder="Item name"
@@ -429,9 +430,9 @@ export function DraftCard({
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div className="col-span-2">
               <Field label="Link">
-                <input
+                <TextField
+                  kind="url"
                   type="url"
-                  className={inputClass}
                   value={d.url}
                   onChange={(e) => onChange({ url: e.target.value })}
                   placeholder="https://…"
@@ -439,16 +440,16 @@ export function DraftCard({
               </Field>
             </div>
             <Field label="Vendor">
-              <input
-                className={inputClass}
+              <TextField
+                kind="vendor"
                 value={d.vendor}
                 onChange={(e) => onChange({ vendor: e.target.value })}
                 placeholder="From the link"
               />
             </Field>
             <Field label="SKU">
-              <input
-                className={inputClass}
+              <TextField
+                kind="sku"
                 value={d.sku}
                 onChange={(e) => onChange({ sku: e.target.value })}
               />
@@ -478,8 +479,8 @@ export function DraftCard({
               </div>
             )}
             <Field label="Each $" hint={d.priceUnit ? `Per ${d.priceUnit}` : undefined}>
-              <input
-                className={inputClass}
+              <TextField
+                typeable
                 inputMode="decimal"
                 value={d.price}
                 onChange={(e) => onChange({ price: e.target.value })}
@@ -588,8 +589,8 @@ export function DraftCard({
             )}
             <div className="col-span-2 sm:col-span-4">
               <Field label="Why do we need it?" hint="Optional">
-                <input
-                  className={inputClass}
+                <TextField
+                  kind="reason"
                   value={d.reason}
                   onChange={(e) => onChange({ reason: e.target.value })}
                   placeholder="What it's for, and anything a mentor should know"
@@ -665,8 +666,9 @@ function CatalogCategoryPicker({
     return (
       <div className="space-y-1">
         <div className="flex gap-2">
-          <input
-            className={`${inputClass} min-w-0 flex-1`}
+          <TextField
+            kind="category"
+            className="min-w-0 flex-1"
             value={adding}
             onChange={(e) => setAdding(e.target.value)}
             onKeyDown={(e) => {
@@ -678,7 +680,6 @@ function CatalogCategoryPicker({
             placeholder="New category name"
             maxLength={100}
             aria-label="New category name"
-            // biome-ignore lint/a11y/noAutofocus: opened by choosing "New category"
             autoFocus
           />
           <Button onClick={add} disabled={busy || !adding.trim()} className="!py-1.5">

@@ -6,6 +6,7 @@ import {
   ErrorBanner,
   Loading,
   Page,
+  TextField,
   inputClass,
 } from "@g3/ui";
 import { GraduationCap, Search, Shield, ShieldOff } from "lucide-react";
@@ -355,13 +356,13 @@ export function AdminUsersPage() {
             size={16}
             className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-secondary-400"
           />
-          <input
+          <TextField
             type="search"
             value={query}
             onChange={(e) => setParam("q", e.target.value)}
             placeholder="Search by name, email or sign-in account"
             aria-label="Search users"
-            className={`${inputClass} pl-9`}
+            className="pl-9"
           />
         </div>
 

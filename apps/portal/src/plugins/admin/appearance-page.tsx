@@ -8,6 +8,7 @@ import {
   buttonTextColor,
   hexToHsv,
   hsvToHex,
+  isDemoPage,
   isHexColor,
   pageTeamId,
   teamUiDefaults,
@@ -20,10 +21,12 @@ import {
   Loading,
   Page,
   SuccessBanner,
+  TextField,
   inputClass,
   refreshTeamUiSettings,
   useTeamNames,
 } from "@g3/ui";
+import type { SafeTextKind } from "@g3/ui";
 import { type CSSProperties, useEffect, useRef, useState } from "react";
 import { FaTimes } from "react-icons/fa";
 import { g3id } from "../../lib/api";
@@ -147,21 +150,24 @@ export function AppearancePage() {
       <form onSubmit={save} onInvalidCapture={revealInvalid} className="space-y-5">
         <Card title="Identity">
           <div className="grid gap-4 sm:grid-cols-2">
-            <TextField
+            <LabeledText
+              kind="teamName"
               label="Team name"
               value={settings.name}
               onChange={(v) => update("name", v)}
               required
               maxLength={100}
             />
-            <TextField
+            <LabeledText
+              kind="shortName"
               label="Short name"
               value={settings.shortName}
               onChange={(v) => update("shortName", v)}
               required
               maxLength={24}
             />
-            <TextField
+            <LabeledText
+              kind="url"
               label="Logo URL (HTTPS)"
               value={settings.logoUrl}
               onChange={(v) => update("logoUrl", v)}
@@ -284,12 +290,15 @@ export function AppearancePage() {
         </Card>
 
         <div className="flex flex-wrap items-center gap-3">
-          <Button type="submit" disabled={saving}>
+          <Button type="submit" disabled={saving || isDemoPage}>
             {saving ? "Saving…" : "Save team appearance"}
           </Button>
           <Button variant="secondary" disabled={saving} onClick={reset}>
             Reset to defaults
           </Button>
+          {isDemoPage && (
+            <p className="text-sm text-secondary-500">Appearance can't be saved in the demo.</p>
+          )}
         </div>
       </form>
     </Page>
@@ -417,14 +426,15 @@ function LinkRow({
       <label htmlFor={`link-${label}`} className="w-full text-sm font-medium sm:w-36 sm:shrink-0">
         {label}
       </label>
-      <input
+      <TextField
+        kind="url"
         id={`link-${label}`}
         type="url"
         value={value}
         placeholder="https://…"
         ref={input}
         onChange={(event) => onChange(event.target.value)}
-        className={`${inputClass} min-w-0 flex-1`}
+        className="min-w-0 flex-1"
       />
       <button
         type="button"
@@ -440,17 +450,19 @@ function LinkRow({
   );
 }
 
-function TextField({
+function LabeledText({
   label,
   value,
   onChange,
   type = "text",
+  kind,
   ...props
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
-  type?: string;
+  type?: "text" | "url";
+  kind: SafeTextKind;
   required?: boolean;
   maxLength?: number;
   placeholder?: string;
@@ -458,7 +470,9 @@ function TextField({
   return (
     <label className="block text-sm font-medium">
       {label}
-      <input
+      <TextField
+        variant="plain"
+        kind={kind}
         className={fieldClass}
         type={type}
         value={value}
@@ -485,7 +499,9 @@ function ColorField({
           onChange={(event) => onChange(event.target.value)}
           className="h-10 w-12 cursor-pointer"
         />
-        <input
+        <TextField
+          variant="plain"
+          typeable
           className={fieldClass}
           value={value}
           pattern="#[0-9a-fA-F]{6}"
@@ -690,7 +706,9 @@ function AccentColors({
                     onChange={(event) => enter(mode, event.target.value)}
                     className="h-10 w-12 cursor-pointer"
                   />
-                  <input
+                  <TextField
+                    variant="plain"
+                    typeable
                     className={fieldClass}
                     value={palette.accent}
                     pattern="#[0-9a-fA-F]{6}"

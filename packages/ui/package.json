@@ -17,6 +17,7 @@
     "react": "^19.0.0"
   },
   "dependencies": {
+    "@g3/demo": "workspace:*",
     "@g3/site-config": "workspace:*"
   }
 }

@@ -1,4 +1,4 @@
-import { Button, Card, ErrorBanner, Loading, Page, inputClass } from "@g3/ui";
+import { Button, Card, ErrorBanner, Loading, Page, TextField, inputClass } from "@g3/ui";
 import { fiscalLabel } from "@g3/worker-orders/fiscal";
 import { type FormEvent, useState } from "react";
 import { api, getErrorMessage } from "../../shared/api";
@@ -330,23 +330,26 @@ function EditCategory({ category, onDone }: { category: Category; onDone: () => 
 
   return (
     <form onSubmit={save} className="flex flex-wrap gap-2 items-start">
-      <input
-        className={`${inputClass} sm:w-56`}
+      <TextField
+        kind="category"
+        className="sm:w-56"
         value={name}
         onChange={(e) => setName(e.target.value)}
         required
         maxLength={60}
       />
-      <input
-        className={`${inputClass} sm:w-32`}
+      <TextField
+        kind="code"
+        className="sm:w-32"
         value={code}
         onChange={(e) => setCode(e.target.value)}
         placeholder="Code (e.g. 4101)"
         maxLength={20}
         title="Accounting code shown in the CSV export's Budget Category column"
       />
-      <input
-        className={`${inputClass} sm:w-40`}
+      <TextField
+        typeable
+        className="sm:w-40"
         inputMode="decimal"
         value={budget}
         onChange={(e) => setBudget(e.target.value)}
@@ -385,24 +388,26 @@ function AddCategory({ fiscalYear, onAdded }: { fiscalYear: number; onAdded: () 
 
   return (
     <form onSubmit={add} className="flex flex-col sm:flex-row gap-2">
-      <input
-        className={inputClass}
+      <TextField
+        kind="category"
         value={name}
         onChange={(e) => setName(e.target.value)}
         placeholder="New category (e.g. Drivetrain, Tools, Outreach)"
         required
         maxLength={60}
       />
-      <input
-        className={`${inputClass} sm:w-32`}
+      <TextField
+        kind="code"
+        className="sm:w-32"
         value={code}
         onChange={(e) => setCode(e.target.value)}
         placeholder="Code (e.g. 4101)"
         maxLength={20}
         title="Accounting code shown in the CSV export's Budget Category column"
       />
-      <input
-        className={`${inputClass} sm:w-48`}
+      <TextField
+        typeable
+        className="sm:w-48"
         inputMode="decimal"
         value={budget}
         onChange={(e) => setBudget(e.target.value)}

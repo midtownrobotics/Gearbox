@@ -5,6 +5,7 @@ import {
   ErrorBanner,
   Loading,
   Page,
+  TextField,
   Toggle,
   inputClass,
 } from "@g3/ui";
@@ -276,8 +277,9 @@ function BlocklistForm({ list, onDone }: { list?: Blocklist; onDone: () => void 
       }}
     >
       <div className="flex flex-wrap items-center gap-3">
-        <input
-          className={`${inputClass} !w-48`}
+        <TextField
+          kind="blocklist"
+          className="!w-48"
           value={name}
           maxLength={40}
           placeholder="Name, e.g. Video"
@@ -315,8 +317,10 @@ function BlocklistForm({ list, onDone }: { list?: Blocklist; onDone: () => void 
         <span className="text-xs font-bold uppercase tracking-widest text-secondary-400">
           Domains (one per line; includes subdomains)
         </span>
-        <textarea
-          className={`${inputClass} mt-1 h-32 font-mono`}
+        <TextField
+          multiline
+          kind="domains"
+          className="mt-1 h-32 font-mono"
           value={domains}
           placeholder={"youtube.com\ngooglevideo.com"}
           onChange={(e) => setDomains(e.target.value)}

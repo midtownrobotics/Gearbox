@@ -9,8 +9,9 @@ main = "src/index.ts"
 compatibility_date = "2026-05-17"
 
 # Daily: apps a team switched off more than 90 days ago have its data deleted (src/team.ts).
+# Hourly: the public demo is reset at midnight in its time zone (src/demo.ts).
 [triggers]
-crons = ["15 7 * * *"]
+crons = ["15 7 * * *", "0 * * * *"]
 
 [[services]]
 binding = "G3ID"
@@ -112,7 +113,7 @@ database_id = "12a64874-012b-4940-bb0f-98ff5a9c5d2e"
 migrations_dir = "src/db/migrations"
 
 [env.production.triggers]
-crons = ["15 7 * * *"]
+crons = ["15 7 * * *", "0 * * * *"]
 
 [env.production.vars]
 SLACK_CLIENT_ID = "4695117013.8723416088496"
@@ -180,7 +181,7 @@ database_id = "a99a45ba-1a2d-41a0-8796-c9eca909251d"
 migrations_dir = "src/db/migrations"
 
 [env.staging.triggers]
-crons = ["15 7 * * *"]
+crons = ["15 7 * * *", "0 * * * *"]
 
 [env.staging.vars]
 SLACK_CLIENT_ID = "4695117013.12279756431623"

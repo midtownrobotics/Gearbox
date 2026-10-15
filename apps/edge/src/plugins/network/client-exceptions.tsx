@@ -1,4 +1,4 @@
-import { Button, Card, ErrorBanner, inputClass } from "@g3/ui";
+import { Button, Card, ErrorBanner, TextField, inputClass } from "@g3/ui";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { api, getErrorMessage } from "../../shared/api";
@@ -74,8 +74,9 @@ export function ClientExceptions({ mac }: { mac: string }) {
               </option>
             ))}
           </select>
-          <input
-            className={`${inputClass} !w-56`}
+          <TextField
+            kind="reason"
+            className="!w-56"
             value={reason}
             maxLength={200}
             placeholder="Reason (optional)"

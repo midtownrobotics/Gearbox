@@ -76,7 +76,7 @@ async function currentEvent(db: Db, team: string) {
  * (`previous`, null for a team's first archive, where every open issue is new), and the ids of
  * the resolved issues in it, which this archive is the record of.
  */
-async function buildSnapshot(
+export async function buildSnapshot(
   db: Db,
   team: string,
   previous: ArchiveSnapshot | null,

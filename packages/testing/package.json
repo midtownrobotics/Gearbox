@@ -8,7 +8,8 @@
     "./users": "./src/users.ts",
     "./setup": "./src/setup.ts",
     "./worker": "./src/worker.ts",
-    "./isolation": "./src/isolation.ts"
+    "./isolation": "./src/isolation.ts",
+    "./demo": "./src/demo.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

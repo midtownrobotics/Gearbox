@@ -1,6 +1,6 @@
 import { wordmark } from "@g3/site-config";
 import { versionLabel } from "@g3/site-config/versions";
-import { AppNavBar, Button, Dialog, Field, activePath, inputClass, linkWith } from "@g3/ui";
+import { AppNavBar, Button, Dialog, Field, TextField, activePath, linkWith } from "@g3/ui";
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { matchMachineProcess } from "./derive";
@@ -78,12 +78,10 @@ function ExitKioskDialog({ onClose }: { onClose: () => void }) {
           Only an admin can exit kiosk mode. You'll be asked to sign in as one.
         </p>
         <Field label='Type "I understand" to continue'>
-          <input
-            type="text"
+          <TextField
+            typeable
             value={typed}
             onChange={(e) => setTyped(e.target.value)}
-            className={inputClass}
-            // biome-ignore lint/a11y/noAutofocus: the pop-up was just opened to type this
             autoFocus
           />
         </Field>

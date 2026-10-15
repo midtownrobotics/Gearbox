@@ -1,4 +1,5 @@
 import { site, teamAppUrl } from "@g3/site-config";
+import { TextField } from "@g3/ui";
 import { useEffect, useMemo, useState } from "react";
 import { FaCheck, FaSlack } from "react-icons/fa";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
@@ -166,7 +167,9 @@ function TeamForm({ onError }: { onError: (error: string | null) => void }) {
       <h2 className="text-lg font-semibold text-secondary-900">Your team</h2>
       <label className="block space-y-1">
         <span className="text-sm font-medium text-secondary-700">FRC team number</span>
-        <input
+        <TextField
+          variant="plain"
+          kind="label"
           required
           inputMode="numeric"
           pattern="[0-9]*"
@@ -177,7 +180,9 @@ function TeamForm({ onError }: { onError: (error: string | null) => void }) {
       </label>
       <label className="block space-y-1">
         <span className="text-sm font-medium text-secondary-700">Team name</span>
-        <input
+        <TextField
+          variant="plain"
+          kind="label"
           required
           maxLength={80}
           value={form.name}

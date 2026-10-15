@@ -85,20 +85,20 @@ export async function fetchExport(
 
 /**
  * Calls an app's hook for a team (its /api/internal/teams/:id routes, which the gateway never
- * answers): true if it answered OK.
+ * answers): true if it answered OK. `demo` is only for the public demo's team.
  */
 export async function callHook(
   env: AppEnv["Bindings"],
   app: AppName,
-  hook: "seed" | "delete",
+  hook: "seed" | "delete" | "demo",
   teamId: string,
 ): Promise<boolean> {
   const binding = BINDINGS[app];
   if (!binding || !MANIFESTS[app].hooks[hook]) return true;
-  const path = `/api/internal/teams/${encodeURIComponent(teamId)}${hook === "seed" ? "/seed" : ""}`;
+  const path = `/api/internal/teams/${encodeURIComponent(teamId)}${hook === "delete" ? "" : `/${hook}`}`;
   try {
     const res = await (env[binding] as Fetcher).fetch(
-      new Request(`http://${app}${path}`, { method: hook === "seed" ? "POST" : "DELETE" }),
+      new Request(`http://${app}${path}`, { method: hook === "delete" ? "DELETE" : "POST" }),
     );
     if (!res.ok) console.error(`[apps] ${hook} ${app} for ${teamId}`, res.status, await res.text());
     return res.ok;

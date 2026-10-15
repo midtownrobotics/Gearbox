@@ -1,4 +1,4 @@
-import { Button, type ButtonSize, type ButtonVariant, buttonClass } from "@g3/ui";
+import { Button, type ButtonSize, type ButtonVariant, TextField, buttonClass } from "@g3/ui";
 import { useRef } from "react";
 import { partFileDownloadUrl } from "../../shared/getters";
 import type { PartDefinition, PartFile } from "../../shared/types";
@@ -43,8 +43,9 @@ export function CountInput({
   label?: string;
 }) {
   return (
-    <input
-      type="text"
+    <TextField
+      variant="plain"
+      typeable
       inputMode="numeric"
       value={value}
       aria-label={label}

@@ -1,4 +1,4 @@
-import { site } from "@g3/site-config";
+import { demoUrl, site } from "@g3/site-config";
 import { type ReactNode, useEffect, useState } from "react";
 import {
   FaCodeBranch,
@@ -178,6 +178,12 @@ function Hero() {
             >
               Sign up your team
             </Link>
+            <a
+              href={demoUrl}
+              className="rounded-lg border border-line bg-surface px-6 py-3 font-semibold text-secondary-900 shadow-sm transition-colors hover:bg-inset"
+            >
+              Try the demo
+            </a>
             <MyTeamButton large />
           </div>
           <p className="text-sm text-secondary-500">

@@ -1,4 +1,13 @@
-import { Button, Card, ErrorBanner, Field, Page, SuccessBanner, inputClass } from "@g3/ui";
+import {
+  Button,
+  Card,
+  ErrorBanner,
+  Field,
+  Page,
+  SuccessBanner,
+  TextField,
+  inputClass,
+} from "@g3/ui";
 import { type FormEvent, useState } from "react";
 import { api, getErrorMessage } from "../../shared/api";
 import { useAuthUser } from "../../shared/auth";
@@ -185,8 +194,9 @@ function PeoplePicker({ onAdd }: { onAdd: (person: Person) => void }) {
   return (
     <div className="grid gap-4 sm:grid-cols-[8rem_1fr]">
       <Field label="PIN" hint={pinError ?? undefined}>
-        <input
-          className={`${inputClass} text-center tracking-widest`}
+        <TextField
+          typeable
+          className="text-center tracking-widest"
           inputMode="numeric"
           autoComplete="off"
           placeholder="123"
@@ -196,8 +206,8 @@ function PeoplePicker({ onAdd }: { onAdd: (person: Person) => void }) {
       </Field>
       <form onSubmit={addFirstMatch}>
         <Field label="Or search by name">
-          <input
-            className={inputClass}
+          <TextField
+            typeable
             placeholder="Type a name…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}

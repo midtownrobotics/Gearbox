@@ -1,4 +1,14 @@
-import { Button, Card, ConfirmButton, ErrorBanner, Field, Loading, Page, inputClass } from "@g3/ui";
+import {
+  Button,
+  Card,
+  ConfirmButton,
+  ErrorBanner,
+  Field,
+  Loading,
+  Page,
+  TextField,
+  inputClass,
+} from "@g3/ui";
 import { type FormEvent, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { api, getErrorMessage } from "../../shared/api";
@@ -325,8 +335,8 @@ function EditForm({ request, onDone }: { request: RequestDetail; onDone: () => v
             />
           </Field>
           <Field label="Price each">
-            <input
-              className={inputClass}
+            <TextField
+              typeable
               inputMode="decimal"
               value={price}
               onChange={(e) => setPrice(e.target.value)}
@@ -368,8 +378,10 @@ function EditForm({ request, onDone }: { request: RequestDetail; onDone: () => v
           </Field>
           <div className="sm:col-span-3">
             <Field label="Why do we need it?" hint="Optional">
-              <textarea
-                className={`${inputClass} min-h-20`}
+              <TextField
+                multiline
+                kind="reason"
+                className="min-h-20"
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
                 maxLength={1000}

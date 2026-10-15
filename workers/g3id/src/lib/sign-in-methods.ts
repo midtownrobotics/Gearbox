@@ -1,3 +1,4 @@
+import { isDemoTeam } from "@g3/site-config";
 import { eq } from "drizzle-orm";
 import { createDb } from "../db";
 import { teamSignInMethods } from "../db/schema";
@@ -32,6 +33,10 @@ export async function signInMethods(db: Db, teamId: string): Promise<SignInMetho
     .from(teamSignInMethods)
     .where(eq(teamSignInMethods.teamId, teamId))
     .get();
+  // The public demo signs nobody in these ways: visitors pick a role (routes/demo.ts).
+  if (isDemoTeam(teamId)) {
+    return { slack: false, google: false, github: false, steam: false, pin: false };
+  }
   return {
     slack: true,
     google: row ? row.google === 1 : true,

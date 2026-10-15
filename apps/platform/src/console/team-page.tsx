@@ -1,3 +1,4 @@
+import { TextField } from "@g3/ui";
 import { type ReactNode, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { type TeamDetail, consoleApi, formatDate, formatTime, read, send, useLoad } from "./data";
@@ -179,7 +180,10 @@ function ActionForm({
       >
         <p className="text-sm text-secondary-600">{description}</p>
         {children}
-        <textarea
+        <TextField
+          multiline
+          variant="plain"
+          kind="reason"
           required
           rows={2}
           maxLength={500}
@@ -267,7 +271,9 @@ function Delete({
       danger
       onSubmit={(reason) => onSubmit(reason, Number(confirm))}
     >
-      <input
+      <TextField
+        variant="plain"
+        kind="label"
         required
         inputMode="numeric"
         value={confirm}

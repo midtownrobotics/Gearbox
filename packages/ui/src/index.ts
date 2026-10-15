@@ -26,6 +26,8 @@ export { Card, Stat } from "./components/card";
 export { Chip } from "./components/chip";
 export { Dialog, type DialogSize } from "./components/dialog";
 export { Field, inputClass } from "./components/field";
+export { TextField, type TextFieldVariant } from "./components/text-field";
+export { nextSafe, type SafeTextKind } from "@g3/demo";
 export { focusRing } from "./components/focus";
 export { ErrorBanner, Loading, SuccessBanner } from "./components/messages";
 export { Page, PageLoading, type PageWidth } from "./components/page";

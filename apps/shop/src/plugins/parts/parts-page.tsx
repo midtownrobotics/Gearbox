@@ -1,4 +1,15 @@
-import { Button, Card, Chip, Dialog, ErrorBanner, Field, Loading, Page, inputClass } from "@g3/ui";
+import {
+  Button,
+  Card,
+  Chip,
+  Dialog,
+  ErrorBanner,
+  Field,
+  Loading,
+  Page,
+  TextField,
+  inputClass,
+} from "@g3/ui";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
@@ -132,8 +143,8 @@ export function PartsPage() {
         {/* Full Part Details Lookup */}
         <Card title="Full part details">
           <div className="flex gap-2">
-            <input
-              type="text"
+            <TextField
+              typeable
               value={lookupPartNumber}
               onChange={(e) => setLookupPartNumber(e.target.value)}
               onKeyDown={(e) => {
@@ -142,7 +153,7 @@ export function PartsPage() {
                 }
               }}
               placeholder="Enter part number (e.g., P-0042)"
-              className={`${inputClass} flex-1`}
+              className="flex-1"
             />
             <Button
               onClick={() => {
@@ -415,12 +426,12 @@ function PartsTable({
       {/* Toolbar */}
       <div className="space-y-3">
         <div className="flex flex-wrap items-center gap-2">
-          <input
+          <TextField
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by name, part number, or revision…"
-            className={`${inputClass} flex-1 min-w-52 ${controlPad}`}
+            className={`flex-1 min-w-52 ${controlPad}`}
           />
           <Chip
             selected={filtersOpen || activeFilterCount > 0}
@@ -488,12 +499,11 @@ function PartsTable({
               ]}
             />
             <Field label="Revision">
-              <input
-                type="text"
+              <TextField
+                typeable
                 value={filters.revision}
                 onChange={(e) => setFilters({ ...filters, revision: e.target.value })}
                 placeholder="e.g. B"
-                className={inputClass}
               />
             </Field>
             <Field label="Min quantity">

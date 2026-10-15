@@ -1,4 +1,10 @@
-import { consoleUrlVia, platformUrl, platformUrlVia, teamAppUrlVia } from "@g3/site-config";
+import {
+  consoleUrlVia,
+  platformUrl,
+  platformUrlVia,
+  site as siteFile,
+  teamAppUrlVia,
+} from "@g3/site-config";
 import { withApiPrefix } from "@g3/site-config/worker";
 import { SLACK_BOT_SCOPES } from "@g3/slack";
 import { and, count, eq } from "drizzle-orm";
@@ -6,8 +12,12 @@ import { Hono } from "hono";
 import packageJson from "../package.json";
 import { consoleRouter, tellOperators } from "./console";
 import { numberReports, teams } from "./db/schema";
+import { maybeResetDemo, resetDemo } from "./demo";
 import { db, g3id, now } from "./lib";
 import { clearSwitchedOff, enabledApps, logTeam, teamRouter } from "./team";
+
+/** The hourly cron (wrangler.toml's triggers). */
+const HOURLY = "0 * * * *";
 import type { AppEnv } from "./types";
 
 // The platform: team sign-up (roadmap 2.7), the team registry the gateway asks about, the
@@ -81,6 +91,9 @@ const routes = app
 
     if (!Number.isInteger(teamNumber) || teamNumber < 1 || teamNumber > 99999) {
       return c.json({ error: "Enter your FRC team number." }, 400);
+    }
+    if (teamNumber === siteFile.demo.teamNumber) {
+      return c.json({ error: `${teamNumber} is the public demo's number. Enter your own.` }, 400);
     }
     if (!name || name.length > 80) return c.json({ error: "Enter your team's name." }, 400);
     if (!/^[A-Z]{2}$/.test(country)) return c.json({ error: "Choose your country." }, 400);
@@ -217,6 +230,9 @@ const routes = app
     if (!Number.isInteger(teamNumber) || teamNumber < 1 || teamNumber > 99999) {
       return c.json({ error: "Enter the team number." }, 400);
     }
+    if (teamNumber === siteFile.demo.teamNumber) {
+      return c.json({ error: `${teamNumber} is the public demo, not a real team.` }, 400);
+    }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) {
       return c.json({ error: "Enter an email address we can reach you at." }, 400);
     }
@@ -345,14 +361,18 @@ const routes = app
     });
     return c.json({ ok: true });
   })
+  // Resets the public demo now (local dev, and operators by hand): the gateway never answers it.
+  .post("/internal/demo/reset", async (c) => c.json({ failed: await resetDemo(c.env) }))
   .route("/console", consoleRouter)
   .route("/team", teamRouter);
 
 export type PlatformApp = typeof routes;
 export default {
   fetch: withApiPrefix(app.fetch),
-  // Daily: apps switched off for longer than the grace period have the team's data deleted.
-  async scheduled(_controller: ScheduledController, env: AppEnv["Bindings"]) {
-    await clearSwitchedOff(env);
+  // Daily (07:15 UTC): apps switched off for longer than the grace period have the team's data
+  // deleted. Hourly: the public demo is reset at midnight in its time zone.
+  async scheduled(controller: ScheduledController, env: AppEnv["Bindings"]) {
+    if (controller.cron === HOURLY) await maybeResetDemo(env, new Date(controller.scheduledTime));
+    else await clearSwitchedOff(env);
   },
 } satisfies ExportedHandler<AppEnv["Bindings"]>;

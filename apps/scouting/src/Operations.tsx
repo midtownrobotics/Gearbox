@@ -1,3 +1,4 @@
+import { TextField } from "@g3/ui";
 import { CheckCircle, Hand, MessageSquarePlus, Plus, Trash2 } from "lucide-react";
 import { type SyntheticEvent, useCallback, useEffect, useState } from "react";
 import { TeamLookupInput } from "./TeamLookupInput";
@@ -102,7 +103,9 @@ export function Operations({ embedded = false }: { embedded?: boolean }) {
             <option value="programming">Programming</option>
             <option value="other">Other</option>
           </select>
-          <input
+          <TextField
+            variant="plain"
+            kind="note"
             placeholder="What appears to be broken?"
             value={ticket.description}
             onChange={(e) => setTicket({ ...ticket, description: e.target.value })}
@@ -223,7 +226,9 @@ export function Operations({ embedded = false }: { embedded?: boolean }) {
                   </option>
                 ))}
             </select>
-            <input
+            <TextField
+              variant="plain"
+              kind="skill"
               value={skills}
               onChange={(e) => setSkills(e.target.value)}
               placeholder="Skills: mechanical, electrical…"

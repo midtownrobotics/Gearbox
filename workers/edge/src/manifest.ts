@@ -11,7 +11,7 @@ export const manifest = defineManifest({
   integrations: ["edge box"],
   availability: "every team",
   version: packageJson.version,
-  hooks: { seed: false, delete: true, export: true },
+  hooks: { seed: false, delete: true, export: true, demo: true },
   settings: [
     {
       key: "capBytes",

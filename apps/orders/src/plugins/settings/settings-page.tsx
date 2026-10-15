@@ -7,6 +7,7 @@ import {
   Loading,
   Page,
   SuccessBanner,
+  TextField,
   inputClass,
   useAppOn,
   useTeamNames,
@@ -94,8 +95,9 @@ function MoneyAndCalendar() {
           </p>
           <div className="grid gap-3 sm:grid-cols-3">
             <Field label="Currency" hint="A 3-letter code: USD, CAD, EUR, ...">
-              <input
-                className={`${inputClass} uppercase`}
+              <TextField
+                kind="currency"
+                className="uppercase"
                 value={currency}
                 maxLength={3}
                 onChange={(e) => setCurrency(e.target.value)}
@@ -118,8 +120,8 @@ function MoneyAndCalendar() {
               label="Default sales tax rate (%)"
               hint="A new order's tax starts at this much of its items, except at tax-exempt vendors"
             >
-              <input
-                className={inputClass}
+              <TextField
+                typeable
                 inputMode="decimal"
                 value={tax}
                 onChange={(e) => setTax(e.target.value)}
@@ -220,8 +222,9 @@ function NamingTemplate() {
       ) : (
         <form onSubmit={save} className="space-y-3">
           <Field label="Template" hint="Tokens: {vendor} {sku} {title} {variant}.">
-            <input
-              className={`${inputClass} font-mono`}
+            <TextField
+              kind="template"
+              className="font-mono"
               value={template}
               onChange={(e) => setTemplate(e.target.value)}
             />
@@ -306,8 +309,9 @@ function CategoryRules() {
         </ul>
       )}
       <form onSubmit={add} className="flex flex-wrap gap-2">
-        <input
-          className={`${inputClass} sm:!w-48`}
+        <TextField
+          kind="keyword"
+          className="sm:!w-48"
           value={keyword}
           onChange={(e) => setKeyword(e.target.value)}
           placeholder="Keyword (e.g. bolt)"
@@ -463,8 +467,8 @@ function TrustedStudents() {
               ))}
             </div>
             <div className="relative max-w-sm">
-              <input
-                className={inputClass}
+              <TextField
+                typeable
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={(e) => {

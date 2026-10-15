@@ -6,8 +6,8 @@ import {
   Field,
   Loading,
   Page,
+  TextField,
   focusRing,
-  inputClass,
 } from "@g3/ui";
 import type { RoleColor } from "@g3/worker-schedule";
 import { useState } from "react";
@@ -208,8 +208,8 @@ function NewRole({
         }}
       >
         <Field label="Name">
-          <input
-            className={inputClass}
+          <TextField
+            kind="role"
             value={name}
             maxLength={40}
             placeholder="Drive Team"
@@ -257,9 +257,9 @@ function RoleRow({
             void onSave({ name, color }).then((ok) => ok && setEditing(false));
           }}
         >
-          <input
+          <TextField
+            kind="role"
             aria-label="Name"
-            className={inputClass}
             value={name}
             maxLength={40}
             required

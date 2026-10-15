@@ -1,4 +1,4 @@
-import { Button, ErrorBanner, Loading, Page, SuccessBanner, inputClass } from "@g3/ui";
+import { Button, ErrorBanner, Loading, Page, SuccessBanner, TextField, inputClass } from "@g3/ui";
 import { amazonAsin, isAmazonShortLink } from "@g3/worker-orders/product-key";
 import { chargesByCategory } from "@g3/worker-orders/split";
 import { useMemo, useState } from "react";
@@ -610,7 +610,9 @@ function VendorOrder({
                     )}
                   </td>
                   <td className="py-1.5 pr-3">
-                    <input
+                    <TextField
+                      variant="plain"
+                      typeable
                       className={small}
                       inputMode="decimal"
                       value={e?.price ?? ""}
@@ -657,7 +659,9 @@ function VendorOrder({
         <div className="flex flex-wrap items-end gap-3 text-sm">
           <label className="space-y-1">
             <span className="block text-xs text-secondary-500">Shipping $</span>
-            <input
+            <TextField
+              variant="plain"
+              typeable
               className={`${small} !w-24`}
               inputMode="decimal"
               value={shipping}
@@ -673,7 +677,9 @@ function VendorOrder({
           </label>
           <label className="space-y-1">
             <span className="block text-xs text-secondary-500">Tax $</span>
-            <input
+            <TextField
+              variant="plain"
+              typeable
               className={`${small} !w-24`}
               inputMode="decimal"
               value={taxText}
@@ -688,7 +694,9 @@ function VendorOrder({
           </label>
           <label className="space-y-1">
             <span className="block text-xs text-secondary-500">Tracking # (optional)</span>
-            <input
+            <TextField
+              variant="plain"
+              kind="tracking"
               className={`${small} !w-44`}
               value={tracking}
               onChange={(e) => setTracking(e.target.value)}

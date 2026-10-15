@@ -1,4 +1,4 @@
-import { Button, Card, ErrorBanner, Field, Page, inputClass } from "@g3/ui";
+import { Button, Card, ErrorBanner, Field, Page, TextField, inputClass } from "@g3/ui";
 import { type FormEvent, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api, getErrorMessage } from "../../shared/api";
@@ -86,8 +86,8 @@ export function NewEntryPage() {
         <Card title="What it is">
           <div className="space-y-4">
             <Field label="Name">
-              <input
-                className={inputClass}
+              <TextField
+                kind="partName"
                 required
                 maxLength={200}
                 value={name}

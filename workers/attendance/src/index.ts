@@ -7,19 +7,21 @@ import {
   teamExport,
   teamSettingsRoutes,
 } from "@g3/auth";
+import { isDemoTeam } from "@g3/demo";
 import { corsOrigin } from "@g3/site-config";
 import { withApiPrefix } from "@g3/site-config/worker";
 import { drizzle } from "drizzle-orm/d1";
 import { type Context, Hono } from "hono";
 import { cors } from "hono/cors";
 import packageJson from "../package.json";
-import { AttendanceDb, type Session, teamsWithOpenSessions } from "./db";
+import { AttendanceDb, type Session, memberKey, teamsWithOpenSessions } from "./db";
 import {
   attendanceMembers,
   attendanceSessions,
   attendanceSettings,
   attendanceTotals,
 } from "./db/schema";
+import { demoWords, loadDemo } from "./demo";
 import { manifest } from "./manifest";
 import { type AttendanceSettings, autoSignOutMs, parseSettings, schoolYear } from "./settings";
 import { currentWindow, validateToken } from "./token";
@@ -96,16 +98,6 @@ async function calculateSchoolYearTotals(
     }
   }
   return { totalMs: Math.max(0, totalMs), completedSessions };
-}
-
-// Human-readable display-name slug joined with the G3ID id for a stable key.
-function memberKey(displayName: string, userId: string): string {
-  const slug = displayName
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, "_")
-    .replace(/[^a-z0-9_]/g, "");
-  return slug ? `${slug}_${userId}` : userId;
 }
 
 function validMemberId(memberId: string): boolean {
@@ -265,6 +257,14 @@ const app = base
   // /internal: the gateway never answers it.
   // The team's data, for its admins to download before switching the app off (the platform's app
   // library). Only other workers reach /internal.
+  // The public demo (roadmap Phase 5): its sample data, after the nightly reset deleted the
+  // team's, and the words in it, which the gateway lets demo visitors send.
+  .post("/internal/teams/:teamId/demo", async (c) => {
+    const teamId = c.req.param("teamId");
+    if (!isDemoTeam(teamId)) return c.json({ error: "Only the demo team." }, 403);
+    return c.json(await loadDemo(c.env.ATTENDANCE_DB, teamId));
+  })
+  .get("/internal/demo/words", (c) => c.json({ words: demoWords() }))
   .get("/internal/teams/:teamId/export", async (c) => {
     const teamId = c.req.param("teamId");
     const tables = await exportTeamRows(drizzle(c.env.ATTENDANCE_DB), teamId, [

@@ -6,7 +6,12 @@ import { newId } from "./id";
 
 const SESSION_TTL = 60 * 60 * 24 * 7; // 7 days
 
-export async function createSession(userId: string, env: AppEnv["Bindings"]): Promise<string> {
+/** A new session for a user, lasting `ttl` seconds (7 days unless said). */
+export async function createSession(
+  userId: string,
+  env: AppEnv["Bindings"],
+  ttl = SESSION_TTL,
+): Promise<string> {
   const db = createDb(env.DB);
   const sessionId = newId();
   const now = Math.floor(Date.now() / 1000);
@@ -15,11 +20,11 @@ export async function createSession(userId: string, env: AppEnv["Bindings"]): Pr
     db.insert(coreSessions).values({
       id: sessionId,
       userId,
-      expiresAt: now + SESSION_TTL,
+      expiresAt: now + ttl,
       createdAt: now,
     }),
     db.update(coreUsers).set({ lastLoginAt: now }).where(eq(coreUsers.id, userId)),
-    env.SESSIONS.put(`session:${sessionId}`, userId, { expirationTtl: SESSION_TTL }),
+    env.SESSIONS.put(`session:${sessionId}`, userId, { expirationTtl: ttl }),
   ]);
 
   return sessionId;

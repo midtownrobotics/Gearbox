@@ -1,3 +1,4 @@
+import { TextField } from "@g3/ui";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { type TeamRow, consoleApi, formatDate, read, useLoad } from "./data";
@@ -16,7 +17,9 @@ export function TeamsPage() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap gap-2">
-        <input
+        <TextField
+          variant="plain"
+          kind="label"
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Team number or name"

@@ -1,3 +1,4 @@
+import { TextField } from "@g3/ui";
 import { useEffect, useId, useState } from "react";
 import { api } from "./api";
 import { clearInputError, showTeamNumberError } from "./input-validation";
@@ -70,7 +71,9 @@ export function TeamLookupInput({
 
   return (
     <div className="team-lookup">
-      <input
+      <TextField
+        variant="plain"
+        typeable
         className="team-number-input"
         list={listId}
         required={required}

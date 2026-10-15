@@ -10,7 +10,7 @@ export const manifest = defineManifest({
   integrations: ["slack", "edge box", "share-a-cart"],
   availability: "every team",
   version: packageJson.version,
-  hooks: { seed: true, delete: true, export: true },
+  hooks: { seed: true, delete: true, export: true, demo: true },
   settings: [
     {
       key: "currency",

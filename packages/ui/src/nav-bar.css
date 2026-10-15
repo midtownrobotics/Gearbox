@@ -415,3 +415,28 @@ html[data-theme="dark"] .g3-nav-drawer {
     transition: none;
   }
 }
+
+/* The public demo's note above the bar (isDemoPage). Amber, as a warning. */
+.g3-demo-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 4px 12px;
+  padding: 6px 16px;
+  background: #fef3c7;
+  color: #78350f;
+  font: 500 13px / 1.4 "Ubuntu", sans-serif;
+  text-align: center;
+}
+
+.g3-demo-banner a {
+  color: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+html[data-theme="dark"] .g3-demo-banner {
+  background: #422006;
+  color: #fde68a;
+}

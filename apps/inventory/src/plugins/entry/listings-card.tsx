@@ -1,4 +1,4 @@
-import { Button, Card, Dialog, ErrorBanner, Field, inputClass } from "@g3/ui";
+import { Button, Card, Dialog, ErrorBanner, Field, TextField, inputClass } from "@g3/ui";
 import type { ItemView, ListingView } from "@g3/worker-inventory";
 import { type FormEvent, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -205,16 +205,16 @@ function AddListingDialog({
         )}
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Vendor">
-            <input
-              className={inputClass}
+            <TextField
+              kind="vendor"
               maxLength={100}
               value={vendor}
               onChange={(e) => setVendor(e.target.value)}
             />
           </Field>
           <Field label="Part number">
-            <input
-              className={inputClass}
+            <TextField
+              kind="sku"
               maxLength={100}
               value={sku}
               onChange={(e) => setSku(e.target.value)}
@@ -222,8 +222,8 @@ function AddListingDialog({
           </Field>
         </div>
         <Field label="Product page">
-          <input
-            className={inputClass}
+          <TextField
+            kind="url"
             type="url"
             placeholder="https://…"
             value={url}
@@ -289,8 +289,8 @@ function SplitDialog({
           The listing becomes its own entry. Say how many parts go with it.
         </p>
         <Field label="The new entry's name">
-          <input
-            className={inputClass}
+          <TextField
+            kind="partName"
             required
             maxLength={200}
             value={name}

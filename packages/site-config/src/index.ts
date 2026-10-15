@@ -108,6 +108,20 @@ export const pageTeamId: string = (pageHost ? teamOfHost(pageHost) : null) ?? te
 /** The page's team's FRC number. */
 export const pageTeamNumber = Number(pageTeamId.replace(/^frc/, ""));
 
+/** The public demo's team (site.demo): its key, "frc9999". */
+export const demoTeamId = `frc${site.demo.teamNumber}`;
+
+/** Whether a team is the public demo. */
+export function isDemoTeam(teamId: string | null | undefined): boolean {
+  return teamId === demoTeamId;
+}
+
+/**
+ * Whether this page is the public demo's. Its text fields then offer safe text to pick instead of
+ * typing (TextField in @g3/ui), and it shows the demo's banner.
+ */
+export const isDemoPage: boolean = pageHost !== undefined && pageTeamId === demoTeamId;
+
 /** An app's page for the page's team, e.g. https://shop.g3robotics.com (or through the dev gateway). */
 export function appUrl(app: AppName): string {
   return teamAppUrlVia(localGateway, pageTeamId, app);
@@ -188,6 +202,17 @@ export const CONSOLE_HOSTS = [platformHost("admin")] as const;
 export function consoleUrl(_teamId?: string): string {
   return consoleUrlVia(localGateway);
 }
+
+/** The demo's short address (demo.<platform domain>), which leads to the demo team's home. */
+export const DEMO_HOST_LABEL = "demo";
+
+/** The demo's address, or given the dev gateway, its address there. */
+export function demoUrlVia(gateway: string | undefined): string {
+  return gateway ? onGateway(gateway, DEMO_HOST_LABEL) : `https://${platformHost(DEMO_HOST_LABEL)}`;
+}
+
+/** The demo's address ("Try the demo"). */
+export const demoUrl = demoUrlVia(localGateway);
 
 /** The console's address, or given the dev gateway, its address there (for workers). */
 export function consoleUrlVia(gateway: string | undefined): string {

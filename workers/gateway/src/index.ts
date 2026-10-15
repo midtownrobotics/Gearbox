@@ -1,8 +1,10 @@
 import {
   type AppName,
   CONSOLE_HOSTS,
+  DEMO_HOST_LABEL,
   DEV_DOMAIN,
   TEAM_HOST_APPS,
+  demoTeamId,
   isAllowedOrigin,
   isStaging,
   platformHost,
@@ -10,9 +12,11 @@ import {
   portalAppLabels,
   site,
   teamAppUrl,
+  teamAppUrlVia,
   teamKey,
 } from "@g3/site-config";
 import devPorts from "../../../.dev-ports.json";
+import { type DemoEnv, checkDemoRequest } from "./demo";
 
 // The one worker on the platform's domain (and *.<domain>, the site team's own, for its retired
 // addresses): works out the team and app from the hostname and sends the request to that app's
@@ -25,6 +29,7 @@ import devPorts from "../../../.dev-ports.json";
 //   <number>-<app>.<platform>/...  → the app, for team <number>
 //   <any of those>/api/~<app>/...  → another app's /api/..., for the same team: how one app's page
 //                                    calls another's API (`apiPath` in @g3/site-config)
+//   demo.<platform>/               → redirected to the public demo team's home (roadmap Phase 5)
 //   id.<platform>/                 → G3ID, for no team: where sign-in providers call back
 //                                    (`signInCallbackApiUrl`); the team is in the sign-in's state
 //   <app>.<domain>, api.<app>.<domain>, id.<domain>, admin.<domain>
@@ -52,6 +57,8 @@ import devPorts from "../../../.dev-ports.json";
 // - An /api request from another team's page (its Origin) is refused. Every app's CORS allows the
 //   whole domain, so without this one team's page could call another team's API with a member's
 //   cookie.
+// - The public demo team's API (site.demo) is checked first (./demo.ts): blocked routes, a rate
+//   limit on changes, no uploads, and only text the demo already has.
 // - The app gets the team and the signed-in user as headers (IDENTITY_HEADERS); copies a client
 //   sent are removed first. Apps don't rely on them yet; production app workers have no
 //   workers.dev address, so these headers can only come from here.
@@ -59,10 +66,11 @@ import devPorts from "../../../.dev-ports.json";
 /** An app, or the platform itself. */
 type Worker = AppName | "platform";
 
-export type Env = Record<(typeof BINDINGS)[Worker], Fetcher> & {
-  /** "true" in local dev (see above). */
-  LOCAL_DEV?: string;
-};
+export type Env = Record<(typeof BINDINGS)[Worker], Fetcher> &
+  DemoEnv & {
+    /** "true" in local dev (see above). */
+    LOCAL_DEV?: string;
+  };
 
 /** The service binding for each worker (wrangler.toml). */
 const BINDINGS = {
@@ -364,6 +372,10 @@ export default {
     const localHost = env.LOCAL_DEV === "true" ? fromLocalHost(url.hostname) : null;
     const local = localHost !== null;
     const host = localHost ?? url.hostname;
+    if (platformLabel(host) === DEMO_HOST_LABEL) {
+      const home = teamAppUrlVia(local ? url.origin : undefined, demoTeamId, "portal");
+      return Response.redirect(`${home}/`, 302);
+    }
     const target = route(host);
     // Any other name on the platform's domain is nothing: the platform's not-found page.
     if (target === null && platformLabel(host) !== null) {
@@ -445,6 +457,11 @@ export default {
     }
     if (url.pathname === "/api/internal" || url.pathname.startsWith("/api/internal/")) {
       return json(404, "Not found.");
+    }
+    if (isApi && team === demoTeamId) {
+      const path = url.pathname.slice("/api".length) || "/";
+      const refused = await checkDemoRequest(request, env, app, path, url.searchParams);
+      if (refused) return refused;
     }
     return env[BINDINGS[app]].fetch(new Request(url.toString(), new Request(request, { headers })));
   },

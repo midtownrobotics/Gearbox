@@ -10,7 +10,7 @@ export const manifest = defineManifest({
   integrations: [],
   availability: "every team",
   version: packageJson.version,
-  hooks: { seed: false, delete: true, export: true },
+  hooks: { seed: false, delete: true, export: true, demo: true },
   // Edited on G3ID's Attendance admin page, which stays on G3ID with members and kiosks.
   settings: [
     {

@@ -1,4 +1,4 @@
-import { Button, ErrorBanner, inputClass, useTeamNames } from "@g3/ui";
+import { Button, ErrorBanner, TextField, inputClass, useTeamNames } from "@g3/ui";
 import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../../lib/api";
@@ -51,11 +51,11 @@ export function EmailLoginPage() {
             <label className="text-sm text-secondary-700" htmlFor="email">
               Email
             </label>
-            <input
+            <TextField
+              kind="email"
               id="email"
               type="email"
               autoComplete="email"
-              className={inputClass}
               placeholder="you@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}

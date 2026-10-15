@@ -90,7 +90,7 @@ Gearbox can connect to services run by others, such as Slack, Google, GitHub, St
 
 ## 9. The demo
 
-The public demo is open to anyone without an account. Do not enter real personal information in it. Everything in the demo is erased on a regular schedule, and the rules in section 6 apply to it.
+The public demo is open to anyone without an account, and everything in it is shared with every other visitor. Do not try to put real personal information in it. Everything in the demo is erased every night at midnight US Eastern time, and the rules in section 6 apply to it.
 
 ## 10. Cost
 

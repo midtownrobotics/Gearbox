@@ -34,7 +34,13 @@
       "recommended": true,
       "a11y": {
         "useSemanticElements": "off",
-        "useKeyWithClickEvents": "off"
+        "useKeyWithClickEvents": "off",
+        "noLabelWithoutControl": {
+          "level": "error",
+          "options": {
+            "inputComponents": ["TextField"]
+          }
+        }
       }
     }
   },

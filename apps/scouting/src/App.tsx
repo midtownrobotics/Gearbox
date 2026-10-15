@@ -1,6 +1,6 @@
 import { pageTeamId, pageTeamNumber, teamKey } from "@g3/site-config";
 import { versionLabel } from "@g3/site-config/versions";
-import { AppNavBar, useTeamNames, useTeamUiSettings } from "@g3/ui";
+import { AppNavBar, TextField, useTeamNames, useTeamUiSettings } from "@g3/ui";
 import {
   ArrowRight,
   Camera,
@@ -369,7 +369,9 @@ function TierLists() {
       </div>
       <div className="editor-card">
         <div className="list-meta">
-          <input
+          <TextField
+            variant="plain"
+            kind="title"
             className="title-input"
             value={current.name}
             onChange={(event) => setCurrent({ ...current, name: event.target.value })}
@@ -378,7 +380,9 @@ function TierLists() {
           <span>Updated {timeAgo(current.updatedAt)}</span>
         </div>
         <div className="add-row">
-          <input
+          <TextField
+            variant="plain"
+            kind="title"
             value={newItem}
             onChange={(event) => setNewItem(event.target.value)}
             onKeyDown={(event) => event.key === "Enter" && addItem()}
@@ -397,7 +401,9 @@ function TierLists() {
               onDrop={() => drop(tier.id)}
             >
               <div className="tier-label" style={{ background: tier.color }}>
-                <input
+                <TextField
+                  variant="plain"
+                  kind="title"
                   value={tier.name}
                   onChange={(event) => updateTier(tier.id, { name: event.target.value })}
                   aria-label="Tier name"
@@ -976,13 +982,27 @@ function MapCanvas({
         )}
       </div>
       <div className="map-details">
-        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Map name *" />
-        <input
+        <TextField
+          variant="plain"
+          kind="title"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Map name *"
+        />
+        <TextField
+          variant="plain"
+          kind="title"
           value={eventName}
           onChange={(e) => setEventName(e.target.value)}
           placeholder="Event or match"
         />
-        <input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notes" />
+        <TextField
+          variant="plain"
+          kind="note"
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="Notes"
+        />
         <button
           type="button"
           className="primary-button"
@@ -1312,7 +1332,9 @@ function AutoLibrary() {
       </div>
       <div className="library-bar">
         <Search size={17} />
-        <input
+        <TextField
+          variant="plain"
+          typeable
           value={search}
           onChange={(event) => setSearch(event.target.value)}
           placeholder="Search by routine or team…"
@@ -1339,7 +1361,9 @@ function AutoLibrary() {
           <form onSubmit={submit}>
             <label>
               Routine name *
-              <input
+              <TextField
+                variant="plain"
+                kind="title"
                 required
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -1348,7 +1372,9 @@ function AutoLibrary() {
             </label>
             <label>
               Team number
-              <input
+              <TextField
+                variant="plain"
+                kind="title"
                 className="team-number-input"
                 inputMode="numeric"
                 pattern="[0-9]+"
@@ -1794,7 +1820,9 @@ function RobotLibrary() {
       </div>
       <div className="library-bar">
         <Search size={17} />
-        <input
+        <TextField
+          variant="plain"
+          typeable
           value={search}
           onChange={(event) => setSearch(event.target.value)}
           placeholder="Search by team…"
@@ -1813,7 +1841,9 @@ function RobotLibrary() {
             {saveError && <div className="wide save-status">{saveError}</div>}
             <label className="wide">
               Team number *
-              <input
+              <TextField
+                variant="plain"
+                kind="teamName"
                 required
                 inputMode="numeric"
                 pattern="[0-9]+"
@@ -1824,7 +1854,10 @@ function RobotLibrary() {
             </label>
             <label className="wide">
               Summary
-              <textarea
+              <TextField
+                multiline
+                variant="plain"
+                kind="note"
                 value={summary}
                 onChange={(event) => setSummary(event.target.value)}
                 placeholder="Drivetrain, mechanisms, notable features, and configuration"

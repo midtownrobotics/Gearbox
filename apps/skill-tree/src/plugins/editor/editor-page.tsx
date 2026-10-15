@@ -1,4 +1,4 @@
-import { Button, Card, ErrorBanner, Field, Page, inputClass } from "@g3/ui";
+import { Button, Card, ErrorBanner, Field, Page, TextField } from "@g3/ui";
 import { type FormEvent, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api, getErrorMessage } from "../../shared/api";
@@ -103,8 +103,9 @@ export function EditorPage() {
         <form onSubmit={add} className="flex flex-wrap items-end gap-3">
           <div className="w-20">
             <Field label="Icon">
-              <input
-                className={`${inputClass} text-center`}
+              <TextField
+                kind="icon"
+                className="text-center"
                 placeholder="🔧"
                 maxLength={16}
                 value={icon}
@@ -114,8 +115,8 @@ export function EditorPage() {
           </div>
           <div className="min-w-48 flex-1">
             <Field label="Name">
-              <input
-                className={inputClass}
+              <TextField
+                kind="tree"
                 required
                 maxLength={60}
                 value={name}

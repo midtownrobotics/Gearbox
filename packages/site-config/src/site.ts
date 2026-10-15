@@ -33,6 +33,13 @@ export const site = {
   staging: { domain: "g3robotics.com", suffix: "-dev" },
 
   /**
+   * The public demo (roadmap Phase 5): a team anyone can use without an account, at its number's
+   * addresses (and demo.<platform domain>), wiped and loaded with sample data every night at
+   * midnight in `timeZone`. Sign-up refuses its number. 9999 is FIRST's own placeholder team.
+   */
+  demo: { teamNumber: 9999, name: "Gearbox Demo", timeZone: "America/New_York" },
+
+  /**
    * Each app, and its old, retired subdomain on `domain` (`web`; null for an app made after the
    * move, which never had one).
    */

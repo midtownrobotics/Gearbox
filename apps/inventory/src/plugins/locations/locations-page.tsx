@@ -1,4 +1,4 @@
-import { Button, Card, Dialog, ErrorBanner, Field, Page, inputClass } from "@g3/ui";
+import { Button, Card, Dialog, ErrorBanner, Field, Page, TextField } from "@g3/ui";
 import type { LocationRow } from "@g3/worker-inventory";
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
@@ -102,7 +102,9 @@ function DescriptionEditor({ row, onDone }: { row: LocationRow; onDone: () => vo
   return (
     <div className="mt-1.5 pl-5">
       <div className="flex items-baseline gap-3">
-        <input
+        <TextField
+          variant="plain"
+          kind="contents"
           ref={input}
           className={`min-w-0 max-w-md flex-1 rounded-md border bg-surface px-2 py-1 text-sm text-secondary-900 placeholder:text-secondary-400 focus:outline-none focus:border-primary-500 ${
             error ? "border-red-400" : "border-secondary-300"
@@ -420,9 +422,9 @@ export function LocationsPage() {
             What's kept where. Move an entry or everything in a location, and describe what each
             place is for.
           </p>
-          <input
+          <TextField
             type="search"
-            className={`${inputClass} max-w-md`}
+            className="max-w-md"
             placeholder="Find a location, a description or a part…"
             aria-label="Search locations"
             value={query}

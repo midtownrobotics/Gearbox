@@ -37,6 +37,11 @@ jobs:
       - name: Tenancy lint
         run: pnpm lint:tenancy
 
+      # Every text box is @g3/ui's TextField, so the public demo can offer safe text in each
+      # (roadmap 5.7): scripts/text-field-lint.ts.
+      - name: Text field lint
+        run: pnpm lint:text-fields
+
       # wrangler.toml production values must match packages/site-config/src/site.ts.
       - name: Site config is applied
         run: pnpm configure --check

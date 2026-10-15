@@ -8,7 +8,7 @@ import {
   Page,
   Stat,
   SuccessBanner,
-  inputClass,
+  TextField,
 } from "@g3/ui";
 import { type FormEvent, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
@@ -165,8 +165,7 @@ export function ListDetailPage() {
       {adding && <AddExisting listId={list.id} onList={onList} onAdded={reload} />}
 
       <div className="space-y-3">
-        <input
-          className={inputClass}
+        <TextField
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search this list…"
@@ -252,14 +251,12 @@ function AddExisting({
 
   return (
     <Card title="Add existing requests" className="space-y-3">
-      <input
-        className={inputClass}
+      <TextField
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         placeholder="Search every request…"
         aria-label="Search requests to add"
         type="search"
-        // biome-ignore lint/a11y/noAutofocus: opened by pressing "Add existing requests"
         autoFocus
       />
       {error && <ErrorBanner message={error} />}
@@ -331,8 +328,8 @@ function ListSettings({ list, onDone }: { list: PartListDetail; onDone: () => vo
   return (
     <form onSubmit={submit} className="space-y-3 border-t border-secondary-100 pt-4">
       <Field label="Name">
-        <input
-          className={inputClass}
+        <TextField
+          kind="title"
           value={name}
           onChange={(e) => setName(e.target.value)}
           maxLength={100}
@@ -340,8 +337,8 @@ function ListSettings({ list, onDone }: { list: PartListDetail; onDone: () => vo
         />
       </Field>
       <Field label="Description">
-        <input
-          className={inputClass}
+        <TextField
+          kind="note"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           maxLength={1000}

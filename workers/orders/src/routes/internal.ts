@@ -1,4 +1,5 @@
 import { deleteTeamRows, exportTeamRows, teamExport } from "@g3/auth";
+import { isDemoTeam } from "@g3/demo";
 import { Hono } from "hono";
 import { createOrdersDb } from "../db";
 import {
@@ -19,6 +20,7 @@ import {
   vendorOrders,
   vendors,
 } from "../db/schema";
+import { demoWords, loadDemo } from "../demo";
 import { ensureCatalog, forgetCatalog } from "../lib/starter";
 import { manifest } from "../manifest";
 import type { AppEnv } from "../types";
@@ -29,6 +31,16 @@ import type { AppEnv } from "../types";
  * library), its data here goes too: every table but the shared lookup cache.
  */
 export const internalRouter = new Hono<AppEnv>()
+  // The public demo (roadmap Phase 5): its sample data, after the nightly reset deleted the
+  // team's, and the words in it, which the gateway lets demo visitors send.
+  .post("/teams/:teamId/demo", async (c) => {
+    const teamId = c.req.param("teamId");
+    if (!isDemoTeam(teamId)) return c.json({ error: "Only the demo team." }, 403);
+    return c.json(await loadDemo(createOrdersDb(c.env.ORDERS_DB), teamId));
+  })
+  .get("/demo/words", async (c) =>
+    c.json({ words: await demoWords(createOrdersDb(c.env.ORDERS_DB)) }),
+  )
   // When the team switches Orders on (the platform's app library): its copy of the starter parts
   // catalog. Opening Orders does the same, so this only gets it ready; a team that has its copy
   // keeps it.

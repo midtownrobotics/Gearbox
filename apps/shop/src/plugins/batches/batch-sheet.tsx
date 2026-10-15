@@ -6,7 +6,7 @@ import {
   ErrorBanner,
   Loading,
   SuccessBanner,
-  inputClass,
+  TextField,
 } from "@g3/ui";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
@@ -451,14 +451,12 @@ function BatchTitle({
           save(draft);
         }}
       >
-        <input
-          type="text"
+        <TextField
+          kind="title"
           value={draft}
           maxLength={80}
           onChange={(e) => setDraft(e.target.value)}
           aria-label="Batch name"
-          className={inputClass}
-          // biome-ignore lint/a11y/noAutofocus: the field was just opened to type the name
           autoFocus
         />
         <div className="flex flex-wrap gap-2">

@@ -4,8 +4,8 @@ import {
   ErrorBanner,
   Loading,
   Page,
+  TextField,
   buttonClass,
-  inputClass,
   useAppOn,
   useTeamNames,
 } from "@g3/ui";
@@ -221,12 +221,11 @@ export function FilesPage() {
             </p>
           </div>
 
-          <input
+          <TextField
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by filename or part number…"
-            className={inputClass}
           />
 
           {drawings.length === 0 ? (

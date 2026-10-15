@@ -1,5 +1,5 @@
 import { pageTeamNumber } from "@g3/site-config";
-import { useTeamNames } from "@g3/ui";
+import { TextField, useTeamNames } from "@g3/ui";
 import {
   AlertCircle,
   ArrowDown,
@@ -150,7 +150,10 @@ function FieldInput({
     );
   if (field.type === "longText")
     return (
-      <textarea
+      <TextField
+        multiline
+        variant="plain"
+        kind="label"
         id={inputId}
         required={field.required}
         value={String(value ?? "")}
@@ -197,9 +200,10 @@ function FieldInput({
     );
   }
   return (
-    <input
+    <TextField
+      variant="plain"
+      kind="label"
       id={inputId}
-      type="text"
       required={field.required}
       value={String(value ?? "")}
       onChange={(event) => setValue(event.target.value)}
@@ -486,7 +490,9 @@ function Editor({
               <GripVertical size={18} />
               <span>{index + 1}</span>
             </button>
-            <input
+            <TextField
+              variant="plain"
+              kind="label"
               value={field.label}
               onChange={(event) => patch(field.id, { label: event.target.value })}
               placeholder="Question"
@@ -502,7 +508,9 @@ function Editor({
               ))}
             </select>
             {(field.type === "mcq" || field.type === "multiSelect") && (
-              <input
+              <TextField
+                variant="plain"
+                kind="label"
                 className="question-options-input"
                 value={optionDrafts[field.id] ?? field.options.join(", ")}
                 onChange={(event) => {
@@ -705,7 +713,9 @@ function AnnouncementManager() {
           setSent(true);
         }}
       >
-        <input
+        <TextField
+          variant="plain"
+          kind="note"
           required
           maxLength={500}
           value={message}
@@ -806,7 +816,9 @@ function ServiceIssueReport() {
       <div>
         <strong>Robot breakdown ticket</strong>
       </div>
-      <input
+      <TextField
+        variant="plain"
+        kind="teamName"
         className="team-number-input"
         required
         inputMode="numeric"
@@ -827,7 +839,9 @@ function ServiceIssueReport() {
         <option value="programming">Programming</option>
         <option value="other">Other</option>
       </select>
-      <input
+      <TextField
+        variant="plain"
+        kind="note"
         value={report.description}
         onChange={(event) => setReport({ ...report, description: event.target.value })}
         placeholder="What appears to be broken?"
@@ -1378,7 +1392,10 @@ function ManualModeManager() {
           <label>
             <strong>Matches</strong>
             <small>One per line: match, time, red 1–3, blue 1–3</small>
-            <textarea
+            <TextField
+              multiline
+              variant="plain"
+              kind="label"
               rows={12}
               value={scheduleText}
               onChange={(e) => setScheduleText(e.target.value)}
@@ -1388,7 +1405,10 @@ function ManualModeManager() {
           <label>
             <strong>Team names</strong>
             <small>Optional: team number, team name</small>
-            <textarea
+            <TextField
+              multiline
+              variant="plain"
+              kind="title"
               rows={12}
               value={teamText}
               onChange={(e) => setTeamText(e.target.value)}
@@ -1535,7 +1555,9 @@ function EventStatus({
             {context?.scheduleMode !== "manual" && (
               <label>
                 <strong>TBA Event Key</strong>
-                <input
+                <TextField
+                  variant="plain"
+                  kind="event"
                   value={eventKey}
                   onChange={(event) => setEventKey(event.target.value)}
                   placeholder="e.g. 2026gacmp"
@@ -1567,7 +1589,9 @@ function EventStatus({
             {isG3IdAdmin && (
               <label>
                 <strong>Nexus Event Key</strong>
-                <input
+                <TextField
+                  variant="plain"
+                  kind="event"
                   value={nexusEventKey}
                   onChange={(event) => setNexusEventKey(event.target.value)}
                   placeholder="e.g. 2026gacmp"

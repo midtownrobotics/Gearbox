@@ -11,6 +11,7 @@ import { googleAuthRouter } from "./routes/auth/google";
 import { pinAuthRouter } from "./routes/auth/pin";
 import { slackAuthRouter } from "./routes/auth/slack";
 import { steamAuthRouter } from "./routes/auth/steam";
+import { demoAuthRouter, demoInternalRouter } from "./routes/demo";
 import { internalRouter } from "./routes/internal";
 import { kioskRouter } from "./routes/kiosk";
 import { adminSignInRouter, teamSignInRouter } from "./routes/sign-in-methods";
@@ -46,6 +47,7 @@ const app = base
   .route("/auth", pinAuthRouter)
   .route("/auth", slackAuthRouter)
   .route("/auth", steamAuthRouter)
+  .route("/auth", demoAuthRouter)
   .route("/admin/team/sign-in", adminSignInRouter)
   .route("/admin", adminRouter)
   .route("/team/sign-in", teamSignInRouter)
@@ -53,6 +55,7 @@ const app = base
   .route("/users", usersRouter)
   .route("/teams", teamsRouter)
   .route("/internal", internalRouter)
+  .route("/internal", demoInternalRouter)
   .route("/", kioskRouter)
   .route("/slack", slackRouter);
 

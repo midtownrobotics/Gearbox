@@ -1,4 +1,15 @@
-import { Button, Card, ErrorBanner, Field, Loading, Page, buttonClass, inputClass } from "@g3/ui";
+import {
+  Button,
+  Card,
+  ErrorBanner,
+  Field,
+  Loading,
+  Page,
+  type SafeTextKind,
+  TextField,
+  buttonClass,
+  inputClass,
+} from "@g3/ui";
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { api } from "../../shared/api";
@@ -238,14 +249,16 @@ export function AddPartPage() {
           ) : (
             <>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <TextField
+                <LabeledText
+                  kind="sku"
                   label="Onshape Part Number"
                   required
                   value={form.onshapePartNumber}
                   onChange={(v) => setForm({ ...form, onshapePartNumber: v })}
                   placeholder="P-0042"
                 />
-                <TextField
+                <LabeledText
+                  kind="revision"
                   label="Onshape Revision"
                   required
                   value={form.revision}
@@ -266,7 +279,8 @@ export function AddPartPage() {
                     ))}
                   </select>
                 </Field>
-                <TextField
+                <LabeledText
+                  kind="partName"
                   label="Name"
                   required
                   value={form.name}
@@ -287,7 +301,8 @@ export function AddPartPage() {
                     className={inputClass}
                   />
                 </Field>
-                <TextField
+                <LabeledText
+                  kind="note"
                   label="Notes"
                   value={form.notes}
                   onChange={(v) => setForm({ ...form, notes: v })}
@@ -295,7 +310,8 @@ export function AddPartPage() {
                 />
                 {infoRequiredBy.length > 0 && (
                   <>
-                    <TextField
+                    <LabeledText
+                      kind="material"
                       label="Material"
                       required
                       value={form.material}
@@ -303,7 +319,8 @@ export function AddPartPage() {
                       placeholder="e.g. 4140"
                       hint={`Required by ${infoRequiredBy.join(", ")}`}
                     />
-                    <TextField
+                    <LabeledText
+                      kind="size"
                       label="Thickness"
                       required
                       value={form.thickness}
@@ -414,8 +431,9 @@ function FieldLabel({ label, required }: { label: string; required?: boolean }) 
   );
 }
 
-function TextField({
+function LabeledText({
   label,
+  kind,
   value,
   onChange,
   placeholder,
@@ -423,6 +441,7 @@ function TextField({
   hint,
 }: {
   label: string;
+  kind: SafeTextKind;
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
@@ -431,12 +450,12 @@ function TextField({
 }) {
   return (
     <Field label={required ? `${label} *` : label} hint={hint}>
-      <input
-        type="text"
+      <TextField
+        kind={kind}
+        required={required}
         value={value}
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
-        className={inputClass}
       />
     </Field>
   );

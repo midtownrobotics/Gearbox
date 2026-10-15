@@ -1,4 +1,4 @@
-import { Button, Card, ErrorBanner, Field, Loading, Page, inputClass } from "@g3/ui";
+import { Button, Card, ErrorBanner, Field, Loading, Page, TextField, inputClass } from "@g3/ui";
 import { type FormEvent, useState } from "react";
 import { api, getErrorMessage } from "../../shared/api";
 import { AnswerDialog, ConfirmDialog } from "../../shared/ask";
@@ -38,8 +38,8 @@ export function VendorsPage() {
 
   return (
     <Page title="Vendors">
-      <input
-        className={inputClass}
+      <TextField
+        typeable
         value={filter}
         onChange={(e) => setFilter(e.target.value)}
         placeholder="Filter vendors…"
@@ -215,24 +215,24 @@ function ProfileForm({
     <form onSubmit={save} className="space-y-3">
       <div className="grid sm:grid-cols-3 gap-3">
         <Field label="Free shipping over $">
-          <input
-            className={inputClass}
+          <TextField
+            typeable
             inputMode="decimal"
             value={f.freeShipping}
             onChange={(e) => set({ freeShipping: e.target.value })}
           />
         </Field>
         <Field label="Typical shipping $">
-          <input
-            className={inputClass}
+          <TextField
+            typeable
             inputMode="decimal"
             value={f.typicalShipping}
             onChange={(e) => set({ typicalShipping: e.target.value })}
           />
         </Field>
         <Field label="Minimum order $">
-          <input
-            className={inputClass}
+          <TextField
+            typeable
             inputMode="decimal"
             value={f.minimumOrder}
             onChange={(e) => set({ minimumOrder: e.target.value })}
@@ -257,23 +257,23 @@ function ProfileForm({
           />
         </Field>
         <Field label="Order cutoff" hint='e.g. "2 PM ET for same-day shipping"'>
-          <input
-            className={inputClass}
+          <TextField
+            kind="text"
             value={f.orderCutoff}
             onChange={(e) => set({ orderCutoff: e.target.value })}
           />
         </Field>
         <Field label="Payment method">
-          <input
-            className={inputClass}
+          <TextField
+            kind="payment"
             value={f.paymentMethod}
             onChange={(e) => set({ paymentMethod: e.target.value })}
             placeholder="e.g. Team credit card, PO"
           />
         </Field>
         <Field label="Account owner">
-          <input
-            className={inputClass}
+          <TextField
+            kind="person"
             value={f.accountOwner}
             onChange={(e) => set({ accountOwner: e.target.value })}
           />
@@ -323,8 +323,10 @@ function ProfileForm({
         </label>
       </div>
       <Field label="Notes">
-        <textarea
-          className={`${inputClass} min-h-16`}
+        <TextField
+          multiline
+          kind="note"
+          className="min-h-16"
           value={f.notes}
           onChange={(e) => set({ notes: e.target.value })}
           maxLength={500}
@@ -464,21 +466,24 @@ function Credits({ vendor: v, onChanged }: { vendor: VendorProfile; onChanged: (
             </option>
           ))}
         </select>
-        <input
-          className={`${inputClass} sm:!w-48`}
+        <TextField
+          kind="credit"
+          className="sm:!w-48"
           value={label}
           onChange={(e) => setLabel(e.target.value)}
           placeholder="Label (e.g. Sponsor 15% off)"
           required
         />
-        <input
-          className={`${inputClass} sm:!w-32`}
+        <TextField
+          kind="code"
+          className="sm:!w-32"
           value={code}
           onChange={(e) => setCode(e.target.value)}
           placeholder="Code"
         />
-        <input
-          className={`${inputClass} sm:!w-28`}
+        <TextField
+          typeable
+          className="sm:!w-28"
           inputMode="decimal"
           value={balance}
           onChange={(e) => setBalance(e.target.value)}

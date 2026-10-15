@@ -25,6 +25,7 @@
   ],
   "ignore": [
     "@g3/auth",
+    "@g3/demo",
     "@g3/site-config",
     "@g3/slack",
     "@g3/testing",

@@ -7,6 +7,7 @@ import {
   Page,
   SlackChannelPicker,
   SuccessBanner,
+  TextField,
   focusRing,
   inputClass,
   useTeamNames,
@@ -292,15 +293,15 @@ function NameList({
         {title} <span className="text-secondary-400 font-normal">({items.length})</span>
       </h3>
       <div className="flex gap-2">
-        <input
-          type="text"
+        <TextField
+          kind="label"
           placeholder={placeholder}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter") onAdd();
           }}
-          className={`${inputClass} flex-1`}
+          className="flex-1"
         />
         <Button onClick={onAdd}>Add</Button>
       </div>
@@ -405,15 +406,15 @@ function ProcessList({
         Processes <span className="text-secondary-400 font-normal">({processes.length})</span>
       </h3>
       <div className="flex gap-2">
-        <input
-          type="text"
+        <TextField
+          kind="process"
           placeholder="New process (e.g. Welding)"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter") onAdd();
           }}
-          className={`${inputClass} flex-1 min-w-0`}
+          className="flex-1 min-w-0"
         />
         <ProcessTypeSelect value={draftType} onChange={setDraftType} label="New process type" />
         <PartInfoToggle checked={draftNeedsInfo} onChange={setDraftNeedsInfo} />
@@ -584,15 +585,15 @@ function OnShapeConfig() {
           Fill in from the document's address
         </p>
         <div className="flex gap-2">
-          <input
-            type="text"
+          <TextField
+            kind="url"
             value={urlInput}
             onChange={(e) => setUrlInput(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") parseUrl();
             }}
             placeholder="https://cad.onshape.com/documents/[...]/e/[...]"
-            className={`${inputClass} flex-1`}
+            className="flex-1"
           />
           <Button variant="secondary" onClick={parseUrl}>
             Fill in
@@ -604,12 +605,11 @@ function OnShapeConfig() {
         label="Document ID"
         hint="From the document's address: cad.onshape.com/documents/[DOCUMENT_ID]/..."
       >
-        <input
-          type="text"
+        <TextField
+          typeable
           value={documentId}
           onChange={(e) => setDocumentId(e.target.value)}
           placeholder="e.g. abc123def456"
-          className={inputClass}
         />
       </Field>
 
@@ -617,22 +617,20 @@ function OnShapeConfig() {
         label="Main Assembly ID"
         hint="Optional: fills in how many of each part a release needs"
       >
-        <input
-          type="text"
+        <TextField
+          typeable
           value={mainAssemblyId}
           onChange={(e) => setMainAssemblyId(e.target.value)}
           placeholder="e.g. xyz789"
-          className={inputClass}
         />
       </Field>
 
       <Field label="Company ID">
-        <input
-          type="text"
+        <TextField
+          typeable
           value={companyId}
           onChange={(e) => setCompanyId(e.target.value)}
           placeholder="The Onshape company (or classroom) that owns the document"
-          className={inputClass}
         />
       </Field>
 

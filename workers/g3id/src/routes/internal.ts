@@ -51,6 +51,40 @@ type NewInstallation = {
   botToken: string;
 };
 
+/**
+ * Deletes a team from G3ID: every account in it, their sign-ins and sessions, its kiosks and its
+ * Slack connection. Returns the deleted accounts' ids.
+ */
+export async function deleteTeam(env: AppEnv["Bindings"], id: string): Promise<string[]> {
+  const db = createDb(env.DB);
+  const members = await db
+    .select({ id: coreUsers.id })
+    .from(coreUsers)
+    .where(eq(coreUsers.teamId, id))
+    .all();
+  const sessions = members.length
+    ? await db
+        .select({ id: coreSessions.id })
+        .from(coreSessions)
+        .where(
+          inArray(
+            coreSessions.userId,
+            members.map((m) => m.id),
+          ),
+        )
+        .all()
+    : [];
+  await env.DB.batch(DELETE_TEAM.map((sql) => env.DB.prepare(sql).bind(id)));
+  // Sessions are looked up in KV; without their user they'd fail anyway, but don't leave them.
+  await Promise.all(
+    sessions.flatMap(({ id: session }) => [
+      env.SESSIONS.delete(`session:${session}`),
+      env.SESSIONS.delete(`session:${session}:meta`),
+    ]),
+  );
+  return members.map((m) => m.id);
+}
+
 export const internalRouter = new Hono<AppEnv>()
   // A team the platform signed up. The platform keeps the team's record; G3ID keeps its id, number
   // and name, which its own tables (users, kiosks, Slack) point at.
@@ -127,33 +161,7 @@ export const internalRouter = new Hono<AppEnv>()
   .delete("/teams/:id", async (c) => {
     const id = c.req.param("id");
     if (id === siteTeamId) return c.json({ error: "The site's own team can't be deleted." }, 409);
-    const db = createDb(c.env.DB);
-    const members = await db
-      .select({ id: coreUsers.id })
-      .from(coreUsers)
-      .where(eq(coreUsers.teamId, id))
-      .all();
-    const sessions = members.length
-      ? await db
-          .select({ id: coreSessions.id })
-          .from(coreSessions)
-          .where(
-            inArray(
-              coreSessions.userId,
-              members.map((m) => m.id),
-            ),
-          )
-          .all()
-      : [];
-    await c.env.DB.batch(DELETE_TEAM.map((sql) => c.env.DB.prepare(sql).bind(id)));
-    // Sessions are looked up in KV; without their user they'd fail anyway, but don't leave them.
-    await Promise.all(
-      sessions.flatMap(({ id: session }) => [
-        c.env.SESSIONS.delete(`session:${session}`),
-        c.env.SESSIONS.delete(`session:${session}:meta`),
-      ]),
-    );
-    return c.json({ deletedUserIds: members.map((m) => m.id) });
+    return c.json({ deletedUserIds: await deleteTeam(c.env, id) });
   })
   // An operator hands a team to one of its members: they become an active admin. The previous
   // owner stays an admin unless `demoteUserId` names them.

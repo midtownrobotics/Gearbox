@@ -1,4 +1,5 @@
 import { deleteTeamRows, exportTeamRows, hasMentorAccess, requireAuth, teamExport } from "@g3/auth";
+import { isDemoTeam } from "@g3/demo";
 import { corsOrigin } from "@g3/site-config";
 import { withApiPrefix } from "@g3/site-config/worker";
 import { Hono } from "hono";
@@ -6,6 +7,7 @@ import { cors } from "hono/cors";
 import packageJson from "../package.json";
 import { createDb } from "./db";
 import { EXPORTED_TABLES, TEAM_TABLES } from "./db/schema";
+import { demoWords, loadDemo } from "./demo";
 import { canEdit } from "./lib/editors";
 import { manifest } from "./manifest";
 import { sendReminders } from "./reminders";
@@ -38,6 +40,14 @@ const app = base
   )
   // The team's data, for its admins to download before switching the app off (the platform's app
   // library). Only other workers reach /internal: the gateway never answers it.
+  // The public demo (roadmap Phase 5): its sample data, after the nightly reset deleted the
+  // team's, and the words in it, which the gateway lets demo visitors send.
+  .post("/internal/teams/:teamId/demo", async (c) => {
+    const teamId = c.req.param("teamId");
+    if (!isDemoTeam(teamId)) return c.json({ error: "Only the demo team." }, 403);
+    return c.json(await loadDemo(createDb(c.env.SCHEDULE_DB), teamId));
+  })
+  .get("/internal/demo/words", (c) => c.json({ words: demoWords() }))
   .get("/internal/teams/:teamId/export", async (c) => {
     const teamId = c.req.param("teamId");
     const tables = await exportTeamRows(createDb(c.env.SCHEDULE_DB), teamId, [...EXPORTED_TABLES]);

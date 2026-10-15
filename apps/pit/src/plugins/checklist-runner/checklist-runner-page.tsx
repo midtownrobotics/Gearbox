@@ -5,9 +5,9 @@ import {
   Loading,
   Page,
   ProgressBar,
+  TextField,
   buttonClass,
   focusRing,
-  inputClass,
 } from "@g3/ui";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
@@ -344,8 +344,8 @@ export function ChecklistRunnerPage() {
 
                   {addingIssue ? (
                     <div className="flex gap-2 pt-1">
-                      <input
-                        type="text"
+                      <TextField
+                        kind="issue"
                         placeholder="Describe the issue…"
                         value={newIssueText}
                         onChange={(e) => setNewIssueText(e.target.value)}
@@ -356,8 +356,7 @@ export function ChecklistRunnerPage() {
                             setNewIssueText("");
                           }
                         }}
-                        className={`${inputClass} min-w-0 flex-1`}
-                        // biome-ignore lint/a11y/noAutofocus: intentional — user just opened the issue form
+                        className="min-w-0 flex-1"
                         autoFocus
                       />
                       <Button onClick={() => handleAddIssue(item.id)}>Add</Button>
