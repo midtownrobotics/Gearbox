@@ -2,7 +2,7 @@ import { consoleUrl, site, teamAppUrl } from "@g3/site-config";
 import { TextField } from "@g3/ui";
 import { type ReactNode, useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
-import { GearMark } from "../layout";
+import { GearboxMark } from "../layout";
 import { consoleApi, read, useLoad } from "./data";
 
 // The operators' console (roadmap 2.8), at admin.<domain>/console. Operators sign in through their
@@ -46,7 +46,7 @@ export function ConsoleShell() {
       <header className="border-b border-line bg-surface">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
           <span className="flex items-center gap-2 font-bold text-secondary-900">
-            <GearMark small /> Gearbox console
+            <GearboxMark small /> Gearbox console
           </span>
           {me?.isOperator && (
             <nav className="flex flex-wrap gap-1 text-sm">
