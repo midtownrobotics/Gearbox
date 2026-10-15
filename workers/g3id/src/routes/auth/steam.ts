@@ -9,7 +9,13 @@ import { decodeState, encodeState } from "../../lib/oauth-state";
 import { sanitizeRedirect } from "../../lib/redirect";
 import { createSession } from "../../lib/session";
 import { methodOff } from "../../lib/sign-in-methods";
-import { providerRedirectUri, requestTeamId, teamFrontend, teamOfUser } from "../../lib/team";
+import {
+  providerRedirectUri,
+  requestTeamId,
+  teamFrontend,
+  teamOfUser,
+  teamUrl,
+} from "../../lib/team";
 import type { AppEnv } from "../../types";
 
 const STEAM_OPENID_URL = "https://steamcommunity.com/openid/login";
@@ -141,7 +147,8 @@ export const steamAuthRouter = new Hono<AppEnv>()
         .get();
 
       if (existingIdentity) {
-        if (existingIdentity.userId === linkUserId) return c.redirect(app("/dashboard"));
+        if (existingIdentity.userId === linkUserId)
+          return c.redirect(`${teamUrl(c.env, st.team, "portal")}/account`);
         return err("This Steam account is already linked to a different account.");
       }
 
@@ -154,7 +161,7 @@ export const steamAuthRouter = new Hono<AppEnv>()
         createdAt: now,
         updatedAt: now,
       });
-      return c.redirect(app("/dashboard"));
+      return c.redirect(`${teamUrl(c.env, st.team, "portal")}/account`);
     }
 
     // --- Sign-in flow ---
@@ -194,5 +201,5 @@ export const steamAuthRouter = new Hono<AppEnv>()
 
     const sessionId = await createSession(user.id, c.env);
     setCookie(c, "g3_session", sessionId, sessionCookieOptions(c.req.url));
-    return c.redirect(redirectTo ?? app("/dashboard"));
+    return c.redirect(redirectTo ?? `${teamUrl(c.env, st.team, "portal")}/`);
   });

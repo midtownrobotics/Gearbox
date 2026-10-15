@@ -17,9 +17,11 @@ export const teamUiLinkLabels = {
 
 export type TeamUiLinkKey = keyof typeof teamUiLinkLabels;
 
-/** The team's own apps on Portal's grid (the sign-in app is named after the team: "G3ID"). */
+/**
+ * The team's own apps on Portal's grid and in the All Apps menu. ID isn't one: it only signs people
+ * in, and a member's account is on Portal.
+ */
 export const portalAppLabels = {
-  id: "ID",
   shop: "Shop",
   pit: "Pit",
   skillTree: "Skill Tree",

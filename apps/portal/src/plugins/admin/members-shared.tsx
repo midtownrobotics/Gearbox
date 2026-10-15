@@ -31,10 +31,12 @@ export function relativeTime(ts: number): string {
   return new Date(ts * 1000).toLocaleDateString();
 }
 
-/** A member's status as a badge's colors (`Badge` from @g3/ui). */
-export const STATUS_STYLES: Record<string, string> = {
+/**
+ * A member's status as a badge's colors (`Badge` from @g3/ui). Only a status that needs noticing
+ * has one: an active member, which nearly everyone is, shows none.
+ */
+export const STATUS_STYLES: Partial<Record<string, string>> = {
   pending: tones.warning,
-  active: tones.success,
   rejected: tones.danger,
 };
 

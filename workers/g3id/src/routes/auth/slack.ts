@@ -6,7 +6,7 @@ import { coreSlackLinkCodes } from "../../db/schema";
 import { sessionCookieOptions } from "../../lib/cookie";
 import { sanitizeRedirect } from "../../lib/redirect";
 import { createLinkCode, createSigninCode } from "../../lib/slack-code";
-import { requestTeamId, teamFrontend, teamOfUser } from "../../lib/team";
+import { requestTeamId, teamFrontend, teamOfUser, teamUrl } from "../../lib/team";
 import { requireAuth } from "../../middleware/auth";
 import type { AppEnv } from "../../types";
 
@@ -87,7 +87,7 @@ export const slackAuthRouter = new Hono<AppEnv>()
 
     // Redirect to the original URL (one of the code's team's pages) or that team's G3ID
     const redirect = sanitizeRedirect(c.req.query("redirect"), record.teamId);
-    const redirectUrl = redirect || `${teamFrontend(c.env, record.teamId)}/`;
+    const redirectUrl = redirect || `${teamUrl(c.env, record.teamId, "portal")}/`;
     return c.redirect(redirectUrl);
   })
   // Cancel — expire the code so it cannot be redeemed

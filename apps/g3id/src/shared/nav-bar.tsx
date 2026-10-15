@@ -9,50 +9,24 @@ import type { PluginNavItem } from "./plugin-types";
 const routerLink = linkWith(Link);
 
 /**
- * The shared G3 top bar. Signed out: Sign in and Sign up. Signed in: Account and Leaderboard, the
- * Admin pages for admins, and the team's apps in the menu.
+ * The shared top bar. ID only signs people in: signed out, Sign in and Sign up; signed in, the
+ * greeting (to the account page on the team's home) and the team's apps in the menu.
  */
 export function NavBar({ items }: { items: PluginNavItem[] }) {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
-  /** The team's sign-in methods: pages for one it switched off are hidden. */
-  const [methods, setMethods] = useState<Partial<Record<string, boolean>>>({});
   const location = useLocation();
-
-  useEffect(() => {
-    api.team["sign-in"]
-      .$get()
-      .then((res) => (res.ok ? res.json() : {}))
-      .then(setMethods)
-      .catch(() => {});
-  }, []);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: location is used to trigger re-fetch on navigation
   useEffect(() => {
-    api.auth.me.$get().then(async (res) => {
-      if (res.ok) {
-        const data = (await res.json()) as { isAdmin?: boolean };
-        setIsLoggedIn(true);
-        setIsAdmin(data.isAdmin ?? false);
-      } else {
-        setIsLoggedIn(false);
-        setIsAdmin(false);
-      }
-    });
+    api.auth.me.$get().then((res) => setIsLoggedIn(res.ok));
   }, [location]);
 
   const shown = items.filter((item) => {
     if (isLoggedIn === null) return false; // Loading
-    if (item.signInMethod && methods[item.signInMethod] === false) return false;
-    const audience = item.audience ?? "signed-in";
-    if (audience === "signed-out") return !isLoggedIn;
-    if (audience === "admin") return isLoggedIn && isAdmin;
-    return isLoggedIn;
+    return (item.audience ?? "signed-in") === "signed-out" ? !isLoggedIn : isLoggedIn;
   });
-  // The dashboard is the home page and also lives at /dashboard.
-  const path = location.pathname === "/dashboard" ? "/" : location.pathname;
   const active = activePath(
-    path,
+    location.pathname,
     shown.map((item) => item.to),
   );
 

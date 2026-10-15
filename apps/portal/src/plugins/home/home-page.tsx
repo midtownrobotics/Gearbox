@@ -23,7 +23,6 @@ import type { IconType } from "react-icons";
 import { FaCube, FaGithub, FaGlobe, FaInstagram, FaSlack } from "react-icons/fa";
 import attendanceIcon from "../../assets/app-icons/attendance.svg";
 import edgeIcon from "../../assets/app-icons/edge.svg";
-import idIcon from "../../assets/app-icons/id.svg";
 import inventoryIcon from "../../assets/app-icons/inventory.svg";
 import ordersIcon from "../../assets/app-icons/orders.svg";
 import pitIcon from "../../assets/app-icons/pit.svg";
@@ -55,13 +54,6 @@ type App = {
 } & ({ tile: string } | { icon?: IconType; logoSrc?: string });
 
 const APPS: App[] = [
-  {
-    // The sign-in app: named after the team ("G3ID") below.
-    key: "id",
-    label: "ID",
-    href: appUrl("id"),
-    tile: idIcon,
-  },
   {
     key: "shop",
     label: "Shop",

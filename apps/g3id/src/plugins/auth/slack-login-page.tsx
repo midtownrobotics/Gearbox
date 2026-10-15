@@ -1,4 +1,4 @@
-import { site } from "@g3/site-config";
+import { appUrl, site } from "@g3/site-config";
 import { Button, ErrorBanner, NotYourTeam, useTeamNames } from "@g3/ui";
 import { Check, Copy, Send } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -67,7 +67,8 @@ export function SlackLoginPage() {
           if (redirect) {
             window.location.href = redirect;
           } else {
-            navigate("/dashboard");
+            // Nowhere asked for: the team's home.
+            window.location.href = `${appUrl("portal")}/`;
           }
           return;
         }

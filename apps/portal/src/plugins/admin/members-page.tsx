@@ -8,11 +8,12 @@ import {
   Page,
   TextField,
   inputClass,
+  redirectToSignIn,
 } from "@g3/ui";
 import { GraduationCap, Search, Shield, ShieldOff } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { api } from "../../lib/api";
+import { g3id as api } from "../../lib/api";
 import {
   PROVIDERS,
   ProviderIcon,
@@ -20,7 +21,7 @@ import {
   type User,
   matchesSearch,
   relativeTime,
-} from "./users-shared";
+} from "./members-shared";
 
 const FILTERS = ["pending", "active", "rejected", "all"] as const;
 type Filter = (typeof FILTERS)[number];
@@ -66,7 +67,7 @@ const isFilter = (v: string | null): v is Filter => FILTERS.includes(v as Filter
 const isSort = (v: string | null): v is Sort => v !== null && v in SORTS;
 const isRole = (v: string | null): v is Role => v !== null && v in ROLES;
 
-export function AdminUsersPage() {
+export function MembersPage() {
   const navigate = useNavigate();
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [users, setUsers] = useState<User[]>([]);
@@ -111,12 +112,12 @@ export function AdminUsersPage() {
   useEffect(() => {
     api.auth.me.$get().then(async (res) => {
       if (res.status === 401) {
-        navigate("/login");
+        redirectToSignIn();
         return;
       }
       const data = (await res.json()) as { id: string; isAdmin?: boolean };
       if (!res.ok || !data.isAdmin) {
-        navigate("/dashboard");
+        navigate("/");
         return;
       }
       setCurrentUserId(data.id);
@@ -345,7 +346,7 @@ export function AdminUsersPage() {
 
   return (
     <Page
-      title="Users"
+      title="Members"
       width="narrow"
       actions={<Button onClick={exportActiveUsersToCSV}>Export active users (CSV)</Button>}
     >
@@ -444,8 +445,8 @@ export function AdminUsersPage() {
               <div className="px-4 py-3 flex items-center gap-3 flex-wrap">
                 {/* Avatar, name and identity icons: open the person's page */}
                 <Link
-                  to={`/admin/users/${user.id}`}
-                  state={{ from: `/admin/users${params.toString() ? `?${params}` : ""}` }}
+                  to={`/admin/members/${user.id}`}
+                  state={{ from: `/admin/members${params.toString() ? `?${params}` : ""}` }}
                   className="flex flex-1 min-w-0 items-center gap-3 rounded-md group"
                 >
                   <div className="w-9 h-9 rounded-full bg-primary-500 flex items-center justify-center text-sm font-semibold text-on-primary shrink-0">
@@ -467,9 +468,11 @@ export function AdminUsersPage() {
                           Mentor
                         </span>
                       )}
-                      <Badge colors={STATUS_STYLES[user.status]}>
-                        <span className="capitalize">{user.status}</span>
-                      </Badge>
+                      {STATUS_STYLES[user.status] && (
+                        <Badge colors={STATUS_STYLES[user.status]}>
+                          <span className="capitalize">{user.status}</span>
+                        </Badge>
+                      )}
                     </div>
                     {/* Identity icons + timestamps */}
                     <div className="flex items-center gap-2 mt-1">

@@ -142,7 +142,7 @@ export function AppNavBar({
   const flat = items.length === 0 && !hasApps;
   const hello =
     account && user && !user.kiosk ? (
-      <a className="g3-nav-text-link g3-nav-hello" href={`${appUrl("id")}/`}>
+      <a className="g3-nav-text-link g3-nav-hello" href={`${appUrl("portal")}/account`}>
         Hello, {user.displayName}!
       </a>
     ) : null;

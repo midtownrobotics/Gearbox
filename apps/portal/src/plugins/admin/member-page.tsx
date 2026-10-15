@@ -1,9 +1,18 @@
-import { Badge, Button, Card, ConfirmQuestion, ErrorBanner, Loading, Page } from "@g3/ui";
+import {
+  Badge,
+  Button,
+  Card,
+  ConfirmQuestion,
+  ErrorBanner,
+  Loading,
+  Page,
+  redirectToSignIn,
+} from "@g3/ui";
 import { GraduationCap, Shield, ShieldOff } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
-import { api } from "../../lib/api";
-import { PROVIDERS, ProviderIcon, STATUS_STYLES, type User, relativeTime } from "./users-shared";
+import { g3id as api } from "../../lib/api";
+import { PROVIDERS, ProviderIcon, STATUS_STYLES, type User, relativeTime } from "./members-shared";
 
 // One member of the team, opened from the Users list: their details, the accounts they sign in
 // with, and what an admin can do for them.
@@ -30,12 +39,12 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   );
 }
 
-export function AdminUserPage() {
+export function MemberPage() {
   const { id = "" } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
   /** Back to the list as it was (its search and filters). */
-  const back = (location.state as { from?: string } | null)?.from ?? "/admin/users";
+  const back = (location.state as { from?: string } | null)?.from ?? "/admin/members";
 
   const [me, setMe] = useState<string | null>(null);
   const [user, setUser] = useState<Details | null>(null);
@@ -45,9 +54,9 @@ export function AdminUserPage() {
 
   useEffect(() => {
     api.auth.me.$get().then(async (res) => {
-      if (res.status === 401) return navigate("/login");
+      if (res.status === 401) return redirectToSignIn();
       const data = (await res.json()) as { id: string; isAdmin?: boolean };
-      if (!res.ok || !data.isAdmin) return navigate("/dashboard");
+      if (!res.ok || !data.isAdmin) return navigate("/");
       setMe(data.id);
     });
   }, [navigate]);
@@ -108,9 +117,11 @@ export function AdminUserPage() {
             <div className="min-w-0">
               <p className="truncate text-sm text-secondary-600">{user.email}</p>
               <div className="mt-1 flex flex-wrap items-center gap-2">
-                <Badge colors={STATUS_STYLES[user.status]}>
-                  <span className="capitalize">{user.status}</span>
-                </Badge>
+                {STATUS_STYLES[user.status] && (
+                  <Badge colors={STATUS_STYLES[user.status]}>
+                    <span className="capitalize">{user.status}</span>
+                  </Badge>
+                )}
                 {user.isAdmin === 1 && (
                   <span className="text-xs px-1.5 py-0.5 rounded bg-primary-50 text-primary-600 border border-primary-200">
                     Admin

@@ -1,11 +1,11 @@
+import { appUrl } from "@g3/site-config";
 import { Button, ErrorBanner, NotYourTeam, TextField, inputClass, useTeamNames } from "@g3/ui";
 import { useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../../lib/api";
 
 export function EmailLoginPage() {
   const names = useTeamNames();
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const redirect = searchParams.get("redirect");
   const [email, setEmail] = useState("");
@@ -27,7 +27,8 @@ export function EmailLoginPage() {
       if (redirect) {
         window.location.href = redirect;
       } else {
-        navigate("/dashboard");
+        // Nowhere asked for: the team's home.
+        window.location.href = `${appUrl("portal")}/`;
       }
     } catch {
       setError("Could not reach the server. Try again.");

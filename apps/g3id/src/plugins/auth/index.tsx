@@ -1,6 +1,5 @@
 import { Moved } from "../../shared/moved";
 import type { Plugin } from "../../shared/plugin-types";
-import { DashboardPage } from "./dashboard-page";
 import { DemoPage } from "./demo-page";
 import { EmailLoginPage } from "./email-login-page";
 import { LoginPage } from "./login-page";
@@ -19,13 +18,13 @@ export const authPlugin: Plugin = {
     { path: "/login/slack", element: <SlackLoginPage /> },
     { path: "/signup", element: <SignupPage /> },
     { path: "/signup/pending", element: <PendingPage /> },
-    { path: "/dashboard", element: <DashboardPage /> },
+    // ID only signs people in: the account page is on the team's home now.
+    { path: "/dashboard", element: <Moved app="portal" to="/account" /> },
     // Moved to Attendance.
     { path: "/leaderboard", element: <Moved app="attendance" to="/leaderboard" /> },
-    { path: "/", element: <DashboardPage /> },
+    { path: "/", element: <Moved app="portal" to="/" /> },
   ],
   navItems: [
-    { label: "Account", to: "/", order: 0 },
     { label: "Sign in", to: "/login", order: 2, audience: "signed-out" },
     { label: "Sign up", to: "/signup", order: 3, audience: "signed-out" },
   ],

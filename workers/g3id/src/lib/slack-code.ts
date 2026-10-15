@@ -340,7 +340,7 @@ export async function handleSlackCode(opts: {
     await dmAdmins(
       env,
       record.teamId,
-      `:wave: ${slackUser.displayName} (${email}) signed up and is waiting for approval: ${teamUrl(env, record.teamId, "id")}/admin/users/${userId}`,
+      `:wave: ${slackUser.displayName} (${email}) signed up and is waiting for approval: ${teamUrl(env, record.teamId, "portal")}/admin/members/${userId}`,
     );
   } catch (err) {
     console.error("[slack] telling admins about a sign-up failed", err);

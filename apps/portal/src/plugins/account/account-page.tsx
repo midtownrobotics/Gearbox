@@ -1,4 +1,4 @@
-import { site } from "@g3/site-config";
+import { appUrl, site } from "@g3/site-config";
 import {
   Badge,
   Button,
@@ -8,13 +8,14 @@ import {
   Loading,
   Page,
   buttonClass,
+  redirectToSignIn,
   tones,
 } from "@g3/ui";
 import { Shield } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { FaGithub, FaGoogle, FaSlack, FaSteam } from "react-icons/fa";
-import { Link, useNavigate } from "react-router-dom";
-import { api } from "../../lib/api";
+import { Link } from "react-router-dom";
+import { g3id as api } from "../../lib/api";
 
 type Identity = {
   id: string;
@@ -36,6 +37,12 @@ type Me = {
   kioskDeviceId?: number;
 };
 
+/**
+ * Linking another sign-in starts on ID's own address, as signing in does: the provider sends them
+ * back there, and ID back to this page.
+ */
+const linkUrl = (provider: string) => `${appUrl("id")}/api/auth/${provider}/link`;
+
 const PROVIDER_LABELS: Record<string, string> = {
   local: "Password",
   google: "Google",
@@ -44,15 +51,14 @@ const PROVIDER_LABELS: Record<string, string> = {
   steam: "Steam",
 };
 
-/** A member's status as a badge's colors. */
-const STATUS_TONES: Record<string, string> = {
-  active: tones.success,
+/** A member's status as a badge's colors: only one that needs noticing (active shows none). */
+const STATUS_TONES: Partial<Record<string, string>> = {
   pending: tones.warning,
   rejected: tones.danger,
 };
 
-export function DashboardPage() {
-  const navigate = useNavigate();
+/** The signed-in member's account: their sign-ins, kiosk PIN, and signing out. */
+export function AccountPage() {
   const [me, setMe] = useState<Me | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -141,11 +147,8 @@ export function DashboardPage() {
   async function handleLogout() {
     const res = await api.auth.logout.$post();
     const data = (await res.json()) as { isKiosk?: boolean };
-    if (data.isKiosk) {
-      navigate("/kiosk/login");
-    } else {
-      navigate("/login");
-    }
+    // A kiosk goes back to its PIN pad; anyone else to the team's front door.
+    window.location.assign(data.isKiosk ? `${appUrl("id")}/kiosk/login` : "/");
   }
 
   async function fetchPin() {
@@ -213,11 +216,11 @@ export function DashboardPage() {
   useEffect(() => {
     api.auth.me.$get().then(async (res) => {
       if (res.status === 401) {
-        navigate("/login");
+        redirectToSignIn();
         return;
       }
       if (res.status === 404) {
-        navigate("/signup");
+        window.location.assign(`${appUrl("id")}/signup`);
         return;
       }
       if (!res.ok) {
@@ -227,7 +230,7 @@ export function DashboardPage() {
       const data = (await res.json()) as Me;
       setMe(data);
     });
-  }, [navigate]);
+  }, []);
 
   if (error) {
     return (
@@ -255,9 +258,11 @@ export function DashboardPage() {
           <p className="text-secondary-900 font-semibold truncate">{me.displayName}</p>
           <p className="text-secondary-600 text-sm truncate">{me.email}</p>
         </div>
-        <Badge colors={STATUS_TONES[me.status] ?? tones.neutral}>
-          <span className="capitalize">{me.status}</span>
-        </Badge>
+        {STATUS_TONES[me.status] && (
+          <Badge colors={STATUS_TONES[me.status]}>
+            <span className="capitalize">{me.status}</span>
+          </Badge>
+        )}
       </Card>
 
       <Card title="Linked accounts">
@@ -318,7 +323,7 @@ export function DashboardPage() {
                   identity.provider === "github") &&
                   linkable(identity.provider) && (
                     <a
-                      href={`${import.meta.env.VITE_API_BASE_URL}/auth/${identity.provider}/link`}
+                      href={linkUrl(identity.provider)}
                       className={`${buttonClass("secondary", "sm")} ml-auto`}
                     >
                       Add another
@@ -341,28 +346,19 @@ export function DashboardPage() {
 
         <div className="mt-3 space-y-2">
           {linkable("google") && !me.identities.some((i) => i.provider === "google") && (
-            <a
-              href={`${import.meta.env.VITE_API_BASE_URL}/auth/google/link`}
-              className={`${buttonClass()} w-full`}
-            >
+            <a href={linkUrl("google")} className={`${buttonClass()} w-full`}>
               <FaGoogle size={16} />
               Connect Google
             </a>
           )}
           {linkable("github") && !me.identities.some((i) => i.provider === "github") && (
-            <a
-              href={`${import.meta.env.VITE_API_BASE_URL}/auth/github/link`}
-              className={`${buttonClass()} w-full`}
-            >
+            <a href={linkUrl("github")} className={`${buttonClass()} w-full`}>
               <FaGithub size={16} />
               Connect GitHub
             </a>
           )}
           {linkable("steam") && !me.identities.some((i) => i.provider === "steam") && (
-            <a
-              href={`${import.meta.env.VITE_API_BASE_URL}/auth/steam/link`}
-              className={`${buttonClass()} w-full`}
-            >
+            <a href={linkUrl("steam")} className={`${buttonClass()} w-full`}>
               <FaSteam size={16} />
               Connect Steam
             </a>
@@ -421,7 +417,7 @@ export function DashboardPage() {
         <div className="flex items-center gap-3">
           {me.isAdmin ? (
             <Link
-              to="/admin/users"
+              to="/admin/members"
               className="text-xs text-primary-500 hover:text-primary-600 transition-colors flex items-center gap-1"
             >
               <Shield size={12} /> Admin

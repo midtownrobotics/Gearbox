@@ -56,6 +56,7 @@ Erik chose these on 12 October 2026. They are settled; don't reopen them in a pu
 | Wording | "Sign in" and "Sign out" |
 | Scouting | Restyled with its team-scoping step (Phase 3). Its name is Scouting everywhere |
 | Signed out (15 October) | Every app sends a signed-out visitor straight to ID's sign-in page (`redirectToSignIn` in `@g3/ui`), coming back afterward; none shows a "Sign in" page of its own, except Portal's home, the team's front door (Sign in, Sign up and the team's public site). Apps that work offline (Pit, Scouting) only do it when the server says nobody is signed in |
+| Status badges (15 October) | A member shows a status badge only when it needs noticing: Pending or Rejected. Active, which nearly everyone is, shows none |
 | The sign-in app's name (15 October) | "ID" in text, "G3 ID" as its wordmark and tab title, like any app; not "G3ID" |
 
 ## The design language
