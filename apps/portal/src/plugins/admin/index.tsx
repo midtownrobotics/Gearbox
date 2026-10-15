@@ -9,6 +9,7 @@ import { KiosksPage } from "./kiosks-page";
 import { MemberPage } from "./member-page";
 import { MembersPage } from "./members-page";
 import { NotificationsPage } from "./notifications-page";
+import { OperatorAccessPage } from "./operator-access-page";
 import { SignInPage } from "./sign-in-page";
 
 // The team's admin pages (roadmap 4.5), on its home: <number>.<platform>/admin. Only what's the
@@ -38,6 +39,7 @@ export const adminPlugin: Plugin = {
     { path: "/admin/slack", element: <SlackMoved /> },
     { path: "/admin/integrations", element: admin(<IntegrationsPage />) },
     { path: "/admin/notifications", element: admin(<NotificationsPage />) },
+    { path: "/admin/operator-access", element: admin(<OperatorAccessPage />) },
   ],
   navItems: [
     { label: "Manage Apps", to: "/admin", order: 10, requiresAdmin: true, group: "Admin" },
@@ -68,6 +70,13 @@ export const adminPlugin: Plugin = {
       label: "Notifications",
       to: "/admin/notifications",
       order: 16,
+      requiresAdmin: true,
+      group: "Admin",
+    },
+    {
+      label: "Operator Access",
+      to: "/admin/operator-access",
+      order: 17,
       requiresAdmin: true,
       group: "Admin",
     },
