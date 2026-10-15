@@ -56,6 +56,10 @@ type AreaProps = Shared &
     ref?: Ref<HTMLTextAreaElement>;
   };
 
+/** Classes that place a field in its layout (rather than style it): its box takes these in the demo. */
+const LAYOUT =
+  /^!?-?(w-|min-w-|max-w-|flex-|grow|shrink|basis-|self-|justify-self-|place-self-|col-|row-|order-|m-|mx-|my-|mt-|mr-|mb-|ml-|ms-|me-)/;
+
 /** Sets a field's value the way typing does, so its own onChange runs. */
 function setLikeTyping(el: HTMLInputElement | HTMLTextAreaElement, value: string) {
   const proto =
@@ -111,7 +115,15 @@ export function TextField(props: InputProps | AreaProps) {
     if (picking && props.required && own.current && own.current.value === "") rotate();
   }, [picking, props.required, rotate]);
 
-  const classes = `${VARIANTS[variant]} ${picking ? "cursor-default pr-9" : ""} ${className}`;
+  // In the demo the field sits in a box with its rotate button, and the box takes the field's
+  // place in the layout: its width, flex, grid and margin classes move to the box, and the
+  // field fills it.
+  const all = `${VARIANTS[variant]} ${className}`.split(/\s+/).filter(Boolean);
+  const layout = picking ? all.filter((c) => LAYOUT.test(c)) : [];
+  const styling = picking
+    ? [...all.filter((c) => !LAYOUT.test(c)), "w-full", "cursor-default", "pr-9"]
+    : all;
+  const classes = styling.join(" ");
   const field = multiline ? (
     <textarea
       {...(rest as TextareaHTMLAttributes<HTMLTextAreaElement>)}
@@ -130,9 +142,10 @@ export function TextField(props: InputProps | AreaProps) {
   );
   if (!picking) return field;
 
-  const wide = variant === "default" || multiline;
+  const box =
+    layout.length > 0 ? `block ${layout.join(" ")}` : multiline ? "block w-full" : "inline-block";
   return (
-    <span className={`relative ${wide ? "block w-full" : "inline-flex"}`}>
+    <span className={`relative ${box}`}>
       {field}
       <button
         type="button"
@@ -141,7 +154,7 @@ export function TextField(props: InputProps | AreaProps) {
         // Keep the field focused, so an edit that saves when it loses focus stays open.
         onMouseDown={(e) => e.preventDefault()}
         onClick={rotate}
-        className={`absolute right-1.5 top-1.5 rounded-md p-1 text-secondary-500 hover:bg-secondary-100 hover:text-secondary-800 ${focusRing}`}
+        className={`absolute right-1.5 ${multiline ? "top-1.5" : "top-1/2 -translate-y-1/2"} rounded-md p-1 text-secondary-500 hover:bg-secondary-100 hover:text-secondary-800 ${focusRing}`}
       >
         <svg
           viewBox="0 0 20 20"
