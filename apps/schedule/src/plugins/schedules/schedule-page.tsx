@@ -137,28 +137,36 @@ function Loaded({
       title={detail.schedule.name}
       width="full"
       description={
-        canEdit && (
-          // Under the name, where it belongs: whether students can see it yet, editing it, and
-          // switching painting off to look without risk.
-          <span className="mt-1 inline-flex flex-wrap items-center gap-2">
-            {!detail.schedule.published && <Badge colors={tones.warning}>Draft</Badge>}
-            <Link
-              to={`/schedules/${detail.schedule.id}/settings`}
-              className={buttonClass("secondary", "sm")}
-            >
-              Settings
-            </Link>
-            <span className="inline-flex items-center gap-2">
-              <Switch checked={editingOn} onChange={setEditingOn} aria-labelledby={editingLabel} />
-              <span id={editingLabel} className="text-sm text-secondary-700">
-                Editing
+        <>
+          <span className="block">
+            <BackLink />
+          </span>
+          {canEdit && (
+            // Under the name, where it belongs: whether students can see it yet, editing it, and
+            // switching painting off to look without risk.
+            <span className="mt-2 inline-flex flex-wrap items-center gap-2">
+              {!detail.schedule.published && <Badge colors={tones.warning}>Draft</Badge>}
+              <Link
+                to={`/schedules/${detail.schedule.id}/settings`}
+                className={buttonClass("secondary", "sm")}
+              >
+                Settings
+              </Link>
+              <span className="inline-flex items-center gap-2">
+                <Switch
+                  checked={editingOn}
+                  onChange={setEditingOn}
+                  aria-labelledby={editingLabel}
+                />
+                <span id={editingLabel} className="text-sm text-secondary-700">
+                  Editing
+                </span>
               </span>
             </span>
-          </span>
-        )
+          )}
+        </>
       }
     >
-      <BackLink />
       {saveError && <ErrorBanner message={saveError} />}
 
       {detail.days.length === 0 || !day ? (
