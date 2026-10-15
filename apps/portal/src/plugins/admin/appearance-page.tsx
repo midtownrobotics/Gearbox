@@ -47,6 +47,7 @@ const colorLabels: Record<Exclude<keyof TeamUiColors, "accent">, string> = {
 const fieldClass = inputClass;
 
 const description = "How your team looks across Gearbox.";
+const FORM_ID = "team-appearance";
 
 export function AppearancePage() {
   const [settings, setSettings] = useState<TeamUiSettings>(() => teamUiDefaults(pageTeamId));
@@ -141,11 +142,28 @@ export function AppearancePage() {
     );
   }
 
+  // Save and Reset, at the top of the page and again at the bottom (the top Save submits the form
+  // by its id, so the browser's checks and the reveal of a field to fix work the same).
+  const buttons = (
+    <>
+      <Button type="submit" form={FORM_ID} disabled={saving || isDemoPage}>
+        {saving ? "Saving…" : "Save team appearance"}
+      </Button>
+      <Button variant="secondary" disabled={saving} onClick={reset}>
+        Reset to defaults
+      </Button>
+    </>
+  );
+
   return (
-    <Page title="Appearance" description={description}>
+    <Page
+      title="Appearance"
+      description={description}
+      actions={<div className="flex flex-wrap items-center gap-3">{buttons}</div>}
+    >
       {error && <ErrorBanner message={error} />}
       {message && <SuccessBanner message={message} />}
-      <form onSubmit={save} onInvalidCapture={revealInvalid} className="space-y-5">
+      <form id={FORM_ID} onSubmit={save} onInvalidCapture={revealInvalid} className="space-y-5">
         <Card title="Identity">
           <div className="grid gap-4 sm:grid-cols-2">
             <LabeledText
@@ -287,12 +305,7 @@ export function AppearancePage() {
         </Card>
 
         <div className="flex flex-wrap items-center gap-3">
-          <Button type="submit" disabled={saving || isDemoPage}>
-            {saving ? "Saving…" : "Save team appearance"}
-          </Button>
-          <Button variant="secondary" disabled={saving} onClick={reset}>
-            Reset to defaults
-          </Button>
+          {buttons}
           {isDemoPage && (
             <p className="text-sm text-secondary-500">Appearance can't be saved in the demo.</p>
           )}
