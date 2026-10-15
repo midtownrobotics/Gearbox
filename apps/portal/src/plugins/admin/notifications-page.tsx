@@ -97,6 +97,11 @@ export function NotificationsPage() {
         Gearbox sends notifications about updates, downtime and anything that needs your attention.
         Choose who sees each kind on your team's home page and where it goes on Slack.
       </p>
+      <p className="mb-6 rounded-lg border border-line bg-inset p-3 text-sm text-secondary-700">
+        <strong className="text-secondary-900">Turn on every kind.</strong> Gearbox is an early beta
+        and changes quickly, so we strongly recommend showing all three on the home page and sending
+        them to Slack. It's how we tell your team about changes and problems.
+      </p>
       {error && (
         <p role="alert" className="mb-4 rounded-md border border-red-500 p-3 text-red-700">
           {error}
