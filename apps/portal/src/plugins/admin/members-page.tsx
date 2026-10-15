@@ -527,7 +527,8 @@ export function MembersPage() {
                     </Button>
                   )}
 
-                  {user.status === "active" && user.id !== currentUserId && (
+                  {/* Your own mentor role is yours to change too. */}
+                  {user.status === "active" && (
                     <Button
                       variant="secondary"
                       size="sm"

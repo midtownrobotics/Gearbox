@@ -178,9 +178,11 @@ export function MemberPage() {
             )}
           </Card>
 
-          {!self && (
+          {/* Your own account: only the mentor role (an admin can't remove their own admin or delete
+              themselves). */}
+          {(!self || user.status === "active") && (
             <section className="flex flex-wrap gap-2">
-              {user.status === "pending" && (
+              {!self && user.status === "pending" && (
                 <>
                   <Button
                     disabled={busy !== null}
@@ -207,22 +209,24 @@ export function MemberPage() {
               )}
               {user.status === "active" && (
                 <>
-                  <Button
-                    variant="secondary"
-                    disabled={busy !== null}
-                    onClick={() =>
-                      user.isAdmin
-                        ? act("admin", () => api.admin.users[":id"].demote.$post(param), {
-                            isAdmin: 0,
-                          })
-                        : act("admin", () => api.admin.users[":id"].promote.$post(param), {
-                            isAdmin: 1,
-                          })
-                    }
-                  >
-                    {user.isAdmin ? <ShieldOff size={14} /> : <Shield size={14} />}
-                    {user.isAdmin ? "Remove admin" : "Make admin"}
-                  </Button>
+                  {!self && (
+                    <Button
+                      variant="secondary"
+                      disabled={busy !== null}
+                      onClick={() =>
+                        user.isAdmin
+                          ? act("admin", () => api.admin.users[":id"].demote.$post(param), {
+                              isAdmin: 0,
+                            })
+                          : act("admin", () => api.admin.users[":id"].promote.$post(param), {
+                              isAdmin: 1,
+                            })
+                      }
+                    >
+                      {user.isAdmin ? <ShieldOff size={14} /> : <Shield size={14} />}
+                      {user.isAdmin ? "Remove admin" : "Make admin"}
+                    </Button>
+                  )}
                   <Button
                     variant="secondary"
                     disabled={busy !== null}
@@ -245,7 +249,7 @@ export function MemberPage() {
                   </Button>
                 </>
               )}
-              {user.status !== "pending" && !confirmDelete && (
+              {!self && user.status !== "pending" && !confirmDelete && (
                 <Button
                   variant="danger"
                   disabled={busy !== null}
