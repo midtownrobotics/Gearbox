@@ -4,6 +4,7 @@ import { roleBlock } from "../../shared/role-colors";
 import { hourLabel, quarterLabel, shortTime, spanLabel, timeLabel } from "../../shared/time";
 import { type Cells, cellKey, rowRanges } from "./cells";
 import { PersonCard } from "./person-card";
+import { SlotCard } from "./slot-card";
 import type { Buttons, Tool } from "./tools";
 
 // The whole team's day: a row per attendee, a column per 15-minute block, the event's periods in
@@ -39,8 +40,21 @@ export function Grid({
   onPaint: (change: Change) => void;
 }) {
   const [drag, setDrag] = useState<Drag | null>(null);
-  // The name being hovered or focused, for its minutes in each role.
-  const [person, setPerson] = useState<{ userId: string; anchor: DOMRect } | null>(null);
+  // A name (its minutes in each role) or a column's time (its counts) being hovered or focused.
+  const [hover, setHover] = useState<
+    (({ person: string } | { slot: number }) & { anchor: DOMRect }) | null
+  >(null);
+  /** Shows a card while an element is hovered or focused. */
+  const hoverOn = (target: { person: string } | { slot: number }) => {
+    const show = (e: { currentTarget: HTMLElement }) =>
+      setHover({ ...target, anchor: e.currentTarget.getBoundingClientRect() });
+    return {
+      onMouseEnter: show,
+      onFocus: show,
+      onMouseLeave: () => setHover(null),
+      onBlur: () => setHover(null),
+    };
+  };
   const slots = day.end - day.start;
   const column = (slot: number) => slot - day.start + 2;
 
@@ -101,7 +115,7 @@ export function Grid({
     <div
       className="overflow-x-auto rounded-xl border border-secondary-200 bg-surface"
       // The card is placed by where the name was; it goes when the grid moves under it.
-      onScroll={() => setPerson(null)}
+      onScroll={() => setHover(null)}
     >
       <div
         role="grid"
@@ -128,7 +142,13 @@ export function Grid({
           return (
             <div
               key={slot}
-              title={timeLabel(slot)}
+              // biome-ignore lint/a11y/noNoninteractiveTabindex: focusing a time shows its counts
+              tabIndex={0}
+              aria-label={timeLabel(slot)}
+              aria-describedby={
+                hover && "slot" in hover && hover.slot === slot ? "slot-card" : undefined
+              }
+              {...hoverOn({ slot })}
               className={`border-b border-secondary-200 px-1 py-1 text-xs whitespace-nowrap ${
                 onHour
                   ? "border-l border-l-secondary-300 font-semibold text-secondary-800"
@@ -176,21 +196,12 @@ export function Grid({
               style={{ gridRow: row, gridColumn: 1 }}
               // biome-ignore lint/a11y/noNoninteractiveTabindex: focusing a name shows its minutes
               tabIndex={0}
-              aria-describedby={person?.userId === attendee.userId ? "person-card" : undefined}
-              onMouseEnter={(e) =>
-                setPerson({
-                  userId: attendee.userId,
-                  anchor: e.currentTarget.getBoundingClientRect(),
-                })
+              aria-describedby={
+                hover && "person" in hover && hover.person === attendee.userId
+                  ? "person-card"
+                  : undefined
               }
-              onFocus={(e) =>
-                setPerson({
-                  userId: attendee.userId,
-                  anchor: e.currentTarget.getBoundingClientRect(),
-                })
-              }
-              onMouseLeave={() => setPerson(null)}
-              onBlur={() => setPerson(null)}
+              {...hoverOn({ person: attendee.userId })}
             >
               {attendee.displayName ?? "Former member"}
             </div>,
@@ -260,13 +271,23 @@ export function Grid({
           />
         )}
       </div>
-      {person && !drag && (
+      {hover && !drag && "person" in hover && (
         <PersonCard
-          attendee={attendees.find((a) => a.userId === person.userId) ?? attendees[0]}
+          attendee={attendees.find((a) => a.userId === hover.person) ?? attendees[0]}
           cells={cells}
           day={day.day}
           roles={roles}
-          anchor={person.anchor}
+          anchor={hover.anchor}
+        />
+      )}
+      {hover && !drag && "slot" in hover && (
+        <SlotCard
+          slot={hover.slot}
+          day={day.day}
+          attendees={attendees}
+          cells={cells}
+          roles={roles}
+          anchor={hover.anchor}
         />
       )}
     </div>

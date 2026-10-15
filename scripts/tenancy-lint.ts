@@ -131,6 +131,7 @@ const APPS: App[] = [
       assignments: "assignments",
       notificationsSent: "notifications_sent",
       scheduleEditors: "schedule_editors",
+      friends: "friends",
     },
   },
 ];

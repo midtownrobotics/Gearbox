@@ -24,6 +24,7 @@ const TABLES = [
   "assignments",
   "notifications_sent",
   "schedule_editors",
+  "friends",
 ];
 
 async function seed(team: TeamUsers): Promise<Seeded> {
@@ -91,6 +92,13 @@ async function seed(team: TeamUsers): Promise<Seeded> {
     team.teamId,
     team.otherStudent.id,
     team.mentor.id,
+    now,
+  );
+  await run(
+    "INSERT INTO friends (team_id, user_id, friend_id, added_at) VALUES (?, ?, ?, ?)",
+    team.teamId,
+    team.student.id,
+    team.otherStudent.id,
     now,
   );
   return {

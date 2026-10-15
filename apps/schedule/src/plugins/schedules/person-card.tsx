@@ -2,10 +2,10 @@ import type { Attendee, Role } from "../../shared/api";
 import { Swatch } from "../../shared/role-colors";
 import { dayLabel } from "../../shared/time";
 import { type Cells, minutesByRole } from "./cells";
+import { HoverCard } from "./hover-card";
 
 // What a person has been given, shown beside their name on the grid: minutes in each role on
-// the day shown and over the whole event. Fixed to the window, so the grid's scrolling doesn't
-// cut it off.
+// the day shown and over the whole event.
 
 const minutes = (n: number | undefined) => (n ? `${n} min` : "–");
 
@@ -30,18 +30,8 @@ export function PersonCard({
     .sort((a, b) => (event.get(b.id) ?? 0) - (event.get(a.id) ?? 0));
   const sum = (m: Map<number, number>) => [...m.values()].reduce((a, b) => a + b, 0);
 
-  // Below the name's top in the upper half of the window, above its bottom in the lower half.
-  const below = anchor.top < window.innerHeight / 2;
   return (
-    <div
-      id="person-card"
-      role="tooltip"
-      className="pointer-events-none fixed z-50 w-72 rounded-xl border border-secondary-200 bg-surface p-3 text-sm shadow-xl"
-      style={{
-        left: Math.min(anchor.right + 8, window.innerWidth - 296),
-        ...(below ? { top: anchor.top } : { bottom: window.innerHeight - anchor.bottom }),
-      }}
-    >
+    <HoverCard id="person-card" anchor={anchor} placement="right">
       <p className="font-semibold text-secondary-900">{attendee.displayName ?? "Former member"}</p>
       {rows.length === 0 ? (
         <p className="mt-1 text-secondary-500">Nothing assigned yet.</p>
@@ -79,6 +69,6 @@ export function PersonCard({
           </tbody>
         </table>
       )}
-    </div>
+    </HoverCard>
   );
 }

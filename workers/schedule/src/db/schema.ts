@@ -149,6 +149,21 @@ export const scheduleEditors = sqliteTable(
   (t) => [primaryKey({ columns: [t.teamId, t.userId] })],
 );
 
+/**
+ * Members each person picks to see beside them on schedules. Private: only `userId` ever sees
+ * their own, and the team's data download leaves them out.
+ */
+export const friends = sqliteTable(
+  "friends",
+  {
+    teamId: text("team_id").notNull(),
+    userId: text("user_id").notNull(),
+    friendId: text("friend_id").notNull(),
+    addedAt: integer("added_at").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.teamId, t.userId, t.friendId] })],
+);
+
 /** Every team table, children before the rows they point at (for deleting a team's data). */
 export const TEAM_TABLES = [
   notificationsSent,
@@ -159,4 +174,8 @@ export const TEAM_TABLES = [
   schedules,
   roles,
   scheduleEditors,
+  friends,
 ] as const;
+
+/** What the team's data download holds: everything but each person's private friends. */
+export const EXPORTED_TABLES = TEAM_TABLES.filter((table) => table !== friends);

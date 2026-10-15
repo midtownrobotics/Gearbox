@@ -18,11 +18,19 @@ for [`workers/schedule`](../../workers/schedule).
   with the number keys (Shift for the right button) in the order each editor drags the toolbar
   into, kept in their own browser (the left button starts on tool 1, the right on Clear, the middle on nothing). On this page
   the browser's menu opens only on a double right-click. The
-  change shows at once and is saved in one call. Hovering or focusing a name shows that person's
-  minutes in each role, on the day and over the event (`person-card.tsx`).
-  The view and the day are in the address.
-- **Edit** (`/schedules/:id/edit`, editors): name, time zone, Slack reminders, Published,
+  change shows at once and is saved in one call. Undo and Redo (Ctrl+Z, Ctrl+Y or
+  Ctrl+Shift+Z; `history.ts`) step back and forward through the paints since the page loaded. Hovering or focusing a name shows that person's
+  minutes in each role, on the day and over the event (`person-card.tsx`); hovering or focusing a
+  column's time shows how many people have each role in that 15 minutes (`slot-card.tsx`).
+  An **Editing** switch beside Settings turns painting on. It's off whenever the app is opened or
+  reloaded (and stays as set while moving around the app), so looking never changes anything by
+  accident. The view and the day are in
+  the address.
+- **Settings** (`/schedules/:id/settings`, editors): name, time zone, Slack reminders, Published,
   delete; the days and their hours; the periods; who's attending.
+- **Friends** (`/friends`): search the team by name to add friends, and remove them. Only you see
+  your friends. A schedule's **Friends** view (between My schedule and Everyone) is the grid with
+  just you and your friends, and My schedule's "With" names only friends.
 - **Roles** (`/roles`, editors): the team's roles and their colors (a preset or a custom one), in
   order; archive one that's been assigned.
 - **Admin** (`/admin`, mentors and admins): the trusted students who edit schedules.
