@@ -1,4 +1,5 @@
 import { teamMembers } from "@g3/auth";
+import { teamAppUrlVia } from "@g3/site-config";
 import { and, eq, gt } from "drizzle-orm";
 import {
   NOTIFICATION_TYPES,
@@ -186,11 +187,26 @@ export async function dmCandidates(env: Bindings, teamId: string) {
     }));
 }
 
-/** The Slack text: its type and short description in bold, then the full text. */
-function slackText(n: { type: NotificationType; summary: string; body: string }) {
+/**
+ * The Slack text, sent by the team's own bot, so it says plainly that it's Gearbox's: "Gearbox ·
+ * Critical" with the type's mark, then the short description and the full text as a quote, then
+ * where the team chooses where these go. Kept under Slack's 4,000 characters (the text is cut).
+ */
+export function slackText(
+  n: { type: NotificationType; summary: string; body: string },
+  settingsUrl: string,
+) {
   const mark = { info: ":information_source:", warning: ":warning:", critical: ":rotating_light:" };
-  const text = `${mark[n.type]} *Gearbox ${LABELS[n.type].toLowerCase()}: ${n.summary}*\n\n${n.body}`;
-  return text.length > 3900 ? `${text.slice(0, 3899)}…` : text;
+  const head = `${mark[n.type]}  *Gearbox · ${LABELS[n.type]}*\n`;
+  const footer = `\n\n_From Gearbox, the platform your team's apps run on · <${settingsUrl}|Choose where these go>_`;
+  // A quote bar down the side of every line of the notification itself, then cut to fit.
+  let quoted = `*${n.summary.trim()}*\n${n.body.trim()}`
+    .split("\n")
+    .map((line) => `>${line}`)
+    .join("\n");
+  const room = 3900 - head.length - footer.length;
+  if (quoted.length > room) quoted = `${quoted.slice(0, room - 1)}…`;
+  return `${head}${quoted}${footer}`;
 }
 
 /**
@@ -212,7 +228,6 @@ export async function deliverToSlack(
     .innerJoin(teams, eq(teams.id, teamNotificationSettings.teamId))
     .where(and(eq(teamNotificationSettings.type, n.type), eq(teams.status, "active")))
     .all();
-  const text = slackText(n);
   let sentTo = 0;
   // A few teams at a time, so one slow Slack doesn't hold up the rest.
   for (let i = 0; i < rows.length; i += 10) {
@@ -222,6 +237,8 @@ export async function deliverToSlack(
         const channel = row.slackChannel;
         const users = parseList(row.slackUsers);
         if (!channel && users.length === 0) return false;
+        const settingsUrl = `${teamAppUrlVia(env.LOCAL_GATEWAY_URL, row.teamId, "portal")}/admin/notifications`;
+        const text = slackText(n, settingsUrl);
         const sends = [
           ...(channel
             ? [
