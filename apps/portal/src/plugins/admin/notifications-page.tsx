@@ -78,29 +78,19 @@ export function NotificationsPage() {
   return (
     <main className="mx-auto w-full max-w-2xl px-6 py-8">
       {welcome && (
-        <div className="mb-6 rounded-lg border border-line bg-surface p-4 text-secondary-700">
-          <p className="font-semibold text-secondary-900">
-            Welcome to Gearbox! Your team is set up.
-          </p>
-          <p className="mt-1 text-sm">
-            First, choose where Gearbox's notifications go, so your team hears about updates and
-            downtime. Then{" "}
-            <Link to="/admin" className="font-semibold text-primary-600 hover:underline">
-              choose your team's apps
-            </Link>
-            .
-          </p>
-        </div>
+        <p className="mb-6 rounded-lg border border-line bg-surface p-4 text-secondary-700">
+          <strong className="text-secondary-900">Welcome to Gearbox!</strong> Start by choosing
+          where notifications go below, then{" "}
+          <Link to="/admin" className="font-semibold text-primary-600 hover:underline">
+            choose your team's apps
+          </Link>
+          .
+        </p>
       )}
       <h1 className="mb-2 text-3xl font-bold text-secondary-900">Notifications</h1>
       <p className="mb-6 text-secondary-600">
-        Gearbox sends notifications about updates, downtime and anything that needs your attention.
-        Choose who sees each kind on your team's home page and where it goes on Slack.
-      </p>
-      <p className="mb-6 rounded-lg border border-line bg-inset p-3 text-sm text-secondary-700">
-        <strong className="text-secondary-900">Turn on every kind.</strong> Gearbox is an early beta
-        and changes quickly, so we strongly recommend showing all three on the home page and sending
-        them to Slack. It's how we tell your team about changes and problems.
+        Updates, downtime and anything that needs your attention. Gearbox is an early beta, so we
+        recommend turning on every kind, on the home page and in Slack.
       </p>
       {error && (
         <p role="alert" className="mb-4 rounded-md border border-red-500 p-3 text-red-700">
