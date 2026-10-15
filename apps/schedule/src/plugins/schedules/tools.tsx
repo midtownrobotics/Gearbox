@@ -13,8 +13,8 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Chip } from "@g3/ui";
-import { type KeyboardEvent, type ReactNode, useCallback, useEffect, useState } from "react";
+import { Button, Chip, Dialog } from "@g3/ui";
+import { Fragment, type ReactNode, useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import type { Role } from "../../shared/api";
 import { Swatch } from "../../shared/role-colors";
@@ -104,11 +104,13 @@ export function Tools({
   tools,
   buttons,
   onChange,
+  history,
 }: {
   roles: Role[];
   tools: Tool[];
   buttons: Buttons;
   onChange: (change: Partial<Buttons> & { order?: Tool[] }) => void;
+  history: { canUndo: boolean; canRedo: boolean; undo: () => void; redo: () => void };
 }) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
   const byId = new Map(roles.map((r) => [r.id, r]));
@@ -124,7 +126,7 @@ export function Tools({
 
   // 1–9 and 0 pick the tool in that place for the left button; with Shift, for the right.
   useEffect(() => {
-    const onKey = (e: globalThis.KeyboardEvent) => {
+    const onKey = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       const target = e.target as HTMLElement | null;
       if (target?.closest("input, textarea, select, [contenteditable]")) return;
@@ -145,15 +147,6 @@ export function Tools({
     onChange({
       order: arrayMove(tools, ids.indexOf(String(active.id)), ids.indexOf(String(over.id))),
     });
-  }
-
-  /** Alt+← and Alt+→ move a focused tool, for reordering without a mouse. */
-  function nudge(e: KeyboardEvent, index: number) {
-    if (!e.altKey || (e.key !== "ArrowLeft" && e.key !== "ArrowRight")) return;
-    const to = index + (e.key === "ArrowLeft" ? -1 : 1);
-    if (to < 0 || to >= tools.length) return;
-    e.preventDefault();
-    onChange({ order: arrayMove(tools, index, to) });
   }
 
   if (tools.length === 1) {
@@ -186,7 +179,6 @@ export function Tools({
                     right: buttons.right === tool,
                   }}
                   onBind={(button) => bind(button, tool)}
-                  onKeyDown={(e) => nudge(e, index)}
                 >
                   {role ? (
                     <>
@@ -208,10 +200,29 @@ export function Tools({
           </div>
         </SortableContext>
       </DndContext>
-      <p className="text-xs text-secondary-500">
-        Click a tool with any mouse button to paint with it using that button. The number keys pick
-        tools for the left button, and with Shift for the right. Drag tools to reorder them.
-      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <TipsButton />
+        <Button
+          size="sm"
+          variant="secondary"
+          disabled={!history.canUndo}
+          onClick={history.undo}
+          title="Ctrl+Z"
+          aria-keyshortcuts="Control+Z Meta+Z"
+        >
+          Undo
+        </Button>
+        <Button
+          size="sm"
+          variant="secondary"
+          disabled={!history.canRedo}
+          onClick={history.redo}
+          title="Ctrl+Y"
+          aria-keyshortcuts="Control+Y Control+Shift+Z Meta+Shift+Z"
+        >
+          Redo
+        </Button>
+      </div>
     </div>
   );
 }
@@ -227,7 +238,6 @@ function ToolButton({
   digit,
   on,
   onBind,
-  onKeyDown,
   children,
 }: {
   id: string;
@@ -235,7 +245,6 @@ function ToolButton({
   /** Which mouse buttons it's on. */
   on: Record<MouseButton, boolean>;
   onBind: (button: MouseButton) => void;
-  onKeyDown: (e: KeyboardEvent) => void;
   children: ReactNode;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -269,7 +278,6 @@ function ToolButton({
         onAuxClick={(e) => e.button === 1 && onBind("middle")}
         // The page keeps the browser's menu shut (context-menu.ts), except on a double right-click.
         onContextMenu={() => onBind("right")}
-        onKeyDown={onKeyDown}
         className={`inline-flex items-center gap-1.5 ${bound ? "border-secondary-900 ring-2 ring-secondary-900" : ""}`}
       >
         {digit && (
@@ -296,5 +304,85 @@ function Marker({ children }: { children: ReactNode }) {
     <span className="rounded bg-secondary-900 px-1 text-[10px] font-bold leading-4 text-white">
       {children}
     </span>
+  );
+}
+
+/** Keys, as the tips write them. */
+function Keys({ children }: { children: ReactNode }) {
+  return (
+    <kbd className="rounded border border-secondary-300 bg-inset px-1 font-sans text-xs text-secondary-800">
+      {children}
+    </kbd>
+  );
+}
+
+const TIPS: { title: string; items: ReactNode[] }[] = [
+  {
+    title: "Painting",
+    items: [
+      "Drag across people and times to give them the role on that mouse button.",
+      "Drag down across rows to give several people the same times.",
+      "Clear is a tool too: paint with it to remove blocks.",
+    ],
+  },
+  {
+    title: "Mouse buttons",
+    items: [
+      "Click a tool with the left, middle or right button to paint with it using that button.",
+      "L, M and R on a tool show which buttons it's on. Click it again to take it off.",
+      "Right-click twice quickly for the browser's own menu.",
+    ],
+  },
+  {
+    title: "Keys",
+    items: [
+      <Fragment key="number-keys">
+        <Keys>1</Keys>–<Keys>9</Keys> and <Keys>0</Keys> pick a tool for the left button; with{" "}
+        <Keys>Shift</Keys>, for the right.
+      </Fragment>,
+      <Fragment key="undo-keys">
+        <Keys>Ctrl</Keys>+<Keys>Z</Keys> undoes; <Keys>Ctrl</Keys>+<Keys>Y</Keys> or{" "}
+        <Keys>Ctrl</Keys>+<Keys>Shift</Keys>+<Keys>Z</Keys> redoes (<Keys>⌘</Keys> on a Mac).
+      </Fragment>,
+      "Drag tools to reorder them and their numbers.",
+    ],
+  },
+  {
+    title: "Looking",
+    items: [
+      "Hover a name for that person's minutes in each role.",
+      "Hover a time for how many people have each role then.",
+      "Editing starts off each time the app opens, so looking never changes anything.",
+    ],
+  },
+];
+
+/** A button for the grid's tips, in a small pop-up in the middle of the screen. */
+function TipsButton() {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <Button size="sm" variant="secondary" onClick={() => setOpen(true)}>
+        Tips
+      </Button>
+      {open && (
+        <Dialog title="Tips" centered onClose={() => setOpen(false)}>
+          <div className="space-y-4 text-sm text-secondary-700">
+            {TIPS.map((group) => (
+              <section key={group.title}>
+                <h3 className="mb-1 font-semibold text-secondary-900">{group.title}</h3>
+                <ul className="list-disc space-y-1 pl-5">
+                  {group.items.map((item, i) => (
+                    // biome-ignore lint/suspicious/noArrayIndexKey: a fixed list
+                    <li key={i}>{item}</li>
+                  ))}
+                </ul>
+              </section>
+            ))}
+          </div>
+          <Button onClick={() => setOpen(false)}>Got it</Button>
+        </Dialog>
+      )}
+    </>
   );
 }

@@ -97,7 +97,7 @@ They are in `packages/ui/src/components/` and exported from `@g3/ui`.
 | `ConfirmButton`, `ConfirmQuestion` | A danger button that asks its `question` in the page before it acts. Its question takes a line of its own, so the row it sits in has to wrap (`flex flex-wrap`). `ConfirmQuestion` is the question alone, for a switch or anything else that needs a yes; its `keepLabel` names what stays ("Keep it on") |
 | `Field`, `inputClass` | A label, a control and a hint; the class for an `<input>`, `<select>` or `<textarea>` |
 | `ErrorBanner`, `SuccessBanner`, `Loading` | Messages |
-| `Dialog` | A pop-up. `size` is how wide it may grow: `md` (a question; the default), `xl`, `2xl` (`wide` means this) or `3xl` (a form with columns) |
+| `Dialog` | A pop-up. `size` is how wide it may grow: `md` (a question; the default), `xl`, `2xl` (`wide` means this) or `3xl` (a form with columns). `centered` puts a short note (Schedule's tips) in the middle of the screen and moves focus into it, giving it back on close |
 | `Toggle`, `Switch` | An on/off switch with a label and description; the switch alone, for a row that already says what it switches |
 | `Chip` | One choice in a row of filters; the chosen one is near-black |
 | `Badge`, `tones` | A status label and the colors that mean something |

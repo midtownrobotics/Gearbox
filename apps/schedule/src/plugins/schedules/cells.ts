@@ -1,4 +1,4 @@
-import type { Range } from "../../shared/api";
+import type { Change, Range } from "../../shared/api";
 import { SLOT_MINUTES } from "../../shared/time";
 
 // The page keeps a schedule's blocks one per slot, as the worker does, so a change can be shown
@@ -56,6 +56,26 @@ export function minutesByRole(cells: Cells, userId: string, day?: string): Map<n
   const out = new Map<number, number>();
   for (const [key, roleId] of cells) {
     if (key.startsWith(prefix)) out.set(roleId, (out.get(roleId) ?? 0) + SLOT_MINUTES);
+  }
+  return out;
+}
+
+/**
+ * The changes that put back what `change` replaces: for each person, runs of the blocks' roles
+ * as they are now (null where nothing is assigned). For undo.
+ */
+export function inverseOf(cells: Cells, change: Change): Change[] {
+  const out: Change[] = [];
+  for (const userId of change.userIds) {
+    let run: Change | null = null;
+    for (let slot = change.start; slot < change.end; slot++) {
+      const roleId = cells.get(cellKey(userId, change.day, slot)) ?? null;
+      if (run && run.roleId === roleId && run.end === slot) run.end++;
+      else {
+        run = { userIds: [userId], day: change.day, start: slot, end: slot + 1, roleId };
+        out.push(run);
+      }
+    }
   }
   return out;
 }

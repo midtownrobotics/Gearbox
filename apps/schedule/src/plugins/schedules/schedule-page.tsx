@@ -1,15 +1,16 @@
 import { Badge, Card, Chip, ErrorBanner, Loading, Page, Switch, buttonClass, tones } from "@g3/ui";
-import { useEffect, useId, useMemo, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { type Change, type Role, type ScheduleDetail, api, unwrap } from "../../shared/api";
 import { useAuthUser } from "../../shared/auth";
 import { Swatch, roleBlock } from "../../shared/role-colors";
 import { dayLabel, longDayLabel, nowAt, spanLabel } from "../../shared/time";
 import { useLoad } from "../../shared/use-load";
-import { type Cells, rowRanges, sharing, toCells } from "./cells";
+import { type Cells, inverseOf, rowRanges, sharing, toCells } from "./cells";
 import { useMenuOnDoubleRightClick } from "./context-menu";
 import { useEditing } from "./editing";
 import { Grid, applyChange } from "./grid";
+import { useHistory } from "./history";
 import { Tools, useTools } from "./tools";
 
 /** One event's schedule: the viewer's own day, or everyone's (where editors paint blocks). */
@@ -97,20 +98,38 @@ function Loaded({
   // With no friends attending, the Friends view would only be the viewer.
   const friendsAttending = shown.some((a) => a.userId !== me);
 
-  async function paint(change: Change) {
-    setSaveError(null);
-    setCells((current) => applyChange(current, change));
-    try {
-      await unwrap(
-        api.schedules[":id"].assignments.$put({
-          param: { id: String(detail.schedule.id) },
-          json: { changes: [change] },
-        }),
-      );
-    } catch (err) {
-      setSaveError(err instanceof Error ? err.message : String(err));
-      reload();
-    }
+  // Saves go one after another, so an undo can't reach the worker before the paint it undoes.
+  const queue = useRef(Promise.resolve());
+  /** Shows changes at once and saves them; a failed save reloads the schedule and its history. */
+  const send = useCallback(
+    (changes: Change[]) => {
+      if (changes.length === 0) return;
+      setSaveError(null);
+      setCells((current) => changes.reduce(applyChange, current));
+      queue.current = queue.current.then(async () => {
+        try {
+          await unwrap(
+            api.schedules[":id"].assignments.$put({
+              param: { id: String(detail.schedule.id) },
+              json: { changes },
+            }),
+          );
+        } catch (err) {
+          setSaveError(err instanceof Error ? err.message : String(err));
+          history.current?.clear();
+          reload();
+        }
+      });
+    },
+    [detail.schedule.id, reload],
+  );
+  const steps = useHistory(send, editing);
+  const history = useRef(steps);
+  history.current = steps;
+
+  function paint(change: Change) {
+    steps.record([change], inverseOf(cells, change));
+    send([change]);
   }
 
   return (
@@ -204,6 +223,7 @@ function Loaded({
                   tools={tools.tools}
                   buttons={tools.buttons}
                   onChange={tools.update}
+                  history={steps}
                 />
               )}
               {shown.length === 0 || (view === "friends" && !friendsAttending) ? (
@@ -224,7 +244,7 @@ function Loaded({
                   buttons={editing ? tools.buttons : null}
                   me={me}
                   now={now?.day === day.day ? now.slot : null}
-                  onPaint={(change) => void paint(change)}
+                  onPaint={paint}
                 />
               )}
               <Legend roles={detail.roles} />

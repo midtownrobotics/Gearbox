@@ -18,7 +18,8 @@ for [`workers/schedule`](../../workers/schedule).
   with the number keys (Shift for the right button) in the order each editor drags the toolbar
   into, kept in their own browser (the left button starts on tool 1, the right on Clear, the middle on nothing). On this page
   the browser's menu opens only on a double right-click. The
-  change shows at once and is saved in one call. Hovering or focusing a name shows that person's
+  change shows at once and is saved in one call. Undo and Redo (Ctrl+Z, Ctrl+Y or
+  Ctrl+Shift+Z; `history.ts`) step back and forward through the paints since the page loaded. Hovering or focusing a name shows that person's
   minutes in each role, on the day and over the event (`person-card.tsx`); hovering or focusing a
   column's time shows how many people have each role in that 15 minutes (`slot-card.tsx`).
   An **Editing** switch beside Settings turns painting on. It's off whenever the app is opened or
