@@ -84,6 +84,7 @@ const routes = app
       name?: unknown;
       country?: unknown;
       acceptTerms?: unknown;
+      acceptBeta?: unknown;
     }>();
     const teamNumber = Number(body.teamNumber);
     const name = typeof body.name === "string" ? body.name.trim() : "";
@@ -99,6 +100,12 @@ const routes = app
     if (!/^[A-Z]{2}$/.test(country)) return c.json({ error: "Choose your country." }, 400);
     if (body.acceptTerms !== true) {
       return c.json({ error: "Accept the terms of service and privacy policy to continue." }, 400);
+    }
+    if (body.acceptBeta !== true) {
+      return c.json(
+        { error: "Confirm you understand Gearbox is an early open beta to continue." },
+        400,
+      );
     }
 
     const id = `frc${teamNumber}`;
@@ -310,7 +317,8 @@ const routes = app
           updatedAt: now(),
         })
         .where(and(eq(teams.id, team.id), eq(teams.status, "pending")));
-      const home = `${teamAppUrlVia(c.env.LOCAL_GATEWAY_URL, team.id, "portal")}/`;
+      // The founder's first stop: where Gearbox's notifications go (then the team's apps).
+      const home = `${teamAppUrlVia(c.env.LOCAL_GATEWAY_URL, team.id, "portal")}/admin/notifications?welcome=1`;
       return c.json({
         status: "done" as const,
         // G3ID sets the session cookie on the team's own domain, then opens the team's home.

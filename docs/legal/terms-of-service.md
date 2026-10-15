@@ -98,7 +98,7 @@ Gearbox is free. No team pays to register or to switch on an app.
 
 ## 11. Availability and changes
 
-Gearbox is run by volunteers and is provided as it is. We do not promise that it will always be available, free of errors, or suited to a particular purpose. Do not rely on Gearbox as your team's only copy of anything it cannot afford to lose.
+Gearbox is an early open beta: it changes quickly, and while we work to prevent it, data can be lost. Every team confirms it understands this when it signs up. Gearbox is run by volunteers and is provided as it is. We do not promise that it will always be available, free of errors, or suited to a particular purpose. Do not rely on Gearbox as your team's only copy of anything it cannot afford to lose.
 
 We may change Gearbox at any time. If we ever decide to shut it down, we will give team owners at least 90 days' notice and keep export working for that period.
 

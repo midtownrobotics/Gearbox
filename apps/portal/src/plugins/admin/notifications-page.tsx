@@ -1,6 +1,7 @@
 import { SlackChannelPicker } from "@g3/ui";
 import { useEffect, useState } from "react";
 import { FaTimes } from "react-icons/fa";
+import { Link, useSearchParams } from "react-router-dom";
 import {
   type DmCandidate,
   NOTIFICATION_STYLES,
@@ -35,6 +36,9 @@ export function NotificationsPage() {
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
+  // A new team's founder lands here from sign-up (?welcome=1): notifications first, then apps.
+  const [params] = useSearchParams();
+  const welcome = params.get("welcome") === "1";
 
   useEffect(() => {
     platform<Loaded>("/team/notification-settings")
@@ -73,6 +77,21 @@ export function NotificationsPage() {
 
   return (
     <main className="mx-auto w-full max-w-2xl px-6 py-8">
+      {welcome && (
+        <div className="mb-6 rounded-lg border border-line bg-surface p-4 text-secondary-700">
+          <p className="font-semibold text-secondary-900">
+            Welcome to Gearbox! Your team is set up.
+          </p>
+          <p className="mt-1 text-sm">
+            First, choose where Gearbox's notifications go, so your team hears about updates and
+            downtime. Then{" "}
+            <Link to="/admin" className="font-semibold text-primary-600 hover:underline">
+              choose your team's apps
+            </Link>
+            .
+          </p>
+        </div>
+      )}
       <h1 className="mb-2 text-3xl font-bold text-secondary-900">Notifications</h1>
       <p className="mb-6 text-secondary-600">
         Gearbox sends notifications about updates, downtime and anything that needs your attention.

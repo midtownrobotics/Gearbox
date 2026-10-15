@@ -23,6 +23,7 @@ const details = (teamNumber: number) => ({
   name: "The Testers",
   country: "us",
   acceptTerms: true,
+  acceptBeta: true,
 });
 
 async function signUp(teamNumber: number): Promise<string> {
@@ -76,7 +77,10 @@ describe("signing a team up", () => {
     const signIn = new URL(done.signInUrl);
     expect(signIn.origin).toBe(`https://${number}-id.${site.platformDomain}`);
     expect(signIn.pathname).toBe("/api/auth/slack/complete");
-    expect(signIn.searchParams.get("redirect")).toBe(`https://${number}.${site.platformDomain}/`);
+    // The founder's first stop is the Notifications page, with its welcome.
+    expect(signIn.searchParams.get("redirect")).toBe(
+      `https://${number}.${site.platformDomain}/admin/notifications?welcome=1`,
+    );
 
     expect(await team(number)).toMatchObject({
       status: "active",
@@ -86,12 +90,13 @@ describe("signing a team up", () => {
     expect(await (await call(`/teams/frc${number}`)).json()).toMatchObject({ teamNumber: number });
   });
 
-  it("checks the details and the terms", async () => {
+  it("checks the details, the terms and the beta", async () => {
     for (const bad of [
       { teamNumber: 0 },
       { name: "" },
       { country: "USA" },
       { acceptTerms: false },
+      { acceptBeta: false },
     ]) {
       const res = await call("/signup", {
         method: "POST",
