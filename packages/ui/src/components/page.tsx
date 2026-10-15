@@ -13,7 +13,7 @@ const WIDTHS: Record<PageWidth, string> = {
 /** The whole screen while an app finds out who is signed in. */
 export function PageLoading() {
   return (
-    <main className="min-h-screen bg-page flex items-center justify-center">
+    <main className="flex flex-1 items-center justify-center bg-page">
       <p className="text-secondary-400">Loading…</p>
     </main>
   );
@@ -21,8 +21,8 @@ export function PageLoading() {
 
 /**
  * A page under the top bar: its title, its buttons at the right, then its content. It fills the
- * room the bar leaves, so the app's shell is a column as tall as the screen
- * (`flex min-h-screen flex-col`).
+ * room the bar leaves, so the app's shell is a column that fills the page's root
+ * (`flex flex-1 flex-col`).
  */
 export function Page({
   title,

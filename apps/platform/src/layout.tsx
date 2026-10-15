@@ -78,7 +78,7 @@ export function Footer() {
 
 export function Page({ children }: { children: ReactNode }) {
   return (
-    <div className="flex min-h-screen flex-col bg-page">
+    <div className="flex flex-1 flex-col bg-page">
       <Header />
       <main className="flex-1">{children}</main>
       <Footer />

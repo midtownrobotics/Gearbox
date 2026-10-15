@@ -9,7 +9,7 @@ export function App() {
   return (
     <BrowserRouter>
       <ProtectedRoute>
-        <div className="flex min-h-screen flex-col bg-page">
+        <div className="flex flex-1 flex-col bg-page">
           <NavBar items={navItems} />
           <Routes>
             <Route path="/" element={<Navigate to="/network" replace />} />

@@ -191,7 +191,7 @@ export function PartViewerPage() {
         key={refreshKey}
         src={`${pdfUrl}?v=${refreshKey}`}
         type="application/pdf"
-        className="h-[calc(100vh-14rem)] min-h-96 w-full rounded-xl border border-secondary-200 bg-surface"
+        className="h-[calc(100dvh-14rem)] min-h-96 w-full rounded-xl border border-secondary-200 bg-surface"
         title={`Drawing for ${partNumber}`}
       />
     </Page>

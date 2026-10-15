@@ -605,7 +605,7 @@
   body {
     margin: 0;
     min-width: 320px;
-    min-height: 100vh;
+    min-height: 100dvh;
     background: radial-gradient(circle at 75% 0%, rgba(50, 104, 161, 0.12), transparent 34rem),
       #090e16;
   }
@@ -624,10 +624,6 @@
 
   button {
     cursor: pointer;
-  }
-
-  .app-shell {
-    min-height: 100vh;
   }
 
   aside {
@@ -791,7 +787,7 @@
   }
 
   .app-shell > main {
-    min-height: 100vh;
+    flex: 1;
     margin-left: 248px;
   }
 
@@ -4480,7 +4476,7 @@
 
   .auth-screen {
     display: flex;
-    min-height: 100vh;
+    flex: 1;
     align-items: center;
     justify-content: center;
     flex-direction: column;
@@ -4943,7 +4939,7 @@
   }
 
   .app-shell > main {
-    min-height: calc(100vh - 56px);
+    flex: 1;
     margin: 0;
     background: var(--g3-page);
   }
@@ -5796,7 +5792,7 @@
   }
 
   .app-shell > main {
-    min-height: calc(100vh - 56px);
+    flex: 1;
     margin: 0;
   }
 

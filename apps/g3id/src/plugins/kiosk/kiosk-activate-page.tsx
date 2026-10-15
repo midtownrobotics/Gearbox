@@ -58,7 +58,7 @@ export function KioskActivatePage() {
   }
 
   return (
-    <div className="min-h-screen bg-page flex items-center justify-center px-4">
+    <div className="flex flex-1 items-center justify-center bg-page px-4">
       <div className="w-full max-w-md space-y-8">
         <div className="text-center">
           <h1 className="text-4xl text-secondary-900 mb-2">Activate Kiosk</h1>

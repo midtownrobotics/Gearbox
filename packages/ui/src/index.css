@@ -54,6 +54,15 @@
 }
 
 @layer base {
+  /* The app fills the visible screen (dvh: a phone's browser bars left out), so a page that fits
+     never scrolls. An app's shell, under its top bar, fills the rest with flex-1; nothing inside
+     it is a whole screen tall. */
+  #root {
+    display: flex;
+    flex-direction: column;
+    min-height: 100dvh;
+  }
+
   h1,
   h2,
   h3,
