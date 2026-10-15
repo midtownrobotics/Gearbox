@@ -1,5 +1,6 @@
 import { adminPlugin } from "./plugins/admin";
+import { friendsPlugin } from "./plugins/friends";
 import { rolesPlugin } from "./plugins/roles";
 import { schedulesPlugin } from "./plugins/schedules";
 
-export const plugins = [schedulesPlugin, rolesPlugin, adminPlugin];
+export const plugins = [schedulesPlugin, friendsPlugin, rolesPlugin, adminPlugin];

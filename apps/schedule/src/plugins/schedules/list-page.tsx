@@ -69,7 +69,7 @@ function NewScheduleDialog({ onClose }: { onClose: () => void }) {
     setError(null);
     try {
       const schedule = await unwrap(api.schedules.$post({ json: { name, timeZone } }));
-      navigate(`/schedules/${schedule.id}/edit`);
+      navigate(`/schedules/${schedule.id}/settings`);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       setSaving(false);

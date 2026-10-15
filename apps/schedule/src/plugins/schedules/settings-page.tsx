@@ -27,7 +27,7 @@ import { TimeZoneSelect } from "./list-page";
 
 const message = (err: unknown) => (err instanceof Error ? err.message : String(err));
 
-export function EditPage() {
+export function SettingsPage() {
   const id = useParams().id ?? "";
   const user = useAuthUser();
   const { data, error, reload } = useLoad(
@@ -38,7 +38,7 @@ export function EditPage() {
 
   if (!user.canEdit) {
     return (
-      <Page title="Edit">
+      <Page title="Settings">
         <p className="text-sm text-secondary-500">
           Only mentors and trusted students can edit schedules.
         </p>
@@ -46,7 +46,7 @@ export function EditPage() {
     );
   }
   return (
-    <Page title="Edit" description={data?.schedule.name} width="narrow">
+    <Page title="Settings" description={data?.schedule.name} width="narrow">
       <Link to={`/schedules/${id}`} className="text-sm text-secondary-500 hover:text-secondary-900">
         ← Back to the schedule
       </Link>

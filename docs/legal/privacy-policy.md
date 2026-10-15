@@ -40,7 +40,7 @@ We collect only what the apps need to work.
 | Shop | Parts, production steps, who did them, who made a part obsolete, drawings and files; for each Onshape release, its name and notes, who made and approved it (their Onshape names) and its comments | Members, mentors and Onshape, if connected |
 | Pit | Checklists, issues and battery records, and archives of the checklists with who archived each one and when | Members |
 | Skill Tree | Each member's progress on skills and who signed it off | Members and mentors |
-| Schedule | Each event's days and periods, which members are attending, each one's role for every 15 minutes, who may edit schedules, and which Slack reminders were sent | Mentors and the students they trust |
+| Schedule | Each event's days and periods, which members are attending, each one's role for every 15 minutes, who may edit schedules, and which Slack reminders were sent; each member's own list of friends, which only that member can see | Mentors and the students they trust; each member, for their friends |
 | Scouting | Match and pit observations, notes on other teams, robot photos, schedules; when engagement is enabled, point balances and awards, match picks and their results | Members and optional scouting activities |
 | Uploaded files | Whatever your team uploads | Members |
 | Technical logs | Internet address, browser type, the page requested and the time | Recorded automatically by our hosting provider |

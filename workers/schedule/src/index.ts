@@ -5,10 +5,11 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import packageJson from "../package.json";
 import { createDb } from "./db";
-import { TEAM_TABLES } from "./db/schema";
+import { EXPORTED_TABLES, TEAM_TABLES } from "./db/schema";
 import { canEdit } from "./lib/editors";
 import { manifest } from "./manifest";
 import { sendReminders } from "./reminders";
+import { friendsRouter } from "./routes/friends";
 import { editorsRouter, membersRouter } from "./routes/people";
 import { rolesRouter } from "./routes/roles";
 import { schedulesRouter } from "./routes/schedules";
@@ -39,8 +40,12 @@ const app = base
   // library). Only other workers reach /internal: the gateway never answers it.
   .get("/internal/teams/:teamId/export", async (c) => {
     const teamId = c.req.param("teamId");
-    const tables = await exportTeamRows(createDb(c.env.SCHEDULE_DB), teamId, [...TEAM_TABLES]);
-    return c.json(teamExport(manifest, teamId, tables));
+    const tables = await exportTeamRows(createDb(c.env.SCHEDULE_DB), teamId, [...EXPORTED_TABLES]);
+    return c.json(
+      teamExport(manifest, teamId, tables, [
+        "Each member's friends are private to them, so they aren't included.",
+      ]),
+    );
   })
   // When an operator deletes the team (the platform's console), or 90 days after the team switches
   // the app off (the platform's app library), its data goes too.
@@ -63,7 +68,8 @@ const app = base
   .route("/schedules", schedulesRouter)
   .route("/roles", rolesRouter)
   .route("/members", membersRouter)
-  .route("/editors", editorsRouter);
+  .route("/editors", editorsRouter)
+  .route("/friends", friendsRouter);
 
 export type ScheduleApp = typeof app;
 /** The Hono app itself, for the isolation test (test/isolation.test.ts). */

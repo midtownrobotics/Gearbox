@@ -1,8 +1,8 @@
 import type { Plugin } from "../../shared/plugin-types";
-import { EditPage } from "./edit-page";
 import { ListPage } from "./list-page";
 import { OpenClosest } from "./open-closest";
 import { SchedulePage } from "./schedule-page";
+import { SettingsPage } from "./settings-page";
 
 export const schedulesPlugin: Plugin = {
   name: "schedules",
@@ -11,7 +11,7 @@ export const schedulesPlugin: Plugin = {
     { path: "/schedules", element: <OpenClosest /> },
     { path: "/schedules/all", element: <ListPage /> },
     { path: "/schedules/:id", element: <SchedulePage /> },
-    { path: "/schedules/:id/edit", element: <EditPage /> },
+    { path: "/schedules/:id/settings", element: <SettingsPage /> },
   ],
   navItems: [{ label: "Schedules", to: "/schedules", order: 10 }],
 };

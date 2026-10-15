@@ -121,7 +121,12 @@ const DATABASES: Database[] = [
     alsoTeams: ["starter"],
   },
   { worker: "pit", binding: "PIT_DB" },
-  { worker: "schedule", binding: "SCHEDULE_DB" },
+  {
+    worker: "schedule",
+    binding: "SCHEDULE_DB",
+    // Each member's friends are private to them, so a rehearsal goes without.
+    skip: ["friends"],
+  },
   {
     worker: "shop",
     binding: "SHOP_DB",

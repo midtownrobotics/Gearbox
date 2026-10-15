@@ -65,3 +65,5 @@ export type Change = {
   end: number;
   roleId: number | null;
 };
+export type Friend = InferResponseType<(typeof api.friends)["$get"], 200>[number];
+export type Person = InferResponseType<(typeof api.friends.people)["$get"], 200>[number];
