@@ -5,9 +5,9 @@ import packageJson from "../package.json";
 export const manifest = defineManifest({
   slug: "schedule",
   name: "Schedule",
-  summary: "The team's meetings, events and deadlines.",
+  summary: "Who does what at each event, 15 minutes at a time.",
   roles: ["admin", "mentor", "member", "kiosk"],
-  integrations: [],
+  integrations: ["slack"],
   availability: "every team",
   version: packageJson.version,
   hooks: { seed: false, delete: true, export: true },

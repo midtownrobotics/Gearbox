@@ -1,9 +1,31 @@
 # Schedule
 
-The team's meetings, events and deadlines.
+Who does what at each event, 15 minutes at a time.
 
 Built like the other apps: React, React Router and Tailwind v4 with the shared top bar, colors,
 fonts and light/dark mode from `@g3/ui`, plugins under `src/plugins/`, and a typed Hono client
 for [`workers/schedule`](../../workers/schedule).
 
-It's being built: the page is empty, and the worker's database holds one table, `events`.
+## Pages
+
+- **Schedules** (`/schedules`): the team's events. Editors see drafts too and make new ones.
+- **A schedule** (`/schedules/:id`): **My schedule** (the viewer's runs of roles for a day, who
+  shares each, and the event's periods beside) or **Everyone** (the grid: a row per attendee, a
+  column per 15 minutes, the periods across the top and a mark at "now"). Editors drag across people and times to paint: each mouse button has its own tool (a role,
+  or Clear), set by clicking it in the toolbar with that button (left, middle or right) (`plugins/schedules/tools.tsx`), or
+  with the number keys (Shift for the right button) in the order each editor drags the toolbar
+  into, kept in their own browser (the left button starts on tool 1, the right on Clear, the middle on nothing). On this page
+  the browser's menu opens only on a double right-click. The
+  change shows at once and is saved in one call. Hovering or focusing a name shows that person's
+  minutes in each role, on the day and over the event (`person-card.tsx`).
+  The view and the day are in the address.
+- **Edit** (`/schedules/:id/edit`, editors): name, time zone, Slack reminders, Published,
+  delete; the days and their hours; the periods; who's attending.
+- **Roles** (`/roles`, editors): the team's roles and their colors (a preset or a custom one), in
+  order; archive one that's been assigned.
+- **Admin** (`/admin`, mentors and admins): the trusted students who edit schedules.
+
+Times are wall-clock slots of the event's own day (`src/shared/time.ts`), shown in the viewer's
+own format. A role's color is a preset (`src/shared/role-colors.tsx`: a tint that suits light and dark mode;
+no red, which means a problem) or any color the team picks, drawn as it is with black or white
+text.

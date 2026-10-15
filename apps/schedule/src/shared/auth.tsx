@@ -5,10 +5,12 @@ import { api, redirectToLogin } from "./api";
 export type AuthUser = {
   userId: string;
   displayName: string;
-  /** G3ID mentors and admins. */
+  /** G3ID mentors and admins: the Admin page (who else edits). */
   isMentor: boolean;
-  /** G3ID admins: the Admin page. */
+  /** G3ID admins. */
   isAdmin: boolean;
+  /** Mentors, admins and trusted students: making and changing schedules, drafts included. */
+  canEdit: boolean;
 };
 
 const AuthUserContext = createContext<AuthUser | null>(null);

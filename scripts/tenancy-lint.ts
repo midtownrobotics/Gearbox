@@ -120,7 +120,19 @@ const APPS: App[] = [
       intakeReceipts: "intake_receipts",
     },
   },
-  { dir: "workers/schedule", teamTables: { events: "events" } },
+  {
+    dir: "workers/schedule",
+    teamTables: {
+      schedules: "schedules",
+      scheduleDays: "schedule_days",
+      schedulePeriods: "schedule_periods",
+      roles: "roles",
+      scheduleAttendees: "schedule_attendees",
+      assignments: "assignments",
+      notificationsSent: "notifications_sent",
+      scheduleEditors: "schedule_editors",
+    },
+  },
 ];
 
 /** The literal SQL a `sql` template writes: its text, not the `${…}` values put in. */

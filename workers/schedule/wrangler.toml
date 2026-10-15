@@ -8,6 +8,10 @@ compatibility_date = "2026-05-17"
 binding = "G3ID"
 service = "g3id"
 
+# Slack reminders before someone's role changes (src/reminders.ts).
+[triggers]
+crons = ["* * * * *"]
+
 [[d1_databases]]
 binding = "SCHEDULE_DB"
 database_name = "g3-schedule-local"
@@ -21,6 +25,9 @@ FRONTEND_URL = "http://localhost:5187"
 name = "schedule-production"
 # No workers.dev address: the gateway is the only way in, so its identity headers can be trusted.
 workers_dev = false
+
+[env.production.triggers]
+crons = ["* * * * *"]
 
 [[env.production.services]]
 binding = "G3ID"
@@ -55,6 +62,9 @@ workers_dev = false
 
 [env.staging.define]
 __G3_STAGING__ = "true"
+
+[env.staging.triggers]
+crons = ["* * * * *"]
 
 [[env.staging.services]]
 binding = "G3ID"

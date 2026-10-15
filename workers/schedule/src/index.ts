@@ -5,8 +5,13 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import packageJson from "../package.json";
 import { createDb } from "./db";
-import { events } from "./db/schema";
+import { TEAM_TABLES } from "./db/schema";
+import { canEdit } from "./lib/editors";
 import { manifest } from "./manifest";
+import { sendReminders } from "./reminders";
+import { editorsRouter, membersRouter } from "./routes/people";
+import { rolesRouter } from "./routes/roles";
+import { schedulesRouter } from "./routes/schedules";
 import type { AppEnv } from "./types";
 
 const base = new Hono<AppEnv>();
@@ -34,28 +39,43 @@ const app = base
   // library). Only other workers reach /internal: the gateway never answers it.
   .get("/internal/teams/:teamId/export", async (c) => {
     const teamId = c.req.param("teamId");
-    const tables = await exportTeamRows(createDb(c.env.SCHEDULE_DB), teamId, [events]);
+    const tables = await exportTeamRows(createDb(c.env.SCHEDULE_DB), teamId, [...TEAM_TABLES]);
     return c.json(teamExport(manifest, teamId, tables));
   })
   // When an operator deletes the team (the platform's console), or 90 days after the team switches
   // the app off (the platform's app library), its data goes too.
   .delete("/internal/teams/:teamId", async (c) => {
-    await deleteTeamRows(createDb(c.env.SCHEDULE_DB), c.req.param("teamId"), [events]);
+    await deleteTeamRows(createDb(c.env.SCHEDULE_DB), c.req.param("teamId"), [...TEAM_TABLES]);
     return c.json({ ok: true });
   })
-  .get("/me", requireAuth, (c) =>
+  .get("/me", requireAuth, async (c) =>
     c.json({
       userId: c.get("userId"),
       displayName: c.get("userDisplayName"),
-      /** G3ID mentors and admins. */
+      /** G3ID mentors and admins: the Admin page, and choosing who else edits. */
       isMentor: hasMentorAccess(c),
-      /** G3ID admins: the Admin page. */
+      /** G3ID admins. */
       isAdmin: c.get("userIsAdmin"),
+      /** Mentors, admins and trusted students: making and changing schedules, drafts included. */
+      canEdit: await canEdit(c),
     }),
-  );
+  )
+  .route("/schedules", schedulesRouter)
+  .route("/roles", rolesRouter)
+  .route("/members", membersRouter)
+  .route("/editors", editorsRouter);
 
 export type ScheduleApp = typeof app;
 /** The Hono app itself, for the isolation test (test/isolation.test.ts). */
 export { app };
 
-export default { fetch: withApiPrefix(app.fetch) };
+export type { AssignmentRange } from "./lib/schedules";
+export { ROLE_COLORS, type RoleColor, type RolePreset } from "./lib/roles";
+
+export default {
+  fetch: withApiPrefix(app.fetch),
+  // Slack reminders before role changes (wrangler.toml's cron: every minute).
+  scheduled: (_event: ScheduledController, env: AppEnv["Bindings"], ctx: ExecutionContext) => {
+    ctx.waitUntil(sendReminders(env));
+  },
+};

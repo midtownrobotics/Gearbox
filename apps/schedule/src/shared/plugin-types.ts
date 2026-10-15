@@ -5,14 +5,15 @@ export interface PluginRoute {
   element: ReactElement;
 }
 
+/** Who a page is for: everyone signed in, editors (mentors, admins, trusted students), mentors. */
+export type Access = "everyone" | "editor" | "mentor";
+
 export interface PluginNavItem {
   label: string;
   to: string;
   order: number;
-  /** The module this item belongs to; items are grouped under it. */
-  group?: string;
-  /** Only shown to G3ID admins. */
-  adminOnly?: boolean;
+  /** Who sees it in the bar. Everyone when left out. */
+  access?: Access;
 }
 
 export interface Plugin {

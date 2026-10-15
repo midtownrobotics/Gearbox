@@ -27,6 +27,7 @@ export async function resolveUserId(
 export {
   type Member,
   activeMembers,
+  sendMemberDM,
   sendTeamDM,
   sendTeamMessage,
   teamHasApp,

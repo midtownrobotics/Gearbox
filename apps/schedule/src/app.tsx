@@ -12,11 +12,11 @@ export function App() {
         <div className="flex min-h-screen flex-col bg-page">
           <NavBar items={navItems} />
           <Routes>
-            <Route path="/" element={<Navigate to="/calendar" replace />} />
+            <Route path="/" element={<Navigate to="/schedules" replace />} />
             {routes.map((r) => (
               <Route key={r.path} path={r.path} element={r.element} />
             ))}
-            <Route path="*" element={<Navigate to="/calendar" replace />} />
+            <Route path="*" element={<Navigate to="/schedules" replace />} />
           </Routes>
         </div>
       </ProtectedRoute>
