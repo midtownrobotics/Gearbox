@@ -98,7 +98,7 @@ export function isTeamUiSettings(value: unknown): value is TeamUiSettings {
   );
 }
 
-/** The default dark accent, now and when records still had `primaryColor`. */
+/** The default dark accent now, and when records still had `primaryColor` (still stored). */
 const unchosenDarkAccents = new Set(["#e8677c", defaultTeamUiSettings.dark.accent]);
 
 /**

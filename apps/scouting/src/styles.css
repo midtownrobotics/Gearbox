@@ -4,6 +4,18 @@
 @import "tailwindcss";
 
 @layer scouting {
+  /* The platform's error red (@g3/ui's ErrorBanner and danger buttons): Tailwind's red-700 for
+     text and buttons, red-800 for messages, and in dark mode the light shades theme-palette.css
+     gives those classes. The red-50 and red-300 tints turn dark by themselves. */
+  :root {
+    --scouting-danger: var(--color-red-700);
+    --scouting-danger-strong: var(--color-red-800);
+  }
+  html[data-theme="dark"] {
+    --scouting-danger: oklch(80.8% 0.114 19.571);
+    --scouting-danger-strong: oklch(88.5% 0.062 18.334);
+  }
+
   /* Match predictions */
   .game-page {
     max-width: 1500px;
@@ -199,7 +211,7 @@
   }
   .bet-status.won {
     color: #ffd4d9;
-    background: rgba(167, 20, 51, 0.16);
+    background: color-mix(in srgb, var(--g3-brand) 16%, transparent);
   }
   .bet-status.lost {
     color: #ff9694;
@@ -1552,10 +1564,10 @@
     align-items: center;
     gap: 8px;
     padding: 11px 13px;
-    border: 1px solid rgba(167, 20, 51, 0.4);
+    border: 1px solid var(--color-red-300);
     border-radius: 9px;
-    color: #c52b49;
-    background: rgba(167, 20, 51, 0.1);
+    color: var(--scouting-danger-strong);
+    background: var(--color-red-50);
     font-size: 13px;
     font-weight: 700;
   }
@@ -1598,7 +1610,7 @@
     color: var(--text-muted, #60656d);
   }
   .field-actions .delete-field-button {
-    color: #a71433;
+    color: var(--scouting-danger);
   }
   .field-actions .field-order-button {
     display: none;
@@ -1674,10 +1686,10 @@
   .analysis-error {
     margin-top: 12px;
     padding: 12px 14px;
-    border: 1px solid rgba(167, 20, 51, 0.4);
+    border: 1px solid var(--color-red-300);
     border-radius: 8px;
-    color: #a71433;
-    background: color-mix(in srgb, #a71433 8%, var(--surface, white));
+    color: var(--scouting-danger-strong);
+    background: var(--color-red-50);
     font-weight: 700;
   }
   .analysis-tabs {
@@ -2063,9 +2075,9 @@
     align-items: center;
     gap: 6px;
     padding: 7px 9px;
-    border: 1px solid rgba(167, 20, 51, 0.3);
+    border: 1px solid var(--color-red-300);
     border-radius: 7px;
-    color: #a71433;
+    color: var(--scouting-danger);
     background: transparent;
     font-size: 12px;
   }
@@ -2451,9 +2463,9 @@
     gap: 7px;
     min-height: 40px;
     padding: 0 14px;
-    border: 1px solid color-mix(in srgb, #a71433 35%, transparent);
+    border: 1px solid var(--color-red-300);
     border-radius: 8px;
-    color: #a71433;
+    color: var(--scouting-danger);
     background: transparent;
   }
   .form-definition {
@@ -3244,7 +3256,7 @@
   }
 
   .event-error {
-    color: #c52b49;
+    color: var(--scouting-danger);
   }
 
   .online-admins {
@@ -6229,7 +6241,7 @@
   }
 
   .field-error {
-    color: #a71433;
+    color: var(--scouting-danger);
     font-size: 12px;
   }
 
@@ -6270,9 +6282,9 @@
   }
 
   .status-toast.error {
-    border-color: rgba(167, 20, 51, 0.4);
-    color: #8a1029;
-    background: #fff4f6;
+    border-color: var(--color-red-300);
+    color: var(--scouting-danger-strong);
+    background: var(--color-red-50);
   }
 
   .status-toast > div {
@@ -6325,9 +6337,9 @@
   }
 
   html[data-theme="dark"] .status-toast.error {
-    border-color: rgba(255, 120, 145, 0.45);
-    color: #ff8da2;
-    background: #3a1b23;
+    border-color: var(--color-red-300);
+    color: var(--scouting-danger-strong);
+    background: var(--color-red-50);
   }
 
   html[data-theme="dark"] .status-toast span,
@@ -7140,13 +7152,13 @@
   }
 
   .map-toolbar .clear-drawings-button {
-    color: #a71433;
+    color: var(--scouting-danger);
   }
 
   .map-toolbar .clear-drawings-button:hover {
-    border-color: rgba(167, 20, 51, 0.35);
-    color: #a71433;
-    background: #faeef1;
+    border-color: var(--color-red-300);
+    color: var(--scouting-danger);
+    background: var(--color-red-50);
   }
 
   .form-map-editor:not(.map-editor-fullscreen) .canvas-shell {
@@ -7160,10 +7172,6 @@
     width: 100%;
     height: auto;
     max-height: none;
-  }
-
-  html[data-theme="dark"] .map-toolbar .clear-drawings-button:hover {
-    background: rgba(167, 20, 51, 0.2);
   }
 
   /* Unified dark layout for Forms, Analysis, Compare, and Service Crew. */
@@ -7399,11 +7407,16 @@
     border-color: var(--border);
   }
 
-  html[data-theme="dark"] .delete-report-button,
+  html[data-theme="dark"] .delete-report-button {
+    border-color: var(--color-red-300);
+    color: var(--scouting-danger);
+    background: var(--color-red-50);
+  }
+
   html[data-theme="dark"] .edit-form-button {
-    border-color: rgba(255, 120, 145, 0.45);
-    color: #ff7891;
-    background: rgba(167, 20, 51, 0.12);
+    border-color: color-mix(in srgb, var(--g3-dark-accent) 45%, transparent);
+    color: var(--g3-dark-accent);
+    background: color-mix(in srgb, var(--g3-dark-accent) 12%, transparent);
   }
 
   html[data-theme="dark"] input::placeholder,

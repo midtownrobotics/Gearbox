@@ -287,6 +287,13 @@ describe("team UI settings", () => {
       expect(brandColor(settings)).toBe("#0b5fa5");
     });
 
+    it("treats the dark accent that was the default then as unchosen", () => {
+      const dark = { ...appearance.dark, accent: "#e8677c" };
+      expect(read({ ...appearance, primaryColor: "#0b5fa5", dark }).dark.accent).toBe(
+        withHueOf("#e8677c", "#0b5fa5"),
+      );
+    });
+
     it("keeps a dark accent the team chose", () => {
       const dark = { ...appearance.dark, accent: "#ffcc00" };
       expect(read({ ...appearance, primaryColor: "#123456", dark })).toEqual({
@@ -332,16 +339,16 @@ describe("accent colors", () => {
 
   it("turns one color to another's hue, keeping its own saturation and value", () => {
     expect(withHueOf("#bf4040", "#0000ff")).toBe("#4040bf");
-    expect(withHueOf("#e8677c", "#0b5fa5")).toBe("#67ade8");
-    const before = hexToHsv("#e8677c");
-    const linked = hexToHsv(withHueOf("#e8677c", "#1d4ed8"));
+    expect(withHueOf("#bd263e", "#0b5fa5")).toBe("#2678bd");
+    const before = hexToHsv("#bd263e");
+    const linked = hexToHsv(withHueOf("#bd263e", "#1d4ed8"));
     expect(linked.s).toBe(before.s);
     expect(linked.v).toBe(before.v);
     expect(linked.h).toBeCloseTo(hexToHsv("#1d4ed8").h, 0);
     // A gray stays a gray whatever hue it's given, and has none to give.
     expect(withHueOf("#808080", "#ff0000")).toBe("#808080");
-    expect(withHueOf("#a71433", "#777777")).toBe("#a71433");
-    expect(withHueOf("#A71433", "#000000")).toBe("#a71433");
+    expect(withHueOf("#a32035", "#777777")).toBe("#a32035");
+    expect(withHueOf("#A32035", "#000000")).toBe("#a32035");
   });
 });
 
