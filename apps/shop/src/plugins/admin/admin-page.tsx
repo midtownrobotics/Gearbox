@@ -203,6 +203,119 @@ type QualityState = {
   peopleLoaded: boolean;
 };
 
+const sectionHeading = "text-sm font-bold uppercase tracking-wider text-steel-dark";
+
+/** An "i" that explains a setting, on hover or on a tap. */
+function InfoTip({ label, children }: { label: string; children: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <span className="relative inline-flex group shrink-0">
+      <button
+        type="button"
+        aria-label={label}
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+        onBlur={() => setOpen(false)}
+        className="w-4 h-4 rounded-full border border-steel/50 text-steel-dark text-[10px] font-bold leading-none flex items-center justify-center hover:border-crimson hover:text-crimson transition-colors"
+      >
+        i
+      </button>
+      <span
+        role="tooltip"
+        className={`absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 bg-ink text-paper text-xs font-normal normal-case tracking-normal text-left rounded-md px-3 py-2 shadow-lg z-20 ${
+          open ? "block" : "hidden group-hover:block"
+        }`}
+      >
+        {children}
+      </span>
+    </span>
+  );
+}
+
+/** Picks someone who isn't a shop manager yet, by typing a name or opening the list. */
+function PersonPicker({
+  people,
+  disabled,
+  onPick,
+}: {
+  people: { id: string; displayName: string; isAdmin: boolean; isMentor: boolean }[];
+  disabled: boolean;
+  onPick: (id: string) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const listId = "shop-manager-options";
+  const term = query.trim().toLowerCase();
+  const matches = term ? people.filter((p) => p.displayName.toLowerCase().includes(term)) : people;
+
+  function pick(id: string) {
+    onPick(id);
+    setQuery("");
+    setOpen(false);
+  }
+
+  return (
+    <div className="relative max-w-sm">
+      <input
+        type="text"
+        role="combobox"
+        aria-expanded={open}
+        aria-controls={listId}
+        aria-label="Add a shop manager"
+        autoComplete="off"
+        disabled={disabled}
+        value={query}
+        placeholder={people.length === 0 ? "Everyone is a shop manager" : "Add a shop manager…"}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setOpen(false)}
+        onChange={(e) => {
+          setQuery(e.target.value);
+          setOpen(true);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") setOpen(false);
+          if (e.key === "Enter" && matches.length > 0) pick(matches[0].id);
+        }}
+        className={inputCls}
+      />
+      {open && people.length > 0 && (
+        <div
+          id={listId}
+          role="listbox"
+          // The box keeps the focus; the list is only reached through it.
+          tabIndex={-1}
+          aria-label="People who aren't shop managers"
+          className="absolute z-10 mt-1 w-full max-h-56 overflow-y-auto bg-paper border border-steel/40 rounded-lg shadow-lg"
+        >
+          {matches.length === 0 ? (
+            <p className="px-3 py-2 text-sm text-steel">Nobody by that name.</p>
+          ) : (
+            matches.map((person) => (
+              <button
+                key={person.id}
+                type="button"
+                // Keeps the box focused so the click lands before the list closes.
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => pick(person.id)}
+                role="option"
+                aria-selected={false}
+                className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm text-ink hover:bg-mist transition-colors"
+              >
+                <span className="flex-1 truncate">{person.displayName}</span>
+                {person.isAdmin ? (
+                  <span className="text-xs text-steel shrink-0">Admin</span>
+                ) : person.isMentor ? (
+                  <span className="text-xs text-steel shrink-0">Mentor</span>
+                ) : null}
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /**
  * Who may check off a Quality Control process, and whether every part ends with a quality check.
  * Admins can always check one off; anyone else has to be a shop manager here.
@@ -211,7 +324,6 @@ function QualityControlSettings() {
   const [state, setState] = useState<QualityState | null>(null);
   const [busy, setBusy] = useState(false);
   const [banner, setBanner] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
 
   const load = useCallback(async () => {
     const res = await api.admin.quality.$get();
@@ -262,113 +374,102 @@ function QualityControlSettings() {
 
   const steps = state.qualityProcesses;
   const managers = state.people.filter((p) => p.isManager);
-  const term = search.trim().toLowerCase();
-  const listed = term
-    ? state.people.filter((p) => p.displayName.toLowerCase().includes(term))
-    : state.people;
 
   return (
     <div className="space-y-6">
       {banner && <ErrorBanner message={banner} />}
 
+      {steps.length > 0 && (
+        <div className="flex items-center gap-2 text-sm text-ink">
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={state.requireQualityCheck}
+              disabled={busy || state.qualityProcessId === null}
+              onChange={(e) => saveCheck({ requireQualityCheck: e.target.checked })}
+              className="accent-crimson w-4 h-4"
+            />
+            Require a quality check
+          </label>
+          <InfoTip label="What requiring a quality check does">
+            The Quality Check Process below goes at the end of every part's processes from now on,
+            so nothing finishes without a shop manager signing it off. Parts already being made keep
+            the steps they have. Pick a process first to turn this on.
+          </InfoTip>
+        </div>
+      )}
+
       <div className="space-y-3">
-        <h3 className="text-sm font-bold uppercase tracking-wider text-steel-dark">
+        <h3 className={sectionHeading}>
           Shop Managers <span className="text-steel font-normal">({managers.length})</span>
         </h3>
         <p className="text-xs text-steel">
           Shop managers and admins are the only people who can mark a Quality Control process
-          complete. Add an admin here too if they work at a kiosk, where a PIN sign-in carries no
-          admin.
+          complete. A kiosk PIN sign-in doesn't carry anyone's admin role, so add your admins here
+          too if they check parts off at a kiosk.
         </p>
         {!state.peopleLoaded && (
           <p className="text-xs text-amber-700">
             The team's member list didn't load, so only the current shop managers are shown.
           </p>
         )}
-        {state.people.length > 5 && (
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search people"
-            aria-label="Search people"
-            className={inputCls}
+        {managers.length > 0 && (
+          <div className="space-y-1.5 max-w-sm">
+            {managers.map((person) => (
+              <div
+                key={person.id}
+                className="flex items-center gap-2 bg-mist border border-steel/20 rounded-lg px-3.5 py-2 text-sm text-ink"
+              >
+                <span className="flex-1 truncate">{person.displayName}</span>
+                {person.isAdmin ? (
+                  <span className="text-xs text-steel shrink-0">Admin</span>
+                ) : person.isMentor ? (
+                  <span className="text-xs text-steel shrink-0">Mentor</span>
+                ) : null}
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => setManager(person.id, false)}
+                  aria-label={`Remove ${person.displayName}`}
+                  title="No longer a shop manager"
+                  className="text-steel hover:text-crimson px-1 transition-colors disabled:opacity-50"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        {state.peopleLoaded && (
+          <PersonPicker
+            people={state.people.filter((p) => !p.isManager)}
+            disabled={busy}
+            onPick={(id) => setManager(id, true)}
           />
         )}
-        <div className="space-y-1.5 max-h-72 overflow-y-auto">
-          {listed.length === 0 && <p className="text-steel text-sm">Nobody to show.</p>}
-          {listed.map((person) => (
-            <label
-              key={person.id}
-              className="flex items-center gap-2 bg-mist border border-steel/20 rounded-lg px-3.5 py-2 text-sm text-ink cursor-pointer select-none"
-            >
-              <input
-                type="checkbox"
-                checked={person.isManager}
-                disabled={busy}
-                onChange={(e) => setManager(person.id, e.target.checked)}
-                className="accent-crimson w-4 h-4"
-              />
-              <span className="flex-1 truncate">{person.displayName}</span>
-              {person.isAdmin ? (
-                <span className="text-xs text-steel shrink-0">Admin</span>
-              ) : person.isMentor ? (
-                <span className="text-xs text-steel shrink-0">Mentor</span>
-              ) : null}
-            </label>
-          ))}
-        </div>
       </div>
 
       <div className="space-y-3">
-        <h3 className="text-sm font-bold uppercase tracking-wider text-steel-dark">
-          Require A Quality Check
-        </h3>
+        <h3 className={sectionHeading}>Quality Check Process</h3>
         {steps.length === 0 ? (
           <p className="text-xs text-steel">
             Add a process with the type Quality Control under Shop Settings first.
           </p>
         ) : (
-          <>
-            <label className="flex items-center gap-2 text-sm text-ink cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={state.requireQualityCheck}
-                disabled={busy}
-                onChange={(e) =>
-                  saveCheck({
-                    requireQualityCheck: e.target.checked,
-                    qualityProcessId: state.qualityProcessId ?? steps[0]?.id ?? null,
-                  })
-                }
-                className="accent-crimson w-4 h-4"
-              />
-              Every part ends with a quality check
-            </label>
-            <div className="space-y-1 max-w-xs">
-              <label htmlFor="quality-process" className="text-xs font-medium text-steel-dark">
-                Quality check process
-              </label>
-              <select
-                id="quality-process"
-                value={state.qualityProcessId ?? ""}
-                disabled={busy}
-                onChange={(e) => saveCheck({ qualityProcessId: Number(e.target.value) || null })}
-                className={inputCls}
-              >
-                <option value="">— Select —</option>
-                {steps.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
-              <p className="text-xs text-steel">
-                It goes at the end of every part's processes from now on. Parts already being made
-                keep the steps they have.
-              </p>
-            </div>
-          </>
+          <select
+            aria-label="Quality check process"
+            value={state.qualityProcessId ?? ""}
+            disabled={busy}
+            onChange={(e) => saveCheck({ qualityProcessId: Number(e.target.value) || null })}
+            className={`${inputCls} max-w-sm`}
+          >
+            <option value="">— Select —</option>
+            {steps.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
         )}
       </div>
     </div>
