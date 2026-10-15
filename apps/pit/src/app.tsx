@@ -1,6 +1,6 @@
 import { redirectToSignIn } from "@g3/ui";
 import { useEffect } from "react";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { plugins } from "./plugins.config";
 import { BarcodeScanDisplay } from "./shared/barcode-scan-display";
 import { BatteryCacheProvider } from "./shared/battery-cache-context";
@@ -29,6 +29,8 @@ function AppContent() {
         {allRoutes.map((r) => (
           <Route key={r.path} path={r.path} element={r.element} />
         ))}
+        {/* An address that isn't a page: the app's home. */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </div>
   );
