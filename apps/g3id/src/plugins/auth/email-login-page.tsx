@@ -1,8 +1,7 @@
-import { Button, ErrorBanner, TextField, inputClass, useTeamNames } from "@g3/ui";
+import { Button, ErrorBanner, NotYourTeam, TextField, inputClass, useTeamNames } from "@g3/ui";
 import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../../lib/api";
-import { NotYourTeam } from "../../shared/not-your-team";
 
 export function EmailLoginPage() {
   const names = useTeamNames();

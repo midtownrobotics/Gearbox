@@ -8,6 +8,8 @@ import {
 } from "@g3/site-config";
 import {
   Loading,
+  NotYourTeam,
+  PublicSiteLink,
   TeamIcon,
   buttonClass,
   rememberTeam,
@@ -205,12 +207,7 @@ const isApp = (key: PortalTileKey) => key in portalAppLabels;
 
 /** The team's home for someone signed out: sign in, join the team, or see its public site. */
 function FrontDoor() {
-  const teamUi = useTeamUiSettings();
   const names = useTeamNames();
-  const publicSite =
-    teamUi.links.publicSite && !teamUi.hiddenLinks?.includes("publicSite")
-      ? teamUi.links.publicSite
-      : null;
   return (
     <main className="flex flex-1 items-center justify-center bg-page px-6 py-12">
       <div className="w-full max-w-sm space-y-8 text-center">
@@ -227,16 +224,10 @@ function FrontDoor() {
           <a href={`${appUrl("id")}/signup`} className={`${buttonClass("secondary", "lg")} w-full`}>
             Sign up
           </a>
-          {publicSite && (
-            <a
-              href={publicSite}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={`${buttonClass("secondary", "lg")} w-full`}
-            >
-              Public team site
-            </a>
-          )}
+        </div>
+        <div className="space-y-2">
+          <PublicSiteLink />
+          <NotYourTeam />
         </div>
       </div>
     </main>

@@ -14,6 +14,7 @@ export {
 } from "./components/app-nav-bar";
 // The parts every app's pages are built from (docs/roadmap/ui-alignment.md).
 export { Badge, tones } from "./components/badge";
+export { NotYourTeam, PublicSiteLink } from "./components/front-door-links";
 export {
   Button,
   type ButtonSize,

@@ -1,7 +1,6 @@
-import { buttonClass, useTeamNames } from "@g3/ui";
+import { NotYourTeam, buttonClass, useTeamNames } from "@g3/ui";
 import { FaSlack } from "react-icons/fa";
 import { Link } from "react-router-dom";
-import { NotYourTeam } from "../../shared/not-your-team";
 
 const apiBase = import.meta.env.VITE_API_BASE_URL ?? "";
 

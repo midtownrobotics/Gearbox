@@ -1,9 +1,8 @@
-import { ErrorBanner, buttonClass, useTeamNames } from "@g3/ui";
+import { ErrorBanner, NotYourTeam, PublicSiteLink, buttonClass, useTeamNames } from "@g3/ui";
 import { useEffect, useState } from "react";
 import { FaGithub, FaGoogle, FaSlack, FaSteam } from "react-icons/fa";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../../lib/api";
-import { NotYourTeam, PublicSiteLink } from "../../shared/not-your-team";
 
 const apiBase = import.meta.env.VITE_API_BASE_URL ?? "";
 

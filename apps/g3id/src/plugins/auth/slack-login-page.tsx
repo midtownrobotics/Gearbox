@@ -1,10 +1,9 @@
 import { site } from "@g3/site-config";
-import { Button, ErrorBanner, useTeamNames } from "@g3/ui";
+import { Button, ErrorBanner, NotYourTeam, useTeamNames } from "@g3/ui";
 import { Check, Copy, Send } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../../lib/api";
-import { NotYourTeam } from "../../shared/not-your-team";
 
 type PollStatus =
   | { status: "pending" }
