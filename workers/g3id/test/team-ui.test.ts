@@ -281,10 +281,17 @@ describe("team UI settings", () => {
         ...defaultTeamUiSettings,
         light: { ...defaultTeamUiSettings.light, accent: "#0b5fa5" },
         // The default dark accent, turned to #0b5fa5's hue.
-        dark: { ...defaultTeamUiSettings.dark, accent: "#67ade8" },
+        dark: { ...defaultTeamUiSettings.dark, accent: "#2678bd" },
       });
       // So buttons, links and icons stay the color the team chose.
       expect(brandColor(settings)).toBe("#0b5fa5");
+    });
+
+    it("treats the dark accent that was the default then as unchosen", () => {
+      const dark = { ...appearance.dark, accent: "#e8677c" };
+      expect(read({ ...appearance, primaryColor: "#0b5fa5", dark }).dark.accent).toBe(
+        withHueOf("#e8677c", "#0b5fa5"),
+      );
     });
 
     it("keeps a dark accent the team chose", () => {
@@ -318,8 +325,8 @@ describe("accent colors", () => {
     expect(hsvToHex({ h: 240, s: 1, v: 1 })).toBe("#0000ff");
     expect(hsvToHex({ h: 360, s: 0.5, v: 1 })).toBe("#ff8080");
     for (const hex of [
-      "#a71433",
-      "#e8677c",
+      "#a32035",
+      "#bd263e",
       "#123456",
       "#0a7d55",
       "#ffcc00",
@@ -332,16 +339,16 @@ describe("accent colors", () => {
 
   it("turns one color to another's hue, keeping its own saturation and value", () => {
     expect(withHueOf("#bf4040", "#0000ff")).toBe("#4040bf");
-    expect(withHueOf("#e8677c", "#0b5fa5")).toBe("#67ade8");
-    const before = hexToHsv("#e8677c");
-    const linked = hexToHsv(withHueOf("#e8677c", "#1d4ed8"));
+    expect(withHueOf("#bd263e", "#0b5fa5")).toBe("#2678bd");
+    const before = hexToHsv("#bd263e");
+    const linked = hexToHsv(withHueOf("#bd263e", "#1d4ed8"));
     expect(linked.s).toBe(before.s);
     expect(linked.v).toBe(before.v);
     expect(linked.h).toBeCloseTo(hexToHsv("#1d4ed8").h, 0);
     // A gray stays a gray whatever hue it's given, and has none to give.
     expect(withHueOf("#808080", "#ff0000")).toBe("#808080");
-    expect(withHueOf("#a71433", "#777777")).toBe("#a71433");
-    expect(withHueOf("#A71433", "#000000")).toBe("#a71433");
+    expect(withHueOf("#a32035", "#777777")).toBe("#a32035");
+    expect(withHueOf("#A32035", "#000000")).toBe("#a32035");
   });
 });
 
@@ -364,10 +371,9 @@ describe("button text color", () => {
     // A theme's buttons are filled with its accent (the built-in brand color for the default).
     expect(fillColor(defaultTeamUiSettings, "light")).toBe(builtInBrandColor);
     expect(fillColor(defaultTeamUiSettings, "dark")).toBe(dark.accent);
-    // The default light accent is dark: light text, which is the dark palette's text color. The
-    // default dark accent is bright: dark text, which is the light palette's.
+    // Both default accents are dark: light text, which is the dark palette's text color.
     expect(buttonTextColor(defaultTeamUiSettings, "light")).toBe(dark.text);
-    expect(buttonTextColor(defaultTeamUiSettings, "dark")).toBe(light.text);
+    expect(buttonTextColor(defaultTeamUiSettings, "dark")).toBe(dark.text);
     expect(buttonTextColor(withAccent("#ffcc00"), "light")).toBe(light.text);
     expect(buttonTextColor(withAccent("#123456"), "dark")).toBe(dark.text);
     // Each theme against its own accent.

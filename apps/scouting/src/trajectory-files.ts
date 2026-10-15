@@ -122,7 +122,7 @@ export async function trajectoryToPng(trajectory: ParsedTrajectory): Promise<Fil
   });
   // The path and its end are drawn in the team's brand color (colors.css).
   const brand =
-    getComputedStyle(document.documentElement).getPropertyValue("--g3-brand").trim() || "#a71433";
+    getComputedStyle(document.documentElement).getPropertyValue("--g3-brand").trim() || "#a32035";
   context.fillStyle = "#17191d";
   context.fillRect(0, 0, canvas.width, canvas.height);
   context.drawImage(field, 0, 0, canvas.width, canvas.height);

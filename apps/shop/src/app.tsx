@@ -24,7 +24,7 @@ function AppContent() {
   // BoardPage locks itself to the kiosk's machine, or shows the selectable overview if unmatched.
   if (kiosk.active) {
     return (
-      <div className="flex min-h-screen flex-col bg-page">
+      <div className="flex flex-1 flex-col bg-page">
         <NavBar items={navItems} />
         <BoardPage />
         <BatchSheet />
@@ -34,7 +34,7 @@ function AppContent() {
 
   const allRoutes = plugins.flatMap((p) => p.routes);
   return (
-    <div className="flex min-h-screen flex-col bg-page">
+    <div className="flex flex-1 flex-col bg-page">
       <NavBar items={navItems} />
       <Routes>
         {allRoutes.map((r) => (

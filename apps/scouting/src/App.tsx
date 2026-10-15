@@ -2068,7 +2068,7 @@ export function App() {
   if (location.pathname === "/forms") return <Navigate to="/" replace />;
   const visiblePage = page;
   return (
-    <div className="app-shell flex min-h-screen flex-col bg-page">
+    <div className="app-shell flex flex-1 flex-col bg-page">
       <AppNavBar
         title={names.wordmark("Scouting")}
         version={versionLabel("Scouting")}

@@ -68,7 +68,7 @@ export function OverviewPage() {
         {rows.length === 0 ? (
           <p className="text-sm text-secondary-500">There are no student accounts yet.</p>
         ) : (
-          <div className="-mx-5 overflow-x-auto px-5">
+          <div className="relative -mx-5 overflow-x-auto px-5">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-secondary-200 text-left text-xs uppercase tracking-wide text-secondary-400">

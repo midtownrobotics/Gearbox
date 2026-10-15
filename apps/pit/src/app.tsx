@@ -21,7 +21,7 @@ function AppContent() {
   const navItems = plugins.flatMap((p) => p.navItems ?? []).sort((a, b) => a.order - b.order);
 
   return (
-    <div className="flex min-h-screen flex-col bg-page">
+    <div className="flex flex-1 flex-col bg-page">
       {!isFullscreen && <NavBar items={navItems} />}
       <OfflineBanner />
       <BarcodeScanDisplay />

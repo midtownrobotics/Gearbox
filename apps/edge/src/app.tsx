@@ -9,7 +9,7 @@ export function App() {
   return (
     <BrowserRouter>
       <ProtectedRoute>
-        <div className="flex min-h-screen flex-col bg-page">
+        <div className="flex flex-1 flex-col bg-page">
           <NavBar items={navItems} />
           <div className="max-w-7xl w-full mx-auto px-4 sm:px-6 pt-4">
             <p className="text-amber-900 text-sm bg-amber-50 border border-amber-300 rounded-lg px-4 py-2.5">

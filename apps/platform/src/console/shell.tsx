@@ -42,7 +42,7 @@ export function ConsoleShell() {
   else if (me) body = <Outlet />;
 
   return (
-    <div className="min-h-screen bg-page">
+    <div className="flex-1 bg-page">
       <header className="border-b border-line bg-surface">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
           <span className="flex items-center gap-2 font-bold text-secondary-900">

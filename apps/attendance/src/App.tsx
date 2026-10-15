@@ -23,7 +23,7 @@ function AppPages() {
   const navItems = plugins.flatMap((p) => p.navItems ?? []).sort((a, b) => a.order - b.order);
   return (
     <ProtectedRoute>
-      <div className="flex min-h-screen flex-col bg-page">
+      <div className="flex flex-1 flex-col bg-page">
         <NavBar items={navItems} />
         <Routes>
           <Route path="/" element={<Navigate to={FIRST_PAGE} replace />} />
