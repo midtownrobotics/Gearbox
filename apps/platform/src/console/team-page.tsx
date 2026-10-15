@@ -1,10 +1,10 @@
-import { TextField } from "@g3/ui";
+import { Button, Card, ErrorBanner, Page, PageLoading, TextField, inputClass } from "@g3/ui";
 import { type ReactNode, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { type TeamDetail, consoleApi, formatDate, formatTime, read, send, useLoad } from "./data";
 import { ActionList } from "./log-page";
 import { ReportCard } from "./reports-page";
-import { Notice, Panel, StatusBadge, buttonClass, fieldClass } from "./shell";
+import { StatusBadge } from "./shell";
 
 // One team: its details and members, the reports against its number, what operators have done to
 // it, and the tools for a number claimed wrongly (hand it over, suspend, delete; a wrong number is deleted and signed up again).
@@ -17,35 +17,44 @@ export function TeamPage() {
     [id],
   );
 
-  if (detail.error) return <Notice>{detail.error}</Notice>;
-  if (!detail.data) return null;
+  const back = (
+    <Link to="/console" className="text-sm text-secondary-500 hover:text-primary-600">
+      ← All teams
+    </Link>
+  );
+  if (detail.error) {
+    return (
+      <Page title="Team" actions={back}>
+        <ErrorBanner message={detail.error} />
+      </Page>
+    );
+  }
+  if (!detail.data) return <PageLoading />;
   const { team, members, reports, actions } = detail.data;
 
   return (
-    <div className="space-y-5">
-      <Link to="/console" className="text-sm text-secondary-500 hover:text-secondary-900">
-        ← Teams
-      </Link>
-      <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-2xl font-bold text-secondary-900">
-          {team.teamNumber} · {team.name}
-        </h1>
-        <StatusBadge status={team.status} />
-        {team.isSite && <span className="text-sm text-secondary-500">The site's own team</span>}
-      </div>
-
-      <Panel title="Details">
+    <Page
+      title={`${team.teamNumber} · ${team.name}`}
+      description={
+        <span className="flex flex-wrap items-center gap-2">
+          <StatusBadge status={team.status} />
+          {team.isSite && "The site's own team"}
+        </span>
+      }
+      actions={back}
+    >
+      <Card title="Details">
         <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
-          <Field label="Owner">{team.owner?.name ?? "—"}</Field>
-          <Field label="Founder">{team.founder?.name ?? "—"}</Field>
-          <Field label="Slack workspace">{team.slackWorkspaceName ?? "—"}</Field>
-          <Field label="Country">{team.country}</Field>
-          <Field label="Signed up">{formatTime(team.createdAt)}</Field>
-          <Field label="Terms accepted">{formatTime(team.termsAcceptedAt)}</Field>
+          <Detail label="Owner">{team.owner?.name ?? "—"}</Detail>
+          <Detail label="Founder">{team.founder?.name ?? "—"}</Detail>
+          <Detail label="Slack workspace">{team.slackWorkspaceName ?? "—"}</Detail>
+          <Detail label="Country">{team.country}</Detail>
+          <Detail label="Signed up">{formatTime(team.createdAt)}</Detail>
+          <Detail label="Terms accepted">{formatTime(team.termsAcceptedAt)}</Detail>
         </dl>
-      </Panel>
+      </Card>
 
-      <Panel title={`Members (${members.length})`}>
+      <Card title={`Members (${members.length})`}>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <tbody>
@@ -74,16 +83,16 @@ export function TeamPage() {
           </table>
           {members.length === 0 && <p className="text-sm text-secondary-500">No accounts yet.</p>}
         </div>
-      </Panel>
+      </Card>
 
       {reports.length > 0 && (
-        <Panel title="Reports about this number">
+        <Card title="Reports about this number">
           <div className="space-y-3">
             {reports.map((r) => (
               <ReportCard key={r.id} report={r} onChange={detail.reload} />
             ))}
           </div>
-        </Panel>
+        </Card>
       )}
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -122,14 +131,14 @@ export function TeamPage() {
         )}
       </div>
 
-      <Panel title="Log">
+      <Card title="Log">
         <ActionList actions={actions} showTeam={false} />
-      </Panel>
-    </div>
+      </Card>
+    </Page>
   );
 }
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
+function Detail({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div>
       <dt className="text-secondary-500">{label}</dt>
@@ -161,7 +170,7 @@ function ActionForm({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   return (
-    <Panel title={title}>
+    <Card title={title}>
       <form
         className="space-y-3"
         onSubmit={async (e) => {
@@ -182,7 +191,6 @@ function ActionForm({
         {children}
         <TextField
           multiline
-          variant="plain"
           kind="reason"
           required
           rows={2}
@@ -190,18 +198,14 @@ function ActionForm({
           value={reason}
           onChange={(e) => setReason(e.target.value)}
           placeholder="Why? (kept in the log, and shown to the team's admins)"
-          className={fieldClass}
+          aria-label="Reason"
         />
-        {error && <Notice>{error}</Notice>}
-        <button
-          type="submit"
-          disabled={busy}
-          className={buttonClass(danger ? "danger" : "primary")}
-        >
+        {error && <ErrorBanner message={error} />}
+        <Button type="submit" disabled={busy} variant={danger ? "danger" : "primary"}>
           {button}
-        </button>
+        </Button>
       </form>
-    </Panel>
+    </Card>
   );
 }
 
@@ -232,7 +236,8 @@ function TransferOwner({
         required
         value={userId}
         onChange={(e) => setUserId(e.target.value)}
-        className={fieldClass}
+        className={inputClass}
+        aria-label="New owner"
       >
         <option value="">Choose a member</option>
         {others.map((m) => (
@@ -272,14 +277,13 @@ function Delete({
       onSubmit={(reason) => onSubmit(reason, Number(confirm))}
     >
       <TextField
-        variant="plain"
         kind="label"
         required
         inputMode="numeric"
         value={confirm}
         onChange={(e) => setConfirm(e.target.value)}
         placeholder={`Type ${number} to confirm`}
-        className={fieldClass}
+        aria-label="Team number, to confirm"
       />
     </ActionForm>
   );

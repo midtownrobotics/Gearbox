@@ -28,6 +28,7 @@ A survey of every difference, with sketches, is at <https://claude.ai/artifact/C
 
 | Change | Step | Pull request |
 | --- | --- | --- |
+| The operators' console is built like an app: the shared bar (`AppNavBar` with `team={false}`: the Gearbox wordmark in Agency FB in the accent, the page links, the greeting, the light/dark switch and a phone menu, in the built-in colors and without the site team's appearance), `Page` with each page's bar label as its title, `Card`, `Button`, `ConfirmButton` for removing an operator, `TextField` and `inputClass`, `Field`, `Chip` for a notification's type and expiry, `Badge` with `tones` for statuses, `Dialog` for deleting a notification, and the shared table header. Errors are red where they were the team's color, and buttons in the team's color take its button text color. The platform's pages follow the shared light/dark cookie | Platform console | This PR |
 | Signed out, the same everywhere: every app (Portal, Pit and Scouting too, which showed their own Sign in pages) goes straight to ID's sign-in page and back. The sign-in app is "ID" ("G3 ID" in its bar and tab); its sign-in pages show the team's name from Team Appearance, the public site link and "Not team N? Find your team"; the banner names the app ("Signing in to G3 Skill Tree") | Decisions of 15 October | This PR |
 | `TextField`: every app's text boxes, Scouting's included, are one shared part with five looks, so the public demo can offer safe text in each (roadmap 5.7). A lint in CI keeps new ones on it. Nothing looks different outside the demo | 1 (a new part) | This PR |
 | Scouting fullscreen removes the shared page's width limit while open, covering the navbar and side gutters on wide screens; exiting restores the normal page width | 8: Fullscreen correction | This branch |
@@ -230,7 +231,7 @@ See "What landed". Edge's went with step 3, ID's with step 4 and Shop's with ste
 - **A button in a table row, or a yes that isn't a delete, asks in a pop-up:** `ConfirmDialog` in `apps/orders/src/shared/ask.tsx` (promoting a wishlist item, removing one from the Wishlist table, removing a vendor credit, placing an order).
 - **An answer that has to be typed is a pop-up with one field:** `AnswerDialog` in the same file (why a request is denied, why a line is taken off an order, a credit's new balance). A bad answer is an error in the pop-up.
 - Both are Orders' own, built from `Dialog`. Move them to `@g3/ui` when a second app needs one.
-- **Platform's console** has its own shell and no shared parts, so removing an operator asks in the row with the shell's own buttons.
+- **Platform's console** asks in the row before removing an operator (`ConfirmButton`, since the console moved onto the shared parts).
 - **Pit's** label maker called `alert` when nothing was chosen. Its button is disabled then, so nobody saw it; it now raises an error, which the page shows.
 - **What changed besides where the question is:** Share-A-Cart's Disconnect and the wishlist page's "Remove from wishlist" are red buttons, since both now ask as deletes do. Denying from the Approvals queue and taking a line off an order show what is about to happen above the box.
 
@@ -278,4 +279,4 @@ From reading the code on 11 October. None was confirmed in a running app, and on
 ## Out of scope
 
 - **Attendance.** Its own pages (Leaderboard, My Attendance, QR Codes, Admin) use the shared bar and parts like any app. The QR code displays and the one-tap phone screen members reach by scanning have no bar; they take the shared wording and nothing else.
-- **The Platform site.** Its public pages belong to no team and keep the built-in colors. The operators' console takes in-page questions (step 7) and the date helper, and otherwise stays as it is.
+- **The Platform site.** Its public pages belong to no team and keep the built-in colors. The operators' console has the shared bar and parts like an app, also in the built-in colors (`AppNavBar`'s `team={false}`).

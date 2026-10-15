@@ -85,6 +85,7 @@ export function AppNavBar({
   account = true,
   signedIn,
   version,
+  team = true,
 }: {
   /** The app's wordmark, e.g. wordmark("Shop") from @g3/site-config. */
   title: string;
@@ -106,17 +107,22 @@ export function AppNavBar({
   signedIn?: boolean | null;
   /** "Orders 1.4.0 · platform 2026.10.0": on the wordmark's tooltip and in the drawer. */
   version?: string;
+  /**
+   * Off for the platform's own pages (the operators' console), which belong to no team: built-in
+   * colors and icon, no team name, no app list and no greeting, and nothing is asked of ID.
+   */
+  team?: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const teamUi = useTeamUiSettings();
-  const brandedTitle = title.replace(
-    new RegExp(`^${site.team.shortName}\\b`, "i"),
-    teamUi.shortName,
-  );
-  const user = useSignedInUser(signedIn);
+  const teamUi = useTeamUiSettings(team);
+  const brandedTitle = team
+    ? title.replace(new RegExp(`^${site.team.shortName}\\b`, "i"), teamUi.shortName)
+    : title;
+  const user = useSignedInUser(team ? signedIn : false);
   const enabled = useTeamApps(allApps && !!user);
   // The app's icon, with its accent in the team's color.
-  const teamIcon = useTeamIcon(icon);
+  const teamIcon = useTeamIcon(team ? icon : undefined);
+  const shownIcon = team ? teamUi.logoUrl || teamIcon : icon;
 
   // The team's home, then its apps that are on, in the order of the home's grid.
   const here = typeof window === "undefined" ? "" : window.location.host;
@@ -209,9 +215,7 @@ export function AppNavBar({
         onClick: () => setOpen(false),
         children: (
           <>
-            {(teamUi.logoUrl || teamIcon) && (
-              <img className="g3-nav-icon" src={teamUi.logoUrl || teamIcon} alt="" />
-            )}
+            {shownIcon && <img className="g3-nav-icon" src={shownIcon} alt="" />}
             {brandedTitle}
           </>
         ),

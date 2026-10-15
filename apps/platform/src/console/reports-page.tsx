@@ -1,7 +1,8 @@
+import { Button, Card, ErrorBanner, Page, inputClass } from "@g3/ui";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { type Report, consoleApi, formatTime, read, send, useLoad } from "./data";
-import { Notice, StatusBadge, buttonClass, fieldClass } from "./shell";
+import { StatusBadge } from "./shell";
 
 // Reports that a team number was signed up by people who aren't that team (the public /report
 // page). An operator writes back by email, then acts on the team and closes the report.
@@ -13,24 +14,25 @@ export function ReportsPage() {
     [status],
   );
   return (
-    <div className="space-y-4">
+    <Page title="Reports">
       <select
         value={status}
         onChange={(e) => setStatus(e.target.value as typeof status)}
-        className={`${fieldClass} w-40`}
+        className={`${inputClass} max-w-40`}
+        aria-label="Status"
       >
         <option value="open">Open</option>
         <option value="resolved">Resolved</option>
         <option value="">All</option>
       </select>
-      {reports.error && <Notice>{reports.error}</Notice>}
+      {reports.error && <ErrorBanner message={reports.error} />}
       {reports.data?.map((r) => (
         <ReportCard key={r.id} report={r} onChange={reports.reload} />
       ))}
       {reports.data?.length === 0 && (
         <p className="py-6 text-center text-sm text-secondary-500">No reports.</p>
       )}
-    </div>
+    </Page>
   );
 }
 
@@ -38,7 +40,7 @@ export function ReportCard({ report, onChange }: { report: Report; onChange: () 
   const [error, setError] = useState<string | null>(null);
   const next = report.status === "open" ? "resolved" : "open";
   return (
-    <article className="space-y-2 rounded-xl border border-line bg-surface p-4 text-sm shadow-sm">
+    <Card className="space-y-2 text-sm">
       <div className="flex flex-wrap items-center gap-2">
         <span className="font-semibold text-secondary-900">Team {report.teamNumber}</span>
         <StatusBadge status={report.status} />
@@ -60,10 +62,10 @@ export function ReportCard({ report, onChange }: { report: Report; onChange: () 
           {report.email}
         </a>
       </p>
-      {error && <Notice>{error}</Notice>}
-      <button
-        type="button"
-        className={buttonClass()}
+      {error && <ErrorBanner message={error} />}
+      <Button
+        variant="secondary"
+        size="sm"
         onClick={async () => {
           try {
             await send("POST", `/reports/${report.id}`, { status: next });
@@ -74,7 +76,7 @@ export function ReportCard({ report, onChange }: { report: Report; onChange: () 
         }}
       >
         {next === "resolved" ? "Mark resolved" : "Reopen"}
-      </button>
-    </article>
+      </Button>
+    </Card>
   );
 }

@@ -1,5 +1,17 @@
-import { TextField } from "@g3/ui";
-import { useEffect, useRef, useState } from "react";
+import {
+  Badge,
+  Button,
+  Card,
+  Chip,
+  Dialog,
+  ErrorBanner,
+  Field,
+  Page,
+  TextField,
+  inputClass,
+  tones,
+} from "@g3/ui";
+import { useState } from "react";
 import { FaChevronDown, FaTrash } from "react-icons/fa";
 import {
   type Notification,
@@ -10,7 +22,6 @@ import {
   send,
   useLoad,
 } from "./data";
-import { Notice, Panel, buttonClass, fieldClass } from "./shell";
 
 // Notifications for every team, written by operators, each shown until it expires. Each team's
 // admins choose where they go: its home page and Slack (workers/platform/src/notifications.ts).
@@ -22,9 +33,9 @@ const TYPES: { type: NotificationType; label: string }[] = [
 ];
 
 const TYPE_STYLES: Record<NotificationType, { badge: string; stripe: string }> = {
-  info: { badge: "bg-secondary-100 text-secondary-700", stripe: "border-l-secondary-300" },
-  warning: { badge: "bg-amber-100 text-amber-800", stripe: "border-l-amber-500" },
-  critical: { badge: "bg-red-100 text-red-800", stripe: "border-l-red-600" },
+  info: { badge: tones.info, stripe: "border-l-sky-400" },
+  warning: { badge: tones.warning, stripe: "border-l-amber-500" },
+  critical: { badge: tones.danger, stripe: "border-l-red-600" },
 };
 
 const DAY_S = 24 * 60 * 60;
@@ -63,11 +74,9 @@ function relative(seconds: number): string {
 
 function TypeBadge({ type }: { type: NotificationType }) {
   return (
-    <span
-      className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${TYPE_STYLES[type].badge}`}
-    >
+    <Badge colors={TYPE_STYLES[type].badge}>
       {TYPES.find((t) => t.type === type)?.label ?? type}
-    </span>
+    </Badge>
   );
 }
 
@@ -98,22 +107,23 @@ export function NotificationsPage() {
   const expired = all.filter((n) => n.expiresAt <= nowS());
 
   return (
-    <div className="space-y-4">
-      {(error ?? list.error) && <Notice>{error ?? list.error}</Notice>}
+    <Page title="Notifications">
+      {(error ?? list.error) && <ErrorBanner message={error ?? list.error ?? ""} />}
       <NewNotification create={create} />
-      <Panel title="Active">
+      <Card title="Active">
         <NotificationList
           notifications={active}
           empty="No active notifications."
           onDelete={setDeleting}
         />
-      </Panel>
+      </Card>
       {expired.length > 0 && (
-        <Panel title="Expired">
+        <Card title="Expired">
           <NotificationList notifications={expired} empty="" onDelete={setDeleting} />
-        </Panel>
+        </Card>
       )}
       <DeleteDialog
+        key={deleting?.id}
         notification={deleting}
         onClose={() => setDeleting(null)}
         onDeleted={async () => {
@@ -121,7 +131,7 @@ export function NotificationsPage() {
           await list.reload();
         }}
       />
-    </div>
+    </Page>
   );
 }
 
@@ -150,7 +160,7 @@ function NewNotification({
         Math.round((nowS() + expiry) / 60) * 60;
 
   return (
-    <Panel title="New notification">
+    <Card title="New notification">
       <form
         className="space-y-4"
         onSubmit={async (e) => {
@@ -166,78 +176,50 @@ function NewNotification({
         }}
       >
         <fieldset>
-          <legend className="mb-2 text-sm font-medium text-secondary-800">Type</legend>
+          <legend className="mb-1 text-sm font-medium text-secondary-700">Type</legend>
           <div className="flex flex-wrap gap-2">
             {TYPES.map((t) => (
-              <label
-                key={t.type}
-                className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-primary-300 ${
-                  type === t.type
-                    ? "border-primary-500 bg-primary-50 text-secondary-900"
-                    : "border-line bg-surface text-secondary-700 hover:bg-inset"
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="type"
-                  value={t.type}
-                  checked={type === t.type}
-                  onChange={() => setType(t.type)}
-                  className="sr-only"
-                />
+              <Chip key={t.type} selected={type === t.type} onClick={() => setType(t.type)}>
                 {t.label}
-              </label>
+              </Chip>
             ))}
           </div>
         </fieldset>
-        <label className="block text-sm">
-          <span className="font-medium text-secondary-800">Short description</span>
+        <Field label="Short description">
           <TextField
-            variant="plain"
             kind="note"
             required
             maxLength={140}
             value={summary}
             onChange={(e) => setSummary(e.target.value)}
-            className={`${fieldClass} mt-1`}
           />
-        </label>
-        <label className="block text-sm">
-          <span className="font-medium text-secondary-800">Full text</span>
+        </Field>
+        <Field label="Full text">
           <TextField
             multiline
-            variant="plain"
             kind="note"
             required
             maxLength={10_000}
             rows={6}
             value={body}
             onChange={(e) => setBody(e.target.value)}
-            className={`${fieldClass} mt-1`}
           />
-        </label>
+        </Field>
         <fieldset>
-          <legend className="mb-2 text-sm font-medium text-secondary-800">Expires</legend>
+          <legend className="mb-1 text-sm font-medium text-secondary-700">Expires</legend>
           <div className="flex flex-wrap items-center gap-2">
             {EXPIRY_PRESETS.map((p) => (
-              <button
+              <Chip
                 key={p.seconds}
-                type="button"
-                aria-pressed={expiry === p.seconds}
+                selected={expiry === p.seconds}
                 onClick={() => setExpiry(p.seconds)}
-                className={chipClass(expiry === p.seconds)}
               >
                 {p.label}
-              </button>
+              </Chip>
             ))}
-            <button
-              type="button"
-              aria-pressed={expiry === "custom"}
-              onClick={() => setExpiry("custom")}
-              className={chipClass(expiry === "custom")}
-            >
+            <Chip selected={expiry === "custom"} onClick={() => setExpiry("custom")}>
               Pick a date
-            </button>
+            </Chip>
             {expiry === "custom" && (
               <input
                 type="datetime-local"
@@ -246,7 +228,7 @@ function NewNotification({
                 min={toLocalInput(nowS())}
                 max={toLocalInput(nowS() + 365 * DAY_S)}
                 onChange={(e) => setCustomAt(e.target.value)}
-                className={`${fieldClass} w-auto`}
+                className={`${inputClass} max-w-64`}
                 aria-label="Expiry date and time"
               />
             )}
@@ -255,20 +237,12 @@ function NewNotification({
             <p className="mt-2 text-sm text-secondary-600">Expires {formatTime(expiresAt)}</p>
           )}
         </fieldset>
-        <button type="submit" disabled={busy} className={buttonClass("primary")}>
+        <Button type="submit" disabled={busy}>
           {busy ? "Creating…" : "Create"}
-        </button>
+        </Button>
       </form>
-    </Panel>
+    </Card>
   );
-}
-
-function chipClass(selected: boolean) {
-  return `rounded-full border px-3 py-1 text-sm ${
-    selected
-      ? "border-primary-500 bg-primary-50 font-semibold text-secondary-900"
-      : "border-line bg-surface text-secondary-700 hover:bg-inset"
-  }`;
 }
 
 function NotificationList({
@@ -336,13 +310,9 @@ function NotificationRow({
             </dd>
           </dl>
           <div className="flex justify-end">
-            <button
-              type="button"
-              onClick={onDelete}
-              className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50"
-            >
+            <Button variant="danger" size="sm" onClick={onDelete}>
               <FaTrash aria-hidden /> Delete
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -350,7 +320,7 @@ function NotificationRow({
   );
 }
 
-/** Asks before deleting, in a dialog over the page. */
+/** Asks before deleting, in a pop-up over the page. */
 function DeleteDialog({
   notification,
   onClose,
@@ -360,63 +330,40 @@ function DeleteDialog({
   onClose: () => void;
   onDeleted: () => Promise<void>;
 }) {
-  const ref = useRef<HTMLDialogElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const dialog = ref.current;
-    if (!dialog) return;
-    if (notification && !dialog.open) {
-      setError(null);
-      dialog.showModal();
-    } else if (!notification && dialog.open) {
-      dialog.close();
-    }
-  }, [notification]);
-
+  if (!notification) return null;
   return (
-    <dialog
-      ref={ref}
-      onClose={onClose}
-      onClick={(e) => e.target === ref.current && !busy && onClose()}
-      className="m-auto w-[min(28rem,calc(100%-2rem))] rounded-xl border border-line bg-surface p-0 text-secondary-900 shadow-xl backdrop:bg-black/40"
-    >
-      {notification && (
-        <div className="space-y-4 p-5">
-          <h2 className="text-lg font-semibold">Delete this notification?</h2>
-          <div className="flex items-center gap-2 rounded-lg bg-inset px-3 py-2 text-sm">
-            <TypeBadge type={notification.type} />
-            <span className="min-w-0 truncate">{notification.summary}</span>
-          </div>
-          <p className="text-sm text-secondary-600">This can't be undone.</p>
-          {error && <p className="text-sm text-red-700">{error}</p>}
-          <div className="flex justify-end gap-2">
-            <button type="button" disabled={busy} className={buttonClass()} onClick={onClose}>
-              Cancel
-            </button>
-            <button
-              type="button"
-              disabled={busy}
-              className={buttonClass("danger")}
-              onClick={async () => {
-                setBusy(true);
-                setError(null);
-                try {
-                  await send("DELETE", `/notifications/${notification.id}`);
-                  await onDeleted();
-                } catch (e) {
-                  setError((e as Error).message);
-                } finally {
-                  setBusy(false);
-                }
-              }}
-            >
-              {busy ? "Deleting…" : "Delete"}
-            </button>
-          </div>
-        </div>
-      )}
-    </dialog>
+    <Dialog title="Delete this notification?" onClose={() => !busy && onClose()}>
+      <div className="flex items-center gap-2 rounded-lg bg-inset px-3 py-2 text-sm">
+        <TypeBadge type={notification.type} />
+        <span className="min-w-0 truncate text-secondary-900">{notification.summary}</span>
+      </div>
+      <p className="text-sm text-secondary-600">This can't be undone.</p>
+      {error && <ErrorBanner message={error} />}
+      <div className="flex justify-end gap-2">
+        <Button variant="secondary" disabled={busy} onClick={onClose}>
+          Cancel
+        </Button>
+        <Button
+          variant="danger"
+          disabled={busy}
+          onClick={async () => {
+            setBusy(true);
+            setError(null);
+            try {
+              await send("DELETE", `/notifications/${notification.id}`);
+              await onDeleted();
+            } catch (e) {
+              setError((e as Error).message);
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          {busy ? "Deleting…" : "Delete"}
+        </Button>
+      </div>
+    </Dialog>
   );
 }
