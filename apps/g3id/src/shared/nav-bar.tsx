@@ -15,7 +15,6 @@ const routerLink = linkWith(Link);
 export function NavBar({ items }: { items: PluginNavItem[] }) {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [attendanceTrusted, setAttendanceTrusted] = useState(false);
   /** The team's sign-in methods: pages for one it switched off are hidden. */
   const [methods, setMethods] = useState<Partial<Record<string, boolean>>>({});
   const location = useLocation();
@@ -30,10 +29,6 @@ export function NavBar({ items }: { items: PluginNavItem[] }) {
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: location is used to trigger re-fetch on navigation
   useEffect(() => {
-    fetch("/api/auth/me?app=attendance&includeIdentities=false", { credentials: "include" })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((me) => setAttendanceTrusted((me as { isAdmin?: boolean } | null)?.isAdmin === true))
-      .catch(() => setAttendanceTrusted(false));
     api.auth.me.$get().then(async (res) => {
       if (res.ok) {
         const data = (await res.json()) as { isAdmin?: boolean };
@@ -56,8 +51,7 @@ export function NavBar({ items }: { items: PluginNavItem[] }) {
     if (item.signInMethod && methods[item.signInMethod] === false) return false;
     const audience = item.audience ?? "signed-in";
     if (audience === "signed-out") return !isLoggedIn;
-    if (audience === "admin")
-      return isLoggedIn && (item.permissionApp === "attendance" ? attendanceTrusted : isAdmin);
+    if (audience === "admin") return isLoggedIn && isAdmin;
     return isLoggedIn;
   });
   // The dashboard is the home page and also lives at /dashboard.

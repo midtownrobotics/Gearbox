@@ -114,7 +114,7 @@ describe("kiosk PIN sign-in", () => {
     const adminRoute = await g3id("/admin/users", { cookie });
     expect(adminRoute.status).toBe(403);
     expect(await adminRoute.json()).toEqual({
-      error: "Trusted student access not allowed from kiosk.",
+      error: "Admin access not allowed from kiosk.",
     });
   });
 

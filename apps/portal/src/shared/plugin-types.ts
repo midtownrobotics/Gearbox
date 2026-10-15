@@ -12,6 +12,8 @@ export interface PluginNavItem {
   requiresAuth?: boolean;
   /** Only shown to the team's admins. */
   requiresAdmin?: boolean;
+  requiresApp?: string;
+  permission?: { app: string; key: string };
   /** Items with the same group are shown together under its name. */
   group?: string;
 }

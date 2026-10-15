@@ -7,6 +7,14 @@ export const manifest = defineManifest({
   name: "Attendance",
   summary: "Shop sign-in and sign-out at a kiosk, with hours and a leaderboard.",
   roles: ["admin", "member", "kiosk"],
+  permissions: [
+    {
+      key: "manage",
+      label: "Manage Attendance",
+      description: "Adjust hours, sign members out and change attendance settings.",
+      roles: [],
+    },
+  ],
   integrations: [],
   availability: "every team",
   version: packageJson.version,
@@ -20,7 +28,7 @@ export const manifest = defineManifest({
       default: "08-01",
       help: "Month and day; hours count from here",
       editedBy: "admin",
-      page: "id:/admin/attendance",
+      page: "portal:/admin/attendance",
     },
     {
       key: "autoSignOutHours",
@@ -31,7 +39,7 @@ export const manifest = defineManifest({
       max: 24,
       help: "Hours; a session open longer is closed and doesn't count",
       editedBy: "admin",
-      page: "id:/admin/attendance",
+      page: "portal:/admin/attendance",
     },
   ],
   plugins: [],

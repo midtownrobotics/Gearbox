@@ -7,6 +7,14 @@ export const manifest = defineManifest({
   name: "Skill Tree",
   summary: "The skills each student has learned, signed off by mentors.",
   roles: ["admin", "mentor", "member", "kiosk"],
+  permissions: [
+    {
+      key: "skills",
+      label: "Manage skills",
+      description: "Edit skill trees and sign off students’ skills.",
+      roles: ["mentor"],
+    },
+  ],
   integrations: [],
   availability: "every team",
   version: packageJson.version,

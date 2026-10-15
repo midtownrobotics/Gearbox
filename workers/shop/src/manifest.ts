@@ -7,6 +7,14 @@ export const manifest = defineManifest({
   name: "Shop",
   summary: "Parts through manufacturing: processes, part files, drawings and Onshape releases.",
   roles: ["admin", "mentor", "member", "kiosk"],
+  permissions: [
+    {
+      key: "manage",
+      label: "Manage Shop",
+      description: "Manage Shop settings, parts and manufacturing controls.",
+      roles: [],
+    },
+  ],
   integrations: ["slack", "onshape", "edge box"],
   availability: "every team",
   version: packageJson.version,

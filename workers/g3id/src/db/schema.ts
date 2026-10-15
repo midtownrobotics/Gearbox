@@ -71,7 +71,7 @@ export const coreUsers = sqliteTable(
   ],
 );
 
-/** Explicit app roles override the member's ID roles; absent rows preserve existing access. */
+/** Deprecated preview roles, retained only for migration 0019; authorization ignores overrides. */
 export const appPermissions = sqliteTable(
   "app_permissions",
   {
@@ -93,6 +93,27 @@ export const appPermissions = sqliteTable(
       .onUpdate("cascade"),
     check("app_permissions_trusted_check", sql`${table.trustedStudent} IN (0, 1)`),
     check("app_permissions_mentor_check", sql`${table.mentorAccess} IN (0, 1)`),
+  ],
+);
+
+export const studentPermissions = sqliteTable(
+  "student_permissions",
+  {
+    teamId: text("team_id").notNull(),
+    userId: text("user_id").notNull(),
+    app: text("app").notNull(),
+    permission: text("permission").notNull(),
+    updatedAt: integer("updated_at").notNull(),
+    updatedBy: text("updated_by").references(() => coreUsers.id, { onDelete: "set null" }),
+  },
+  (table) => [
+    primaryKey({ columns: [table.teamId, table.userId, table.app, table.permission] }),
+    foreignKey({
+      columns: [table.teamId, table.userId],
+      foreignColumns: [coreUsers.teamId, coreUsers.id],
+    })
+      .onDelete("cascade")
+      .onUpdate("cascade"),
   ],
 );
 

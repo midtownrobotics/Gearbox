@@ -1,4 +1,4 @@
-import { inTeam, requireAdmin } from "@g3/auth";
+import { inTeam, requirePermission } from "@g3/auth";
 import { eq, inArray } from "drizzle-orm";
 import { type Context, Hono } from "hono";
 import { type EdgeDb, createEdgeDb } from "../../db";
@@ -7,6 +7,8 @@ import type { AppEnv } from "../../types";
 import { clientName, getSettings, teamTimeZone } from "./common";
 import { type Range, rangeOf, rangeQuery, usageStats } from "./range";
 import { clientSites, siteClients, siteDaily, topSites } from "./sites";
+
+const requireManage = requirePermission("manage");
 
 /** The range the page asks for (`?from=&to=`; the billing cycle by default), with the zone. */
 async function pageRange(c: Context<AppEnv>, db: EdgeDb, teamId: string) {
@@ -21,7 +23,7 @@ async function pageRange(c: Context<AppEnv>, db: EdgeDb, teamId: string) {
 const plain = ({ tz: _tz, now: _now, ...range }: Range & { tz: string; now: number }) => range;
 
 export const sitesRouter = new Hono<AppEnv>()
-  .get("/", requireAdmin, rangeQuery, async (c) => {
+  .get("/", requireManage, rangeQuery, async (c) => {
     const db = createEdgeDb(c.env.EDGE_DB);
     const teamId = c.get("teamId");
     const range = await pageRange(c, db, teamId);
@@ -29,7 +31,7 @@ export const sitesRouter = new Hono<AppEnv>()
     const sites = await topSites(db, teamId, range.from, range.to);
     return c.json({ range: plain(range), sites });
   })
-  .get("/site/:site", requireAdmin, rangeQuery, async (c) => {
+  .get("/site/:site", requireManage, rangeQuery, async (c) => {
     const db = createEdgeDb(c.env.EDGE_DB);
     const teamId = c.get("teamId");
     const site = c.req.param("site");
@@ -60,7 +62,7 @@ export const sitesRouter = new Hono<AppEnv>()
       }),
     });
   })
-  .get("/client/:mac", requireAdmin, rangeQuery, async (c) => {
+  .get("/client/:mac", requireManage, rangeQuery, async (c) => {
     const db = createEdgeDb(c.env.EDGE_DB);
     const teamId = c.get("teamId");
     const mac = c.req.param("mac");

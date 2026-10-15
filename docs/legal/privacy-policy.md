@@ -32,7 +32,7 @@ We collect only what the apps need to work.
 | --- | --- | --- |
 | Account | Name, email address, when you last signed in | You, or the sign-in service you use |
 | Sign-in links | Your identifier at each service you link, such as Google, GitHub, Slack or Steam. A password is stored only as a one-way hash. For Google and GitHub, the access token they issue when you sign in | You, when you link a service |
-| Team membership | Your team, your role, app-specific permissions, who changed those permissions and when, your status, and a kiosk PIN if your team uses kiosks | Your team's ID trusted students |
+| Team membership | Your team, your role, app-specific permissions, who changed those permissions and when, your status, and a kiosk PIN if your team uses kiosks | Your team's Admins |
 | Sessions and devices | A session identifier in a cookie, and for shared shop devices a kiosk token | Created when you sign in |
 | Attendance | When you signed in and out, and hours added by an admin | You and your team's admins |
 | Orders | Part requests, reasons, approvals, costs, budgets and vendors | Members and mentors |

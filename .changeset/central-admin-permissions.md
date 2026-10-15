@@ -12,6 +12,6 @@
 "@g3/worker-portal": minor
 ---
 
-Add a central Admin page in ID, available from the Account page and navbar. ID's trusted students assign trusted student and mentor access separately for each app, including Orders catalog editors and Scouting strategy, publishing and service-crew permissions. Each app keeps its settings and enforces its assigned permissions. Rename the admin role to Trusted student in the interface.
+Move Account, Users, Kiosk management, Leaderboard and Attendance pages into Gearbox Home, with redirects from ID. Combine user management and permissions on each member's page. Keep site-wide Admin and Mentor roles, reserve Home settings and permission assignments for Admins, and let trusted students receive granular capabilities for enabled apps without changing global roles. Generate permission controls from the apps' manifest definitions and descriptions, including existing Orders and Scouting grants in the same section.
 
-Preserve existing ID roles and app grants. App-specific overrides take effect on authenticated requests, cannot grant ID authority and are unavailable to kiosk PIN sessions. Apply G3ID migration 0018 before deployment, and deploy all updated app workers before using app-specific assignments.
+Apply ID migrations through 0019 before deployment. Migration 0019 converts preview app-role grants into student capabilities while preserving identity roles; global roles can no longer be denied per app. Preserve legacy catalog, strategy, publisher and service-crew assignments, enforce kiosk and team boundaries, and deploy the updated Platform, ID and app workers together before assigning new capabilities. The release workflow applies versions and changelogs.

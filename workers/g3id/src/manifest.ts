@@ -8,6 +8,7 @@ export const manifest = defineManifest({
   name: "ID",
   summary: "Sign-in for the team's members: accounts, roles, kiosk PINs and the team's Slack.",
   roles: ["admin", "mentor", "member", "kiosk"],
+  permissions: [],
   integrations: ["slack"],
   availability: "every team",
   alwaysOn: true,

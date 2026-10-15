@@ -1,4 +1,4 @@
-import { logTeamChange, requireAdmin, withTeam } from "@g3/auth";
+import { logTeamChange, requirePermission, withTeam } from "@g3/auth";
 import { Hono } from "hono";
 import { createEdgeDb } from "../db";
 import { edgeBoxes } from "../db/schema";
@@ -7,16 +7,18 @@ import { writeAudit } from "../lib/audit";
 import { hashKey, newKey, teamBox } from "../lib/box-key";
 import type { AppEnv } from "../types";
 
+const requireManage = requirePermission("manage");
+
 /**
  * The team's box and its key (G3ID admins, never from a kiosk). Making a key replaces the old one
  * and disconnects the box until it's given the new key; the key is shown only in this answer.
  */
 export const boxRouter = new Hono<AppEnv>()
-  .get("/", requireAdmin, async (c) => {
+  .get("/", requireManage, async (c) => {
     const box = await teamBox(createEdgeDb(c.env.EDGE_DB), c.get("teamId"));
     return c.json({ box: box ?? null });
   })
-  .post("/key", requireAdmin, async (c) => {
+  .post("/key", requireManage, async (c) => {
     const db = createEdgeDb(c.env.EDGE_DB);
     const teamId = c.get("teamId");
     const key = newKey();

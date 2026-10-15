@@ -1,4 +1,4 @@
-import { site } from "@g3/site-config";
+import { apiPath, appUrl, site } from "@g3/site-config";
 import {
   Badge,
   Button,
@@ -13,7 +13,7 @@ import {
 import { Shield } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { FaGithub, FaGoogle, FaSlack, FaSteam } from "react-icons/fa";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { api } from "../../lib/api";
 
 type Identity = {
@@ -52,7 +52,6 @@ const STATUS_TONES: Record<string, string> = {
 };
 
 export function DashboardPage() {
-  const navigate = useNavigate();
   const [me, setMe] = useState<Me | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -142,9 +141,11 @@ export function DashboardPage() {
     const res = await api.auth.logout.$post();
     const data = (await res.json()) as { isKiosk?: boolean };
     if (data.isKiosk) {
-      navigate("/kiosk/login");
+      window.location.assign(`${appUrl("id")}/kiosk/login`);
     } else {
-      navigate("/login");
+      window.location.assign(
+        `${appUrl("id")}/login?redirect=${encodeURIComponent(window.location.href)}`,
+      );
     }
   }
 
@@ -213,11 +214,13 @@ export function DashboardPage() {
   useEffect(() => {
     api.auth.me.$get().then(async (res) => {
       if (res.status === 401) {
-        navigate("/login");
+        window.location.assign(
+          `${appUrl("id")}/login?redirect=${encodeURIComponent(window.location.href)}`,
+        );
         return;
       }
       if (res.status === 404) {
-        navigate("/signup");
+        window.location.assign(`${appUrl("id")}/signup`);
         return;
       }
       if (!res.ok) {
@@ -227,7 +230,7 @@ export function DashboardPage() {
       const data = (await res.json()) as Me;
       setMe(data);
     });
-  }, [navigate]);
+  }, []);
 
   if (error) {
     return (
@@ -267,12 +270,12 @@ export function DashboardPage() {
             <div>
               <h2 className="text-xl text-secondary-900">Admin</h2>
               <p className="text-sm text-secondary-600">
-                Manage trusted students and app permissions.
+                Manage accounts, roles and student permissions.
               </p>
             </div>
           </div>
-          <Link to="/admin" className={buttonClass("primary")}>
-            Manage permissions
+          <Link to="/admin/users" className={buttonClass("primary")}>
+            Manage users
           </Link>
         </Card>
       )}
@@ -335,7 +338,7 @@ export function DashboardPage() {
                   identity.provider === "github") &&
                   linkable(identity.provider) && (
                     <a
-                      href={`${import.meta.env.VITE_API_BASE_URL}/auth/${identity.provider}/link`}
+                      href={`${apiPath("id")}/auth/${identity.provider}/link`}
                       className={`${buttonClass("secondary", "sm")} ml-auto`}
                     >
                       Add another
@@ -358,28 +361,19 @@ export function DashboardPage() {
 
         <div className="mt-3 space-y-2">
           {linkable("google") && !me.identities.some((i) => i.provider === "google") && (
-            <a
-              href={`${import.meta.env.VITE_API_BASE_URL}/auth/google/link`}
-              className={`${buttonClass()} w-full`}
-            >
+            <a href={`${apiPath("id")}/auth/google/link`} className={`${buttonClass()} w-full`}>
               <FaGoogle size={16} />
               Connect Google
             </a>
           )}
           {linkable("github") && !me.identities.some((i) => i.provider === "github") && (
-            <a
-              href={`${import.meta.env.VITE_API_BASE_URL}/auth/github/link`}
-              className={`${buttonClass()} w-full`}
-            >
+            <a href={`${apiPath("id")}/auth/github/link`} className={`${buttonClass()} w-full`}>
               <FaGithub size={16} />
               Connect GitHub
             </a>
           )}
           {linkable("steam") && !me.identities.some((i) => i.provider === "steam") && (
-            <a
-              href={`${import.meta.env.VITE_API_BASE_URL}/auth/steam/link`}
-              className={`${buttonClass()} w-full`}
-            >
+            <a href={`${apiPath("id")}/auth/steam/link`} className={`${buttonClass()} w-full`}>
               <FaSteam size={16} />
               Connect Steam
             </a>

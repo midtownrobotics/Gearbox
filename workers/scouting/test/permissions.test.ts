@@ -7,7 +7,7 @@ describe("central Scouting permission management", () => {
     const team = teamUsers(newTeamId());
     const trusted = testUser({
       ...team.student,
-      appPermissions: { scouting: { trustedStudent: true, mentorAccess: false } },
+      permissions: { scouting: ["manage"] },
     });
     expect(await jsonAs(trusted, "/scouting/me")).toMatchObject({
       isAdmin: true,

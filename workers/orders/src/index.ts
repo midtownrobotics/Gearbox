@@ -1,5 +1,4 @@
-import { appAuthContext } from "@g3/auth";
-import { hasMentorAccess, requireAuth, withTeam } from "@g3/auth";
+import { appAuthContext, hasPermission, requireAuth, withTeam } from "@g3/auth";
 import { corsOrigin } from "@g3/site-config";
 import { withApiPrefix } from "@g3/site-config/worker";
 import { Hono } from "hono";
@@ -10,6 +9,7 @@ import { appUsers } from "./db/schema";
 import { TIME_ZONE_HEADER } from "./lib/local-time";
 import { teamSettings } from "./lib/settings";
 import { catalogReady } from "./lib/starter";
+import { manifest } from "./manifest";
 import { canEditCatalog } from "./middleware/auth";
 import { catalogRouter } from "./routes/catalog";
 import { categoriesRouter } from "./routes/categories";
@@ -27,7 +27,7 @@ import { vendorsRouter } from "./routes/vendors";
 import type { AppEnv } from "./types";
 
 const base = new Hono<AppEnv>();
-base.use("*", appAuthContext("orders"));
+base.use("*", appAuthContext(manifest));
 
 base.onError((err, c) => {
   console.error(err);
@@ -65,7 +65,7 @@ const app = base
     return c.json({
       userId: c.get("userId"),
       displayName: c.get("userDisplayName"),
-      isMentor: hasMentorAccess(c),
+      isMentor: hasPermission(c, "orders"),
       canEditCatalog: await canEditCatalog(c),
       currency: settings.currency,
       fiscalYearStart: settings.fiscalYearStart,

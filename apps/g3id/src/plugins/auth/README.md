@@ -1,8 +1,5 @@
-# auth plugin
+# ID auth plugin
 
-Login and signup pages for G3ID.
+Sign-in and sign-up pages for ID. Routes include /login, /login/email, provider/error flows, /signup and /signup/pending. Navigation uses Sign in and Sign up.
 
-**Routes:** `/` (login), `/signup`
-**Nav:** Log in (order 0), Sign up (order 1)
-
-The pages sign in through G3ID's worker (`workers/g3id`, `/auth/*`).
+The pages sign in through ID's worker (workers/g3id, /auth/*). Account, user management, permissions, kiosk management and attendance pages live in Gearbox Home. Existing ID URLs redirect there.

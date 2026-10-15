@@ -1,27 +1,30 @@
-# Central permissions in ID
+# Users and permissions in Gearbox Home
 
-Implemented on central-admin-page. ID's Account page has an Admin card and a Manage permissions button; Admin is also a navbar link. Its app tabs contain permission controls only, with compact member names and short summaries beneath the trusted student and mentor labels. The summaries describe the selected app's access and share the existing switches' height. App settings stay on their existing pages.
+Gearbox Home owns Account, Users, Kiosk Devices, Leaderboard and Attendance pages. ID owns sign-in flows and the identity backend. Existing ID page URLs redirect to Home, preserving member IDs and query strings. Home's Users list opens each member's account details, site-wide roles and student permissions together; the separate central Admin permission page is retired.
 
-## Authority
+## Roles and authority
 
-- Only ID's trusted students manage assignments. An app's trusted student can use that app's restricted controls without gaining access to ID's permission editor or account administration.
-- Trusted student is the displayed name for the existing admin role. Stored `isAdmin` fields, manifest roles and API keys retain their existing names for compatibility. Mentor identity remains distinct from an app's mentor access.
-- Every data-owning app declares its permission scope with `appAuthContext` before mounting routes. Shared auth asks ID for that app's effective roles. Client role and app-scope headers are ignored.
-- `userIsAdmin` and `userIsMentor` are effective app roles; `userIsIdentityAdmin` separately identifies who may assign permissions. Kiosk sessions never receive any of these powers, including through legacy Orders catalog grants.
-- ID reads active members and edits only its signed-in manager's team. Cross-team identifiers, invalid roles, inactive members and self-removal of ID trusted student access are refused.
+- Admin and Mentor remain site-wide roles within a team. Admin grants every permission in every team app, including permission assignments and Home settings. Mentor grants the existing mentor capabilities throughout the team's apps.
+- Trusted students have explicitly assigned app capabilities, without becoming site-wide Admins or Mentors. App permissions cannot deny or downgrade global roles.
+- Only Admins assign roles or student permissions. Home's app selection, appearance, sign-in, integrations and notification settings are restricted to Admins on both frontend and backend.
+- Kiosk PIN sessions receive neither elevated roles nor student permissions. Every mutation validates the manager's team, active membership, enabled app and declared permission key. Admins cannot remove their own Admin access.
 
-## Existing roles and settings
+## Manifest authority and enabled apps
 
-Migration 0018 adds `app_permissions` without rewriting existing accounts. No override means the member keeps their existing ID roles in that app. Editing an app creates an explicit assignment; Use ID roles removes it. Identity and app roles are shown separately in the editor. Composite ownership keys and foreign keys prevent a grant from referring to another team's member. Account deletion cascades its overrides; team deletion removes only that team's grants.
+Each app's `manifest.ts` declares a `permissions` array with stable keys, labels, descriptions, Mentor defaults and any included capabilities. Home generates the permission controls from those definitions. ID asks Platform for the signed-in team's enabled manifests; the browser never chooses the permission catalog. Disabled apps are hidden and cannot receive new assignments. Their stored grants survive being switched off.
 
-Orders' catalog-editor grants and Scouting's strategy, field-map publishing and service-crew grants remain in their existing team-scoped app tables. Their existing assignments are preserved and their editing controls move to ID's app tabs. Their APIs now require ID's trusted student authority, even when the caller is trusted in the app. Orders can grant catalog access before a member first opens it. Service skills remain alongside the service-crew assignment.
+Workers declare `appAuthContext(manifest)`. `userIsAdmin` and `userIsMentor` always mean global roles; `userPermissions` contains additional student grants. `hasPermission` and `requirePermission` enforce manifest capabilities, including implied permissions. Global `requireAdmin` is reserved for Admin-only actions. Existing app API capability flags remain compatible with their frontend consumers.
 
-The old assignment controls are removed from ID's Users pages, Orders Admin, Scouting Admin, Field Maps and Service Tickets. Users still approves, rejects, merges and deletes accounts; app Admin pages retain configuration, operational tools and API-key settings. Attendance's existing settings page in ID follows Attendance's assigned access. Gearbox Home's settings follow its own app scope. Shop and Home can list Slack channel choices using their app-specific trusted student access without gaining ID management authority.
+Orders and Scouting now have one generated permission section each. Orders offers order management and catalog editing. Scouting offers settings, strategy/forms, field-map publishing and service crew. The old ID roles badge, inheritance/reset controls and per-app Admin/Mentor switches are removed.
 
-## Rollout and validation
+## Storage and compatibility
 
-Apply G3ID migration 0018 locally or on staging before starting the updated ID worker. Production requires the same migration first. Deploy the updated ID and app workers as one coordinated rollout; finish deploying all app workers before using app-specific assignments. The shared SDK remains compatible with an older ID worker during deployment, and existing roles continue to work until overrides are chosen.
+Migration `0019_student_permissions.sql` adds team-owned student grants with composite ownership foreign keys, cascading account cleanup and actor/timestamp metadata. It converts the preview's positive app-role assignments into student capabilities, normalizes Skill Tree's manifest slug and discards Home overrides. It never modifies site-wide identity roles. Preview denial rows no longer suppress Admin or Mentor access; the old table remains only for migration compatibility.
 
-Validation passed: 505 tests across all 12 workers, workspace type checks, Biome CI, tenancy lint, configuration checks, production builds for ID, Scouting, Shop, Home and Orders, and an ID worker dry-run build. Worker tests cover scoped grants and revocation with existing sessions, inherited-role overrides and reset, separate mentor access, ID-only management, kiosk exclusion, forged headers, cross-team isolation and database constraints, account/team deletion, Slack channel authorization, and preserved Orders/Scouting workflows.
+Existing Orders catalog-editor and Scouting strategy, publisher and service-crew grants stay in their app-owned tables. Platform's authenticated adapters read and update those assignments for ID, so Home displays them alongside manifest-defined permissions without a second section. Existing service skills are preserved. Assignment APIs continue to require a global Admin. Configuration and operational tools stay with their apps; moving user pages does not transfer their databases to Platform.
 
-Real local browser checks verified grants and revocation, strategy access, field-map publishing, service-crew skills, catalog editing and the ID-only assignment boundary. All ten app tabs passed 80 views across light and dark themes at four mobile-to-desktop widths, with no horizontal overflow or browser exceptions. A separate role-summary review compared 100 views against the previous layout at widths from 320 to 1440 pixels in both themes: card heights did not increase, switch dimensions stayed unchanged, and no overflow or browser exceptions occurred. Temporary QA accounts were removed afterward. Migration and browser testing used local databases; no production deployment or remote database changes were made.
+## Validation and rollout
+
+Validation passed: 508 tests across all 12 workers, workspace type checks, Biome, tenancy/configuration checks, both frontend builds and ID/Platform production dry-run builds. Coverage includes global Admin/Mentor access, granular student capabilities, kiosk refusal, forged headers, cross-team reads and writes, account/team cleanup, disabled apps, Home settings authorization and preserved legacy grants. The local browser workflow checked Account to Users, direct role/grant edits, all enabled app tabs, existing ID redirects, preservation of service-crew skills and 48 light/dark/mobile/desktop views with no overflow or browser exceptions. A populated SQLite migration rehearsal confirmed preview grants convert without changing global roles.
+
+Apply ID migrations through `0019` before the updated ID worker (including `0018` when not yet applied). Deploy Platform's manifest catalog/adapters, updated ID and all affected app workers as a coordinated rollout; finish before assigning student capabilities. Deploy the Home and ID frontends together so old links redirect to the moved pages. No production database changes or deployment were performed.

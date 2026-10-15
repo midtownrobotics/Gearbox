@@ -2,8 +2,8 @@ import {
   changedFields,
   inTeam,
   logTeamChange,
-  requireAdmin,
   requireAuth,
+  requirePermission,
   settingLabels,
 } from "@g3/auth";
 import { desc, eq } from "drizzle-orm";
@@ -34,6 +34,8 @@ import {
   project,
   totalsByMac,
 } from "./usage";
+
+const requireManage = requirePermission("manage");
 
 const now = () => Math.floor(Date.now() / 1000);
 
@@ -227,7 +229,7 @@ export const networkRouter = new Hono<AppEnv>()
   })
   .patch(
     "/clients/:mac",
-    requireAdmin,
+    requireManage,
     validator("json", (value, c) => {
       const { displayName } = (value ?? {}) as { displayName?: unknown };
       if (displayName !== null && typeof displayName !== "string") {
@@ -267,7 +269,7 @@ export const networkRouter = new Hono<AppEnv>()
   })
   .patch(
     "/settings",
-    requireAdmin,
+    requireManage,
     validator("json", (value, c) => {
       const { capBytes, cycleStartDay } = (value ?? {}) as Record<string, unknown>;
       const out: { capBytes?: number; cycleStartDay?: number } = {};

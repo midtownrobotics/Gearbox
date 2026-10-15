@@ -1,5 +1,5 @@
 import {
-  hasMentorAccess,
+  hasPermission,
   inTeam,
   requireAuth,
   requireAuthWithIdentities,
@@ -496,10 +496,10 @@ export const requestsRouter = new Hono<AppEnv>()
     // Anyone edits a wishlist item; a request, its requester or a mentor while it's waiting.
     const wished = current.status === "wishlist";
     const approved = current.status === "approved";
-    if (!wished && current.requesterId !== c.get("userId") && !hasMentorAccess(c)) {
+    if (!wished && current.requesterId !== c.get("userId") && !hasPermission(c, "orders")) {
       return c.json({ error: "Only the requester or a mentor can edit this." }, 403);
     }
-    if (approved && !hasMentorAccess(c)) {
+    if (approved && !hasPermission(c, "orders")) {
       return c.json({ error: "Only a mentor can edit an approved request." }, 403);
     }
     if (!wished && !approved && current.status !== "requested") {
@@ -666,7 +666,7 @@ export const requestsRouter = new Hono<AppEnv>()
 
     const current = await selectRequests(db, teamId, eq(orderRequests.id, id)).get();
     if (!current) return c.json({ error: "Request not found." }, 404);
-    const isMentor = hasMentorAccess(c);
+    const isMentor = hasPermission(c, "orders");
     const isRequester = current.request.requesterId === c.get("userId");
     const allowed =
       rule.who === "anyone" || isMentor || (rule.who === "mentor-or-requester" && isRequester);

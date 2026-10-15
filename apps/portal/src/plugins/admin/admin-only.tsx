@@ -23,7 +23,7 @@ export function AdminOnly({ children }: { children: ReactNode }) {
   if (!me.isAdmin) {
     return (
       <main className="mx-auto w-full max-w-2xl flex-1 px-6 py-12 text-center text-secondary-700">
-        Only your team's trusted students can manage the team.
+        Only your team's Admins can manage the team.
       </main>
     );
   }

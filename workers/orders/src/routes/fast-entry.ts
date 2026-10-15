@@ -3,7 +3,7 @@ import {
   inTeam,
   logTeamChange,
   requireAuth,
-  requireMentor,
+  requirePermission,
   settingLabels,
   withTeam,
 } from "@g3/auth";
@@ -28,6 +28,8 @@ import { catalogReady } from "../lib/starter";
 import { vendorKey, vendorName } from "../lib/vendors";
 import { manifest } from "../manifest";
 import type { AppEnv } from "../types";
+
+const requireDelegatedMentor = requirePermission("orders");
 
 /** Whether this runtime can format money in a currency ("USD", "CAD", ...). */
 function isCurrency(code: string) {
@@ -101,7 +103,7 @@ export const settingsRouter = new Hono<AppEnv>()
       defaultNamingTemplate: DEFAULT_TEMPLATE,
     });
   })
-  .put("/", requireMentor, settingsValidator, async (c) => {
+  .put("/", requireDelegatedMentor, settingsValidator, async (c) => {
     const db = createOrdersDb(c.env.ORDERS_DB);
     const teamId = c.get("teamId");
     const input = c.req.valid("json");
@@ -145,7 +147,7 @@ export const categoryRulesRouter = new Hono<AppEnv>()
         .all(),
     );
   })
-  .post("/", requireMentor, ruleValidator, async (c) => {
+  .post("/", requireDelegatedMentor, ruleValidator, async (c) => {
     const db = createOrdersDb(c.env.ORDERS_DB);
     const teamId = c.get("teamId");
     const body = c.req.valid("json");
@@ -162,7 +164,7 @@ export const categoryRulesRouter = new Hono<AppEnv>()
       .get();
     return c.json(row, 201);
   })
-  .delete("/:id", requireMentor, async (c) => {
+  .delete("/:id", requireDelegatedMentor, async (c) => {
     const db = createOrdersDb(c.env.ORDERS_DB);
     const row = await db
       .delete(categoryRules)

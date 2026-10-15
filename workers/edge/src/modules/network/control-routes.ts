@@ -1,4 +1,4 @@
-import { inTeam, logTeamChange, requireAdmin, settingLabels, withTeam } from "@g3/auth";
+import { inTeam, logTeamChange, requirePermission, settingLabels, withTeam } from "@g3/auth";
 import { count, eq, isNull } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import { Hono } from "hono";
@@ -29,6 +29,8 @@ import {
   parseBlocklistInput,
   pokeAgent,
 } from "./control";
+
+const requireManage = requirePermission("manage");
 
 const now = () => Math.floor(Date.now() / 1000);
 
@@ -76,7 +78,7 @@ const blocklistBody = validator("json", (value, c) => {
 
 /** Blocking controls. Admin-only. */
 export const controlRouter = new Hono<AppEnv>()
-  .get("/", requireAdmin, async (c) => {
+  .get("/", requireManage, async (c) => {
     const db = createEdgeDb(c.env.EDGE_DB);
     const teamId = c.get("teamId");
     const t = now();
@@ -110,7 +112,7 @@ export const controlRouter = new Hono<AppEnv>()
   })
   .patch(
     "/settings",
-    requireAdmin,
+    requireManage,
     validator("json", (value, c) => {
       const { enforce, dnsHardening } = (value ?? {}) as Record<string, unknown>;
       const out: { enforce?: boolean; dnsHardening?: boolean } = {};
@@ -150,7 +152,7 @@ export const controlRouter = new Hono<AppEnv>()
       return c.json({ ok: true });
     },
   )
-  .post("/blocklists", requireAdmin, blocklistBody, async (c) => {
+  .post("/blocklists", requireManage, blocklistBody, async (c) => {
     const db = createEdgeDb(c.env.EDGE_DB);
     const input = c.req.valid("json");
     const teamId = c.get("teamId");
@@ -181,7 +183,7 @@ export const controlRouter = new Hono<AppEnv>()
     await afterChange(c, db, "network.blocklist.create", { id: created.id, ...input });
     return c.json({ id: created.id });
   })
-  .put("/blocklists/:id", requireAdmin, blocklistBody, async (c) => {
+  .put("/blocklists/:id", requireManage, blocklistBody, async (c) => {
     const db = createEdgeDb(c.env.EDGE_DB);
     const id = Number(c.req.param("id"));
     const input = c.req.valid("json");
@@ -203,7 +205,7 @@ export const controlRouter = new Hono<AppEnv>()
     await afterChange(c, db, "network.blocklist.update", { id, ...input });
     return c.json({ ok: true });
   })
-  .delete("/blocklists/:id", requireAdmin, async (c) => {
+  .delete("/blocklists/:id", requireManage, async (c) => {
     const db = createEdgeDb(c.env.EDGE_DB);
     const id = Number(c.req.param("id"));
     const deleted = await db
@@ -216,7 +218,7 @@ export const controlRouter = new Hono<AppEnv>()
   })
   .post(
     "/grants",
-    requireAdmin,
+    requireManage,
     validator("json", (value, c) => {
       const { mac, blocklistId, duration, reason } = (value ?? {}) as Record<string, unknown>;
       if (typeof mac !== "string" || !mac) return c.json({ error: "mac is required." }, 400);
@@ -278,7 +280,7 @@ export const controlRouter = new Hono<AppEnv>()
       return c.json({ id: created.id, expiresAt });
     },
   )
-  .delete("/grants/:id", requireAdmin, async (c) => {
+  .delete("/grants/:id", requireManage, async (c) => {
     const db = createEdgeDb(c.env.EDGE_DB);
     const id = Number(c.req.param("id"));
     const revoked = await db
@@ -291,7 +293,7 @@ export const controlRouter = new Hono<AppEnv>()
     return c.json({ ok: true });
   })
   // Re-sends the current state, e.g. after the box comes back online.
-  .post("/sync", requireAdmin, async (c) => {
+  .post("/sync", requireManage, async (c) => {
     c.executionCtx.waitUntil(pokeAgent(c.env, c.get("teamId")));
     return c.json({ ok: true });
   });

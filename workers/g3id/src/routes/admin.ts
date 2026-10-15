@@ -361,7 +361,7 @@ export const adminRouter = new Hono<AppEnv>()
       .set({ isAdmin: 1, updatedAt: Math.floor(Date.now() / 1000) })
       .where(memberOf(c.get("adminTeamId") as string, id));
 
-    return c.json({ message: "User promoted to trusted student." });
+    return c.json({ message: "User promoted to admin." });
   })
   .post("/users/:id/demote", async (c) => {
     const id = c.req.param("id");

@@ -1,4 +1,4 @@
-import { inTeam, requireAuth, requireMentor, withTeam } from "@g3/auth";
+import { inTeam, requireAuth, requirePermission, withTeam } from "@g3/auth";
 import { asc, eq, inArray } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
@@ -9,6 +9,8 @@ import { fiscalYearOf } from "../lib/fiscal";
 import { localTimeZone } from "../lib/local-time";
 import { teamCalendar } from "../lib/settings";
 import type { AppEnv } from "../types";
+
+const requireDelegatedMentor = requirePermission("orders");
 
 type CategoryInput = {
   name?: string;
@@ -184,7 +186,7 @@ export const categoriesRouter = new Hono<AppEnv>()
     ]);
     return c.json({ current, years: [...years].sort((a, b) => b - a) });
   })
-  .post("/", requireMentor, categoryValidator(true), async (c) => {
+  .post("/", requireDelegatedMentor, categoryValidator(true), async (c) => {
     const body = c.req.valid("json");
     const db = createOrdersDb(c.env.ORDERS_DB);
     const teamId = c.get("teamId");
@@ -215,7 +217,7 @@ export const categoriesRouter = new Hono<AppEnv>()
     return c.json({ ...row, isArchived: row.isArchived === 1 }, 201);
   })
   /** Rename, set the code, archive, or set the budget for `fiscalYear` (default: current). */
-  .patch("/:id", requireMentor, categoryValidator(false), async (c) => {
+  .patch("/:id", requireDelegatedMentor, categoryValidator(false), async (c) => {
     const body = c.req.valid("json");
     const id = Number(c.req.param("id"));
     const db = createOrdersDb(c.env.ORDERS_DB);

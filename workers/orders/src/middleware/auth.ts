@@ -1,4 +1,4 @@
-import { hasMentorAccess, inTeam } from "@g3/auth";
+import { hasPermission, inTeam } from "@g3/auth";
 import { eq } from "drizzle-orm";
 import type { Context } from "hono";
 import { createMiddleware } from "hono/factory";
@@ -11,7 +11,7 @@ import type { AppEnv } from "../types";
 /** Catalog editing: app mentor/trusted-student access, or an editor assigned by ID. Never PIN. */
 export async function canEditCatalog(c: Context<AppEnv>) {
   if (c.get("sessionType") === "pin") return false;
-  if (hasMentorAccess(c)) return true;
+  if (hasPermission(c, "catalog")) return true;
   const row = await createOrdersDb(c.env.ORDERS_DB)
     .select({ trusted: appUsers.trusted })
     .from(appUsers)

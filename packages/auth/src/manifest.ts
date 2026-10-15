@@ -10,6 +10,19 @@ import type { AppName } from "@g3/site-config";
 /** The roles an app gives a meaning to. */
 export type AppRole = "admin" | "mentor" | "member" | "kiosk";
 
+/** A student permission, described and enforced by its app. Admins always have all permissions. */
+export type AppPermissionDefinition = {
+  key: string;
+  label: string;
+  description: string;
+  /** Site-wide roles that already have this permission. */
+  roles: "mentor"[];
+  /** Other permissions included in this permission, in the same app. */
+  includes?: string[];
+  /** Existing app-owned grants are managed through Platform's authenticated adapter. */
+  storage?: "app";
+};
+
 /** Something outside the app that it uses when the team has it. */
 export type AppIntegration =
   | "slack"
@@ -48,6 +61,8 @@ export type AppSetting = {
   help?: string;
   /** Who may change it. */
   editedBy: "admin" | "mentor";
+  /** Additional student permission allowed to change this setting. Defaults to manage. */
+  permission?: string;
   /**
    * The page that edits it: its path in the app, or `<app>:<path>` for a page in another app
    * (Attendance's settings are on G3ID: `id:/admin/attendance`).
@@ -79,6 +94,7 @@ export type AppManifest = {
   /** One sentence for the app library. */
   summary: string;
   roles: AppRole[];
+  permissions: AppPermissionDefinition[];
   integrations: AppIntegration[];
   /**
    * Who may switch it on: every team, or only the site's own team (an app whose data isn't kept

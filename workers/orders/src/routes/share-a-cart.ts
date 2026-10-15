@@ -1,4 +1,4 @@
-import { inTeam, requestTeamId, requireAuth, requireMentor } from "@g3/auth";
+import { inTeam, requestTeamId, requireAuth, requirePermission } from "@g3/auth";
 import { eq, inArray } from "drizzle-orm";
 import type { Context } from "hono";
 import { Hono } from "hono";
@@ -24,6 +24,8 @@ import {
 import { ordersUrl } from "../lib/urls";
 import { vendorKey } from "../lib/vendors";
 import type { AppEnv } from "../types";
+
+const requireDelegatedMentor = requirePermission("orders");
 
 // Share-A-Cart sends the mentor back to their own team's address, so the callback (which has no
 // session to go on) is for the team the gateway says, and finds the sign-in among that team's.
@@ -82,7 +84,7 @@ export const shareACartRouter = new Hono<AppEnv>()
     });
   })
   /** Opened in the browser by a mentor: sends them to sign in to Share-A-Cart and approve. */
-  .get("/connect", requireMentor, async (c) => {
+  .get("/connect", requireDelegatedMentor, async (c) => {
     const teamId = c.get("teamId");
     try {
       const url = await startConnect(
@@ -113,7 +115,7 @@ export const shareACartRouter = new Hono<AppEnv>()
       );
     }
   })
-  .post("/disconnect", requireMentor, async (c) => {
+  .post("/disconnect", requireDelegatedMentor, async (c) => {
     await disconnect(teamOf(c));
     return c.json({ ok: true });
   })
@@ -121,7 +123,7 @@ export const shareACartRouter = new Hono<AppEnv>()
    * Builds a Share-A-Cart cart from approved lines at one vendor (quantities as edited on the
    * Carts page) and returns its link. Lines without an ASIN are left out and reported.
    */
-  .post("/carts", requireMentor, cartValidator, async (c) => {
+  .post("/carts", requireDelegatedMentor, cartValidator, async (c) => {
     const { vendor, lines } = c.req.valid("json");
     const sacVendor = SAC_VENDORS[vendorKey(vendor)];
     if (!sacVendor) return c.json({ error: `Share-A-Cart doesn't support ${vendor}.` }, 400);

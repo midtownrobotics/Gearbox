@@ -1,4 +1,4 @@
-import { requireAdmin, requireAuth } from "@g3/auth";
+import { hasPermission, requireAuth, requirePermission } from "@g3/auth";
 import { type Context, Hono } from "hono";
 import { validator } from "hono/validator";
 import { AgentError, agentFetch } from "../../lib/agent";
@@ -14,6 +14,8 @@ import {
   isValidPrinterName,
   parsePrintOptions,
 } from "./types";
+
+const requireManage = requirePermission("manage");
 
 type Ctx = Context<AppEnv>;
 
@@ -70,7 +72,7 @@ export const printRouter = new Hono<AppEnv>()
       ...new Set(r.data.jobs.map((j) => j.user).filter((u): u is string => !!u)),
     ]);
     const me = c.get("userId");
-    const admin = c.get("userIsAdmin");
+    const admin = hasPermission(c, "manage");
     return c.json({
       jobs: r.data.jobs.map((j) => ({
         ...j,
@@ -122,7 +124,7 @@ export const printRouter = new Hono<AppEnv>()
   .delete("/jobs/:id", requireAuth, async (c) => {
     const id = Number(c.req.param("id"));
     if (!Number.isInteger(id) || id < 1) return c.json({ error: "Invalid job id." }, 400);
-    if (!c.get("userIsAdmin")) {
+    if (!hasPermission(c, "manage")) {
       // Members can cancel their own jobs only.
       const list = await relay<{ jobs: PrintJob[] }>(c, "/jobs");
       if ("error" in list) return c.json({ error: list.error }, list.status);
@@ -137,7 +139,7 @@ export const printRouter = new Hono<AppEnv>()
     return c.json({ ok: true });
   })
   // Admin: find printers on the shop network (mDNS/DNS-SD), takes ~10s.
-  .post("/discover", requireAdmin, async (c) => {
+  .post("/discover", requireManage, async (c) => {
     const r = await relay<{ printers: DiscoveredPrinter[] }>(c, "/discover", {
       method: "POST",
       timeoutMs: 45_000,
@@ -147,7 +149,7 @@ export const printRouter = new Hono<AppEnv>()
   })
   .post(
     "/printers",
-    requireAdmin,
+    requireManage,
     validator("json", (value, c) => {
       const v = (value ?? {}) as Record<string, unknown>;
       const text = (x: unknown) => (typeof x === "string" ? x : undefined);
@@ -182,7 +184,7 @@ export const printRouter = new Hono<AppEnv>()
       return c.json({ ok: true });
     },
   )
-  .delete("/printers/:name", requireAdmin, async (c) => {
+  .delete("/printers/:name", requireManage, async (c) => {
     const name = printerParam(c);
     if (!name) return c.json({ error: "Invalid printer name." }, 400);
     // Removing a printer first stops its current job, which can be slow.
@@ -190,7 +192,7 @@ export const printRouter = new Hono<AppEnv>()
     if ("error" in r) return c.json({ error: r.error }, r.status);
     return c.json({ ok: true });
   })
-  .post("/printers/:name/:action{default|resume|test}", requireAdmin, async (c) => {
+  .post("/printers/:name/:action{default|resume|test}", requireManage, async (c) => {
     const name = printerParam(c);
     if (!name) return c.json({ error: "Invalid printer name." }, 400);
     // Longer than the agent's own 75s limit on CUPS commands, so its clearer error wins.

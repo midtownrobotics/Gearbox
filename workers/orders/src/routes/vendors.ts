@@ -1,4 +1,4 @@
-import { hasMentorAccess, inTeam, requireAuth, requireMentor, withTeam } from "@g3/auth";
+import { hasPermission, inTeam, requireAuth, requirePermission, withTeam } from "@g3/auth";
 import { eq, gte, lt } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
@@ -16,6 +16,8 @@ import { localTimeZone } from "../lib/local-time";
 import { teamCalendar } from "../lib/settings";
 import { vendorKey } from "../lib/vendors";
 import type { AppEnv } from "../types";
+
+const requireDelegatedMentor = requirePermission("orders");
 
 type Profile = Partial<
   Omit<
@@ -152,7 +154,7 @@ export const vendorsRouter = new Hono<AppEnv>()
         )
         .all(),
     ]);
-    const mentor = hasMentorAccess(c);
+    const mentor = hasPermission(c, "orders");
     const names = new Map<string, string>();
     for (const r of requests)
       if (!names.has(vendorKey(r.vendor))) names.set(vendorKey(r.vendor), r.vendor.trim());
@@ -197,7 +199,7 @@ export const vendorsRouter = new Hono<AppEnv>()
     );
   })
   /** Creates or updates a vendor's profile (the key is its lowercased name). */
-  .put("/:key", requireMentor, profileValidator, async (c) => {
+  .put("/:key", requireDelegatedMentor, profileValidator, async (c) => {
     const key = vendorKey(decodeURIComponent(c.req.param("key")));
     if (!key) return c.json({ error: "Vendor name is required." }, 400);
     const { taxExempt, teamAccountLogin, ...rest } = c.req.valid("json");
@@ -236,7 +238,7 @@ export const vendorsRouter = new Hono<AppEnv>()
       .get();
     return c.json(row);
   })
-  .post("/:key/credits", requireMentor, creditValidator(false), async (c) => {
+  .post("/:key/credits", requireDelegatedMentor, creditValidator(false), async (c) => {
     const vendor = vendorKey(decodeURIComponent(c.req.param("key")));
     const body = c.req.valid("json") as CreditInput;
     const db = createOrdersDb(c.env.ORDERS_DB);
@@ -257,7 +259,7 @@ export const vendorsRouter = new Hono<AppEnv>()
       .get();
     return c.json(row, 201);
   })
-  .patch("/credits/:id", requireMentor, creditValidator(true), async (c) => {
+  .patch("/credits/:id", requireDelegatedMentor, creditValidator(true), async (c) => {
     const body = c.req.valid("json");
     if (Object.keys(body).length === 0) return c.json({ error: "Nothing to update." }, 400);
     const db = createOrdersDb(c.env.ORDERS_DB);
@@ -272,7 +274,7 @@ export const vendorsRouter = new Hono<AppEnv>()
     if (!row) return c.json({ error: "Credit not found." }, 404);
     return c.json(row);
   })
-  .delete("/credits/:id", requireMentor, async (c) => {
+  .delete("/credits/:id", requireDelegatedMentor, async (c) => {
     const db = createOrdersDb(c.env.ORDERS_DB);
     const row = await db
       .delete(vendorCredits)

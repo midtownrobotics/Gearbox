@@ -276,3 +276,34 @@ describe("the team's log of settings changes", () => {
     expect((await post("frc1", { app: "orders", what: "x" })).status).toBe(404);
   });
 });
+
+describe("manifest-defined student permissions and global Admin settings", () => {
+  it("returns permissions only for enabled apps and keeps the Home boundary site wide", async () => {
+    const users = await newTeam();
+    const path = `/internal/teams/${users.admin.teamId}/permissions?grants=false`;
+    expect((await call(null, path)).status).toBe(401);
+    expect((await call(users.mentor, path)).status).toBe(403);
+    const delegated = { ...users.student, permissions: { portal: ["manage"], shop: ["manage"] } };
+    expect((await call(delegated, path)).status).toBe(403);
+    const before = await json<{ apps: { slug: string }[] }>(users.admin, path);
+    expect(before.apps).toEqual([]);
+    expect((await switchApp(users.admin, "shop", true)).status).toBe(200);
+    const after = await json<{
+      apps: { slug: string; permissions: { key: string; description: string }[] }[];
+    }>(users.admin, path);
+    expect(after.apps.map((app) => app.slug)).toEqual(["shop"]);
+    expect(after.apps[0].permissions).toMatchObject([
+      { key: "manage", description: expect.any(String) },
+    ]);
+    const other = await newTeam();
+    expect(
+      (await call(users.admin, `/internal/teams/${other.admin.teamId}/permissions?grants=false`))
+        .status,
+    ).toBe(403);
+    for (const actor of [users.student, users.mentor, delegated, users.kioskAdmin]) {
+      expect((await call(actor, "/team/library")).status).toBe(403);
+      expect((await call(actor, "/team/notification-settings")).status).toBe(403);
+      expect((await switchApp(actor, "shop", false)).status).toBe(403);
+    }
+  });
+});

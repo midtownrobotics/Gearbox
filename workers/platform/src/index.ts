@@ -2,12 +2,14 @@ import { appAuthContext } from "@g3/auth";
 import { consoleUrlVia, platformUrl, platformUrlVia, teamAppUrlVia } from "@g3/site-config";
 import { withApiPrefix } from "@g3/site-config/worker";
 import { SLACK_BOT_SCOPES } from "@g3/slack";
+import { manifest } from "@g3/worker-portal/manifest";
 import { and, count, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import packageJson from "../package.json";
 import { consoleRouter, tellOperators } from "./console";
 import { numberReports, teams } from "./db/schema";
 import { db, g3id, now } from "./lib";
+import { permissionsRouter } from "./permissions";
 import { clearSwitchedOff, enabledApps, logTeam, teamRouter } from "./team";
 import type { AppEnv } from "./types";
 
@@ -27,7 +29,8 @@ import type { AppEnv } from "./types";
 // other providers: accounts are G3ID's.
 
 const app = new Hono<AppEnv>();
-app.use("*", appAuthContext("portal"));
+app.use("*", appAuthContext(manifest));
+app.route("/internal/teams", permissionsRouter);
 
 app.onError((err, c) => {
   console.error(err);

@@ -191,7 +191,7 @@ export const googleAuthRouter = new Hono<AppEnv>()
       if (!user || user.status !== "active") {
         const message =
           user?.status === "pending"
-            ? "Your account is awaiting trusted student approval."
+            ? "Your account is awaiting admin approval."
             : "Your account is not active.";
         return err(message);
       }

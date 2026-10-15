@@ -1,5 +1,11 @@
-import { appAuthContext } from "@g3/auth";
-import { deleteTeamRows, hasMentorAccess, inTeam, requireAuth, teamExport } from "@g3/auth";
+import {
+  appAuthContext,
+  deleteTeamRows,
+  hasPermission,
+  inTeam,
+  requireAuth,
+  teamExport,
+} from "@g3/auth";
 import { corsOrigin } from "@g3/site-config";
 import { withApiPrefix } from "@g3/site-config/worker";
 import { eq } from "drizzle-orm";
@@ -15,7 +21,7 @@ import { categoriesRouter, skillsRouter, treesRouter } from "./routes/trees";
 import type { AppEnv } from "./types";
 
 const base = new Hono<AppEnv>();
-base.use("*", appAuthContext("skill-tree"));
+base.use("*", appAuthContext(manifest));
 
 base.onError((err, c) => {
   console.error("[skill-tree]", err);
@@ -88,7 +94,7 @@ const app = base
       userId: c.get("userId"),
       displayName: c.get("userDisplayName"),
       /** G3ID mentors and admins: sign skills off and edit the trees. */
-      isMentor: hasMentorAccess(c),
+      isMentor: hasPermission(c, "skills"),
     }),
   )
   .route("/trees", treesRouter)

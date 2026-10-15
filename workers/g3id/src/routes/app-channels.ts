@@ -5,13 +5,13 @@ import { Hono } from "hono";
 import { getCookie } from "hono/cookie";
 import { createDb } from "../db";
 import { coreUsers } from "../db/schema";
-import { effectivePermissions } from "../lib/permissions";
+import { assignedPermissions } from "../lib/permissions";
 import { isPinSession } from "../lib/session";
 import { slackForTeam } from "../lib/slack-install";
 import { requireAuth } from "../middleware/auth";
 import type { AppEnv } from "../types";
 
-/** Read-only channel choices for the app whose settings the trusted student is editing. */
+/** Read-only channel choices for the app whose settings the admin is editing. */
 export const appChannelsRouter = new Hono<AppEnv>()
   .use("*", requireAuth)
   .use("*", async (c, next) => {
@@ -29,11 +29,14 @@ export const appChannelsRouter = new Hono<AppEnv>()
       user.status !== "active" ||
       (await isPinSession(getCookie(c, "g3_session"), c.env))
     )
-      return c.json({ error: "Trusted student access required." }, 403);
+      return c.json({ error: "Admin access required." }, 403);
     if (c.req.header("X-Team-Id") && c.req.header("X-Team-Id") !== user.teamId)
       return c.json({ error: "This is another team's address." }, 403);
-    if (!(await effectivePermissions(db, user, app)).isAdmin)
-      return c.json({ error: "Trusted student access required." }, 403);
+    if (
+      !user.isAdmin &&
+      !(app === "shop" && (await assignedPermissions(db, user, app)).includes("manage"))
+    )
+      return c.json({ error: "Admin access required." }, 403);
     c.set("adminTeamId", user.teamId);
     await next();
   })

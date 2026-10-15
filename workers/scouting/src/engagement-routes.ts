@@ -1,4 +1,4 @@
-import { logTeamChange, withTeam } from "@g3/auth";
+import { hasPermission, logTeamChange, withTeam } from "@g3/auth";
 import { Hono } from "hono";
 import { dbOf } from "./db";
 import { scoutingEngagementSettings } from "./db/schema";
@@ -13,7 +13,7 @@ engagementRoutes.get("/engagement-settings", requireAuth, async (c) =>
 );
 
 engagementRoutes.put("/engagement-settings", requireAuth, async (c) => {
-  if (!c.get("userIsAdmin") || c.get("sessionType") === "pin")
+  if (!hasPermission(c, "manage") || c.get("sessionType") === "pin")
     return c.json({ error: "Only a team trusted student can change engagement settings." }, 403);
   const settings = parseEngagementSettings(await c.req.json().catch(() => null));
   if (!settings)

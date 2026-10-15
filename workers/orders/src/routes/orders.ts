@@ -1,4 +1,4 @@
-import { inTeam, requireAuth, requireMentor, withTeam } from "@g3/auth";
+import { inTeam, requireAuth, requirePermission, withTeam } from "@g3/auth";
 import { and, asc, desc, eq, gte, inArray, isNotNull, lt } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
@@ -22,6 +22,8 @@ import { importSheet } from "../lib/sheet-import";
 import { vendorName } from "../lib/vendors";
 import type { AppEnv } from "../types";
 import { describeChanges } from "./requests";
+
+const requireDelegatedMentor = requirePermission("orders");
 
 type PlaceOrder = {
   vendor: string;
@@ -319,7 +321,7 @@ export const ordersRouter = new Hono<AppEnv>()
     });
   })
   /** Sets or clears a placed order's tracking number. */
-  .patch("/:id/tracking", requireMentor, trackingValidator, async (c) => {
+  .patch("/:id/tracking", requireDelegatedMentor, trackingValidator, async (c) => {
     const db = createOrdersDb(c.env.ORDERS_DB);
     const row = await db
       .update(vendorOrders)
@@ -337,7 +339,7 @@ export const ordersRouter = new Hono<AppEnv>()
    */
   .post(
     "/import",
-    requireMentor,
+    requireDelegatedMentor,
     validator("query", (value) => ({ dryRun: value.dryRun === "1" ? ("1" as const) : undefined })),
     async (c) => {
       const text = await c.req.text();
@@ -360,7 +362,7 @@ export const ordersRouter = new Hono<AppEnv>()
    * quantity and price entered here, with the order's shipping and tax. Only these numbers count
    * against budgets. Lines no longer approved are skipped and reported.
    */
-  .post("/", requireMentor, placeValidator, async (c) => {
+  .post("/", requireDelegatedMentor, placeValidator, async (c) => {
     const body = c.req.valid("json");
     const db = createOrdersDb(c.env.ORDERS_DB);
     const teamId = c.get("teamId");
@@ -496,7 +498,7 @@ export const ordersRouter = new Hono<AppEnv>()
    */
   .get(
     "/export.csv",
-    requireMentor,
+    requireDelegatedMentor,
     validator("query", (value, c): { fy?: string } => {
       if (value.fy !== undefined && !/^\d{4}$/.test(String(value.fy))) {
         return c.json({ error: "fy must be a year like 2026." }, 400) as never;

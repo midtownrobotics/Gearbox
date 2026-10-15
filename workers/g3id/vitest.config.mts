@@ -63,6 +63,62 @@ const slack = (request: Request) => {
 // with GET /api/internal/teams/:id/audit.
 const logged = new Map<string, unknown[]>();
 const platform = async (request: Request) => {
+  const url = new URL(request.url);
+  if (/^\/api\/internal\/teams\/[^/]+\/permissions$/.test(url.pathname)) {
+    return Response.json({
+      apps: [
+        {
+          slug: "shop",
+          name: "Shop",
+          permissions: [
+            {
+              key: "manage",
+              label: "Manage Shop",
+              description: "Manage Shop controls.",
+              roles: [],
+            },
+          ],
+        },
+        {
+          slug: "pit",
+          name: "Pit",
+          permissions: [
+            { key: "manage", label: "Manage Pit", description: "Manage Pit settings.", roles: [] },
+          ],
+        },
+        {
+          slug: "inventory",
+          name: "Inventory",
+          permissions: [
+            {
+              key: "items",
+              label: "Manage items",
+              description: "Delete and merge entries.",
+              roles: ["mentor"],
+            },
+          ],
+        },
+        {
+          slug: "orders",
+          name: "Orders",
+          permissions: [
+            {
+              key: "catalog",
+              label: "Edit catalog",
+              description: "Edit catalog parts.",
+              roles: ["mentor"],
+              storage: "app",
+            },
+          ],
+        },
+      ]
+        .filter((app) => app.permissions.length && app.slug !== "edge")
+        .map(({ slug, name, permissions }) => ({ slug, name, permissions })),
+      grants: [],
+    });
+  }
+  if (/^\/api\/internal\/teams\/[^/]+\/permissions\//.test(url.pathname))
+    return Response.json({ ok: true });
   const team = new URL(request.url).pathname.match(/^\/api\/internal\/teams\/([^/]+)\/audit$/);
   if (!team) return Response.json({ error: "Not stubbed" }, { status: 404 });
   const id = decodeURIComponent(team[1]);

@@ -7,6 +7,28 @@ export const manifest = defineManifest({
   name: "Orders",
   summary: "Parts requests, approvals, vendor carts, budgets and deliveries.",
   roles: ["admin", "mentor", "member", "kiosk"],
+  permissions: [
+    {
+      key: "manage",
+      label: "Manage Orders",
+      description: "Manage orders, budgets, vendors and settings.",
+      roles: [],
+      includes: ["orders", "catalog"],
+    },
+    {
+      key: "orders",
+      label: "Approve and manage orders",
+      description: "Approve requests, manage budgets, carts and deliveries.",
+      roles: ["mentor"],
+    },
+    {
+      key: "catalog",
+      label: "Edit catalog",
+      description: "Add, edit and remove catalog parts and categories.",
+      roles: ["mentor"],
+      storage: "app",
+    },
+  ],
   integrations: ["slack", "edge box", "share-a-cart"],
   availability: "every team",
   version: packageJson.version,
@@ -19,6 +41,7 @@ export const manifest = defineManifest({
       default: "USD",
       help: "A 3-letter code (USD, CAD, EUR) for budgets and prices",
       editedBy: "mentor",
+      permission: "orders",
       page: "/admin",
     },
     {
@@ -28,6 +51,7 @@ export const manifest = defineManifest({
       default: 7,
       help: "Budgets run from this month",
       editedBy: "mentor",
+      permission: "orders",
       page: "/admin",
     },
     {
@@ -39,6 +63,7 @@ export const manifest = defineManifest({
       max: 100,
       help: "A percent of a new order's items, at vendors that charge tax",
       editedBy: "mentor",
+      permission: "orders",
       page: "/admin",
     },
     {
@@ -48,6 +73,7 @@ export const manifest = defineManifest({
       default: "{vendor} {sku} – {title}",
       help: "Must include {title}",
       editedBy: "mentor",
+      permission: "orders",
       page: "/admin",
     },
     {
@@ -56,6 +82,7 @@ export const manifest = defineManifest({
       type: "boolean",
       default: false,
       editedBy: "mentor",
+      permission: "orders",
       page: "/admin",
     },
   ],

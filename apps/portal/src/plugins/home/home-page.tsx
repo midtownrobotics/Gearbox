@@ -50,10 +50,10 @@ type App = {
 
 const APPS: App[] = [
   {
-    // The sign-in app: named after the team ("G3ID") below.
+    // Keep the stable tile key for saved grid order; account management now lives in Home.
     key: "id",
-    label: "ID",
-    href: appUrl("id"),
+    label: "Account",
+    href: "/account",
     tile: idIcon,
   },
   {

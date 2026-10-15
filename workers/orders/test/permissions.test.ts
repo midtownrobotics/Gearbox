@@ -3,11 +3,11 @@ import { callAs, jsonAs } from "@g3/testing/worker";
 import { describe, expect, it } from "vitest";
 
 describe("central catalog permissions", () => {
-  it("allows only ID's trusted students to assign catalog access, including before a member opens Orders", async () => {
+  it("allows only site-wide Admins to assign catalog access, including before a member opens Orders", async () => {
     const team = teamUsers(newTeamId());
     const trusted = testUser({
       ...team.student,
-      appPermissions: { orders: { trustedStudent: true, mentorAccess: true } },
+      permissions: { orders: ["manage"] },
     });
     const path = `/trusted/${team.otherStudent.id}`;
     for (const actor of [team.student, team.mentor, trusted, team.kioskAdmin])

@@ -1,4 +1,4 @@
-import { inTeam, requireAuth, requireMentor, withTeam } from "@g3/auth";
+import { inTeam, requireAuth, requirePermission, withTeam } from "@g3/auth";
 import { type SQL, desc, eq, exists, gt, ne, sql } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import { alias } from "drizzle-orm/sqlite-core";
@@ -34,6 +34,8 @@ import {
   tidyStorage,
 } from "../lib/stock";
 import type { AppEnv } from "../types";
+
+const requireDelegatedMentor = requirePermission("items");
 
 // Entries: one kind of part each, with the team's fields, the vendors' listings it can be bought
 // as, and its history. Anyone signed in adds and edits them (kiosk sessions too); mentors and
@@ -299,7 +301,7 @@ export const itemsRouter = new Hono<AppEnv>()
     return c.json({ ok: true });
   })
   /** Removes an entry with its stock, listings and history. */
-  .delete("/:id", requireMentor, async (c) => {
+  .delete("/:id", requireDelegatedMentor, async (c) => {
     const id = parseId(c.req.param("id"));
     if (id === null) return c.json({ error: GONE }, 404);
     await createDb(c.env.INVENTORY_DB)
@@ -410,7 +412,7 @@ export const itemsRouter = new Hono<AppEnv>()
    * entry. Its stock, listings and history move here, its values fill this entry's blanks, and it
    * is gone.
    */
-  .post("/:id/merge", requireMentor, mergeValidator, async (c) => {
+  .post("/:id/merge", requireDelegatedMentor, mergeValidator, async (c) => {
     const id = parseId(c.req.param("id"));
     const { fromId } = c.req.valid("json");
     const db = createDb(c.env.INVENTORY_DB);
@@ -532,7 +534,7 @@ export const itemsRouter = new Hono<AppEnv>()
    * Undoes a merge for one listing: it becomes its own entry, with the same values, and with as
    * many of the parts as the mentor says are that vendor's.
    */
-  .post("/:id/split", requireMentor, splitValidator, async (c) => {
+  .post("/:id/split", requireDelegatedMentor, splitValidator, async (c) => {
     const id = parseId(c.req.param("id"));
     const body = c.req.valid("json");
     const db = createDb(c.env.INVENTORY_DB);

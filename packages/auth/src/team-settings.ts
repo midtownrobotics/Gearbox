@@ -1,7 +1,7 @@
 import type { Context, MiddlewareHandler } from "hono";
 import { Hono } from "hono";
 import { logTeamChange, settingLabels } from "./audit";
-import { type G3AuthEnv, hasMentorAccess, requireAuth } from "./g3id";
+import { type G3AuthEnv, hasMentorAccess, hasPermission, requireAuth } from "./g3id";
 import type { AppIntegration, AppManifest, AppSetting } from "./manifest";
 
 // The team's settings for one app, in one shape every app shares (roadmap 4.5), by manifest key.
@@ -125,7 +125,8 @@ export function parseSettingValue(
 /** Whether this user may change a setting: its editors, never a kiosk session. */
 const mayEdit = (c: Context<G3AuthEnv>, setting: AppSetting) =>
   c.get("sessionType") !== "pin" &&
-  (setting.editedBy === "admin" ? c.get("userIsAdmin") : hasMentorAccess(c));
+  ((setting.editedBy === "admin" ? c.get("userIsAdmin") : hasMentorAccess(c)) ||
+    hasPermission(c, setting.permission ?? "manage"));
 
 /**
  * `GET /` and `PUT /` for an app's team settings, mounted at `/team-settings`. Mentors and admins
@@ -159,7 +160,10 @@ export function teamSettingsRoutes<E extends G3AuthEnv>(
 
   const readers: MiddlewareHandler<E> = async (c, next) => {
     const g = c as unknown as Context<G3AuthEnv>;
-    if (g.get("sessionType") === "pin" || !hasMentorAccess(g)) {
+    if (
+      g.get("sessionType") === "pin" ||
+      (!hasMentorAccess(g) && !hasPermission(g, "manage") && !settings.some((s) => mayEdit(g, s)))
+    ) {
       return c.json({ error: "Mentor access required." }, 403);
     }
     await next();

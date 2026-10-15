@@ -1,7 +1,9 @@
+import { appUrl } from "@g3/site-config";
 import { Badge, Button, Card, ConfirmQuestion, ErrorBanner, Loading, Page } from "@g3/ui";
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { api } from "../../lib/api";
+import { UserPermissions } from "./user-permissions";
 import { PROVIDERS, ProviderIcon, STATUS_STYLES, type User, relativeTime } from "./users-shared";
 
 // One member of the team, opened from the Users list: their details, the accounts they sign in
@@ -44,9 +46,12 @@ export function AdminUserPage() {
 
   useEffect(() => {
     api.auth.me.$get().then(async (res) => {
-      if (res.status === 401) return navigate("/login");
+      if (res.status === 401)
+        return window.location.assign(
+          `${appUrl("id")}/login?redirect=${encodeURIComponent(window.location.href)}`,
+        );
       const data = (await res.json()) as { id: string; isAdmin?: boolean };
-      if (!res.ok || !data.isAdmin) return navigate("/dashboard");
+      if (!res.ok || !data.isAdmin) return navigate("/account");
       setMe(data.id);
     });
   }, [navigate]);
@@ -112,7 +117,7 @@ export function AdminUserPage() {
                 </Badge>
                 {user.isAdmin === 1 && (
                   <span className="text-xs px-1.5 py-0.5 rounded bg-primary-50 text-primary-600 border border-primary-200">
-                    Trusted student
+                    Admin
                   </span>
                 )}
                 {user.isMentor === 1 && (
@@ -138,6 +143,14 @@ export function AdminUserPage() {
             </dl>
           </Card>
 
+          {user.status === "active" && (
+            <UserPermissions
+              userId={user.id}
+              onRolesChanged={(roles) =>
+                setUser((current) => (current ? { ...current, ...roles } : current))
+              }
+            />
+          )}
           <Card title="Signs in with">
             {user.identities.length === 0 ? (
               <p className="text-sm text-secondary-500">No linked accounts.</p>
@@ -194,14 +207,6 @@ export function AdminUserPage() {
                 </>
               )}
 
-              {user.status === "active" && (
-                <Link
-                  to={`/admin?member=${encodeURIComponent(user.id)}`}
-                  className="text-sm font-medium text-primary-600 underline"
-                >
-                  Manage permissions
-                </Link>
-              )}
               {user.status !== "pending" && !confirmDelete && (
                 <Button
                   variant="danger"

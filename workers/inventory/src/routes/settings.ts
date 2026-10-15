@@ -1,4 +1,4 @@
-import { inTeam, requireAdmin, withTeam } from "@g3/auth";
+import { inTeam, requirePermission, withTeam } from "@g3/auth";
 import { eq, gt, inArray, sql } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import { Hono } from "hono";
@@ -29,6 +29,8 @@ import {
   starterSetup,
 } from "../lib/setup";
 import type { AppEnv } from "../types";
+
+const requireManage = requirePermission("manage");
 
 // The Admin page: how a team has Inventory arranged. Its fields, its tree of locations, its
 // robots and subsystems are all the team's own, so all of it is made here (or loaded from a setup
@@ -110,7 +112,7 @@ const fieldValidator = (partial: boolean) =>
   });
 
 export const fieldsRouter = new Hono<AppEnv>()
-  .post("/", requireAdmin, fieldValidator(false), async (c) => {
+  .post("/", requireManage, fieldValidator(false), async (c) => {
     const body = c.req.valid("json");
     const db = createDb(c.env.INVENTORY_DB);
     const team = c.get("teamId");
@@ -141,12 +143,12 @@ export const fieldsRouter = new Hono<AppEnv>()
       .get();
     return c.json({ id: made.id }, 201);
   })
-  .put("/order", requireAdmin, orderValidator, async (c) => {
+  .put("/order", requireManage, orderValidator, async (c) => {
     await reorder(createDb(c.env.INVENTORY_DB), c.get("teamId"), fields, c.req.valid("json").ids);
     return c.json({ ok: true });
   })
   /** Renames a field, changes its choices or whether the table shows it. Its type stays. */
-  .patch("/:id", requireAdmin, fieldValidator(true), async (c) => {
+  .patch("/:id", requireManage, fieldValidator(true), async (c) => {
     const id = parseId(c.req.param("id"));
     const body = c.req.valid("json");
     const db = createDb(c.env.INVENTORY_DB);
@@ -178,7 +180,7 @@ export const fieldsRouter = new Hono<AppEnv>()
     return c.json({ ok: true });
   })
   /** Removes a field. What entries had in it stops showing, and goes when they're next saved. */
-  .delete("/:id", requireAdmin, async (c) => {
+  .delete("/:id", requireManage, async (c) => {
     const id = parseId(c.req.param("id"));
     if (id !== null) {
       await createDb(c.env.INVENTORY_DB)
@@ -229,7 +231,7 @@ const editLocationValidator = validator(
 
 export const locationsRouter = new Hono<AppEnv>()
   /** Adds locations at the top level or inside one. Names already there are skipped. */
-  .post("/", requireAdmin, newLocationsValidator, async (c) => {
+  .post("/", requireManage, newLocationsValidator, async (c) => {
     const { parentId, names } = c.req.valid("json");
     const db = createDb(c.env.INVENTORY_DB);
     const team = c.get("teamId");
@@ -261,7 +263,7 @@ export const locationsRouter = new Hono<AppEnv>()
     if (first) await db.batch([first, ...rest]);
     return c.json({ added: adding.length, skipped: names.length - adding.length }, 201);
   })
-  .put("/order", requireAdmin, orderValidator, async (c) => {
+  .put("/order", requireManage, orderValidator, async (c) => {
     await reorder(
       createDb(c.env.INVENTORY_DB),
       c.get("teamId"),
@@ -271,7 +273,7 @@ export const locationsRouter = new Hono<AppEnv>()
     return c.json({ ok: true });
   })
   /** Renames a location, or moves it (with everything inside) to another place in the tree. */
-  .patch("/:id", requireAdmin, editLocationValidator, async (c) => {
+  .patch("/:id", requireManage, editLocationValidator, async (c) => {
     const id = parseId(c.req.param("id"));
     const body = c.req.valid("json");
     const db = createDb(c.env.INVENTORY_DB);
@@ -312,7 +314,7 @@ export const locationsRouter = new Hono<AppEnv>()
     return c.json({ ok: true });
   })
   /** Removes a location and everything inside it, if no parts are kept there. */
-  .delete("/:id", requireAdmin, async (c) => {
+  .delete("/:id", requireManage, async (c) => {
     const id = parseId(c.req.param("id"));
     if (id === null) return c.json({ ok: true });
     const db = createDb(c.env.INVENTORY_DB);
@@ -368,7 +370,7 @@ function namedRouter(table: typeof robots | typeof subsystems, what: string, max
   const usedBy = table === robots ? stock.robotId : stock.subsystemId;
   return (
     new Hono<AppEnv>()
-      .post("/", requireAdmin, nameValidator, async (c) => {
+      .post("/", requireManage, nameValidator, async (c) => {
         const { name } = c.req.valid("json");
         const db = createDb(c.env.INVENTORY_DB);
         const team = c.get("teamId");
@@ -391,7 +393,7 @@ function namedRouter(table: typeof robots | typeof subsystems, what: string, max
           .get();
         return c.json({ id: made.id }, 201);
       })
-      .put("/order", requireAdmin, orderValidator, async (c) => {
+      .put("/order", requireManage, orderValidator, async (c) => {
         await reorder(
           createDb(c.env.INVENTORY_DB),
           c.get("teamId"),
@@ -400,7 +402,7 @@ function namedRouter(table: typeof robots | typeof subsystems, what: string, max
         );
         return c.json({ ok: true });
       })
-      .patch("/:id", requireAdmin, nameValidator, async (c) => {
+      .patch("/:id", requireManage, nameValidator, async (c) => {
         const id = parseId(c.req.param("id"));
         const { name } = c.req.valid("json");
         const db = createDb(c.env.INVENTORY_DB);
@@ -423,7 +425,7 @@ function namedRouter(table: typeof robots | typeof subsystems, what: string, max
         return c.json({ ok: true });
       })
       /** Removes one, unless parts are in use on it. */
-      .delete("/:id", requireAdmin, async (c) => {
+      .delete("/:id", requireManage, async (c) => {
         const id = parseId(c.req.param("id"));
         if (id === null) return c.json({ ok: true });
         const db = createDb(c.env.INVENTORY_DB);
@@ -462,19 +464,19 @@ const setupValidator = validator("json", (value, c) => {
 
 export const setupRouter = new Hono<AppEnv>()
   /** The team's setup as a file: its fields, locations, robots and subsystems, and no parts. */
-  .get("/export", requireAdmin, async (c) =>
+  .get("/export", requireManage, async (c) =>
     c.json(await exportSetup(createDb(c.env.INVENTORY_DB), c.get("teamId"))),
   )
   /** The setup that comes with the app. */
-  .get("/starter", requireAdmin, (c) => c.json(starterSetup()))
+  .get("/starter", requireManage, (c) => c.json(starterSetup()))
   /** What loading a file would add, without adding it. */
-  .post("/preview", requireAdmin, setupValidator, async (c) =>
+  .post("/preview", requireManage, setupValidator, async (c) =>
     c.json(
       await loadSetup(createDb(c.env.INVENTORY_DB), c.get("teamId"), c.req.valid("json"), false),
     ),
   )
   /** Adds what's in a file that the team doesn't have yet. Nothing is changed or removed. */
-  .post("/import", requireAdmin, setupValidator, async (c) =>
+  .post("/import", requireManage, setupValidator, async (c) =>
     c.json(
       await loadSetup(createDb(c.env.INVENTORY_DB), c.get("teamId"), c.req.valid("json"), true),
     ),

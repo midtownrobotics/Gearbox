@@ -1,5 +1,4 @@
-import { appAuthContext } from "@g3/auth";
-import { inTeam, requestTeamId, withTeam } from "@g3/auth";
+import { appAuthContext, hasPermission, inTeam, requestTeamId, withTeam } from "@g3/auth";
 import { corsOrigin } from "@g3/site-config";
 import { withApiPrefix } from "@g3/site-config/worker";
 import { sql } from "drizzle-orm";
@@ -33,6 +32,7 @@ import {
 import { getEngagementSettings } from "./engagement";
 import { engagementRoutes } from "./engagement-routes";
 import { internalRoutes } from "./internal";
+import { manifest } from "./manifest";
 import { getManualMatches, manualRoutes, purgeExpiredManualEvents } from "./manual";
 import { requireAuth } from "./middleware/auth";
 import { predictionsRoutes, settleConfiguredGame } from "./predictions";
@@ -114,7 +114,7 @@ app.get("/me", requireAuth, async (c) =>
     displayName: c.get("userDisplayName"),
     email: c.get("userEmail"),
     isAdmin: await isStrategyAdmin(c),
-    isG3IdAdmin: c.get("userIsAdmin"),
+    isG3IdAdmin: hasPermission(c, "manage"),
     isHelper: await isServiceHelper(c),
     engagement: await getEngagementSettings(c.env.SCOUTING_DB, c.get("teamId")),
   }),
@@ -566,7 +566,7 @@ app.put("/event-context", requireAuth, async (c) => {
   const tbaAuthKey = text(body.tbaAuthKey, 200);
   const nexusEventKey = text(body.nexusEventKey, 30).toLowerCase() || eventKey;
   const nexusApiKey = text(body.nexusApiKey, 300);
-  if ((tbaAuthKey || nexusApiKey) && !c.get("userIsAdmin"))
+  if ((tbaAuthKey || nexusApiKey) && !hasPermission(c, "manage"))
     return c.json({ error: "Only a team trusted student can update API keys." }, 403);
   if (activeConfig?.schedule_mode !== "manual" && eventKey && !/^\d{4}[a-z0-9]+$/.test(eventKey))
     return c.json({ error: "Enter a valid TBA event key, such as 2026gadal." }, 400);
@@ -1177,7 +1177,7 @@ app.get("/field-maps", requireAuth, async (c) => {
 });
 
 async function canShareFieldMaps(c: Context<AppEnv>) {
-  if (c.get("userIsAdmin")) return true;
+  if (hasPermission(c, "publish")) return true;
   const permission = await first<Record<string, unknown>>(
     dbOf(c),
     sql`SELECT email FROM (SELECT * FROM ${fieldMapPublishers} WHERE ${inTeam(fieldMapPublishers, c.get("teamId"))}) AS scoped_field_map_publishers WHERE email = ${c.get("userEmail").toLowerCase()}`,
@@ -1186,12 +1186,12 @@ async function canShareFieldMaps(c: Context<AppEnv>) {
 }
 
 app.get("/field-map-permissions", requireAuth, async (c) =>
-  c.json({ canShare: await canShareFieldMaps(c), isAdmin: c.get("userIsAdmin") }),
+  c.json({ canShare: await canShareFieldMaps(c), isAdmin: hasPermission(c, "manage") }),
 );
 
 app.get("/field-map-publishers", requireAuth, async (c) => {
   if (!c.get("userIsIdentityAdmin"))
-    return c.json({ error: "Only ID's trusted students can assign permissions." }, 403);
+    return c.json({ error: "Only Admins can assign permissions." }, 403);
   const rows = await all<{ email: string; created_at: number }>(
     dbOf(c),
     sql`SELECT email, created_at FROM (SELECT * FROM ${fieldMapPublishers} WHERE ${inTeam(fieldMapPublishers, c.get("teamId"))}) AS scoped_field_map_publishers ORDER BY email`,
@@ -1201,7 +1201,7 @@ app.get("/field-map-publishers", requireAuth, async (c) => {
 
 app.get("/permission-management", requireAuth, async (c) => {
   if (!c.get("userIsIdentityAdmin"))
-    return c.json({ error: "Only ID's trusted students can assign permissions." }, 403);
+    return c.json({ error: "Only Admins can assign permissions." }, 403);
   const db = dbOf(c);
   const [leads, publishers, helpers] = await Promise.all([
     db
@@ -1240,7 +1240,7 @@ app.get("/strategy-admins", requireAuth, async (c) => {
 
 app.post("/strategy-admins", requireAuth, async (c) => {
   if (!c.get("userIsIdentityAdmin"))
-    return c.json({ error: "Only ID's trusted students can assign permissions." }, 403);
+    return c.json({ error: "Only Admins can assign permissions." }, 403);
   const body = await c.req.json<{ userId?: unknown }>();
   const userId = text(body.userId, 200);
   const users = await getG3IdUsers(c);
@@ -1272,7 +1272,7 @@ app.post("/strategy-admins", requireAuth, async (c) => {
 
 app.delete("/strategy-admins/:userId", requireAuth, async (c) => {
   if (!c.get("userIsIdentityAdmin"))
-    return c.json({ error: "Only ID's trusted students can assign permissions." }, 403);
+    return c.json({ error: "Only Admins can assign permissions." }, 403);
   await dbOf(c)
     .delete(strategyAdmins)
     .where(inTeam(strategyAdmins, c.get("teamId"), sql`user_id = ${c.req.param("userId")}`))
@@ -1466,7 +1466,7 @@ app.delete("/analysis/reports/:id/permanent", requireAuth, async (c) => {
 
 app.get("/field-map-publisher-options", requireAuth, async (c) => {
   if (!c.get("userIsIdentityAdmin"))
-    return c.json({ error: "Only ID's trusted students can assign permissions." }, 403);
+    return c.json({ error: "Only Admins can assign permissions." }, 403);
   const users = await getG3IdUsers(c);
   if (!users) return c.json({ error: "Could not load the team's accounts." }, 502);
   return c.json({
@@ -1479,7 +1479,7 @@ app.get("/field-map-publisher-options", requireAuth, async (c) => {
 
 app.post("/field-map-publishers", requireAuth, async (c) => {
   if (!c.get("userIsIdentityAdmin"))
-    return c.json({ error: "Only ID's trusted students can assign permissions." }, 403);
+    return c.json({ error: "Only Admins can assign permissions." }, 403);
   const body = await c.req.json<{ userId?: unknown }>();
   const userId = text(body.userId, 200);
   if (!userId) return c.json({ error: "Select an account." }, 400);
@@ -1504,7 +1504,7 @@ app.post("/field-map-publishers", requireAuth, async (c) => {
 
 app.delete("/field-map-publishers/:email", requireAuth, async (c) => {
   if (!c.get("userIsIdentityAdmin"))
-    return c.json({ error: "Only ID's trusted students can assign permissions." }, 403);
+    return c.json({ error: "Only Admins can assign permissions." }, 403);
   await dbOf(c)
     .delete(fieldMapPublishers)
     .where(
@@ -1580,7 +1580,7 @@ app.delete("/field-maps/:id", requireAuth, async (c) => {
     sql`SELECT r2_key, created_by FROM (SELECT * FROM ${fieldMaps} WHERE ${inTeam(fieldMaps, c.get("teamId"))}) AS scoped_field_maps WHERE id = ${c.req.param("id")}`,
   );
   if (!map) return c.json({ error: "Map not found." }, 404);
-  if (!c.get("userIsAdmin") && map.created_by !== c.get("userId")) {
+  if (!hasPermission(c, "manage") && map.created_by !== c.get("userId")) {
     return c.json({ error: "Only the publisher or a trusted student can delete this map." }, 403);
   }
   await Promise.all([
@@ -1897,7 +1897,7 @@ app.delete("/service-helpers/:id", requireAuth, async (c) => {
 });
 
 const worker = new Hono<AppEnv>();
-worker.use("*", appAuthContext("scouting"));
+worker.use("*", appAuthContext(manifest));
 worker.use("*", async (c, next) => {
   await adoptLegacyRows(c.env.SCOUTING_DB);
   await next();

@@ -1,5 +1,4 @@
-import { appAuthContext } from "@g3/auth";
-import { requireAuth } from "@g3/auth";
+import { appAuthContext, hasPermission, requireAuth } from "@g3/auth";
 import { corsOrigin } from "@g3/site-config";
 import { withApiPrefix } from "@g3/site-config/worker";
 import { Hono } from "hono";
@@ -7,6 +6,7 @@ import { cors } from "hono/cors";
 import packageJson from "../package.json";
 import { createEdgeDb } from "./db";
 import { CONNECT_PATH, agentLink } from "./lib/agent-link";
+import { manifest } from "./manifest";
 import { recordAgentContact, requireAgent, requireAgentKey } from "./middleware/auth";
 import { lookupRouter } from "./modules/lookup/routes";
 import { networkAgentRouter, networkRouter, networkScheduled } from "./modules/network";
@@ -20,7 +20,7 @@ import { teamSettingsRouter } from "./routes/team-settings";
 import type { AppEnv } from "./types";
 
 const base = new Hono<AppEnv>();
-base.use("*", appAuthContext("edge"));
+base.use("*", appAuthContext(manifest));
 
 base.onError((err, c) => {
   console.error(err);
@@ -43,7 +43,7 @@ const app = base
     c.json({
       userId: c.get("userId"),
       displayName: c.get("userDisplayName"),
-      isAdmin: c.get("userIsAdmin"),
+      isAdmin: hasPermission(c, "manage"),
       /** The team's box's time zone (UTC until it has said): pages show its days and times. */
       timeZone: await teamTimeZone(createEdgeDb(c.env.EDGE_DB), c.get("teamId")),
     }),

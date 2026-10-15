@@ -1,8 +1,9 @@
-import { appAuthContext } from "@g3/auth";
 import {
   activeMembers,
+  appAuthContext,
   deleteTeamRows,
   exportTeamRows,
+  hasPermission,
   logTeamChange,
   requireAuth,
   teamExport,
@@ -32,7 +33,7 @@ import type { AppEnv } from "./types";
 const MAX_MANUAL_HOURS = 1000;
 
 const base = new Hono<AppEnv>();
-base.use("*", appAuthContext("attendance"));
+base.use("*", appAuthContext(manifest));
 
 base.onError((err, c) => {
   const msg = err instanceof Error ? err.message : String(err);
@@ -291,14 +292,14 @@ const app = base
       id: c.get("userId"),
       displayName: c.get("userDisplayName"),
       email: c.get("userEmail"),
-      isAdmin: c.get("userIsAdmin"),
+      isAdmin: hasPermission(c, "manage"),
     }),
   )
 
   // Current kiosk code — admin only. The kiosk display fetches this to build its
   // QR, so the live presence token is never issued to non-admins.
   .get("/code", requireAuth, (c) => {
-    if (!c.get("userIsAdmin")) return c.json({ error: "Forbidden." }, 403);
+    if (!hasPermission(c, "manage")) return c.json({ error: "Forbidden." }, 403);
     return c.json({ w: currentWindow() });
   })
 
@@ -366,7 +367,7 @@ const app = base
   })
   // Manual attendance controls — admin only.
   .post("/admin/members/:memberId/signout", requireAuth, async (c) => {
-    if (!c.get("userIsAdmin")) return c.json({ error: "Forbidden." }, 403);
+    if (!hasPermission(c, "manage")) return c.json({ error: "Forbidden." }, 403);
     const memberId = c.req.param("memberId");
     if (!validMemberId(memberId)) return c.json({ error: "Invalid member." }, 400);
 
@@ -379,7 +380,7 @@ const app = base
   })
   // Signs out everyone who is signed in, each with the time they've had so far.
   .post("/admin/signout-all", requireAuth, async (c) => {
-    if (!c.get("userIsAdmin")) return c.json({ error: "Forbidden." }, 403);
+    if (!hasPermission(c, "manage")) return c.json({ error: "Forbidden." }, 403);
 
     const store = teamDb(c);
     const settings = await store.settings();
@@ -391,7 +392,7 @@ const app = base
     return c.json({ ok: true, signedOut: memberIds.length });
   })
   .post("/admin/members/:memberId/add-hours", requireAuth, async (c) => {
-    if (!c.get("userIsAdmin")) return c.json({ error: "Forbidden." }, 403);
+    if (!hasPermission(c, "manage")) return c.json({ error: "Forbidden." }, 403);
     const memberId = c.req.param("memberId");
     if (!validMemberId(memberId)) return c.json({ error: "Invalid member." }, 400);
 
@@ -436,7 +437,7 @@ const app = base
     return c.json({ ok: true, totalHours });
   })
   .delete("/admin/members/:memberId", requireAuth, async (c) => {
-    if (!c.get("userIsAdmin")) return c.json({ error: "Forbidden." }, 403);
+    if (!hasPermission(c, "manage")) return c.json({ error: "Forbidden." }, 403);
     const memberId = c.req.param("memberId");
     if (!validMemberId(memberId)) return c.json({ error: "Invalid member." }, 400);
 
@@ -447,11 +448,11 @@ const app = base
   })
   // The team's attendance settings — admin only (G3ID's Attendance admin page edits them).
   .get("/admin/settings", requireAuth, async (c) => {
-    if (!c.get("userIsAdmin")) return c.json({ error: "Forbidden." }, 403);
+    if (!hasPermission(c, "manage")) return c.json({ error: "Forbidden." }, 403);
     return c.json(await teamDb(c).settings());
   })
   .put("/admin/settings", requireAuth, async (c) => {
-    if (!c.get("userIsAdmin")) return c.json({ error: "Forbidden." }, 403);
+    if (!hasPermission(c, "manage")) return c.json({ error: "Forbidden." }, 403);
     const settings = parseSettings(await c.req.json().catch(() => null));
     if (typeof settings === "string") return c.json({ error: settings }, 400);
     const before = await teamDb(c).settings();
@@ -476,7 +477,7 @@ const app = base
   // Attendance summary — admin only. One row per member: current status,
   // last sign-in, and total hours for the current year.
   .get("/admin/summary", requireAuth, async (c) => {
-    if (!c.get("userIsAdmin")) return c.json({ error: "Forbidden." }, 403);
+    if (!hasPermission(c, "manage")) return c.json({ error: "Forbidden." }, 403);
 
     const store = teamDb(c);
     const settings = await store.settings();

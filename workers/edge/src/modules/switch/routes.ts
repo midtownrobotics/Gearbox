@@ -1,4 +1,4 @@
-import { requireAdmin } from "@g3/auth";
+import { requirePermission } from "@g3/auth";
 import { type Context, Hono } from "hono";
 import { AgentError, agentFetch } from "../../lib/agent";
 import type { AppEnv } from "../../types";
@@ -9,6 +9,8 @@ import {
   isWaveFile,
   validSwitchSoundName,
 } from "./types";
+
+const requireManage = requirePermission("manage");
 
 type Ctx = Context<AppEnv>;
 
@@ -35,17 +37,17 @@ function soundName(c: Ctx) {
 }
 
 export const switchRouter = new Hono<AppEnv>()
-  .get("/state", requireAdmin, async (c) => {
+  .get("/state", requireManage, async (c) => {
     const result = await relay<SwitchState>(c, "/state");
     if ("error" in result) return c.json({ error: result.error }, result.status);
     return c.json(result.data);
   })
-  .get("/sounds", requireAdmin, async (c) => {
+  .get("/sounds", requireManage, async (c) => {
     const result = await relay<{ sounds: SwitchSound[] }>(c, "/sounds");
     if ("error" in result) return c.json({ error: result.error }, result.status);
     return c.json(result.data);
   })
-  .post("/sounds", requireAdmin, async (c) => {
+  .post("/sounds", requireManage, async (c) => {
     const name = soundName(c);
     if (!name) {
       return c.json(
@@ -80,7 +82,7 @@ export const switchRouter = new Hono<AppEnv>()
     if ("error" in result) return c.json({ error: result.error }, result.status);
     return c.json(result.data);
   })
-  .post("/sounds/:name/test", requireAdmin, async (c) => {
+  .post("/sounds/:name/test", requireManage, async (c) => {
     const name = soundName(c);
     if (!name) return c.json({ error: "Invalid sound name." }, 400);
     const result = await relay<{ ok: true; sound: string }>(
@@ -91,12 +93,12 @@ export const switchRouter = new Hono<AppEnv>()
     if ("error" in result) return c.json({ error: result.error }, result.status);
     return c.json(result.data);
   })
-  .post("/stop", requireAdmin, async (c) => {
+  .post("/stop", requireManage, async (c) => {
     const result = await relay<{ ok: true }>(c, "/stop", { method: "POST" });
     if ("error" in result) return c.json({ error: result.error }, result.status);
     return c.json(result.data);
   })
-  .delete("/sounds/:name", requireAdmin, async (c) => {
+  .delete("/sounds/:name", requireManage, async (c) => {
     const name = soundName(c);
     if (!name) return c.json({ error: "Invalid sound name." }, 400);
     const result = await relay<{ ok: true; sounds: SwitchSound[] }>(

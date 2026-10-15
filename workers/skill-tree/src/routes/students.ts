@@ -1,4 +1,4 @@
-import { requireAuth, requireMentor } from "@g3/auth";
+import { requireAuth, requirePermission } from "@g3/auth";
 import { and, eq, inArray } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import type { Context } from "hono";
@@ -10,6 +10,8 @@ import { chunks, idList, parseId } from "../lib/input";
 import { ROSTER_UNAVAILABLE, loadStudents } from "../lib/roster";
 import { currentTreeSet } from "../lib/tree-set";
 import type { AppEnv } from "../types";
+
+const requireDelegatedMentor = requirePermission("skills");
 
 // Who has done what. The students are G3ID's accounts that aren't mentors (lib/roster.ts);
 // Skill Tree only stores their progress. Anyone signed in sees the team's progress; only mentors
@@ -151,7 +153,7 @@ export const studentsRouter = new Hono<AppEnv>()
     });
   })
   /** Who has this kiosk PIN, so students can add themselves to a mentor's bulk sign-off. */
-  .get("/by-pin/:pin", requireMentor, async (c) => {
+  .get("/by-pin/:pin", requireDelegatedMentor, async (c) => {
     const pin = c.req.param("pin");
     if (!/^\d{1,8}$/.test(pin)) return c.json({ error: "A PIN is digits only." }, 400);
     const res = await c.env.G3ID.fetch(
@@ -188,7 +190,7 @@ export const studentsRouter = new Hono<AppEnv>()
       .all();
     return c.json({ ...student, progress });
   })
-  .put("/:userId/skills/:skillId", requireMentor, statusValidator, async (c) => {
+  .put("/:userId/skills/:skillId", requireDelegatedMentor, statusValidator, async (c) => {
     const skillId = parseId(c.req.param("skillId"));
     const userId = c.req.param("userId");
     const { status } = c.req.valid("json");
@@ -208,7 +210,7 @@ export const studentsRouter = new Hono<AppEnv>()
 /** Bulk sign-off: one status for several students on several skills. */
 export const progressRouter = new Hono<AppEnv>().post(
   "/",
-  requireMentor,
+  requireDelegatedMentor,
   bulkValidator,
   async (c) => {
     const { userIds, skillIds, status } = c.req.valid("json");

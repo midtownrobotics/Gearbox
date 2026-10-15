@@ -28,6 +28,7 @@ const MEMBERS = "(SELECT id FROM core_users WHERE team_id = ?1)";
 const MEMBER_ROWS = `user_id IN ${MEMBERS}`;
 /** Deleting a team, in order: each row goes before the rows it points at. */
 const DELETE_TEAM = [
+  "DELETE FROM student_permissions WHERE team_id = ?1",
   "DELETE FROM app_permissions WHERE team_id = ?1",
   "DELETE FROM team_ui_settings WHERE team_id = ?1",
   "DELETE FROM team_sign_in_methods WHERE team_id = ?1",

@@ -1,4 +1,4 @@
-import { activeMembers, inTeam } from "@g3/auth";
+import { activeMembers, hasPermission, inTeam } from "@g3/auth";
 
 import { sql } from "drizzle-orm";
 import type { Context } from "hono";
@@ -11,7 +11,7 @@ import type { AppEnv } from "./types";
 
 export async function isStrategyAdmin(c: Context<AppEnv>) {
   if (c.get("sessionType") === "pin") return false;
-  if (c.get("userIsAdmin")) return true;
+  if (hasPermission(c, "strategy")) return true;
   const row = await first<Record<string, unknown>>(
     dbOf(c),
     sql`SELECT user_id FROM (SELECT * FROM ${strategyAdmins} WHERE ${inTeam(strategyAdmins, c.get("teamId"))}) AS scoped_strategy_admins WHERE user_id = ${c.get("userId")}`,
@@ -21,6 +21,7 @@ export async function isStrategyAdmin(c: Context<AppEnv>) {
 
 export async function isServiceHelper(c: Context<AppEnv>) {
   if (c.get("sessionType") === "pin") return false;
+  if (hasPermission(c, "service")) return true;
   const row = await first<Record<string, unknown>>(
     dbOf(c),
     sql`SELECT user_id FROM (SELECT * FROM ${serviceHelpers} WHERE ${inTeam(serviceHelpers, c.get("teamId"))}) AS scoped_service_helpers WHERE user_id = ${c.get("userId")}`,

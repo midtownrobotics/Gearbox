@@ -72,6 +72,8 @@ export {
   type G3AuthVariables,
   appAuthContext,
   hasMentorAccess,
+  hasPermission,
+  requirePermission,
   requireAdmin,
   requireAuth,
   requireAuthWithIdentities,
@@ -83,16 +85,17 @@ export {
 } from "./g3id";
 
 export {
-  permissionApps,
   isPermissionApp,
   type PermissionApp,
-  type AppPermission,
+  type PermissionCatalogApp,
+  type PermissionGrant,
   type PermissionMember,
 } from "./permissions";
 
 export {
   type AppIntegration,
   type AppManifest,
+  type AppPermissionDefinition,
   type AppPlugin,
   type AppRole,
   type AppSetting,

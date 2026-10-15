@@ -1,4 +1,4 @@
-import { inTeam, logTeamChange, requireAdmin, requireAuth, sendTeamMessage } from "@g3/auth";
+import { inTeam, logTeamChange, requireAuth, requirePermission, sendTeamMessage } from "@g3/auth";
 import { eq, inArray, isNull } from "drizzle-orm";
 import { Hono } from "hono";
 import { createShopDb } from "../db";
@@ -16,6 +16,8 @@ import { registerOnShapeWebhook, unregisterOnShapeWebhooks } from "../lib/onshap
 import { SETTING, getSetting, setSetting } from "../lib/settings";
 import { shopUrl } from "../lib/urls";
 import type { AppEnv } from "../types";
+
+const requireManage = requirePermission("manage");
 
 const RELEASE_CHANNEL_KEY = SETTING.slackReleaseChannel;
 const SUMMARY_CHANNEL_KEY = SETTING.slackSummaryChannel;
@@ -227,7 +229,7 @@ export const adminPartsRouter = new Hono<AppEnv>()
    * The team's Onshape connection. The key, secret and webhook signing keys are never sent back:
    * only whether they're set (and whether they're still the site team's worker secrets).
    */
-  .get("/onshape/config", requireAdmin, async (c) => {
+  .get("/onshape/config", requireManage, async (c) => {
     const config = await onshapeConfig(c.env, createShopDb(c.env.SHOP_DB), c.get("teamId"));
     return c.json({
       documentId: config.documentId ?? "",
@@ -243,7 +245,7 @@ export const adminPartsRouter = new Hono<AppEnv>()
    * Saves the team's Onshape connection (secrets left empty stay as they are), then registers
    * Shop's webhook on the document again, so it calls back on the team's own address.
    */
-  .post("/onshape/config", requireAdmin, async (c) => {
+  .post("/onshape/config", requireManage, async (c) => {
     const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
     const text = (key: string) =>
       typeof body[key] === "string" ? (body[key] as string).trim() : undefined;
@@ -324,7 +326,7 @@ export const adminPartsRouter = new Hono<AppEnv>()
       return c.json({ error: err instanceof Error ? err.message : "Failed to update config" }, 500);
     }
   })
-  .get("/slack/config", requireAdmin, async (c) => {
+  .get("/slack/config", requireManage, async (c) => {
     const db = createShopDb(c.env.SHOP_DB);
     const teamId = c.get("teamId");
     const [release, summary] = await Promise.all([
@@ -333,7 +335,7 @@ export const adminPartsRouter = new Hono<AppEnv>()
     ]);
     return c.json({ slackReleaseChannelId: release ?? "", slackSummaryChannelId: summary ?? "" });
   })
-  .post("/slack/config", requireAdmin, async (c) => {
+  .post("/slack/config", requireManage, async (c) => {
     const db = createShopDb(c.env.SHOP_DB);
     const body = await c.req.json<{
       slackReleaseChannelId?: string;
@@ -376,7 +378,7 @@ export const adminPartsRouter = new Hono<AppEnv>()
   })
   // Posts the Overview (start of day) or Reflection (end of day) to the summary channel. The
   // browser sends the start of its local day and its time zone, since the worker runs in UTC.
-  .post("/slack/daily-summary", requireAdmin, async (c) => {
+  .post("/slack/daily-summary", requireManage, async (c) => {
     const body = await c.req.json<{
       kind?: unknown;
       since?: unknown;
@@ -441,7 +443,7 @@ export const adminPartsRouter = new Hono<AppEnv>()
     }
     return c.json({ text, channel });
   })
-  .delete("/obsolete-instances", requireAdmin, async (c) => {
+  .delete("/obsolete-instances", requireManage, async (c) => {
     try {
       const db = createShopDb(c.env.SHOP_DB);
       const teamId = c.get("teamId");

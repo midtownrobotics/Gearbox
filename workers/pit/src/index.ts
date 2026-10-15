@@ -1,11 +1,12 @@
-import { appAuthContext } from "@g3/auth";
 import {
+  appAuthContext,
   deleteTeamRows,
   exportTeamRows,
+  hasPermission,
   inTeam,
   logTeamChange,
-  requireAdmin,
   requireAuth,
+  requirePermission,
   settingLabels,
   teamExport,
   teamSettingsRoutes,
@@ -32,8 +33,10 @@ import { manifest } from "./manifest";
 import { SETTING_KEYS, type SettingKey, getSetting, teamNumberOf } from "./settings";
 import type { AppEnv } from "./types";
 
+const requireManage = requirePermission("manage");
+
 const base = new Hono<AppEnv>();
-base.use("*", appAuthContext("pit"));
+base.use("*", appAuthContext(manifest));
 
 base.onError((err, c) => {
   console.error("[pit]", err);
@@ -220,7 +223,7 @@ const app = base
   .get("/me", requireAuth, (c) =>
     c.json({
       id: c.get("userId"),
-      isAdmin: c.get("userIsAdmin"),
+      isAdmin: hasPermission(c, "manage"),
       email: c.get("userEmail"),
       displayName: c.get("userDisplayName"),
     }),
@@ -973,7 +976,7 @@ const app = base
   })
 
   // Admin — the team's settings (admin only): its event keys and the monitor's feed.
-  .get("/admin/settings", requireAdmin, async (c) => {
+  .get("/admin/settings", requireManage, async (c) => {
     const db = createDb(c.env.PIT_DB);
     const team = c.get("teamId");
     const [eventKey, nexusEventKey, iframeUrl] = await Promise.all([
@@ -984,7 +987,7 @@ const app = base
     return c.json({ eventKey, nexusEventKey, iframeUrl, teamNumber: teamNumberOf(team) });
   })
 
-  .patch("/admin/settings", requireAdmin, settingsValidator, async (c) => {
+  .patch("/admin/settings", requireManage, settingsValidator, async (c) => {
     const updates = c.req.valid("json");
     const db = createDb(c.env.PIT_DB);
     const team = c.get("teamId");

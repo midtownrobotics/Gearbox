@@ -249,7 +249,7 @@ export async function handleSlackCode(opts: {
     if (!user || user.status !== "active") {
       const msg =
         user?.status === "pending"
-          ? "Your account is awaiting trusted student approval."
+          ? "Your account is awaiting admin approval."
           : "Your account is not active.";
       await updateStatus("failed", msg);
       return { success: false, message: `❌ ${msg}` };
@@ -332,7 +332,7 @@ export async function handleSlackCode(opts: {
       success: true,
       token: record.pollingToken,
       redirectUrl: record.redirectUrl,
-      message: "✅ Your team is set up, and you're its first trusted student.",
+      message: "✅ Your team is set up, and you're its first admin.",
     };
   }
 
@@ -345,10 +345,10 @@ export async function handleSlackCode(opts: {
       `:wave: ${slackUser.displayName} (${email}) signed up and is waiting for approval: ${teamUrl(env, record.teamId, "id")}/admin/users/${userId}`,
     );
   } catch (err) {
-    console.error("[slack] telling trusted students about a sign-up failed", err);
+    console.error("[slack] telling admins about a sign-up failed", err);
   }
   return {
     success: true,
-    message: "✅ Account created! Your account is pending trusted student approval.",
+    message: "✅ Account created! Your account is pending admin approval.",
   };
 }

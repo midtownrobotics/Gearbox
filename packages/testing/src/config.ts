@@ -49,13 +49,13 @@ export const g3idStub: ServiceStub = async (request) => {
   if (url.pathname === "/auth/me") {
     if (!user) return json({ error: "Unauthorized." }, 401);
     const pin = user.sessionType === "pin";
-    const grant = user.appPermissions?.[url.searchParams.get("app") ?? ""];
     return json({
       ...user,
       status: "active",
-      isAdmin: !pin && (grant?.trustedStudent ?? user.isAdmin),
+      isAdmin: !pin && user.isAdmin,
       isIdentityAdmin: !pin && user.isAdmin,
-      isMentor: !pin && (grant?.mentorAccess ?? user.isMentor),
+      isMentor: !pin && user.isMentor,
+      permissions: pin ? [] : (user.permissions?.[url.searchParams.get("app") ?? ""] ?? []),
       identities: url.searchParams.get("includeIdentities") === "false" ? [] : user.identities,
     });
   }

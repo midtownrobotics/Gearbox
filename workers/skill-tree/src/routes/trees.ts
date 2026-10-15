@@ -1,4 +1,4 @@
-import { requireAuth, requireMentor } from "@g3/auth";
+import { requireAuth, requirePermission } from "@g3/auth";
 import { and, eq } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import { Hono } from "hono";
@@ -17,6 +17,8 @@ import {
 } from "../lib/tree-set";
 import { keyFrom, loadTrees, requiresItself } from "../lib/trees";
 import type { AppEnv } from "../types";
+
+const requireDelegatedMentor = requirePermission("skills");
 
 // The team's trees. Anyone signed in reads them; mentors (and admins) edit them, one piece at a
 // time here or all at once by loading a file (lib/tree-set.ts). Every query is kept to the team's
@@ -243,17 +245,17 @@ export const treesRouter = new Hono<AppEnv>()
     });
   })
   /** The team's trees as a file, to keep, share, or edit and load again. */
-  .get("/export", requireMentor, async (c) => {
+  .get("/export", requireDelegatedMentor, async (c) => {
     const db = createDb(c.env.SKILL_DB);
     return c.json(await exportTreeSet(db, await currentTreeSet(db, c.get("teamId"))));
   })
   /** The set every team starts with, as a file. */
-  .get("/default", requireMentor, (c) => c.json(defaultTreeSet()))
+  .get("/default", requireDelegatedMentor, (c) => c.json(defaultTreeSet()))
   /**
    * What loading a file would change, without changing anything: what's added and removed, and
    * how many sign-offs go with the removed skills.
    */
-  .post("/import/preview", requireMentor, treeSetValidator, async (c) => {
+  .post("/import/preview", requireDelegatedMentor, treeSetValidator, async (c) => {
     const db = createDb(c.env.SKILL_DB);
     const summary = await previewTreeSet(
       db,
@@ -263,7 +265,7 @@ export const treesRouter = new Hono<AppEnv>()
     return c.json({ summary });
   })
   /** Loads a file in place of the team's trees. */
-  .post("/import", requireMentor, treeSetValidator, async (c) => {
+  .post("/import", requireDelegatedMentor, treeSetValidator, async (c) => {
     const db = createDb(c.env.SKILL_DB);
     const summary = await applyTreeSet(
       db,
@@ -273,7 +275,7 @@ export const treesRouter = new Hono<AppEnv>()
     );
     return c.json({ summary });
   })
-  .post("/", requireMentor, treeValidator(false), async (c) => {
+  .post("/", requireDelegatedMentor, treeValidator(false), async (c) => {
     const body = c.req.valid("json") as Partial<TreeFields> & { name: string };
     const db = createDb(c.env.SKILL_DB);
     const set = await currentTreeSet(db, c.get("teamId"));
@@ -304,7 +306,7 @@ export const treesRouter = new Hono<AppEnv>()
     return c.json({ id: row.id }, 201);
   })
   /** The order trees are listed in: every tree's id, first to last. */
-  .put("/order", requireMentor, orderValidator, async (c) => {
+  .put("/order", requireDelegatedMentor, orderValidator, async (c) => {
     const { ids } = c.req.valid("json");
     const db = createDb(c.env.SKILL_DB);
     const set = await currentTreeSet(db, c.get("teamId"));
@@ -318,7 +320,7 @@ export const treesRouter = new Hono<AppEnv>()
     );
     return c.json({ ok: true });
   })
-  .patch("/:id", requireMentor, treeValidator(true), async (c) => {
+  .patch("/:id", requireDelegatedMentor, treeValidator(true), async (c) => {
     const id = parseId(c.req.param("id"));
     const body = c.req.valid("json");
     if (Object.keys(body).length === 0) return c.json({ error: "Nothing to update." }, 400);
@@ -341,7 +343,7 @@ export const treesRouter = new Hono<AppEnv>()
     return c.json({ ok: true });
   })
   /** Deletes the tree with its categories and skills, and everyone's progress on them. */
-  .delete("/:id", requireMentor, async (c) => {
+  .delete("/:id", requireDelegatedMentor, async (c) => {
     const id = parseId(c.req.param("id"));
     const db = createDb(c.env.SKILL_DB);
     const set = await currentTreeSet(db, c.get("teamId"));
@@ -356,7 +358,7 @@ export const treesRouter = new Hono<AppEnv>()
     if (!row) return c.json({ error: "Tree not found." }, 404);
     return c.json({ ok: true });
   })
-  .post("/:id/categories", requireMentor, categoryValidator(false), async (c) => {
+  .post("/:id/categories", requireDelegatedMentor, categoryValidator(false), async (c) => {
     const treeId = parseId(c.req.param("id"));
     const body = c.req.valid("json") as Partial<CategoryFields> & { name: string };
     const db = createDb(c.env.SKILL_DB);
@@ -400,7 +402,7 @@ export const treesRouter = new Hono<AppEnv>()
   });
 
 export const categoriesRouter = new Hono<AppEnv>()
-  .patch("/:id", requireMentor, categoryValidator(true), async (c) => {
+  .patch("/:id", requireDelegatedMentor, categoryValidator(true), async (c) => {
     const body = c.req.valid("json");
     if (Object.keys(body).length === 0) return c.json({ error: "Nothing to update." }, 400);
     const db = createDb(c.env.SKILL_DB);
@@ -437,7 +439,7 @@ export const categoriesRouter = new Hono<AppEnv>()
     return c.json({ ok: true });
   })
   /** Deletes the category with its skills, and everyone's progress on them. */
-  .delete("/:id", requireMentor, async (c) => {
+  .delete("/:id", requireDelegatedMentor, async (c) => {
     const db = createDb(c.env.SKILL_DB);
     const set = await currentTreeSet(db, c.get("teamId"));
     const category = await categoryIn(db, set.id, parseId(c.req.param("id")));
@@ -445,7 +447,7 @@ export const categoriesRouter = new Hono<AppEnv>()
     await db.delete(treeCategories).where(eq(treeCategories.id, category.id));
     return c.json({ ok: true });
   })
-  .post("/:id/skills", requireMentor, skillValidator(false), async (c) => {
+  .post("/:id/skills", requireDelegatedMentor, skillValidator(false), async (c) => {
     const body = c.req.valid("json") as Partial<SkillFields> & { name: string };
     const db = createDb(c.env.SKILL_DB);
     const set = await currentTreeSet(db, c.get("teamId"));
@@ -487,7 +489,7 @@ export const categoriesRouter = new Hono<AppEnv>()
   });
 
 export const skillsRouter = new Hono<AppEnv>()
-  .patch("/:id", requireMentor, skillValidator(true), async (c) => {
+  .patch("/:id", requireDelegatedMentor, skillValidator(true), async (c) => {
     const id = parseId(c.req.param("id"));
     const { requires, ...fields } = c.req.valid("json");
     if (requires === undefined && Object.keys(fields).length === 0) {
@@ -524,7 +526,7 @@ export const skillsRouter = new Hono<AppEnv>()
     return c.json({ ok: true });
   })
   /** Deletes the skill and everyone's progress on it. */
-  .delete("/:id", requireMentor, async (c) => {
+  .delete("/:id", requireDelegatedMentor, async (c) => {
     const id = parseId(c.req.param("id"));
     const db = createDb(c.env.SKILL_DB);
     const set = await currentTreeSet(db, c.get("teamId"));

@@ -1,6 +1,5 @@
 import type { MessageBatch } from "@cloudflare/workers-types";
-import { appAuthContext } from "@g3/auth";
-import { requireAuth } from "@g3/auth";
+import { appAuthContext, hasPermission, requireAuth } from "@g3/auth";
 import { corsOrigin } from "@g3/site-config";
 import { withApiPrefix } from "@g3/site-config/worker";
 import { Hono } from "hono";
@@ -8,6 +7,7 @@ import { cors } from "hono/cors";
 import packageJson from "../package.json";
 import { createShopDb } from "./db";
 import { type BOMQueueMessage, processBOMQueue } from "./lib/bom-queue-consumer";
+import { manifest } from "./manifest";
 import { actionsRouter } from "./routes/actions";
 import { adminPartsRouter } from "./routes/admin-parts";
 import { drawingsRouter } from "./routes/drawings";
@@ -29,7 +29,7 @@ import { teamSettingsRouter } from "./routes/team-settings";
 import type { AppEnv } from "./types";
 
 const base = new Hono<AppEnv>();
-base.use("*", appAuthContext("shop"));
+base.use("*", appAuthContext(manifest));
 
 base.onError((err, c) => {
   console.error(err);
@@ -51,7 +51,7 @@ const app = base
   .get("/me", requireAuth, (c) =>
     c.json({
       userId: c.get("userId"),
-      isAdmin: c.get("userIsAdmin"),
+      isAdmin: hasPermission(c, "manage"),
       email: c.get("userEmail"),
       displayName: c.get("userDisplayName"),
       sessionType: c.get("sessionType"),

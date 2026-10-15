@@ -5,7 +5,7 @@ import { deleteCookie, getCookie } from "hono/cookie";
 import { createDb } from "../db";
 import { coreUserIdentities, coreUserPins, coreUsers, kioskDevices } from "../db/schema";
 import { deleteCookieOptions } from "../lib/cookie";
-import { effectivePermissions } from "../lib/permissions";
+import { assignedPermissions } from "../lib/permissions";
 import { regeneratePinForUser } from "../lib/pin";
 import { deleteSession, isPinSession } from "../lib/session";
 import { slackForTeam } from "../lib/slack-install";
@@ -76,13 +76,13 @@ export const authRouter = new Hono<AppEnv>()
       }
     }
 
-    const permissions = await effectivePermissions(
+    const permissions = await assignedPermissions(
       db,
       user,
       isPermissionApp(requestedApp) ? requestedApp : undefined,
     );
-    const isAdmin = sessionType === "pin" ? false : permissions.isAdmin;
-    const isMentor = sessionType === "pin" ? false : permissions.isMentor;
+    const isAdmin = sessionType === "pin" ? false : user.isAdmin === 1;
+    const isMentor = sessionType === "pin" ? false : user.isMentor === 1;
     const isIdentityAdmin = sessionType !== "pin" && user.isAdmin === 1;
 
     let kioskDeviceName: string | undefined;
@@ -100,6 +100,7 @@ export const authRouter = new Hono<AppEnv>()
       identities,
       isAdmin,
       isIdentityAdmin,
+      permissions: sessionType === "pin" ? [] : permissions,
       isMentor,
       sessionType,
       ...(kioskDeviceId && { kioskDeviceId }),

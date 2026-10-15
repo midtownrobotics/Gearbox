@@ -5,7 +5,7 @@ export async function permissionRequest<T>(url: string, init?: RequestInit): Pro
     const error = data && typeof data === "object" && "error" in data ? data.error : undefined;
     throw new Error(
       error === "Forbidden."
-        ? "Only ID's trusted students can manage permissions."
+        ? "Only Admins can manage permissions."
         : error === "Unauthorized."
           ? "Sign in to manage permissions."
           : typeof error === "string"

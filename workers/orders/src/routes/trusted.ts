@@ -15,7 +15,7 @@ const trustedValidator = validator("json", (value, c): { trusted: boolean } => {
 });
 
 /**
- * Catalog editor grants, managed by ID's trusted students from its central permissions page.
+ * Catalog editor grants, managed by Admins from its central permissions page.
  */
 export const trustedRouter = new Hono<AppEnv>()
   .get("/", requireIdentityAdmin, async (c) => {

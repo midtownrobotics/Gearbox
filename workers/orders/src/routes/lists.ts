@@ -1,4 +1,4 @@
-import { hasMentorAccess, inTeam, requireAuth, withTeam } from "@g3/auth";
+import { hasPermission, inTeam, requireAuth, withTeam } from "@g3/auth";
 import { desc, eq, inArray, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
@@ -234,7 +234,7 @@ export const listsRouter = new Hono<AppEnv>()
     const teamId = c.get("teamId");
     const found = await ownedList(db, teamId, id, {
       id: c.get("userId"),
-      isMentor: hasMentorAccess(c),
+      isMentor: hasPermission(c, "orders"),
     });
     if ("error" in found) return c.json({ error: found.error }, found.status);
     const { isArchived, ...rest } = body;
@@ -256,7 +256,7 @@ export const listsRouter = new Hono<AppEnv>()
     const teamId = c.get("teamId");
     const found = await ownedList(db, teamId, id, {
       id: c.get("userId"),
-      isMentor: hasMentorAccess(c),
+      isMentor: hasPermission(c, "orders"),
     });
     if ("error" in found) return c.json({ error: found.error }, found.status);
     await db.batch([

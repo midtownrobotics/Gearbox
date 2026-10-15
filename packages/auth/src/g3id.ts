@@ -1,6 +1,7 @@
 import { teamKey } from "@g3/site-config";
 import type { Context, MiddlewareHandler } from "hono";
 import { createMiddleware } from "hono/factory";
+import type { AppManifest, AppPermissionDefinition } from "./manifest";
 import type { PermissionApp } from "./permissions";
 
 // Sign-in for every worker except G3ID itself: ask G3ID (the G3ID service binding) who the
@@ -29,6 +30,7 @@ type G3IdMe = {
   isAdmin?: boolean;
   isIdentityAdmin?: boolean;
   isMentor?: boolean;
+  permissions?: string[];
   sessionType?: "oauth" | "pin";
   kioskDeviceId?: number;
   kioskDeviceName?: string;
@@ -42,13 +44,15 @@ export type G3AuthVariables = {
   userId: string;
   userDisplayName: string;
   userEmail: string;
-  /** Trusted student in this worker's app. Never true on a kiosk PIN session. */
+  /** Site-wide Admin. Delegated app permissions never change this role. */
   userIsAdmin: boolean;
-  /** Permission assignments are reserved for ID's trusted students, independent of app roles. */
+  /** Compatibility name for site-wide Admin authority, never a delegated student grant. */
   userIsIdentityAdmin: boolean;
   /** Set by the worker, never read from client headers or request bodies. */
   permissionApp?: PermissionApp;
-  /** Mentor access in this worker's app, separate from trusted student access. Never true on PIN. */
+  permissionDefinitions?: AppPermissionDefinition[];
+  userPermissions: string[];
+  /** Site-wide Mentor role. Never true on PIN. */
   userIsMentor: boolean;
   /** "pin" when signed in with a PIN on a shop kiosk. */
   sessionType: "oauth" | "pin";
@@ -87,6 +91,7 @@ async function loadUser(c: Context<G3AuthEnv>, identities: boolean) {
   c.set("userIsAdmin", !kiosk && user.isAdmin === true);
   c.set("userIsIdentityAdmin", !kiosk && (user.isIdentityAdmin ?? user.isAdmin) === true);
   c.set("userIsMentor", !kiosk && user.isMentor === true);
+  c.set("userPermissions", !kiosk && Array.isArray(user.permissions) ? user.permissions : []);
   c.set("sessionType", user.sessionType ?? "oauth");
   c.set("kioskDeviceId", user.kioskDeviceId ?? null);
   c.set("kioskDeviceName", user.kioskDeviceName ?? null);
@@ -100,18 +105,19 @@ async function loadUser(c: Context<G3AuthEnv>, identities: boolean) {
 const unauthorized = (c: Context) => c.json({ error: "Unauthorized." }, 401);
 
 /** Each worker declares which app's permissions it enforces before mounting its routes. */
-export const appAuthContext = (app: PermissionApp): MiddlewareHandler<G3AuthEnv> =>
+export const appAuthContext = (app: AppManifest): MiddlewareHandler<G3AuthEnv> =>
   createMiddleware<G3AuthEnv>(async (c, next) => {
-    c.set("permissionApp", app);
+    c.set("permissionApp", app.slug);
+    c.set("permissionDefinitions", app.permissions);
     await next();
   });
 
-/** Only ID's trusted students assign permissions, even when an app has its own trusted students. */
+/** Only site-wide Admins assign roles and student permissions. */
 export const requireIdentityAdmin: MiddlewareHandler<G3AuthEnv> = createMiddleware<G3AuthEnv>(
   async (c, next) => {
     if (!(await loadUser(c, false))) return unauthorized(c);
     if (!c.get("userIsIdentityAdmin"))
-      return c.json({ error: "Only ID's trusted students can assign permissions." }, 403);
+      return c.json({ error: "Only Admins can assign permissions." }, 403);
     await next();
   },
 );
@@ -132,11 +138,11 @@ export const requireAuthWithIdentities: MiddlewareHandler<G3AuthEnv> = createMid
   },
 );
 
-/** Trusted students in the worker's declared app (403 otherwise). */
+/** Site-wide Admins (403 otherwise); use requirePermission for delegated app capabilities. */
 export const requireAdmin: MiddlewareHandler<G3AuthEnv> = createMiddleware<G3AuthEnv>(
   async (c, next) => {
     if (!(await loadUser(c, false))) return unauthorized(c);
-    if (!c.get("userIsAdmin")) return c.json({ error: "Trusted student access required." }, 403);
+    if (!c.get("userIsAdmin")) return c.json({ error: "Admin access required." }, 403);
     await next();
   },
 );
@@ -144,6 +150,30 @@ export const requireAdmin: MiddlewareHandler<G3AuthEnv> = createMiddleware<G3Aut
 /** Mentors or admins: who may act as a mentor in an app. Takes any worker's context. */
 export const hasMentorAccess = (c: { get(key: "userIsMentor" | "userIsAdmin"): boolean }) =>
   c.get("userIsMentor") || c.get("userIsAdmin");
+
+/** Admin grants everything. Mentor defaults and student grants come from the app manifest. */
+export function hasPermission(c: Pick<Context<G3AuthEnv>, "get">, key: string): boolean {
+  if (c.get("sessionType") === "pin") return false;
+  if (c.get("userIsAdmin")) return true;
+  const definitions = c.get("permissionDefinitions") ?? [];
+  const definition = definitions.find((permission) => permission.key === key);
+  if (!definition) return false;
+  if (c.get("userIsMentor") && definition.roles.includes("mentor")) return true;
+  const assigned = c.get("userPermissions") ?? [];
+  return (
+    assigned.includes(key) ||
+    definitions.some(
+      (permission) => assigned.includes(permission.key) && permission.includes?.includes(key),
+    )
+  );
+}
+
+export const requirePermission = (key: string): MiddlewareHandler<G3AuthEnv> =>
+  createMiddleware<G3AuthEnv>(async (c, next) => {
+    if (!(await loadUser(c, false))) return unauthorized(c);
+    if (!hasPermission(c, key)) return c.json({ error: "You do not have this permission." }, 403);
+    await next();
+  });
 
 /** Mentor access or trusted student access in this app (403 otherwise). */
 export const requireMentor: MiddlewareHandler<G3AuthEnv> = createMiddleware<G3AuthEnv>(

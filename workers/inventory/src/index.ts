@@ -1,5 +1,11 @@
-import { appAuthContext } from "@g3/auth";
-import { deleteTeamRows, exportTeamRows, hasMentorAccess, requireAuth, teamExport } from "@g3/auth";
+import {
+  appAuthContext,
+  deleteTeamRows,
+  exportTeamRows,
+  hasPermission,
+  requireAuth,
+  teamExport,
+} from "@g3/auth";
 import { corsOrigin } from "@g3/site-config";
 import { withApiPrefix } from "@g3/site-config/worker";
 import { Hono } from "hono";
@@ -33,7 +39,7 @@ import { stockRouter } from "./routes/stock";
 import type { AppEnv } from "./types";
 
 const base = new Hono<AppEnv>();
-base.use("*", appAuthContext("inventory"));
+base.use("*", appAuthContext(manifest));
 
 base.onError((err, c) => {
   console.error("[inventory]", err);
@@ -93,9 +99,9 @@ const app = base
       userId: c.get("userId"),
       displayName: c.get("userDisplayName"),
       /** G3ID mentors and admins: delete, merge and split entries. */
-      isMentor: hasMentorAccess(c),
+      isMentor: hasPermission(c, "items"),
       /** G3ID admins: the Admin page. */
-      isAdmin: c.get("userIsAdmin"),
+      isAdmin: hasPermission(c, "manage"),
     }),
   )
   .route("/", inventoryRouter)

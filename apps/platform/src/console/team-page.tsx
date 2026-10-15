@@ -59,7 +59,7 @@ export function TeamPage() {
                   <td className="py-2 pr-4 text-secondary-600">{m.email}</td>
                   <td className="py-2 pr-4 text-secondary-600">
                     {[
-                      m.isAdmin && "trusted student",
+                      m.isAdmin && "admin",
                       m.isMentor && "mentor",
                       m.status !== "active" && m.status,
                     ]
@@ -217,7 +217,7 @@ function TransferOwner({
   return (
     <ActionForm
       title="Hand over"
-      description="Makes another member the team's owner and a trusted student."
+      description="Makes another member the team's owner and a admin."
       button="Hand over"
       onSubmit={async (reason) => {
         await send({ reason, userId, keepPreviousAdmin });
@@ -244,7 +244,7 @@ function TransferOwner({
             checked={keepPreviousAdmin}
             onChange={(e) => setKeepPreviousAdmin(e.target.checked)}
           />
-          Keep {team.team.owner.name} a trusted student
+          Keep {team.team.owner.name} a admin
         </label>
       )}
     </ActionForm>

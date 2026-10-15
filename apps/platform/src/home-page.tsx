@@ -80,7 +80,7 @@ const FOUNDATION = [
   {
     icon: FaSlack,
     title: "Sign in once",
-    body: "Members join from your Slack workspace and a trusted student lets them in. That one account works in every app. (Slack is required today; other options are planned.)",
+    body: "Members join from your Slack workspace and a admin lets them in. That one account works in every app. (Slack is required today; other options are planned.)",
   },
   {
     icon: FaUserShield,
@@ -103,7 +103,7 @@ const CUSTOMIZE = [
   {
     icon: FaToggleOn,
     title: "Pick your apps",
-    body: "Team trusted students turn apps on or off whenever they like. Use one, use them all.",
+    body: "Team admins turn apps on or off whenever they like. Use one, use them all.",
   },
   {
     icon: FaSlidersH,

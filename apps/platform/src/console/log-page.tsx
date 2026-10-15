@@ -29,7 +29,7 @@ function describe(action: Action): string {
     case "renumber_team":
       return `Changed team ${str(d.from)} to ${str(d.to)}`;
     case "transfer_owner":
-      return `Handed the team over${d.previousKeptAdmin === false ? ", removing the previous owner's trusted student" : ""}`;
+      return `Handed the team over${d.previousKeptAdmin === false ? ", removing the previous owner's admin" : ""}`;
     case "suspend_team":
       return "Suspended the team";
     case "reactivate_team":

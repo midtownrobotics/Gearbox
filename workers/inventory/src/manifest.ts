@@ -7,6 +7,21 @@ export const manifest = defineManifest({
   name: "Inventory",
   summary: "What the team owns, where it's kept and what's on a robot.",
   roles: ["admin", "mentor", "member", "kiosk"],
+  permissions: [
+    {
+      key: "manage",
+      label: "Manage Inventory",
+      description: "Change fields, locations and inventory settings.",
+      roles: [],
+      includes: ["items"],
+    },
+    {
+      key: "items",
+      label: "Manage items",
+      description: "Delete, merge and split inventory entries.",
+      roles: ["mentor"],
+    },
+  ],
   integrations: [],
   availability: "every team",
   version: packageJson.version,

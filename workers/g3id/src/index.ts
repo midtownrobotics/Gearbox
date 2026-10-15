@@ -61,5 +61,10 @@ const app = base
   .route("/slack", slackRouter);
 
 export type G3IDApp = typeof app;
-export type { PermissionMember, AppPermission, PermissionApp } from "@g3/auth";
+export type {
+  PermissionMember,
+  PermissionCatalogApp,
+  PermissionGrant,
+  PermissionApp,
+} from "@g3/auth";
 export default { fetch: withApiPrefix(app.fetch) };

@@ -8,6 +8,14 @@ export const manifest = defineManifest({
   summary:
     "The team's own network box: data use, blocking, printing, a shop drive and door sounds.",
   roles: ["admin", "member"],
+  permissions: [
+    {
+      key: "manage",
+      label: "Manage Edge",
+      description: "Manage the box, network and printers.",
+      roles: [],
+    },
+  ],
   integrations: ["edge box"],
   availability: "every team",
   version: packageJson.version,

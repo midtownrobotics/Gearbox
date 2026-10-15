@@ -7,6 +7,14 @@ export const manifest = defineManifest({
   name: "Pit",
   summary: "The pit at an event: checklists, match schedule and the team's stream.",
   roles: ["admin", "member", "kiosk"],
+  permissions: [
+    {
+      key: "manage",
+      label: "Manage Pit",
+      description: "Change Pit settings and monitor configuration.",
+      roles: [],
+    },
+  ],
   integrations: ["the blue alliance"],
   availability: "every team",
   version: packageJson.version,

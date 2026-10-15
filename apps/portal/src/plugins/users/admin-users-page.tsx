@@ -1,3 +1,4 @@
+import { appUrl } from "@g3/site-config";
 import {
   Badge,
   Button,
@@ -36,7 +37,7 @@ const SORTS = {
 type Sort = keyof typeof SORTS;
 
 const ROLES = {
-  admin: { label: "Trusted students", has: (u: User) => u.isAdmin === 1 },
+  admin: { label: "Admins", has: (u: User) => u.isAdmin === 1 },
   mentor: { label: "Mentors", has: (u: User) => u.isMentor === 1 },
   none: { label: "Neither", has: (u: User) => u.isAdmin !== 1 && u.isMentor !== 1 },
 } as const;
@@ -108,12 +109,14 @@ export function AdminUsersPage() {
   useEffect(() => {
     api.auth.me.$get().then(async (res) => {
       if (res.status === 401) {
-        navigate("/login");
+        window.location.assign(
+          `${appUrl("id")}/login?redirect=${encodeURIComponent(window.location.href)}`,
+        );
         return;
       }
       const data = (await res.json()) as { id: string; isAdmin?: boolean };
       if (!res.ok || !data.isAdmin) {
-        navigate("/dashboard");
+        navigate("/account");
         return;
       }
       setCurrentUserId(data.id);
@@ -245,7 +248,7 @@ export function AdminUsersPage() {
       "Email",
       "Joined Date",
       "Last Sign-in",
-      "Trusted student",
+      "Admin",
       "Mentor",
       ...authMethods,
     ];
@@ -400,7 +403,7 @@ export function AdminUsersPage() {
                       </span>
                       {user.isAdmin === 1 && (
                         <span className="text-xs px-1.5 py-0.5 rounded bg-primary-50 text-primary-600 border border-primary-200">
-                          Trusted student
+                          Admin
                         </span>
                       )}
                       {user.isMentor === 1 && (

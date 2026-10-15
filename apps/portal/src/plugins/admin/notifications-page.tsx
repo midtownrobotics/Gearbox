@@ -17,12 +17,12 @@ import {
 
 const AUDIENCES: { value: PortalAudience; label: string }[] = [
   { value: "everyone", label: "Everyone" },
-  { value: "admins", label: "Trusted students" },
+  { value: "admins", label: "Admins" },
   { value: "nobody", label: "Nobody" },
 ];
 
 const TYPE_HINTS: Record<NotificationType, string> = {
-  critical: "Needs a trusted student's attention right away.",
+  critical: "Needs a admin's attention right away.",
   warning: "Planned downtime and version changes.",
   info: "Updates, surveys and other news.",
 };
@@ -253,7 +253,7 @@ function PeopleList({
         {available.map((m) => (
           <option key={m.id} value={m.id} disabled={!m.hasSlack}>
             {m.displayName}
-            {m.isAdmin ? " (trusted student)" : ""}
+            {m.isAdmin ? " (admin)" : ""}
             {m.hasSlack ? "" : " (no Slack linked)"}
           </option>
         ))}
