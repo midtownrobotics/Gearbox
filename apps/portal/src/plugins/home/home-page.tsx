@@ -139,6 +139,7 @@ const APPS: App[] = [
     linkKey: "publicSite",
     href: "",
     icon: FaGlobe,
+    external: true,
   },
   {
     label: "Slack",
