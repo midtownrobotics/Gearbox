@@ -63,3 +63,10 @@
     font-family: var(--font-display);
   }
 }
+
+/* No overscroll stretch or bounce at a page's edges in any app (Android's stretch, iOS's rubber
+   band, pull-to-refresh): the page stays put, as Pit's always has. */
+html,
+body {
+  overscroll-behavior: none;
+}
