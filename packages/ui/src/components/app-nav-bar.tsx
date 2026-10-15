@@ -3,6 +3,7 @@ import {
   appUrl,
   completeAppOrder,
   isDemoPage,
+  platformUrl,
   portalAppLabels,
   site,
 } from "@g3/site-config";
@@ -227,7 +228,10 @@ export function AppNavBar({
             This is the public demo. Everything resets at midnight Eastern, and anyone can see what
             you change.
           </span>
-          <a href={`${appUrl("id")}/demo`}>Switch role</a>
+          <span className="g3-demo-banner-links">
+            <a href={`${appUrl("id")}/demo`}>Switch role</a>
+            <a href={platformUrl}>Back to Gearbox</a>
+          </span>
         </div>
       )}
       <header className={`g3-nav${flat ? " is-flat" : ""}${hasApps ? " has-apps" : ""}`}>

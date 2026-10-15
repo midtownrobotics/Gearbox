@@ -1,6 +1,6 @@
 import { demoTeamId, site, teamOfHost } from "@g3/site-config";
 import { ErrorBanner } from "@g3/ui";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api } from "../../lib/api";
 
@@ -34,6 +34,13 @@ export function DemoPage() {
   const [searchParams] = useSearchParams();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // A link straight to a role (the platform's home page) picks it at once.
+  const asked = ROLES.find((r) => r.role === searchParams.get("role"))?.role;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: once, when the page opens
+  useEffect(() => {
+    if (asked) void pick(asked);
+  }, []);
 
   async function pick(role: (typeof ROLES)[number]["role"]) {
     setBusy(role);

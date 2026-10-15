@@ -430,6 +430,11 @@ html[data-theme="dark"] .g3-nav-drawer {
   text-align: center;
 }
 
+.g3-demo-banner-links {
+  display: inline-flex;
+  gap: 12px;
+}
+
 .g3-demo-banner a {
   color: inherit;
   font-weight: 700;
