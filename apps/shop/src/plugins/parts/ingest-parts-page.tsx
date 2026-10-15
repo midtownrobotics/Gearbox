@@ -1,3 +1,4 @@
+import { isDemoPage } from "@g3/site-config";
 import {
   Badge,
   Button,
@@ -8,6 +9,8 @@ import {
   Field,
   Loading,
   Page,
+  type SafeTextKind,
+  TextField,
   inputClass,
   tones,
 } from "@g3/ui";
@@ -444,6 +447,22 @@ export function IngestPartsPage() {
     };
   }, [localPartData]);
 
+  const [addingRelease, setAddingRelease] = useState(false);
+  /** The demo's stand-in for a release from Onshape. */
+  async function addSampleRelease() {
+    setAddingRelease(true);
+    try {
+      const res = await api.admin.parts["demo-release"].$post();
+      if (!res.ok) {
+        setError(await getErrorMessage(res as unknown as Response));
+        return;
+      }
+      await loadPendingParts();
+    } finally {
+      setAddingRelease(false);
+    }
+  }
+
   async function loadPendingParts() {
     try {
       setPendingLoading(true);
@@ -521,9 +540,16 @@ export function IngestPartsPage() {
     );
   }
 
+  // The public demo has no Onshape: a button brings in a sample release instead.
+  const sampleRelease = isDemoPage && (
+    <Button variant="secondary" disabled={addingRelease} onClick={addSampleRelease}>
+      {addingRelease ? "Adding…" : "Add a sample release"}
+    </Button>
+  );
+
   if (!pendingData || pendingData.parts.length === 0) {
     return (
-      <Page title="Ingest" width="full">
+      <Page title="Ingest" width="full" actions={sampleRelease || undefined}>
         <p className="text-sm text-secondary-500">
           No parts are waiting. Parts from an approved Onshape release show up here.
         </p>
@@ -538,6 +564,7 @@ export function IngestPartsPage() {
         title="Ingest"
         description="Give each released part its subsystem and processes, then ingest them."
         width="full"
+        actions={sampleRelease || undefined}
       >
         <>
           <div className="bg-surface border border-secondary-200 rounded-xl overflow-hidden">
@@ -590,8 +617,9 @@ export function IngestPartsPage() {
                           {(localPartData[part.partNumber]?.name ?? part.name) || "—"}
                         </td>
                         <td className="px-4 py-3 text-secondary-400 text-xs">
-                          <input
-                            type="text"
+                          <TextField
+                            variant="plain"
+                            typeable
                             inputMode="numeric"
                             value={
                               localPartData[part.partNumber]?.quantity === null
@@ -732,8 +760,9 @@ export function IngestPartsPage() {
                             data.processes,
                           ).length > 0 ? (
                             <div className="flex gap-1.5">
-                              <input
-                                type="text"
+                              <TextField
+                                variant="plain"
+                                kind="material"
                                 value={localPartData[part.partNumber]?.material ?? ""}
                                 onChange={(e) =>
                                   updateLocal(part.partNumber, { material: e.target.value })
@@ -742,8 +771,9 @@ export function IngestPartsPage() {
                                 aria-label={`Material for ${part.partNumber}`}
                                 className="w-24 bg-surface border border-secondary-300 rounded px-2 py-1 text-xs text-secondary-900 placeholder-secondary-400 focus:outline-none focus:border-primary-500"
                               />
-                              <input
-                                type="text"
+                              <TextField
+                                variant="plain"
+                                kind="size"
                                 value={localPartData[part.partNumber]?.thickness ?? ""}
                                 onChange={(e) =>
                                   updateLocal(part.partNumber, { thickness: e.target.value })
@@ -1279,14 +1309,16 @@ function PartIngestCard({
       {banner && <ErrorBanner message={banner} />}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <TextField
+        <LabeledText
+          kind="sku"
           label="Onshape Part Number"
           required
           value={form.onshapePartNumber}
           onChange={(v) => setForm({ ...form, onshapePartNumber: v })}
           placeholder="P-0042"
         />
-        <TextField
+        <LabeledText
+          kind="revision"
           label="Revision"
           required
           value={form.revision}
@@ -1326,7 +1358,8 @@ function PartIngestCard({
             ))}
           </select>
         </Field>
-        <TextField
+        <LabeledText
+          kind="partName"
           label="Name"
           required
           value={form.name}
@@ -1343,8 +1376,8 @@ function PartIngestCard({
           placeholder="Same as Onshape"
         />
         <Field label="Quantity *">
-          <input
-            type="text"
+          <TextField
+            typeable
             inputMode="numeric"
             value={quantityInput}
             onChange={(e) => {
@@ -1382,10 +1415,10 @@ function PartIngestCard({
                 });
               }
             }}
-            className={inputClass}
           />
         </Field>
-        <TextField
+        <LabeledText
+          kind="note"
           label="Notes"
           value={form.notes}
           onChange={(v) => setForm({ ...form, notes: v })}
@@ -1393,7 +1426,8 @@ function PartIngestCard({
         />
         {infoRequiredBy.length > 0 && (
           <>
-            <TextField
+            <LabeledText
+              kind="material"
               label="Material"
               required
               value={form.material}
@@ -1404,7 +1438,8 @@ function PartIngestCard({
               placeholder="e.g. 4140"
               hint={`Required by ${infoRequiredBy.join(", ")}`}
             />
-            <TextField
+            <LabeledText
+              kind="size"
               label="Thickness"
               required
               value={form.thickness}
@@ -1429,12 +1464,11 @@ function PartIngestCard({
               </button>
             )}
           </div>
-          <input
-            type="text"
+          <TextField
+            kind="url"
             value={form.partDrawingUrl}
             onChange={(e) => setForm({ ...form, partDrawingUrl: e.target.value })}
             placeholder="https://…"
-            className={inputClass}
           />
           <p className="text-xs text-secondary-500">Fetching the drawing below fills this in.</p>
         </div>
@@ -1611,8 +1645,9 @@ function FieldLabel({ label, required }: { label: string; required?: boolean }) 
   );
 }
 
-function TextField({
+function LabeledText({
   label,
+  kind,
   value,
   onChange,
   placeholder,
@@ -1620,6 +1655,7 @@ function TextField({
   hint,
 }: {
   label: string;
+  kind: SafeTextKind;
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
@@ -1628,12 +1664,11 @@ function TextField({
 }) {
   return (
     <Field label={required ? `${label} *` : label} hint={hint}>
-      <input
-        type="text"
+      <TextField
+        kind={kind}
         value={value}
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
-        className={inputClass}
       />
     </Field>
   );

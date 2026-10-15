@@ -1,4 +1,5 @@
 import { deleteTeamRows, exportTeamRows, teamExport } from "@g3/auth";
+import { isDemoTeam } from "@g3/demo";
 import { Hono } from "hono";
 import { createEdgeDb } from "../db";
 import {
@@ -15,6 +16,7 @@ import {
   netUsage,
   netUsageHourly,
 } from "../db/schema";
+import { demoWords, loadDemo } from "../demo";
 import { disconnectBox } from "../lib/agent";
 import { manifest } from "../manifest";
 import type { AppEnv } from "../types";
@@ -25,6 +27,14 @@ import type { AppEnv } from "../types";
  * library), its box's key, link and data go too.
  */
 export const internalRouter = new Hono<AppEnv>()
+  // The public demo (roadmap Phase 5): its sample data, after the nightly reset deleted the
+  // team's, and the words in it, which the gateway lets demo visitors send.
+  .post("/teams/:teamId/demo", async (c) => {
+    const teamId = c.req.param("teamId");
+    if (!isDemoTeam(teamId)) return c.json({ error: "Only the demo team." }, 403);
+    return c.json(await loadDemo(createEdgeDb(c.env.EDGE_DB), teamId));
+  })
+  .get("/demo/words", (c) => c.json({ words: demoWords() }))
   // The team's data, for its admins to download before switching Edge off (the platform's app
   // library). The box key's hash is left out.
   .get("/teams/:teamId/export", async (c) => {

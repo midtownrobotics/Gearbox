@@ -1,4 +1,4 @@
-import { Button, Card, ErrorBanner, Loading, Page, inputClass } from "@g3/ui";
+import { Button, Card, ErrorBanner, Loading, Page, TextField, inputClass } from "@g3/ui";
 import type { PrinterAlert } from "@g3/worker-edge/print-types";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
@@ -213,8 +213,8 @@ function PrintForm({
           </label>
           <label className={field}>
             Pages
-            <input
-              className={inputClass}
+            <TextField
+              typeable
               value={pageRanges}
               placeholder="All (or e.g. 1-3,5)"
               onChange={(e) => setPageRanges(e.target.value)}

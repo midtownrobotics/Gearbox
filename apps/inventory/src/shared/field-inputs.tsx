@@ -1,4 +1,4 @@
-import { Field, inputClass } from "@g3/ui";
+import { Field, TextField, inputClass } from "@g3/ui";
 import type { FieldValue, FieldValues, FieldView } from "@g3/worker-inventory";
 import { formatDate } from "./format";
 
@@ -108,26 +108,26 @@ export function FieldInputs({
                 ))}
               </select>
             ) : field.type === "paragraph" ? (
-              <textarea
-                className={inputClass}
+              <TextField
+                multiline
+                kind="note"
                 rows={3}
                 maxLength={4000}
                 value={text}
                 onChange={(e) => set(e.target.value)}
               />
-            ) : (
+            ) : field.type === "number" || field.type === "date" ? (
               <input
                 className={inputClass}
-                type={
-                  field.type === "number"
-                    ? "number"
-                    : field.type === "date"
-                      ? "date"
-                      : field.type === "link"
-                        ? "url"
-                        : "text"
-                }
+                type={field.type}
                 step={field.type === "number" ? "any" : undefined}
+                value={text}
+                onChange={(e) => set(e.target.value)}
+              />
+            ) : (
+              <TextField
+                type={field.type === "link" ? "url" : "text"}
+                kind={field.type === "link" ? "url" : "text"}
                 placeholder={field.type === "link" ? "https://…" : undefined}
                 maxLength={field.type === "text" ? 200 : undefined}
                 value={text}

@@ -1,4 +1,4 @@
-import { ErrorBanner, Loading, Page, Switch, inputClass } from "@g3/ui";
+import { ErrorBanner, Loading, Page, Switch, TextField } from "@g3/ui";
 import { useEffect, useId, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { fetchOnshapeReleases } from "../../shared/getters";
@@ -106,12 +106,11 @@ export function OnshapePage() {
       ) : (
         <>
           <div className="space-y-3">
-            <input
+            <TextField
               type="search"
               value={query}
               onChange={(e) => setParam({ q: e.target.value || null })}
               placeholder="Search releases, people or parts"
-              className={inputClass}
             />
             <div className="flex items-center gap-2 text-sm text-secondary-900">
               <Switch

@@ -1,6 +1,7 @@
 import type { Plugin } from "../../shared/plugin-types";
 import { RequiresApp } from "../../shared/requires-app";
 import { DashboardPage } from "./dashboard-page";
+import { DemoPage } from "./demo-page";
 import { EmailLoginPage } from "./email-login-page";
 import { LeaderboardPage } from "./leaderboard-page";
 import { LoginPage } from "./login-page";
@@ -13,6 +14,7 @@ export const authPlugin: Plugin = {
   name: "auth",
   routes: [
     { path: "/login", element: <LoginPage /> },
+    { path: "/demo", element: <DemoPage /> },
     { path: "/login/email", element: <EmailLoginPage /> },
     { path: "/login/error", element: <OAuthErrorPage /> },
     { path: "/login/slack", element: <SlackLoginPage /> },

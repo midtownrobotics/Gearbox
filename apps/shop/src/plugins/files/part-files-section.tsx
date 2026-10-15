@@ -1,4 +1,4 @@
-import { Badge, Button, ConfirmButton, ErrorBanner, inputClass } from "@g3/ui";
+import { Badge, Button, ConfirmButton, ErrorBanner, TextField, inputClass } from "@g3/ui";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   type FileState,
@@ -186,12 +186,11 @@ export function PartFilesSection({ data, rows }: { data: ShopData | null; rows: 
         <NoticeText key={n} message={n} />
       ))}
 
-      <input
+      <TextField
         type="search"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         placeholder="Search by file, batch, part number or part name…"
-        className={inputClass}
       />
 
       {files.length === 0 ? (
@@ -421,8 +420,9 @@ function PartTargetFields({
 
   return (
     <div className="flex flex-wrap items-center gap-1.5">
-      <input
-        type="text"
+      <TextField
+        variant="plain"
+        kind="sku"
         value={value.partNumber}
         onChange={(e) => onChange({ ...value, partNumber: e.target.value })}
         placeholder="Part number"

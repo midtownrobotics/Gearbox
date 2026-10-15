@@ -50,6 +50,8 @@ const g3id = async (request: Request) => {
   if (team) {
     const [, , rest] = team;
     if (rest === "/members") return Response.json(MEMBERS);
+    // The public demo's accounts, made again on its nightly reset.
+    if (rest === "/demo/reset" && request.method === "POST") return Response.json({ ok: true });
     if (rest === "/slack/dm-admins") {
       const id = team[1];
       if (request.method === "GET") return Response.json(adminDms.get(id) ?? []);
@@ -114,18 +116,25 @@ const slack = async (request: Request) => {
 };
 
 /**
- * A team-scoped app's /api/internal/teams/:id: records each team it's asked to delete or seed
- * (read back with GET /api/internal/deleted and /seeded), and fails for a team a test named with
- * POST /api/internal/fail/:id.
+ * A team-scoped app's /api/internal/teams/:id: records each team it's asked to delete, seed or
+ * load the demo's sample data for (read back with GET /api/internal/deleted, /seeded and
+ * /demoed), and fails for a team a test named with POST /api/internal/fail/:id.
  */
 function teamApp() {
   const deleted: string[] = [];
   const seeded: string[] = [];
+  const demoed: string[] = [];
   const failing = new Set<string>();
   return (request: Request) => {
     const path = new URL(request.url).pathname;
     if (path === "/api/internal/deleted") return Response.json(deleted);
     if (path === "/api/internal/seeded") return Response.json(seeded);
+    if (path === "/api/internal/demoed") return Response.json(demoed);
+    const demo = path.match(/^\/api\/internal\/teams\/(.+)\/demo$/);
+    if (demo && request.method === "POST") {
+      demoed.push(decodeURIComponent(demo[1]));
+      return Response.json({ ok: true });
+    }
     const seed = path.match(/^\/api\/internal\/teams\/(.+)\/seed$/);
     if (seed && request.method === "POST") {
       seeded.push(decodeURIComponent(seed[1]));
@@ -173,6 +182,7 @@ export default workerTestConfig({
     PIT: teamApp(),
     SCHEDULE: teamApp(),
     SHOP: teamApp(),
+    SCOUTING: teamApp(),
     SKILL_TREE: teamApp(),
   },
   outbound: slack,

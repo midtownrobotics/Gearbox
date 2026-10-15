@@ -1,3 +1,4 @@
+import { TextField } from "@g3/ui";
 import { useEffect, useRef, useState } from "react";
 import { FaChevronDown, FaTrash } from "react-icons/fa";
 import {
@@ -191,7 +192,9 @@ function NewNotification({
         </fieldset>
         <label className="block text-sm">
           <span className="font-medium text-secondary-800">Short description</span>
-          <input
+          <TextField
+            variant="plain"
+            kind="note"
             required
             maxLength={140}
             value={summary}
@@ -201,7 +204,10 @@ function NewNotification({
         </label>
         <label className="block text-sm">
           <span className="font-medium text-secondary-800">Full text</span>
-          <textarea
+          <TextField
+            multiline
+            variant="plain"
+            kind="note"
             required
             maxLength={10_000}
             rows={6}

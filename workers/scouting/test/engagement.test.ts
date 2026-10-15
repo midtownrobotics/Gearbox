@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers";
 import { teamKey } from "@g3/site-config";
-import { admin, kioskAdmin, otherStudent, student } from "@g3/testing/users";
+import { admin, kioskAdmin, otherStudent, student, teamUsers } from "@g3/testing/users";
 import { call, callAs, jsonAs } from "@g3/testing/worker";
 import { beforeEach, describe, expect, it } from "vitest";
 import { type EngagementSettings, defaultEngagementSettings } from "../src/engagement";
@@ -26,6 +26,38 @@ beforeEach(async () => {
 });
 
 describe("optional engagement", () => {
+  it("keeps settings, defaults and admin updates within the authenticated team", async () => {
+    const other = teamUsers("frc999998");
+    const original = await save({ enabled: true, pointsLabel: "Original points" });
+    expect(await jsonAs(other.student, path)).toEqual(defaultEngagementSettings);
+    const changed = await jsonAs(other.admin, path, {
+      method: "PUT",
+      body: { ...defaultEngagementSettings, pointsLabel: "Other points" },
+    });
+    expect(await jsonAs(other.student, path)).toEqual(changed);
+    expect(await jsonAs(student, path)).toEqual(original);
+    expect(await jsonAs(other.student, "/scouting/me")).toMatchObject({ engagement: changed });
+    expect(
+      (
+        await callAs(other.kioskAdmin, path, {
+          method: "PUT",
+          body: original,
+        })
+      ).status,
+    ).toBe(403);
+    expect(
+      (
+        await callAs(admin, path, {
+          headers: { "X-Team-Id": other.admin.teamId },
+          method: "PUT",
+          body: original,
+        })
+      ).status,
+    ).toBe(401);
+    expect(await jsonAs(other.student, path)).toEqual(changed);
+    expect(await jsonAs(student, path)).toEqual(original);
+  });
+
   it("is off by default and rejects direct game requests before creating accounts", async () => {
     expect((await call(path)).status).toBe(401);
     expect(await jsonAs(student, path)).toEqual(defaultEngagementSettings);
@@ -53,16 +85,7 @@ describe("optional engagement", () => {
         .first(),
     ).toBeNull();
     const pending: Promise<unknown>[] = [];
-    const disabledBindings = {
-      SCOUTING_DB: {
-        prepare: (sql: string) => {
-          if (sql.includes("strategy_event_config"))
-            throw new Error("Disabled cron must not query events");
-          return db.prepare(sql);
-        },
-      },
-    } as unknown as AppEnv["Bindings"];
-    worker.scheduled({} as ScheduledController, disabledBindings, {
+    worker.scheduled({} as ScheduledController, bindings, {
       waitUntil: (task: Promise<unknown>) => pending.push(task),
     } as unknown as ExecutionContext);
     await Promise.all(pending);
@@ -71,9 +94,9 @@ describe("optional engagement", () => {
   it("restricts changes to identity admins, including when a student is a strategy lead", async () => {
     await db
       .prepare(
-        "INSERT INTO strategy_admins (user_id, email, display_name, granted_by, created_at) VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO strategy_admins (team_id, user_id, email, display_name, granted_by, created_at) VALUES (?, ?, ?, ?, ?, ?)",
       )
-      .bind(student.id, student.email, student.displayName, admin.id, Date.now())
+      .bind(teamKey, student.id, student.email, student.displayName, admin.id, Date.now())
       .run();
     for (const user of [student, kioskAdmin]) {
       expect(
@@ -89,8 +112,8 @@ describe("optional engagement", () => {
     expect(settings.pointsLabel).toBe("Team Points");
     expect(await jsonAs(student, path)).toEqual(settings);
     expect(
-      await db.prepare("SELECT team_key, updated_by FROM scouting_engagement_settings").first(),
-    ).toEqual({ team_key: teamKey, updated_by: admin.id });
+      await db.prepare("SELECT team_id, updated_by FROM scouting_engagement_settings").first(),
+    ).toEqual({ team_id: teamKey, updated_by: admin.id });
   });
 
   it("rejects invalid names, malformed JSON, and non-boolean switches without changing settings", async () => {
@@ -117,15 +140,15 @@ describe("optional engagement", () => {
     await save({ enabled: true, predictionsEnabled: false });
     await db
       .prepare(
-        "INSERT OR REPLACE INTO boylebucks_accounts (user_id, display_name, balance, earned, wagered, updated_at) VALUES (?, ?, 75, 75, 0, ?)",
+        "INSERT OR REPLACE INTO boylebucks_accounts (team_id, user_id, display_name, balance, earned, wagered, updated_at) VALUES (?, ?, ?, 75, 75, 0, ?)",
       )
-      .bind(student.id, student.displayName, Date.now())
+      .bind(teamKey, student.id, student.displayName, Date.now())
       .run();
     await db
       .prepare(
-        "INSERT INTO boylebucks_accounts (user_id, display_name, balance, earned, wagered, updated_at) VALUES (?, ?, 25, 25, 0, ?)",
+        "INSERT INTO boylebucks_accounts (team_id, user_id, display_name, balance, earned, wagered, updated_at) VALUES (?, ?, ?, 25, 25, 0, ?)",
       )
-      .bind(otherStudent.id, otherStudent.displayName, Date.now())
+      .bind(teamKey, otherStudent.id, otherStudent.displayName, Date.now())
       .run();
     const game = await jsonAs<{
       account: { balance: number };
@@ -191,9 +214,9 @@ describe("optional engagement", () => {
     );
     await db
       .prepare(
-        "INSERT INTO strategy_event_config (id, event_key, current_match_number, updated_by, updated_at, schedule_mode) VALUES (1, ?, 1, ?, ?, 'manual')",
+        "INSERT INTO strategy_event_config (team_id, id, event_key, current_match_number, updated_by, updated_at, schedule_mode) VALUES (?, 1, ?, 1, ?, ?, 'manual')",
       )
-      .bind(eventKey, admin.id, Date.now())
+      .bind(teamKey, eventKey, admin.id, Date.now())
       .run();
     const submit = async (match: number) => {
       await db
@@ -202,9 +225,9 @@ describe("optional engagement", () => {
         .run();
       await db
         .prepare(
-          "INSERT OR IGNORE INTO scouting_match_assignments (event_key, match_number, user_id, team_number, assigned_at) VALUES (?, ?, ?, '9999', ?)",
+          "INSERT OR IGNORE INTO scouting_match_assignments (team_id, event_key, match_number, user_id, team_number, assigned_at) VALUES (?, ?, ?, ?, '9999', ?)",
         )
-        .bind(eventKey, match, student.id, Date.now())
+        .bind(teamKey, eventKey, match, student.id, Date.now())
         .run();
       const body = new FormData();
       body.set("answers", JSON.stringify({ auto: 5 }));

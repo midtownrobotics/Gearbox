@@ -1,4 +1,4 @@
-import { Card, Page, inputClass } from "@g3/ui";
+import { Card, Page, TextField, inputClass } from "@g3/ui";
 import type { StockView } from "@g3/worker-inventory";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
@@ -251,9 +251,8 @@ export function TablePage() {
       ) : (
         <>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <input
+            <TextField
               type="search"
-              className={inputClass}
               placeholder="Search name, details, vendor, location…"
               aria-label="Search the inventory"
               value={filters.query}

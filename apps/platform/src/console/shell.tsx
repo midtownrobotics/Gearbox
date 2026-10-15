@@ -1,4 +1,5 @@
 import { consoleUrl, site, teamAppUrl } from "@g3/site-config";
+import { TextField } from "@g3/ui";
 import { type ReactNode, useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import { GearMark } from "../layout";
@@ -85,7 +86,9 @@ function SignIn() {
           window.location.href = signInUrl(Number(number));
         }}
       >
-        <input
+        <TextField
+          variant="plain"
+          kind="title"
           required
           inputMode="numeric"
           pattern="[0-9]*"

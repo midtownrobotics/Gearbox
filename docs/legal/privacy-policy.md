@@ -48,7 +48,7 @@ We collect only what the apps need to work.
 
 We do not ask for, and teams should not enter, home addresses, government identifiers, health information or payment card details.
 
-The public demo needs no account. Anything typed into it is erased on a schedule, so please do not enter real personal information there.
+The public demo needs no account. Visitors pick text from ready-made examples instead of typing, and everything changed in it is erased every night at midnight US Eastern time. Anyone using the demo can see what other visitors changed that day. To limit how fast one visitor can make changes, the demo counts changes by IP address for a minute at a time; the address isn't stored.
 
 ## 3. How we use it
 
@@ -78,6 +78,8 @@ We count teams and the apps they use so we can plan capacity. Those counts do no
 - **The law.** We disclose information if the law requires it. Where we are allowed to, we tell the team owner first.
 
 Some things are public by design: your team's name, number and branding on its sign-in page, and the apps your team has submitted to the library.
+
+Scouting forms, reports, schedules, uploaded files and points are private to the owning team. Team deletion or the app's scheduled deletion removes its database records and uploaded files.
 
 Scouting engagement is off by default. An admin can enable points and match predictions and can separately enable team points standings. Standings show members' names, balances, points earned and points used to signed-in teammates. A member's prediction history is shown only to that member through the activity page. Disabling activities pauses new awards and prediction result processing and keeps existing balances and history under the same retention rules as other team data.
 
@@ -114,7 +116,7 @@ Where the law of your team's country requires a legal basis for that transfer, t
 | Operator access log | 12 months |
 | Technical logs | [Period set with our hosting provider] |
 | Backups | [Period], after which deleted information is gone from backups too |
-| The public demo | Erased every 24 hours |
+| The public demo | Erased every night at midnight US Eastern time |
 
 ## 9. Your choices and rights
 

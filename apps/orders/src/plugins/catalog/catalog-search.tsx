@@ -1,4 +1,4 @@
-import { inputClass } from "@g3/ui";
+import { TextField } from "@g3/ui";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { formatCents } from "../../shared/format";
 import type { CatalogItem } from "../../shared/types";
@@ -45,9 +45,8 @@ export function CatalogSearch({
 
   return (
     <div ref={box} className="relative">
-      <input
+      <TextField
         type="search"
-        className={inputClass}
         value={query}
         onChange={(e) => {
           setQuery(e.target.value);
@@ -71,7 +70,6 @@ export function CatalogSearch({
         }}
         placeholder={placeholder}
         aria-label="Search the catalog"
-        // biome-ignore lint/a11y/noAutofocus: callers turn it on where search is the next step
         autoFocus={autoFocus}
       />
       {open && query.trim() && (

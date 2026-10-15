@@ -12,8 +12,8 @@
 // the team through another (`LINKED`). Left out on purpose (`SKIP`, `KEEP_OUT`): sessions, sign-in
 // and kiosk codes, kiosk devices and PINs, the Slack installation and every setting encrypted with
 // production's SECRETS_KEY (staging has its own key and couldn't read them), the edge box's key,
-// per-student browsing data, caches, and the platform's operator records. Scouting isn't per team
-// yet and only the site's team has it, so for the site's team its whole database is copied.
+// per-student browsing data, caches, and the platform's operator records. Scouting follows the
+// same team_id filtering as the other apps; another team's private rows are never copied.
 // Not copied: KV (members sign in again on staging) and R2 files (Shop's drawings, Scouting's field
 // maps), which pages show as missing.
 //
@@ -55,8 +55,6 @@ type Database = {
   keepOut?: Record<string, string>;
   /** Columns copied as NULL (secrets, tokens). */
   blank?: Record<string, string[]>;
-  /** The whole database is the site team's (an app that isn't per team yet). */
-  wholeForSiteTeam?: boolean;
   /** Other team ids whose rows come too (Orders' shared starter catalog). */
   alsoTeams?: string[];
   /**
@@ -155,7 +153,6 @@ const DATABASES: Database[] = [
   {
     worker: "scouting",
     binding: "SCOUTING_DB",
-    wholeForSiteTeam: true,
     skip: [
       "tba_match_cache",
       "tba_team_cache",
@@ -295,7 +292,6 @@ console.log(
 
 for (const db of DATABASES) {
   if (only && !only.includes(db.worker)) continue;
-  const whole = db.wholeForSiteTeam === true;
   console.log(`\n${db.worker}:`);
 
   if (migrations(db, "production") !== migrations(db, "staging")) {
@@ -316,14 +312,13 @@ for (const db of DATABASES) {
   }
 
   // Which rows of each table are the team's, in the order they go in (parents first).
-  const linkedFirst = whole ? [] : Object.keys(db.linked ?? {}).filter((t) => t === "teams");
+  const linkedFirst = Object.keys(db.linked ?? {}).filter((t) => t === "teams");
   const plan: { table: string; where: string }[] = [];
   const left: string[] = [];
   for (const table of [...linkedFirst, ...[...tables.keys()].sort()]) {
     if (plan.some((p) => p.table === table) || db.skip?.includes(table)) continue;
     let where: string | undefined;
-    if (whole) where = "1 = 1";
-    else if (db.linked?.[table]) where = db.linked[table].replaceAll(":team", literal(team));
+    if (db.linked?.[table]) where = db.linked[table].replaceAll(":team", literal(team));
     else if (tables.get(table)?.includes("team_id")) where = `team_id IN (${teamList(db)})`;
     if (!where) {
       left.push(table);

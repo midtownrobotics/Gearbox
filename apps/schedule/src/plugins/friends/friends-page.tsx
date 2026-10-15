@@ -1,4 +1,4 @@
-import { Button, Card, ErrorBanner, Field, Loading, Page, inputClass } from "@g3/ui";
+import { Button, Card, ErrorBanner, Field, Loading, Page, TextField } from "@g3/ui";
 import { useState } from "react";
 import { type Friend, type Person, api, unwrap } from "../../shared/api";
 import { compareNames } from "../../shared/names";
@@ -61,9 +61,8 @@ export function FriendsPage() {
       <Card title="Add a friend">
         <div className="space-y-3">
           <Field label="Search">
-            <input
+            <TextField
               type="search"
-              className={inputClass}
               value={query}
               placeholder="Name"
               autoComplete="off"

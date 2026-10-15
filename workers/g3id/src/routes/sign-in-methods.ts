@@ -1,3 +1,4 @@
+import { isDemoTeam } from "@g3/site-config";
 import { and, eq, inArray } from "drizzle-orm";
 import { Hono } from "hono";
 import { createDb } from "../db";
@@ -42,7 +43,9 @@ export const teamSignInRouter = new Hono<AppEnv>()
   // The team's methods, for the sign-in page (public, like its name and colors).
   .get("/", async (c) => {
     c.header("Cache-Control", "public, max-age=60");
-    return c.json(await signInMethods(createDb(c.env.DB), requestTeamId(c)));
+    const team = requestTeamId(c);
+    // `demo`: the public demo's sign-in page offers its roles instead.
+    return c.json({ ...(await signInMethods(createDb(c.env.DB), team)), demo: isDemoTeam(team) });
   });
 
 export const adminSignInRouter = new Hono<AppEnv>()

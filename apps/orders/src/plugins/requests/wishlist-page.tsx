@@ -1,4 +1,4 @@
-import { ErrorBanner, Loading, Page, SuccessBanner, inputClass } from "@g3/ui";
+import { ErrorBanner, Loading, Page, SuccessBanner, TextField } from "@g3/ui";
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api, getErrorMessage } from "../../shared/api";
@@ -86,9 +86,8 @@ export function WishlistPage() {
       <p className="text-sm text-secondary-500">
         Parts we'd like one day. Promote one from its page to request it.
       </p>
-      <input
+      <TextField
         type="search"
-        className={inputClass}
         placeholder="Search the wishlist…"
         value={query}
         onChange={(e) => setQuery(e.target.value)}

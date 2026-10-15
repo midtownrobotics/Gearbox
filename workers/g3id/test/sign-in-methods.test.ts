@@ -28,7 +28,7 @@ describe("sign-in methods", () => {
   it("are all on for a team that hasn't chosen", async () => {
     const team = await createTeam();
     const res = await g3id("/team/sign-in", { headers: { "X-Team-Id": team } });
-    expect(await res.json()).toEqual({ slack: true, ...all });
+    expect(await res.json()).toEqual({ slack: true, ...all, demo: false });
   });
 
   it("switched off, can't start a sign-in, and stay off only for that team", async () => {

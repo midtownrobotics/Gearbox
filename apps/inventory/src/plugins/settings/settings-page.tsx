@@ -1,4 +1,4 @@
-import { Button, Card, ErrorBanner, Page, SuccessBanner, inputClass } from "@g3/ui";
+import { Button, Card, ErrorBanner, Page, SuccessBanner, TextField } from "@g3/ui";
 import type { Setup, SetupSummary } from "@g3/worker-inventory";
 import { type ChangeEvent, type FormEvent, useRef, useState } from "react";
 import { api, getErrorMessage } from "../../shared/api";
@@ -78,8 +78,8 @@ function NamesCard({
             <li key={row.id} className="py-1.5">
               {editing?.id === row.id ? (
                 <form onSubmit={rename} className="flex gap-2">
-                  <input
-                    className={inputClass}
+                  <TextField
+                    kind="label"
                     aria-label={`New name for ${row.name}`}
                     maxLength={80}
                     value={editing.name}
@@ -146,8 +146,8 @@ function NamesCard({
         </ul>
       )}
       <form onSubmit={add} className="flex gap-2">
-        <input
-          className={inputClass}
+        <TextField
+          kind="label"
           placeholder={`New ${what}`}
           aria-label={`New ${what}`}
           maxLength={80}

@@ -138,7 +138,7 @@ describe("reporting a falsely registered team number", () => {
     call("/reports", {
       method: "POST",
       json: {
-        teamNumber: 9999,
+        teamNumber: 4242,
         email: "mentor@example.org",
         message: "I'm a mentor on this team, and we didn't sign up.",
         ...body,

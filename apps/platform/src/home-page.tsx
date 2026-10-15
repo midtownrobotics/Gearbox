@@ -1,22 +1,27 @@
-import { site } from "@g3/site-config";
+import { type AppName, demoTeamId, demoUrl, site, teamAppUrl } from "@g3/site-config";
 import { type ReactNode, useEffect, useState } from "react";
 import {
+  FaChalkboardTeacher,
   FaCodeBranch,
   FaGithub,
   FaHome,
+  FaKey,
   FaPalette,
   FaServer,
   FaSlack,
   FaSlidersH,
   FaToggleOn,
+  FaUserGraduate,
   FaUserShield,
 } from "react-icons/fa";
 import { Link } from "react-router-dom";
 import attendanceIcon from "./assets/app-icons/attendance.svg";
+import edgeIcon from "./assets/app-icons/edge.svg";
 import idIcon from "./assets/app-icons/id.svg";
 import inventoryIcon from "./assets/app-icons/inventory.svg";
 import ordersIcon from "./assets/app-icons/orders.svg";
 import pitIcon from "./assets/app-icons/pit.svg";
+import scheduleIcon from "./assets/app-icons/schedule.svg";
 import scoutingIcon from "./assets/app-icons/scouting.svg";
 import shopIcon from "./assets/app-icons/shop.svg";
 import skillsIcon from "./assets/app-icons/skills.svg";
@@ -26,7 +31,8 @@ import { MyTeamButton } from "./team-pages";
 // The platform's public page: what Gearbox is, its apps, how a team makes it its own, and how to
 // sign up. Written from the release announcement.
 
-type App = { name: string; icon: string; blurb: string };
+/** `demo`: the app in the public demo, where its card links (none for one the demo doesn't have). */
+type App = { name: string; icon: string; blurb: string; demo?: AppName };
 
 /** Sign-in, on every team: in the launcher mock, not the app list. */
 const SIGN_IN: App = { name: "Sign-in", icon: idIcon, blurb: "" };
@@ -34,45 +40,66 @@ const SIGN_IN: App = { name: "Sign-in", icon: idIcon, blurb: "" };
 const APPS: App[] = [
   {
     name: "Orders",
+    demo: "orders",
     icon: ordersIcon,
     blurb:
       "Paste a vendor link or pick from the FRC parts catalog. Mentors approve, carts build themselves per vendor, and budgets only count money actually spent.",
   },
   {
     name: "Shop",
+    demo: "shop",
     icon: shopIcon,
     blurb:
       "Parts released in Onshape show up ready to make. Students pick up and finish each step from a phone or a shop kiosk, with drawings a scan away.",
   },
   {
     name: "Pit",
+    demo: "pit",
     icon: pitIcon,
     blurb:
       "Checklists before every match, an issue log, battery health and cycle counts, and a monitor showing the schedule and rankings.",
   },
   {
     name: "Scouting",
+    demo: "scouting",
     icon: scoutingIcon,
     blurb:
       "Your own match and pit forms, pick lists and strategy tools, shared with the whole team. Turn on a points game to keep scouts engaged.",
   },
   {
     name: "Inventory",
+    demo: "inventory",
     icon: inventoryIcon,
     blurb:
       "What you own and where it lives, on a shelf or on a robot. Deliveries from Orders land here automatically.",
   },
   {
     name: "Attendance",
+    demo: "id",
     icon: attendanceIcon,
     blurb:
       "Members scan a QR code at the door to check in and out. Hours roll up into a season leaderboard, and missed check-outs fix themselves.",
   },
   {
     name: "Skill Tree",
+    demo: "skillTree",
     icon: skillsIcon,
     blurb:
       "Training laid out as skills that unlock one after another. Mentors sign off individuals or whole groups, using our trees or yours.",
+  },
+  {
+    name: "Schedule",
+    demo: "schedule",
+    icon: scheduleIcon,
+    blurb:
+      "Who does what at each event, 15 minutes at a time. Drag roles across the grid, publish it, and Slack reminds people before their role changes.",
+  },
+  {
+    name: "Edge",
+    demo: "edge",
+    icon: edgeIcon,
+    blurb:
+      "Optional, with a small box on your shop's network: see how much data each device uses, block distractions, and print from any app.",
   },
 ];
 
@@ -122,6 +149,34 @@ const CUSTOMIZE = [
   },
 ];
 
+const DEMO_ROLES = [
+  {
+    role: "student",
+    icon: FaUserGraduate,
+    title: "Student",
+    body: "Request parts, check off the pit list, work through the skill trees and see your schedule.",
+  },
+  {
+    role: "mentor",
+    icon: FaChalkboardTeacher,
+    title: "Mentor",
+    body: "Approve orders and build carts, sign off skills, and plan who does what at an event.",
+  },
+  {
+    role: "admin",
+    icon: FaKey,
+    title: "Admin",
+    body: "Everything a mentor does, plus each app's settings and the team's admin pages.",
+  },
+] as const;
+
+const DEMO_NOTES = [
+  "It starts fresh every night at midnight Eastern.",
+  "Everyone shares it, so you'll see what other visitors changed today.",
+  "Text is picked from examples with a rotate button instead of typed.",
+  "Slack, printing and Onshape aren't connected, so those parts are switched off.",
+];
+
 const STEPS = [
   {
     title: "Enter your team number",
@@ -143,6 +198,7 @@ export function HomePage() {
       <Hero />
       <Foundation />
       <Apps />
+      <Demo />
       <MakeItYours />
       <HowItWorks />
       <Feedback />
@@ -178,6 +234,12 @@ function Hero() {
             >
               Sign up your team
             </Link>
+            <a
+              href={demoUrl}
+              className="rounded-lg border border-line bg-surface px-6 py-3 font-semibold text-secondary-900 shadow-sm transition-colors hover:bg-inset"
+            >
+              Try the demo
+            </a>
             <MyTeamButton large />
           </div>
           <p className="text-sm text-secondary-500">
@@ -202,7 +264,7 @@ const MOMENTS: { app: string; label: string; text: string }[] = [
 
 const LAUNCHER_APPS = [
   SIGN_IN,
-  ...APPS.filter((app) => app.name !== "Attendance" && app.name !== "Inventory"),
+  ...APPS.filter((app) => !["Attendance", "Inventory", "Schedule", "Edge"].includes(app.name)),
 ];
 
 /** What a team's home looks like once it's signed up, with a moment from each app in turn. */
@@ -358,12 +420,78 @@ function Apps() {
             className="flex gap-4 rounded-xl border border-line bg-surface p-5 transition-shadow hover:shadow-md"
           >
             <AppTile app={app} size="lg" />
-            <div>
+            <div className="flex flex-col">
               <h3 className="font-semibold text-secondary-900">{app.name}</h3>
-              <p className="mt-1 text-sm text-secondary-600">{app.blurb}</p>
+              <p className="mt-1 flex-1 text-sm text-secondary-600">{app.blurb}</p>
+              {app.demo && (
+                <a
+                  href={`${teamAppUrl(demoTeamId, app.demo)}/${app.name === "Attendance" ? "leaderboard" : ""}`}
+                  className="mt-3 self-start text-sm font-semibold text-primary-600 hover:text-primary-700"
+                >
+                  See it in the demo →
+                </a>
+              )}
             </div>
           </div>
         ))}
+      </div>
+      <p className="mt-6 text-sm text-secondary-600">
+        Turn on only the ones your team needs, and try every one of them in the{" "}
+        <a href="#demo" className="font-semibold text-primary-600 hover:text-primary-700">
+          demo
+        </a>
+        .
+      </p>
+    </Section>
+  );
+}
+
+function Demo() {
+  const pick = (role: string) => `${teamAppUrl(demoTeamId, "id")}/demo?role=${role}`;
+  return (
+    <Section id="demo" eyebrow="Try it" title="Look around before you sign up.">
+      <p className="-mt-4 mb-10 max-w-3xl text-secondary-600">
+        The demo is a whole team with a season already underway: orders in every stage, parts on the
+        shop floor, checklists, attendance and a schedule. No account needed. Pick who you'd like to
+        be.
+      </p>
+      <div className="grid gap-4 md:grid-cols-3">
+        {DEMO_ROLES.map(({ role, icon: Icon, title, body }) => (
+          <a
+            key={role}
+            href={pick(role)}
+            className="group flex flex-col rounded-xl border border-line bg-surface p-6 transition-shadow hover:border-primary-500 hover:shadow-md"
+          >
+            <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-50 text-primary-600">
+              <Icon />
+            </span>
+            <h3 className="mt-4 font-semibold text-secondary-900">
+              Try it as a {title.toLowerCase()}
+            </h3>
+            <p className="mt-1 flex-1 text-sm text-secondary-600">{body}</p>
+            <span className="mt-4 text-sm font-semibold text-primary-600 group-hover:text-primary-700">
+              Open the demo →
+            </span>
+          </a>
+        ))}
+      </div>
+      <div className="mt-8 flex flex-col gap-6 rounded-xl border border-line bg-inset p-6 md:flex-row md:items-center md:justify-between">
+        <ul className="space-y-1.5 text-sm text-secondary-600">
+          {DEMO_NOTES.map((note) => (
+            <li key={note} className="flex gap-2">
+              <span aria-hidden="true" className="text-primary-500">
+                •
+              </span>
+              {note}
+            </li>
+          ))}
+        </ul>
+        <a
+          href={demoUrl}
+          className="shrink-0 self-start rounded-lg bg-primary-600 px-6 py-3 font-semibold text-white shadow-sm transition-colors hover:bg-primary-500 md:self-center"
+        >
+          Try the demo
+        </a>
       </div>
     </Section>
   );

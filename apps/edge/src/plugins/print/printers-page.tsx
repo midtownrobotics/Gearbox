@@ -1,4 +1,4 @@
-import { Button, Card, ConfirmButton, ErrorBanner, Loading, Page, inputClass } from "@g3/ui";
+import { Button, Card, ConfirmButton, ErrorBanner, Loading, Page, TextField } from "@g3/ui";
 import { useState } from "react";
 import { api, getErrorMessage } from "../../shared/api";
 import { useAuthUser } from "../../shared/auth";
@@ -308,8 +308,9 @@ function AddPrinter({ onAdded, existing }: { onAdded: () => void; existing: Prin
           }}
         >
           <span className="text-sm text-secondary-600">Or by address:</span>
-          <input
-            className={`${inputClass} !w-64`}
+          <TextField
+            typeable
+            className="!w-64"
             value={address}
             placeholder="192.168.50.140 or ipp://…"
             onChange={(e) => setAddress(e.target.value)}

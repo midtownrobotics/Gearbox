@@ -1,3 +1,4 @@
+import { TextField } from "@g3/ui";
 import { useState } from "react";
 import { type Operator, consoleApi, formatDate, read, send, useLoad } from "./data";
 import { Notice, Panel, buttonClass, fieldClass } from "./shell";
@@ -81,7 +82,9 @@ export function OperatorsPage() {
             });
           }}
         >
-          <input
+          <TextField
+            variant="plain"
+            kind="label"
             required
             value={userId}
             onChange={(e) => setUserId(e.target.value)}

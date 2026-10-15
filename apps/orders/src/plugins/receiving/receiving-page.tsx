@@ -1,4 +1,4 @@
-import { Button, ErrorBanner, Loading, Page, SuccessBanner, inputClass } from "@g3/ui";
+import { Button, ErrorBanner, Loading, Page, SuccessBanner, TextField } from "@g3/ui";
 import type { InferResponseType } from "hono/client";
 import { useState } from "react";
 import { Link } from "react-router-dom";
@@ -150,8 +150,9 @@ function OrderCard({
         <div className="flex items-center gap-2 text-sm">
           {editingTracking ? (
             <>
-              <input
-                className={`${inputClass} !w-56 !py-1`}
+              <TextField
+                kind="tracking"
+                className="!w-56 !py-1"
                 value={tracking}
                 onChange={(e) => setTracking(e.target.value)}
                 placeholder="Tracking number"

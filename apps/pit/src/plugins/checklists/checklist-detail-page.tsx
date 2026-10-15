@@ -6,8 +6,8 @@ import {
   Field,
   Loading,
   Page,
+  TextField,
   focusRing,
-  inputClass,
 } from "@g3/ui";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
@@ -223,22 +223,23 @@ export function ChecklistDetailPage() {
 
       <Card title="Checklist" className="space-y-3">
         <Field label="Name">
-          <input
-            type="text"
+          <TextField
+            kind="title"
             value={listDraft.name}
             onChange={(e) => setListDraft({ ...listDraft, name: e.target.value })}
             onKeyDown={(e) => {
               if (e.key === "Enter") saveList();
             }}
-            className={inputClass}
           />
         </Field>
         <Field label="Description (optional)">
-          <textarea
+          <TextField
+            multiline
+            kind="note"
             value={listDraft.description}
             onChange={(e) => setListDraft({ ...listDraft, description: e.target.value })}
             rows={2}
-            className={`${inputClass} resize-none`}
+            className="resize-none"
           />
         </Field>
         <div>
@@ -284,8 +285,8 @@ export function ChecklistDetailPage() {
       {adding && (
         <Card title={addingType === "topic" ? "New topic" : "New item"} className="space-y-3">
           <Field label="Name">
-            <input
-              type="text"
+            <TextField
+              kind="checklist"
               value={newItemName}
               onChange={(e) => {
                 setNewItemName(e.target.value);
@@ -295,18 +296,18 @@ export function ChecklistDetailPage() {
                 if (e.key === "Enter") handleAddItem();
                 if (e.key === "Escape") setAdding(false);
               }}
-              className={inputClass}
-              // biome-ignore lint/a11y/noAutofocus: intentional — user just opened the add form
               autoFocus
             />
           </Field>
           {addingType === "item" && (
             <Field label="Description (optional)">
-              <textarea
+              <TextField
+                multiline
+                kind="note"
                 value={newItemDesc}
                 onChange={(e) => setNewItemDesc(e.target.value)}
                 rows={2}
-                className={`${inputClass} resize-none`}
+                className="resize-none"
               />
             </Field>
           )}
@@ -348,22 +349,22 @@ export function ChecklistDetailPage() {
               {editing ? (
                 <div className="space-y-3">
                   <Field label="Name">
-                    <input
-                      type="text"
+                    <TextField
+                      kind="checklist"
                       value={editing.name}
                       onChange={(e) => setEditingItem({ ...editing, name: e.target.value })}
                       onKeyDown={(e) => {
                         if (e.key === "Enter") saveItemEdit(item);
                         if (e.key === "Escape") setEditingItem(null);
                       }}
-                      className={inputClass}
-                      // biome-ignore lint/a11y/noAutofocus: intentional — user just opened the edit form
                       autoFocus
                     />
                   </Field>
                   {!topic && (
                     <Field label="Description (optional)">
-                      <textarea
+                      <TextField
+                        multiline
+                        kind="note"
                         value={editing.description}
                         onChange={(e) =>
                           setEditingItem({ ...editing, description: e.target.value })
@@ -372,7 +373,7 @@ export function ChecklistDetailPage() {
                           if (e.key === "Escape") setEditingItem(null);
                         }}
                         rows={2}
-                        className={`${inputClass} resize-none`}
+                        className="resize-none"
                       />
                     </Field>
                   )}

@@ -13,6 +13,12 @@ compatibility_date = "2026-05-17"
 [vars]
 LOCAL_DEV = "true"
 
+# The public demo's limit on changes per visitor (src/demo.ts): 60 a minute by IP address.
+[[ratelimits]]
+name = "DEMO_LIMITER"
+namespace_id = "9999"
+simple = { limit = 60, period = 60 }
+
 [[services]]
 binding = "PLATFORM"
 service = "platform"
@@ -205,6 +211,11 @@ service = "inventory-production"
 binding = "SCHEDULE"
 service = "schedule-production"
 
+[[env.production.ratelimits]]
+name = "DEMO_LIMITER"
+namespace_id = "9999"
+simple = { limit = 60, period = 60 }
+
 # ---- Staging: written by `pnpm configure` from [env.production]; don't edit below. ----
 
 [env.staging]
@@ -261,6 +272,11 @@ service = "inventory-staging"
 [[env.staging.services]]
 binding = "SCHEDULE"
 service = "schedule-staging"
+
+[[env.staging.ratelimits]]
+name = "DEMO_LIMITER"
+namespace_id = "9999"
+simple = { limit = 60, period = 60 }
 
 [[env.staging.routes]]
 pattern = "*-dev.g3robotics.com/*"

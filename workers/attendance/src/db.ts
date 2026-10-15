@@ -151,3 +151,13 @@ export async function teamsWithOpenSessions(d1: D1Database): Promise<string[]> {
     .all();
   return rows.map((row) => row.teamId);
 }
+
+// Human-readable display-name slug joined with the G3ID id for a stable key.
+export function memberKey(displayName: string, userId: string): string {
+  const slug = displayName
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "_")
+    .replace(/[^a-z0-9_]/g, "");
+  return slug ? `${slug}_${userId}` : userId;
+}

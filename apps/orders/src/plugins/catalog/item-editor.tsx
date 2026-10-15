@@ -1,4 +1,4 @@
-import { Button, Card, ConfirmButton, ErrorBanner, Field, inputClass } from "@g3/ui";
+import { Button, Card, ConfirmButton, ErrorBanner, Field, TextField, inputClass } from "@g3/ui";
 import { useState } from "react";
 import { api, getErrorMessage } from "../../shared/api";
 import type { CatalogItem } from "../../shared/types";
@@ -80,8 +80,8 @@ export function ItemEditor({
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="col-span-2 sm:col-span-4">
           <Field label="Name">
-            <input
-              className={inputClass}
+            <TextField
+              kind="partName"
               value={name}
               onChange={(e) => setName(e.target.value)}
               maxLength={300}
@@ -90,9 +90,9 @@ export function ItemEditor({
         </div>
         <div className="col-span-2">
           <Field label="Link" hint="The product page, if you can find it">
-            <input
+            <TextField
+              kind="url"
               type="url"
-              className={inputClass}
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               placeholder="https://…"
@@ -100,14 +100,10 @@ export function ItemEditor({
           </Field>
         </div>
         <Field label="Vendor">
-          <input
-            className={inputClass}
-            value={vendor}
-            onChange={(e) => setVendor(e.target.value)}
-          />
+          <TextField kind="vendor" value={vendor} onChange={(e) => setVendor(e.target.value)} />
         </Field>
         <Field label="Part number">
-          <input className={inputClass} value={sku} onChange={(e) => setSku(e.target.value)} />
+          <TextField kind="sku" value={sku} onChange={(e) => setSku(e.target.value)} />
         </Field>
         <Field label="Pack of" hint="Parts in one of these">
           <input
@@ -139,8 +135,10 @@ export function ItemEditor({
         </div>
         <div className="col-span-2">
           <Field label="Sizes and types" hint='One per line, like Length: 1/2"'>
-            <textarea
-              className={`${inputClass} min-h-16 font-mono text-xs`}
+            <TextField
+              multiline
+              kind="options"
+              className="min-h-16 font-mono text-xs"
               value={options}
               onChange={(e) => setOptions(e.target.value)}
             />

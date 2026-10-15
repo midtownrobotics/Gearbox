@@ -1,4 +1,5 @@
 import { deleteTeamRows, exportTeamRows, teamExport } from "@g3/auth";
+import { isDemoTeam } from "@g3/demo";
 import { Hono } from "hono";
 import { createShopDb } from "../db";
 import {
@@ -18,6 +19,7 @@ import {
   stagingBatches,
   subsystems,
 } from "../db/schema";
+import { demoWords, loadDemo } from "../demo";
 import { onshapeConfig } from "../lib/onshape-config";
 import { unregisterOnShapeWebhooks } from "../lib/onshape-webhook";
 import { SETTING } from "../lib/settings";
@@ -41,6 +43,14 @@ const SECRET_SETTINGS: string[] = [
 ];
 
 export const internalRouter = new Hono<AppEnv>()
+  // The public demo (roadmap Phase 5): its sample data, after the nightly reset deleted the
+  // team's, and the words in it, which the gateway lets demo visitors send.
+  .post("/teams/:teamId/demo", async (c) => {
+    const teamId = c.req.param("teamId");
+    if (!isDemoTeam(teamId)) return c.json({ error: "Only the demo team." }, 403);
+    return c.json(await loadDemo(c.env, teamId));
+  })
+  .get("/demo/words", (c) => c.json({ words: demoWords() }))
   // The team's data, for its admins to download before switching Shop off (the platform's app
   // library): every row, and a list of its files in R2 (drawings, part files), which stay there
   // until the data is deleted. Onshape's keys are left out.

@@ -1,4 +1,4 @@
-import { Button, Card, ErrorBanner, Loading, Page, Stat, inputClass } from "@g3/ui";
+import { Button, Card, ErrorBanner, Loading, Page, Stat, TextField } from "@g3/ui";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, getErrorMessage } from "../../shared/api";
@@ -219,13 +219,13 @@ function RenameForm({
         void save();
       }}
     >
-      <input
-        className={`${inputClass} !w-64`}
+      <TextField
+        kind="device"
+        className="!w-64"
         value={name}
         maxLength={64}
         placeholder="Name (blank to use hostname)"
         onChange={(e) => setName(e.target.value)}
-        // biome-ignore lint/a11y/noAutofocus: inline edit field opened by the user
         autoFocus
       />
       <Button type="submit">Save</Button>

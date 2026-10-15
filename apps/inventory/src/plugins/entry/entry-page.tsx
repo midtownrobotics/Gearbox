@@ -1,5 +1,5 @@
 import { appUrl } from "@g3/site-config";
-import { Button, Card, Dialog, ErrorBanner, Field, Loading, Page, inputClass } from "@g3/ui";
+import { Button, Card, Dialog, ErrorBanner, Field, Loading, Page, TextField } from "@g3/ui";
 import type { ItemView } from "@g3/worker-inventory";
 import { type FormEvent, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
@@ -134,8 +134,8 @@ function DetailsCard({ item, onChanged }: { item: ItemView; onChanged: () => Pro
       <Card title="Details">
         <form onSubmit={save} className="space-y-4">
           <Field label="Name">
-            <input
-              className={inputClass}
+            <TextField
+              kind="partName"
               required
               maxLength={200}
               value={name}
@@ -338,9 +338,8 @@ function MergeDialog({
         </>
       ) : (
         <>
-          <input
+          <TextField
             type="search"
-            className={inputClass}
             placeholder="Find the other entry by name, vendor or part number"
             aria-label="Find the entry to merge in"
             value={query}

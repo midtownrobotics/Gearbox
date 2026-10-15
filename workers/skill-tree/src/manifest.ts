@@ -10,7 +10,7 @@ export const manifest = defineManifest({
   integrations: [],
   availability: "every team",
   version: packageJson.version,
-  hooks: { seed: true, delete: true, export: true },
+  hooks: { seed: true, delete: true, export: true, demo: true },
   // The trees are the team's content (a tree set file), not settings.
   settings: [],
   plugins: [],

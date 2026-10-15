@@ -50,8 +50,10 @@ const switchApp = (user: TestUser, slug: string, enabled: boolean) =>
 const teamApps = async (teamId: string) =>
   ((await json<{ apps: string[] }>(null, `/teams/${teamId}`)).apps ?? []).sort();
 
-const stubbed = async (binding: "ORDERS" | "SHOP" | "SKILL_TREE", what: "seeded" | "deleted") =>
-  (await (await testEnv[binding].fetch(`http://app/api/internal/${what}`)).json()) as string[];
+const stubbed = async (
+  binding: "ORDERS" | "SHOP" | "SKILL_TREE" | "SCOUTING",
+  what: "seeded" | "deleted",
+) => (await (await testEnv[binding].fetch(`http://app/api/internal/${what}`)).json()) as string[];
 
 describe("a new team", () => {
   it("starts with only sign-in and its home", async () => {
@@ -61,12 +63,14 @@ describe("a new team", () => {
     expect(home.apps.map((a) => a.slug)).toEqual(["id", "portal"]);
   });
 
-  it("can't switch on Scouting, which isn't kept per team yet; the site's team can", async () => {
+  it("can enable team-scoped Scouting through the app library", async () => {
     const team = await newTeam();
     const library = await json<LibraryApp[]>(team.admin, "/team/library");
-    expect(library.map((a) => a.slug)).not.toContain("scouting");
+    expect(library.map((a) => a.slug)).toContain("scouting");
     expect(library.map((a) => a.slug)).not.toContain("id");
-    expect((await switchApp(team.admin, "scouting", true)).status).toBe(404);
+    expect((await switchApp(team.admin, "scouting", true)).status).toBe(200);
+    expect(await stubbed("SCOUTING", "seeded")).toContain(team.teamId);
+    expect(await teamApps(team.teamId)).toContain("scouting");
     const site = await json<LibraryApp[]>(teamUsers(teamKey).admin, "/team/library");
     expect(site.map((a) => a.slug)).toContain("scouting");
   });

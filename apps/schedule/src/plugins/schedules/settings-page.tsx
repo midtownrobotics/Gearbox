@@ -10,6 +10,7 @@ import {
   Page,
   SuccessBanner,
   Switch,
+  TextField,
   Toggle,
   inputClass,
 } from "@g3/ui";
@@ -130,8 +131,8 @@ function DetailsCard({ detail, reload }: CardProps) {
         {error && <ErrorBanner message={error} />}
         {saved && <SuccessBanner message="Saved." />}
         <Field label="Event">
-          <input
-            className={inputClass}
+          <TextField
+            kind="title"
             value={name}
             maxLength={100}
             required
@@ -455,8 +456,8 @@ function PeriodsCard({ detail, reload }: CardProps) {
         >
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Add a period">
-              <input
-                className={inputClass}
+              <TextField
+                kind="period"
                 value={draft.label}
                 placeholder="Lunch"
                 maxLength={60}
@@ -543,9 +544,10 @@ function PeriodRow({
           void onSave({ label: draft.label, ...times }).then((ok) => ok && setEditing(false));
         }}
       >
-        <input
+        <TextField
+          kind="period"
           aria-label="Label"
-          className={`${inputClass} w-40`}
+          className="w-40"
           value={draft.label}
           maxLength={60}
           required

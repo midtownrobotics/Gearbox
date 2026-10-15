@@ -1,4 +1,15 @@
-import { Badge, Button, Card, ErrorBanner, Field, Loading, Page, inputClass, tones } from "@g3/ui";
+import {
+  Badge,
+  Button,
+  Card,
+  ErrorBanner,
+  Field,
+  Loading,
+  Page,
+  TextField,
+  inputClass,
+  tones,
+} from "@g3/ui";
 import { Dialog } from "@g3/ui";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -87,14 +98,13 @@ function NewScheduleDialog({ onClose }: { onClose: () => void }) {
       >
         {error && <ErrorBanner message={error} />}
         <Field label="Event">
-          <input
-            className={inputClass}
+          <TextField
+            kind="title"
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Greater Kansas City Regional"
             maxLength={100}
             required
-            // biome-ignore lint/a11y/noAutofocus: the dialog's only job is this field
             autoFocus
           />
         </Field>

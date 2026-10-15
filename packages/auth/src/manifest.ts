@@ -97,8 +97,11 @@ export type AppManifest = {
    *   cleared, or the team is deleted. Without it, the app's data is kept.
    * - `export`: `GET /api/internal/teams/:id/export`, the team's data as a `TeamExport` (JSON,
    *   secrets left out), offered to the team's admins before they switch the app off.
+   * - `demo`: `POST /api/internal/teams/:id/demo`, the public demo's sample data, loaded after
+   *   the nightly reset deleted the demo team's data (`delete`); and `GET /api/internal/demo/words`,
+   *   the words in it, which the gateway lets demo visitors send back (@g3/demo).
    */
-  hooks: { seed: boolean; delete: boolean; export: boolean };
+  hooks: { seed: boolean; delete: boolean; export: boolean; demo: boolean };
   /** The team's settings for this app (none for an app without any). */
   settings: AppSetting[];
   /** Its optional parts, each switched on and off inside the app. */

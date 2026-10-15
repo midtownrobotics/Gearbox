@@ -7,8 +7,8 @@ import {
   Field,
   Loading,
   Page,
+  TextField,
   buttonClass,
-  inputClass,
 } from "@g3/ui";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
@@ -98,8 +98,8 @@ export function ChecklistsPage() {
       {creating && (
         <Card title="New checklist" className="space-y-3">
           <Field label="Name">
-            <input
-              type="text"
+            <TextField
+              kind="title"
               value={newName}
               onChange={(e) => {
                 setNewName(e.target.value);
@@ -109,17 +109,17 @@ export function ChecklistsPage() {
                 if (e.key === "Enter") handleCreate();
                 if (e.key === "Escape") setCreating(false);
               }}
-              className={inputClass}
-              // biome-ignore lint/a11y/noAutofocus: intentional — user just opened the create form
               autoFocus
             />
           </Field>
           <Field label="Description (optional)">
-            <textarea
+            <TextField
+              multiline
+              kind="note"
               value={newDesc}
               onChange={(e) => setNewDesc(e.target.value)}
               rows={2}
-              className={`${inputClass} resize-none`}
+              className="resize-none"
             />
           </Field>
           {createError && <p className="text-xs text-red-700">{createError}</p>}

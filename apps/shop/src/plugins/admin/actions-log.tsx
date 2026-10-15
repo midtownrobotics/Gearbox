@@ -1,4 +1,4 @@
-import { ErrorBanner, inputClass } from "@g3/ui";
+import { ErrorBanner, TextField, inputClass } from "@g3/ui";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { fetchActions } from "../../shared/getters";
@@ -135,12 +135,12 @@ export function ActionsLog({ data }: { data: ShopData }) {
     <div className="space-y-3">
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-2">
-        <input
-          type="text"
+        <TextField
+          typeable
           placeholder="Search actions…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className={`${inputClass} flex-1 min-w-40`}
+          className="flex-1 min-w-40"
         />
         <select
           value={userFilter}

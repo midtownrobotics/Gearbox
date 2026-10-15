@@ -1,4 +1,5 @@
 import { teamAppUrl } from "@g3/site-config";
+import { TextField } from "@g3/ui";
 import { forgetTeam, rememberedTeam } from "@g3/ui/my-team";
 import { useEffect, useRef, useState } from "react";
 import { FaArrowRight } from "react-icons/fa";
@@ -44,7 +45,9 @@ export function TeamNumberForm({ autoFocus = false }: { autoFocus?: boolean }) {
         Team number
       </label>
       <div className="flex gap-2">
-        <input
+        <TextField
+          variant="plain"
+          kind="title"
           id="team-number"
           inputMode="numeric"
           pattern="[0-9]*"

@@ -1,4 +1,4 @@
-import { Button, Dialog, ErrorBanner, Field, focusRing, inputClass } from "@g3/ui";
+import { Button, Dialog, ErrorBanner, Field, TextField, focusRing, inputClass } from "@g3/ui";
 import { useEffect, useState } from "react";
 import { getErrorMessage } from "../../shared/api-error";
 import { createArchive, fetchArchiveDefaults, fetchNextMatch } from "../../shared/getters/archives";
@@ -122,8 +122,9 @@ export function ArchiveDialog({
 
       <Field label="Event">
         <div className="relative">
-          <input
-            type="text"
+          <TextField
+            variant="plain"
+            kind="event"
             value={atEvent ? lockedEvent : event}
             onChange={(e) => setEvent(e.target.value)}
             disabled={atEvent || eventKnown === null}
@@ -171,8 +172,9 @@ export function ArchiveDialog({
       </div>
 
       <Field label="Details">
-        <input
-          type="text"
+        <TextField
+          variant="plain"
+          kind="text"
           value={shownDetails}
           onChange={(e) => {
             if (selected === "match") setMatchEdited(true);

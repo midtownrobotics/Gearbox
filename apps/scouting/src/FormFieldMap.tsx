@@ -1,3 +1,4 @@
+import { Button } from "@g3/ui";
 import { ArrowRight, Maximize2, Minimize2, Pencil, RotateCcw, Target, Trash2 } from "lucide-react";
 import {
   type PointerEvent as ReactPointerEvent,
@@ -323,7 +324,8 @@ export function FormFieldMap({
         >
           <RotateCcw size={16} /> <span>Undo</span>
         </button>
-        <button
+        <Button
+          variant="danger"
           type="button"
           className="clear-drawings-button"
           onClick={clear}
@@ -331,7 +333,7 @@ export function FormFieldMap({
           title="Clear"
         >
           <Trash2 size={16} /> <span>Clear</span>
-        </button>
+        </Button>
       </div>
       <div className="canvas-shell has-image">
         <canvas

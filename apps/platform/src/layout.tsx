@@ -19,6 +19,9 @@ export function Header() {
           <a href="/#apps" className="hidden text-secondary-600 hover:text-secondary-900 sm:block">
             Apps
           </a>
+          <a href="/#demo" className="hidden text-secondary-600 hover:text-secondary-900 sm:block">
+            Demo
+          </a>
           <a href="/#how" className="hidden text-secondary-600 hover:text-secondary-900 sm:block">
             Set up
           </a>

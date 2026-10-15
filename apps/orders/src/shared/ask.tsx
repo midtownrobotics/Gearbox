@@ -1,4 +1,4 @@
-import { Button, Dialog, ErrorBanner, Field, inputClass } from "@g3/ui";
+import { Button, Dialog, ErrorBanner, Field, TextField } from "@g3/ui";
 import { type FormEvent, type ReactNode, useState } from "react";
 
 // Questions asked in a pop-up before something happens. A delete button that has room to ask in
@@ -83,21 +83,21 @@ export function AnswerDialog({
         {children && <p className="text-sm text-secondary-600">{children}</p>}
         <Field label={label}>
           {multiline ? (
-            <textarea
-              className={`${inputClass} min-h-20`}
+            <TextField
+              multiline
+              kind="note"
+              className="min-h-20"
               value={answer}
               onChange={(e) => setAnswer(e.target.value)}
               maxLength={1000}
-              // biome-ignore lint/a11y/noAutofocus: the pop-up was just opened to type this
               autoFocus
             />
           ) : (
-            <input
-              className={inputClass}
+            <TextField
+              typeable
               inputMode={inputMode}
               value={answer}
               onChange={(e) => setAnswer(e.target.value)}
-              // biome-ignore lint/a11y/noAutofocus: the pop-up was just opened to type this
               autoFocus
             />
           )}

@@ -1,4 +1,4 @@
-import { Dialog, ErrorBanner } from "@g3/ui";
+import { Dialog, ErrorBanner, TextField } from "@g3/ui";
 import { useEffect, useRef, useState } from "react";
 import { type InstanceRow, matchScannedDrawing, partLabel } from "../../shared/derive";
 
@@ -64,7 +64,9 @@ export function ScanDialog({ queue, all, onFound, onClose }: Props) {
             submit(value);
           }}
         >
-          <input
+          <TextField
+            variant="plain"
+            typeable
             ref={inputRef}
             value={value}
             onChange={(e) => {

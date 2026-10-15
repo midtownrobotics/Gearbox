@@ -1,3 +1,4 @@
+import { TextField } from "@g3/ui";
 import { useState } from "react";
 import { FaCheck } from "react-icons/fa";
 import { useSearchParams } from "react-router-dom";
@@ -83,7 +84,9 @@ export function ReportPage() {
               <form onSubmit={submit} className="space-y-4">
                 <label className="block space-y-1">
                   <span className="text-sm font-medium text-secondary-700">Team number</span>
-                  <input
+                  <TextField
+                    variant="plain"
+                    kind="label"
                     required
                     inputMode="numeric"
                     pattern="[0-9]*"
@@ -94,7 +97,9 @@ export function ReportPage() {
                 </label>
                 <label className="block space-y-1">
                   <span className="text-sm font-medium text-secondary-700">Your email</span>
-                  <input
+                  <TextField
+                    variant="plain"
+                    kind="email"
                     required
                     type="email"
                     value={form.email}
@@ -106,7 +111,9 @@ export function ReportPage() {
                   <span className="text-sm font-medium text-secondary-700">
                     Your name <span className="font-normal text-secondary-500">(optional)</span>
                   </span>
-                  <input
+                  <TextField
+                    variant="plain"
+                    kind="label"
                     maxLength={100}
                     value={form.name}
                     onChange={(e) => set({ name: e.target.value })}
@@ -117,7 +124,10 @@ export function ReportPage() {
                   <span className="text-sm font-medium text-secondary-700">
                     How are you connected to this team?
                   </span>
-                  <textarea
+                  <TextField
+                    multiline
+                    variant="plain"
+                    kind="note"
                     required
                     rows={4}
                     maxLength={2000}

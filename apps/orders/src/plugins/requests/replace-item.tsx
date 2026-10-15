@@ -1,4 +1,4 @@
-import { Button, Dialog, ErrorBanner, inputClass } from "@g3/ui";
+import { Button, Dialog, ErrorBanner, TextField } from "@g3/ui";
 import { type FormEvent, useState } from "react";
 import { api, getErrorMessage } from "../../shared/api";
 import { formatCents, msToDateInput } from "../../shared/format";
@@ -183,8 +183,9 @@ function ReplaceDialog({
               <form onSubmit={fromLink} className="space-y-1">
                 <p className="text-sm font-semibold text-secondary-700">Or paste a link</p>
                 <div className="flex gap-2">
-                  <input
-                    className={`${inputClass} min-w-0 flex-1`}
+                  <TextField
+                    kind="url"
+                    className="min-w-0 flex-1"
                     value={link}
                     onChange={(e) => setLink(e.target.value)}
                     placeholder="https://…"

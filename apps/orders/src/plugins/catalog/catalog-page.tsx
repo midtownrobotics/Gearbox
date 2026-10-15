@@ -1,4 +1,15 @@
-import { Button, Card, ErrorBanner, Loading, Page, SuccessBanner, inputClass } from "@g3/ui";
+import { isDemoPage } from "@g3/site-config";
+import {
+  Button,
+  Card,
+  ErrorBanner,
+  Loading,
+  Page,
+  SuccessBanner,
+  TextField,
+  inputClass,
+  nextSafe,
+} from "@g3/ui";
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { api, getErrorMessage } from "../../shared/api";
@@ -78,7 +89,8 @@ export function CatalogPage() {
 
   // The search box is an omnibox: words search the catalog; a pasted link opens a request for it
   // right away, from its catalog part when the catalog has it (else New Request looks it up).
-  const pasted = query.match(LINKS) ?? [];
+  // Not in the public demo, where nothing typed leaves the page: it offers a sample link instead.
+  const pasted = isDemoPage ? [] : (query.match(LINKS) ?? []);
   const link = pasted.length > 0 && query.replace(LINKS, "").trim() === "";
   // biome-ignore lint/correctness/useExhaustiveDependencies: open once the link and catalog are in
   useEffect(() => {
@@ -222,14 +234,13 @@ export function CatalogPage() {
           />
         )}
         <div className="space-y-3">
-          <input
+          <TextField
             type="search"
-            className={`${inputClass} !text-base`}
+            className="!text-base"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder='Search parts ("1/2 hex bearing", "WCP-0320", "neo") or paste a product link'
             aria-label="Search the catalog, or paste a product link"
-            // biome-ignore lint/a11y/noAutofocus: the page is for searching
             autoFocus
           />
           {link && <p className="text-sm text-secondary-500">Opening a request for that link…</p>}
@@ -273,6 +284,18 @@ export function CatalogPage() {
           >
             Add a part by hand
           </button>
+          {isDemoPage && (
+            <>
+              {" or "}
+              <button
+                type="button"
+                className="underline hover:text-secondary-800"
+                onClick={() => openRequest({ urls: nextSafe("url") })}
+              >
+                try a sample link
+              </button>
+            </>
+          )}
           .
         </p>
 
@@ -580,14 +603,14 @@ function NewCategory({ onDone }: { onDone: (name: string | null) => void }) {
   return (
     <Card title="New category" className="!p-4">
       <form onSubmit={save} className="flex flex-wrap gap-2">
-        <input
-          className={`${inputClass} min-w-0 flex-1`}
+        <TextField
+          kind="category"
+          className="min-w-0 flex-1"
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="e.g. Pneumatics"
           maxLength={100}
           aria-label="Category name"
-          // biome-ignore lint/a11y/noAutofocus: opened by clicking "New category"
           autoFocus
         />
         <Button type="submit" disabled={busy || !name.trim()}>

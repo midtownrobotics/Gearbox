@@ -1,4 +1,4 @@
-import { Button, Card, ErrorBanner, Field, SuccessBanner, inputClass } from "@g3/ui";
+import { Button, Card, ErrorBanner, Field, SuccessBanner, TextField } from "@g3/ui";
 import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api, getErrorMessage } from "../../shared/api";
@@ -247,8 +247,10 @@ export function useRequestComposer({
                 label="Why do we need these?"
                 hint="Optional. Used for every item without its own reason"
               >
-                <textarea
-                  className={`${inputClass} min-h-16`}
+                <TextField
+                  multiline
+                  kind="reason"
+                  className="min-h-16"
                   value={sharedReason}
                   onChange={(e) => setSharedReason(e.target.value)}
                   maxLength={1000}

@@ -29,20 +29,28 @@ export function Page({
   description,
   actions,
   width = "default",
+  className = "",
+  contentClassName = "",
+  as: Container = "main",
   children,
 }: {
   /** The page's name: the same words as its link in the top bar. */
-  title: string;
+  title: ReactNode;
   /** A sentence under the title on what the page is for. */
   description?: ReactNode;
   actions?: ReactNode;
   /** "wide" for a page that is mostly a table or tree; "full" only for a sheet-like table. */
   width?: PageWidth;
+  /** Extra layout hooks for a specialized workspace, such as a fullscreen canvas. */
+  className?: string;
+  contentClassName?: string;
+  /** Embedded workspaces use a section instead of a second main landmark. */
+  as?: "main" | "section";
   children: ReactNode;
 }) {
   return (
-    <main className="flex-1 bg-page">
-      <div className={`${WIDTHS[width]} px-4 sm:px-6 py-6 space-y-5`}>
+    <Container className={`flex-1 bg-page ${className}`}>
+      <div className={`${WIDTHS[width]} px-4 sm:px-6 py-6 space-y-5 ${contentClassName}`}>
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <h1 className="text-4xl text-secondary-900">{title}</h1>
@@ -52,6 +60,6 @@ export function Page({
         </div>
         {children}
       </div>
-    </main>
+    </Container>
   );
 }

@@ -1,4 +1,4 @@
-import { inputClass } from "@g3/ui";
+import { TextField } from "@g3/ui";
 import { useMemo, useState } from "react";
 import { type CatalogPart, packOf, searchCatalog, useCatalog } from "./catalog";
 import { ago, formatCents } from "./format";
@@ -45,9 +45,8 @@ export function CatalogPick({
   }
   return (
     <div className="space-y-2">
-      <input
+      <TextField
         type="search"
-        className={inputClass}
         placeholder="Search the Orders catalog: name, vendor or part number"
         aria-label="Search the Orders catalog"
         value={query}

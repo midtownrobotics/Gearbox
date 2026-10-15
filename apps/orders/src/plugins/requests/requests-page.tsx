@@ -1,4 +1,4 @@
-import { Card, ErrorBanner, Loading, Page, inputClass } from "@g3/ui";
+import { Card, ErrorBanner, Loading, Page, TextField } from "@g3/ui";
 import { type ReactNode, useMemo } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api, getErrorMessage } from "../../shared/api";
@@ -93,9 +93,8 @@ export function RequestsPage() {
   return (
     <Page title="Requests" width="full">
       <div className="space-y-3">
-        <input
+        <TextField
           type="search"
-          className={inputClass}
           placeholder="Search parts, SKUs, vendors, people…"
           value={query}
           onChange={(e) => update({ q: e.target.value })}

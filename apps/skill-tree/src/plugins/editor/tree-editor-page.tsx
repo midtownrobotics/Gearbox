@@ -1,4 +1,13 @@
-import { Button, Card, ConfirmButton, ErrorBanner, Field, Page, inputClass } from "@g3/ui";
+import {
+  Button,
+  Card,
+  ConfirmButton,
+  ErrorBanner,
+  Field,
+  Page,
+  TextField,
+  inputClass,
+} from "@g3/ui";
 import { type FormEvent, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../../shared/api";
@@ -114,16 +123,17 @@ function TreeSettings({ tree, others }: { tree: Tree; others: Tree[] }) {
       <form onSubmit={submit} className="space-y-4">
         <div className="grid gap-4 sm:grid-cols-[5rem_1fr]">
           <Field label="Icon">
-            <input
-              className={`${inputClass} text-center`}
+            <TextField
+              kind="icon"
+              className="text-center"
               maxLength={16}
               value={icon}
               onChange={(e) => setIcon(e.target.value)}
             />
           </Field>
           <Field label="Name">
-            <input
-              className={inputClass}
+            <TextField
+              kind="tree"
               required
               maxLength={60}
               value={name}
@@ -132,8 +142,8 @@ function TreeSettings({ tree, others }: { tree: Tree; others: Tree[] }) {
           </Field>
         </div>
         <Field label="Subtitle">
-          <input
-            className={inputClass}
+          <TextField
+            kind="note"
             maxLength={120}
             value={subtitle}
             onChange={(e) => setSubtitle(e.target.value)}
@@ -192,8 +202,8 @@ function CategoryEditor({ category, others }: { category: Category; others: Cate
     <Card title="Category">
       <form onSubmit={submit} className="space-y-3">
         <Field label="Name">
-          <input
-            className={inputClass}
+          <TextField
+            kind="category"
             required
             maxLength={60}
             value={name}
@@ -270,8 +280,8 @@ function SkillEditor({ skill, others }: { skill: Skill; others: Skill[] }) {
     <li className="py-3">
       <form onSubmit={submit} className="space-y-3 rounded-lg bg-secondary-50 p-4">
         <Field label="Name">
-          <input
-            className={inputClass}
+          <TextField
+            kind="skill"
             required
             maxLength={80}
             value={name}
@@ -279,16 +289,17 @@ function SkillEditor({ skill, others }: { skill: Skill; others: Skill[] }) {
           />
         </Field>
         <Field label="Summary" hint="A few words shown on the skill's box.">
-          <input
-            className={inputClass}
+          <TextField
+            kind="note"
             maxLength={120}
             value={summary}
             onChange={(e) => setSummary(e.target.value)}
           />
         </Field>
         <Field label="Description" hint="What a student must show to have it signed off.">
-          <textarea
-            className={inputClass}
+          <TextField
+            multiline
+            kind="note"
             rows={3}
             maxLength={2000}
             value={description}
@@ -332,8 +343,9 @@ function AddSkill({ category }: { category: Category }) {
 
   return (
     <form onSubmit={submit} className="mt-3 flex flex-wrap items-center gap-2">
-      <input
-        className={`${inputClass} min-w-48 flex-1`}
+      <TextField
+        kind="skill"
+        className="min-w-48 flex-1"
         placeholder="New skill's name"
         aria-label={`New skill in ${category.name}`}
         maxLength={80}
@@ -367,8 +379,9 @@ function AddCategory({ tree }: { tree: Tree }) {
   return (
     <Card title="New category">
       <form onSubmit={submit} className="flex flex-wrap items-center gap-2">
-        <input
-          className={`${inputClass} min-w-48 flex-1`}
+        <TextField
+          kind="category"
+          className="min-w-48 flex-1"
           placeholder="e.g. Hand Tools"
           aria-label="New category's name"
           maxLength={60}

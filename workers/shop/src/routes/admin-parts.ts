@@ -1,8 +1,10 @@
 import { inTeam, logTeamChange, requireAdmin, requireAuth, sendTeamMessage } from "@g3/auth";
+import { isDemoTeam } from "@g3/demo";
 import { eq, inArray, isNull } from "drizzle-orm";
 import { Hono } from "hono";
 import { createShopDb } from "../db";
 import * as schema from "../db/schema";
+import { addDemoRelease } from "../demo";
 import { obsoleteFileIds } from "../lib/batches";
 import {
   formatOverview,
@@ -101,6 +103,12 @@ export const adminPartsRouter = new Hono<AppEnv>()
       releases,
       subsystems,
     });
+  })
+  // The public demo has no Onshape: a sample release stands in for one its webhook would bring.
+  .post("/parts/demo-release", requireAuth, async (c) => {
+    const teamId = c.get("teamId");
+    if (!isDemoTeam(teamId)) return c.json({ error: "Only in the demo." }, 403);
+    return c.json(await addDemoRelease(c.env, teamId));
   })
   .post("/parts/:partNumber/:revision/fetch-drawing", requireAuth, async (c) => {
     const partNumber = c.req.param("partNumber");

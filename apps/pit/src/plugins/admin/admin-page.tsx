@@ -1,4 +1,14 @@
-import { Button, Card, ErrorBanner, Field, Loading, Page, SuccessBanner, inputClass } from "@g3/ui";
+import {
+  Button,
+  Card,
+  ErrorBanner,
+  Field,
+  Loading,
+  Page,
+  type SafeTextKind,
+  SuccessBanner,
+  TextField,
+} from "@g3/ui";
 import { useEffect, useState } from "react";
 import { api } from "../../shared/api";
 import { getErrorMessage } from "../../shared/api-error";
@@ -74,16 +84,21 @@ export function AdminPage() {
   }
 
   /** A setting's text box: typing in one takes the "Saved" away. */
-  const setting = (value: string, onChange: (value: string) => void, placeholder: string) => (
-    <input
-      type="text"
+  const setting = (
+    value: string,
+    onChange: (value: string) => void,
+    placeholder: string,
+    kind: SafeTextKind,
+  ) => (
+    <TextField
+      kind={kind}
       placeholder={placeholder}
       value={value}
       onChange={(e) => {
         onChange(e.target.value);
         setSaved(false);
       }}
-      className={`${inputClass} font-mono`}
+      className="font-mono"
     />
   );
 
@@ -94,10 +109,10 @@ export function AdminPage() {
           Team {teamNumber}. Nexus and TBA event keys can differ, especially in the offseason.
         </p>
         <Field label="TBA Event Key" hint="Year + event code. Used for rankings and matches.">
-          {setting(eventKey, setEventKey, "e.g. 2026gacmp")}
+          {setting(eventKey, setEventKey, "e.g. 2026gacmp", "event")}
         </Field>
         <Field label="Nexus Event Key" hint="Leave blank to turn off Nexus data.">
-          {setting(nexusEventKey, setNexusEventKey, "e.g. 2026gacmp")}
+          {setting(nexusEventKey, setNexusEventKey, "e.g. 2026gacmp", "event")}
         </Field>
       </Card>
 
@@ -107,7 +122,7 @@ export function AdminPage() {
           label="Custom Monitor Feed URL (Optional)"
           hint="A page that allows embedding. Leave blank for none."
         >
-          {setting(iframeUrl, setIframeUrl, "e.g. https://example.com/monitor")}
+          {setting(iframeUrl, setIframeUrl, "e.g. https://example.com/monitor", "url")}
         </Field>
       </Card>
 
