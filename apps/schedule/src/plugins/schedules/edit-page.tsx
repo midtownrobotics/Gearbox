@@ -1,6 +1,7 @@
 import {
   Button,
   Card,
+  Chip,
   ConfirmButton,
   ConfirmQuestion,
   ErrorBanner,
@@ -13,9 +14,10 @@ import {
   inputClass,
 } from "@g3/ui";
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { type Day, type Period, type ScheduleDetail, api, unwrap } from "../../shared/api";
 import { useAuthUser } from "../../shared/auth";
+import { type NameOrder, compareNames } from "../../shared/names";
 import { longDayLabel, slotOptions, spanLabel, timeLabel } from "../../shared/time";
 import { useLoad } from "../../shared/use-load";
 import { TimeZoneSelect } from "./list-page";
@@ -591,6 +593,19 @@ function AttendeesCard({ detail, reload }: CardProps) {
 
   const missing = members.data?.filter((m) => !going.has(m.id)) ?? [];
 
+  // First or last name, kept in the address like the app's other choices.
+  const [params, setParams] = useSearchParams();
+  const order: NameOrder = params.get("sort") === "last" ? "last" : "first";
+  const sortBy = (next: NameOrder) => {
+    const changed = new URLSearchParams(params);
+    if (next === "first") changed.delete("sort");
+    else changed.set("sort", next);
+    setParams(changed, { replace: true });
+  };
+  const sorted = [...(members.data ?? [])].sort((a, b) =>
+    compareNames(a.displayName, b.displayName, order),
+  );
+
   return (
     <Card title={`Attending (${detail.attendees.length})`}>
       <div className="space-y-3">
@@ -608,8 +623,19 @@ function AttendeesCard({ detail, reload }: CardProps) {
             Add everyone
           </Button>
         )}
+        {members.data && members.data.length > 1 && (
+          <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Sort by">
+            <span className="text-sm text-secondary-500">Sort by</span>
+            <Chip selected={order === "first"} onClick={() => sortBy("first")}>
+              First name
+            </Chip>
+            <Chip selected={order === "last"} onClick={() => sortBy("last")}>
+              Last name
+            </Chip>
+          </div>
+        )}
         <ul className="divide-y divide-secondary-100">
-          {members.data?.map((member) => {
+          {sorted.map((member) => {
             const on = going.has(member.id);
             return (
               <li

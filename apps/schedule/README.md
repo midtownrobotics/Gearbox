@@ -19,7 +19,8 @@ for [`workers/schedule`](../../workers/schedule).
   into, kept in their own browser (the left button starts on tool 1, the right on Clear, the middle on nothing). On this page
   the browser's menu opens only on a double right-click. The
   change shows at once and is saved in one call. Hovering or focusing a name shows that person's
-  minutes in each role, on the day and over the event (`person-card.tsx`).
+  minutes in each role, on the day and over the event (`person-card.tsx`); hovering or focusing a
+  column's time shows how many people have each role in that 15 minutes (`slot-card.tsx`).
   The view and the day are in the address.
 - **Edit** (`/schedules/:id/edit`, editors): name, time zone, Slack reminders, Published,
   delete; the days and their hours; the periods; who's attending.
