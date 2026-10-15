@@ -170,13 +170,16 @@ function subscribe(listener: () => void) {
   return () => listeners.delete(listener);
 }
 
-export function useTeamUiSettings(): TeamUiSettings {
+/** The page's team's appearance, kept up to date. `team` false: for a page with no team. */
+export function useTeamUiSettings(team = true): TeamUiSettings {
   const settings = useSyncExternalStore(
     subscribe,
     () => current,
     () => initial,
   );
   useEffect(() => {
+    // The platform's own pages belong to no team: built-in colors, nothing loaded.
+    if (!team) return;
     const refresh = () => {
       if (Date.now() - loadedAt > 60_000) void refreshTeamUiSettings();
       else applySettings();
@@ -190,7 +193,7 @@ export function useTeamUiSettings(): TeamUiSettings {
       document.removeEventListener("visibilitychange", refresh);
       window.removeEventListener("g3-theme-changed", applySettings);
     };
-  }, []);
+  }, [team]);
   return settings;
 }
 

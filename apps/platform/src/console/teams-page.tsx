@@ -1,8 +1,8 @@
-import { TextField } from "@g3/ui";
+import { Card, ErrorBanner, Page, TextField, inputClass } from "@g3/ui";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { type TeamRow, consoleApi, formatDate, read, useLoad } from "./data";
-import { Notice, Panel, StatusBadge, fieldClass } from "./shell";
+import { StatusBadge } from "./shell";
 
 // Every team on the platform, with the reports open against its number.
 
@@ -15,20 +15,21 @@ export function TeamsPage() {
   );
 
   return (
-    <div className="space-y-4">
+    <Page title="Teams" width="wide">
       <div className="flex flex-wrap gap-2">
         <TextField
-          variant="plain"
           kind="label"
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Team number or name"
-          className={`${fieldClass} max-w-xs`}
+          aria-label="Search teams"
+          className="max-w-xs"
         />
         <select
           value={status}
           onChange={(e) => setStatus(e.target.value)}
-          className={`${fieldClass} w-40`}
+          className={`${inputClass} max-w-40`}
+          aria-label="Status"
         >
           <option value="">Every status</option>
           <option value="active">Active</option>
@@ -36,24 +37,24 @@ export function TeamsPage() {
           <option value="suspended">Suspended</option>
         </select>
       </div>
-      {teams.error && <Notice>{teams.error}</Notice>}
-      <Panel>
+      {teams.error && <ErrorBanner message={teams.error} />}
+      <Card>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
-            <thead className="text-secondary-500">
-              <tr>
-                <th className="py-2 pr-4 font-medium">Number</th>
-                <th className="py-2 pr-4 font-medium">Name</th>
-                <th className="py-2 pr-4 font-medium">Status</th>
-                <th className="py-2 pr-4 font-medium">Slack</th>
-                <th className="py-2 pr-4 font-medium">Country</th>
-                <th className="py-2 pr-4 font-medium">Signed up</th>
-                <th className="py-2 font-medium">Open reports</th>
+            <thead>
+              <tr className="border-b border-secondary-200 text-xs font-bold uppercase tracking-wider text-secondary-400">
+                <th className="py-2 pr-4">Number</th>
+                <th className="py-2 pr-4">Name</th>
+                <th className="py-2 pr-4">Status</th>
+                <th className="py-2 pr-4">Slack</th>
+                <th className="py-2 pr-4">Country</th>
+                <th className="py-2 pr-4">Signed up</th>
+                <th className="py-2">Open reports</th>
               </tr>
             </thead>
             <tbody>
               {teams.data?.map((team) => (
-                <tr key={team.id} className="border-t border-line">
+                <tr key={team.id} className="border-t border-line first:border-0">
                   <td className="py-2 pr-4 font-semibold">
                     <Link
                       to={`/console/teams/${team.id}`}
@@ -87,7 +88,7 @@ export function TeamsPage() {
             <p className="py-6 text-center text-sm text-secondary-500">No teams match.</p>
           )}
         </div>
-      </Panel>
-    </div>
+      </Card>
+    </Page>
   );
 }

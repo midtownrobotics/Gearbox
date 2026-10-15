@@ -1,7 +1,6 @@
-import { TextField } from "@g3/ui";
+import { Button, Card, ConfirmButton, ErrorBanner, Page, TextField } from "@g3/ui";
 import { useState } from "react";
 import { type Operator, consoleApi, formatDate, read, send, useLoad } from "./data";
-import { Notice, Panel, buttonClass, fieldClass } from "./shell";
 
 // Who can use the console. Someone who isn't an operator sees their account id when they open it;
 // an operator adds them with it.
@@ -10,8 +9,6 @@ export function OperatorsPage() {
   const operators = useLoad(() => read<Operator[]>(consoleApi.operators.$get()), []);
   const [userId, setUserId] = useState("");
   const [error, setError] = useState<string | null>(null);
-  // The operator whose Remove was clicked, while the row asks.
-  const [removing, setRemoving] = useState<string | null>(null);
 
   async function run(action: () => Promise<unknown>) {
     setError(null);
@@ -24,9 +21,9 @@ export function OperatorsPage() {
   }
 
   return (
-    <div className="space-y-4">
-      {(error ?? operators.error) && <Notice>{error ?? operators.error}</Notice>}
-      <Panel title="Operators">
+    <Page title="Operators">
+      {(error ?? operators.error) && <ErrorBanner message={error ?? operators.error ?? ""} />}
+      <Card>
         <ul className="divide-y divide-line text-sm">
           {operators.data?.map((o) => (
             <li key={o.userId} className="flex flex-wrap items-center gap-x-4 gap-y-1 py-2">
@@ -38,40 +35,23 @@ export function OperatorsPage() {
               <span className="text-secondary-500">
                 {o.teamId?.replace(/^frc/, "Team ")} · since {formatDate(o.createdAt)}
               </span>
-              {!o.isYou && removing !== o.userId && (
-                <button
-                  type="button"
-                  className={`${buttonClass()} ml-auto`}
-                  onClick={() => setRemoving(o.userId)}
-                >
-                  Remove
-                </button>
-              )}
-              {removing === o.userId && (
-                <span className="ml-auto flex flex-wrap items-center gap-2">
-                  <span className="text-secondary-900">
-                    Remove {o.displayName ?? o.userId} as an operator?
-                  </span>
-                  <button
-                    type="button"
-                    className={buttonClass("danger")}
-                    onClick={() => {
-                      setRemoving(null);
-                      run(() => send("DELETE", `/operators/${o.userId}`));
-                    }}
-                  >
-                    Remove
-                  </button>
-                  <button type="button" className={buttonClass()} onClick={() => setRemoving(null)}>
-                    Keep them
-                  </button>
-                </span>
+              {!o.isYou && (
+                <>
+                  {/* Pushes Remove to the end of the row; asking, it takes a line of its own. */}
+                  <span aria-hidden className="ml-auto" />
+                  <ConfirmButton
+                    size="sm"
+                    label="Remove"
+                    question={`Remove ${o.displayName ?? o.userId} as an operator?`}
+                    onConfirm={() => run(() => send("DELETE", `/operators/${o.userId}`))}
+                  />
+                </>
               )}
             </li>
           ))}
         </ul>
-      </Panel>
-      <Panel title="Add an operator">
+      </Card>
+      <Card title="Add an operator">
         <form
           className="flex flex-wrap gap-2"
           onSubmit={(e) => {
@@ -83,19 +63,17 @@ export function OperatorsPage() {
           }}
         >
           <TextField
-            variant="plain"
             kind="label"
             required
             value={userId}
             onChange={(e) => setUserId(e.target.value)}
             placeholder="Their account id (shown to them on this console)"
-            className={`${fieldClass} max-w-md`}
+            aria-label="Account id"
+            className="max-w-md"
           />
-          <button type="submit" className={buttonClass("primary")}>
-            Add
-          </button>
+          <Button type="submit">Add</Button>
         </form>
-      </Panel>
-    </div>
+      </Card>
+    </Page>
   );
 }

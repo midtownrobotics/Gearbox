@@ -3,11 +3,14 @@
   <head>
     <meta charset="UTF-8" />
     <script>
-      // Light/dark from the system setting (the platform's domain has no g3_theme cookie).
+      // Light/dark for every app (the g3_theme cookie on the platform's domain), set before first
+      // paint; the system setting without one. @g3/ui's useTheme keeps it in sync after that.
       (function () {
+        var saved = document.cookie.match(/(?:^|;\s*)g3_theme=(light|dark)/);
         var dark = window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches;
-        document.documentElement.dataset.theme = dark ? "dark" : "light";
-        document.documentElement.style.colorScheme = dark ? "dark" : "light";
+        var theme = saved ? saved[1] : dark ? "dark" : "light";
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.style.colorScheme = theme;
       })();
     </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />

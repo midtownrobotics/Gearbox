@@ -1,6 +1,6 @@
+import { Card, ErrorBanner, Page } from "@g3/ui";
 import { Link } from "react-router-dom";
 import { type Action, consoleApi, formatTime, read, useLoad } from "./data";
-import { Notice, Panel } from "./shell";
 
 // Everything operators have done, and each time one looked at a team's members, newest first.
 // Kept 12 months (the privacy policy's operator access log).
@@ -8,10 +8,10 @@ import { Notice, Panel } from "./shell";
 export function LogPage() {
   const actions = useLoad(() => read<Action[]>(consoleApi.actions.$get({ query: {} })), []);
   return (
-    <div className="space-y-4">
-      {actions.error && <Notice>{actions.error}</Notice>}
-      <Panel>{actions.data && <ActionList actions={actions.data} showTeam />}</Panel>
-    </div>
+    <Page title="Log">
+      {actions.error && <ErrorBanner message={actions.error} />}
+      <Card>{actions.data && <ActionList actions={actions.data} showTeam />}</Card>
+    </Page>
   );
 }
 
