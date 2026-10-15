@@ -55,6 +55,36 @@ export async function sendTeamDM(
 }
 
 /**
+ * Sends a Slack direct message from the team's own bot to members by their G3ID ids, for an app
+ * that knows who but not their Slack account. Only active members with Slack linked get it.
+ * Returns how many were sent (0 when the team has no Slack, or G3ID couldn't be reached); it never
+ * throws, so callers can fire and forget.
+ */
+export async function sendMemberDM(
+  env: { G3ID: Fetcher },
+  teamId: string,
+  userIds: string[],
+  text: string,
+): Promise<number> {
+  try {
+    const res = await env.G3ID.fetch(
+      new Request(`http://g3id/api/internal/teams/${encodeURIComponent(teamId)}/slack/dm-members`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userIds, text }),
+      }),
+    );
+    if (res.ok) return ((await res.json()) as { sent?: number }).sent ?? 0;
+    if (res.status !== 404) {
+      console.error("[slack] member DM failed", res.status, await res.text().catch(() => ""));
+    }
+  } catch (err) {
+    console.error("[slack] member DM failed", err);
+  }
+  return 0;
+}
+
+/**
  * Posts to one of the team's Slack channels from its own bot. Never throws: gives back why it
  * wasn't posted (the team has no Slack, or Slack's refusal, like "not_in_channel").
  */

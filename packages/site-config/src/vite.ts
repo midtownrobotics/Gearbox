@@ -15,6 +15,7 @@ const DEV_WORKERS: Partial<Record<AppName | "platform", string>> = {
   skillTree: "skill-tree",
   attendance: "attendance",
   inventory: "inventory",
+  schedule: "schedule",
 };
 
 /**

@@ -19,6 +19,7 @@
     ["@g3/skill-tree", "@g3/worker-skill-tree"],
     ["@g3/attendance", "@g3/worker-attendance"],
     ["@g3/inventory", "@g3/worker-inventory"],
+    ["@g3/schedule", "@g3/worker-schedule"],
     ["@g3/portal", "@g3/worker-portal"],
     ["@g3/platform", "@g3/worker-platform"]
   ],
