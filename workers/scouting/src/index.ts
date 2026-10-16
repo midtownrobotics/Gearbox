@@ -5,6 +5,7 @@ import { sql } from "drizzle-orm";
 import { type Context, Hono } from "hono";
 import { cors } from "hono/cors";
 import packageJson from "../package.json";
+import { teamApiKey } from "./api-keys";
 import { all, batch, dbOf, first } from "./db";
 import { adoptLegacyRows, seedTeam } from "./db/bootstrap";
 import {
@@ -238,7 +239,7 @@ async function getTbaAuthKey(c: Context<AppEnv>) {
     dbOf(c),
     sql`SELECT tba_auth_key FROM (SELECT * FROM ${strategyEventConfig} WHERE ${inTeam(strategyEventConfig, c.get("teamId"))}) AS scoped_strategy_event_config WHERE id = 1`,
   );
-  return config?.tba_auth_key || c.env.TBA_AUTH_KEY || "";
+  return teamApiKey(c.get("teamId"), config?.tba_auth_key, c.env.TBA_AUTH_KEY);
 }
 
 async function validateTbaConfiguration(eventKey: string, authKey: string) {
@@ -519,10 +520,14 @@ app.get("/event-context", requireAuth, async (c) => {
     eventSchedule: admin ? matches.map(publicMatch) : [],
     onlineAdmins: onlineAdmins?.results ?? [],
     scheduleError: admin ? scheduleError : "",
-    hasTbaAuthKey: admin ? Boolean(config?.tba_auth_key || c.env.TBA_AUTH_KEY) : false,
+    hasTbaAuthKey: admin
+      ? Boolean(teamApiKey(c.get("teamId"), config?.tba_auth_key, c.env.TBA_AUTH_KEY))
+      : false,
     tbaAuthKey: "",
     nexusEventKey: admin ? config?.nexus_event_key || eventKey : "",
-    hasNexusApiKey: admin ? Boolean(config?.nexus_api_key || c.env.NEXUS_API_KEY) : false,
+    hasNexusApiKey: admin
+      ? Boolean(teamApiKey(c.get("teamId"), config?.nexus_api_key, c.env.NEXUS_API_KEY))
+      : false,
     nexusApiKey: "",
     scheduleMode: admin ? config?.schedule_mode || "tba" : config?.schedule_mode || "tba",
     manualEvent:
@@ -586,7 +591,7 @@ app.put("/event-context", requireAuth, async (c) => {
     try {
       await validateTbaConfiguration(
         eventKey,
-        tbaAuthKey || activeConfig?.tba_auth_key || c.env.TBA_AUTH_KEY || "",
+        teamApiKey(c.get("teamId"), tbaAuthKey || activeConfig?.tba_auth_key, c.env.TBA_AUTH_KEY),
       );
     } catch (error) {
       return c.json(

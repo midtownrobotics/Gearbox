@@ -8,6 +8,6 @@ Validated locally on 16 October 2026.
 - Manual schedules continue using the lead's selected match, and hide the automatic-delay field. Switching modes preserves the setting.
 - Migration `0034_auto_advance_delay.sql` preserves existing configuration and gives existing and new rows a two-minute default. Apply it before deploying the worker.
 
-All 50 worker tests pass. Eight match-advance tests cover exact timing boundaries, longer and zero delays, unfinished matches, timing fallbacks, saved values and team isolation, permission and invalid-input rejection, report linkage, manual schedules and the manifest-backed API. The populated migration test verifies preserved rows, the new default and database constraints.
+All 53 worker tests pass. Eight match-advance tests cover exact timing boundaries, longer and zero delays, unfinished matches, timing fallbacks, saved values and team isolation, permission and invalid-input rejection, report linkage, manual schedules and the manifest-backed API. The populated migration test verifies preserved rows, the new default and database constraints.
 
 Browser checks at 320, 390 and 768px in both themes verify the two-minute default, validation, save confirmation, reloading a saved value and hiding the field in manual mode. Six captures show no horizontal overflow or browser exceptions. Browser API responses are fixtures; worker storage and cache tests use the real local runtime. Physical devices and production deployment were not part of validation.

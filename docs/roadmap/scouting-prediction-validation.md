@@ -14,7 +14,7 @@ Validated locally on 16 October 2026. Direct public Statbotics requests for GRIT
 
 ## Validation
 
-- All 50 worker tests and the populated migration check pass. Nine new tests cover concurrent requests, successful and failed caches, fresh recovery, a stalled upstream, malformed data, fast local summaries, named 500 errors, cached missing-event errors, and rejected single/combined picks during an outage.
+- All 53 worker tests and the populated migration check pass. Nine new tests cover concurrent requests, successful and failed caches, fresh recovery, a stalled upstream, malformed data, fast local summaries, named 500 errors, cached missing-event errors, and rejected single/combined picks during an outage.
 - Frontend and worker type checks, frontend production build, worker production dry-run bundle, Biome, text-field lint, tenancy lint and whitespace checks pass.
 - Browser workflows at 320, 390 and 768px in both themes verify local data before the held prediction response; coalesced focus loads; named GRITS server and missing-event errors; usable standings/history after 500; disabled stale selections and submissions while refreshing; cleared picks on failure; transport-error recovery; points-only mode; and no-event mode. Thirty captures have no viewport overflow or browser exceptions.
 - Additional browser checks cover a failed initial local-data request and recovery, plus a six-second client timeout while preserving local data.

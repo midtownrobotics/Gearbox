@@ -104,6 +104,7 @@ The apps are being brought into one design language. The plan of record is `docs
 
 ### Optional Scouting engagement
 
+- Scouting credentials use `teamApiKey` (`workers/scouting/src/api-keys.ts`): saved keys belong to their authenticated team; legacy deployment keys are available only to the original site team. Never return the keys in browser responses or exports.
 - Scouting points and match predictions are off by default. Identity admins configure them on Scouting's Admin page; Strategy leads and kiosk PIN sessions cannot change these controls.
 - `workers/scouting/src/engagement.ts` reads team-keyed D1 settings. `/scouting/me` includes the settings; `/scouting/engagement-settings` reads them and accepts admin-only PUT updates. Predictions, combined picks and team standings have separate switches, and the points label defaults to "Scout Points".
 - The master switch gates `/game`, point awards on scouting submissions, and scheduled prediction result processing. Disabling predictions alone also pauses result processing. Existing balances and picks are preserved; existing combined picks still resolve when predictions resume even if new combinations are disabled.
