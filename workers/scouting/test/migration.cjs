@@ -86,4 +86,24 @@ for (const table of order) {
 }
 db.exec("COMMIT");
 assert.deepEqual(db.prepare("PRAGMA foreign_key_check").all(), []);
+const beforeDelay = db
+  .prepare("SELECT * FROM strategy_event_config")
+  .all()
+  .map((row) => ({ ...row }));
+db.exec(fs.readFileSync(`${md}/0034_auto_advance_delay.sql`, "utf8"));
+const afterDelay = db.prepare("SELECT * FROM strategy_event_config").all();
+assert.deepEqual(
+  afterDelay.map(({ auto_advance_delay_minutes, ...row }) => {
+    assert.equal(auto_advance_delay_minutes, 2);
+    return row;
+  }),
+  beforeDelay,
+);
+for (const value of [-1, 31, 1.5])
+  assert.throws(() =>
+    db.prepare("UPDATE strategy_event_config SET auto_advance_delay_minutes = ?").run(value),
+  );
+console.log(
+  "Auto-advance migration preserves event configuration, defaults existing teams to two minutes and rejects invalid delays.",
+);
 db.close();

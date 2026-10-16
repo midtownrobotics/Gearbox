@@ -424,6 +424,7 @@ export const strategyEventConfig = sqliteTable(
     id: integer("id").notNull(),
     event_key: text("event_key").notNull().default(""),
     current_match_number: integer("current_match_number"),
+    auto_advance_delay_minutes: integer("auto_advance_delay_minutes").notNull().default(2),
     updated_by: text("updated_by").notNull(),
     updated_at: integer("updated_at").notNull(),
     tba_auth_key: text("tba_auth_key"),

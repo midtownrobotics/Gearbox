@@ -904,6 +904,7 @@ type EventMatch = {
 };
 type EventContext = {
   eventKey: string;
+  autoAdvanceDelayMinutes: number;
   currentMatchNumber: number | null;
   currentMatch: EventMatch | null;
   tbaCurrentMatch: EventMatch | null;
@@ -1462,6 +1463,7 @@ function EventStatus({
   const [context, setContext] = useState<EventContext | null>(null);
   const [eventKey, setEventKey] = useState("");
   const [matchNumber, setMatchNumber] = useState("");
+  const [autoAdvanceDelayMinutes, setAutoAdvanceDelayMinutes] = useState("2");
   const [tbaAuthKey, setTbaAuthKey] = useState("");
   const [nexusEventKey, setNexusEventKey] = useState("");
   const [nexusApiKey, setNexusApiKey] = useState("");
@@ -1475,6 +1477,7 @@ function EventStatus({
     if (!editingRef.current) {
       setEventKey(result.eventKey);
       setMatchNumber(result.currentMatchNumber?.toString() ?? "");
+      setAutoAdvanceDelayMinutes(String(result.autoAdvanceDelayMinutes ?? 2));
       setNexusEventKey(result.nexusEventKey || result.eventKey);
     }
   }, []);
@@ -1495,6 +1498,7 @@ function EventStatus({
       body: JSON.stringify({
         eventKey,
         currentMatchNumber,
+        autoAdvanceDelayMinutes: Number(autoAdvanceDelayMinutes),
         tbaAuthKey,
         nexusEventKey,
         nexusApiKey,
@@ -1587,6 +1591,22 @@ function EventStatus({
                   onChange={(event) => setEventKey(event.target.value)}
                   placeholder="e.g. 2026gacmp"
                 />
+              </label>
+            )}
+            {context?.scheduleMode !== "manual" && (
+              <label>
+                <strong>Auto-advance delay (minutes)</strong>
+                <input
+                  className={inputClass}
+                  type="number"
+                  min={0}
+                  max={30}
+                  step={1}
+                  required
+                  value={autoAdvanceDelayMinutes}
+                  onChange={(event) => setAutoAdvanceDelayMinutes(event.target.value)}
+                />
+                <span>Wait after a match finishes. 0 advances immediately.</span>
               </label>
             )}
             {context?.scheduleMode !== "manual" && isG3IdAdmin && (

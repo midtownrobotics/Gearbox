@@ -33,6 +33,12 @@ import { getEngagementSettings } from "./engagement";
 import { engagementRoutes } from "./engagement-routes";
 import { internalRoutes } from "./internal";
 import { getManualMatches, manualRoutes, purgeExpiredManualEvents } from "./manual";
+import {
+  DEFAULT_AUTO_ADVANCE_DELAY_MINUTES,
+  automaticTbaMatch,
+  matchOrder,
+  parseAutoAdvanceDelay,
+} from "./match-advance";
 import { requireAuth } from "./middleware/auth";
 import { predictionsRoutes, settleConfiguredGame } from "./predictions";
 import { getG3IdUsers, isServiceHelper, isStrategyAdmin } from "./roles";
@@ -130,11 +136,6 @@ app.get("/me", requireAuth, async (c) =>
   }),
 );
 
-function matchOrder(match: TbaMatch) {
-  const level = { qm: 0, ef: 1, qf: 2, sf: 3, f: 4 }[match.comp_level] ?? 5;
-  return level * 100_000 + match.set_number * 1_000 + match.match_number;
-}
-
 function matchLabel(match: TbaMatch) {
   if (match.comp_level === "qm") return `Qualification ${match.match_number}`;
   const level = { ef: "Eighthfinal", qf: "Quarterfinal", sf: "Semifinal", f: "Final" }[
@@ -157,26 +158,6 @@ function publicMatch(match: TbaMatch) {
     redTeams,
     blueTeams,
   };
-}
-
-function automaticTbaMatch(matches: TbaMatch[], now = Math.floor(Date.now() / 1000)) {
-  const qualifications = matches
-    .filter((match) => match.comp_level === "qm")
-    .sort((left, right) => matchOrder(left) - matchOrder(right));
-  const ordered = qualifications.length
-    ? qualifications
-    : [...matches].sort((left, right) => matchOrder(left) - matchOrder(right));
-  if (!ordered.length) return undefined;
-  for (let index = 0; index < ordered.length - 1; index += 1) {
-    const match = ordered[index];
-    const hasResult = match.alliances.red.score >= 0 && match.alliances.blue.score >= 0;
-    const endedAt =
-      match.post_result_time ??
-      (match.actual_time ? match.actual_time + 150 : null) ??
-      (hasResult ? (match.predicted_time ?? match.time ?? 0) + 150 : null);
-    if (!endedAt || now < endedAt + 60) return match;
-  }
-  return ordered.at(-1);
 }
 
 async function persistAutomaticMatch(
@@ -394,11 +375,12 @@ async function resolveEventLink(c: Context<AppEnv>) {
   const config = await first<{
     event_key: string;
     current_match_number: number | null;
+    auto_advance_delay_minutes: number;
     tba_auth_key: string | null;
     schedule_mode: string;
   }>(
     dbOf(c),
-    sql`SELECT event_key, current_match_number, tba_auth_key, schedule_mode FROM (SELECT * FROM ${strategyEventConfig} WHERE ${inTeam(strategyEventConfig, c.get("teamId"))}) AS scoped_strategy_event_config WHERE id = 1`,
+    sql`SELECT event_key, current_match_number, auto_advance_delay_minutes, tba_auth_key, schedule_mode FROM (SELECT * FROM ${strategyEventConfig} WHERE ${inTeam(strategyEventConfig, c.get("teamId"))}) AS scoped_strategy_event_config WHERE id = 1`,
   );
   if (!config?.event_key) return { eventKey: null, matchKey: null, matchNumber: null };
   let current: TbaMatch | undefined;
@@ -412,7 +394,7 @@ async function resolveEventLink(c: Context<AppEnv>) {
             (match) =>
               match.comp_level === "qm" && match.match_number === config.current_match_number,
           )
-        : automaticTbaMatch(matches);
+        : automaticTbaMatch(matches, config?.auto_advance_delay_minutes);
     if (config.schedule_mode !== "manual")
       await persistAutomaticMatch(c, config.current_match_number, current);
   } catch {
@@ -431,13 +413,14 @@ app.get("/event-context", requireAuth, async (c) => {
   const config = await first<{
     event_key: string;
     current_match_number: number | null;
+    auto_advance_delay_minutes: number;
     tba_auth_key: string | null;
     nexus_event_key: string | null;
     nexus_api_key: string | null;
     schedule_mode: string;
   }>(
     dbOf(c),
-    sql`SELECT event_key, current_match_number, tba_auth_key, nexus_event_key, nexus_api_key, schedule_mode FROM (SELECT * FROM ${strategyEventConfig} WHERE ${inTeam(strategyEventConfig, c.get("teamId"))}) AS scoped_strategy_event_config WHERE id = 1`,
+    sql`SELECT event_key, current_match_number, auto_advance_delay_minutes, tba_auth_key, nexus_event_key, nexus_api_key, schedule_mode FROM (SELECT * FROM ${strategyEventConfig} WHERE ${inTeam(strategyEventConfig, c.get("teamId"))}) AS scoped_strategy_event_config WHERE id = 1`,
   );
   const eventKey = config?.event_key ?? "";
   let matches: TbaMatch[] = [];
@@ -456,7 +439,10 @@ app.get("/event-context", requireAuth, async (c) => {
         (match) => match.comp_level === "qm" && match.match_number === config.current_match_number,
       )
     : undefined;
-  const tbaCurrent = config?.schedule_mode === "manual" ? undefined : automaticTbaMatch(matches);
+  const tbaCurrent =
+    config?.schedule_mode === "manual"
+      ? undefined
+      : automaticTbaMatch(matches, config?.auto_advance_delay_minutes);
   const current =
     (config?.schedule_mode === "manual" ? configuredCurrent : tbaCurrent) ??
     configuredCurrent ??
@@ -519,6 +505,8 @@ app.get("/event-context", requireAuth, async (c) => {
       : null;
   return c.json({
     eventKey: admin ? eventKey : "",
+    autoAdvanceDelayMinutes:
+      config?.auto_advance_delay_minutes ?? DEFAULT_AUTO_ADVANCE_DELAY_MINUTES,
     currentMatchNumber: admin ? currentMatchNumber : null,
     currentMatch: current ? publicMatch(current) : null,
     tbaCurrentMatch: tbaCurrent ? publicMatch(tbaCurrent) : null,
@@ -563,12 +551,22 @@ app.put("/event-context", requireAuth, async (c) => {
   const body = await c.req.json<Record<string, unknown>>();
   const activeConfig = await first<{
     event_key: string;
+    auto_advance_delay_minutes: number;
     tba_auth_key: string | null;
     schedule_mode: string;
   }>(
     dbOf(c),
-    sql`SELECT event_key, tba_auth_key, schedule_mode FROM (SELECT * FROM ${strategyEventConfig} WHERE ${inTeam(strategyEventConfig, c.get("teamId"))}) AS scoped_strategy_event_config WHERE id = 1`,
+    sql`SELECT event_key, auto_advance_delay_minutes, tba_auth_key, schedule_mode FROM (SELECT * FROM ${strategyEventConfig} WHERE ${inTeam(strategyEventConfig, c.get("teamId"))}) AS scoped_strategy_event_config WHERE id = 1`,
   );
+  const autoAdvanceDelayMinutes =
+    body.autoAdvanceDelayMinutes === undefined
+      ? (activeConfig?.auto_advance_delay_minutes ?? DEFAULT_AUTO_ADVANCE_DELAY_MINUTES)
+      : parseAutoAdvanceDelay(body.autoAdvanceDelayMinutes);
+  if (autoAdvanceDelayMinutes === null)
+    return c.json(
+      { error: "Auto-advance delay must be a whole number from 0 to 30 minutes." },
+      400,
+    );
   const eventKey =
     activeConfig?.schedule_mode === "manual"
       ? activeConfig.event_key
@@ -614,6 +612,7 @@ app.put("/event-context", requireAuth, async (c) => {
         id: 1,
         event_key: eventKey,
         current_match_number: currentMatchNumber,
+        auto_advance_delay_minutes: autoAdvanceDelayMinutes,
         tba_auth_key: sql`NULLIF(${tbaAuthKey}, '')`,
         nexus_event_key: nexusEventKey,
         nexus_api_key: sql`NULLIF(${nexusApiKey}, '')`,
@@ -626,6 +625,7 @@ app.put("/event-context", requireAuth, async (c) => {
       set: {
         event_key: sql`excluded.event_key`,
         current_match_number: sql`excluded.current_match_number`,
+        auto_advance_delay_minutes: sql`excluded.auto_advance_delay_minutes`,
         tba_auth_key: sql`CASE WHEN excluded.tba_auth_key IS NULL THEN ${strategyEventConfig.tba_auth_key} ELSE excluded.tba_auth_key END`,
         nexus_event_key: sql`excluded.nexus_event_key`,
         nexus_api_key: sql`CASE WHEN excluded.nexus_api_key IS NULL THEN ${strategyEventConfig.nexus_api_key} ELSE excluded.nexus_api_key END`,

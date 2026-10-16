@@ -13,6 +13,17 @@ export const manifest = defineManifest({
   hooks: { seed: true, delete: true, export: true, demo: true },
   settings: [
     {
+      key: "autoAdvanceDelayMinutes",
+      label: "Auto-advance delay",
+      type: "number",
+      default: 2,
+      min: 0,
+      max: 30,
+      help: "Minutes after a match finishes. 0 advances immediately.",
+      editedBy: "admin",
+      page: "/admin",
+    },
+    {
       key: "pointsLabel",
       label: "Points name",
       type: "text",
