@@ -54,6 +54,7 @@ As of 10 October 2026, five of the six Phase 0 steps are done on `main`, Phase 1
 
 | Change | Roadmap step | Pull request |
 | --- | --- | --- |
+| Scouting combines the Competition overview and zero-rating fixes with report filters, prediction reliability and isolated credentials. One seconds-based advance delay defaults to 120 seconds and preserves saved values. See [combined validation](scouting-merged-validation.md) | Phase 3: Scouting integration | This PR |
 | Scouting reserves legacy deployment API keys for their original team. Other teams use their own saved credentials; configuration status and event validation enforce the same rule. See [credential isolation](scouting-api-key-isolation.md) | Phase 3: Scouting credentials | This PR |
 | Scouting automatically advances two minutes after a match finishes by default. Teams customize the delay in Admin; assignments and report links use the same TBA-based selection, independently of predictions. [Validation](scouting-match-advance-validation.md) covers timing, permissions and saved settings | Phase 3: Scouting match timing | This PR |
 | Scouting's prediction page loads local points and history independently of Statbotics. Requests have bounded waits, shared public match caching and short failure caching; live single/combined pick validation remains mandatory. Errors name the active event and distinguish missing events from server failures. [Validation](scouting-prediction-validation.md) covers outages, timeouts and preserved balances | Phase 3: Scouting prediction reliability | This PR |

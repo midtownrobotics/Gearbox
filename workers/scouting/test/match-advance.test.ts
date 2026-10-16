@@ -33,9 +33,9 @@ function matches(endedAt: number): TbaMatch[] {
 }
 type EventContext = {
   currentMatch: { matchNumber: number } | null;
-  autoAdvanceDelayMinutes: number;
+  submissionWindowSeconds: number | null;
 };
-type Settings = { values: { autoAdvanceDelayMinutes: number } };
+type Settings = { values: { submissionWindowSeconds: number } };
 
 async function eventTeam() {
   const team = teamUsers(newTeamId());
@@ -67,43 +67,45 @@ describe("automatic match advancing", () => {
 
   it("honors longer delays and zero without advancing an unfinished match", () => {
     const schedule = matches(now);
-    expect(automaticTbaMatch(schedule, 5, now + 299)?.match_number).toBe(1);
-    expect(automaticTbaMatch(schedule, 5, now + 300)?.match_number).toBe(2);
+    expect(automaticTbaMatch(schedule, 37, now + 36)?.match_number).toBe(1);
+    expect(automaticTbaMatch(schedule, 37, now + 37)?.match_number).toBe(2);
+    expect(automaticTbaMatch(schedule, 300, now + 299)?.match_number).toBe(1);
+    expect(automaticTbaMatch(schedule, 300, now + 300)?.match_number).toBe(2);
     expect(automaticTbaMatch(schedule, 0, now)?.match_number).toBe(2);
     schedule[0].post_result_time = null;
     schedule[0].actual_time = null;
     schedule[0].alliances.red.score = -1;
     schedule[0].alliances.blue.score = -1;
     expect(automaticTbaMatch(schedule, 0, now + 10000)?.match_number).toBe(1);
-    expect(automaticTbaMatch([], 2, now)).toBeUndefined();
+    expect(automaticTbaMatch([], 120, now)).toBeUndefined();
   });
 
   it("uses actual match duration or scored schedule timing when result time is absent", () => {
     const schedule = matches(now);
     schedule[0].post_result_time = null;
-    expect(automaticTbaMatch(schedule, 2, now + 119)?.match_number).toBe(1);
-    expect(automaticTbaMatch(schedule, 2, now + 120)?.match_number).toBe(2);
+    expect(automaticTbaMatch(schedule, 120, now + 119)?.match_number).toBe(1);
+    expect(automaticTbaMatch(schedule, 120, now + 120)?.match_number).toBe(2);
     schedule[0].actual_time = null;
-    expect(automaticTbaMatch(schedule, 2, now + 120)?.match_number).toBe(2);
+    expect(automaticTbaMatch(schedule, 120, now + 120)?.match_number).toBe(2);
   });
 
   it("persists the Admin setting per team and applies it to automatic match selection", async () => {
     const a = await eventTeam();
     const b = await eventTeam();
     expect(await jsonAs<EventContext>(a.admin, "/scouting/event-context")).toMatchObject({
-      autoAdvanceDelayMinutes: 2,
+      submissionWindowSeconds: 120,
       currentMatch: { matchNumber: 1 },
     });
     await jsonAs(a.admin, "/scouting/event-context", {
       method: "PUT",
-      body: { eventKey: a.eventKey, currentMatchNumber: 1, autoAdvanceDelayMinutes: 1 },
+      body: { eventKey: a.eventKey, currentMatchNumber: 1, submissionWindowSeconds: 60 },
     });
     expect(await jsonAs<EventContext>(a.student, "/scouting/event-context")).toMatchObject({
-      autoAdvanceDelayMinutes: 1,
+      submissionWindowSeconds: null,
       currentMatch: { matchNumber: 2 },
     });
     expect(await jsonAs<EventContext>(b.admin, "/scouting/event-context")).toMatchObject({
-      autoAdvanceDelayMinutes: 2,
+      submissionWindowSeconds: 120,
       currentMatch: { matchNumber: 1 },
     });
     await jsonAs(a.admin, "/scouting/event-context", {
@@ -111,29 +113,29 @@ describe("automatic match advancing", () => {
       body: { eventKey: a.eventKey, currentMatchNumber: 2 },
     });
     expect(
-      (await jsonAs<EventContext>(a.admin, "/scouting/event-context")).autoAdvanceDelayMinutes,
-    ).toBe(1);
+      (await jsonAs<EventContext>(a.admin, "/scouting/event-context")).submissionWindowSeconds,
+    ).toBe(60);
   });
 
   it("rejects invalid delays and unauthorized changes", async () => {
     const team = await eventTeam();
-    const body = { eventKey: team.eventKey, currentMatchNumber: 1, autoAdvanceDelayMinutes: 3 };
+    const body = { eventKey: team.eventKey, currentMatchNumber: 1, submissionWindowSeconds: 180 };
     for (const user of [team.student, team.kioskAdmin])
       expect((await callAs(user, "/scouting/event-context", { method: "PUT", body })).status).toBe(
         403,
       );
-    for (const value of [-1, 31, 1.5, "", null, true, "invalid"])
+    for (const value of [-1, 1801, 1.5, null, true, "invalid"])
       expect(
         (
           await callAs(team.admin, "/scouting/event-context", {
             method: "PUT",
-            body: { ...body, autoAdvanceDelayMinutes: value },
+            body: { ...body, submissionWindowSeconds: value },
           })
         ).status,
       ).toBe(400);
     expect(
-      (await jsonAs<EventContext>(team.admin, "/scouting/event-context")).autoAdvanceDelayMinutes,
-    ).toBe(2);
+      (await jsonAs<EventContext>(team.admin, "/scouting/event-context")).submissionWindowSeconds,
+    ).toBe(120);
     await db.insert(strategyAdmins).values(
       withTeam(team.teamId, {
         user_id: team.student.id,
@@ -152,7 +154,7 @@ describe("automatic match advancing", () => {
     const team = await eventTeam();
     await jsonAs(team.admin, "/scouting/event-context", {
       method: "PUT",
-      body: { eventKey: team.eventKey, currentMatchNumber: 1, autoAdvanceDelayMinutes: 5 },
+      body: { eventKey: team.eventKey, currentMatchNumber: 1, submissionWindowSeconds: 300 },
     });
     const { id } = await jsonAs<{ id: string }>(
       team.admin,
@@ -190,7 +192,7 @@ describe("automatic match advancing", () => {
     const team = await eventTeam();
     await jsonAs(team.admin, "/scouting/event-context", {
       method: "PUT",
-      body: { eventKey: team.eventKey, currentMatchNumber: 1, autoAdvanceDelayMinutes: 0 },
+      body: { eventKey: team.eventKey, currentMatchNumber: 1, submissionWindowSeconds: 0 },
     });
     await jsonAs(team.admin, "/scouting/manual-mode", {
       method: "POST",
@@ -212,29 +214,49 @@ describe("automatic match advancing", () => {
     });
     expect(await jsonAs<EventContext>(team.admin, "/scouting/event-context")).toMatchObject({
       currentMatch: { matchNumber: 1 },
-      autoAdvanceDelayMinutes: 0,
+      submissionWindowSeconds: 0,
     });
   });
 
   it("exposes the same setting through the manifest-backed settings API", async () => {
     const team = await eventTeam();
     expect(
-      (await jsonAs<Settings>(team.admin, "/team-settings")).values.autoAdvanceDelayMinutes,
-    ).toBe(2);
+      (await jsonAs<Settings>(team.admin, "/team-settings")).values.submissionWindowSeconds,
+    ).toBe(120);
     await jsonAs(team.admin, "/team-settings", {
       method: "PUT",
-      body: { values: { autoAdvanceDelayMinutes: 5 } },
+      body: { values: { submissionWindowSeconds: 300 } },
     });
     expect(
-      (await jsonAs<EventContext>(team.admin, "/scouting/event-context")).autoAdvanceDelayMinutes,
-    ).toBe(5);
+      (await jsonAs<EventContext>(team.admin, "/scouting/event-context")).submissionWindowSeconds,
+    ).toBe(300);
     expect(
       (
         await callAs(team.admin, "/team-settings", {
           method: "PUT",
-          body: { values: { autoAdvanceDelayMinutes: 1.5 } },
+          body: { values: { submissionWindowSeconds: 1.5 } },
         })
       ).status,
     ).toBe(400);
+  });
+
+  it("supports a previously loaded minutes editor and preserves precise second values", async () => {
+    const team = await eventTeam();
+    await jsonAs(team.admin, "/scouting/event-context", {
+      method: "PUT",
+      body: { eventKey: team.eventKey, autoAdvanceDelayMinutes: 5 },
+    });
+    expect(await jsonAs(team.admin, "/scouting/event-context")).toMatchObject({
+      submissionWindowSeconds: 300,
+      autoAdvanceDelayMinutes: 5,
+    });
+    await jsonAs(team.admin, "/scouting/event-context", {
+      method: "PUT",
+      body: { eventKey: team.eventKey, submissionWindowSeconds: 75 },
+    });
+    expect(await jsonAs(team.admin, "/scouting/event-context")).toMatchObject({
+      submissionWindowSeconds: 75,
+      autoAdvanceDelayMinutes: 1.25,
+    });
   });
 });

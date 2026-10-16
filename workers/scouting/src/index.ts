@@ -35,10 +35,12 @@ import { engagementRoutes } from "./engagement-routes";
 import { internalRoutes } from "./internal";
 import { getManualMatches, manualRoutes, purgeExpiredManualEvents } from "./manual";
 import {
-  DEFAULT_AUTO_ADVANCE_DELAY_MINUTES,
+  DEFAULT_SUBMISSION_WINDOW,
+  MAX_SUBMISSION_WINDOW,
+  MIN_SUBMISSION_WINDOW,
   automaticTbaMatch,
   matchOrder,
-  parseAutoAdvanceDelay,
+  submissionWindow,
 } from "./match-advance";
 import { requireAuth } from "./middleware/auth";
 import { predictionsRoutes, settleConfiguredGame } from "./predictions";
@@ -80,13 +82,9 @@ app.use(
   }),
 );
 
-function nonZeroEntry(value: unknown) {
-  if (typeof value === "number") return Number.isFinite(value) && value !== 0;
-  if (typeof value === "boolean") return value;
-  if (typeof value === "string") return value.trim() !== "" && Number(value.trim()) !== 0;
-  if (Array.isArray(value)) return value.length > 0 && value.every(nonZeroEntry);
-  return false;
-}
+/** What a scout is told when a field on a match form has no answer yet. */
+const needsAnswer = (label: string) =>
+  `${label} needs an answer before this form can be submitted.`;
 
 /**
  * A counter's answer as a whole count. A counter reads 0 in the app until it's
@@ -100,26 +98,34 @@ function scoutingCount(value: unknown) {
   return numeric !== null && Number.isInteger(numeric) && numeric >= 0 ? numeric : null;
 }
 
-function validScoutingEntry(field: ScoutingField, value: unknown) {
-  if (field.type === "slider") {
-    const numeric = finiteNumber(value);
-    const min = Number.isFinite(field.min) ? field.min : 0;
-    const max = Number.isFinite(field.max) ? field.max : 10;
-    const step = Number.isFinite(field.step) && field.step > 0 ? field.step : 1;
-    if (numeric === null || numeric === 0 || numeric < min || numeric > max) return false;
-    const steps = (numeric - min) / step;
-    return Math.abs(steps - Math.round(steps)) < 1e-9;
-  }
-  if (field.type === "mcq")
-    return typeof value === "string" && field.options.includes(value) && nonZeroEntry(value);
+/**
+ * A slider's answer, or null when it hasn't got one. Anywhere in the slider's own
+ * range counts, 0 included: a rating of 0 is a rating. A slider writes nothing
+ * until it's moved, so an untouched one has no answer however it reads on screen.
+ */
+function scoutingRating(field: ScoutingField, value: unknown) {
+  const numeric = finiteNumber(value);
+  const min = Number.isFinite(field.min) ? field.min : 0;
+  const max = Number.isFinite(field.max) ? field.max : 10;
+  const step = Number.isFinite(field.step) && field.step > 0 ? field.step : 1;
+  if (numeric === null || numeric < min || numeric > max) return null;
+  const steps = (numeric - min) / step;
+  return Math.abs(steps - Math.round(steps)) < 1e-9 ? numeric : null;
+}
+
+/**
+ * Whether a field on a match form has been answered. Every field needs an answer, but what the
+ * answer says is the scout's: a choice named "0", a rating of 0 and a note reading "0" are all
+ * answers, since a robot that did nothing did nothing. Counts and ratings have their own rules
+ * above, and a field map its drawing.
+ */
+function answeredScoutingEntry(field: ScoutingField, value: unknown) {
+  if (field.type === "mcq") return typeof value === "string" && field.options.includes(value);
   if (field.type === "multiSelect") {
     const selected = stringArray(value, 30);
-    return (
-      selected.length > 0 &&
-      selected.every((option) => field.options.includes(option) && nonZeroEntry(option))
-    );
+    return selected.length > 0 && selected.every((option) => field.options.includes(option));
   }
-  return nonZeroEntry(value);
+  return text(value, 3000) !== "";
 }
 
 app.get("/health", (c) =>
@@ -376,12 +382,12 @@ async function resolveEventLink(c: Context<AppEnv>) {
   const config = await first<{
     event_key: string;
     current_match_number: number | null;
-    auto_advance_delay_minutes: number;
     tba_auth_key: string | null;
     schedule_mode: string;
+    submission_window_seconds: number | null;
   }>(
     dbOf(c),
-    sql`SELECT event_key, current_match_number, auto_advance_delay_minutes, tba_auth_key, schedule_mode FROM (SELECT * FROM ${strategyEventConfig} WHERE ${inTeam(strategyEventConfig, c.get("teamId"))}) AS scoped_strategy_event_config WHERE id = 1`,
+    sql`SELECT event_key, current_match_number, tba_auth_key, schedule_mode, submission_window_seconds FROM (SELECT * FROM ${strategyEventConfig} WHERE ${inTeam(strategyEventConfig, c.get("teamId"))}) AS scoped_strategy_event_config WHERE id = 1`,
   );
   if (!config?.event_key) return { eventKey: null, matchKey: null, matchNumber: null };
   let current: TbaMatch | undefined;
@@ -395,7 +401,7 @@ async function resolveEventLink(c: Context<AppEnv>) {
             (match) =>
               match.comp_level === "qm" && match.match_number === config.current_match_number,
           )
-        : automaticTbaMatch(matches, config?.auto_advance_delay_minutes);
+        : automaticTbaMatch(matches, config.submission_window_seconds ?? DEFAULT_SUBMISSION_WINDOW);
     if (config.schedule_mode !== "manual")
       await persistAutomaticMatch(c, config.current_match_number, current);
   } catch {
@@ -414,14 +420,14 @@ app.get("/event-context", requireAuth, async (c) => {
   const config = await first<{
     event_key: string;
     current_match_number: number | null;
-    auto_advance_delay_minutes: number;
     tba_auth_key: string | null;
     nexus_event_key: string | null;
     nexus_api_key: string | null;
     schedule_mode: string;
+    submission_window_seconds: number | null;
   }>(
     dbOf(c),
-    sql`SELECT event_key, current_match_number, auto_advance_delay_minutes, tba_auth_key, nexus_event_key, nexus_api_key, schedule_mode FROM (SELECT * FROM ${strategyEventConfig} WHERE ${inTeam(strategyEventConfig, c.get("teamId"))}) AS scoped_strategy_event_config WHERE id = 1`,
+    sql`SELECT event_key, current_match_number, tba_auth_key, nexus_event_key, nexus_api_key, schedule_mode, submission_window_seconds FROM (SELECT * FROM ${strategyEventConfig} WHERE ${inTeam(strategyEventConfig, c.get("teamId"))}) AS scoped_strategy_event_config WHERE id = 1`,
   );
   const eventKey = config?.event_key ?? "";
   let matches: TbaMatch[] = [];
@@ -440,10 +446,9 @@ app.get("/event-context", requireAuth, async (c) => {
         (match) => match.comp_level === "qm" && match.match_number === config.current_match_number,
       )
     : undefined;
+  const windowSeconds = config?.submission_window_seconds ?? DEFAULT_SUBMISSION_WINDOW;
   const tbaCurrent =
-    config?.schedule_mode === "manual"
-      ? undefined
-      : automaticTbaMatch(matches, config?.auto_advance_delay_minutes);
+    config?.schedule_mode === "manual" ? undefined : automaticTbaMatch(matches, windowSeconds);
   const current =
     (config?.schedule_mode === "manual" ? configuredCurrent : tbaCurrent) ??
     configuredCurrent ??
@@ -506,8 +511,6 @@ app.get("/event-context", requireAuth, async (c) => {
       : null;
   return c.json({
     eventKey: admin ? eventKey : "",
-    autoAdvanceDelayMinutes:
-      config?.auto_advance_delay_minutes ?? DEFAULT_AUTO_ADVANCE_DELAY_MINUTES,
     currentMatchNumber: admin ? currentMatchNumber : null,
     currentMatch: current ? publicMatch(current) : null,
     tbaCurrentMatch: tbaCurrent ? publicMatch(tbaCurrent) : null,
@@ -530,6 +533,9 @@ app.get("/event-context", requireAuth, async (c) => {
       : false,
     nexusApiKey: "",
     scheduleMode: admin ? config?.schedule_mode || "tba" : config?.schedule_mode || "tba",
+    submissionWindowSeconds: admin ? windowSeconds : null,
+    // Compatibility for a page loaded before the seconds-based editor was deployed.
+    autoAdvanceDelayMinutes: admin ? windowSeconds / 60 : null,
     manualEvent:
       admin && config?.schedule_mode === "manual"
         ? await first<Record<string, unknown>>(
@@ -556,22 +562,13 @@ app.put("/event-context", requireAuth, async (c) => {
   const body = await c.req.json<Record<string, unknown>>();
   const activeConfig = await first<{
     event_key: string;
-    auto_advance_delay_minutes: number;
     tba_auth_key: string | null;
     schedule_mode: string;
+    submission_window_seconds: number | null;
   }>(
     dbOf(c),
-    sql`SELECT event_key, auto_advance_delay_minutes, tba_auth_key, schedule_mode FROM (SELECT * FROM ${strategyEventConfig} WHERE ${inTeam(strategyEventConfig, c.get("teamId"))}) AS scoped_strategy_event_config WHERE id = 1`,
+    sql`SELECT event_key, tba_auth_key, schedule_mode, submission_window_seconds FROM (SELECT * FROM ${strategyEventConfig} WHERE ${inTeam(strategyEventConfig, c.get("teamId"))}) AS scoped_strategy_event_config WHERE id = 1`,
   );
-  const autoAdvanceDelayMinutes =
-    body.autoAdvanceDelayMinutes === undefined
-      ? (activeConfig?.auto_advance_delay_minutes ?? DEFAULT_AUTO_ADVANCE_DELAY_MINUTES)
-      : parseAutoAdvanceDelay(body.autoAdvanceDelayMinutes);
-  if (autoAdvanceDelayMinutes === null)
-    return c.json(
-      { error: "Auto-advance delay must be a whole number from 0 to 30 minutes." },
-      400,
-    );
   const eventKey =
     activeConfig?.schedule_mode === "manual"
       ? activeConfig.event_key
@@ -610,6 +607,23 @@ app.put("/event-context", requireAuth, async (c) => {
     (!Number.isInteger(currentMatchNumber) || currentMatchNumber < 1)
   )
     return c.json({ error: "Current match must be a positive qualification match number." }, 400);
+  // The match form on the same page sends no window of its own, so leave it as it was.
+  const storedWindow = activeConfig?.submission_window_seconds ?? DEFAULT_SUBMISSION_WINDOW;
+  const requestedWindow =
+    body.submissionWindowSeconds === undefined && body.autoAdvanceDelayMinutes !== undefined
+      ? (finiteNumber(body.autoAdvanceDelayMinutes) ?? Number.NaN) * 60
+      : body.submissionWindowSeconds;
+  const windowSeconds =
+    requestedWindow === undefined || requestedWindow === ""
+      ? storedWindow
+      : submissionWindow(requestedWindow);
+  if (windowSeconds === null)
+    return c.json(
+      {
+        error: `The scouting window must be between ${MIN_SUBMISSION_WINDOW} and ${MAX_SUBMISSION_WINDOW} seconds.`,
+      },
+      400,
+    );
   const updateConfig = dbOf(c)
     .insert(strategyEventConfig)
     .values(
@@ -617,10 +631,10 @@ app.put("/event-context", requireAuth, async (c) => {
         id: 1,
         event_key: eventKey,
         current_match_number: currentMatchNumber,
-        auto_advance_delay_minutes: autoAdvanceDelayMinutes,
         tba_auth_key: sql`NULLIF(${tbaAuthKey}, '')`,
         nexus_event_key: nexusEventKey,
         nexus_api_key: sql`NULLIF(${nexusApiKey}, '')`,
+        submission_window_seconds: windowSeconds,
         updated_by: c.get("userId"),
         updated_at: Date.now(),
       }),
@@ -630,10 +644,10 @@ app.put("/event-context", requireAuth, async (c) => {
       set: {
         event_key: sql`excluded.event_key`,
         current_match_number: sql`excluded.current_match_number`,
-        auto_advance_delay_minutes: sql`excluded.auto_advance_delay_minutes`,
         tba_auth_key: sql`CASE WHEN excluded.tba_auth_key IS NULL THEN ${strategyEventConfig.tba_auth_key} ELSE excluded.tba_auth_key END`,
         nexus_event_key: sql`excluded.nexus_event_key`,
         nexus_api_key: sql`CASE WHEN excluded.nexus_api_key IS NULL THEN ${strategyEventConfig.nexus_api_key} ELSE excluded.nexus_api_key END`,
+        submission_window_seconds: sql`excluded.submission_window_seconds`,
         updated_by: sql`excluded.updated_by`,
         updated_at: sql`excluded.updated_at`,
       },
@@ -905,17 +919,18 @@ app.post("/scouting-forms/:id/submissions", requireAuth, async (c) => {
       cleanAnswers[field.id] = count;
       continue;
     }
+    if (formDefinition.form_kind === "scouting" && field.type === "slider") {
+      const rating = scoutingRating(field, value);
+      if (rating === null) return c.json({ error: needsAnswer(field.label) }, 400);
+      cleanAnswers[field.id] = rating;
+      continue;
+    }
     if (
       formDefinition.form_kind === "scouting" &&
       field.type !== "fieldMap" &&
-      !validScoutingEntry(field, value)
+      !answeredScoutingEntry(field, value)
     ) {
-      return c.json(
-        {
-          error: `${field.label} must have a value other than 0 before this form can be submitted.`,
-        },
-        400,
-      );
+      return c.json({ error: needsAnswer(field.label) }, 400);
     }
     if (
       field.required &&

@@ -1,16 +1,17 @@
 import type { TbaMatch } from "./types";
 import { finiteNumber } from "./utils";
 
-export const DEFAULT_AUTO_ADVANCE_DELAY_MINUTES = 2;
-export const MAX_AUTO_ADVANCE_DELAY_MINUTES = 30;
+export const DEFAULT_SUBMISSION_WINDOW = 120;
+export const MIN_SUBMISSION_WINDOW = 0;
+export const MAX_SUBMISSION_WINDOW = 1800;
 
-export function parseAutoAdvanceDelay(value: unknown) {
-  const minutes = finiteNumber(value);
-  return minutes !== null &&
-    Number.isInteger(minutes) &&
-    minutes >= 0 &&
-    minutes <= MAX_AUTO_ADVANCE_DELAY_MINUTES
-    ? minutes
+export function submissionWindow(value: unknown) {
+  const seconds = finiteNumber(value);
+  return seconds !== null &&
+    Number.isInteger(seconds) &&
+    seconds >= 0 &&
+    seconds <= MAX_SUBMISSION_WINDOW
+    ? seconds
     : null;
 }
 
@@ -21,7 +22,7 @@ export function matchOrder(match: TbaMatch) {
 
 export function automaticTbaMatch(
   matches: TbaMatch[],
-  delayMinutes = DEFAULT_AUTO_ADVANCE_DELAY_MINUTES,
+  windowSeconds = DEFAULT_SUBMISSION_WINDOW,
   now = Math.floor(Date.now() / 1000),
 ) {
   const qualifications = matches
@@ -38,7 +39,7 @@ export function automaticTbaMatch(
       match.post_result_time ??
       (match.actual_time ? match.actual_time + 150 : null) ??
       (hasResult ? (match.predicted_time ?? match.time ?? 0) + 150 : null);
-    if (!endedAt || now < endedAt + delayMinutes * 60) return match;
+    if (!endedAt || now < endedAt + windowSeconds) return match;
   }
   return ordered.at(-1);
 }

@@ -4,7 +4,7 @@ import { type WriteQuery, batch, dbOf } from "./db";
 import { scoutingEngagementSettings, strategyEventConfig } from "./db/schema";
 import { getEngagementSettings } from "./engagement";
 import { manifest } from "./manifest";
-import { DEFAULT_AUTO_ADVANCE_DELAY_MINUTES, parseAutoAdvanceDelay } from "./match-advance";
+import { DEFAULT_SUBMISSION_WINDOW, submissionWindow } from "./match-advance";
 import type { AppEnv } from "./types";
 
 export const teamSettingsRouter = teamSettingsRoutes<AppEnv>(manifest, "Scouting settings", {
@@ -13,7 +13,7 @@ export const teamSettingsRouter = teamSettingsRoutes<AppEnv>(manifest, "Scouting
     const config = await dbOf(c)
       .select({
         tbaKey: strategyEventConfig.tba_auth_key,
-        autoAdvanceDelayMinutes: strategyEventConfig.auto_advance_delay_minutes,
+        submissionWindowSeconds: strategyEventConfig.submission_window_seconds,
       })
       .from(strategyEventConfig)
       .where(inTeam(strategyEventConfig, c.get("teamId")))
@@ -21,8 +21,7 @@ export const teamSettingsRouter = teamSettingsRoutes<AppEnv>(manifest, "Scouting
     return {
       values: {
         pointsLabel: settings.pointsLabel,
-        autoAdvanceDelayMinutes:
-          config?.autoAdvanceDelayMinutes ?? DEFAULT_AUTO_ADVANCE_DELAY_MINUTES,
+        submissionWindowSeconds: config?.submissionWindowSeconds ?? DEFAULT_SUBMISSION_WINDOW,
       },
       integrations: {
         "the blue alliance": {
@@ -37,10 +36,10 @@ export const teamSettingsRouter = teamSettingsRoutes<AppEnv>(manifest, "Scouting
       typeof changes.pointsLabel === "string" ? changes.pointsLabel.trim() : settings.pointsLabel;
     if (!pointsLabel || pointsLabel.length > 40) return "Points name must be 1 to 40 characters.";
     const delay =
-      changes.autoAdvanceDelayMinutes === undefined
+      changes.submissionWindowSeconds === undefined
         ? undefined
-        : parseAutoAdvanceDelay(changes.autoAdvanceDelayMinutes);
-    if (delay === null) return "Auto-advance delay must be a whole number from 0 to 30 minutes.";
+        : submissionWindow(changes.submissionWindowSeconds);
+    if (delay === null) return "Scouting window must be a whole number from 0 to 1800 seconds.";
     const values = {
       enabled: Number(settings.enabled),
       predictions_enabled: Number(settings.predictionsEnabled),
@@ -58,7 +57,7 @@ export const teamSettingsRouter = teamSettingsRoutes<AppEnv>(manifest, "Scouting
     ];
     if (delay !== undefined) {
       const delayValues = {
-        auto_advance_delay_minutes: delay,
+        submission_window_seconds: delay,
         updated_by: c.get("userId"),
         updated_at: Date.now(),
       };
