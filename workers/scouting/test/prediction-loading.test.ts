@@ -4,13 +4,14 @@ import { newTeamId, teamUsers } from "@g3/testing/users";
 import { callAs, jsonAs } from "@g3/testing/worker";
 import { describe, expect, it } from "vitest";
 import { createDb } from "../src/db";
-import { boylebucksAccounts, strategyEventConfig } from "../src/db/schema";
-import { statboticsMatches } from "../src/statbotics";
+import { boylebucksAccounts, manualEvents, strategyEventConfig } from "../src/db/schema";
+import { StatboticsError, statboticsFailureMessage, statboticsMatches } from "../src/statbotics";
 import type { AppEnv } from "../src/types";
 
 const db = createDb((env as unknown as AppEnv["Bindings"]).SCOUTING_DB);
 const event = (prefix: string) => `qa-${prefix}-${crypto.randomUUID()}`;
 type Game = {
+  eventName: string;
   account: { balance: number };
   matches: unknown[];
   statsError: string;
@@ -35,6 +36,7 @@ async function gameTeam(eventKey: string) {
     withTeam(team.teamId, {
       id: 1,
       event_key: eventKey,
+      tba_auth_key: "test-key",
       updated_by: team.admin.id,
       updated_at: Date.now(),
     }),
@@ -89,10 +91,48 @@ describe("bounded prediction loading", () => {
   });
 
   it("keeps local game data available when Statbotics returns 500", async () => {
-    const team = await gameTeam(event("down"));
+    const team = await gameTeam("2099qagrits");
     const game = await jsonAs<Game>(team.student, "/scouting/game");
-    expect(game).toMatchObject({ account: { balance: 100 }, matches: [], bets: [] });
-    expect(game.statsError).toContain("(500)");
+    expect(game).toMatchObject({
+      eventName: "GRITS",
+      account: { balance: 100 },
+      matches: [],
+      bets: [],
+    });
+    expect(game.statsError).toBe(
+      "Statbotics couldn't load GRITS predictions (server error 500). Try again shortly.",
+    );
+    expect(game.statsError).not.toContain("page found");
+  });
+
+  it("names a missing event and preserves the distinction in cached failures", async () => {
+    const key = event("missing");
+    const team = await gameTeam(key);
+    await db.insert(manualEvents).values(
+      withTeam(team.teamId, {
+        event_key: key,
+        event_name: "Example Invitational",
+        ends_at: Date.now() + 86400000,
+        delete_after: Date.now() + 172800000,
+        created_by: team.admin.id,
+        updated_at: Date.now(),
+      }),
+    );
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const game = await jsonAs<Game>(team.student, "/scouting/game");
+      expect(game.eventName).toBe("Example Invitational");
+      expect(game.statsError).toBe("No Statbotics event page found for Example Invitational.");
+      expect(game.account.balance).toBe(100);
+    }
+  });
+
+  it("explains timeouts and unreadable responses without claiming an event is missing", () => {
+    expect(
+      statboticsFailureMessage(new StatboticsError("timeout", "timeout"), "Example Event"),
+    ).toBe("Statbotics took too long to load Example Event predictions. Try again shortly.");
+    expect(
+      statboticsFailureMessage(new StatboticsError("invalid", "invalid"), "Example Event"),
+    ).toBe("Statbotics returned unreadable predictions for Example Event. Try again shortly.");
   });
 
   it("cannot submit a cached prediction while live validation is failing or spend any points", async () => {

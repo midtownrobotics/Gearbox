@@ -3,6 +3,7 @@ import { inTeam, withTeam } from "@g3/auth";
 import { sql } from "drizzle-orm";
 import { Hono } from "hono";
 
+import { analysisEventNames } from "./analysis-events";
 import { type Db, type WriteQuery, all, batch, createDb, dbOf, first } from "./db";
 import { adoptLegacyRows } from "./db/bootstrap";
 import {
@@ -16,7 +17,7 @@ import {
 import { getEngagementSettings } from "./engagement";
 
 import { requireAuth } from "./middleware/auth";
-import { statboticsMatches } from "./statbotics";
+import { statboticsFailureMessage, statboticsMatches } from "./statbotics";
 
 import type { AppEnv } from "./types";
 
@@ -473,14 +474,19 @@ predictionsRoutes.get("/game", requireAuth, async (c) => {
   }
   let matches: GameMatch[] = [];
   let statsError = "";
+  let eventName = config?.event_key ?? "";
   if (settings.predictionsEnabled && config?.event_key && c.req.query("summary") !== "true") {
+    // Resolve the name alongside predictions so failures still respect the loading deadline.
+    const names = analysisEventNames(c, [config.event_key]);
     try {
       matches = await gameMatches(c.env, config.event_key, c.get("teamId"));
       await settleGameBets(dbOf(c), c.get("teamId"), config.event_key, matches);
       await settleGameParlays(dbOf(c), c.get("teamId"), config.event_key, matches);
     } catch (error) {
-      statsError = error instanceof Error ? error.message : "Statbotics is unavailable.";
+      eventName = (await names)[config.event_key] || eventName;
+      statsError = statboticsFailureMessage(error, eventName);
     }
+    eventName = (await names)[config.event_key] || eventName;
   }
   const account = await first<Record<string, number>>(
     dbOf(c),
@@ -577,6 +583,7 @@ predictionsRoutes.get("/game", requireAuth, async (c) => {
     });
   return c.json({
     eventKey: config?.event_key ?? "",
+    eventName,
     account: account ?? { balance: 0, earned: 0, wagered: 0 },
     settings,
     leaderboard: leaderboard.results,
@@ -612,8 +619,9 @@ predictionsRoutes.post("/game/bets", requireAuth, async (c) => {
   try {
     matches = await gameMatches(c.env, config.event_key, c.get("teamId"), true);
   } catch (error) {
+    const names = await analysisEventNames(c, [config.event_key]);
     return c.json(
-      { error: error instanceof Error ? error.message : "Statbotics is unavailable." },
+      { error: statboticsFailureMessage(error, names[config.event_key] || config.event_key) },
       503,
     );
   }
@@ -737,8 +745,9 @@ predictionsRoutes.post("/game/parlays", requireAuth, async (c) => {
   try {
     matches = await gameMatches(c.env, config.event_key, c.get("teamId"), true);
   } catch (error) {
+    const names = await analysisEventNames(c, [config.event_key]);
     return c.json(
-      { error: error instanceof Error ? error.message : "Statbotics is unavailable." },
+      { error: statboticsFailureMessage(error, names[config.event_key] || config.event_key) },
       503,
     );
   }

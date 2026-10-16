@@ -33,6 +33,7 @@ type MatchPredictionsMatch = {
 type MatchPredictionsData = {
   settings: EngagementSettings;
   eventKey: string;
+  eventName?: string;
   account: { balance: number; earned: number; wagered: number };
   leaderboard: { display_name: string; balance: number; earned: number; wagered: number }[];
   bets: {
@@ -251,7 +252,7 @@ export function MatchPredictions({ predictionsEnabled = true }: { predictionsEna
       width="wide"
       className="scouting-page-frame"
       contentClassName="predictions-workspace"
-      description={data?.eventKey ? `Event: ${data.eventKey}` : undefined}
+      description={data?.eventKey ? `Event: ${data.eventName || data.eventKey}` : undefined}
       actions={
         <Button variant="secondary" type="button" onClick={load} disabled={refreshing || placing}>
           {refreshing ? <Loader2 className="spin" size={16} /> : <RefreshCw size={16} />}

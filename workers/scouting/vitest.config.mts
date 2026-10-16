@@ -7,13 +7,20 @@ export default workerTestConfig({
   vars: { LOCAL_AUTH_BYPASS: "false" },
   outbound: async (request) => {
     const url = new URL(request.url);
+    if (url.hostname === "www.thebluealliance.com" && url.pathname.endsWith("/2099qagrits"))
+      return Response.json({
+        name: "Georgia Robotics Invitational Tournament",
+        short_name: "GRITS",
+      });
     if (url.hostname !== "api.statbotics.io") return new Response("Not mocked", { status: 503 });
     const event = url.searchParams.get("event") || "";
     const calls = (statboticsCalls.get(event) || 0) + 1;
     statboticsCalls.set(event, calls);
+    if (event.startsWith("qa-missing-")) return new Response("Not found", { status: 404 });
     if (event.startsWith("qa-timeout-")) await new Promise((resolve) => setTimeout(resolve, 5000));
     if (
       event.startsWith("qa-down-") ||
+      event === "2099qagrits" ||
       (event.startsWith("qa-recover-") && calls === 1) ||
       (event.startsWith("qa-fail-after-") && calls > 1)
     )
