@@ -36,13 +36,12 @@ jobs:
 
       - name: Work out the next release
         id: preview
-        run: pnpm release:preview --github-output "$GITHUB_OUTPUT"
+        run: pnpm release:preview --github-output "$GITHUB_OUTPUT" --body-file "$RUNNER_TEMP/release-body.md"
 
       - name: Open or update the release PR
         env:
           GH_TOKEN: ${{ github.token }}
           TITLE: ${{ steps.preview.outputs.title }}
-          BODY: ${{ steps.preview.outputs.body }}
         run: |
           git fetch origin public
           if [ -z "$(git log --oneline origin/public..origin/main)" ]; then
@@ -51,7 +50,7 @@ jobs:
           fi
           number=$(gh pr list --base public --head main --state open --json number --jq '.[0].number')
           if [ -n "$number" ]; then
-            gh pr edit "$number" --title "$TITLE" --body "$BODY"
+            gh pr edit "$number" --title "$TITLE" --body-file "$RUNNER_TEMP/release-body.md"
           else
-            gh pr create --base public --head main --title "$TITLE" --body "$BODY"
+            gh pr create --base public --head main --title "$TITLE" --body-file "$RUNNER_TEMP/release-body.md"
           fi
