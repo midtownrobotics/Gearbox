@@ -2,6 +2,8 @@ import { env } from "cloudflare:test";
 import { admin, kioskAdmin, mentor, otherStudent, student } from "@g3/testing/users";
 import { callAs, jsonAs } from "@g3/testing/worker";
 import { describe, expect, it } from "vitest";
+import { createDb } from "../src/db";
+import { peopleNow } from "../src/lib/now";
 import { dueBlock, sendReminders } from "../src/reminders";
 
 // An event's schedule from start to finish: made as a draft, given days, periods, attendees and
@@ -245,6 +247,37 @@ describe("roles", () => {
     }
   });
 
+  it("is other unless given a type, which editors can change", async () => {
+    const add = (body: Record<string, unknown>) =>
+      callAs(mentor, "/roles", {
+        method: "POST",
+        body: { name: `Type ${crypto.randomUUID().slice(0, 6)}`, color: "blue", ...body },
+      });
+    const plain = await add({});
+    expect(plain.status).toBe(201);
+    const role = await plain.json<{ id: number; type: string }>();
+    expect(role.type).toBe("other");
+    const scouting = await add({ type: "scouting" });
+    expect(await scouting.json()).toMatchObject({ type: "scouting" });
+    expect((await add({ type: "drive" })).status).toBe(400);
+
+    const changed = await jsonAs(mentor, `/roles/${role.id}`, {
+      method: "PATCH",
+      body: { type: "pit" },
+    });
+    expect(changed).toMatchObject({ type: "pit" });
+    const renamed = await jsonAs(mentor, `/roles/${role.id}`, {
+      method: "PATCH",
+      body: { name: `Renamed ${crypto.randomUUID().slice(0, 6)}` },
+    });
+    expect(renamed).toMatchObject({ type: "pit" });
+    const bad = await callAs(mentor, `/roles/${role.id}`, {
+      method: "PATCH",
+      body: { type: "Pit" },
+    });
+    expect(bad.status).toBe(400);
+  });
+
   it("names each role once, and archives one that's in use instead of deleting it", async () => {
     const pit = await newRole("Pit");
     const [role] = (await jsonAs<{ id: number; name: string }[]>(student, "/roles")).filter(
@@ -262,6 +295,53 @@ describe("roles", () => {
 
     const unused = await newRole("Unused");
     expect((await callAs(mentor, `/roles/${unused.id}`, { method: "DELETE" })).status).toBe(200);
+  });
+});
+
+describe("who's on a role type now", () => {
+  it("lists people whose role now is of the type, until it ends, once published", async () => {
+    const pit = await jsonAs<{ id: number }>(
+      mentor,
+      "/roles",
+      {
+        method: "POST",
+        body: { name: `Pit ${crypto.randomUUID().slice(0, 6)}`, color: "orange", type: "pit" },
+      },
+      201,
+    );
+    const other = await newRole("Drive");
+    const id = await newSchedule();
+    // 10:00–11:00 in the pit, then 11:00–11:30 still in the pit for one, driving for the other.
+    await paint(id, [
+      { userIds: [student.id], day: DAY, start: 40, end: 46, roleId: pit.id },
+      { userIds: [otherStudent.id], day: DAY, start: 40, end: 44, roleId: other.id },
+      { userIds: [otherStudent.id], day: DAY, start: 44, end: 46, roleId: pit.id },
+    ]);
+    const db = createDb((env as unknown as { SCHEDULE_DB: D1Database }).SCHEDULE_DB);
+    const at = async (iso: string) =>
+      (await peopleNow(env as never, db, student.teamId, "pit", new Date(iso))).filter(
+        (p) => p.scheduleId === id,
+      );
+    // 10:30 AM in Chicago (CST, UTC−6) on the day.
+    const halfPastTen = `${DAY}T16:30:00Z`;
+    expect(await at(halfPastTen)).toEqual([]);
+
+    await jsonAs(mentor, `/schedules/${id}`, { method: "PATCH", body: { published: true } });
+    expect(await at(halfPastTen)).toMatchObject([
+      { userId: student.id, roleId: pit.id, until: "11:30" },
+    ]);
+    expect((await at(`${DAY}T17:15:00Z`)).map((p) => p.userId).sort()).toEqual(
+      [student.id, otherStudent.id].sort(),
+    );
+    // After the day's hours, or another day, nobody.
+    expect(await at(`${DAY}T23:30:00Z`)).toEqual([]);
+    expect(await at("2027-03-13T16:30:00Z")).toEqual([]);
+  });
+
+  it("is for anyone signed in, kiosks too, and takes only a known type", async () => {
+    expect((await callAs(kioskAdmin, "/now?type=pit")).status).toBe(200);
+    expect((await callAs(student, "/now?type=drive")).status).toBe(400);
+    expect((await callAs(student, "/now")).status).toBe(400);
   });
 });
 

@@ -12,6 +12,7 @@ import { canEdit } from "./lib/editors";
 import { manifest } from "./manifest";
 import { sendReminders } from "./reminders";
 import { friendsRouter } from "./routes/friends";
+import { nowRouter } from "./routes/now";
 import { editorsRouter, membersRouter } from "./routes/people";
 import { rolesRouter } from "./routes/roles";
 import { schedulesRouter } from "./routes/schedules";
@@ -79,14 +80,22 @@ const app = base
   .route("/roles", rolesRouter)
   .route("/members", membersRouter)
   .route("/editors", editorsRouter)
-  .route("/friends", friendsRouter);
+  .route("/friends", friendsRouter)
+  .route("/now", nowRouter);
 
 export type ScheduleApp = typeof app;
 /** The Hono app itself, for the isolation test (test/isolation.test.ts). */
 export { app };
 
+export type { PersonNow } from "./lib/now";
 export type { AssignmentRange } from "./lib/schedules";
-export { ROLE_COLORS, type RoleColor, type RolePreset } from "./lib/roles";
+export {
+  ROLE_COLORS,
+  ROLE_TYPES,
+  type RoleColor,
+  type RolePreset,
+  type RoleType,
+} from "./lib/roles";
 
 export default {
   fetch: withApiPrefix(app.fetch),

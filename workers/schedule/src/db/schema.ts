@@ -72,6 +72,10 @@ export const roles = sqliteTable(
     name: text("name").notNull(),
     /** A preset key from the page's palette (drawn to suit light and dark mode), or #rrggbb. */
     color: text("color").notNull(),
+    /** What kind of work it is: scouting, pit or other (the default). */
+    type: text("type", { enum: ["scouting", "pit", "other"] })
+      .notNull()
+      .default("other"),
     sortOrder: integer("sort_order").notNull().default(0),
     archivedAt: integer("archived_at"),
     createdAt: integer("created_at").notNull(),

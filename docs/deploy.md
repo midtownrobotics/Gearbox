@@ -30,11 +30,19 @@ A worker with a service binding to another worker can't be deployed until that w
 
 ## Staging
 
-Staging is a second copy of everything, deployed from `main` on every push by `.github/workflows/staging.yml` through the same `deploy.yml` as production (migrations, then each app's worker, then the gateway). Its addresses are production's with `-dev` on the first part, on g3robotics.com: `1648-orders-dev.g3robotics.com`, a team's home at `1648-dev.g3robotics.com`, sign-in callbacks at `id-dev.g3robotics.com`, the console at `admin-dev.g3robotics.com` and the platform at `dev.g3robotics.com` (`site.staging` in `site.ts`). A different domain from production's, so the two never share a cookie; every page has a "Staging" banner.
+Staging is a second copy of everything, deployed from `main` (or the branch in `STAGING_BRANCH`, below) on every push by `.github/workflows/staging.yml` through the same `deploy.yml` as production (migrations, then each app's worker, then the gateway). Its addresses are production's with `-dev` on the first part, on g3robotics.com: `1648-orders-dev.g3robotics.com`, a team's home at `1648-dev.g3robotics.com`, sign-in callbacks at `id-dev.g3robotics.com`, the console at `admin-dev.g3robotics.com` and the platform at `dev.g3robotics.com` (`site.staging` in `site.ts`). A different domain from production's, so the two never share a cookie; every page has a "Staging" banner.
 
 Each worker's `[env.staging]` is written by `pnpm configure` from its `[env.production]` (below the "Staging" line at the end of each `wrangler.toml`): `-staging` worker names, databases and buckets, staging's addresses, and the ids in `infra/staging/resources.json`. Change `[env.production]` and run `pnpm configure`; never edit the staging part. Production's gateway answers only G3's retired addresses on g3robotics.com, by exact name, and staging's gateway only `*-dev.g3robotics.com` and `dev.g3robotics.com`.
 
 To deploy staging by hand: `pnpm db:migrate:staging`, then `pnpm deploy:staging` (or one worker's `deploy:staging`).
+
+### Trying a branch on staging
+
+Staging deploys from `main` unless the repository variable `STAGING_BRANCH` names another branch (GitHub → Settings → Secrets and variables → Actions → Variables). Set it to a feature branch and every push to that branch deploys staging, migrations included, while pushes to `main` don't. Delete the variable (or set it to `main`) to go back. To deploy a branch once without changing the variable, run the workflow by hand on it (Actions → staging → Run workflow, then pick the branch).
+
+- **Migrations stay applied.** A branch's migrations are applied to staging's databases and aren't undone when staging goes back to `main`. If the branch's schema changes don't land as they are, staging's databases have to be put right by hand.
+- **One branch at a time.** Whatever deployed last is what staging runs, so say when you take it over.
+- **With `PRODUCTION_BRANCH` set to `main`,** a push to `main` while staging is on another branch still deploys production, without staging first.
 
 ### Setting staging up (once)
 
