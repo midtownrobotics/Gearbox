@@ -14,8 +14,8 @@ import type {
   ChecklistIssueSummary,
   ChecklistList,
 } from "../../shared/getters/types";
-import { ConnectionIndicator, OfflineOverlay, useConnection } from "./connection";
 import { type PersonInThePit, untilLabel, useInThePit } from "../../shared/in-the-pit";
+import { ConnectionIndicator, OfflineOverlay, useConnection } from "./connection";
 
 const REFRESH_MS = 15_000;
 
