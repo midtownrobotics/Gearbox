@@ -9,7 +9,9 @@ Requires=avahi-daemon.service
 ExecStart=/usr/bin/avahi-publish --address --no-reverse drive.local 192.168.50.1
 Restart=always
 RestartSec=10
-DynamicUser=yes
+# Not DynamicUser: Armbian's nsswitch.conf can't look dynamic users up, and D-Bus
+# then refuses avahi-publish ("An unexpected D-Bus error occurred").
+User=avahi
 
 [Install]
 WantedBy=multi-user.target

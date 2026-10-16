@@ -25,6 +25,7 @@ Files under `etc/` mirror where they go on the box. `local/` is **gitignored** a
 | `etc/dnsmasq.d/lan.conf` | LAN DHCP/DNS, the query log, the agent's generated config, `drive.local` |
 | `etc/netplan/`, `etc/systemd/network/`, `etc/sysctl.d/` | `lan0`/`wan0` naming and addressing, IPv4 forwarding |
 | `etc/tmpfiles.d/`, `etc/logrotate.d/` | Directories for the DNS query log and generated config; log rotation |
+| `etc/systemd/journald.conf.d/` | Logs kept on disk and saved every 10 s, so a power cut keeps its last moments (copy to `/etc/systemd/journald.conf.d/`, then `sudo systemctl restart systemd-journald`) |
 
 ## On your computer (once)
 
@@ -98,6 +99,12 @@ Only for a new box (or a fresh Armbian install). Do these on the box over SSH, f
    sudo tune2fs -o ^journal_data_writeback "$(findmnt -no SOURCE /)"
    sudo sed -i '/ \/ ext4 /s/,commit=[0-9]*//' /etc/fstab && sudo systemctl daemon-reload
    ```
+   **Make the boot script's fallback the root drive.** Armbian's `armbian-hardware-optimization` rewrites `/boot/armbianEnv.txt` on every boot. A power cut seconds later leaves the new copy only in the ext4 journal, which U-Boot doesn't replay: it can't find the file, falls back to `rootdev "/dev/mmcblk0p1"` in `boot.cmd`, and the box stops in a busybox shell on every boot after (plugging the drive into a Linux computer replays the journal and fixes it). Point the fallback at the root drive's UUID and rebuild `boot.scr` (repeat after an Armbian update that replaces `boot.cmd`):
+   ```bash
+   U=$(findmnt -no UUID /)
+   sudo sed -i "s#^setenv rootdev \"/dev/mmcblk0p1\"#setenv rootdev \"UUID=$U\"#" /boot/boot.cmd
+   sudo mkimage -C none -A arm -T script -d /boot/boot.cmd /boot/boot.scr && sync
+   ```
 2. **Packages.**
    ```bash
    sudo apt install nftables dnsmasq cups cups-filters avahi-daemon avahi-utils alsa-utils
@@ -142,4 +149,6 @@ curl -s http://127.0.0.1:8700/health
 - **`link.lastError` mentions 401, or the agent never connects:** `EDGE_AGENT_KEY` in `/etc/g3-edge/agent.env` isn't the team's current box key (a new key on the Edge Box page replaces the old one), or `EDGE_WORKER_URL` is another team's address. A 410 means `EDGE_WORKER_URL` is a retired address.
 - **Blocking misbehaves:** turn off **Enforce blocklists** and **DNS hardening** in the app. Without the app, `sudo nft delete table inet g3` removes blocking until the agent's next cycle; `sudo systemctl stop g3-edge-agent` keeps it off.
 - **Printer "Stopped":** click **Resume** on the Printers page once it's back; `lpstat -p -d` and `sudo journalctl -u cups -n 50` on the box.
+- **No LAN IP on the Edge Box page, no DHCP:** the box has no `lan0`. It names only its own USB adapter `lan0`, by its MAC (`local/etc/netplan/10-router.yaml`); another adapter, even the same model, shows up as `enx…` and isn't used. Plug USB devices in with the box off: plugging one in while it runs can reset the board.
+- **Stuck in a busybox shell saying `/dev/mmcblk0p1` does not exist:** see "Make the boot script's fallback the root drive" under First-time box setup. To recover, plug the drive into a Linux computer, let it mount, eject it and put it back.
 - If the hotspot is down, usage is buffered in `/var/lib/g3-edge/agent.db` and uploaded later. Don't delete `/var/lib/g3-edge`.
