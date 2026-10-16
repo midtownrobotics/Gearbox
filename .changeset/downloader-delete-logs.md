@@ -3,4 +3,4 @@
 "@g3/worker-pit": patch
 ---
 
-Each log on the pit log downloader's status page has a Delete button: it deletes the log from the pit computer (it isn't copied off the robot again) and, for a log already in Pit, can delete it from Gearbox too. Pit's Monitor starts its right-hand column at the top, beside the Nexus status.
+Each log on the pit log downloader's status page has a Delete button: it deletes the log from the pit computer (it isn't copied off the robot again) and, for a log already in Pit, can delete it from Gearbox too.
