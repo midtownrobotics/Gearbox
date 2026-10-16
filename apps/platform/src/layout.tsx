@@ -27,8 +27,8 @@ export function Header() {
         <a href="/#how" className="g3-nav-text-link hidden md:block">
           Set up
         </a>
-        <a href="/#customize" className="g3-nav-text-link hidden md:block">
-          Make it yours
+        <a href="/#open-source" className="g3-nav-text-link hidden md:block">
+          Open source
         </a>
         <span className="text-sm">
           <MyTeamButton />
@@ -56,6 +56,10 @@ export function Footer() {
             Free, open source (MIT), and run by volunteers from {site.team.name}, FRC Team{" "}
             {site.team.number}.
           </p>
+          <p>
+            With thanks to Team 4414 (TideApps), Team 6328, FRCBOM, FRCTools and FRCDesign, whose
+            work Gearbox builds on.
+          </p>
         </div>
         <div className="flex flex-wrap gap-x-5 gap-y-2">
           <a href={site.legal.terms} className="hover:text-secondary-900">
@@ -76,9 +80,11 @@ export function Footer() {
   );
 }
 
-export function Page({ children }: { children: ReactNode }) {
+/** `banner`: a full-width bar above the header (the landing page's open beta note). */
+export function Page({ children, banner }: { children: ReactNode; banner?: ReactNode }) {
   return (
     <div className="flex flex-1 flex-col bg-page">
+      {banner}
       <Header />
       <main className="flex-1">{children}</main>
       <Footer />

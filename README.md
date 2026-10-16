@@ -20,13 +20,15 @@ Each team has its own address for every app, its own sign-in through its own Sla
 
 ## Using it
 
-**Hosted (coming soon):** a free, volunteer-run version every team can sign up for. Signing up takes your team's details, adding Gearbot (the Gearbox Slack bot) to your Slack, and sending Gearbot a code; whoever signs up becomes the team's first admin.
+**Hosted:** a free, volunteer-run version every team can sign up for at [frcgearbox.com](https://frcgearbox.com), in open beta. Signing up takes your team's details, adding Gearbot (the Gearbox Slack bot) to your Slack, and sending Gearbot a code; whoever signs up becomes the team's first admin.
 
 **On your own servers:** everything runs on Cloudflare (Workers, D1, KV). Put your team and domains in [`packages/site-config/src/site.ts`](packages/site-config/src/site.ts), run `pnpm configure`, and follow [`docs/deploy.md`](docs/deploy.md).
 
 ## Developing
 
 ```bash
+git clone https://github.com/midtownrobotics/Gearbox.git
+cd Gearbox
 pnpm install
 pnpm db:migrate:local   # local databases
 pnpm dev                # every app and worker, plus the gateway
@@ -48,7 +50,7 @@ We want your pull requests: bug fixes, new features, docs, even whole new apps, 
 
 - [`docs/roadmap/roadmap.md`](docs/roadmap/roadmap.md) is the plan: what's done, what's next, and why.
 - Every PR that changes an app adds a changeset (`pnpm changeset`); see [`.changeset/README.md`](.changeset/README.md).
-- Much of this code is written with AI assistants, then tried and tested by G3 through real seasons. AI-assisted PRs are welcome if you've checked they work.
+- Much of this code is written with AI assistants, then tried and tested by G3 through the offseason. AI-assisted PRs are welcome if you've checked they work.
 
 ## License and policies
 
