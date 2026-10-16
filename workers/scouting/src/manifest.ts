@@ -20,6 +20,17 @@ export const manifest = defineManifest({
       editedBy: "admin",
       page: "/admin",
     },
+    {
+      key: "submissionWindowSeconds",
+      label: "Scouting window after a match",
+      type: "number",
+      default: 60,
+      min: 15,
+      max: 900,
+      help: "seconds",
+      editedBy: "admin",
+      page: "/admin",
+    },
   ],
   // Engagement (engagement.ts): each switched on and off on Scouting's Admin page.
   plugins: [

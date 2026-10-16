@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers";
 import { teamKey } from "@g3/site-config";
-import { admin, kioskAdmin, student } from "@g3/testing/users";
+import { admin, kioskAdmin, otherStudent, student } from "@g3/testing/users";
 import { call, callAs, jsonAs } from "@g3/testing/worker";
 import { describe, expect, it } from "vitest";
 import type { AppEnv } from "../src/types";
@@ -181,5 +181,56 @@ describe("number answers", () => {
   it("refuses a rating outside the slider's range", async () => {
     expect((await submitRating(9)).status).toBe(400);
     expect((await submitRating(-1)).status).toBe(400);
+  });
+});
+
+// How long a finished match stays the current one, so a scout can still send its form in.
+describe("scouting window", () => {
+  const db = (env as unknown as AppEnv["Bindings"]).SCOUTING_DB;
+  const windowOf = () =>
+    db
+      .prepare(
+        "SELECT submission_window_seconds AS seconds FROM strategy_event_config WHERE team_id = ? AND id = 1",
+      )
+      .bind(teamKey)
+      .first<{ seconds: number }>();
+  const save = (submissionWindowSeconds: unknown) =>
+    callAs(admin, "/scouting/event-context", {
+      method: "PUT",
+      body: { eventKey: "", submissionWindowSeconds },
+    });
+
+  it("starts at a minute and is a strategy lead's to change", async () => {
+    expect((await save(180)).status).toBe(200);
+    expect(await windowOf()).toEqual({ seconds: 180 });
+    expect(await jsonAs(admin, "/scouting/event-context")).toMatchObject({
+      submissionWindowSeconds: 180,
+    });
+    expect(
+      (await callAs(otherStudent, "/scouting/event-context", { method: "PUT", body: {} })).status,
+    ).toBe(403);
+  });
+
+  it("keeps the saved window when a form doesn't send one", async () => {
+    await save(240);
+    expect(
+      (await callAs(admin, "/scouting/event-context", { method: "PUT", body: { eventKey: "" } }))
+        .status,
+    ).toBe(200);
+    expect(await windowOf()).toEqual({ seconds: 240 });
+  });
+
+  it("refuses a window outside what a match allows", async () => {
+    await save(120);
+    expect((await save(5)).status).toBe(400);
+    expect((await save(4000)).status).toBe(400);
+    expect((await save(30.5)).status).toBe(400);
+    expect(await windowOf()).toEqual({ seconds: 120 });
+  });
+
+  it("keeps the window out of what a scout can read", async () => {
+    expect(await jsonAs(otherStudent, "/scouting/event-context")).toMatchObject({
+      submissionWindowSeconds: null,
+    });
   });
 });

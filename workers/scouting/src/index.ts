@@ -165,7 +165,30 @@ function publicMatch(match: TbaMatch) {
   };
 }
 
-function automaticTbaMatch(matches: TbaMatch[], now = Math.floor(Date.now() / 1000)) {
+/**
+ * How long a match stays the current one after it ends, so a scout still has time to send its
+ * form in. Each team sets its own on the Admin page; `DEFAULT_SUBMISSION_WINDOW` is one minute.
+ */
+const DEFAULT_SUBMISSION_WINDOW = 60;
+const MIN_SUBMISSION_WINDOW = 15;
+const MAX_SUBMISSION_WINDOW = 900;
+
+/** A submission window in seconds, or null when it isn't a whole number in range. */
+function submissionWindow(value: unknown) {
+  const numeric = finiteNumber(value);
+  return numeric !== null &&
+    Number.isInteger(numeric) &&
+    numeric >= MIN_SUBMISSION_WINDOW &&
+    numeric <= MAX_SUBMISSION_WINDOW
+    ? numeric
+    : null;
+}
+
+function automaticTbaMatch(
+  matches: TbaMatch[],
+  windowSeconds = DEFAULT_SUBMISSION_WINDOW,
+  now = Math.floor(Date.now() / 1000),
+) {
   const qualifications = matches
     .filter((match) => match.comp_level === "qm")
     .sort((left, right) => matchOrder(left) - matchOrder(right));
@@ -180,7 +203,7 @@ function automaticTbaMatch(matches: TbaMatch[], now = Math.floor(Date.now() / 10
       match.post_result_time ??
       (match.actual_time ? match.actual_time + 150 : null) ??
       (hasResult ? (match.predicted_time ?? match.time ?? 0) + 150 : null);
-    if (!endedAt || now < endedAt + 60) return match;
+    if (!endedAt || now < endedAt + windowSeconds) return match;
   }
   return ordered.at(-1);
 }
@@ -402,9 +425,10 @@ async function resolveEventLink(c: Context<AppEnv>) {
     current_match_number: number | null;
     tba_auth_key: string | null;
     schedule_mode: string;
+    submission_window_seconds: number | null;
   }>(
     dbOf(c),
-    sql`SELECT event_key, current_match_number, tba_auth_key, schedule_mode FROM (SELECT * FROM ${strategyEventConfig} WHERE ${inTeam(strategyEventConfig, c.get("teamId"))}) AS scoped_strategy_event_config WHERE id = 1`,
+    sql`SELECT event_key, current_match_number, tba_auth_key, schedule_mode, submission_window_seconds FROM (SELECT * FROM ${strategyEventConfig} WHERE ${inTeam(strategyEventConfig, c.get("teamId"))}) AS scoped_strategy_event_config WHERE id = 1`,
   );
   if (!config?.event_key) return { eventKey: null, matchKey: null, matchNumber: null };
   let current: TbaMatch | undefined;
@@ -418,7 +442,7 @@ async function resolveEventLink(c: Context<AppEnv>) {
             (match) =>
               match.comp_level === "qm" && match.match_number === config.current_match_number,
           )
-        : automaticTbaMatch(matches);
+        : automaticTbaMatch(matches, config.submission_window_seconds ?? DEFAULT_SUBMISSION_WINDOW);
     if (config.schedule_mode !== "manual")
       await persistAutomaticMatch(c, config.current_match_number, current);
   } catch {
@@ -441,9 +465,10 @@ app.get("/event-context", requireAuth, async (c) => {
     nexus_event_key: string | null;
     nexus_api_key: string | null;
     schedule_mode: string;
+    submission_window_seconds: number | null;
   }>(
     dbOf(c),
-    sql`SELECT event_key, current_match_number, tba_auth_key, nexus_event_key, nexus_api_key, schedule_mode FROM (SELECT * FROM ${strategyEventConfig} WHERE ${inTeam(strategyEventConfig, c.get("teamId"))}) AS scoped_strategy_event_config WHERE id = 1`,
+    sql`SELECT event_key, current_match_number, tba_auth_key, nexus_event_key, nexus_api_key, schedule_mode, submission_window_seconds FROM (SELECT * FROM ${strategyEventConfig} WHERE ${inTeam(strategyEventConfig, c.get("teamId"))}) AS scoped_strategy_event_config WHERE id = 1`,
   );
   const eventKey = config?.event_key ?? "";
   let matches: TbaMatch[] = [];
@@ -462,7 +487,9 @@ app.get("/event-context", requireAuth, async (c) => {
         (match) => match.comp_level === "qm" && match.match_number === config.current_match_number,
       )
     : undefined;
-  const tbaCurrent = config?.schedule_mode === "manual" ? undefined : automaticTbaMatch(matches);
+  const windowSeconds = config?.submission_window_seconds ?? DEFAULT_SUBMISSION_WINDOW;
+  const tbaCurrent =
+    config?.schedule_mode === "manual" ? undefined : automaticTbaMatch(matches, windowSeconds);
   const current =
     (config?.schedule_mode === "manual" ? configuredCurrent : tbaCurrent) ??
     configuredCurrent ??
@@ -543,6 +570,7 @@ app.get("/event-context", requireAuth, async (c) => {
     hasNexusApiKey: admin ? Boolean(config?.nexus_api_key || c.env.NEXUS_API_KEY) : false,
     nexusApiKey: "",
     scheduleMode: admin ? config?.schedule_mode || "tba" : config?.schedule_mode || "tba",
+    submissionWindowSeconds: admin ? windowSeconds : null,
     manualEvent:
       admin && config?.schedule_mode === "manual"
         ? await first<Record<string, unknown>>(
@@ -571,9 +599,10 @@ app.put("/event-context", requireAuth, async (c) => {
     event_key: string;
     tba_auth_key: string | null;
     schedule_mode: string;
+    submission_window_seconds: number | null;
   }>(
     dbOf(c),
-    sql`SELECT event_key, tba_auth_key, schedule_mode FROM (SELECT * FROM ${strategyEventConfig} WHERE ${inTeam(strategyEventConfig, c.get("teamId"))}) AS scoped_strategy_event_config WHERE id = 1`,
+    sql`SELECT event_key, tba_auth_key, schedule_mode, submission_window_seconds FROM (SELECT * FROM ${strategyEventConfig} WHERE ${inTeam(strategyEventConfig, c.get("teamId"))}) AS scoped_strategy_event_config WHERE id = 1`,
   );
   const eventKey =
     activeConfig?.schedule_mode === "manual"
@@ -613,6 +642,19 @@ app.put("/event-context", requireAuth, async (c) => {
     (!Number.isInteger(currentMatchNumber) || currentMatchNumber < 1)
   )
     return c.json({ error: "Current match must be a positive qualification match number." }, 400);
+  // The match form on the same page sends no window of its own, so leave it as it was.
+  const storedWindow = activeConfig?.submission_window_seconds ?? DEFAULT_SUBMISSION_WINDOW;
+  const windowSeconds =
+    body.submissionWindowSeconds === undefined || body.submissionWindowSeconds === ""
+      ? storedWindow
+      : submissionWindow(body.submissionWindowSeconds);
+  if (windowSeconds === null)
+    return c.json(
+      {
+        error: `The scouting window must be between ${MIN_SUBMISSION_WINDOW} and ${MAX_SUBMISSION_WINDOW} seconds.`,
+      },
+      400,
+    );
   const updateConfig = dbOf(c)
     .insert(strategyEventConfig)
     .values(
@@ -623,6 +665,7 @@ app.put("/event-context", requireAuth, async (c) => {
         tba_auth_key: sql`NULLIF(${tbaAuthKey}, '')`,
         nexus_event_key: nexusEventKey,
         nexus_api_key: sql`NULLIF(${nexusApiKey}, '')`,
+        submission_window_seconds: windowSeconds,
         updated_by: c.get("userId"),
         updated_at: Date.now(),
       }),
@@ -635,6 +678,7 @@ app.put("/event-context", requireAuth, async (c) => {
         tba_auth_key: sql`CASE WHEN excluded.tba_auth_key IS NULL THEN ${strategyEventConfig.tba_auth_key} ELSE excluded.tba_auth_key END`,
         nexus_event_key: sql`excluded.nexus_event_key`,
         nexus_api_key: sql`CASE WHEN excluded.nexus_api_key IS NULL THEN ${strategyEventConfig.nexus_api_key} ELSE excluded.nexus_api_key END`,
+        submission_window_seconds: sql`excluded.submission_window_seconds`,
         updated_by: sql`excluded.updated_by`,
         updated_at: sql`excluded.updated_at`,
       },

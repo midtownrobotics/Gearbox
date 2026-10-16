@@ -2979,10 +2979,10 @@
     gap: 10px;
     margin-top: 16px;
   }
-  .live-strategy h2 {
+  .live-strategy h3 {
     grid-column: 1 / -1;
     margin: 0 0 4px;
-    font-size: 18px;
+    font-size: 15px;
   }
   .live-strategy > div:not(.forms-empty) {
     display: grid;
@@ -3155,6 +3155,69 @@
   .event-admin-panel > header h2 {
     margin: 0;
     font-size: 18px;
+  }
+
+  /* The Competition overview: what's happening right now, above the event's settings. */
+  .competition-overview .live-strategy {
+    margin-top: 14px;
+  }
+
+  .competition-overview > form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* The hint under the scouting window field needs a row of its own. */
+  .event-admin-panel label.window-field {
+    grid-template-rows: auto 46px auto;
+  }
+
+  /* A section's own heading, with the button that explains it. */
+  .section-heading {
+    display: grid;
+    gap: 2px;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .manual-schedule-panel > header > .section-heading {
+    align-items: start;
+  }
+
+  .section-heading h2 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    font-size: 18px;
+  }
+
+  .section-heading > span {
+    color: var(--text-muted, var(--g3-light-muted));
+    font-size: 12px;
+  }
+
+  .info-button {
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    border: 1px solid var(--border, var(--g3-light-line));
+    border-radius: 50%;
+    color: var(--text-muted, var(--g3-light-muted));
+    background: transparent;
+    cursor: pointer;
+  }
+
+  .info-button:hover {
+    border-color: var(--g3-brand);
+    color: var(--g3-brand);
+  }
+
+  .field-hint {
+    color: var(--text-muted, var(--g3-light-muted));
+    font-size: 11px;
+    font-weight: 400;
+    line-height: 1.4;
   }
 
   .event-admin-panel > header p {
