@@ -1,0 +1,45 @@
+name: pit-log-downloader
+
+# The pit log downloader runs on team members' own computers, so it's checked on Linux, Windows
+# and macOS: it installs, type checks, starts and answers its status page.
+
+on:
+  pull_request:
+    paths:
+      - "devices/pit-log-downloader/**"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - ".github/workflows/pit-log-downloader.yml"
+  push:
+    branches: [main]
+    paths:
+      - "devices/pit-log-downloader/**"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - ".github/workflows/pit-log-downloader.yml"
+
+jobs:
+  smoke:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      # Only the downloader and what it needs, as on a pit computer.
+      - run: pnpm install --frozen-lockfile --filter "@g3/pit-log-downloader..."
+
+      - run: pnpm --filter @g3/pit-log-downloader typecheck
+
+      - run: pnpm --filter @g3/pit-log-downloader smoke

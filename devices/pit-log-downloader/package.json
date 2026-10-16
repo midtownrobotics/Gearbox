@@ -1,0 +1,27 @@
+{
+  "name": "@g3/pit-log-downloader",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "start": "node --env-file-if-exists=config.env src/index.ts",
+    "watch": "node --env-file-if-exists=config.env --watch-path=src src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "smoke": "node scripts/smoke.ts"
+  },
+  "dependencies": {
+    "express": "^5.2.1",
+    "googleapis": "^171.4.0",
+    "is-online": "^12.0.2",
+    "node-ssh": "^13.2.1"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^22.0.0",
+    "@types/ssh2": "^1.15.6",
+    "typescript": "^5.8.0"
+  }
+}

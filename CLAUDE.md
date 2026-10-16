@@ -57,7 +57,7 @@ The apps are being brought into one design language. The plan of record is `docs
 - `apps/` — React frontends (g3id, portal, shop, pit, skill-tree, attendance, scouting, edge, orders, inventory, schedule, platform)
 - `workers/` — Cloudflare Workers: one per app (g3id, portal, shop, pit, skill-tree, attendance, scouting, edge, orders, inventory, schedule, platform), each serving its app's page and its API at `/api`, plus `gateway`, which routes `*.<domain>` to them
 - `packages/` — Shared libraries (auth, ui, slack, demo: the public demo's people, safe text and guard)
-- `devices/` — Software that runs on physical hardware (edge-agent: Bun, compiled to an arm64 binary)
+- `devices/` — Software that runs on physical hardware (edge-agent: Bun, compiled to an arm64 binary; pit-log-downloader: Node 24, below)
 - `infra/edge/` — Hand-applied system config for the shop edge box
 
 ## Architecture Overview
@@ -128,6 +128,12 @@ Design brief: `docs/edge.md`. On-site Orange Pi 5 (hostname `orangepi5`, login u
 - **Power cuts:** the box is unplugged without warning, so nothing it needs may depend on a write from the last few seconds. Its root filesystem runs `data=ordered` with the default commit (Armbian ships `writeback` + `commit=120`, which left files empty after a power cut; `infra/edge/README.md`), `install-agent.sh` refuses empty files and `sync`s, and dnsmasq creates its own query-log folder on every start (`etc/systemd/system/dnsmasq.service.d/g3-edge.conf`), so DHCP and DNS never depend on `tmpfiles.d`.
 - **Door sounds:** `devices/edge-agent/src/modules/switch` reads the Orange Pi 5's GPIO2_D4 (physical pin 22 / GPIO 92). The door-closed microswitch grounds the pulled-up input; the opening transition plays a WAV through `aplay` to the Orange Pi 5 analog headphone jack (`EDGE_SWITCH_AUDIO_DEVICE`, default `plughw:CARD=rockchipes8388,DEV=0`). Admin-only `/switch/*` worker routes and the Edge app's Door Sounds page manage, test, and delete WAV files stored on the box in `/srv/g3-sounds`; audio is not stored in Cloudflare.
 - Local dev: `pnpm --filter @g3/edge-agent run dev:mock` runs the agent with fake counters against the local worker, and opens its link to it (run `pnpm --filter @g3/worker-edge box-key:set -- --local --key local-dev-agent-key` once (stores the mock agent's key, from `mock.env`, as the site team's box key)). The agent logs `[link] connected to the worker`; its `/health` shows `link`.
+
+### Pit log downloader
+
+- `devices/pit-log-downloader` (`@g3/pit-log-downloader`, its own version like the edge agent): runs on a pit computer (Linux, Windows or macOS) on plain Node 24, with no build step (`pnpm --filter @g3/pit-log-downloader start`). When the computer joins the robot's network (`10.TE.AM.x`, from `TEAM_NUMBER`), it copies AdvantageKit `.wpilog` match logs off the roboRIO over SFTP (node-ssh), names them by match and event, and uploads them to a Google Drive folder with a service account when one is set. A status page on `127.0.0.1:3000`. Moved in from the old Pit-Log-Downloader repository as it was; not connected to the Pit app yet.
+- Settings are in its gitignored `config.env` (`config.env.example`, read by `src/config.ts`), never in code. Its data (`logs.json`, `logs/<event>/`) is in `DATA_DIR` (`data/`, gitignored), and each log's local path is worked out from it, never stored. Paths on the roboRIO always use `/`; paths on the computer always go through `node:path`.
+- `ssh2`'s native add-ons are off (`allowBuilds` in `pnpm-workspace.yaml`), so it installs without a compiler. `pnpm --filter @g3/pit-log-downloader smoke` starts it and checks its status page; `.github/workflows/pit-log-downloader.yml` runs that on all three systems.
 
 ### G3 Orders (parts ordering)
 

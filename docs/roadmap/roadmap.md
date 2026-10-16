@@ -54,6 +54,7 @@ As of 10 October 2026, five of the six Phase 0 steps are done on `main`, Phase 1
 
 | Change | Roadmap step | Pull request |
 | --- | --- | --- |
+| The pit log downloader moved into the repository (`devices/pit-log-downloader`) as it was, with its team number, Drive folder and paths in a settings file instead of the code, so any team can run it on Linux, Windows or macOS | Pit log downloader: L.1 | This PR |
 | The team's admins see the operator access log, as the privacy policy draft already promised: Portal's Operator Access page lists each time an operator opened the team's member list, handed over its ownership or suspended or reactivated it, with when and the reason given, but not which operator | 2.8 | This PR |
 | ID only signs people in: each member's Account page (sign-ins, kiosk PIN) and the admins' Members and Kiosk Devices pages moved to Portal, ID's old addresses redirect, signing in or linking a sign-in lands on Portal, and ID is no longer a tile on Portal or in the All Apps menu. Status badges show only Pending and Rejected | 4.5 (decisions of 15 October) | This PR |
 | A team's name is the one in its Team Appearance: saving a new one renames it in G3ID and the platform's registry (the console, ID's sign-in page, the gateway's lookup). Every app sends a signed-out visitor straight to sign in, the sign-in app is called "ID", and ID's sign-in pages link to the platform's team finder ("Not team N? Find your team") | 4.5 (decisions of 15 October) | This PR |
@@ -476,6 +477,16 @@ It stays optional. Core apps must keep working without it, and most teams will n
 | Order | E.1 and E.2 come with Edge's turn in Phase 3, E.3 to E.5 before it is listed in the library in Phase 4, and E.6 before any team other than G3 turns it on. E.7 (updates from R2) is worth doing first of the rest: it replaces the SSH upgrade in `infra/edge/README.md`, and E.5's kit relies on it. E.8 and E.9 go with E.5 |
 | Updates and builds | Releases go to R2 in a private bucket and reach boxes through the edge worker, so there's no public download address or new domain. If a public download (for a first install without a key) is wanted, that's a hosting decision for the owners: a public bucket or a custom domain on it |
 | Hosting | Each box adds one hibernating Durable Object on the existing plan and no new Cloudflare product. The box, its SIM or internet line, and its setup are the team's own |
+
+## Pit log downloader
+
+A tool a team runs on a computer in the pit: when the computer joins the robot's network, it copies the robot's AdvantageKit match logs off the roboRIO and, if the team gives it one, uploads them to the team's Google Drive folder. It used to be its own repository with G3's team number and Drive folder in its code. It's optional, like Edge: Pit must keep working without it.
+
+| Step | Change | Where | Status |
+| --- | --- | --- | --- |
+| L.1 | Moved in as it was, runnable on Linux, Windows and macOS: settings (team number, Drive folder, key file, data folder) in a `config.env`, a startup check on all three in CI | `devices/pit-log-downloader` | Done (this PR) |
+| L.2 | Connect it to Pit: the downloader tells the team's Pit which match logs it has, and Pit shows them beside the match and its checklist archive. Needs a way for the downloader to sign in as the team (like a kiosk or a box key) | `devices/pit-log-downloader`, `workers/pit`, `apps/pit` | Not started |
+| L.3 | Where logs are kept: today the team's own Google Drive. Keeping them on the platform (R2) instead would be a hosting decision for the owners and a change to the privacy draft | `docs/legal/` | Needs a decision |
 
 ## Moving G3 in as the first team
 

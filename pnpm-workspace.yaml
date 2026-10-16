@@ -30,6 +30,10 @@ onlyBuiltDependencies:
 allowBuilds:
   "@biomejs/biome": true
   core-js: false
+  # ssh2's native add-ons (for the pit log downloader) are optional: it falls back to plain
+  # JavaScript, so the downloader installs on any computer without a compiler.
+  cpu-features: false
+  ssh2: false
   esbuild: true
   sharp: true
   workerd: true
