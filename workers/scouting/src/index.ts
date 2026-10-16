@@ -93,16 +93,22 @@ function scoutingCount(value: unknown) {
   return numeric !== null && Number.isInteger(numeric) && numeric >= 0 ? numeric : null;
 }
 
+/**
+ * A slider's answer, or null when it hasn't got one. Anywhere in the slider's own
+ * range counts, 0 included: a rating of 0 is a rating. A slider writes nothing
+ * until it's moved, so an untouched one has no answer however it reads on screen.
+ */
+function scoutingRating(field: ScoutingField, value: unknown) {
+  const numeric = finiteNumber(value);
+  const min = Number.isFinite(field.min) ? field.min : 0;
+  const max = Number.isFinite(field.max) ? field.max : 10;
+  const step = Number.isFinite(field.step) && field.step > 0 ? field.step : 1;
+  if (numeric === null || numeric < min || numeric > max) return null;
+  const steps = (numeric - min) / step;
+  return Math.abs(steps - Math.round(steps)) < 1e-9 ? numeric : null;
+}
+
 function validScoutingEntry(field: ScoutingField, value: unknown) {
-  if (field.type === "slider") {
-    const numeric = finiteNumber(value);
-    const min = Number.isFinite(field.min) ? field.min : 0;
-    const max = Number.isFinite(field.max) ? field.max : 10;
-    const step = Number.isFinite(field.step) && field.step > 0 ? field.step : 1;
-    if (numeric === null || numeric === 0 || numeric < min || numeric > max) return false;
-    const steps = (numeric - min) / step;
-    return Math.abs(steps - Math.round(steps)) < 1e-9;
-  }
   if (field.type === "mcq")
     return typeof value === "string" && field.options.includes(value) && nonZeroEntry(value);
   if (field.type === "multiSelect") {
@@ -898,6 +904,16 @@ app.post("/scouting-forms/:id/submissions", requireAuth, async (c) => {
       if (count === null)
         return c.json({ error: `${field.label} must be a whole count of 0 or more.` }, 400);
       cleanAnswers[field.id] = count;
+      continue;
+    }
+    if (formDefinition.form_kind === "scouting" && field.type === "slider") {
+      const rating = scoutingRating(field, value);
+      if (rating === null)
+        return c.json(
+          { error: `${field.label} needs an answer before this form can be submitted.` },
+          400,
+        );
+      cleanAnswers[field.id] = rating;
       continue;
     }
     if (
