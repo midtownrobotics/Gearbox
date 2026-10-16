@@ -1,4 +1,13 @@
-import { Badge, Button, Card, Stat, buttonClass, tones } from "@g3/ui";
+import {
+  Badge,
+  Button,
+  Card,
+  ConfirmQuestion,
+  ErrorBanner,
+  Stat,
+  buttonClass,
+  tones,
+} from "@g3/ui";
 import { type ReactNode, useState } from "react";
 import type { LogStatus, Status } from "../../src/status.ts";
 import { TrimDialog } from "./trim-dialog";
@@ -202,9 +211,68 @@ function CopyPathButton({ path }: { path: string }) {
   );
 }
 
+/**
+ * Delete, which asks first. A log in Gearbox can go from here only or from Gearbox too (from the
+ * pit computer: Pit's own pages leave deleting to admins).
+ */
+function DeleteLog({ log, onError }: { log: LogStatus; onError: (message: string) => void }) {
+  const [asking, setAsking] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  async function remove(alsoFromGearbox: boolean) {
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/logs/${encodeURIComponent(log.id)}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ alsoFromGearbox }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as { error?: string } | null;
+        onError(body?.error ?? "Couldn't delete it.");
+      }
+    } catch {
+      onError("Can't reach the downloader. Check that it's still running.");
+    } finally {
+      setBusy(false);
+      setAsking(false);
+    }
+  }
+
+  if (!asking) {
+    return (
+      <Button variant="danger" size="sm" onClick={() => setAsking(true)}>
+        Delete
+      </Button>
+    );
+  }
+  return (
+    <ConfirmQuestion
+      question={
+        log.uploaded
+          ? `Delete ${log.name}? It can't be undone, and it won't be copied off the robot again.`
+          : `Delete ${log.name} from this computer? It can't be undone, it won't be copied off the robot again, and it hasn't been uploaded to Pit.`
+      }
+      confirmLabel={log.uploaded ? "Delete from this computer" : "Delete"}
+      keepLabel="Keep it"
+      size="sm"
+      disabled={busy}
+      onConfirm={() => void remove(false)}
+      onKeep={() => setAsking(false)}
+    >
+      {log.uploaded && (
+        <Button variant="danger" size="sm" disabled={busy} onClick={() => void remove(true)}>
+          Delete here and from Gearbox
+        </Button>
+      )}
+    </ConfirmQuestion>
+  );
+}
+
 function LogRow({ log }: { log: LogStatus }) {
   const here = log.downloaded && log.sizeBytes !== null;
   const [trimming, setTrimming] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const download = `/api/download?event=${encodeURIComponent(log.event)}&file=${encodeURIComponent(log.localFile)}`;
   return (
     <li className="flex flex-wrap items-center gap-x-4 gap-y-2 py-3">
@@ -229,8 +297,14 @@ function LogRow({ log }: { log: LogStatus }) {
             Trim
           </Button>
         )}
+        {log.downloaded && !log.downloading && <DeleteLog log={log} onError={setError} />}
       </div>
       {trimming && <TrimDialog log={log} onClose={() => setTrimming(false)} />}
+      {error && (
+        <div className="w-full">
+          <ErrorBanner message={error} />
+        </div>
+      )}
     </li>
   );
 }

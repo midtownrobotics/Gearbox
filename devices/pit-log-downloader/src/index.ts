@@ -13,6 +13,7 @@ import {
   UploadRefused,
   checkGearbox,
   currentPairing,
+  deleteFromGearbox,
   gearboxStatus,
   pairWithGearbox,
   teamAppearance,
@@ -76,6 +77,11 @@ type Log = {
   trim?: { fromUs: number; toUs: number };
   /** What it comes to gzipped for Pit (trimmed, if it is), once worked out. */
   uploadSize?: number;
+  /**
+   * Deleted from this computer on the status page. The record stays, so it isn't copied off the
+   * robot again; it's left out of everything else.
+   */
+  deleted?: boolean;
   match: {
     event: string;
     type: MatchType;
@@ -118,6 +124,7 @@ const logs: Log[] = (JSON.parse(fs.readFileSync(kLogsJson).toString()) as Log[])
   status: { downloaded: log.status.downloaded, uploaded: log.status.uploaded === true },
   ...(log.trim ? { trim: log.trim } : {}),
   ...(log.uploadSize ? { uploadSize: log.uploadSize } : {}),
+  ...(log.deleted ? { deleted: true } : {}),
   locations: { rio: log.locations.rio },
 }));
 
@@ -312,7 +319,7 @@ async function uploadLogs(online: boolean) {
   uploadingRunning = true;
   try {
     for (const log of logs) {
-      if (!log.status.downloaded || log.status.uploaded) continue;
+      if (!log.status.downloaded || log.status.uploaded || log.deleted) continue;
       if (!currentPairing()) return;
       if (!fs.existsSync(localPathOf(log))) continue;
       if (log.uploadSize !== undefined && (needsTrim(log) || !online)) continue;
@@ -396,35 +403,37 @@ app.get("/api/status", (_req, res) => {
     p: "Practice",
   };
 
-  const decorated = logs.map((log): LogStatus => {
-    const localPath = localPathOf(log);
-    let sizeBytes: number | null = null;
-    try {
-      sizeBytes = fs.statSync(localPath).size;
-    } catch {
-      /* file was moved or deleted outside of this process */
-    }
+  const decorated = logs
+    .filter((log) => !log.deleted)
+    .map((log): LogStatus => {
+      const localPath = localPathOf(log);
+      let sizeBytes: number | null = null;
+      try {
+        sizeBytes = fs.statSync(localPath).size;
+      } catch {
+        /* file was moved or deleted outside of this process */
+      }
 
-    return {
-      id: log.id,
-      name: log.name,
-      event: log.match.event,
-      matchType: matchTypeNames[log.match.type],
-      matchNumber: log.match.number,
-      downloaded: log.status.downloaded,
-      uploaded: log.status.uploaded,
-      trimmed: Boolean(log.trim),
-      uploadSize: log.uploadSize ?? null,
-      needsTrim: needsTrim(log),
-      onRobot: rioLogs.some((r) => r.id === log.id),
-      downloading: downloadingIds.includes(log.id),
-      uploading: uploadingId === log.id,
-      localPath,
-      localFile: path.basename(localPath),
-      rioPath: log.locations.rio.path,
-      sizeBytes,
-    };
-  });
+      return {
+        id: log.id,
+        name: log.name,
+        event: log.match.event,
+        matchType: matchTypeNames[log.match.type],
+        matchNumber: log.match.number,
+        downloaded: log.status.downloaded,
+        uploaded: log.status.uploaded,
+        trimmed: Boolean(log.trim),
+        uploadSize: log.uploadSize ?? null,
+        needsTrim: needsTrim(log),
+        onRobot: rioLogs.some((r) => r.id === log.id),
+        downloading: downloadingIds.includes(log.id),
+        uploading: uploadingId === log.id,
+        localPath,
+        localFile: path.basename(localPath),
+        rioPath: log.locations.rio.path,
+        sizeBytes,
+      };
+    });
 
   const status: Status = {
     version: kVersion,
@@ -533,6 +542,38 @@ async function trimView(log: Log): Promise<TrimView> {
     maxUploadSize: kMaxUploadSize,
   };
 }
+
+// Deletes a log from this computer, and from Gearbox too with { alsoFromGearbox: true } (first, so
+// nothing is deleted here when Gearbox can't be reached). It isn't copied off the robot again.
+app.delete("/api/logs/:id", async (req, res) => {
+  const log = logs.find((l) => l.id === req.params.id && !l.deleted);
+  if (!log) {
+    res.status(404).json({ error: "That log isn't on this computer." });
+    return;
+  }
+  if (uploadingId === log.id) {
+    res.status(409).json({ error: "It's uploading now. Try again in a moment." });
+    return;
+  }
+  if (req.body?.alsoFromGearbox === true) {
+    try {
+      await deleteFromGearbox(log.match.event, log.name);
+    } catch (err) {
+      res.status(502).json({
+        error: `${err instanceof Error ? err.message : err} Nothing was deleted.`,
+      });
+      return;
+    }
+    logWithTimestamp(`Deleted ${log.name} from Gearbox.`);
+  }
+  fs.rmSync(localPathOf(log), { force: true });
+  log.deleted = true;
+  log.uploadSize = undefined;
+  log.trim = undefined;
+  saveLogs();
+  logWithTimestamp(`Deleted ${log.name} from this computer.`);
+  res.json({ ok: true });
+});
 
 app.get("/api/logs/:id/trim", async (req, res) => {
   const log = logs.find((l) => l.id === req.params.id);

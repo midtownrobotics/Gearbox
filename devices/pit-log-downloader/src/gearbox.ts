@@ -265,6 +265,29 @@ export async function uploadLog(log: LogUpload): Promise<"uploaded" | "already t
   return "uploaded";
 }
 
+/** Deletes a log from the team's Pit (gone already counts as done). Throws when it can't. */
+export async function deleteFromGearbox(event: string, name: string): Promise<void> {
+  if (!pairing) throw new Error("Not paired with Gearbox.");
+  let res: Response;
+  try {
+    res = await pit(
+      pairing.teamNumber,
+      `/downloader/logs/${encodeURIComponent(event)}/${encodeURIComponent(name)}`,
+      { method: "DELETE" },
+    );
+  } catch {
+    throw new Error("Couldn't reach Gearbox. Check the internet connection.");
+  }
+  if (res.status === 401) {
+    save(null);
+    connection = "removed";
+  }
+  if (!res.ok) {
+    const body = (await res.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(body?.error ?? `Gearbox answered ${res.status}.`);
+  }
+}
+
 /** Forgets the pairing, and tells Pit to remove this downloader when it can. */
 export async function unpairFromGearbox(): Promise<void> {
   if (pairing)
