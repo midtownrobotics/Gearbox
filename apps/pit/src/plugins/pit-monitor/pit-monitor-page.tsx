@@ -14,6 +14,7 @@ import type {
   ChecklistIssueSummary,
   ChecklistList,
 } from "../../shared/getters/types";
+import { ConnectionIndicator, OfflineOverlay, useConnection } from "./connection";
 
 const REFRESH_MS = 15_000;
 
@@ -559,6 +560,7 @@ export function PitMonitorPage() {
   const [iframeUrl, setIframeUrl] = useState<string | null>(null);
   // The newest match logs, while the team has a paired log downloader; null hides the box.
   const [recentLogs, setRecentLogs] = useState<MatchLog[] | null>(null);
+  const connection = useConnection();
 
   const handleFullscreen = async () => {
     if (!isFullscreen) {
@@ -577,28 +579,30 @@ export function PitMonitorPage() {
   };
 
   async function loadAll() {
+    // Each part is kept as it was when it couldn't be asked (undefined), never blanked.
     const [b, l, i, m, logs] = await Promise.all([
-      fetchBatteries().catch(() => [] as Battery[]),
-      fetchLists().catch(() => [] as ChecklistList[]),
-      fetchAllIssues().catch(() => [] as ChecklistIssueSummary[]),
+      fetchBatteries().catch(() => undefined),
+      fetchLists().catch(() => undefined),
+      fetchAllIssues().catch(() => undefined),
       api.monitor.data
         .$get()
-        .then((r) => (r.ok ? (r.json() as Promise<MonitorData>) : null))
-        .catch(() => null),
+        .then((r) => (r.ok ? (r.json() as Promise<MonitorData>) : undefined))
+        .catch(() => undefined),
       fetchDownloaders()
         .then(async ({ downloaders }) =>
           downloaders.length ? (await fetchMatchLogs()).logs.slice(0, 3) : null,
         )
         .catch(() => undefined),
     ]);
-    setBatteries(b);
-    setCachedBatteries(b);
-    setLists(l);
-    setIssues(i);
-    setMonitor(m);
-    // Kept as it was when it couldn't be asked.
+    if (b !== undefined) {
+      setBatteries(b);
+      setCachedBatteries(b);
+    }
+    if (l !== undefined) setLists(l);
+    if (i !== undefined) setIssues(i);
+    if (m !== undefined) setMonitor(m);
     if (logs !== undefined) setRecentLogs(logs);
-    setLastUpdated(new Date());
+    if ([b, l, i, m, logs].every((part) => part !== undefined)) setLastUpdated(new Date());
     setLoading(false);
   }
 
@@ -631,6 +635,12 @@ export function PitMonitorPage() {
     };
   }, []);
 
+  // Back online: catch up at once instead of waiting for the next refresh.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: loadAll is stable
+  useEffect(() => {
+    if (connection.online && !loading) void loadAll();
+  }, [connection.online]);
+
   if (loading) {
     return (
       <main className="flex-1 bg-page flex items-center justify-center">
@@ -645,11 +655,13 @@ export function PitMonitorPage() {
 
   return (
     <main className="flex-1 bg-page text-secondary-900">
+      <OfflineOverlay connection={connection} />
       <div className="px-6 py-5 space-y-5">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-secondary-200 pb-4">
           <h1 className="text-2xl font-black tracking-tight">{names.appTitle("Pit")} Monitor</h1>
           <div className="flex items-center gap-4">
+            <ConnectionIndicator connection={connection} />
             {lastUpdated && (
               <p className="text-xs text-secondary-600">
                 Updated {lastUpdated.toLocaleTimeString()}
