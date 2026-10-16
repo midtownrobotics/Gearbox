@@ -1,12 +1,16 @@
 name: pit-log-downloader
 
 # The pit log downloader runs on team members' own computers, so it's checked on Linux, Windows
-# and macOS: it installs, type checks, starts and answers its status page.
+# and macOS: it installs, type checks, builds its status page, starts and answers.
 
 on:
   pull_request:
     paths:
       - "devices/pit-log-downloader/**"
+      # Its status page is built from these.
+      - "packages/ui/**"
+      - "packages/site-config/**"
+      - "packages/demo/**"
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"
       - ".github/workflows/pit-log-downloader.yml"
@@ -14,6 +18,10 @@ on:
     branches: [main]
     paths:
       - "devices/pit-log-downloader/**"
+      # Its status page is built from these.
+      - "packages/ui/**"
+      - "packages/site-config/**"
+      - "packages/demo/**"
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"
       - ".github/workflows/pit-log-downloader.yml"

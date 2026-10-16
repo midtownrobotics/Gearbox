@@ -1,4 +1,5 @@
 import * as fs from "node:fs";
+import { createServer } from "node:http";
 import * as os from "node:os";
 import * as path from "node:path";
 import express from "express";
@@ -6,7 +7,7 @@ import { type drive_v3, google } from "googleapis";
 import isOnline from "is-online";
 import { NodeSSH } from "node-ssh";
 import { config } from "./config.ts";
-import { dashboardHtml } from "./dashboard.ts";
+import type { LogStatus, MatchTypeName, Status } from "./status.ts";
 
 const kRobotNetworkBaseIp = config.robotNetworkBaseIp;
 const kRioIp = config.rioIp;
@@ -32,8 +33,12 @@ let rioLogs: { id: string; name: string; filename: string; origin: string }[] = 
 let rioLogsCheckedAt: number | null = null;
 let downloadingIds: string[] = [];
 let uploadingId: string | null = null;
-const activity: { time: string; message: string }[] = [];
-const kStartedAt = Date.now();
+const activity: { id: number; time: string; message: string }[] = [];
+let activityCount = 0;
+const kPackageDir = path.join(import.meta.dirname, "..");
+const kVersion: string = JSON.parse(
+  fs.readFileSync(path.join(kPackageDir, "package.json"), "utf8"),
+).version;
 
 type MatchType = "e" | "q" | "p";
 
@@ -346,26 +351,21 @@ function logWithTimestamp(message: string) {
   const time = `${pn(date.getHours())}:${pn(date.getMinutes())}:${pn(date.getSeconds())}`;
   console.log(`${message} (${time})`);
 
-  activity.unshift({ time, message });
+  activity.unshift({ id: ++activityCount, time, message });
   if (activity.length > 100) activity.length = 100;
 }
 
 const app = express();
 
-// Serve the dashboard UI
-app.get("/", (_req, res) => {
-  res.send(dashboardHtml);
-});
-
-// Everything the dashboard renders, in one payload.
-app.get("/status", (_req, res) => {
-  const matchTypeNames: Record<MatchType, string> = {
+// Everything the status page shows, in one payload.
+app.get("/api/status", (_req, res) => {
+  const matchTypeNames: Record<MatchType, MatchTypeName> = {
     e: "Elimination",
     q: "Qualification",
     p: "Practice",
   };
 
-  const decorated = logs.map((log) => {
+  const decorated = logs.map((log): LogStatus => {
     const localPath = localPathOf(log);
     let sizeBytes: number | null = null;
     try {
@@ -395,9 +395,8 @@ app.get("/status", (_req, res) => {
     };
   });
 
-  res.json({
-    now: Date.now(),
-    startedAt: kStartedAt,
+  const status: Status = {
+    version: kVersion,
     connection: {
       robot: robotConnected,
       internet: internetConnected,
@@ -406,19 +405,17 @@ app.get("/status", (_req, res) => {
       downloadingIds,
       rioLogsCheckedAt,
     },
-    constants: {
-      kRobotNetworkBaseIp,
-      kRioIp,
-      kLogFolderId,
-      logFolderUrl: kLogFolderId ? `https://drive.google.com/drive/folders/${kLogFolderId}` : null,
-      kServerPort: config.port,
-      kLogFileRegex: kLogFileRegex.toString(),
-      pollIntervalMs: 3000,
+    settings: {
+      teamNumber: config.teamNumber,
+      robotNetwork: kRobotNetworkBaseIp,
+      rioIp: kRioIp,
+      driveFolderUrl: kLogFolderId
+        ? `https://drive.google.com/drive/folders/${kLogFolderId}`
+        : null,
       rioLogDirs: kRioLogDirs,
       localLogsDir: kLogsDir,
     },
     counts: {
-      total: decorated.length,
       downloaded: decorated.filter((l) => l.downloaded).length,
       inDrive: decorated.filter((l) => l.inDrive).length,
       pendingUpload: kLogFolderId ? decorated.filter((l) => l.downloaded && !l.inDrive).length : 0,
@@ -430,53 +427,16 @@ app.get("/status", (_req, res) => {
     })),
     logs: decorated,
     activity,
-  });
-});
-
-// List events (folders) or files within an event
-app.get("/files", (req, res) => {
-  const event = req.query.event as string | undefined;
-
-  if (!fs.existsSync(kLogsDir)) {
-    return res.json([]);
-  }
-
-  if (!event) {
-    // Return top-level event folders
-    const entries = fs
-      .readdirSync(kLogsDir, { withFileTypes: true })
-      .filter((e) => e.isDirectory())
-      .map((e) => {
-        const files = fs.readdirSync(path.join(kLogsDir, e.name));
-        return { type: "folder", name: e.name, count: files.length };
-      });
-    return res.json(entries);
-  }
-
-  // Sanitize to prevent path traversal
-  const eventDir = path.join(kLogsDir, path.basename(event));
-  if (!fs.existsSync(eventDir)) {
-    return res.json([]);
-  }
-
-  const files = fs
-    .readdirSync(eventDir, { withFileTypes: true })
-    .filter((e) => e.isFile())
-    .map((e) => {
-      const stat = fs.statSync(path.join(eventDir, e.name));
-      const mb = (stat.size / 1024 / 1024).toFixed(1);
-      return { type: "file", name: e.name, event, size: `${mb} MB` };
-    });
-
-  res.json(files);
+  };
+  res.json(status);
 });
 
 // Download a specific log file
-app.get("/download", (req, res) => {
-  const event = req.query.event as string;
-  const file = req.query.file as string;
+app.get("/api/download", (req, res) => {
+  const event = req.query.event;
+  const file = req.query.file;
 
-  if (!event || !file) {
+  if (typeof event !== "string" || typeof file !== "string" || !event || !file) {
     return res.status(400).send("Missing event or file parameter.");
   }
 
@@ -490,7 +450,36 @@ app.get("/download", (req, res) => {
   res.download(filePath);
 });
 
-app.listen(config.port, config.host, () => {
+app.use("/api", (_req, res) => {
+  res.status(404).json({ error: "Not found" });
+});
+
+const server = createServer(app);
+
+if (process.argv.includes("--dev")) {
+  // `watch`: the page is served by Vite, which reloads it as its files change.
+  const { createServer: createVite } = await import("vite");
+  const vite = await createVite({
+    configFile: path.join(kPackageDir, "vite.config.ts"),
+    server: { middlewareMode: true, hmr: { server } },
+    appType: "spa",
+  });
+  app.use(vite.middlewares);
+} else {
+  // `start` builds the page first.
+  const webDir = path.join(kPackageDir, "dist", "web");
+  app.use(express.static(webDir));
+  app.use((_req, res) => {
+    const page = path.join(webDir, "index.html");
+    if (fs.existsSync(page)) res.sendFile(page);
+    else
+      res
+        .status(503)
+        .send("The status page isn't built. Run: pnpm --filter @g3/pit-log-downloader build");
+  });
+}
+
+server.listen(config.port, config.host, () => {
   const shown = config.host === "0.0.0.0" ? "localhost" : config.host;
-  logWithTimestamp(`Log browser running at http://${shown}:${config.port}`);
+  logWithTimestamp(`Status page running at http://${shown}:${config.port}`);
 });

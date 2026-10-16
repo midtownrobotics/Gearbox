@@ -1,11 +1,12 @@
 // `pnpm --filter @g3/pit-log-downloader smoke`: starts the downloader with no robot, no Drive and
-// an empty data folder, waits for its status page to answer, and stops it. CI runs it on Linux,
+// an empty data folder, waits for its status API and page to answer, and stops it. CI runs it on Linux,
 // Windows and macOS.
 
 import { spawn } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { Status } from "../src/status.ts";
 
 const dataDir = mkdtempSync(join(tmpdir(), "pit-log-downloader-"));
 const port = 3917;
@@ -14,19 +15,20 @@ const child = spawn(process.execPath, [join(import.meta.dirname, "../src/index.t
   stdio: "inherit",
 });
 
-let failure: string | null = "the status page didn't answer within 20 seconds";
+let failure: string | null = "the downloader didn't answer within 20 seconds";
 for (let i = 0; i < 40 && child.exitCode === null; i++) {
   await new Promise((resolve) => setTimeout(resolve, 500));
-  const status = await fetch(`http://127.0.0.1:${port}/status`)
-    .then(
-      (r) => r.json() as Promise<{ constants?: { kRioIp?: string }; counts?: { total?: number } }>,
-    )
+  const status = await fetch(`http://127.0.0.1:${port}/api/status`)
+    .then((r) => r.json() as Promise<Partial<Status>>)
     .catch(() => null);
   if (!status) continue;
+  const page = await fetch(`http://127.0.0.1:${port}/`).then((r) => r.text());
   failure =
-    status.constants?.kRioIp === "10.16.48.2" && status.counts?.total === 0
-      ? null
-      : `unexpected status: ${JSON.stringify(status.constants)}`;
+    status.settings?.rioIp !== "10.16.48.2" || status.logs?.length !== 0
+      ? `unexpected status: ${JSON.stringify(status.settings)}`
+      : !page.includes('<div id="root">')
+        ? "the status page isn't built"
+        : null;
   break;
 }
 if (child.exitCode !== null) failure = `it exited with code ${child.exitCode}`;
@@ -37,4 +39,4 @@ if (failure) {
   console.error(`Smoke test failed: ${failure}.`);
   process.exit(1);
 }
-console.log("Smoke test passed: the downloader started and its status page answered.");
+console.log("Smoke test passed: the downloader started and its status API and page answered.");

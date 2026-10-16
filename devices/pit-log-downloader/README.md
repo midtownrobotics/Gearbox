@@ -6,8 +6,9 @@ by match (`Qual-13.wpilog`, `Elim-2.wpilog`, `Prct-0.wpilog`) and sorts them by 
 it a Google Drive folder, it also uploads them there, one folder per event, once the computer is
 online again.
 
-It runs on Linux, Windows and macOS. A status page at <http://localhost:3000> shows the robot and
-internet connection, every log and where it is, and lets you download them.
+It runs on Linux, Windows and macOS. A status page at <http://localhost:3000>, in the same style
+as the other Gearbox apps, shows the robot and internet connection and every log and where it is,
+and lets you download them or copy their path (to open in AdvantageScope).
 
 Logs are only found if their names follow AdvantageKit's pattern with an event and match, like
 `akit_26-04-30_14-40-08_archimedes_q13.wpilog`. They're read from `/u/logs` (a USB drive) and
@@ -52,10 +53,23 @@ From the `Gearbox` folder:
 pnpm --filter @g3/pit-log-downloader start
 ```
 
-Leave it running, connect to the robot's network (over Wi-Fi, Ethernet or USB) and open
-<http://localhost:3000>. Stop it with Ctrl+C.
+It builds the status page first, which takes a few seconds. Leave it running, connect to the
+robot's network (over Wi-Fi, Ethernet or USB) and open <http://localhost:3000>. Stop it with
+Ctrl+C.
 
-`watch` instead of `start` restarts it whenever you change its code.
+## Working on it
+
+```sh
+pnpm --filter @g3/pit-log-downloader watch
+```
+
+restarts the downloader when `src/` changes and reloads the status page as you edit it.
+
+- `src/`: the downloader and its API (`/api/status`, `/api/download`), on Node with Express.
+  `src/status.ts` is what `/api/status` answers, shared with the page.
+- `web/`: the status page, in React with Vite and Tailwind, built from the shared Gearbox parts
+  (`@g3/ui`). It has the Gearbox top bar with no team: the built-in colors, light and dark mode,
+  and no sign-in. `start` builds it into `dist/web`; `watch` serves it through Vite instead.
 
 ## Settings
 
@@ -83,5 +97,5 @@ pnpm --filter @g3/pit-log-downloader typecheck
 pnpm --filter @g3/pit-log-downloader smoke
 ```
 
-`smoke` starts the downloader with no robot and no Drive and checks that its status page
-answers. CI runs both on Linux, Windows and macOS.
+`smoke` builds the page, starts the downloader with no robot and no Drive, and checks that its
+API and page answer. CI runs both on Linux, Windows and macOS.
