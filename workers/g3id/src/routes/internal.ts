@@ -1,4 +1,4 @@
-import { sendDM, sendMessage } from "@g3/slack";
+import type { DiscordGuild, DiscordUser } from "@g3/discord";
 import { and, eq, inArray, isNull, ne } from "drizzle-orm";
 import { Hono } from "hono";
 import { createDb } from "../db";
@@ -7,18 +7,30 @@ import {
   coreSlackLinkCodes,
   coreUserIdentities,
   coreUsers,
+  discordInstallations,
   teams,
 } from "../db/schema";
+import {
+  CHAT_LABELS,
+  chatForTeam,
+  chatProvider,
+  isChatChannelId,
+  postError,
+  postToChannel,
+} from "../lib/chat";
+import { saveDiscordInstallation } from "../lib/discord-install";
+import { signInWithDiscord } from "../lib/discord-sign-in";
+import { createHandoff } from "../lib/handoff";
 import { dmAdmins, dmMembers } from "../lib/member-dm";
 import { createSigninCode } from "../lib/slack-code";
-import { saveInstallation, slackForTeam } from "../lib/slack-install";
+import { saveInstallation } from "../lib/slack-install";
 import { siteTeamId } from "../lib/team";
 import { logToTeam } from "../lib/team-log";
 import type { AppEnv } from "../types";
 
 // For other workers only, over service bindings: the platform worker signs teams up through these,
 // and its operator console (roadmap 2.8) deletes and hands over teams through them.
-// Apps read a team's members and send its Slack messages through them (@g3/auth).
+// Apps read a team's members and send its Slack or Discord messages through them (@g3/auth).
 // The gateway never answers /api/internal, and production workers have no other public address.
 
 type NewTeam = { id: string; teamNumber: number; name: string };
@@ -38,6 +50,8 @@ const DELETE_TEAM = [
   `DELETE FROM core_slack_link_codes WHERE team_id = ?1 OR ${MEMBER_ROWS}`,
   "DELETE FROM slack_installations WHERE team_id = ?1",
   `UPDATE slack_installations SET installed_by = NULL WHERE installed_by IN ${MEMBERS}`,
+  "DELETE FROM discord_installations WHERE team_id = ?1",
+  `UPDATE discord_installations SET installed_by = NULL WHERE installed_by IN ${MEMBERS}`,
   `UPDATE core_users SET merged_into_user_id = NULL WHERE merged_into_user_id IN ${MEMBERS}`,
   "DELETE FROM core_users WHERE team_id = ?1",
   "DELETE FROM teams WHERE id = ?1",
@@ -53,7 +67,7 @@ type NewInstallation = {
 
 /**
  * Deletes a team from G3ID: every account in it, their sign-ins and sessions, its kiosks and its
- * Slack connection. Returns the deleted accounts' ids.
+ * Slack or Discord connection. Returns the deleted accounts' ids.
  */
 export async function deleteTeam(env: AppEnv["Bindings"], id: string): Promise<string[]> {
   const db = createDb(env.DB);
@@ -119,14 +133,16 @@ export const internalRouter = new Hono<AppEnv>()
       )
       .orderBy(coreUsers.displayName)
       .all();
-    const withSlack = new Set(
+    // Who the team's bot can DM: members with its chat (Slack or Discord) linked.
+    const provider = (await chatProvider(c.env, c.req.param("id"))) ?? "slack";
+    const withChat = new Set(
       (
         await createDb(c.env.DB)
           .select({ userId: coreUserIdentities.userId })
           .from(coreUserIdentities)
           .innerJoin(coreUsers, eq(coreUsers.id, coreUserIdentities.userId))
           .where(
-            and(eq(coreUsers.teamId, c.req.param("id")), eq(coreUserIdentities.provider, "slack")),
+            and(eq(coreUsers.teamId, c.req.param("id")), eq(coreUserIdentities.provider, provider)),
           )
           .all()
       ).map((r) => r.userId),
@@ -136,7 +152,7 @@ export const internalRouter = new Hono<AppEnv>()
         ...m,
         isAdmin: m.isAdmin === 1,
         isMentor: m.isMentor === 1,
-        hasSlack: withSlack.has(m.id),
+        hasChat: withChat.has(m.id),
       })),
     );
   })
@@ -198,46 +214,23 @@ export const internalRouter = new Hono<AppEnv>()
     }
     return c.json({ ok: true });
   })
-  // A direct message from the team's own Slack bot (an app telling a member something, like Orders
-  // approving their request). The bot token never leaves G3ID. 404 when the team has no Slack.
-  .post("/teams/:id/slack/dm", async (c) => {
-    const body = await c.req
-      .json<{ slackUserId?: unknown; text?: unknown }>()
-      .catch(() => ({}) as { slackUserId?: unknown; text?: unknown });
-    const { slackUserId, text } = body;
-    if (typeof slackUserId !== "string" || typeof text !== "string" || !text.trim()) {
-      return c.json({ error: "slackUserId and text are required." }, 400);
-    }
-    // Only ever a member's DM, never a channel.
-    if (!/^[UW][A-Z0-9]+$/.test(slackUserId)) {
-      return c.json({ error: "slackUserId must be a Slack user ID." }, 400);
-    }
-    if (text.length > 4000) return c.json({ error: "text is too long." }, 400);
-    const teamSlack = await slackForTeam(c.env, c.req.param("id"));
-    if (!teamSlack) return c.json({ error: "This team hasn't connected Slack." }, 404);
-    try {
-      await sendDM(slackUserId, text, teamSlack.slack);
-    } catch (err) {
-      return c.json({ error: err instanceof Error ? err.message : String(err) }, 502);
-    }
-    return c.json({ ok: true });
-  })
-  // The same message to every active admin of the team, each in a DM from its own bot (the
-  // platform tells them when an app is switched on or off). Admins without a linked Slack account
-  // aren't sent one; 404 when the team has no Slack.
-  .post("/teams/:id/slack/dm-admins", async (c) => {
+  // The same message to every active admin of the team, each in a DM from its own bot on its chat
+  // (Slack or Discord; the platform tells them when an app is switched on or off). Admins without
+  // the chat linked aren't sent one; 404 when the team has no chat. `text` is in Gearbox's chat
+  // format (lib/chat.ts).
+  .post("/teams/:id/chat/dm-admins", async (c) => {
     const body = await c.req.json<{ text?: unknown }>().catch(() => ({}) as { text?: unknown });
     const text = typeof body.text === "string" ? body.text.trim() : "";
     if (!text || text.length > 4000)
       return c.json({ error: "text is required (up to 4000)." }, 400);
     const result = await dmAdmins(c.env, c.req.param("id"), text);
-    if (!result) return c.json({ error: "This team hasn't connected Slack." }, 404);
+    if (!result) return c.json({ error: "This team hasn't connected Slack or Discord." }, 404);
     return c.json({ ok: true, sent: result.sent, admins: result.members });
   })
-  // A message from the team's own bot to some of its members (the platform's notifications, to
-  // the people a team admin chose). Only the team's active members with a linked Slack account
-  // are sent one; anyone else in `userIds` is skipped. 404 when the team has no Slack.
-  .post("/teams/:id/slack/dm-members", async (c) => {
+  // A message from the team's own bot to some of its members, by G3ID id (Orders' approvals,
+  // Schedule's reminders, the platform's notifications). Only the team's active members with its
+  // chat linked are sent one; anyone else in `userIds` is skipped. 404 when the team has no chat.
+  .post("/teams/:id/chat/dm-members", async (c) => {
     const body = await c.req
       .json<{ userIds?: unknown; text?: unknown }>()
       .catch(() => ({}) as { userIds?: unknown; text?: unknown });
@@ -251,7 +244,7 @@ export const internalRouter = new Hono<AppEnv>()
       return c.json({ error: "userIds is required (up to 100)." }, 400);
     }
     const result = await dmMembers(c.env, c.req.param("id"), text, inArray(coreUsers.id, userIds));
-    if (!result) return c.json({ error: "This team hasn't connected Slack." }, 404);
+    if (!result) return c.json({ error: "This team hasn't connected Slack or Discord." }, 404);
     return c.json({ ok: true, sent: result.sent, members: result.members });
   })
   // Which apps the team has on (the platform's app library), for an app whose feature needs
@@ -282,27 +275,29 @@ export const internalRouter = new Hono<AppEnv>()
       ? c.json({ ok: true })
       : c.json({ error: "The team's log couldn't be written." }, 502);
   })
-  // A message from the team's own Slack bot to one of its channels (Shop's release and daily
-  // summary posts). 404 when the team has no Slack; Slack's own refusal (not_in_channel, ...) is
-  // passed back as the error.
-  .post("/teams/:id/slack/message", async (c) => {
+  // A post from the team's own bot in one of its channels (Shop's release and daily summary
+  // posts, the platform's notifications), on Slack or Discord, whichever the team has. 404 when
+  // the team has no chat; the service's own refusal (not_in_channel, ...) is passed back as the
+  // error.
+  .post("/teams/:id/chat/message", async (c) => {
     const body = await c.req
       .json<{ channel?: unknown; text?: unknown }>()
       .catch(() => ({}) as { channel?: unknown; text?: unknown });
     const { channel, text } = body;
-    if (typeof channel !== "string" || !/^[CG][A-Z0-9]+$/.test(channel)) {
-      return c.json({ error: "channel must be a Slack channel ID." }, 400);
+    const teamId = c.req.param("id");
+    const chat = await chatForTeam(c.env, teamId);
+    if (!chat) return c.json({ error: "This team hasn't connected Slack or Discord." }, 404);
+    if (typeof channel !== "string" || !isChatChannelId(chat.provider, channel)) {
+      return c.json({ error: `channel must be a ${CHAT_LABELS[chat.provider]} channel ID.` }, 400);
     }
     if (typeof text !== "string" || !text.trim()) {
       return c.json({ error: "text is required." }, 400);
     }
     if (text.length > 40_000) return c.json({ error: "text is too long." }, 400);
-    const teamSlack = await slackForTeam(c.env, c.req.param("id"));
-    if (!teamSlack) return c.json({ error: "This team hasn't connected Slack." }, 404);
     try {
-      await sendMessage(channel, text, teamSlack.slack);
+      await postToChannel(c.env, teamId, chat, channel, text);
     } catch (err) {
-      return c.json({ error: err instanceof Error ? err.message : String(err) }, 502);
+      return c.json({ error: postError(err) }, 502);
     }
     return c.json({ ok: true });
   })
@@ -311,6 +306,37 @@ export const internalRouter = new Hono<AppEnv>()
     const install = await c.req.json<NewInstallation>();
     const result = await saveInstallation(c.env, { ...install, installedBy: null });
     return c.json({ result }, result === "saved" ? 200 : 409);
+  })
+  // The team's Discord server and its founder, from the sign-up's "Add to Discord" (one authorize
+  // adds the bot and signs the founder in). The team has no members yet, so the founder becomes
+  // its first admin; the answer's token is spent at /auth/handoff on the team's own address,
+  // which sets the session cookie there.
+  .post("/teams/:id/discord-founder", async (c) => {
+    const teamId = c.req.param("id");
+    const body = await c.req.json<{ guild: DiscordGuild; user: DiscordUser }>();
+    const saved = await saveDiscordInstallation(c.env, {
+      teamId,
+      guildId: body.guild.id,
+      guildName: body.guild.name,
+      installedBy: null,
+    });
+    if (saved === "taken") {
+      return c.json({ error: "That Discord server is already connected to another team." }, 409);
+    }
+    if (saved === "slack") return c.json({ error: "This team already has Slack." }, 409);
+    const signIn = await signInWithDiscord(c.env, teamId, body.user);
+    if (signIn.result === "failed") return c.json({ error: signIn.message }, 409);
+    if (signIn.result !== "signed_in" || !signIn.firstAdmin) {
+      return c.json({ error: "This team already has members." }, 409);
+    }
+    await createDb(c.env.DB)
+      .update(discordInstallations)
+      .set({ installedBy: signIn.userId })
+      .where(eq(discordInstallations.teamId, teamId));
+    return c.json({
+      userId: signIn.userId,
+      token: await createHandoff(c.env, teamId, signIn.sessionId),
+    });
   })
   // The code the founder sends to the bot: the team has no members yet, so whoever sends it from
   // the team's workspace becomes its first admin (lib/slack-code.ts).

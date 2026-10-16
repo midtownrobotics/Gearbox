@@ -63,6 +63,7 @@ describe("the demo team", () => {
     const res = await g3id("/team/sign-in", { headers: onDemo });
     expect(await res.json()).toEqual({
       slack: false,
+      discord: false,
       google: false,
       github: false,
       steam: false,

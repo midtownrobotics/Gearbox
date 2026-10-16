@@ -7,7 +7,7 @@ import { eventually, onshapeEvent } from "./onshape";
 
 // What each team has of its own in Shop (roadmap Phase 3): its lists (including the ones that are
 // only numbers, which the isolation test's markers can't see), its files under its own R2 prefix,
-// its Onshape keys and webhook, and its Slack posts.
+// its Onshape keys and webhook, and its chat posts.
 
 const database = (env as unknown as { SHOP_DB: D1Database }).SHOP_DB;
 const bucket = (env as unknown as { DRAWINGS: R2Bucket }).DRAWINGS;
@@ -227,19 +227,19 @@ describe("Onshape", () => {
   });
 });
 
-describe("Slack", () => {
-  it("posts the daily summary on the team's own Slack", async () => {
+describe("chat posts", () => {
+  it("posts the daily summary on the team's own chat", async () => {
     const { team } = await shopWithWork();
-    await jsonAs(team.admin, "/admin/slack/config", {
+    await jsonAs(team.admin, "/admin/chat/config", {
       method: "POST",
-      body: { slackReleaseChannelId: "CREL", slackSummaryChannelId: "CSUM" },
+      body: { releaseChannelId: "CREL", summaryChannelId: "CSUM" },
     });
-    await jsonAs(team.admin, "/admin/slack/daily-summary", {
+    await jsonAs(team.admin, "/admin/chat/daily-summary", {
       method: "POST",
       body: { kind: "overview", since: Date.now() - 60_000 },
     });
     const sent = (await (
-      await g3id.fetch(`http://g3id/api/internal/teams/${team.teamId}/slack/messages`)
+      await g3id.fetch(`http://g3id/api/internal/teams/${team.teamId}/chat/message`)
     ).json()) as { channel: string; text: string }[];
     expect(sent).toHaveLength(1);
     expect(sent[0].channel).toBe("CSUM");

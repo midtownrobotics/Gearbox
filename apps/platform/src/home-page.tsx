@@ -88,7 +88,7 @@ const APPS: App[] = [
     demo: "schedule",
     icon: scheduleIcon,
     blurb:
-      "Who does what at each event, 15 minutes at a time. Drag roles across the grid, publish it, and Slack reminds people before their role changes.",
+      "Who does what at each event, 15 minutes at a time. Drag roles across the grid, publish it, and Slack or Discord reminds people before their role changes.",
   },
   {
     name: "Edge",
@@ -102,7 +102,7 @@ const APPS: App[] = [
 
 /** What every app shares: one line after the apps. */
 const SHARED = [
-  { icon: FaSlack, text: "One sign-in through your team's Slack" },
+  { icon: FaSlack, text: "One sign-in through your team's Slack or Discord" },
   { icon: FaUserShield, text: "Admin, mentor and student roles in every app" },
   { icon: FaPalette, text: "Your name, logo and colors everywhere" },
 ];
@@ -142,12 +142,12 @@ const STEPS = [
     body: "Your FRC number, name and country. One team per number.",
   },
   {
-    title: `Add ${site.slackBotName} to your Slack`,
-    body: `One click installs ${site.slackBotName} in your team's workspace. It's how everyone signs in.`,
+    title: `Add ${site.slackBotName} to your Slack or Discord`,
+    body: `One click adds ${site.slackBotName} to your team's Slack workspace or Discord server. It's how everyone signs in.`,
   },
   {
-    title: "Send it the code on screen",
-    body: `DM ${site.slackBotName} the code. You're your team's first admin, and your apps are live.`,
+    title: "Confirm it's you",
+    body: `On Discord, adding ${site.slackBotName} signs you in. On Slack, DM it the code on screen. You're your team's first admin, and your apps are live.`,
   },
 ];
 
@@ -235,7 +235,7 @@ function Hero() {
           </h1>
           <p className="max-w-xl text-lg text-secondary-600">
             Orders, shop tracking, pit checklists and scouting that all share one sign-in through
-            your team's Slack. Free, open source, and built by an FRC team.
+            your team's Slack or Discord. Free, open source, and built by an FRC team.
           </p>
           <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-3">
@@ -248,7 +248,8 @@ function Hero() {
               <MyTeamButton large />
             </div>
             <p className="text-sm text-secondary-500">
-              Takes about two minutes. You'll need to be able to add an app to your team's Slack.
+              Takes about two minutes. You'll need to be able to add an app to your team's Slack or
+              Discord.
             </p>
           </div>
           <div className="space-y-2 border-t border-line pt-5">

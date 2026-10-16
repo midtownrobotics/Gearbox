@@ -9,7 +9,8 @@
     "./setup": "./src/setup.ts",
     "./worker": "./src/worker.ts",
     "./isolation": "./src/isolation.ts",
-    "./demo": "./src/demo.ts"
+    "./demo": "./src/demo.ts",
+    "./discord": "./src/discord.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

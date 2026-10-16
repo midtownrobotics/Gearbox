@@ -46,7 +46,7 @@ export const overlaps = (a: [number, number], b: [number, number]) => a[0] < b[1
 
 /**
  * The day and slot a moment falls in, in an event's time zone: which block is "now" there, or
- * `minutes` from now (for Slack). Wall-clock, so a daylight-saving change during the event only
+ * `minutes` from now (for chat reminders). Wall-clock, so a daylight-saving change during the event only
  * moves which moment a slot is, never the slots themselves.
  */
 export function slotAt(
@@ -75,7 +75,7 @@ export function slotAt(
   };
 }
 
-/** 49 → "12:15 PM", for Slack messages (pages format times for the viewer). */
+/** 49 → "12:15 PM", for chat messages (pages format times for the viewer). */
 export function clockLabel(slot: number): string {
   const minutes = slot * SLOT_MINUTES;
   const hour = Math.floor(minutes / 60) % 24;

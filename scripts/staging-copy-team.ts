@@ -10,7 +10,7 @@
 //
 // For each database: the team's rows of every table with a `team_id`, and the tables that belong to
 // the team through another (`LINKED`). Left out on purpose (`SKIP`, `KEEP_OUT`): sessions, sign-in
-// and kiosk codes, kiosk devices and PINs, the Slack installation and every setting encrypted with
+// and kiosk codes, kiosk devices and PINs, the Slack and Discord installations and every setting encrypted with
 // production's SECRETS_KEY (staging has its own key and couldn't read them), the edge box's key,
 // per-student browsing data, caches, and the platform's operator records. Scouting follows the
 // same team_id filtering as the other apps; another team's private rows are never copied.
@@ -83,6 +83,7 @@ const DATABASES: Database[] = [
       "kiosk_devices",
       "kiosk_activation_codes",
       "slack_installations",
+      "discord_installations",
     ],
     // Sign-in providers' own tokens; signing in on staging gets new ones.
     blank: { core_user_identities: ["access_token", "refresh_token", "token_expires_at"] },
@@ -94,6 +95,7 @@ const DATABASES: Database[] = [
       `DELETE FROM kiosk_activation_codes WHERE team_id = :team OR created_by IN ${STAGING_MEMBERS};`,
       `DELETE FROM kiosk_devices WHERE team_id = :team OR created_by IN ${STAGING_MEMBERS};`,
       `UPDATE slack_installations SET installed_by = NULL WHERE installed_by IN ${STAGING_MEMBERS};`,
+      `UPDATE discord_installations SET installed_by = NULL WHERE installed_by IN ${STAGING_MEMBERS};`,
     ],
   },
   {

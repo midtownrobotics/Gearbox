@@ -99,6 +99,7 @@ export const slackRouter = new Hono<AppEnv>()
     });
     if (result === "taken")
       return fail("That Slack workspace is already connected to another team.");
+    if (result === "discord") return fail("Disconnect Discord before connecting Slack.");
     await logToTeam(c.env, team, {
       userId,
       app: "id",

@@ -281,7 +281,7 @@ export const schedulesRouter = new Hono<AppEnv>()
       .get();
     return c.json(scheduleSummary(row), 201);
   })
-  // Name, time zone, reminders, and publishing (students and Slack see it once it's published).
+  // Name, time zone, reminders, and publishing (students and chat reminders see it once it's published).
   .patch("/:id", requireEditor, idParam, scheduleValidator(true), async (c) => {
     const team = c.get("teamId");
     const { id } = c.req.valid("param");

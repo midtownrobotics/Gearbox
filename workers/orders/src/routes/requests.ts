@@ -1,11 +1,4 @@
-import {
-  hasMentorAccess,
-  inTeam,
-  requireAuth,
-  requireAuthWithIdentities,
-  sendTeamDM,
-  withTeam,
-} from "@g3/auth";
+import { hasMentorAccess, inTeam, requireAuth, sendMemberDM, withTeam } from "@g3/auth";
 import { type SQL, and, asc, eq, inArray, max, ne, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
@@ -413,7 +406,7 @@ export const requestsRouter = new Hono<AppEnv>()
     }
     return c.json({ ...row.request, image, categoryName: row.categoryName, events });
   })
-  .post("/", requireAuthWithIdentities, catalogReady, requestValidator(false), async (c) => {
+  .post("/", requireAuth, catalogReady, requestValidator(false), async (c) => {
     const {
       catalogItemId: picked,
       catalogCategory,
@@ -456,7 +449,6 @@ export const requestsRouter = new Hono<AppEnv>()
           currency: body.currency ?? (await teamSettings(db, teamId)).currency,
           requesterId: c.get("userId"),
           requesterName: c.get("userDisplayName"),
-          requesterSlackId: c.get("userSlackId"),
           status: wishlist ? ("wishlist" as const) : ("requested" as const),
           createdAt: now,
           updatedAt: now,
@@ -575,7 +567,7 @@ export const requestsRouter = new Hono<AppEnv>()
    * dated now, and goes to the mentors like any new request. Who wished for it stays in its
    * history.
    */
-  .post("/:id/promote", requireAuthWithIdentities, async (c) => {
+  .post("/:id/promote", requireAuth, async (c) => {
     const id = Number(c.req.param("id"));
     const db = createOrdersDb(c.env.ORDERS_DB);
     const teamId = c.get("teamId");
@@ -598,7 +590,6 @@ export const requestsRouter = new Hono<AppEnv>()
         status: "requested",
         requesterId: c.get("userId"),
         requesterName: c.get("userDisplayName"),
-        requesterSlackId: c.get("userSlackId"),
         createdAt: now,
         updatedAt: now,
       })
@@ -731,8 +722,9 @@ export const requestsRouter = new Hono<AppEnv>()
       }),
     );
 
-    // The requester hears on the team's own Slack (nothing is sent if it hasn't connected one).
-    if (action === "approve" && row.requesterSlackId) {
+    // The requester hears on the team's own chat, Slack or Discord (nothing is sent if it hasn't
+    // connected one, or they haven't linked it).
+    if (action === "approve") {
       const cost =
         row.unitPriceCents === null
           ? ""
@@ -740,15 +732,11 @@ export const requestsRouter = new Hono<AppEnv>()
       const message = [
         `✅ ${c.get("userDisplayName")} approved your order request: ${row.quantity}× ${row.title}${cost}, charged to ${current.categoryName}.`,
         note ? `> ${note}` : null,
-        `${ordersUrl(c.env, teamId)}/requests/${row.id}`,
+        `[Open the request](${ordersUrl(c.env, teamId)}/requests/${row.id})`,
       ]
         .filter(Boolean)
         .join("\n");
-      c.executionCtx.waitUntil(
-        sendTeamDM(c.env, teamId, row.requesterSlackId, message).catch((err) =>
-          console.error("Approval DM failed:", err),
-        ),
-      );
+      c.executionCtx.waitUntil(sendMemberDM(c.env, teamId, [row.requesterId], message));
     }
 
     return c.json({ ...row, categoryName: current.categoryName });

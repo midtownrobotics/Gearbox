@@ -1,12 +1,12 @@
 # Gearbox
 
-**The open-source platform that runs an FRC team.** Free apps for parts ordering, shop and pit tracking, scouting, skills and attendance, all behind one sign-in with your team's Slack. Started by [G3 Robotics](https://www.g3robotics.com), FRC Team 1648, and open to every team that wants to use it or make it better.
+**The open-source platform that runs an FRC team.** Free apps for parts ordering, shop and pit tracking, scouting, skills and attendance, all behind one sign-in with your team's Slack or Discord. Started by [G3 Robotics](https://www.g3robotics.com), FRC Team 1648, and open to every team that wants to use it or make it better.
 
 ## The apps
 
 | App | What it does |
 | --- | --- |
-| **Sign-in** (G3ID) | One account for every app. Members sign in through the team's Slack, and can link Google, GitHub or Steam. Shared shop computers use 3-digit kiosk PINs. |
+| **Sign-in** (G3ID) | One account for every app. Members sign in through the team's Slack or Discord, and can link Google, GitHub or Steam. Shared shop computers use 3-digit kiosk PINs. |
 | **Portal** | The team's home: every app and the team's links in one place. |
 | **Orders** | Part requests from any member, mentor approvals, budgets by category, carts grouped by vendor, a searchable catalog of FRC parts. Inspired by [frctools.com](https://orders.frctools.com/). |
 | **Shop** | Every manufactured part from the CAD's bill of materials through each process, with drawings and printing. |
@@ -16,11 +16,11 @@
 | **Attendance** | Kiosk sign-in and sign-out, with season hours. |
 | **Edge** | G3's own app for the shop's network box (printing, network usage, a shared drive). Not part of the platform other teams get. |
 
-Each team has its own address for every app, its own sign-in through its own Slack workspace, and its own name, colors, logo and links, set by its admins.
+Each team has its own address for every app, its own sign-in through its own Slack workspace or Discord server, and its own name, colors, logo and links, set by its admins.
 
 ## Using it
 
-**Hosted:** a free, volunteer-run version every team can sign up for at [frcgearbox.com](https://frcgearbox.com), in open beta. Signing up takes your team's details, adding Gearbot (the Gearbox Slack bot) to your Slack, and sending Gearbot a code; whoever signs up becomes the team's first admin.
+**Hosted:** a free, volunteer-run version every team can sign up for at [frcgearbox.com](https://frcgearbox.com), in open beta. Signing up takes your team's details and adding Gearbot (the Gearbox bot) to your Slack or Discord (on Slack, you then send Gearbot a code); whoever signs up becomes the team's first admin.
 
 **On your own servers:** everything runs on Cloudflare (Workers, D1, KV). Put your team and domains in [`packages/site-config/src/site.ts`](packages/site-config/src/site.ts), run `pnpm configure`, and follow [`docs/deploy.md`](docs/deploy.md).
 

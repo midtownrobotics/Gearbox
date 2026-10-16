@@ -5,6 +5,7 @@ import { cors } from "hono/cors";
 import packageJson from "../package.json";
 import { adminRouter } from "./routes/admin";
 import { authRouter } from "./routes/auth";
+import { discordAuthRouter } from "./routes/auth/discord";
 import { emailAuthRouter } from "./routes/auth/email";
 import { githubAuthRouter } from "./routes/auth/github";
 import { googleAuthRouter } from "./routes/auth/google";
@@ -14,7 +15,7 @@ import { steamAuthRouter } from "./routes/auth/steam";
 import { demoAuthRouter, demoInternalRouter } from "./routes/demo";
 import { internalRouter } from "./routes/internal";
 import { kioskRouter } from "./routes/kiosk";
-import { adminSignInRouter, teamSignInRouter } from "./routes/sign-in-methods";
+import { adminSignInRouter, teamChatRouter, teamSignInRouter } from "./routes/sign-in-methods";
 import { slackRouter } from "./routes/slack";
 import { teamUiRouter } from "./routes/team-ui";
 import { teamsRouter } from "./routes/teams";
@@ -46,11 +47,13 @@ const app = base
   .route("/auth", googleAuthRouter)
   .route("/auth", pinAuthRouter)
   .route("/auth", slackAuthRouter)
+  .route("/auth", discordAuthRouter)
   .route("/auth", steamAuthRouter)
   .route("/auth", demoAuthRouter)
   .route("/admin/team/sign-in", adminSignInRouter)
   .route("/admin", adminRouter)
   .route("/team/sign-in", teamSignInRouter)
+  .route("/team/chat", teamChatRouter)
   .route("/team/ui", teamUiRouter)
   .route("/users", usersRouter)
   .route("/teams", teamsRouter)

@@ -88,7 +88,7 @@ describe("messages to every admin", () => {
     await withSlack(team, { isAdmin: true, status: "pending" });
     await withSlack(team, {});
     await createUser({ teamId: team, isAdmin: true });
-    const res = await g3id(`/internal/teams/${team}/slack/dm-admins`, {
+    const res = await g3id(`/internal/teams/${team}/chat/dm-admins`, {
       method: "POST",
       body: { text: "Pit was switched off." },
     });
@@ -97,7 +97,7 @@ describe("messages to every admin", () => {
 
   it("answers 404 for a team without Slack, so the platform knows nobody was told", async () => {
     const team = await createTeam();
-    const res = await g3id(`/internal/teams/${team}/slack/dm-admins`, {
+    const res = await g3id(`/internal/teams/${team}/chat/dm-admins`, {
       method: "POST",
       body: { text: "Hello" },
     });
@@ -121,7 +121,7 @@ describe("messages to chosen members", () => {
     await withSlack(team, {});
     const noSlack = await createUser({ teamId: team });
     const elsewhere = await withSlack(await createTeam(), {});
-    const res = await g3id(`/internal/teams/${team}/slack/dm-members`, {
+    const res = await g3id(`/internal/teams/${team}/chat/dm-members`, {
       method: "POST",
       body: {
         userIds: [chosen, pending, noSlack, elsewhere],
@@ -131,7 +131,7 @@ describe("messages to chosen members", () => {
     expect(await res.json()).toEqual({ ok: true, sent: 1, members: 1 });
     expect(
       (
-        await g3id(`/internal/teams/${team}/slack/dm-members`, {
+        await g3id(`/internal/teams/${team}/chat/dm-members`, {
           method: "POST",
           body: { text: "x" },
         })
@@ -145,9 +145,9 @@ describe("messages to chosen members", () => {
     const plain = await createUser({ teamId: team });
     const members = (await (await g3id(`/internal/teams/${team}/members`)).json()) as {
       id: string;
-      hasSlack: boolean;
+      hasChat: boolean;
     }[];
-    expect(members.find((m) => m.id === linked)?.hasSlack).toBe(true);
-    expect(members.find((m) => m.id === plain)?.hasSlack).toBe(false);
+    expect(members.find((m) => m.id === linked)?.hasChat).toBe(true);
+    expect(members.find((m) => m.id === plain)?.hasChat).toBe(false);
   });
 });

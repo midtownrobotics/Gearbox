@@ -6,9 +6,11 @@ import {
   Field,
   Page as SharedPage,
   TextField,
+  chatName,
   inputClass,
   tones,
   useQuestions,
+  useTeamChat,
 } from "@g3/ui";
 import { CheckCircle, Hand, MessageSquarePlus, Plus, Trash2 } from "lucide-react";
 import { type SyntheticEvent, useCallback, useEffect, useState } from "react";
@@ -42,6 +44,7 @@ type Data = {
 
 export function Operations({ embedded = false }: { embedded?: boolean }) {
   const questions = useQuestions();
+  const chat = chatName(useTeamChat());
   const [data, setData] = useState<Data>({
     tickets: [],
     helpers: [],
@@ -66,7 +69,7 @@ export function Operations({ embedded = false }: { embedded?: boolean }) {
     event.preventDefault();
     if (
       !(await questions.confirm(
-        `Open a ${ticket.issueType} service ticket for team ${ticket.teamName}? Helpers will be notified in Slack.`,
+        `Open a ${ticket.issueType} service ticket for team ${ticket.teamName}? Helpers will be notified in ${chat}.`,
       ))
     )
       return;
@@ -258,7 +261,7 @@ export function Operations({ embedded = false }: { embedded?: boolean }) {
               event.preventDefault();
               if (
                 !(await questions.confirm(
-                  "Approve this member for the service crew? They will receive ticket alerts in Slack.",
+                  `Approve this member for the service crew? They will receive ticket alerts in ${chat}.`,
                 ))
               )
                 return;

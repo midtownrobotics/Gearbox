@@ -32,6 +32,9 @@ GITHUB_REDIRECT_URI = "http://localhost:5173/api/auth/github/callback"
 SLACK_TEAM_ID = "T04LF3F0D"
 SLACK_APP_ID = "A08M9C82LEL"
 STEAM_REDIRECT_URI = "http://localhost:5173/api/auth/steam/callback"
+# Discord (docs/deploy.md, "Discord"): set DISCORD_CLIENT_ID here and DISCORD_CLIENT_SECRET and
+# DISCORD_BOT_TOKEN in .dev.vars. Discord is always offered, so they're required.
+DISCORD_REDIRECT_URI = "http://localhost:5173/api/auth/discord/callback"
 FRONTEND_URL = "http://localhost:5173"
 # Local dev: every team's addresses go through the dev gateway (http://<number>-id.gearbox.localhost:8796).
 LOCAL_GATEWAY_URL = "http://localhost:8796"
@@ -69,6 +72,8 @@ SLACK_TEAM_ID = "T04LF3F0D"
 SLACK_APP_ID = "A08M9C82LEL"
 STEAM_REDIRECT_URI = "https://id.frcgearbox.com/api/auth/steam/callback"
 FRONTEND_URL = "https://1648-id.frcgearbox.com"
+# The Discord app's client ID (not secret). Secrets: DISCORD_CLIENT_SECRET, DISCORD_BOT_TOKEN.
+DISCORD_CLIENT_ID = "1560731248853258314"
 
 [observability]
 enabled = false
@@ -132,6 +137,7 @@ GITHUB_REDIRECT_URI = "https://id-dev.g3robotics.com/api/auth/github/callback"
 SLACK_APP_ID = "A0C87N8CPJB"
 STEAM_REDIRECT_URI = "https://id-dev.g3robotics.com/api/auth/steam/callback"
 FRONTEND_URL = "https://1648-id-dev.g3robotics.com"
+DISCORD_CLIENT_ID = "1560731248853258314"
 
 [env.staging.build]
 command = "GEARBOX_STAGING=1 pnpm --filter @g3/g3id build"

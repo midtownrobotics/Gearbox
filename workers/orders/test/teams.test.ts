@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { fiscalLabel, fiscalRange, fiscalYearOf } from "../src/lib/fiscal";
 
 // What each team has of its own in Orders (roadmap Phase 3): its settings (fiscal year, money), its
-// copy of the starter catalog, and approval messages on its own Slack. Dates are the viewer's local
+// copy of the starter catalog, and approval messages on its own chat (Slack or Discord). Dates are the viewer's local
 // time, which the app sends with every call.
 
 const database = (env as unknown as { ORDERS_DB: D1Database }).ORDERS_DB;
@@ -245,12 +245,9 @@ describe("the starter catalog", () => {
 });
 
 describe("approval messages", () => {
-  it("go out on the requester's team's Slack", async () => {
+  it("go to the requester on their team's chat", async () => {
     const team = teamUsers(newTeamId());
-    const requester = {
-      ...team.student,
-      identities: [{ provider: "slack", providerId: "U0TEST" }],
-    };
+    const requester = team.student;
     const category = await jsonAs<{ id: number }>(
       team.mentor,
       "/categories",
@@ -277,14 +274,14 @@ describe("approval messages", () => {
     await jsonAs(team.mentor, `/requests/${request.id}/approve`, { method: "POST", body: {} });
     const sent = async () =>
       (await (
-        await g3id.fetch(`http://g3id/api/internal/teams/${team.teamId}/slack/dms`)
-      ).json()) as { slackUserId: string; text: string }[];
+        await g3id.fetch(`http://g3id/api/internal/teams/${team.teamId}/chat/dm-members`)
+      ).json()) as { userIds: string[]; text: string }[];
     // Sent after the answer (waitUntil).
     for (let i = 0; i < 20 && (await sent()).length === 0; i++) {
       await new Promise((r) => setTimeout(r, 25));
     }
     const [dm] = await sent();
-    expect(dm.slackUserId).toBe("U0TEST");
+    expect(dm.userIds).toEqual([requester.id]);
     expect(dm.text).toContain("Hex bearing");
     expect(dm.text).toContain(`${team.teamId.replace("frc", "")}-orders.`);
   });

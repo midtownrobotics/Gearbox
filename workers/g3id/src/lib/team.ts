@@ -38,7 +38,7 @@ export function teamUrl(env: AppEnv["Bindings"], teamId: string, app: AppName): 
  */
 export function providerRedirectUri(
   env: AppEnv["Bindings"],
-  provider: "google" | "github" | "steam",
+  provider: "google" | "github" | "steam" | "discord",
   teamId: string,
 ): string {
   if (teamId === teamKey) {
@@ -46,8 +46,9 @@ export function providerRedirectUri(
       google: env.GOOGLE_REDIRECT_URI,
       github: env.GITHUB_REDIRECT_URI,
       steam: env.STEAM_REDIRECT_URI,
+      discord: env.DISCORD_REDIRECT_URI,
     };
-    return settings[provider];
+    if (settings[provider]) return settings[provider];
   }
   return `${signInCallbackApiUrl(teamId)}/auth/${provider}/callback`;
 }

@@ -9,8 +9,9 @@ import { adminSettings } from "../db/schema";
 type ShopDb = ReturnType<typeof createShopDb>;
 
 export const SETTING = {
-  slackReleaseChannel: "slack_release_channel_id",
-  slackSummaryChannel: "slack_summary_channel_id",
+  /** A Slack or Discord channel id, on whichever the team uses (the row keys are from before Discord). */
+  releaseChannel: "slack_release_channel_id",
+  summaryChannel: "slack_summary_channel_id",
   onshapeDocument: "onshape_document_id",
   onshapeMainAssembly: "onshape_main_assembly_id",
   onshapeCompany: "onshape_company_id",
@@ -20,6 +21,10 @@ export const SETTING = {
   onshapeWebhookPrimary: "onshape_webhook_key_primary",
   onshapeWebhookSecondary: "onshape_webhook_key_secondary",
 } as const;
+
+/** A Slack channel id (C0123456789) or a Discord one (17 to 20 digits). */
+export const isChannelId = (value: string) =>
+  /^[CG][A-Z0-9]+$/.test(value) || /^\d{17,20}$/.test(value);
 
 export async function getSetting(db: ShopDb, teamId: string, key: string) {
   const row = await db

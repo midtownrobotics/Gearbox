@@ -14,7 +14,7 @@ import {
   teams,
 } from "./db/schema";
 import { accounts, db, g3id, now } from "./lib";
-import { deliverToSlack } from "./notifications";
+import { deliverToChat } from "./notifications";
 import { DELETABLE, callHook } from "./registry";
 import type { AppEnv } from "./types";
 import { recentVisits } from "./visits";
@@ -22,7 +22,7 @@ import { recentVisits } from "./visits";
 // The platform operators' console (roadmap 2.8), at /console on the platform worker; its page is
 // apps/platform's /console, opened at admin.<domain> (CONSOLE_HOSTS). Operators are G3ID accounts
 // flagged in this worker's `operators` table, never by a team role. They:
-// - delete a team: its registry row here, and in G3ID every account, session, kiosk and its Slack;
+// - delete a team: its registry row here, and in G3ID every account, session, kiosk and its chat;
 // - hand a team to another of its members, who becomes an admin;
 // - suspend a team (the gateway stops answering its addresses) and reactivate it;
 // - follow up reports that a number was falsely registered (POST /reports);
@@ -145,8 +145,8 @@ function teamById(env: AppEnv["Bindings"], id: string) {
 }
 
 /**
- * DMs every operator on their own team's Slack (through G3ID, from each team's bot). Never
- * throws: an operator whose team has no Slack, or hasn't linked theirs, isn't told.
+ * DMs every operator on their own team's chat, Slack or Discord (through G3ID, from each team's
+ * bot). Never throws: an operator whose team has no chat, or hasn't linked theirs, isn't told.
  */
 export async function tellOperators(env: AppEnv["Bindings"], text: string) {
   try {
@@ -161,7 +161,7 @@ export async function tellOperators(env: AppEnv["Bindings"], text: string) {
     }
     await Promise.all(
       [...byTeam].map(async ([teamId, userIds]) => {
-        const res = await g3id(env, `/teams/${encodeURIComponent(teamId)}/slack/dm-members`, {
+        const res = await g3id(env, `/teams/${encodeURIComponent(teamId)}/chat/dm-members`, {
           method: "POST",
           body: { userIds, text },
         });
@@ -220,6 +220,7 @@ export const consoleRouter = new Hono<AppEnv>()
           country: teams.country,
           status: teams.status,
           slackWorkspaceName: teams.slackWorkspaceName,
+          discordGuildName: teams.discordGuildName,
           createdAt: teams.createdAt,
         })
         .from(teams)
@@ -289,6 +290,7 @@ export const consoleRouter = new Hono<AppEnv>()
         country: team.country,
         status: team.status,
         slackWorkspaceName: team.slackWorkspaceName,
+        discordGuildName: team.discordGuildName,
         founder: team.founderUserId && { id: team.founderUserId, name: name(team.founderUserId) },
         owner: team.ownerUserId && { id: team.ownerUserId, name: name(team.ownerUserId) },
         termsAcceptedAt: team.termsAcceptedAt,
@@ -347,6 +349,7 @@ export const consoleRouter = new Hono<AppEnv>()
         name: team.name,
         status: team.status,
         slackWorkspaceName: team.slackWorkspaceName,
+        discordGuildName: team.discordGuildName,
         deletedAccounts: deletedUserIds.length,
         apps: DELETABLE.map((app) => app.name),
       },
@@ -599,8 +602,8 @@ export const consoleRouter = new Hono<AppEnv>()
     await log(c.env, c.get("userId"), "create_notification", {
       details: { notificationId: id, type, summary, expiresAt },
     });
-    // Slack, to each team's chosen channels and people, after answering.
-    c.executionCtx.waitUntil(deliverToSlack(c.env, { type, summary, body }));
+    // Each team's chat, to its chosen channels and people, after answering.
+    c.executionCtx.waitUntil(deliverToChat(c.env, { type, summary, body }));
     return c.json({ id }, 201);
   })
   .delete("/notifications/:id", async (c) => {

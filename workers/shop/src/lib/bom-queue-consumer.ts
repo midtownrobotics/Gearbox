@@ -29,10 +29,6 @@ export interface BOMQueueMessage {
 
 type ShopDb = ReturnType<typeof createShopDb>;
 
-/** Text for a Slack message, with Slack's control characters escaped. */
-const slackText = (text: string) =>
-  text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-
 /**
  * Keeps what the release package says: the release's details on its row, and each part and
  * drawing in it as a part of the release (as the revision events record them; drawings share
@@ -168,44 +164,46 @@ async function processSingleBOMJob(
     .from(schema.onshapeParts)
     .where(inTeam(schema.onshapeParts, teamId, eq(schema.onshapeParts.releaseId, releaseRowId)));
 
-  // Build and send Slack message
-  console.log(`[BOM Queue Job] [${Date.now() - jobStartTime}ms] Building Slack message`);
+  // The message, in Gearbox's chat format (`sendTeamMessage`: Slack or Discord).
+  console.log(`[BOM Queue Job] [${Date.now() - jobStartTime}ms] Building the release message`);
   const shop = shopUrl(env, teamId);
   const details = release?.details;
-  const releaseLink = `<https://cad.onshape.com/documents?releasepackage=${releaseId}|${slackText(details?.name ?? releaseId)}>`;
+  const releaseLink = `[${details?.name ?? releaseId}](https://cad.onshape.com/documents?releasepackage=${releaseId})`;
   const approvedBy = details?.approvers.filter((a) => a.approvedAt).map((a) => a.name) ?? [];
   const message = [
-    "🎉 *New release candidate approved!*",
+    "🎉 **New release candidate approved!**",
     `Release: ${releaseLink}`,
-    ...(details?.madeBy ? [`Made by: ${slackText(details.madeBy)}`] : []),
-    ...(approvedBy.length > 0 ? [`Approved by: ${slackText(approvedBy.join(", "))}`] : []),
-    ...(details?.notes && details.notes !== details.name
-      ? [`Notes: ${slackText(details.notes)}`]
-      : []),
-    `Time: <!date^${Math.floor(new Date(timestamp).getTime() / 1000)}^{date_num} {time_secs}|${timestamp}>`,
+    ...(details?.madeBy ? [`Made by: ${details.madeBy}`] : []),
+    ...(approvedBy.length > 0 ? [`Approved by: ${approvedBy.join(", ")}`] : []),
+    ...(details?.notes && details.notes !== details.name ? [`Notes: ${details.notes}`] : []),
+    `Time: <t:${Math.floor(new Date(timestamp).getTime() / 1000)}:f>`,
     `Parts: ${updatedParts.length}`,
     ...updatedParts.map((part) => {
-      const partLink = part.entityId
-        ? `\n    • <https://cad.onshape.com/documents/${docId}/v/${part.versionId}/e/${part.entityId}|OnShape Part Link>`
-        : "";
-      const drawingLink = part.partDrawingEntityId
-        ? `\n    • <https://cad.onshape.com/documents/${docId}/v/${part.versionId}/e/${part.partDrawingEntityId}|OnShape Drawing Link>`
-        : "";
-      return `
-  • *${part.partNumber}*${part.name ? ` - "${part.name}"` : ""}${part.quantity ? ` (x${part.quantity})` : ""}
-    ${part.revision ? `• Revision: ${part.revision}` : ""}
-    • <${shop}/part?p=${part.partNumber}|Shop SW Link>${partLink}${drawingLink}
-          `;
+      const onshape = (entity: string) =>
+        `https://cad.onshape.com/documents/${docId}/v/${part.versionId}/e/${entity}`;
+      const links = [
+        `[Shop](${shop}/part?p=${part.partNumber})`,
+        ...(part.entityId ? [`[Onshape part](${onshape(part.entityId)})`] : []),
+        ...(part.partDrawingEntityId
+          ? [`[Onshape drawing](${onshape(part.partDrawingEntityId)})`]
+          : []),
+      ];
+      return [
+        `• **${part.partNumber}**${part.name ? ` - "${part.name}"` : ""}${part.quantity ? ` (x${part.quantity})` : ""}`,
+        ...(part.revision ? [`  Revision: ${part.revision}`] : []),
+        `  ${links.join(" · ")}`,
+      ].join("\n");
     }),
-    `\nClick <${shop}/ingest|here> to assign production processes.`,
+    "",
+    `[Assign production processes](${shop}/ingest)`,
   ].join("\n");
 
-  // On the team's own Slack, in the channel its admins picked (none picked: no message).
-  const channel = await getSetting(database, teamId, SETTING.slackReleaseChannel);
+  // On the team's own chat, in the channel its admins picked (none picked: no message).
+  const channel = await getSetting(database, teamId, SETTING.releaseChannel);
   if (channel) {
-    console.log(`[BOM Queue Job] [${Date.now() - jobStartTime}ms] Sending Slack message`);
+    console.log(`[BOM Queue Job] [${Date.now() - jobStartTime}ms] Sending the release message`);
     const sent = await sendTeamMessage(env, teamId, channel, message);
-    if (!sent.ok) console.error("[BOM Queue Job] Slack message not sent:", sent.error);
+    if (!sent.ok) console.error("[BOM Queue Job] Release message not sent:", sent.error);
   }
 
   // Export drawings for parts that have both drawing entity ID and revision (batched 4 at a time)

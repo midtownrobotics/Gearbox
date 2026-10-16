@@ -7,7 +7,7 @@ export const manifest = defineManifest({
   name: "Scouting",
   summary: "Match and pit scouting, picklists and match predictions.",
   roles: ["admin", "mentor", "member"],
-  integrations: ["slack", "the blue alliance"],
+  integrations: ["slack or discord", "the blue alliance"],
   availability: "every team",
   version: packageJson.version,
   hooks: { seed: true, delete: true, export: true, demo: true },

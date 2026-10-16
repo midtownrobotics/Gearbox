@@ -1,16 +1,18 @@
 import { g3idStub, workerTestConfig } from "@g3/testing/config";
+import { fakeDiscord } from "@g3/testing/discord";
 
 // G3ID's internal routes, as the platform uses them: it accepts teams and workspaces (one
 // workspace, TTAKEN, is already another team's), and hands out codes. A code is pending the first
 // time it's checked, and sent by its founder ("u-founder") after that.
 // For the operators' console: every team has two members, its founder ("u-founder", who has
-// linked Slack) and "u-member"; Slack posts and DMs to a team are recorded (GET the same path);
+// linked the team's chat) and "u-member"; chat posts and DMs to a team are recorded (GET the
+// same path);
 // any account exists except "u-nobody"; and deleting and handing over a team work.
 // /auth/me is the usual test stub (@g3/testing).
 const checks = new Map<string, number>();
 /** Messages to every admin of a team (the app library's), by team: read back with a GET. */
 const adminDms = new Map<string, { text: string }[]>();
-/** Slack posts and member DMs (notifications), by team and path: read back with a GET. */
+/** Chat posts and member DMs (notifications), by team and path: read back with a GET. */
 const slackSent = new Map<string, unknown[]>();
 const MEMBERS = [
   {
@@ -19,7 +21,7 @@ const MEMBERS = [
     email: "fay@test",
     status: "active",
     isAdmin: true,
-    hasSlack: true,
+    hasChat: true,
   },
   {
     id: "u-member",
@@ -27,7 +29,7 @@ const MEMBERS = [
     email: "max@test",
     status: "active",
     isAdmin: false,
-    hasSlack: false,
+    hasChat: false,
   },
 ];
 const g3id = async (request: Request) => {
@@ -50,16 +52,24 @@ const g3id = async (request: Request) => {
   if (team) {
     const [, , rest] = team;
     if (rest === "/members") return Response.json(MEMBERS);
+    // A team signed up with Discord: its founder becomes "u-founder", unless they have no
+    // verified email.
+    if (rest === "/discord-founder") {
+      const { user } = (await request.json()) as { user: { email: string | null } };
+      return user.email
+        ? Response.json({ userId: "u-founder", token: "handoff-token" })
+        : Response.json({ error: "Your Discord account has no verified email." }, { status: 409 });
+    }
     // The public demo's accounts, made again on its nightly reset.
     if (rest === "/demo/reset" && request.method === "POST") return Response.json({ ok: true });
-    if (rest === "/slack/dm-admins") {
+    if (rest === "/chat/dm-admins") {
       const id = team[1];
       if (request.method === "GET") return Response.json(adminDms.get(id) ?? []);
       const body = (await request.json()) as { text: string };
       adminDms.set(id, [...(adminDms.get(id) ?? []), body]);
       return Response.json({ ok: true, sent: 1, admins: 1 });
     }
-    if (rest === "/slack/message" || rest === "/slack/dm-members") {
+    if (rest === "/chat/message" || rest === "/chat/dm-members") {
       const key = `${team[1]}${rest}`;
       if (request.method === "GET") return Response.json(slackSent.get(key) ?? []);
       slackSent.set(key, [...(slackSent.get(key) ?? []), await request.json()]);
@@ -101,6 +111,8 @@ const g3id = async (request: Request) => {
 // Slack's install: answers for the workspace named in the code ("ws:T123").
 const slack = async (request: Request) => {
   const url = new URL(request.url);
+  // Discord: @g3/testing's fake (packages/testing/src/discord.ts).
+  if (url.hostname === "discord.com") return fakeDiscord(request);
   if (url.hostname === "slack.com" && url.pathname === "/api/oauth.v2.access") {
     const code = String((await request.formData()).get("code") ?? "");
     if (!code.startsWith("ws:")) return Response.json({ ok: false });
@@ -171,6 +183,8 @@ export default workerTestConfig({
   vars: {
     SLACK_CLIENT_ID: "test-client",
     SLACK_CLIENT_SECRET: "test-secret",
+    DISCORD_CLIENT_ID: "test-discord-client",
+    DISCORD_CLIENT_SECRET: "test-discord-secret",
     LOCAL_GATEWAY_URL: "",
   },
   services: {
