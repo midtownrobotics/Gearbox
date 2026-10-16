@@ -1,7 +1,7 @@
 import { decryptSecret, encryptSecret } from "@g3/auth";
 import { eq } from "drizzle-orm";
 import { createDb } from "../db";
-import { slackInstallations } from "../db/schema";
+import { discordInstallations, slackInstallations } from "../db/schema";
 import type { AppEnv } from "../types";
 import { siteTeamId } from "./team";
 
@@ -37,7 +37,12 @@ export async function slackForTeam(env: Env, teamId: string): Promise<TeamSlack 
       slack: { SLACK_BOT_TOKEN: await decryptSecret(row.botTokenEncrypted, env.SECRETS_KEY) },
     };
   }
-  if (teamId === siteTeamId && env.SLACK_BOT_TOKEN && env.SLACK_TEAM_ID) {
+  if (
+    teamId === siteTeamId &&
+    env.SLACK_BOT_TOKEN &&
+    env.SLACK_TEAM_ID &&
+    !(await hasDiscord(env, teamId))
+  ) {
     return {
       workspaceId: env.SLACK_TEAM_ID,
       workspaceName: null,
@@ -46,6 +51,15 @@ export async function slackForTeam(env: Env, teamId: string): Promise<TeamSlack 
     };
   }
   return null;
+}
+
+/** Whether the team uses Discord instead (then the settings' Slack doesn't count as its own). */
+async function hasDiscord(env: Env, teamId: string): Promise<boolean> {
+  return !!(await createDb(env.DB)
+    .select({ teamId: discordInstallations.teamId })
+    .from(discordInstallations)
+    .where(eq(discordInstallations.teamId, teamId))
+    .get());
 }
 
 /** The team a Slack workspace belongs to, or null if no team has connected it. */
@@ -65,7 +79,10 @@ export async function teamForWorkspace(env: Env, workspaceId: string): Promise<s
   return null;
 }
 
-/** Saves (or replaces) a team's workspace. Fails if another team already has that workspace. */
+/**
+ * Saves (or replaces) a team's workspace. "taken" if another team already has that workspace,
+ * "discord" when the team has Discord connected (it disconnects Discord first).
+ */
 export async function saveInstallation(
   env: Env,
   install: {
@@ -77,9 +94,10 @@ export async function saveInstallation(
     /** The admin who connected it; null when it came with the team's sign-up. */
     installedBy: string | null;
   },
-): Promise<"saved" | "taken"> {
+): Promise<"saved" | "taken" | "discord"> {
   const owner = await teamForWorkspace(env, install.workspaceId);
   if (owner && owner !== install.teamId) return "taken";
+  if (await hasDiscord(env, install.teamId)) return "discord";
   const now = Math.floor(Date.now() / 1000);
   const values = {
     slackTeamId: install.workspaceId,

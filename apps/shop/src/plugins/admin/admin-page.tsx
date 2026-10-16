@@ -1,15 +1,17 @@
 import {
   Button,
+  ChannelPicker,
   ConfirmButton,
   ErrorBanner,
   Field,
   Loading,
   Page,
-  SlackChannelPicker,
   SuccessBanner,
   TextField,
+  chatName,
   focusRing,
   inputClass,
+  useTeamChat,
 } from "@g3/ui";
 import { useEffect, useState } from "react";
 import { api } from "../../shared/api";
@@ -22,8 +24,9 @@ import { ActionsLog } from "./actions-log";
 
 export function AdminPage() {
   const { data, loading, error, refresh } = useShopData();
-  // The Onshape, Slack and data sections and the Slack buttons only work for an admin.
+  // The Onshape, chat and data sections and the summary buttons only work for an admin.
   const isAdmin = useAuthUser()?.isAdmin ?? false;
+  const chat = chatName(useTeamChat());
   const [banner, setBanner] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
   const [deletingObsolete, setDeletingObsolete] = useState(false);
@@ -117,7 +120,7 @@ export function AdminPage() {
     );
 
   return (
-    <Page title="Admin" actions={isAdmin && <DailySlackButtons />}>
+    <Page title="Admin" actions={isAdmin && <DailySummaryButtons chat={chat} />}>
       <>
         {error && <ErrorBanner message={error} />}
         {banner && <ErrorBanner message={banner} />}
@@ -193,10 +196,10 @@ export function AdminPage() {
           </Section>
         )}
 
-        {/* Section 6: Slack */}
+        {/* Section 6: the team's chat (Slack or Discord) */}
         {isAdmin && (
-          <Section title="Slack Configuration" defaultOpen={false}>
-            <SlackSettings />
+          <Section title={`${chat} Configuration`} defaultOpen={false}>
+            <ChannelSettings />
           </Section>
         )}
       </>
@@ -690,7 +693,7 @@ const SUMMARY_KINDS = {
   reflection: { label: "Reflection", blurb: "what got done today" },
 } as const;
 
-function DailySlackButtons() {
+function DailySummaryButtons({ chat }: { chat: string }) {
   const [sending, setSending] = useState<keyof typeof SUMMARY_KINDS | null>(null);
   const [asking, setAsking] = useState<keyof typeof SUMMARY_KINDS | null>(null);
   const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
@@ -702,7 +705,7 @@ function DailySlackButtons() {
     setSending(kind);
     setResult(null);
     try {
-      const res = await api.admin.slack["daily-summary"].$post({
+      const res = await api.admin.chat["daily-summary"].$post({
         json: {
           kind,
           since: startOfDay.getTime(),
@@ -747,7 +750,7 @@ function DailySlackButtons() {
       {asking && (
         <div className="w-full space-y-2 rounded-lg border border-secondary-200 bg-surface p-3">
           <p className="text-sm text-secondary-900">
-            Post the {SUMMARY_KINDS[asking].label} ({SUMMARY_KINDS[asking].blurb}) to the Slack
+            Post the {SUMMARY_KINDS[asking].label} ({SUMMARY_KINDS[asking].blurb}) to the {chat}{" "}
             summary channel?
           </p>
           <div className="flex flex-wrap gap-2">
@@ -775,7 +778,7 @@ function DailySlackButtons() {
   );
 }
 
-function SlackSettings() {
+function ChannelSettings() {
   const [channelId, setChannelId] = useState("");
   const [summaryChannelId, setSummaryChannelId] = useState("");
   const [saving, setSaving] = useState(false);
@@ -790,21 +793,21 @@ function SlackSettings() {
   async function loadConfig() {
     try {
       // biome-ignore lint/suspicious/noExplicitAny: workaround for Hono client type generation
-      const res = await (api as any).admin.slack.config.$get();
+      const res = await (api as any).admin.chat.config.$get();
       if (!res.ok) {
         setBanner(await getErrorMessage(res as unknown as Response));
         return;
       }
       const config = (await res.json()) as {
-        slackReleaseChannelId: string;
-        slackSummaryChannelId: string;
+        releaseChannelId: string;
+        summaryChannelId: string;
       };
-      setChannelId(config.slackReleaseChannelId || "");
-      setSummaryChannelId(config.slackSummaryChannelId || "");
+      setChannelId(config.releaseChannelId || "");
+      setSummaryChannelId(config.summaryChannelId || "");
       setBanner(null);
       setLoaded(true);
     } catch (err) {
-      setBanner(err instanceof Error ? err.message : "Failed to load Slack config");
+      setBanner(err instanceof Error ? err.message : "Failed to load the channels");
     }
   }
 
@@ -818,10 +821,10 @@ function SlackSettings() {
     setSaved(false);
     try {
       // biome-ignore lint/suspicious/noExplicitAny: workaround for Hono client type generation
-      const res = await (api as any).admin.slack.config.$post({
+      const res = await (api as any).admin.chat.config.$post({
         json: {
-          slackReleaseChannelId: channelId.trim(),
-          slackSummaryChannelId: summaryChannelId.trim(),
+          releaseChannelId: channelId.trim(),
+          summaryChannelId: summaryChannelId.trim(),
         },
       });
 
@@ -844,13 +847,13 @@ function SlackSettings() {
   return (
     <div className="space-y-4 max-w-xl">
       {banner && <ErrorBanner message={banner} />}
-      {saved && <SuccessBanner message="Slack channels saved." />}
+      {saved && <SuccessBanner message="Channels saved." />}
 
       <div className="space-y-1">
         <label htmlFor="channel-id" className="block text-sm font-medium text-secondary-700">
           Release notification channel *
         </label>
-        <SlackChannelPicker
+        <ChannelPicker
           id="channel-id"
           value={channelId}
           onChange={(id) => setChannelId(id ?? "")}
@@ -866,7 +869,7 @@ function SlackSettings() {
         >
           Overview &amp; Reflection channel
         </label>
-        <SlackChannelPicker
+        <ChannelPicker
           id="summary-channel-id"
           value={summaryChannelId}
           onChange={(id) => setSummaryChannelId(id ?? "")}

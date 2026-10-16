@@ -7,6 +7,7 @@ export const teamUiLinkLabels = {
   frcBom: "FRCBOM",
   publicSite: "Public site",
   slack: "Slack",
+  discord: "Discord",
   github: "GitHub",
   instagram: "Instagram",
   frcEvents: "FRC-Events",
@@ -43,6 +44,7 @@ export const defaultAppOrder: PortalTileKey[] = [
   "frcBom",
   "publicSite",
   "slack",
+  "discord",
   "github",
   "instagram",
   "frcEvents",
@@ -187,6 +189,7 @@ export const defaultTeamUiSettings: TeamUiSettings = {
   links: {
     publicSite: site.publicSiteUrl,
     slack: site.links.slack,
+    discord: site.links.discord,
     github: site.links.github,
     instagram: site.links.instagram,
     ...teamLinks,
@@ -211,6 +214,7 @@ export function teamUiDefaults(teamId: string, name?: string): TeamUiSettings {
     links: {
       publicSite: "",
       slack: "",
+      discord: "",
       github: "",
       instagram: "",
       ...teamLinksFor(number),

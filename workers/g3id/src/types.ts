@@ -16,6 +16,15 @@ export type AppEnv = {
     /** The Slack app's OAuth credentials, for installing it into a team's workspace. */
     SLACK_CLIENT_ID?: string;
     SLACK_CLIENT_SECRET?: string;
+    /**
+     * The Discord app (one for every team): its OAuth credentials, its bot's token (secrets) and,
+     * for the site's team, where Discord calls back (localhost in dev). Without them Discord is
+     * off on this server.
+     */
+    DISCORD_CLIENT_ID?: string;
+    DISCORD_CLIENT_SECRET?: string;
+    DISCORD_BOT_TOKEN?: string;
+    DISCORD_REDIRECT_URI?: string;
     /** Encrypts secrets stored in D1, like each team's Slack bot token (`encryptSecret` in @g3/auth). */
     SECRETS_KEY?: string;
     STEAM_API_KEY: string;

@@ -26,7 +26,7 @@ for [`workers/schedule`](../../workers/schedule).
   reloaded (and stays as set while moving around the app), so looking never changes anything by
   accident. The view and the day are in
   the address.
-- **Settings** (`/schedules/:id/settings`, editors): name, time zone, Slack reminders, Published,
+- **Settings** (`/schedules/:id/settings`, editors): name, time zone, chat reminders (Slack or Discord), Published,
   delete; the days and their hours; the periods; who's attending.
 - **Friends** (`/friends`): search the team by name to add friends, and remove them. Only you see
   your friends. A schedule's **Friends** view (between My schedule and Everyone) is the grid with

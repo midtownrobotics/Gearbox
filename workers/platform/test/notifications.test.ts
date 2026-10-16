@@ -2,7 +2,7 @@ import { env } from "cloudflare:test";
 import { exports } from "cloudflare:workers";
 import { type TestUser, asUser, teamUsers } from "@g3/testing/users";
 import { describe, expect, it } from "vitest";
-import { deliverToSlack, slackText } from "../src/notifications";
+import { chatText, deliverToChat } from "../src/notifications";
 import type { AppEnv } from "../src/types";
 
 // Delivering the console's notifications: each team's settings (its admin pages), what its home
@@ -43,12 +43,12 @@ async function addNotification(type: string, expiresAt = nowS() + 3600) {
 
 const settings = (
   portal: Record<string, string>,
-  slack: Partial<Record<string, { slackChannel?: string | null; slackUsers?: string[] }>> = {},
+  slack: Partial<Record<string, { channel?: string | null; users?: string[] }>> = {},
 ) =>
   Object.fromEntries(
     ["info", "warning", "critical"].map((type) => [
       type,
-      { portal: portal[type], slackChannel: null, slackUsers: [], ...slack[type] },
+      { portal: portal[type], channel: null, users: [], ...slack[type] },
     ]),
   );
 
@@ -56,7 +56,7 @@ const seen = async (user: TestUser) =>
   ((await (await call(user, "/team/notifications")).json()) as { id: string }[]).map((n) => n.id);
 
 describe("a team's notification settings", () => {
-  it("start with admins on the home page and nothing on Slack", async () => {
+  it("start with admins on the home page and nothing on the team's chat", async () => {
     const team = await newTeam();
     const res = await call(team.admin, "/team/notification-settings");
     const body = (await res.json()) as { settings: unknown; members: { id: string }[] };
@@ -81,7 +81,7 @@ describe("a team's notification settings", () => {
           settings(
             { info: "everyone", warning: "admins", critical: "admins" },
             {
-              info: { slackChannel: "general" },
+              info: { channel: "general" },
             },
           ),
         )
@@ -93,7 +93,7 @@ describe("a team's notification settings", () => {
           settings(
             { info: "everyone", warning: "admins", critical: "admins" },
             {
-              info: { slackUsers: ["someone-else"] },
+              info: { users: ["someone-else"] },
             },
           ),
         )
@@ -101,13 +101,13 @@ describe("a team's notification settings", () => {
     ).toBe(400);
     const saved = settings(
       { info: "everyone", warning: "admins", critical: "nobody" },
-      { critical: { slackChannel: "C0123456789", slackUsers: ["u-founder"] } },
+      { critical: { channel: "C0123456789", users: ["u-founder"] } },
     );
     expect((await put(saved)).status).toBe(200);
     const body = (await (await call(team.admin, "/team/notification-settings")).json()) as {
-      settings: Record<string, { slackChannel: string | null }>;
+      settings: Record<string, { channel: string | null }>;
     };
-    expect(body.settings.critical.slackChannel).toBe("C0123456789");
+    expect(body.settings.critical.channel).toBe("C0123456789");
     const log = await testEnv.PLATFORM_DB.prepare(
       "SELECT details FROM team_audit_log WHERE team_id = ? AND action = 'settings_changed'",
     )
@@ -145,47 +145,41 @@ describe("the home page's notifications", () => {
   });
 });
 
-describe("Slack delivery", () => {
+describe("chat delivery", () => {
   it("sends to each active team's chosen channels and people for that type", async () => {
     const team = await newTeam();
     const quiet = await newTeam();
     const suspended = await newTeam("suspended");
     const chosen = settings(
       { info: "admins", warning: "admins", critical: "admins" },
-      { critical: { slackChannel: "C0123456789", slackUsers: ["u-founder"] } },
+      { critical: { channel: "C0123456789", users: ["u-founder"] } },
     );
     await call(team.admin, "/team/notification-settings", { method: "PUT", body: chosen });
     await call(suspended.admin, "/team/notification-settings", { method: "PUT", body: chosen });
 
-    await deliverToSlack(testEnv, { type: "warning", summary: "Not this", body: "x" });
-    await deliverToSlack(testEnv, { type: "critical", summary: "Read now", body: "Details" });
+    await deliverToChat(testEnv, { type: "warning", summary: "Not this", body: "x" });
+    await deliverToChat(testEnv, { type: "critical", summary: "Read now", body: "Details" });
 
     const sent = async (teamId: string, path: string) =>
       (await (
         await testEnv.G3ID.fetch(`http://g3id/api/internal/teams/${teamId}${path}`)
       ).json()) as { channel?: string; userIds?: string[]; text: string }[];
-    const posts = await sent(team.teamId, "/slack/message");
+    const posts = await sent(team.teamId, "/chat/message");
     expect(posts).toHaveLength(1);
     expect(posts[0]).toMatchObject({ channel: "C0123456789" });
     // Plainly Gearbox's, with the notification quoted.
-    expect(posts[0].text).toBe(
-      ":rotating_light:  *Gearbox Critical Notification*\n>*Read now*\n>Details",
-    );
-    expect(await sent(team.teamId, "/slack/dm-members")).toMatchObject([
-      { userIds: ["u-founder"] },
-    ]);
-    expect(await sent(quiet.teamId, "/slack/message")).toEqual([]);
-    expect(await sent(suspended.teamId, "/slack/message")).toEqual([]);
+    expect(posts[0].text).toBe("🚨  **Gearbox Critical Notification**\n> **Read now**\n> Details");
+    expect(await sent(team.teamId, "/chat/dm-members")).toMatchObject([{ userIds: ["u-founder"] }]);
+    expect(await sent(quiet.teamId, "/chat/message")).toEqual([]);
+    expect(await sent(suspended.teamId, "/chat/message")).toEqual([]);
   });
 });
 
-describe("a notification's Slack text", () => {
-  it("stays under Slack's limit, keeping its heading and quote bars", () => {
-    const text = slackText({ type: "info", summary: "Long", body: "word ".repeat(2000) });
+describe("a notification's chat text", () => {
+  it("stays under the length limit, keeping its heading and quote bars", () => {
+    const text = chatText({ type: "info", summary: "Long", body: "word ".repeat(2000) });
     expect(text.length).toBeLessThanOrEqual(3900);
-    expect(
-      text.startsWith(":information_source:  *Gearbox Informational Notification*\n>*Long*"),
-    ).toBe(true);
+    expect(text.startsWith("ℹ️  **Gearbox Informational Notification**\n> **Long**")).toBe(true);
     expect(text.endsWith("…")).toBe(true);
   });
 });

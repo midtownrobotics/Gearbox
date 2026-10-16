@@ -1745,7 +1745,7 @@ app.post("/service-tickets", requireAuth, async (c) => {
   for (let offset = 0; offset < helpers.length; offset += 100) {
     await c.env.G3ID.fetch(
       new Request(
-        `http://g3id/api/internal/teams/${encodeURIComponent(c.get("teamId"))}/slack/dm-members`,
+        `http://g3id/api/internal/teams/${encodeURIComponent(c.get("teamId"))}/chat/dm-members`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },

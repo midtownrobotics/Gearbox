@@ -15,7 +15,8 @@ import { SignInPage } from "./sign-in-page";
 // The team's admin pages (roadmap 4.5), on its home: <number>.<platform>/admin. Only what's the
 // whole team's lives here: Apps is the platform's (which apps the team has on); Appearance and
 // Sign-in are G3ID's settings; Members and Kiosk Devices are G3ID's people and kiosks (moved from
-// ID, which only signs people in now); Integrations connects Slack (G3ID's) and shows what else
+// ID, which only signs people in now); Integrations connects the team's chat, Slack or Discord
+// (G3ID's), and shows what else
 // each app is connected to; and Notifications says where the platform's notifications go.
 // A setting for one app stays on that app's own pages.
 

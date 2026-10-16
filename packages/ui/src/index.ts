@@ -2,7 +2,7 @@ import { useIsOnline } from "./hooks/use-is-online";
 export { useIsOnline };
 
 export { TeamIcon } from "./components/team-icon";
-export { SlackChannelPicker, type SlackChannelOption } from "./components/slack-channel-picker";
+export { ChannelPicker, type ChannelOption } from "./components/channel-picker";
 export {
   activePath,
   AppNavBar,
@@ -38,5 +38,14 @@ export { Switch, Toggle } from "./components/toggle";
 export { forceTheme, readTheme, setTheme, type Theme, useTheme } from "./theme";
 export { refreshTeamUiSettings, useTeamIcon, useTeamNames, useTeamUiSettings } from "./team-ui";
 export { forgetTeam, rememberedTeam, rememberTeam } from "./my-team";
-export { type SignedInUser, appOn, useAppOn, useSignedInUser, useTeamApps } from "./session";
+export {
+  type SignedInUser,
+  type TeamChat,
+  appOn,
+  chatName,
+  useAppOn,
+  useSignedInUser,
+  useTeamApps,
+  useTeamChat,
+} from "./session";
 export { redirectToSignIn, signInUrl } from "./sign-in";

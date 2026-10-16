@@ -14,7 +14,7 @@ import { type LibraryApp, type LogEntry, downloadAppData, platform } from "../..
 // The app library (roadmap 4.4): which apps the team has on. Switching one off hides it from
 // everyone at once (within a minute) and keeps its data for 90 days; switching it on again in that
 // time brings it all back. After that the app deletes the team's data. Before switching one off
-// its data is offered as a download, and every admin hears about the change on Slack.
+// its data is offered as a download, and every admin hears about the change on the team's chat.
 
 const day = (seconds: number) =>
   new Date(seconds * 1000).toLocaleDateString(undefined, {

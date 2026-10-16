@@ -2,16 +2,16 @@ import { apiPath } from "@g3/site-config";
 import { Card, ConfirmQuestion, ErrorBanner, Loading, Page, Switch } from "@g3/ui";
 import { useEffect, useState } from "react";
 import type { IconType } from "react-icons";
-import { FaGithub, FaGoogle, FaSlack, FaSteam } from "react-icons/fa";
+import { FaDiscord, FaGithub, FaGoogle, FaSlack, FaSteam } from "react-icons/fa";
 import { MdPin } from "react-icons/md";
 import { g3id } from "../../lib/api";
 
-// The ways the team's members sign in (G3ID's /admin/team/sign-in, through /api/~id). Slack is
-// always on: members join through it.
+// The ways the team's members sign in (G3ID's /admin/team/sign-in, through /api/~id). The team's
+// chat (Slack, or Discord for a team that connected Discord) is always on: members join through it.
 
 type Optional = "google" | "github" | "steam" | "pin";
 type State = {
-  methods: Record<Optional | "slack", boolean>;
+  methods: Record<Optional | "slack" | "discord", boolean>;
   /** Active members who can sign in only with that method. */
   onlyWith: Record<Optional, number>;
 };
@@ -53,7 +53,7 @@ export function SignInPage() {
     setBusy(true);
     setError("");
     try {
-      const { slack: _, ...current } = state.methods;
+      const { slack: _slack, discord: _discord, ...current } = state.methods;
       const res = await fetch(`${apiPath("id")}/admin/team/sign-in`, {
         method: "PUT",
         credentials: "include",
@@ -70,6 +70,8 @@ export function SignInPage() {
     }
   }
 
+  const chat = state?.methods.discord ? "Discord" : "Slack";
+  const ChatIcon = state?.methods.discord ? FaDiscord : FaSlack;
   return (
     <Page
       title="Sign-in"
@@ -83,15 +85,15 @@ export function SignInPage() {
           <li>
             <Card className="flex items-start justify-between gap-4">
               <div className="flex gap-3">
-                <FaSlack size={20} className="mt-0.5 shrink-0 text-secondary-700" />
+                <ChatIcon size={20} className="mt-0.5 shrink-0 text-secondary-700" />
                 <div>
-                  <h2 className="font-semibold text-secondary-900">Slack</h2>
+                  <h2 className="font-semibold text-secondary-900">{chat}</h2>
                   <p className="text-sm text-secondary-600">
-                    Members join through Slack, so it's always on.
+                    Members join through {chat}, so it's always on.
                   </p>
                 </div>
               </div>
-              <Switch checked label="Slack on" disabled onChange={() => {}} />
+              <Switch checked label={`${chat} on`} disabled onChange={() => {}} />
             </Card>
           </li>
           {METHODS.map(({ key, label, Icon, summary }) => {
@@ -123,7 +125,7 @@ export function SignInPage() {
                   {asking === key && (
                     <ConfirmQuestion
                       size="sm"
-                      question={`Switch off ${label}? ${people(only)} won't be able to sign in until they link Slack to their account.`}
+                      question={`Switch off ${label}? ${people(only)} won't be able to sign in until they link ${chat} to their account.`}
                       confirmLabel="Switch off"
                       keepLabel="Keep it on"
                       disabled={busy}

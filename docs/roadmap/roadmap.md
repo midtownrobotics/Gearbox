@@ -54,6 +54,7 @@ As of 10 October 2026, five of the six Phase 0 steps are done on `main`, Phase 1
 
 | Change | Roadmap step | Pull request |
 | --- | --- | --- |
+| Discord beside Slack: a team connects one or the other on Integrations (or at sign-up, where adding the bot also makes the founder its first admin); members sign in, sign up and link with Discord, if they're in the team's server; every DM and channel post (Orders' approvals, Shop's releases and summaries, Schedule's reminders, Scouting's service alerts, notifications, admins' alerts) goes out on whichever the team uses, through one chat layer in G3ID and one message format; channel pickers, sign-in methods, the members list, the account page and page text follow the team's chat; a Discord link on Portal. [Plan](discord.md) | Beside the phases: confirmed 16 October 2026 (Hosting and stack decisions) | This PR |
 | Scouting's inline mobile maps expose labeled Undo and Clear, with larger controls and no toolbar covering the drawing. All three canvas editors handle canceled and secondary pointers, auto-route clearing is undoable, and phone fullscreen preserves the field's proportions. [Mobile validation](scouting-mobile-validation.md) covers all pages and mouse/touch drawing workflows | Phase 3: Scouting mobile usability | This PR |
 | The pit log downloader moved into the repository (`devices/pit-log-downloader`), with its team number, Drive folder and paths in a settings file instead of the code, so any team can run it on Linux, Windows or macOS. Its status page is now React from the shared Gearbox parts, in the built-in colors with light and dark mode | Pit log downloader: L.1 | This PR |
 | Pit's checklist archives page is Archives, and its new Logs page pairs the team's log downloaders: setup steps for each system, a 6-digit pairing code, and each downloader's own key for Pit's API. The downloader needs no settings file, does nothing until it's paired, and takes its team's Team Appearance from Pit | Pit log downloader: L.2 | This PR |
@@ -233,7 +234,7 @@ A team's address is its FRC team number, and no two teams can share a number. Th
 
 ## Hosting and stack decisions
 
-Seven choices were confirmed on 3 October 2026, one more on 6 October, widened the same day to every team's box, and the demo's rate limit on 15 October. Everything else stays on the current stack.
+Seven choices were confirmed on 3 October 2026, one more on 6 October, widened the same day to every team's box, the demo's rate limit on 15 October, and Discord on 16 October. Everything else stays on the current stack.
 
 | Decision | Confirmed choice | What it replaces |
 | --- | --- | --- |
@@ -246,6 +247,7 @@ Seven choices were confirmed on 3 October 2026, one more on 6 October, widened t
 | Staging address | Production's addresses with `-dev` on the first part, on g3robotics.com: `1648-orders-dev.g3robotics.com`, the platform at `dev.g3robotics.com` (decided 11 October 2026, after G3's cutover). One level deep, so the free certificate covers it, and a domain apart from production's, so they never share a cookie; G3's retired addresses there stay production's | New |
 | Demo rate limit | Cloudflare's Rate Limiting binding on the gateway, 60 changes a minute per visitor on the public demo team only (confirmed 15 October 2026). Included in Workers Paid | New |
 | Edge box link | A Durable Object (SQLite-backed, hibernating WebSockets) holds each edge box's connection, one object per team's box, on the existing Workers Paid plan. Confirmed 6 October 2026 for G3's box, then for every team that runs Edge | The Cloudflare Tunnel to `edge-agent.g3robotics.com` |
+| Discord | Discord as a second chat service beside Slack: one Discord app (and a separate one for staging), a team connects Slack or Discord, members sign in with Discord OAuth. Free, no paid add-on, no new Cloudflare product (confirmed 16 October 2026). Plan: [discord.md](discord.md) | New |
 
 **Why one level.** Cloudflare's free certificate covers the domain and one level of subdomain ([Universal SSL limitations](https://developers.cloudflare.com/ssl/edge-certificates/universal-ssl/limitations/)). Today's two-level names work because each is a Custom Domain with its own certificate, but Custom Domains take no wildcards and stop at 100 per zone ([Custom Domains](https://developers.cloudflare.com/workers/configuration/routing/custom-domains/), [Workers limits](https://developers.cloudflare.com/workers/platform/limits/)). A wildcard route matches any hostname ([Routes](https://developers.cloudflare.com/workers/configuration/routing/routes/)), and a wildcard DNS record can be proxied on every plan ([Wildcard DNS records](https://developers.cloudflare.com/dns/manage-dns-records/reference/wildcard-dns-records/)).
 

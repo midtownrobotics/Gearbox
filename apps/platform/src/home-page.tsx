@@ -142,12 +142,12 @@ const STEPS = [
     body: "Your FRC number, name and country. One team per number.",
   },
   {
-    title: `Add ${site.slackBotName} to your Slack`,
-    body: `One click installs ${site.slackBotName} in your team's workspace. It's how everyone signs in.`,
+    title: `Add ${site.slackBotName} to your Slack or Discord`,
+    body: `One click adds ${site.slackBotName} to your team's Slack workspace or Discord server. It's how everyone signs in.`,
   },
   {
-    title: "Send it the code on screen",
-    body: `DM ${site.slackBotName} the code. You're your team's first admin, and your apps are live.`,
+    title: "Confirm it's you",
+    body: `On Discord, adding ${site.slackBotName} signs you in. On Slack, DM it the code on screen. You're your team's first admin, and your apps are live.`,
   },
 ];
 

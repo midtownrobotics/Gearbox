@@ -1,4 +1,4 @@
-import { type AppName, apiPath, appUrl } from "@g3/site-config";
+import { type AppName, apiPath, appUrl, site } from "@g3/site-config";
 import {
   Badge,
   Card,
@@ -21,10 +21,11 @@ import {
 } from "../../lib/platform";
 
 // The services outside Gearbox the team's apps work with: whether each is connected, what's known
-// about the connection, what the team uses it for, and where it's set up. Slack is connected here
-// (G3ID's /admin/slack and /slack/install, through /api/~id; Slack sends the admin back here).
-// The others' status comes from the app that connects them (its /team-settings), and they're set
-// up in that app.
+// about the connection, what the team uses it for, and where it's set up. The team's chat is
+// connected here: Slack (G3ID's /admin/slack and /slack/install) or Discord (/admin/discord and
+// /auth/discord/install), through /api/~id, one at a time; each sends the admin back here. The
+// others' status comes from the app that connects them (its /team-settings), and they're set up
+// in that app.
 
 type Status = IntegrationStatus | "loading" | "unknown";
 
@@ -34,6 +35,13 @@ type SlackStatus = {
   workspaceName: string | null;
   /** Connected through the server's settings (from before teams), not this page. */
   fromSettings: boolean;
+  canConnect: boolean;
+};
+
+type DiscordStatus = {
+  connected: boolean;
+  guildId: string | null;
+  guildName: string | null;
   canConnect: boolean;
 };
 
@@ -51,15 +59,25 @@ type Integration = {
   page?: string;
 };
 
-const SLACK_USES: Use[] = [
-  { app: null, text: "Signing in: members get their sign-in code from the bot." },
-  { app: null, text: "Admins hear when an app is switched on or off." },
+/** What the team's chat is used for, after how members sign in with it. */
+const CHAT_USES: Use[] = [
+  { app: null, text: "Admins hear when an app is switched on or off, and when someone signs up." },
   { app: null, text: "Gearbox notifications go to the channel and people set on Notifications." },
   { app: "orders", text: "Orders tells people when their request is approved." },
   {
     app: "shop",
     text: "Shop posts releases and daily summaries to the channels set on its Admin page.",
   },
+  { app: "schedule", text: "Schedule reminds people before their role changes." },
+  { app: "scouting", text: "Scouting alerts the service crew about new tickets." },
+];
+const SLACK_USES: Use[] = [
+  { app: null, text: "Signing in: members get their sign-in code from the bot." },
+  ...CHAT_USES,
+];
+const DISCORD_USES: Use[] = [
+  { app: null, text: "Signing in: members of your server sign in with Discord." },
+  ...CHAT_USES,
 ];
 
 const INTEGRATIONS: Integration[] = [
@@ -180,6 +198,7 @@ export function IntegrationsPage() {
   const [apps, setApps] = useState<LibraryApp[] | null>(null);
   const [statuses, setStatuses] = useState<Record<string, Status>>({});
   const [slack, setSlack] = useState<SlackStatus | "loading" | "unknown">("loading");
+  const [discord, setDiscord] = useState<DiscordStatus | "loading" | "unknown">("loading");
   const [error, setError] = useState(searchParams.get("error") ?? "");
   const [busy, setBusy] = useState(false);
 
@@ -193,9 +212,20 @@ export function IntegrationsPage() {
     }
   }
 
+  async function loadDiscord() {
+    try {
+      const res = await g3id.admin.discord.$get();
+      if (!res.ok) throw new Error();
+      setDiscord((await res.json()) as DiscordStatus);
+    } catch {
+      setDiscord("unknown");
+    }
+  }
+
   // biome-ignore lint/correctness/useExhaustiveDependencies: loads once
   useEffect(() => {
     loadSlack();
+    loadDiscord();
     platform<LibraryApp[]>("/team/library")
       .then((library) => {
         setApps(library);
@@ -225,7 +255,24 @@ export function IntegrationsPage() {
     }
   }
 
+  async function disconnectDiscord() {
+    setBusy(true);
+    setError("");
+    try {
+      const res = await g3id.admin.discord.$delete();
+      if (!res.ok) throw new Error();
+      await loadDiscord();
+    } catch {
+      setError("Couldn't disconnect Discord.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const on = new Set(apps?.filter((a) => a.enabled).map((a) => a.slug) ?? []);
+  // A team uses one chat at a time: the other can be connected once this one is disconnected.
+  const slackOn = typeof slack !== "string" && slack.connected;
+  const discordOn = typeof discord !== "string" && discord.connected;
   const usesOf = (uses: Use[]) =>
     uses.filter((u) => u.app === null || on.has(u.app)).map((u) => u.text);
   const shown = INTEGRATIONS.filter((i) => usesOf(i.uses).length > 0);
@@ -246,6 +293,19 @@ export function IntegrationsPage() {
               ]
             : undefined,
         };
+  const discordStatus: Status =
+    typeof discord === "string"
+      ? discord
+      : {
+          connected: discord.connected,
+          facts: discord.connected
+            ? [
+                { label: "Server", value: discord.guildName ?? "Unnamed" },
+                ...(discord.guildId ? [{ label: "Server ID", value: discord.guildId }] : []),
+              ]
+            : undefined,
+        };
+  const connected = searchParams.get("connected");
 
   return (
     <Page
@@ -254,9 +314,8 @@ export function IntegrationsPage() {
       width="narrow"
     >
       {error && <ErrorBanner message={error} />}
-      {searchParams.get("connected") && typeof slack !== "string" && slack.connected && (
-        <SuccessBanner message="Slack is connected." />
-      )}
+      {connected === "1" && slackOn && <SuccessBanner message="Slack is connected." />}
+      {connected === "discord" && discordOn && <SuccessBanner message="Discord is connected." />}
       <ul className="space-y-3">
         <IntegrationCard
           name="Slack"
@@ -264,7 +323,12 @@ export function IntegrationsPage() {
           status={slackStatus}
           uses={usesOf(SLACK_USES)}
         >
-          {typeof slack !== "string" && slack.canConnect && (
+          {typeof slack !== "string" && slack.canConnect && discordOn && (
+            <p className="text-sm text-secondary-500">
+              Your team uses Discord. Disconnect it to use Slack instead.
+            </p>
+          )}
+          {typeof slack !== "string" && slack.canConnect && !discordOn && (
             <>
               <a href={`${apiPath("id")}/slack/install`} className={linkButton}>
                 {slack.connected ? "Reconnect" : "Connect Slack"}
@@ -284,6 +348,38 @@ export function IntegrationsPage() {
             <p className="text-sm text-secondary-500">
               Connecting a workspace isn't set up on this server yet.
             </p>
+          )}
+        </IntegrationCard>
+
+        <IntegrationCard
+          name="Discord"
+          summary="Your team's Discord server."
+          status={discordStatus}
+          uses={usesOf(DISCORD_USES)}
+        >
+          {typeof discord !== "string" && discord.canConnect && slackOn && (
+            <p className="text-sm text-secondary-500">
+              Your team uses Slack. Disconnect it to use Discord instead.
+            </p>
+          )}
+          {typeof discord !== "string" && discord.canConnect && !slackOn && (
+            <>
+              <a href={`${apiPath("id")}/auth/discord/install`} className={linkButton}>
+                {discord.connected ? "Reconnect" : "Connect Discord"}
+              </a>
+              {discord.connected && (
+                <ConfirmButton
+                  size="sm"
+                  label="Disconnect"
+                  question={`Disconnect Discord? ${site.discordBotName} leaves your server, members can't sign in with Discord, and the apps can't message anyone, until it's connected again.`}
+                  disabled={busy}
+                  onConfirm={() => void disconnectDiscord()}
+                />
+              )}
+            </>
+          )}
+          {typeof discord !== "string" && !discord.canConnect && (
+            <p className="text-sm text-secondary-500">Connecting Discord isn't set up here yet.</p>
           )}
         </IntegrationCard>
 

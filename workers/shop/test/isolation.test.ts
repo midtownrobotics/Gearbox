@@ -14,7 +14,7 @@ import { eventually, onshapeEvent } from "./onshape";
 
 // Two teams, each with its own subsystem, processes, part with instances, a batch with a part
 // file and an instance sent back out of it, a drawing in R2 (and an uploaded one), a part from its Onshape webhook, its Onshape
-// and Slack settings, and a kiosk at the shop. Every route, called as team A's admin, mentor,
+// and chat settings, and a kiosk at the shop. Every route, called as team A's admin, mentor,
 // student and kiosk session with team B's ids, must show none of B's and change nothing of B's,
 // in D1 or in R2.
 
@@ -48,11 +48,11 @@ async function seed(team: TeamUsers): Promise<Seeded> {
   const partNumber = `PN-${crypto.randomUUID().slice(0, 8)}`;
   const webhookKey = `key-${tag}`;
 
-  // Settings: the team's Slack channels and Onshape document and webhook key (no API keys, so
+  // Settings: the team's chat channels and Onshape document and webhook key (no API keys, so
   // nothing calls Onshape).
-  await jsonAs(admin, "/admin/slack/config", {
+  await jsonAs(admin, "/admin/chat/config", {
     method: "POST",
-    body: { slackReleaseChannelId: "CRELEASE", slackSummaryChannelId: "CSUMMARY" },
+    body: { releaseChannelId: "CRELEASE", summaryChannelId: "CSUMMARY" },
   });
   await jsonAs(admin, "/admin/onshape/config", {
     method: "POST",
@@ -254,9 +254,9 @@ it("keeps every team's shop to itself", async () => {
         "PUT /staging-batches/:id/file": { fileId: d.file },
         "POST /staging-batches/:id/status": { at: "producer", to: "done" },
         "POST /staging-batches/:id/send-back": { to: "producer" },
-        "POST /admin/slack/config": { slackReleaseChannelId: "CMINE" },
+        "POST /admin/chat/config": { releaseChannelId: "CMINE" },
         "POST /admin/onshape/config": { documentId: "mine" },
-        "POST /admin/slack/daily-summary": { kind: "overview", since: Date.now() - 1000 },
+        "POST /admin/chat/daily-summary": { kind: "overview", since: Date.now() - 1000 },
       };
     },
   });

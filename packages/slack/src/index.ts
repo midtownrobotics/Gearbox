@@ -5,6 +5,27 @@
 export const SLACK_BOT_SCOPES =
   "commands,chat:write,im:write,im:history,users:read,users:read.email,channels:read,groups:read";
 
+/**
+ * Turns a message in Gearbox's chat format into Slack's mrkdwn. The format is the part of
+ * Discord's Markdown both services can show, which Discord reads as it is: `**bold**`,
+ * `[label](https://...)`, `> ` quotes, `<t:UNIX>` for a time each reader sees in their own zone,
+ * Unicode emoji (not `:names:`) and line breaks.
+ */
+export function toSlack(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/&lt;t:(\d+)(?::[tTdDfFR])?&gt;/g, (_, unix: string) => {
+      const fallback = new Date(Number(unix) * 1000).toISOString().replace(/\.\d+Z$/, "Z");
+      return `<!date^${unix}^{date_num} {time_secs}|${fallback}>`;
+    })
+    .replace(/\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g, (_, label: string, url: string) => {
+      return `<${url.replace(/&amp;/g, "&")}|${label.replace(/\|/g, "/")}>`;
+    })
+    .replace(/\*\*([^*\n]+)\*\*/g, "*$1*");
+}
+
 export type SlackChannel = {
   id: string;
   name: string;

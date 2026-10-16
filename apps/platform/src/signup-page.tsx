@@ -1,7 +1,7 @@
 import { site, teamAppUrl } from "@g3/site-config";
 import { TextField } from "@g3/ui";
 import { useEffect, useMemo, useState } from "react";
-import { FaCheck, FaSlack } from "react-icons/fa";
+import { FaCheck, FaDiscord, FaSlack } from "react-icons/fa";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "./api";
 import { Page } from "./layout";
@@ -38,14 +38,16 @@ const COUNTRIES = [
 type Signup = {
   teamNumber: number;
   name: string;
-  step: "slack" | "code" | "done";
+  step: "connect" | "code" | "done";
   workspaceName: string | null;
+  /** Whether a team can sign up with Discord here. */
+  discord: boolean;
 };
 
 const field =
   "w-full rounded-lg border border-secondary-300 bg-surface px-3 py-2 text-secondary-900 focus:border-primary-500 focus:outline-none";
 
-const STEPS = ["Your team", "Connect Slack", "Confirm it's you"];
+const STEPS = ["Your team", "Connect Slack or Discord", "Confirm it's you"];
 
 export function SignupPage() {
   const [params] = useSearchParams();
@@ -270,7 +272,7 @@ function SignupSteps({
   const [signup, setSignup] = useState<Signup | null>(null);
 
   useEffect(() => {
-    if (signup) onStep({ slack: 1, code: 2, done: 3 }[signup.step]);
+    if (signup) onStep({ connect: 1, code: 2, done: 3 }[signup.step]);
   }, [signup, onStep]);
 
   useEffect(() => {
@@ -292,7 +294,7 @@ function SignupSteps({
         Team <span className="font-semibold text-secondary-900">{signup.teamNumber}</span>,{" "}
         {signup.name}
       </p>
-      {signup.step === "slack" && <ConnectSlack signupId={signupId} />}
+      {signup.step === "connect" && <ConnectChat signupId={signupId} discord={signup.discord} />}
       {signup.step === "code" && (
         <SendCode signupId={signupId} workspace={signup.workspaceName} onError={onError} />
       )}
@@ -311,12 +313,13 @@ function SignupSteps({
   );
 }
 
-function ConnectSlack({ signupId }: { signupId: string }) {
+function ConnectChat({ signupId, discord }: { signupId: string; discord: boolean }) {
   return (
     <div className="space-y-4">
-      <h2 className="text-lg font-semibold text-secondary-900">Connect your team's Slack</h2>
+      <h2 className="text-lg font-semibold text-secondary-900">Connect your team's chat</h2>
       <p className="text-sm text-secondary-600">
-        Your team signs in with Slack. Add {site.slackBotName} to your workspace to continue.
+        Your team signs in with Slack or Discord, whichever it uses. Add {site.slackBotName} to your
+        Slack workspace{discord ? " or your Discord server" : ""} to continue.
       </p>
       <a
         href={`/api/signup/${signupId}/slack`}
@@ -325,6 +328,21 @@ function ConnectSlack({ signupId }: { signupId: string }) {
         <FaSlack size={18} />
         Add to Slack
       </a>
+      {discord && (
+        <>
+          <a
+            href={`/api/signup/${signupId}/discord`}
+            className="flex items-center justify-center gap-2 rounded-lg bg-[#5865f2] hover:bg-[#4752c4] py-2.5 font-semibold text-white transition-colors"
+          >
+            <FaDiscord size={18} />
+            Add to Discord
+          </a>
+          <p className="text-xs text-secondary-500">
+            With Discord, you need to be able to manage the server. Adding {site.discordBotName}{" "}
+            also signs you in as your team's first admin.
+          </p>
+        </>
+      )}
     </div>
   );
 }
