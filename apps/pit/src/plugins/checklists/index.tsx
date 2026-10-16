@@ -55,5 +55,5 @@ export const checklistsPlugin: Plugin = {
       ),
     },
   ],
-  navItems: [{ label: "Edit Checklists", to: "/editor", order: 3 }],
+  navItems: [{ label: "Edit Checklists", to: "/editor", order: 4 }],
 };

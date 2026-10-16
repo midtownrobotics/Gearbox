@@ -51,7 +51,7 @@ export const ARCHIVE_TYPE_LABELS: Record<ArchiveType, string> = {
   other: "Other",
 };
 
-/** An archive of the checklists as the Logs page lists it. */
+/** An archive of the checklists as the Archives page lists it. */
 export type ChecklistArchive = {
   id: number;
   event: string;

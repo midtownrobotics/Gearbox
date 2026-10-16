@@ -139,8 +139,8 @@ export function ChecklistRunnerListPage() {
           className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-2.5 text-sm text-emerald-800"
         >
           <span>Archived: {archiveTitle(archived)}</span>
-          <Link to="/logs" className="font-semibold underline">
-            View in Logs
+          <Link to="/archives" className="font-semibold underline">
+            View in Archives
           </Link>
         </p>
       )}

@@ -117,7 +117,7 @@ export function ArchiveDialog({
       }}
     >
       <p className="text-sm text-secondary-500">
-        Saves the checklists to Logs and unchecks every item. Open issues stay.
+        Saves the checklists to Archives and unchecks every item. Open issues stay.
       </p>
 
       <Field label="Event">
