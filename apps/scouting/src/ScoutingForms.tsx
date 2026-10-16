@@ -126,7 +126,7 @@ function FieldInput({
           <button
             type="button"
             aria-label={`Subtract ${counterInterval}`}
-            onClick={() => setValue(current - counterInterval)}
+            onClick={() => setValue(Math.max(0, current - counterInterval))}
           >
             −{counterInterval}
           </button>
