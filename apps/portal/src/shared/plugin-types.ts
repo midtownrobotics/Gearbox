@@ -10,6 +10,10 @@ export interface PluginNavItem {
   to: string;
   order: number;
   requiresAuth?: boolean;
+  /** Only shown to the team's admins. */
+  requiresAdmin?: boolean;
+  /** Items with the same group are shown together under its name. */
+  group?: string;
 }
 
 export interface Plugin {

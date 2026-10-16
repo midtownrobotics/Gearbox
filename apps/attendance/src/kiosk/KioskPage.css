@@ -1,0 +1,229 @@
+/* The display fills the screen exactly and never scrolls: the codes take the space between their
+   labels and the status line, each QR the largest square that fits (container query units). */
+.kiosk {
+  position: relative;
+  height: 100dvh;
+  display: flex;
+  justify-content: center;
+  background: var(--g3-page);
+  color: var(--g3-text);
+  overflow: hidden;
+}
+
+.kiosk,
+.kiosk--signin,
+.kiosk--combined,
+.kiosk__code--signin {
+  --accent: var(--att-signin);
+}
+.kiosk--signout,
+.kiosk__code--signout {
+  --accent: var(--att-signout);
+}
+.kiosk__content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  gap: clamp(8px, 2dvh, 18px);
+  padding: clamp(12px, 2.5dvh, 24px) 20px;
+  animation: fadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.kiosk__codes {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+.kiosk__codes--combined {
+  gap: clamp(20px, 4vw, 72px);
+}
+
+.kiosk__code {
+  flex: 1;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  max-width: 900px;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(8px, 2dvh, 18px);
+}
+
+/* Admin gate + QR loading placeholder */
+.kiosk-gate {
+  justify-content: center;
+  gap: 16px;
+  text-align: center;
+  padding: 0 24px;
+}
+.kiosk-gate__title {
+  font-family: var(--font-display);
+  font-size: clamp(22px, 6vw, 34px);
+  letter-spacing: 0.08em;
+  color: var(--g3-text);
+}
+.kiosk-gate__text {
+  font-size: 15px;
+  color: var(--g3-muted);
+}
+.kiosk__qr-loading {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-size: clamp(20px, 9cqmin, 56px);
+  letter-spacing: 0.06em;
+  color: #6b6b6b;
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Big label */
+.kiosk__label {
+  font-family: var(--font-display);
+  font-size: clamp(36px, min(11vw, 12dvh), 120px);
+  line-height: 1;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+  user-select: none;
+}
+
+.kiosk__codes--combined .kiosk__label {
+  font-size: clamp(32px, min(7vw, 10dvh), 82px);
+}
+
+/* QR wrapper */
+.kiosk__qr-wrapper {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  container-type: size;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+/* The QR on a white tile: dark modules on light scan most reliably. */
+.kiosk__qr-frame {
+  box-sizing: border-box;
+  width: min(100cqw, 100cqh);
+  height: min(100cqw, 100cqh);
+  padding: clamp(8px, 3cqmin, 20px);
+  background: #ffffff;
+  border-radius: 16px;
+  border: 4px solid var(--accent);
+  animation: qrAppear 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.kiosk__qr-code {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+@keyframes qrAppear {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Timer */
+.kiosk__timer {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.kiosk__timer-label {
+  font-size: 13px;
+  letter-spacing: 0.25em;
+  color: var(--g3-muted);
+  text-transform: uppercase;
+}
+
+.kiosk__timer-seconds {
+  font-family: var(--font-display);
+  font-size: 32px;
+  color: var(--g3-text);
+  letter-spacing: 0.05em;
+  min-width: 3ch;
+  text-align: center;
+}
+
+.kiosk--combined .kiosk__timer-seconds {
+  font-size: 38px;
+}
+
+@media (max-width: 720px) {
+  .kiosk__codes--combined {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .kiosk__codes--combined .kiosk__code {
+    width: 100%;
+  }
+}
+
+/* When the display can't get a fresh code: what's wrong, in place of the countdown. Amber is a
+   warning, fixed since the display is always dark. */
+.kiosk__content--problem {
+  justify-content: center;
+}
+
+.kiosk__problem {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  max-width: 640px;
+  text-align: center;
+}
+.kiosk__problem-title {
+  font-family: var(--font-display);
+  font-size: clamp(24px, 4vw, 40px);
+  letter-spacing: 0.08em;
+  color: #fbbf24;
+}
+.kiosk__problem-text {
+  font-size: 15px;
+  letter-spacing: 0.06em;
+  color: var(--g3-muted);
+}
+.kiosk__problem-button {
+  margin-top: 8px;
+  padding: 10px 28px;
+  border-radius: 8px;
+  border: 1px solid var(--g3-line);
+  background: var(--g3-surface);
+  color: var(--g3-text);
+  font-family: var(--font-display);
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}

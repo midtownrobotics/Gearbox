@@ -1,10 +1,14 @@
 import { useEffect, useSyncExternalStore } from "react";
+import { sharedCookieAttributes } from "./shared-cookie";
 
-// One light/dark setting for every G3 app. It lives in a cookie on .g3robotics.com, which every
+// One light/dark setting for every app. It lives in a cookie on the team's domain, which every
 // app's subdomain can read (localStorage is per subdomain). On localhost, cookies are shared
 // across ports, so dev servers share it too. With no cookie, the system setting decides.
 
 export type Theme = "light" | "dark";
+let defaultTheme: Theme | "system" = "system";
+/** A page that must always look one way (Attendance's kiosk display, on a shop TV). */
+let forcedTheme: Theme | null = null;
 
 const COOKIE = "g3_theme";
 const listeners = new Set<() => void>();
@@ -15,8 +19,34 @@ function systemTheme(): Theme {
 
 /** The saved theme, or the system's when none is saved. */
 export function readTheme(): Theme {
+  if (forcedTheme) return forcedTheme;
   const saved = document.cookie.match(/(?:^|;\s*)g3_theme=(light|dark)/)?.[1];
-  return (saved as Theme | undefined) ?? systemTheme();
+  return (saved as Theme | undefined) ?? (defaultTheme === "system" ? systemTheme() : defaultTheme);
+}
+
+/**
+ * Pins this page to one theme whatever the saved setting or the team's default says (null lets
+ * the setting decide again). Doesn't change the saved setting other apps use.
+ */
+export function forceTheme(theme: Theme | null) {
+  forcedTheme = theme;
+  applyTheme(readTheme());
+}
+
+/** Team choice applies only when the member has not saved a personal preference. */
+export function setDefaultTheme(theme: Theme | "system") {
+  defaultTheme = theme;
+  applyTheme(readTheme());
+}
+
+/**
+ * The browser's own bar matches the app's top bar: the theme's surface color, the team's own
+ * once its appearance has loaded.
+ */
+export function syncThemeColor() {
+  const surface = getComputedStyle(document.documentElement).getPropertyValue("--g3-surface");
+  if (!surface.trim()) return;
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", surface.trim());
 }
 
 function applyTheme(theme: Theme) {
@@ -24,20 +54,16 @@ function applyTheme(theme: Theme) {
   if (root.dataset.theme === theme) return;
   root.dataset.theme = theme;
   root.style.colorScheme = theme;
-  // The browser's own bar matches the app's top bar.
-  document
-    .querySelector('meta[name="theme-color"]')
-    ?.setAttribute("content", theme === "dark" ? "#262626" : "#fefefe");
+  // The team's colors for this theme are put in place by whoever listens (team-ui.ts).
+  window.dispatchEvent(new Event("g3-theme-changed"));
+  syncThemeColor();
   for (const listener of listeners) listener();
 }
 
 /** Saves the theme for every G3 app and applies it here. */
 export function setTheme(theme: Theme) {
-  const host = window.location.hostname;
-  const domain =
-    host === "g3robotics.com" || host.endsWith(".g3robotics.com") ? "; domain=.g3robotics.com" : "";
-  const secure = window.location.protocol === "https:" ? "; secure" : "";
-  document.cookie = `${COOKIE}=${theme}; path=/; max-age=31536000; samesite=lax${domain}${secure}`;
+  // Shared by every app on the domain this page is on.
+  document.cookie = `${COOKIE}=${theme}; ${sharedCookieAttributes(31536000)}`;
   applyTheme(theme);
 }
 

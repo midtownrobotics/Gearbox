@@ -33,12 +33,12 @@ export function DrawingPreview({
 
   useEffect(() => {
     const controller = new AbortController();
-    let cancelled = false;
+    let canceled = false;
     let doc: pdfjs.PDFDocumentProxy | null = null;
     let task: pdfjs.RenderTask | null = null;
     let objectUrl: string | null = null;
     const timeout = setTimeout(() => {
-      cancelled = true;
+      canceled = true;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
       setState({ kind: "error" });
     }, 30000); // 30 second timeout
@@ -46,7 +46,7 @@ export function DrawingPreview({
     fetchDrawingObjectUrl(partNumber, revision, controller.signal)
       .then(async (url) => {
         objectUrl = url;
-        if (controller.signal.aborted || cancelled || !objectUrl) {
+        if (controller.signal.aborted || canceled || !objectUrl) {
           if (objectUrl) URL.revokeObjectURL(objectUrl);
           setState(objectUrl ? { kind: "rendering" } : { kind: "none" });
           return;
@@ -59,11 +59,11 @@ export function DrawingPreview({
           console.log("Starting PDF load for", objectUrl);
           doc = await pdfjs.getDocument({ url: objectUrl }).promise;
           console.log("PDF loaded, getting page 1");
-          if (cancelled) return;
+          if (canceled) return;
 
           const page = await doc.getPage(1);
           console.log("Page 1 retrieved, rendering to canvas");
-          if (cancelled) return;
+          if (canceled) return;
 
           const canvas = canvasRef.current;
           if (!canvas) {
@@ -120,7 +120,7 @@ export function DrawingPreview({
       });
 
     return () => {
-      cancelled = true;
+      canceled = true;
       controller.abort();
       task?.cancel();
       clearTimeout(timeout);
@@ -131,13 +131,13 @@ export function DrawingPreview({
   if (state.kind === "ready" || state.kind === "rendering") {
     const containerClass = fullHeight
       ? "relative flex-1 overflow-hidden flex items-center justify-center"
-      : "relative h-44 rounded-xl border border-steel/30 overflow-hidden flex items-center justify-center";
+      : "relative h-44 rounded-xl border border-secondary-200 overflow-hidden flex items-center justify-center";
     return (
       <div className={containerClass}>
         <canvas ref={canvasRef} className="max-w-full max-h-full object-contain" />
         {state.kind === "rendering" && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-            <span className="text-xs text-paper">Rendering…</span>
+            <span className="text-xs text-surface">Rendering…</span>
           </div>
         )}
         {!hideOverlay && (
@@ -145,9 +145,9 @@ export function DrawingPreview({
             href={drawingUrl(partNumber, revision)}
             target="_blank"
             rel="noreferrer"
-            className="absolute inset-0 flex items-end justify-end p-2 bg-transparent hover:bg-ink/5 transition-colors"
+            className="absolute inset-0 flex items-end justify-end p-2 bg-transparent hover:bg-secondary-900/5 transition-colors"
           >
-            <span className="text-[11px] font-semibold text-paper bg-ink/70 rounded-md px-2 py-1">
+            <span className="text-[11px] font-semibold text-surface bg-secondary-900/70 rounded-md px-2 py-1">
               Open drawing ↗
             </span>
           </a>
@@ -157,8 +157,8 @@ export function DrawingPreview({
   }
 
   const emptyClass = fullHeight
-    ? "flex-1 border border-dashed border-steel/40 bg-mist flex flex-col items-center justify-center gap-1 text-steel"
-    : "h-44 rounded-xl border border-dashed border-steel/40 bg-mist flex flex-col items-center justify-center gap-1 text-steel";
+    ? "flex-1 border border-dashed border-secondary-300 bg-page flex flex-col items-center justify-center gap-1 text-secondary-400"
+    : "h-44 rounded-xl border border-dashed border-secondary-300 bg-page flex flex-col items-center justify-center gap-1 text-secondary-400";
   return (
     <div className={emptyClass}>
       <svg

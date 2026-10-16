@@ -1,3 +1,4 @@
+import { appTitle } from "@g3/site-config";
 import type { PrintJob, Printer } from "@g3/worker-edge/print-types";
 import { type PrintBackend, PrintError } from "./cups";
 
@@ -96,7 +97,7 @@ export function mockBackend(): PrintBackend {
     },
     async testPrint(name) {
       get(name);
-      return addJob(name, "G3 Edge test page", null);
+      return addJob(name, `${appTitle("Edge")} test page`, null);
     },
     async submit(options) {
       const printer = options.printer ?? defaultName;

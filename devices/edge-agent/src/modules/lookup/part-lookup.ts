@@ -4,7 +4,7 @@
  * Runs on the edge box (the agent's lookup module), so vendors see the shop's
  * connection rather than a cloud IP. Amazon links (including a.co / amzn.to
  * share links) go straight to Amazon's page markup, fetched with the requester's
- * own browser headers. DigiKey blocks scraping, so it uses its official API when
+ * own browser headers (a desktop browser's when the requester is on a phone). DigiKey blocks scraping, so it uses its official API when
  * credentials are configured. McMaster blocks scraping too and only offers its
  * API to B2B customers, so its lookups return the part number from the URL (plus
  * the name when the page is prerendered). Everything else is tried in order,
@@ -21,6 +21,7 @@
  */
 
 import { brotliDecompressSync, gunzipSync, inflateRawSync, inflateSync } from "node:zlib";
+import { site } from "@g3/site-config";
 import type { ClientHeaders, PartLookup, PartVariant } from "@g3/worker-edge/lookup-types";
 
 export type { PartLookup };
@@ -105,7 +106,7 @@ export class LookupError extends Error {
 // Shopify rate-limits requests that claim to be Chrome but don't act like it
 // (429), so only Amazon (which blocks non-browser agents) gets browser headers:
 // the requester's own, falling back to a generic Chrome.
-const HONEST_UA = "G3RoboticsPartLookup/0.1 (+https://g3robotics.com)";
+const HONEST_UA = `${site.team.name.replace(/\s+/g, "")}PartLookup/0.1 (+https://${site.domain})`;
 const FALLBACK_BROWSER_UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36";
 const FALLBACK_LANGUAGE = "en-US,en;q=0.9";
@@ -129,6 +130,24 @@ function browserHeaders(client: ClientHeaders = {}): Record<string, string> {
   if (client.secChUaMobile) headers["Sec-CH-UA-Mobile"] = client.secChUaMobile;
   if (client.secChUaPlatform) headers["Sec-CH-UA-Platform"] = client.secChUaPlatform;
   return headers;
+}
+
+/** A phone or tablet browser: its own headers or its user agent say so. */
+function isMobileClient(client: ClientHeaders): boolean {
+  if (client.secChUaMobile === "?1") return true;
+  return /Mobi|Android|iPhone|iPad|iPod/i.test(client.userAgent ?? "");
+}
+
+/**
+ * Headers for Amazon: always a desktop browser. A phone's headers get Amazon's mobile page, which
+ * doesn't have the product details where the desktop page does.
+ */
+function amazonHeaders(client: ClientHeaders = {}): Record<string, string> {
+  if (!isMobileClient(client)) return browserHeaders(client);
+  return {
+    "User-Agent": FALLBACK_BROWSER_UA,
+    "Accept-Language": client.acceptLanguage || FALLBACK_LANGUAGE,
+  };
 }
 
 export async function lookupPart(rawUrl: string, options: LookupOptions = {}): Promise<PartLookup> {
@@ -773,7 +792,7 @@ async function resolveAmazonShortLink(url: URL, client: ClientHeaders | undefine
     try {
       // a.co answers HEAD with 404, so this has to be a GET.
       res = await meteredFetch(current, {
-        headers: browserHeaders(client),
+        headers: amazonHeaders(client),
         redirect: "manual",
         signal: AbortSignal.timeout(TIMEOUT_MS),
       });
@@ -803,10 +822,16 @@ async function lookupAmazon(input: URL, client: ClientHeaders | undefined): Prom
   if (!asin) throw new LookupError("That Amazon link isn't a product page.", 400);
   const url = new URL(`/dp/${asin.toUpperCase()}`, resolved.origin);
 
-  const html = await getHtml(url, browserHeaders(client));
+  const html = await getHtml(url, amazonHeaders(client));
   const page = await scanPage(html);
-  if (!page.amazonTitle) {
-    throw new LookupError("Amazon didn't return the product page (probably a bot check).", 502);
+  const title = amazonTitleOf(page);
+  if (!title) {
+    throw new LookupError(
+      isAmazonCaptcha(html)
+        ? "Amazon asked for a CAPTCHA (a bot check), so the page couldn't be read."
+        : "Couldn't find the product on Amazon's page.",
+      502,
+    );
   }
 
   const wholeAndFraction =
@@ -822,7 +847,7 @@ async function lookupAmazon(input: URL, client: ClientHeaders | undefined): Prom
     url: url.toString(),
     source: "amazon",
     vendor: site,
-    title: page.amazonTitle,
+    title,
     sku: asin.toUpperCase(),
     image: page.amazonImage ?? page.meta["og:image"],
     price,
@@ -830,6 +855,30 @@ async function lookupAmazon(input: URL, client: ClientHeaders | undefined): Prom
     available: page.amazonAvailability ? /in stock/i.test(page.amazonAvailability) : undefined,
     variants: [],
   };
+}
+
+/**
+ * The product's name: the desktop page's title, the mobile page's, or the page's own title
+ * ("Amazon.com: <name> : <category>") with Amazon's parts taken off.
+ */
+function amazonTitleOf(page: PageScan): string | undefined {
+  if (page.amazonTitle) return page.amazonTitle;
+  if (page.amazonMobileTitle) return page.amazonMobileTitle;
+  for (const raw of [page.meta["og:title"], page.title]) {
+    const name = raw
+      ?.replace(/^Amazon\.[a-z.]+\s*:\s*/i, "")
+      .replace(/\s+:\s+[^:]+$/, "")
+      .trim();
+    if (name && !/^Amazon(\.[a-z.]+)?$/i.test(name)) return name;
+  }
+  return undefined;
+}
+
+/** Amazon's bot check: a CAPTCHA page in place of the product. */
+function isAmazonCaptcha(html: string): boolean {
+  return /\/errors\/validateCaptcha|Type the characters you see|Enter the characters you see/i.test(
+    html,
+  );
 }
 
 // --- Page scanning ---------------------------------------------------------
@@ -842,6 +891,8 @@ type PageScan = {
   h1?: string;
   productIdInput?: string;
   amazonTitle?: string;
+  /** The mobile page's title element. */
+  amazonMobileTitle?: string;
   amazonPrice?: string;
   amazonPriceWhole?: string;
   amazonPriceFraction?: string;
@@ -853,6 +904,7 @@ type TextField =
   | "title"
   | "h1"
   | "amazonTitle"
+  | "amazonMobileTitle"
   | "amazonPrice"
   | "amazonPriceWhole"
   | "amazonPriceFraction"
@@ -908,6 +960,7 @@ async function scanPage(html: string): Promise<PageScan> {
     .on("title", firstText("title"))
     .on("h1", firstText("h1"))
     .on("#productTitle", firstText("amazonTitle"))
+    .on("#title", firstText("amazonMobileTitle"))
     // The buy-box price; other .a-price elements on the page belong to ads and related items.
     // The buy-box price to pay. `.a-text-price` marks the other prices shown beside it (per-unit
     // like "$0.05 / foot", and the struck-through list price), which must never be taken instead.

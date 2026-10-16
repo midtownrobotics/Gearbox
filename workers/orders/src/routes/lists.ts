@@ -1,4 +1,5 @@
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { hasMentorAccess, inTeam, requireAuth, withTeam } from "@g3/auth";
+import { desc, eq, inArray, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
 import { type OrdersDb, createOrdersDb } from "../db";
@@ -11,7 +12,6 @@ import {
   partLists,
 } from "../db/schema";
 import { addToList } from "../lib/lists";
-import { requireAuth } from "../middleware/auth";
 import type { AppEnv } from "../types";
 
 type ListFields = { name: string; description: string | null; isArchived: boolean };
@@ -59,7 +59,7 @@ const itemsValidator = validator("json", (value, c): { requestIds: number[] } =>
 /** How many of a list's requests are in each status, and what the live ones cost. */
 type Progress = Record<RequestStatus, number> & {
   total: number;
-  /** Requests not denied or cancelled: what the list still needs or already has. */
+  /** Requests not denied or canceled: what the list still needs or already has. */
   active: number;
   /** Known cost of the active requests (ordered prices once ordered, estimates before). */
   costCents: number;
@@ -75,7 +75,7 @@ const emptyProgress = (): Progress => ({
   unpriced: 0,
 });
 
-async function progressByList(db: OrdersDb, listIds?: number[]) {
+async function progressByList(db: OrdersDb, teamId: string, listIds?: number[]) {
   const rows = await db
     .select({
       listId: partListItems.listId,
@@ -86,7 +86,9 @@ async function progressByList(db: OrdersDb, listIds?: number[]) {
     })
     .from(partListItems)
     .innerJoin(orderRequests, eq(orderRequests.id, partListItems.requestId))
-    .where(listIds ? inArray(partListItems.listId, listIds) : undefined)
+    .where(
+      inTeam(partListItems, teamId, listIds ? inArray(partListItems.listId, listIds) : undefined),
+    )
     .groupBy(partListItems.listId, orderRequests.status)
     .all();
   const out = new Map<number, Progress>();
@@ -104,13 +106,18 @@ async function progressByList(db: OrdersDb, listIds?: number[]) {
   return out;
 }
 
-/** The list, if this user may rename, archive or delete it (its creator or a mentor). */
+/** The team's list, if this user may rename, archive or delete it (its creator or a mentor). */
 async function ownedList(
   db: OrdersDb,
+  teamId: string,
   id: number,
   user: { id: string; isMentor: boolean },
 ): Promise<{ list: typeof partLists.$inferSelect } | { error: string; status: 403 | 404 }> {
-  const list = await db.select().from(partLists).where(eq(partLists.id, id)).get();
+  const list = await db
+    .select()
+    .from(partLists)
+    .where(inTeam(partLists, teamId, eq(partLists.id, id)))
+    .get();
   if (!list) return { error: "List not found.", status: 404 };
   if (list.createdById !== user.id && !user.isMentor) {
     return { error: "Only the list's creator or a mentor can change it.", status: 403 };
@@ -125,9 +132,15 @@ async function ownedList(
 export const listsRouter = new Hono<AppEnv>()
   .get("/", requireAuth, async (c) => {
     const db = createOrdersDb(c.env.ORDERS_DB);
+    const teamId = c.get("teamId");
     const [lists, progress] = await Promise.all([
-      db.select().from(partLists).orderBy(desc(partLists.updatedAt)).all(),
-      progressByList(db),
+      db
+        .select()
+        .from(partLists)
+        .where(inTeam(partLists, teamId))
+        .orderBy(desc(partLists.updatedAt))
+        .all(),
+      progressByList(db, teamId),
     ]);
     return c.json(
       lists.map((l) => ({
@@ -143,14 +156,16 @@ export const listsRouter = new Hono<AppEnv>()
     const now = Date.now();
     const row = await db
       .insert(partLists)
-      .values({
-        name: body.name,
-        description: body.description ?? null,
-        createdById: c.get("userId"),
-        createdByName: c.get("userDisplayName"),
-        createdAt: now,
-        updatedAt: now,
-      })
+      .values(
+        withTeam(c.get("teamId"), {
+          name: body.name,
+          description: body.description ?? null,
+          createdById: c.get("userId"),
+          createdByName: c.get("userDisplayName"),
+          createdAt: now,
+          updatedAt: now,
+        }),
+      )
       .returning()
       .get();
     return c.json({ ...row, isArchived: false, progress: emptyProgress() }, 201);
@@ -162,7 +177,13 @@ export const listsRouter = new Hono<AppEnv>()
       .select({ id: partLists.id, name: partLists.name })
       .from(partListItems)
       .innerJoin(partLists, eq(partLists.id, partListItems.listId))
-      .where(eq(partListItems.requestId, Number(c.req.param("requestId"))))
+      .where(
+        inTeam(
+          partListItems,
+          c.get("teamId"),
+          eq(partListItems.requestId, Number(c.req.param("requestId"))),
+        ),
+      )
       .orderBy(partLists.name)
       .all();
     return c.json(rows);
@@ -170,7 +191,12 @@ export const listsRouter = new Hono<AppEnv>()
   .get("/:id", requireAuth, async (c) => {
     const id = Number(c.req.param("id"));
     const db = createOrdersDb(c.env.ORDERS_DB);
-    const list = await db.select().from(partLists).where(eq(partLists.id, id)).get();
+    const teamId = c.get("teamId");
+    const list = await db
+      .select()
+      .from(partLists)
+      .where(inTeam(partLists, teamId, eq(partLists.id, id)))
+      .get();
     if (!list) return c.json({ error: "List not found." }, 404);
     const [rows, progress] = await Promise.all([
       db
@@ -183,10 +209,10 @@ export const listsRouter = new Hono<AppEnv>()
         .from(partListItems)
         .innerJoin(orderRequests, eq(orderRequests.id, partListItems.requestId))
         .innerJoin(budgetCategories, eq(budgetCategories.id, orderRequests.categoryId))
-        .where(eq(partListItems.listId, id))
+        .where(inTeam(partListItems, teamId, eq(partListItems.listId, id)))
         .orderBy(desc(partListItems.addedAt))
         .all(),
-      progressByList(db, [id]),
+      progressByList(db, teamId, [id]),
     ]);
     return c.json({
       ...list,
@@ -205,9 +231,10 @@ export const listsRouter = new Hono<AppEnv>()
     const body = c.req.valid("json");
     if (Object.keys(body).length === 0) return c.json({ error: "Nothing to update." }, 400);
     const db = createOrdersDb(c.env.ORDERS_DB);
-    const found = await ownedList(db, id, {
+    const teamId = c.get("teamId");
+    const found = await ownedList(db, teamId, id, {
       id: c.get("userId"),
-      isMentor: c.get("userIsMentor"),
+      isMentor: hasMentorAccess(c),
     });
     if ("error" in found) return c.json({ error: found.error }, found.status);
     const { isArchived, ...rest } = body;
@@ -218,7 +245,7 @@ export const listsRouter = new Hono<AppEnv>()
         ...(isArchived !== undefined ? { isArchived: isArchived ? 1 : 0 } : {}),
         updatedAt: Date.now(),
       })
-      .where(eq(partLists.id, id))
+      .where(inTeam(partLists, teamId, eq(partLists.id, id)))
       .returning()
       .get();
     return c.json({ ...row, isArchived: row.isArchived === 1 });
@@ -226,14 +253,15 @@ export const listsRouter = new Hono<AppEnv>()
   .delete("/:id", requireAuth, async (c) => {
     const id = Number(c.req.param("id"));
     const db = createOrdersDb(c.env.ORDERS_DB);
-    const found = await ownedList(db, id, {
+    const teamId = c.get("teamId");
+    const found = await ownedList(db, teamId, id, {
       id: c.get("userId"),
-      isMentor: c.get("userIsMentor"),
+      isMentor: hasMentorAccess(c),
     });
     if ("error" in found) return c.json({ error: found.error }, found.status);
     await db.batch([
-      db.delete(partListItems).where(eq(partListItems.listId, id)),
-      db.delete(partLists).where(eq(partLists.id, id)),
+      db.delete(partListItems).where(inTeam(partListItems, teamId, eq(partListItems.listId, id))),
+      db.delete(partLists).where(inTeam(partLists, teamId, eq(partLists.id, id))),
     ]);
     return c.json({ ok: true });
   })
@@ -241,19 +269,27 @@ export const listsRouter = new Hono<AppEnv>()
     const id = Number(c.req.param("id"));
     const { requestIds } = c.req.valid("json");
     const db = createOrdersDb(c.env.ORDERS_DB);
-    const list = await db.select().from(partLists).where(eq(partLists.id, id)).get();
+    const teamId = c.get("teamId");
+    const list = await db
+      .select()
+      .from(partLists)
+      .where(inTeam(partLists, teamId, eq(partLists.id, id)))
+      .get();
     if (!list) return c.json({ error: "List not found." }, 404);
-    const added = await addToList(db, id, requestIds, c.get("userDisplayName"));
+    const added = await addToList(db, teamId, id, requestIds, c.get("userDisplayName"));
     if (added === null) return c.json({ error: "Some of those requests don't exist." }, 400);
     return c.json({ added });
   })
   .delete("/:id/items/:requestId", requireAuth, async (c) => {
     const db = createOrdersDb(c.env.ORDERS_DB);
+    const teamId = c.get("teamId");
     const listId = Number(c.req.param("id"));
     const row = await db
       .delete(partListItems)
       .where(
-        and(
+        inTeam(
+          partListItems,
+          teamId,
           eq(partListItems.listId, listId),
           eq(partListItems.requestId, Number(c.req.param("requestId"))),
         ),
@@ -261,6 +297,9 @@ export const listsRouter = new Hono<AppEnv>()
       .returning()
       .get();
     if (!row) return c.json({ error: "That request isn't on this list." }, 404);
-    await db.update(partLists).set({ updatedAt: Date.now() }).where(eq(partLists.id, listId));
+    await db
+      .update(partLists)
+      .set({ updatedAt: Date.now() })
+      .where(inTeam(partLists, teamId, eq(partLists.id, listId)));
     return c.json({ ok: true });
   });

@@ -1,0 +1,88 @@
+# Production URLs, route patterns and TEAM_NUMBER here are written by `pnpm configure` from
+# packages/site-config/src/site.ts. Change them there, not here.
+name = "schedule"
+main = "src/index.ts"
+compatibility_date = "2026-05-17"
+
+[[services]]
+binding = "G3ID"
+service = "g3id"
+
+# Slack reminders before someone's role changes (src/reminders.ts).
+[triggers]
+crons = ["* * * * *"]
+
+[[d1_databases]]
+binding = "SCHEDULE_DB"
+database_name = "g3-schedule-local"
+database_id = "00000000-0000-0000-0000-000000000010"
+migrations_dir = "src/db/migrations"
+
+[vars]
+FRONTEND_URL = "http://localhost:5187"
+
+[env.production]
+name = "schedule-production"
+# No workers.dev address: the gateway is the only way in, so its identity headers can be trusted.
+workers_dev = false
+
+[env.production.triggers]
+crons = ["* * * * *"]
+
+[[env.production.services]]
+binding = "G3ID"
+service = "g3id-production"
+
+# Create with `wrangler d1 create g3-schedule-prod` and paste its ID here.
+[[env.production.d1_databases]]
+binding = "SCHEDULE_DB"
+database_name = "g3-schedule-prod"
+database_id = "24657c2f-7a5e-4dc7-8bae-f06009229b05"
+migrations_dir = "src/db/migrations"
+
+[env.production.vars]
+FRONTEND_URL = "https://1648-schedule.frcgearbox.com"
+
+# The app's page, served by this worker in production; only /api/* runs the worker code, and
+# other paths fall back to index.html for the app's router. Wrangler builds the page before
+# every production deploy or upload (Cloudflare's Git builds too).
+[env.production.build]
+command = "pnpm --filter @g3/schedule build"
+
+[env.production.assets]
+directory = "../../apps/schedule/dist"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]
+
+# ---- Staging: written by `pnpm configure` from [env.production]; don't edit below. ----
+
+[env.staging]
+name = "schedule-staging"
+workers_dev = false
+
+[env.staging.define]
+__G3_STAGING__ = "true"
+
+[env.staging.triggers]
+crons = ["* * * * *"]
+
+[[env.staging.services]]
+binding = "G3ID"
+service = "g3id-staging"
+
+[[env.staging.d1_databases]]
+binding = "SCHEDULE_DB"
+database_name = "g3-schedule-staging"
+database_id = "353b7713-4b00-47d8-8e7d-ac1e6dd598fb"
+migrations_dir = "src/db/migrations"
+
+[env.staging.vars]
+FRONTEND_URL = "https://1648-schedule-dev.g3robotics.com"
+
+[env.staging.build]
+command = "GEARBOX_STAGING=1 pnpm --filter @g3/schedule build"
+
+[env.staging.assets]
+directory = "../../apps/schedule/dist"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]

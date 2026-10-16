@@ -1,17 +1,89 @@
-import { sendMessage } from "@g3/slack";
+import { inTeam, sendTeamMessage, withTeam } from "@g3/auth";
 import { eq } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/d1";
+import { createShopDb } from "../db";
 import * as schema from "../db/schema";
 import type { AppEnv } from "../types";
+import { onshapeConfig } from "./onshape-config";
 import { exportDrawingAsPDF, storeDrawingInR2 } from "./onshape-export";
+import {
+  ELEMENT_DRAWING,
+  ELEMENT_PART_STUDIO,
+  type ReleaseDetails,
+  type ReleaseItem,
+  fetchReleasePackage,
+} from "./onshape-release";
 import { fetchAndParseBOM } from "./onshape-webhook";
+import { SETTING, getSetting } from "./settings";
+import { shopUrl } from "./urls";
 
-const DEFAULT_SLACK_CHANNEL_ID = "C09QYMTSGKT";
-
+/**
+ * One team's approved Onshape release, to read the release package, BOM quantities and drawings for
+ * (lib/onshape-webhook.ts).
+ */
 export interface BOMQueueMessage {
+  teamId: string;
   releaseId: string;
   releaseRowId: number;
   timestamp: string;
+}
+
+type ShopDb = ReturnType<typeof createShopDb>;
+
+/** Text for a Slack message, with Slack's control characters escaped. */
+const slackText = (text: string) =>
+  text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+/**
+ * Keeps what the release package says: the release's details on its row, and each part and
+ * drawing in it as a part of the release (as the revision events record them; drawings share
+ * their part's number). Parts go before drawings, so a part's name is the part's, not its drawing's.
+ */
+async function saveRelease(
+  db: ShopDb,
+  teamId: string,
+  releaseId: string,
+  releaseRowId: number,
+  release: { details: ReleaseDetails; items: ReleaseItem[] },
+) {
+  const now = Math.floor(Date.now() / 1000);
+  await db
+    .update(schema.onshapeReleases)
+    .set({ ...release.details, detailsAt: now })
+    .where(inTeam(schema.onshapeReleases, teamId, eq(schema.onshapeReleases.id, releaseRowId)));
+
+  const items = [...release.items].sort(
+    (a, b) => Number(a.elementType === ELEMENT_DRAWING) - Number(b.elementType === ELEMENT_DRAWING),
+  );
+  for (const item of items) {
+    const drawing = item.elementType === ELEMENT_DRAWING;
+    const set = {
+      releaseId: releaseRowId,
+      versionId: item.versionId,
+      ...(item.elementType === ELEMENT_PART_STUDIO && { entityId: item.elementId }),
+      ...(drawing && { partDrawingEntityId: item.elementId }),
+      ...(!drawing && item.name && { name: item.name }),
+      ...(!drawing && item.description && { description: item.description }),
+      ...(item.revision && { revision: item.revision }),
+    };
+    await db
+      .insert(schema.onshapeParts)
+      .values(
+        withTeam(teamId, {
+          onshapeReleaseId: releaseId,
+          partNumber: item.partNumber,
+          ...set,
+          createdAt: now,
+        }),
+      )
+      .onConflictDoUpdate({
+        target: [
+          schema.onshapeParts.teamId,
+          schema.onshapeParts.onshapeReleaseId,
+          schema.onshapeParts.partNumber,
+        ],
+        set,
+      });
+  }
 }
 
 export async function processBOMQueue(
@@ -26,151 +98,153 @@ async function processSingleBOMJob(
   env: AppEnv["Bindings"],
 ): Promise<void> {
   const jobStartTime = Date.now();
-  const { releaseId, releaseRowId, timestamp } = jobData;
+  const { teamId, releaseId, releaseRowId, timestamp } = jobData;
+  // Queued before releases carried their team: there's no telling whose it is.
+  if (!teamId) {
+    console.warn("[BOM Queue Job] Skipping a release queued without its team", { releaseId });
+    return;
+  }
 
-  console.log(`[BOM Queue Job] Starting for release ${releaseId}`);
+  console.log(`[BOM Queue Job] Starting for release ${releaseId}`, { teamId });
 
-  const database = drizzle(env.SHOP_DB, { schema });
+  const database = createShopDb(env.SHOP_DB);
 
-  // Query parts for this release
-  console.log("[BOM Queue Job] Querying parts for release");
+  // The team's document and keys.
+  const config = await onshapeConfig(env, database, teamId);
+  const { mainAssemblyId, credentials } = config;
+  if (!credentials) {
+    console.log("[BOM Queue Job] No Onshape keys for this team, skipping");
+    return;
+  }
+
+  // The release package: its name, who made and approved it, and its parts and drawings. If it
+  // can't be read, the parts the revision events recorded are used, with the BOM's details.
+  console.log(`[BOM Queue Job] [${Date.now() - jobStartTime}ms] Fetching release package`);
+  const release = await fetchReleasePackage(releaseId, credentials);
+  if (release) await saveRelease(database, teamId, releaseId, releaseRowId, release);
+
   const parts = await database
     .select()
     .from(schema.onshapeParts)
-    .where(eq(schema.onshapeParts.releaseId, releaseRowId));
+    .where(inTeam(schema.onshapeParts, teamId, eq(schema.onshapeParts.releaseId, releaseRowId)));
 
   console.log(`[BOM Queue Job] Found ${parts.length} parts`);
 
   if (parts.length === 0) {
-    console.log("[BOM Queue Job] No parts found, skipping BOM fetch");
+    console.log("[BOM Queue Job] No parts found, skipping");
     return;
   }
 
-  // Get document ID and main assembly ID from database
-  const docIdSetting = await database
-    .select()
-    .from(schema.adminSettings)
-    .where(eq(schema.adminSettings.key, "onshape_document_id"))
-    .get();
-  const mainAssemblyIdSetting = await database
-    .select()
-    .from(schema.adminSettings)
-    .where(eq(schema.adminSettings.key, "onshape_main_assembly_id"))
-    .get();
-  const documentId = docIdSetting?.value;
-  const mainAssemblyId = mainAssemblyIdSetting?.value;
+  const documentId = release?.details.documentId ?? config.documentId;
+  const versionId = release?.details.versionId ?? parts[0]?.versionId ?? null;
   const docId = documentId || "unknown";
 
-  // Fetch BOM data if we have the necessary IDs
-  if (documentId && mainAssemblyId && parts[0]?.versionId) {
-    const apiKey = env.ONSHAPE_API_KEY;
-    const apiSecret = env.ONSHAPE_API_SECRET;
+  // Quantities come from the main assembly's BOM, when the team has set one. Without the release
+  // package, so do the names, descriptions and revisions.
+  if (documentId && mainAssemblyId && versionId) {
+    console.log(`[BOM Queue Job] [${Date.now() - jobStartTime}ms] Fetching BOM data`);
+    const bomMetadata = await fetchAndParseBOM(documentId, versionId, mainAssemblyId, credentials);
+    for (const part of parts) {
+      const metadata = bomMetadata.get(part.partNumber);
+      if (!metadata) continue;
+      await database
+        .update(schema.onshapeParts)
+        .set(
+          release
+            ? { quantity: metadata.quantity ?? part.quantity }
+            : {
+                quantity: metadata.quantity ?? part.quantity,
+                name: metadata.name ?? part.name,
+                description: metadata.description ?? part.description,
+                revision: metadata.revision ?? part.revision,
+              },
+        )
+        .where(inTeam(schema.onshapeParts, teamId, eq(schema.onshapeParts.id, part.id)));
+    }
+  }
 
-    if (apiKey && apiSecret) {
-      console.log(`[BOM Queue Job] [${Date.now() - jobStartTime}ms] Fetching BOM data`);
-      const bomMetadata = await fetchAndParseBOM(
-        documentId,
-        parts[0].versionId,
-        mainAssemblyId,
-        apiKey,
-        apiSecret,
-      );
-      console.log(
-        `[BOM Queue Job] [${Date.now() - jobStartTime}ms] BOM fetch complete, updating ${parts.length} parts`,
-      );
+  const updatedParts = await database
+    .select()
+    .from(schema.onshapeParts)
+    .where(inTeam(schema.onshapeParts, teamId, eq(schema.onshapeParts.releaseId, releaseRowId)));
 
-      // Update parts with BOM metadata
-      for (const part of parts) {
-        const metadata = bomMetadata.get(part.partNumber);
-        if (metadata) {
-          await database
-            .update(schema.onshapeParts)
-            .set({
-              quantity: metadata.quantity ?? part.quantity,
-              name: metadata.name ?? part.name,
-              description: metadata.description ?? part.description,
-              revision: metadata.revision ?? part.revision,
-            })
-            .where(eq(schema.onshapeParts.id, part.id));
-        }
-      }
-
-      // Refetch parts to get updated metadata
-      console.log(`[BOM Queue Job] [${Date.now() - jobStartTime}ms] Refetching updated parts`);
-      const updatedParts = await database
-        .select()
-        .from(schema.onshapeParts)
-        .where(eq(schema.onshapeParts.releaseId, releaseRowId));
-
-      // Build and send Slack message with BOM data
-      console.log(`[BOM Queue Job] [${Date.now() - jobStartTime}ms] Building Slack message`);
-      const releaseLink = `<https://cad.onshape.com/documents?releasepackage=${releaseId}|${releaseId}>`;
-      const message = [
-        "🎉 *New release candidate approved!*",
-        `Release: ${releaseLink}`,
-        `Time: <!date^${Math.floor(new Date(timestamp).getTime() / 1000)}^{date_num} {time_secs}|${timestamp}>`,
-        `Parts: ${updatedParts.length}`,
-        ...updatedParts.map((part) => {
-          const partLink = part.entityId
-            ? `\n    • <https://cad.onshape.com/documents/${docId}/v/${part.versionId}/e/${part.entityId}|OnShape Part Link>`
-            : "";
-          const drawingLink = part.partDrawingEntityId
-            ? `\n    • <https://cad.onshape.com/documents/${docId}/v/${part.versionId}/e/${part.partDrawingEntityId}|OnShape Drawing Link>`
-            : "";
-          return `
+  // Build and send Slack message
+  console.log(`[BOM Queue Job] [${Date.now() - jobStartTime}ms] Building Slack message`);
+  const shop = shopUrl(env, teamId);
+  const details = release?.details;
+  const releaseLink = `<https://cad.onshape.com/documents?releasepackage=${releaseId}|${slackText(details?.name ?? releaseId)}>`;
+  const approvedBy = details?.approvers.filter((a) => a.approvedAt).map((a) => a.name) ?? [];
+  const message = [
+    "🎉 *New release candidate approved!*",
+    `Release: ${releaseLink}`,
+    ...(details?.madeBy ? [`Made by: ${slackText(details.madeBy)}`] : []),
+    ...(approvedBy.length > 0 ? [`Approved by: ${slackText(approvedBy.join(", "))}`] : []),
+    ...(details?.notes && details.notes !== details.name
+      ? [`Notes: ${slackText(details.notes)}`]
+      : []),
+    `Time: <!date^${Math.floor(new Date(timestamp).getTime() / 1000)}^{date_num} {time_secs}|${timestamp}>`,
+    `Parts: ${updatedParts.length}`,
+    ...updatedParts.map((part) => {
+      const partLink = part.entityId
+        ? `\n    • <https://cad.onshape.com/documents/${docId}/v/${part.versionId}/e/${part.entityId}|OnShape Part Link>`
+        : "";
+      const drawingLink = part.partDrawingEntityId
+        ? `\n    • <https://cad.onshape.com/documents/${docId}/v/${part.versionId}/e/${part.partDrawingEntityId}|OnShape Drawing Link>`
+        : "";
+      return `
   • *${part.partNumber}*${part.name ? ` - "${part.name}"` : ""}${part.quantity ? ` (x${part.quantity})` : ""}
     ${part.revision ? `• Revision: ${part.revision}` : ""}
-    • <https://shop.g3robotics.com/part?p=${part.partNumber}|Shop SW Link>${partLink}${drawingLink}
+    • <${shop}/part?p=${part.partNumber}|Shop SW Link>${partLink}${drawingLink}
           `;
+    }),
+    `\nClick <${shop}/ingest|here> to assign production processes.`,
+  ].join("\n");
+
+  // On the team's own Slack, in the channel its admins picked (none picked: no message).
+  const channel = await getSetting(database, teamId, SETTING.slackReleaseChannel);
+  if (channel) {
+    console.log(`[BOM Queue Job] [${Date.now() - jobStartTime}ms] Sending Slack message`);
+    const sent = await sendTeamMessage(env, teamId, channel, message);
+    if (!sent.ok) console.error("[BOM Queue Job] Slack message not sent:", sent.error);
+  }
+
+  // Export drawings for parts that have both drawing entity ID and revision (batched 4 at a time)
+  if (documentId) {
+    console.log(`[BOM Queue Job] [${Date.now() - jobStartTime}ms] Exporting drawings`);
+    const partsToExport = updatedParts.filter(
+      (p) => p.partDrawingEntityId && p.revision && p.versionId,
+    );
+
+    let drawingsExported = 0;
+    for (let i = 0; i < partsToExport.length; i += 4) {
+      const batch = partsToExport.slice(i, i + 4);
+      await Promise.all(
+        batch.map(async (part) => {
+          try {
+            const pdfBuffer = await exportDrawingAsPDF(
+              documentId,
+              part.versionId as string,
+              part.partDrawingEntityId as string,
+              credentials,
+            );
+
+            await storeDrawingInR2(
+              env,
+              teamId,
+              part.partNumber,
+              part.revision as string,
+              pdfBuffer,
+            );
+            drawingsExported++;
+          } catch (err) {
+            console.error(`[BOM Queue Job] Failed to export drawing for ${part.partNumber}`, err);
+          }
         }),
-        "\nClick <https://shop.g3robotics.com/ingest|here> to assign production processes.",
-      ].join("\n");
-
-      console.log(`[BOM Queue Job] [${Date.now() - jobStartTime}ms] Sending Slack message`);
-      const channelIdSetting = await database
-        .select()
-        .from(schema.adminSettings)
-        .where(eq(schema.adminSettings.key, "slack_release_channel_id"))
-        .get();
-      const slackChannelId = channelIdSetting?.value || DEFAULT_SLACK_CHANNEL_ID;
-      await sendMessage(slackChannelId, message, env);
-
-      // Export drawings for parts that have both drawing entity ID and revision (batched 4 at a time)
-      if (documentId) {
-        console.log(`[BOM Queue Job] [${Date.now() - jobStartTime}ms] Exporting drawings`);
-        const partsToExport = updatedParts.filter(
-          (p) => p.partDrawingEntityId && p.revision && p.versionId,
-        );
-
-        let drawingsExported = 0;
-        for (let i = 0; i < partsToExport.length; i += 4) {
-          const batch = partsToExport.slice(i, i + 4);
-          await Promise.all(
-            batch.map(async (part) => {
-              try {
-                const pdfBuffer = await exportDrawingAsPDF(
-                  documentId,
-                  part.versionId as string,
-                  part.partDrawingEntityId as string,
-                  env,
-                );
-
-                await storeDrawingInR2(part.partNumber, part.revision as string, pdfBuffer, env);
-                drawingsExported++;
-              } catch (err) {
-                console.error(
-                  `[BOM Queue Job] Failed to export drawing for ${part.partNumber}`,
-                  err,
-                );
-              }
-            }),
-          );
-        }
-        console.log(
-          `[BOM Queue Job] [${Date.now() - jobStartTime}ms] Drawing export complete, exported ${drawingsExported} drawings`,
-        );
-      }
+      );
     }
+    console.log(
+      `[BOM Queue Job] [${Date.now() - jobStartTime}ms] Drawing export complete, exported ${drawingsExported} drawings`,
+    );
   }
 
   const totalTime = Date.now() - jobStartTime;

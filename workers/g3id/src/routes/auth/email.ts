@@ -7,6 +7,7 @@ import { sessionCookieOptions } from "../../lib/cookie";
 import { newId } from "../../lib/id";
 import { hashPassword, verifyPassword } from "../../lib/password";
 import { createSession } from "../../lib/session";
+import { requestTeamId, siteTeamId, teamOfUser } from "../../lib/team";
 import { requireAuth } from "../../middleware/auth";
 import type { AppEnv } from "../../types";
 
@@ -55,6 +56,7 @@ export const emailAuthRouter = new Hono<AppEnv>()
           await db.batch([
             db.insert(coreUsers).values({
               id: userId,
+              teamId: siteTeamId,
               email: "admin@localhost",
               displayName: "Admin",
               status: "active",
@@ -80,7 +82,7 @@ export const emailAuthRouter = new Hono<AppEnv>()
     const invalidError = { error: "Invalid email or password." };
 
     const user = await db
-      .select({ id: coreUsers.id, status: coreUsers.status })
+      .select({ id: coreUsers.id, teamId: coreUsers.teamId, status: coreUsers.status })
       .from(coreUsers)
       .where(eq(coreUsers.email, email))
       .get();
@@ -103,6 +105,14 @@ export const emailAuthRouter = new Hono<AppEnv>()
     const valid = await verifyPassword(password, identity.passwordHash);
     if (!valid) return c.json(invalidError, 401);
 
+    // Only after the password, so this never tells anyone else whether an email has an account.
+    if (user.teamId !== requestTeamId(c)) {
+      return c.json(
+        { error: "This account belongs to another team. Sign in on your own team's page." },
+        403,
+      );
+    }
+
     if (user.status === "pending") {
       return c.json({ error: "Your account is awaiting admin approval." }, 403);
     }
@@ -111,7 +121,7 @@ export const emailAuthRouter = new Hono<AppEnv>()
     }
 
     const sessionId = await createSession(user.id as string, c.env);
-    setCookie(c, "g3_session", sessionId, sessionCookieOptions(c.env.FRONTEND_URL));
+    setCookie(c, "g3_session", sessionId, sessionCookieOptions(c.req.url));
 
     return c.json({ ok: true });
   })
@@ -201,6 +211,7 @@ export const emailAuthRouter = new Hono<AppEnv>()
     await db.batch([
       db.insert(coreUsers).values({
         id: newUserId,
+        teamId: await teamOfUser(db, userId),
         email,
         displayName,
         status: "active",

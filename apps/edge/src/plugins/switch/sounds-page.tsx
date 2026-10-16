@@ -1,15 +1,10 @@
+import { Button, Card, ConfirmButton, ErrorBanner, Loading, Page, Stat, inputClass } from "@g3/ui";
 import { useRef, useState } from "react";
 import { getErrorMessage } from "../../shared/api";
 import { formatDateTime } from "../../shared/format";
-import { Card, ErrorBanner, Loading, Page, Stat } from "../../shared/ui";
 import { useLoad } from "../../shared/use-load";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "";
-const button =
-  "rounded-lg border border-secondary-300 px-3 py-2 text-sm font-medium text-secondary-700 hover:bg-secondary-50 disabled:opacity-50";
-const primaryButton =
-  "rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50";
-
 async function request(path: string, init?: RequestInit) {
   const response = await fetch(`${API_BASE}/switch${path}`, {
     ...init,
@@ -74,7 +69,7 @@ export function DoorSoundsPage() {
           headers: { "Content-Type": "audio/wav" },
           body: file,
         }),
-      `Uploaded ${file.name}. It is now included in the door-opening sound rotation.`,
+      `Uploaded ${file.name}.`,
     );
     if (!uploaded) return;
     setFile(null);
@@ -101,29 +96,58 @@ export function DoorSoundsPage() {
     <Page title="Door Sounds">
       {actionError && <ErrorBanner message={actionError} />}
       {message && (
-        <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm text-emerald-800">
+        <p className="break-words rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm text-emerald-800">
           {message}
         </p>
       )}
 
       <Card title="Door switch">
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-secondary-500">
+            Sound starts when the door opens, repeats while it stays open, and stops when it closes.
+          </p>
+          <Button variant="secondary" onClick={state.reload}>
+            Refresh status
+          </Button>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-3">
           <Stat label="Door" value={data.grounded ? "Closed" : "Open"} />
-          <Stat
-            label="Input"
-            value={data.input === "gpio" ? "GPIO2_D4" : "Mock"}
-            hint={data.gpio}
-          />
-          <Stat label="Audio output" value={data.audioDevice} hint="Bluetooth via ALSA" />
           <Stat label="Openings" value={data.triggerCount} />
           <Stat
             label="Last opened"
             value={data.lastTriggeredAt ? formatDateTime(data.lastTriggeredAt) : "Never"}
-            hint={data.lastSound ? `Played ${data.lastSound.split(/[\\/]/).pop()}` : undefined}
           />
         </div>
+        <dl className="mt-5 grid gap-4 border-t border-secondary-100 pt-4 sm:grid-cols-2">
+          <div className="min-w-0">
+            <dt className="text-xs font-bold uppercase tracking-widest text-secondary-400">
+              Input
+            </dt>
+            <dd className="mt-1 break-words text-sm text-secondary-900">
+              {data.input === "gpio" ? (data.gpio ?? "GPIO") : "Mock input"}
+            </dd>
+          </div>
+          <div className="min-w-0">
+            <dt className="text-xs font-bold uppercase tracking-widest text-secondary-400">
+              Audio output
+            </dt>
+            <dd className="mt-1 break-all font-mono text-sm text-secondary-900">
+              {data.audioDevice}
+            </dd>
+          </div>
+          {data.lastSound && (
+            <div className="min-w-0 sm:col-span-2">
+              <dt className="text-xs font-bold uppercase tracking-widest text-secondary-400">
+                Last sound
+              </dt>
+              <dd className="mt-1 break-all text-sm text-secondary-900">
+                {data.lastSound.split(/[\\/]/).pop()}
+              </dd>
+            </div>
+          )}
+        </dl>
         {data.lastError && (
-          <div className="mt-4">
+          <div className="mt-4 break-words">
             <ErrorBanner message={data.lastError} />
           </div>
         )}
@@ -131,8 +155,7 @@ export function DoorSoundsPage() {
 
       <Card title="Upload a sound">
         <p className="mb-3 text-sm text-secondary-500">
-          Upload a RIFF/WAVE file up to 10 MB. Uploaded sounds join the rotation immediately;
-          restarting the edge agent is not required.
+          Upload a WAV file up to 10 MB. It joins the rotation right away.
         </p>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <input
@@ -140,20 +163,29 @@ export function DoorSoundsPage() {
             type="file"
             accept=".wav,audio/wav,audio/x-wav"
             onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-            className="min-w-0 flex-1 rounded-lg border border-secondary-300 px-3 py-2 text-sm"
+            className={`${inputClass} min-w-0 flex-1`}
           />
-          <button
-            type="button"
-            className={primaryButton}
-            disabled={!file || busy !== null}
-            onClick={() => void upload()}
-          >
+          <Button disabled={!file || busy !== null} onClick={() => void upload()}>
             {busy === "upload" ? "Uploading…" : "Upload sound"}
-          </button>
+          </Button>
         </div>
       </Card>
 
       <Card title="Sounds on the Orange Pi">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-secondary-500">
+            One sound plays at a time: a test or door opening replaces the one playing.
+          </p>
+          <Button
+            variant="secondary"
+            disabled={busy !== null}
+            onClick={() =>
+              void act("stop", () => request("/stop", { method: "POST" }), "Stopped the sound.")
+            }
+          >
+            {busy === "stop" ? "Stopping…" : "Stop sound"}
+          </Button>
+        </div>
         {data.sounds.length === 0 ? (
           <p className="text-sm text-secondary-500">No uploaded sounds yet.</p>
         ) : (
@@ -163,14 +195,13 @@ export function DoorSoundsPage() {
                 key={sound.name}
                 className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0 last:pb-0"
               >
-                <div>
-                  <p className="font-medium text-secondary-900">{sound.name}</p>
+                <div className="min-w-0 flex-1">
+                  <p className="break-all font-medium text-secondary-900">{sound.name}</p>
                   <p className="text-xs text-secondary-500">{bytes(sound.size)}</p>
                 </div>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    className={button}
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="secondary"
                     disabled={busy !== null}
                     onClick={() =>
                       void act(
@@ -179,17 +210,18 @@ export function DoorSoundsPage() {
                           request(`/sounds/${encodeURIComponent(sound.name)}/test`, {
                             method: "POST",
                           }),
-                        `Played ${sound.name} on the Orange Pi.`,
+                        `Playing ${sound.name} on the box.`,
                       )
                     }
                   >
                     {busy === `test-${sound.name}` ? "Playing…" : "Test on Orange Pi"}
-                  </button>
-                  <button
-                    type="button"
-                    className={button}
+                  </Button>
+                  <ConfirmButton
+                    label={busy === `delete-${sound.name}` ? "Deleting…" : "Delete"}
+                    confirmLabel="Delete"
+                    question={`Delete ${sound.name} from the box?`}
                     disabled={busy !== null}
-                    onClick={() =>
+                    onConfirm={() =>
                       void act(
                         `delete-${sound.name}`,
                         () =>
@@ -199,9 +231,7 @@ export function DoorSoundsPage() {
                         `Deleted ${sound.name}.`,
                       )
                     }
-                  >
-                    {busy === `delete-${sound.name}` ? "Deleting…" : "Delete"}
-                  </button>
+                  />
                 </div>
               </div>
             ))}

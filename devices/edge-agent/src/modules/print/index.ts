@@ -11,7 +11,7 @@ import { PrintError, cupsBackend } from "./cups";
 import { mockBackend } from "./mock";
 
 /**
- * Print module: the worker's print routes call these through the tunnel
+ * Print module: the worker's print routes call these over the worker link
  * (/print/*, shared-key auth in core). CUPS on the box does the queueing;
  * documents go straight to `lp` and nothing is stored by the agent.
  */

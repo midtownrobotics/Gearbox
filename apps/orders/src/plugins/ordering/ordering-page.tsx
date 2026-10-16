@@ -1,14 +1,17 @@
+import { Button, ErrorBanner, Loading, Page, SuccessBanner, TextField, inputClass } from "@g3/ui";
+import { amazonAsin, isAmazonShortLink } from "@g3/worker-orders/product-key";
 import { chargesByCategory } from "@g3/worker-orders/split";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, getErrorMessage } from "../../shared/api";
+import { AnswerDialog, ConfirmDialog } from "../../shared/ask";
+import { useAuthUser } from "../../shared/auth";
 import { cartLinks } from "../../shared/cart";
 import { Deadline, isLate } from "../../shared/deadline";
 import { ExportCsvButton } from "../../shared/export-csv";
-import { formatCents, formatDate, parseDollars, startOfToday } from "../../shared/format";
+import { formatCents, formatDay, parseDollars, startOfToday } from "../../shared/format";
 import { PRIORITY_ORDER, PriorityBadge } from "../../shared/priority";
 import type { OrderRequest, Vendor } from "../../shared/types";
-import { Button, ErrorBanner, Loading, Page, SuccessBanner, inputClass } from "../../shared/ui";
 import { useLoad } from "../../shared/use-load";
 import { useVendors } from "../../shared/vendors";
 
@@ -24,15 +27,84 @@ type LineEdit = { quantity: string; price: string };
 const vendorKey = (vendor: string) => vendor.trim().toLowerCase();
 const dollars = (cents: number | null) => (cents === null ? "" : (cents / 100).toFixed(2));
 
-/** The team's sales tax rate, charged by every vendor that doesn't have our exemption on file. */
-const TAX_RATE = 0.089;
-
 /** Whether the vendor has an unexpired tax-exempt certificate on file. */
 const isTaxExempt = (vendor: Vendor | undefined) =>
   !!vendor &&
   "taxExempt" in vendor &&
   vendor.taxExempt &&
   (vendor.taxExemptExpires === null || vendor.taxExemptExpires >= startOfToday());
+
+const priorityRank = (r: OrderRequest) => PRIORITY_ORDER.indexOf(r.priority);
+
+/** One vendor's approved requests as its cart, most urgent lines first. */
+function cartFor(items: OrderRequest[], vendorFor: (name: string) => Vendor | undefined): Group {
+  const vendor = vendorFor(items[0].vendor);
+  return {
+    vendor: items[0].vendor,
+    profile: vendor,
+    placeToday: items.some((r) => r.priority === "blocking" || isLate(r, vendor)),
+    items: [...items].sort(
+      (a, b) =>
+        priorityRank(a) - priorityRank(b) ||
+        (a.needBy ?? Number.MAX_SAFE_INTEGER) - (b.needBy ?? Number.MAX_SAFE_INTEGER) ||
+        a.title.localeCompare(b.title),
+    ),
+  };
+}
+
+/**
+ * One vendor's cart, as on the Carts page (a request's page shows its vendor's): everything
+ * approved from that vendor, ready to place as one order. Nothing when nothing is approved there.
+ */
+export function VendorCart({
+  vendor,
+  onChanged,
+}: {
+  vendor: string;
+  /** After the order is placed or a line removed (the request may have changed). */
+  onChanged: () => void;
+}) {
+  const sac = useLoad(async () => {
+    const res = await api["share-a-cart"].status.$get();
+    if (!res.ok) throw new Error(await getErrorMessage(res));
+    return res.json();
+  }, []);
+  const { data, error, reload } = useLoad(async () => {
+    const res = await api.requests.$get({ query: { status: "approved" } });
+    if (!res.ok) throw new Error(await getErrorMessage(res));
+    return res.json();
+  }, []);
+  const [done, setDone] = useState<string | null>(null);
+  const { vendorFor } = useVendors();
+  const key = vendorKey(vendor);
+  const items = (data ?? []).filter((r) => vendorKey(r.vendor) === key);
+
+  if (error) return <ErrorBanner message={error} />;
+  if (!data) return <Loading />;
+  const changed = (message: string) => {
+    setDone(message);
+    reload();
+    onChanged();
+  };
+  return (
+    <>
+      {done && <SuccessBanner message={done} />}
+      {items.length > 0 && (
+        <section className="space-y-2">
+          <h2 className="text-xs font-bold uppercase tracking-widest text-secondary-400 font-sans">
+            Everything approved to order from {items[0].vendor}
+          </h2>
+          <VendorOrder
+            group={cartFor(items, vendorFor)}
+            shareACart={sac.data?.vendors.includes(key) ? { connected: sac.data.connected } : null}
+            onPlaced={changed}
+            onRemoved={changed}
+          />
+        </section>
+      )}
+    </>
+  );
+}
 
 /**
  * Approved requests grouped by vendor, for placing orders (mentors). Quantities and prices can be
@@ -55,33 +127,19 @@ export function OrderingPage() {
   const { vendorFor } = useVendors();
 
   // Most urgent carts first: anything Blocking or past its place-by date, then by the highest
-  // priority inside, then the biggest. Within a cart, the same order for its lines.
+  // priority inside, then the biggest.
   const groups = useMemo<Group[]>(() => {
     const byVendor = new Map<string, OrderRequest[]>();
     for (const r of data ?? []) {
       const key = vendorKey(r.vendor);
       byVendor.set(key, [...(byVendor.get(key) ?? []), r]);
     }
-    const rank = (r: OrderRequest) => PRIORITY_ORDER.indexOf(r.priority);
     return [...byVendor.values()]
-      .map((items) => {
-        const vendor = vendorFor(items[0].vendor);
-        return {
-          vendor: items[0].vendor,
-          profile: vendor,
-          placeToday: items.some((r) => r.priority === "blocking" || isLate(r, vendor)),
-          items: items.sort(
-            (a, b) =>
-              rank(a) - rank(b) ||
-              (a.needBy ?? Number.MAX_SAFE_INTEGER) - (b.needBy ?? Number.MAX_SAFE_INTEGER) ||
-              a.title.localeCompare(b.title),
-          ),
-        };
-      })
+      .map((items) => cartFor(items, vendorFor))
       .sort(
         (a, b) =>
           Number(b.placeToday) - Number(a.placeToday) ||
-          Math.min(...a.items.map(rank)) - Math.min(...b.items.map(rank)) ||
+          Math.min(...a.items.map(priorityRank)) - Math.min(...b.items.map(priorityRank)) ||
           b.items.length - a.items.length ||
           a.vendor.localeCompare(b.vendor),
       );
@@ -91,7 +149,7 @@ export function OrderingPage() {
   const estimate = (data ?? []).reduce((n, r) => n + (r.unitPriceCents ?? 0) * r.quantity, 0);
 
   return (
-    <Page title="Ordering" actions={<ExportCsvButton />}>
+    <Page title="Carts" actions={<ExportCsvButton />}>
       {error && <ErrorBanner message={error} />}
       {done && <SuccessBanner message={done} />}
       {!data ? (
@@ -142,9 +200,11 @@ function VendorOrder({
   /** Set when Share-A-Cart supports this vendor. */
   shareACart: { connected: boolean } | null;
   onPlaced: (message: string) => void;
-  /** A line was cancelled (trashed) instead of ordered. */
+  /** A line was canceled (trashed) instead of ordered. */
   onRemoved: (message: string) => void;
 }) {
+  // The team's sales tax rate (Settings), charged by every vendor without its exemption on file.
+  const { salesTaxPercent } = useAuthUser();
   const [sacBusy, setSacBusy] = useState(false);
   const [sacLink, setSacLink] = useState<string | null>(null);
   const [edits, setEdits] = useState<Record<number, LineEdit>>(() =>
@@ -164,7 +224,7 @@ function VendorOrder({
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
-  // Lines in this order: the ticked ones, or all of them when nothing is ticked.
+  // Lines in this order: the checked ones, or all of them when nothing is checked.
   const inOrder = selected.size > 0 ? group.items.filter((r) => selected.has(r.id)) : group.items;
   const parsed = inOrder.map((r) => {
     const e = edits[r.id] ?? { quantity: String(r.quantity), price: dollars(r.unitPriceCents) };
@@ -189,9 +249,11 @@ function VendorOrder({
   );
   const shippingCents = parseDollars(shipping) ?? 0;
   const itemsTotal = parsed.reduce((n, l) => n + (l.ok ? l.quantity * (l.price as number) : 0), 0);
-  // Tax starts at 8.9% of the items (nothing at tax-exempt vendors) and follows the items total
-  // until someone types their own amount.
-  const defaultTaxCents = isTaxExempt(group.profile) ? 0 : Math.round(itemsTotal * TAX_RATE);
+  // Tax starts at the team's rate on the items (nothing at tax-exempt vendors) and follows the
+  // items total until someone types their own amount.
+  const defaultTaxCents = isTaxExempt(group.profile)
+    ? 0
+    : Math.round((itemsTotal * salesTaxPercent) / 100);
   const taxText = tax ?? dollars(defaultTaxCents);
   const taxCents = parseDollars(taxText) ?? 0;
   const feesOk = !Number.isNaN(shippingCents) && !Number.isNaN(taxCents);
@@ -220,12 +282,13 @@ function VendorOrder({
     });
   const allSelected = selected.size === group.items.length;
 
-  /** Takes a line off the order list by cancelling the request (the requester sees why). */
-  async function trash(r: OrderRequest) {
-    const reason = window.prompt(
-      `Remove “${r.title}” and cancel ${r.requesterName}'s request? Say why (shown to them):`,
-    );
-    if (reason === null) return;
+  // The line being taken off, and whether the order is being placed, while a pop-up asks.
+  const [removing, setRemoving] = useState<OrderRequest | null>(null);
+  const [placing, setPlacing] = useState(false);
+
+  /** Takes a line off the order list by canceling the request (the requester sees why). */
+  async function trash(r: OrderRequest, reason: string) {
+    setRemoving(null);
     setError(null);
     const res = await api.requests[":id"][":action"].$post({
       param: { id: String(r.id), action: "cancel" },
@@ -237,25 +300,21 @@ function VendorOrder({
       next.delete(r.id);
       return next;
     });
-    onRemoved(`Removed “${r.title}” (request cancelled).`);
+    onRemoved(`Removed “${r.title}” (request canceled).`);
   }
 
-  async function place() {
+  /** Asks first: placing an order counts it against the budget. */
+  function askToPlace() {
     if (!valid) {
       return setError(
         "Every line needs a quantity and a price; shipping and tax must be dollar amounts.",
       );
     }
-    const what =
-      inOrder.length === group.items.length
-        ? "this order"
-        : `an order of ${inOrder.length} item(s)`;
-    if (
-      !window.confirm(
-        `Place ${what} with ${group.vendor} for ${formatCents(itemsTotal + shippingCents + taxCents)}?`,
-      )
-    )
-      return;
+    setPlacing(true);
+  }
+
+  async function place() {
+    setPlacing(false);
     setBusy(true);
     setError(null);
     const res = await api.orders.$post({
@@ -310,7 +369,26 @@ function VendorOrder({
     }
   }
 
+  /** McMaster-Carr takes a pasted list of "part number,quantity" lines on its order page. */
+  const isMcMaster = /mcmaster/i.test(group.vendor);
+
   async function copyList() {
+    if (isMcMaster) {
+      const missing = group.items.filter((r) => !r.sku);
+      const text = group.items
+        .filter((r) => r.sku)
+        .map((r) => `${r.sku},${edits[r.id]?.quantity ?? r.quantity}`)
+        .join("\n");
+      await navigator.clipboard.writeText(text);
+      if (missing.length > 0) {
+        setError(
+          `Left out (no McMaster part number): ${missing.map((r) => r.title).join(", ")}. Add those by hand.`,
+        );
+      }
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+      return;
+    }
     const text = group.items
       .map((r) => {
         const e = edits[r.id];
@@ -334,7 +412,7 @@ function VendorOrder({
   const small = `${inputClass} !py-1 !px-2`;
 
   return (
-    <section className="bg-white border border-secondary-200 rounded-xl overflow-hidden">
+    <section className="bg-surface border border-secondary-200 rounded-xl overflow-hidden">
       <header className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 bg-secondary-50 border-b border-secondary-200">
         <h2
           className="min-w-0 max-w-full truncate font-semibold text-secondary-900"
@@ -343,7 +421,7 @@ function VendorOrder({
           {group.vendor}
         </h2>
         {group.placeToday && (
-          <span className="rounded-full border border-primary-300 bg-primary-50 px-2 py-0.5 text-xs font-semibold text-primary-700">
+          <span className="rounded-full border border-red-300 bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-800">
             ⛔ Place today
           </span>
         )}
@@ -363,7 +441,7 @@ function VendorOrder({
                   ? `${cart.manual} item(s) can't be added automatically; add those by hand.`
                   : "Opens the store with these items and quantities in the cart"
               }
-              className="rounded-lg bg-primary-500 px-3 py-1.5 text-sm font-semibold text-white hover:bg-primary-600"
+              className="rounded-lg bg-primary-500 px-3 py-1.5 text-sm font-semibold text-on-primary hover:bg-primary-600"
             >
               🛒 Add {link.count} to {link.label} ↗
             </a>
@@ -374,7 +452,7 @@ function VendorOrder({
                 {sacBusy ? "Building cart…" : "🛒 Share-A-Cart ↗"}
               </Button>
             ) : (
-              <Link to="/settings" className="text-xs underline text-secondary-500">
+              <Link to="/admin" className="text-xs underline text-secondary-500">
                 Connect Share-A-Cart for one-click carts
               </Link>
             ))}
@@ -391,13 +469,24 @@ function VendorOrder({
           {!shareACart && cart.links.length > 0 && cart.manual > 0 && (
             <span className="text-xs text-secondary-500">+{cart.manual} by hand</span>
           )}
-          <Button variant="secondary" onClick={copyList} className="!py-1.5">
+          <Button
+            variant="secondary"
+            onClick={copyList}
+            className="!py-1.5"
+            title={
+              isMcMaster
+                ? 'Copies "part number,quantity" lines to paste into McMaster\'s order page'
+                : undefined
+            }
+          >
             {copied ? "Copied ✓" : "Copy list"}
           </Button>
         </div>
       </header>
       <Nudges vendor={group.profile} itemsTotal={itemsTotal} />
-      <div className="overflow-x-auto">
+      {/* relative: the cells' screen-reader-only labels are positioned, and without it they'd
+          sit outside this scroll box and widen the whole page on a phone. */}
+      <div className="relative overflow-x-auto">
         {/* Fixed column widths: long names wrap inside their column instead of squeezing the
             others; on narrow screens the table scrolls sideways. */}
         <table className="w-full min-w-[55rem] table-fixed text-sm">
@@ -499,6 +588,14 @@ function VendorOrder({
                     )}
                   </td>
                   <td className="py-1.5 pr-3">
+                    {shareACart && !amazonAsin(r) && !isAmazonShortLink(r.url) && (
+                      <span
+                        className="mb-0.5 block text-xs font-semibold text-amber-700"
+                        title="Share-A-Cart leaves this out. Edit the request's link to the product's Amazon page."
+                      >
+                        No Amazon ASIN
+                      </span>
+                    )}
                     {r.sku ? (
                       <button
                         type="button"
@@ -513,7 +610,9 @@ function VendorOrder({
                     )}
                   </td>
                   <td className="py-1.5 pr-3">
-                    <input
+                    <TextField
+                      variant="plain"
+                      typeable
                       className={small}
                       inputMode="decimal"
                       value={e?.price ?? ""}
@@ -542,8 +641,8 @@ function VendorOrder({
                   <td className="py-1.5 pr-3 text-right">
                     <button
                       type="button"
-                      onClick={() => trash(r)}
-                      className="rounded px-1.5 py-1 text-secondary-400 hover:bg-primary-50 hover:text-primary-600"
+                      onClick={() => setRemoving(r)}
+                      className="rounded px-1.5 py-1 text-secondary-400 hover:bg-red-50 hover:text-red-600"
                       title="Remove from the order (cancels the request)"
                       aria-label={`Remove ${r.title}`}
                     >
@@ -560,7 +659,9 @@ function VendorOrder({
         <div className="flex flex-wrap items-end gap-3 text-sm">
           <label className="space-y-1">
             <span className="block text-xs text-secondary-500">Shipping $</span>
-            <input
+            <TextField
+              variant="plain"
+              typeable
               className={`${small} !w-24`}
               inputMode="decimal"
               value={shipping}
@@ -576,7 +677,9 @@ function VendorOrder({
           </label>
           <label className="space-y-1">
             <span className="block text-xs text-secondary-500">Tax $</span>
-            <input
+            <TextField
+              variant="plain"
+              typeable
               className={`${small} !w-24`}
               inputMode="decimal"
               value={taxText}
@@ -585,13 +688,15 @@ function VendorOrder({
               title={
                 isTaxExempt(group.profile)
                   ? "Tax exempt: starts at $0"
-                  : "Starts at 8.9% of the items; type to change it"
+                  : `Starts at ${salesTaxPercent}% of the items; type to change it`
               }
             />
           </label>
           <label className="space-y-1">
             <span className="block text-xs text-secondary-500">Tracking # (optional)</span>
-            <input
+            <TextField
+              variant="plain"
+              kind="tracking"
               className={`${small} !w-44`}
               value={tracking}
               onChange={(e) => setTracking(e.target.value)}
@@ -611,13 +716,44 @@ function VendorOrder({
               )}
             </p>
           </div>
-          <Button disabled={busy || !valid} onClick={place}>
+          <Button disabled={busy || !valid} onClick={askToPlace}>
             {busy
               ? "Placing…"
               : selected.size > 0
                 ? `Place order (${selected.size})`
                 : "Place order"}
           </Button>
+          {placing && (
+            <ConfirmDialog
+              title="Place order"
+              confirmLabel="Place order"
+              keepLabel="Not yet"
+              onConfirm={place}
+              onClose={() => setPlacing(false)}
+            >
+              Place{" "}
+              {inOrder.length === group.items.length
+                ? "this order"
+                : `an order of ${inOrder.length} item${inOrder.length === 1 ? "" : "s"}`}{" "}
+              with {group.vendor} for {formatCents(itemsTotal + shippingCents + taxCents)}?
+            </ConfirmDialog>
+          )}
+          {removing && (
+            <AnswerDialog
+              title="Remove from the order"
+              label="Why (shown to them, optional)"
+              multiline
+              confirmLabel="Remove and cancel the request"
+              danger
+              onSubmit={(reason) => {
+                void trash(removing, reason);
+                return undefined;
+              }}
+              onClose={() => setRemoving(null)}
+            >
+              Remove “{removing.title}” and cancel {removing.requesterName}'s request?
+            </AnswerDialog>
+          )}
         </div>
         {charges && charges.size > 0 && (
           <p className="text-xs text-secondary-600 tabular-nums">
@@ -663,7 +799,7 @@ function Nudges({ vendor, itemsTotal }: { vendor: Vendor | undefined; itemsTotal
     notes.push(
       expired
         ? {
-            text: `⚠ Tax-exempt certificate expired ${formatDate(vendor.taxExemptExpires as number)}`,
+            text: `⚠ Tax-exempt certificate expired ${formatDay(vendor.taxExemptExpires as number)}`,
             tone: "warn",
           }
         : {
@@ -691,7 +827,7 @@ function Nudges({ vendor, itemsTotal }: { vendor: Vendor | undefined; itemsTotal
     if (cr.expiresAt !== null && cr.expiresAt < today) continue;
     if (cr.balanceCents === 0) continue;
     notes.push({
-      text: `🎟 ${cr.label}${cr.code ? ` (code ${cr.code})` : ""}${cr.balanceCents !== null ? ` · ${formatCents(cr.balanceCents)} left` : ""}${cr.expiresAt !== null ? ` · expires ${formatDate(cr.expiresAt)}` : ""}`,
+      text: `🎟 ${cr.label}${cr.code ? ` (code ${cr.code})` : ""}${cr.balanceCents !== null ? ` · ${formatCents(cr.balanceCents)} left` : ""}${cr.expiresAt !== null ? ` · expires ${formatDay(cr.expiresAt)}` : ""}`,
       tone: "good",
     });
   }
@@ -699,7 +835,7 @@ function Nudges({ vendor, itemsTotal }: { vendor: Vendor | undefined; itemsTotal
   if (notes.length === 0) return null;
   const tones = {
     good: "text-emerald-800",
-    warn: "text-primary-700 font-semibold",
+    warn: "text-red-700 font-semibold",
     info: "text-secondary-700",
   };
   return (

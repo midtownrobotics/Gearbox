@@ -1,10 +1,41 @@
-import { eq, inArray, sql } from "drizzle-orm";
+import {
+  deleteTeamRows,
+  exportTeamRows,
+  inTeam,
+  logTeamChange,
+  requireAdmin,
+  requireAuth,
+  settingLabels,
+  teamExport,
+  teamSettingsRoutes,
+  withTeam,
+} from "@g3/auth";
+import { isDemoTeam } from "@g3/demo";
+import { corsOrigin } from "@g3/site-config";
+import { withApiPrefix } from "@g3/site-config/worker";
+import { eq, inArray, isNull, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { validator } from "hono/validator";
+import packageJson from "../package.json";
+import { archiveRoutes } from "./archives";
 import { createDb } from "./db";
-import { batteries, checklistIssues, checklistItems, checklistLists, settings } from "./db/schema";
-import { requireAdmin, requireAuth } from "./middleware/auth";
+import {
+  batteries,
+  checklistArchives,
+  checklistIssues,
+  checklistItems,
+  checklistLists,
+  logDownloaderCodes,
+  logDownloaders,
+  matchLogs,
+  settings,
+} from "./db/schema";
+import { demoWords, loadDemo } from "./demo";
+import { downloaderRoutes, downloaderSelfRoutes } from "./downloaders";
+import { manifest } from "./manifest";
+import { deleteTeamLogFiles, logUploadRoutes, matchLogRoutes } from "./match-logs";
+import { SETTING_KEYS, type SettingKey, getSetting, getWhenFull, teamNumberOf } from "./settings";
 import type { AppEnv } from "./types";
 
 const base = new Hono<AppEnv>();
@@ -18,13 +49,7 @@ base.onError((err, c) => {
 base.use(
   "*",
   cors({
-    origin: (origin) => {
-      if (!origin) return null;
-      if (origin === "https://g3robotics.com") return origin;
-      if (origin.endsWith(".g3robotics.com")) return origin;
-      if (origin.startsWith("http://localhost:")) return origin;
-      return null;
-    },
+    origin: corsOrigin,
     allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allowHeaders: ["Content-Type", "Authorization"],
     credentials: true,
@@ -105,15 +130,6 @@ const issueTextValidator = validator("json", (value, c) => {
   return { text: v.text.trim() };
 });
 
-const SETTING_KEYS = [
-  "eventKey",
-  "nexusEventKey",
-  "tbaAuthKey",
-  "nexusApiKey",
-  "iframeUrl",
-] as const;
-type SettingKey = (typeof SETTING_KEYS)[number];
-
 interface NexusMonitorData {
   matches?: unknown[];
   isRealNexus?: boolean;
@@ -165,16 +181,6 @@ const reorderValidator = validator("json", (value, c) => {
   return { ids: v.ids as number[] };
 });
 
-// Reads a setting from the DB, falling back to a default (e.g. an env var).
-async function getSetting(
-  db: ReturnType<typeof createDb>,
-  key: string,
-  fallback: string,
-): Promise<string> {
-  const [row] = await db.select().from(settings).where(eq(settings.key, key));
-  return row?.value ?? fallback;
-}
-
 // Shared select shape for list queries — counts only checkable items (type = 'item')
 const listSelect = {
   id: checklistLists.id,
@@ -186,8 +192,60 @@ const listSelect = {
 };
 
 const app = base
-  .get("/health", (c) => c.json({ status: "ok", service: "pit" }))
+  .get("/health", (c) => c.json({ status: "ok", service: "pit", version: packageJson.version }))
 
+  // When an operator deletes the team (the platform's console), or 90 days after the team switches
+  // the app off (the platform's app library), its data goes too. Only other workers reach
+  // /internal: the gateway never answers it.
+  // The team's data, for its admins to download before switching the app off (the platform's app
+  // library). Only other workers reach /internal.
+  // The public demo (roadmap Phase 5): its sample data, after the nightly reset deleted the
+  // team's, and the words in it, which the gateway lets demo visitors send.
+  .post("/internal/teams/:teamId/demo", async (c) => {
+    const teamId = c.req.param("teamId");
+    if (!isDemoTeam(teamId)) return c.json({ error: "Only the demo team." }, 403);
+    return c.json(await loadDemo(createDb(c.env.PIT_DB), teamId));
+  })
+  .get("/internal/demo/words", (c) => c.json({ words: demoWords() }))
+  .get("/internal/teams/:teamId/export", async (c) => {
+    const teamId = c.req.param("teamId");
+    const tables = await exportTeamRows(
+      createDb(c.env.PIT_DB),
+      teamId,
+      [
+        settings,
+        batteries,
+        checklistLists,
+        checklistItems,
+        checklistIssues,
+        checklistArchives,
+        logDownloaders,
+        matchLogs,
+      ],
+      { log_downloaders: ["keyHash"], match_logs: ["uploadId"] },
+    );
+    return c.json(
+      teamExport(manifest, teamId, tables, [
+        "Log downloaders' keys and pairing codes aren't included: pair a downloader again on the Logs page.",
+        "The match log files aren't included: download them on the Logs page.",
+      ]),
+    );
+  })
+  .delete("/internal/teams/:teamId", async (c) => {
+    await deleteTeamLogFiles(c.env.LOGS, c.req.param("teamId"));
+    await deleteTeamRows(createDb(c.env.PIT_DB), c.req.param("teamId"), [
+      matchLogs,
+      checklistArchives,
+      checklistIssues,
+      checklistItems,
+      checklistLists,
+      batteries,
+      settings,
+      logDownloaders,
+      logDownloaderCodes,
+    ]);
+    return c.json({ ok: true });
+  })
   .get("/me", requireAuth, (c) =>
     c.json({
       id: c.get("userId"),
@@ -200,10 +258,12 @@ const app = base
   // Lists — reads
   .get("/lists", requireAuth, async (c) => {
     const db = createDb(c.env.PIT_DB);
+    const team = c.get("teamId");
     const rows = await db
       .select(listSelect)
       .from(checklistLists)
       .leftJoin(checklistItems, eq(checklistItems.listId, checklistLists.id))
+      .where(inTeam(checklistLists, team))
       .groupBy(checklistLists.id);
     return c.json(rows);
   })
@@ -213,11 +273,13 @@ const app = base
     if (!id) return c.json({ error: "Invalid id." }, 400);
 
     const db = createDb(c.env.PIT_DB);
+
+    const team = c.get("teamId");
     const [row] = await db
       .select(listSelect)
       .from(checklistLists)
       .leftJoin(checklistItems, eq(checklistItems.listId, checklistLists.id))
-      .where(eq(checklistLists.id, id))
+      .where(inTeam(checklistLists, team, eq(checklistLists.id, id)))
       .groupBy(checklistLists.id);
     if (!row) return c.json({ error: "List not found." }, 404);
     return c.json(row);
@@ -229,20 +291,26 @@ const app = base
     if (!listId) return c.json({ error: "Invalid id." }, 400);
 
     const db = createDb(c.env.PIT_DB);
-    const [list] = await db.select().from(checklistLists).where(eq(checklistLists.id, listId));
+
+    const team = c.get("teamId");
+    const [list] = await db
+      .select()
+      .from(checklistLists)
+      .where(inTeam(checklistLists, team, eq(checklistLists.id, listId)));
     if (!list) return c.json({ error: "List not found." }, 404);
 
     const items = await db
       .select()
       .from(checklistItems)
-      .where(eq(checklistItems.listId, listId))
+      .where(inTeam(checklistItems, team, eq(checklistItems.listId, listId)))
       .orderBy(checklistItems.index);
     return c.json(items);
   })
 
-  // Issues — reads (all)
+  // Issues — reads (all that are open; a resolved one waits, unseen, for the next archive)
   .get("/issues", requireAuth, async (c) => {
     const db = createDb(c.env.PIT_DB);
+    const team = c.get("teamId");
     const issues = await db
       .select({
         id: checklistIssues.id,
@@ -256,6 +324,7 @@ const app = base
       .from(checklistIssues)
       .innerJoin(checklistItems, eq(checklistIssues.itemId, checklistItems.id))
       .innerJoin(checklistLists, eq(checklistItems.listId, checklistLists.id))
+      .where(inTeam(checklistIssues, team, isNull(checklistIssues.resolvedAt)))
       .orderBy(checklistIssues.createdAt);
     return c.json(issues);
   })
@@ -266,7 +335,12 @@ const app = base
     if (!listId) return c.json({ error: "Invalid id." }, 400);
 
     const db = createDb(c.env.PIT_DB);
-    const [list] = await db.select().from(checklistLists).where(eq(checklistLists.id, listId));
+
+    const team = c.get("teamId");
+    const [list] = await db
+      .select()
+      .from(checklistLists)
+      .where(inTeam(checklistLists, team, eq(checklistLists.id, listId)));
     if (!list) return c.json({ error: "List not found." }, 404);
 
     const issues = await db
@@ -278,7 +352,14 @@ const app = base
       })
       .from(checklistIssues)
       .innerJoin(checklistItems, eq(checklistIssues.itemId, checklistItems.id))
-      .where(eq(checklistItems.listId, listId))
+      .where(
+        inTeam(
+          checklistItems,
+          team,
+          eq(checklistItems.listId, listId),
+          isNull(checklistIssues.resolvedAt),
+        ),
+      )
       .orderBy(checklistIssues.createdAt);
     return c.json(issues);
   })
@@ -287,12 +368,15 @@ const app = base
   .post("/lists", requireAuth, listBodyValidator, async (c) => {
     const { name, description } = c.req.valid("json");
     const db = createDb(c.env.PIT_DB);
+    const team = c.get("teamId");
     const now = Math.floor(Date.now() / 1000);
-    const result = await db.insert(checklistLists).values({ name, description, createdAt: now });
+    const result = await db
+      .insert(checklistLists)
+      .values(withTeam(team, { name, description, createdAt: now }));
     const [created] = await db
       .select()
       .from(checklistLists)
-      .where(eq(checklistLists.id, Number(result.meta.last_row_id)));
+      .where(inTeam(checklistLists, team, eq(checklistLists.id, Number(result.meta.last_row_id))));
     return c.json(created, 201);
   })
 
@@ -301,21 +385,30 @@ const app = base
     if (!id) return c.json({ error: "Invalid id." }, 400);
 
     const db = createDb(c.env.PIT_DB);
-    const [existing] = await db.select().from(checklistLists).where(eq(checklistLists.id, id));
+
+    const team = c.get("teamId");
+    const [existing] = await db
+      .select()
+      .from(checklistLists)
+      .where(inTeam(checklistLists, team, eq(checklistLists.id, id)));
     if (!existing) return c.json({ error: "List not found." }, 404);
 
     const itemIds = (
       await db
         .select({ id: checklistItems.id })
         .from(checklistItems)
-        .where(eq(checklistItems.listId, id))
+        .where(inTeam(checklistItems, team, eq(checklistItems.listId, id)))
     ).map((i) => i.id);
 
     if (itemIds.length > 0) {
-      await db.delete(checklistIssues).where(inArray(checklistIssues.itemId, itemIds));
+      await db
+        .delete(checklistIssues)
+        .where(inTeam(checklistIssues, team, inArray(checklistIssues.itemId, itemIds)));
     }
-    await db.delete(checklistItems).where(eq(checklistItems.listId, id));
-    await db.delete(checklistLists).where(eq(checklistLists.id, id));
+    await db
+      .delete(checklistItems)
+      .where(inTeam(checklistItems, team, eq(checklistItems.listId, id)));
+    await db.delete(checklistLists).where(inTeam(checklistLists, team, eq(checklistLists.id, id)));
     return c.json({ success: true });
   })
 
@@ -325,11 +418,21 @@ const app = base
 
     const { name } = c.req.valid("json");
     const db = createDb(c.env.PIT_DB);
-    const [existing] = await db.select().from(checklistLists).where(eq(checklistLists.id, id));
+    const team = c.get("teamId");
+    const [existing] = await db
+      .select()
+      .from(checklistLists)
+      .where(inTeam(checklistLists, team, eq(checklistLists.id, id)));
     if (!existing) return c.json({ error: "List not found." }, 404);
 
-    await db.update(checklistLists).set({ name }).where(eq(checklistLists.id, id));
-    const [updated] = await db.select().from(checklistLists).where(eq(checklistLists.id, id));
+    await db
+      .update(checklistLists)
+      .set({ name })
+      .where(inTeam(checklistLists, team, eq(checklistLists.id, id)));
+    const [updated] = await db
+      .select()
+      .from(checklistLists)
+      .where(inTeam(checklistLists, team, eq(checklistLists.id, id)));
     return c.json(updated);
   })
 
@@ -339,11 +442,21 @@ const app = base
 
     const { description } = c.req.valid("json");
     const db = createDb(c.env.PIT_DB);
-    const [existing] = await db.select().from(checklistLists).where(eq(checklistLists.id, id));
+    const team = c.get("teamId");
+    const [existing] = await db
+      .select()
+      .from(checklistLists)
+      .where(inTeam(checklistLists, team, eq(checklistLists.id, id)));
     if (!existing) return c.json({ error: "List not found." }, 404);
 
-    await db.update(checklistLists).set({ description }).where(eq(checklistLists.id, id));
-    const [updated] = await db.select().from(checklistLists).where(eq(checklistLists.id, id));
+    await db
+      .update(checklistLists)
+      .set({ description })
+      .where(inTeam(checklistLists, team, eq(checklistLists.id, id)));
+    const [updated] = await db
+      .select()
+      .from(checklistLists)
+      .where(inTeam(checklistLists, team, eq(checklistLists.id, id)));
     return c.json(updated);
   })
 
@@ -354,18 +467,22 @@ const app = base
 
     const { ids } = c.req.valid("json");
     const db = createDb(c.env.PIT_DB);
+    const team = c.get("teamId");
 
     const existing = await db
       .select({ id: checklistItems.id })
       .from(checklistItems)
-      .where(eq(checklistItems.listId, listId));
+      .where(inTeam(checklistItems, team, eq(checklistItems.listId, listId)));
 
     const existingIds = new Set(existing.map((i) => i.id));
     if (ids.length !== existingIds.size || !ids.every((id) => existingIds.has(id)))
       return c.json({ error: "ids must contain every item in the list exactly once." }, 400);
 
     for (let i = 0; i < ids.length; i++) {
-      await db.update(checklistItems).set({ index: i }).where(eq(checklistItems.id, ids[i]));
+      await db
+        .update(checklistItems)
+        .set({ index: i })
+        .where(inTeam(checklistItems, team, eq(checklistItems.id, ids[i])));
     }
     return c.json({ success: true });
   })
@@ -376,23 +493,27 @@ const app = base
 
     const { name, description, type } = c.req.valid("json");
     const db = createDb(c.env.PIT_DB);
-    const [list] = await db.select().from(checklistLists).where(eq(checklistLists.id, listId));
+    const team = c.get("teamId");
+    const [list] = await db
+      .select()
+      .from(checklistLists)
+      .where(inTeam(checklistLists, team, eq(checklistLists.id, listId)));
     if (!list) return c.json({ error: "List not found." }, 404);
 
     const existing = await db
       .select({ id: checklistItems.id })
       .from(checklistItems)
-      .where(eq(checklistItems.listId, listId));
+      .where(inTeam(checklistItems, team, eq(checklistItems.listId, listId)));
     const index = existing.length;
 
     const now = Math.floor(Date.now() / 1000);
     const result = await db
       .insert(checklistItems)
-      .values({ listId, index, type, name, description, createdAt: now });
+      .values(withTeam(team, { listId, index, type, name, description, createdAt: now }));
     const [created] = await db
       .select()
       .from(checklistItems)
-      .where(eq(checklistItems.id, Number(result.meta.last_row_id)));
+      .where(inTeam(checklistItems, team, eq(checklistItems.id, Number(result.meta.last_row_id))));
     return c.json(created, 201);
   })
 
@@ -402,11 +523,20 @@ const app = base
     if (!listId || !itemId) return c.json({ error: "Invalid id." }, 400);
 
     const db = createDb(c.env.PIT_DB);
-    const [item] = await db.select().from(checklistItems).where(eq(checklistItems.id, itemId));
+
+    const team = c.get("teamId");
+    const [item] = await db
+      .select()
+      .from(checklistItems)
+      .where(inTeam(checklistItems, team, eq(checklistItems.id, itemId)));
     if (!item || item.listId !== listId) return c.json({ error: "Item not found." }, 404);
 
-    await db.delete(checklistIssues).where(eq(checklistIssues.itemId, itemId));
-    await db.delete(checklistItems).where(eq(checklistItems.id, itemId));
+    await db
+      .delete(checklistIssues)
+      .where(inTeam(checklistIssues, team, eq(checklistIssues.itemId, itemId)));
+    await db
+      .delete(checklistItems)
+      .where(inTeam(checklistItems, team, eq(checklistItems.id, itemId)));
     return c.json({ success: true });
   })
 
@@ -417,11 +547,21 @@ const app = base
 
     const { name } = c.req.valid("json");
     const db = createDb(c.env.PIT_DB);
-    const [item] = await db.select().from(checklistItems).where(eq(checklistItems.id, itemId));
+    const team = c.get("teamId");
+    const [item] = await db
+      .select()
+      .from(checklistItems)
+      .where(inTeam(checklistItems, team, eq(checklistItems.id, itemId)));
     if (!item || item.listId !== listId) return c.json({ error: "Item not found." }, 404);
 
-    await db.update(checklistItems).set({ name }).where(eq(checklistItems.id, itemId));
-    const [updated] = await db.select().from(checklistItems).where(eq(checklistItems.id, itemId));
+    await db
+      .update(checklistItems)
+      .set({ name })
+      .where(inTeam(checklistItems, team, eq(checklistItems.id, itemId)));
+    const [updated] = await db
+      .select()
+      .from(checklistItems)
+      .where(inTeam(checklistItems, team, eq(checklistItems.id, itemId)));
     return c.json(updated);
   })
 
@@ -436,11 +576,21 @@ const app = base
 
       const { description } = c.req.valid("json");
       const db = createDb(c.env.PIT_DB);
-      const [item] = await db.select().from(checklistItems).where(eq(checklistItems.id, itemId));
+      const team = c.get("teamId");
+      const [item] = await db
+        .select()
+        .from(checklistItems)
+        .where(inTeam(checklistItems, team, eq(checklistItems.id, itemId)));
       if (!item || item.listId !== listId) return c.json({ error: "Item not found." }, 404);
 
-      await db.update(checklistItems).set({ description }).where(eq(checklistItems.id, itemId));
-      const [updated] = await db.select().from(checklistItems).where(eq(checklistItems.id, itemId));
+      await db
+        .update(checklistItems)
+        .set({ description })
+        .where(inTeam(checklistItems, team, eq(checklistItems.id, itemId)));
+      const [updated] = await db
+        .select()
+        .from(checklistItems)
+        .where(inTeam(checklistItems, team, eq(checklistItems.id, itemId)));
       return c.json(updated);
     },
   )
@@ -453,11 +603,21 @@ const app = base
 
     const { checked } = c.req.valid("json");
     const db = createDb(c.env.PIT_DB);
-    const [item] = await db.select().from(checklistItems).where(eq(checklistItems.id, itemId));
+    const team = c.get("teamId");
+    const [item] = await db
+      .select()
+      .from(checklistItems)
+      .where(inTeam(checklistItems, team, eq(checklistItems.id, itemId)));
     if (!item || item.listId !== listId) return c.json({ error: "Item not found." }, 404);
 
-    await db.update(checklistItems).set({ checked }).where(eq(checklistItems.id, itemId));
-    const [updated] = await db.select().from(checklistItems).where(eq(checklistItems.id, itemId));
+    await db
+      .update(checklistItems)
+      .set({ checked })
+      .where(inTeam(checklistItems, team, eq(checklistItems.id, itemId)));
+    const [updated] = await db
+      .select()
+      .from(checklistItems)
+      .where(inTeam(checklistItems, team, eq(checklistItems.id, itemId)));
     return c.json(updated);
   })
 
@@ -466,13 +626,18 @@ const app = base
     if (!listId) return c.json({ error: "Invalid id." }, 400);
 
     const db = createDb(c.env.PIT_DB);
-    const [list] = await db.select().from(checklistLists).where(eq(checklistLists.id, listId));
+
+    const team = c.get("teamId");
+    const [list] = await db
+      .select()
+      .from(checklistLists)
+      .where(inTeam(checklistLists, team, eq(checklistLists.id, listId)));
     if (!list) return c.json({ error: "List not found." }, 404);
 
     await db
       .update(checklistItems)
       .set({ checked: false })
-      .where(eq(checklistItems.listId, listId));
+      .where(inTeam(checklistItems, team, eq(checklistItems.listId, listId)));
     return c.json({ success: true });
   })
 
@@ -484,18 +649,28 @@ const app = base
 
     const { text } = c.req.valid("json");
     const db = createDb(c.env.PIT_DB);
-    const [item] = await db.select().from(checklistItems).where(eq(checklistItems.id, itemId));
+    const team = c.get("teamId");
+    const [item] = await db
+      .select()
+      .from(checklistItems)
+      .where(inTeam(checklistItems, team, eq(checklistItems.id, itemId)));
     if (!item || item.listId !== listId) return c.json({ error: "Item not found." }, 404);
 
     const now = Math.floor(Date.now() / 1000);
-    const result = await db.insert(checklistIssues).values({ itemId, text, createdAt: now });
+    const result = await db
+      .insert(checklistIssues)
+      .values(withTeam(team, { itemId, text, createdAt: now }));
     const [created] = await db
       .select()
       .from(checklistIssues)
-      .where(eq(checklistIssues.id, Number(result.meta.last_row_id)));
+      .where(
+        inTeam(checklistIssues, team, eq(checklistIssues.id, Number(result.meta.last_row_id))),
+      );
     return c.json(created, 201);
   })
 
+  // Resolving an issue. It's kept, out of the open issues, until the next archive has recorded
+  // it as resolved (./archives.ts).
   .delete("/lists/:id/items/:itemId/issues/:issueId", requireAuth, async (c) => {
     const listId = parseId(c.req.param("id"));
     const itemId = parseId(c.req.param("itemId"));
@@ -503,34 +678,58 @@ const app = base
     if (!listId || !itemId || !issueId) return c.json({ error: "Invalid id." }, 400);
 
     const db = createDb(c.env.PIT_DB);
-    const [item] = await db.select().from(checklistItems).where(eq(checklistItems.id, itemId));
+
+    const team = c.get("teamId");
+    const [item] = await db
+      .select()
+      .from(checklistItems)
+      .where(inTeam(checklistItems, team, eq(checklistItems.id, itemId)));
     if (!item || item.listId !== listId) return c.json({ error: "Item not found." }, 404);
 
-    const [issue] = await db.select().from(checklistIssues).where(eq(checklistIssues.id, issueId));
+    const [issue] = await db
+      .select()
+      .from(checklistIssues)
+      .where(
+        inTeam(
+          checklistIssues,
+          team,
+          eq(checklistIssues.id, issueId),
+          isNull(checklistIssues.resolvedAt),
+        ),
+      );
     if (!issue || issue.itemId !== itemId) return c.json({ error: "Issue not found." }, 404);
 
-    await db.delete(checklistIssues).where(eq(checklistIssues.id, issueId));
+    await db
+      .update(checklistIssues)
+      .set({ resolvedAt: Math.floor(Date.now() / 1000) })
+      .where(inTeam(checklistIssues, team, eq(checklistIssues.id, issueId)));
     return c.json({ success: true });
   })
 
   // Batteries
   .get("/batteries", requireAuth, async (c) => {
     const db = createDb(c.env.PIT_DB);
-    const rows = await db.select().from(batteries).orderBy(batteries.createdAt);
+    const team = c.get("teamId");
+    const rows = await db
+      .select()
+      .from(batteries)
+      .where(inTeam(batteries, team))
+      .orderBy(batteries.createdAt);
     return c.json(rows);
   })
 
   .post("/batteries", requireAuth, listNameValidator, async (c) => {
     const { name } = c.req.valid("json");
     const db = createDb(c.env.PIT_DB);
+    const team = c.get("teamId");
     const now = Math.floor(Date.now() / 1000);
     const result = await db
       .insert(batteries)
-      .values({ name, state: "Idle", stateSince: Date.now(), createdAt: now });
+      .values(withTeam(team, { name, state: "Idle", stateSince: Date.now(), createdAt: now }));
     const [created] = await db
       .select()
       .from(batteries)
-      .where(eq(batteries.id, Number(result.meta.last_row_id)));
+      .where(inTeam(batteries, team, eq(batteries.id, Number(result.meta.last_row_id))));
     return c.json(created, 201);
   })
 
@@ -538,9 +737,13 @@ const app = base
     const id = parseId(c.req.param("id"));
     if (!id) return c.json({ error: "Invalid id." }, 400);
     const db = createDb(c.env.PIT_DB);
-    const [existing] = await db.select().from(batteries).where(eq(batteries.id, id));
+    const team = c.get("teamId");
+    const [existing] = await db
+      .select()
+      .from(batteries)
+      .where(inTeam(batteries, team, eq(batteries.id, id)));
     if (!existing) return c.json({ error: "Battery not found." }, 404);
-    await db.delete(batteries).where(eq(batteries.id, id));
+    await db.delete(batteries).where(inTeam(batteries, team, eq(batteries.id, id)));
     return c.json({ success: true });
   })
 
@@ -549,7 +752,11 @@ const app = base
     if (!id) return c.json({ error: "Invalid id." }, 400);
     const { state } = c.req.valid("json");
     const db = createDb(c.env.PIT_DB);
-    const [existing] = await db.select().from(batteries).where(eq(batteries.id, id));
+    const team = c.get("teamId");
+    const [existing] = await db
+      .select()
+      .from(batteries)
+      .where(inTeam(batteries, team, eq(batteries.id, id)));
     if (!existing) return c.json({ error: "Battery not found." }, 404);
     const tracksVoltage = state === "In Robot" || state === "Next Up";
     // Count a use each time the battery newly enters the robot.
@@ -564,8 +771,11 @@ const app = base
         voltage: tracksVoltage ? (existing.voltage ?? null) : null,
         useCount: newUseCount,
       })
-      .where(eq(batteries.id, id));
-    const [updated] = await db.select().from(batteries).where(eq(batteries.id, id));
+      .where(inTeam(batteries, team, eq(batteries.id, id)));
+    const [updated] = await db
+      .select()
+      .from(batteries)
+      .where(inTeam(batteries, team, eq(batteries.id, id)));
     return c.json(updated);
   })
 
@@ -573,10 +783,20 @@ const app = base
     const id = parseId(c.req.param("id"));
     if (!id) return c.json({ error: "Invalid id." }, 400);
     const db = createDb(c.env.PIT_DB);
-    const [existing] = await db.select().from(batteries).where(eq(batteries.id, id));
+    const team = c.get("teamId");
+    const [existing] = await db
+      .select()
+      .from(batteries)
+      .where(inTeam(batteries, team, eq(batteries.id, id)));
     if (!existing) return c.json({ error: "Battery not found." }, 404);
-    await db.update(batteries).set({ useCount: 0 }).where(eq(batteries.id, id));
-    const [updated] = await db.select().from(batteries).where(eq(batteries.id, id));
+    await db
+      .update(batteries)
+      .set({ useCount: 0 })
+      .where(inTeam(batteries, team, eq(batteries.id, id)));
+    const [updated] = await db
+      .select()
+      .from(batteries)
+      .where(inTeam(batteries, team, eq(batteries.id, id)));
     return c.json(updated);
   })
 
@@ -585,28 +805,52 @@ const app = base
     if (!id) return c.json({ error: "Invalid id." }, 400);
     const { voltage } = c.req.valid("json");
     const db = createDb(c.env.PIT_DB);
-    const [existing] = await db.select().from(batteries).where(eq(batteries.id, id));
+    const team = c.get("teamId");
+    const [existing] = await db
+      .select()
+      .from(batteries)
+      .where(inTeam(batteries, team, eq(batteries.id, id)));
     if (!existing) return c.json({ error: "Battery not found." }, 404);
-    await db.update(batteries).set({ voltage }).where(eq(batteries.id, id));
-    const [updated] = await db.select().from(batteries).where(eq(batteries.id, id));
+    await db
+      .update(batteries)
+      .set({ voltage })
+      .where(inTeam(batteries, team, eq(batteries.id, id)));
+    const [updated] = await db
+      .select()
+      .from(batteries)
+      .where(inTeam(batteries, team, eq(batteries.id, id)));
     return c.json(updated);
   })
 
-  // Global reset — unchecks all items across all lists, preserves issues
+  // Checklist archives: "Archive and reset" and the Archives page (./archives.ts).
+  .route("/archives", archiveRoutes)
+
+  // Log downloaders: pairing on Pit's Logs page, and the downloader's own key (./downloaders.ts).
+  .route("/downloaders", downloaderRoutes)
+  .route("/downloader/logs", logUploadRoutes)
+  .route("/downloader", downloaderSelfRoutes)
+
+  // Match logs the downloaders uploaded (./match-logs.ts).
+  .route("/logs", matchLogRoutes)
+
+  // Global reset — unchecks all items across all lists, preserves issues, archives nothing
   .post("/reset", requireAuth, async (c) => {
     const db = createDb(c.env.PIT_DB);
-    await db.update(checklistItems).set({ checked: false });
+    const team = c.get("teamId");
+    await db.update(checklistItems).set({ checked: false }).where(inTeam(checklistItems, team));
     return c.json({ success: true });
   })
 
   // Pit monitor — proxies external APIs so the frontend avoids CORS
   .get("/monitor/data", requireAuth, async (c) => {
     const db = createDb(c.env.PIT_DB);
-    const team = c.env.TEAM_NUMBER;
-    const eventKey = await getSetting(db, "eventKey", c.env.EVENT_KEY);
-    const nexusEventKey = await getSetting(db, "nexusEventKey", c.env.EVENT_KEY);
-    const tbaKey = await getSetting(db, "tbaAuthKey", c.env.TBA_AUTH_KEY);
-    const nexusKey = await getSetting(db, "nexusApiKey", c.env.NEXUS_API_KEY);
+    const team = teamNumberOf(c.get("teamId"));
+    const [eventKey, nexusEventKey] = await Promise.all([
+      getSetting(db, c.get("teamId"), "eventKey"),
+      getSetting(db, c.get("teamId"), "nexusEventKey"),
+    ]);
+    const tbaKey = c.env.TBA_AUTH_KEY;
+    const nexusKey = c.env.NEXUS_API_KEY;
     const year = new Date().getFullYear();
 
     const [nexusResult, tbaResult, tbaRankingsResult, sbResult, tbaScheduleResult] =
@@ -759,46 +1003,86 @@ const app = base
   // Pit monitor settings — read-only, public (display-only settings like iframe URL)
   .get("/monitor/settings", requireAuth, async (c) => {
     const db = createDb(c.env.PIT_DB);
-    const iframeUrl = await getSetting(db, "iframeUrl", "");
+    const iframeUrl = await getSetting(db, c.get("teamId"), "iframeUrl");
     return c.json({
       iframeUrl: iframeUrl || undefined,
     });
   })
 
-  // Admin — settings (admin only). Event key + external API keys live in the DB
-  // so they're configurable at runtime; env vars are the fallback defaults.
+  // Admin — the team's settings (admin only): its event keys and the monitor's feed.
   .get("/admin/settings", requireAdmin, async (c) => {
     const db = createDb(c.env.PIT_DB);
-    const [eventKey, nexusEventKey, tbaAuthKey, nexusApiKey, iframeUrl] = await Promise.all([
-      getSetting(db, "eventKey", c.env.EVENT_KEY),
-      getSetting(db, "nexusEventKey", c.env.EVENT_KEY),
-      getSetting(db, "tbaAuthKey", c.env.TBA_AUTH_KEY),
-      getSetting(db, "nexusApiKey", c.env.NEXUS_API_KEY),
-      getSetting(db, "iframeUrl", ""),
+    const team = c.get("teamId");
+    const [eventKey, nexusEventKey, iframeUrl] = await Promise.all([
+      getSetting(db, team, "eventKey"),
+      getSetting(db, team, "nexusEventKey"),
+      getSetting(db, team, "iframeUrl"),
     ]);
-    return c.json({
-      eventKey,
-      nexusEventKey,
-      tbaAuthKey,
-      nexusApiKey,
-      iframeUrl,
-      teamNumber: c.env.TEAM_NUMBER,
-    });
+    return c.json({ eventKey, nexusEventKey, iframeUrl, teamNumber: teamNumberOf(team) });
   })
 
   .patch("/admin/settings", requireAdmin, settingsValidator, async (c) => {
     const updates = c.req.valid("json");
     const db = createDb(c.env.PIT_DB);
+    const team = c.get("teamId");
+    const changed: string[] = [];
+    for (const [key, value] of Object.entries(updates)) {
+      if ((await getSetting(db, team, key as SettingKey)) !== value) changed.push(key);
+    }
     await Promise.all(
       Object.entries(updates).map(([key, value]) =>
         db
           .insert(settings)
-          .values({ key, value })
-          .onConflictDoUpdate({ target: settings.key, set: { value } }),
+          .values(withTeam(team, { key, value }))
+          .onConflictDoUpdate({ target: [settings.teamId, settings.key], set: { value } }),
       ),
     );
+    if (changed.length > 0) {
+      await logTeamChange(c.env, team, {
+        userId: c.get("userId"),
+        app: "pit",
+        what: "Pit settings",
+        changed: settingLabels(manifest, changed),
+      });
+    }
     return c.json({ ok: true });
-  });
+  })
+
+  // The same settings for the team's dashboard (roadmap 4.5), by manifest key. Empty is stored
+  // as "", like the Admin page does.
+  .route(
+    "/team-settings",
+    teamSettingsRoutes<AppEnv>(manifest, "Pit settings", {
+      async read(c) {
+        const db = createDb(c.env.PIT_DB);
+        const team = c.get("teamId");
+        const values = await Promise.all(SETTING_KEYS.map((key) => getSetting(db, team, key)));
+        return {
+          values: {
+            ...Object.fromEntries(SETTING_KEYS.map((key, i) => [key, values[i] || null])),
+            matchLogsWhenFull: await getWhenFull(db, team),
+          },
+        };
+      },
+      async save(c, changes) {
+        const db = createDb(c.env.PIT_DB);
+        const team = c.get("teamId");
+        await Promise.all(
+          Object.entries(changes).map(([key, value]) =>
+            db
+              .insert(settings)
+              .values(withTeam(team, { key, value: String(value ?? "") }))
+              .onConflictDoUpdate({
+                target: [settings.teamId, settings.key],
+                set: { value: String(value ?? "") },
+              }),
+          ),
+        );
+      },
+    }),
+  );
 
 export type PitApp = typeof app;
-export default app;
+/** The Hono app itself, for the isolation test (test/teams.test.ts). */
+export { app };
+export default { fetch: withApiPrefix(app.fetch) };

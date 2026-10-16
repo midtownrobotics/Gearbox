@@ -1,6 +1,7 @@
+import { PageLoading } from "@g3/ui";
 import { type ReactNode, createContext, useContext, useEffect, useState } from "react";
 import { api, redirectToLogin } from "./api";
-import { PageLoading } from "./ui";
+import { setTeamCurrency } from "./format";
 
 export type AuthUser = {
   userId: string;
@@ -9,6 +10,12 @@ export type AuthUser = {
   isMentor: boolean;
   /** Mentors and trusted students: add catalog categories and add, edit or delete parts. */
   canEditCatalog: boolean;
+  /** The team's settings every page needs: its currency and fiscal calendar. */
+  currency: string;
+  /** 1–12: the month the team's fiscal year starts. */
+  fiscalYearStart: number;
+  /** 0–100: the sales tax a new order starts with, as a percent of its items. */
+  salesTaxPercent: number;
 };
 
 const AuthUserContext = createContext<AuthUser | null>(null);
@@ -26,7 +33,11 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
   useEffect(() => {
     api.me
       .$get()
-      .then(async (res) => setUser(res.ok ? await res.json() : null))
+      .then(async (res) => {
+        const me: AuthUser | null = res.ok ? await res.json() : null;
+        if (me) setTeamCurrency(me.currency);
+        setUser(me);
+      })
       .catch(() => setUser(null));
   }, []);
 

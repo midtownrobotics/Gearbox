@@ -1,3 +1,4 @@
+import { Button, Dialog } from "@g3/ui";
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { api } from "./api";
 import { matchMachineProcess } from "./derive";
@@ -53,19 +54,19 @@ export function KioskShell({ children }: { children: ReactNode }) {
   // the machine has a part in progress (which suspends the auto-logout).
   useEffect(() => {
     if (!isKioskSession) return;
-    let cancelled = false;
+    let canceled = false;
 
     async function beat() {
       api["kiosk-presence"].heartbeat.$post().catch(() => {});
       try {
         if (machineProcessIdRef.current === null && machineName) {
           const processes = await fetchProcesses();
-          if (cancelled) return;
+          if (canceled) return;
           machineProcessIdRef.current = matchMachineProcess(processes, machineName)?.id ?? null;
         }
         if (machineProcessIdRef.current !== null) {
           const queue = await fetchProcessQueue(machineProcessIdRef.current);
-          if (cancelled) return;
+          if (canceled) return;
           machineBusyRef.current = queue.some((p) => p.status === "doing");
         }
       } catch {
@@ -76,7 +77,7 @@ export function KioskShell({ children }: { children: ReactNode }) {
     beat();
     const id = setInterval(beat, HEARTBEAT_MS);
     return () => {
-      cancelled = true;
+      canceled = true;
       clearInterval(id);
     };
   }, [isKioskSession, machineName]);
@@ -110,22 +111,18 @@ export function KioskShell({ children }: { children: ReactNode }) {
     <>
       {children}
       {isKioskSession && secondsLeft !== null && (
-        <div className="fixed inset-0 z-[100] bg-ink/70 flex items-center justify-center p-6">
-          <div className="bg-paper rounded-2xl shadow-xl max-w-md w-full p-8 text-center space-y-5">
-            <h2 className="font-display text-4xl text-ink">Still there?</h2>
-            <p className="text-steel-dark">
-              You'll be logged out in <span className="font-bold text-crimson">{secondsLeft}</span>{" "}
-              second{secondsLeft === 1 ? "" : "s"} due to inactivity.
+        <Dialog title="Still there?" onClose={stay}>
+          <>
+            <p className="text-secondary-500">
+              You'll be signed out in{" "}
+              <span className="font-bold text-secondary-900">{secondsLeft}</span> second
+              {secondsLeft === 1 ? "" : "s"} due to inactivity.
             </p>
-            <button
-              type="button"
-              onClick={stay}
-              className="w-full py-4 rounded-xl bg-crimson hover:bg-crimson-dark text-paper text-lg font-semibold transition-colors"
-            >
+            <Button size="lg" className="w-full" onClick={stay}>
               I'm still here
-            </button>
-          </div>
-        </div>
+            </Button>
+          </>
+        </Dialog>
       )}
     </>
   );

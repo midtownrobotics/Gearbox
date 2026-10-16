@@ -1,4 +1,18 @@
-import { AppNavBar } from "@g3/ui";
+import { pageTeamId, pageTeamNumber, teamKey } from "@g3/site-config";
+import { versionLabel } from "@g3/site-config/versions";
+import {
+  AppNavBar,
+  Button,
+  Card,
+  PageLoading,
+  Page as SharedPage,
+  TextField,
+  inputClass,
+  linkWith,
+  useQuestions,
+  useTeamNames,
+  useTeamUiSettings,
+} from "@g3/ui";
 import {
   ArrowRight,
   Camera,
@@ -6,7 +20,6 @@ import {
   Image,
   ImagePlus,
   Loader2,
-  LogIn,
   Map as MapIcon,
   Maximize2,
   Minimize2,
@@ -30,11 +43,13 @@ import {
   useRef,
   useState,
 } from "react";
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { Analysis } from "./Analysis";
-import { Sportsbook } from "./Game";
+import { type EngagementSettings, EngagementSettingsPanel } from "./EngagementSettings";
+import { MatchPredictions } from "./Game";
 import { Operations } from "./Operations";
 import { ScoutingAdminPage, ScoutingForms } from "./ScoutingForms";
-import { API_URL, G3ID_URL, api } from "./api";
+import { API_URL, api } from "./api";
 import { clearInputError, showTeamNumberError } from "./input-validation";
 import {
   deleteLocalFieldMap,
@@ -45,16 +60,7 @@ import {
 } from "./local-field-maps";
 import { type ParsedTrajectory, parseTrajectoryFile, trajectoryToPng } from "./trajectory-files";
 
-type Page =
-  | "forms"
-  | "sportsbook"
-  | "admin"
-  | "analysis"
-  | "service"
-  | "autos"
-  | "other"
-  | "tiers"
-  | "maps";
+type Page = "forms" | "predictions" | "admin" | "analysis" | "service" | "autos" | "tiers" | "maps";
 type User = {
   userId: string;
   displayName: string;
@@ -62,6 +68,7 @@ type User = {
   isAdmin: boolean;
   isG3IdAdmin: boolean;
   isHelper: boolean;
+  engagement: EngagementSettings;
 };
 type Tier = { id: string; name: string; color: string; items: string[] };
 type TierList = {
@@ -142,11 +149,15 @@ function AnnouncementBanner() {
   );
 }
 
-function G3Logo({ size = 20, className = "" }: { size?: number; className?: string }) {
+/** The team's logo (Team Appearance); G3's own on the site team's pages, otherwise none. */
+function TeamLogo({ size = 20, className = "" }: { size?: number; className?: string }) {
+  const { logoUrl } = useTeamUiSettings();
+  const src = logoUrl || (pageTeamId === teamKey ? "/g3.png" : "");
+  if (!src) return null;
   return (
     <img
       className={`g3-icon ${className}`}
-      src="/g3.png"
+      src={src}
       alt=""
       aria-hidden="true"
       width={size}
@@ -217,30 +228,6 @@ function EmptyState({
       {title && <h3>{title}</h3>}
       {action}
     </div>
-  );
-}
-
-function OtherTools({ go }: { go: (page: Page) => void }) {
-  const tools = [
-    { page: "autos" as const, label: "Auto Library" },
-    { page: "tiers" as const, label: "Tier Lists" },
-    { page: "maps" as const, label: "Field Maps" },
-  ];
-  return (
-    <section className="page other-tools-page">
-      <div className="page-heading">
-        <div>
-          <h1>Other Tools</h1>
-        </div>
-      </div>
-      <div className="tool-grid">
-        {tools.map((tool) => (
-          <button type="button" className="tool-card" key={tool.page} onClick={() => go(tool.page)}>
-            <h2>{tool.label}</h2>
-          </button>
-        ))}
-      </div>
-    </section>
   );
 }
 
@@ -316,52 +303,54 @@ function TierLists() {
   }
 
   return (
-    <section className="page tier-lists-page">
-      <div className="page-heading">
-        <div>
-          <h1>Tier Lists</h1>
-        </div>
-        <div className="heading-actions">
-          <select
-            aria-label="Select tier list"
-            value={current.id ?? "new"}
-            onChange={(event) => {
-              const selected = lists.find((list) => list.id === event.target.value);
-              if (selected) setCurrent(selected);
-            }}
-          >
-            <option value="new">New unsaved list</option>
-            {lists.map((list) => (
-              <option key={list.id} value={list.id}>
-                {list.name}
-              </option>
-            ))}
-          </select>
-          <button
-            type="button"
-            className="secondary-button"
-            onClick={() =>
-              setCurrent({
-                name: "Untitled tier list",
-                description: "",
-                tiers: defaultTiers.map((tier) => ({
-                  ...tier,
-                  id: crypto.randomUUID(),
-                  items: [],
-                })),
-              })
-            }
-          >
-            <Plus size={17} /> New
-          </button>
-          <button type="button" className="primary-button" onClick={save} disabled={saving}>
-            {saving ? <Loader2 size={17} className="spin" /> : <Save size={17} />} Save list
-          </button>
-        </div>
+    <SharedPage
+      title={<>Tier Lists</>}
+      width="wide"
+      className="scouting-page-frame"
+      contentClassName="page tier-lists-page"
+      actions=<div className="heading-actions">
+        <select
+          className={inputClass}
+          aria-label="Select tier list"
+          value={current.id ?? "new"}
+          onChange={(event) => {
+            const selected = lists.find((list) => list.id === event.target.value);
+            if (selected) setCurrent(selected);
+          }}
+        >
+          <option value="new">New unsaved list</option>
+          {lists.map((list) => (
+            <option key={list.id} value={list.id}>
+              {list.name}
+            </option>
+          ))}
+        </select>
+        <Button
+          variant="secondary"
+          type="button"
+          onClick={() =>
+            setCurrent({
+              name: "Untitled tier list",
+              description: "",
+              tiers: defaultTiers.map((tier) => ({
+                ...tier,
+                id: crypto.randomUUID(),
+                items: [],
+              })),
+            })
+          }
+        >
+          <Plus size={17} /> New
+        </Button>
+        <Button variant="primary" type="button" onClick={save} disabled={saving}>
+          {saving ? <Loader2 size={17} className="spin" /> : <Save size={17} />} Save list
+        </Button>
       </div>
-      <div className="editor-card">
+    >
+      <Card className="editor-card">
         <div className="list-meta">
-          <input
+          <TextField
+            kind="title"
             className="title-input"
             value={current.name}
             onChange={(event) => setCurrent({ ...current, name: event.target.value })}
@@ -370,7 +359,8 @@ function TierLists() {
           <span>Updated {timeAgo(current.updatedAt)}</span>
         </div>
         <div className="add-row">
-          <input
+          <TextField
+            kind="strategy"
             value={newItem}
             onChange={(event) => setNewItem(event.target.value)}
             onKeyDown={(event) => event.key === "Enter" && addItem()}
@@ -389,7 +379,9 @@ function TierLists() {
               onDrop={() => drop(tier.id)}
             >
               <div className="tier-label" style={{ background: tier.color }}>
-                <input
+                <TextField
+                  variant="plain"
+                  kind="tier"
                   value={tier.name}
                   onChange={(event) => updateTier(tier.id, { name: event.target.value })}
                   aria-label="Tier name"
@@ -448,8 +440,8 @@ function TierLists() {
         >
           <Plus size={16} /> Add tier
         </button>
-      </div>
-    </section>
+      </Card>
+    </SharedPage>
   );
 }
 
@@ -464,6 +456,7 @@ function MapCanvas({
   const editorRef = useRef<HTMLDivElement>(null);
   const baseCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const drawing = useRef(false);
+  const activePointer = useRef<number | null>(null);
   const lastDrawPoint = useRef<{ x: number; y: number } | null>(null);
   const currentStroke = useRef<{
     points: { x: number; y: number }[];
@@ -601,7 +594,8 @@ function MapCanvas({
   }
 
   function startDraw(event: ReactPointerEvent<HTMLCanvasElement>) {
-    if (!hasImage) return;
+    if (!hasImage || event.button !== 0 || activePointer.current !== null) return;
+    activePointer.current = event.pointerId;
     snapshot();
     if (tool === "arrow") {
       shapeStart.current = point(event);
@@ -632,6 +626,7 @@ function MapCanvas({
   }
 
   function draw(event: ReactPointerEvent<HTMLCanvasElement>) {
+    if (event.pointerId !== activePointer.current) return;
     if (shapeStart.current && shapePreview.current) {
       const context = event.currentTarget.getContext("2d");
       if (!context) return;
@@ -810,6 +805,8 @@ function MapCanvas({
   }
 
   function finishDraw(event: ReactPointerEvent<HTMLCanvasElement>) {
+    if (event.pointerId !== activePointer.current) return;
+    activePointer.current = null;
     drawing.current = false;
     lastDrawPoint.current = null;
     const context = event.currentTarget.getContext("2d");
@@ -822,6 +819,22 @@ function MapCanvas({
     if (!context) return;
     context.putImageData(preview, 0, 0);
     paintShape(context, start, point(event), true);
+  }
+
+  function cancelDraw(event: ReactPointerEvent<HTMLCanvasElement>) {
+    if (event.pointerId !== activePointer.current) return;
+    activePointer.current = null;
+    drawing.current = false;
+    lastDrawPoint.current = null;
+    shapeStart.current = null;
+    const context = canvasRef.current?.getContext("2d");
+    const canceledState = history.current.pop();
+    if (context && canceledState) {
+      context.putImageData(canceledState.image, 0, 0);
+      drawingProgress.current = canceledState.progress;
+    }
+    currentStroke.current = null;
+    shapePreview.current = null;
   }
 
   function undo() {
@@ -886,37 +899,39 @@ function MapCanvas({
       <div className="map-toolbar">
         <button
           type="button"
-          className="fullscreen-toggle"
+          className="fullscreen-toggle map-fullscreen-button"
           onClick={() => setIsFullscreen((value) => !value)}
           aria-label={isFullscreen ? "Exit fullscreen map" : "Open fullscreen map"}
           aria-pressed={isFullscreen}
         >
           {isFullscreen ? <Minimize2 size={17} /> : <Maximize2 size={17} />}
-          {isFullscreen ? "Exit fullscreen" : "Fullscreen map"}
+          <span>{isFullscreen ? "Exit fullscreen" : "Fullscreen map"}</span>
         </button>
-        <span className="toolbar-divider" />
         <span className="toolbar-divider" />
         <button
           type="button"
-          className={tool === "draw" ? "active" : ""}
+          className={`map-tool-button ${tool === "draw" ? "active" : ""}`}
           onClick={() => chooseTool("draw")}
+          aria-pressed={tool === "draw"}
         >
-          <Pencil size={16} /> Draw
+          <Pencil size={16} /> <span>Draw</span>
         </button>
         <button
           type="button"
-          className={tool === "arrow" ? "active" : ""}
+          className={`map-tool-button ${tool === "arrow" ? "active" : ""}`}
           onClick={() => chooseTool("arrow")}
+          aria-pressed={tool === "arrow"}
         >
-          <ArrowRight size={19} /> Arrow
+          <ArrowRight size={19} /> <span>Arrow</span>
         </button>
         <button
           type="button"
-          className={tool === "sotm" ? "active" : ""}
+          className={`map-tool-button ${tool === "sotm" ? "active" : ""}`}
           onClick={() => chooseTool("sotm")}
+          aria-pressed={tool === "sotm"}
           title="Draw a movement path to create a shooting cone aimed at the nearest hub"
         >
-          <Target size={19} /> SOTM
+          <Target size={19} /> <span>SOTM</span>
         </button>
         <div className="drawing-colors" aria-label="Brush color">
           {DRAWING_COLORS.map((option) => (
@@ -931,32 +946,27 @@ function MapCanvas({
             />
           ))}
         </div>
-        <button type="button" onClick={undo} title="Undo (Ctrl+Z)">
-          <RotateCcw size={16} /> Undo
+        <button type="button" className="map-undo-button" onClick={undo} title="Undo (Ctrl+Z)">
+          <RotateCcw size={16} /> <span>Undo</span>
         </button>
-        <button type="button" className="clear-drawings-button" onClick={clearDrawings}>
-          <Trash2 size={17} /> Clear drawings
-        </button>
+        <Button
+          variant="danger"
+          type="button"
+          className="clear-drawings-button"
+          onClick={clearDrawings}
+        >
+          <Trash2 size={17} /> <span>Clear</span>
+        </Button>
       </div>
       <div className={`canvas-shell ${hasImage ? "has-image" : ""}`}>
         <canvas
           ref={canvasRef}
+          aria-label="Drawable field map"
           onPointerDown={startDraw}
           onPointerMove={draw}
           onPointerUp={finishDraw}
-          onPointerCancel={() => {
-            drawing.current = false;
-            lastDrawPoint.current = null;
-            shapeStart.current = null;
-            const context = canvasRef.current?.getContext("2d");
-            const canceledState = history.current.pop();
-            if (context && canceledState) {
-              context.putImageData(canceledState.image, 0, 0);
-              drawingProgress.current = canceledState.progress;
-            }
-            currentStroke.current = null;
-            shapePreview.current = null;
-          }}
+          onPointerCancel={cancelDraw}
+          onLostPointerCapture={cancelDraw}
         />
         {!hasImage && (
           <label className="canvas-placeholder">
@@ -968,28 +978,40 @@ function MapCanvas({
         )}
       </div>
       <div className="map-details">
-        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Map name *" />
-        <input
+        <TextField
+          kind="map"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Map name *"
+        />
+        <TextField
+          kind="match"
           value={eventName}
           onChange={(e) => setEventName(e.target.value)}
           placeholder="Event or match"
         />
-        <input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notes" />
-        <button
+        <TextField
+          kind="note"
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="Notes"
+        />
+        <Button
+          variant="primary"
           type="button"
-          className="primary-button"
           disabled={!hasImage || !name || saving}
           onClick={save}
         >
           {saving ? <Loader2 size={17} className="spin" /> : <Save size={17} />}
           {editingMap ? "Save changes" : "Save annotated map"}
-        </button>
+        </Button>
       </div>
     </div>
   );
 }
 
 function FieldMaps({ user }: { user: User }) {
+  const questions = useQuestions();
   const [maps, setMaps] = useState<FieldMap[]>([]);
   const [editingMap, setEditingMap] = useState<FieldMap | null>(null);
   const [canShare, setCanShare] = useState(false);
@@ -1039,7 +1061,7 @@ function FieldMaps({ user }: { user: User }) {
   }, [load]);
 
   async function remove(map: FieldMap) {
-    if (!window.confirm(`Delete “${map.name}”? This cannot be undone.`)) return;
+    if (!(await questions.confirm(`Delete “${map.name}”? This cannot be undone.`))) return;
     if (map.shared) await api(`/field-maps/${map.id}`, { method: "DELETE" });
     else await deleteLocalFieldMap(map.id);
     await load();
@@ -1076,7 +1098,7 @@ function FieldMaps({ user }: { user: User }) {
   }
 
   async function revokeAccess(email: string) {
-    if (!window.confirm(`Remove field-map publishing access for ${email}?`)) return;
+    if (!(await questions.confirm(`Remove field-map publishing access for ${email}?`))) return;
     await api(`/field-map-publishers/${encodeURIComponent(email)}`, { method: "DELETE" });
     await load();
   }
@@ -1090,26 +1112,27 @@ function FieldMaps({ user }: { user: User }) {
   }
 
   return (
-    <section className="page">
-      <div className="page-heading">
-        <div>
-          <h1>Field Maps</h1>
-        </div>
-      </div>
+    <SharedPage
+      title={<>Field Maps</>}
+      width="wide"
+      className="scouting-page-frame"
+      contentClassName="page"
+    >
       <MapCanvas onSaved={load} editingMap={editingMap} />
       {user.isAdmin && (
-        <div className="map-sharing-access">
+        <Card className="map-sharing-access">
           <div>
             <h2>Map sharing access</h2>
           </div>
           <form onSubmit={grantAccess}>
             <select
+              className={inputClass}
               required
               value={publisherUserId}
               onChange={(event) => setPublisherUserId(event.target.value)}
-              aria-label="G3ID account"
+              aria-label="Account"
             >
-              <option value="">Select a G3ID account</option>
+              <option value="">Select an account</option>
               {publisherOptions
                 .filter(
                   (account) => !publishers.some((publisher) => publisher.email === account.email),
@@ -1120,9 +1143,9 @@ function FieldMaps({ user }: { user: User }) {
                   </option>
                 ))}
             </select>
-            <button type="submit" className="primary-button">
+            <Button variant="primary" type="submit">
               <Plus size={16} /> Give access
-            </button>
+            </Button>
           </form>
           {publishers.length > 0 && (
             <div className="publisher-list">
@@ -1140,7 +1163,7 @@ function FieldMaps({ user }: { user: User }) {
               ))}
             </div>
           )}
-        </div>
+        </Card>
       )}
       {mapMessage && <div className="save-status success">{mapMessage}</div>}
       <div className="section-title">
@@ -1169,7 +1192,7 @@ function FieldMaps({ user }: { user: User }) {
                   {map.shared ? "Shared with team" : map.eventName || "Personal map"}
                 </span>
                 <h3>{map.name}</h3>
-                <p>{map.notes || "No notes added."}</p>
+                {map.notes && <p>{map.notes}</p>}
                 <footer>
                   <span>{timeAgo(map.updatedAt)}</span>
                   {!map.shared && canShare && (
@@ -1186,7 +1209,8 @@ function FieldMaps({ user }: { user: User }) {
                     </button>
                   )}
                   {(!map.shared || user.isAdmin || map.createdBy === user.userId) && (
-                    <button
+                    <Button
+                      variant="danger"
                       type="button"
                       aria-label={`Delete ${map.name}`}
                       onClick={(event) => {
@@ -1195,7 +1219,7 @@ function FieldMaps({ user }: { user: User }) {
                       }}
                     >
                       <Trash2 size={15} />
-                    </button>
+                    </Button>
                   )}
                 </footer>
               </div>
@@ -1205,11 +1229,12 @@ function FieldMaps({ user }: { user: User }) {
       ) : (
         <EmptyState icon={MapIcon} title="No saved maps yet" />
       )}
-    </section>
+    </SharedPage>
   );
 }
 
 function AutoLibrary() {
+  const questions = useQuestions();
   const [autos, setAutos] = useState<AutoRoutine[]>([]);
   const [search, setSearch] = useState("");
   const [formOpen, setFormOpen] = useState(false);
@@ -1295,15 +1320,16 @@ function AutoLibrary() {
   }
 
   return (
-    <section className="page">
-      <div className="page-heading">
-        <div>
-          <h1>Auto Library</h1>
-        </div>
-      </div>
+    <SharedPage
+      title={<>Auto Library</>}
+      width="wide"
+      className="scouting-page-frame"
+      contentClassName="page"
+    >
       <div className="library-bar">
         <Search size={17} />
-        <input
+        <TextField
+          typeable
           value={search}
           onChange={(event) => setSearch(event.target.value)}
           placeholder="Search by routine or team…"
@@ -1318,7 +1344,7 @@ function AutoLibrary() {
         </div>
       )}
       {formOpen && (
-        <div className="form-panel">
+        <Card className="form-panel">
           <div className="form-panel-heading">
             <div>
               <h2>Add an autonomous routine</h2>
@@ -1330,7 +1356,8 @@ function AutoLibrary() {
           <form onSubmit={submit}>
             <label>
               Routine name *
-              <input
+              <TextField
+                kind="routine"
                 required
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -1339,16 +1366,17 @@ function AutoLibrary() {
             </label>
             <label>
               Team number
-              <input
+              <TextField
+                typeable
                 className="team-number-input"
                 inputMode="numeric"
                 pattern="[0-9]+"
-                title="Enter a team number using digits only, such as 1648."
+                title={`Enter a team number using digits only, such as ${pageTeamNumber}.`}
                 value={form.team}
                 onChange={(e) => setForm({ ...form, team: e.target.value })}
                 onInput={clearInputError}
                 onInvalid={showTeamNumberError}
-                placeholder="1648"
+                placeholder={String(pageTeamNumber)}
               />
             </label>
             <div className="wide auto-route-input">
@@ -1375,9 +1403,6 @@ function AutoLibrary() {
               </div>
               {routeInput === "upload" ? (
                 <>
-                  <span className="field-help">
-                    A .traj or .path file will be plotted automatically.
-                  </span>
                   <label className="trajectory-upload">
                     <Upload size={17} />
                     {trajectory ? trajectory.name : "Upload trajectory"}
@@ -1395,16 +1420,16 @@ function AutoLibrary() {
               )}
             </div>
             <div className="wide form-actions">
-              <button type="button" className="secondary-button" onClick={() => setFormOpen(false)}>
+              <Button variant="secondary" type="button" onClick={() => setFormOpen(false)}>
                 Cancel
-              </button>
-              <button type="submit" className="primary-button" disabled={saving}>
+              </Button>
+              <Button variant="primary" type="submit" disabled={saving}>
                 {saving ? <Loader2 size={17} className="spin" /> : <Save size={17} />}
                 {saving ? "Saving…" : "Save routine"}
-              </button>
+              </Button>
             </div>
           </form>
-        </div>
+        </Card>
       )}
       {filtered.length ? (
         <>
@@ -1430,19 +1455,20 @@ function AutoLibrary() {
                 )}
                 <header>
                   <span className="auto-icon">
-                    <G3Logo size={24} />
+                    <TeamLogo size={24} />
                   </span>
                   <div>
                     <span>{auto.team ? `Team ${auto.team}` : "Unassigned team"}</span>
                     <h3>{auto.name}</h3>
                   </div>
-                  <button
+                  <Button
+                    variant="danger"
                     type="button"
                     aria-label={`Delete ${auto.name}`}
-                    onClick={(event) => {
+                    onClick={async (event) => {
                       event.stopPropagation();
                       if (
-                        window.confirm(
+                        await questions.confirm(
                           `Delete “${auto.name}”? This removes it for everyone and cannot be undone.`,
                         )
                       ) {
@@ -1451,9 +1477,9 @@ function AutoLibrary() {
                     }}
                   >
                     <Trash2 size={15} />
-                  </button>
+                  </Button>
                 </header>
-                <p>{auto.description || "No description added."}</p>
+                {auto.description && <p>{auto.description}</p>}
                 {auto.steps.length > 0 && (
                   <ol>
                     {auto.steps.map((step, index) => (
@@ -1472,9 +1498,9 @@ function AutoLibrary() {
           </div>
           {!search && (
             <div className="build-auto-row">
-              <button type="button" className="primary-button" onClick={() => setFormOpen(true)}>
+              <Button variant="primary" type="button" onClick={() => setFormOpen(true)}>
                 <Plus size={17} /> Build an auto entry
-              </button>
+              </Button>
             </div>
           )}
         </>
@@ -1484,9 +1510,9 @@ function AutoLibrary() {
           title={search ? "No routines match" : ""}
           action={
             !search && (
-              <button type="button" className="primary-button" onClick={() => setFormOpen(true)}>
+              <Button variant="primary" type="button" onClick={() => setFormOpen(true)}>
                 <Plus size={17} /> Build an auto entry
-              </button>
+              </Button>
             )
           }
         />
@@ -1522,7 +1548,7 @@ function AutoLibrary() {
           </div>
         </div>
       )}
-    </section>
+    </SharedPage>
   );
 }
 
@@ -1530,10 +1556,15 @@ type RouteStroke = { color: string; points: { x: number; y: number }[] };
 
 function AutoRouteDrawing({ onChange }: { onChange: (file: File | null) => void }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const fieldRef = useRef<HTMLImageElement | null>(null);
+  const fieldRef = useRef<HTMLCanvasElement | null>(null);
   const drawing = useRef(false);
+  const activePointer = useRef<number | null>(null);
   const strokesRef = useRef<RouteStroke[]>([]);
+  const history = useRef<RouteStroke[][]>([]);
+  const exportVersion = useRef(0);
   const [strokes, setStrokes] = useState<RouteStroke[]>([]);
+  const [canUndo, setCanUndo] = useState(false);
+  const [fieldReady, setFieldReady] = useState(false);
   const [color, setColor] = useState("#ff334f");
 
   const render = useCallback((items: RouteStroke[]) => {
@@ -1543,7 +1574,7 @@ function AutoRouteDrawing({ onChange }: { onChange: (file: File | null) => void 
     if (!canvas || !context) return;
     context.fillStyle = "#17191d";
     context.fillRect(0, 0, canvas.width, canvas.height);
-    if (field?.complete) context.drawImage(field, 0, 0, canvas.width, canvas.height);
+    if (field) context.drawImage(field, 0, 0, canvas.width, canvas.height);
     for (const stroke of items) {
       if (!stroke.points.length) continue;
       context.strokeStyle = "rgba(0,0,0,.9)";
@@ -1566,9 +1597,11 @@ function AutoRouteDrawing({ onChange }: { onChange: (file: File | null) => void 
 
   const exportDrawing = useCallback(
     (items: RouteStroke[]) => {
+      const version = ++exportVersion.current;
       const canvas = canvasRef.current;
       if (!canvas || !items.length) return onChange(null);
       canvas.toBlob((blob) => {
+        if (version !== exportVersion.current) return;
         onChange(blob ? new File([blob], "drawn-auto.png", { type: "image/png" }) : null);
       }, "image/png");
     },
@@ -1577,9 +1610,20 @@ function AutoRouteDrawing({ onChange }: { onChange: (file: File | null) => void 
 
   useEffect(() => {
     const field = new window.Image();
-    field.onload = () => render([]);
+    field.onload = () => {
+      const base = document.createElement("canvas");
+      base.width = 1400;
+      base.height = 724;
+      base.getContext("2d")?.drawImage(field, 0, 0, base.width, base.height);
+      fieldRef.current = base;
+      render(strokesRef.current);
+      setFieldReady(true);
+    };
     field.src = "/field-2026.svg";
-    fieldRef.current = field;
+    return () => {
+      field.onload = null;
+      exportVersion.current++;
+    };
   }, [render]);
 
   function point(event: ReactPointerEvent<HTMLCanvasElement>) {
@@ -1592,6 +1636,8 @@ function AutoRouteDrawing({ onChange }: { onChange: (file: File | null) => void 
   }
 
   function start(event: ReactPointerEvent<HTMLCanvasElement>) {
+    if (!fieldReady || event.button !== 0 || activePointer.current !== null) return;
+    activePointer.current = event.pointerId;
     drawing.current = true;
     event.currentTarget.setPointerCapture(event.pointerId);
     const next = [...strokesRef.current, { color, points: [point(event)] }];
@@ -1601,7 +1647,7 @@ function AutoRouteDrawing({ onChange }: { onChange: (file: File | null) => void 
   }
 
   function move(event: ReactPointerEvent<HTMLCanvasElement>) {
-    if (!drawing.current) return;
+    if (!drawing.current || event.pointerId !== activePointer.current) return;
     const current = strokesRef.current;
     const next = current.map((stroke, index) =>
       index === current.length - 1
@@ -1613,10 +1659,41 @@ function AutoRouteDrawing({ onChange }: { onChange: (file: File | null) => void 
     render(next);
   }
 
-  function finish() {
-    if (!drawing.current) return;
+  function finish(event: ReactPointerEvent<HTMLCanvasElement>) {
+    if (!drawing.current || event.pointerId !== activePointer.current) return;
+    activePointer.current = null;
     drawing.current = false;
+    const current = strokesRef.current;
+    if (current[current.length - 1].points.length < 2) {
+      replaceStrokes(current.slice(0, -1));
+      return;
+    }
+    remember(current.slice(0, -1));
     exportDrawing(strokesRef.current);
+  }
+
+  function cancel(event: ReactPointerEvent<HTMLCanvasElement>) {
+    if (event.pointerId !== activePointer.current) return;
+    activePointer.current = null;
+    drawing.current = false;
+    replaceStrokes(strokesRef.current.slice(0, -1));
+  }
+
+  function remember(items: RouteStroke[]) {
+    history.current.push(items);
+    if (history.current.length > DRAWING_HISTORY_LIMIT) history.current.shift();
+    setCanUndo(true);
+  }
+
+  function undo() {
+    const previous = history.current.pop();
+    if (previous) replaceStrokes(previous);
+    setCanUndo(history.current.length > 0);
+  }
+
+  function clear() {
+    remember(strokesRef.current);
+    replaceStrokes([]);
   }
 
   function replaceStrokes(next: RouteStroke[]) {
@@ -1629,7 +1706,6 @@ function AutoRouteDrawing({ onChange }: { onChange: (file: File | null) => void 
   return (
     <div className="auto-drawing">
       <div className="auto-drawing-toolbar">
-        <span>Draw the robot path on the field</span>
         <div className="drawing-colors" aria-label="Route color">
           {["#ff334f", "#36a3ff", "#35d06f", "#ffd43b"].map((option) => (
             <button
@@ -1643,16 +1719,12 @@ function AutoRouteDrawing({ onChange }: { onChange: (file: File | null) => void 
             />
           ))}
         </div>
-        <button
-          type="button"
-          disabled={!strokes.length}
-          onClick={() => replaceStrokes(strokes.slice(0, -1))}
-        >
+        <button type="button" disabled={!canUndo} onClick={undo}>
           <RotateCcw size={15} /> Undo
         </button>
-        <button type="button" disabled={!strokes.length} onClick={() => replaceStrokes([])}>
+        <Button variant="danger" type="button" disabled={!strokes.length} onClick={clear}>
           <Trash2 size={15} /> Clear
-        </button>
+        </Button>
       </div>
       <canvas
         ref={canvasRef}
@@ -1662,7 +1734,8 @@ function AutoRouteDrawing({ onChange }: { onChange: (file: File | null) => void 
         onPointerDown={start}
         onPointerMove={move}
         onPointerUp={finish}
-        onPointerCancel={finish}
+        onPointerCancel={cancel}
+        onLostPointerCapture={cancel}
       />
       <span className="field-help">
         Use separate strokes for each part of the route. Undo removes the last stroke.
@@ -1710,6 +1783,7 @@ function TrajectoryPreview({ trajectory }: { trajectory: ParsedTrajectory }) {
 }
 
 function RobotLibrary() {
+  const questions = useQuestions();
   const [robots, setRobots] = useState<RobotTeam[]>([]);
   const [search, setSearch] = useState("");
   const [formOpen, setFormOpen] = useState(false);
@@ -1762,9 +1836,9 @@ function RobotLibrary() {
 
   async function remove(robot: RobotTeam) {
     if (
-      !window.confirm(
+      !(await questions.confirm(
         `Delete ${robot.teamName} and all of its robot pictures? This removes them for everyone.`,
-      )
+      ))
     )
       return;
     await api(`/robots/${robot.id}`, { method: "DELETE" });
@@ -1777,15 +1851,16 @@ function RobotLibrary() {
   );
 
   return (
-    <section className="page robot-library-page">
-      <div className="page-heading">
-        <div>
-          <h1>Robot Library</h1>
-        </div>
-      </div>
+    <SharedPage
+      title={<>Robot Library</>}
+      width="wide"
+      className="scouting-page-frame"
+      contentClassName="page robot-library-page"
+    >
       <div className="library-bar">
         <Search size={17} />
-        <input
+        <TextField
+          typeable
           value={search}
           onChange={(event) => setSearch(event.target.value)}
           placeholder="Search by team…"
@@ -1793,7 +1868,7 @@ function RobotLibrary() {
         <span>{filtered.length} teams</span>
       </div>
       {formOpen && (
-        <div className="form-panel">
+        <Card className="form-panel">
           <div className="form-panel-heading">
             <h2>Add a team robot</h2>
             <button type="button" aria-label="Close form" onClick={() => setFormOpen(false)}>
@@ -1804,18 +1879,21 @@ function RobotLibrary() {
             {saveError && <div className="wide save-status">{saveError}</div>}
             <label className="wide">
               Team number *
-              <input
+              <TextField
+                typeable
                 required
                 inputMode="numeric"
                 pattern="[0-9]+"
                 value={teamName}
                 onChange={(event) => setTeamName(event.target.value)}
-                placeholder="1648"
+                placeholder={String(pageTeamNumber)}
               />
             </label>
             <label className="wide">
               Summary
-              <textarea
+              <TextField
+                multiline
+                kind="note"
                 value={summary}
                 onChange={(event) => setSummary(event.target.value)}
                 placeholder="Drivetrain, mechanisms, notable features, and configuration"
@@ -1834,16 +1912,16 @@ function RobotLibrary() {
               />
             </label>
             <div className="wide form-actions">
-              <button type="button" className="secondary-button" onClick={() => setFormOpen(false)}>
+              <Button variant="secondary" type="button" onClick={() => setFormOpen(false)}>
                 Cancel
-              </button>
-              <button type="submit" className="primary-button" disabled={saving}>
+              </Button>
+              <Button variant="primary" type="submit" disabled={saving}>
                 {saving ? <Loader2 size={17} className="spin" /> : <Save size={17} />}
                 {saving ? "Saving…" : "Save team"}
-              </button>
+              </Button>
             </div>
           </form>
-        </div>
+        </Card>
       )}
       {filtered.length ? (
         <>
@@ -1868,7 +1946,8 @@ function RobotLibrary() {
                   <h2>{robot.teamName}</h2>
                   <span>{robot.images.length} pictures</span>
                 </div>
-                <button
+                <Button
+                  variant="danger"
                   type="button"
                   aria-label={`Delete ${robot.teamName}`}
                   onClick={(event) => {
@@ -1877,15 +1956,15 @@ function RobotLibrary() {
                   }}
                 >
                   <Trash2 size={16} />
-                </button>
+                </Button>
               </article>
             ))}
           </div>
           {!search && (
             <div className="build-auto-row">
-              <button type="button" className="primary-button" onClick={() => setFormOpen(true)}>
+              <Button variant="primary" type="button" onClick={() => setFormOpen(true)}>
                 <Plus size={17} /> Add a team
-              </button>
+              </Button>
             </div>
           )}
         </>
@@ -1895,9 +1974,9 @@ function RobotLibrary() {
           title={search ? "No teams match" : ""}
           action={
             !search && (
-              <button type="button" className="primary-button" onClick={() => setFormOpen(true)}>
+              <Button variant="primary" type="button" onClick={() => setFormOpen(true)}>
                 <Plus size={17} /> Add a team
-              </button>
+              </Button>
             )
           }
         />
@@ -1914,7 +1993,7 @@ function RobotLibrary() {
             <header>
               <div>
                 <h2 id="robot-team-title">{selected.teamName}</h2>
-                <p>{selected.summary || "No summary added."}</p>
+                {selected.summary && <p>{selected.summary}</p>}
               </div>
               <button type="button" aria-label="Close team" onClick={() => setSelected(null)}>
                 <X size={20} />
@@ -1943,14 +2022,29 @@ function RobotLibrary() {
           </div>
         </div>
       )}
-    </section>
+    </SharedPage>
   );
 }
 
 void RobotLibrary;
 
 export function App() {
-  const [page, setPage] = useState<Page>("forms");
+  const names = useTeamNames();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const paths: Record<Page, string> = {
+    forms: "/",
+    predictions: "/predictions",
+    admin: "/admin",
+    analysis: "/analysis",
+    service: "/service",
+    autos: "/autos",
+    tiers: "/tiers",
+    maps: "/maps",
+  };
+  const page =
+    (Object.keys(paths) as Page[]).find((key) => paths[key] === location.pathname) ?? "forms";
+  const setPage = (next: Page) => navigate(paths[next]);
   const [analysisReportId, setAnalysisReportId] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -1959,6 +2053,12 @@ export function App() {
       .then(setUser)
       .catch(() => setUser(null))
       .finally(() => setLoading(false));
+    const refresh = () =>
+      api<User>("/me")
+        .then(setUser)
+        .catch(() => setUser(null));
+    window.addEventListener("focus", refresh);
+    return () => window.removeEventListener("focus", refresh);
   }, []);
 
   useEffect(() => {
@@ -1976,98 +2076,105 @@ export function App() {
     };
   }, [page, user]);
 
-  if (loading) {
-    return (
-      <div className="auth-screen">
-        <Loader2 className="spin" />
-        <span>Opening scouting workspace…</span>
-      </div>
-    );
-  }
+  if (loading) return <PageLoading />;
 
+  // Signed out sends the page to sign in (api.ts); this is only when Scouting couldn't be reached.
   if (!user) {
-    const returnTo = window.location.href;
     return (
       <div className="auth-screen">
         <div className="auth-mark">
-          <G3Logo size={38} />
+          <TeamLogo size={38} />
         </div>
-        <h1>Scouting starts with G3ID</h1>
-        <p>Sign in with your team account to open shared tier lists, field maps, and autos.</p>
-        <a href={`${G3ID_URL}/login?redirect=${encodeURIComponent(returnTo)}`}>
-          <LogIn size={18} /> Sign in with G3ID
-        </a>
+        <h1>Couldn't reach Scouting</h1>
+        <a href={window.location.href}>Try again</a>
       </div>
     );
   }
 
   const adminNav = [
     { id: "forms" as const, label: "Scouting Forms" },
-    { id: "sportsbook" as const, label: "Sportsbook" },
-    { id: "admin" as const, label: "Admin" },
+    {
+      id: "predictions" as const,
+      label: user.engagement.predictionsEnabled ? "Match Predictions" : "Scouting Points",
+    },
     { id: "analysis" as const, label: "Analysis" },
     { id: "service" as const, label: "Service Tickets" },
-    { id: "other" as const, label: "Other Tools" },
+    { id: "autos" as const, label: "Auto Library" },
+    { id: "tiers" as const, label: "Tier Lists" },
+    { id: "maps" as const, label: "Field Maps" },
+    { id: "admin" as const, label: "Admin" },
   ];
-  const nav = user.isAdmin
+  const navItems = user.isAdmin
     ? adminNav
     : [
         { id: "forms" as const, label: "Scouting Forms" },
-        { id: "sportsbook" as const, label: "Sportsbook" },
+        {
+          id: "predictions" as const,
+          label: user.engagement.predictionsEnabled ? "Match Predictions" : "Scouting Points",
+        },
         ...(user.isHelper ? [{ id: "service" as const, label: "Service Tickets" }] : []),
       ];
 
+  const nav = navItems.filter((item) => item.id !== "predictions" || user.engagement.enabled);
+  if (
+    !nav.some((item) => item.id === page) ||
+    (location.pathname !== paths[page] && location.pathname !== "/forms")
+  )
+    return <Navigate to="/" replace />;
+  if (location.pathname === "/forms") return <Navigate to="/" replace />;
+  const visiblePage = page;
   return (
-    <div className="app-shell">
+    <div className="app-shell flex flex-1 flex-col bg-page">
       <AppNavBar
-        title="G3 STRATEGY"
+        title={names.wordmark("Scouting")}
+        version={versionLabel("Scouting")}
         icon="/favicon.svg"
-        homeHref="#"
-        link={({ href, children, ...props }) => (
-          <a
-            href={href}
-            {...props}
-            onClick={(e) => {
-              e.preventDefault();
-              setPage("forms");
-              props.onClick?.();
-            }}
-          >
-            {children}
-          </a>
-        )}
+        homeHref="/"
+        link={linkWith(Link)}
         items={nav.map(({ id, label }) => ({
           key: id,
           label,
-          onSelect: () => setPage(id),
-          active: page === id || (id === "other" && ["autos", "tiers", "maps"].includes(page)),
+          href: paths[id],
+          group: ["autos", "tiers", "maps"].includes(id) ? "Libraries" : undefined,
+          active: visiblePage === id,
         }))}
       />
-      <main>
+      <div className="scouting-content flex flex-1 flex-col">
         <AnnouncementBanner />
-        {page === "forms" && (
+        {visiblePage === "forms" && (
           <ScoutingForms
             isAdmin={user.isAdmin}
             canManageServiceCrew={user.isAdmin || user.isHelper}
           />
         )}
-        {page === "sportsbook" && <Sportsbook />}
-        {page === "admin" && user.isAdmin && (
+        {visiblePage === "predictions" && (
+          <MatchPredictions predictionsEnabled={user.engagement.predictionsEnabled} />
+        )}
+        {visiblePage === "admin" && user.isAdmin && (
           <ScoutingAdminPage
             isG3IdAdmin={user.isG3IdAdmin}
+            engagement={
+              user.isG3IdAdmin ? (
+                <EngagementSettingsPanel
+                  settings={user.engagement}
+                  onSaved={(engagement) => setUser({ ...user, engagement })}
+                />
+              ) : undefined
+            }
             onOpenSubmission={(submissionId) => {
               setAnalysisReportId(submissionId);
               setPage("analysis");
             }}
           />
         )}
-        {page === "other" && <OtherTools go={setPage} />}
-        {page === "tiers" && <TierLists />}
-        {page === "maps" && <FieldMaps user={user} />}
-        {page === "autos" && <AutoLibrary />}
-        {page === "analysis" && user.isAdmin && <Analysis initialReportId={analysisReportId} />}
-        {page === "service" && (user.isAdmin || user.isHelper) && <Operations />}
-      </main>
+        {visiblePage === "tiers" && <TierLists />}
+        {visiblePage === "maps" && <FieldMaps user={user} />}
+        {visiblePage === "autos" && <AutoLibrary />}
+        {visiblePage === "analysis" && user.isAdmin && (
+          <Analysis initialReportId={analysisReportId} />
+        )}
+        {visiblePage === "service" && (user.isAdmin || user.isHelper) && <Operations />}
+      </div>
     </div>
   );
 }

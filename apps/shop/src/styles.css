@@ -1,16 +1,2 @@
 @import "@g3/ui/index.css";
 @import "tailwindcss";
-
-/* G3 brand palette (#A71433, #FEFEFE, #0C0C0C, #798A92) plus tints for a
-   light, professional tool surface. */
-@theme {
-  --color-crimson: #a71433;
-  --color-crimson-dark: #8a1029;
-  --color-crimson-tint: #faeef1;
-  --color-ink: #0c0c0c;
-  --color-paper: #ffffff;
-  --color-steel: #798a92;
-  --color-steel-dark: #57646c;
-  --color-steel-tint: #eef1f3;
-  --color-mist: #f4f6f7;
-}

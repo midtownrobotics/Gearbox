@@ -1,21 +1,12 @@
+import { Button, Card, ErrorBanner, Loading, Page, TextField, inputClass } from "@g3/ui";
 import type { PrinterAlert } from "@g3/worker-edge/print-types";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, getErrorMessage } from "../../shared/api";
 import { formatAgo, formatBytes } from "../../shared/format";
-import { Card, ErrorBanner, Loading, Page } from "../../shared/ui";
 import { useLoad } from "../../shared/use-load";
 import { PrinterAlerts } from "./alerts";
-import {
-  type PrinterRow,
-  alertsFor,
-  input,
-  loadPrinters,
-  networkError,
-  plainButton,
-  primaryButton,
-  printerStatus,
-} from "./shared";
+import { type PrinterRow, alertsFor, loadPrinters, networkError, printerStatus } from "./shared";
 
 const MAX_BYTES = 50 * 1024 * 1024;
 const ACCEPT = ".pdf,.txt,.jpg,.jpeg,.png,application/pdf,text/plain,image/jpeg,image/png";
@@ -172,7 +163,11 @@ function PrintForm({
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           <label className={field}>
             Printer
-            <select className={input} value={printer} onChange={(e) => setPrinter(e.target.value)}>
+            <select
+              className={inputClass}
+              value={printer}
+              onChange={(e) => setPrinter(e.target.value)}
+            >
               {printers.map((p) => (
                 <option key={p.name} value={p.name}>
                   {p.description ?? p.name}
@@ -184,7 +179,7 @@ function PrintForm({
           <label className={field}>
             Copies
             <input
-              className={input}
+              className={inputClass}
               type="number"
               min="1"
               max="50"
@@ -194,7 +189,7 @@ function PrintForm({
           </label>
           <label className={field}>
             Sides
-            <select className={input} value={sides} onChange={(e) => setSides(e.target.value)}>
+            <select className={inputClass} value={sides} onChange={(e) => setSides(e.target.value)}>
               <option value="one-sided">One-sided</option>
               <option value="two-sided-long-edge">Two-sided (long edge)</option>
               <option value="two-sided-short-edge">Two-sided (short edge)</option>
@@ -202,14 +197,14 @@ function PrintForm({
           </label>
           <label className={field}>
             Color
-            <select className={input} value={color} onChange={(e) => setColor(e.target.value)}>
+            <select className={inputClass} value={color} onChange={(e) => setColor(e.target.value)}>
               <option value="monochrome">Black and white</option>
               <option value="color">Color</option>
             </select>
           </label>
           <label className={field}>
             Paper
-            <select className={input} value={media} onChange={(e) => setMedia(e.target.value)}>
+            <select className={inputClass} value={media} onChange={(e) => setMedia(e.target.value)}>
               <option value="na_letter_8.5x11in">Letter</option>
               <option value="na_legal_8.5x14in">Legal</option>
               <option value="na_ledger_11x17in">Tabloid (11×17)</option>
@@ -218,8 +213,8 @@ function PrintForm({
           </label>
           <label className={field}>
             Pages
-            <input
-              className={input}
+            <TextField
+              typeable
               value={pageRanges}
               placeholder="All (or e.g. 1-3,5)"
               onChange={(e) => setPageRanges(e.target.value)}
@@ -227,9 +222,9 @@ function PrintForm({
           </label>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <button type="submit" className={primaryButton} disabled={!file || busy}>
+          <Button type="submit" disabled={!file || busy}>
             {busy ? "Sending…" : "Print"}
-          </button>
+          </Button>
           {status && (
             <span className="flex items-center gap-1.5 text-sm text-secondary-500">
               <span className={`w-2 h-2 rounded-full ${status.dot}`} aria-hidden />
@@ -324,9 +319,9 @@ function JobList({
                 {j.pages ? ` · ${j.pages} page${j.pages === 1 ? "" : "s"}` : ""}
               </span>
               {open && j.canCancel && (
-                <button
-                  type="button"
-                  className={plainButton}
+                <Button
+                  variant="secondary"
+                  size="sm"
                   onClick={async () => {
                     try {
                       const res = await api.print.jobs[":id"].$delete({
@@ -340,7 +335,7 @@ function JobList({
                   }}
                 >
                   Cancel
-                </button>
+                </Button>
               )}
             </li>
           );

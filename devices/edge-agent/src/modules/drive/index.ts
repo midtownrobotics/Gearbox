@@ -11,7 +11,7 @@ const RETRY_LISTEN_MS = 30_000;
  * Shop drive: a 10 GB shared folder served by the box on the shop LAN
  * (http://drive.local). Anyone on the network can upload, download, and
  * delete. It has its own web server on the LAN address only, separate from
- * the agent API: it's never reachable through the tunnel, so file traffic
+ * the agent API: it's never reachable over the worker link, so file traffic
  * never crosses the internet.
  */
 export function createDriveModule(ctx: ModuleContext): EdgeModule {

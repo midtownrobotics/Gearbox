@@ -1,8 +1,8 @@
+import { Button, Card, ErrorBanner, Field, Loading, Page, TextField } from "@g3/ui";
 import { type FormEvent, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api, getErrorMessage } from "../../shared/api";
 import { formatCents } from "../../shared/format";
-import { Button, Card, ErrorBanner, Field, Loading, Page, inputClass } from "../../shared/ui";
 import { useLoad } from "../../shared/use-load";
 import { ProgressBar, summary } from "./progress";
 import { listSearch } from "./search";
@@ -29,8 +29,8 @@ export function ListsPage() {
     >
       {creating && <NewListForm onCancel={() => setCreating(false)} />}
       <div className="flex flex-wrap items-center gap-3">
-        <input
-          className={`${inputClass} sm:max-w-sm`}
+        <TextField
+          className="sm:max-w-sm"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Find a list…"
@@ -114,20 +114,19 @@ function NewListForm({ onCancel }: { onCancel: () => void }) {
     <form onSubmit={create}>
       <Card title="New list" className="space-y-3">
         <Field label="Name">
-          <input
-            className={inputClass}
+          <TextField
+            kind="title"
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Intake v2, Week 3 restock, …"
             maxLength={100}
             required
-            // biome-ignore lint/a11y/noAutofocus: opened by pressing "New list"
             autoFocus
           />
         </Field>
         <Field label="Description">
-          <input
-            className={inputClass}
+          <TextField
+            kind="note"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             maxLength={1000}

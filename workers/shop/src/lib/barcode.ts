@@ -179,7 +179,7 @@ export type BarcodeLayout = {
   padding: number;
   /** Bottom edge of the block, in points from the page bottom. */
   bottom: number;
-  /** Horizontal band the block is centred within: [left, right] in points. */
+  /** Horizontal band the block is centered within: [left, right] in points. */
   centerWithin: [number, number];
 };
 

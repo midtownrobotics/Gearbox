@@ -9,11 +9,12 @@ This document outlines every change needed to wire up a new OAuth provider (sign
 Create an OAuth application in the provider's developer console. You will need:
 
 - **Client ID** and **Client Secret**
-- **Redirect URI** — the dev URI goes through the Vite proxy (which strips `/api` before forwarding to the worker); the production URI hits the worker subdomain directly with no prefix:
-  - Dev: `http://localhost:5173/api/auth/{provider}/callback`
-  - Production: `https://api.g3id.g3robotics.com/auth/{provider}/callback`
+- **Redirect URIs** — every one of them, so the same app works in dev and for every team:
+  - Dev: `http://localhost:5173/api/auth/{provider}/callback` (through the Vite proxy)
+  - The site's team: `https://id.<domain>/api/auth/{provider}/callback`
+  - Every other team: `https://id.<platform domain>/api/auth/{provider}/callback`
 
-Register **both** in the provider's OAuth app so the same app works in dev and production.
+  Sign-in calls back on the `id.` host of the team's own domain, so the session cookie lands there (`providerRedirectUri()` in `src/lib/team.ts`).
 
 Request the minimum scopes needed. At minimum you need the user's unique ID (sub/uid), email address, and display name.
 
@@ -32,11 +33,11 @@ Request the minimum scopes needed. At minimum you need the user's unique ID (sub
 
 **Production secrets** — set via Wrangler rather than a committed file:
 ```
-wrangler secret put {PROVIDER}_CLIENT_ID
-wrangler secret put {PROVIDER}_CLIENT_SECRET
-wrangler secret put {PROVIDER}_REDIRECT_URI
-# value: https://api.g3id.g3robotics.com/auth/{provider}/callback
+wrangler secret put {PROVIDER}_CLIENT_ID --env production
+wrangler secret put {PROVIDER}_CLIENT_SECRET --env production
 ```
+
+**`workers/g3id/wrangler.toml`** — add `{PROVIDER}_REDIRECT_URI` to `[env.production.vars]`, add the provider to the `(GOOGLE|GITHUB|STEAM)` list in `scripts/configure.ts`, and run `pnpm configure`, which writes the site team's callback address. Other teams' addresses come from `providerRedirectUri()`; add the provider to it too.
 
 **`workers/g3id/src/types.ts`** — add the three variables to the `Bindings` block of `AppEnv`.
 

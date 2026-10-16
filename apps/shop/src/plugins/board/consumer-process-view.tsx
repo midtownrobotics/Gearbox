@@ -1,194 +1,120 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { type InstanceRow, partLabel } from "../../shared/derive";
-import { bulkMoveInstances, fetchPartFiles } from "../../shared/getters";
-import type { PartFile } from "../../shared/types";
-import { DownloadLink, ErrorText, formatInstanceRanges } from "../files/part-files-panel";
+import { ErrorBanner } from "@g3/ui";
+import { useState } from "react";
+import { batchArrival } from "../../shared/batches";
+import type { InstanceRow } from "../../shared/derive";
+import type { Batch } from "../../shared/types";
+import type { ShopData } from "../../shared/use-shop-data";
+import { BatchMoveButtons } from "../batches/batch-actions";
+import { BatchFileLine } from "../batches/batch-file";
+import { BatchLink, PartNameLink, PriorityTag, plural } from "../batches/batch-ui";
+import { formatInstanceRanges, partLabelOf } from "../files/file-ui";
 
-type FileGroup = { key: string; file: PartFile | null; rows: InstanceRow[] };
+/** A batch at a File Consumer process, with which of its live parts have reached it. */
+export type BatchHere = { batch: Batch } & ReturnType<typeof batchArrival>;
 
-const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
-
-/** Groups rows by the file assigned to each instance; instances with no file group together. */
-function groupByFile(rows: InstanceRow[], fileByInstance: Map<number, PartFile>): FileGroup[] {
-  const map = new Map<string, FileGroup>();
-  for (const r of rows) {
-    const file = fileByInstance.get(r.instance.id) ?? null;
-    const key = file ? String(file.id) : "none";
-    const group = map.get(key) ?? { key, file, rows: [] };
-    group.rows.push(r);
-    map.set(key, group);
-  }
-  // Files by name, with the "no file" group last.
-  return [...map.values()].sort((a, b) =>
-    !a.file ? 1 : !b.file ? -1 : a.file.filename.localeCompare(b.file.filename),
-  );
+/**
+ * The batches at a File Consumer process that have a part there: made, and not yet complete
+ * there. Each moves as one unit, so its parts aren't listed on their own.
+ */
+export function batchesHere(
+  processId: number,
+  data: ShopData,
+  rowById: Map<number, InstanceRow>,
+): BatchHere[] {
+  return data.batches
+    .filter(
+      (b) =>
+        b.consumerProcessId === processId &&
+        b.producerStatus === "done" &&
+        b.consumerStatus !== "done",
+    )
+    .map((batch) => ({ batch, ...batchArrival(batch, rowById) }))
+    .filter((b) => b.here.length > 0);
 }
 
 /**
- * Shop-floor view for a File Consumer process: work moves one file at a time. To Do and In
- * Progress are grouped by file, each with a download; start a file's instances together, then
- * complete them together.
+ * One batch at its File Consumer process, as a row of that process's list: its name (which opens
+ * it), its file, the parts in it, and Start and Mark complete for the batch as a whole. A part
+ * that failed is sent back from the batch's own view.
  */
-export function ConsumerSections({
-  processId,
-  rows,
+export function ConsumerBatchCard({
+  item,
   touch,
   onChanged,
 }: {
-  processId: number;
-  rows: InstanceRow[];
+  item: BatchHere;
   touch: boolean;
   onChanged: () => Promise<void>;
 }) {
-  const [files, setFiles] = useState<PartFile[]>([]);
+  const { batch, live, here, all } = item;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const loadFiles = useCallback(async () => {
-    try {
-      setFiles(await fetchPartFiles());
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load files.");
-    }
-  }, []);
-
-  useEffect(() => {
-    loadFiles();
-  }, [loadFiles]);
-
-  const fileByInstance = useMemo(() => {
-    const map = new Map<number, PartFile>();
-    for (const f of files) for (const a of f.assignments) map.set(a.partInstanceId, f);
-    return map;
-  }, [files]);
-
-  const atThisStep = (status: "todo" | "doing") =>
-    rows.filter((r) => r.current?.processId === processId && r.current.status === status);
-  const todo = groupByFile(atThisStep("todo"), fileByInstance);
-  const doing = groupByFile(atThisStep("doing"), fileByInstance);
-
-  function move(group: FileGroup, to: "doing" | "done") {
+  async function run(action: () => Promise<unknown>) {
     setBusy(true);
     setError(null);
-    bulkMoveInstances(
-      processId,
-      group.rows.map((r) => r.instance.id),
-      to,
-    )
-      .catch((err) => setError(err instanceof Error ? err.message : "Something went wrong."))
-      .finally(async () => {
-        await Promise.all([onChanged(), loadFiles()]);
-        setBusy(false);
-      });
+    try {
+      await action();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong.");
+    } finally {
+      await onChanged();
+      setBusy(false);
+    }
   }
 
-  const btn = touch ? "px-4 py-2.5 text-sm" : "px-3 py-1.5 text-xs";
-
-  const section = (
-    title: string,
-    groups: FileGroup[],
-    empty: string,
-    action: (group: FileGroup) => React.ReactNode,
-  ) => (
-    <section className="space-y-2">
-      <h2 className="text-xs font-bold uppercase tracking-widest text-steel">
-        {title}{" "}
-        <span className="text-crimson">{groups.reduce((n, g) => n + g.rows.length, 0)}</span>
-      </h2>
-      {groups.length === 0 ? (
-        <p className="text-steel text-sm">{empty}</p>
-      ) : (
-        <div className="bg-paper border border-steel/30 rounded-xl divide-y divide-steel/15">
-          {groups.map((group) => (
-            <FileGroupBlock key={group.key} group={group} touch={touch}>
-              {group.file && <DownloadLink file={group.file} />}
-              {action(group)}
-            </FileGroupBlock>
-          ))}
-        </div>
-      )}
-    </section>
-  );
-
-  return (
-    <>
-      {error && <ErrorText message={error} />}
-
-      {section("In Progress", doing, "Nothing in progress here.", (group) => (
-        <span className="relative group">
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => move(group, "done")}
-            className={`${btn} font-semibold bg-emerald-600 hover:bg-emerald-700 text-paper rounded-lg transition-colors disabled:opacity-50`}
-          >
-            Mark all complete
-          </button>
-          <span className="pointer-events-none absolute bottom-full right-0 mb-1.5 hidden group-hover:block whitespace-nowrap bg-ink text-paper text-xs rounded-md px-2.5 py-1.5 shadow-lg">
-            Do a quality check before marking these complete!
-          </span>
-        </span>
-      ))}
-
-      {section("To Do", todo, "Nothing ready to start.", (group) => (
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => move(group, "doing")}
-          className={`${btn} font-semibold bg-crimson hover:bg-crimson-dark text-paper rounded-lg transition-colors disabled:opacity-50`}
-        >
-          Start all
-        </button>
-      ))}
-    </>
-  );
-}
-
-/** A file header (name + actions) with one thin row per part it covers here. */
-function FileGroupBlock({
-  group,
-  touch,
-  children,
-}: {
-  group: FileGroup;
-  touch: boolean;
-  children: React.ReactNode;
-}) {
   const byPart = new Map<number, InstanceRow[]>();
-  for (const r of group.rows) {
-    byPart.set(r.definition.id, [...(byPart.get(r.definition.id) ?? []), r]);
-  }
+  for (const r of live) byPart.set(r.definition.id, [...(byPart.get(r.definition.id) ?? []), r]);
+
   return (
-    <div className={`px-4 ${touch ? "py-3" : "py-2.5"}`}>
+    <div className={`space-y-2 px-4 ${touch ? "py-4" : "py-3"}`}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <div className="flex-1 min-w-0">
-          {group.file ? (
-            <p className="text-sm font-semibold text-ink truncate" title={group.file.filename}>
-              {group.file.filename}
-            </p>
-          ) : (
-            <p className="text-sm font-semibold text-amber-800">No file assigned</p>
-          )}
-          <p className="text-xs text-steel">{plural(group.rows.length, "instance")}</p>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold" title={batch.label}>
+            <BatchLink batch={batch} />
+          </p>
+          <p className="text-xs text-secondary-400">Batch · {plural(live.length, "instance")}</p>
         </div>
-        <div className="flex items-center gap-1.5 shrink-0">{children}</div>
+        <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
+          <BatchMoveButtons
+            batch={batch}
+            arrived={all}
+            nextName={null}
+            busy={busy}
+            size={touch ? "touch" : "sm"}
+            run={run}
+          />
+        </div>
       </div>
-      <ul className="mt-1.5 ml-2 border-l-2 border-steel/25">
+
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs font-bold uppercase tracking-wide text-secondary-400">File</span>
+        <BatchFileLine batch={batch} />
+      </div>
+
+      {error && <ErrorBanner message={error} />}
+      {!all && (
+        <p className="text-xs text-amber-800">
+          {here.length} of its {live.length} instances are here. It can start once they all are.
+        </p>
+      )}
+
+      <ul className="ml-2 border-l-2 border-secondary-200">
         {[...byPart.values()].map((list) => (
           <li
             key={list[0].definition.id}
             className={`flex items-center gap-2 pl-3 pr-1 text-xs ${touch ? "py-1.5" : "py-0.5"}`}
           >
-            <span className="text-ink truncate">{list[0].definition.name}</span>
-            <span className="font-mono text-steel shrink-0">{partLabel(list[0])}</span>
-            <span className="font-mono text-steel-dark shrink-0">
+            <span className="truncate">
+              <PartNameLink definition={list[0].definition} />
+            </span>
+            <span className="font-mono text-secondary-400 shrink-0">
+              {partLabelOf(list[0].definition)}
+            </span>
+            <span className="font-mono text-secondary-500 shrink-0">
               {formatInstanceRanges(list.map((r) => r.instance.instanceNumber))}
             </span>
-            {list.some((r) => r.instance.isPriority) && (
-              <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-700 bg-amber-50 border border-amber-300 rounded px-1 shrink-0">
-                Priority
-              </span>
-            )}
+            {list.some((r) => r.instance.isPriority) && <PriorityTag />}
           </li>
         ))}
       </ul>

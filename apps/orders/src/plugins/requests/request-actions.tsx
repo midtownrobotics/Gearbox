@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { Button, ConfirmQuestion, ErrorBanner, TextField, inputClass } from "@g3/ui";
+import { type ReactNode, useState } from "react";
 import { api, getErrorMessage } from "../../shared/api";
+import { AnswerDialog } from "../../shared/ask";
 import { useAuthUser } from "../../shared/auth";
 import { formatCents, parseDollars } from "../../shared/format";
+import { ReceiveDialog, asksInventory, useIntake } from "../../shared/receive-dialog";
 import type { OrderRequest } from "../../shared/types";
-import { Button, ErrorBanner, inputClass } from "../../shared/ui";
 
 type Action = "approve" | "deny" | "receive" | "cancel";
 
@@ -16,7 +18,7 @@ const LABELS: Record<Action, string> = {
 
 /**
  * What this user may do to the request right now (mirrors the worker's rules). Ordering isn't
- * here: mentors place orders for whole vendors on the Ordering page.
+ * here: mentors place orders for whole vendors on the Carts page.
  */
 export function allowedActions(
   request: Pick<OrderRequest, "status" | "requesterId">,
@@ -33,7 +35,8 @@ export function allowedActions(
     case "approved":
       return mentor || owner ? ["cancel"] : [];
     case "ordered":
-      return mentor || owner ? ["receive"] : [];
+      // Whoever opens the package marks it received.
+      return ["receive"];
     default:
       return [];
   }
@@ -44,15 +47,18 @@ const dollars = (cents: number | null) => (cents === null ? "" : (cents / 100).t
 /**
  * Buttons for the allowed status changes. When approving, the quantity and price can be adjusted
  * first; `compact` (the Approvals queue) leaves out the note box and asks why when denying.
+ * `extra` is the page's own buttons, on the same line after these.
  */
 export function RequestActions({
   request,
   onChanged,
   compact = false,
+  extra,
 }: {
   request: OrderRequest;
   onChanged: () => void;
   compact?: boolean;
+  extra?: ReactNode;
 }) {
   const user = useAuthUser();
   const actions = allowedActions(request, user);
@@ -61,18 +67,23 @@ export function RequestActions({
   const [price, setPrice] = useState(dollars(request.unitPriceCents));
   const [busy, setBusy] = useState<Action | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [receiving, setReceiving] = useState(false);
+  // Canceling asks first, and in the Approvals queue denying asks why: which one is asking.
+  const [asking, setAsking] = useState<"cancel" | "deny" | null>(null);
+  const intake = useIntake();
 
-  if (actions.length === 0) return null;
+  if (actions.length === 0)
+    return extra ? <div className="flex flex-wrap gap-2">{extra}</div> : null;
   const canApprove = actions.includes("approve");
 
-  async function run(action: Action) {
-    if (action === "cancel" && !window.confirm("Cancel this request?")) return;
-    let reason = note;
-    if (compact && action === "deny") {
-      const answer = window.prompt("Why is it denied? (shown to the requester)");
-      if (answer === null) return;
-      reason = answer;
-    }
+  /** `answer`: the yes to canceling, or the reason typed for denying. */
+  async function run(action: Action, answer?: { confirmed?: boolean; reason?: string }) {
+    if (action === "cancel" && !answer?.confirmed) return setAsking("cancel");
+    // With Inventory set up (or required), a pop-up asks where the parts go first.
+    if (action === "receive" && asksInventory(intake)) return setReceiving(true);
+    if (compact && action === "deny" && answer?.reason === undefined) return setAsking("deny");
+    setAsking(null);
+    const reason = answer?.reason ?? note;
     const edits: { quantity?: number; unitPriceCents?: number | null } = {};
     if (action === "approve") {
       const q = Number(quantity);
@@ -115,8 +126,9 @@ export function RequestActions({
           </label>
           <label className="flex items-center gap-1.5 text-secondary-600">
             Each $
-            <input
-              className={`${inputClass} !w-24 !py-1.5`}
+            <TextField
+              typeable
+              className="!w-24 !py-1.5"
               inputMode="decimal"
               value={price}
               onChange={(e) => setPrice(e.target.value)}
@@ -129,8 +141,10 @@ export function RequestActions({
         </div>
       )}
       {!compact && (canApprove || actions.includes("cancel")) && (
-        <textarea
-          className={`${inputClass} min-h-16`}
+        <TextField
+          multiline
+          kind="note"
+          className="min-h-16"
           value={note}
           onChange={(e) => setNote(e.target.value)}
           placeholder={
@@ -140,20 +154,61 @@ export function RequestActions({
         />
       )}
       <div className="flex flex-wrap gap-2">
-        {actions.map((a) => (
-          <Button
-            key={a}
-            variant={
-              a === "approve" || a === "receive" ? "primary" : a === "deny" ? "danger" : "secondary"
-            }
-            disabled={busy !== null}
-            onClick={() => run(a)}
-          >
-            {busy === a ? "…" : LABELS[a]}
-          </Button>
-        ))}
+        {actions.map((a) =>
+          a === "cancel" && asking === "cancel" ? (
+            <ConfirmQuestion
+              key={a}
+              question="Cancel this request?"
+              confirmLabel="Cancel request"
+              keepLabel="Keep it"
+              onConfirm={() => run("cancel", { confirmed: true })}
+              onKeep={() => setAsking(null)}
+            />
+          ) : (
+            <Button
+              key={a}
+              variant={
+                a === "approve" || a === "receive"
+                  ? "primary"
+                  : a === "deny"
+                    ? "danger"
+                    : "secondary"
+              }
+              disabled={busy !== null}
+              onClick={() => run(a)}
+            >
+              {busy === a ? "…" : LABELS[a]}
+            </Button>
+          ),
+        )}
+        {extra}
       </div>
+      {asking === "deny" && (
+        <AnswerDialog
+          title="Deny request"
+          label="Why is it denied? (shown to the requester)"
+          multiline
+          confirmLabel="Deny"
+          danger
+          onSubmit={(reason) => {
+            void run("deny", { reason });
+            return undefined;
+          }}
+          onClose={() => setAsking(null)}
+        />
+      )}
       {error && <ErrorBanner message={error} />}
+      {receiving && intake && (
+        <ReceiveDialog
+          lines={[request]}
+          intake={intake}
+          onClose={() => setReceiving(false)}
+          onReceived={() => {
+            setReceiving(false);
+            onChanged();
+          }}
+        />
+      )}
     </div>
   );
 }

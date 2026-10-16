@@ -1,3 +1,4 @@
+import { Button, Card, ErrorBanner, Loading, Page, TextField, inputClass } from "@g3/ui";
 import { fiscalLabel } from "@g3/worker-orders/fiscal";
 import { type FormEvent, useState } from "react";
 import { api, getErrorMessage } from "../../shared/api";
@@ -5,7 +6,6 @@ import { useAuthUser } from "../../shared/auth";
 import { ExportCsvButton } from "../../shared/export-csv";
 import { formatCents, parseDollars } from "../../shared/format";
 import type { Category } from "../../shared/types";
-import { Button, Card, ErrorBanner, Loading, Page, inputClass } from "../../shared/ui";
 import { useLoad } from "../../shared/use-load";
 import { ImportSheet } from "./import-sheet";
 
@@ -24,7 +24,7 @@ const SEGMENTS = [
 ] as const;
 
 /**
- * Spending per budget category for one fiscal year (July–June): the summary table, then each
+ * Spending per budget category for one fiscal year (from the team's start month): the summary table, then each
  * category's bar. Mentors add, rename, set each year's budget, archive, import and export.
  */
 export function BudgetPage() {
@@ -68,7 +68,7 @@ export function BudgetPage() {
             >
               {years.data.years.map((y) => (
                 <option key={y} value={y}>
-                  FY {fiscalLabel(y)}
+                  FY {fiscalLabel(y, user.fiscalYearStart)}
                   {y === years.data?.current ? " (current)" : ""}
                 </option>
               ))}
@@ -153,9 +153,10 @@ function SummaryTable({ categories, fiscalYear }: { categories: Category[]; fisc
   const money = (cents: number | null) =>
     cents === null ? "—" : cents < 0 ? `-${formatCents(-cents)}` : formatCents(cents);
   const over = (s: number, b: number | null) => b !== null && s > b;
+  const { fiscalYearStart } = useAuthUser();
 
   return (
-    <Card title={`General expenses · FY ${fiscalLabel(fiscalYear)}`}>
+    <Card title={`General expenses · FY ${fiscalLabel(fiscalYear, fiscalYearStart)}`}>
       <div className="overflow-x-auto">
         <table className="w-full text-sm tabular-nums">
           <thead>
@@ -176,12 +177,12 @@ function SummaryTable({ categories, fiscalYear }: { categories: Category[]; fisc
                 <td className="py-1.5 pr-3 text-right">{formatCents(c.spentCents)}</td>
                 <td className="py-1.5 pr-3 text-right">{money(c.budgetCents)}</td>
                 <td
-                  className={`py-1.5 pr-3 text-right ${over(c.spentCents, c.budgetCents) ? "text-primary-700 font-semibold" : ""}`}
+                  className={`py-1.5 pr-3 text-right ${over(c.spentCents, c.budgetCents) ? "text-red-700 font-semibold" : ""}`}
                 >
                   {pct(c.spentCents, c.budgetCents)}
                 </td>
                 <td
-                  className={`py-1.5 text-right ${over(c.spentCents, c.budgetCents) ? "text-primary-700 font-semibold" : ""}`}
+                  className={`py-1.5 text-right ${over(c.spentCents, c.budgetCents) ? "text-red-700 font-semibold" : ""}`}
                 >
                   {over(c.spentCents, c.budgetCents) && <span aria-hidden>⚠ </span>}
                   {money(remaining(c.spentCents, c.budgetCents))}
@@ -194,7 +195,7 @@ function SummaryTable({ categories, fiscalYear }: { categories: Category[]; fisc
               <td className="py-2 pr-3 text-right">{formatCents(spent)}</td>
               <td className="py-2 pr-3 text-right">{formatCents(budget)}</td>
               <td className="py-2 pr-3 text-right">{pct(spent, budget || null)}</td>
-              <td className={`py-2 text-right ${spent > budget ? "text-primary-700" : ""}`}>
+              <td className={`py-2 text-right ${spent > budget ? "text-red-700" : ""}`}>
                 {money(budget - spent)}
               </td>
             </tr>
@@ -264,7 +265,7 @@ function CategoryRow({
         ))}
       </div>
       {c.budgetCents !== null && (
-        <p className={`text-xs ${over ? "text-primary-700 font-semibold" : "text-secondary-500"}`}>
+        <p className={`text-xs ${over ? "text-red-700 font-semibold" : "text-secondary-500"}`}>
           {over
             ? `⚠ Over budget by ${formatCents(c.spentCents - c.budgetCents)}`
             : `${formatCents(c.budgetCents - c.spentCents)} left${
@@ -307,6 +308,7 @@ function CategoryRow({
 }
 
 function EditCategory({ category, onDone }: { category: Category; onDone: () => void }) {
+  const { fiscalYearStart } = useAuthUser();
   const [name, setName] = useState(category.name);
   const [code, setCode] = useState(category.code ?? "");
   const [budget, setBudget] = useState(
@@ -317,7 +319,7 @@ function EditCategory({ category, onDone }: { category: Category; onDone: () => 
   async function save(e: FormEvent) {
     e.preventDefault();
     const budgetCents = parseDollars(budget);
-    if (Number.isNaN(budgetCents)) return setError("Budget must be a dollar amount like 500.");
+    if (Number.isNaN(budgetCents)) return setError("Budget must be an amount like 500.");
     const res = await api.categories[":id"].$patch({
       param: { id: String(category.id) },
       json: { name, code: code.trim() || null, budgetCents, fiscalYear: category.fiscalYear },
@@ -328,27 +330,30 @@ function EditCategory({ category, onDone }: { category: Category; onDone: () => 
 
   return (
     <form onSubmit={save} className="flex flex-wrap gap-2 items-start">
-      <input
-        className={`${inputClass} sm:w-56`}
+      <TextField
+        kind="category"
+        className="sm:w-56"
         value={name}
         onChange={(e) => setName(e.target.value)}
         required
         maxLength={60}
       />
-      <input
-        className={`${inputClass} sm:w-32`}
+      <TextField
+        kind="code"
+        className="sm:w-32"
         value={code}
         onChange={(e) => setCode(e.target.value)}
         placeholder="Code (e.g. 4101)"
         maxLength={20}
         title="Accounting code shown in the CSV export's Budget Category column"
       />
-      <input
-        className={`${inputClass} sm:w-40`}
+      <TextField
+        typeable
+        className="sm:w-40"
         inputMode="decimal"
         value={budget}
         onChange={(e) => setBudget(e.target.value)}
-        placeholder={`FY ${fiscalLabel(category.fiscalYear)} budget`}
+        placeholder={`FY ${fiscalLabel(category.fiscalYear, fiscalYearStart)} budget`}
       />
       <Button type="submit">Save</Button>
       <Button variant="secondary" onClick={onDone}>
@@ -360,6 +365,7 @@ function EditCategory({ category, onDone }: { category: Category; onDone: () => 
 }
 
 function AddCategory({ fiscalYear, onAdded }: { fiscalYear: number; onAdded: () => void }) {
+  const { fiscalYearStart } = useAuthUser();
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
   const [budget, setBudget] = useState("");
@@ -368,7 +374,7 @@ function AddCategory({ fiscalYear, onAdded }: { fiscalYear: number; onAdded: () 
   async function add(e: FormEvent) {
     e.preventDefault();
     const budgetCents = parseDollars(budget);
-    if (Number.isNaN(budgetCents)) return setError("Budget must be a dollar amount like 500.");
+    if (Number.isNaN(budgetCents)) return setError("Budget must be an amount like 500.");
     const res = await api.categories.$post({
       json: { name, code: code.trim() || null, budgetCents, fiscalYear },
     });
@@ -382,28 +388,30 @@ function AddCategory({ fiscalYear, onAdded }: { fiscalYear: number; onAdded: () 
 
   return (
     <form onSubmit={add} className="flex flex-col sm:flex-row gap-2">
-      <input
-        className={inputClass}
+      <TextField
+        kind="category"
         value={name}
         onChange={(e) => setName(e.target.value)}
         placeholder="New category (e.g. Drivetrain, Tools, Outreach)"
         required
         maxLength={60}
       />
-      <input
-        className={`${inputClass} sm:w-32`}
+      <TextField
+        kind="code"
+        className="sm:w-32"
         value={code}
         onChange={(e) => setCode(e.target.value)}
         placeholder="Code (e.g. 4101)"
         maxLength={20}
         title="Accounting code shown in the CSV export's Budget Category column"
       />
-      <input
-        className={`${inputClass} sm:w-48`}
+      <TextField
+        typeable
+        className="sm:w-48"
         inputMode="decimal"
         value={budget}
         onChange={(e) => setBudget(e.target.value)}
-        placeholder={`FY ${fiscalLabel(fiscalYear)} budget`}
+        placeholder={`FY ${fiscalLabel(fiscalYear, fiscalYearStart)} budget`}
       />
       <Button type="submit" className="shrink-0">
         Add category

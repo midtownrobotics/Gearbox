@@ -1,3 +1,5 @@
+# Production URLs, route patterns and TEAM_NUMBER here are written by `pnpm configure` from
+# packages/site-config/src/site.ts. Change them there, not here.
 name = "pit"
 main = "src/index.ts"
 compatibility_date = "2026-05-17"
@@ -16,14 +18,20 @@ database_name = "g3-pit-local"
 database_id = "00000000-0000-0000-0000-000000000002"
 migrations_dir = "src/db/migrations"
 
+# Match logs from the team's log downloaders, in Shop's bucket under pit/teams/<team>/logs/
+# (outside Shop's own teams/<team>/, which Shop deletes when a team switches it off).
+[[r2_buckets]]
+binding = "LOGS"
+bucket_name = "g3-bucket"
+
 [vars]
 FRONTEND_URL = "http://localhost:5175"
-TEAM_NUMBER = "1648"
-EVENT_KEY = "2026gacmp"
 # TBA_AUTH_KEY and NEXUS_API_KEY are secrets — set via `.dev.vars` locally and `wrangler secret put` in prod
 
 [env.production]
 name = "pit-production"
+# No workers.dev address: the gateway is the only way in, so its identity headers can be trusted.
+workers_dev = false
 
 [[env.production.services]]
 binding = "G3ID"
@@ -39,8 +47,59 @@ database_name = "g3-pit-prod"
 database_id = "f10a16be-9193-4888-ac18-099ccebe63c2"
 migrations_dir = "src/db/migrations"
 
+[[env.production.r2_buckets]]
+binding = "LOGS"
+bucket_name = "g3-bucket"
+
 [env.production.vars]
-FRONTEND_URL = "https://pit.g3robotics.com"
-TEAM_NUMBER = "1648"
-EVENT_KEY = "2026gacmp"
+FRONTEND_URL = "https://1648-pit.frcgearbox.com"
 # TBA_AUTH_KEY and NEXUS_API_KEY are secrets — set via `wrangler secret put <NAME> --env production`
+
+# The app's page, served by this worker in production; only /api/* runs the worker code, and
+# other paths fall back to index.html for the app's router. Wrangler builds the page before
+# every production deploy or upload (Cloudflare's Git builds too).
+[env.production.build]
+command = "pnpm --filter @g3/pit build"
+
+[env.production.assets]
+directory = "../../apps/pit/dist"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]
+
+# ---- Staging: written by `pnpm configure` from [env.production]; don't edit below. ----
+
+[env.staging]
+name = "pit-staging"
+workers_dev = false
+
+[env.staging.define]
+__G3_STAGING__ = "true"
+
+[[env.staging.services]]
+binding = "G3ID"
+service = "g3id-staging"
+
+[[env.staging.kv_namespaces]]
+binding = "SESSIONS"
+id = "85741df814134e55b70b4cbc725240dc"
+
+[[env.staging.d1_databases]]
+binding = "PIT_DB"
+database_name = "g3-pit-staging"
+database_id = "237ff642-f72c-4f72-a0a1-563fa4a8f39f"
+migrations_dir = "src/db/migrations"
+
+[[env.staging.r2_buckets]]
+binding = "LOGS"
+bucket_name = "g3-bucket-staging"
+
+[env.staging.vars]
+FRONTEND_URL = "https://1648-pit-dev.g3robotics.com"
+
+[env.staging.build]
+command = "GEARBOX_STAGING=1 pnpm --filter @g3/pit build"
+
+[env.staging.assets]
+directory = "../../apps/pit/dist"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]

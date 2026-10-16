@@ -12,11 +12,9 @@ export function csvRow(fields: (string | number | null | undefined)[]): string {
 export const csvMoney = (cents: number | null | undefined) =>
   cents === null || cents === undefined ? "" : `$${(cents / 100).toFixed(2)}`;
 
-/** M/D/YYYY in the shop's time zone, like the team's sheet. */
-export const csvDate = (ms: number | null | undefined) =>
-  ms === null || ms === undefined
-    ? ""
-    : new Date(ms).toLocaleDateString("en-US", { timeZone: "America/New_York" });
+/** M/D/YYYY in the given time zone (the person exporting), like the team's sheet. */
+export const csvDate = (ms: number | null | undefined, timeZone: string) =>
+  ms === null || ms === undefined ? "" : new Date(ms).toLocaleDateString("en-US", { timeZone });
 
 /**
  * Parses CSV text (RFC 4180: quoted fields may contain commas, "" quotes and line breaks) into

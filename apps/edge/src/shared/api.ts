@@ -1,3 +1,4 @@
+import { redirectToSignIn } from "@g3/ui";
 import type { EdgeApp } from "@g3/worker-edge";
 import { hc } from "hono/client";
 
@@ -5,14 +6,9 @@ export const api = hc<EdgeApp>(import.meta.env.VITE_API_BASE_URL ?? "", {
   init: { credentials: "include" },
 });
 
-export function g3idUrl(): string {
-  return import.meta.env.VITE_G3ID_URL || "http://localhost:5173";
-}
-
-/** Send the user to g3id login, returning here afterwards. */
+/** Off to the team's ID sign-in page, coming back here (the same for every app). */
 export function redirectToLogin(): void {
-  const redirect = encodeURIComponent(window.location.href);
-  window.location.href = `${g3idUrl()}/login?redirect=${redirect}`;
+  redirectToSignIn();
 }
 
 export async function getErrorMessage(res: {
@@ -21,7 +17,7 @@ export async function getErrorMessage(res: {
 }): Promise<string> {
   if (res.status === 401) {
     redirectToLogin();
-    return "Redirecting to login...";
+    return "Redirecting to sign in…";
   }
   try {
     const body = (await res.json()) as { error?: string };

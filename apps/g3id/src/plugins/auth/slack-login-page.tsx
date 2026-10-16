@@ -1,4 +1,6 @@
-import { Check, Copy, Loader2, Send } from "lucide-react";
+import { appUrl, site } from "@g3/site-config";
+import { Button, ErrorBanner, NotYourTeam, useTeamNames } from "@g3/ui";
+import { Check, Copy, Send } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../../lib/api";
@@ -12,10 +14,12 @@ type PollStatus =
 
 type BotInfo = {
   appId: string;
-  teamId: string;
+  /** The team's Slack workspace; null if the team hasn't connected one. */
+  teamId: string | null;
 };
 
 export function SlackLoginPage() {
+  const names = useTeamNames();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const token = searchParams.get("token") ?? "";
@@ -63,7 +67,8 @@ export function SlackLoginPage() {
           if (redirect) {
             window.location.href = redirect;
           } else {
-            navigate("/dashboard");
+            // Nowhere asked for: the team's home.
+            window.location.href = `${appUrl("portal")}/`;
           }
           return;
         }
@@ -115,7 +120,7 @@ export function SlackLoginPage() {
   function handleOpenSlack() {
     navigator.clipboard.writeText(formattedCode);
 
-    if (botInfo) {
+    if (botInfo?.teamId) {
       const slackUrl = `slack://app?team=${botInfo.teamId}&id=${botInfo.appId}&tab=messages`;
       window.location.href = slackUrl;
     }
@@ -127,9 +132,7 @@ export function SlackLoginPage() {
     <main className="flex-1 flex items-center justify-center px-4">
       <div className="w-full max-w-sm space-y-6 text-center">
         <div>
-          <h1 className="text-5xl font-bold text-secondary-900">
-            <span className="text-primary-500">G3</span>ID
-          </h1>
+          <h1 className="text-4xl text-secondary-900">{names.name}</h1>
         </div>
 
         {!isTerminal && (
@@ -140,23 +143,19 @@ export function SlackLoginPage() {
                   <p className="text-sm text-secondary-700">
                     EASIEST: Click to copy the code and open the Slack DM:
                   </p>
-                  <button
-                    type="button"
-                    onClick={handleOpenSlack}
-                    className="w-full rounded-lg bg-primary-500 hover:bg-primary-600 text-white font-semibold py-2.5 text-sm transition-colors flex items-center justify-center gap-2"
-                  >
+                  <Button className="w-full" onClick={handleOpenSlack}>
                     <Send size={16} />
                     Open Slack
-                  </button>
+                  </Button>
                 </div>
               )}
 
               <div className="space-y-2">
                 <p className="text-sm text-secondary-700">
                   Or DM this code to the {""}
-                  <span className="text-primary-500 font-medium">"G3 Bot"</span> user:
+                  <span className="text-primary-500 font-medium">"{site.slackBotName}"</span> user:
                 </p>
-                <div className="bg-white border border-secondary-200 rounded-xl px-6 py-4 flex items-center justify-center gap-3">
+                <div className="bg-surface border border-secondary-200 rounded-xl px-6 py-4 flex items-center justify-center gap-3">
                   <p className="text-5xl font-mono font-bold text-secondary-900 tracking-widest">
                     {formattedCode}
                   </p>
@@ -173,7 +172,7 @@ export function SlackLoginPage() {
 
               <div className="space-y-2">
                 <p className="text-sm text-secondary-700">Or run this command in any channel:</p>
-                <div className="bg-white border border-secondary-200 rounded-xl px-6 py-4 flex items-center justify-center gap-3">
+                <div className="bg-surface border border-secondary-200 rounded-xl px-6 py-4 flex items-center justify-center gap-3">
                   <p className="font-mono text-3xl font-bold text-primary-500 tracking-wide">
                     /signin {formattedCode}
                   </p>
@@ -189,25 +188,22 @@ export function SlackLoginPage() {
               </div>
             </div>
 
-            <div className="flex items-center justify-center gap-2 text-sm text-secondary-500 mb-2">
-              <Loader2 size={16} className="animate-spin" />
-              Waiting for Slack confirmation…
-            </div>
+            <p className="text-sm text-secondary-500">Waiting for Slack confirmation…</p>
           </>
         )}
 
         {isTerminal && (
           <div className="space-y-4">
-            <p className="text-sm text-primary-500">
-              {pollStatus.status === "expired" ? "This code has expired." : pollStatus.message}
-            </p>
-            <button
-              type="button"
-              onClick={() => navigate("/login")}
-              className="w-full rounded-lg bg-primary-500 hover:bg-primary-600 text-white font-semibold py-2.5 text-sm transition-colors"
-            >
+            <ErrorBanner
+              message={
+                pollStatus.status === "expired"
+                  ? "This code has expired."
+                  : (pollStatus.message ?? "Sign-in failed.")
+              }
+            />
+            <Button className="w-full" onClick={() => navigate("/login")}>
               Try again
-            </button>
+            </Button>
           </div>
         )}
 
@@ -220,6 +216,7 @@ export function SlackLoginPage() {
             ← Go back
           </button>
         )}
+        <NotYourTeam />
       </div>
     </main>
   );

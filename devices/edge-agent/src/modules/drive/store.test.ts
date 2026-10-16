@@ -9,7 +9,7 @@ const stream = (text: string) => new Response(text).body;
 describe("safeName", () => {
   test("allows ordinary names", () => {
     expect(safeName(" CAD export v2.step ")).toBe("CAD export v2.step");
-    expect(safeName("Ünïcødé – 1648.pdf")).toBe("Ünïcødé – 1648.pdf");
+    expect(safeName("Ünïcødé – 2026.pdf")).toBe("Ünïcødé – 2026.pdf");
   });
   test("rejects paths, dot names, control characters, and long names", () => {
     for (const bad of [

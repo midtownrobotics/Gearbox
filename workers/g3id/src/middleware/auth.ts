@@ -70,7 +70,7 @@ export const requireKioskToken = createMiddleware<AppEnv>(async (c, next) => {
 
   const db = createDb(c.env.DB);
   const device = await db
-    .select({ id: kioskDevices.id, revokedAt: kioskDevices.revokedAt })
+    .select({ id: kioskDevices.id, teamId: kioskDevices.teamId, revokedAt: kioskDevices.revokedAt })
     .from(kioskDevices)
     .where(eq(kioskDevices.token, token))
     .get();
@@ -83,5 +83,6 @@ export const requireKioskToken = createMiddleware<AppEnv>(async (c, next) => {
   await db.update(kioskDevices).set({ lastUsedAt: now }).where(eq(kioskDevices.id, device.id));
 
   c.set("kioskDeviceId", device.id);
+  c.set("kioskTeamId", device.teamId);
   await next();
 });

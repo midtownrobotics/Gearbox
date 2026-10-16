@@ -1,318 +1,299 @@
-import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { inTeam, requireAuth } from "@g3/auth";
+import { eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
 import { createShopDb } from "../db";
+import { processes, stagingBatches } from "../db/schema";
 import {
-  actions,
-  files,
-  partInstanceFiles,
-  partInstanceProcesses,
-  stagingBatches,
-} from "../db/schema";
-import { requireAuth } from "../middleware/auth";
+  BatchError,
+  batchRow,
+  createBatch,
+  deleteBatch,
+  duplicateBatch,
+  duplicatePlan,
+  loadBatch,
+  loadBatches,
+  moveAtConsumer,
+  moveAtProducer,
+  sendBatchBack,
+  sendInstanceBack,
+  stageInto,
+  teamFile,
+  unstageFrom,
+} from "../lib/batches";
 import type { AppEnv } from "../types";
 
-type ShopDb = ReturnType<typeof createShopDb>;
-type BatchRow = typeof stagingBatches.$inferSelect;
+// Batches: instances that share one file, moved as one unit. The rules are in lib/batches.ts.
 
-export type StagingBatch = Omit<BatchRow, "closedAt"> & { partInstanceIds: number[] };
+export type { Batch, BatchInstance, DuplicatePlan, StoredFile } from "../lib/batches";
 
-// D1 caps a statement at 100 bound parameters; the widest insert here has 5 columns.
-const CHUNK = 15;
+const MAX_NAME = 80;
 
-function chunks<T>(items: T[], size = CHUNK): T[][] {
-  const out: T[][] = [];
-  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
-  return out;
+const isId = (n: unknown): n is number => Number.isInteger(n) && (n as number) > 0;
+
+function instanceIds(value: unknown): number[] | null {
+  if (
+    !Array.isArray(value) ||
+    value.length === 0 ||
+    value.length > 500 ||
+    !value.every((n) => isId(n))
+  ) {
+    return null;
+  }
+  return [...new Set(value as number[])];
+}
+
+/** A name as typed: trimmed, and null (the automatic name) when it's left empty. */
+function batchName(value: unknown): string | null | undefined {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== "string" || value.trim().length > MAX_NAME) return undefined;
+  return value.trim() || null;
 }
 
 const instanceIdsValidator = validator("json", (value, c): { partInstanceIds: number[] } => {
-  const ids = ((value ?? {}) as { partInstanceIds?: unknown }).partInstanceIds;
-  if (
-    !Array.isArray(ids) ||
-    ids.length === 0 ||
-    ids.length > 500 ||
-    !ids.every((n) => Number.isInteger(n) && n > 0)
-  ) {
+  const ids = instanceIds(((value ?? {}) as { partInstanceIds?: unknown }).partInstanceIds);
+  if (!ids) {
     return c.json({ error: "partInstanceIds must be 1–500 positive integers." }, 400) as never;
   }
-  return { partInstanceIds: [...new Set(ids as number[])] };
+  return { partInstanceIds: ids };
 });
 
-const createValidator = validator("json", (value, c): { processId: number } => {
-  const processId = ((value ?? {}) as { processId?: unknown }).processId;
-  if (!Number.isInteger(processId) || (processId as number) < 1) {
+type NewBatch = {
+  processId: number;
+  name: string | null;
+  fileId: number | null;
+  partInstanceIds: number[];
+};
+
+const createValidator = validator("json", (value, c): NewBatch => {
+  const v = (value ?? {}) as Record<string, unknown>;
+  if (!isId(v.processId)) {
     return c.json({ error: "processId must be a positive integer." }, 400) as never;
   }
-  return { processId: processId as number };
+  const name = batchName(v.name);
+  if (name === undefined) {
+    return c.json({ error: `name must be ${MAX_NAME} characters or fewer.` }, 400) as never;
+  }
+  if (v.fileId !== undefined && v.fileId !== null && !isId(v.fileId)) {
+    return c.json({ error: "fileId must be a positive integer." }, 400) as never;
+  }
+  const none = v.partInstanceIds === undefined || (v.partInstanceIds as unknown[]).length === 0;
+  const ids = none ? [] : instanceIds(v.partInstanceIds);
+  if (!ids) {
+    return c.json({ error: "partInstanceIds must be 1–500 positive integers." }, 400) as never;
+  }
+  return {
+    processId: v.processId,
+    name,
+    fileId: (v.fileId as number) ?? null,
+    partInstanceIds: ids,
+  };
+});
+
+const renameValidator = validator("json", (value, c): { name: string | null } => {
+  const name = batchName(((value ?? {}) as { name?: unknown }).name);
+  if (name === undefined) {
+    return c.json({ error: `name must be ${MAX_NAME} characters or fewer.` }, 400) as never;
+  }
+  return { name };
 });
 
 const fileValidator = validator("json", (value, c): { fileId: number | null } => {
   const fileId = ((value ?? {}) as { fileId?: unknown }).fileId;
-  if (fileId !== null && (!Number.isInteger(fileId) || (fileId as number) < 1)) {
+  if (fileId !== null && !isId(fileId)) {
     return c.json({ error: "fileId must be a positive integer or null." }, 400) as never;
   }
-  return { fileId: fileId as number | null };
+  return { fileId };
 });
 
-async function getOpenBatch(db: ShopDb, id: number): Promise<BatchRow | null> {
-  const row = await db
-    .select()
-    .from(stagingBatches)
-    .where(and(eq(stagingBatches.id, id), isNull(stagingBatches.closedAt)))
-    .get();
-  return row ?? null;
-}
-
-/** Instances currently staged in a batch (in progress at its process). */
-async function stagedIn(db: ShopDb, batch: BatchRow): Promise<number[]> {
-  const rows = await db
-    .select({ id: partInstanceProcesses.partInstanceId })
-    .from(partInstanceProcesses)
-    .where(
-      and(
-        eq(partInstanceProcesses.batchId, batch.id),
-        eq(partInstanceProcesses.processId, batch.processId),
-        eq(partInstanceProcesses.status, "doing"),
-      ),
-    )
-    .all();
-  return rows.map((r) => r.id);
-}
-
-/** Makes `fileId` the only file on these instances (or clears them when null). */
-async function putFileOn(
-  db: ShopDb,
-  fileId: number | null,
-  instanceIds: number[],
-  userId: string,
-): Promise<void> {
-  const now = Date.now();
-  for (const batch of chunks(instanceIds)) {
-    await db.delete(partInstanceFiles).where(inArray(partInstanceFiles.partInstanceId, batch));
-    if (fileId !== null) {
-      await db
-        .insert(partInstanceFiles)
-        .values(
-          batch.map((id) => ({ fileId, partInstanceId: id, assignedBy: userId, createdAt: now })),
-        )
-        .onConflictDoNothing();
+const statusValidator = validator(
+  "json",
+  (value, c): { at: "producer" | "consumer"; to: "doing" | "done" } => {
+    const v = (value ?? {}) as { at?: unknown; to?: unknown };
+    if (v.at !== "producer" && v.at !== "consumer") {
+      return c.json({ error: "at must be 'producer' or 'consumer'." }, 400) as never;
     }
-  }
-}
-
-async function logActions(
-  db: ShopDb,
-  userId: string,
-  processId: number,
-  instanceIds: number[],
-  action: "started" | "completed",
-): Promise<void> {
-  const now = Date.now();
-  try {
-    for (const batch of chunks(instanceIds)) {
-      await db.insert(actions).values(
-        batch.map((partInstanceId) => ({
-          userId,
-          partInstanceId,
-          processId,
-          action,
-          createdAt: now,
-        })),
-      );
+    if (v.to !== "doing" && v.to !== "done") {
+      return c.json({ error: "to must be 'doing' or 'done'." }, 400) as never;
     }
-  } catch (err) {
-    // Same policy as recordAction: the audit log never blocks shop-floor work.
-    console.error("Failed to record actions:", err);
+    return { at: v.at, to: v.to };
+  },
+);
+
+const sendBackValidator = validator("json", (value, c): { to: "producer" | "consumer" } => {
+  const to = ((value ?? {}) as { to?: unknown }).to;
+  if (to !== "producer" && to !== "consumer") {
+    return c.json({ error: "to must be 'producer' or 'consumer'." }, 400) as never;
   }
-}
+  return { to };
+});
+
+const KIOSK_FILES = "Kiosks can't change a batch's file.";
 
 export const stagingBatchesRouter = new Hono<AppEnv>()
-  // Open batches for a process, oldest first, with the instances staged in each.
+  // What a rule in lib/batches.ts refuses, as the sentence to show (and, for a copy, the plan).
+  .onError((err, c) => {
+    if (err instanceof BatchError) {
+      return c.json({ error: err.message, ...err.details }, err.status);
+    }
+    throw err;
+  })
+  // Every batch, oldest first, with its file and the instances in it or sent back out of it.
   .get("/", requireAuth, async (c) => {
-    const processId = Number(c.req.query("processId"));
-    if (!Number.isInteger(processId) || processId < 1) {
-      return c.json({ error: "processId query param is required." }, 400);
-    }
-    const db = createShopDb(c.env.SHOP_DB);
-    const batches = await db
-      .select()
-      .from(stagingBatches)
-      .where(and(eq(stagingBatches.processId, processId), isNull(stagingBatches.closedAt)))
-      .orderBy(asc(stagingBatches.createdAt))
-      .all();
-    if (batches.length === 0) return c.json([] as StagingBatch[]);
-
-    const staged = await db
-      .select({ batchId: partInstanceProcesses.batchId, id: partInstanceProcesses.partInstanceId })
-      .from(partInstanceProcesses)
-      .where(
-        and(
-          eq(partInstanceProcesses.processId, processId),
-          eq(partInstanceProcesses.status, "doing"),
-          inArray(
-            partInstanceProcesses.batchId,
-            db
-              .select({ id: stagingBatches.id })
-              .from(stagingBatches)
-              .where(and(eq(stagingBatches.processId, processId), isNull(stagingBatches.closedAt))),
-          ),
-        ),
-      )
-      .all();
-
-    return c.json(
-      batches.map(({ closedAt: _closedAt, ...b }) => ({
-        ...b,
-        partInstanceIds: staged.filter((s) => s.batchId === b.id).map((s) => s.id),
-      })) as StagingBatch[],
-    );
+    return c.json(await loadBatches(createShopDb(c.env.SHOP_DB), c.get("teamId")));
   })
+  // A new batch at a File Producer process: empty, or with a file, or holding these instances
+  // (linking a file to instances makes a batch of them).
   .post("/", requireAuth, createValidator, async (c) => {
-    const { processId } = c.req.valid("json");
+    const { processId, name, fileId, partInstanceIds } = c.req.valid("json");
     const db = createShopDb(c.env.SHOP_DB);
-    const row = await db
-      .insert(stagingBatches)
-      .values({ processId, createdBy: c.get("userId"), createdAt: Date.now() })
-      .returning()
+    const teamId = c.get("teamId");
+    const process = await db
+      .select({ type: processes.type })
+      .from(processes)
+      .where(inTeam(processes, teamId, eq(processes.id, processId)))
       .get();
-    return c.json(row, 201);
-  })
-  // Stages To Do instances (or in-progress ones outside any batch) into this batch; they take
-  // the batch's file. A batch left empty because nothing could be staged is removed.
-  .post("/:id/stage", requireAuth, instanceIdsValidator, async (c) => {
-    const db = createShopDb(c.env.SHOP_DB);
-    const batch = await getOpenBatch(db, Number(c.req.param("id")));
-    if (!batch) return c.json({ error: "Batch not found or already completed." }, 404);
-    const { partInstanceIds } = c.req.valid("json");
-
-    const staged: number[] = [];
-    for (const ids of chunks(partInstanceIds)) {
-      const rows = await db
-        .update(partInstanceProcesses)
-        .set({ status: "doing", batchId: batch.id })
-        .where(
-          and(
-            eq(partInstanceProcesses.processId, batch.processId),
-            inArray(partInstanceProcesses.partInstanceId, ids),
-            sql`(${partInstanceProcesses.status} = 'todo' OR (${partInstanceProcesses.status} = 'doing' AND ${partInstanceProcesses.batchId} IS NULL))`,
-          ),
-        )
-        .returning({ id: partInstanceProcesses.partInstanceId })
-        .all();
-      staged.push(...rows.map((r) => r.id));
+    if (!process) return c.json({ error: "Process not found." }, 404);
+    if (process.type !== "file_producer") {
+      return c.json({ error: "A batch is made at a File Producer process." }, 409);
     }
-
-    if (staged.length === 0 && (await stagedIn(db, batch)).length === 0) {
-      await db.delete(stagingBatches).where(eq(stagingBatches.id, batch.id));
-      return c.json({ error: "None of those instances could be staged." }, 409);
+    if (fileId !== null) {
+      if (c.get("sessionType") === "pin") return c.json({ error: KIOSK_FILES }, 403);
+      const file = await teamFile(db, teamId, fileId);
+      if (!file) return c.json({ error: "File not found." }, 404);
+      if (file.obsolete) {
+        return c.json(
+          { error: `${file.filename} was made for a part that's now obsolete. Upload a new file.` },
+          409,
+        );
+      }
     }
 
     const userId = c.get("userId");
-    if (batch.fileId !== null) await putFileOn(db, batch.fileId, staged, userId);
-    await logActions(db, userId, batch.processId, staged, "started");
-    return c.json({ staged: staged.length, requested: partInstanceIds.length });
+    const row = await createBatch(db, teamId, { processId, name, fileId, createdBy: userId });
+    let refused: string[] = [];
+    if (partInstanceIds.length > 0) {
+      const result = await stageInto(db, teamId, row, partInstanceIds, userId);
+      refused = result.refused;
+      if (result.staged.length === 0) {
+        // Nothing went in: no batch left behind.
+        await deleteBatch(db, teamId, row);
+        return c.json(
+          { error: refused[0] ?? "None of those instances could be staged.", refused },
+          409,
+        );
+      }
+    }
+    return c.json({ batch: await loadBatch(db, teamId, row.id), refused }, 201);
   })
-  // Sends instances back to To Do and drops the batch's file from them.
+  // Its name; null or empty for the automatic one.
+  .patch("/:id", requireAuth, renameValidator, async (c) => {
+    const db = createShopDb(c.env.SHOP_DB);
+    const teamId = c.get("teamId");
+    const batch = await batchRow(db, teamId, Number(c.req.param("id")));
+    await db
+      .update(stagingBatches)
+      .set({ name: c.req.valid("json").name })
+      .where(inTeam(stagingBatches, teamId, eq(stagingBatches.id, batch.id)));
+    return c.json(await loadBatch(db, teamId, batch.id));
+  })
+  // Adds instances that are at the batch's File Producer process; they take on its status there.
+  .post("/:id/stage", requireAuth, instanceIdsValidator, async (c) => {
+    const db = createShopDb(c.env.SHOP_DB);
+    const teamId = c.get("teamId");
+    const batch = await batchRow(db, teamId, Number(c.req.param("id")));
+    const { partInstanceIds } = c.req.valid("json");
+    const { staged, refused } = await stageInto(
+      db,
+      teamId,
+      batch,
+      partInstanceIds,
+      c.get("userId"),
+    );
+    if (staged.length === 0 && refused.length > 0) {
+      return c.json({ error: refused[0], refused }, 409);
+    }
+    return c.json({ staged: staged.length, requested: partInstanceIds.length, refused });
+  })
+  // Takes instances out, back to To Do, while the batch is still at its File Producer process.
   .post("/:id/unstage", requireAuth, instanceIdsValidator, async (c) => {
     const db = createShopDb(c.env.SHOP_DB);
-    const batch = await getOpenBatch(db, Number(c.req.param("id")));
-    if (!batch) return c.json({ error: "Batch not found or already completed." }, 404);
-    const { partInstanceIds } = c.req.valid("json");
-
-    const unstaged: number[] = [];
-    for (const ids of chunks(partInstanceIds)) {
-      const rows = await db
-        .update(partInstanceProcesses)
-        .set({ status: "todo", batchId: null })
-        .where(
-          and(
-            eq(partInstanceProcesses.batchId, batch.id),
-            eq(partInstanceProcesses.status, "doing"),
-            inArray(partInstanceProcesses.partInstanceId, ids),
-          ),
-        )
-        .returning({ id: partInstanceProcesses.partInstanceId })
-        .all();
-      unstaged.push(...rows.map((r) => r.id));
-    }
-    await putFileOn(db, null, unstaged, c.get("userId"));
-
-    // A batch that empties out is gone; batches only exist while they hold work.
-    const deleted = (await stagedIn(db, batch)).length === 0;
-    if (deleted) await db.delete(stagingBatches).where(eq(stagingBatches.id, batch.id));
-    return c.json({ unstaged: unstaged.length, batchDeleted: deleted });
+    const teamId = c.get("teamId");
+    const batch = await batchRow(db, teamId, Number(c.req.param("id")));
+    const out = await unstageFrom(db, teamId, batch, c.req.valid("json").partInstanceIds);
+    return c.json({ unstaged: out.length });
   })
-  // Sets (or clears) the batch's file and applies it to every staged instance.
+  // Sets (or clears) the batch's file, until the batch is complete.
   .put("/:id/file", requireAuth, fileValidator, async (c) => {
-    if (c.get("sessionType") === "pin") {
-      return c.json({ error: "Kiosks can't change a batch's file." }, 403);
-    }
+    if (c.get("sessionType") === "pin") return c.json({ error: KIOSK_FILES }, 403);
     const db = createShopDb(c.env.SHOP_DB);
-    const batch = await getOpenBatch(db, Number(c.req.param("id")));
-    if (!batch) return c.json({ error: "Batch not found or already completed." }, 404);
-    const { fileId } = c.req.valid("json");
-
-    if (fileId !== null) {
-      const file = await db.select({ id: files.id }).from(files).where(eq(files.id, fileId)).get();
-      if (!file) return c.json({ error: "File not found." }, 404);
+    const teamId = c.get("teamId");
+    const batch = await batchRow(db, teamId, Number(c.req.param("id")));
+    if (batch.producerStatus === "done" && batch.consumerStatus === "done") {
+      return c.json({ error: "This batch is complete, so its file can't change." }, 409);
     }
-    await db.update(stagingBatches).set({ fileId }).where(eq(stagingBatches.id, batch.id));
-    await putFileOn(db, fileId, await stagedIn(db, batch), c.get("userId"));
+    const { fileId } = c.req.valid("json");
+    if (fileId !== null) {
+      const file = await teamFile(db, teamId, fileId);
+      if (!file) return c.json({ error: "File not found." }, 404);
+      if (file.obsolete) {
+        return c.json(
+          { error: `${file.filename} was made for a part that's now obsolete. Upload a new file.` },
+          409,
+        );
+      }
+    }
+    await db
+      .update(stagingBatches)
+      .set({ fileId })
+      .where(inTeam(stagingBatches, teamId, eq(stagingBatches.id, batch.id)));
     return c.json({ ok: true });
   })
-  // Completes every staged instance (unlocking each one's next process) and closes the batch.
-  .post("/:id/complete", requireAuth, async (c) => {
+  // Starts or completes the batch, as one, at its File Producer or File Consumer process.
+  .post("/:id/status", requireAuth, statusValidator, async (c) => {
     const db = createShopDb(c.env.SHOP_DB);
-    const batch = await getOpenBatch(db, Number(c.req.param("id")));
-    if (!batch) return c.json({ error: "Batch not found or already completed." }, 404);
-    if (batch.fileId === null) {
-      return c.json({ error: "Add a file to the batch before completing it." }, 409);
-    }
-
-    const now = Date.now();
-    const done = await db
-      .update(partInstanceProcesses)
-      .set({ status: "done", completedAt: now })
-      .where(
-        and(eq(partInstanceProcesses.batchId, batch.id), eq(partInstanceProcesses.status, "doing")),
-      )
-      .returning({ id: partInstanceProcesses.partInstanceId })
-      .all();
-    if (done.length === 0) return c.json({ error: "Nothing is staged in this batch." }, 409);
-
-    // Promote each instance's next step, mirroring the single-instance "done" route.
-    await db.run(sql`
-      UPDATE part_instance_processes SET status = 'todo'
-      WHERE status = 'waiting' AND id IN (
-        SELECT (
-          SELECT n.id FROM part_instance_processes n
-          WHERE n.part_instance_id = d.part_instance_id AND n."index" > d."index"
-          ORDER BY n."index" LIMIT 1
-        )
-        FROM part_instance_processes d
-        WHERE d.batch_id = ${batch.id} AND d.status = 'done' AND d.completed_at = ${now}
-      )
-    `);
-
-    await db.update(stagingBatches).set({ closedAt: now }).where(eq(stagingBatches.id, batch.id));
-    await logActions(
-      db,
-      c.get("userId"),
-      batch.processId,
-      done.map((r) => r.id),
-      "completed",
-    );
-    return c.json({ completed: done.length });
+    const teamId = c.get("teamId");
+    const batch = await batchRow(db, teamId, Number(c.req.param("id")));
+    const { at, to } = c.req.valid("json");
+    const move = at === "producer" ? moveAtProducer : moveAtConsumer;
+    await move(db, teamId, batch, to, c.get("userId"));
+    return c.json({ ok: true });
   })
-  // Only empty batches can be deleted; unstage everything first.
+  // Sends the whole batch back to To Do at one of its two processes.
+  .post("/:id/send-back", requireAuth, sendBackValidator, async (c) => {
+    const db = createShopDb(c.env.SHOP_DB);
+    const teamId = c.get("teamId");
+    const batch = await batchRow(db, teamId, Number(c.req.param("id")));
+    await sendBatchBack(db, teamId, batch, c.req.valid("json").to);
+    return c.json({ ok: true });
+  })
+  // Sends one instance back to the File Producer process; the batch keeps a record of it.
+  .post("/:id/instances/:instanceId/send-back", requireAuth, async (c) => {
+    const db = createShopDb(c.env.SHOP_DB);
+    const teamId = c.get("teamId");
+    const batch = await batchRow(db, teamId, Number(c.req.param("id")));
+    await sendInstanceBack(db, teamId, batch, Number(c.req.param("instanceId")), c.get("userId"));
+    return c.json({ ok: true });
+  })
+  // What a copy of the batch would take, and whether there are enough free parts for it.
+  .get("/:id/duplicate", requireAuth, async (c) => {
+    const db = createShopDb(c.env.SHOP_DB);
+    const teamId = c.get("teamId");
+    const batch = await batchRow(db, teamId, Number(c.req.param("id")));
+    return c.json(await duplicatePlan(db, teamId, batch));
+  })
+  .post("/:id/duplicate", requireAuth, async (c) => {
+    const db = createShopDb(c.env.SHOP_DB);
+    const teamId = c.get("teamId");
+    const batch = await batchRow(db, teamId, Number(c.req.param("id")));
+    const copy = await duplicateBatch(db, teamId, batch, c.get("userId"));
+    return c.json({ batch: await loadBatch(db, teamId, copy.id) }, 201);
+  })
+  // Only while it's at its File Producer process; what's in it goes back to To Do.
   .delete("/:id", requireAuth, async (c) => {
     const db = createShopDb(c.env.SHOP_DB);
-    const batch = await getOpenBatch(db, Number(c.req.param("id")));
-    if (!batch) return c.json({ error: "Batch not found or already completed." }, 404);
-    if ((await stagedIn(db, batch)).length > 0) {
-      return c.json({ error: "Unstage everything in this batch before deleting it." }, 409);
-    }
-    await db.delete(stagingBatches).where(eq(stagingBatches.id, batch.id));
+    const teamId = c.get("teamId");
+    const batch = await batchRow(db, teamId, Number(c.req.param("id")));
+    await deleteBatch(db, teamId, batch);
     return c.json({ ok: true });
   });

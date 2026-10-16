@@ -1,0 +1,22 @@
+@import "@g3/ui/index.css";
+@import "tailwindcss";
+
+/* The launcher mock's moments slide in as they change (home page). */
+@keyframes moment-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.moment-in {
+  animation: moment-in 350ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .moment-in {
+    animation: none;
+  }
+}

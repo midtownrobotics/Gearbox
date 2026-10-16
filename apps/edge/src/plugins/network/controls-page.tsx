@@ -1,9 +1,18 @@
+import {
+  Button,
+  Card,
+  ConfirmButton,
+  ErrorBanner,
+  Loading,
+  Page,
+  TextField,
+  Toggle,
+  inputClass,
+} from "@g3/ui";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { api, getErrorMessage } from "../../shared/api";
 import { formatUntil } from "../../shared/format";
-import { Toggle } from "../../shared/toggle";
-import { Card, ErrorBanner, Loading, Page } from "../../shared/ui";
 import { useLoad } from "../../shared/use-load";
 
 async function loadControls() {
@@ -22,10 +31,6 @@ async function mutate(
   const res = await run();
   return res.ok ? null : getErrorMessage(res);
 }
-
-const button = "text-sm font-medium rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50";
-const primaryButton = `${button} bg-primary-500 hover:bg-primary-600 text-white`;
-const plainButton = `${button} text-secondary-600 hover:text-secondary-900 hover:bg-secondary-100`;
 
 export function ControlsPage() {
   const { data, error, reload } = useLoad(loadControls, []);
@@ -68,7 +73,7 @@ export function ControlsPage() {
         <div className="space-y-4">
           <Toggle
             label="Enforce blocklists"
-            description="Block or throttle the sites in the enabled lists below, except for devices with an active exception."
+            description="Block or throttle sites in the enabled lists, except on devices with an exception."
             checked={data.enforce}
             disabled={busy}
             onChange={(enforce) =>
@@ -77,7 +82,7 @@ export function ControlsPage() {
           />
           <Toggle
             label="DNS hardening"
-            description="Send all DNS through the box and block encrypted-DNS services and iCloud Private Relay, so blocklists can't be bypassed that way and fewer sites show as (unknown)."
+            description="Stop devices getting around blocklists with encrypted DNS or iCloud Private Relay."
             checked={data.dnsHardening}
             disabled={busy}
             onChange={(dnsHardening) =>
@@ -117,9 +122,9 @@ export function ControlsPage() {
                 <span className="text-xs text-secondary-400 flex-1 truncate">
                   {g.reason ? `“${g.reason}” · ` : ""}by {g.createdByName}
                 </span>
-                <button
-                  type="button"
-                  className={plainButton}
+                <Button
+                  variant="secondary"
+                  size="sm"
                   disabled={busy}
                   onClick={() =>
                     run(() =>
@@ -130,7 +135,7 @@ export function ControlsPage() {
                   }
                 >
                   Revoke
-                </button>
+                </Button>
               </li>
             ))}
           </ul>
@@ -153,9 +158,9 @@ function SyncBadge({ data, onResend }: { data: Controls; onResend: () => void })
         {pending ? "Changes pending on the box" : "Applied on the box"}
       </span>
       {pending && (
-        <button type="button" className={plainButton} onClick={onResend}>
+        <Button variant="secondary" size="sm" onClick={onResend}>
           Resend
-        </button>
+        </Button>
       )}
     </div>
   );
@@ -168,8 +173,7 @@ function Blocklists({ lists, onChanged }: { lists: Blocklist[]; onChanged: () =>
       <div className="space-y-3">
         {lists.length === 0 && editing !== "new" && (
           <p className="text-sm text-secondary-400">
-            No blocklists yet. A list is a set of domains (each includes its subdomains) that is
-            either blocked or throttled.
+            No blocklists yet. A list is a set of domains to block or throttle.
           </p>
         )}
         {lists.map((l) =>
@@ -201,9 +205,9 @@ function Blocklists({ lists, onChanged }: { lists: Blocklist[]; onChanged: () =>
                 {l.domains.length} domain{l.domains.length === 1 ? "" : "s"}
                 {!l.enabled && " · disabled"}
               </span>
-              <button type="button" className={plainButton} onClick={() => setEditing(l.id)}>
+              <Button variant="secondary" size="sm" onClick={() => setEditing(l.id)}>
                 Edit
-              </button>
+              </Button>
             </div>
           ),
         )}
@@ -215,9 +219,9 @@ function Blocklists({ lists, onChanged }: { lists: Blocklist[]; onChanged: () =>
             }}
           />
         ) : (
-          <button type="button" className={primaryButton} onClick={() => setEditing("new")}>
+          <Button size="sm" onClick={() => setEditing("new")}>
             New blocklist
-          </button>
+          </Button>
         )}
       </div>
     </Card>
@@ -253,7 +257,7 @@ function BlocklistForm({ list, onDone }: { list?: Blocklist; onDone: () => void 
   }
 
   async function remove() {
-    if (!list || !window.confirm(`Delete the "${list.name}" blocklist and its exceptions?`)) return;
+    if (!list) return;
     setSaving(true);
     const err = await mutate(() =>
       api.network.control.blocklists[":id"].$delete({ param: { id: String(list.id) } }),
@@ -263,7 +267,7 @@ function BlocklistForm({ list, onDone }: { list?: Blocklist; onDone: () => void 
     else onDone();
   }
 
-  const input = "border border-secondary-300 rounded-lg px-2 py-1 text-sm";
+  const input = `${inputClass} !w-auto`;
   return (
     <form
       className="border border-primary-200 bg-primary-50/40 rounded-lg p-3 space-y-3"
@@ -273,8 +277,9 @@ function BlocklistForm({ list, onDone }: { list?: Blocklist; onDone: () => void 
       }}
     >
       <div className="flex flex-wrap items-center gap-3">
-        <input
-          className={`${input} w-48`}
+        <TextField
+          kind="blocklist"
+          className="!w-48"
           value={name}
           maxLength={40}
           placeholder="Name, e.g. Video"
@@ -292,7 +297,7 @@ function BlocklistForm({ list, onDone }: { list?: Blocklist; onDone: () => void 
           <label className="flex items-center gap-1.5 text-sm text-secondary-600">
             to
             <input
-              className={`${input} w-20`}
+              className={`${inputClass} !w-20`}
               type="number"
               min="0.1"
               max="100"
@@ -312,30 +317,33 @@ function BlocklistForm({ list, onDone }: { list?: Blocklist; onDone: () => void 
         <span className="text-xs font-bold uppercase tracking-widest text-secondary-400">
           Domains (one per line; includes subdomains)
         </span>
-        <textarea
-          className={`${input} mt-1 w-full h-32 font-mono`}
+        <TextField
+          multiline
+          kind="domains"
+          className="mt-1 h-32 font-mono"
           value={domains}
           placeholder={"youtube.com\ngooglevideo.com"}
           onChange={(e) => setDomains(e.target.value)}
         />
       </label>
       {error && <ErrorBanner message={error} />}
-      <div className="flex items-center gap-2">
-        <button type="submit" className={primaryButton} disabled={saving}>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button type="submit" disabled={saving}>
           Save
-        </button>
-        <button type="button" className={plainButton} onClick={onDone} disabled={saving}>
+        </Button>
+        <Button variant="secondary" onClick={onDone} disabled={saving}>
           Cancel
-        </button>
+        </Button>
         {list && (
-          <button
-            type="button"
-            className={`${plainButton} ml-auto text-primary-600`}
-            onClick={remove}
-            disabled={saving}
-          >
-            Delete
-          </button>
+          <>
+            <span className="flex-1" />
+            <ConfirmButton
+              label="Delete"
+              question={`Delete the "${list.name}" blocklist and its exceptions?`}
+              disabled={saving}
+              onConfirm={() => void remove()}
+            />
+          </>
         )}
       </div>
     </form>

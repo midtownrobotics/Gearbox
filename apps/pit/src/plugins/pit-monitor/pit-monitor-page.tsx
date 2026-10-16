@@ -1,11 +1,20 @@
+import { Button, ProgressBar, useTeamNames } from "@g3/ui";
 import { useEffect, useState } from "react";
 import { api } from "../../shared/api";
 import { useBatteryCache } from "../../shared/battery-cache-context";
+import { ElapsedTime, STATE_TONES, voltageColor } from "../../shared/battery-display";
 import { useFullscreen } from "../../shared/fullscreen-context";
 import { fetchBatteries } from "../../shared/getters/batteries";
+import { type MatchLog, fetchDownloaders, fetchMatchLogs } from "../../shared/getters/downloaders";
 import { fetchAllIssues } from "../../shared/getters/issues";
 import { fetchLists } from "../../shared/getters/lists";
-import type { Battery, ChecklistIssueSummary, ChecklistList } from "../../shared/getters/types";
+import type {
+  Battery,
+  BatteryState,
+  ChecklistIssueSummary,
+  ChecklistList,
+} from "../../shared/getters/types";
+import { type PersonInThePit, untilLabel, useInThePit } from "../../shared/in-the-pit";
 
 const REFRESH_MS = 15_000;
 
@@ -56,18 +65,6 @@ type MonitorData = {
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-function formatElapsed(sinceMs: number): string {
-  const ms = Date.now() - sinceMs;
-  const totalSeconds = Math.floor(ms / 1000);
-  const totalMinutes = Math.floor(totalSeconds / 60);
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-  const seconds = totalSeconds % 60;
-  if (hours > 0) return `${hours}h ${minutes}m`;
-  if (minutes > 0) return `${minutes}m ${seconds}s`;
-  return `${seconds}s`;
-}
-
 function formatCountdown(targetMs: number): string {
   const remaining = targetMs - Date.now();
   if (remaining <= 0) return "Now";
@@ -87,12 +84,6 @@ function formatTime(ms?: number | null): string {
   return `${h}:${m} ${d.getHours() >= 12 ? "PM" : "AM"}`;
 }
 
-function voltageColor(v: number): string {
-  if (v >= 12.5) return "text-green-600";
-  if (v >= 12.0) return "text-gray-900";
-  return "text-red-600";
-}
-
 function teamInMatch(m: NexusMatch, team: string): boolean {
   return (
     m.blueTeams?.some((t) => t === team) === true || m.redTeams?.some((t) => t === team) === true
@@ -100,15 +91,6 @@ function teamInMatch(m: NexusMatch, team: string): boolean {
 }
 
 // ── Isolated timer components ──────────────────────────────────────────────
-
-function ElapsedTime({ sinceMs }: { sinceMs: number }) {
-  const [text, setText] = useState(() => formatElapsed(sinceMs));
-  useEffect(() => {
-    const interval = setInterval(() => setText(formatElapsed(sinceMs)), 250);
-    return () => clearInterval(interval);
-  }, [sinceMs]);
-  return <>{text}</>;
-}
 
 function Countdown({ targetMs }: { targetMs: number }) {
   const [text, setText] = useState(() => formatCountdown(targetMs));
@@ -138,10 +120,10 @@ function NexusSection({ nexus, teamNumber }: { nexus: NexusData; teamNumber: str
             <p className="text-[10px] font-bold uppercase tracking-widest text-red-600">
               On Deck {teamInMatch(onDeck, teamNumber) && "!"}
             </p>
-            <p className="text-lg font-black text-gray-900">{onDeck.label}</p>
+            <p className="text-lg font-black text-secondary-900">{onDeck.label}</p>
             {onDeck.times.estimatedOnFieldTime && (
               <div>
-                <p className="text-[10px] text-gray-600">On field in</p>
+                <p className="text-[10px] text-secondary-600">On field in</p>
                 <p className="text-sm font-bold text-red-600 tabular-nums">
                   <Countdown targetMs={onDeck.times.estimatedOnFieldTime} />
                 </p>
@@ -153,17 +135,17 @@ function NexusSection({ nexus, teamNumber }: { nexus: NexusData; teamNumber: str
 
       {nowQueuing && (
         <div
-          className={`rounded-xl p-2.5 border ${teamInMatch(nowQueuing, teamNumber) ? "bg-yellow-100 border-yellow-300 ring-2 ring-yellow-400" : "bg-yellow-100 border-yellow-700"}`}
+          className={`rounded-xl p-2.5 border ${teamInMatch(nowQueuing, teamNumber) ? "bg-amber-100 border-amber-300 ring-2 ring-amber-400" : "bg-amber-100 border-amber-300"}`}
         >
           <div className="space-y-1">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-900">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-secondary-900">
               Now Queuing {teamInMatch(nowQueuing, teamNumber) && "!"}
             </p>
-            <p className="text-lg font-black text-gray-900">{nowQueuing.label}</p>
+            <p className="text-lg font-black text-secondary-900">{nowQueuing.label}</p>
             {nowQueuing.times.estimatedOnFieldTime && (
               <div>
-                <p className="text-[10px] text-gray-600">On field in</p>
-                <p className="text-sm font-bold text-gray-900 tabular-nums">
+                <p className="text-[10px] text-secondary-600">On field in</p>
+                <p className="text-sm font-bold text-secondary-900 tabular-nums">
                   <Countdown targetMs={nowQueuing.times.estimatedOnFieldTime} />
                 </p>
               </div>
@@ -180,10 +162,10 @@ function NexusSection({ nexus, teamNumber }: { nexus: NexusData; teamNumber: str
             <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-600">
               Queuing Soon {teamInMatch(queuingSoon, teamNumber) && "!"}
             </p>
-            <p className="text-lg font-black text-gray-900">{queuingSoon.label}</p>
+            <p className="text-lg font-black text-secondary-900">{queuingSoon.label}</p>
             {queuingSoon.times.estimatedQueueTime && (
               <div>
-                <p className="text-[10px] text-gray-600">Queue in</p>
+                <p className="text-[10px] text-secondary-600">Queue in</p>
                 <p className="text-sm font-bold text-emerald-600 tabular-nums">
                   <Countdown targetMs={queuingSoon.times.estimatedQueueTime} />
                 </p>
@@ -211,17 +193,17 @@ function UpcomingMatchesSection({
 
   return (
     <div className="space-y-2">
-      <h2 className="text-xs font-bold uppercase tracking-widest text-gray-600">
+      <h2 className="text-xs font-bold uppercase tracking-widest text-secondary-600">
         Upcoming Matches
       </h2>
       <div
-        className="bg-white border border-gray-200 rounded-2xl overflow-hidden flex flex-col"
+        className="bg-surface border border-secondary-200 rounded-xl overflow-hidden flex flex-col"
         style={{ maxHeight: "400px" }}
       >
         <div className="overflow-y-auto flex-1">
           <table className="w-full text-sm">
-            <thead className="sticky top-0 bg-white border-b border-gray-200">
-              <tr className="text-gray-600 text-xs uppercase tracking-wide">
+            <thead className="sticky top-0 bg-surface border-b border-secondary-200">
+              <tr className="text-secondary-600 text-xs uppercase tracking-wide">
                 <th className="text-left px-4 py-2 font-semibold">Match</th>
                 <th className="text-left px-4 py-2 font-semibold">Queue</th>
                 <th className="text-left px-4 py-2 font-semibold">Start</th>
@@ -235,15 +217,15 @@ function UpcomingMatchesSection({
                 return (
                   <tr
                     key={m.label}
-                    className={`border-b border-gray-200/50 last:border-0 ${isOurMatch ? "bg-red-50" : ""}`}
+                    className={`border-b border-secondary-200/50 last:border-0 ${isOurMatch ? "bg-primary-50" : ""}`}
                   >
                     <td
-                      className={`px-4 py-2.5 font-semibold ${isOurMatch ? "text-red-700" : "text-gray-900"}`}
+                      className={`px-4 py-2.5 font-semibold ${isOurMatch ? "text-primary-700" : "text-secondary-900"}`}
                     >
                       {m.label}
                     </td>
                     <td
-                      className={`px-4 py-2.5 tabular-nums ${isOurMatch ? "text-red-600 font-semibold" : "text-gray-600"}`}
+                      className={`px-4 py-2.5 tabular-nums ${isOurMatch ? "text-primary-600 font-semibold" : "text-secondary-600"}`}
                     >
                       {m.times.actualQueueTime
                         ? formatTime(m.times.actualQueueTime)
@@ -252,7 +234,7 @@ function UpcomingMatchesSection({
                           : "—"}
                     </td>
                     <td
-                      className={`px-4 py-2.5 tabular-nums ${isOurMatch ? "text-red-600 font-semibold" : "text-gray-600"}`}
+                      className={`px-4 py-2.5 tabular-nums ${isOurMatch ? "text-primary-600 font-semibold" : "text-secondary-600"}`}
                     >
                       {formatTime(m.times.estimatedStartTime)}
                     </td>
@@ -261,7 +243,7 @@ function UpcomingMatchesSection({
                         className={
                           m.blueTeams?.includes(teamNumber)
                             ? "text-blue-600 font-bold bg-blue-100 px-2 py-1 rounded"
-                            : "text-gray-600"
+                            : "text-secondary-600"
                         }
                       >
                         {m.blueTeams?.filter(Boolean).join(", ")}
@@ -272,7 +254,7 @@ function UpcomingMatchesSection({
                         className={
                           m.redTeams?.includes(teamNumber)
                             ? "text-red-600 font-bold bg-red-100 px-2 py-1 rounded"
-                            : "text-gray-600"
+                            : "text-secondary-600"
                         }
                       >
                         {m.redTeams?.filter(Boolean).join(", ")}
@@ -300,35 +282,37 @@ function RankingSection({
 }) {
   return (
     <div className="space-y-2">
-      <h2 className="text-xs font-bold uppercase tracking-widest text-gray-600">Ranking</h2>
-      <div className="bg-white border border-gray-200 rounded-2xl p-5">
+      <h2 className="text-xs font-bold uppercase tracking-widest text-secondary-600">Ranking</h2>
+      <div className="bg-surface border border-secondary-200 rounded-xl p-5">
         <div className="flex gap-6 items-start">
           {/* Left: rank info */}
           <div className="flex gap-6 shrink-0">
             {ranking.rank !== null && (
-              <p className="text-6xl font-black text-gray-900 leading-none">
-                <span className="text-2xl text-gray-600 font-normal">#</span>
+              <p className="text-6xl font-black text-secondary-900 leading-none">
+                <span className="text-2xl text-secondary-600 font-normal">#</span>
                 {ranking.rank}
               </p>
             )}
             <div className="space-y-1 text-sm">
-              <p className="text-gray-700">
-                <span className="text-green-600 font-bold">{ranking.wins}W</span>
+              <p className="text-secondary-700">
+                <span className="text-emerald-600 font-bold">{ranking.wins}W</span>
                 {" — "}
                 <span className="text-red-600 font-bold">{ranking.losses}L</span>
                 {ranking.ties > 0 && (
                   <>
                     {" — "}
-                    <span className="text-gray-600 font-bold">{ranking.ties}T</span>
+                    <span className="text-secondary-600 font-bold">{ranking.ties}T</span>
                   </>
                 )}
               </p>
-              <p className="text-gray-600">
-                <span className="text-gray-900 font-semibold">{ranking.rp}</span> RP
+              <p className="text-secondary-600">
+                <span className="text-secondary-900 font-semibold">{ranking.rp}</span> RP
                 {ranking.epa > 0 && (
                   <>
                     {" · "}
-                    <span className="text-gray-900 font-semibold">{ranking.epa.toFixed(1)}</span>{" "}
+                    <span className="text-secondary-900 font-semibold">
+                      {ranking.epa.toFixed(1)}
+                    </span>{" "}
                     EPA
                   </>
                 )}
@@ -338,19 +322,19 @@ function RankingSection({
 
           {/* Right: context table if available */}
           {contextRankings && (
-            <div className="flex-1 pl-6 border-l border-gray-300">
+            <div className="flex-1 pl-6 border-l border-secondary-300">
               <div className="grid grid-cols-2 gap-4">
                 {/* Left: context (around us) */}
                 <div className="space-y-2">
-                  <p className="text-xs text-gray-600 font-semibold">Around Us</p>
+                  <p className="text-xs text-secondary-600 font-semibold">Around Us</p>
                   <div className="space-y-1">
                     {contextRankings.context.map((r) => (
                       <div
                         key={r.team}
                         className={`flex justify-between px-2.5 py-1.5 rounded text-sm ${
                           r.team === teamNumber
-                            ? "bg-red-100 text-red-700 font-semibold"
-                            : "text-gray-700"
+                            ? "bg-primary-100 text-primary-700 font-semibold"
+                            : "text-secondary-700"
                         }`}
                       >
                         <span>#{r.rank}</span>
@@ -362,15 +346,15 @@ function RankingSection({
 
                 {/* Right: top 3 */}
                 <div className="space-y-2">
-                  <p className="text-xs text-gray-600 font-semibold">Top 3</p>
+                  <p className="text-xs text-secondary-600 font-semibold">Top 3</p>
                   <div className="space-y-1">
                     {contextRankings.top3.map((r) => (
                       <div
                         key={r.team}
                         className={`flex justify-between px-2.5 py-1.5 rounded text-sm ${
                           r.team === teamNumber
-                            ? "bg-red-100 text-red-700 font-semibold"
-                            : "text-gray-700"
+                            ? "bg-primary-100 text-primary-700 font-semibold"
+                            : "text-secondary-700"
                         }`}
                       >
                         <span>#{r.rank}</span>
@@ -388,6 +372,37 @@ function RankingSection({
   );
 }
 
+/** One of the Monitor's three batteries, in its state's color. */
+function BatteryTile({
+  label,
+  battery,
+  state,
+  none,
+}: { label: string; battery: Battery | undefined; state: BatteryState; none: string }) {
+  return (
+    <div className={`rounded-xl border p-3 ${STATE_TONES[state]}`}>
+      <p className="mb-2 text-xs font-bold uppercase tracking-widest">{label}</p>
+      {battery ? (
+        <div className="space-y-1">
+          <p className="text-xl font-black text-secondary-900">{battery.name}</p>
+          <p className="text-xs tabular-nums text-secondary-600">
+            <ElapsedTime sinceMs={battery.stateSince} />
+          </p>
+          {state !== "Charging" && battery.voltage != null && (
+            <p
+              className={`font-mono text-lg font-bold tabular-nums ${voltageColor(battery.voltage)}`}
+            >
+              {battery.voltage.toFixed(2)}V
+            </p>
+          )}
+        </div>
+      ) : (
+        <p className="text-xs text-secondary-600">{none}</p>
+      )}
+    </div>
+  );
+}
+
 function BatteriesSection({ batteries }: { batteries: Battery[] }) {
   const inRobot = batteries.find((b) => b.state === "In Robot");
   const nextUp = batteries.find((b) => b.state === "Next Up");
@@ -397,71 +412,75 @@ function BatteriesSection({ batteries }: { batteries: Battery[] }) {
 
   return (
     <div className="space-y-2">
-      <h2 className="text-xs font-bold uppercase tracking-widest text-gray-600">Batteries</h2>
-      <div className="bg-white border border-gray-200 rounded-2xl p-5">
+      <h2 className="text-xs font-bold uppercase tracking-widest text-secondary-600">Batteries</h2>
+      <div className="bg-surface border border-secondary-200 rounded-xl p-5">
         <div className="grid grid-cols-3 gap-3">
-          <div className="bg-red-100 border border-red-300 rounded-xl p-3">
-            <p className="text-xs font-bold uppercase tracking-widest text-red-600 mb-2">
-              In Robot
-            </p>
-            {inRobot ? (
-              <div className="space-y-1">
-                <p className="text-xl font-black text-gray-900">{inRobot.name}</p>
-                <p className="text-xs text-gray-600">
-                  <ElapsedTime sinceMs={inRobot.stateSince} />
-                </p>
-                {inRobot.voltage != null && (
-                  <p
-                    className={`text-lg font-bold font-mono tabular-nums ${voltageColor(inRobot.voltage)}`}
-                  >
-                    {inRobot.voltage.toFixed(2)}V
-                  </p>
-                )}
-              </div>
-            ) : (
-              <p className="text-gray-600 text-xs">No battery</p>
-            )}
-          </div>
-
-          <div className="bg-emerald-50 border border-emerald-300 rounded-xl p-3">
-            <p className="text-xs font-bold uppercase tracking-widest text-emerald-600 mb-2">
-              Next Up
-            </p>
-            {nextUp ? (
-              <div className="space-y-1">
-                <p className="text-xl font-black text-gray-900">{nextUp.name}</p>
-                <p className="text-xs text-gray-600">
-                  <ElapsedTime sinceMs={nextUp.stateSince} />
-                </p>
-                {nextUp.voltage != null && (
-                  <p
-                    className={`text-lg font-bold font-mono tabular-nums ${voltageColor(nextUp.voltage)}`}
-                  >
-                    {nextUp.voltage.toFixed(2)}V
-                  </p>
-                )}
-              </div>
-            ) : (
-              <p className="text-gray-600 text-xs">None</p>
-            )}
-          </div>
-
-          <div className="bg-blue-100 border border-blue-800 rounded-xl p-3">
-            <p className="text-xs font-bold uppercase tracking-widest text-blue-600 mb-2">
-              Charging
-            </p>
-            {longestCharging ? (
-              <div className="space-y-1">
-                <p className="text-xl font-black text-gray-900">{longestCharging.name}</p>
-                <p className="text-xs text-gray-600 tabular-nums">
-                  <ElapsedTime sinceMs={longestCharging.stateSince} />
-                </p>
-              </div>
-            ) : (
-              <p className="text-gray-600 text-xs">None</p>
-            )}
-          </div>
+          <BatteryTile label="In Robot" battery={inRobot} state="In Robot" none="No battery" />
+          <BatteryTile label="Next Up" battery={nextUp} state="Next Up" none="None" />
+          <BatteryTile label="Charging" battery={longestCharging} state="Charging" none="None" />
         </div>
+      </div>
+    </div>
+  );
+}
+
+/** Who has a Pit role on the team's Schedule now, and until when. */
+function InThePitSection({ people }: { people: PersonInThePit[] }) {
+  return (
+    <div className="space-y-2">
+      <h2 className="text-xs font-bold uppercase tracking-widest text-secondary-600">
+        In the pit now
+      </h2>
+      <div className="bg-surface border border-secondary-200 rounded-xl p-5">
+        {people.length === 0 ? (
+          <p className="text-secondary-500">No one has a Pit role on the schedule right now.</p>
+        ) : (
+          <ul className="divide-y divide-secondary-200">
+            {people.map((person) => (
+              <li key={person.userId} className="flex items-baseline justify-between gap-3 py-2">
+                <span className="font-semibold text-secondary-900">
+                  {person.displayName ?? "Former member"}{" "}
+                  <span className="font-normal text-secondary-500">{person.roleName}</span>
+                </span>
+                <span className="text-sm text-secondary-500">until {untilLabel(person.until)}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** The team's newest match logs from its log downloaders. */
+function RecentLogsSection({ logs }: { logs: MatchLog[] }) {
+  const when = new Intl.DateTimeFormat(undefined, {
+    weekday: "short",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+  return (
+    <div className="space-y-2">
+      <h2 className="text-xs font-bold uppercase tracking-widest text-secondary-600">
+        Recent Logs
+      </h2>
+      <div className="bg-surface border border-secondary-200 rounded-xl p-5">
+        {logs.length === 0 ? (
+          <p className="text-secondary-500">No match logs yet.</p>
+        ) : (
+          <ul className="divide-y divide-secondary-200">
+            {logs.map((log) => (
+              <li key={log.id} className="flex items-baseline justify-between gap-3 py-2">
+                <span className="font-semibold text-secondary-900">
+                  {log.name} <span className="font-normal text-secondary-500">{log.event}</span>
+                </span>
+                <span className="text-sm text-secondary-500">
+                  {log.uploadedAt ? when.format(log.uploadedAt) : ""}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </div>
   );
@@ -483,28 +502,23 @@ function ChecklistSection({
     <div className="space-y-4">
       {/* Progress */}
       <div className="space-y-3">
-        <h2 className="text-xs font-bold uppercase tracking-widest text-gray-600">
+        <h2 className="text-xs font-bold uppercase tracking-widest text-secondary-600">
           Checklist Progress
         </h2>
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
             <span
-              className={`text-sm font-semibold ${allDone ? "text-green-600" : "text-gray-700"}`}
+              className={`text-sm font-semibold ${allDone ? "text-emerald-600" : "text-secondary-700"}`}
             >
               {allDone ? "All done!" : `${totalChecked} / ${totalItems} complete`}
             </span>
             <span
-              className={`text-lg font-black tabular-nums ${allDone ? "text-green-600" : "text-gray-900"}`}
+              className={`text-lg font-black tabular-nums ${allDone ? "text-emerald-600" : "text-secondary-900"}`}
             >
               {globalPct}%
             </span>
           </div>
-          <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
-            <div
-              className={`h-full rounded-full transition-all duration-500 ${allDone ? "bg-green-500" : "bg-red-500"}`}
-              style={{ width: `${globalPct}%` }}
-            />
-          </div>
+          <ProgressBar percent={globalPct} done={allDone} className="!h-3" />
         </div>
         <div className="space-y-2">
           {lists.map((list) => {
@@ -514,19 +528,14 @@ function ChecklistSection({
             return (
               <div key={list.id} className="space-y-1">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600 truncate">{list.name}</span>
+                  <span className="text-sm text-secondary-600 truncate">{list.name}</span>
                   <span
-                    className={`text-sm font-semibold tabular-nums shrink-0 ml-3 ${done ? "text-green-600" : "text-gray-700"}`}
+                    className={`text-sm font-semibold tabular-nums shrink-0 ml-3 ${done ? "text-emerald-600" : "text-secondary-700"}`}
                   >
                     {list.checkedCount}/{list.itemCount}
                   </span>
                 </div>
-                <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                  <div
-                    className={`h-full rounded-full transition-all duration-500 ${done ? "bg-green-500" : "bg-red-500"}`}
-                    style={{ width: `${pct}%` }}
-                  />
-                </div>
+                <ProgressBar percent={pct} done={done} />
               </div>
             );
           })}
@@ -534,22 +543,24 @@ function ChecklistSection({
       </div>
 
       {/* Issues */}
-      <div className="space-y-2 pt-2 border-t border-gray-200">
-        <h2 className="text-xs font-bold uppercase tracking-widest text-gray-600">
+      <div className="space-y-2 pt-2 border-t border-secondary-200">
+        <h2 className="text-xs font-bold uppercase tracking-widest text-secondary-600">
           Open Issues{" "}
-          {issues.length > 0 && <span className="text-gray-900 normal-case">{issues.length}</span>}
+          {issues.length > 0 && (
+            <span className="text-secondary-900 normal-case">{issues.length}</span>
+          )}
         </h2>
         {issues.length === 0 ? (
-          <p className="text-green-600 text-sm font-semibold">No open issues ✓</p>
+          <p className="text-emerald-600 text-sm font-semibold">No open issues ✓</p>
         ) : (
           <div className="space-y-2">
             {issues.map((issue) => (
               <div
                 key={issue.id}
-                className="bg-yellow-100 border border-yellow-300 rounded-xl px-4 py-3"
+                className="bg-amber-100 border border-amber-300 rounded-xl px-4 py-3"
               >
-                <p className="text-sm text-gray-900/90 leading-snug">{issue.text}</p>
-                <p className="text-xs text-gray-600 mt-0.5">
+                <p className="text-sm text-secondary-900 leading-snug">{issue.text}</p>
+                <p className="text-xs text-secondary-600 mt-0.5">
                   {issue.listName} · {issue.itemName}
                 </p>
               </div>
@@ -564,6 +575,7 @@ function ChecklistSection({
 // ── Root ───────────────────────────────────────────────────────────────────
 
 export function PitMonitorPage() {
+  const names = useTeamNames();
   const { isFullscreen, setFullscreen } = useFullscreen();
   const { setBatteries: setCachedBatteries } = useBatteryCache();
   const [batteries, setBatteries] = useState<Battery[]>([]);
@@ -572,7 +584,12 @@ export function PitMonitorPage() {
   const [monitor, setMonitor] = useState<MonitorData | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [loading, setLoading] = useState(true);
+  // The team's stream link (Admin), shown when it has one.
   const [iframeUrl, setIframeUrl] = useState<string | null>(null);
+  // The newest match logs, while the team has a paired log downloader; null hides the box.
+  const [recentLogs, setRecentLogs] = useState<MatchLog[] | null>(null);
+  // Who's in the pit on the team's Schedule; hidden while Schedule is off or hasn't answered.
+  const inThePit = useInThePit();
 
   const handleFullscreen = async () => {
     if (!isFullscreen) {
@@ -591,7 +608,7 @@ export function PitMonitorPage() {
   };
 
   async function loadAll() {
-    const [b, l, i, m] = await Promise.all([
+    const [b, l, i, m, logs] = await Promise.all([
       fetchBatteries().catch(() => [] as Battery[]),
       fetchLists().catch(() => [] as ChecklistList[]),
       fetchAllIssues().catch(() => [] as ChecklistIssueSummary[]),
@@ -599,12 +616,19 @@ export function PitMonitorPage() {
         .$get()
         .then((r) => (r.ok ? (r.json() as Promise<MonitorData>) : null))
         .catch(() => null),
+      fetchDownloaders()
+        .then(async ({ downloaders }) =>
+          downloaders.length ? (await fetchMatchLogs()).logs.slice(0, 3) : null,
+        )
+        .catch(() => undefined),
     ]);
     setBatteries(b);
     setCachedBatteries(b);
     setLists(l);
     setIssues(i);
     setMonitor(m);
+    // Kept as it was when it couldn't be asked.
+    if (logs !== undefined) setRecentLogs(logs);
     setLastUpdated(new Date());
     setLoading(false);
   }
@@ -613,7 +637,7 @@ export function PitMonitorPage() {
     const response = await api.monitor.settings.$get();
     if (!response.ok) return;
     const settings = (await response.json()) as { iframeUrl?: string };
-    setIframeUrl(settings.iframeUrl ?? null);
+    setIframeUrl(settings.iframeUrl || null);
   }
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: loadAll is stable
@@ -640,8 +664,8 @@ export function PitMonitorPage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-page flex items-center justify-center">
-        <p className="text-gray-600 text-lg">Loading…</p>
+      <main className="flex-1 bg-page flex items-center justify-center">
+        <p className="text-secondary-600 text-lg">Loading…</p>
       </main>
     );
   }
@@ -651,33 +675,29 @@ export function PitMonitorPage() {
   const nexus = monitor?.nexus;
 
   return (
-    <main className="min-h-screen bg-page text-gray-900">
+    <main className="flex-1 bg-page text-secondary-900">
       <div className="px-6 py-5 space-y-5">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-gray-200 pb-4">
-          <h1 className="text-2xl font-black tracking-tight">G3 Pit Monitor</h1>
+        <div className="flex items-center justify-between border-b border-secondary-200 pb-4">
+          <h1 className="text-2xl font-black tracking-tight">{names.appTitle("Pit")} Monitor</h1>
           <div className="flex items-center gap-4">
             {lastUpdated && (
-              <p className="text-xs text-gray-600">Updated {lastUpdated.toLocaleTimeString()}</p>
+              <p className="text-xs text-secondary-600">
+                Updated {lastUpdated.toLocaleTimeString()}
+              </p>
             )}
-            <button
-              type="button"
-              onClick={handleFullscreen}
-              className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-900 text-sm font-semibold rounded-lg transition-colors"
-              title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
-            >
-              {isFullscreen ? "Exit" : "⛶ Fullscreen"}
-            </button>
+            <Button variant="secondary" size="sm" onClick={handleFullscreen}>
+              {isFullscreen ? "Exit full screen" : "Full screen"}
+            </Button>
           </div>
         </div>
 
-        {/* Nexus status — full width, only if real Nexus data available */}
-        {nexus?.isRealNexus && <NexusSection nexus={nexus} teamNumber={teamNumber} />}
-
         {/* Main grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Left: ranking + upcoming matches */}
+          {/* Left: Nexus status (only with real Nexus data) + ranking + upcoming matches. In the
+              column, so the right one starts at the top instead of under it. */}
           <div className="space-y-5">
+            {nexus?.isRealNexus && <NexusSection nexus={nexus} teamNumber={teamNumber} />}
             {monitor?.ranking && (
               <RankingSection
                 ranking={monitor.ranking}
@@ -688,14 +708,14 @@ export function PitMonitorPage() {
             {hasNexus && nexus && <UpcomingMatchesSection nexus={nexus} teamNumber={teamNumber} />}
           </div>
 
-          {/* Right: custom iframe + batteries + checklist + issues */}
+          {/* Right: the stream (when set) + recent logs + batteries + checklist + issues */}
           <div className="space-y-5">
             {iframeUrl && (
               <div className="space-y-2">
-                <h2 className="text-xs font-bold uppercase tracking-widest text-gray-600">
+                <h2 className="text-xs font-bold uppercase tracking-widest text-secondary-600">
                   Monitor Feed
                 </h2>
-                <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
+                <div className="bg-surface border border-secondary-200 rounded-xl overflow-hidden">
                   <iframe
                     src={iframeUrl}
                     title="Custom monitor feed"
@@ -707,6 +727,8 @@ export function PitMonitorPage() {
                 </div>
               </div>
             )}
+            {inThePit && <InThePitSection people={inThePit} />}
+            {recentLogs && <RecentLogsSection logs={recentLogs} />}
             <BatteriesSection batteries={batteries} />
             <ChecklistSection lists={lists} issues={issues} />
           </div>

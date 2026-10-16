@@ -1,0 +1,822 @@
+import {
+  type ButtonText,
+  type Hsv,
+  type TeamUiColors,
+  type TeamUiLinkKey,
+  type TeamUiSettings,
+  buttonTextChoices,
+  buttonTextColor,
+  hexToHsv,
+  hsvToHex,
+  isDemoPage,
+  isHexColor,
+  pageTeamId,
+  teamUiDefaults,
+  teamUiLinkLabels,
+} from "@g3/site-config";
+import {
+  Button,
+  Card,
+  ErrorBanner,
+  Loading,
+  Page,
+  SuccessBanner,
+  TextField,
+  inputClass,
+  refreshTeamUiSettings,
+} from "@g3/ui";
+import type { SafeTextKind } from "@g3/ui";
+import { type CSSProperties, useEffect, useRef, useState } from "react";
+import { FaTimes } from "react-icons/fa";
+import { g3id } from "../../lib/api";
+import { AppOrder } from "./app-order";
+
+type Mode = "light" | "dark";
+const modes: Mode[] = ["light", "dark"];
+
+// A theme's colors other than its accent, which has its own controls (AccentColors).
+const colorLabels: Record<Exclude<keyof TeamUiColors, "accent">, string> = {
+  page: "Page background",
+  surface: "Cards and navigation",
+  inset: "Inset backgrounds",
+  line: "Borders",
+  text: "Text",
+  muted: "Muted text",
+};
+
+const fieldClass = inputClass;
+
+const description = "How your team looks across Gearbox.";
+const FORM_ID = "team-appearance";
+
+export function AppearancePage() {
+  const [settings, setSettings] = useState<TeamUiSettings>(() => teamUiDefaults(pageTeamId));
+  // The team's own defaults (its name and number), from G3ID: what "Reset to defaults" restores.
+  const [defaults, setDefaults] = useState<TeamUiSettings>(() => teamUiDefaults(pageTeamId));
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  // The links listed in the Links section (and the grid order): the ones the team shows as
+  // loaded, plus any added here, less any removed. Clearing a link's address doesn't take it off
+  // the list until it's saved.
+  const [linkRows, setLinkRows] = useState<TeamUiLinkKey[]>([]);
+
+  useEffect(() => {
+    g3id.admin.team.ui
+      .$get()
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Could not load team settings.");
+        const data = await response.json();
+        setSettings(data.settings);
+        setDefaults(data.defaults);
+        setLinkRows(shownLinks(data.settings));
+      })
+      .catch((reason) =>
+        setError(reason instanceof Error ? reason.message : "Could not load team settings."),
+      )
+      .finally(() => setLoading(false));
+  }, []);
+
+  function update<K extends keyof TeamUiSettings>(key: K, value: TeamUiSettings[K]) {
+    setSettings((current) => ({ ...current, [key]: value }));
+    setMessage("");
+  }
+
+  function updateColor(mode: Mode, key: keyof TeamUiColors, value: string) {
+    update(mode, { ...settings[mode], [key]: value });
+  }
+
+  function updateAccents(accents: Partial<Record<Mode, string>>) {
+    setSettings((current) => {
+      const next = { ...current };
+      for (const mode of modes) {
+        const accent = accents[mode];
+        if (accent !== undefined) next[mode] = { ...current[mode], accent };
+      }
+      return next;
+    });
+    setMessage("");
+  }
+
+  // A field that can't be saved may be inside the closed "More options" panel, where the browser
+  // can't point at it: open the panel so it can.
+  function revealInvalid(event: React.FormEvent) {
+    const panel = (event.target as HTMLElement).closest("details");
+    if (panel) panel.open = true;
+  }
+
+  function reset() {
+    setSettings(structuredClone(defaults));
+    setLinkRows(shownLinks(defaults));
+    setError("");
+    setMessage("Defaults restored. Save to apply them.");
+  }
+
+  async function save(event: React.FormEvent) {
+    event.preventDefault();
+    setSaving(true);
+    setMessage("");
+    setError("");
+    try {
+      const response = await g3id.admin.team.ui.$put({ json: settings });
+      if (!response.ok) {
+        const data = (await response.json()) as { error?: string };
+        throw new Error(data.error ?? "Could not save team settings.");
+      }
+      await refreshTeamUiSettings(true);
+      setLinkRows(shownLinks(settings));
+      setMessage("Team appearance saved.");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not save team settings.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (loading) {
+    return (
+      <Page title="Appearance" description={description}>
+        <Loading />
+      </Page>
+    );
+  }
+
+  // Save and Reset, at the top of the page and again at the bottom (the top Save submits the form
+  // by its id, so the browser's checks and the reveal of a field to fix work the same).
+  const buttons = (
+    <>
+      <Button type="submit" form={FORM_ID} disabled={saving || isDemoPage}>
+        {saving ? "Saving…" : "Save team appearance"}
+      </Button>
+      <Button variant="secondary" disabled={saving} onClick={reset}>
+        Reset to defaults
+      </Button>
+    </>
+  );
+
+  return (
+    <Page
+      title="Appearance"
+      description={description}
+      actions={<div className="flex flex-wrap items-center gap-3">{buttons}</div>}
+    >
+      {error && <ErrorBanner message={error} />}
+      {message && <SuccessBanner message={message} />}
+      <form id={FORM_ID} onSubmit={save} onInvalidCapture={revealInvalid} className="space-y-5">
+        <Card title="Identity">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <LabeledText
+              kind="teamName"
+              label="Team name"
+              value={settings.name}
+              onChange={(v) => update("name", v)}
+              required
+              maxLength={100}
+            />
+            <LabeledText
+              kind="shortName"
+              label="Short name"
+              value={settings.shortName}
+              onChange={(v) => update("shortName", v)}
+              required
+              maxLength={24}
+            />
+            <LabeledText
+              kind="url"
+              label="Logo URL (HTTPS)"
+              value={settings.logoUrl}
+              onChange={(v) => update("logoUrl", v)}
+              type="url"
+              placeholder="https://…"
+            />
+            <label className="block text-sm font-medium">
+              Display font
+              <select
+                className={fieldClass}
+                value={settings.displayFont}
+                onChange={(e) =>
+                  update("displayFont", e.target.value as TeamUiSettings["displayFont"])
+                }
+              >
+                <option>Agency FB</option>
+                <option>Ubuntu</option>
+                <option>system-ui</option>
+              </select>
+            </label>
+            <label className="block text-sm font-medium">
+              Default theme (members can override it)
+              <select
+                className={fieldClass}
+                value={settings.defaultTheme}
+                onChange={(e) =>
+                  update("defaultTheme", e.target.value as TeamUiSettings["defaultTheme"])
+                }
+              >
+                <option value="system">Use device setting</option>
+                <option value="light">Light</option>
+                <option value="dark">Dark</option>
+              </select>
+            </label>
+          </div>
+          {settings.logoUrl && (
+            <img
+              src={settings.logoUrl}
+              alt="Team logo preview"
+              className="mt-4 h-16 max-w-40 object-contain"
+            />
+          )}
+        </Card>
+
+        <Card title="Colors">
+          <p className="mb-4 text-sm text-secondary-600">
+            Your team's color in each theme. App icons use the light accent in both.
+          </p>
+          <AccentColors
+            light={settings.light}
+            dark={settings.dark}
+            linked={settings.linkAccents}
+            onLinkedChange={(linked) => update("linkAccents", linked)}
+            onChange={updateAccents}
+            buttonText={settings.buttonText}
+            onButtonTextChange={(mode, choice) =>
+              update("buttonText", { ...settings.buttonText, [mode]: choice })
+            }
+          />
+          <details className="mt-5 rounded-md border border-line">
+            <summary className="cursor-pointer px-4 py-3 font-semibold">More options</summary>
+            <div className="space-y-6 border-t border-line p-4">
+              <p className="text-sm text-secondary-600">
+                Each theme's backgrounds, borders and text.
+              </p>
+              {modes.map((mode) => (
+                <div key={mode}>
+                  <h3 className="mb-3 font-semibold">
+                    {mode === "light" ? "Light" : "Dark"} palette
+                  </h3>
+                  <div className="grid gap-4 md:grid-cols-3">
+                    <ThemePreview
+                      mode={mode}
+                      colors={settings[mode]}
+                      buttonText={buttonTextColor(settings, mode)}
+                      shortName={settings.shortName}
+                    />
+                    <div className="grid content-start gap-4 sm:grid-cols-2 md:col-span-2">
+                      {(Object.keys(colorLabels) as (keyof typeof colorLabels)[]).map((key) => (
+                        <ColorField
+                          key={key}
+                          label={colorLabels[key]}
+                          value={settings[mode][key]}
+                          onChange={(value) => updateColor(mode, key, value)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </details>
+        </Card>
+
+        <Card title="Links">
+          <p className="mb-4 text-sm text-secondary-600">Shown as tiles on your team's home.</p>
+          <Links
+            links={settings.links}
+            hiddenLinks={settings.hiddenLinks}
+            rows={linkRows}
+            onRowsChange={setLinkRows}
+            disabled={saving}
+            onChange={(links, hiddenLinks) => {
+              setSettings((current) => ({ ...current, links, hiddenLinks }));
+              setMessage("");
+            }}
+          />
+        </Card>
+
+        <Card title="Apps grid order">
+          <p className="mb-4 text-sm text-secondary-600">
+            Drag tiles into the order they appear on the portal.
+          </p>
+          <AppOrder
+            settings={settings}
+            shownLinks={linkRows}
+            onChange={(order) => update("appOrder", order)}
+          />
+        </Card>
+
+        <div className="flex flex-wrap items-center gap-3">
+          {buttons}
+          {isDemoPage && (
+            <p className="text-sm text-secondary-500">Appearance can't be saved in the demo.</p>
+          )}
+        </div>
+      </form>
+    </Page>
+  );
+}
+
+/** The links a team's saved settings show on its home: an address, and not hidden. */
+function shownLinks(settings: TeamUiSettings): TeamUiLinkKey[] {
+  return (Object.keys(teamUiLinkLabels) as TeamUiLinkKey[]).filter(
+    (key) => settings.links[key] && !settings.hiddenLinks.includes(key),
+  );
+}
+
+/**
+ * The team's links: one row for each it shows, and a menu to add another. Removing one clears its
+ * address. A link hidden in the editor before this one (address kept, not shown) comes back with
+ * its address when it's added again.
+ */
+function Links({
+  links,
+  hiddenLinks,
+  rows,
+  onRowsChange,
+  disabled,
+  onChange,
+}: {
+  links: TeamUiSettings["links"];
+  hiddenLinks: TeamUiLinkKey[];
+  /** The links listed (see `linkRows`). */
+  rows: TeamUiLinkKey[];
+  onRowsChange: (rows: TeamUiLinkKey[]) => void;
+  disabled: boolean;
+  onChange: (links: TeamUiSettings["links"], hiddenLinks: TeamUiLinkKey[]) => void;
+}) {
+  // Rows added here, whose address box gets the cursor.
+  const [added, setAdded] = useState<TeamUiLinkKey[]>([]);
+  const keys = Object.keys(teamUiLinkLabels) as TeamUiLinkKey[];
+  const shown = keys.filter((key) => rows.includes(key));
+  const addable = keys.filter((key) => !rows.includes(key));
+
+  function add(key: TeamUiLinkKey) {
+    setAdded((current) => [...current, key]);
+    onRowsChange([...rows, key]);
+    onChange(
+      links,
+      hiddenLinks.filter((link) => link !== key),
+    );
+  }
+
+  function remove(key: TeamUiLinkKey) {
+    onRowsChange(rows.filter((link) => link !== key));
+    onChange(
+      { ...links, [key]: "" },
+      hiddenLinks.filter((link) => link !== key),
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {shown.length > 0 ? (
+        <ul className="divide-y divide-line rounded-md border border-line">
+          {shown.map((key) => (
+            <LinkRow
+              key={key}
+              label={teamUiLinkLabels[key]}
+              value={links[key]}
+              disabled={disabled}
+              autoFocus={added.includes(key) && !links[key]}
+              onChange={(value) => onChange({ ...links, [key]: value }, hiddenLinks)}
+              onRemove={() => remove(key)}
+            />
+          ))}
+        </ul>
+      ) : (
+        <p className="rounded-md border border-dashed border-line px-3 py-4 text-center text-sm text-secondary-500">
+          No links yet.
+        </p>
+      )}
+      {addable.length > 0 && (
+        <select
+          aria-label="Add a link"
+          value=""
+          disabled={disabled}
+          onChange={(event) => add(event.target.value as TeamUiLinkKey)}
+          className={`${inputClass} !w-auto`}
+        >
+          <option value="" disabled>
+            + Add a link
+          </option>
+          {addable.map((key) => (
+            <option key={key} value={key}>
+              {teamUiLinkLabels[key]}
+            </option>
+          ))}
+        </select>
+      )}
+    </div>
+  );
+}
+
+/** One link: its name, its address, and a button to remove it. */
+function LinkRow({
+  label,
+  value,
+  disabled,
+  autoFocus,
+  onChange,
+  onRemove,
+}: {
+  label: string;
+  value: string;
+  disabled: boolean;
+  autoFocus: boolean;
+  onChange: (value: string) => void;
+  onRemove: () => void;
+}) {
+  // A link just added from the menu: ready to type its address.
+  const input = useRef<HTMLInputElement>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: only when the row first appears
+  useEffect(() => {
+    if (autoFocus) input.current?.focus();
+  }, []);
+  return (
+    <li className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 sm:flex-nowrap">
+      <label htmlFor={`link-${label}`} className="w-full text-sm font-medium sm:w-36 sm:shrink-0">
+        {label}
+      </label>
+      <TextField
+        kind="url"
+        id={`link-${label}`}
+        type="url"
+        value={value}
+        placeholder="https://…"
+        ref={input}
+        onChange={(event) => onChange(event.target.value)}
+        className="min-w-0 flex-1"
+      />
+      <button
+        type="button"
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-secondary-500 hover:bg-inset hover:text-red-600 disabled:opacity-40"
+        disabled={disabled}
+        onClick={onRemove}
+        aria-label={`Remove ${label}`}
+        title="Remove"
+      >
+        <FaTimes />
+      </button>
+    </li>
+  );
+}
+
+function LabeledText({
+  label,
+  value,
+  onChange,
+  type = "text",
+  kind,
+  ...props
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  type?: "text" | "url";
+  kind: SafeTextKind;
+  required?: boolean;
+  maxLength?: number;
+  placeholder?: string;
+}) {
+  return (
+    <label className="block text-sm font-medium">
+      {label}
+      <TextField
+        variant="plain"
+        kind={kind}
+        className={fieldClass}
+        type={type}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        {...props}
+      />
+    </label>
+  );
+}
+
+function ColorField({
+  label,
+  value,
+  onChange,
+}: { label: string; value: string; onChange: (value: string) => void }) {
+  return (
+    <label className="block text-sm font-medium">
+      {label}
+      <span className="flex gap-2">
+        <input
+          aria-label={`${label} picker`}
+          type="color"
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          className="h-10 w-12 cursor-pointer"
+        />
+        <TextField
+          variant="plain"
+          typeable
+          className={fieldClass}
+          value={value}
+          pattern="#[0-9a-fA-F]{6}"
+          onChange={(event) => onChange(event.target.value)}
+          required
+        />
+      </span>
+    </label>
+  );
+}
+
+/**
+ * A theme's colors together, as the apps use them: a top bar and a card on the page, with text,
+ * muted text, an inset box, a link in the accent and a button filled with it, with this theme's
+ * button text color.
+ */
+function ThemePreview({
+  mode,
+  colors,
+  buttonText,
+  shortName,
+}: { mode: Mode; colors: TeamUiColors; buttonText: string; shortName: string }) {
+  return (
+    <div
+      role="img"
+      aria-label={`${mode === "light" ? "Light" : "Dark"} theme preview`}
+      className="self-start overflow-hidden rounded-md border text-sm md:order-last"
+      style={{ background: colors.page, borderColor: colors.line, color: colors.text }}
+    >
+      <div
+        className="flex flex-wrap items-center gap-x-3 border-b px-3 py-2"
+        style={{ background: colors.surface, borderColor: colors.line }}
+      >
+        <span className="font-bold uppercase" style={{ color: colors.accent }}>
+          {shortName} App
+        </span>
+        <span style={{ color: colors.muted }}>Home</span>
+        <span
+          className="border-b-2 font-medium"
+          style={{ color: colors.accent, borderColor: colors.accent }}
+        >
+          Parts
+        </span>
+      </div>
+      <div className="p-3">
+        <p className="font-semibold">Page title</p>
+        <p style={{ color: colors.muted }}>Muted text on the page.</p>
+        <div
+          className="mt-3 rounded-md border p-3"
+          style={{ background: colors.surface, borderColor: colors.line }}
+        >
+          <p className="font-semibold">Card</p>
+          <p style={{ color: colors.muted }}>Muted text on a card.</p>
+          <p className="mt-2 rounded px-2 py-1.5" style={{ background: colors.inset }}>
+            Inset background
+          </p>
+          <p className="mt-3 flex flex-wrap items-center justify-between gap-2">
+            <span className="underline" style={{ color: colors.accent }}>
+              A link
+            </span>
+            <span
+              className="rounded-md px-3 py-1.5 font-semibold"
+              style={{
+                background: `color-mix(in srgb, ${colors.accent}, black 15%)`,
+                color: buttonText,
+              }}
+            >
+              Button
+            </span>
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const otherMode = (mode: Mode): Mode => (mode === "light" ? "dark" : "light");
+
+// The two parts of an accent its own sliders set; its hue comes from the color entered.
+const sliders: { part: "s" | "v"; label: string }[] = [
+  { part: "s", label: "Saturation" },
+  { part: "v", label: "Brightness" },
+];
+
+const sliderClass = [
+  "mt-1 block h-3 w-full cursor-pointer appearance-none rounded-full border border-line",
+  "[&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:w-5",
+  "[&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full",
+  "[&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-solid",
+  "[&::-webkit-slider-thumb]:border-white [&::-webkit-slider-thumb]:bg-[var(--shade)]",
+  "[&::-webkit-slider-thumb]:shadow-[0_0_0_1px_rgb(0_0_0/0.45)]",
+  "[&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:rounded-full",
+  "[&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-solid",
+  "[&::-moz-range-thumb]:border-white [&::-moz-range-thumb]:bg-[var(--shade)]",
+  "[&::-moz-range-thumb]:shadow-[0_0_0_1px_rgb(0_0_0/0.45)]",
+].join(" ");
+
+/**
+ * A color just entered, for the sliders. Black has no hue or saturation and a gray no hue, so
+ * those stay as they were: the sliders can bring the color back.
+ */
+function shadeOf(entered: Hsv, previous: Hsv): Hsv {
+  if (entered.v === 0) return { ...previous, v: 0 };
+  return entered.s === 0 ? { ...entered, h: previous.h } : entered;
+}
+
+const buttonTextLabels: Record<ButtonText, string> = {
+  auto: "Automatic",
+  light: "Light",
+  dark: "Dark",
+};
+
+/**
+ * The team's accent in each theme. Linked, a color entered in either box gives the other its
+ * hue, and the other keeps its own saturation and brightness; unlinked, the two are chosen freely.
+ * Either way the sliders under a box change only that box, and never its hue. Under each is that
+ * theme's text color on buttons, which are filled with its accent.
+ */
+function AccentColors({
+  light,
+  dark,
+  linked,
+  onLinkedChange,
+  onChange,
+  buttonText,
+  onButtonTextChange,
+}: {
+  light: TeamUiColors;
+  dark: TeamUiColors;
+  linked: boolean;
+  onLinkedChange: (linked: boolean) => void;
+  onChange: (accents: Partial<Record<Mode, string>>) => void;
+  buttonText: TeamUiSettings["buttonText"];
+  onButtonTextChange: (mode: Mode, choice: ButtonText) => void;
+}) {
+  const palettes = { light, dark };
+  // Each accent as the sliders see it. A hex code alone forgets the hue of a color slid down to
+  // gray or black, and rounds the rest, so the exact shade is kept here beside it.
+  const [kept, setKept] = useState<Record<Mode, Hsv>>(() => ({
+    light: isHexColor(light.accent) ? hexToHsv(light.accent) : { h: 0, s: 0, v: 0 },
+    dark: isHexColor(dark.accent) ? hexToHsv(dark.accent) : { h: 0, s: 0, v: 0 },
+  }));
+  // A color that arrived from outside (loaded, or reset to defaults) replaces the kept shade.
+  let shades = kept;
+  for (const mode of modes) {
+    const hex = palettes[mode].accent.toLowerCase();
+    if (isHexColor(hex) && hsvToHex(shades[mode]) !== hex) {
+      shades = { ...shades, [mode]: hexToHsv(hex) };
+    }
+  }
+  if (shades !== kept) setKept(shades);
+
+  function enter(mode: Mode, text: string) {
+    // Still being typed: nothing else changes until it's a whole color.
+    if (!isHexColor(text)) return onChange({ [mode]: text });
+    const entered = hexToHsv(text);
+    const next = { ...shades, [mode]: shadeOf(entered, shades[mode]) };
+    const accents: Partial<Record<Mode, string>> = { [mode]: text };
+    // A gray or black has no hue to give the other accent.
+    if (linked && entered.s > 0) {
+      const twin = otherMode(mode);
+      next[twin] = { ...shades[twin], h: entered.h };
+      accents[twin] = hsvToHex(next[twin]);
+    }
+    setKept(next);
+    onChange(accents);
+  }
+
+  function slide(mode: Mode, part: "s" | "v", percent: number) {
+    const shade = { ...shades[mode], [part]: percent / 100 };
+    setKept({ ...shades, [mode]: shade });
+    onChange({ [mode]: hsvToHex(shade) });
+  }
+
+  return (
+    <div>
+      <div className="grid gap-6 sm:grid-cols-2">
+        {modes.map((mode) => {
+          const palette = palettes[mode];
+          const shade = shades[mode];
+          const label = mode === "light" ? "Light mode accent" : "Dark mode accent";
+          const shown = hsvToHex(shade);
+          // A theme's buttons are filled with its accent (as last entered whole).
+          const onButton = buttonTextColor(
+            {
+              light: { ...light, accent: hsvToHex(shades.light) },
+              dark: { ...dark, accent: hsvToHex(shades.dark) },
+              buttonText,
+            },
+            mode,
+          );
+          const groupLabel = `${mode === "light" ? "Light" : "Dark"} mode button text color`;
+          return (
+            <div key={mode}>
+              <label className="block text-sm font-medium">
+                {label}
+                <span className="flex gap-2">
+                  <input
+                    aria-label={`${label} picker`}
+                    type="color"
+                    value={shown}
+                    onChange={(event) => enter(mode, event.target.value)}
+                    className="h-10 w-12 cursor-pointer"
+                  />
+                  <TextField
+                    variant="plain"
+                    typeable
+                    className={fieldClass}
+                    value={palette.accent}
+                    pattern="#[0-9a-fA-F]{6}"
+                    onChange={(event) => enter(mode, event.target.value)}
+                    required
+                  />
+                </span>
+              </label>
+              {sliders.map(({ part, label: name }) => {
+                const percent = Math.round(shade[part] * 100);
+                // The track runs through the colors the slider can reach.
+                const from = hsvToHex({ ...shade, [part]: 0 });
+                const to = hsvToHex({ ...shade, [part]: 1 });
+                return (
+                  <label key={part} className="mt-3 block text-sm font-medium">
+                    <span className="flex justify-between">
+                      {name}
+                      <span className="font-normal text-secondary-600">{percent}%</span>
+                    </span>
+                    <input
+                      aria-label={`${label} ${name.toLowerCase()}`}
+                      type="range"
+                      min={0}
+                      max={100}
+                      value={percent}
+                      onChange={(event) => slide(mode, part, Number(event.target.value))}
+                      className={sliderClass}
+                      style={
+                        {
+                          background: `linear-gradient(to right, ${from}, ${to})`,
+                          "--shade": shown,
+                        } as CSSProperties
+                      }
+                    />
+                  </label>
+                );
+              })}
+              {/* The accent as it will sit on this theme's own backgrounds, and this theme's
+                  text on a button. */}
+              <div
+                className="mt-3 grid grid-cols-3 overflow-hidden rounded-md border text-center text-sm font-semibold"
+                style={{ borderColor: palette.line, color: shown }}
+              >
+                <span className="px-2 py-2" style={{ background: palette.page }}>
+                  On the page
+                </span>
+                <span className="px-2 py-2" style={{ background: palette.surface }}>
+                  On cards
+                </span>
+                <span className="px-2 py-2" style={{ background: shown, color: onButton }}>
+                  On a button
+                </span>
+              </div>
+              <p className="mt-3 text-sm font-medium" id={`button-text-${mode}`}>
+                Button text color
+              </p>
+              <div
+                role="group"
+                aria-label={groupLabel}
+                className="mt-1 grid grid-cols-3 overflow-hidden rounded-lg border border-line"
+              >
+                {buttonTextChoices.map((choice) => {
+                  const on = choice === buttonText[mode];
+                  return (
+                    <button
+                      key={choice}
+                      type="button"
+                      aria-pressed={on}
+                      onClick={() => onButtonTextChange(mode, choice)}
+                      className={`border-l border-line px-3 py-2.5 text-sm font-semibold transition-colors first:border-l-0 ${
+                        on
+                          ? "bg-primary-600 text-on-primary"
+                          : "bg-surface text-secondary-700 hover:bg-inset hover:text-secondary-900"
+                      }`}
+                    >
+                      {buttonTextLabels[choice]}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <label className="mt-5 flex items-start gap-2 text-sm">
+        <input
+          type="checkbox"
+          className="mt-1"
+          checked={linked}
+          onChange={(event) => onLinkedChange(event.target.checked)}
+        />
+        <span>
+          <span className="font-medium">Link the light and dark accents</span>
+          <span className="block text-secondary-600">
+            Entering a color in one box gives the other the same hue.
+          </span>
+        </span>
+      </label>
+    </div>
+  );
+}

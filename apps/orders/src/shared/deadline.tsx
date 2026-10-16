@@ -1,4 +1,4 @@
-import { formatDate, placeBy, startOfToday } from "./format";
+import { formatDay, placeBy, startOfToday } from "./format";
 import type { OrderRequest, Vendor } from "./types";
 
 /**
@@ -18,10 +18,10 @@ export function Deadline({
   const late = open && by !== null && by < startOfToday();
   const knowsTimes = vendor?.leadTimeDays != null || vendor?.shippingDays != null;
   return (
-    <span className={late ? "text-primary-700 font-semibold" : undefined}>
+    <span className={late ? "text-red-700 font-semibold" : undefined}>
       {late && <span aria-hidden>⚠ </span>}
-      Need by {formatDate(request.needBy)}
-      {open && by !== null && knowsTimes && ` · place by ${formatDate(by)}`}
+      Need by {formatDay(request.needBy)}
+      {open && by !== null && knowsTimes && ` · place by ${formatDay(by)}`}
       {late && " (late)"}
     </span>
   );

@@ -1,10 +1,11 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { setCookie } from "hono/cookie";
 import { createDb } from "../../db";
 import { coreUserPins, coreUsers } from "../../db/schema";
 import { sessionCookieOptions } from "../../lib/cookie";
 import { createSession } from "../../lib/session";
+import { methodOff } from "../../lib/sign-in-methods";
 import { requireKioskToken } from "../../middleware/auth";
 import type { AppEnv } from "../../types";
 
@@ -21,11 +22,15 @@ export const pinAuthRouter = new Hono<AppEnv>().post("/pin", requireKioskToken, 
     return c.json({ error: "PIN is required." }, 400);
   }
 
+  const off = await methodOff(c.env, c.get("kioskTeamId") as string, "pin");
+  if (off) return c.json({ error: off }, 403);
+
+  // PINs are unique within a team, and a kiosk signs in only its own team's members.
   const db = createDb(c.env.DB);
   const userPin = await db
     .select({ userId: coreUserPins.userId })
     .from(coreUserPins)
-    .where(eq(coreUserPins.pin, pin))
+    .where(and(eq(coreUserPins.teamId, c.get("kioskTeamId") as string), eq(coreUserPins.pin, pin)))
     .get();
 
   if (!userPin) {
@@ -50,7 +55,7 @@ export const pinAuthRouter = new Hono<AppEnv>().post("/pin", requireKioskToken, 
     { expirationTtl: 7 * 24 * 60 * 60 },
   );
 
-  setCookie(c, "g3_session", sessionId, sessionCookieOptions(c.env.FRONTEND_URL));
+  setCookie(c, "g3_session", sessionId, sessionCookieOptions(c.req.url));
 
   return c.json({ success: true });
 });

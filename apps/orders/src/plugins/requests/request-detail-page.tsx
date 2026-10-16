@@ -1,6 +1,18 @@
+import {
+  Button,
+  Card,
+  ConfirmButton,
+  ErrorBanner,
+  Field,
+  Loading,
+  Page,
+  TextField,
+  inputClass,
+} from "@g3/ui";
 import { type FormEvent, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { api, getErrorMessage } from "../../shared/api";
+import { ConfirmDialog } from "../../shared/ask";
 import { useAuthUser } from "../../shared/auth";
 import { Deadline } from "../../shared/deadline";
 import {
@@ -13,16 +25,18 @@ import {
 import { PRIORITY, PRIORITY_ORDER, PriorityBadge } from "../../shared/priority";
 import { STATUS, StatusBadge } from "../../shared/status-badge";
 import type { Priority, RequestDetail, RequestStatus } from "../../shared/types";
-import { Button, Card, ErrorBanner, Field, Loading, Page, inputClass } from "../../shared/ui";
 import { useLoad } from "../../shared/use-load";
 import { useVendors } from "../../shared/vendors";
 import { RequestLists } from "../lists/request-lists";
+import { VendorCart } from "../ordering/ordering-page";
 import { RequestActions } from "./request-actions";
+import { promote, removeWish } from "./wishlist-page";
 
 const EVENT_LABELS: Record<string, string> = {
   created: "Requested",
   edited: "Edited",
   replaced: "Replaced item",
+  reapproved: "Re-approved",
 };
 
 export function RequestDetailPage() {
@@ -30,11 +44,49 @@ export function RequestDetailPage() {
   const user = useAuthUser();
   const { vendorFor } = useVendors();
   const [editing, setEditing] = useState(false);
+  const navigate = useNavigate();
+  // Back to where the request was opened from (a list, Approvals, a filtered search); straight
+  // to Requests when the page was opened directly (a link in Slack, a new tab).
+  const cameFromApp = useLocation().key !== "default";
+  const [busy, setBusy] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+  // Promoting a wishlist item asks first, in a pop-up.
+  const [promoting, setPromoting] = useState(false);
   const { data, error, reload } = useLoad(async () => {
     const res = await api.requests[":id"].$get({ param: { id } });
     if (!res.ok) throw new Error(await getErrorMessage(res));
     return res.json();
   }, [id]);
+  const wished = data?.status === "wishlist";
+  const back = (
+    <button
+      type="button"
+      onClick={() => (cameFromApp ? navigate(-1) : navigate(wished ? "/wishlist" : "/requests"))}
+      className="text-sm text-secondary-500 hover:text-secondary-800"
+    >
+      ← {cameFromApp ? "Back" : wished ? "Wishlist" : "All requests"}
+    </button>
+  );
+
+  /** Wishlist: promote it to a request (by this member) or remove it. Anyone can. */
+  async function wishAction(action: "promote" | "remove") {
+    setPromoting(false);
+    setBusy(true);
+    setActionError(null);
+    try {
+      if (action === "promote") {
+        await promote(Number(id));
+        reload();
+      } else {
+        await removeWish(Number(id));
+        navigate("/wishlist", { replace: true });
+      }
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
 
   if (error) {
     return (
@@ -53,17 +105,21 @@ export function RequestDetailPage() {
 
   const r = data;
   const estimate = r.unitPriceCents === null ? null : r.unitPriceCents * r.quantity;
-  const canEdit = r.status === "requested" && (user.isMentor || r.requesterId === user.userId);
+  // A wishlist item: anyone. A request: its requester or a mentor while it's waiting, and a
+  // mentor once it's approved, until it's ordered.
+  const canEdit =
+    wished ||
+    (r.status === "requested" && (user.isMentor || r.requesterId === user.userId)) ||
+    (r.status === "approved" && user.isMentor);
+  // On the same line as the page's other buttons, where there's room.
+  const editButton = canEdit && !editing && (
+    <Button variant="secondary" onClick={() => setEditing(true)}>
+      Edit request
+    </Button>
+  );
 
   return (
-    <Page
-      title={`Request #${r.id}`}
-      actions={
-        <Link to="/requests" className="text-sm text-secondary-500 hover:text-secondary-800">
-          ← All requests
-        </Link>
-      }
-    >
+    <Page title={wished ? `Wishlist #${r.id}` : `Request #${r.id}`} actions={back}>
       <Card>
         <div className="flex flex-col md:flex-row gap-6">
           {r.image && (
@@ -96,7 +152,11 @@ export function RequestDetailPage() {
                   <span className="font-mono">{r.sku}</span>
                 </Row>
               )}
-              <Row label="Quantity">{r.quantity}</Row>
+              <Row label="Quantity">
+                {r.quantity}
+                {r.packQuantity > 1 &&
+                  ` × pack of ${r.packQuantity} (${r.quantity * r.packQuantity} parts)`}
+              </Row>
               <Row label="Price each">{formatCents(r.unitPriceCents, r.currency)}</Row>
               <Row label={r.orderId === null ? "Estimated total" : "Ordered total"}>
                 {formatCents(estimate, r.currency)}
@@ -109,25 +169,61 @@ export function RequestDetailPage() {
                   <Deadline request={r} vendor={vendorFor(r.vendor)} />
                 </Row>
               )}
-              <Row label="Requested by">{r.requesterName}</Row>
+              <Row label={wished ? "Added by" : "Requested by"}>{r.requesterName}</Row>
             </dl>
-            <div>
-              <p className="text-sm font-medium text-secondary-700">Why</p>
-              <p className="text-sm text-secondary-800 whitespace-pre-wrap">{r.reason}</p>
-            </div>
+            {r.reason && (
+              <div>
+                <p className="text-sm font-medium text-secondary-700">Why</p>
+                <p className="text-sm text-secondary-800 whitespace-pre-wrap">{r.reason}</p>
+              </div>
+            )}
           </div>
         </div>
         <div className="mt-5 space-y-3">
-          <RequestActions request={r} onChanged={reload} />
-          {canEdit && !editing && (
-            <Button variant="secondary" onClick={() => setEditing(true)}>
-              Edit request
-            </Button>
+          {actionError && <ErrorBanner message={actionError} />}
+          {wished && (
+            <div className="flex flex-wrap gap-2">
+              <Button disabled={busy} onClick={() => setPromoting(true)}>
+                Promote to request
+              </Button>
+              {editButton}
+              <ConfirmButton
+                label="Remove from wishlist"
+                confirmLabel="Remove it"
+                question={`Remove ${r.title} from the wishlist?`}
+                disabled={busy}
+                onConfirm={() => void wishAction("remove")}
+              />
+              {promoting && (
+                <ConfirmDialog
+                  title="Promote to a request"
+                  confirmLabel="Request it"
+                  onConfirm={() => void wishAction("promote")}
+                  onClose={() => setPromoting(false)}
+                >
+                  Request {r.title}? It goes to the mentors as your request.
+                </ConfirmDialog>
+              )}
+            </div>
           )}
+          {/* Keyed so its quantity and price boxes follow an edit. */}
+          <RequestActions
+            key={r.updatedAt}
+            request={r}
+            onChanged={reload}
+            extra={wished ? undefined : editButton}
+          />
         </div>
       </Card>
 
-      <RequestLists requestId={r.id} />
+      {/* Approved: its vendor's whole cart, to place it from here (mentors place orders). Keyed so
+          the cart follows an edit to this request. */}
+      {r.status === "approved" && user.isMentor && (
+        <VendorCart key={r.updatedAt} vendor={r.vendor} onChanged={reload} />
+      )}
+
+      {/* Lists are of requests: a wishlist item joins one once it's promoted. */}
+      {!wished && <RequestLists requestId={r.id} />}
 
       {editing && (
         <EditForm
@@ -179,6 +275,7 @@ function EditForm({ request, onDone }: { request: RequestDetail; onDone: () => v
     return (await res.json()).filter((c) => !c.isArchived || c.id === request.categoryId);
   }, []);
   const [quantity, setQuantity] = useState(String(request.quantity));
+  const [packQuantity, setPackQuantity] = useState(String(request.packQuantity));
   const [price, setPrice] = useState(
     request.unitPriceCents === null ? "" : (request.unitPriceCents / 100).toFixed(2),
   );
@@ -198,6 +295,7 @@ function EditForm({ request, onDone }: { request: RequestDetail; onDone: () => v
       param: { id: String(request.id) },
       json: {
         quantity: Number(quantity),
+        packQuantity: Number(packQuantity),
         unitPriceCents,
         categoryId: Number(categoryId),
         reason,
@@ -225,9 +323,20 @@ function EditForm({ request, onDone }: { request: RequestDetail; onDone: () => v
               required
             />
           </Field>
-          <Field label="Price each">
+          <Field label="Pack of" hint="Parts in one of these">
             <input
+              type="number"
+              min={1}
+              max={10000}
               className={inputClass}
+              value={packQuantity}
+              onChange={(e) => setPackQuantity(e.target.value)}
+              required
+            />
+          </Field>
+          <Field label="Price each">
+            <TextField
+              typeable
               inputMode="decimal"
               value={price}
               onChange={(e) => setPrice(e.target.value)}
@@ -268,12 +377,13 @@ function EditForm({ request, onDone }: { request: RequestDetail; onDone: () => v
             />
           </Field>
           <div className="sm:col-span-3">
-            <Field label="Why do we need it?">
-              <textarea
-                className={`${inputClass} min-h-20`}
+            <Field label="Why do we need it?" hint="Optional">
+              <TextField
+                multiline
+                kind="reason"
+                className="min-h-20"
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
-                required
                 maxLength={1000}
               />
             </Field>
@@ -286,7 +396,7 @@ function EditForm({ request, onDone }: { request: RequestDetail; onDone: () => v
         )}
         <div className="mt-4 flex gap-2">
           <Button type="submit" disabled={busy}>
-            {busy ? "Saving…" : "Save"}
+            {busy ? "Saving…" : request.status === "approved" ? "Save and re-approve" : "Save"}
           </Button>
           <Button variant="secondary" onClick={onDone}>
             Cancel

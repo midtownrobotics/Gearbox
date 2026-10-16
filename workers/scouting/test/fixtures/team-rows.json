@@ -1,0 +1,266 @@
+{
+  "auto_routines": {
+    "id": "fixture",
+    "name": "fixture",
+    "robot_name": "fixture",
+    "start_position": "fixture",
+    "summary": "fixture",
+    "steps_json": "fixture",
+    "tags_json": "fixture",
+    "created_by": "fixture",
+    "created_at": 1,
+    "updated_at": 1,
+    "image_r2_key": "fixture",
+    "image_content_type": "fixture"
+  },
+  "boylebucks_accounts": {
+    "user_id": "fixture",
+    "display_name": "fixture",
+    "balance": 1,
+    "earned": 1,
+    "wagered": 1,
+    "updated_at": 1
+  },
+  "boylebucks_ledger": {
+    "id": "fixture",
+    "user_id": "fixture",
+    "amount": 1,
+    "reason": "fixture",
+    "reference_id": "fixture",
+    "created_at": 1
+  },
+  "field_map_publishers": {
+    "email": "fixture",
+    "granted_by": "fixture",
+    "created_at": 1
+  },
+  "field_maps": {
+    "id": "fixture",
+    "name": "fixture",
+    "event_name": "fixture",
+    "notes": "fixture",
+    "r2_key": "fixture",
+    "content_type": "fixture",
+    "created_by": "fixture",
+    "created_at": 1,
+    "updated_at": 1
+  },
+  "game_bets": {
+    "id": "fixture",
+    "user_id": "fixture",
+    "user_name": "fixture",
+    "event_key": "fixture",
+    "match_key": "fixture",
+    "match_label": "fixture",
+    "market": "fixture",
+    "selection": "fixture",
+    "line": 0,
+    "odds": 1,
+    "stake": 1,
+    "status": "fixture",
+    "payout": 1,
+    "placed_at": 1,
+    "settled_at": 1
+  },
+  "game_parlay_legs": {
+    "id": "fixture",
+    "parlay_id": "fixture",
+    "match_key": "fixture",
+    "match_label": "fixture",
+    "market": "fixture",
+    "selection": "fixture",
+    "line": 0,
+    "odds": 1,
+    "status": "fixture"
+  },
+  "game_parlays": {
+    "id": "fixture",
+    "user_id": "fixture",
+    "user_name": "fixture",
+    "event_key": "fixture",
+    "odds": 1,
+    "stake": 1,
+    "status": "fixture",
+    "payout": 1,
+    "placed_at": 1,
+    "settled_at": 1
+  },
+  "manual_events": {
+    "event_key": "fixture",
+    "event_name": "fixture",
+    "ends_at": 1,
+    "delete_after": 1,
+    "created_by": "fixture",
+    "updated_at": 1
+  },
+  "manual_matches": {
+    "event_key": "fixture",
+    "match_key": "fixture",
+    "comp_level": "fixture",
+    "set_number": 1,
+    "match_number": 1,
+    "scheduled_at": 1,
+    "red_1": "fixture",
+    "red_2": "fixture",
+    "red_3": "fixture",
+    "blue_1": "fixture",
+    "blue_2": "fixture",
+    "blue_3": "fixture"
+  },
+  "manual_scan_cache": {
+    "content_hash": "fixture",
+    "result_json": "fixture",
+    "expires_at": 1
+  },
+  "manual_scan_usage": {
+    "user_id": "fixture",
+    "window_started_at": 1,
+    "page_count": 1
+  },
+  "manual_teams": {
+    "event_key": "fixture",
+    "team_number": "fixture",
+    "team_name": "fixture"
+  },
+  "robot_images": {
+    "id": "fixture",
+    "robot_id": "fixture",
+    "r2_key": "fixture",
+    "content_type": "fixture",
+    "created_by": "fixture",
+    "created_at": 1
+  },
+  "robot_teams": {
+    "id": "fixture",
+    "team_name": "fixture",
+    "summary": "fixture",
+    "created_by": "fixture",
+    "created_at": 1,
+    "updated_at": 1
+  },
+  "scouting_engagement_settings": {
+    "enabled": 1,
+    "predictions_enabled": 1,
+    "combinations_enabled": 1,
+    "leaderboard_enabled": 1,
+    "points_label": "fixture",
+    "updated_by": "fixture",
+    "updated_at": 1
+  },
+  "scouting_form_submissions": {
+    "id": "fixture",
+    "form_id": "fixture",
+    "answers_json": "fixture",
+    "drawing_r2_key": "fixture",
+    "drawing_content_type": "fixture",
+    "submitted_by": "fixture",
+    "submitted_by_name": "fixture",
+    "created_at": 1,
+    "team_name": "fixture",
+    "drawing_fields_json": "fixture",
+    "event_key": "fixture",
+    "match_key": "fixture",
+    "match_number": 1,
+    "starred_fields_json": "fixture",
+    "archived_at": 1,
+    "archived_by": "fixture",
+    "archive_reason": "fixture",
+    "fields_json": "fixture"
+  },
+  "scouting_forms": {
+    "id": "fixture",
+    "name": "fixture",
+    "description": "fixture",
+    "fields_json": "fixture",
+    "is_active": 1,
+    "created_by": "fixture",
+    "created_at": 1,
+    "updated_at": 1,
+    "form_kind": "fixture"
+  },
+  "scouting_match_assignments": {
+    "event_key": "fixture",
+    "match_number": 1,
+    "user_id": "fixture",
+    "team_number": "fixture",
+    "assigned_at": 1
+  },
+  "service_helpers": {
+    "user_id": "fixture",
+    "display_name": "fixture",
+    "email": "fixture",
+    "slack_user_id": "fixture",
+    "skills_json": "fixture",
+    "approved_by": "fixture",
+    "created_at": 1
+  },
+  "service_tickets": {
+    "id": "fixture",
+    "team_name": "fixture",
+    "issue_type": "fixture",
+    "description": "fixture",
+    "status": "fixture",
+    "claimed_by": "fixture",
+    "claimed_by_name": "fixture",
+    "resolution": "fixture",
+    "created_by": "fixture",
+    "created_by_name": "fixture",
+    "created_at": 1,
+    "updated_at": 1,
+    "event_key": "fixture",
+    "match_key": "fixture",
+    "match_number": 1
+  },
+  "strategy_admins": {
+    "user_id": "fixture",
+    "email": "fixture",
+    "display_name": "fixture",
+    "granted_by": "fixture",
+    "created_at": 1
+  },
+  "strategy_announcements": {
+    "id": "fixture",
+    "message": "fixture",
+    "created_by": "fixture",
+    "created_by_name": "fixture",
+    "created_at": 1,
+    "expires_at": 1
+  },
+  "strategy_event_config": {
+    "id": 1,
+    "event_key": "fixture",
+    "current_match_number": 1,
+    "updated_by": "fixture",
+    "updated_at": 1,
+    "tba_auth_key": "fixture",
+    "nexus_event_key": "fixture",
+    "nexus_api_key": "fixture",
+    "schedule_mode": "fixture"
+  },
+  "strategy_presence": {
+    "user_id": "fixture",
+    "display_name": "fixture",
+    "is_admin": 1,
+    "last_seen_at": 1,
+    "current_page": "fixture"
+  },
+  "team_comments": {
+    "id": "fixture",
+    "team_name": "fixture",
+    "comment": "fixture",
+    "event_key": "fixture",
+    "source_ticket_id": "fixture",
+    "created_by": "fixture",
+    "created_by_name": "fixture",
+    "created_at": 1
+  },
+  "tier_lists": {
+    "id": "fixture",
+    "name": "fixture",
+    "description": "fixture",
+    "tiers_json": "fixture",
+    "created_by": "fixture",
+    "created_at": 1,
+    "updated_at": 1
+  }
+}

@@ -1,6 +1,6 @@
 import type { ListProgress } from "../../shared/types";
 
-// Where a list's parts are, furthest along first. Denied and cancelled requests are left out:
+// Where a list's parts are, furthest along first. Denied and canceled requests are left out:
 // they aren't coming, so they don't count toward "how much of the list is here".
 export const STAGES = [
   { status: "received", label: "Arrived", bar: "bg-emerald-500", dot: "bg-emerald-500" },
@@ -35,7 +35,7 @@ export function ProgressBar({ progress }: { progress: ListProgress }) {
 /** "3 of 10 arrived · 2 ordered · 1 approved · 4 awaiting approval" */
 export function summary(p: ListProgress): string {
   if (p.total === 0) return "No parts yet";
-  if (p.active === 0) return "Nothing coming (all denied or cancelled)";
+  if (p.active === 0) return "Nothing coming (all denied or canceled)";
   const rest = STAGES.slice(1)
     .filter((s) => p[s.status] > 0)
     .map((s) => `${p[s.status]} ${s.label.toLowerCase()}`);

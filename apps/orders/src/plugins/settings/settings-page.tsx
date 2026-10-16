@@ -1,17 +1,22 @@
-import { DEFAULT_TEMPLATE, applyTemplate } from "@g3/worker-orders/naming";
-import { type FormEvent, useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
-import { api, getErrorMessage } from "../../shared/api";
 import {
   Button,
   Card,
+  ConfirmButton,
   ErrorBanner,
   Field,
   Loading,
   Page,
   SuccessBanner,
+  TextField,
   inputClass,
-} from "../../shared/ui";
+  useAppOn,
+  useTeamNames,
+} from "@g3/ui";
+import { DEFAULT_TEMPLATE, applyTemplate } from "@g3/worker-orders/naming";
+import { type FormEvent, useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import { api, getErrorMessage } from "../../shared/api";
+import { forgetIntake } from "../../shared/receive-dialog";
 import { useLoad } from "../../shared/use-load";
 
 const EXAMPLE = {
@@ -21,15 +26,170 @@ const EXAMPLE = {
   variant: "8mm SplineXS",
 };
 
-/** Mentors: the request naming template and the keyword rules that guess budget categories. */
+/** Mentors: the team's money and calendar, who edits the catalog, and how requests are named. */
 export function SettingsPage() {
+  // Receiving into Inventory is only a setting while the team has Inventory on.
+  const inventoryOn = useAppOn("inventory");
   return (
-    <Page title="Settings">
+    <Page title="Admin">
+      <MoneyAndCalendar />
       <TrustedStudents />
       <ShareACart />
+      {inventoryOn !== false && <InventoryOnReceive />}
       <NamingTemplate />
       <CategoryRules />
     </Page>
+  );
+}
+
+const MONTHS = Array.from({ length: 12 }, (_, i) =>
+  new Date(Date.UTC(2026, i, 1)).toLocaleDateString(undefined, { month: "long", timeZone: "UTC" }),
+);
+
+/** The team's currency, fiscal calendar and sales tax: what budgets, prices and new orders use. */
+function MoneyAndCalendar() {
+  const settings = useLoad(async () => {
+    const res = await api.settings.$get();
+    if (!res.ok) throw new Error(await getErrorMessage(res));
+    return res.json();
+  }, []);
+  const [currency, setCurrency] = useState("");
+  const [start, setStart] = useState(7);
+  const [tax, setTax] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!settings.data) return;
+    setCurrency(settings.data.currency);
+    setStart(settings.data.fiscalYearStart);
+    setTax(String(settings.data.salesTaxPercent));
+  }, [settings.data]);
+
+  async function save(e: FormEvent) {
+    e.preventDefault();
+    // Left empty, there's no tax.
+    const salesTaxPercent = Number(tax.trim() || 0);
+    if (!(salesTaxPercent >= 0 && salesTaxPercent <= 100)) {
+      return setError("The sales tax rate must be a percent from 0 to 100.");
+    }
+    setBusy(true);
+    setError(null);
+    const res = await api.settings.$put({
+      json: { currency: currency.trim().toUpperCase(), fiscalYearStart: start, salesTaxPercent },
+    });
+    setBusy(false);
+    if (!res.ok) return setError(await getErrorMessage(res));
+    // Every page reads these when it loads.
+    window.location.reload();
+  }
+
+  return (
+    <Card title="Money and calendar">
+      {!settings.data ? (
+        <Loading />
+      ) : (
+        <form onSubmit={save} className="space-y-3">
+          <p className="text-sm text-secondary-600">
+            Budgets and spending are counted by fiscal year, starting on the 1st of the month below.
+            Changing it recounts every year.
+          </p>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <Field label="Currency" hint="A 3-letter code: USD, CAD, EUR, ...">
+              <TextField
+                kind="currency"
+                className="uppercase"
+                value={currency}
+                maxLength={3}
+                onChange={(e) => setCurrency(e.target.value)}
+              />
+            </Field>
+            <Field label="Fiscal year starts in">
+              <select
+                className={inputClass}
+                value={start}
+                onChange={(e) => setStart(Number(e.target.value))}
+              >
+                {MONTHS.map((month, i) => (
+                  <option key={month} value={i + 1}>
+                    {month}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field
+              label="Default sales tax rate (%)"
+              hint="A new order's tax starts at this much of its items, except at tax-exempt vendors"
+            >
+              <TextField
+                typeable
+                inputMode="decimal"
+                value={tax}
+                onChange={(e) => setTax(e.target.value)}
+                placeholder="0"
+              />
+            </Field>
+          </div>
+          {error && <ErrorBanner message={error} />}
+          <Button type="submit" disabled={busy}>
+            Save
+          </Button>
+        </form>
+      )}
+    </Card>
+  );
+}
+
+/** Whether marking a part received has to say where it goes in the Inventory app. */
+function InventoryOnReceive() {
+  const names = useTeamNames();
+  const inventory = names.appTitle("Inventory");
+  const settings = useLoad(async () => {
+    const res = await api.settings.$get();
+    if (!res.ok) throw new Error(await getErrorMessage(res));
+    return res.json();
+  }, []);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function set(required: boolean) {
+    setBusy(true);
+    setError(null);
+    const res = await api.settings.$put({ json: { inventoryRequired: required } });
+    setBusy(false);
+    if (!res.ok) return setError(await getErrorMessage(res));
+    forgetIntake();
+    settings.reload();
+  }
+
+  return (
+    <Card title="Receiving and Inventory">
+      {!settings.data ? (
+        <Loading />
+      ) : (
+        <div className="space-y-3">
+          <label className="flex items-start gap-3 text-sm text-secondary-900">
+            <input
+              type="checkbox"
+              className="mt-0.5"
+              checked={settings.data.inventoryRequired}
+              disabled={busy}
+              onChange={(e) => void set(e.target.checked)}
+            />
+            <span>
+              <span className="font-semibold">
+                Require a place in {inventory} when marking parts received
+              </span>
+              <span className="mt-0.5 block text-secondary-600">
+                {settings.data.inventoryRequired
+                  ? `Whoever receives a part must say where it goes, and it's added to ${inventory}.`
+                  : `Optional. Parts received without a place aren't added to ${inventory}.`}
+              </span>
+            </span>
+          </label>
+          {error && <ErrorBanner message={error} />}
+        </div>
+      )}
+    </Card>
   );
 }
 
@@ -61,12 +221,10 @@ function NamingTemplate() {
         <Loading />
       ) : (
         <form onSubmit={save} className="space-y-3">
-          <Field
-            label="Template"
-            hint="Tokens: {vendor} {sku} {title} {variant}. The title is cleaned of store names and the SKU."
-          >
-            <input
-              className={`${inputClass} font-mono`}
+          <Field label="Template" hint="Tokens: {vendor} {sku} {title} {variant}.">
+            <TextField
+              kind="template"
+              className="font-mono"
               value={template}
               onChange={(e) => setTemplate(e.target.value)}
             />
@@ -127,8 +285,8 @@ function CategoryRules() {
   return (
     <Card title="Budget category guesses">
       <p className="text-sm text-secondary-600 mb-3">
-        New requests get a budget category from the last time the same product was bought, then the
-        vendor's default (set on Vendors), then these keywords (matched in the item name).
+        A new request's budget category comes from the product's last purchase, then the vendor's
+        default, then these keywords.
       </p>
       {rules.data && rules.data.length > 0 && (
         <ul className="mb-3 divide-y divide-secondary-100 text-sm">
@@ -151,8 +309,9 @@ function CategoryRules() {
         </ul>
       )}
       <form onSubmit={add} className="flex flex-wrap gap-2">
-        <input
-          className={`${inputClass} sm:!w-48`}
+        <TextField
+          kind="keyword"
+          className="sm:!w-48"
           value={keyword}
           onChange={(e) => setKeyword(e.target.value)}
           placeholder="Keyword (e.g. bolt)"
@@ -205,7 +364,6 @@ function ShareACart() {
   }, []);
 
   async function disconnect() {
-    if (!window.confirm("Disconnect the team's Share-A-Cart account?")) return;
     const res = await api["share-a-cart"].disconnect.$post();
     if (!res.ok) return setError(await getErrorMessage(res));
     status.reload();
@@ -216,8 +374,7 @@ function ShareACart() {
     <Card title="Share-A-Cart">
       <div className="space-y-3 text-sm">
         <p className="text-secondary-600">
-          Builds one-click Amazon carts on the Ordering tab. Carts are saved to the connected
-          Share-A-Cart account.
+          Builds one-click Amazon carts, saved to your Share-A-Cart account.
         </p>
         {justConnected && <SuccessBanner message="Share-A-Cart is connected." />}
         {error && <ErrorBanner message={error} />}
@@ -232,14 +389,16 @@ function ShareACart() {
                 ? ` on ${new Date(status.data.connectedAt).toLocaleDateString()}`
                 : ""}
             </span>
-            <Button variant="secondary" onClick={disconnect}>
-              Disconnect
-            </Button>
+            <ConfirmButton
+              label="Disconnect"
+              question="Disconnect the team's Share-A-Cart account? Amazon carts can't be built until someone connects one again."
+              onConfirm={disconnect}
+            />
           </div>
         ) : (
           <a
             href={connectUrl}
-            className="inline-block rounded-lg bg-primary-500 px-3.5 py-2 font-semibold text-white hover:bg-primary-600"
+            className="inline-block rounded-lg bg-primary-500 px-3.5 py-2 font-semibold text-on-primary hover:bg-primary-600"
           >
             Connect the team's Share-A-Cart account
           </a>
@@ -255,6 +414,7 @@ function ShareACart() {
  * has opened G3 Orders), so a team of 60 stays one line plus a search box.
  */
 function TrustedStudents() {
+  const names = useTeamNames();
   const people = useLoad(async () => {
     const res = await api.trusted.$get();
     if (!res.ok) throw new Error(await getErrorMessage(res));
@@ -280,10 +440,7 @@ function TrustedStudents() {
   return (
     <Card title="Trusted students">
       <div className="space-y-3 text-sm">
-        <p className="text-secondary-600">
-          Like mentors, they can add catalog categories and add, edit or delete parts. Everyone else
-          browses and requests.
-        </p>
+        <p className="text-secondary-600">They can edit the catalog, like mentors.</p>
         {error && <ErrorBanner message={error} />}
         {!people.data ? (
           <Loading />
@@ -310,8 +467,8 @@ function TrustedStudents() {
               ))}
             </div>
             <div className="relative max-w-sm">
-              <input
-                className={inputClass}
+              <TextField
+                typeable
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={(e) => {
@@ -321,10 +478,10 @@ function TrustedStudents() {
                 aria-label="Add a trusted student"
               />
               {q && (
-                <ul className="absolute z-10 mt-1 w-full rounded-lg border border-secondary-200 bg-white shadow-lg">
+                <ul className="absolute z-10 mt-1 w-full rounded-lg border border-secondary-200 bg-surface shadow-lg">
                   {matches.length === 0 ? (
                     <li className="px-3 py-2 text-secondary-500">
-                      No one by that name has opened G3 Orders yet.
+                      No one by that name has opened {names.appTitle("Orders")} yet.
                     </li>
                   ) : (
                     matches.map((p) => (

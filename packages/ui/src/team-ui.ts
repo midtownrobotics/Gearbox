@@ -1,0 +1,266 @@
+import {
+  type TeamUiSettings,
+  apiPath,
+  brandColor,
+  builtInBrandColor,
+  buttonTextColor,
+  defaultTeamUiSettings,
+  pageTeamId,
+  pageTeamNumber,
+  teamUiDefaults,
+} from "@g3/site-config";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import { sharedCookieAttributes } from "./shared-cookie";
+import { applyTabIcons, iconDataUrl, isIconAccent, loadIconSvg, recolorIcon } from "./team-icon";
+import { setDefaultTheme, syncThemeColor } from "./theme";
+
+// The page's team's appearance (roadmap 2.10): its defaults until G3ID's /team/ui answers, so a team
+// never sees another team's name first.
+const initial = teamUiDefaults(pageTeamId);
+let current: TeamUiSettings = initial;
+let loadedAt = 0;
+// The saved-appearance stamp this page loaded with (see changedStamp).
+let loadedStamp: string | undefined;
+let pending: Promise<void> | null = null;
+let originalTitle: string | null = null;
+const listeners = new Set<() => void>();
+
+function notify() {
+  for (const listener of listeners) listener();
+}
+
+/**
+ * The team's colors as the variables colors.css declares: both themes' (--g3-light-page,
+ * --g3-dark-page), the showing theme's (--g3-page), its color for solid fills (--g3-brand, the
+ * theme's accent) and the text on them (--g3-on-brand).
+ */
+function applyColors(showing: "light" | "dark") {
+  const style = document.documentElement.style;
+  for (const mode of ["light", "dark"] as const) {
+    for (const [key, color] of Object.entries(current[mode])) {
+      style.setProperty(`--g3-${mode}-${key}`, color);
+    }
+    style.setProperty(`--g3-${mode}-on-brand`, buttonTextColor(current, mode));
+  }
+  for (const [key, color] of Object.entries(current[showing])) {
+    style.setProperty(`--g3-${key}`, color);
+  }
+  style.setProperty("--g3-brand", current[showing].accent);
+  style.setProperty("--g3-on-brand", buttonTextColor(current, showing));
+}
+
+// The neutral ramps apps write their grays with (text-secondary-600, border-gray-200).
+const NEUTRALS = ["secondary", "gray", "slate", "zinc", "neutral", "stone"];
+const NEUTRAL_KEYS = ["surface", "inset", "line", "muted", "text"] as const;
+// What a light color left at its default stands for in the built-in ramp (index.css).
+const BUILT_IN_NEUTRALS: Record<(typeof NEUTRAL_KEYS)[number], string> = {
+  surface: "#ffffff",
+  inset: "#efefef",
+  line: "#e0e0e0",
+  muted: "#5a5a5a",
+  text: "#1a1a1a",
+};
+
+/**
+ * The grays inside every app, from the team's colors. In light mode the ramps are built in
+ * (index.css, and Tailwind's own grays), and stay exactly so for a team on the default colors. A
+ * team that changes its light card, inset, border, text or muted color gets ramps built from
+ * them: 100 is the inset color, 200 the border, 500 muted text, 900 text, and the steps between
+ * are mixes. Dark mode builds its ramps the same way in CSS (theme-palette.css), so nothing is set
+ * here for it.
+ */
+function applyNeutrals(root: HTMLElement) {
+  const defaults = defaultTeamUiSettings.light;
+  const changed = (key: (typeof NEUTRAL_KEYS)[number]) =>
+    current.light[key].toLowerCase() !== defaults[key];
+  const custom = root.dataset.theme !== "dark" && NEUTRAL_KEYS.some(changed);
+  const of = (key: (typeof NEUTRAL_KEYS)[number]) =>
+    changed(key) ? current.light[key] : BUILT_IN_NEUTRALS[key];
+  const mix = (from: string, to: string, percent: number) =>
+    `color-mix(in srgb, ${from}, ${to} ${percent}%)`;
+  const ramp: Record<number, string> = {
+    50: mix(of("inset"), of("surface"), 50),
+    100: of("inset"),
+    200: of("line"),
+    300: mix(of("line"), of("muted"), 24),
+    400: mix(of("line"), of("muted"), 64),
+    500: of("muted"),
+    600: mix(of("muted"), of("text"), 33),
+    700: mix(of("muted"), of("text"), 50),
+    800: mix(of("muted"), of("text"), 75),
+    900: of("text"),
+    950: of("text"),
+  };
+  for (const family of NEUTRALS) {
+    for (const [step, shade] of Object.entries(ramp)) {
+      if (custom) root.style.setProperty(`--color-${family}-${step}`, shade);
+      else root.style.removeProperty(`--color-${family}-${step}`);
+    }
+  }
+}
+
+function applySettings() {
+  const root = document.documentElement;
+  applyColors(root.dataset.theme === "dark" ? "dark" : "light");
+  applyNeutrals(root);
+  syncThemeColor();
+  root.style.setProperty(
+    "--font-display",
+    current.displayFont === "system-ui" ? "system-ui" : `"${current.displayFont}", sans-serif`,
+  );
+  // The primary palette, from the team's brand color (its light accent). Tailwind utilities
+  // resolve these variables at runtime across all apps. In dark mode the tints behind banners and
+  // selected rows are dark (the brand color sunk into the page), and solid fills (500 and darker)
+  // and brand text take the dark accent, which theme.css builds from --g3-dark-accent: nothing
+  // is set for them here.
+  const base = brandColor(current);
+  const dark = root.dataset.theme === "dark";
+  const steps = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900];
+  const blends = [90, 75, 55, 35, 18, 0, 15, 30, 45, 60];
+  const darkTints = [85, 75, 52, 27];
+  for (let i = 0; i < steps.length; i++) {
+    if (base === builtInBrandColor || (dark && steps[i] >= 500)) {
+      root.style.removeProperty(`--color-primary-${steps[i]}`);
+      continue;
+    }
+    const shade =
+      dark && i < darkTints.length
+        ? `color-mix(in srgb, ${base}, var(--g3-page) ${darkTints[i]}%)`
+        : i < 5
+          ? `color-mix(in srgb, ${base}, white ${blends[i]}%)`
+          : i === 5
+            ? base
+            : `color-mix(in srgb, ${base}, black ${blends[i]}%)`;
+    root.style.setProperty(`--color-primary-${steps[i]}`, shade);
+  }
+  // The tab's icon takes the team's color too (team-icon.ts).
+  applyTabIcons(base);
+  // index.html's title is the app's own name ("Orders", "ID"); the team's short name goes in
+  // front: "G3 Orders", "G3 ID".
+  originalTitle ??= document.title;
+  document.title = `${current.shortName} ${originalTitle}`;
+}
+
+// A save on the Appearance page stamps a cookie every app on the domain reads, so the other apps
+// (each on its own address, with its own cached copy) load the new appearance the next time they're
+// shown, instead of up to a minute later. The stamp also goes in the address, past the browser's cache.
+const STAMP_COOKIE = "g3_team_ui";
+const changedStamp = () => document.cookie.match(/(?:^|;\s*)g3_team_ui=([a-z0-9]+)/)?.[1];
+
+/**
+ * Refreshes the public settings after a minute away from this tab, or at once after a save
+ * (`force`), which every other open app then picks up too.
+ */
+export function refreshTeamUiSettings(force = false): Promise<void> {
+  if (pending) return force ? pending.then(() => refreshTeamUiSettings(true)) : pending;
+  if (force) {
+    document.cookie = `${STAMP_COOKIE}=${Date.now().toString(36)}; ${sharedCookieAttributes(86400)}`;
+  }
+  const stamp = changedStamp();
+  const local = ["localhost", "127.0.0.1"].includes(window.location.hostname);
+  // In production, G3ID's API on the page's own address, which the gateway answers for the page's
+  // team (so each team gets its own appearance).
+  const endpoint =
+    import.meta.env.VITE_G3ID_API_URL ?? (local ? "http://localhost:8787" : apiPath("id"));
+  const query = stamp ? `?v=${stamp}` : "";
+  pending = fetch(`${endpoint}/team/ui${query}`, { cache: force ? "no-store" : "default" })
+    .then(async (response) => {
+      if (!response.ok) return;
+      const data = (await response.json()) as TeamUiSettings;
+      current = data;
+      loadedAt = Date.now();
+      loadedStamp = stamp;
+      setDefaultTheme(current.defaultTheme);
+      applySettings();
+      notify();
+    })
+    .catch(() => {
+      // The last known/default appearance remains usable while identity is unreachable.
+    })
+    .finally(() => {
+      pending = null;
+    });
+  return pending;
+}
+
+function subscribe(listener: () => void) {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
+
+/** The page's team's appearance, kept up to date. `team` false: for a page with no team. */
+export function useTeamUiSettings(team = true): TeamUiSettings {
+  const settings = useSyncExternalStore(
+    subscribe,
+    () => current,
+    () => initial,
+  );
+  useEffect(() => {
+    // The platform's own pages belong to no team: built-in colors, nothing loaded.
+    if (!team) return;
+    const refresh = () => {
+      if (Date.now() - loadedAt > 60_000 || changedStamp() !== loadedStamp) {
+        void refreshTeamUiSettings();
+      } else applySettings();
+    };
+    refresh();
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    window.addEventListener("g3-theme-changed", applySettings);
+    return () => {
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+      window.removeEventListener("g3-theme-changed", applySettings);
+    };
+  }, [team]);
+  return settings;
+}
+
+/**
+ * An app icon (the address of its SVG) with its accent in the team's brand color. Gives back
+ * the icon as it is until the recolored one is ready, for a team with the default color, and
+ * for anything that isn't an SVG.
+ */
+export function useTeamIcon(src: string | undefined): string | undefined {
+  const color = useSyncExternalStore(
+    subscribe,
+    () => brandColor(current),
+    () => brandColor(initial),
+  );
+  const [recolored, setRecolored] = useState<{ key: string; src: string } | null>(null);
+  const key = `${color} ${src}`;
+  const wanted = !!src && !isIconAccent(color);
+  useEffect(() => {
+    if (!wanted || !src) return;
+    let canceled = false;
+    void loadIconSvg(src).then((svg) => {
+      if (svg && !canceled) {
+        setRecolored({ key, src: iconDataUrl(recolorIcon(svg, color)) });
+      }
+    });
+    return () => {
+      canceled = true;
+    };
+  }, [wanted, src, key, color]);
+  return wanted && recolored?.key === key ? recolored.src : src;
+}
+
+/**
+ * The page's team's names, for text a team sees (roadmap 2.10): from its Team Appearance settings,
+ * and its number from the page's address. Use these, not site-config's build-time wordmark,
+ * appTitle and site.team, which only know the site's team.
+ */
+export function useTeamNames() {
+  const settings = useTeamUiSettings();
+  const { name, shortName } = settings;
+  return {
+    name,
+    shortName,
+    number: pageTeamNumber,
+    /** "G3 SHOP". */
+    wordmark: (app: string) => `${shortName} ${app}`.toUpperCase(),
+    /** "G3 Shop". */
+    appTitle: (app: string) => `${shortName} ${app}`,
+    links: settings.links,
+  };
+}

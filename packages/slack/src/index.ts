@@ -1,3 +1,64 @@
+/**
+ * What the Slack app's bot needs in a workspace: commands, DMs, members' names and emails, and
+ * the list of channels (so admins choose a channel by name).
+ */
+export const SLACK_BOT_SCOPES =
+  "commands,chat:write,im:write,im:history,users:read,users:read.email,channels:read,groups:read";
+
+export type SlackChannel = {
+  id: string;
+  name: string;
+  isPrivate: boolean;
+  /** The bot is in it, so it can post there. */
+  isMember: boolean;
+};
+
+/** An error Slack answered with ("missing_scope", "invalid_auth", ...). */
+export class SlackApiError extends Error {
+  constructor(readonly code: string) {
+    super(`Slack API error: ${code}`);
+  }
+}
+
+/**
+ * The workspace's channels the bot can see, by name: every public one, and the private ones it's
+ * in. Archived ones are left out.
+ */
+export async function listChannels(env: SlackBindings): Promise<SlackChannel[]> {
+  const channels: SlackChannel[] = [];
+  let cursor = "";
+  // 1,000 a page; a workspace with more than 10,000 channels only shows the first.
+  for (let page = 0; page < 10; page++) {
+    const params = new URLSearchParams({
+      types: "public_channel,private_channel",
+      exclude_archived: "true",
+      limit: "1000",
+    });
+    if (cursor) params.set("cursor", cursor);
+    const res = await fetch(`https://slack.com/api/conversations.list?${params}`, {
+      headers: { Authorization: `Bearer ${env.SLACK_BOT_TOKEN}` },
+    });
+    const data = (await res.json()) as {
+      ok?: boolean;
+      error?: string;
+      channels?: { id: string; name: string; is_private?: boolean; is_member?: boolean }[];
+      response_metadata?: { next_cursor?: string };
+    };
+    if (!data.ok) throw new SlackApiError(data.error ?? `http_${res.status}`);
+    for (const c of data.channels ?? []) {
+      channels.push({
+        id: c.id,
+        name: c.name,
+        isPrivate: c.is_private === true,
+        isMember: c.is_member === true,
+      });
+    }
+    cursor = data.response_metadata?.next_cursor ?? "";
+    if (!cursor) break;
+  }
+  return channels.sort((a, b) => a.name.localeCompare(b.name));
+}
+
 export type SlackBindings = {
   SLACK_BOT_TOKEN: string;
   SLACK_SIGNING_SECRET?: string;

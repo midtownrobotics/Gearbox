@@ -1,13 +1,16 @@
 import type { Database } from "bun:sqlite";
+import type { BoxInterface } from "@g3/worker-edge/interface-types";
 import type { AgentConfig } from "../../core/config";
 import type { Counters } from "./deltas";
 import { DnsLogTailer } from "./dns-log";
 import { flowKey, parseFlowKey } from "./flows";
+import { readInterface } from "./interfaces";
 import { nft } from "./nft";
 import { type Lease, parseLeases, parseNftFlowSet, parseNftSet } from "./parse";
+import { type Neighbor, type PresenceSource, parseNeighbors } from "./presence";
 
 /** Where the collector reads counters and leases from. */
-export interface NetworkSource {
+export interface NetworkSource extends PresenceSource {
   counters(): Promise<Counters>;
   leases(): Promise<Lease[]>;
   /** Changes on every reboot, which resets all counters. */
@@ -21,6 +24,8 @@ export interface NetworkSource {
   deleteFlows(keys: string[]): Promise<string[]>;
   /** New dnsmasq query log lines since the last call. */
   dnsLines(): Promise<string[]>;
+  /** The box's own LAN and WAN addresses. */
+  interfaces(): Promise<BoxInterface[]>;
 }
 
 const listSet = (name: string) => nft(["-j", "list", "set", "inet", "acct", name]);
@@ -66,11 +71,48 @@ async function deleteFlowElements(keys: string[]): Promise<string[]> {
   return deleted;
 }
 
+/** The discard port: nothing listens, but sending to it makes the kernel resolve the address. */
+const PROBE_PORT = 9;
+
+/**
+ * Sends one empty UDP datagram to each address. That needs no privileges, and
+ * the kernel ARPs any address it hasn't confirmed lately before sending.
+ */
+async function probeAddresses(ips: string[]) {
+  if (ips.length === 0) return;
+  const socket = await Bun.udpSocket({});
+  try {
+    const empty = new Uint8Array(0);
+    for (const ip of ips) {
+      if (IPV4.test(ip)) socket.send(empty, PROBE_PORT, ip);
+    }
+  } finally {
+    socket.close();
+  }
+}
+
+async function readNeighbors(lanInterface: string): Promise<Neighbor[]> {
+  const proc = Bun.spawn(["ip", "-j", "-4", "neigh", "show", "dev", lanInterface], {
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  const [out, err, code] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+    proc.exited,
+  ]);
+  if (code !== 0) throw new Error(`ip neigh failed: ${err.trim()}`);
+  return parseNeighbors(out);
+}
+
 async function readInt(path: string) {
   return Number((await Bun.file(path).text()).trim());
 }
 
-/** Reads the live system: nftables `inet acct` sets, wan0 stats, dnsmasq leases and query log. */
+/**
+ * Reads the live system: nftables `inet acct` sets, wan0 stats, dnsmasq leases
+ * and query log, and the LAN's neighbor table.
+ */
 export function systemSource(config: AgentConfig, db: Database): NetworkSource {
   const dnsLog = new DnsLogTailer(config.dnsLogPath, db);
   const stats = `/sys/class/net/${config.wanInterface}/statistics`;
@@ -113,6 +155,13 @@ export function systemSource(config: AgentConfig, db: Database): NetworkSource {
     },
     deleteFlows: deleteFlowElements,
     dnsLines: () => dnsLog.read(),
+    neighbors: () => readNeighbors(config.lanInterface),
+    probe: probeAddresses,
+    interfaces: () =>
+      Promise.all([
+        readInterface("lan", config.lanInterface),
+        readInterface("wan", config.wanInterface),
+      ]),
   };
 }
 
@@ -144,6 +193,10 @@ export function mockSource(): NetworkSource {
   // A distinct documentation-range IP per (device, site).
   const remoteFor = (client: string, i: number) =>
     `203.0.113.${(Number(client.split(".")[3]) - 100) * 10 + i}`;
+  // A printer with a static address: on the LAN, but it never uses the internet.
+  const printer = { mac: "02:00:00:00:00:10", ip: "192.168.50.20" };
+  // The phone has left: its entry went stale and checks fail.
+  const away = "192.168.50.103";
   const counters: Counters = new Map();
   const flowCounters: Counters = new Map();
   let last = Date.now();
@@ -195,6 +248,38 @@ export function mockSource(): NetworkSource {
         });
       }
       return lines;
+    },
+    async neighbors() {
+      return [
+        ...devices.map((d) => ({
+          ip: d.ip,
+          mac: d.mac,
+          state: [d.ip === away ? "STALE" : "REACHABLE"],
+        })),
+        { ...printer, state: ["REACHABLE"] },
+      ];
+    },
+    async probe() {},
+    async interfaces() {
+      return [
+        {
+          role: "lan",
+          name: "lan0",
+          state: "up",
+          mac: "02:00:00:00:01:00",
+          addresses: [{ address: "192.168.50.1", prefixLength: 24, family: "ipv4" }],
+        },
+        {
+          role: "wan",
+          name: "wan0",
+          state: "up",
+          mac: "02:00:00:00:02:00",
+          addresses: [
+            { address: "192.168.0.23", prefixLength: 24, family: "ipv4" },
+            { address: "2001:db8::23", prefixLength: 64, family: "ipv6" },
+          ],
+        },
+      ];
     },
   };
 }

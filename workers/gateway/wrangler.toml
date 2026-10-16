@@ -1,0 +1,287 @@
+# Production URLs, route patterns and TEAM_NUMBER here are written by `pnpm configure` from
+# packages/site-config/src/site.ts. Change them there, not here.
+#
+# The one worker on every subdomain: routes each request to its app's worker by hostname
+# (src/index.ts). Deploy it after the app workers it binds to.
+name = "gateway"
+main = "src/index.ts"
+compatibility_date = "2026-05-17"
+
+# Local dev (`pnpm dev`): one port for everything, with gearbox.localhost standing for the
+# platform's domain (http://gearbox.localhost:8796, http://<number>-<app>.gearbox.localhost:8796). Each binding reaches that
+# worker's own `wrangler dev`; pages come from the apps' Vite dev servers.
+[vars]
+LOCAL_DEV = "true"
+
+# The public demo's limit on changes per visitor (src/demo.ts): 60 a minute by IP address.
+[[ratelimits]]
+name = "DEMO_LIMITER"
+namespace_id = "9999"
+simple = { limit = 60, period = 60 }
+
+[[services]]
+binding = "PLATFORM"
+service = "platform"
+
+[[services]]
+binding = "G3ID"
+service = "g3id"
+
+[[services]]
+binding = "PORTAL"
+service = "portal"
+
+[[services]]
+binding = "SHOP"
+service = "shop"
+
+[[services]]
+binding = "PIT"
+service = "pit"
+
+[[services]]
+binding = "ORDERS"
+service = "orders"
+
+[[services]]
+binding = "EDGE"
+service = "edge"
+
+[[services]]
+binding = "SCOUTING"
+service = "scouting"
+
+[[services]]
+binding = "SKILL_TREE"
+service = "skill-tree"
+
+[[services]]
+binding = "ATTENDANCE"
+service = "attendance"
+
+[[services]]
+binding = "INVENTORY"
+service = "inventory"
+
+[[services]]
+binding = "SCHEDULE"
+service = "schedule"
+
+[env.production]
+name = "gateway-production"
+workers_dev = false
+
+# Routes (written by `pnpm configure`): the platform's domain and every name under it, and on G3's
+# own domain only its retired addresses, by exact name, so staging's names there
+# (<label>-dev.g3robotics.com) are never production's. Each needs proxied DNS: a wildcard
+# (* → AAAA 100::) for names without their own record, and the platform domain itself.
+[[env.production.routes]]
+pattern = "*.frcgearbox.com/*"
+zone_name = "frcgearbox.com"
+
+[[env.production.routes]]
+pattern = "frcgearbox.com/*"
+zone_name = "frcgearbox.com"
+
+[[env.production.routes]]
+pattern = "g3id.g3robotics.com/*"
+zone_name = "g3robotics.com"
+
+[[env.production.routes]]
+pattern = "api.g3id.g3robotics.com/*"
+zone_name = "g3robotics.com"
+
+[[env.production.routes]]
+pattern = "gearbox.g3robotics.com/*"
+zone_name = "g3robotics.com"
+
+[[env.production.routes]]
+pattern = "api.gearbox.g3robotics.com/*"
+zone_name = "g3robotics.com"
+
+[[env.production.routes]]
+pattern = "shop.g3robotics.com/*"
+zone_name = "g3robotics.com"
+
+[[env.production.routes]]
+pattern = "api.shop.g3robotics.com/*"
+zone_name = "g3robotics.com"
+
+[[env.production.routes]]
+pattern = "pit.g3robotics.com/*"
+zone_name = "g3robotics.com"
+
+[[env.production.routes]]
+pattern = "api.pit.g3robotics.com/*"
+zone_name = "g3robotics.com"
+
+[[env.production.routes]]
+pattern = "orders.g3robotics.com/*"
+zone_name = "g3robotics.com"
+
+[[env.production.routes]]
+pattern = "api.orders.g3robotics.com/*"
+zone_name = "g3robotics.com"
+
+[[env.production.routes]]
+pattern = "edge.g3robotics.com/*"
+zone_name = "g3robotics.com"
+
+[[env.production.routes]]
+pattern = "api.edge.g3robotics.com/*"
+zone_name = "g3robotics.com"
+
+[[env.production.routes]]
+pattern = "scouting.g3robotics.com/*"
+zone_name = "g3robotics.com"
+
+[[env.production.routes]]
+pattern = "api.scouting.g3robotics.com/*"
+zone_name = "g3robotics.com"
+
+[[env.production.routes]]
+pattern = "skilltree.g3robotics.com/*"
+zone_name = "g3robotics.com"
+
+[[env.production.routes]]
+pattern = "api.skilltree.g3robotics.com/*"
+zone_name = "g3robotics.com"
+
+[[env.production.routes]]
+pattern = "attendance.g3robotics.com/*"
+zone_name = "g3robotics.com"
+
+[[env.production.routes]]
+pattern = "api.attendance.g3robotics.com/*"
+zone_name = "g3robotics.com"
+
+[[env.production.routes]]
+pattern = "id.g3robotics.com/*"
+zone_name = "g3robotics.com"
+
+[[env.production.routes]]
+pattern = "admin.g3robotics.com/*"
+zone_name = "g3robotics.com"
+
+[[env.production.services]]
+binding = "PLATFORM"
+service = "platform-production"
+
+[[env.production.services]]
+binding = "G3ID"
+service = "g3id-production"
+
+[[env.production.services]]
+binding = "PORTAL"
+service = "portal-production"
+
+[[env.production.services]]
+binding = "SHOP"
+service = "shop-production"
+
+[[env.production.services]]
+binding = "PIT"
+service = "pit-production"
+
+[[env.production.services]]
+binding = "ORDERS"
+service = "orders-production"
+
+[[env.production.services]]
+binding = "EDGE"
+service = "edge-production"
+
+[[env.production.services]]
+binding = "SCOUTING"
+service = "scouting-production"
+
+[[env.production.services]]
+binding = "SKILL_TREE"
+service = "skill-tree-production"
+
+[[env.production.services]]
+binding = "ATTENDANCE"
+service = "attendance-production"
+
+[[env.production.services]]
+binding = "INVENTORY"
+service = "inventory-production"
+
+[[env.production.services]]
+binding = "SCHEDULE"
+service = "schedule-production"
+
+[[env.production.ratelimits]]
+name = "DEMO_LIMITER"
+namespace_id = "9999"
+simple = { limit = 60, period = 60 }
+
+# ---- Staging: written by `pnpm configure` from [env.production]; don't edit below. ----
+
+[env.staging]
+name = "gateway-staging"
+workers_dev = false
+
+[env.staging.define]
+__G3_STAGING__ = "true"
+
+[[env.staging.services]]
+binding = "PLATFORM"
+service = "platform-staging"
+
+[[env.staging.services]]
+binding = "G3ID"
+service = "g3id-staging"
+
+[[env.staging.services]]
+binding = "PORTAL"
+service = "portal-staging"
+
+[[env.staging.services]]
+binding = "SHOP"
+service = "shop-staging"
+
+[[env.staging.services]]
+binding = "PIT"
+service = "pit-staging"
+
+[[env.staging.services]]
+binding = "ORDERS"
+service = "orders-staging"
+
+[[env.staging.services]]
+binding = "EDGE"
+service = "edge-staging"
+
+[[env.staging.services]]
+binding = "SCOUTING"
+service = "scouting-staging"
+
+[[env.staging.services]]
+binding = "SKILL_TREE"
+service = "skill-tree-staging"
+
+[[env.staging.services]]
+binding = "ATTENDANCE"
+service = "attendance-staging"
+
+[[env.staging.services]]
+binding = "INVENTORY"
+service = "inventory-staging"
+
+[[env.staging.services]]
+binding = "SCHEDULE"
+service = "schedule-staging"
+
+[[env.staging.ratelimits]]
+name = "DEMO_LIMITER"
+namespace_id = "9999"
+simple = { limit = 60, period = 60 }
+
+[[env.staging.routes]]
+pattern = "*-dev.g3robotics.com/*"
+zone_name = "g3robotics.com"
+
+[[env.staging.routes]]
+pattern = "dev.g3robotics.com/*"
+zone_name = "g3robotics.com"

@@ -1,0 +1,92 @@
+name: release
+
+# main is where work lands; public is what's released (and deployed). Merging main into public
+# makes a release: this applies the pending changesets on public (versions, changelogs, platform
+# CalVer, RELEASES.md), commits and tags it, then merges public back into main so main has the
+# new versions and the used changesets are gone there too. (A real merge, not a cherry-pick, so
+# main and public share history and the next main → public merge stays clean. It's the only merge
+# commit on main; the deploy key bypasses main's linear-history rule for it.) See RELEASES.md.
+#
+# Pushes go through a deploy key (secret RELEASE_DEPLOY_KEY) that's on the bypass list of the
+# main and public rulesets, since both only accept changes through pull requests. Its push to
+# public starts this workflow again, which then finds nothing to release.
+#
+# Then it deploys production (deploy.yml): migrations, every worker, the gateway. Only a run that
+# finds nothing left to release deploys, so what goes live is always a released commit: merging
+# the release PR commits the release, and that push starts this workflow again, which deploys it.
+# A push to public with no changesets deploys straight away. While the repository variable
+# PRODUCTION_BRANCH is "main", production deploys from main instead (staging.yml) and this doesn't.
+
+on:
+  push:
+    branches: [public]
+
+concurrency: release
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    outputs:
+      released: ${{ steps.commit.outputs.released }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: public
+          fetch-depth: 0
+          ssh-key: ${{ secrets.RELEASE_DEPLOY_KEY }}
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Apply changesets
+        run: pnpm release:version
+
+      - name: Commit the release
+        id: commit
+        run: |
+          if git diff --quiet; then
+            echo "No changesets to release."
+          else
+            git add -A
+            git commit -m "Release $(node -p 'require("./package.json").version')"
+            git push origin public
+            echo "released=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Tag it
+        run: pnpm release:tag --push
+
+      - name: Merge public back into main
+        if: steps.commit.outputs.released == 'true'
+        run: |
+          version=$(node -p 'require("./package.json").version')
+          git fetch origin main
+          git checkout -B main origin/main
+          git merge --no-ff public -m "Merge release $version into main"
+          git push origin main
+
+  deploy:
+    needs: release
+    # Not while production deploys from main (PRODUCTION_BRANCH, staging.yml): public is behind
+    # main, so deploying it would put older code back.
+    if: needs.release.outputs.released != 'true' && vars.PRODUCTION_BRANCH != 'main'
+    uses: ./.github/workflows/deploy.yml
+    with:
+      environment: production
+    secrets: inherit

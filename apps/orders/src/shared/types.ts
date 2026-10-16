@@ -1,7 +1,10 @@
 import type { InferResponseType } from "hono/client";
 import type { api } from "./api";
 
-export type OrderRequest = InferResponseType<typeof api.requests.$get, 200>[number];
+/** A row of the requests list, with when it was ordered and received. */
+export type RequestListRow = InferResponseType<typeof api.requests.$get, 200>[number];
+/** A request as every page has it (lists and the request page leave out the list's dates). */
+export type OrderRequest = Omit<RequestListRow, "orderedAt" | "receivedAt">;
 export type RequestDetail = InferResponseType<(typeof api.requests)[":id"]["$get"], 200>;
 export type Category = InferResponseType<typeof api.categories.$get, 200>[number];
 export type RequestStatus = OrderRequest["status"];

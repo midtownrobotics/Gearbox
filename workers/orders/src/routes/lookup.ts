@@ -1,3 +1,4 @@
+import { forwardIdentity, requireAuth } from "@g3/auth";
 import {
   CLIENT_HEADER_NAMES,
   type ClientHeaders,
@@ -8,7 +9,6 @@ import { Hono } from "hono";
 import { validator } from "hono/validator";
 import { createOrdersDb } from "../db";
 import { lookupCache } from "../db/schema";
-import { requireAuth } from "../middleware/auth";
 import type { AppEnv } from "../types";
 
 const CACHE_MS = 7 * 24 * 60 * 60 * 1000;
@@ -57,9 +57,10 @@ export const lookupRouter = new Hono<AppEnv>().get("/", requireAuth, urlValidato
     if (value) client[key as keyof ClientHeaders] = value;
   }
   const res = await c.env.EDGE.fetch(
-    new Request("http://edge/lookup", {
+    new Request("http://edge/api/lookup", {
       method: "POST",
-      headers: { cookie: c.req.header("Cookie") ?? "", "Content-Type": "application/json" },
+      // As the member, for their team: Edge asks that team's own box.
+      headers: { ...forwardIdentity(c), "Content-Type": "application/json" },
       body: JSON.stringify({ url, client }),
     }),
   );
@@ -74,7 +75,8 @@ export const lookupRouter = new Hono<AppEnv>().get("/", requireAuth, urlValidato
         422,
       );
     }
-    const status = ([400, 401, 404, 503] as const).find((s) => s === res.status) ?? 502;
+    // Never 401: the member is signed in here, so the app mustn't send them to sign in again.
+    const status = ([400, 404, 503] as const).find((s) => s === res.status) ?? 502;
     return c.json({ error: body.error ?? `Lookup failed (HTTP ${res.status}).` }, status);
   }
 

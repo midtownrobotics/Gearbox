@@ -1,3 +1,4 @@
+import { Button, ErrorBanner, TextField, buttonClass } from "@g3/ui";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
@@ -57,10 +58,10 @@ export function KioskActivatePage() {
   }
 
   return (
-    <div className="min-h-screen bg-page flex items-center justify-center px-4">
+    <div className="flex flex-1 items-center justify-center bg-page px-4">
       <div className="w-full max-w-md space-y-8">
         <div className="text-center">
-          <h1 className="text-4xl font-bold text-secondary-900 mb-2">Activate Kiosk</h1>
+          <h1 className="text-4xl text-secondary-900 mb-2">Activate Kiosk</h1>
           <p className="text-secondary-600">Enter the 6-digit code from your admin</p>
         </div>
 
@@ -72,32 +73,30 @@ export function KioskActivatePage() {
             >
               Activation Code
             </label>
-            <input
+            <TextField
+              typeable
               id="activation-code"
-              type="text"
               inputMode="numeric"
               maxLength={6}
               placeholder="000000"
               value={code}
               onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-              className="w-full px-4 py-3 text-center text-2xl tracking-widest rounded-lg bg-white border border-secondary-300 text-secondary-900 placeholder-secondary-400 focus:outline-none focus:border-primary-500"
+              className="!px-4 !py-3 text-center !text-2xl tracking-widest"
             />
           </div>
 
-          {error && <p className="text-primary-500 text-center text-sm">{error}</p>}
+          {error && <ErrorBanner message={error} />}
 
-          <button
+          <Button
             type="submit"
+            size="lg"
+            className="w-full"
             disabled={loading || code.length !== 6}
-            className="w-full py-3 px-4 rounded-lg bg-primary-600 hover:bg-primary-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold transition-colors"
           >
-            {loading ? "Activating..." : "Activate Device"}
-          </button>
+            {loading ? "Activating…" : "Activate device"}
+          </Button>
 
-          <Link
-            to="/"
-            className="block text-center py-3 px-4 rounded-lg bg-white border border-secondary-300 hover:bg-secondary-50 text-secondary-900 font-semibold transition-colors"
-          >
+          <Link to="/" className={`${buttonClass("secondary", "lg")} w-full`}>
             Cancel
           </Link>
         </form>

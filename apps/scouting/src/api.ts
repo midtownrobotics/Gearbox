@@ -1,6 +1,6 @@
+import { redirectToSignIn } from "@g3/ui";
 const API_ORIGIN = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
 export const API_URL = `${API_ORIGIN}/scouting`;
-export const G3ID_URL = import.meta.env.VITE_G3ID_URL ?? "https://g3id.g3robotics.com";
 const inflightGets = new Map<string, Promise<unknown>>();
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -12,6 +12,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       ...init?.headers,
     },
   });
+  // Signed out: off to sign in, like every app.
+  if (response.status === 401) {
+    redirectToSignIn();
+    throw new Error("Redirecting to sign in…");
+  }
   const body = (await response.json().catch(() => ({}))) as T & { error?: string };
   if (!response.ok) throw new Error(body.error ?? "Request failed.");
   return body;

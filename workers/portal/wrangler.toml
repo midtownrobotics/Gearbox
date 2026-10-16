@@ -1,0 +1,36 @@
+name = "portal"
+main = "src/index.ts"
+compatibility_date = "2026-05-17"
+
+[env.production]
+name = "portal-production"
+# No workers.dev address: the gateway is the only way in, so its identity headers can be trusted.
+workers_dev = false
+
+# The app's page, served by this worker in production; only /api/* runs the worker code, and
+# other paths fall back to index.html for the app's router. Wrangler builds the page before
+# every production deploy or upload (Cloudflare's Git builds too).
+[env.production.build]
+command = "pnpm --filter @g3/portal build"
+
+[env.production.assets]
+directory = "../../apps/portal/dist"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]
+
+# ---- Staging: written by `pnpm configure` from [env.production]; don't edit below. ----
+
+[env.staging]
+name = "portal-staging"
+workers_dev = false
+
+[env.staging.define]
+__G3_STAGING__ = "true"
+
+[env.staging.build]
+command = "GEARBOX_STAGING=1 pnpm --filter @g3/portal build"
+
+[env.staging.assets]
+directory = "../../apps/portal/dist"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]

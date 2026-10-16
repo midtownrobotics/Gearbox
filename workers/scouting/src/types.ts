@@ -1,3 +1,5 @@
+import type { G3AuthVariables } from "@g3/auth";
+
 export type AppEnv = {
   Bindings: {
     FRONTEND_URL: string;
@@ -5,15 +7,25 @@ export type AppEnv = {
     SCOUTING_DB: D1Database;
     FIELD_MAPS: R2Bucket;
     G3ID: Fetcher;
-    SLACK_BOT_TOKEN?: string;
     TBA_AUTH_KEY?: string;
     NEXUS_API_KEY?: string;
     AI: Ai;
   };
-  Variables: {
-    userId: string;
-    userDisplayName: string;
-    userEmail: string;
-    userIsAdmin: boolean;
+  Variables: G3AuthVariables;
+};
+
+export type TbaMatch = {
+  key: string;
+  comp_level: string;
+  set_number: number;
+  match_number: number;
+  time: number | null;
+  predicted_time: number | null;
+  actual_time: number | null;
+  post_result_time?: number | null;
+  alliances: {
+    red: { team_keys: string[]; score: number };
+    blue: { team_keys: string[]; score: number };
   };
 };
+export type TbaTeam = { key: string; team_number: number; nickname: string | null; name: string };

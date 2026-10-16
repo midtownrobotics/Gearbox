@@ -1,25 +1,22 @@
+import { NotYourTeam, buttonClass, useTeamNames } from "@g3/ui";
 import { FaSlack } from "react-icons/fa";
 import { Link } from "react-router-dom";
 
 const apiBase = import.meta.env.VITE_API_BASE_URL ?? "";
 
 export function SignupPage() {
+  const names = useTeamNames();
   return (
     <main className="flex-1 flex items-center justify-center px-4 bg-secondary-50">
       <div className="w-full max-w-sm space-y-6">
         <div className="text-center">
-          <h1 className="text-5xl font-bold text-secondary-900">
-            Join <span className="text-primary-500">G3</span>ID
-          </h1>
+          <h1 className="text-4xl text-secondary-900">Join {names.name}</h1>
           <p className="mt-2 text-secondary-700 text-sm">
-            G3ID uses Slack for signup. Once you signup, you can add additional login methods.
+            Sign up with Slack. You can add other sign-in methods afterward.
           </p>
         </div>
 
-        <a
-          href={`${apiBase}/auth/slack/initiate`}
-          className="w-full flex items-center justify-center gap-3 rounded-lg bg-primary-500 hover:bg-primary-600 px-4 py-3 text-sm text-white font-medium transition-colors"
-        >
+        <a href={`${apiBase}/auth/slack/initiate`} className={`${buttonClass()} w-full`}>
           <FaSlack size={20} />
           Sign up with Slack
         </a>
@@ -27,9 +24,10 @@ export function SignupPage() {
         <p className="text-center text-sm text-secondary-500">
           Already have an account?{" "}
           <Link to="/login" className="text-primary-500 hover:text-primary-600 transition-colors">
-            Log in
+            Sign in
           </Link>
         </p>
+        <NotYourTeam />
       </div>
     </main>
   );

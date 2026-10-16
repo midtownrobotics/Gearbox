@@ -1,17 +1,22 @@
+import { inTeam } from "@g3/auth";
 import { desc, eq } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/d1";
+import type { createShopDb } from "../db";
 import * as schema from "../db/schema";
 import type { AppEnv } from "../types";
 import { drawingBarcodeValue, stampBarcode } from "./barcode";
+import { type OnshapeCredentials, basicAuth, onshapeConfig } from "./onshape-config";
+import { drawingKey } from "./storage";
+
+type ShopDb = ReturnType<typeof createShopDb>;
 
 export async function drawingExistsInR2(
+  env: AppEnv["Bindings"],
+  teamId: string,
   partNumber: string,
   revision: string,
-  env: AppEnv["Bindings"],
 ): Promise<boolean> {
-  const r2Key = `drawings/${partNumber}/${revision}/drawing.pdf`;
   try {
-    const obj = await env.DRAWINGS.head(r2Key);
+    const obj = await env.DRAWINGS.head(drawingKey(teamId, partNumber, revision));
     return obj !== null;
   } catch {
     return false;
@@ -19,12 +24,12 @@ export async function drawingExistsInR2(
 }
 
 export async function retrieveDrawingFromR2(
+  env: AppEnv["Bindings"],
+  teamId: string,
   partNumber: string,
   revision: string,
-  env: AppEnv["Bindings"],
 ): Promise<ArrayBuffer> {
-  const r2Key = `drawings/${partNumber}/${revision}/drawing.pdf`;
-  const obj = await env.DRAWINGS.get(r2Key);
+  const obj = await env.DRAWINGS.get(drawingKey(teamId, partNumber, revision));
   if (!obj) {
     throw new Error(`Drawing not found in R2: ${partNumber} revision ${revision}`);
   }
@@ -32,12 +37,13 @@ export async function retrieveDrawingFromR2(
 }
 
 export async function storeDrawingInR2(
+  env: AppEnv["Bindings"],
+  teamId: string,
   partNumber: string,
   revision: string,
   pdfBuffer: ArrayBuffer,
-  env: AppEnv["Bindings"],
 ): Promise<string> {
-  const r2Key = `drawings/${partNumber}/${revision}/drawing.pdf`;
+  const r2Key = drawingKey(teamId, partNumber, revision);
 
   // Stamp the part-number barcode before the drawing is stored, so every copy served or
   // printed from R2 carries it. A stamping failure must not cost us the drawing itself.
@@ -68,27 +74,30 @@ export async function storeDrawingInR2(
 }
 
 export async function getDrawingExportParams(
-  partNumber: string,
   env: AppEnv["Bindings"],
-): Promise<{ documentId: string; versionId: string; drawingEntityId: string }> {
-  // Get document ID from database
-  const db = drizzle(env.SHOP_DB, { schema });
-  const docIdSetting = await db
-    .select()
-    .from(schema.adminSettings)
-    .where(eq(schema.adminSettings.key, "onshape_document_id"))
-    .get();
-  const documentId = docIdSetting?.value;
-
+  db: ShopDb,
+  teamId: string,
+  partNumber: string,
+): Promise<{
+  documentId: string;
+  versionId: string;
+  drawingEntityId: string;
+  credentials: OnshapeCredentials;
+}> {
+  const config = await onshapeConfig(env, db, teamId);
+  const documentId = config.documentId;
   if (!documentId) {
     throw new Error("Document ID not configured in database");
+  }
+  if (!config.credentials) {
+    throw new Error("OnShape API credentials not configured");
   }
 
   // Get part info from database (most recent)
   const part = await db
     .select()
     .from(schema.onshapeParts)
-    .where(eq(schema.onshapeParts.partNumber, partNumber))
+    .where(inTeam(schema.onshapeParts, teamId, eq(schema.onshapeParts.partNumber, partNumber)))
     .orderBy(desc(schema.onshapeParts.createdAt))
     .get();
 
@@ -108,6 +117,7 @@ export async function getDrawingExportParams(
     documentId,
     versionId: part.versionId,
     drawingEntityId: part.partDrawingEntityId,
+    credentials: config.credentials,
   };
 }
 
@@ -115,16 +125,9 @@ export async function exportDrawingAsPDF(
   documentId: string,
   versionId: string,
   drawingEntityId: string,
-  env: AppEnv["Bindings"],
+  onshape: OnshapeCredentials,
 ): Promise<ArrayBuffer> {
-  const apiKey = env.ONSHAPE_API_KEY;
-  const apiSecret = env.ONSHAPE_API_SECRET;
-
-  if (!apiKey || !apiSecret) {
-    throw new Error("OnShape API credentials not configured");
-  }
-
-  const credentials = btoa(`${apiKey}:${apiSecret}`);
+  const credentials = basicAuth(onshape);
 
   // Step 1: Request PDF export
   console.log("[OnShape Export] Requesting PDF export", { documentId, versionId, drawingEntityId });
@@ -134,7 +137,7 @@ export async function exportDrawingAsPDF(
     {
       method: "POST",
       headers: {
-        Authorization: `Basic ${credentials}`,
+        Authorization: credentials,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -184,7 +187,7 @@ export async function exportDrawingAsPDF(
       `https://cad.onshape.com/api/v16/translations/${translationId}`,
       {
         headers: {
-          Authorization: `Basic ${credentials}`,
+          Authorization: credentials,
         },
       },
     );
@@ -227,7 +230,7 @@ export async function exportDrawingAsPDF(
     `https://cad.onshape.com/api/v16/documents/d/${documentId}/externaldata/${externalDataId}`,
     {
       headers: {
-        Authorization: `Basic ${credentials}`,
+        Authorization: credentials,
       },
     },
   );

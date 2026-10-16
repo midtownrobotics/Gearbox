@@ -1,6 +1,8 @@
+import { withTeam } from "@g3/auth";
 import { sql } from "drizzle-orm";
 import type { EdgeDb } from "../../db";
 import { netClients, netUsage } from "../../db/schema";
+import { chunk, rowsPerInsert } from "../../lib/d1";
 
 export const BUCKET_SECONDS = 300;
 export const MAX_SAMPLES_PER_BATCH = 2000;
@@ -44,18 +46,11 @@ export function parseUsageBatch(value: unknown): UsageBatch | null {
   return { samples: samples as UsageSample[], clients: clients as UsageClient[] };
 }
 
-// D1 allows 100 bound parameters per statement.
-function chunk<T>(items: T[], size: number) {
-  const out: T[][] = [];
-  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
-  return out;
-}
-
 /**
  * Stores a batch. Samples carry full bucket totals, so re-sending a bucket
  * replaces it rather than adding to it — retries and replays are safe.
  */
-export async function ingestUsage(db: EdgeDb, batch: UsageBatch) {
+export async function ingestUsage(db: EdgeDb, teamId: string, batch: UsageBatch) {
   const now = Math.floor(Date.now() / 1000);
 
   const lastSeen = new Map<string, number>();
@@ -66,13 +61,19 @@ export async function ingestUsage(db: EdgeDb, batch: UsageBatch) {
   const clientInfo = new Map(batch.clients.map((c) => [c.mac, c]));
 
   const statements = [];
-  for (const rows of chunk(batch.samples, 20)) {
+  // Five values a row: 20 rows a statement.
+  for (const rows of chunk(batch.samples, rowsPerInsert(netUsage))) {
     statements.push(
       db
         .insert(netUsage)
-        .values(rows.map(([ts, mac, dl, ul]) => ({ ts, mac, dlBytes: dl, ulBytes: ul })))
+        .values(
+          withTeam(
+            teamId,
+            rows.map(([ts, mac, dl, ul]) => ({ ts, mac, dlBytes: dl, ulBytes: ul })),
+          ),
+        )
         .onConflictDoUpdate({
-          target: [netUsage.ts, netUsage.mac],
+          target: [netUsage.teamId, netUsage.ts, netUsage.mac],
           set: { dlBytes: sql`excluded.dl_bytes`, ulBytes: sql`excluded.ul_bytes` },
         }),
     );
@@ -88,13 +89,14 @@ export async function ingestUsage(db: EdgeDb, batch: UsageBatch) {
       firstSeenAt: seenAt,
       lastSeenAt: seenAt,
     }));
-  for (const rows of chunk(clientRows, 15)) {
+  // Six values a row: 15 rows a statement.
+  for (const rows of chunk(clientRows, rowsPerInsert(netClients))) {
     statements.push(
       db
         .insert(netClients)
-        .values(rows)
+        .values(withTeam(teamId, rows))
         .onConflictDoUpdate({
-          target: netClients.mac,
+          target: [netClients.teamId, netClients.mac],
           set: {
             hostname: sql`coalesce(excluded.hostname, ${netClients.hostname})`,
             lastIp: sql`coalesce(excluded.last_ip, ${netClients.lastIp})`,

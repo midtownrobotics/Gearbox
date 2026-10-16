@@ -12,6 +12,17 @@ VERSION=$2
 HERE=$(cd "$(dirname "$0")" && pwd)
 BASE=/opt/g3-edge
 
+# Refuse to install from a damaged copy: an empty unit, script or config file would quietly
+# break the box at its next boot (an empty unit reads as masked; an empty tmpfiles.d entry
+# leaves dnsmasq without its log folder, so no DHCP or DNS).
+empty=$(find "$HERE" -type f -empty ! -path "*/.git/*")
+if [[ -n $empty ]]; then
+  echo "These files are empty; copy infra/edge to the box again:" >&2
+  echo "$empty" >&2
+  exit 1
+fi
+if [[ ! -s $BINARY ]]; then echo "$BINARY is empty or missing." >&2; exit 1; fi
+
 # 1. Service user (no login, no home).
 if ! id g3-edge &>/dev/null; then
   useradd --system --no-create-home --shell /usr/sbin/nologin g3-edge
@@ -76,6 +87,14 @@ for unit in g3-edge-agent.service g3-edge-dnsmasq.path g3-edge-dnsmasq.service g
 done
 install -m 644 "$HERE/etc/tmpfiles.d/g3-edge.conf" /etc/tmpfiles.d/g3-edge.conf
 systemd-tmpfiles --create /etc/tmpfiles.d/g3-edge.conf
+# dnsmasq makes its own query log folder on every start too, so DHCP and DNS never depend on
+# the tmpfiles.d entry above.
+install -d -m 755 /etc/systemd/system/dnsmasq.service.d
+install -m 644 "$HERE/etc/systemd/system/dnsmasq.service.d/g3-edge.conf" \
+  /etc/systemd/system/dnsmasq.service.d/g3-edge.conf
+# Everything above is on disk before anything restarts: a power cut right after an install
+# must not leave empty files behind.
+sync
 systemctl daemon-reload
 systemctl enable --now g3-edge-dnsmasq.path
 
@@ -89,6 +108,7 @@ systemctl enable g3-edge-agent
 systemctl enable g3-door-gpio.service
 systemctl restart g3-door-gpio.service
 systemctl restart g3-edge-agent
+sync
 sleep 2
 systemctl --no-pager --lines=10 status g3-edge-agent || true
 echo

@@ -1,8 +1,20 @@
+import {
+  allAppsUrl,
+  appUrl,
+  completeAppOrder,
+  isDemoPage,
+  platformUrl,
+  portalAppLabels,
+  site,
+} from "@g3/site-config";
 import { type ComponentType, type ReactNode, useEffect, useState } from "react";
+import { useSignedInUser, useTeamApps } from "../session";
+import { useTeamIcon, useTeamUiSettings } from "../team-ui";
 import { useTheme } from "../theme";
 
-// The top bar every G3 app shares (from G3 Strategy's): the app's wordmark, its pages, the
-// light/dark switch and All Apps. Below 768px the pages move into a drawer. It has its own CSS
+// The top bar every G3 app shares (from Scouting's): the menu button, the app's wordmark, its
+// pages, who's signed in and the light/dark switch. The menu (a drawer) lists the team's apps
+// under "All Apps"; below 768px the pages move into it too, above them. It has its own CSS
 // (nav-bar.css), so it looks the same in apps that don't use Tailwind.
 
 export type AppNavItem = {
@@ -21,18 +33,18 @@ export type AppNavItem = {
 export type AppNavLink = (props: {
   href: string;
   className: string;
+  title?: string;
   onClick?: () => void;
   "aria-current"?: "page";
   children: ReactNode;
 }) => ReactNode;
-
-export const ALL_APPS_URL = "https://gearbox.g3robotics.com";
 
 /** An AppNavLink from a router's link component, e.g. `linkWith(Link)` for react-router. */
 export function linkWith(
   Link: ComponentType<{
     to: string;
     className: string;
+    title?: string;
     onClick?: () => void;
     "aria-current"?: "page";
     children: ReactNode;
@@ -70,22 +82,76 @@ export function AppNavBar({
   link = plainLink,
   actions,
   allApps = true,
+  account = true,
+  signedIn,
+  version,
+  team = true,
 }: {
-  /** The app's wordmark, e.g. "G3 SHOP". */
+  /** The app's wordmark, e.g. wordmark("Shop") from @g3/site-config. */
   title: string;
   /** The app's icon (its tab icon, e.g. "/favicon.svg"), shown before the wordmark. */
   icon?: string;
   homeHref?: string;
   items: AppNavItem[];
   link?: AppNavLink;
-  /** Extra controls on the right (user, kiosk badge); also at the bottom of the drawer. */
+  /** Extra controls on the right (kiosk badge, Log in); also at the bottom of the drawer. */
   actions?: ReactNode;
-  /** Show the All Apps link. */
+  /** List the team's apps in the menu, under "All Apps". Off where people shouldn't leave (a kiosk). */
   allApps?: boolean;
+  /** Greet whoever is signed in, with a link to their account (ID). Never for a kiosk PIN session. */
+  account?: boolean;
+  /**
+   * For an app that signs people in and out without reloading (ID): what it knows, null while
+   * it's finding out. Other apps leave it out, and the bar asks.
+   */
+  signedIn?: boolean | null;
+  /** "Orders 1.4.0 · platform 2026.10.0": on the wordmark's tooltip and in the drawer. */
+  version?: string;
+  /**
+   * Off for the platform's own pages (the operators' console), which belong to no team: built-in
+   * colors and icon, no team name, no app list and no greeting, and nothing is asked of ID.
+   */
+  team?: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  // With no pages there's nothing for a menu; the bar keeps its controls on phones too.
-  const flat = items.length === 0;
+  const teamUi = useTeamUiSettings(team);
+  const brandedTitle = team
+    ? title.replace(new RegExp(`^${site.team.shortName}\\b`, "i"), teamUi.shortName)
+    : title;
+  const user = useSignedInUser(team ? signedIn : false);
+  const enabled = useTeamApps(allApps && !!user);
+  // The app's icon, with its accent in the team's color.
+  const teamIcon = useTeamIcon(team ? icon : undefined);
+  const shownIcon = team ? teamUi.logoUrl || teamIcon : icon;
+
+  // The team's home, then its apps that are on, in the order of the home's grid.
+  const here = typeof window === "undefined" ? "" : window.location.host;
+  const appLinks: { key: string; label: string; href: string }[] =
+    allApps && user
+      ? [
+          { key: "portal", label: "Portal", href: allAppsUrl },
+          ...(enabled
+            ? completeAppOrder(teamUi.appOrder ?? [])
+                .filter((key): key is keyof typeof portalAppLabels => key in portalAppLabels)
+                .filter((key) => enabled === "all" || enabled.has(key))
+                .map((key) => ({
+                  key,
+                  label: portalAppLabels[key],
+                  href: appUrl(key),
+                }))
+            : []),
+        ]
+      : [];
+  // Whether the bar has an app list to offer (or may, while it's being asked).
+  const hasApps = allApps && user !== null;
+  // With no pages and no apps there's nothing for a menu; the bar keeps its controls on phones too.
+  const flat = items.length === 0 && !hasApps;
+  const hello =
+    account && user && !user.kiosk ? (
+      <a className="g3-nav-text-link g3-nav-hello" href={`${appUrl("portal")}/account`}>
+        Hello, {user.displayName}!
+      </a>
+    ) : null;
 
   useEffect(() => {
     if (!open) return;
@@ -145,11 +211,12 @@ export function AppNavBar({
       {link({
         href: homeHref,
         className: "g3-nav-wordmark",
+        title: version,
         onClick: () => setOpen(false),
         children: (
           <>
-            {icon && <img className="g3-nav-icon" src={icon} alt="" />}
-            {title}
+            {shownIcon && <img className="g3-nav-icon" src={shownIcon} alt="" />}
+            {brandedTitle}
           </>
         ),
       })}
@@ -158,7 +225,19 @@ export function AppNavBar({
 
   return (
     <>
-      <header className={`g3-nav${flat ? " is-flat" : ""}`}>
+      {isDemoPage && (
+        <div className="g3-demo-banner" role="note">
+          <span>
+            This is the public demo. Everything resets at midnight Eastern, and anyone can see what
+            you change.
+          </span>
+          <span className="g3-demo-banner-links">
+            <a href={`${appUrl("id")}/demo`}>Switch role</a>
+            <a href={platformUrl}>Back to Gearbox</a>
+          </span>
+        </div>
+      )}
+      <header className={`g3-nav${flat ? " is-flat" : ""}${hasApps ? " has-apps" : ""}`}>
         {!flat && (
           <button
             type="button"
@@ -181,12 +260,8 @@ export function AppNavBar({
         </nav>
         <div className="g3-nav-end">
           {actions && <div className="g3-nav-actions">{actions}</div>}
+          {hello}
           <ThemeToggle />
-          {allApps && (
-            <a className="g3-nav-all-apps" href={ALL_APPS_URL}>
-              All Apps
-            </a>
-          )}
         </div>
       </header>
 
@@ -211,21 +286,36 @@ export function AppNavBar({
               <CloseIcon />
             </button>
           </div>
-          <nav className="g3-nav-drawer-links" aria-label="Pages">
+          <nav className="g3-nav-drawer-links" aria-label="Menu">
+            {/* The pages are only here on a phone: a wide bar has them across the top. */}
             {groups.map(([name, groupItems], i) => (
-              <div key={name || i} className="g3-nav-drawer-group">
+              <div key={name || i} className="g3-nav-drawer-group g3-nav-drawer-pages">
                 {groupItems.map((item) => renderItem(item, true))}
               </div>
             ))}
+            {appLinks.length > 0 && (
+              <div className="g3-nav-drawer-group g3-nav-drawer-apps">
+                <span className="g3-nav-drawer-title">All Apps</span>
+                {appLinks.map((app) => {
+                  const current = new URL(app.href, window.location.href).host === here;
+                  return (
+                    <a
+                      key={app.key}
+                      className={`g3-nav-link${current ? " is-active" : ""}`}
+                      href={app.href}
+                      aria-current={current ? "page" : undefined}
+                    >
+                      {app.label}
+                    </a>
+                  );
+                })}
+              </div>
+            )}
           </nav>
           <div className="g3-nav-drawer-foot">
             {actions && <div className="g3-nav-actions">{actions}</div>}
-            <ThemeToggle labelled />
-            {allApps && (
-              <a className="g3-nav-all-apps" href={ALL_APPS_URL}>
-                All Apps
-              </a>
-            )}
+            <ThemeToggle labeled />
+            {version && <span className="g3-nav-version">{version}</span>}
           </div>
         </div>
       )}
@@ -234,14 +324,14 @@ export function AppNavBar({
 }
 
 /** Switches light/dark for every G3 app. */
-export function ThemeToggle({ labelled = false }: { labelled?: boolean }) {
+export function ThemeToggle({ labeled = false }: { labeled?: boolean }) {
   const [theme, setTheme] = useTheme();
   const next = theme === "dark" ? "light" : "dark";
   const label = next === "dark" ? "Dark mode" : "Light mode";
   return (
     <button
       type="button"
-      className={`g3-nav-theme${labelled ? " is-labelled" : ""}`}
+      className={`g3-nav-theme${labeled ? " is-labeled" : ""}`}
       onClick={() => setTheme(next)}
       aria-label={`Switch to ${next} mode`}
       title={`Switch to ${next} mode`}

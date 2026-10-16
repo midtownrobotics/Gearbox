@@ -32,7 +32,7 @@ export function counterDeltas(prev: Counters, curr: Counters, reset = false): Co
 
 /**
  * Attributes per-IP deltas to clients by MAC (IPs change, MACs don't), using
- * the current DHCP leases. IPs without a lease are keyed "ip:<addr>". WAN
+ * the LAN's known devices (leases and neighbor table). IPs with no known MAC are keyed "ip:<addr>". WAN
  * interface totals go to the "_wan" pseudo-client.
  */
 export function attribute(deltas: Counters, leases: Lease[]): Map<string, Usage> {

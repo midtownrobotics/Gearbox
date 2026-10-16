@@ -1,7 +1,7 @@
+import { ErrorBanner, Loading, Page } from "@g3/ui";
 import { useEffect, useMemo, useState } from "react";
 import { fetchActions } from "../../shared/getters";
 import type { Action } from "../../shared/types";
-import { ErrorBanner, PageLoading } from "../../shared/ui";
 import { useUserNames } from "../../shared/use-user-names";
 
 const MEDALS: Record<number, { emoji: string; ring: string }> = {
@@ -33,29 +33,21 @@ export function LeaderboardPage() {
 
   const resolveName = useUserNames(standings.map((s) => s.userId));
 
-  if (error)
+  if (error || !actions)
     return (
-      <main className="min-h-screen bg-page">
-        <div className="max-w-3xl mx-auto px-6 py-8">
-          <ErrorBanner message={error} />
-        </div>
-      </main>
+      <Page title="Leaderboard" width="narrow">
+        {error ? <ErrorBanner message={error} /> : <Loading />}
+      </Page>
     );
-  if (!actions) return <PageLoading />;
 
   return (
-    <main className="min-h-screen bg-page">
-      <div className="max-w-3xl mx-auto px-6 py-8 space-y-5">
-        <div>
-          <h1 className="font-display text-4xl text-ink">Leaderboard</h1>
-          <p className="text-steel-dark mt-1 text-sm">Ranked by parts marked complete.</p>
-        </div>
-
-        {standings.length === 0 ? (
-          <p className="text-steel text-sm">
-            No parts completed yet — finish a part on the shop floor to get on the board.
-          </p>
-        ) : (
+    <Page title="Leaderboard" description="Ranked by parts marked complete." width="narrow">
+      {standings.length === 0 ? (
+        <p className="text-secondary-500 text-sm">
+          No parts completed yet. Finish a part on the shop floor to get on the board.
+        </p>
+      ) : (
+        <>
           <div className="space-y-2">
             {standings.map((s, i) => {
               const medal = MEDALS[i];
@@ -63,26 +55,26 @@ export function LeaderboardPage() {
                 <div
                   key={s.userId}
                   className={`flex items-center gap-4 rounded-xl border px-5 ${
-                    medal ? `${medal.ring} py-4` : "bg-paper border-steel/25 py-3"
+                    medal ? `${medal.ring} py-4` : "bg-surface border-secondary-200 py-3"
                   }`}
                 >
                   <span
-                    className={`font-display shrink-0 text-center ${medal ? "text-3xl w-10" : "text-xl w-10 text-steel"}`}
+                    className={`font-display shrink-0 text-center ${medal ? "text-3xl w-10" : "text-xl w-10 text-secondary-400"}`}
                   >
                     {medal ? medal.emoji : `#${i + 1}`}
                   </span>
                   <span
-                    className={`flex-1 min-w-0 truncate font-semibold ${medal ? "text-lg text-ink" : "text-ink"}`}
+                    className={`flex-1 min-w-0 truncate font-semibold ${medal ? "text-lg text-secondary-900" : "text-secondary-900"}`}
                   >
                     {resolveName(s.userId)}
                   </span>
                   <span className="shrink-0 text-right">
                     <span
-                      className={`font-bold ${medal ? "text-2xl text-ink" : "text-lg text-steel-dark"}`}
+                      className={`font-bold ${medal ? "text-2xl text-secondary-900" : "text-lg text-secondary-500"}`}
                     >
                       {s.completed}
                     </span>
-                    <span className="text-xs text-steel ml-1.5">
+                    <span className="text-xs text-secondary-400 ml-1.5">
                       part{s.completed === 1 ? "" : "s"}
                     </span>
                   </span>
@@ -90,8 +82,8 @@ export function LeaderboardPage() {
               );
             })}
           </div>
-        )}
-      </div>
-    </main>
+        </>
+      )}
+    </Page>
   );
 }

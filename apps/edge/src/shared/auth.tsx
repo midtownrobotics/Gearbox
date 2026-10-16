@@ -1,8 +1,15 @@
+import { PageLoading } from "@g3/ui";
 import { type ReactNode, createContext, useContext, useEffect, useState } from "react";
 import { api, redirectToLogin } from "./api";
-import { PageLoading } from "./ui";
+import { setBoxTimeZone } from "./format";
 
-export type AuthUser = { userId: string; displayName: string; isAdmin: boolean };
+export type AuthUser = {
+  userId: string;
+  displayName: string;
+  isAdmin: boolean;
+  /** The team's box's time zone: the app shows its days and times. */
+  timeZone: string;
+};
 
 const AuthUserContext = createContext<AuthUser | null>(null);
 
@@ -19,7 +26,11 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
   useEffect(() => {
     api.me
       .$get()
-      .then(async (res) => setUser(res.ok ? await res.json() : null))
+      .then(async (res) => {
+        const me: AuthUser | null = res.ok ? await res.json() : null;
+        if (me) setBoxTimeZone(me.timeZone);
+        setUser(me);
+      })
       .catch(() => setUser(null));
   }, []);
 

@@ -4,5 +4,5 @@ import { ReceivingPage } from "./receiving-page";
 export const receivingPlugin: Plugin = {
   name: "receiving",
   routes: [{ path: "/receiving", element: <ReceivingPage /> }],
-  navItems: [{ label: "Receiving", to: "/receiving", order: 36 }],
+  navItems: [{ label: "Deliveries", to: "/receiving", order: 36 }],
 };

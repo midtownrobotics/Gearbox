@@ -15,14 +15,17 @@ export type InstanceRow = {
 
 export type InstanceState = "todo" | "doing" | "waiting" | "complete" | "no-processes";
 
+/** What a step's stored status is called on a page. */
+export const STATUS_LABELS = { todo: "To Do", doing: "In Progress", done: "Complete" } as const;
+
 export const STATE_META: Record<InstanceState, { label: string; badge: string }> = {
-  todo: { label: "To Do", badge: "bg-steel-tint text-steel-dark border-steel/40" },
+  todo: { label: "To Do", badge: "bg-inset text-secondary-500 border-secondary-300" },
   doing: { label: "In Progress", badge: "bg-amber-50 text-amber-700 border-amber-300" },
-  waiting: { label: "Waiting", badge: "bg-mist text-steel border-steel/30" },
+  waiting: { label: "Waiting", badge: "bg-page text-secondary-400 border-secondary-200" },
   complete: { label: "Complete", badge: "bg-emerald-50 text-emerald-700 border-emerald-300" },
   "no-processes": {
     label: "No Processes",
-    badge: "bg-mist text-steel border-dashed border-steel/40",
+    badge: "bg-page text-secondary-400 border-dashed border-secondary-300",
   },
 };
 
@@ -58,6 +61,16 @@ export function buildInstanceRows(
     rows.push({ instance, definition, procs, current, state });
   }
   return rows;
+}
+
+/**
+ * A revision that is no longer made: one marked obsolete, or one whose every instance has been
+ * made obsolete.
+ */
+export function isObsoleteRevision(definition: PartDefinition, instances: PartInstance[]): boolean {
+  if (definition.isObsolete) return true;
+  const own = instances.filter((i) => i.partDefinitionId === definition.id);
+  return own.length > 0 && own.every((i) => i.isStale);
 }
 
 export function partLabel(row: InstanceRow): string {
@@ -144,39 +157,6 @@ export function matchMachineProcess(
   if (!machineName) return null;
   const wanted = machineName.trim().toLowerCase();
   return processes.find((p) => p.name.trim().toLowerCase() === wanted) ?? null;
-}
-
-/** Status for a single machine based on how much work it has queued. */
-export function machineMood(todo: number, doing: number): ShopMood {
-  if (todo === 0 && doing === 0) {
-    return { label: "Idle", blurb: "No parts queued for this machine.", tone: "calm" };
-  }
-  if (doing === 0) {
-    if (todo >= 5) {
-      return {
-        label: "Backing Up",
-        blurb: `${todo} parts are waiting and nothing is running.`,
-        tone: "warn",
-      };
-    }
-    return {
-      label: "Ready",
-      blurb: `${todo} part${todo === 1 ? " is" : "s are"} ready to start.`,
-      tone: "steady",
-    };
-  }
-  if (todo >= 5) {
-    return {
-      label: "Slammed",
-      blurb: `${doing} running with ${todo} more waiting — this machine is the bottleneck.`,
-      tone: "hot",
-    };
-  }
-  return {
-    label: "Running",
-    blurb: `${doing} in progress, ${todo} up next.`,
-    tone: "steady",
-  };
 }
 
 export type ShopMood = {

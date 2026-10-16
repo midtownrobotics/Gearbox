@@ -1,4 +1,5 @@
-import { inArray, isNotNull } from "drizzle-orm";
+import { inTeam, withTeam } from "@g3/auth";
+import { eq, isNotNull } from "drizzle-orm";
 import type { OrdersDb } from "../db";
 import {
   budgetCategories,
@@ -8,6 +9,8 @@ import {
   vendorOrders,
 } from "../db/schema";
 import { parseCsv } from "./csv";
+import { zonedTime } from "./fiscal";
+import { teamSettings } from "./settings";
 import { vendorName } from "./vendors";
 
 // Imports the team's purchasing spreadsheet (the format /orders/export.csv writes). Consecutive
@@ -79,12 +82,27 @@ function money(s: string): number | null {
   return Number.isFinite(n) ? Math.round(n * 100) : null;
 }
 
-/** M/D/YYYY → midday Eastern that day (so the date never shifts in any US time zone). */
-function sheetDate(s: string): number | null {
+/** M/D/YYYY → [year, month, day], or null. */
+function sheetDay(s: string): [number, number, number] | null {
   const m = clean(s).match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
   if (!m) return null;
   const year = Number(m[3]) < 100 ? 2000 + Number(m[3]) : Number(m[3]);
-  return Date.UTC(year, Number(m[1]) - 1, Number(m[2]), 16);
+  return [year, Number(m[1]), Number(m[2])];
+}
+
+/** M/D/YYYY → midday that day in the importer's time zone (so the date never shifts). */
+function sheetDate(s: string, timeZone: string): number | null {
+  const day = sheetDay(s);
+  return day ? zonedTime(...day, 12, timeZone) : null;
+}
+
+/**
+ * The date as row fingerprints have always written it (16:00 UTC that day), so a sheet imported
+ * before teams had time zones is still recognized and skipped.
+ */
+function keyDate(s: string): number | null {
+  const day = sheetDay(s);
+  return day ? Date.UTC(day[0], day[1] - 1, day[2], 16) : null;
 }
 
 function isUrl(s: string) {
@@ -97,7 +115,7 @@ function isUrl(s: string) {
 }
 
 /** Reads the sheet into orders (placed) and lines not placed yet, with warnings for odd rows. */
-export function planSheet(text: string): SheetPlan | string {
+export function planSheet(text: string, timeZone: string): SheetPlan | string {
   const rows = parseCsv(text);
   const header = (rows[0] ?? []).map((h) =>
     clean(h)
@@ -131,7 +149,7 @@ export function planSheet(text: string): SheetPlan | string {
     if (!part) return; // blank or totals-only rows
     const vendor = vendorName(get("supplier")) || "Unknown vendor";
     const category = get("category") || "Uncategorized";
-    const placedAt = sheetDate(get("placedAt"));
+    const placedAt = sheetDate(get("placedAt"), timeZone);
     const placedBy = get("placedBy") || "Order sheet";
     const quantity = Number.parseInt(get("quantity"), 10) || 1;
     const unit = money(get("unit"));
@@ -151,7 +169,9 @@ export function planSheet(text: string): SheetPlan | string {
     const notes = get("notes");
     const sku = get("sku") || null;
     // Identical rows can repeat (the same part bought twice); the occurrence keeps keys unique.
-    const base = [vendor, placedAt ?? "", part, sku ?? "", quantity, total].join("|");
+    const base = [vendor, keyDate(get("placedAt")) ?? "", part, sku ?? "", quantity, total].join(
+      "|",
+    );
     const occurrence = (seen.get(base) ?? 0) + 1;
     seen.set(base, occurrence);
     const line: SheetLine = {
@@ -169,7 +189,7 @@ export function planSheet(text: string): SheetPlan | string {
           .join(" — ")
           .slice(0, 1000) || "Imported from the order sheet.",
       category,
-      receivedAt: sheetDate(get("receivedAt")),
+      receivedAt: sheetDate(get("receivedAt"), timeZone),
       receivedBy: get("receivedBy") || null,
       key: `${base}|${occurrence}`,
     };
@@ -247,10 +267,14 @@ export type ImportSummary = {
 /** Plans (and unless `dryRun`, performs) the import. Rows imported before are skipped. */
 export async function importSheet(
   db: OrdersDb,
+  teamId: string,
+  /** The importer's time zone: the sheet's dates are theirs. */
+  timeZone: string,
   text: string,
   dryRun: boolean,
 ): Promise<ImportSummary | string> {
-  const plan = planSheet(text);
+  const settings = await teamSettings(db, teamId);
+  const plan = planSheet(text, timeZone);
   if (typeof plan === "string") return plan;
 
   // Skip rows already imported. A placed order is skipped whole if any of its rows exist.
@@ -262,7 +286,7 @@ export async function importSheet(
       await db
         .select({ key: orderRequests.importKey })
         .from(orderRequests)
-        .where(isNotNull(orderRequests.importKey))
+        .where(inTeam(orderRequests, teamId, isNotNull(orderRequests.importKey)))
         .all()
     ).map((r) => r.key),
   );
@@ -275,6 +299,7 @@ export async function importSheet(
   const categories = await db
     .select({ id: budgetCategories.id, name: budgetCategories.name, code: budgetCategories.code })
     .from(budgetCategories)
+    .where(inTeam(budgetCategories, teamId))
     .all();
   const labels = new Set([
     ...orders.flatMap((o) => [...o.lines.map((l) => l.category), ...o.fees.map((f) => f.category)]),
@@ -310,7 +335,13 @@ export async function importSheet(
     if (m.action === "create") {
       const created = await db
         .insert(budgetCategories)
-        .values({ name: m.label, code: /^\d+$/.test(m.label) ? m.label : null, createdAt: now })
+        .values(
+          withTeam(teamId, {
+            name: m.label,
+            code: /^\d+$/.test(m.label) ? m.label : null,
+            createdAt: now,
+          }),
+        )
         .returning({ id: budgetCategories.id })
         .get();
       categoryId.set(m.label, created.id);
@@ -319,13 +350,13 @@ export async function importSheet(
         await db
           .update(budgetCategories)
           .set({ code: m.label })
-          .where(inArray(budgetCategories.id, [m.id as number]));
+          .where(inTeam(budgetCategories, teamId, eq(budgetCategories.id, m.id as number)));
       }
       categoryId.set(m.label, m.id as number);
     }
   }
 
-  const events: (typeof requestEvents.$inferInsert)[] = [];
+  const events: Omit<typeof requestEvents.$inferInsert, "teamId">[] = [];
   const insertLines = async (
     lines: SheetLine[],
     order: { id: number; placedAt: number; placedBy: string } | null,
@@ -340,7 +371,7 @@ export async function importSheet(
         title: l.title,
         sku: l.sku,
         unitPriceCents: l.unitPriceCents,
-        currency: "USD",
+        currency: settings.currency,
         quantity: l.quantity,
         categoryId: categoryId.get(l.category) as number,
         reason: l.reason,
@@ -355,12 +386,12 @@ export async function importSheet(
         updatedAt: now,
       };
     });
-    // ~20 columns per row: 4 rows per statement stays under D1's 100 bound parameters.
+    // ~21 columns per row: 4 rows per statement stays under D1's 100 bound parameters.
     for (let i = 0; i < values.length; i += 4) {
       const chunk = values.slice(i, i + 4);
       const ids = await db
         .insert(orderRequests)
-        .values(chunk)
+        .values(withTeam(teamId, chunk))
         .returning({ id: orderRequests.id, key: orderRequests.importKey })
         .all();
       for (const { id, key } of ids) {
@@ -412,32 +443,37 @@ export async function importSheet(
       o.fees.filter((f) => f.kind === kind).reduce((n, f) => n + f.cents, 0);
     const order = await db
       .insert(vendorOrders)
-      .values({
-        vendor: o.vendor,
-        placedById: IMPORT_USER,
-        placedByName: o.placedBy,
-        shippingCents: fee("Shipping"),
-        taxCents: fee("Tax"),
-        tracking: o.tracking,
-        placedAt: o.placedAt,
-      })
+      .values(
+        withTeam(teamId, {
+          vendor: o.vendor,
+          placedById: IMPORT_USER,
+          placedByName: o.placedBy,
+          shippingCents: fee("Shipping"),
+          taxCents: fee("Tax"),
+          tracking: o.tracking,
+          placedAt: o.placedAt,
+        }),
+      )
       .returning({ id: vendorOrders.id })
       .get();
     if (o.fees.length) {
       await db.insert(orderCharges).values(
-        o.fees.map((f) => ({
-          orderId: order.id,
-          kind: f.kind,
-          categoryId: categoryId.get(f.category) as number,
-          cents: f.cents,
-        })),
+        withTeam(
+          teamId,
+          o.fees.map((f) => ({
+            orderId: order.id,
+            kind: f.kind,
+            categoryId: categoryId.get(f.category) as number,
+            cents: f.cents,
+          })),
+        ),
       );
     }
     await insertLines(o.lines, { id: order.id, placedAt: o.placedAt, placedBy: o.placedBy });
   }
   if (unplaced.length) await insertLines(unplaced, null);
-  for (let i = 0; i < events.length; i += 15) {
-    await db.insert(requestEvents).values(events.slice(i, i + 15));
+  for (let i = 0; i < events.length; i += 14) {
+    await db.insert(requestEvents).values(withTeam(teamId, events.slice(i, i + 14)));
   }
   return summary;
 }

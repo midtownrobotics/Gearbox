@@ -1,4 +1,4 @@
-import { Card, Page } from "../../shared/ui";
+import { Card, Page } from "@g3/ui";
 
 const DRIVE_URL = "http://drive.local";
 const DRIVE_IP_URL = "http://192.168.50.1";
@@ -11,20 +11,19 @@ const DRIVE_IP_URL = "http://192.168.50.1";
  */
 export function DrivePage() {
   return (
-    <Page title="Shop Drive">
+    <Page title="Drive">
       <Card>
         <div className="space-y-4">
           <p className="text-secondary-700">
-            A shared 10 GB drive on the edge box for big files (CAD exports, installers, videos), so
-            they only need to come over the internet once. Uploads and downloads go straight between
-            your device and the box over the shop network.
+            A shared 10 GB drive for big files (CAD exports, installers, videos). Files move over
+            the shop network, not the internet.
           </p>
           <div className="flex flex-wrap items-center gap-3">
             <a
               href={DRIVE_URL}
               target="_blank"
               rel="noreferrer"
-              className="text-sm font-medium rounded-lg px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white"
+              className="text-sm font-medium rounded-lg px-4 py-2 bg-primary-500 hover:bg-primary-600 text-on-primary"
             >
               Open the drive
             </a>

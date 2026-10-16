@@ -1,7 +1,7 @@
+import { Button, Card, ConfirmButton, ErrorBanner, Field, TextField, inputClass } from "@g3/ui";
 import { useState } from "react";
 import { api, getErrorMessage } from "../../shared/api";
 import type { CatalogItem } from "../../shared/types";
-import { Button, Card, ErrorBanner, Field, inputClass } from "../../shared/ui";
 
 /** "Length: 1/2\"" per line ↔ {"Length": "1/2\""}. */
 const optionsText = (options: Record<string, string>) =>
@@ -35,6 +35,7 @@ export function ItemEditor({
   const [vendor, setVendor] = useState(item?.vendor ?? "");
   const [sku, setSku] = useState(item?.sku ?? "");
   const [url, setUrl] = useState(item?.url ?? "");
+  const [packQuantity, setPackQuantity] = useState(String(item?.packQuantity ?? 1));
   const [options, setOptions] = useState(optionsText(item?.options ?? {}));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -47,9 +48,13 @@ export function ItemEditor({
       sku: sku.trim() || null,
       url: url.trim(),
       options: parseOptions(options),
+      packQuantity: Number(packQuantity),
     };
     if (!json.name || !json.category || !json.vendor || !json.url) {
       return setError("Name, category, vendor and link are all needed.");
+    }
+    if (!Number.isInteger(json.packQuantity) || json.packQuantity < 1) {
+      return setError("Pack of must be a whole number, 1 or more.");
     }
     setBusy(true);
     setError(null);
@@ -62,7 +67,7 @@ export function ItemEditor({
   }
 
   async function remove() {
-    if (!item || !window.confirm(`Delete “${item.name}” from the catalog?`)) return;
+    if (!item) return;
     setBusy(true);
     const res = await api.catalog.items[":id"].$delete({ param: { id: String(item.id) } });
     setBusy(false);
@@ -75,8 +80,8 @@ export function ItemEditor({
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="col-span-2 sm:col-span-4">
           <Field label="Name">
-            <input
-              className={inputClass}
+            <TextField
+              kind="partName"
               value={name}
               onChange={(e) => setName(e.target.value)}
               maxLength={300}
@@ -85,9 +90,9 @@ export function ItemEditor({
         </div>
         <div className="col-span-2">
           <Field label="Link" hint="The product page, if you can find it">
-            <input
+            <TextField
+              kind="url"
               type="url"
-              className={inputClass}
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               placeholder="https://…"
@@ -95,14 +100,20 @@ export function ItemEditor({
           </Field>
         </div>
         <Field label="Vendor">
-          <input
-            className={inputClass}
-            value={vendor}
-            onChange={(e) => setVendor(e.target.value)}
-          />
+          <TextField kind="vendor" value={vendor} onChange={(e) => setVendor(e.target.value)} />
         </Field>
         <Field label="Part number">
-          <input className={inputClass} value={sku} onChange={(e) => setSku(e.target.value)} />
+          <TextField kind="sku" value={sku} onChange={(e) => setSku(e.target.value)} />
+        </Field>
+        <Field label="Pack of" hint="Parts in one of these">
+          <input
+            type="number"
+            min={1}
+            max={10000}
+            className={inputClass}
+            value={packQuantity}
+            onChange={(e) => setPackQuantity(e.target.value)}
+          />
         </Field>
         <div className="col-span-2">
           <Field label="Category" hint="Missing one? Use “New category” first">
@@ -124,8 +135,10 @@ export function ItemEditor({
         </div>
         <div className="col-span-2">
           <Field label="Sizes and types" hint='One per line, like Length: 1/2"'>
-            <textarea
-              className={`${inputClass} min-h-16 font-mono text-xs`}
+            <TextField
+              multiline
+              kind="options"
+              className="min-h-16 font-mono text-xs"
               value={options}
               onChange={(e) => setOptions(e.target.value)}
             />
@@ -141,9 +154,15 @@ export function ItemEditor({
           Cancel
         </Button>
         {item && (
-          <Button variant="danger" onClick={remove} disabled={busy} className="ml-auto">
-            Delete
-          </Button>
+          <>
+            <span className="flex-1" />
+            <ConfirmButton
+              label="Delete"
+              question={`Delete “${item.name}” from the catalog? This can't be undone.`}
+              disabled={busy}
+              onConfirm={remove}
+            />
+          </>
         )}
       </div>
     </Card>

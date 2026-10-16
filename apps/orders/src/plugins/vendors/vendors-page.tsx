@@ -1,14 +1,15 @@
+import { Button, Card, ErrorBanner, Field, Loading, Page, TextField, inputClass } from "@g3/ui";
 import { type FormEvent, useState } from "react";
 import { api, getErrorMessage } from "../../shared/api";
+import { AnswerDialog, ConfirmDialog } from "../../shared/ask";
 import {
   dateInputToMs,
   formatCents,
-  formatDate,
+  formatDay,
   msToDateInput,
   parseDollars,
 } from "../../shared/format";
 import type { VendorProfile } from "../../shared/types";
-import { Button, Card, ErrorBanner, Field, Loading, Page, inputClass } from "../../shared/ui";
 import { useLoad } from "../../shared/use-load";
 import { useVendors } from "../../shared/vendors";
 
@@ -37,8 +38,8 @@ export function VendorsPage() {
 
   return (
     <Page title="Vendors">
-      <input
-        className={inputClass}
+      <TextField
+        typeable
         value={filter}
         onChange={(e) => setFilter(e.target.value)}
         placeholder="Filter vendors…"
@@ -78,7 +79,7 @@ function VendorCard({
   const [editing, setEditing] = useState(false);
   const facts = [
     v.taxExempt &&
-      `Tax exempt${v.taxExemptExpires ? ` (certificate until ${formatDate(v.taxExemptExpires)})` : ""}`,
+      `Tax exempt${v.taxExemptExpires ? ` (certificate until ${formatDay(v.taxExemptExpires)})` : ""}`,
     v.teamAccountLogin && "Sign in to the team account",
     v.freeShippingCents !== null && `Free shipping over ${formatCents(v.freeShippingCents)}`,
     v.typicalShippingCents !== null && `Shipping usually ${formatCents(v.typicalShippingCents)}`,
@@ -112,7 +113,7 @@ function VendorCard({
               🎟 {cr.label}
               {cr.balanceCents !== null && ` · ${formatCents(cr.balanceCents)} left`}
               {cr.code && <span className="ml-1 font-mono text-xs">{cr.code}</span>}
-              {cr.expiresAt !== null && ` · expires ${formatDate(cr.expiresAt)}`}
+              {cr.expiresAt !== null && ` · expires ${formatDay(cr.expiresAt)}`}
             </li>
           ))}
         </ul>
@@ -214,24 +215,24 @@ function ProfileForm({
     <form onSubmit={save} className="space-y-3">
       <div className="grid sm:grid-cols-3 gap-3">
         <Field label="Free shipping over $">
-          <input
-            className={inputClass}
+          <TextField
+            typeable
             inputMode="decimal"
             value={f.freeShipping}
             onChange={(e) => set({ freeShipping: e.target.value })}
           />
         </Field>
         <Field label="Typical shipping $">
-          <input
-            className={inputClass}
+          <TextField
+            typeable
             inputMode="decimal"
             value={f.typicalShipping}
             onChange={(e) => set({ typicalShipping: e.target.value })}
           />
         </Field>
         <Field label="Minimum order $">
-          <input
-            className={inputClass}
+          <TextField
+            typeable
             inputMode="decimal"
             value={f.minimumOrder}
             onChange={(e) => set({ minimumOrder: e.target.value })}
@@ -256,23 +257,23 @@ function ProfileForm({
           />
         </Field>
         <Field label="Order cutoff" hint='e.g. "2 PM ET for same-day shipping"'>
-          <input
-            className={inputClass}
+          <TextField
+            kind="text"
             value={f.orderCutoff}
             onChange={(e) => set({ orderCutoff: e.target.value })}
           />
         </Field>
         <Field label="Payment method">
-          <input
-            className={inputClass}
+          <TextField
+            kind="payment"
             value={f.paymentMethod}
             onChange={(e) => set({ paymentMethod: e.target.value })}
             placeholder="e.g. Team credit card, PO"
           />
         </Field>
         <Field label="Account owner">
-          <input
-            className={inputClass}
+          <TextField
+            kind="person"
             value={f.accountOwner}
             onChange={(e) => set({ accountOwner: e.target.value })}
           />
@@ -322,8 +323,10 @@ function ProfileForm({
         </label>
       </div>
       <Field label="Notes">
-        <textarea
-          className={`${inputClass} min-h-16`}
+        <TextField
+          multiline
+          kind="note"
+          className="min-h-16"
           value={f.notes}
           onChange={(e) => set({ notes: e.target.value })}
           maxLength={500}
@@ -368,14 +371,13 @@ function Credits({ vendor: v, onChanged }: { vendor: VendorProfile; onChanged: (
     onChanged();
   }
 
-  async function setCreditBalance(id: number, current: number | null) {
-    const answer = window.prompt(
-      "New balance ($):",
-      current === null ? "" : (current / 100).toFixed(2),
-    );
-    if (answer === null) return;
-    const balanceCents = parseDollars(answer);
-    if (Number.isNaN(balanceCents)) return setError("Balance must be a dollar amount.");
+  type Credit = (typeof v.credits)[number];
+  // The credit whose balance is being typed, or that is being removed, while a pop-up asks.
+  const [updating, setUpdating] = useState<Credit | null>(null);
+  const [removing, setRemoving] = useState<Credit | null>(null);
+
+  async function setCreditBalance(id: number, balanceCents: number | null) {
+    setUpdating(null);
     const res = await api.vendors.credits[":id"].$patch({
       param: { id: String(id) },
       json: { balanceCents },
@@ -385,7 +387,7 @@ function Credits({ vendor: v, onChanged }: { vendor: VendorProfile; onChanged: (
   }
 
   async function remove(id: number) {
-    if (!window.confirm("Remove this credit?")) return;
+    setRemoving(null);
     const res = await api.vendors.credits[":id"].$delete({ param: { id: String(id) } });
     if (!res.ok) return setError(await getErrorMessage(res));
     onChanged();
@@ -404,25 +406,53 @@ function Credits({ vendor: v, onChanged }: { vendor: VendorProfile; onChanged: (
                 {CREDIT_KINDS[cr.kind]}: {cr.label}
                 {cr.code && <span className="ml-1 font-mono text-xs">{cr.code}</span>}
                 {cr.balanceCents !== null && ` · ${formatCents(cr.balanceCents)} left`}
-                {cr.expiresAt !== null && ` · expires ${formatDate(cr.expiresAt)}`}
+                {cr.expiresAt !== null && ` · expires ${formatDay(cr.expiresAt)}`}
               </span>
               <button
                 type="button"
                 className="text-xs underline text-secondary-500"
-                onClick={() => setCreditBalance(cr.id, cr.balanceCents)}
+                onClick={() => setUpdating(cr)}
               >
                 Update balance
               </button>
               <button
                 type="button"
                 className="text-xs underline text-secondary-500"
-                onClick={() => remove(cr.id)}
+                onClick={() => setRemoving(cr)}
               >
                 Remove
               </button>
             </li>
           ))}
         </ul>
+      )}
+      {updating && (
+        <AnswerDialog
+          title="Update balance"
+          label={`What's left on ${updating.label} ($)`}
+          initial={updating.balanceCents === null ? "" : (updating.balanceCents / 100).toFixed(2)}
+          inputMode="decimal"
+          confirmLabel="Save"
+          onSubmit={(answer) => {
+            const balanceCents = parseDollars(answer);
+            if (Number.isNaN(balanceCents)) return "Balance must be a dollar amount.";
+            void setCreditBalance(updating.id, balanceCents);
+            return undefined;
+          }}
+          onClose={() => setUpdating(null)}
+        />
+      )}
+      {removing && (
+        <ConfirmDialog
+          title="Remove credit"
+          confirmLabel="Remove it"
+          keepLabel="Keep it"
+          danger
+          onConfirm={() => void remove(removing.id)}
+          onClose={() => setRemoving(null)}
+        >
+          Remove {removing.label} from {v.name}?
+        </ConfirmDialog>
       )}
       <form onSubmit={add} className="flex flex-wrap gap-2 items-start">
         <select
@@ -436,21 +466,24 @@ function Credits({ vendor: v, onChanged }: { vendor: VendorProfile; onChanged: (
             </option>
           ))}
         </select>
-        <input
-          className={`${inputClass} sm:!w-48`}
+        <TextField
+          kind="credit"
+          className="sm:!w-48"
           value={label}
           onChange={(e) => setLabel(e.target.value)}
           placeholder="Label (e.g. Sponsor 15% off)"
           required
         />
-        <input
-          className={`${inputClass} sm:!w-32`}
+        <TextField
+          kind="code"
+          className="sm:!w-32"
           value={code}
           onChange={(e) => setCode(e.target.value)}
           placeholder="Code"
         />
-        <input
-          className={`${inputClass} sm:!w-28`}
+        <TextField
+          typeable
+          className="sm:!w-28"
           inputMode="decimal"
           value={balance}
           onChange={(e) => setBalance(e.target.value)}

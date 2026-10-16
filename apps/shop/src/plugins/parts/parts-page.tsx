@@ -1,5 +1,17 @@
-import { useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import {
+  Button,
+  Card,
+  Chip,
+  Dialog,
+  ErrorBanner,
+  Field,
+  Loading,
+  Page,
+  TextField,
+  inputClass,
+} from "@g3/ui";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   type InstanceRow,
   type InstanceState,
@@ -7,7 +19,6 @@ import {
   buildInstanceRows,
 } from "../../shared/derive";
 import { processPath } from "../../shared/nav";
-import { ErrorBanner, PageLoading } from "../../shared/ui";
 import { useAuthUser } from "../../shared/use-auth";
 import type { ShopData } from "../../shared/use-shop-data";
 import { useShopData } from "../../shared/use-shop-data";
@@ -60,7 +71,19 @@ export function PartsPage() {
   const navigate = useNavigate();
   const user = useAuthUser();
   const [selectedInstanceId, setSelectedInstanceId] = useState<number | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
   const [lookupPartNumber, setLookupPartNumber] = useState("");
+
+  // A link to a part's details view (`?instance=`, from its shop view) opens its card. The
+  // address is then put back as it was, so closing the card doesn't leave it to open again.
+  useEffect(() => {
+    const instance = searchParams.get("instance");
+    if (!instance) return;
+    setSelectedInstanceId(Number(instance));
+    const rest = new URLSearchParams(searchParams);
+    rest.delete("instance");
+    setSearchParams(rest, { replace: true });
+  }, [searchParams, setSearchParams]);
   const [showRestrictedModal, setShowRestrictedModal] = useState(false);
 
   const handleAddPartClick = () => {
@@ -93,7 +116,12 @@ export function PartsPage() {
     return map;
   }, [data]);
 
-  if (loading) return <PageLoading />;
+  if (loading)
+    return (
+      <Page title="Parts">
+        <Loading />
+      </Page>
+    );
 
   const selectedRow =
     selectedInstanceId !== null
@@ -101,29 +129,22 @@ export function PartsPage() {
       : null;
 
   return (
-    <main className="min-h-screen bg-page">
-      <div className="max-w-5xl mx-auto px-6 py-8 space-y-8">
-        <div className="flex items-center justify-between gap-3">
-          <h1 className="font-display text-4xl text-ink">Parts</h1>
-          <button
-            type="button"
-            onClick={handleAddPartClick}
-            className={`bg-crimson hover:bg-crimson-dark text-paper text-sm font-semibold rounded-lg transition-colors ${
-              touch ? "px-5 py-3" : "px-4 py-2"
-            }`}
-          >
-            + Add Part
-          </button>
-        </div>
-
+    <Page
+      title="Parts"
+      actions={
+        <Button size={touch ? "lg" : "md"} onClick={handleAddPartClick}>
+          Add a part
+        </Button>
+      }
+    >
+      <>
         {error && <ErrorBanner message={error} />}
 
         {/* Full Part Details Lookup */}
-        <div className="bg-paper border border-steel/30 rounded-xl p-5">
-          <h2 className="font-semibold text-ink mb-3">Full Part Details</h2>
+        <Card title="Full part details">
           <div className="flex gap-2">
-            <input
-              type="text"
+            <TextField
+              typeable
               value={lookupPartNumber}
               onChange={(e) => setLookupPartNumber(e.target.value)}
               onKeyDown={(e) => {
@@ -132,21 +153,19 @@ export function PartsPage() {
                 }
               }}
               placeholder="Enter part number (e.g., P-0042)"
-              className="flex-1 bg-paper border border-steel/40 rounded-lg px-3 py-2 text-sm text-ink placeholder-steel focus:outline-none focus:border-crimson"
+              className="flex-1"
             />
-            <button
-              type="button"
+            <Button
               onClick={() => {
                 if (lookupPartNumber.trim()) {
                   navigate(`/part?p=${encodeURIComponent(lookupPartNumber.trim())}`);
                 }
               }}
-              className="px-4 py-2 bg-crimson hover:bg-crimson-dark text-paper text-sm font-semibold rounded-lg transition-colors"
             >
               View
-            </button>
+            </Button>
           </div>
-        </div>
+        </Card>
 
         {data && (
           <>
@@ -179,46 +198,33 @@ export function PartsPage() {
             />
           </>
         )}
-      </div>
 
-      {selectedRow && data && (
-        <PartCard
-          row={selectedRow}
-          data={data}
-          onClose={() => setSelectedInstanceId(null)}
-          onChanged={refresh}
-        />
-      )}
+        {selectedRow && data && (
+          <PartCard
+            row={selectedRow}
+            data={data}
+            onClose={() => setSelectedInstanceId(null)}
+            onChanged={refresh}
+          />
+        )}
 
-      {/* Restricted Add Part Modal */}
-      {showRestrictedModal && (
-        <div className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center p-4">
-          <div className="bg-paper rounded-lg shadow-lg max-w-sm w-full p-6 space-y-4">
-            <h3 className="text-lg font-bold text-ink">Manual Part Entry Restricted</h3>
-            <p className="text-sm text-steel space-y-3">
-              <div>You can no longer manually create parts.</div>
-              <div className="space-y-2">
-                <div>To add a new part, follow these steps:</div>
-                <ol className="list-decimal list-inside space-y-1 text-xs">
-                  <li>Release the part in OnShape</li>
-                  <li>Get it approved</li>
-                  <li>Assign manufacturing processes</li>
-                  <li>It will then appear in the shop software</li>
-                </ol>
-              </div>
-              <div>If you absolutely need a part manually created, see an admin.</div>
-            </p>
-            <button
-              type="button"
-              onClick={() => setShowRestrictedModal(false)}
-              className="w-full py-2 rounded-lg bg-crimson text-paper text-sm font-semibold hover:bg-crimson-dark transition-colors"
-            >
-              OK
-            </button>
-          </div>
-        </div>
-      )}
-    </main>
+        {/* Restricted Add Part Modal */}
+        {showRestrictedModal && (
+          <Dialog title="Parts come from Onshape" onClose={() => setShowRestrictedModal(false)}>
+            <>
+              <p className="text-sm text-secondary-600">To add a part:</p>
+              <ol className="list-decimal list-inside space-y-1 text-sm text-secondary-600">
+                <li>Release it in Onshape.</li>
+                <li>Get the release approved.</li>
+                <li>Give it its manufacturing processes on Ingest.</li>
+              </ol>
+              <p className="text-sm text-secondary-600">Only an admin can add a part by hand.</p>
+              <Button onClick={() => setShowRestrictedModal(false)}>OK</Button>
+            </>
+          </Dialog>
+        )}
+      </>
+    </Page>
   );
 }
 
@@ -409,41 +415,38 @@ function PartsTable({
     (filters.revision.trim() ? 1 : 0) +
     (filters.minQty > 0 ? 1 : 0);
 
-  const controlPad = touch ? "py-3" : "py-2";
+  const controlPad = touch ? "!py-3" : "";
 
   return (
     <section className="space-y-3">
-      <h2 className="font-display text-2xl text-ink">
-        {title} <span className="text-steel text-lg font-normal">({rows.length})</span>
+      <h2 className="text-2xl text-secondary-900">
+        {title} <span className="text-secondary-400 text-lg font-normal">({rows.length})</span>
       </h2>
 
       {/* Toolbar */}
       <div className="space-y-3">
         <div className="flex flex-wrap items-center gap-2">
-          <input
+          <TextField
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by name, part number, or revision…"
-            className={`flex-1 min-w-52 bg-paper border border-steel/40 rounded-lg px-3 text-sm text-ink placeholder-steel focus:outline-none focus:border-crimson ${controlPad}`}
+            className={`flex-1 min-w-52 ${controlPad}`}
           />
-          <button
-            type="button"
+          <Chip
+            selected={filtersOpen || activeFilterCount > 0}
+            aria-expanded={filtersOpen}
             onClick={() => setFiltersOpen((o) => !o)}
-            className={`px-3 text-sm font-medium rounded-lg border transition-colors ${controlPad} ${
-              filtersOpen || activeFilterCount > 0
-                ? "bg-crimson-tint border-crimson/40 text-crimson-dark"
-                : "bg-paper border-steel/40 text-steel-dark hover:border-steel"
-            }`}
+            className={controlPad}
           >
             Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
-          </button>
-          <label className="flex items-center gap-2 text-sm text-steel-dark">
+          </Chip>
+          <label className="flex items-center gap-2 text-sm text-secondary-500">
             Sort
             <select
               value={sort}
               onChange={(e) => setSort(e.target.value as SortKey)}
-              className={`bg-paper border border-steel/40 rounded-lg px-2.5 text-sm text-ink focus:outline-none focus:border-crimson ${controlPad}`}
+              className={`${inputClass} !w-auto ${controlPad}`}
             >
               <option value="newest">Newest first</option>
               <option value="oldest">Oldest first</option>
@@ -457,7 +460,7 @@ function PartsTable({
         </div>
 
         {filtersOpen && (
-          <div className="bg-paper border border-steel/30 rounded-xl p-4 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+          <div className="bg-surface border border-secondary-200 rounded-xl p-4 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
             <FilterSelect
               label="Priority"
               value={filters.priority}
@@ -495,18 +498,15 @@ function PartsTable({
                 ...Object.entries(STATE_META).map(([k, m]): [string, string] => [k, m.label]),
               ]}
             />
-            <div className="space-y-1">
-              <span className="text-xs font-medium text-steel-dark">Revision</span>
-              <input
-                type="text"
+            <Field label="Revision">
+              <TextField
+                typeable
                 value={filters.revision}
                 onChange={(e) => setFilters({ ...filters, revision: e.target.value })}
                 placeholder="e.g. B"
-                className="w-full bg-paper border border-steel/40 rounded-lg px-2.5 py-1.5 text-sm text-ink placeholder-steel focus:outline-none focus:border-crimson"
               />
-            </div>
-            <div className="space-y-1">
-              <span className="text-xs font-medium text-steel-dark">Min Quantity</span>
+            </Field>
+            <Field label="Min quantity">
               <input
                 type="number"
                 min={0}
@@ -515,14 +515,14 @@ function PartsTable({
                   setFilters({ ...filters, minQty: Math.max(0, Number(e.target.value)) })
                 }
                 placeholder="Any"
-                className="w-full bg-paper border border-steel/40 rounded-lg px-2.5 py-1.5 text-sm text-ink placeholder-steel focus:outline-none focus:border-crimson"
+                className={inputClass}
               />
-            </div>
+            </Field>
             {activeFilterCount > 0 && (
               <button
                 type="button"
                 onClick={() => setFilters(DEFAULT_FILTERS)}
-                className="self-end text-sm text-crimson hover:text-crimson-dark font-medium text-left pb-1.5"
+                className="self-end text-sm text-primary-600 hover:text-primary-700 font-medium text-left pb-1.5"
               >
                 Clear all
               </button>
@@ -532,60 +532,60 @@ function PartsTable({
       </div>
 
       {/* Table */}
-      <div className="bg-paper border border-steel/30 rounded-xl overflow-hidden">
-        <div className="flex items-center gap-3 px-3 py-2 border-b border-steel/25 bg-mist text-xs font-semibold uppercase tracking-wider text-steel">
+      <div className="bg-surface border border-secondary-200 rounded-xl overflow-hidden">
+        <div className="flex items-center gap-3 px-3 py-2 border-b border-secondary-200 bg-page text-xs font-semibold uppercase tracking-wider text-secondary-400">
           <span className="w-3.5 shrink-0" />
           <button
             type="button"
             onClick={() => setSort(sort === "alpha" ? "alpha-rev" : "alpha")}
-            className="flex-1 min-w-0 text-left hover:text-ink transition-colors cursor-pointer"
+            className="flex-1 min-w-0 text-left hover:text-secondary-900 transition-colors cursor-pointer"
           >
             Part {sort === "alpha" ? "↓" : sort === "alpha-rev" ? "↑" : ""}
           </button>
           <button
             type="button"
             onClick={() => setSort(sort === "number" ? "number-rev" : "number")}
-            className="w-44 shrink-0 hidden sm:block text-left hover:text-ink transition-colors cursor-pointer"
+            className="w-44 shrink-0 hidden sm:block text-left hover:text-secondary-900 transition-colors cursor-pointer"
           >
             Number {sort === "number" ? "↓" : sort === "number-rev" ? "↑" : ""}
           </button>
           <button
             type="button"
             onClick={() => setSort(sort === "revision" ? "revision-rev" : "revision")}
-            className="w-12 shrink-0 hidden sm:block text-center hover:text-ink transition-colors cursor-pointer"
+            className="w-12 shrink-0 hidden sm:block text-center hover:text-secondary-900 transition-colors cursor-pointer"
           >
             Rev {sort === "revision" ? "↓" : sort === "revision-rev" ? "↑" : ""}
           </button>
           <button
             type="button"
             onClick={() => setSort(sort === "instance" ? "instance-rev" : "instance")}
-            className="w-16 shrink-0 hidden sm:block text-center hover:text-ink transition-colors cursor-pointer"
+            className="w-16 shrink-0 hidden sm:block text-center hover:text-secondary-900 transition-colors cursor-pointer"
           >
             Inst {sort === "instance" ? "↓" : sort === "instance-rev" ? "↑" : ""}
           </button>
           <button
             type="button"
             onClick={() => setSort(sort === "process" ? "process-rev" : "process")}
-            className="w-40 shrink-0 hidden md:block text-center hover:text-ink transition-colors cursor-pointer"
+            className="w-40 shrink-0 hidden md:block text-center hover:text-secondary-900 transition-colors cursor-pointer"
           >
             Proc {sort === "process" ? "↓" : sort === "process-rev" ? "↑" : ""}
           </button>
           <button
             type="button"
             onClick={() => setSort(sort === "progress" ? "progress-rev" : "progress")}
-            className="w-20 shrink-0 text-center hover:text-ink transition-colors cursor-pointer"
+            className="w-20 shrink-0 text-center hover:text-secondary-900 transition-colors cursor-pointer"
           >
             Progress {sort === "progress" ? "↓" : sort === "progress-rev" ? "↑" : ""}
           </button>
         </div>
 
         {groups.length === 0 && (
-          <p className="text-steel text-sm text-center py-12">
+          <p className="text-secondary-400 text-sm text-center py-12">
             {rows.length === 0 ? emptyAll : "No parts match your search or filters."}
           </p>
         )}
 
-        <div className="divide-y divide-steel/15">
+        <div className="divide-y divide-secondary-200">
           {groups.map((group) =>
             group.map((row, i) => {
               const activeForDef = (data?.instances ?? []).filter(
@@ -647,7 +647,7 @@ function PartRow({
 
   return (
     <div
-      className={`relative flex items-center gap-3 px-3 cursor-pointer hover:bg-mist/70 transition-colors ${
+      className={`relative flex items-center gap-3 px-3 cursor-pointer hover:bg-secondary-50 transition-colors ${
         touch ? "py-4" : "py-2.5"
       }`}
       onClick={onOpen}
@@ -660,39 +660,39 @@ function PartRow({
       <Connector pos={connector} />
 
       <span
-        className="flex-1 min-w-0 text-sm font-medium text-ink truncate"
+        className="flex-1 min-w-0 text-sm font-medium text-secondary-900 truncate"
         title={`Part name: ${row.definition.name}`}
       >
         {row.definition.name}
       </span>
 
       <span
-        className="w-44 shrink-0 hidden sm:block text-sm font-mono text-steel-dark truncate"
+        className="w-44 shrink-0 hidden sm:block text-sm font-mono text-secondary-500 truncate"
         title={`Onshape part number: ${row.definition.onshapePartNumber}`}
       >
         {row.definition.onshapePartNumber}
       </span>
 
       <span
-        className="w-12 shrink-0 hidden sm:block text-xs font-mono text-steel-dark text-center"
+        className="w-12 shrink-0 hidden sm:block text-xs font-mono text-secondary-500 text-center"
         title={`Revision: ${row.definition.revision}`}
       >
         {row.definition.revision}
       </span>
 
       <span
-        className="w-16 shrink-0 hidden sm:block text-xs text-steel-dark text-center"
+        className="w-16 shrink-0 hidden sm:block text-xs text-secondary-500 text-center"
         title={`Instance ${activePosition} of ${total}`}
       >
         {activePosition}/{total}
       </span>
 
-      <span className="w-40 shrink-0 hidden md:block text-sm text-ink text-center">
+      <span className="w-40 shrink-0 hidden md:block text-sm text-secondary-900 text-center">
         {row.current ? (
           <Link
             to={processPath(row.current.processId)}
             onClick={(e) => e.stopPropagation()}
-            className="text-ink hover:text-crimson underline decoration-steel/40 hover:decoration-crimson transition-colors"
+            className="text-secondary-900 hover:text-primary-600 underline decoration-secondary-300 hover:decoration-primary-600 transition-colors"
             title={`Go to ${processName(row.current.processId)} on the shop floor`}
           >
             {processName(row.current.processId)}
@@ -714,7 +714,7 @@ function PartRow({
                 ? "bg-emerald-500"
                 : step === "current"
                   ? "bg-amber-400"
-                  : "bg-steel/20"
+                  : "bg-secondary-200"
             }`}
           />
         ))}
@@ -729,11 +729,11 @@ function Connector({ pos }: { pos: "only" | "first" | "middle" | "last" }) {
   return (
     <span className="relative w-3.5 self-stretch shrink-0" aria-hidden="true">
       <span
-        className={`absolute left-1/2 -translate-x-1/2 w-px bg-steel/50 ${
+        className={`absolute left-1/2 -translate-x-1/2 w-px bg-secondary-300 ${
           pos === "first" ? "top-1/2 bottom-0" : pos === "last" ? "top-0 bottom-1/2" : "inset-y-0"
         }`}
       />
-      <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-steel/60" />
+      <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-secondary-300" />
     </span>
   );
 }
@@ -750,19 +750,14 @@ function FilterSelect({
   options: [string, string][];
 }) {
   return (
-    <div className="space-y-1">
-      <span className="text-xs font-medium text-steel-dark">{label}</span>
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full bg-paper border border-steel/40 rounded-lg px-2.5 py-1.5 text-sm text-ink focus:outline-none focus:border-crimson"
-      >
+    <Field label={label}>
+      <select value={value} onChange={(e) => onChange(e.target.value)} className={inputClass}>
         {options.map(([v, l]) => (
           <option key={v} value={v}>
             {l}
           </option>
         ))}
       </select>
-    </div>
+    </Field>
   );
 }

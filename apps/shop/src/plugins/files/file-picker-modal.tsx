@@ -1,7 +1,9 @@
+import { Button, Dialog, TextField, focusRing, inputClass } from "@g3/ui";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { PartDefinition, PartFile } from "../../shared/types";
+import { batchMembers } from "../../shared/batches";
+import type { Batch, PartFile } from "../../shared/types";
 import { useUserNames } from "../../shared/use-user-names";
-import { UploadButton, formatBytes, formatInstanceRanges, partLabelOf } from "./part-files-panel";
+import { UploadButton, formatBytes } from "./file-ui";
 
 type SortKey = "newest" | "oldest" | "name" | "type" | "size";
 
@@ -18,10 +20,13 @@ export function fileExtension(filename: string): string {
   return dot > 0 && dot < filename.length - 1 ? filename.slice(dot + 1).toLowerCase() : "";
 }
 
-/** Searchable, filterable list of library files; resolves one choice via `onPick`. */
+/**
+ * Searchable, filterable list of the library's files; resolves one choice via `onPick`. Obsolete
+ * files aren't offered: one can't go on another batch.
+ */
 export function FilePickerModal({
-  files,
-  definitions,
+  files: everyFile,
+  batches,
   title = "Choose a file",
   confirmLabel = "Use this file",
   onPick,
@@ -29,7 +34,8 @@ export function FilePickerModal({
   onClose,
 }: {
   files: PartFile[];
-  definitions: PartDefinition[];
+  /** Says which batches already use each file. */
+  batches: Batch[];
   title?: string;
   confirmLabel?: string;
   onPick: (file: PartFile) => void;
@@ -42,21 +48,13 @@ export function FilePickerModal({
   const [sort, setSort] = useState<SortKey>("newest");
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  const files = useMemo(() => everyFile.filter((f) => !f.obsolete), [everyFile]);
+  const obsolete = everyFile.length - files.length;
   const resolveName = useUserNames(files.map((f) => f.uploadedBy));
 
   useEffect(() => {
     searchRef.current?.focus();
   }, []);
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
-  const definitionById = useMemo(() => new Map(definitions.map((d) => [d.id, d])), [definitions]);
 
   const typeCounts = useMemo(() => {
     const counts = new Map<string, number>();
@@ -67,17 +65,14 @@ export function FilePickerModal({
     return [...counts.entries()].sort(([a], [b]) => a.localeCompare(b));
   }, [files]);
 
-  /** "Part 1 · Rev A #1–6; Part 2 · Rev B #1–3" */
-  const coverage = (f: PartFile) => {
-    const byPart = new Map<number, number[]>();
-    for (const a of f.assignments) {
-      byPart.set(a.partDefinitionId, [...(byPart.get(a.partDefinitionId) ?? []), a.instanceNumber]);
+  const usedBy = useMemo(() => {
+    const map = new Map<number, Batch[]>();
+    for (const b of batches) {
+      if (b.fileId === null || batchMembers(b).length === 0) continue;
+      map.set(b.fileId, [...(map.get(b.fileId) ?? []), b]);
     }
-    return [...byPart.entries()].map(([id, numbers]) => {
-      const d = definitionById.get(id);
-      return `${d ? `${d.name || partLabelOf(d)} (${partLabelOf(d)})` : `Part #${id}`} ${formatInstanceRanges(numbers)}`;
-    });
-  };
+    return map;
+  }, [batches]);
 
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -85,13 +80,7 @@ export function FilePickerModal({
       if (type !== "all" && fileExtension(f.filename) !== type) return false;
       if (!q) return true;
       if (f.filename.toLowerCase().includes(q)) return true;
-      return f.assignments.some((a) => {
-        const d = definitionById.get(a.partDefinitionId);
-        return (
-          !!d &&
-          (d.onshapePartNumber.toLowerCase().includes(q) || d.name?.toLowerCase().includes(q))
-        );
-      });
+      return (usedBy.get(f.id) ?? []).some((b) => b.label.toLowerCase().includes(q));
     });
     const byName = (a: PartFile, b: PartFile) => a.filename.localeCompare(b.filename);
     const compare: Record<SortKey, (a: PartFile, b: PartFile) => number> = {
@@ -103,144 +92,123 @@ export function FilePickerModal({
       size: (a, b) => b.fileSize - a.fileSize,
     };
     return list.sort(compare[sort]);
-  }, [files, search, type, sort, definitionById]);
+  }, [files, search, type, sort, usedBy]);
 
   const selected = files.find((f) => f.id === selectedId) ?? null;
-  const control =
-    "bg-paper border border-steel/40 rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-crimson";
+  const control = `${inputClass} !w-auto`;
 
   return (
-    <div
-      className="fixed inset-0 z-[60] bg-ink/50 flex items-center justify-center p-4"
-      onPointerDown={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label={title}
-        className="bg-paper rounded-xl shadow-xl w-full max-w-2xl max-h-[85vh] flex flex-col"
-      >
-        <div className="flex items-center justify-between px-5 py-4 border-b border-steel/25">
-          <h2 className="font-display text-2xl text-ink">{title}</h2>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            className="text-2xl leading-none text-steel hover:text-ink px-1"
-          >
-            ✕
-          </button>
-        </div>
-
-        <div className="flex flex-wrap gap-2 px-5 py-3 border-b border-steel/15">
-          <input
-            ref={searchRef}
-            type="search"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search filename, part number, or part name…"
-            className={`${control} flex-1 min-w-[12rem] placeholder-steel`}
-          />
-          <select
-            value={type}
-            onChange={(e) => setType(e.target.value)}
-            aria-label="File type"
-            className={control}
-          >
-            <option value="all">All types ({files.length})</option>
-            {typeCounts.map(([ext, n]) => (
-              <option key={ext} value={ext}>
-                {ext ? `.${ext}` : "No extension"} ({n})
-              </option>
-            ))}
-          </select>
-          <select
-            value={sort}
-            onChange={(e) => setSort(e.target.value as SortKey)}
-            aria-label="Sort"
-            className={control}
-          >
-            {SORTS.map((s) => (
-              <option key={s.key} value={s.key}>
-                {s.label}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <ul className="flex-1 overflow-y-auto divide-y divide-steel/15">
-          {visible.length === 0 && (
-            <li className="px-5 py-8 text-center text-sm text-steel">
-              {files.length === 0 ? "No files uploaded yet." : "No files match."}
-            </li>
-          )}
-          {visible.map((f) => {
-            const ext = fileExtension(f.filename);
-            const covers = coverage(f);
-            const isSelected = f.id === selectedId;
-            return (
-              <li key={f.id}>
-                <button
-                  type="button"
-                  onClick={() => setSelectedId(f.id)}
-                  onDoubleClick={() => onPick(f)}
-                  className={`w-full text-left px-5 py-2.5 transition-colors ${
-                    isSelected ? "bg-crimson-tint" : "hover:bg-mist"
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-bold uppercase tracking-wide text-steel-dark bg-steel-tint border border-steel/30 rounded px-1.5 py-0.5 shrink-0 min-w-[2.75rem] text-center">
-                      {ext || "file"}
-                    </span>
-                    <span className="text-sm font-medium text-ink truncate" title={f.filename}>
-                      {f.filename}
-                    </span>
-                  </div>
-                  <p className="text-xs text-steel mt-0.5">
-                    {formatBytes(f.fileSize)} · {new Date(f.createdAt).toLocaleDateString()} ·{" "}
-                    {resolveName(f.uploadedBy)} · {f.assignments.length} instance
-                    {f.assignments.length === 1 ? "" : "s"}
-                  </p>
-                  <p className="text-xs text-steel-dark mt-0.5 truncate">
-                    {covers.length === 0 ? "Not assigned to any instances" : covers.join("; ")}
-                  </p>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-
-        <div className="flex items-center gap-3 px-5 py-3 border-t border-steel/25">
-          {onUploadNew && (
-            <UploadButton
-              busy={false}
-              multiple={false}
-              label="Upload new file…"
-              onFiles={([file]) => file && onUploadNew(file)}
-            />
-          )}
-          <span className="flex-1 min-w-0 text-sm text-steel-dark truncate">
-            {selected ? selected.filename : "Select a file"}
-          </span>
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-steel-dark hover:text-ink rounded-lg"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            disabled={!selected}
-            onClick={() => selected && onPick(selected)}
-            className="px-4 py-2 text-sm font-semibold bg-crimson hover:bg-crimson-dark text-paper rounded-lg transition-colors disabled:opacity-50"
-          >
-            {confirmLabel}
-          </button>
-        </div>
+    <Dialog title={title} onClose={onClose} wide>
+      <div className="flex flex-wrap gap-2">
+        <TextField
+          ref={searchRef}
+          type="search"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search by file or batch name…"
+          className="flex-1 min-w-[12rem]"
+        />
+        <select
+          value={type}
+          onChange={(e) => setType(e.target.value)}
+          aria-label="File type"
+          className={control}
+        >
+          <option value="all">All types ({files.length})</option>
+          {typeCounts.map(([ext, n]) => (
+            <option key={ext} value={ext}>
+              {ext ? `.${ext}` : "No extension"} ({n})
+            </option>
+          ))}
+        </select>
+        <select
+          value={sort}
+          onChange={(e) => setSort(e.target.value as SortKey)}
+          aria-label="Sort"
+          className={control}
+        >
+          {SORTS.map((s) => (
+            <option key={s.key} value={s.key}>
+              {s.label}
+            </option>
+          ))}
+        </select>
       </div>
-    </div>
+
+      <ul className="max-h-[50vh] overflow-y-auto divide-y divide-secondary-200 rounded-lg border border-secondary-200">
+        {visible.length === 0 && (
+          <li className="px-4 py-8 text-center text-sm text-secondary-500">
+            {files.length === 0 ? "No files to choose from. Upload one." : "No files match."}
+          </li>
+        )}
+        {visible.map((f) => {
+          const ext = fileExtension(f.filename);
+          const used = usedBy.get(f.id) ?? [];
+          const isSelected = f.id === selectedId;
+          return (
+            <li key={f.id}>
+              <button
+                type="button"
+                onClick={() => setSelectedId(f.id)}
+                onDoubleClick={() => onPick(f)}
+                aria-pressed={isSelected}
+                className={`w-full text-left px-4 py-2.5 ${focusRing} ${
+                  isSelected ? "bg-secondary-100" : "hover:bg-secondary-50"
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wide text-secondary-500 bg-inset border border-secondary-200 rounded px-1.5 py-0.5 shrink-0 min-w-[2.75rem] text-center">
+                    {ext || "file"}
+                  </span>
+                  <span
+                    className="text-sm font-medium text-secondary-900 truncate"
+                    title={f.filename}
+                  >
+                    {f.filename}
+                  </span>
+                </div>
+                <p className="text-xs text-secondary-400 mt-0.5">
+                  {formatBytes(f.fileSize)} · {new Date(f.createdAt).toLocaleDateString()} ·{" "}
+                  {resolveName(f.uploadedBy)}
+                </p>
+                <p className="text-xs text-secondary-500 mt-0.5 truncate">
+                  {used.length === 0
+                    ? "Not in a batch"
+                    : `In ${used.map((b) => b.label).join(", ")}`}
+                </p>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+
+      {obsolete > 0 && (
+        <p className="text-xs text-secondary-500">
+          {obsolete} obsolete file{obsolete === 1 ? " isn't" : "s aren't"} listed: a file made for
+          an obsolete part can't go on another batch.
+        </p>
+      )}
+
+      <div className="flex flex-wrap items-center gap-2">
+        {onUploadNew && (
+          <UploadButton
+            busy={false}
+            multiple={false}
+            size="md"
+            label="Upload a new file…"
+            onFiles={([file]) => file && onUploadNew(file)}
+          />
+        )}
+        <span className="flex-1 min-w-0 text-sm text-secondary-500 truncate">
+          {selected ? selected.filename : "Select a file"}
+        </span>
+        <Button variant="secondary" onClick={onClose}>
+          Cancel
+        </Button>
+        <Button disabled={!selected} onClick={() => selected && onPick(selected)}>
+          {confirmLabel}
+        </Button>
+      </div>
+    </Dialog>
   );
 }

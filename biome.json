@@ -14,7 +14,7 @@
       "G3-Web-Apps",
       "*.tsbuildinfo",
       ".claude",
-      "apps/skill-tree",
+      "devices/pit-log-downloader/data",
       "workers/attendance/src/firestore.ts",
       "workers/attendance/src/auth.ts"
     ]
@@ -35,7 +35,13 @@
       "recommended": true,
       "a11y": {
         "useSemanticElements": "off",
-        "useKeyWithClickEvents": "off"
+        "useKeyWithClickEvents": "off",
+        "noLabelWithoutControl": {
+          "level": "error",
+          "options": {
+            "inputComponents": ["TextField"]
+          }
+        }
       }
     }
   },

@@ -1,14 +1,34 @@
+import {
+  Button,
+  ConfirmButton,
+  ErrorBanner,
+  Loading,
+  Page,
+  TextField,
+  buttonClass,
+  useAppOn,
+  useTeamNames,
+} from "@g3/ui";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../../shared/api";
 import { getErrorMessage } from "../../shared/api-error";
+import { type DrawingState, drawingKey, drawingStates } from "../../shared/batches";
 import { buildInstanceRows } from "../../shared/derive";
-import { deleteDrawing } from "../../shared/getters";
-import { ErrorBanner, PageLoading } from "../../shared/ui";
+import { deleteDrawing, drawingUrl } from "../../shared/getters";
 import { useAuthUser } from "../../shared/use-auth";
 import { useKiosk } from "../../shared/use-auth";
 import { useShopData } from "../../shared/use-shop-data";
-import { InProductionBadge, confirmDelete, formatBytes, productionRows } from "./part-files-panel";
-import { PartFilesSection } from "./part-files-section";
+import { PartNameLink, linkClass } from "../batches/batch-ui";
+import { FileHeading, formatBytes } from "./file-ui";
+import { PartFilesSection, Subsection } from "./part-files-section";
+
+/** The drawing subsections, in the order the page shows them, with what each holds. */
+const DRAWING_STATES: { state: DrawingState; title: string; empty: string }[] = [
+  { state: "not-started", title: "Not Started", empty: "No drawing's part is waiting to start." },
+  { state: "in-progress", title: "In Progress", empty: "No drawing's part is being made." },
+  { state: "complete", title: "Complete", empty: "No drawing's part is complete yet." },
+  { state: "obsolete", title: "Obsolete", empty: "No drawing is for an obsolete revision." },
+];
 
 type Drawing = {
   id: number;
@@ -22,33 +42,33 @@ type Drawing = {
 };
 
 export function FilesPage() {
+  const names = useTeamNames();
   const user = useAuthUser();
   const [drawings, setDrawings] = useState<Drawing[]>([]);
   const [search, setSearch] = useState("");
   const [deletingKey, setDeletingKey] = useState<string | null>(null);
   const kiosk = useKiosk();
   const { data } = useShopData();
-  const inProduction = useMemo(() => (data ? productionRows(buildInstanceRows(data)) : []), [data]);
-  const drawingUsage = useMemo(() => {
-    const map = new Map<string, typeof inProduction>();
-    for (const r of inProduction) {
-      const key = `${r.definition.onshapePartNumber}\u0000${r.definition.revision}`;
-      map.set(key, [...(map.get(key) ?? []), r]);
-    }
-    return map;
-  }, [inProduction]);
-  const usageOfDrawing = (d: Drawing) =>
-    drawingUsage.get(`${d.partNumber}\u0000${d.revision}`) ?? [];
+  const rows = useMemo(() => (data ? buildInstanceRows(data) : []), [data]);
+  /** The part a drawing is of, when the shop has that revision. */
+  const partOf = (d: Drawing) =>
+    data?.definitions.find(
+      (p) => p.onshapePartNumber === d.partNumber && p.revision === d.revision,
+    );
+  // Where each drawing's part is in production. One for a part nobody has made is not started.
+  const states = useMemo(() => (data ? drawingStates(data) : new Map()), [data]);
+  const stateOf = (d: Drawing): DrawingState =>
+    states.get(drawingKey(d.partNumber, d.revision)) ?? "not-started";
+  /** How many instances of a drawing's revision are still being made. */
+  const stillMaking = (d: Drawing) =>
+    rows.filter(
+      (r) =>
+        r.definition.onshapePartNumber === d.partNumber &&
+        r.definition.revision === d.revision &&
+        r.state !== "complete",
+    ).length;
 
   async function handleDeleteDrawing(drawing: Drawing) {
-    if (
-      !confirmDelete(
-        `the drawing for ${drawing.partNumber} Rev ${drawing.revision}`,
-        usageOfDrawing(drawing),
-      )
-    ) {
-      return;
-    }
     setDeletingKey(drawing.r2Key);
     try {
       await deleteDrawing(drawing.partNumber, drawing.revision);
@@ -62,6 +82,8 @@ export function FilesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [printingId, setPrintingId] = useState<number | null>(null);
+  // Printing goes through the team's edge box: no print buttons while Edge is off.
+  const canPrint = useAppOn("edge") !== false;
   const [testPrinting, setTestPrinting] = useState(false);
 
   useEffect(() => {
@@ -117,8 +139,7 @@ export function FilesPage() {
   async function handleTestPrint() {
     setTestPrinting(true);
     try {
-      const testContent =
-        "G3 Robotics Shop - Test Print\n\nIf you're seeing this, the printer is working!";
+      const testContent = `${names.name} Shop - Test Print\n\nIf you're seeing this, the printer is working!`;
       const encoder = new TextEncoder();
       const testBuffer = encoder.encode(testContent);
 
@@ -165,103 +186,135 @@ export function FilesPage() {
     );
   }, [drawings, search]);
 
-  if (loading) return <PageLoading />;
+  if (loading)
+    return (
+      <Page title="Files" width="wide">
+        <Loading />
+      </Page>
+    );
 
   const totalSize = drawings.reduce((sum, d) => sum + (d.fileSize || 0), 0);
 
   return (
-    <main className="min-h-screen bg-page">
-      <div className="max-w-full mx-auto px-6 py-8 space-y-5">
-        <div className="flex items-center justify-between">
-          <h1 className="font-display text-4xl text-ink">Files</h1>
-          {user?.isAdmin && (
-            <button
-              type="button"
-              onClick={handleTestPrint}
-              disabled={testPrinting}
-              className="px-4 py-2 text-sm font-medium border border-steel/40 text-steel-dark bg-steel-tint hover:bg-steel/20 hover:border-steel/50 active:bg-steel/30 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors"
-            >
-              {testPrinting ? "Testing…" : "Test Print"}
-            </button>
-          )}
-        </div>
-
+    <Page
+      title="Files"
+      width="wide"
+      actions={
+        user?.isAdmin &&
+        canPrint && (
+          <Button variant="secondary" onClick={handleTestPrint} disabled={testPrinting}>
+            {testPrinting ? "Testing…" : "Test print"}
+          </Button>
+        )
+      }
+    >
+      <>
         {error && <ErrorBanner message={error} />}
 
-        <PartFilesSection data={data} inProduction={inProduction} />
+        <PartFilesSection data={data} rows={rows} />
 
         <section className="space-y-3 pt-4">
           <div>
-            <h2 className="font-display text-2xl text-ink">Drawings</h2>
-            <p className="text-xs text-steel">
+            <h2 className="text-2xl text-secondary-900">Drawings</h2>
+            <p className="text-xs text-secondary-500">
               {drawings.length} drawing{drawings.length === 1 ? "" : "s"} · {formatBytes(totalSize)}
             </p>
           </div>
 
-          <input
+          <TextField
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by filename or part number…"
-            className="w-full bg-paper border border-steel/40 rounded-lg px-3 py-2 text-sm text-ink placeholder-steel focus:outline-none focus:border-crimson"
           />
 
-          {visibleDrawings.length === 0 ? (
-            <div className="bg-paper border border-steel/30 rounded-lg p-6 text-center">
-              <p className="text-steel text-sm">
-                {drawings.length === 0
-                  ? "No drawings stored yet."
-                  : "No drawings match your search."}
-              </p>
-            </div>
+          {drawings.length === 0 ? (
+            <p className="text-secondary-500 text-sm">
+              No drawings yet. A release's drawings are saved when its parts are ingested.
+            </p>
+          ) : visibleDrawings.length === 0 ? (
+            <p className="text-secondary-500 text-sm">No drawings match your search.</p>
           ) : (
-            <ul className="bg-paper border border-steel/30 rounded-lg divide-y divide-steel/20">
-              {visibleDrawings.map((drawing) => (
-                <li key={drawing.r2Key} className="px-4 py-3 flex items-center gap-3">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-ink truncate" title={drawing.filename}>
-                      {drawing.filename}
-                    </p>
-                    <p className="text-xs text-steel">
-                      <span className="font-mono text-steel-dark">
-                        {drawing.partNumber} · Rev {drawing.revision}
-                      </span>{" "}
-                      · {formatBytes(drawing.fileSize || 0)} ·{" "}
-                      {new Date(drawing.createdAt * 1000).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <InProductionBadge rows={usageOfDrawing(drawing)} />
-                  <button
-                    type="button"
-                    onClick={() => handlePrint(drawing)}
-                    disabled={printingId === drawing.id}
-                    className="px-2.5 py-1 text-xs font-medium bg-crimson text-paper hover:bg-crimson-dark disabled:bg-steel/30 disabled:cursor-not-allowed rounded transition-colors shrink-0"
-                  >
-                    {printingId === drawing.id ? "Printing…" : "Print"}
-                  </button>
-                  <a
-                    href={`${import.meta.env.VITE_API_BASE_URL ?? ""}/parts/${drawing.partNumber}/${drawing.revision}/drawing`}
-                    download={drawing.filename}
-                    className="px-2.5 py-1 text-xs font-medium border border-steel/40 text-steel hover:text-ink rounded transition-colors shrink-0"
-                  >
-                    Download
-                  </a>
-                  {!kiosk.active && (
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteDrawing(drawing)}
-                      disabled={deletingKey === drawing.r2Key}
-                      className="px-2.5 py-1 text-xs font-medium border border-crimson/40 text-crimson hover:bg-crimson-tint rounded transition-colors disabled:opacity-50 shrink-0"
-                    >
-                      {deletingKey === drawing.r2Key ? "Deleting…" : "Delete"}
-                    </button>
-                  )}
-                </li>
-              ))}
-            </ul>
+            DRAWING_STATES.map(({ state, title, empty }) => {
+              const list = visibleDrawings.filter((d) => stateOf(d) === state);
+              // A search shows only the subsections that have a match.
+              if (search.trim() && list.length === 0) return null;
+              return (
+                <Subsection key={state} title={title} count={list.length} empty={empty}>
+                  {list.map((drawing) => {
+                    const making = stillMaking(drawing);
+                    const part = partOf(drawing);
+                    return (
+                      <li key={drawing.r2Key} className="px-4 py-3">
+                        <FileHeading
+                          name={
+                            <a
+                              href={drawingUrl(drawing.partNumber, drawing.revision)}
+                              target="_blank"
+                              rel="noreferrer"
+                              title="Open this drawing"
+                              className={linkClass}
+                            >
+                              {drawing.filename}
+                            </a>
+                          }
+                          title={drawing.filename}
+                          details={
+                            <p className="text-xs text-secondary-400">
+                              {part?.name && (
+                                <>
+                                  <PartNameLink definition={part} />{" "}
+                                </>
+                              )}
+                              <span className="font-mono text-secondary-500">
+                                {drawing.partNumber} · Rev {drawing.revision}
+                              </span>{" "}
+                              · {formatBytes(drawing.fileSize || 0)} ·{" "}
+                              {new Date(drawing.createdAt * 1000).toLocaleDateString()}
+                            </p>
+                          }
+                        >
+                          {canPrint && (
+                            <Button
+                              size="sm"
+                              className="shrink-0"
+                              onClick={() => handlePrint(drawing)}
+                              disabled={printingId === drawing.id}
+                            >
+                              {printingId === drawing.id ? "Printing…" : "Print"}
+                            </Button>
+                          )}
+                          <a
+                            href={drawingUrl(drawing.partNumber, drawing.revision)}
+                            download={drawing.filename}
+                            className={`${buttonClass("secondary", "sm")} shrink-0`}
+                          >
+                            Download
+                          </a>
+                          {!kiosk.active && (
+                            <ConfirmButton
+                              size="sm"
+                              label={deletingKey === drawing.r2Key ? "Deleting…" : "Delete"}
+                              confirmLabel="Delete"
+                              question={`${
+                                making > 0
+                                  ? `${making} instance${making === 1 ? " that's" : "s that are"} still being made use${making === 1 ? "s" : ""} it. `
+                                  : ""
+                              }Delete the drawing for ${drawing.partNumber} Rev ${drawing.revision}? This can't be undone.`}
+                              disabled={deletingKey === drawing.r2Key}
+                              onConfirm={() => handleDeleteDrawing(drawing)}
+                            />
+                          )}
+                        </FileHeading>
+                      </li>
+                    );
+                  })}
+                </Subsection>
+              );
+            })
           )}
         </section>
-      </div>
-    </main>
+      </>
+    </Page>
   );
 }

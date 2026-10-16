@@ -1,6 +1,6 @@
+import { requireAdmin } from "@g3/auth";
 import { type Context, Hono } from "hono";
 import { AgentError, agentFetch } from "../../lib/agent";
-import { requireAdmin } from "../../middleware/auth";
 import type { AppEnv } from "../../types";
 import {
   MAX_SWITCH_SOUND_BYTES,
@@ -12,9 +12,9 @@ import {
 
 type Ctx = Context<AppEnv>;
 
-async function relay<T>(c: Ctx, path: string, init?: Parameters<typeof agentFetch>[2]) {
+async function relay<T>(c: Ctx, path: string, init?: Parameters<typeof agentFetch>[3]) {
   try {
-    const res = await agentFetch(c.env, `/switch${path}`, init);
+    const res = await agentFetch(c.env, c.get("teamId"), `/switch${path}`, init);
     const body = (await res.json().catch(() => ({}))) as T & { error?: string };
     if (!res.ok) {
       return {
@@ -86,8 +86,13 @@ export const switchRouter = new Hono<AppEnv>()
     const result = await relay<{ ok: true; sound: string }>(
       c,
       `/sounds/${encodeURIComponent(name)}/test`,
-      { method: "POST", timeoutMs: 60_000 },
+      { method: "POST" },
     );
+    if ("error" in result) return c.json({ error: result.error }, result.status);
+    return c.json(result.data);
+  })
+  .post("/stop", requireAdmin, async (c) => {
+    const result = await relay<{ ok: true }>(c, "/stop", { method: "POST" });
     if ("error" in result) return c.json({ error: result.error }, result.status);
     return c.json(result.data);
   })

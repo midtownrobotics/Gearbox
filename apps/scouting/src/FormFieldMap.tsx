@@ -1,3 +1,4 @@
+import { Button } from "@g3/ui";
 import { ArrowRight, Maximize2, Minimize2, Pencil, RotateCcw, Target, Trash2 } from "lucide-react";
 import {
   type PointerEvent as ReactPointerEvent,
@@ -38,6 +39,7 @@ export function FormFieldMap({
   const hasDrawing = useRef(false);
   const onDrawingChangeRef = useRef(onDrawingChange);
   const drawing = useRef(false);
+  const activePointer = useRef<number | null>(null);
   const start = useRef<Point | null>(null);
   const last = useRef<Point | null>(null);
   const preview = useRef<ImageData | null>(null);
@@ -98,7 +100,14 @@ export function FormFieldMap({
   }, [loadRebuilt]);
   useEffect(() => {
     document.body.classList.toggle("map-workspace-open", fullscreen);
-    return () => document.body.classList.remove("map-workspace-open");
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setFullscreen(false);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.classList.remove("map-workspace-open");
+      window.removeEventListener("keydown", closeOnEscape);
+    };
   }, [fullscreen]);
   useLayoutEffect(() => {
     const canvas = canvasRef.current;
@@ -260,6 +269,21 @@ export function FormFieldMap({
     preview.current = null;
     path.current = [];
   }
+  function cancelDrawing(event: ReactPointerEvent<HTMLCanvasElement>) {
+    if (event.pointerId !== activePointer.current) return;
+    activePointer.current = null;
+    const entry = history.current.pop();
+    if (entry) {
+      event.currentTarget.getContext("2d")?.putImageData(entry.image, 0, 0);
+      setHasDrawing(entry.hasDrawing);
+    }
+    drawing.current = false;
+    start.current = null;
+    last.current = null;
+    preview.current = null;
+    path.current = [];
+    commitCanvas(event.currentTarget);
+  }
 
   return (
     <div className={`map-editor form-map-editor ${fullscreen ? "map-editor-fullscreen" : ""}`}>
@@ -270,6 +294,7 @@ export function FormFieldMap({
           onClick={() => setFullscreen((value) => !value)}
           aria-label={fullscreen ? "Exit fullscreen map" : "Open fullscreen map"}
           title={fullscreen ? "Exit fullscreen" : "Fullscreen map"}
+          aria-pressed={fullscreen}
         >
           {fullscreen ? <Minimize2 size={17} /> : <Maximize2 size={17} />}
           <span>{fullscreen ? "Exit fullscreen" : "Fullscreen map"}</span>
@@ -280,6 +305,7 @@ export function FormFieldMap({
           className={`map-tool-button ${tool === "draw" ? "active" : ""}`}
           onClick={() => setTool("draw")}
           aria-label="Draw freehand"
+          aria-pressed={tool === "draw"}
           title="Draw"
         >
           <Pencil size={16} /> <span>Draw</span>
@@ -289,6 +315,7 @@ export function FormFieldMap({
           className={`map-tool-button ${tool === "arrow" ? "active" : ""}`}
           onClick={() => setTool("arrow")}
           aria-label="Draw arrow"
+          aria-pressed={tool === "arrow"}
           title="Arrow"
         >
           <ArrowRight size={17} /> <span>Arrow</span>
@@ -297,12 +324,13 @@ export function FormFieldMap({
           type="button"
           className={`map-tool-button ${tool === "sotm" ? "active" : ""}`}
           onClick={() => setTool("sotm")}
-          aria-label="Draw start of match path"
-          title="Start of match"
+          aria-label="Draw shooting on the move path"
+          title="Shooting on the move"
+          aria-pressed={tool === "sotm"}
         >
           <Target size={17} /> <span>SOTM</span>
         </button>
-        <div className="drawing-colors">
+        <div className="drawing-colors" aria-label="Brush color">
           {COLORS.map((option) => (
             <button
               type="button"
@@ -311,6 +339,7 @@ export function FormFieldMap({
               style={{ backgroundColor: option }}
               onClick={() => setColor(option)}
               aria-label={`Use ${option}`}
+              aria-pressed={color === option}
             />
           ))}
         </div>
@@ -323,7 +352,8 @@ export function FormFieldMap({
         >
           <RotateCcw size={16} /> <span>Undo</span>
         </button>
-        <button
+        <Button
+          variant="danger"
           type="button"
           className="clear-drawings-button"
           onClick={clear}
@@ -331,13 +361,15 @@ export function FormFieldMap({
           title="Clear"
         >
           <Trash2 size={16} /> <span>Clear</span>
-        </button>
+        </Button>
       </div>
       <div className="canvas-shell has-image">
         <canvas
           ref={canvasRef}
           aria-label="Drawable field map"
           onPointerDown={(event) => {
+            if (event.button !== 0 || activePointer.current !== null || !base.current) return;
+            activePointer.current = event.pointerId;
             snapshot();
             drawing.current = true;
             start.current = point(event);
@@ -350,7 +382,8 @@ export function FormFieldMap({
             event.currentTarget.setPointerCapture(event.pointerId);
           }}
           onPointerMove={(event) => {
-            if (!drawing.current || !last.current) return;
+            if (event.pointerId !== activePointer.current || !drawing.current || !last.current)
+              return;
             const next = point(event);
             const context = event.currentTarget.getContext("2d");
             if (!context) return;
@@ -371,8 +404,13 @@ export function FormFieldMap({
             setHasDrawing(true);
             last.current = next;
           }}
-          onPointerUp={(event) => finishDrawing(event.currentTarget)}
-          onPointerCancel={(event) => finishDrawing(event.currentTarget)}
+          onPointerUp={(event) => {
+            if (event.pointerId !== activePointer.current) return;
+            activePointer.current = null;
+            finishDrawing(event.currentTarget);
+          }}
+          onPointerCancel={cancelDrawing}
+          onLostPointerCapture={cancelDrawing}
         />
       </div>
     </div>

@@ -1,13 +1,17 @@
 import { adminPlugin } from "./plugins/admin";
+import { archivesPlugin } from "./plugins/archives";
 import { batteriesPlugin } from "./plugins/batteries";
 import { checklistRunnerPlugin } from "./plugins/checklist-runner";
 import { checklistsPlugin } from "./plugins/checklists";
-import { homePlugin } from "./plugins/home";
+import { logsPlugin } from "./plugins/logs";
+import { overviewPlugin } from "./plugins/overview";
 import { pitMonitorPlugin } from "./plugins/pit-monitor";
 
 export const plugins = [
-  homePlugin,
+  overviewPlugin,
   checklistRunnerPlugin,
+  archivesPlugin,
+  logsPlugin,
   checklistsPlugin,
   batteriesPlugin,
   pitMonitorPlugin,

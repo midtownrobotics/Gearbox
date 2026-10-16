@@ -1,3 +1,4 @@
+import { appTitle } from "@g3/site-config";
 import type {
   DiscoveredPrinter,
   JobState,
@@ -247,7 +248,7 @@ export function cupsBackend(): PrintBackend {
         "-d",
         name,
         "-t",
-        "G3 Edge test page",
+        `${appTitle("Edge")} test page`,
         "/usr/share/cups/data/testprint",
       ]);
       return parseRequestId(out);
