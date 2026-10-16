@@ -48,7 +48,13 @@ function Stopped({ restartCommand }: { restartCommand?: string }) {
   const [copied, setCopied] = useState(false);
   return (
     <div className="space-y-2">
-      <ErrorBanner message="Can't reach the downloader: it has stopped. Start it again from a terminal on this computer, then this page picks it up." />
+      <ErrorBanner
+        message={
+          restartCommand
+            ? "The downloader has stopped. To start it again, open a terminal on this computer (PowerShell on Windows), run the command below and leave it running. This page picks it up once it's back."
+            : "The downloader has stopped. Start it again from a terminal on this computer, and this page picks it up once it's back."
+        }
+      />
       {restartCommand && (
         <div className="flex items-start gap-2 rounded-lg bg-inset px-3 py-2">
           <pre className="min-w-0 flex-1 overflow-x-auto whitespace-pre font-mono text-xs leading-5 text-secondary-900">
