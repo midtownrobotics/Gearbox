@@ -81,14 +81,25 @@ function nonZeroEntry(value: unknown) {
   return false;
 }
 
+/**
+ * A counter's answer as a whole count. A counter reads 0 in the app until it's
+ * tapped and sends nothing while it's untouched, so a missing count is 0, and 0
+ * is a real answer: a robot that scored nothing counts nothing. Counts have no
+ * upper limit, since a form has no maximum to set for one.
+ */
+function scoutingCount(value: unknown) {
+  if (value === undefined || value === null || value === "") return 0;
+  const numeric = finiteNumber(value);
+  return numeric !== null && Number.isInteger(numeric) && numeric >= 0 ? numeric : null;
+}
+
 function validScoutingEntry(field: ScoutingField, value: unknown) {
-  if (field.type === "slider" || field.type === "counter") {
+  if (field.type === "slider") {
     const numeric = finiteNumber(value);
     const min = Number.isFinite(field.min) ? field.min : 0;
     const max = Number.isFinite(field.max) ? field.max : 10;
     const step = Number.isFinite(field.step) && field.step > 0 ? field.step : 1;
     if (numeric === null || numeric === 0 || numeric < min || numeric > max) return false;
-    if (field.type === "counter" && !Number.isInteger(numeric)) return false;
     const steps = (numeric - min) / step;
     return Math.abs(steps - Math.round(steps)) < 1e-9;
   }
@@ -882,6 +893,13 @@ app.post("/scouting-forms/:id/submissions", requireAuth, async (c) => {
   const cleanAnswers: Record<string, string | number | boolean | string[]> = {};
   for (const field of fields) {
     const value = answers[field.id];
+    if (field.type === "counter") {
+      const count = scoutingCount(value);
+      if (count === null)
+        return c.json({ error: `${field.label} must be a whole count of 0 or more.` }, 400);
+      cleanAnswers[field.id] = count;
+      continue;
+    }
     if (
       formDefinition.form_kind === "scouting" &&
       field.type !== "fieldMap" &&
@@ -904,11 +922,7 @@ app.post("/scouting-forms/:id/submissions", requireAuth, async (c) => {
     if (field.required && field.type === "multiSelect" && stringArray(value, 30).length === 0)
       return c.json({ error: `${field.label} is required.` }, 400);
     if (field.type === "multiSelect") cleanAnswers[field.id] = stringArray(value, 30);
-    else if (
-      (field.type === "slider" || field.type === "counter") &&
-      value !== "" &&
-      value !== undefined
-    )
+    else if (field.type === "slider" && value !== "" && value !== undefined)
       cleanAnswers[field.id] = Number(value);
     else if (field.type !== "fieldMap") cleanAnswers[field.id] = text(value, 3000);
   }

@@ -1,4 +1,5 @@
 import {
+  Badge,
   Button,
   Card,
   ConfirmButton,
@@ -8,8 +9,9 @@ import {
   Page,
   TextField,
   focusRing,
+  inputClass,
 } from "@g3/ui";
-import type { RoleColor } from "@g3/worker-schedule";
+import { ROLE_TYPES, type RoleColor, type RoleType } from "@g3/worker-schedule";
 import { useState } from "react";
 import { type Role, api, unwrap } from "../../shared/api";
 import { useAuthUser } from "../../shared/auth";
@@ -18,6 +20,8 @@ import { useLoad } from "../../shared/use-load";
 
 // The team's roles, kept from event to event: what people can be assigned. A role that's been
 // assigned is archived rather than deleted, so past schedules keep it.
+
+const TYPE_NAMES: Record<RoleType, string> = { scouting: "Scouting", pit: "Pit", other: "Other" };
 
 const message = (err: unknown) => (err instanceof Error ? err.message : String(err));
 
@@ -79,7 +83,9 @@ export function RolesPage() {
         <>
           <NewRole
             saving={saving}
-            onAdd={(name, color) => run(() => unwrap(api.roles.$post({ json: { name, color } })))}
+            onAdd={(name, color, type) =>
+              run(() => unwrap(api.roles.$post({ json: { name, color, type } })))
+            }
           />
           <Card title="Roles">
             {active.length === 0 ? (
@@ -192,19 +198,45 @@ function ColorPicker({ value, onChange }: { value: string; onChange: (color: Rol
   );
 }
 
+/** What kind of work the role is. */
+function TypePicker({ value, onChange }: { value: RoleType; onChange: (type: RoleType) => void }) {
+  return (
+    <select
+      aria-label="Type"
+      className={inputClass}
+      value={value}
+      onChange={(e) => onChange(e.target.value as RoleType)}
+    >
+      {ROLE_TYPES.map((type) => (
+        <option key={type} value={type}>
+          {TYPE_NAMES[type]}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 function NewRole({
   saving,
   onAdd,
-}: { saving: boolean; onAdd: (name: string, color: RoleColor) => Promise<boolean> }) {
+}: {
+  saving: boolean;
+  onAdd: (name: string, color: RoleColor, type: RoleType) => Promise<boolean>;
+}) {
   const [name, setName] = useState("");
   const [color, setColor] = useState<RoleColor>("blue");
+  const [type, setType] = useState<RoleType>("other");
   return (
     <Card title="New role">
       <form
         className="space-y-3"
         onSubmit={(e) => {
           e.preventDefault();
-          void onAdd(name, color).then((ok) => ok && setName(""));
+          void onAdd(name, color, type).then((ok) => {
+            if (!ok) return;
+            setName("");
+            setType("other");
+          });
         }}
       >
         <Field label="Name">
@@ -216,6 +248,9 @@ function NewRole({
             required
             onChange={(e) => setName(e.target.value)}
           />
+        </Field>
+        <Field label="Type">
+          <TypePicker value={type} onChange={setType} />
         </Field>
         <ColorPicker value={color} onChange={setColor} />
         <Button type="submit" disabled={saving || !name.trim()}>
@@ -240,12 +275,18 @@ function RoleRow({
   first: boolean;
   last: boolean;
   onMove: (by: -1 | 1) => void;
-  onSave: (changes: { name?: string; color?: RoleColor; archived?: boolean }) => Promise<boolean>;
+  onSave: (changes: {
+    name?: string;
+    color?: RoleColor;
+    type?: RoleType;
+    archived?: boolean;
+  }) => Promise<boolean>;
   onDelete: () => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(role.name);
   const [color, setColor] = useState(role.color as RoleColor);
+  const [type, setType] = useState(role.type);
 
   if (editing) {
     return (
@@ -254,7 +295,7 @@ function RoleRow({
           className="space-y-3"
           onSubmit={(e) => {
             e.preventDefault();
-            void onSave({ name, color }).then((ok) => ok && setEditing(false));
+            void onSave({ name, color, type }).then((ok) => ok && setEditing(false));
           }}
         >
           <TextField
@@ -265,6 +306,7 @@ function RoleRow({
             required
             onChange={(e) => setName(e.target.value)}
           />
+          <TypePicker value={type} onChange={setType} />
           <ColorPicker value={color} onChange={setColor} />
           <div className="flex flex-wrap gap-2">
             <Button type="submit" size="sm" disabled={saving || !name.trim()}>
@@ -280,11 +322,14 @@ function RoleRow({
   }
   return (
     <li className="flex flex-wrap items-center justify-between gap-2 py-2">
-      <span
-        className={`rounded-md border px-2 py-0.5 text-sm font-medium ${roleBlock(role.color).className}`}
-        style={roleBlock(role.color).style}
-      >
-        {role.name}
+      <span className="inline-flex items-center gap-2">
+        <span
+          className={`rounded-md border px-2 py-0.5 text-sm font-medium ${roleBlock(role.color).className}`}
+          style={roleBlock(role.color).style}
+        >
+          {role.name}
+        </span>
+        <Badge>{TYPE_NAMES[role.type]}</Badge>
       </span>
       <div className="flex flex-wrap gap-2">
         <Button

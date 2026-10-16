@@ -31,8 +31,9 @@ for [`workers/schedule`](../../workers/schedule).
 - **Friends** (`/friends`): search the team by name to add friends, and remove them. Only you see
   your friends. A schedule's **Friends** view (between My schedule and Everyone) is the grid with
   just you and your friends, and My schedule's "With" names only friends.
-- **Roles** (`/roles`, editors): the team's roles and their colors (a preset or a custom one), in
-  order; archive one that's been assigned.
+- **Roles** (`/roles`, editors): the team's roles, each with a type (Scouting, Pit or Other, which
+  a new role starts as) and a color (a preset or a custom one), in order; archive one that's been
+  assigned.
 - **Admin** (`/admin`, mentors and admins): the trusted students who edit schedules.
 
 Times are wall-clock slots of the event's own day (`src/shared/time.ts`), shown in the viewer's

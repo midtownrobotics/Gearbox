@@ -13,6 +13,7 @@ import {
   type ChecklistIssueSummary,
   type ChecklistList,
 } from "../../shared/getters/types";
+import { type PersonInThePit, scheduleUrl, untilLabel, useInThePit } from "../../shared/in-the-pit";
 
 // Overview: the pit at a glance. Each tile is a figure from one of the other pages and opens it.
 
@@ -234,10 +235,38 @@ function MatchTile({
   );
 }
 
+/** Who has a Pit role on the team's Schedule now; opens Schedule. */
+function InThePitTile({ people }: { people: PersonInThePit[] | null }) {
+  return (
+    <a href={scheduleUrl()} className={`${tileClass} sm:col-span-2`}>
+      <Stat
+        label="In the pit now"
+        value={people === null ? "…" : people.length === 0 ? "Nobody" : people.length}
+        hint={people?.length === 0 ? "No one has a Pit role on the schedule right now." : undefined}
+      />
+      {people && people.length > 0 && (
+        <ul className="mt-2 grid gap-x-4 gap-y-1 sm:grid-cols-2">
+          {people.map((person) => (
+            <li key={person.userId} className="flex min-w-0 items-baseline justify-between gap-2">
+              <span className="truncate font-medium text-secondary-900">
+                {person.displayName ?? "Former member"}
+              </span>
+              <span className="shrink-0 text-xs text-secondary-500">
+                until {untilLabel(person.until)}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </a>
+  );
+}
+
 export function OverviewPage() {
   const { lists, issues, batteries, lastArchive, nextMatch, loaded } = useFigures();
   // A figure nobody has answered: still being asked for, or it couldn't be.
   const unknown = loaded ? "—" : "…";
+  const inThePit = useInThePit();
 
   return (
     <Page title="Overview" width="narrow">
@@ -246,6 +275,7 @@ export function OverviewPage() {
         <IssuesTile issues={issues} lastArchive={lastArchive} unknown={unknown} />
         <BatteriesTile batteries={batteries} unknown={unknown} />
         <MatchTile nextMatch={nextMatch} lastArchive={lastArchive} unknown={unknown} />
+        {inThePit !== false && <InThePitTile people={inThePit} />}
       </div>
     </Page>
   );

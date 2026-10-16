@@ -33,3 +33,10 @@ export const normalizeRoleColor = (color: RoleColor): RoleColor =>
 /** The most roles a team keeps, archived ones included. */
 export const MAX_ROLES = 100;
 export const MAX_ROLE_NAME = 40;
+
+/** What kind of work a role is at an event. A role is `other` unless an editor says. */
+export const ROLE_TYPES = ["scouting", "pit", "other"] as const;
+export type RoleType = (typeof ROLE_TYPES)[number];
+
+export const isRoleType = (value: unknown): value is RoleType =>
+  typeof value === "string" && (ROLE_TYPES as readonly string[]).includes(value);

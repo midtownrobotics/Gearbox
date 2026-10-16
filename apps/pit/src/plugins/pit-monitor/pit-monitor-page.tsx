@@ -15,6 +15,7 @@ import type {
   ChecklistList,
 } from "../../shared/getters/types";
 import { ConnectionIndicator, OfflineOverlay, useConnection } from "./connection";
+import { type PersonInThePit, untilLabel, useInThePit } from "../../shared/in-the-pit";
 
 const REFRESH_MS = 15_000;
 
@@ -424,6 +425,34 @@ function BatteriesSection({ batteries }: { batteries: Battery[] }) {
   );
 }
 
+/** Who has a Pit role on the team's Schedule now, and until when. */
+function InThePitSection({ people }: { people: PersonInThePit[] }) {
+  return (
+    <div className="space-y-2">
+      <h2 className="text-xs font-bold uppercase tracking-widest text-secondary-600">
+        In the pit now
+      </h2>
+      <div className="bg-surface border border-secondary-200 rounded-xl p-5">
+        {people.length === 0 ? (
+          <p className="text-secondary-500">No one has a Pit role on the schedule right now.</p>
+        ) : (
+          <ul className="divide-y divide-secondary-200">
+            {people.map((person) => (
+              <li key={person.userId} className="flex items-baseline justify-between gap-3 py-2">
+                <span className="font-semibold text-secondary-900">
+                  {person.displayName ?? "Former member"}{" "}
+                  <span className="font-normal text-secondary-500">{person.roleName}</span>
+                </span>
+                <span className="text-sm text-secondary-500">until {untilLabel(person.until)}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /** The team's newest match logs from its log downloaders. */
 function RecentLogsSection({ logs }: { logs: MatchLog[] }) {
   const when = new Intl.DateTimeFormat(undefined, {
@@ -561,6 +590,8 @@ export function PitMonitorPage() {
   // The newest match logs, while the team has a paired log downloader; null hides the box.
   const [recentLogs, setRecentLogs] = useState<MatchLog[] | null>(null);
   const connection = useConnection();
+  // Who's in the pit on the team's Schedule; hidden while Schedule is off or hasn't answered.
+  const inThePit = useInThePit();
 
   const handleFullscreen = async () => {
     if (!isFullscreen) {
@@ -673,13 +704,12 @@ export function PitMonitorPage() {
           </div>
         </div>
 
-        {/* Nexus status — full width, only if real Nexus data available */}
-        {nexus?.isRealNexus && <NexusSection nexus={nexus} teamNumber={teamNumber} />}
-
         {/* Main grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Left: ranking + upcoming matches */}
+          {/* Left: Nexus status (only with real Nexus data) + ranking + upcoming matches. In the
+              column, so the right one starts at the top instead of under it. */}
           <div className="space-y-5">
+            {nexus?.isRealNexus && <NexusSection nexus={nexus} teamNumber={teamNumber} />}
             {monitor?.ranking && (
               <RankingSection
                 ranking={monitor.ranking}
@@ -709,6 +739,7 @@ export function PitMonitorPage() {
                 </div>
               </div>
             )}
+            {inThePit && <InThePitSection people={inThePit} />}
             {recentLogs && <RecentLogsSection logs={recentLogs} />}
             <BatteriesSection batteries={batteries} />
             <ChecklistSection lists={lists} issues={issues} />
