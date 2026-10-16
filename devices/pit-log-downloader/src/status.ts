@@ -46,6 +46,11 @@ export type GearboxStatus = {
 
 export type Status = {
   version: string;
+  /**
+   * How to start it again from a terminal, for when the page loses it: a cd to this Gearbox
+   * folder, then the start command.
+   */
+  restartCommand: string;
   gearbox: GearboxStatus;
   connection: {
     robot: boolean;

@@ -43,6 +43,14 @@ let uploadingId: string | null = null;
 const activity: { id: number; time: string; message: string }[] = [];
 let activityCount = 0;
 const kPackageDir = path.join(import.meta.dirname, "..");
+/**
+ * The command that starts it again, for the status page to show if it stops: from this Gearbox
+ * folder, as it was started (with --dev or not). Windows PowerShell 5 has no `&&`, so `;` there.
+ */
+const kRestartCommand = [
+  `cd "${path.resolve(kPackageDir, "../..")}"`,
+  `pnpm --filter @g3/pit-log-downloader start${config.devGateway ? " -- --dev" : ""}`,
+].join(process.platform === "win32" ? "; " : " && ");
 const kVersion: string = JSON.parse(
   fs.readFileSync(path.join(kPackageDir, "package.json"), "utf8"),
 ).version;
@@ -454,6 +462,7 @@ app.get("/api/status", (_req, res) => {
 
   const status: Status = {
     version: kVersion,
+    restartCommand: kRestartCommand,
     gearbox: gearboxStatus(),
     connection: {
       robot: robotConnected,

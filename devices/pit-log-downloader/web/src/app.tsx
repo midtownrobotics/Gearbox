@@ -1,4 +1,4 @@
-import { AppNavBar, ErrorBanner, Loading, Page, buttonClass } from "@g3/ui";
+import { AppNavBar, Button, ErrorBanner, Loading, Page, buttonClass } from "@g3/ui";
 import { useEffect, useState } from "react";
 import type { Status } from "../../src/status.ts";
 import { GearboxCard, PairingCard } from "./gearbox-card";
@@ -43,6 +43,35 @@ function useStatus() {
   return { status, lost, refresh: () => setAsked((n) => n + 1) };
 }
 
+/** The downloader has stopped answering: how to start it again, as it last said. */
+function Stopped({ restartCommand }: { restartCommand?: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <div className="space-y-2">
+      <ErrorBanner message="Can't reach the downloader: it has stopped. Start it again from a terminal on this computer, then this page picks it up." />
+      {restartCommand && (
+        <div className="flex items-start gap-2 rounded-lg bg-inset px-3 py-2">
+          <pre className="min-w-0 flex-1 overflow-x-auto whitespace-pre font-mono text-xs leading-5 text-secondary-900">
+            {restartCommand}
+          </pre>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => {
+              void navigator.clipboard.writeText(restartCommand).then(() => {
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+              });
+            }}
+          >
+            {copied ? "Copied" : "Copy"}
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function App() {
   const { status, lost, refresh } = useStatus();
   const driveFolderUrl = status?.settings.driveFolderUrl;
@@ -84,9 +113,7 @@ export function App() {
           )
         }
       >
-        {lost && (
-          <ErrorBanner message="Can't reach the downloader. Check that it's still running on this computer." />
-        )}
+        {lost && <Stopped restartCommand={status?.restartCommand} />}
         {status && unpaired ? (
           <PairingCard gearbox={status.gearbox} onPaired={refresh} />
         ) : status ? (
