@@ -15,11 +15,12 @@ import {
   fetchDownloaders,
   removeDownloader,
 } from "../../shared/getters/downloaders";
+import { MatchLogs } from "./match-logs";
 import { SetupSteps } from "./setup-steps";
 
 // Logs: the robot's match logs, which the team's paired log downloaders (devices/pit-log-
-// downloader) will send (roadmap: Pit log downloader, L.2). For now it pairs them: a team with
-// none is shown how to set one up and gets a code to pair it with.
+// downloader) upload. A team with none is shown how to set one up and gets a code to pair it
+// with; with one, the page lists the logs and the downloaders.
 
 const whenFormat = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
 
@@ -209,9 +210,7 @@ export function LogsPage() {
         </Card>
       ) : (
         <>
-          <Card>
-            <p className="text-sm text-secondary-500">No match logs yet.</p>
-          </Card>
+          <MatchLogs />
           <Card title="Log downloaders">
             <ul className="divide-y divide-secondary-200">
               {data.downloaders.map((d) => (

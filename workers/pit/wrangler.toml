@@ -18,6 +18,12 @@ database_name = "g3-pit-local"
 database_id = "00000000-0000-0000-0000-000000000002"
 migrations_dir = "src/db/migrations"
 
+# Match logs from the team's log downloaders, in Shop's bucket under pit/teams/<team>/logs/
+# (outside Shop's own teams/<team>/, which Shop deletes when a team switches it off).
+[[r2_buckets]]
+binding = "LOGS"
+bucket_name = "g3-bucket"
+
 [vars]
 FRONTEND_URL = "http://localhost:5175"
 # TBA_AUTH_KEY and NEXUS_API_KEY are secrets — set via `.dev.vars` locally and `wrangler secret put` in prod
@@ -40,6 +46,10 @@ binding = "PIT_DB"
 database_name = "g3-pit-prod"
 database_id = "f10a16be-9193-4888-ac18-099ccebe63c2"
 migrations_dir = "src/db/migrations"
+
+[[env.production.r2_buckets]]
+binding = "LOGS"
+bucket_name = "g3-bucket"
 
 [env.production.vars]
 FRONTEND_URL = "https://1648-pit.frcgearbox.com"
@@ -78,6 +88,10 @@ binding = "PIT_DB"
 database_name = "g3-pit-staging"
 database_id = "237ff642-f72c-4f72-a0a1-563fa4a8f39f"
 migrations_dir = "src/db/migrations"
+
+[[env.staging.r2_buckets]]
+binding = "LOGS"
+bucket_name = "g3-bucket-staging"
 
 [env.staging.vars]
 FRONTEND_URL = "https://1648-pit-dev.g3robotics.com"

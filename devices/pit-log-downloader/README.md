@@ -2,9 +2,9 @@
 
 Runs on a computer in the pit. Whenever the computer joins the robot's network, it copies the
 [AdvantageKit](https://docs.advantagekit.org/) match logs (`.wpilog`) off the roboRIO, names them
-by match (`Qual-13.wpilog`, `Elim-2.wpilog`, `Prct-0.wpilog`) and sorts them by event. If you give
-it a Google Drive folder, it also uploads them there, one folder per event, once the computer is
-online again.
+by match (`Qual-13.wpilog`, `Elim-2.wpilog`, `Prct-0.wpilog`) and sorts them by event. Once the
+computer is online again, it uploads them to your team's Pit on Gearbox, where anyone on the
+team downloads them from the Logs page.
 
 It runs on Linux, Windows and macOS. A status page at <http://localhost:3000>, in the same style
 as the other Gearbox apps, shows the robot and internet connection and every log and where it is,
@@ -40,20 +40,9 @@ knows its team: on first start, the status page only asks to pair.
    name is what Pit lists it as.
 
 Then the status page takes your team's colors, names and logo from Gearbox, and it copies logs
-whenever the computer joins the robot's network (`10.TE.AM.x`, from the team
+(and uploads them to Pit once online) whenever the computer joins the robot's network (`10.TE.AM.x`, from the team
 number). It keeps its key in `data/gearbox.json` (readable only by you). Unpairing on the status
 page, or removing it on Pit's Logs page, stops it until it's paired again with a new code.
-
-## Uploading to Google Drive (optional)
-
-1. In the [Google Cloud console](https://console.cloud.google.com/), make a project, turn on the
-   Google Drive API and make a service account. Make a JSON key for it.
-2. Save the key as `devices/pit-log-downloader/service-account-key.json` (or set
-   `GOOGLE_KEY_FILE` to where it is). Keep it secret: anyone with it can use the folder.
-3. Share the Drive folder with the service account's email address as an Editor. The folder can
-   be in a shared drive.
-4. Copy `config.env.example` to `config.env` and set `DRIVE_FOLDER_ID` to the folder's ID, the
-   last part of its address: `https://drive.google.com/drive/folders/<FOLDER ID>`.
 
 ## Settings
 
@@ -62,8 +51,6 @@ None are needed. To change one, copy `config.env.example` to `config.env` in
 
 | Setting | What it is | Default |
 | --- | --- | --- |
-| `DRIVE_FOLDER_ID` | The Google Drive folder logs are uploaded to | None: logs stay on the computer |
-| `GOOGLE_KEY_FILE` | The service account's JSON key | `service-account-key.json` |
 | `DATA_DIR` | Where logs, the list of them (`logs.json`) and the pairing are kept | `data` |
 | `PORT` | The status page's port | `3000` |
 | `HOST` | Who can open the status page: `127.0.0.1` for this computer only, `0.0.0.0` for anyone on its networks | `127.0.0.1` |
@@ -92,10 +79,9 @@ downloader when `src/` changes and reloads the status page as you edit it.
 
 ## Moving from the old Pit-Log-Downloader repository
 
-Copy its `logs.json` and `logs` folder into `devices/pit-log-downloader/data/`, and its
-`service-account-key.json` into `devices/pit-log-downloader/`; set `DRIVE_FOLDER_ID` in
-`config.env`. Its `TEAM_NUMBER` isn't needed any more: pair it instead. Logs it already
-downloaded or uploaded aren't downloaded or uploaded again.
+Copy its `logs.json` and `logs` folder into `devices/pit-log-downloader/data/` and pair it. Logs
+it already downloaded aren't downloaded again, and they're uploaded to Gearbox (Google Drive and
+its `TEAM_NUMBER`, `DRIVE_FOLDER_ID` and key file aren't used any more).
 
 ## Checking a change
 

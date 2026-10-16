@@ -87,7 +87,8 @@ function Stopped({ restartCommand }: { restartCommand?: string }) {
 
 export function App() {
   const { status, lost } = useStatus();
-  const driveFolderUrl = status?.settings.driveFolderUrl;
+  // The team's logs in Pit, once paired.
+  const pitLogsUrl = status?.gearbox.paired ? `${status.gearbox.paired.pitUrl}/logs` : null;
   // Until it's paired, pairing is all there is.
   const unpaired = status !== null && !status.gearbox.paired;
   const teamNumber = status?.gearbox.paired?.teamNumber;
@@ -126,15 +127,14 @@ export function App() {
         }
         width={unpaired ? "narrow" : "wide"}
         actions={
-          !unpaired &&
-          driveFolderUrl && (
+          pitLogsUrl && (
             <a
               className={buttonClass("secondary")}
-              href={driveFolderUrl}
+              href={pitLogsUrl}
               target="_blank"
               rel="noreferrer"
             >
-              Open Drive folder
+              Open in Pit
             </a>
           )
         }

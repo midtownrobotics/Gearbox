@@ -94,7 +94,34 @@ async function seed(team: TeamUsers): Promise<Seeded> {
       headers: { "Content-Type": "application/json", "X-Team-Id": team.teamId },
       body: JSON.stringify({ code, name: `Downloader ${tag}` }),
     })
+  ).json()) as { id: number; key: string };
+  // A match log it uploaded, in one part.
+  const asDownloader = { Authorization: `Bearer ${paired.key}`, "X-Team-Id": team.teamId };
+  const log = (await (
+    await call("/downloader/logs", {
+      method: "POST",
+      headers: { ...asDownloader, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        event: "seed",
+        name: "Qual-1",
+        matchType: "q",
+        matchNumber: 1,
+        size: 4,
+      }),
+    })
   ).json()) as { id: number };
+  const part = (await (
+    await call(`/downloader/logs/${log.id}/parts/1`, {
+      method: "PUT",
+      headers: asDownloader,
+      body: tag.slice(0, 4),
+    })
+  ).json()) as { partNumber: number; etag: string };
+  await call(`/downloader/logs/${log.id}/complete`, {
+    method: "POST",
+    headers: { ...asDownloader, "Content-Type": "application/json" },
+    body: JSON.stringify({ parts: [part] }),
+  });
   return {
     params: (path, name) => {
       if (name === "itemId") return String(item.id);
@@ -102,6 +129,7 @@ async function seed(team: TeamUsers): Promise<Seeded> {
       if (name === "id") {
         if (path.startsWith("/batteries")) return String(battery.id);
         if (path.startsWith("/downloaders")) return String(paired.id);
+        if (path.startsWith("/logs") || path.startsWith("/downloader/logs")) return String(log.id);
         return String(path.startsWith("/archives") ? archive.id : list.id);
       }
       return undefined;
@@ -120,6 +148,7 @@ async function snapshot(teamId: string) {
     "checklist_archives",
     "batteries",
     "log_downloaders",
+    "match_logs",
   ]) {
     out[table] = (
       await database

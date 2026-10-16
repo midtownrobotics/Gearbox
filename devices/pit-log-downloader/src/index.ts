@@ -3,7 +3,6 @@ import { createServer } from "node:http";
 import * as os from "node:os";
 import * as path from "node:path";
 import express from "express";
-import { type drive_v3, google } from "googleapis";
 import isOnline from "is-online";
 import { NodeSSH } from "node-ssh";
 import { config, parseTeamNumber, pitUrlFor, robotNetworkOf } from "./config.ts";
@@ -15,23 +14,19 @@ import {
   pairWithGearbox,
   teamAppearance,
   unpairFromGearbox,
+  uploadLog,
 } from "./gearbox.ts";
 import type { LogStatus, MatchTypeName, Status } from "./status.ts";
 
-const kLogFolderId = config.driveFolderId;
 const kLogFileRegex = /^akit_[^_]+_[^_]+_[^_]+_[qep]\d+\.wpilog$/;
 const kRioLogDirs = ["/u/logs", "/home/lvuser/logs"];
 const kLogsJson = path.join(config.dataDir, "logs.json");
 const kLogsDir = path.join(config.dataDir, "logs");
 
 const ssh = new NodeSSH();
-const auth = new google.auth.GoogleAuth({
-  keyFile: config.googleKeyFile,
-  scopes: ["https://www.googleapis.com/auth/drive"],
-});
 
 let robotConnected = false;
-let driveUpdating = false;
+let uploadingRunning = false;
 
 // Live state surfaced by the status endpoint / dashboard.
 let internetConnected = false;
@@ -63,7 +58,8 @@ type Log = {
   id: string;
   status: {
     downloaded: boolean;
-    inDrive: boolean;
+    /** In the team's Pit on Gearbox. */
+    uploaded: boolean;
   };
   match: {
     event: string;
@@ -74,10 +70,6 @@ type Log = {
     rio: {
       path: string;
       origin: string;
-    };
-    drive?: {
-      fileId: string;
-      folderId: string;
     };
   };
 };
@@ -103,11 +95,14 @@ if (!fs.existsSync(kLogsJson)) {
   fs.writeFileSync(kLogsJson, "[]");
 }
 
-// Older versions saved each log's absolute path as locations.localPath; it's dropped on load.
-const logs: Log[] = (JSON.parse(fs.readFileSync(kLogsJson).toString()) as Log[]).map((log) => {
-  const { rio, drive } = log.locations;
-  return { ...log, locations: drive ? { rio, drive } : { rio } };
-});
+// Older versions saved each log's absolute path (locations.localPath) and where it was in Google
+// Drive (status.inDrive, locations.drive); both are dropped on load, and a log not yet in
+// Gearbox is uploaded.
+const logs: Log[] = (JSON.parse(fs.readFileSync(kLogsJson).toString()) as Log[]).map((log) => ({
+  ...log,
+  status: { downloaded: log.status.downloaded, uploaded: log.status.uploaded === true },
+  locations: { rio: log.locations.rio },
+}));
 
 /** The paired team's robot network ("10.16.48"), or null before pairing. */
 function robotNetwork() {
@@ -126,11 +121,6 @@ function robotNetwork() {
   if (config.devGateway) {
     logWithTimestamp(`--dev: pairing through the dev gateway, at ${pitUrlFor("<team>")}.`);
   }
-}
-if (!kLogFolderId) {
-  logWithTimestamp("No DRIVE_FOLDER_ID is set, so logs stay on this computer.");
-} else if (!fs.existsSync(config.googleKeyFile)) {
-  logWithTimestamp(`Google key file not found: ${config.googleKeyFile}. Drive uploads will fail.`);
 }
 
 let running = false;
@@ -176,8 +166,8 @@ async function logicLoop() {
     logWithTimestamp("Robot network lost.");
   }
 
-  if (kLogFolderId) {
-    updateDrive(kLogFolderId).catch((err) => logWithTimestamp(`Could not update drive: ${err}`));
+  if (internetConnected) {
+    uploadLogs().catch((err) => logWithTimestamp(`Could not upload logs: ${err}`));
   }
 
   robotConnected = recentPoll;
@@ -236,7 +226,7 @@ async function downloadLogs(rioIp: string) {
           id: `${event}-${matchType}-${matchNumber}`,
           status: {
             downloaded: true,
-            inDrive: false,
+            uploaded: false,
           },
           match: {
             event,
@@ -284,112 +274,43 @@ async function downloadLogs(rioIp: string) {
   return true;
 }
 
-async function updateDrive(logFolderId: string) {
-  if (driveUpdating) return;
-  if (!logs.some((l) => l.status.inDrive === false)) return;
-
-  if (!(await isOnline())) {
-    logWithTimestamp("Computer must be online to upload to drive.");
-    return;
-  }
-
-  driveUpdating = true;
+/** Uploads every copied log Gearbox doesn't have yet to the team's Pit, one at a time. */
+async function uploadLogs() {
+  if (uploadingRunning) return;
+  uploadingRunning = true;
   try {
-    const drive = google.drive({ version: "v3", auth });
-
-    const folderData =
-      (
-        await drive.files.list({
-          q: `'${logFolderId}' in parents and mimeType = 'application/vnd.google-apps.folder'`,
-          supportsAllDrives: true,
-          includeItemsFromAllDrives: true,
-        })
-      ).data.files ?? [];
-    const folders = folderData.map((f) => ({ name: f.name, id: f.id }));
-
-    for (let i = 0; i < logs.length; i++) {
-      const log = logs[i];
-      if (!log.status.downloaded || log.status.inDrive) continue;
-
-      let folderId = folders.find((f) => f.name === log.match.event)?.id;
-
-      if (!folderId) {
-        const file = await drive.files.create({
-          supportsAllDrives: true,
-          requestBody: {
-            name: log.match.event,
-            mimeType: "application/vnd.google-apps.folder",
-            parents: [logFolderId],
-          },
-          fields: "id, name",
-        });
-        folderId = file.data.id;
-        if (folderId) folders.push({ name: log.match.event, id: folderId });
-      }
-
-      if (!folderId) {
-        logWithTimestamp(`Could not find or create event folder: ${log.match.event}`);
-        continue;
-      }
-
+    for (const log of logs) {
+      if (!log.status.downloaded || log.status.uploaded) continue;
+      if (!currentPairing()) return;
+      const filePath = localPathOf(log);
+      if (!fs.existsSync(filePath)) continue;
       uploadingId = log.id;
-      const fileId = await uploadFile(
-        drive,
-        localPathOf(log),
-        `${log.name}.wpilog`,
-        folderId,
-      ).catch(() => logWithTimestamp(`Could not upload log: ${log.id}`));
-      uploadingId = null;
-
-      if (!fileId) continue;
-
-      logs[i].locations.drive = {
-        fileId,
-        folderId,
-      };
-      logs[i].status.inDrive = true;
-      logWithTimestamp(`Uploaded ${logs[i].name} to the drive.`);
+      try {
+        const done = await uploadLog({
+          event: log.match.event,
+          name: log.name,
+          matchType: log.match.type,
+          matchNumber: log.match.number,
+          filePath,
+        });
+        log.status.uploaded = true;
+        fs.writeFileSync(kLogsJson, JSON.stringify(logs));
+        logWithTimestamp(
+          done === "uploaded"
+            ? `Uploaded ${log.name} to Gearbox.`
+            : `Gearbox already has ${log.name}.`,
+        );
+      } catch (err) {
+        logWithTimestamp(
+          `Could not upload ${log.name}: ${err instanceof Error ? err.message : err}`,
+        );
+        return; // Tried again on the next pass.
+      }
     }
   } finally {
-    driveUpdating = false;
     uploadingId = null;
+    uploadingRunning = false;
   }
-}
-
-async function uploadFile(
-  drive: drive_v3.Drive,
-  filePath: string,
-  fileName: string,
-  folderId: string,
-) {
-  const currentFiles = (
-    await drive.files.list({
-      q: `'${folderId}' in parents and name = '${fileName}' and trashed = false`,
-      fields: "files(id, name)",
-      supportsAllDrives: true,
-      includeItemsFromAllDrives: true,
-    })
-  ).data.files;
-
-  if (currentFiles && currentFiles.length > 0) {
-    return currentFiles[0].id;
-  }
-
-  const response = await drive.files.create({
-    supportsAllDrives: true,
-    requestBody: {
-      name: fileName,
-      parents: [folderId],
-    },
-    media: {
-      mimeType: "application/octet-stream",
-      body: fs.createReadStream(filePath),
-    },
-    fields: "id, name",
-    uploadType: "resumable",
-  });
-
-  return response.data.id;
 }
 
 function logWithTimestamp(message: string) {
@@ -447,7 +368,7 @@ app.get("/api/status", (_req, res) => {
       matchType: matchTypeNames[log.match.type],
       matchNumber: log.match.number,
       downloaded: log.status.downloaded,
-      inDrive: log.status.inDrive,
+      uploaded: log.status.uploaded,
       onRobot: rioLogs.some((r) => r.id === log.id),
       downloading: downloadingIds.includes(log.id),
       uploading: uploadingId === log.id,
@@ -455,9 +376,6 @@ app.get("/api/status", (_req, res) => {
       localFile: path.basename(localPath),
       rioPath: log.locations.rio.path,
       sizeBytes,
-      driveUrl: log.locations.drive
-        ? `https://drive.google.com/file/d/${log.locations.drive.fileId}/view`
-        : null,
     };
   });
 
@@ -468,7 +386,7 @@ app.get("/api/status", (_req, res) => {
     connection: {
       robot: robotConnected,
       internet: internetConnected,
-      driveUpdating,
+      uploadingRunning,
       uploadingId,
       downloadingIds,
       rioLogsCheckedAt,
@@ -477,16 +395,13 @@ app.get("/api/status", (_req, res) => {
       teamNumber: currentPairing()?.teamNumber ?? null,
       robotNetwork: robotNetwork(),
       rioIp: robotNetwork() && `${robotNetwork()}.2`,
-      driveFolderUrl: kLogFolderId
-        ? `https://drive.google.com/drive/folders/${kLogFolderId}`
-        : null,
       rioLogDirs: kRioLogDirs,
       localLogsDir: kLogsDir,
     },
     counts: {
       downloaded: decorated.filter((l) => l.downloaded).length,
-      inDrive: decorated.filter((l) => l.inDrive).length,
-      pendingUpload: kLogFolderId ? decorated.filter((l) => l.downloaded && !l.inDrive).length : 0,
+      uploaded: decorated.filter((l) => l.uploaded).length,
+      pendingUpload: decorated.filter((l) => l.downloaded && !l.uploaded).length,
       onRobot: rioLogs.length,
     },
     rioLogs: rioLogs.map((r) => ({

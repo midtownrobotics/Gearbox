@@ -11,7 +11,8 @@ export type LogStatus = {
   matchType: MatchTypeName;
   matchNumber: number;
   downloaded: boolean;
-  inDrive: boolean;
+  /** In the team's Pit on Gearbox. */
+  uploaded: boolean;
   onRobot: boolean;
   downloading: boolean;
   uploading: boolean;
@@ -22,7 +23,6 @@ export type LogStatus = {
   rioPath: string;
   /** Null when the file is gone from this computer. */
   sizeBytes: number | null;
-  driveUrl: string | null;
 };
 
 /** Pairing with the team's Pit on Gearbox (src/gearbox.ts). */
@@ -55,7 +55,8 @@ export type Status = {
   connection: {
     robot: boolean;
     internet: boolean;
-    driveUpdating: boolean;
+    /** Uploading to Gearbox right now. */
+    uploadingRunning: boolean;
     uploadingId: string | null;
     downloadingIds: string[];
     /** When the roboRIO's logs were last listed, or null if they haven't been. */
@@ -68,13 +69,12 @@ export type Status = {
     robotNetwork: string | null;
     rioIp: string | null;
     /** Null when logs stay on this computer. */
-    driveFolderUrl: string | null;
     rioLogDirs: string[];
     localLogsDir: string;
   };
   counts: {
     downloaded: number;
-    inDrive: number;
+    uploaded: number;
     pendingUpload: number;
     onRobot: number;
   };

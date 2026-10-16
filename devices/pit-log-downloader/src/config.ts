@@ -42,8 +42,6 @@ function devGateway() {
 }
 
 export const config = {
-  /** Null when logs stay on this computer only. */
-  driveFolderId: setting("DRIVE_FOLDER_ID") ?? null,
   /**
    * The Pit to pair with when it isn't the team's usual address (staging, a local Pit); null for
    * the usual one, worked out from the team number given when pairing.
@@ -51,7 +49,6 @@ export const config = {
   pitUrl,
   /** The dev gateway (`--dev`), whose team addresses are the team's Pit; null otherwise. */
   devGateway: process.argv.includes("--dev") && !pitUrl ? devGateway() : null,
-  googleKeyFile: fromPackage(setting("GOOGLE_KEY_FILE") ?? "service-account-key.json"),
   dataDir: fromPackage(setting("DATA_DIR") ?? "data"),
   port,
   host: setting("HOST") ?? "127.0.0.1",

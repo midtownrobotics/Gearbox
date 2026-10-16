@@ -44,7 +44,6 @@ function Tile({
 
 export function ConnectionTiles({ status }: { status: Status }) {
   const { connection: c, settings, counts } = status;
-  const drive = settings.driveFolderUrl !== null;
 
   return (
     <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -72,36 +71,28 @@ export function ConnectionTiles({ status }: { status: Status }) {
       />
       <Tile
         label="Internet"
-        light={c.internet ? "ok" : drive && counts.pendingUpload ? "busy" : "off"}
+        light={c.internet ? "ok" : counts.pendingUpload ? "busy" : "off"}
         value={c.internet ? "Online" : "Offline"}
         hint={
-          !drive
-            ? "Not needed: logs stay on this computer"
-            : c.internet
-              ? "Uploads to Drive can run"
-              : "Uploads wait until this computer is online"
+          c.internet ? "Logs can upload to Gearbox" : "Uploads wait until this computer is online"
         }
       />
       <Tile
-        label="Google Drive"
-        light={!drive ? "off" : c.driveUpdating || counts.pendingUpload ? "busy" : "ok"}
+        label="Gearbox"
+        light={c.uploadingRunning || counts.pendingUpload ? "busy" : "ok"}
         value={
-          !drive
-            ? "Off"
-            : c.driveUpdating
-              ? "Uploading"
-              : counts.pendingUpload
-                ? `${counts.pendingUpload} waiting`
-                : "Up to date"
+          c.uploadingRunning
+            ? "Uploading"
+            : counts.pendingUpload
+              ? `${counts.pendingUpload} waiting`
+              : "Up to date"
         }
         hint={
-          !drive
-            ? "Logs stay on this computer"
-            : c.uploadingId
-              ? `Now: ${c.uploadingId}`
-              : counts.pendingUpload
-                ? "Uploaded once this computer is online"
-                : "Every copied log is in Drive"
+          c.uploadingId
+            ? `Now: ${c.uploadingId}`
+            : counts.pendingUpload
+              ? "Uploaded once this computer is online"
+              : "Every copied log is in Pit"
         }
       />
     </div>
@@ -110,14 +101,13 @@ export function ConnectionTiles({ status }: { status: Status }) {
 
 export function Counts({ status }: { status: Status }) {
   const { counts } = status;
-  const drive = status.settings.driveFolderUrl !== null;
   return (
     <Card>
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <Stat label="On the robot" value={counts.onRobot} />
         <Stat label="Copied here" value={counts.downloaded} />
-        {drive && <Stat label="In Drive" value={counts.inDrive} />}
-        {drive && <Stat label="Waiting to upload" value={counts.pendingUpload} />}
+        <Stat label="In Gearbox" value={counts.uploaded} />
+        <Stat label="Waiting to upload" value={counts.pendingUpload} />
       </div>
     </Card>
   );
@@ -141,7 +131,7 @@ function byEvent(logs: LogStatus[]) {
   return [...events];
 }
 
-function LogBadges({ log, drive }: { log: LogStatus; drive: boolean }) {
+function LogBadges({ log }: { log: LogStatus }) {
   const badges: ReactNode[] = [];
   if (log.onRobot) badges.push(<Badge key="robot">On robot</Badge>);
   if (log.downloading) {
@@ -157,21 +147,19 @@ function LogBadges({ log, drive }: { log: LogStatus; drive: boolean }) {
       </Badge>,
     );
   }
-  if (drive) {
-    badges.push(
-      log.uploading ? (
-        <Badge key="drive" colors={tones.warning}>
-          Uploading…
-        </Badge>
-      ) : log.inDrive ? (
-        <Badge key="drive" colors={tones.success}>
-          In Drive
-        </Badge>
-      ) : (
-        <Badge key="drive">Waiting to upload</Badge>
-      ),
-    );
-  }
+  badges.push(
+    log.uploading ? (
+      <Badge key="gearbox" colors={tones.warning}>
+        Uploading…
+      </Badge>
+    ) : log.uploaded ? (
+      <Badge key="gearbox" colors={tones.success}>
+        In Gearbox
+      </Badge>
+    ) : (
+      <Badge key="gearbox">Waiting to upload</Badge>
+    ),
+  );
   return <div className="flex flex-wrap gap-1.5">{badges}</div>;
 }
 
@@ -194,7 +182,7 @@ function CopyPathButton({ path }: { path: string }) {
   );
 }
 
-function LogRow({ log, drive }: { log: LogStatus; drive: boolean }) {
+function LogRow({ log }: { log: LogStatus }) {
   const here = log.downloaded && log.sizeBytes !== null;
   const download = `/api/download?event=${encodeURIComponent(log.event)}&file=${encodeURIComponent(log.localFile)}`;
   return (
@@ -203,7 +191,7 @@ function LogRow({ log, drive }: { log: LogStatus; drive: boolean }) {
         <p className="font-semibold text-secondary-900">{log.name}</p>
         <p className="text-xs text-secondary-500">{size(log.sizeBytes)}</p>
       </div>
-      <LogBadges log={log} drive={drive} />
+      <LogBadges log={log} />
       <div className="ml-auto flex flex-wrap gap-2">
         {here && (
           <a className={buttonClass("secondary", "sm")} href={download}>
@@ -211,23 +199,12 @@ function LogRow({ log, drive }: { log: LogStatus; drive: boolean }) {
           </a>
         )}
         {here && <CopyPathButton path={log.localPath} />}
-        {log.driveUrl && (
-          <a
-            className={buttonClass("secondary", "sm")}
-            href={log.driveUrl}
-            target="_blank"
-            rel="noreferrer"
-          >
-            Open in Drive
-          </a>
-        )}
       </div>
     </li>
   );
 }
 
 export function LogsCard({ status }: { status: Status }) {
-  const drive = status.settings.driveFolderUrl !== null;
   if (!status.logs.length) {
     return (
       <Card title="Logs">
@@ -243,7 +220,7 @@ export function LogsCard({ status }: { status: Status }) {
         <Card key={event} title={event}>
           <ul className="divide-y divide-secondary-200">
             {logs.map((log) => (
-              <LogRow key={log.id} log={log} drive={drive} />
+              <LogRow key={log.id} log={log} />
             ))}
           </ul>
         </Card>
@@ -320,20 +297,6 @@ export function SettingsCard({ status }: { status: Status }) {
       <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[max-content_1fr]">
         <Setting label="Team">{settings.teamNumber}</Setting>
         <Setting label="roboRIO">{settings.rioIp}</Setting>
-        <Setting label="Drive folder">
-          {settings.driveFolderUrl ? (
-            <a
-              className="text-primary-600 underline"
-              href={settings.driveFolderUrl}
-              target="_blank"
-              rel="noreferrer"
-            >
-              {settings.driveFolderUrl}
-            </a>
-          ) : (
-            "Off"
-          )}
-        </Setting>
         <Setting label="Logs on this computer">
           <span className="font-mono text-xs">{settings.localLogsDir}</span>
         </Setting>

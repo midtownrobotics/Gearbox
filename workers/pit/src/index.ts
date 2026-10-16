@@ -28,11 +28,13 @@ import {
   checklistLists,
   logDownloaderCodes,
   logDownloaders,
+  matchLogs,
   settings,
 } from "./db/schema";
 import { demoWords, loadDemo } from "./demo";
 import { downloaderRoutes, downloaderSelfRoutes } from "./downloaders";
 import { manifest } from "./manifest";
+import { deleteTeamLogFiles, logUploadRoutes, matchLogRoutes } from "./match-logs";
 import { SETTING_KEYS, type SettingKey, getSetting, teamNumberOf } from "./settings";
 import type { AppEnv } from "./types";
 
@@ -218,17 +220,21 @@ const app = base
         checklistIssues,
         checklistArchives,
         logDownloaders,
+        matchLogs,
       ],
-      { log_downloaders: ["keyHash"] },
+      { log_downloaders: ["keyHash"], match_logs: ["uploadId"] },
     );
     return c.json(
       teamExport(manifest, teamId, tables, [
         "Log downloaders' keys and pairing codes aren't included: pair a downloader again on the Logs page.",
+        "The match log files aren't included: download them on the Logs page.",
       ]),
     );
   })
   .delete("/internal/teams/:teamId", async (c) => {
+    await deleteTeamLogFiles(c.env.LOGS, c.req.param("teamId"));
     await deleteTeamRows(createDb(c.env.PIT_DB), c.req.param("teamId"), [
+      matchLogs,
       checklistArchives,
       checklistIssues,
       checklistItems,
@@ -821,7 +827,11 @@ const app = base
 
   // Log downloaders: pairing on Pit's Logs page, and the downloader's own key (./downloaders.ts).
   .route("/downloaders", downloaderRoutes)
+  .route("/downloader/logs", logUploadRoutes)
   .route("/downloader", downloaderSelfRoutes)
+
+  // Match logs the downloaders uploaded (./match-logs.ts).
+  .route("/logs", matchLogRoutes)
 
   // Global reset — unchecks all items across all lists, preserves issues, archives nothing
   .post("/reset", requireAuth, async (c) => {

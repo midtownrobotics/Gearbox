@@ -79,6 +79,7 @@ const APPS: App[] = [
       batteries: "batteries",
       logDownloaders: "log_downloaders",
       logDownloaderCodes: "log_downloader_codes",
+      matchLogs: "match_logs",
     },
   },
   {

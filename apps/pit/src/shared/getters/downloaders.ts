@@ -33,3 +33,34 @@ export async function removeDownloader(id: number): Promise<void> {
   const res = await api.downloaders[":id"].$delete({ param: { id: String(id) } });
   if (!res.ok) throw new Error(`Failed to remove the log downloader (${res.status})`);
 }
+
+/** A match log a downloader uploaded. */
+export type MatchLog = {
+  id: number;
+  /** As AdvantageKit names the event ("archimedes"). */
+  event: string;
+  /** "Qual-13", "Elim-2", "Prct-0". */
+  name: string;
+  matchType: "q" | "e" | "p";
+  matchNumber: number;
+  /** Bytes. */
+  size: number;
+  downloaderName: string;
+  uploadedAt: number | null;
+};
+
+/** The team's match logs, newest first, and whether the user may delete them. */
+export async function fetchMatchLogs(): Promise<{ logs: MatchLog[]; canDelete: boolean }> {
+  const res = await api.logs.$get();
+  if (!res.ok) throw new Error(`Failed to fetch match logs (${res.status})`);
+  return res.json() as Promise<{ logs: MatchLog[]; canDelete: boolean }>;
+}
+
+/** Where a log downloads from. */
+export const matchLogFileUrl = (id: number) =>
+  api.logs[":id"].file.$url({ param: { id: String(id) } }).toString();
+
+export async function deleteMatchLog(id: number): Promise<void> {
+  const res = await api.logs[":id"].$delete({ param: { id: String(id) } });
+  if (!res.ok) throw new Error(`Failed to delete the log (${res.status})`);
+}

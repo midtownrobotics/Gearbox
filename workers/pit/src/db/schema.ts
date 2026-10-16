@@ -140,3 +140,33 @@ export const logDownloaderCodes = sqliteTable(
   },
   (t) => [primaryKey({ columns: [t.teamId, t.code] })],
 );
+
+/**
+ * Match logs a paired log downloader uploaded (migration 0014), the files in the LOGS bucket at
+ * `r2Key` (../match-logs.ts). Times are milliseconds.
+ */
+export const matchLogs = sqliteTable(
+  "match_logs",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    teamId: text("team_id").notNull(),
+    /** The event as AdvantageKit names it ("archimedes"). */
+    event: text("event").notNull(),
+    /** "Qual-13", "Elim-2", "Prct-0". */
+    name: text("name").notNull(),
+    matchType: text("match_type", { enum: ["q", "e", "p"] }).notNull(),
+    matchNumber: integer("match_number").notNull(),
+    /** Bytes. */
+    size: integer("size").notNull(),
+    r2Key: text("r2_key").notNull(),
+    status: text("status", { enum: ["uploading", "stored"] }).notNull(),
+    /** The R2 multipart upload, while `uploading`. */
+    uploadId: text("upload_id"),
+    downloaderId: integer("downloader_id"),
+    /** Kept when the downloader is removed. */
+    downloaderName: text("downloader_name").notNull(),
+    createdAt: integer("created_at").notNull(),
+    uploadedAt: integer("uploaded_at"),
+  },
+  (t) => [uniqueIndex("match_logs_name_idx").on(t.teamId, t.event, t.name)],
+);

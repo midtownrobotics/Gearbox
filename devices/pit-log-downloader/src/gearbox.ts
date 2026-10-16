@@ -61,11 +61,16 @@ export const currentPairing = () => pairing;
 function pit(teamNumber: number, apiPath: string, init: RequestInit = {}) {
   const headers = new Headers(init.headers);
   if (pairing) headers.set("Authorization", `Bearer ${pairing.key}`);
-  if (init.body) headers.set("Content-Type", "application/json");
+  if (init.body && !headers.has("Content-Type")) {
+    headers.set(
+      "Content-Type",
+      typeof init.body === "string" ? "application/json" : "application/octet-stream",
+    );
+  }
   return fetch(`${pitUrlFor(teamNumber)}/api${apiPath}`, {
     ...init,
     headers,
-    signal: AbortSignal.timeout(kTimeoutMs),
+    signal: AbortSignal.timeout(init.body && typeof init.body !== "string" ? 120_000 : kTimeoutMs),
   });
 }
 
@@ -182,6 +187,72 @@ export async function teamAppearance(): Promise<TeamUiSettings | null> {
     // None kept yet.
   }
   return teamUiDefaults(`frc${teamNumber}`);
+}
+
+/** What Pit needs to know about a log before taking it. */
+export type LogUpload = {
+  event: string;
+  name: string;
+  matchType: "q" | "e" | "p";
+  matchNumber: number;
+  filePath: string;
+};
+
+/**
+ * Uploads a log to the team's Pit, in parts (Pit says how big), unless Pit already has it.
+ * Throws when it can't; a key Pit removed unpairs this side first.
+ */
+export async function uploadLog(log: LogUpload): Promise<"uploaded" | "already there"> {
+  if (!pairing) throw new Error("Not paired with Gearbox.");
+  const { teamNumber } = pairing;
+  const expectOk = async (res: Response) => {
+    if (res.status === 401) {
+      save(null);
+      connection = "removed";
+    }
+    if (!res.ok) {
+      const body = (await res.json().catch(() => null)) as { error?: string } | null;
+      throw new Error(body?.error ?? `Gearbox answered ${res.status}.`);
+    }
+    return res.json();
+  };
+
+  const file = await fs.promises.open(log.filePath, "r");
+  try {
+    const { size } = await file.stat();
+    const { filePath: _, ...meta } = log;
+    const started = (await expectOk(
+      await pit(teamNumber, "/downloader/logs", {
+        method: "POST",
+        body: JSON.stringify({ ...meta, size }),
+      }),
+    )) as { id: number; exists: boolean; partSize?: number };
+    if (started.exists) return "already there";
+
+    const partSize = started.partSize ?? 10 * 1024 * 1024;
+    const parts: { partNumber: number; etag: string }[] = [];
+    for (let offset = 0, part = 1; offset < size; offset += partSize, part++) {
+      const buffer = Buffer.alloc(Math.min(partSize, size - offset));
+      await file.read(buffer, 0, buffer.length, offset);
+      parts.push(
+        (await expectOk(
+          await pit(teamNumber, `/downloader/logs/${started.id}/parts/${part}`, {
+            method: "PUT",
+            body: buffer,
+          }),
+        )) as { partNumber: number; etag: string },
+      );
+    }
+    await expectOk(
+      await pit(teamNumber, `/downloader/logs/${started.id}/complete`, {
+        method: "POST",
+        body: JSON.stringify({ parts }),
+      }),
+    );
+    return "uploaded";
+  } finally {
+    await file.close();
+  }
 }
 
 /** Forgets the pairing, and tells Pit to remove this downloader when it can. */
