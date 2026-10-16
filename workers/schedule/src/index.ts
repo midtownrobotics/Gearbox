@@ -99,7 +99,7 @@ export {
 
 export default {
   fetch: withApiPrefix(app.fetch),
-  // Slack reminders before role changes (wrangler.toml's cron: every minute).
+  // Slack or Discord reminders before role changes (wrangler.toml's cron: every minute).
   scheduled: (_event: ScheduledController, env: AppEnv["Bindings"], ctx: ExecutionContext) => {
     ctx.waitUntil(sendReminders(env));
   },

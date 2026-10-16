@@ -56,7 +56,7 @@ export async function loadDemo(db: Db, teamId: string) {
       withTeam(teamId, {
         name: SCHEDULE_NAME,
         timeZone: site.demo.timeZone,
-        // The demo has no Slack: nothing to remind anyone of.
+        // The demo has no Slack or Discord: nothing to remind anyone of.
         notifyMinutes: null,
         publishedAt: seconds,
         createdBy: mentor.id,

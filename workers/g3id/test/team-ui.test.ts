@@ -234,7 +234,7 @@ describe("team UI settings", () => {
       ...legacy,
       linkAccents: true,
       buttonText: { light: "auto", dark: "auto" },
-      links: { ...legacy.links, ...teamLinks, ...toolLinks },
+      links: { ...legacy.links, discord: links.discord, ...teamLinks, ...toolLinks },
       hiddenLinks: [],
       appOrder: defaultAppOrder,
     };

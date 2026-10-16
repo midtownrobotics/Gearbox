@@ -7,8 +7,10 @@ import {
   Loading,
   Page as SharedPage,
   TextField,
+  chatName,
   inputClass,
   useQuestions,
+  useTeamChat,
   useTeamNames,
 } from "@g3/ui";
 import {
@@ -854,6 +856,7 @@ function LiveUsers() {
 
 function ServiceIssueReport() {
   const questions = useQuestions();
+  const chat = chatName(useTeamChat());
   const [open, setOpen] = useState(false);
   const [report, setReport] = useState({ teamName: "", issueType: "mechanical", description: "" });
   const [message, setMessage] = useState("");
@@ -878,7 +881,7 @@ function ServiceIssueReport() {
         try {
           await api("/service-tickets", { method: "POST", body: JSON.stringify(report) });
           setMessageType("success");
-          setMessage("Service crew alerted through Slack.");
+          setMessage(`Service crew alerted through ${chat}.`);
           setReport({ teamName: "", issueType: "mechanical", description: "" });
         } catch (error) {
           setMessageType("error");

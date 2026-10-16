@@ -20,7 +20,7 @@ import {
 } from "@g3/ui";
 import { useEffect } from "react";
 import type { IconType } from "react-icons";
-import { FaCube, FaGithub, FaGlobe, FaInstagram, FaSlack } from "react-icons/fa";
+import { FaCube, FaDiscord, FaGithub, FaGlobe, FaInstagram, FaSlack } from "react-icons/fa";
 import attendanceIcon from "../../assets/app-icons/attendance.svg";
 import edgeIcon from "../../assets/app-icons/edge.svg";
 import inventoryIcon from "../../assets/app-icons/inventory.svg";
@@ -139,6 +139,14 @@ const APPS: App[] = [
     linkKey: "slack",
     href: "",
     icon: FaSlack,
+    external: true,
+  },
+  {
+    label: "Discord",
+    key: "discord",
+    linkKey: "discord",
+    href: "",
+    icon: FaDiscord,
     external: true,
   },
   {

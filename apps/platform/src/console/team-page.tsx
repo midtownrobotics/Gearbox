@@ -47,7 +47,11 @@ export function TeamPage() {
         <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
           <Detail label="Owner">{team.owner?.name ?? "—"}</Detail>
           <Detail label="Founder">{team.founder?.name ?? "—"}</Detail>
-          <Detail label="Slack workspace">{team.slackWorkspaceName ?? "—"}</Detail>
+          {team.discordGuildName ? (
+            <Detail label="Discord server">{team.discordGuildName}</Detail>
+          ) : (
+            <Detail label="Slack workspace">{team.slackWorkspaceName ?? "—"}</Detail>
+          )}
           <Detail label="Country">{team.country}</Detail>
           <Detail label="Signed up">{formatTime(team.createdAt)}</Detail>
           <Detail label="Terms accepted">{formatTime(team.termsAcceptedAt)}</Detail>
@@ -271,7 +275,7 @@ function Delete({
   return (
     <ActionForm
       title="Delete the team"
-      description="Deletes the team for good: every account on it, their sign-ins, its kiosks and its Slack connection. The number is free again. This can't be undone."
+      description="Deletes the team for good: every account on it, their sign-ins, its kiosks and its Slack or Discord connection. The number is free again. This can't be undone."
       button="Delete for good"
       danger
       onSubmit={(reason) => onSubmit(reason, Number(confirm))}

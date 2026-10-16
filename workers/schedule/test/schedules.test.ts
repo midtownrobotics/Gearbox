@@ -374,7 +374,7 @@ describe("reminders", () => {
       (
         (await (
           await (env as unknown as { G3ID: Fetcher }).G3ID.fetch(
-            `http://g3id/api/internal/teams/${student.teamId}/slack/dm-members`,
+            `http://g3id/api/internal/teams/${student.teamId}/chat/dm-members`,
           )
         ).json()) as { userIds: string[]; text: string }[]
       ).filter((dm) => dm.text.includes(`Regional ${id}`));
@@ -390,7 +390,7 @@ describe("reminders", () => {
     expect(await dms()).toEqual([
       {
         userIds: [student.id],
-        text: expect.stringMatching(/at 10:00 AM you're on \*Lunch .*\* until 10:30 AM/),
+        text: expect.stringMatching(/at 10:00 AM you're on \*\*Lunch .*\*\* until 10:30 AM/),
       },
     ]);
   });

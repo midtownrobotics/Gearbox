@@ -14,6 +14,9 @@ export const teams = sqliteTable("teams", {
   ownerUserId: text("owner_user_id"),
   slackWorkspaceId: text("slack_workspace_id"),
   slackWorkspaceName: text("slack_workspace_name"),
+  /** The Discord server, for a team that signed up with Discord instead (migration 0011). */
+  discordGuildId: text("discord_guild_id"),
+  discordGuildName: text("discord_guild_name"),
   termsAcceptedAt: integer("terms_accepted_at"),
   signupId: text("signup_id").unique(),
   signupCodeToken: text("signup_code_token"),

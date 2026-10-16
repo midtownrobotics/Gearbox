@@ -101,7 +101,7 @@ describe("team-scoped workflows", () => {
     expect(objects.objects).toHaveLength(3);
   });
 
-  it("grants roles only to the team's members and routes alerts through its own Slack", async () => {
+  it("grants roles only to the team's members and routes alerts through its own chat", async () => {
     const a = teamUsers(newTeamId());
     const b = teamUsers(newTeamId());
     for (const route of ["strategy-admins", "service-helpers", "field-map-publishers"]) {
@@ -134,7 +134,9 @@ describe("team-scoped workflows", () => {
     ).toBe(201);
     const messages = async (teamId: string) =>
       (
-        await bindings.G3ID.fetch(new Request(`http://g3id/api/internal/teams/${teamId}/slack/dms`))
+        await bindings.G3ID.fetch(
+          new Request(`http://g3id/api/internal/teams/${teamId}/chat/dm-members`),
+        )
       ).json();
     expect(await messages(a.teamId)).toEqual([
       expect.objectContaining({

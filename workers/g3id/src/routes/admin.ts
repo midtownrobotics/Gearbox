@@ -1,4 +1,5 @@
-import { SlackApiError, listChannels, sendDM } from "@g3/slack";
+import { leaveGuild } from "@g3/discord";
+import { SlackApiError } from "@g3/slack";
 import { and, desc, eq, gt, inArray, isNull, or } from "drizzle-orm";
 import { Hono } from "hono";
 import { createDb } from "../db";
@@ -8,11 +9,15 @@ import {
   coreUserIdentities,
   coreUserPins,
   coreUsers,
+  discordInstallations,
   kioskActivationCodes,
   kioskDevices,
   slackInstallations,
   teamUiSettings,
 } from "../db/schema";
+import { CHAT_LABELS, chatForTeam, listChatChannels } from "../lib/chat";
+import { discordForTeam, removeDiscordInstallation } from "../lib/discord-install";
+import { dmMember } from "../lib/member-dm";
 import { methodOff } from "../lib/sign-in-methods";
 import { removeInstallation, slackForTeam } from "../lib/slack-install";
 import { teamOfUser, teamUrl } from "../lib/team";
@@ -32,16 +37,19 @@ export const adminRouter = new Hono<AppEnv>()
     c.set("adminTeamId", await teamOfUser(createDb(c.env.DB), c.get("userId") as string));
     await next();
   })
-  // The team's Slack channels, so its admins choose one by name (Shop's channels, the platform's
-  // notifications). 404 without Slack; 409 when the team's connection is from before the bot could
-  // read channels and has to be connected again.
-  .get("/slack/channels", async (c) => {
-    const teamSlack = await slackForTeam(c.env, c.get("adminTeamId") as string);
-    if (!teamSlack) {
-      return c.json({ code: "no_slack", error: "Your team hasn't connected Slack." }, 404);
+  // The team's channels on its chat (Slack or Discord), so its admins choose one by name (Shop's
+  // channels, the platform's notifications). 404 without a chat; 409 when the team's Slack
+  // connection is from before the bot could read channels and has to be connected again.
+  .get("/chat/channels", async (c) => {
+    const chat = await chatForTeam(c.env, c.get("adminTeamId") as string);
+    if (!chat) {
+      return c.json(
+        { code: "no_chat", error: "Your team hasn't connected Slack or Discord." },
+        404,
+      );
     }
     try {
-      return c.json({ channels: await listChannels(teamSlack.slack) });
+      return c.json({ provider: chat.provider, channels: await listChatChannels(chat) });
     } catch (err) {
       if (err instanceof SlackApiError && err.code === "missing_scope") {
         return c.json(
@@ -49,8 +57,14 @@ export const adminRouter = new Hono<AppEnv>()
           409,
         );
       }
-      console.error("[slack] listing channels failed", err);
-      return c.json({ code: "slack_error", error: "Slack didn't answer. Please try again." }, 502);
+      console.error(`[${chat.provider}] listing channels failed`, err);
+      return c.json(
+        {
+          code: "chat_error",
+          error: `${CHAT_LABELS[chat.provider]} didn't answer. Please try again.`,
+        },
+        502,
+      );
     }
   })
   // The admin's own team's appearance.
@@ -191,18 +205,19 @@ export const adminRouter = new Hono<AppEnv>()
       .set({ status: "active", updatedAt: Math.floor(Date.now() / 1000) })
       .where(memberOf(c.get("adminTeamId") as string, id));
 
-    const [slackIdentity] = await db
-      .select({ providerId: coreUserIdentities.providerId })
-      .from(coreUserIdentities)
-      .where(and(eq(coreUserIdentities.userId, id), eq(coreUserIdentities.provider, "slack")));
-
-    const teamSlack = await slackForTeam(c.env, user.teamId);
-    if (slackIdentity?.providerId && teamSlack) {
-      await sendDM(
-        slackIdentity.providerId,
-        `✅ Your ID account has been approved! Click <${teamUrl(c.env, user.teamId, "id")}/login|here> to go to the sign-in page and *sign in with Slack*. Yes, you will have to repeat the code sending process.`,
-        teamSlack.slack,
-      );
+    // They hear it on the team's chat, where they signed up. Never fails the approval.
+    const chat = await chatForTeam(c.env, user.teamId);
+    if (chat) {
+      const how =
+        chat.provider === "slack"
+          ? "**sign in with Slack**. Yes, you will have to repeat the code sending process."
+          : "**sign in with Discord**.";
+      await dmMember(
+        c.env,
+        user.teamId,
+        id,
+        `✅ Your ID account has been approved! [Go to the sign-in page](${teamUrl(c.env, user.teamId, "id")}/login) and ${how}`,
+      ).catch((err) => console.error("[chat] approval DM failed", err));
     }
 
     return c.json({ message: "User approved." });
@@ -353,6 +368,10 @@ export const adminRouter = new Hono<AppEnv>()
         .update(slackInstallations)
         .set({ installedBy: null })
         .where(inArray(slackInstallations.installedBy, ids)),
+      db
+        .update(discordInstallations)
+        .set({ installedBy: null })
+        .where(inArray(discordInstallations.installedBy, ids)),
       db.delete(coreUsers).where(and(eq(coreUsers.teamId, team), inArray(coreUsers.id, ids))),
     ]);
     // Sessions are looked up in KV; without their user they'd fail anyway, but don't leave them.
@@ -490,6 +509,32 @@ export const adminRouter = new Hono<AppEnv>()
       fromSettings: teamSlack?.fromSettings ?? false,
       canConnect: Boolean(c.env.SLACK_CLIENT_ID && c.env.SECRETS_KEY),
     });
+  })
+  // The team's Discord server, which an admin connects with /auth/discord/install.
+  .get("/discord", async (c) => {
+    const teamDiscord = await discordForTeam(c.env, c.get("adminTeamId") as string);
+    return c.json({
+      connected: teamDiscord !== null,
+      guildId: teamDiscord?.guildId ?? null,
+      guildName: teamDiscord?.guildName ?? null,
+    });
+  })
+  // Disconnects Discord: the bot leaves the server and the team forgets it.
+  .delete("/discord", async (c) => {
+    const team = c.get("adminTeamId") as string;
+    const teamDiscord = await discordForTeam(c.env, team);
+    if (teamDiscord) {
+      await leaveGuild({ DISCORD_BOT_TOKEN: c.env.DISCORD_BOT_TOKEN }, teamDiscord.guildId).catch(
+        (err) => console.error("[discord] leaving the server failed", err),
+      );
+    }
+    await removeDiscordInstallation(c.env, team);
+    await logToTeam(c.env, team, {
+      userId: c.get("userId") as string,
+      app: "id",
+      what: "Discord disconnected",
+    });
+    return c.json({ ok: true });
   })
   .delete("/slack", async (c) => {
     const team = await teamOfUser(createDb(c.env.DB), c.get("userId") as string);

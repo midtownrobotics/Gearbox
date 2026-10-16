@@ -1,10 +1,11 @@
 import { env } from "cloudflare:test";
 import { exports } from "cloudflare:workers";
 import { platformUrl, site, teamKey } from "@g3/site-config";
+import { snowflake } from "@g3/testing/discord";
 import { describe, expect, it } from "vitest";
 import type { AppEnv } from "../src/types";
 
-// Team sign-up (roadmap 2.7). G3ID and Slack are stubbed in vitest.config.mts.
+// Team sign-up (roadmap 2.7). G3ID, Slack and Discord are stubbed in vitest.config.mts.
 
 const call = (path: string, init: RequestInit & { json?: unknown } = {}) =>
   exports.default.fetch(
@@ -53,7 +54,7 @@ describe("signing a team up", () => {
     const signupId = await signUp(number);
     expect(await (await call(`/signup/${signupId}`)).json()).toMatchObject({
       teamNumber: number,
-      step: "slack",
+      step: "connect",
     });
     // Pending teams have no addresses yet.
     expect((await call(`/teams/frc${number}`)).status).toBe(404);
@@ -129,12 +130,56 @@ describe("signing a team up", () => {
     const signupId = await signUp(newNumber());
     const back = await connectSlack(signupId, "TTAKEN");
     expect(back.headers.get("Location")).toContain("error=");
-    expect(await (await call(`/signup/${signupId}`)).json()).toMatchObject({ step: "slack" });
+    expect(await (await call(`/signup/${signupId}`)).json()).toMatchObject({ step: "connect" });
   });
 
   it("needs Slack before the code", async () => {
     const signupId = await signUp(newNumber());
     expect((await call(`/signup/${signupId}/code`, { method: "POST" })).status).toBe(409);
+  });
+});
+
+describe("signing a team up with Discord", () => {
+  /** "Add to Discord" for the sign-up: the founder (a Discord user) adds the bot to a server. */
+  async function connectDiscord(signupId: string, founder: string, guild = snowflake("5")) {
+    const start = await call(`/signup/${signupId}/discord`);
+    const discord = new URL(start.headers.get("Location") as string);
+    expect(discord.searchParams.get("redirect_uri")).toBe(
+      `${platformUrl}/api/signup/discord/callback`,
+    );
+    expect(discord.searchParams.get("scope")).toContain("bot");
+    return call(
+      `/signup/discord/callback?code=u:${founder}:g:${guild}&state=${discord.searchParams.get("state")}`,
+    );
+  }
+
+  it("connects the server and signs the founder in on the team's own address, in one step", async () => {
+    const number = newNumber();
+    const signupId = await signUp(number);
+    const guild = snowflake("5");
+    const back = await connectDiscord(signupId, snowflake("5"), guild);
+    const to = new URL(back.headers.get("Location") as string);
+    expect(to.origin).toBe(`https://${number}-id.${site.platformDomain}`);
+    expect(to.pathname).toBe("/api/auth/handoff");
+    expect(to.searchParams.get("token")).toBe("handoff-token");
+    expect(to.searchParams.get("redirect")).toBe(
+      `https://${number}.${site.platformDomain}/admin/notifications?welcome=1`,
+    );
+    expect(await team(number)).toMatchObject({
+      status: "active",
+      founder_user_id: "u-founder",
+      discord_guild_id: guild,
+    });
+    expect(await (await call(`/teams/frc${number}`)).json()).toMatchObject({ teamNumber: number });
+  });
+
+  it("says why, and stays pending, when G3ID turns the founder away", async () => {
+    const number = newNumber();
+    const signupId = await signUp(number);
+    // No verified email: G3ID can't make the account.
+    const back = await connectDiscord(signupId, snowflake("6"));
+    expect(decodeURIComponent(back.headers.get("Location") ?? "")).toContain("verified email");
+    expect(await team(number)).toMatchObject({ status: "pending" });
   });
 });
 

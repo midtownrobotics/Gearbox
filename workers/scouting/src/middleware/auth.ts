@@ -21,6 +21,5 @@ export const requireAuth = createMiddleware<AppEnv>(async (c, next) => {
   c.set("sessionType", "oauth");
   c.set("kioskDeviceId", null);
   c.set("kioskDeviceName", null);
-  c.set("userSlackId", null);
   await next();
 });

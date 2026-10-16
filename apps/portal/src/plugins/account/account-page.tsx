@@ -13,7 +13,7 @@ import {
 } from "@g3/ui";
 import { Shield } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { FaGithub, FaGoogle, FaSlack, FaSteam } from "react-icons/fa";
+import { FaDiscord, FaGithub, FaGoogle, FaSlack, FaSteam } from "react-icons/fa";
 import { Link } from "react-router-dom";
 import { g3id as api } from "../../lib/api";
 
@@ -47,6 +47,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   local: "Password",
   google: "Google",
   slack: "Slack",
+  discord: "Discord",
   github: "GitHub",
   steam: "Steam",
 };
@@ -287,7 +288,10 @@ export function AccountPage() {
               if (displayText) {
                 profileUrl = `https://steamcommunity.com/profiles/${displayText}`;
               }
-            } else if (identity.provider === "google" && identity.providerEmail) {
+            } else if (
+              (identity.provider === "google" || identity.provider === "discord") &&
+              identity.providerEmail
+            ) {
               displayText = identity.providerEmail;
             }
             const label = PROVIDER_LABELS[identity.provider] ?? identity.provider;
@@ -329,16 +333,19 @@ export function AccountPage() {
                       Add another
                     </a>
                   )}
-                {identity.provider !== "slack" && me.identities.length > 1 && (
-                  <ConfirmButton
-                    size="sm"
-                    label={unlinkingProvider === identity.id ? "Unlinking…" : "Unlink"}
-                    confirmLabel="Unlink"
-                    question={`Unlink ${label}? You won't be able to sign in with it.`}
-                    disabled={unlinkingProvider === identity.id}
-                    onConfirm={() => void handleUnlink(identity.id)}
-                  />
-                )}
+                {/* The team's chat stays linked: members join through it. */}
+                {identity.provider !== "slack" &&
+                  identity.provider !== "discord" &&
+                  me.identities.length > 1 && (
+                    <ConfirmButton
+                      size="sm"
+                      label={unlinkingProvider === identity.id ? "Unlinking…" : "Unlink"}
+                      confirmLabel="Unlink"
+                      question={`Unlink ${label}? You won't be able to sign in with it.`}
+                      disabled={unlinkingProvider === identity.id}
+                      onConfirm={() => void handleUnlink(identity.id)}
+                    />
+                  )}
               </div>
             );
           })}
@@ -364,7 +371,13 @@ export function AccountPage() {
             </a>
           )}
         </div>
-        {!me.identities.some((i) => i.provider === "slack") && (
+        {methods.discord === true && !me.identities.some((i) => i.provider === "discord") && (
+          <a href={linkUrl("discord")} className={`${buttonClass()} mt-3 w-full`}>
+            <FaDiscord size={16} />
+            Connect Discord
+          </a>
+        )}
+        {methods.slack !== false && !me.identities.some((i) => i.provider === "slack") && (
           <div className="mt-3">
             {slackCode ? (
               <div className="rounded-lg bg-secondary-50 border border-secondary-200 px-4 py-3 space-y-2">

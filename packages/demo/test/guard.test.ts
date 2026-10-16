@@ -60,6 +60,9 @@ describe("allowedText", () => {
 describe("demoBlocked", () => {
   it("refuses what reaches outside the demo", () => {
     expect(demoBlocked("id", "GET", "/slack/install")).toBe(true);
+    expect(demoBlocked("id", "GET", "/auth/discord/install")).toBe(true);
+    expect(demoBlocked("id", "DELETE", "/admin/discord")).toBe(true);
+    expect(demoBlocked("shop", "POST", "/admin/chat/config")).toBe(true);
     expect(demoBlocked("platform", "PUT", "/team/library/orders")).toBe(true);
     expect(demoBlocked("edge", "POST", "/box/key")).toBe(true);
     expect(demoBlocked("id", "PUT", "/admin/team/ui")).toBe(true);

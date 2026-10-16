@@ -3,7 +3,8 @@ import type { AppName } from "@g3/site-config";
 // What the gateway lets a demo visitor do (roadmap 5.5 and 5.7). The demo's pages only send text
 // picked from the safe lists (safe-text.ts) or the demo's own sample data, so this only stops
 // someone calling the API by hand:
-// - Routes that reach outside the platform or lock visitors out (connecting Slack, kiosks, keys,
+// - Routes that reach outside the platform or lock visitors out (connecting Slack or Discord,
+//   kiosks, keys,
 //   switching apps off, deleting the shared accounts) are refused for every role.
 // - Uploads are refused: any file, and any body that isn't JSON or a form of text.
 // - Every string in a JSON body must be made of words the demo already has (`vocabulary`), or be
@@ -19,6 +20,8 @@ export const DEMO_BLOCKED: readonly Blocked[] = [
   // Sign-in, accounts and kiosks: the three visitor accounts are shared.
   { app: "id", method: "*", path: /^\/slack\/install/ },
   { app: "id", method: "DELETE", path: /^\/admin\/slack$/ },
+  { app: "id", method: "*", path: /^\/auth\/discord\/(install|link)/ },
+  { app: "id", method: "DELETE", path: /^\/admin\/discord$/ },
   { app: "id", method: "PUT", path: /^\/admin\/team\/sign-in/ },
   // Team Appearance: visitors can try the editor, but not save it.
   { app: "id", method: "PUT", path: /^\/admin\/team\/ui/ },
@@ -32,7 +35,7 @@ export const DEMO_BLOCKED: readonly Blocked[] = [
   { app: "id", method: "POST", path: /^\/kiosk\/activate/ },
   { app: "id", method: "POST", path: /^\/auth\/(password|pin\/regenerate|login\/email)/ },
   { app: "id", method: "DELETE", path: /^\/auth\/identities\// },
-  // The team's apps stay on, and nothing is sent to Slack.
+  // The team's apps stay on, and nothing is sent to Slack or Discord.
   { app: "platform", method: "PUT", path: /^\/team\/library\// },
   { app: "platform", method: "PUT", path: /^\/team\/notification-settings/ },
   // Integrations: keys, webhooks and boxes stay unconnected.
@@ -40,7 +43,7 @@ export const DEMO_BLOCKED: readonly Blocked[] = [
   { app: "pit", method: "POST", path: /^\/downloaders\/(codes|pair)/ },
   { app: "edge", method: "*", path: /^\/switch\// },
   { app: "edge", method: "*", path: /^\/print\// },
-  { app: "shop", method: "POST", path: /^\/admin\/(onshape|slack)\// },
+  { app: "shop", method: "POST", path: /^\/admin\/(onshape|chat)\// },
   { app: "shop", method: "*", path: /^\/print\// },
   { app: "orders", method: "*", path: /^\/share-a-cart\/(connect|callback|disconnect)/ },
   { app: "orders", method: "POST", path: /^\/orders\/import/ },

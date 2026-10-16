@@ -48,8 +48,6 @@ export type G3AuthVariables = {
   sessionType: "oauth" | "pin";
   kioskDeviceId: number | null;
   kioskDeviceName: string | null;
-  /** The user's linked Slack account; only loaded by `requireAuthWithIdentities`. */
-  userSlackId: string | null;
 };
 
 /** What a worker needs for these middlewares: the G3ID binding and the user variables. */
@@ -58,9 +56,9 @@ export type G3AuthEnv = {
   Variables: G3AuthVariables;
 };
 
-async function loadUser(c: Context<G3AuthEnv>, identities: boolean) {
+async function loadUser(c: Context<G3AuthEnv>) {
   const res = await c.env.G3ID.fetch(
-    new Request(`http://g3id/api/auth/me${identities ? "" : "?includeIdentities=false"}`, {
+    new Request("http://g3id/api/auth/me?includeIdentities=false", {
       headers: { cookie: c.req.header("Cookie") ?? "" },
     }),
   );
@@ -78,10 +76,6 @@ async function loadUser(c: Context<G3AuthEnv>, identities: boolean) {
   c.set("sessionType", user.sessionType ?? "oauth");
   c.set("kioskDeviceId", user.kioskDeviceId ?? null);
   c.set("kioskDeviceName", user.kioskDeviceName ?? null);
-  c.set(
-    "userSlackId",
-    user.identities?.find((identity) => identity.provider === "slack")?.providerId ?? null,
-  );
   return user;
 }
 
@@ -90,15 +84,7 @@ const unauthorized = (c: Context) => c.json({ error: "Unauthorized." }, 401);
 /** Any signed-in user (401 otherwise). */
 export const requireAuth: MiddlewareHandler<G3AuthEnv> = createMiddleware<G3AuthEnv>(
   async (c, next) => {
-    if (!(await loadUser(c, false))) return unauthorized(c);
-    await next();
-  },
-);
-
-/** Like requireAuth, also loading linked accounts (`userSlackId`). G3ID does more work for it. */
-export const requireAuthWithIdentities: MiddlewareHandler<G3AuthEnv> = createMiddleware<G3AuthEnv>(
-  async (c, next) => {
-    if (!(await loadUser(c, true))) return unauthorized(c);
+    if (!(await loadUser(c))) return unauthorized(c);
     await next();
   },
 );
@@ -106,7 +92,7 @@ export const requireAuthWithIdentities: MiddlewareHandler<G3AuthEnv> = createMid
 /** G3ID admins only (403 otherwise). */
 export const requireAdmin: MiddlewareHandler<G3AuthEnv> = createMiddleware<G3AuthEnv>(
   async (c, next) => {
-    if (!(await loadUser(c, false))) return unauthorized(c);
+    if (!(await loadUser(c))) return unauthorized(c);
     if (!c.get("userIsAdmin")) return c.json({ error: "Admin access required." }, 403);
     await next();
   },
@@ -119,7 +105,7 @@ export const hasMentorAccess = (c: { get(key: "userIsMentor" | "userIsAdmin"): b
 /** G3ID mentors and admins only (403 otherwise). */
 export const requireMentor: MiddlewareHandler<G3AuthEnv> = createMiddleware<G3AuthEnv>(
   async (c, next) => {
-    if (!(await loadUser(c, false))) return unauthorized(c);
+    if (!(await loadUser(c))) return unauthorized(c);
     if (!hasMentorAccess(c)) return c.json({ error: "Mentor access required." }, 403);
     await next();
   },

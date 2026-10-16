@@ -24,7 +24,8 @@ import {
 } from "./data";
 
 // Notifications for every team, written by operators, each shown until it expires. Each team's
-// admins choose where they go: its home page and Slack (workers/platform/src/notifications.ts).
+// admins choose where they go: its home page and its chat, Slack or Discord
+// (workers/platform/src/notifications.ts).
 
 const TYPES: { type: NotificationType; label: string }[] = [
   { type: "info", label: "Informational" },

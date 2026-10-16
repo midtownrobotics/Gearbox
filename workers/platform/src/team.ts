@@ -24,7 +24,8 @@ import type { AppEnv } from "./types";
 // hides it at once (the gateway checks with GET /teams/:id, remembered for a minute) and keeps its
 // data for GRACE_S, so switching it on again brings everything back. After that the daily cron
 // (clearSwitchedOff) has the app delete the team's data. Before switching one off an admin can
-// download its data (its export hook), and every admin is told on Slack when one goes on or off.
+// download its data (its export hook), and every admin is told on the team's chat when one goes
+// on or off.
 //
 // Members also read the platform's notifications here, and admins choose where each type goes
 // (src/notifications.ts).
@@ -92,13 +93,13 @@ const longDay = (seconds: number) =>
   });
 
 /**
- * Tells every admin of the team, on its Slack, that an app was switched on or off (G3ID sends it
- * from the team's own bot to each active admin with a linked Slack account). Never fails the
- * change: a team without Slack just isn't told.
+ * Tells every admin of the team, on its chat (Slack or Discord), that an app was switched on or
+ * off (G3ID sends it from the team's own bot to each active admin who has linked it). Never fails
+ * the change: a team without a chat just isn't told.
  */
 async function tellAdmins(env: AppEnv["Bindings"], teamId: string, text: string) {
   try {
-    const res = await g3id(env, `/teams/${encodeURIComponent(teamId)}/slack/dm-admins`, {
+    const res = await g3id(env, `/teams/${encodeURIComponent(teamId)}/chat/dm-admins`, {
       method: "POST",
       body: { text },
     });
@@ -168,7 +169,7 @@ export const teamRouter = new Hono<AppEnv>()
     ),
   )
   .use("/notification-settings", requireAdmin)
-  // Where the team wants each type: the home page, Slack channels, and members to DM (the team's
+  // Where the team wants each type: the home page, chat channels, and members to DM (the team's
   // active members to choose from).
   .get("/notification-settings", async (c) => {
     const teamId = c.get("teamId");
@@ -266,8 +267,8 @@ export const teamRouter = new Hono<AppEnv>()
       c.env,
       teamId,
       enabled
-        ? `${who} switched *${app.name}* on for your team.${restored ? " Everything it had is back." : ""} ${apps}`
-        : `${who} switched *${app.name}* off for your team. Nobody can open it now.${
+        ? `${who} switched **${app.name}** on for your team.${restored ? " Everything it had is back." : ""} ${apps}`
+        : `${who} switched **${app.name}** off for your team. Nobody can open it now.${
             values.deleteAfter
               ? ` Its data is kept until ${longDay(values.deleteAfter)}, then deleted; switch it on again before then to keep it.`
               : " Its data is kept."

@@ -376,12 +376,12 @@ describe("notifications", () => {
 });
 
 describe("telling operators", () => {
-  it("DMs every operator on their own team's Slack", async () => {
+  it("DMs every operator on their own team's chat", async () => {
     const text = `New report ${crypto.randomUUID()}`;
     await tellOperators(testEnv, text);
     // The G3ID stub puts every account on frc1648 and records what's sent.
     const sent = (await (
-      await testEnv.G3ID.fetch("http://g3id/api/internal/teams/frc1648/slack/dm-members")
+      await testEnv.G3ID.fetch("http://g3id/api/internal/teams/frc1648/chat/dm-members")
     ).json()) as { userIds: string[]; text: string }[];
     expect(sent.find((m) => m.text === text)?.userIds).toContain(operator.id);
   });

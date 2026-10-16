@@ -1,5 +1,5 @@
 import { tones } from "@g3/ui";
-import { FaGithub, FaGoogle, FaKey, FaSlack, FaSteam } from "react-icons/fa";
+import { FaDiscord, FaGithub, FaGoogle, FaKey, FaSlack, FaSteam } from "react-icons/fa";
 
 // What the Users list and a member's page share.
 
@@ -55,6 +55,12 @@ export function ProviderIcon({ provider }: { provider: string }) {
           <FaSlack />
         </span>
       );
+    case "discord":
+      return (
+        <span className={`${cls} text-indigo-600`} title="Discord">
+          <FaDiscord />
+        </span>
+      );
     case "github":
       return (
         <span className={`${cls} text-secondary-700`} title="GitHub">
@@ -81,6 +87,7 @@ export function ProviderIcon({ provider }: { provider: string }) {
 /** Sign-in providers by the name people know them by, in the order they're offered. */
 export const PROVIDERS: Record<string, string> = {
   slack: "Slack",
+  discord: "Discord",
   google: "Google",
   github: "GitHub",
   steam: "Steam",
@@ -96,7 +103,7 @@ const fold = (text: string) =>
 
 /**
  * Whether a user matches a search: every word is somewhere in their name, email, or the name of
- * an account they sign in with (a Slack or GitHub username, a Google email).
+ * an account they sign in with (a Slack, Discord or GitHub username, a Google email).
  */
 export function matchesSearch(user: User, query: string): boolean {
   const words = fold(query).split(/\s+/).filter(Boolean);
