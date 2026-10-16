@@ -54,6 +54,7 @@ As of 10 October 2026, five of the six Phase 0 steps are done on `main`, Phase 1
 
 | Change | Roadmap step | Pull request |
 | --- | --- | --- |
+| Scouting's inline mobile maps expose labeled Undo and Clear, with larger controls and no toolbar covering the drawing. All three canvas editors handle canceled and secondary pointers, auto-route clearing is undoable, and phone fullscreen preserves the field's proportions. [Mobile validation](scouting-mobile-validation.md) covers all pages and mouse/touch drawing workflows | Phase 3: Scouting mobile usability | This PR |
 | The pit log downloader moved into the repository (`devices/pit-log-downloader`), with its team number, Drive folder and paths in a settings file instead of the code, so any team can run it on Linux, Windows or macOS. Its status page is now React from the shared Gearbox parts, in the built-in colors with light and dark mode | Pit log downloader: L.1 | This PR |
 | Pit's checklist archives page is Archives, and its new Logs page pairs the team's log downloaders: setup steps for each system, a 6-digit pairing code, and each downloader's own key for Pit's API. The downloader needs no settings file, does nothing until it's paired, and takes its team's Team Appearance from Pit | Pit log downloader: L.2 | This PR |
 | Match logs live in Pit: the downloader uploads them (in parts) to R2 instead of Google Drive, and Pit's Logs page lists, downloads and deletes them | Pit log downloader: L.3, L.4 | This PR |

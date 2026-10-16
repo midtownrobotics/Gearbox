@@ -8929,3 +8929,108 @@
     font-size: .875rem;
   }
 }
+
+@layer components {
+  /* Keep every drawing action visible without swiping the toolbar on a phone. */
+  @media (max-width: 1024px) {
+    .scouting-content .map-editor .map-toolbar {
+      position: static;
+      top: auto;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+      width: 100%;
+      min-width: 0;
+      min-height: 0;
+      padding: 8px;
+      overflow: visible;
+    }
+
+    .scouting-content .map-editor .map-toolbar .toolbar-divider {
+      display: none;
+    }
+
+    .scouting-content .map-editor .map-toolbar > button {
+      width: 100%;
+      min-width: 0;
+      min-height: 44px;
+      padding: 0 4px;
+      justify-content: center;
+      gap: 4px;
+    }
+
+    .scouting-content .map-editor .map-toolbar > button span {
+      display: inline;
+    }
+
+    .scouting-content .map-editor .map-toolbar .map-fullscreen-button span {
+      display: none;
+    }
+
+    .scouting-content .map-editor .map-toolbar .drawing-colors {
+      grid-column: 1 / -1;
+      order: 1;
+      justify-content: center;
+      gap: 8px;
+      padding: 0;
+    }
+
+    .scouting-content .map-editor .map-toolbar .drawing-colors button,
+    .scouting-content .auto-drawing-toolbar .drawing-colors button {
+      width: 44px;
+      height: 44px;
+      min-height: 44px;
+      padding: 0;
+      flex: 0 0 44px;
+    }
+
+    .scouting-content .auto-drawing-toolbar {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .scouting-content .auto-drawing-toolbar .drawing-colors {
+      grid-column: 1 / -1;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .scouting-content .auto-drawing-toolbar > button {
+      min-height: 44px;
+      justify-content: center;
+    }
+
+    .scouting-content .map-editor:not(.map-editor-fullscreen) .canvas-shell {
+      min-height: 0;
+    }
+
+    .scouting-content .map-editor.map-editor-fullscreen {
+      grid-template-rows: auto minmax(0, 1fr);
+    }
+
+    .scouting-content .map-editor.map-editor-fullscreen .map-details {
+      display: none;
+    }
+
+    .scouting-content .map-editor.map-editor-fullscreen .canvas-shell {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 0;
+    }
+
+    .scouting-content .map-editor.map-editor-fullscreen .canvas-shell canvas {
+      width: auto;
+      height: auto;
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: fill;
+    }
+  }
+
+  @media (min-width: 600px) and (max-width: 1024px) and (max-height: 500px) {
+    .scouting-content .map-editor .map-toolbar {
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+    }
+  }
+}
