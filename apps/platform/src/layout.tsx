@@ -80,9 +80,11 @@ export function Footer() {
   );
 }
 
-export function Page({ children }: { children: ReactNode }) {
+/** `banner`: a full-width bar above the header (the landing page's open beta note). */
+export function Page({ children, banner }: { children: ReactNode; banner?: ReactNode }) {
   return (
     <div className="flex flex-1 flex-col bg-page">
+      {banner}
       <Header />
       <main className="flex-1">{children}</main>
       <Footer />

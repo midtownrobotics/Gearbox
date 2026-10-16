@@ -152,7 +152,7 @@ const STEPS = [
 
 export function HomePage() {
   return (
-    <Page>
+    <Page banner={<BetaBar />}>
       <Hero />
       <Apps />
       <Shared />
@@ -161,6 +161,18 @@ export function HomePage() {
       <OpenSource />
       <FinalCall />
     </Page>
+  );
+}
+
+/** Across the top of the page: Gearbox is an open beta (sign-up asks people to agree to that too). */
+function BetaBar() {
+  return (
+    <div className="bg-primary-600 px-5 py-2 text-center text-sm text-white">
+      <span className="font-semibold">Open beta:</span> Gearbox is new and still changing.{" "}
+      <a href={`${site.sourceUrl}/issues`} className="font-semibold underline hover:no-underline">
+        Tell us what's missing
+      </a>
+    </div>
   );
 }
 
@@ -200,14 +212,9 @@ function Hero() {
           <p className="text-sm font-semibold uppercase tracking-widest text-primary-500">
             Free · Open source · Built by FRC Team {site.team.number}
           </p>
-          <div className="space-y-3">
-            <span className="inline-block rounded-full border border-primary-200 bg-primary-50 px-3 py-0.5 text-xs font-semibold text-primary-700">
-              Open beta
-            </span>
-            <h1 className="text-4xl font-bold leading-tight tracking-tight text-secondary-900 sm:text-5xl">
-              Run your whole team from one place.
-            </h1>
-          </div>
+          <h1 className="text-4xl font-bold leading-tight tracking-tight text-secondary-900 sm:text-5xl">
+            Run your whole team from one place.
+          </h1>
           <p className="max-w-xl text-lg text-secondary-600">
             Orders, shop tracking, pit checklists and scouting that all share one sign-in through
             your team's Slack. Free, open source, and built by an FRC team.
