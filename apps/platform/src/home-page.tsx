@@ -235,10 +235,7 @@ function Hero() {
           </div>
           <div className="space-y-2 border-t border-line pt-5">
             <DemoButtons />
-            <p className="text-sm text-secondary-500">
-              A sample team with no account needed. Tested by {site.team.name} through the 2026
-              offseason.
-            </p>
+            <p className="text-sm text-secondary-500">A sample team, no account needed.</p>
           </div>
         </div>
         <LauncherMock />
@@ -545,7 +542,9 @@ function FinalCall() {
       <div className="mx-auto flex max-w-6xl flex-col items-start gap-6 px-5 py-16 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-3xl font-bold text-[#ffffff]">Get set up before Kickoff.</h2>
-          <p className="mt-2 text-[#b8b8b8]">Set your team up now. It's free.</p>
+          <p className="mt-2 text-[#b8b8b8]">
+            Free for every team, and tested by {site.team.name} through the 2026 offseason.
+          </p>
         </div>
         <Link
           to="/signup"
