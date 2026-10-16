@@ -1,0 +1,205 @@
+import { env } from "cloudflare:workers";
+import { inTeam, withTeam } from "@g3/auth";
+import { newTeamId, teamUsers } from "@g3/testing/users";
+import { callAs, jsonAs } from "@g3/testing/worker";
+import { describe, expect, it, vi } from "vitest";
+import { createDb } from "../src/db";
+import {
+  scoutingFormSubmissions,
+  scoutingMatchAssignments,
+  strategyEventConfig,
+  tbaMatchCache,
+} from "../src/db/schema";
+import { automaticTbaMatch, matchSubmissionClosesAt } from "../src/match-advance";
+import type { AppEnv, TbaMatch } from "../src/types";
+import { seedManualMatch } from "./manual-match";
+
+const bindings = env as unknown as AppEnv["Bindings"];
+const db = createDb(bindings.SCOUTING_DB);
+type Context = {
+  currentMatch: { key: string; matchNumber: number } | null;
+  assignedTeam: string | null;
+  submissionClosesAt: number | null;
+  serverNow: number;
+};
+function match(key: string, number: number, endedAt: number | null): TbaMatch {
+  return {
+    key,
+    comp_level: "qm",
+    set_number: 1,
+    match_number: number,
+    time: null,
+    predicted_time: null,
+    actual_time: null,
+    post_result_time: endedAt,
+    alliances: {
+      red: { team_keys: ["frc101", "frc102", "frc103"], score: endedAt ? 10 : -1 },
+      blue: { team_keys: ["frc104", "frc105", "frc106"], score: endedAt ? 20 : -1 },
+    },
+  };
+}
+async function fixture(manual = false) {
+  const team = teamUsers(newTeamId());
+  const eventKey = manual
+    ? `manual-${crypto.randomUUID()}`
+    : `2099qa${crypto.randomUUID().replaceAll("-", "")}`;
+  await db.insert(strategyEventConfig).values(
+    withTeam(team.teamId, {
+      id: 1,
+      event_key: eventKey,
+      current_match_number: 1,
+      schedule_mode: manual ? "manual" : "tba",
+      updated_by: team.admin.id,
+      updated_at: Date.now(),
+    }),
+  );
+  const keys = [`${eventKey}_qm1`, `${eventKey}_qm2`];
+  if (manual)
+    for (const number of [1, 2])
+      await seedManualMatch(bindings.SCOUTING_DB, team.teamId, eventKey, number, team.admin.id);
+  async function schedule(endedAt: number | null, final = false) {
+    const rows = [match(keys[0], 1, endedAt), ...(final ? [] : [match(keys[1], 2, null)])];
+    await db
+      .insert(tbaMatchCache)
+      .values({
+        event_key: eventKey,
+        matches_json: JSON.stringify(rows),
+        expires_at: Date.now() + 600000,
+      })
+      .onConflictDoUpdate({
+        target: tbaMatchCache.event_key,
+        set: { matches_json: JSON.stringify(rows) },
+      });
+  }
+  if (!manual) await schedule(Math.floor(Date.now() / 1000) - 30);
+  const { id } = await jsonAs<{ id: string }>(
+    team.admin,
+    "/scouting/scouting-forms",
+    {
+      method: "POST",
+      body: { name: "Deadline test", fields: [{ id: "score", label: "Score", type: "counter" }] },
+    },
+    201,
+  );
+  const context = () => jsonAs<Context>(team.student, "/scouting/event-context?assign=true");
+  const submit = (snapshot: Partial<Context>, overrideTeam?: string, drawing = false) => {
+    const body = new FormData();
+    if (snapshot.currentMatch) body.set("matchKey", snapshot.currentMatch.key);
+    body.set("teamName", overrideTeam ?? snapshot.assignedTeam ?? "");
+    body.set("answers", JSON.stringify({ score: 5 }));
+    if (drawing) body.set("drawing", new File(["test-image"], "auto.png", { type: "image/png" }));
+    return callAs(team.student, `/scouting/scouting-forms/${id}/submissions`, {
+      method: "POST",
+      body,
+    });
+  };
+  const reports = () =>
+    db
+      .select()
+      .from(scoutingFormSubmissions)
+      .where(inTeam(scoutingFormSubmissions, team.teamId))
+      .all();
+  return { team, eventKey, keys, schedule, context, submit, reports };
+}
+
+describe("scouting submission deadlines", () => {
+  it("uses one exact boundary for the countdown and match advance", () => {
+    const first = match("a", 1, 2000000000);
+    const next = match("b", 2, null);
+    expect(matchSubmissionClosesAt(first)).toBe(2000000120000);
+    expect(automaticTbaMatch([first, next], 120, 2000000119)?.key).toBe("a");
+    expect(automaticTbaMatch([first, next], 120, 2000000120)?.key).toBe("b");
+    expect(matchSubmissionClosesAt(next)).toBeNull();
+  });
+  it("accepts a current snapshot and saves its exact match and assigned team", async () => {
+    const f = await fixture();
+    const context = await f.context();
+    expect(context.submissionClosesAt).toBeGreaterThan(context.serverNow);
+    expect((await f.submit(context)).status).toBe(201);
+    expect(await f.reports()).toMatchObject([
+      {
+        match_key: context.currentMatch?.key,
+        team_name: context.assignedTeam,
+        answers_json: '{"score":5}',
+      },
+    ]);
+  });
+  it("rejects an old draft even when the scout already has the next assignment", async () => {
+    const f = await fixture();
+    const old = await f.context();
+    await f.schedule(Math.floor(Date.now() / 1000) - 121);
+    const next = await f.context();
+    expect(next.currentMatch?.matchNumber).toBe(2);
+    expect(next.assignedTeam).toBeTruthy();
+    expect((await f.submit(old)).status).toBe(409);
+    expect(await f.reports()).toEqual([]);
+    expect((await f.submit(next)).status).toBe(201);
+  });
+  it("rejects missing match identity and wrong-team snapshots without saving", async () => {
+    const f = await fixture();
+    const context = await f.context();
+    expect((await f.submit({ assignedTeam: context.assignedTeam })).status).toBe(409);
+    expect((await f.submit(context, "9999")).status).toBe(409);
+    expect(await f.reports()).toEqual([]);
+  });
+  it("closes the final match instead of keeping an expired form usable", async () => {
+    const f = await fixture();
+    const old = await f.context();
+    await f.schedule(Math.floor(Date.now() / 1000) - 121, true);
+    const expired = await f.context();
+    expect(expired.currentMatch?.matchNumber).toBe(1);
+    expect(expired.assignedTeam).toBeNull();
+    expect(expired.submissionClosesAt).toBeLessThan(expired.serverNow);
+    const response = await f.submit(old);
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ error: expect.stringContaining("Time expired") });
+    expect(await f.reports()).toEqual([]);
+  });
+  it("resets manual match identity without inventing an automatic deadline", async () => {
+    const f = await fixture(true);
+    const old = await f.context();
+    expect(old.submissionClosesAt).toBeNull();
+    await jsonAs(f.team.admin, "/scouting/event-context", {
+      method: "PUT",
+      body: { currentMatchNumber: 2 },
+    });
+    const next = await f.context();
+    expect(next.currentMatch?.matchNumber).toBe(2);
+    expect((await f.submit(old)).status).toBe(409);
+    expect((await f.submit(next)).status).toBe(201);
+  });
+  it("rejects a changed assignment within the same match", async () => {
+    const f = await fixture();
+    const old = await f.context();
+    await db
+      .update(scoutingMatchAssignments)
+      .set({ team_number: "9999" })
+      .where(inTeam(scoutingMatchAssignments, f.team.teamId));
+    expect((await f.submit(old)).status).toBe(409);
+    expect(await f.reports()).toEqual([]);
+  });
+  it("rechecks after uploading a drawing and removes it if the match expired", async () => {
+    const f = await fixture();
+    const old = await f.context();
+    const originalPut = bindings.FIELD_MAPS.put.bind(bindings.FIELD_MAPS);
+    const upload = vi.spyOn(bindings.FIELD_MAPS, "put").mockImplementationOnce(async (...args) => {
+      const result = await originalPut(...args);
+      await f.schedule(Math.floor(Date.now() / 1000) - 121);
+      return result;
+    });
+    try {
+      expect((await f.submit(old, undefined, true)).status).toBe(409);
+      expect(upload).toHaveBeenCalledOnce();
+      expect(await f.reports()).toEqual([]);
+      expect(
+        (
+          await bindings.FIELD_MAPS.list({
+            prefix: `teams/${encodeURIComponent(f.team.teamId)}/scouting-submissions/`,
+          })
+        ).objects,
+      ).toEqual([]);
+    } finally {
+      upload.mockRestore();
+    }
+  });
+});

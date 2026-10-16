@@ -41,6 +41,7 @@ import {
   type SyntheticEvent,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -235,7 +236,33 @@ function EntryForm({
   context: EventContext | null;
   refreshContext: () => Promise<void>;
 }) {
-  const [teamName, setTeamName] = useState("");
+  // A new assignment always starts with an empty draft, including every canvas.
+  const assignment =
+    form.kind === "scouting"
+      ? `${context?.currentMatch?.key ?? ""}:${context?.assignedTeam ?? ""}`
+      : "pit";
+  return (
+    <EntryDraft
+      key={`${form.id}:${assignment}`}
+      form={form}
+      context={context}
+      refreshContext={refreshContext}
+    />
+  );
+}
+
+function EntryDraft({
+  form,
+  context,
+  refreshContext,
+}: {
+  form: ScoutingForm;
+  context: EventContext | null;
+  refreshContext: () => Promise<void>;
+}) {
+  const [teamName, setTeamName] = useState(
+    form.kind === "scouting" ? (context?.assignedTeam ?? "") : "",
+  );
   const [answers, setAnswers] = useState<Record<string, unknown>>({});
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState<"success" | "error">("success");
@@ -244,25 +271,61 @@ function EntryForm({
   const canvases = useRef<Record<string, HTMLCanvasElement | null>>({});
   const canvasAdapters = useRef<Record<string, RefObject<HTMLCanvasElement | null>>>({});
   const drawnFields = useRef(new Set<string>());
-  const assignedMatchKey = useRef<string | null>(null);
+  const mounted = useRef(true);
+  const expiredRef = useRef(false);
+  const [expired, setExpired] = useState(false);
+  const [, tick] = useState(0);
   const currentMatch = context?.currentMatch ?? null;
+  const closesAt = context?.submissionClosesAt ?? null;
+  const clockOffset = useMemo(
+    () => (context?.serverNow ? context.serverNow - Date.now() : 0),
+    [context?.serverNow],
+  );
+  const isExpired = () =>
+    form.kind === "scouting" &&
+    (expiredRef.current || (closesAt !== null && Date.now() + clockOffset >= closesAt));
+  const blocked =
+    form.kind === "scouting" &&
+    (expired || isExpired() || !currentMatch || !teamName || context?.hasSubmittedCurrentMatch);
   useEffect(() => {
-    if (form.kind !== "scouting") return;
-    const matchKey = context?.currentMatch?.key ?? null;
-    if (context?.assignedTeam) {
-      setTeamName(context.assignedTeam);
-    } else if (matchKey && assignedMatchKey.current !== matchKey) {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+  useEffect(() => {
+    if (form.kind !== "scouting" || closesAt === null) return;
+    function checkDeadline() {
+      tick((value) => value + 1);
+      if (Date.now() + clockOffset < (closesAt as number) || expiredRef.current) return;
+      expiredRef.current = true;
+      setExpired(true);
       setTeamName("");
+      setAnswers({});
+      drawnFields.current.clear();
+      setCanvasKey((value) => value + 1);
+      setMessage("");
+      void refreshContext().catch(() => {});
     }
-    if (matchKey) assignedMatchKey.current = matchKey;
-  }, [context?.assignedTeam, context?.currentMatch?.key, form.kind]);
+    checkDeadline();
+    const timer = window.setInterval(checkDeadline, 500);
+    window.addEventListener("focus", checkDeadline);
+    document.addEventListener("visibilitychange", checkDeadline);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", checkDeadline);
+      document.removeEventListener("visibilitychange", checkDeadline);
+    };
+  }, [form.kind, closesAt, clockOffset, refreshContext]);
   async function submit(event: SyntheticEvent) {
     event.preventDefault();
+    if (saving || blocked || isExpired()) return;
     setSaving(true);
     setMessage("");
     try {
       const payload = new FormData();
       payload.set("teamName", teamName);
+      if (form.kind === "scouting") payload.set("matchKey", currentMatch?.key ?? "");
       payload.set("answers", JSON.stringify(answers));
       for (const field of form.fields.filter((item) => item.type === "fieldMap")) {
         if (!drawnFields.current.has(field.id)) continue;
@@ -274,7 +337,9 @@ function EntryForm({
           if (blob) payload.set(`drawing:${field.id}`, blob, `${field.id}.png`);
         }
       }
+      if (!mounted.current || isExpired()) return;
       await api(`/scouting-forms/${form.id}/submissions`, { method: "POST", body: payload });
+      if (!mounted.current || isExpired()) return;
       setAnswers({});
       drawnFields.current.clear();
       setCanvasKey((value) => value + 1);
@@ -282,10 +347,12 @@ function EntryForm({
       setMessage("Report submitted.");
       await refreshContext();
     } catch (error) {
+      if (!mounted.current || isExpired()) return;
       setMessageType("error");
       setMessage(error instanceof Error ? error.message : "Could not submit report.");
+      if (form.kind === "scouting") void refreshContext().catch(() => {});
     } finally {
-      setSaving(false);
+      if (mounted.current) setSaving(false);
     }
   }
   function canvasAdapter(fieldId: string) {
@@ -325,52 +392,91 @@ function EntryForm({
           )}
         </div>
       </div>
-      <label className="team-entry" htmlFor={`team-${form.id}`}>
-        <span>
-          Team number <b>*</b>
-        </span>
-        <TeamLookupInput
-          value={teamName}
-          onChange={setTeamName}
-          size="lg"
-          inputMode="numeric"
-          readOnly={form.kind === "scouting"}
-        />
-      </label>
-      <div className="scouting-questions">
-        {form.fields.map((field) => {
-          const mapRef = field.type === "fieldMap" ? canvasAdapter(field.id) : undefined;
-          return (
-            <div
-              className={`scouting-question ${field.type === "fieldMap" ? "wide" : ""}`}
-              key={field.id}
-            >
-              <label htmlFor={`field-${field.id}`}>
-                {field.label}
-                {field.required && <b> *</b>}
-              </label>
-              <FieldInput
-                field={field}
-                value={answers[field.id]}
-                setValue={(value) => setAnswers((current) => ({ ...current, [field.id]: value }))}
-                canvasRef={mapRef}
-                canvasKey={canvasKey}
-                onDrawingChange={(hasDrawing) => {
-                  if (hasDrawing) drawnFields.current.add(field.id);
-                  else drawnFields.current.delete(field.id);
-                }}
-              />
-            </div>
-          );
-        })}
-      </div>
-      <Button
-        variant="primary"
-        type="submit"
-        disabled={
-          saving || (form.kind === "scouting" && (context?.hasSubmittedCurrentMatch || !teamName))
-        }
+      {form.kind === "scouting" && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">
+          {expired || isExpired() ? (
+            <span role="status">
+              Time expired. Previous answers cleared. Waiting for the next match.
+            </span>
+          ) : context?.scheduleMode === "manual" ? (
+            <span>Manual schedule: this form resets when the match or assigned team changes.</span>
+          ) : closesAt !== null ? (
+            <span>
+              Submit by{" "}
+              <strong>
+                {new Date(closesAt).toLocaleTimeString([], {
+                  hour: "numeric",
+                  minute: "2-digit",
+                  second: "2-digit",
+                })}
+              </strong>
+              .{" "}
+              <span role="timer" aria-live="off">
+                {Math.floor(
+                  Math.max(0, Math.ceil((closesAt - Date.now() - clockOffset) / 1000)) / 60,
+                )}
+                :
+                {String(
+                  Math.max(0, Math.ceil((closesAt - Date.now() - clockOffset) / 1000)) % 60,
+                ).padStart(2, "0")}{" "}
+                remaining.
+              </span>{" "}
+              Answers and drawings reset when time runs out.
+            </span>
+          ) : (
+            <span>
+              Submit within {Math.floor((context?.submissionWindowSeconds ?? 120) / 60)}:
+              {String((context?.submissionWindowSeconds ?? 120) % 60).padStart(2, "0")} after the
+              match ends. Answers and drawings reset at the deadline.
+            </span>
+          )}
+        </div>
+      )}
+      <fieldset
+        className="m-0 grid min-w-0 gap-[22px] border-0 p-0 disabled:pointer-events-none"
+        disabled={saving || !!blocked}
       >
+        <label className="team-entry" htmlFor={`team-${form.id}`}>
+          <span>
+            Team number <b>*</b>
+          </span>
+          <TeamLookupInput
+            value={teamName}
+            onChange={setTeamName}
+            size="lg"
+            inputMode="numeric"
+            readOnly={form.kind === "scouting"}
+          />
+        </label>
+        <div className="scouting-questions">
+          {form.fields.map((field) => {
+            const mapRef = field.type === "fieldMap" ? canvasAdapter(field.id) : undefined;
+            return (
+              <div
+                className={`scouting-question ${field.type === "fieldMap" ? "wide" : ""}`}
+                key={field.id}
+              >
+                <label htmlFor={`field-${field.id}`}>
+                  {field.label}
+                  {field.required && <b> *</b>}
+                </label>
+                <FieldInput
+                  field={field}
+                  value={answers[field.id]}
+                  setValue={(value) => setAnswers((current) => ({ ...current, [field.id]: value }))}
+                  canvasRef={mapRef}
+                  canvasKey={canvasKey}
+                  onDrawingChange={(hasDrawing) => {
+                    if (hasDrawing) drawnFields.current.add(field.id);
+                    else drawnFields.current.delete(field.id);
+                  }}
+                />
+              </div>
+            );
+          })}
+        </div>
+      </fieldset>
+      <Button variant="primary" type="submit" disabled={saving || !!blocked}>
         <Check size={17} />{" "}
         {saving
           ? "Submitting…"
@@ -982,6 +1088,8 @@ type EventContext = {
   nexusApiKey: string;
   scheduleMode: "tba" | "manual";
   submissionWindowSeconds: number | null;
+  submissionClosesAt: number | null;
+  serverNow: number;
   manualEvent: { event_name: string; ends_at: number; delete_after: number } | null;
   manualTeamNames: Record<string, string>;
 };
@@ -1858,7 +1966,16 @@ export function ScoutingForms({
     const interval = window.setInterval(() => {
       if (document.visibilityState === "visible") loadMatch();
     }, 10_000);
-    return () => window.clearInterval(interval);
+    const resume = () => {
+      if (document.visibilityState === "visible") void loadMatch();
+    };
+    window.addEventListener("focus", resume);
+    document.addEventListener("visibilitychange", resume);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", resume);
+      document.removeEventListener("visibilitychange", resume);
+    };
   }, []);
   useEffect(() => {
     document.body.classList.toggle("scouting-workspace-open", isFullscreen);
@@ -1975,7 +2092,7 @@ export function ScoutingForms({
             form={selected}
             context={context}
             refreshContext={async () => {
-              setContext(await api<EventContext>("/event-context"));
+              setContext(await api<EventContext>("/event-context?assign=true"));
             }}
           />
         ))}
