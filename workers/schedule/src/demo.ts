@@ -15,11 +15,11 @@ import {
 // a published two-day event later this week, with periods and everyone's roles painted in.
 
 const ROLES = [
-  { name: "Drive Team", color: "green" },
-  { name: "Scouting", color: "sky" },
-  { name: "Pit", color: "orange" },
-  { name: "Break", color: "gray" },
-  { name: "Lunch", color: "amber" },
+  { name: "Drive Team", color: "green", type: "other" },
+  { name: "Scouting", color: "sky", type: "scouting" },
+  { name: "Pit", color: "orange", type: "pit" },
+  { name: "Break", color: "gray", type: "other" },
+  { name: "Lunch", color: "amber", type: "other" },
 ] as const;
 
 /** 8:00 AM to 6:00 PM, as 15-minute slots of the day. */

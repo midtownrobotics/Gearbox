@@ -10,8 +10,11 @@ import {
   MAX_ROLES,
   MAX_ROLE_NAME,
   ROLE_COLORS,
+  ROLE_TYPES,
   type RoleColor,
+  type RoleType,
   isRoleColor,
+  isRoleType,
   normalizeRoleColor,
 } from "../lib/roles";
 import { roleView } from "../lib/schedules";
@@ -21,7 +24,7 @@ import type { AppEnv } from "../types";
 // Everyone signed in reads them; editors make and change them. A role that's assigned anywhere
 // is archived instead of deleted, so past schedules keep it.
 
-type RoleInput = { name?: string; color?: RoleColor; archived?: boolean };
+type RoleInput = { name?: string; color?: RoleColor; type?: RoleType; archived?: boolean };
 
 const roleValidator = (partial: boolean) =>
   validator("json", (value, c): RoleInput => {
@@ -38,6 +41,11 @@ const roleValidator = (partial: boolean) =>
         return fail(`color must be #rrggbb or one of: ${ROLE_COLORS.join(", ")}.`);
       }
       out.color = normalizeRoleColor(v.color);
+    }
+    // Optional on a new role too: it's other unless an editor says.
+    if (v.type !== undefined) {
+      if (!isRoleType(v.type)) return fail(`type must be one of: ${ROLE_TYPES.join(", ")}.`);
+      out.type = v.type;
     }
     if (partial && v.archived !== undefined) {
       if (typeof v.archived !== "boolean") return fail("archived must be true or false.");
@@ -83,7 +91,8 @@ export const rolesRouter = new Hono<AppEnv>()
   })
   .post("/", requireEditor, roleValidator(false), async (c) => {
     const team = c.get("teamId");
-    const input = c.req.valid("json") as Required<Omit<RoleInput, "archived">>;
+    const input = c.req.valid("json") as Required<Omit<RoleInput, "archived" | "type">> &
+      Pick<RoleInput, "type">;
     const db = createDb(c.env.SCHEDULE_DB);
     const [count, last] = await db.batch([
       db.select({ id: roles.id }).from(roles).where(inTeam(roles, team)),
@@ -107,6 +116,7 @@ export const rolesRouter = new Hono<AppEnv>()
         withTeam(team, {
           name: input.name,
           color: input.color,
+          type: input.type ?? "other",
           sortOrder: (last[0]?.order ?? -1) + 1,
           createdAt: nowSeconds(),
         }),
@@ -139,7 +149,7 @@ export const rolesRouter = new Hono<AppEnv>()
       return c.json({ ok: true });
     },
   )
-  // Renames, recolors, archives (hidden from new assignments, kept on past ones) or brings back.
+  // Renames, recolors, changes the type, archives (hidden from new assignments, kept on past ones) or brings back.
   .patch("/:roleId", requireEditor, roleValidator(true), async (c) => {
     const team = c.get("teamId");
     const id = parseId(c.req.param("roleId"));
@@ -157,6 +167,7 @@ export const rolesRouter = new Hono<AppEnv>()
       .set({
         name,
         color: input.color ?? role.color,
+        type: input.type ?? role.type,
         archivedAt: archived ? (role.archivedAt ?? nowSeconds()) : null,
       })
       .where(inTeam(roles, team, eq(roles.id, id)))
