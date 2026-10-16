@@ -661,13 +661,12 @@ export function PitMonitorPage() {
           </div>
         </div>
 
-        {/* Nexus status — full width, only if real Nexus data available */}
-        {nexus?.isRealNexus && <NexusSection nexus={nexus} teamNumber={teamNumber} />}
-
         {/* Main grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Left: ranking + upcoming matches */}
+          {/* Left: Nexus status (only with real Nexus data) + ranking + upcoming matches. In the
+              column, so the right one starts at the top instead of under it. */}
           <div className="space-y-5">
+            {nexus?.isRealNexus && <NexusSection nexus={nexus} teamNumber={teamNumber} />}
             {monitor?.ranking && (
               <RankingSection
                 ranking={monitor.ranking}
