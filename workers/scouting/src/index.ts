@@ -5,6 +5,7 @@ import { sql } from "drizzle-orm";
 import { type Context, Hono } from "hono";
 import { cors } from "hono/cors";
 import packageJson from "../package.json";
+import { analysisEventNames } from "./analysis-events";
 import { all, batch, dbOf, first } from "./db";
 import { adoptLegacyRows, seedTeam } from "./db/bootstrap";
 import {
@@ -1300,6 +1301,10 @@ app.get("/analysis", requireAuth, async (c) => {
     ),
   ]);
   let teamMatches: Record<string, unknown>[] = [];
+  const eventNames = await analysisEventNames(c, [
+    ...rows.results.map((row) => String(row.event_key || "")),
+    ...teamComments.results.map((row) => String(row.event_key || "")),
+  ]);
   if (team && eventConfig?.event_key) {
     try {
       const matches = (await getEventMatches(c, eventConfig.event_key)).sort(
@@ -1355,6 +1360,7 @@ app.get("/analysis", requireAuth, async (c) => {
     })),
     teamComments: teamComments.results,
     teamMatches,
+    eventNames,
   });
 });
 

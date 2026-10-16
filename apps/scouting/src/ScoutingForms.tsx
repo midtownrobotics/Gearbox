@@ -2,6 +2,7 @@ import { pageTeamNumber } from "@g3/site-config";
 import {
   Button,
   Card,
+  Chip,
   ErrorBanner,
   Loading,
   Page as SharedPage,
@@ -1794,35 +1795,56 @@ export function ScoutingForms({
       {!loading && !loadError && !forms.length && (
         <p className="text-sm text-secondary-500">No scouting forms are available.</p>
       )}
-      <div className="form-choice-grid">
-        {forms.map((form) => (
-          <div
-            className={selected?.id === form.id ? "form-choice active" : "form-choice"}
-            key={form.id}
-          >
-            <button
-              type="button"
+      {forms.length > 0 && (
+        <div className="flex flex-wrap gap-2" role="group" aria-label="Scouting form type">
+          {(["scouting", "pit"] as const).map((kind) => (
+            <Chip
+              key={kind}
+              selected={selected?.kind === kind}
+              className="min-h-11"
+              disabled={!forms.some((form) => form.kind === kind)}
               onClick={() => {
-                setSelected(form);
+                if (selected?.kind === kind) return;
+                setSelected(forms.find((form) => form.kind === kind) ?? null);
                 setEditing(false);
               }}
             >
-              <strong>{form.name}</strong>
-            </button>
-            {isAdmin && (
+              {kind === "pit" ? "Pit scouting" : "Match scouting"}
+            </Chip>
+          ))}
+        </div>
+      )}
+      <div className="form-choice-grid">
+        {forms
+          .filter((form) => form.kind === selected?.kind)
+          .map((form) => (
+            <div
+              className={selected?.id === form.id ? "form-choice active" : "form-choice"}
+              key={form.id}
+            >
               <button
                 type="button"
-                className="edit-form-button"
                 onClick={() => {
                   setSelected(form);
-                  setEditing(true);
+                  setEditing(false);
                 }}
               >
-                <Pencil size={15} /> Edit
+                <strong>{form.name}</strong>
               </button>
-            )}
-          </div>
-        ))}
+              {isAdmin && (
+                <button
+                  type="button"
+                  className="edit-form-button"
+                  onClick={() => {
+                    setSelected(form);
+                    setEditing(true);
+                  }}
+                >
+                  <Pencil size={15} /> Edit
+                </button>
+              )}
+            </div>
+          ))}
       </div>
       {selected &&
         (editing && isAdmin ? (
