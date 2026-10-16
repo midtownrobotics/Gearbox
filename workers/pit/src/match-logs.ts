@@ -1,4 +1,11 @@
-import { inTeam, logTeamChange, requireAuth, requireMentor, withTeam } from "@g3/auth";
+import {
+  inTeam,
+  logTeamChange,
+  requireAdmin,
+  requireAuth,
+  requireMentor,
+  withTeam,
+} from "@g3/auth";
 import { asc, desc, eq, inArray, ne } from "drizzle-orm";
 import { Hono } from "hono";
 import { type Db, createDb } from "./db";
@@ -87,6 +94,8 @@ export const matchLogRoutes = new Hono<AppEnv>()
       limit: MAX_LOGS,
       whenFull: await getWhenFull(db, teamId),
       canManage: c.get("userIsMentor") || c.get("userIsAdmin"),
+      // Deleting logs is for admins only.
+      canDelete: c.get("userIsAdmin"),
     });
   })
 
@@ -139,7 +148,7 @@ export const matchLogRoutes = new Hono<AppEnv>()
   })
 
   // The logs the page names (after an export: just those it exported).
-  .delete("/", requireMentor, async (c) => {
+  .delete("/", requireAdmin, async (c) => {
     const body = (await c.req.json().catch(() => null)) as { ids?: unknown } | null;
     const ids = Array.isArray(body?.ids) ? body.ids.map(Number).filter(Number.isInteger) : [];
     if (ids.length === 0) return c.json({ error: "No logs named." }, 400);
@@ -176,7 +185,7 @@ export const matchLogRoutes = new Hono<AppEnv>()
     });
   })
 
-  .delete("/:id", requireMentor, async (c) => {
+  .delete("/:id", requireAdmin, async (c) => {
     const id = parseId(c.req.param("id"));
     if (!id) return c.json({ error: "Invalid id." }, 400);
     const deleted = await deleteLogs(createDb(c.env.PIT_DB), c.env.LOGS, c.get("teamId"), [id]);
