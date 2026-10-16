@@ -13,6 +13,12 @@ export type LogStatus = {
   downloaded: boolean;
   /** In the team's Pit on Gearbox. */
   uploaded: boolean;
+  /** Kept to part of the match when uploaded. */
+  trimmed: boolean;
+  /** What it comes to gzipped for Pit, once worked out. */
+  uploadSize: number | null;
+  /** Over Pit's limit gzipped: it waits until it's trimmed. */
+  needsTrim: boolean;
   onRobot: boolean;
   downloading: boolean;
   uploading: boolean;
@@ -57,6 +63,8 @@ export type Status = {
     internet: boolean;
     /** Uploading to Gearbox right now. */
     uploadingRunning: boolean;
+    /** Pit has the most logs it keeps and keeps what it has: uploads wait. */
+    pitFull: boolean;
     uploadingId: string | null;
     downloadingIds: string[];
     /** When the roboRIO's logs were last listed, or null if they haven't been. */
@@ -75,6 +83,8 @@ export type Status = {
   counts: {
     downloaded: number;
     uploaded: number;
+    /** Over Pit's limit, waiting to be trimmed. */
+    needsTrim: number;
     pendingUpload: number;
     onRobot: number;
   };
@@ -82,4 +92,24 @@ export type Status = {
   logs: LogStatus[];
   /** Newest first. */
   activity: { id: number; time: string; message: string }[];
+};
+
+/** GET /api/logs/:id/trim: what's in a log over time, for choosing what to keep. */
+export type TrimView = {
+  /** Seconds from its first record to its last. */
+  duration: number;
+  /** The log's bytes in each second. */
+  bytesPerSecond: number[];
+  /** When the robot was enabled, and in autonomous, [from, to] in seconds. */
+  enabled: [number, number][];
+  autonomous: [number, number][];
+  /** Around the enabled time, or null if the robot was never enabled. */
+  suggested: [number, number] | null;
+  /** What it's kept to now, in seconds, or null for all of it. */
+  trim: [number, number] | null;
+  /** The whole log's bytes, and what it comes to gzipped (trimmed, if it is). */
+  rawSize: number;
+  uploadSize: number | null;
+  /** The most Pit takes, gzipped. */
+  maxUploadSize: number;
 };

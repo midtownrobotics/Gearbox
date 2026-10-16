@@ -1,6 +1,7 @@
 import { Badge, Button, Card, Stat, buttonClass, tones } from "@g3/ui";
 import { type ReactNode, useState } from "react";
 import type { LogStatus, Status } from "../../src/status.ts";
+import { TrimDialog } from "./trim-dialog";
 
 const size = (bytes: number | null) =>
   bytes == null
@@ -79,20 +80,34 @@ export function ConnectionTiles({ status }: { status: Status }) {
       />
       <Tile
         label="Gearbox"
-        light={c.uploadingRunning || counts.pendingUpload ? "busy" : "ok"}
+        light={
+          c.pitFull || counts.needsTrim
+            ? "busy"
+            : c.uploadingRunning || counts.pendingUpload
+              ? "busy"
+              : "ok"
+        }
         value={
-          c.uploadingRunning
+          c.uploadingId
             ? "Uploading"
-            : counts.pendingUpload
-              ? `${counts.pendingUpload} waiting`
-              : "Up to date"
+            : c.pitFull
+              ? "Pit is full"
+              : counts.pendingUpload
+                ? `${counts.pendingUpload} waiting`
+                : counts.needsTrim
+                  ? `${counts.needsTrim} to trim`
+                  : "Up to date"
         }
         hint={
           c.uploadingId
             ? `Now: ${c.uploadingId}`
-            : counts.pendingUpload
-              ? "Uploaded once this computer is online"
-              : "Every copied log is in Pit"
+            : c.pitFull
+              ? "Delete or export logs on Pit's Logs page to upload more"
+              : counts.needsTrim
+                ? "Logs over 40 MB compressed upload once they're trimmed"
+                : counts.pendingUpload
+                  ? "Uploaded once this computer is online"
+                  : "Every copied log is in Pit"
         }
       />
     </div>
@@ -156,10 +171,15 @@ function LogBadges({ log }: { log: LogStatus }) {
       <Badge key="gearbox" colors={tones.success}>
         In Gearbox
       </Badge>
+    ) : log.needsTrim ? (
+      <Badge key="gearbox" colors={tones.warning}>
+        Too big to upload: trim it
+      </Badge>
     ) : (
       <Badge key="gearbox">Waiting to upload</Badge>
     ),
   );
+  if (log.trimmed) badges.push(<Badge key="trimmed">Trimmed</Badge>);
   return <div className="flex flex-wrap gap-1.5">{badges}</div>;
 }
 
@@ -184,6 +204,7 @@ function CopyPathButton({ path }: { path: string }) {
 
 function LogRow({ log }: { log: LogStatus }) {
   const here = log.downloaded && log.sizeBytes !== null;
+  const [trimming, setTrimming] = useState(false);
   const download = `/api/download?event=${encodeURIComponent(log.event)}&file=${encodeURIComponent(log.localFile)}`;
   return (
     <li className="flex flex-wrap items-center gap-x-4 gap-y-2 py-3">
@@ -199,7 +220,17 @@ function LogRow({ log }: { log: LogStatus }) {
           </a>
         )}
         {here && <CopyPathButton path={log.localPath} />}
+        {here && (
+          <Button
+            variant={log.needsTrim ? "primary" : "secondary"}
+            size="sm"
+            onClick={() => setTrimming(true)}
+          >
+            Trim
+          </Button>
+        )}
       </div>
+      {trimming && <TrimDialog log={log} onClose={() => setTrimming(false)} />}
     </li>
   );
 }
@@ -277,36 +308,6 @@ export function ActivityCard({ status }: { status: Status }) {
       ) : (
         <p className="text-sm text-secondary-500">Nothing yet.</p>
       )}
-    </Card>
-  );
-}
-
-function Setting({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <>
-      <dt className="text-secondary-500">{label}</dt>
-      <dd className="mb-2 min-w-0 break-all text-secondary-900 sm:mb-0">{children}</dd>
-    </>
-  );
-}
-
-export function SettingsCard({ status }: { status: Status }) {
-  const { settings } = status;
-  return (
-    <Card title="Settings">
-      <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[max-content_1fr]">
-        <Setting label="Team">{settings.teamNumber}</Setting>
-        <Setting label="roboRIO">{settings.rioIp}</Setting>
-        <Setting label="Logs on this computer">
-          <span className="font-mono text-xs">{settings.localLogsDir}</span>
-        </Setting>
-        <Setting label="Logs on the robot">
-          <span className="font-mono text-xs">{settings.rioLogDirs.join(", ")}</span>
-        </Setting>
-      </dl>
-      <p className="mt-4 text-xs text-secondary-500">
-        To change them, edit config.env next to the downloader and start it again.
-      </p>
     </Card>
   );
 }

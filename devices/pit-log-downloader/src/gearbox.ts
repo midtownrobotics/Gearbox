@@ -189,18 +189,32 @@ export async function teamAppearance(): Promise<TeamUiSettings | null> {
   return teamUiDefaults(`frc${teamNumber}`);
 }
 
-/** What Pit needs to know about a log before taking it. */
+/** A log ready for Pit: gzipped, and what Pit lists about it. */
 export type LogUpload = {
   event: string;
   name: string;
   matchType: "q" | "e" | "p";
   matchNumber: number;
-  filePath: string;
+  /** The gzipped .wpilog. */
+  gzipped: Buffer;
+  /** The .wpilog's own bytes. */
+  rawSize: number;
+  trimmed: boolean;
 };
 
+/** Why Pit didn't take a log: it's full and keeps what it has, or the log is over its limit. */
+export class UploadRefused extends Error {
+  readonly reason: "full" | "too_big";
+  constructor(message: string, reason: "full" | "too_big") {
+    super(message);
+    this.reason = reason;
+  }
+}
+
 /**
- * Uploads a log to the team's Pit, in parts (Pit says how big), unless Pit already has it.
- * Throws when it can't; a key Pit removed unpairs this side first.
+ * Uploads a gzipped log to the team's Pit, in parts (Pit says how big), unless Pit already has it.
+ * Throws UploadRefused when Pit won't take it, or an Error when it can't; a key Pit removed
+ * unpairs this side first.
  */
 export async function uploadLog(log: LogUpload): Promise<"uploaded" | "already there"> {
   if (!pairing) throw new Error("Not paired with Gearbox.");
@@ -211,48 +225,44 @@ export async function uploadLog(log: LogUpload): Promise<"uploaded" | "already t
       connection = "removed";
     }
     if (!res.ok) {
-      const body = (await res.json().catch(() => null)) as { error?: string } | null;
-      throw new Error(body?.error ?? `Gearbox answered ${res.status}.`);
+      const body = (await res.json().catch(() => null)) as { error?: string; code?: string } | null;
+      const message = body?.error ?? `Gearbox answered ${res.status}.`;
+      if (body?.code === "full" || body?.code === "too_big") {
+        throw new UploadRefused(message, body.code);
+      }
+      throw new Error(message);
     }
     return res.json();
   };
 
-  const file = await fs.promises.open(log.filePath, "r");
-  try {
-    const { size } = await file.stat();
-    const { filePath: _, ...meta } = log;
-    const started = (await expectOk(
-      await pit(teamNumber, "/downloader/logs", {
-        method: "POST",
-        body: JSON.stringify({ ...meta, size }),
-      }),
-    )) as { id: number; exists: boolean; partSize?: number };
-    if (started.exists) return "already there";
+  const { gzipped, ...meta } = log;
+  const started = (await expectOk(
+    await pit(teamNumber, "/downloader/logs", {
+      method: "POST",
+      body: JSON.stringify({ ...meta, size: gzipped.length }),
+    }),
+  )) as { id: number; exists: boolean; partSize?: number };
+  if (started.exists) return "already there";
 
-    const partSize = started.partSize ?? 10 * 1024 * 1024;
-    const parts: { partNumber: number; etag: string }[] = [];
-    for (let offset = 0, part = 1; offset < size; offset += partSize, part++) {
-      const buffer = Buffer.alloc(Math.min(partSize, size - offset));
-      await file.read(buffer, 0, buffer.length, offset);
-      parts.push(
-        (await expectOk(
-          await pit(teamNumber, `/downloader/logs/${started.id}/parts/${part}`, {
-            method: "PUT",
-            body: buffer,
-          }),
-        )) as { partNumber: number; etag: string },
-      );
-    }
-    await expectOk(
-      await pit(teamNumber, `/downloader/logs/${started.id}/complete`, {
-        method: "POST",
-        body: JSON.stringify({ parts }),
-      }),
+  const partSize = started.partSize ?? 10 * 1024 * 1024;
+  const parts: { partNumber: number; etag: string }[] = [];
+  for (let offset = 0, part = 1; offset < gzipped.length; offset += partSize, part++) {
+    parts.push(
+      (await expectOk(
+        await pit(teamNumber, `/downloader/logs/${started.id}/parts/${part}`, {
+          method: "PUT",
+          body: gzipped.subarray(offset, offset + partSize),
+        }),
+      )) as { partNumber: number; etag: string },
     );
-    return "uploaded";
-  } finally {
-    await file.close();
   }
+  await expectOk(
+    await pit(teamNumber, `/downloader/logs/${started.id}/complete`, {
+      method: "POST",
+      body: JSON.stringify({ parts }),
+    }),
+  );
+  return "uploaded";
 }
 
 /** Forgets the pairing, and tells Pit to remove this downloader when it can. */

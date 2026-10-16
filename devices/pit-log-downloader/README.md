@@ -44,6 +44,17 @@ Then the status page takes your team's colors, names and logo from Gearbox, and 
 number). It keeps its key in `data/gearbox.json` (readable only by you). Unpairing on the status
 page, or removing it on Pit's Logs page, stops it until it's paired again with a new code.
 
+## Limits and trimming
+
+Logs are gzipped before they're uploaded, which takes them to about 40% of their size. Gearbox
+takes logs up to **40 MB** gzipped and keeps **20** per team; when it's full, it either keeps what
+it has (the default) or replaces the oldest, as a mentor chooses on Pit's Logs page.
+
+A log over 40 MB gzipped waits on this computer until it's trimmed: its **Trim** button shows the
+log's data over time with the robot's enabled time shaded, and **Suggested trim** keeps from a
+little before the robot was first enabled to a little after it was last disabled. Only what's
+uploaded is trimmed: the whole log stays on this computer. Any log can be trimmed.
+
 ## Settings
 
 None are needed. To change one, copy `config.env.example` to `config.env` in

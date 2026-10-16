@@ -2,12 +2,15 @@ import * as fs from "node:fs";
 import { createServer } from "node:http";
 import * as os from "node:os";
 import * as path from "node:path";
+import { promisify } from "node:util";
+import * as zlib from "node:zlib";
 import express from "express";
 import isOnline from "is-online";
 import { NodeSSH } from "node-ssh";
 import { config, parseTeamNumber, pitUrlFor, robotNetworkOf } from "./config.ts";
 import {
   PairingError,
+  UploadRefused,
   checkGearbox,
   currentPairing,
   gearboxStatus,
@@ -16,7 +19,8 @@ import {
   unpairFromGearbox,
   uploadLog,
 } from "./gearbox.ts";
-import type { LogStatus, MatchTypeName, Status } from "./status.ts";
+import type { LogStatus, MatchTypeName, Status, TrimView } from "./status.ts";
+import { timeline, trim } from "./wpilog.ts";
 
 const kLogFileRegex = /^akit_[^_]+_[^_]+_[^_]+_[qep]\d+\.wpilog$/;
 const kRioLogDirs = ["/u/logs", "/home/lvuser/logs"];
@@ -27,7 +31,14 @@ const ssh = new NodeSSH();
 
 let robotConnected = false;
 let uploadingRunning = false;
+/** Pit said it's full and keeps what it has: uploads wait until then (ms). */
+let pitFullUntil = 0;
 
+/** The largest log Pit takes, gzipped: a bigger one is trimmed first. */
+const kMaxUploadSize = 40 * 1024 * 1024;
+/** How long uploads wait after Pit says it's full. */
+const kFullRetryMs = 5 * 60 * 1000;
+const gzip = promisify(zlib.gzip);
 // Live state surfaced by the status endpoint / dashboard.
 let internetConnected = false;
 let lastInternetCheck = 0;
@@ -61,6 +72,10 @@ type Log = {
     /** In the team's Pit on Gearbox. */
     uploaded: boolean;
   };
+  /** Kept to [fromUs, toUs] when uploaded (log timestamps, microseconds); the file itself isn't cut. */
+  trim?: { fromUs: number; toUs: number };
+  /** What it comes to gzipped for Pit (trimmed, if it is), once worked out. */
+  uploadSize?: number;
   match: {
     event: string;
     type: MatchType;
@@ -101,6 +116,8 @@ if (!fs.existsSync(kLogsJson)) {
 const logs: Log[] = (JSON.parse(fs.readFileSync(kLogsJson).toString()) as Log[]).map((log) => ({
   ...log,
   status: { downloaded: log.status.downloaded, uploaded: log.status.uploaded === true },
+  ...(log.trim ? { trim: log.trim } : {}),
+  ...(log.uploadSize ? { uploadSize: log.uploadSize } : {}),
   locations: { rio: log.locations.rio },
 }));
 
@@ -166,9 +183,8 @@ async function logicLoop() {
     logWithTimestamp("Robot network lost.");
   }
 
-  if (internetConnected) {
-    uploadLogs().catch((err) => logWithTimestamp(`Could not upload logs: ${err}`));
-  }
+  // Sizes are worked out offline too, so a log that needs trimming says so at once.
+  uploadLogs(internetConnected).catch((err) => logWithTimestamp(`Could not upload logs: ${err}`));
 
   robotConnected = recentPoll;
   fs.writeFileSync(kLogsJson, JSON.stringify(logs));
@@ -274,16 +290,38 @@ async function downloadLogs(rioIp: string) {
   return true;
 }
 
-/** Uploads every copied log Gearbox doesn't have yet to the team's Pit, one at a time. */
-async function uploadLogs() {
+const saveLogs = () => fs.writeFileSync(kLogsJson, JSON.stringify(logs));
+
+/** The log as it goes to Pit: trimmed, if it is, and gzipped. Notes its size. */
+async function prepare(log: Log) {
+  const file = await fs.promises.readFile(localPathOf(log));
+  const source = log.trim ? trim(file, log.trim.fromUs, log.trim.toUs) : file;
+  const gzipped = await gzip(source, { level: 9 });
+  log.uploadSize = gzipped.length;
+  return { gzipped, rawSize: source.length };
+}
+
+const needsTrim = (log: Log) => (log.uploadSize ?? 0) > kMaxUploadSize;
+
+/**
+ * Uploads every copied log Gearbox doesn't have yet to the team's Pit, one at a time, when
+ * `online`; offline, only works out sizes. A log over the limit waits until it's trimmed.
+ */
+async function uploadLogs(online: boolean) {
   if (uploadingRunning) return;
   uploadingRunning = true;
   try {
     for (const log of logs) {
       if (!log.status.downloaded || log.status.uploaded) continue;
       if (!currentPairing()) return;
-      const filePath = localPathOf(log);
-      if (!fs.existsSync(filePath)) continue;
+      if (!fs.existsSync(localPathOf(log))) continue;
+      if (log.uploadSize !== undefined && (needsTrim(log) || !online)) continue;
+      if (online && Date.now() < pitFullUntil) return;
+
+      const prepared = await prepare(log);
+      saveLogs();
+      if (needsTrim(log) || !online) continue;
+
       uploadingId = log.id;
       try {
         const done = await uploadLog({
@@ -291,24 +329,30 @@ async function uploadLogs() {
           name: log.name,
           matchType: log.match.type,
           matchNumber: log.match.number,
-          filePath,
+          gzipped: prepared.gzipped,
+          rawSize: prepared.rawSize,
+          trimmed: Boolean(log.trim),
         });
         log.status.uploaded = true;
-        fs.writeFileSync(kLogsJson, JSON.stringify(logs));
+        saveLogs();
         logWithTimestamp(
           done === "uploaded"
             ? `Uploaded ${log.name} to Gearbox.`
             : `Gearbox already has ${log.name}.`,
         );
       } catch (err) {
+        if (err instanceof UploadRefused && err.reason === "full") {
+          pitFullUntil = Date.now() + kFullRetryMs;
+        }
         logWithTimestamp(
           `Could not upload ${log.name}: ${err instanceof Error ? err.message : err}`,
         );
-        return; // Tried again on the next pass.
+        return; // Tried again on a later pass.
+      } finally {
+        uploadingId = null;
       }
     }
   } finally {
-    uploadingId = null;
     uploadingRunning = false;
   }
 }
@@ -369,6 +413,9 @@ app.get("/api/status", (_req, res) => {
       matchNumber: log.match.number,
       downloaded: log.status.downloaded,
       uploaded: log.status.uploaded,
+      trimmed: Boolean(log.trim),
+      uploadSize: log.uploadSize ?? null,
+      needsTrim: needsTrim(log),
       onRobot: rioLogs.some((r) => r.id === log.id),
       downloading: downloadingIds.includes(log.id),
       uploading: uploadingId === log.id,
@@ -387,6 +434,7 @@ app.get("/api/status", (_req, res) => {
       robot: robotConnected,
       internet: internetConnected,
       uploadingRunning,
+      pitFull: Date.now() < pitFullUntil,
       uploadingId,
       downloadingIds,
       rioLogsCheckedAt,
@@ -401,7 +449,8 @@ app.get("/api/status", (_req, res) => {
     counts: {
       downloaded: decorated.filter((l) => l.downloaded).length,
       uploaded: decorated.filter((l) => l.uploaded).length,
-      pendingUpload: decorated.filter((l) => l.downloaded && !l.uploaded).length,
+      pendingUpload: decorated.filter((l) => l.downloaded && !l.uploaded && !l.needsTrim).length,
+      needsTrim: decorated.filter((l) => l.needsTrim && !l.uploaded).length,
       onRobot: rioLogs.length,
     },
     rioLogs: rioLogs.map((r) => ({
@@ -465,6 +514,60 @@ app.get("/api/gearbox/team/ui", async (_req, res) => {
     return;
   }
   res.set("Cache-Control", "no-store").json(settings);
+});
+
+// Trimming a log: what's in it over time, and keeping part of it when it's uploaded.
+async function trimView(log: Log): Promise<TrimView> {
+  const file = await fs.promises.readFile(localPathOf(log));
+  const view = timeline(file);
+  const toSeconds = (us: number) => (us - view.startUs) / 1e6;
+  return {
+    duration: view.duration,
+    bytesPerSecond: view.bytesPerSecond,
+    enabled: view.enabled,
+    autonomous: view.autonomous,
+    suggested: view.suggested,
+    trim: log.trim ? [toSeconds(log.trim.fromUs), toSeconds(log.trim.toUs)] : null,
+    rawSize: file.length,
+    uploadSize: log.uploadSize ?? null,
+    maxUploadSize: kMaxUploadSize,
+  };
+}
+
+app.get("/api/logs/:id/trim", async (req, res) => {
+  const log = logs.find((l) => l.id === req.params.id);
+  if (!log || !fs.existsSync(localPathOf(log))) {
+    res.status(404).json({ error: "That log isn't on this computer." });
+    return;
+  }
+  res.json(await trimView(log));
+});
+
+// { from, to } in seconds keeps that part; { from: null } keeps all of it. It's uploaded again.
+app.post("/api/logs/:id/trim", async (req, res) => {
+  const log = logs.find((l) => l.id === req.params.id);
+  if (!log || !fs.existsSync(localPathOf(log))) {
+    res.status(404).json({ error: "That log isn't on this computer." });
+    return;
+  }
+  const from = req.body?.from;
+  const to = req.body?.to;
+  if (from === null) {
+    log.trim = undefined;
+  } else if (typeof from === "number" && typeof to === "number" && from >= 0 && to > from) {
+    const { startUs } = timeline(await fs.promises.readFile(localPathOf(log)));
+    log.trim = { fromUs: startUs + Math.round(from * 1e6), toUs: startUs + Math.round(to * 1e6) };
+  } else {
+    res.status(400).json({ error: "Choose where the log starts and ends." });
+    return;
+  }
+  log.status.uploaded = false;
+  await prepare(log);
+  saveLogs();
+  logWithTimestamp(
+    log.trim ? `Trimmed ${log.name} for Gearbox.` : `${log.name} goes to Gearbox whole.`,
+  );
+  res.json(await trimView(log));
 });
 
 app.delete("/api/gearbox", async (_req, res) => {

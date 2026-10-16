@@ -1,24 +1,29 @@
-import { inTeam, requireAuth, requireMentor, withTeam } from "@g3/auth";
-import { desc, eq } from "drizzle-orm";
+import { inTeam, logTeamChange, requireAuth, requireMentor, withTeam } from "@g3/auth";
+import { asc, desc, eq, inArray, ne } from "drizzle-orm";
 import { Hono } from "hono";
-import { createDb } from "./db";
-import { logDownloaders, matchLogs } from "./db/schema";
+import { type Db, createDb } from "./db";
+import { logDownloaders, matchLogs, settings } from "./db/schema";
 import { requireDownloader } from "./downloaders";
+import { WHEN_FULL, type WhenFull, getWhenFull } from "./settings";
 import type { AppEnv } from "./types";
+import { type ZipSource, writeZip, zipSize } from "./zip";
 
 // Match logs: the AdvantageKit .wpilog files the team's paired log downloaders copy off the robot,
-// kept in the LOGS bucket (Shop's) under pit/teams/<team>/logs/, outside Shop's own
+// gzipped, kept in the LOGS bucket (Shop's) under pit/teams/<team>/logs/, outside Shop's own
 // teams/<team>/, which Shop deletes when a team switches it off. A log goes up in parts (R2
-// multipart): Workers refuse a request body over 100 MB, and a log can come near that.
+// multipart): Workers refuse a request body over 100 MB. A team keeps at most MAX_LOGS, each at
+// most MAX_SIZE gzipped; the downloader trims a bigger one to part of the match first.
 
 /** Each part but the last; R2 needs at least 5 MiB, and every part but the last the same size. */
 export const PART_SIZE = 10 * 1024 * 1024;
-/** The largest log taken. */
-const MAX_SIZE = 1024 * 1024 * 1024;
+/** The largest log taken, gzipped. */
+export const MAX_SIZE = 40 * 1024 * 1024;
+/** The most logs a team keeps. */
+export const MAX_LOGS = 20;
 
 export const logsPrefix = (teamId: string) => `pit/teams/${teamId}/logs/`;
 const logKey = (teamId: string, event: string, name: string) =>
-  `${logsPrefix(teamId)}${event}/${name}.wpilog`;
+  `${logsPrefix(teamId)}${event}/${name}.wpilog.gz`;
 
 const EVENT = /^[A-Za-z0-9_-]{1,40}$/;
 const NAME = /^(Qual|Elim|Prct)-\d{1,4}$/;
@@ -36,15 +41,32 @@ export type MatchLog = {
   name: string;
   matchType: "q" | "e" | "p";
   matchNumber: number;
+  /** Bytes, gzipped. */
   size: number;
+  /** The .wpilog's own bytes. */
+  rawSize: number | null;
+  trimmed: boolean;
   downloaderName: string;
   uploadedAt: number | null;
 };
 
-/** Pit's side (`/logs`): list, download, delete. */
+/** Deletes logs, their files first. */
+async function deleteLogs(db: Db, bucket: R2Bucket, teamId: string, ids: number[]) {
+  if (ids.length === 0) return 0;
+  const removed = await db
+    .delete(matchLogs)
+    .where(inTeam(matchLogs, teamId, inArray(matchLogs.id, ids)))
+    .returning({ r2Key: matchLogs.r2Key });
+  if (removed.length) await bucket.delete(removed.map((r) => r.r2Key));
+  return removed.length;
+}
+
+/** Pit's side (`/logs`): list, download, export, delete, and what to do when full. */
 export const matchLogRoutes = new Hono<AppEnv>()
   .get("/", requireAuth, async (c) => {
-    const logs: MatchLog[] = await createDb(c.env.PIT_DB)
+    const db = createDb(c.env.PIT_DB);
+    const teamId = c.get("teamId");
+    const logs: MatchLog[] = await db
       .select({
         id: matchLogs.id,
         event: matchLogs.event,
@@ -52,15 +74,85 @@ export const matchLogRoutes = new Hono<AppEnv>()
         matchType: matchLogs.matchType,
         matchNumber: matchLogs.matchNumber,
         size: matchLogs.size,
+        rawSize: matchLogs.rawSize,
+        trimmed: matchLogs.trimmed,
         downloaderName: matchLogs.downloaderName,
         uploadedAt: matchLogs.uploadedAt,
       })
       .from(matchLogs)
-      .where(inTeam(matchLogs, c.get("teamId"), eq(matchLogs.status, "stored")))
+      .where(inTeam(matchLogs, teamId, eq(matchLogs.status, "stored")))
       .orderBy(desc(matchLogs.uploadedAt));
-    return c.json({ logs, canDelete: c.get("userIsMentor") || c.get("userIsAdmin") });
+    return c.json({
+      logs,
+      limit: MAX_LOGS,
+      whenFull: await getWhenFull(db, teamId),
+      canManage: c.get("userIsMentor") || c.get("userIsAdmin"),
+    });
   })
 
+  // What Pit does with a new log once the team has MAX_LOGS.
+  .put("/settings", requireMentor, async (c) => {
+    const body = (await c.req.json().catch(() => null)) as { whenFull?: unknown } | null;
+    const whenFull = body?.whenFull as WhenFull;
+    if (!WHEN_FULL.includes(whenFull)) return c.json({ error: "Not a choice." }, 400);
+    const db = createDb(c.env.PIT_DB);
+    const teamId = c.get("teamId");
+    if ((await getWhenFull(db, teamId)) !== whenFull) {
+      await db
+        .insert(settings)
+        .values(withTeam(teamId, { key: "matchLogsWhenFull", value: whenFull }))
+        .onConflictDoUpdate({ target: [settings.teamId, settings.key], set: { value: whenFull } });
+      await logTeamChange(c.env, teamId, {
+        userId: c.get("userId"),
+        app: "pit",
+        what: "Match logs when full",
+        changed: ["When Pit has 20 match logs"],
+      });
+    }
+    return c.json({ whenFull });
+  })
+
+  // Every log as one zip of .wpilog files, built from the gzipped files as they are (zip.ts).
+  .get("/export.zip", requireAuth, async (c) => {
+    const logs = await createDb(c.env.PIT_DB)
+      .select()
+      .from(matchLogs)
+      .where(inTeam(matchLogs, c.get("teamId"), eq(matchLogs.status, "stored")))
+      .orderBy(asc(matchLogs.event), asc(matchLogs.name));
+    const files: ZipSource[] = logs.map((log) => ({
+      name: `${log.event}/${log.name}.wpilog`,
+      key: log.r2Key,
+      size: log.size,
+      modified: new Date(log.uploadedAt ?? log.createdAt),
+    }));
+    const { readable, writable } = new TransformStream();
+    c.executionCtx.waitUntil(
+      writeZip(c.env.LOGS, files, writable).catch((err) => console.error("[pit] export", err)),
+    );
+    return new Response(readable, {
+      headers: {
+        "Content-Type": "application/zip",
+        "Content-Length": String(zipSize(files)),
+        "Content-Disposition": 'attachment; filename="match-logs.zip"',
+      },
+    });
+  })
+
+  // The logs the page names (after an export: just those it exported).
+  .delete("/", requireMentor, async (c) => {
+    const body = (await c.req.json().catch(() => null)) as { ids?: unknown } | null;
+    const ids = Array.isArray(body?.ids) ? body.ids.map(Number).filter(Number.isInteger) : [];
+    if (ids.length === 0) return c.json({ error: "No logs named." }, 400);
+    const deleted = await deleteLogs(
+      createDb(c.env.PIT_DB),
+      c.env.LOGS,
+      c.get("teamId"),
+      ids.slice(0, 1000),
+    );
+    return c.json({ deleted });
+  })
+
+  // One log as a .wpilog: stored gzipped, so the browser unzips it as it downloads.
   .get("/:id/file", requireAuth, async (c) => {
     const id = parseId(c.req.param("id"));
     if (!id) return c.json({ error: "Invalid id." }, 400);
@@ -68,14 +160,16 @@ export const matchLogRoutes = new Hono<AppEnv>()
       .select()
       .from(matchLogs)
       .where(
-        inTeam(matchLogs, c.get("teamId"), eq(matchLogs.id, id), eq(matchLogs.status, "stored")),
+        inTeam(matchLogs, c.get("teamId"), eq(matchLogs.status, "stored"), eq(matchLogs.id, id)),
       )
       .get();
     const object = log ? await c.env.LOGS.get(log.r2Key) : null;
     if (!log || !object) return c.json({ error: "Log not found." }, 404);
     return new Response(object.body, {
+      encodeBody: "manual",
       headers: {
         "Content-Type": "application/octet-stream",
+        "Content-Encoding": "gzip",
         "Content-Length": String(object.size),
         "Content-Disposition": `attachment; filename="${log.event}-${log.name}.wpilog"`,
       },
@@ -85,19 +179,15 @@ export const matchLogRoutes = new Hono<AppEnv>()
   .delete("/:id", requireMentor, async (c) => {
     const id = parseId(c.req.param("id"));
     if (!id) return c.json({ error: "Invalid id." }, 400);
-    const db = createDb(c.env.PIT_DB);
-    const [removed] = await db
-      .delete(matchLogs)
-      .where(inTeam(matchLogs, c.get("teamId"), eq(matchLogs.id, id)))
-      .returning({ r2Key: matchLogs.r2Key });
-    if (!removed) return c.json({ error: "Log not found." }, 404);
-    await c.env.LOGS.delete(removed.r2Key);
+    const deleted = await deleteLogs(createDb(c.env.PIT_DB), c.env.LOGS, c.get("teamId"), [id]);
+    if (!deleted) return c.json({ error: "Log not found." }, 404);
     return c.json({ ok: true });
   });
 
 /** The downloader's side (`/downloader/logs`), with its key: start an upload, send parts, finish. */
 export const logUploadRoutes = new Hono<AppEnv>()
-  // Starts uploading a log, or says Pit already has it (the same event, name and size).
+  // Starts uploading a gzipped log, or says Pit already has it (the same event, name and size),
+  // or that the team is full and keeps what it has (409, `full`).
   .post("/", requireDownloader, async (c) => {
     const body = (await c.req.json().catch(() => null)) as Record<string, unknown> | null;
     const event = String(body?.event ?? "");
@@ -105,6 +195,8 @@ export const logUploadRoutes = new Hono<AppEnv>()
     const matchType = body?.matchType as (typeof TYPES)[number];
     const matchNumber = Number(body?.matchNumber);
     const size = Number(body?.size);
+    const rawSize = Number(body?.rawSize);
+    const trimmed = body?.trimmed === true;
     if (
       !EVENT.test(event) ||
       !NAME.test(name) ||
@@ -113,9 +205,16 @@ export const logUploadRoutes = new Hono<AppEnv>()
       matchNumber < 0 ||
       !Number.isInteger(size) ||
       size < 1 ||
-      size > MAX_SIZE
+      !Number.isInteger(rawSize) ||
+      rawSize < 1
     ) {
       return c.json({ error: "Not a match log Pit takes." }, 400);
+    }
+    if (size > MAX_SIZE) {
+      return c.json(
+        { error: "The log is over 40 MB compressed: trim it first.", code: "too_big" },
+        413,
+      );
     }
 
     const db = createDb(c.env.PIT_DB);
@@ -127,6 +226,19 @@ export const logUploadRoutes = new Hono<AppEnv>()
       .get();
     if (existing?.status === "stored" && existing.size === size) {
       return c.json({ id: existing.id, exists: true });
+    }
+    // A new log, with the team at its limit and keeping what it has.
+    if (existing?.status !== "stored") {
+      const others = await db
+        .select({ id: matchLogs.id })
+        .from(matchLogs)
+        .where(inTeam(matchLogs, teamId, eq(matchLogs.status, "stored")));
+      if (others.length >= MAX_LOGS && (await getWhenFull(db, teamId)) === "skip-new") {
+        return c.json(
+          { error: `Pit has ${MAX_LOGS} match logs, the most it keeps.`, code: "full" },
+          409,
+        );
+      }
     }
     // An upload of it that never finished: dropped, and started again.
     if (existing?.uploadId) {
@@ -142,12 +254,14 @@ export const logUploadRoutes = new Hono<AppEnv>()
       .get();
     const r2Key = logKey(teamId, event, name);
     const upload = await c.env.LOGS.createMultipartUpload(r2Key, {
-      httpMetadata: { contentType: "application/octet-stream" },
+      httpMetadata: { contentType: "application/gzip" },
     });
     const values = {
       matchType,
       matchNumber,
       size,
+      rawSize,
+      trimmed,
       r2Key,
       status: "uploading" as const,
       uploadId: upload.uploadId,
@@ -196,7 +310,8 @@ export const logUploadRoutes = new Hono<AppEnv>()
     return c.json({ partNumber: uploaded.partNumber, etag: uploaded.etag });
   })
 
-  // The parts, in order: the log is stored.
+  // The parts, in order: the log is stored. With the team deleting its oldest when full, the
+  // oldest beyond MAX_LOGS go now.
   .post("/:id/complete", requireDownloader, async (c) => {
     const id = parseId(c.req.param("id"));
     if (!id) return c.json({ error: "Invalid id." }, 400);
@@ -218,10 +333,32 @@ export const logUploadRoutes = new Hono<AppEnv>()
       .complete(body.parts.map((p) => ({ partNumber: Number(p.partNumber), etag: String(p.etag) })))
       .catch(() => null);
     if (!object) return c.json({ error: "The parts didn't make the log." }, 400);
+    if (object.size > MAX_SIZE) {
+      await c.env.LOGS.delete(log.r2Key);
+      await db.delete(matchLogs).where(inTeam(matchLogs, teamId, eq(matchLogs.id, id)));
+      return c.json(
+        { error: "The log is over 40 MB compressed: trim it first.", code: "too_big" },
+        413,
+      );
+    }
     await db
       .update(matchLogs)
       .set({ status: "stored", uploadId: null, size: object.size, uploadedAt: Date.now() })
       .where(inTeam(matchLogs, teamId, eq(matchLogs.id, id)));
+
+    if ((await getWhenFull(db, teamId)) === "delete-oldest") {
+      const older = await db
+        .select({ id: matchLogs.id })
+        .from(matchLogs)
+        .where(inTeam(matchLogs, teamId, eq(matchLogs.status, "stored"), ne(matchLogs.id, id)))
+        .orderBy(desc(matchLogs.uploadedAt));
+      await deleteLogs(
+        db,
+        c.env.LOGS,
+        teamId,
+        older.slice(MAX_LOGS - 1).map((row) => row.id),
+      );
+    }
     return c.json({ ok: true });
   });
 

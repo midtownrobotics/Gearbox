@@ -95,8 +95,13 @@ async function seed(team: TeamUsers): Promise<Seeded> {
       body: JSON.stringify({ code, name: `Downloader ${tag}` }),
     })
   ).json()) as { id: number; key: string };
-  // A match log it uploaded, in one part.
   const asDownloader = { Authorization: `Bearer ${paired.key}`, "X-Team-Id": team.teamId };
+  // A match log it uploaded, gzipped like the downloader sends them, in one part.
+  const gzipped = new Uint8Array(
+    await new Response(
+      new Blob([`log ${tag}`]).stream().pipeThrough(new CompressionStream("gzip")),
+    ).arrayBuffer(),
+  );
   const log = (await (
     await call("/downloader/logs", {
       method: "POST",
@@ -106,7 +111,8 @@ async function seed(team: TeamUsers): Promise<Seeded> {
         name: "Qual-1",
         matchType: "q",
         matchNumber: 1,
-        size: 4,
+        size: gzipped.length,
+        rawSize: 4 + tag.length,
       }),
     })
   ).json()) as { id: number };
@@ -114,7 +120,7 @@ async function seed(team: TeamUsers): Promise<Seeded> {
     await call(`/downloader/logs/${log.id}/parts/1`, {
       method: "PUT",
       headers: asDownloader,
-      body: tag.slice(0, 4),
+      body: gzipped,
     })
   ).json()) as { partNumber: number; etag: string };
   await call(`/downloader/logs/${log.id}/complete`, {
@@ -135,7 +141,7 @@ async function seed(team: TeamUsers): Promise<Seeded> {
       return undefined;
     },
     markers: [tag],
-    data: { item: item.id },
+    data: { item: item.id, log: log.id },
   };
 }
 
@@ -194,6 +200,8 @@ it("keeps every team's checklists, archives, batteries, settings and log downloa
       "PATCH /batteries/:id/voltage": { voltage: 1 },
       "PATCH /admin/settings": { eventKey: "2026mine" },
       "POST /downloaders/pair": { code: "123456", name: "Mine now" },
+      "PUT /logs/settings": { whenFull: "delete-oldest" },
+      "DELETE /logs": { ids: [(b.data as { log: number }).log] },
     }),
   });
   expect(problems).toEqual([]);

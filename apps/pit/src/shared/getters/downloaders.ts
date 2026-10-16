@@ -43,24 +43,62 @@ export type MatchLog = {
   name: string;
   matchType: "q" | "e" | "p";
   matchNumber: number;
-  /** Bytes. */
+  /** Bytes as stored, gzipped. */
   size: number;
+  /** The .wpilog's own bytes. */
+  rawSize: number | null;
+  /** Cut to part of the match on the downloader. */
+  trimmed: boolean;
   downloaderName: string;
   uploadedAt: number | null;
 };
 
-/** The team's match logs, newest first, and whether the user may delete them. */
-export async function fetchMatchLogs(): Promise<{ logs: MatchLog[]; canDelete: boolean }> {
+/** What Pit does with a new log once the team has `limit`. */
+export type WhenFull = "skip-new" | "delete-oldest";
+
+export type MatchLogs = {
+  logs: MatchLog[];
+  /** The most logs Pit keeps for a team. */
+  limit: number;
+  whenFull: WhenFull;
+  /** Mentors and admins: delete logs and choose `whenFull`. */
+  canManage: boolean;
+};
+
+/** The team's match logs, newest first. */
+export async function fetchMatchLogs(): Promise<MatchLogs> {
   const res = await api.logs.$get();
   if (!res.ok) throw new Error(`Failed to fetch match logs (${res.status})`);
-  return res.json() as Promise<{ logs: MatchLog[]; canDelete: boolean }>;
+  return res.json() as Promise<MatchLogs>;
 }
 
-/** Where a log downloads from. */
+/** Where a log downloads from, as a .wpilog. */
 export const matchLogFileUrl = (id: number) =>
   api.logs[":id"].file.$url({ param: { id: String(id) } }).toString();
+
+/** Where every log downloads from, as one zip. */
+export const matchLogsZipUrl = () => api.logs["export.zip"].$url().toString();
 
 export async function deleteMatchLog(id: number): Promise<void> {
   const res = await api.logs[":id"].$delete({ param: { id: String(id) } });
   if (!res.ok) throw new Error(`Failed to delete the log (${res.status})`);
+}
+
+/** Deletes these logs (after an export, the ones it held). */
+export async function deleteMatchLogs(ids: number[]): Promise<void> {
+  const res = await api.logs.$delete(
+    {},
+    { init: { body: JSON.stringify({ ids }), headers: { "Content-Type": "application/json" } } },
+  );
+  if (!res.ok) throw new Error(`Failed to delete the logs (${res.status})`);
+}
+
+export async function setWhenFull(whenFull: WhenFull): Promise<void> {
+  const res = await api.logs.settings.$put(
+    {},
+    {
+      init: { body: JSON.stringify({ whenFull }), headers: { "Content-Type": "application/json" } },
+    },
+  );
+  if (!res.ok) throw new Error(`Failed to save (${res.status})`);
 }

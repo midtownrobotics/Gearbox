@@ -194,6 +194,10 @@ export function LogsPage() {
 
   return (
     <Page title="Logs" description="The robot's match logs." width="narrow">
+      <p className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
+        Logs is in beta and isn't fully set up yet: things may change, and logs here may not be
+        kept.
+      </p>
       {failed && (
         <ErrorBanner message="Couldn't load the log downloaders. Check your connection and try again." />
       )}

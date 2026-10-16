@@ -35,7 +35,7 @@ import { demoWords, loadDemo } from "./demo";
 import { downloaderRoutes, downloaderSelfRoutes } from "./downloaders";
 import { manifest } from "./manifest";
 import { deleteTeamLogFiles, logUploadRoutes, matchLogRoutes } from "./match-logs";
-import { SETTING_KEYS, type SettingKey, getSetting, teamNumberOf } from "./settings";
+import { SETTING_KEYS, type SettingKey, getSetting, getWhenFull, teamNumberOf } from "./settings";
 import type { AppEnv } from "./types";
 
 const base = new Hono<AppEnv>();
@@ -1058,7 +1058,10 @@ const app = base
         const team = c.get("teamId");
         const values = await Promise.all(SETTING_KEYS.map((key) => getSetting(db, team, key)));
         return {
-          values: Object.fromEntries(SETTING_KEYS.map((key, i) => [key, values[i] || null])),
+          values: {
+            ...Object.fromEntries(SETTING_KEYS.map((key, i) => [key, values[i] || null])),
+            matchLogsWhenFull: await getWhenFull(db, team),
+          },
         };
       },
       async save(c, changes) {

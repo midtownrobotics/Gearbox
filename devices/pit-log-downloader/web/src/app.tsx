@@ -12,7 +12,7 @@ import {
 import { useEffect, useState } from "react";
 import type { Status } from "../../src/status.ts";
 import { GearboxCard, PairingCard } from "./gearbox-card";
-import { ActivityCard, ConnectionTiles, Counts, LogsCard, RobotCard, SettingsCard } from "./parts";
+import { ActivityCard, ConnectionTiles, Counts, LogsCard, RobotCard } from "./parts";
 
 const POLL_INTERVAL_MS = 3000;
 
@@ -154,7 +154,6 @@ export function App() {
               <RobotCard status={status} />
               <ActivityCard status={status} />
             </div>
-            <SettingsCard status={status} />
           </>
         ) : (
           !lost && <Loading />

@@ -156,8 +156,12 @@ export const matchLogs = sqliteTable(
     name: text("name").notNull(),
     matchType: text("match_type", { enum: ["q", "e", "p"] }).notNull(),
     matchNumber: integer("match_number").notNull(),
-    /** Bytes. */
+    /** Bytes as stored: gzipped (migration 0015). */
     size: integer("size").notNull(),
+    /** The .wpilog's own bytes, unzipped; null for one stored before 0015. */
+    rawSize: integer("raw_size"),
+    /** Cut to part of the match on the downloader. */
+    trimmed: integer("trimmed", { mode: "boolean" }).notNull().default(false),
     r2Key: text("r2_key").notNull(),
     status: text("status", { enum: ["uploading", "stored"] }).notNull(),
     /** The R2 multipart upload, while `uploading`. */
