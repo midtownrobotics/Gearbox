@@ -72,12 +72,17 @@ export async function fetchMatchLogs(): Promise<MatchLogs> {
   return res.json() as Promise<MatchLogs>;
 }
 
+/**
+ * The API's base for a link (an <a href>). Not the client's `$url()`: it builds a URL object, and
+ * the base is "/api" in production, which isn't a whole address on its own.
+ */
+const apiBase = import.meta.env.VITE_API_BASE_URL ?? "";
+
 /** Where a log downloads from, as a .wpilog. */
-export const matchLogFileUrl = (id: number) =>
-  api.logs[":id"].file.$url({ param: { id: String(id) } }).toString();
+export const matchLogFileUrl = (id: number) => `${apiBase}/logs/${id}/file`;
 
 /** Where every log downloads from, as one zip. */
-export const matchLogsZipUrl = () => api.logs["export.zip"].$url().toString();
+export const matchLogsZipUrl = () => `${apiBase}/logs/export.zip`;
 
 export async function deleteMatchLog(id: number): Promise<void> {
   const res = await api.logs[":id"].$delete({ param: { id: String(id) } });
