@@ -157,5 +157,6 @@ export const roleView = (role: typeof roles.$inferSelect) => ({
   id: role.id,
   name: role.name,
   color: role.color,
+  type: role.type,
   archived: role.archivedAt !== null,
 });
