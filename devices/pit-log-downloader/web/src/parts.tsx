@@ -1,4 +1,4 @@
-import { Badge, Button, Card, Stat, buttonClass, tones } from "@g3/ui";
+import { Badge, Button, Card, ConfirmButton, ErrorBanner, Stat, buttonClass, tones } from "@g3/ui";
 import { type ReactNode, useState } from "react";
 import type { LogStatus, Status } from "../../src/status.ts";
 import { TrimDialog } from "./trim-dialog";
@@ -205,6 +205,7 @@ function CopyPathButton({ path }: { path: string }) {
 function LogRow({ log }: { log: LogStatus }) {
   const here = log.downloaded && log.sizeBytes !== null;
   const [trimming, setTrimming] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const download = `/api/download?event=${encodeURIComponent(log.event)}&file=${encodeURIComponent(log.localFile)}`;
   return (
     <li className="flex flex-wrap items-center gap-x-4 gap-y-2 py-3">
@@ -229,8 +230,35 @@ function LogRow({ log }: { log: LogStatus }) {
             Trim
           </Button>
         )}
+        {log.downloaded && !log.downloading && (
+          <ConfirmButton
+            label="Delete"
+            size="sm"
+            question={`Delete ${log.name} from this computer? It can't be undone, and it won't be copied off the robot again.${log.uploaded ? " It stays in Pit." : " It hasn't been uploaded to Pit."}`}
+            onConfirm={async () => {
+              try {
+                const res = await fetch(`/api/logs/${encodeURIComponent(log.id)}`, {
+                  method: "DELETE",
+                  headers: { "Content-Type": "application/json" },
+                  body: "{}",
+                });
+                if (!res.ok) {
+                  const body = (await res.json().catch(() => null)) as { error?: string } | null;
+                  setError(body?.error ?? "Couldn't delete it.");
+                }
+              } catch {
+                setError("Can't reach the downloader. Check that it's still running.");
+              }
+            }}
+          />
+        )}
       </div>
       {trimming && <TrimDialog log={log} onClose={() => setTrimming(false)} />}
+      {error && (
+        <div className="w-full">
+          <ErrorBanner message={error} />
+        </div>
+      )}
     </li>
   );
 }
