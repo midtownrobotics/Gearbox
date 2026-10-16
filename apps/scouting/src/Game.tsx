@@ -12,7 +12,7 @@ import {
   tones,
 } from "@g3/ui";
 import { Coins, Loader2, RefreshCw, Trophy, X } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { EngagementSettings } from "./EngagementSettings";
 import { api } from "./api";
 
@@ -97,26 +97,68 @@ export function MatchPredictions({ predictionsEnabled = true }: { predictionsEna
   const [data, setData] = useState<MatchPredictionsData | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [matchesLoading, setMatchesLoading] = useState(false);
+  const pendingLoad = useRef<Promise<void> | null>(null);
   const [placing, setPlacing] = useState(false);
   const [section, setSection] = useState<"predictions" | "leaderboard">("predictions");
   const [slip, setSlip] = useState<PickSlip[]>([]);
   const [stake, setStake] = useState(10);
 
-  const load = useCallback(async () => {
-    setError("");
-    try {
-      const next = await api<MatchPredictionsData>("/game");
-      setData(next);
-      if (!next.settings.predictionsEnabled) setSection("leaderboard");
-      else if (!next.settings.leaderboardEnabled) setSection("predictions");
-      if (!next.settings.combinationsEnabled) setSlip((current) => current.slice(0, 1));
-    } catch (cause) {
-      setData(null);
-      setSlip([]);
-      setError(cause instanceof Error ? cause.message : "Could not load match predictions.");
-    } finally {
-      setLoading(false);
-    }
+  const load = useCallback(() => {
+    if (pendingLoad.current) return pendingLoad.current;
+    const request = (async () => {
+      setRefreshing(true);
+      setMatchesLoading(true);
+      setError("");
+      try {
+        const summary = await api<MatchPredictionsData>("/game?summary=true", {
+          signal: AbortSignal.timeout(6000),
+        });
+        setData((current) => ({
+          ...summary,
+          matches: current?.eventKey === summary.eventKey ? current.matches : [],
+        }));
+        setLoading(false);
+        if (!summary.settings.predictionsEnabled) setSection("leaderboard");
+        else if (!summary.settings.leaderboardEnabled) setSection("predictions");
+        if (!summary.settings.combinationsEnabled) setSlip((current) => current.slice(0, 1));
+        if (!summary.settings.predictionsEnabled || !summary.eventKey) {
+          setSlip([]);
+          return;
+        }
+        const next = await api<MatchPredictionsData>("/game", {
+          signal: AbortSignal.timeout(6000),
+        });
+        setData(next);
+        setSlip((current) =>
+          current.filter((leg) =>
+            next.matches.some(
+              (match) =>
+                match.key === leg.match.key && match.markets.spread[leg.selection] === leg.line,
+            ),
+          ),
+        );
+      } catch (cause) {
+        // Points and history remain useful when the prediction service cannot be reached.
+        setData((current) => (current ? { ...current, matches: [] } : null));
+        setSlip([]);
+        setError(
+          cause instanceof Error && (cause.name === "TimeoutError" || cause.name === "AbortError")
+            ? "The request took too long. Try refreshing."
+            : cause instanceof Error
+              ? cause.message
+              : "Could not load match predictions.",
+        );
+      } finally {
+        setLoading(false);
+        setMatchesLoading(false);
+        setRefreshing(false);
+        pendingLoad.current = null;
+      }
+    })();
+    pendingLoad.current = request;
+    return request;
   }, []);
 
   useEffect(() => {
@@ -210,6 +252,12 @@ export function MatchPredictions({ predictionsEnabled = true }: { predictionsEna
       className="scouting-page-frame"
       contentClassName="predictions-workspace"
       description={data?.eventKey ? `Event: ${data.eventKey}` : undefined}
+      actions={
+        <Button variant="secondary" type="button" onClick={load} disabled={refreshing || placing}>
+          {refreshing ? <Loader2 className="spin" size={16} /> : <RefreshCw size={16} />}
+          {refreshing ? "Refreshing…" : "Refresh"}
+        </Button>
+      }
     >
       {error && (
         <div role="alert">
@@ -271,11 +319,9 @@ export function MatchPredictions({ predictionsEnabled = true }: { predictionsEna
           <div className="game-main">
             <div className="game-section-heading">
               <h2>Upcoming Matches</h2>
-              <Button variant="secondary" type="button" onClick={load}>
-                <RefreshCw size={16} /> Refresh
-              </Button>
             </div>
-            {!data?.matches.length && !data?.statsError && (
+            {matchesLoading && <div role="status">Loading predictions…</div>}
+            {!matchesLoading && !data?.matches.length && !data?.statsError && !error && (
               <Card className="space-y-2">
                 <h3 className="text-base font-semibold text-secondary-900">No upcoming matches</h3>
                 <p className="text-sm text-secondary-500">
@@ -303,6 +349,7 @@ export function MatchPredictions({ predictionsEnabled = true }: { predictionsEna
                       </div>
                       <button
                         type="button"
+                        disabled={matchesLoading || Boolean(data.statsError)}
                         aria-pressed={isSelected(match.key, "spread", "red")}
                         aria-label={`Pick Red for ${match.label}, adjustment ${signed(match.markets.spread.red)}`}
                         className={isSelected(match.key, "spread", "red") ? "selected" : ""}
@@ -328,6 +375,7 @@ export function MatchPredictions({ predictionsEnabled = true }: { predictionsEna
                       </div>
                       <button
                         type="button"
+                        disabled={matchesLoading || Boolean(data.statsError)}
                         aria-pressed={isSelected(match.key, "spread", "blue")}
                         aria-label={`Pick Blue for ${match.label}, adjustment ${signed(match.markets.spread.blue)}`}
                         className={isSelected(match.key, "spread", "blue") ? "selected" : ""}
@@ -412,6 +460,8 @@ export function MatchPredictions({ predictionsEnabled = true }: { predictionsEna
                     type="button"
                     disabled={
                       placing ||
+                      matchesLoading ||
+                      Boolean(data.statsError) ||
                       !Number.isInteger(stake) ||
                       stake < 1 ||
                       stake > 10_000 ||
