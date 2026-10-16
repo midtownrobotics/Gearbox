@@ -456,6 +456,7 @@ function MapCanvas({
   const editorRef = useRef<HTMLDivElement>(null);
   const baseCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const drawing = useRef(false);
+  const activePointer = useRef<number | null>(null);
   const lastDrawPoint = useRef<{ x: number; y: number } | null>(null);
   const currentStroke = useRef<{
     points: { x: number; y: number }[];
@@ -593,7 +594,8 @@ function MapCanvas({
   }
 
   function startDraw(event: ReactPointerEvent<HTMLCanvasElement>) {
-    if (!hasImage) return;
+    if (!hasImage || event.button !== 0 || activePointer.current !== null) return;
+    activePointer.current = event.pointerId;
     snapshot();
     if (tool === "arrow") {
       shapeStart.current = point(event);
@@ -624,6 +626,7 @@ function MapCanvas({
   }
 
   function draw(event: ReactPointerEvent<HTMLCanvasElement>) {
+    if (event.pointerId !== activePointer.current) return;
     if (shapeStart.current && shapePreview.current) {
       const context = event.currentTarget.getContext("2d");
       if (!context) return;
@@ -802,6 +805,8 @@ function MapCanvas({
   }
 
   function finishDraw(event: ReactPointerEvent<HTMLCanvasElement>) {
+    if (event.pointerId !== activePointer.current) return;
+    activePointer.current = null;
     drawing.current = false;
     lastDrawPoint.current = null;
     const context = event.currentTarget.getContext("2d");
@@ -814,6 +819,22 @@ function MapCanvas({
     if (!context) return;
     context.putImageData(preview, 0, 0);
     paintShape(context, start, point(event), true);
+  }
+
+  function cancelDraw(event: ReactPointerEvent<HTMLCanvasElement>) {
+    if (event.pointerId !== activePointer.current) return;
+    activePointer.current = null;
+    drawing.current = false;
+    lastDrawPoint.current = null;
+    shapeStart.current = null;
+    const context = canvasRef.current?.getContext("2d");
+    const canceledState = history.current.pop();
+    if (context && canceledState) {
+      context.putImageData(canceledState.image, 0, 0);
+      drawingProgress.current = canceledState.progress;
+    }
+    currentStroke.current = null;
+    shapePreview.current = null;
   }
 
   function undo() {
@@ -878,37 +899,39 @@ function MapCanvas({
       <div className="map-toolbar">
         <button
           type="button"
-          className="fullscreen-toggle"
+          className="fullscreen-toggle map-fullscreen-button"
           onClick={() => setIsFullscreen((value) => !value)}
           aria-label={isFullscreen ? "Exit fullscreen map" : "Open fullscreen map"}
           aria-pressed={isFullscreen}
         >
           {isFullscreen ? <Minimize2 size={17} /> : <Maximize2 size={17} />}
-          {isFullscreen ? "Exit fullscreen" : "Fullscreen map"}
+          <span>{isFullscreen ? "Exit fullscreen" : "Fullscreen map"}</span>
         </button>
-        <span className="toolbar-divider" />
         <span className="toolbar-divider" />
         <button
           type="button"
-          className={tool === "draw" ? "active" : ""}
+          className={`map-tool-button ${tool === "draw" ? "active" : ""}`}
           onClick={() => chooseTool("draw")}
+          aria-pressed={tool === "draw"}
         >
-          <Pencil size={16} /> Draw
+          <Pencil size={16} /> <span>Draw</span>
         </button>
         <button
           type="button"
-          className={tool === "arrow" ? "active" : ""}
+          className={`map-tool-button ${tool === "arrow" ? "active" : ""}`}
           onClick={() => chooseTool("arrow")}
+          aria-pressed={tool === "arrow"}
         >
-          <ArrowRight size={19} /> Arrow
+          <ArrowRight size={19} /> <span>Arrow</span>
         </button>
         <button
           type="button"
-          className={tool === "sotm" ? "active" : ""}
+          className={`map-tool-button ${tool === "sotm" ? "active" : ""}`}
           onClick={() => chooseTool("sotm")}
+          aria-pressed={tool === "sotm"}
           title="Draw a movement path to create a shooting cone aimed at the nearest hub"
         >
-          <Target size={19} /> SOTM
+          <Target size={19} /> <span>SOTM</span>
         </button>
         <div className="drawing-colors" aria-label="Brush color">
           {DRAWING_COLORS.map((option) => (
@@ -923,8 +946,8 @@ function MapCanvas({
             />
           ))}
         </div>
-        <button type="button" onClick={undo} title="Undo (Ctrl+Z)">
-          <RotateCcw size={16} /> Undo
+        <button type="button" className="map-undo-button" onClick={undo} title="Undo (Ctrl+Z)">
+          <RotateCcw size={16} /> <span>Undo</span>
         </button>
         <Button
           variant="danger"
@@ -932,28 +955,18 @@ function MapCanvas({
           className="clear-drawings-button"
           onClick={clearDrawings}
         >
-          <Trash2 size={17} /> Clear drawings
+          <Trash2 size={17} /> <span>Clear</span>
         </Button>
       </div>
       <div className={`canvas-shell ${hasImage ? "has-image" : ""}`}>
         <canvas
           ref={canvasRef}
+          aria-label="Drawable field map"
           onPointerDown={startDraw}
           onPointerMove={draw}
           onPointerUp={finishDraw}
-          onPointerCancel={() => {
-            drawing.current = false;
-            lastDrawPoint.current = null;
-            shapeStart.current = null;
-            const context = canvasRef.current?.getContext("2d");
-            const canceledState = history.current.pop();
-            if (context && canceledState) {
-              context.putImageData(canceledState.image, 0, 0);
-              drawingProgress.current = canceledState.progress;
-            }
-            currentStroke.current = null;
-            shapePreview.current = null;
-          }}
+          onPointerCancel={cancelDraw}
+          onLostPointerCapture={cancelDraw}
         />
         {!hasImage && (
           <label className="canvas-placeholder">
@@ -1543,10 +1556,15 @@ type RouteStroke = { color: string; points: { x: number; y: number }[] };
 
 function AutoRouteDrawing({ onChange }: { onChange: (file: File | null) => void }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const fieldRef = useRef<HTMLImageElement | null>(null);
+  const fieldRef = useRef<HTMLCanvasElement | null>(null);
   const drawing = useRef(false);
+  const activePointer = useRef<number | null>(null);
   const strokesRef = useRef<RouteStroke[]>([]);
+  const history = useRef<RouteStroke[][]>([]);
+  const exportVersion = useRef(0);
   const [strokes, setStrokes] = useState<RouteStroke[]>([]);
+  const [canUndo, setCanUndo] = useState(false);
+  const [fieldReady, setFieldReady] = useState(false);
   const [color, setColor] = useState("#ff334f");
 
   const render = useCallback((items: RouteStroke[]) => {
@@ -1556,7 +1574,7 @@ function AutoRouteDrawing({ onChange }: { onChange: (file: File | null) => void 
     if (!canvas || !context) return;
     context.fillStyle = "#17191d";
     context.fillRect(0, 0, canvas.width, canvas.height);
-    if (field?.complete) context.drawImage(field, 0, 0, canvas.width, canvas.height);
+    if (field) context.drawImage(field, 0, 0, canvas.width, canvas.height);
     for (const stroke of items) {
       if (!stroke.points.length) continue;
       context.strokeStyle = "rgba(0,0,0,.9)";
@@ -1579,9 +1597,11 @@ function AutoRouteDrawing({ onChange }: { onChange: (file: File | null) => void 
 
   const exportDrawing = useCallback(
     (items: RouteStroke[]) => {
+      const version = ++exportVersion.current;
       const canvas = canvasRef.current;
       if (!canvas || !items.length) return onChange(null);
       canvas.toBlob((blob) => {
+        if (version !== exportVersion.current) return;
         onChange(blob ? new File([blob], "drawn-auto.png", { type: "image/png" }) : null);
       }, "image/png");
     },
@@ -1590,9 +1610,20 @@ function AutoRouteDrawing({ onChange }: { onChange: (file: File | null) => void 
 
   useEffect(() => {
     const field = new window.Image();
-    field.onload = () => render([]);
+    field.onload = () => {
+      const base = document.createElement("canvas");
+      base.width = 1400;
+      base.height = 724;
+      base.getContext("2d")?.drawImage(field, 0, 0, base.width, base.height);
+      fieldRef.current = base;
+      render(strokesRef.current);
+      setFieldReady(true);
+    };
     field.src = "/field-2026.svg";
-    fieldRef.current = field;
+    return () => {
+      field.onload = null;
+      exportVersion.current++;
+    };
   }, [render]);
 
   function point(event: ReactPointerEvent<HTMLCanvasElement>) {
@@ -1605,6 +1636,8 @@ function AutoRouteDrawing({ onChange }: { onChange: (file: File | null) => void 
   }
 
   function start(event: ReactPointerEvent<HTMLCanvasElement>) {
+    if (!fieldReady || event.button !== 0 || activePointer.current !== null) return;
+    activePointer.current = event.pointerId;
     drawing.current = true;
     event.currentTarget.setPointerCapture(event.pointerId);
     const next = [...strokesRef.current, { color, points: [point(event)] }];
@@ -1614,7 +1647,7 @@ function AutoRouteDrawing({ onChange }: { onChange: (file: File | null) => void 
   }
 
   function move(event: ReactPointerEvent<HTMLCanvasElement>) {
-    if (!drawing.current) return;
+    if (!drawing.current || event.pointerId !== activePointer.current) return;
     const current = strokesRef.current;
     const next = current.map((stroke, index) =>
       index === current.length - 1
@@ -1626,10 +1659,41 @@ function AutoRouteDrawing({ onChange }: { onChange: (file: File | null) => void 
     render(next);
   }
 
-  function finish() {
-    if (!drawing.current) return;
+  function finish(event: ReactPointerEvent<HTMLCanvasElement>) {
+    if (!drawing.current || event.pointerId !== activePointer.current) return;
+    activePointer.current = null;
     drawing.current = false;
+    const current = strokesRef.current;
+    if (current[current.length - 1].points.length < 2) {
+      replaceStrokes(current.slice(0, -1));
+      return;
+    }
+    remember(current.slice(0, -1));
     exportDrawing(strokesRef.current);
+  }
+
+  function cancel(event: ReactPointerEvent<HTMLCanvasElement>) {
+    if (event.pointerId !== activePointer.current) return;
+    activePointer.current = null;
+    drawing.current = false;
+    replaceStrokes(strokesRef.current.slice(0, -1));
+  }
+
+  function remember(items: RouteStroke[]) {
+    history.current.push(items);
+    if (history.current.length > DRAWING_HISTORY_LIMIT) history.current.shift();
+    setCanUndo(true);
+  }
+
+  function undo() {
+    const previous = history.current.pop();
+    if (previous) replaceStrokes(previous);
+    setCanUndo(history.current.length > 0);
+  }
+
+  function clear() {
+    remember(strokesRef.current);
+    replaceStrokes([]);
   }
 
   function replaceStrokes(next: RouteStroke[]) {
@@ -1655,19 +1719,10 @@ function AutoRouteDrawing({ onChange }: { onChange: (file: File | null) => void 
             />
           ))}
         </div>
-        <button
-          type="button"
-          disabled={!strokes.length}
-          onClick={() => replaceStrokes(strokes.slice(0, -1))}
-        >
+        <button type="button" disabled={!canUndo} onClick={undo}>
           <RotateCcw size={15} /> Undo
         </button>
-        <Button
-          variant="danger"
-          type="button"
-          disabled={!strokes.length}
-          onClick={() => replaceStrokes([])}
-        >
+        <Button variant="danger" type="button" disabled={!strokes.length} onClick={clear}>
           <Trash2 size={15} /> Clear
         </Button>
       </div>
@@ -1679,7 +1734,8 @@ function AutoRouteDrawing({ onChange }: { onChange: (file: File | null) => void 
         onPointerDown={start}
         onPointerMove={move}
         onPointerUp={finish}
-        onPointerCancel={finish}
+        onPointerCancel={cancel}
+        onLostPointerCapture={cancel}
       />
       <span className="field-help">
         Use separate strokes for each part of the route. Undo removes the last stroke.
