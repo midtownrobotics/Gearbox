@@ -84,7 +84,9 @@ describe("the public demo", () => {
 
   it("limits how fast one visitor makes changes", async () => {
     const statuses: number[] = [];
-    for (let i = 0; i < 70; i++) {
+    // The limit is 60 changes a minute in fixed windows, so 70 can straddle two windows without
+    // either going over; 130 goes over in one however the windows fall.
+    for (let i = 0; i < 130; i++) {
       statuses.push((await send(`${demo("pit")}/api/lists`, "POST", {}, "198.51.100.7")).status);
     }
     expect(statuses).toContain(429);
