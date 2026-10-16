@@ -7,7 +7,7 @@ import { cors } from "hono/cors";
 import packageJson from "../package.json";
 import { createShopDb } from "./db";
 import { type BOMQueueMessage, processBOMQueue } from "./lib/bom-queue-consumer";
-import { isShopManager, qualityCheck } from "./lib/quality";
+import { isShopManager, qualityCheck, qualityReportsOn } from "./lib/quality";
 import { actionsRouter } from "./routes/actions";
 import { adminPartsRouter } from "./routes/admin-parts";
 import { drawingsRouter } from "./routes/drawings";
@@ -24,6 +24,7 @@ import { partViewerRouter } from "./routes/part-viewer";
 import { printRouter } from "./routes/print";
 import { processesRouter } from "./routes/processes";
 import { qualityRouter } from "./routes/quality";
+import { qualityReportsRouter } from "./routes/quality-reports";
 import { stagingBatchesRouter } from "./routes/staging-batches";
 import { subsystemsRouter } from "./routes/subsystems";
 import { teamSettingsRouter } from "./routes/team-settings";
@@ -53,9 +54,10 @@ const app = base
   .get("/me", requireAuth, async (c) => {
     const db = createShopDb(c.env.SHOP_DB);
     const teamId = c.get("teamId");
-    const [check, manager] = await Promise.all([
+    const [check, manager, reports] = await Promise.all([
       qualityCheck(db, teamId),
       isShopManager(db, teamId, c.get("userId")),
+      qualityReportsOn(db, teamId),
     ]);
     return c.json({
       userId: c.get("userId"),
@@ -67,6 +69,7 @@ const app = base
       kioskDeviceName: c.get("kioskDeviceName"),
       isShopManager: manager,
       qualityCheck: check,
+      qualityReports: reports,
     });
   })
   .route("/drawings", drawingsRouter)
@@ -115,6 +118,7 @@ const app = base
   .route("/kiosk-presence", kioskPresenceRouter)
   .route("/admin", adminPartsRouter)
   .route("/admin/quality", qualityRouter)
+  .route("/quality-reports", qualityReportsRouter)
   .route("/team-settings", teamSettingsRouter)
   .route("/internal", internalRouter);
 

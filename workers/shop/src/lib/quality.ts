@@ -5,8 +5,9 @@ import { processes, shopManagers } from "../db/schema";
 import { SETTING, getSettings, setSetting } from "./settings";
 
 // Quality Control steps (`processes.type`): a step that only the team's shop managers, and its
-// admins, may mark complete, after checking the part. A team can also require a quality check,
-// which puts one chosen Quality Control step at the end of every part's pipeline.
+// admins, may mark complete, after checking the part. A team can also require quality control,
+// which puts one chosen Quality Control step at the end of every part's pipeline, and turn on
+// quality reports, which finish a Quality Control step with a report instead (routes/quality-reports.ts).
 
 type ShopDb = ReturnType<typeof createShopDb>;
 
@@ -23,6 +24,26 @@ export async function qualityCheck(db: ShopDb, teamId: string): Promise<QualityC
     required: values.get(SETTING.qualityCheckRequired) === "1",
     processId: Number.isInteger(processId) && processId > 0 ? processId : null,
   };
+}
+
+/** Whether the team finishes its Quality Control steps with quality reports. */
+export async function qualityReportsOn(db: ShopDb, teamId: string): Promise<boolean> {
+  return (
+    (await getSettings(db, teamId, [SETTING.qualityReports])).get(SETTING.qualityReports) === "1"
+  );
+}
+
+/**
+ * Whether this person may sign off a Quality Control step: an admin, or one of the team's shop
+ * managers. An admin signed in on a kiosk counts only if they're on the list, since a kiosk PIN
+ * session carries no roles.
+ */
+export async function canQualityCheck(
+  db: ShopDb,
+  teamId: string,
+  user: { id: string; isAdmin: boolean },
+): Promise<boolean> {
+  return user.isAdmin || isShopManager(db, teamId, user.id);
 }
 
 /** Whether this person is one of the team's shop managers. */
@@ -60,8 +81,8 @@ async function qualityStepNames(db: ShopDb, teamId: string, processIds: number[]
 
 /**
  * Why this person can't mark these steps complete, or null: a Quality Control step is for the
- * team's shop managers and its admins only. An admin signed in on a kiosk counts as a shop
- * manager only if they're on the list, since a kiosk PIN session carries no roles.
+ * team's shop managers and its admins only, and while the team has quality reports on, it's
+ * finished by a report and no other way.
  */
 export async function qualityCheckBlock(
   db: ShopDb,
@@ -71,8 +92,11 @@ export async function qualityCheckBlock(
 ): Promise<string | null> {
   const names = await qualityStepNames(db, teamId, processIds);
   if (names.length === 0) return null;
-  if (user.isAdmin || (await isShopManager(db, teamId, user.id))) return null;
   const steps = names.join(" and ");
+  if (await qualityReportsOn(db, teamId)) {
+    return `Quality reports are on: ${steps} ${names.length > 1 ? "are" : "is"} finished with a quality report.`;
+  }
+  if (await canQualityCheck(db, teamId, user)) return null;
   return `${steps} ${names.length > 1 ? "are quality checks" : "is a quality check"}: only a shop manager can mark ${names.length > 1 ? "them" : "it"} complete.`;
 }
 

@@ -13,6 +13,8 @@ export type AuthUser = {
   isShopManager: boolean;
   /** The team's quality check: whether every part ends with one, and which process it is. */
   qualityCheck: { required: boolean; processId: number | null };
+  /** Quality Control steps are finished with a quality report, not Start Part / Mark Complete. */
+  qualityReports: boolean;
 };
 
 type AuthState =

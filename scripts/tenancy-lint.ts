@@ -88,6 +88,7 @@ const APPS: App[] = [
       stagingBatches: "staging_batches",
       adminSettings: "admin_settings",
       shopManagers: "shop_managers",
+      qualityReports: "quality_reports",
     },
   },
   {

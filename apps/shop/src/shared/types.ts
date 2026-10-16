@@ -126,3 +126,53 @@ export type PartFile = {
   createdAt: number;
   assignments: FileAssignment[];
 };
+
+/** A step a failed quality report names as the likely cause, as it was when reported. */
+export type QualitySuspect = {
+  processId: number;
+  name: string;
+  /** When it was last finished, and by whom (a user id); null when that wasn't recorded. */
+  completedAt: number | null;
+  completedBy: string | null;
+};
+
+export type QualityOutcome = "passed" | "sent_back" | "not_sent_back";
+
+/** A quality report on a part at a Quality Control step; the part and step as they were then. */
+export type QualityReport = {
+  id: number;
+  partInstanceId: number;
+  partDefinitionId: number;
+  partName: string;
+  partNumber: string;
+  revision: string | null;
+  instanceNumber: number;
+  processId: number;
+  processName: string;
+  reportedBy: string;
+  createdAt: number;
+  dimensionsOk: number;
+  thicknessOk: number;
+  positionsOk: number;
+  sizesOk: number;
+  passed: number;
+  unsure: number;
+  suspects: QualitySuspect[];
+  notes: string | null;
+  outcome: QualityOutcome;
+  sentBackProcessId: number | null;
+  sentBackProcessName: string | null;
+  sentBackStatus: "todo" | "doing" | null;
+  outcomeBy: string | null;
+  outcomeAt: number | null;
+};
+
+/** The four checks of a quality report, in order, with what each asks. */
+export const QUALITY_CHECKS = [
+  { key: "dimensions", field: "dimensionsOk", label: "Part has the proper dimensions" },
+  { key: "thickness", field: "thicknessOk", label: "Part is the proper thickness" },
+  { key: "positions", field: "positionsOk", label: "Features are positioned correctly" },
+  { key: "sizes", field: "sizesOk", label: "Features are the proper size" },
+] as const;
+
+export type QualityCheckKey = (typeof QUALITY_CHECKS)[number]["key"];

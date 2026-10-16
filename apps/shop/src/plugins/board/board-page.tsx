@@ -15,7 +15,7 @@ import { fetchKioskPresence } from "../../shared/getters";
 import { processPath } from "../../shared/nav";
 import type { KioskPresence, PartDefinition, ProcessType } from "../../shared/types";
 import { ErrorBanner, PageLoading } from "../../shared/ui";
-import { useCanQualityCheck, useKiosk } from "../../shared/use-auth";
+import { useAuthUser, useCanQualityCheck, useKiosk } from "../../shared/use-auth";
 import { useShopData } from "../../shared/use-shop-data";
 import { useTouchDevice } from "../../shared/use-touch";
 import { useUserNames } from "../../shared/use-user-names";
@@ -24,6 +24,7 @@ import { ConsumerSections } from "./consumer-process-view";
 import { PartDetailsView } from "./part-details-view";
 import { PartWorkView } from "./part-work-view";
 import { ProducerSections } from "./producer-process-view";
+import { QualityReportView } from "./quality-report-view";
 import { ScanDialog } from "./scan-dialog";
 
 const MOOD_TONES: Record<ShopMood["tone"], string> = {
@@ -47,6 +48,8 @@ export function BoardPage() {
   const kiosk = useKiosk();
   // A Quality Control process is only checked off by a shop manager or an admin.
   const canQualityCheck = useCanQualityCheck();
+  // With quality reports on, a part at a Quality Control step gets a report instead.
+  const reportsOn = !!useAuthUser()?.qualityReports;
   // Kiosks are tablets — always use the finger-friendly layout there.
   const touch = useTouchDevice() || kiosk.active;
 
@@ -67,6 +70,7 @@ export function BoardPage() {
   const [viewingPartInstanceId, setViewingPartInstanceId] = useState<number | null>(null);
   const [presence, setPresence] = useState<KioskPresence[]>([]);
   const [scanOpen, setScanOpen] = useState(false);
+  const [reportingInstanceId, setReportingInstanceId] = useState<number | null>(null);
 
   const rows = useMemo(() => (data ? buildInstanceRows(data) : []), [data]);
   const loads = useMemo(() => (data ? processLoads(rows, data.processes) : []), [rows, data]);
@@ -139,6 +143,17 @@ export function BoardPage() {
   }
 
   if (loading) return <PageLoading />;
+
+  /** Whether this part is at a Quality Control step that's finished with a report. */
+  const atReport = (row: InstanceRow) =>
+    reportsOn &&
+    data?.processes.find((p) => p.id === row.current?.processId)?.type === "quality_control";
+  /** Closes whichever shop view is open and starts this part's quality report. */
+  const startReport = (row: InstanceRow) => {
+    setWorkingPartInstanceId(null);
+    setViewingPartInstanceId(null);
+    setReportingInstanceId(row.instance.id);
+  };
 
   const processName = (pid: number) =>
     data?.processes.find((p) => p.id === pid)?.name ?? `Process #${pid}`;
@@ -218,6 +233,8 @@ export function BoardPage() {
             onViewPart={setViewingPartInstanceId}
             processType={data?.processes.find((p) => p.id === view)?.type ?? "regular"}
             canQualityCheck={canQualityCheck}
+            reports={reportsOn}
+            onStartReport={startReport}
             requiresPartInfo={!!data?.processes.find((p) => p.id === view)?.requiresPartInfo}
             definitions={data?.definitions ?? []}
             onChanged={refresh}
@@ -252,6 +269,7 @@ export function BoardPage() {
                   setWorkingPartInstanceId(null);
                 }
               }}
+              onStartReport={atReport(workingRow) ? () => startReport(workingRow) : undefined}
               onChanged={refresh}
             />
           ) : null;
@@ -271,6 +289,21 @@ export function BoardPage() {
                   await advance(viewingRow, "doing");
                 }
               }}
+              onStartReport={atReport(viewingRow) ? () => startReport(viewingRow) : undefined}
+            />
+          ) : null;
+        })()}
+
+      {reportingInstanceId &&
+        data &&
+        (() => {
+          const reportingRow = rows.find((r) => r.instance.id === reportingInstanceId);
+          return reportingRow ? (
+            <QualityReportView
+              row={reportingRow}
+              data={data}
+              onClose={() => setReportingInstanceId(null)}
+              onChanged={refresh}
             />
           ) : null;
         })()}
@@ -449,6 +482,8 @@ function ProcessView({
   onViewPart,
   processType,
   canQualityCheck,
+  reports,
+  onStartReport,
   requiresPartInfo,
   definitions,
   onChanged,
@@ -462,6 +497,8 @@ function ProcessView({
   onViewPart: (instanceId: number) => void;
   processType: ProcessType;
   canQualityCheck: boolean;
+  reports: boolean;
+  onStartReport: (row: InstanceRow) => void;
   requiresPartInfo: boolean;
   definitions: PartDefinition[];
   onChanged: () => Promise<void>;
@@ -487,6 +524,11 @@ function ProcessView({
     : processType === "quality_control"
       ? "Check the part before marking it complete!"
       : "Do a quality check before marking this complete!";
+  // With quality reports on, a quality check is one report: no Start Part or Mark as Complete.
+  const reporting = processType === "quality_control" && reports;
+  const reportButton = (row: InstanceRow) => (
+    <ReportButton blocked={blocked} size={btnSize} onClick={() => onStartReport(row)} />
+  );
 
   return (
     <div className="space-y-6">
@@ -519,12 +561,16 @@ function ProcessView({
                     onOpenPart={() => onOpenWorkView(row.instance.id)}
                     stack
                   >
-                    <CompleteButton
-                      blocked={blocked}
-                      hint={completeHint}
-                      size={btnSize}
-                      onClick={() => onAdvance(row, "done")}
-                    />
+                    {reporting ? (
+                      reportButton(row)
+                    ) : (
+                      <CompleteButton
+                        blocked={blocked}
+                        hint={completeHint}
+                        size={btnSize}
+                        onClick={() => onAdvance(row, "done")}
+                      />
+                    )}
                   </PartLine>
                 ))}
               </div>
@@ -547,22 +593,28 @@ function ProcessView({
                     onOpenPart={() => onViewPart(row.instance.id)}
                     stack
                   >
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onAdvance(row, "doing");
-                      }}
-                      className={`whitespace-nowrap text-xs bg-crimson hover:bg-crimson-dark text-paper rounded-lg font-semibold transition-colors ${btnSize}`}
-                    >
-                      Start Part
-                    </button>
-                    <CompleteButton
-                      blocked={blocked}
-                      hint={completeHint}
-                      size={btnSize}
-                      onClick={() => onAdvance(row, "done")}
-                    />
+                    {reporting ? (
+                      reportButton(row)
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onAdvance(row, "doing");
+                          }}
+                          className={`whitespace-nowrap text-xs bg-crimson hover:bg-crimson-dark text-paper rounded-lg font-semibold transition-colors ${btnSize}`}
+                        >
+                          Start Part
+                        </button>
+                        <CompleteButton
+                          blocked={blocked}
+                          hint={completeHint}
+                          size={btnSize}
+                          onClick={() => onAdvance(row, "done")}
+                        />
+                      </>
+                    )}
                   </PartLine>
                 ))}
               </div>
@@ -633,6 +685,32 @@ function CompleteButton({
         {hint}
       </span>
     </span>
+  );
+}
+
+/** Opens a part's quality report. Disabled for anyone who can't sign a quality check off. */
+function ReportButton({
+  blocked,
+  size,
+  onClick,
+}: {
+  blocked: boolean;
+  size: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={blocked}
+      title={blocked ? "Only a shop manager can do a quality report." : undefined}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+      className={`whitespace-nowrap text-xs bg-crimson hover:bg-crimson-dark text-paper rounded-lg font-semibold transition-colors disabled:bg-steel/40 disabled:cursor-not-allowed ${size}`}
+    >
+      Start Quality Report
+    </button>
   );
 }
 

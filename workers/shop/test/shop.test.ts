@@ -1,4 +1,4 @@
-import { admin, kioskAdmin, mentor, student } from "@g3/testing/users";
+import { admin, kioskAdmin, mentor, newTeamId, student, teamUsers } from "@g3/testing/users";
 import { call, callAs, jsonAs } from "@g3/testing/worker";
 import { describe, expect, it } from "vitest";
 
@@ -438,5 +438,186 @@ describe("quality control", () => {
     expect(
       await jsonAs<{ processId: number }[]>(student, `/part-definitions/${part.id}/processes`),
     ).toHaveLength(1);
+  });
+});
+
+describe("quality reports", () => {
+  type Id = { id: number };
+  type Step = { processId: number; index: number; status: string };
+  type Report = {
+    id: number;
+    passed: number;
+    unsure: number;
+    outcome: string;
+    suspects: { processId: number; completedBy: string | null; completedAt: number | null }[];
+    notes: string | null;
+    sentBackProcessName: string | null;
+  };
+  const post = (body?: unknown) => ({ method: "POST" as const, body });
+  const put = (body: unknown) => ({ method: "PUT" as const, body });
+  const allGood = { dimensions: true, thickness: true, positions: true, sizes: true };
+
+  /**
+   * A team of its own with reports on, and a part made through Mill and Deburr (by its student)
+   * that's now waiting at its Quality Control step.
+   */
+  async function seed() {
+    const team = teamUsers(newTeamId());
+    const { admin, student } = team;
+    const subsystem = await jsonAs<Id>(student, "/subsystems", post({ name: "Arm" }), 201);
+    const mill = await jsonAs<Id>(student, "/processes", post({ name: "Mill" }), 201);
+    const deburr = await jsonAs<Id>(student, "/processes", post({ name: "Deburr" }), 201);
+    const check = await jsonAs<Id>(
+      admin,
+      "/processes",
+      post({ name: "QC", type: "quality_control" }),
+      201,
+    );
+    await jsonAs(admin, "/admin/quality/settings", put({ qualityReports: true }));
+    const part = await jsonAs<Id>(
+      student,
+      "/part-definitions",
+      post({
+        onshapePartNumber: "QR-1",
+        revision: "A",
+        subsystemId: subsystem.id,
+        name: "Bracket",
+        processIds: [mill.id, deburr.id, check.id],
+      }),
+      201,
+    );
+    const [instance] = await jsonAs<Id[]>(
+      student,
+      "/part-instances",
+      post({ partDefinitionId: part.id, quantity: 1 }),
+      201,
+    );
+    for (const step of [mill, deburr]) {
+      await jsonAs(
+        student,
+        `/part-instance-processes/${instance.id}/processes/${step.id}/done`,
+        post(),
+      );
+    }
+    const steps = async () =>
+      (
+        await jsonAs<Step[]>(student, `/part-instance-processes?partInstanceId=${instance.id}`)
+      ).sort((a, b) => a.index - b.index);
+    return { team, mill, deburr, check, instance, steps };
+  }
+
+  it("finish a Quality Control step only with a report while they're on", async () => {
+    const { team, check, instance, steps } = await seed();
+    expect(await jsonAs<{ qualityReports: boolean }>(team.admin, "/me")).toMatchObject({
+      qualityReports: true,
+    });
+    const done = await callAs(
+      team.admin,
+      `/part-instance-processes/${instance.id}/processes/${check.id}/done`,
+      post(),
+    );
+    expect(done.status).toBe(403);
+    // Only shop managers and admins write one.
+    const body = { partInstanceId: instance.id, processId: check.id, checks: allGood };
+    expect((await callAs(team.student, "/quality-reports", post(body))).status).toBe(403);
+
+    const { report } = await jsonAs<{ report: Report }>(
+      team.admin,
+      "/quality-reports",
+      post({ ...body, notes: "Looks right" }),
+      201,
+    );
+    expect(report).toMatchObject({ passed: 1, outcome: "passed", notes: "Looks right" });
+    expect((await steps()).map((s) => s.status)).toEqual(["done", "done", "done"]);
+    // Not twice.
+    expect((await callAs(team.admin, "/quality-reports", post(body))).status).toBe(409);
+  });
+
+  it("record a problem with who did the likely step, then send the part back", async () => {
+    const { team, mill, deburr, check, instance, steps } = await seed();
+    const failed = { ...allGood, thickness: false };
+    const base = { partInstanceId: instance.id, processId: check.id, checks: failed };
+    // A failed check needs a likely step, or Unsure, and only one the part went through.
+    expect((await callAs(team.admin, "/quality-reports", post(base))).status).toBe(400);
+    expect(
+      (
+        await callAs(
+          team.admin,
+          "/quality-reports",
+          post({ ...base, suspectProcessIds: [check.id] }),
+        )
+      ).status,
+    ).toBe(400);
+
+    const { report, history } = await jsonAs<{
+      report: Report;
+      history: { processId: number }[];
+    }>(
+      team.admin,
+      "/quality-reports",
+      post({ ...base, suspectProcessIds: [mill.id], unsure: true, notes: "Too thin" }),
+      201,
+    );
+    expect(report).toMatchObject({ passed: 0, unsure: 1, outcome: "not_sent_back" });
+    expect(report.suspects).toEqual([
+      expect.objectContaining({ processId: mill.id, completedBy: team.student.id }),
+    ]);
+    expect(report.suspects[0].completedAt).toBeGreaterThan(0);
+    expect(history.map((h) => h.processId)).toEqual([mill.id, deburr.id]);
+    // The part stays at the check until it's sent back.
+    expect((await steps()).map((s) => s.status)).toEqual(["done", "done", "todo"]);
+
+    // Back to Mill: Mill is to do again, and everything after it waits, the check included.
+    expect(
+      (
+        await callAs(
+          team.student,
+          `/quality-reports/${report.id}/send-back`,
+          post({ processId: mill.id, status: "todo" }),
+        )
+      ).status,
+    ).toBe(403);
+    expect(
+      (
+        await callAs(
+          team.admin,
+          `/quality-reports/${report.id}/send-back`,
+          post({ processId: check.id, status: "todo" }),
+        )
+      ).status,
+    ).toBe(400);
+    await jsonAs(
+      team.admin,
+      `/quality-reports/${report.id}/send-back`,
+      post({ processId: mill.id, status: "todo" }),
+    );
+    expect((await steps()).map((s) => s.status)).toEqual(["todo", "waiting", "waiting"]);
+    expect(
+      (
+        await callAs(
+          team.admin,
+          `/quality-reports/${report.id}/send-back`,
+          post({ processId: mill.id, status: "todo" }),
+        )
+      ).status,
+    ).toBe(409);
+
+    // The Admin page's table has it, for admins only.
+    expect((await callAs(team.student, "/quality-reports")).status).toBe(403);
+    const reports = await jsonAs<Report[]>(team.admin, "/quality-reports");
+    expect(reports.find((r) => r.id === report.id)).toMatchObject({
+      outcome: "sent_back",
+      sentBackProcessName: "Mill",
+    });
+  });
+
+  it("are refused while they're off", async () => {
+    const team = teamUsers(newTeamId());
+    const res = await callAs(
+      team.admin,
+      "/quality-reports",
+      post({ partInstanceId: 1, processId: 1, checks: allGood }),
+    );
+    expect(res.status).toBe(409);
   });
 });

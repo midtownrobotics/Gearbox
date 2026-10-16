@@ -13,12 +13,15 @@ export function PartWorkView({
   data,
   onClose,
   onMarkComplete,
+  onStartReport,
   onChanged,
 }: {
   row: InstanceRow;
   data: ShopData;
   onClose: () => void;
   onMarkComplete: () => Promise<void>;
+  /** Given at a Quality Control step finished with a report: shown in place of Mark Complete. */
+  onStartReport?: () => void;
   onChanged?: () => Promise<void>;
 }) {
   const [busy, setBusy] = useState(false);
@@ -95,16 +98,28 @@ export function PartWorkView({
           ↶ Send Back
         </button>
       )}
-      <button
-        type="button"
-        onClick={onMarkComplete}
-        disabled={busy || blocked}
-        title={blocked ? "Only a shop manager can mark a quality check complete." : undefined}
-        // On its own row under the others when the panel is under the drawing.
-        className={`${shopButton} col-span-full bg-emerald-600 text-paper hover:bg-emerald-700 disabled:bg-steel/40 disabled:cursor-not-allowed`}
-      >
-        {blocked ? "Needs a shop manager" : "Mark Complete"}
-      </button>
+      {onStartReport ? (
+        <button
+          type="button"
+          onClick={onStartReport}
+          disabled={busy || blocked}
+          title={blocked ? "Only a shop manager can do a quality report." : undefined}
+          className={`${shopButton} col-span-full bg-crimson text-paper hover:bg-crimson-dark disabled:bg-steel/40 disabled:cursor-not-allowed`}
+        >
+          {blocked ? "Needs a shop manager" : "Start Quality Report"}
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={onMarkComplete}
+          disabled={busy || blocked}
+          title={blocked ? "Only a shop manager can mark a quality check complete." : undefined}
+          // On its own row under the others when the panel is under the drawing.
+          className={`${shopButton} col-span-full bg-emerald-600 text-paper hover:bg-emerald-700 disabled:bg-steel/40 disabled:cursor-not-allowed`}
+        >
+          {blocked ? "Needs a shop manager" : "Mark Complete"}
+        </button>
+      )}
 
       {showRevertModal && (
         <div className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center p-4">

@@ -465,7 +465,7 @@ export function IngestPartsPage() {
   const pickable = (data?.processes ?? []).filter((p) => p.id !== qualityStep?.id);
   const qualityNote = qualityStep ? (
     <p className="text-sm text-steel">
-      {qualityStep.name} is the team's quality check, added to the end of every part.
+      The team requires quality control: {qualityStep.name} is added to the end of every part.
     </p>
   ) : null;
 

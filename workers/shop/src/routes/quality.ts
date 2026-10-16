@@ -12,7 +12,8 @@ import { Hono } from "hono";
 import { validator } from "hono/validator";
 import { createShopDb } from "../db";
 import { shopManagers } from "../db/schema";
-import { qualityCheck, qualityProcesses, saveQualityCheck } from "../lib/quality";
+import { qualityCheck, qualityProcesses, qualityReportsOn, saveQualityCheck } from "../lib/quality";
+import { SETTING, setSetting } from "../lib/settings";
 import { manifest } from "../manifest";
 import type { AppEnv } from "../types";
 
@@ -30,9 +31,30 @@ const managerValidator = validator("json", (value, c): { manager: boolean } => {
 
 const settingsValidator = validator(
   "json",
-  (value, c): { requireQualityCheck?: boolean; qualityProcessId?: number | null } => {
-    const v = (value ?? {}) as { requireQualityCheck?: unknown; qualityProcessId?: unknown };
-    const out: { requireQualityCheck?: boolean; qualityProcessId?: number | null } = {};
+  (
+    value,
+    c,
+  ): {
+    requireQualityCheck?: boolean;
+    qualityProcessId?: number | null;
+    qualityReports?: boolean;
+  } => {
+    const v = (value ?? {}) as {
+      requireQualityCheck?: unknown;
+      qualityProcessId?: unknown;
+      qualityReports?: unknown;
+    };
+    const out: {
+      requireQualityCheck?: boolean;
+      qualityProcessId?: number | null;
+      qualityReports?: boolean;
+    } = {};
+    if (v.qualityReports !== undefined) {
+      if (typeof v.qualityReports !== "boolean") {
+        return c.json({ error: "qualityReports must be a boolean." }, 400) as never;
+      }
+      out.qualityReports = v.qualityReports;
+    }
     if (v.requireQualityCheck !== undefined) {
       if (typeof v.requireQualityCheck !== "boolean") {
         return c.json({ error: "requireQualityCheck must be a boolean." }, 400) as never;
@@ -66,8 +88,9 @@ export const qualityRouter = new Hono<AppEnv>()
   .get("/", requireAdmin, async (c) => {
     const db = createShopDb(c.env.SHOP_DB);
     const teamId = c.get("teamId");
-    const [check, steps, rows, members] = await Promise.all([
+    const [check, reports, steps, rows, members] = await Promise.all([
       qualityCheck(db, teamId),
+      qualityReportsOn(db, teamId),
       qualityProcesses(db, teamId),
       db
         .select({ userId: shopManagers.userId })
@@ -98,6 +121,7 @@ export const qualityRouter = new Hono<AppEnv>()
     return c.json({
       requireQualityCheck: check.required,
       qualityProcessId: check.processId,
+      qualityReports: reports,
       qualityProcesses: steps,
       people,
       peopleLoaded: Boolean(members),
@@ -133,12 +157,19 @@ export const qualityRouter = new Hono<AppEnv>()
     });
     return c.json({ userId, isManager: manager });
   })
-  /** Whether every part ends with a quality check, and which Quality Control step it is. */
+  /**
+   * Whether every part ends with quality control and which Quality Control step it is, and
+   * whether those steps are finished with quality reports.
+   */
   .put("/settings", requireAdmin, settingsValidator, async (c) => {
     const body = c.req.valid("json");
     const db = createShopDb(c.env.SHOP_DB);
     const teamId = c.get("teamId");
-    const before = await qualityCheck(db, teamId);
+    const [before, reportsBefore] = await Promise.all([
+      qualityCheck(db, teamId),
+      qualityReportsOn(db, teamId),
+    ]);
+    const reports = body.qualityReports ?? reportsBefore;
 
     const next = {
       required: body.requireQualityCheck ?? before.required,
@@ -147,10 +178,21 @@ export const qualityRouter = new Hono<AppEnv>()
 
     const refused = await saveQualityCheck(db, teamId, next);
     if (refused) return c.json({ error: refused }, 400);
+    if (reports !== reportsBefore) {
+      await setSetting(db, teamId, SETTING.qualityReports, reports ? "1" : "");
+    }
 
     const changed = changedFields(
-      { requireQualityCheck: before.required, qualityProcessId: before.processId },
-      { requireQualityCheck: next.required, qualityProcessId: next.processId },
+      {
+        requireQualityCheck: before.required,
+        qualityProcessId: before.processId,
+        qualityReports: reportsBefore,
+      },
+      {
+        requireQualityCheck: next.required,
+        qualityProcessId: next.processId,
+        qualityReports: reports,
+      },
     );
     if (changed.length > 0) {
       await logTeamChange(c.env, teamId, {
@@ -160,5 +202,9 @@ export const qualityRouter = new Hono<AppEnv>()
         changed: settingLabels(manifest, changed),
       });
     }
-    return c.json({ requireQualityCheck: next.required, qualityProcessId: next.processId });
+    return c.json({
+      requireQualityCheck: next.required,
+      qualityProcessId: next.processId,
+      qualityReports: reports,
+    });
   });

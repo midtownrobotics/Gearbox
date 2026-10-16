@@ -248,3 +248,48 @@ export const adminSettings = sqliteTable(
   },
   (t) => [unique().on(t.teamId, t.key)],
 );
+
+export const QUALITY_OUTCOMES = ["passed", "sent_back", "not_sent_back"] as const;
+export type QualityOutcome = (typeof QUALITY_OUTCOMES)[number];
+
+/** A step a failed quality report names as the likely cause, as it was when reported. */
+export type QualitySuspect = {
+  processId: number;
+  name: string;
+  /** When the step was last finished, and by whom (a G3ID user id); null when not recorded. */
+  completedAt: number | null;
+  completedBy: string | null;
+};
+
+/**
+ * A quality report on a part at a Quality Control step. It keeps the part and step as they were,
+ * with no foreign keys, so it outlives obsolete instances deleted from the Admin page.
+ */
+export const qualityReports = sqliteTable("quality_reports", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  teamId: teamId(),
+  partInstanceId: integer("part_instance_id").notNull(),
+  partDefinitionId: integer("part_definition_id").notNull(),
+  partName: text("part_name").notNull(),
+  partNumber: text("part_number").notNull(),
+  revision: text("revision"),
+  instanceNumber: integer("instance_number").notNull(),
+  processId: integer("process_id").notNull(),
+  processName: text("process_name").notNull(),
+  reportedBy: text("reported_by").notNull(),
+  createdAt: integer("created_at").notNull(),
+  dimensionsOk: integer("dimensions_ok").notNull(),
+  thicknessOk: integer("thickness_ok").notNull(),
+  positionsOk: integer("positions_ok").notNull(),
+  sizesOk: integer("sizes_ok").notNull(),
+  passed: integer("passed").notNull(),
+  unsure: integer("unsure").notNull().default(0),
+  suspects: text("suspects", { mode: "json" }).$type<QualitySuspect[]>().notNull().default([]),
+  notes: text("notes"),
+  outcome: text("outcome", { enum: QUALITY_OUTCOMES }).notNull(),
+  sentBackProcessId: integer("sent_back_process_id"),
+  sentBackProcessName: text("sent_back_process_name"),
+  sentBackStatus: text("sent_back_status", { enum: ["todo", "doing"] }),
+  outcomeBy: text("outcome_by"),
+  outcomeAt: integer("outcome_at"),
+});

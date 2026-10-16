@@ -15,6 +15,8 @@ export const SETTING = {
   qualityCheckRequired: "quality_check_required",
   /** The Quality Control process the required check uses. */
   qualityCheckProcess: "quality_check_process_id",
+  /** "1" when Quality Control steps are finished by a quality report. */
+  qualityReports: "quality_reports_enabled",
   onshapeDocument: "onshape_document_id",
   onshapeMainAssembly: "onshape_main_assembly_id",
   onshapeCompany: "onshape_company_id",

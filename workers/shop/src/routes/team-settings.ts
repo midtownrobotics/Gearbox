@@ -1,7 +1,7 @@
 import { teamSettingsRoutes } from "@g3/auth";
 import { createShopDb } from "../db";
 import { onshapeConfig } from "../lib/onshape-config";
-import { qualityCheck, saveQualityCheck } from "../lib/quality";
+import { qualityCheck, qualityReportsOn, saveQualityCheck } from "../lib/quality";
 import { SETTING, getSetting, setSetting } from "../lib/settings";
 import { manifest } from "../manifest";
 import type { AppEnv } from "../types";
@@ -18,11 +18,12 @@ export const teamSettingsRouter = teamSettingsRoutes<AppEnv>(manifest, "Shop set
   async read(c) {
     const db = createShopDb(c.env.SHOP_DB);
     const teamId = c.get("teamId");
-    const [release, summary, onshape, quality] = await Promise.all([
+    const [release, summary, onshape, quality, reports] = await Promise.all([
       getSetting(db, teamId, CHANNELS.slackReleaseChannelId),
       getSetting(db, teamId, CHANNELS.slackSummaryChannelId),
       onshapeConfig(c.env, db, teamId).catch(() => null),
       qualityCheck(db, teamId),
+      qualityReportsOn(db, teamId),
     ]);
     const connected = Boolean(onshape?.credentials && onshape.companyId && onshape.documentId);
     return {
@@ -31,6 +32,7 @@ export const teamSettingsRouter = teamSettingsRoutes<AppEnv>(manifest, "Shop set
         slackSummaryChannelId: summary,
         requireQualityCheck: quality.required,
         qualityProcessId: quality.processId === null ? null : String(quality.processId),
+        qualityReports: reports,
       },
       secretsSet: {
         apiKey: Boolean(onshape?.credentials),
@@ -78,6 +80,10 @@ export const teamSettingsRouter = teamSettingsRoutes<AppEnv>(manifest, "Shop set
               : Number(processId),
       });
       if (refused) return refused;
+    }
+
+    if (typeof changes.qualityReports === "boolean") {
+      await setSetting(db, teamId, SETTING.qualityReports, changes.qualityReports ? "1" : "");
     }
 
     for (const [key, value] of Object.entries(changes)) {

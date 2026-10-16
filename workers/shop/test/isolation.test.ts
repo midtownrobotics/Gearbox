@@ -14,7 +14,8 @@ import { eventually, onshapeEvent } from "./onshape";
 
 // Two teams, each with its own subsystem, process, part with instances and a staging batch, a
 // part file, a drawing in R2 (and an uploaded one), a part from its Onshape webhook, its Onshape
-// and Slack settings, a shop manager, a required quality check, and a kiosk at the shop. Every route, called as team A's admin, mentor,
+// and Slack settings, a shop manager, a required quality check, a failed quality report, and a
+// kiosk at the shop. Every route, called as team A's admin, mentor,
 // student and kiosk session with team B's ids, must show none of B's and change nothing of B's,
 // in D1 or in R2.
 
@@ -37,6 +38,7 @@ const TABLES = [
   "staging_batches",
   "admin_settings",
   "shop_managers",
+  "quality_reports",
 ];
 
 type Id = { id: number };
@@ -159,8 +161,50 @@ async function seed(team: TeamUsers): Promise<Seeded> {
   );
   await jsonAs(admin, "/admin/quality/settings", {
     method: "PUT",
-    body: { requireQualityCheck: true, qualityProcessId: check.id },
+    body: { requireQualityCheck: true, qualityProcessId: check.id, qualityReports: true },
   });
+  // A part that failed its quality report (the check is appended to it), the marker in its notes.
+  const checked = await jsonAs<Id>(
+    student,
+    "/part-definitions",
+    {
+      method: "POST",
+      body: {
+        onshapePartNumber: `QR-${crypto.randomUUID().slice(0, 8)}`,
+        revision: "A",
+        subsystemId: subsystem.id,
+        name: `Checked ${tag}`,
+        processIds: [process.id],
+      },
+    },
+    201,
+  );
+  const [checkedInstance] = await jsonAs<Id[]>(
+    student,
+    "/part-instances",
+    { method: "POST", body: { partDefinitionId: checked.id, quantity: 1 } },
+    201,
+  );
+  await jsonAs(
+    student,
+    `/part-instance-processes/${checkedInstance.id}/processes/${process.id}/done`,
+    { method: "POST" },
+  );
+  const { report } = await jsonAs<{ report: Id }>(
+    admin,
+    "/quality-reports",
+    {
+      method: "POST",
+      body: {
+        partInstanceId: checkedInstance.id,
+        processId: check.id,
+        checks: { dimensions: false, thickness: true, positions: true, sizes: true },
+        unsure: true,
+        notes: `Problem ${tag}`,
+      },
+    },
+    201,
+  );
 
   const ids: Record<string, number> = {
     "part-definitions": part.id,
@@ -168,6 +212,7 @@ async function seed(team: TeamUsers): Promise<Seeded> {
     "part-files": file.id,
     "staging-batches": batch.id,
     processes: process.id,
+    "quality-reports": report.id,
   };
   return {
     params: (path, name) => {
@@ -188,6 +233,7 @@ async function seed(team: TeamUsers): Promise<Seeded> {
       instance: instances[2].id,
       file: file.id,
       check: check.id,
+      checkedInstance: checkedInstance.id,
     },
   };
 }
@@ -247,6 +293,12 @@ it("keeps every team's shop to itself", async () => {
         "POST /admin/slack/daily-summary": { kind: "overview", since: Date.now() - 1000 },
         "PUT /admin/quality/managers/:userId": { manager: true },
         "PUT /admin/quality/settings": { requireQualityCheck: true, qualityProcessId: d.check },
+        "POST /quality-reports": {
+          partInstanceId: d.checkedInstance,
+          processId: d.check,
+          checks: { dimensions: true, thickness: true, positions: true, sizes: true },
+        },
+        "POST /quality-reports/:id/send-back": { processId: d.process, status: "todo" },
       };
     },
   });

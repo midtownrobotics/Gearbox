@@ -15,6 +15,7 @@ import {
   partInstanceProcesses,
   partInstances,
   processes,
+  qualityReports,
   shopManagers,
   stagingBatches,
   subsystems,
@@ -65,6 +66,7 @@ export const internalRouter = new Hono<AppEnv>()
       kioskPresence,
       actions,
       shopManagers,
+      qualityReports,
     ]);
     tables.admin_settings = (tables.admin_settings ?? []).filter(
       (row) => !SECRET_SETTINGS.includes(String(row.key)),
@@ -124,6 +126,7 @@ export const internalRouter = new Hono<AppEnv>()
       drawings,
       adminSettings,
       shopManagers,
+      qualityReports,
     ]);
     return c.json({ ok: true });
   });

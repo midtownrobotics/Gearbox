@@ -4,9 +4,10 @@ import { api } from "../../shared/api";
 import { getErrorMessage } from "../../shared/api-error";
 import { enableKioskMode } from "../../shared/kiosk";
 import { PROCESS_TYPE_LABELS, type Process, type ProcessType } from "../../shared/types";
-import { ErrorBanner, PageLoading } from "../../shared/ui";
+import { ErrorBanner, InfoTip, PageLoading } from "../../shared/ui";
 import { useShopData } from "../../shared/use-shop-data";
 import { ActionsLog } from "./actions-log";
+import { QualityReports } from "./quality-reports";
 
 export function AdminPage() {
   const { data, loading, error, refresh } = useShopData();
@@ -155,7 +156,12 @@ export function AdminPage() {
           <QualityControlSettings />
         </Section>
 
-        {/* Section 4: Data Management */}
+        {/* Section 4: Quality Reports */}
+        <Section title="Quality Reports" defaultOpen={false}>
+          <QualityReports />
+        </Section>
+
+        {/* Section 5: Data Management */}
         <Section title="Data Management" defaultOpen={false}>
           <button
             type="button"
@@ -170,17 +176,17 @@ export function AdminPage() {
           </p>
         </Section>
 
-        {/* Section 5: Kiosk Mode */}
+        {/* Section 6: Kiosk Mode */}
         <Section title="Kiosk Mode" defaultOpen={false}>
           <KioskModeSettings />
         </Section>
 
-        {/* Section 6: OnShape Configuration */}
+        {/* Section 7: OnShape Configuration */}
         <Section title="OnShape Configuration" defaultOpen={false}>
           {data ? <OnShapeConfig /> : <p className="text-sm text-steel">Loading…</p>}
         </Section>
 
-        {/* Section 7: Slack Configuration */}
+        {/* Section 8: Slack Configuration */}
         <Section title="Slack Configuration" defaultOpen={false}>
           <SlackSettings />
         </Section>
@@ -204,33 +210,6 @@ type QualityState = {
 };
 
 const sectionHeading = "text-sm font-bold uppercase tracking-wider text-steel-dark";
-
-/** An "i" that explains a setting, on hover or on a tap. */
-function InfoTip({ label, children }: { label: string; children: React.ReactNode }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <span className="relative inline-flex group shrink-0">
-      <button
-        type="button"
-        aria-label={label}
-        aria-expanded={open}
-        onClick={() => setOpen((o) => !o)}
-        onBlur={() => setOpen(false)}
-        className="w-4 h-4 rounded-full border border-steel/50 text-steel-dark text-[10px] font-bold leading-none flex items-center justify-center hover:border-crimson hover:text-crimson transition-colors"
-      >
-        i
-      </button>
-      <span
-        role="tooltip"
-        className={`absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 bg-ink text-paper text-xs font-normal normal-case tracking-normal text-left rounded-md px-3 py-2 shadow-lg z-20 ${
-          open ? "block" : "hidden group-hover:block"
-        }`}
-      >
-        {children}
-      </span>
-    </span>
-  );
-}
 
 /** Picks someone who isn't a shop manager yet, by typing a name or opening the list. */
 function PersonPicker({
@@ -317,7 +296,7 @@ function PersonPicker({
 }
 
 /**
- * Who may check off a Quality Control process, and whether every part ends with a quality check.
+ * Who may check off a Quality Control process, and whether every part ends with one.
  * Admins can always check one off; anyone else has to be a shop manager here.
  */
 function QualityControlSettings() {
@@ -379,26 +358,6 @@ function QualityControlSettings() {
     <div className="space-y-6">
       {banner && <ErrorBanner message={banner} />}
 
-      {steps.length > 0 && (
-        <div className="flex items-center gap-2 text-sm text-ink">
-          <label className="flex items-center gap-2 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={state.requireQualityCheck}
-              disabled={busy || state.qualityProcessId === null}
-              onChange={(e) => saveCheck({ requireQualityCheck: e.target.checked })}
-              className="accent-crimson w-4 h-4"
-            />
-            Require a quality check
-          </label>
-          <InfoTip label="What requiring a quality check does">
-            The Quality Check Process below goes at the end of every part's processes from now on,
-            so nothing finishes without a shop manager signing it off. Parts already being made keep
-            the steps they have. Pick a process first to turn this on.
-          </InfoTip>
-        </div>
-      )}
-
       <div className="space-y-3">
         <h3 className={sectionHeading}>
           Shop Managers <span className="text-steel font-normal">({managers.length})</span>
@@ -450,26 +409,45 @@ function QualityControlSettings() {
       </div>
 
       <div className="space-y-3">
-        <h3 className={sectionHeading}>Quality Check Process</h3>
+        <h3 className={sectionHeading}>Quality Control Process</h3>
         {steps.length === 0 ? (
           <p className="text-xs text-steel">
             Add a process with the type Quality Control under Shop Settings first.
           </p>
         ) : (
-          <select
-            aria-label="Quality check process"
-            value={state.qualityProcessId ?? ""}
-            disabled={busy}
-            onChange={(e) => saveCheck({ qualityProcessId: Number(e.target.value) || null })}
-            className={`${inputCls} max-w-sm`}
-          >
-            <option value="">— Select —</option>
-            {steps.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
+          <>
+            <select
+              aria-label="Quality control process"
+              value={state.qualityProcessId ?? ""}
+              disabled={busy}
+              onChange={(e) => saveCheck({ qualityProcessId: Number(e.target.value) || null })}
+              className={`${inputCls} max-w-sm`}
+            >
+              <option value="">— Select —</option>
+              {steps.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+            <div className="flex items-center gap-2 text-sm text-ink">
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={state.requireQualityCheck}
+                  disabled={busy || state.qualityProcessId === null}
+                  onChange={(e) => saveCheck({ requireQualityCheck: e.target.checked })}
+                  className="accent-crimson w-4 h-4"
+                />
+                Require quality control
+              </label>
+              <InfoTip label="What requiring quality control does">
+                The process above goes at the end of every part's processes from now on, so nothing
+                finishes without a shop manager signing it off. Parts already being made keep the
+                steps they have. Pick a process first to turn this on.
+              </InfoTip>
+            </div>
+          </>
         )}
       </div>
     </div>

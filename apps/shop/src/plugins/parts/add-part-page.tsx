@@ -393,7 +393,8 @@ export function AddPartPage() {
                       <div className="flex items-center gap-2">
                         <span className="w-6 shrink-0" />
                         <p className="flex-1 bg-mist border border-steel/30 rounded-lg px-3 py-2 text-sm text-steel-dark">
-                          Last: {qualityStep.name} — the team's quality check, on every part.
+                          Last: {qualityStep.name} — the team requires quality control on every
+                          part.
                         </p>
                       </div>
                     )}

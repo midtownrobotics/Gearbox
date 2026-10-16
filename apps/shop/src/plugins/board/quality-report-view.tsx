@@ -1,0 +1,364 @@
+import { useState } from "react";
+import type { InstanceRow } from "../../shared/derive";
+import { sendBackFromReport, submitQualityReport } from "../../shared/getters";
+import {
+  QUALITY_CHECKS,
+  type QualityCheckKey,
+  type QualityReport,
+  type QualitySuspect,
+} from "../../shared/types";
+import type { ShopData } from "../../shared/use-shop-data";
+import { useUserNames } from "../../shared/use-user-names";
+import { DrawingPreview } from "../parts/drawing-preview";
+import { shopButton, shopButtonPlain } from "./shop-view";
+
+const NO_CHECKS: Record<QualityCheckKey, boolean> = {
+  dimensions: false,
+  thickness: false,
+  positions: false,
+  sizes: false,
+};
+
+/** The value the Unsure choice takes among the likely steps. */
+const UNSURE = 0;
+
+function when(at: number) {
+  return new Date(at).toLocaleString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+/**
+ * A quality report on a part waiting at a Quality Control step, over the whole screen beside its
+ * drawing. All four checks passing finishes the step. Otherwise the reporter names the steps it
+ * likely went wrong at (or Unsure), then sees who did those steps and when, and sends the part back
+ * or leaves it at the check.
+ */
+export function QualityReportView({
+  row,
+  data,
+  onClose,
+  onChanged,
+}: {
+  row: InstanceRow;
+  data: ShopData;
+  onClose: () => void;
+  onChanged: () => Promise<void>;
+}) {
+  const step = row.current;
+  const processName = (id: number) => data.processes.find((p) => p.id === id)?.name ?? `#${id}`;
+  // The steps before the check, each process once, in the order the part went through them.
+  const earlier = step
+    ? [...new Set(row.procs.filter((p) => p.index < step.index).map((p) => p.processId))].map(
+        (id) => ({ id, name: processName(id) }),
+      )
+    : [];
+
+  const [checks, setChecks] = useState(NO_CHECKS);
+  const [likely, setLikely] = useState<number[]>([]);
+  const [notes, setNotes] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [failed, setFailed] = useState<{ report: QualityReport; history: QualitySuspect[] } | null>(
+    null,
+  );
+
+  const passing = QUALITY_CHECKS.every((c) => checks[c.key]);
+
+  function toggleLikely(id: number) {
+    setLikely((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }
+
+  async function submit() {
+    if (!step) return;
+    if (!passing && likely.length === 0) {
+      setError("Pick the step it likely went wrong at, or Unsure.");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await submitQualityReport({
+        partInstanceId: row.instance.id,
+        processId: step.processId,
+        checks,
+        suspectProcessIds: passing ? [] : likely.filter((id) => id !== UNSURE),
+        unsure: !passing && likely.includes(UNSURE),
+        notes,
+      });
+      await onChanged();
+      if (result.report.passed) onClose();
+      else setFailed(result);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "The report didn't save.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col bg-paper">
+      <div className="flex items-center justify-between gap-3 border-b border-steel/30 px-4 py-3 lg:px-6 lg:py-5">
+        <h1 className="min-w-0 truncate font-display text-2xl text-ink lg:text-3xl">
+          Quality Report: {row.definition.name}
+          <span className="ml-2 font-normal text-steel">#{row.instance.instanceNumber}</span>
+        </h1>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close"
+          className="shrink-0 text-3xl text-steel transition-colors hover:text-ink"
+        >
+          ✕
+        </button>
+      </div>
+
+      <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+        <div className="flex min-h-0 flex-1 border-b border-steel/30 bg-surface lg:border-b-0 lg:border-r">
+          <DrawingPreview
+            partNumber={row.definition.onshapePartNumber}
+            revision={row.definition.revision}
+            hideOverlay
+            fullHeight
+          />
+        </div>
+
+        <div className="flex max-h-[65%] shrink-0 flex-col gap-5 overflow-y-auto p-4 lg:max-h-none lg:w-[28rem] lg:p-6">
+          {failed ? (
+            <SendBack
+              report={failed.report}
+              history={failed.history}
+              earlier={earlier}
+              checkName={step ? processName(step.processId) : "the check"}
+              onDone={async () => {
+                await onChanged();
+                onClose();
+              }}
+            />
+          ) : (
+            <>
+              <fieldset className="space-y-2">
+                <legend className="mb-1 text-base font-semibold text-ink">
+                  Does the part meet each of these?
+                </legend>
+                <p className="text-xs text-steel">
+                  If one doesn't apply to this part, check it anyway.
+                </p>
+                {QUALITY_CHECKS.map((c) => (
+                  <label
+                    key={c.key}
+                    className="flex cursor-pointer select-none items-center gap-3 rounded-lg border border-steel/30 bg-mist px-3.5 py-3 text-sm text-ink"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checks[c.key]}
+                      onChange={(e) => setChecks({ ...checks, [c.key]: e.target.checked })}
+                      className="h-5 w-5 accent-crimson"
+                    />
+                    {c.label}
+                  </label>
+                ))}
+              </fieldset>
+
+              {!passing && (
+                <fieldset className="space-y-2">
+                  <legend className="mb-1 text-base font-semibold text-ink">
+                    Which step did the mistake likely happen at?
+                  </legend>
+                  <p className="text-xs text-steel">
+                    Pick at least one. Pick Unsure if you can't tell.
+                  </p>
+                  {[...earlier, { id: UNSURE, name: "Unsure" }].map((p) => (
+                    <label
+                      key={p.id}
+                      className="flex cursor-pointer select-none items-center gap-3 rounded-lg border border-steel/30 bg-mist px-3.5 py-3 text-sm text-ink"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={likely.includes(p.id)}
+                        onChange={() => toggleLikely(p.id)}
+                        className="h-5 w-5 accent-crimson"
+                      />
+                      {p.name}
+                    </label>
+                  ))}
+                </fieldset>
+              )}
+
+              <div className="space-y-1">
+                <label htmlFor="quality-notes" className="text-base font-semibold text-ink">
+                  Notes / Likely Reasons / Problems
+                </label>
+                <textarea
+                  id="quality-notes"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  rows={4}
+                  maxLength={2000}
+                  className="w-full rounded-lg border border-steel/40 bg-paper px-3 py-2 text-sm text-ink placeholder-steel focus:border-crimson focus:outline-none"
+                />
+              </div>
+
+              {error && <p className="text-sm text-crimson-dark">{error}</p>}
+
+              <div className="mt-auto grid grid-cols-2 gap-2 border-t border-steel/30 pt-4">
+                <button type="button" onClick={onClose} className={shopButtonPlain}>
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={submit}
+                  disabled={busy || (!passing && likely.length === 0)}
+                  className={`${shopButton} text-paper ${
+                    passing
+                      ? "bg-emerald-600 hover:bg-emerald-700"
+                      : "bg-crimson hover:bg-crimson-dark"
+                  }`}
+                >
+                  {busy ? "Saving…" : passing ? "Pass Part" : "Report Problem"}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * After a failed report: who finished the steps it likely went wrong at and when (every step
+ * before the check when the reporter was unsure), then where to send the part back to.
+ */
+function SendBack({
+  report,
+  history,
+  earlier,
+  checkName,
+  onDone,
+}: {
+  report: QualityReport;
+  history: QualitySuspect[];
+  earlier: { id: number; name: string }[];
+  checkName: string;
+  onDone: () => Promise<void>;
+}) {
+  const shown = report.suspects.length > 0 ? report.suspects : history;
+  const resolveName = useUserNames(shown.map((s) => s.completedBy));
+  // Start at the earliest step named, else the first step.
+  const first =
+    earlier.find((p) => report.suspects.some((s) => s.processId === p.id)) ?? earlier[0];
+  const [target, setTarget] = useState<number | null>(first?.id ?? null);
+  const [status, setStatus] = useState<"todo" | "doing">("todo");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function sendBack() {
+    if (target === null) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await sendBackFromReport(report.id, target, status);
+      await onDone();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "The part wasn't sent back.");
+      setBusy(false);
+    }
+  }
+
+  return (
+    <>
+      <div className="space-y-2">
+        <h2 className="text-base font-semibold text-ink">
+          {report.suspects.length > 0
+            ? "Where it likely went wrong"
+            : "You weren't sure where it went wrong. Every step before the check:"}
+        </h2>
+        {shown.length === 0 ? (
+          <p className="text-sm text-steel">This part had no steps before the check.</p>
+        ) : (
+          <ul className="space-y-1.5">
+            {shown.map((s) => (
+              <li
+                key={s.processId}
+                className="rounded-lg border border-steel/30 bg-mist px-3.5 py-2.5 text-sm"
+              >
+                <p className="font-semibold text-ink">{s.name}</p>
+                <p className="text-xs text-steel-dark">
+                  {s.completedAt
+                    ? `Finished ${when(s.completedAt)}${s.completedBy ? ` by ${resolveName(s.completedBy)}` : ""}`
+                    : "No finish recorded"}
+                </p>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {earlier.length > 0 ? (
+        <div className="space-y-3">
+          <h2 className="text-base font-semibold text-ink">Send the part back to</h2>
+          <select
+            aria-label="Step to send the part back to"
+            value={target ?? ""}
+            onChange={(e) => setTarget(Number(e.target.value) || null)}
+            className="w-full rounded-lg border border-steel/40 bg-paper px-3 py-2 text-sm text-ink focus:border-crimson focus:outline-none"
+          >
+            {earlier.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+          <div className="flex gap-4">
+            {(
+              [
+                ["todo", "To Do"],
+                ["doing", "In Progress"],
+              ] as const
+            ).map(([value, label]) => (
+              <label
+                key={value}
+                className="flex cursor-pointer items-center gap-2 text-sm text-ink"
+              >
+                <input
+                  type="radio"
+                  name="send-back-status"
+                  checked={status === value}
+                  onChange={() => setStatus(value)}
+                  className="accent-amber-500"
+                />
+                {label}
+              </label>
+            ))}
+          </div>
+          <p className="text-xs text-steel">
+            Every step after it, {checkName} included, is done again.
+          </p>
+        </div>
+      ) : null}
+
+      {error && <p className="text-sm text-crimson-dark">{error}</p>}
+
+      <div className="mt-auto grid grid-cols-1 gap-2 border-t border-steel/30 pt-4">
+        {earlier.length > 0 && (
+          <button
+            type="button"
+            onClick={sendBack}
+            disabled={busy || target === null}
+            className={`${shopButton} bg-amber-500 text-white hover:bg-amber-600`}
+          >
+            {busy ? "Sending…" : "↶ Send Back"}
+          </button>
+        )}
+        <button type="button" onClick={onDone} disabled={busy} className={shopButtonPlain}>
+          Leave it at {checkName} for now
+        </button>
+      </div>
+    </>
+  );
+}

@@ -37,7 +37,7 @@ We collect only what the apps need to work.
 | Attendance | When you signed in and out, and hours added by an admin | You and your team's admins |
 | Orders | Part requests, reasons, approvals, costs, budgets and vendors | Members and mentors |
 | Inventory | What the team owns, how many and where, and a history of who counted, moved, checked out or received each part | Members and mentors |
-| Shop | Parts, production steps, who did them, who made a part obsolete, who your team's shop managers are, drawings and files | Members, mentors and Onshape, if connected |
+| Shop | Parts, production steps, who did them, who made a part obsolete, who your team's shop managers are, quality reports (who made each, its notes, and who did the steps it questions), drawings and files | Members, mentors and Onshape, if connected |
 | Pit | Checklists, issues and battery records, and archives of the checklists with who archived each one and when | Members |
 | Skill Tree | Each member's progress on skills and who signed it off | Members and mentors |
 | Scouting | Match and pit observations, notes on other teams, robot photos, schedules; when engagement is enabled, point balances and awards, match picks and their results | Members and optional scouting activities |
