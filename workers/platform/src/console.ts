@@ -17,6 +17,7 @@ import { accounts, db, g3id, now } from "./lib";
 import { deliverToSlack } from "./notifications";
 import { DELETABLE, callHook } from "./registry";
 import type { AppEnv } from "./types";
+import { recentVisits } from "./visits";
 
 // The platform operators' console (roadmap 2.8), at /console on the platform worker; its page is
 // apps/platform's /console, opened at admin.<domain> (CONSOLE_HOSTS). Operators are G3ID accounts
@@ -422,6 +423,11 @@ export const consoleRouter = new Hono<AppEnv>()
       { teamId: team.id, reason },
     );
     return c.json({ ok: true });
+  })
+  // Visits to the landing page per day, the last `days` (30 by default, at most 366).
+  .get("/visits", async (c) => {
+    const days = Math.min(366, Math.max(1, Number(c.req.query("days")) || 30));
+    return c.json({ days, visits: await recentVisits(c.env, days) });
   })
   // Reports that a number was falsely registered, newest first, with the team holding it.
   .get("/reports", async (c) => {

@@ -146,3 +146,14 @@ export const teamNotificationSettings = sqliteTable(
   },
   (t) => [primaryKey({ columns: [t.teamId, t.type] })],
 );
+
+/**
+ * Visits to the public landing page per day (migration 0010): how many, and how many by someone
+ * signed in. Nothing about a visitor is kept. Operators read them in the console.
+ */
+export const landingVisits = sqliteTable("landing_visits", {
+  /** UTC day, "2026-10-16". */
+  day: text("day").primaryKey(),
+  visits: integer("visits").notNull().default(0),
+  signedIn: integer("signed_in").notNull().default(0),
+});

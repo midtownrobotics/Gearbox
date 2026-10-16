@@ -15,6 +15,7 @@ import { numberReports, teams } from "./db/schema";
 import { maybeResetDemo, resetDemo } from "./demo";
 import { db, g3id, now } from "./lib";
 import { clearSwitchedOff, enabledApps, logTeam, teamRouter } from "./team";
+import { countVisit } from "./visits";
 
 /** The hourly cron (wrangler.toml's triggers). */
 const HOURLY = "0 * * * *";
@@ -386,6 +387,11 @@ const routes = app
   })
   // Resets the public demo now (local dev, and operators by hand): the gateway never answers it.
   .post("/internal/demo/reset", async (c) => c.json({ failed: await resetDemo(c.env) }))
+  // A visit to the landing page (the page sends it once per tab session; src/visits.ts).
+  .post("/visits", async (c) => {
+    await countVisit(c.env, c.req.header("Cookie"));
+    return c.body(null, 204);
+  })
   .route("/console", consoleRouter)
   .route("/team", teamRouter);
 

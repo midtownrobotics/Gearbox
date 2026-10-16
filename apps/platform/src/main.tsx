@@ -10,6 +10,7 @@ import { ReportsPage } from "./console/reports-page";
 import { ConsoleShell } from "./console/shell";
 import { TeamPage } from "./console/team-page";
 import { TeamsPage } from "./console/teams-page";
+import { VisitsPage } from "./console/visits-page";
 import { HomePage } from "./home-page";
 import { ReportPage } from "./report-page";
 import { SignupPage } from "./signup-page";
@@ -29,6 +30,7 @@ createRoot(rootElement).render(
           <Route index element={<TeamsPage />} />
           <Route path="teams/:id" element={<TeamPage />} />
           <Route path="reports" element={<ReportsPage />} />
+          <Route path="visitors" element={<VisitsPage />} />
           <Route path="notifications" element={<NotificationsPage />} />
           <Route path="operators" element={<OperatorsPage />} />
           <Route path="log" element={<LogPage />} />
