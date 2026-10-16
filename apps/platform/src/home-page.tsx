@@ -164,10 +164,13 @@ export function HomePage() {
   );
 }
 
-/** "Try it as a student", "… a mentor", "… an admin": small buttons into the demo. */
+/** "Try the demo as: Student, Mentor, Admin": small buttons into the demo. */
 function DemoButtons({ dark = false }: { dark?: boolean }) {
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="flex flex-wrap items-center gap-2">
+      <span className={`text-sm font-semibold ${dark ? "text-[#ffffff]" : "text-secondary-900"}`}>
+        Try the demo as:
+      </span>
       {DEMO_ROLES.map((role) => (
         <a
           key={role}
@@ -178,7 +181,7 @@ function DemoButtons({ dark = false }: { dark?: boolean }) {
               : "border-line bg-surface text-secondary-900 hover:bg-inset"
           }`}
         >
-          Try it as {role === "admin" ? "an" : "a"} {role}
+          {role[0].toUpperCase() + role.slice(1)}
         </a>
       ))}
     </div>
@@ -209,21 +212,26 @@ function Hero() {
             Orders, shop tracking, pit checklists and scouting that all share one sign-in through
             your team's Slack. Free, open source, and built by an FRC team.
           </p>
-          <div className="flex flex-wrap items-center gap-3">
-            <Link
-              to="/signup"
-              className="rounded-lg bg-primary-600 px-6 py-3 font-semibold text-white shadow-sm transition-colors hover:bg-primary-500"
-            >
-              Sign up your team
-            </Link>
-            <MyTeamButton large />
-          </div>
-          <DemoButtons />
-          <div className="space-y-1 text-sm text-secondary-500">
-            <p>
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-3">
+              <Link
+                to="/signup"
+                className="rounded-lg bg-primary-600 px-6 py-3 font-semibold text-white shadow-sm transition-colors hover:bg-primary-500"
+              >
+                Sign up your team
+              </Link>
+              <MyTeamButton large />
+            </div>
+            <p className="text-sm text-secondary-500">
               Takes about two minutes. You'll need to be able to add an app to your team's Slack.
             </p>
-            <p>Tested by {site.team.name} through the 2026 offseason.</p>
+          </div>
+          <div className="space-y-2 border-t border-line pt-5">
+            <DemoButtons />
+            <p className="text-sm text-secondary-500">
+              A sample team with no account needed. Tested by {site.team.name} through the 2026
+              offseason.
+            </p>
           </div>
         </div>
         <LauncherMock />
@@ -234,12 +242,14 @@ function Hero() {
 
 /** A moment from each app, shown in turn on the launcher mock. */
 const MOMENTS: { app: string; label: string; text: string }[] = [
-  { app: "Orders", label: "Order approved", text: '4× 1/2" hex bearings' },
   { app: "Shop", label: "Part finished", text: "Intake side plate · 2 of 2 cut" },
+  { app: "Skill Tree", label: "Skill signed off", text: "CAD Basics · complete" },
+  { app: "Orders", label: "Order approved", text: '4× 1/2" hex bearings' },
+  { app: "Inventory", label: "Delivery put away", text: "Hex bearings · Shelf A2" },
+  { app: "Attendance", label: "Checked in", text: "18 members at tonight's meeting" },
   { app: "Pit", label: "Battery ready", text: "Battery 7 charged for Q42" },
   { app: "Scouting", label: "Pick list updated", text: "Team 9999 moved to the top tier" },
   { app: "Schedule", label: "Shift reminder", text: "Pit crew shift starts in 15 min" },
-  { app: "Skill Tree", label: "Skill signed off", text: "CAD Basics · complete" },
 ];
 
 const LAUNCHER_APPS = MOMENTS.map((moment) => APPS.find((app) => app.name === moment.app) as App);
@@ -278,7 +288,7 @@ function LauncherMock() {
             <FaSlack /> Signed in
           </span>
         </div>
-        <div className="grid grid-cols-3 gap-x-3 gap-y-5">
+        <div className="grid grid-cols-4 gap-x-2 gap-y-5">
           {LAUNCHER_APPS.map((tile, i) => {
             const active = i === index;
             return (
@@ -422,7 +432,9 @@ function Demo() {
     <section id="demo" className="scroll-mt-16 border-t border-line">
       <div className="mx-auto flex max-w-6xl flex-col gap-6 px-5 py-14 md:flex-row md:items-center md:justify-between">
         <div>
-          <p className="text-sm font-semibold uppercase tracking-widest text-primary-500">Try it</p>
+          <p className="text-sm font-semibold uppercase tracking-widest text-primary-500">
+            Try the demo
+          </p>
           <p className="mt-2 text-xl font-semibold text-secondary-900">
             A whole team mid-season, no account needed. Resets nightly.
           </p>
