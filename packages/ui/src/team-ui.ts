@@ -10,6 +10,7 @@ import {
   teamUiDefaults,
 } from "@g3/site-config";
 import { useEffect, useState, useSyncExternalStore } from "react";
+import { sharedCookieAttributes } from "./shared-cookie";
 import { applyTabIcons, iconDataUrl, isIconAccent, loadIconSvg, recolorIcon } from "./team-icon";
 import { setDefaultTheme, syncThemeColor } from "./theme";
 
@@ -18,6 +19,8 @@ import { setDefaultTheme, syncThemeColor } from "./theme";
 const initial = teamUiDefaults(pageTeamId);
 let current: TeamUiSettings = initial;
 let loadedAt = 0;
+// The saved-appearance stamp this page loaded with (see changedStamp).
+let loadedStamp: string | undefined;
 let pending: Promise<void> | null = null;
 let originalTitle: string | null = null;
 const listeners = new Set<() => void>();
@@ -138,20 +141,35 @@ function applySettings() {
   document.title = `${current.shortName} ${originalTitle}`;
 }
 
-/** Refreshes the public settings after a save or after a minute away from this tab. */
+// A save on the Appearance page stamps a cookie every app on the domain reads, so the other apps
+// (each on its own address, with its own cached copy) load the new appearance the next time they're
+// shown, instead of up to a minute later. The stamp also goes in the address, past the browser's cache.
+const STAMP_COOKIE = "g3_team_ui";
+const changedStamp = () => document.cookie.match(/(?:^|;\s*)g3_team_ui=([a-z0-9]+)/)?.[1];
+
+/**
+ * Refreshes the public settings after a minute away from this tab, or at once after a save
+ * (`force`), which every other open app then picks up too.
+ */
 export function refreshTeamUiSettings(force = false): Promise<void> {
   if (pending) return force ? pending.then(() => refreshTeamUiSettings(true)) : pending;
+  if (force) {
+    document.cookie = `${STAMP_COOKIE}=${Date.now().toString(36)}; ${sharedCookieAttributes(86400)}`;
+  }
+  const stamp = changedStamp();
   const local = ["localhost", "127.0.0.1"].includes(window.location.hostname);
   // In production, G3ID's API on the page's own address, which the gateway answers for the page's
   // team (so each team gets its own appearance).
   const endpoint =
     import.meta.env.VITE_G3ID_API_URL ?? (local ? "http://localhost:8787" : apiPath("id"));
-  pending = fetch(`${endpoint}/team/ui`, { cache: force ? "no-store" : "default" })
+  const query = stamp ? `?v=${stamp}` : "";
+  pending = fetch(`${endpoint}/team/ui${query}`, { cache: force ? "no-store" : "default" })
     .then(async (response) => {
       if (!response.ok) return;
       const data = (await response.json()) as TeamUiSettings;
       current = data;
       loadedAt = Date.now();
+      loadedStamp = stamp;
       setDefaultTheme(current.defaultTheme);
       applySettings();
       notify();
@@ -181,8 +199,9 @@ export function useTeamUiSettings(team = true): TeamUiSettings {
     // The platform's own pages belong to no team: built-in colors, nothing loaded.
     if (!team) return;
     const refresh = () => {
-      if (Date.now() - loadedAt > 60_000) void refreshTeamUiSettings();
-      else applySettings();
+      if (Date.now() - loadedAt > 60_000 || changedStamp() !== loadedStamp) {
+        void refreshTeamUiSettings();
+      } else applySettings();
     };
     refresh();
     window.addEventListener("focus", refresh);
