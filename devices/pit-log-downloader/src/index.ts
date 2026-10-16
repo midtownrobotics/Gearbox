@@ -13,6 +13,7 @@ import {
   UploadRefused,
   checkGearbox,
   currentPairing,
+  deleteFromGearbox,
   gearboxStatus,
   pairWithGearbox,
   teamAppearance,
@@ -542,9 +543,9 @@ async function trimView(log: Log): Promise<TrimView> {
   };
 }
 
-// Deletes a log from this computer. One already uploaded stays in Pit, and it isn't copied off the
-// robot again.
-app.delete("/api/logs/:id", (req, res) => {
+// Deletes a log from this computer, and from Gearbox too with { alsoFromGearbox: true } (first, so
+// nothing is deleted here when Gearbox can't be reached). It isn't copied off the robot again.
+app.delete("/api/logs/:id", async (req, res) => {
   const log = logs.find((l) => l.id === req.params.id && !l.deleted);
   if (!log) {
     res.status(404).json({ error: "That log isn't on this computer." });
@@ -553,6 +554,17 @@ app.delete("/api/logs/:id", (req, res) => {
   if (uploadingId === log.id) {
     res.status(409).json({ error: "It's uploading now. Try again in a moment." });
     return;
+  }
+  if (req.body?.alsoFromGearbox === true) {
+    try {
+      await deleteFromGearbox(log.match.event, log.name);
+    } catch (err) {
+      res.status(502).json({
+        error: `${err instanceof Error ? err.message : err} Nothing was deleted.`,
+      });
+      return;
+    }
+    logWithTimestamp(`Deleted ${log.name} from Gearbox.`);
   }
   fs.rmSync(localPathOf(log), { force: true });
   log.deleted = true;

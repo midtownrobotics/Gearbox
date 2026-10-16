@@ -55,8 +55,8 @@ log's data over time with the robot's enabled time shaded, and **Suggested trim*
 little before the robot was first enabled to a little after it was last disabled. Only what's
 uploaded is trimmed: the whole log stays on this computer. Any log can be trimmed.
 
-**Delete** removes a log from this computer. It stays in Pit if it was uploaded, and it isn't
-copied off the robot again.
+**Delete** removes a log from this computer, and it isn't copied off the robot again. For a log
+already in Pit, it can delete it from Gearbox too.
 
 ## Settings
 

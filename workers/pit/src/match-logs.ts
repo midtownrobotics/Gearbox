@@ -286,6 +286,24 @@ export const logUploadRoutes = new Hono<AppEnv>()
     return c.json({ id, exists: false, partSize: PART_SIZE }, 201);
   })
 
+  // Deleting a log from Pit from the pit computer (its status page), by event and name. The paired
+  // downloader is trusted with its team's logs; Pit's own pages leave deleting to admins.
+  .delete("/:event/:name", requireDownloader, async (c) => {
+    const event = c.req.param("event");
+    const name = c.req.param("name");
+    if (!EVENT.test(event) || !NAME.test(name)) return c.json({ error: "No such log." }, 400);
+    const db = createDb(c.env.PIT_DB);
+    const teamId = c.get("teamId");
+    const log = await db
+      .select({ id: matchLogs.id })
+      .from(matchLogs)
+      .where(inTeam(matchLogs, teamId, eq(matchLogs.event, event), eq(matchLogs.name, name)))
+      .get();
+    // Already gone counts as done.
+    if (log) await deleteLogs(db, c.env.LOGS, teamId, [log.id]);
+    return c.json({ ok: true });
+  })
+
   // One part: PART_SIZE bytes, or what's left for the last.
   .put("/:id/parts/:part", requireDownloader, async (c) => {
     const id = parseId(c.req.param("id"));
