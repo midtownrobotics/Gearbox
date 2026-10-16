@@ -44,6 +44,7 @@ We collect only what the apps need to work.
 | Scouting | Match and pit observations, notes on other teams, robot photos, schedules; when engagement is enabled, point balances and awards, match picks and their results | Members and optional scouting activities |
 | Uploaded files | Whatever your team uploads | Members |
 | Technical logs | Internet address, browser type, the page requested and the time | Recorded automatically by our hosting provider |
+| Visits to our public page | How many visits frcgearbox.com's home page had each day, and how many of them were by someone signed in. Only these daily totals: nothing that identifies a visitor | Counted when the page opens |
 | Team record | Team name, FRC team number, country, branding, which apps are on, and acceptance of our terms | The team owner |
 
 We do not ask for, and teams should not enter, home addresses, government identifiers, health information or payment card details.
@@ -114,6 +115,7 @@ Where the law of your team's country requires a legal basis for that transfer, t
 | Data of an app your team switches off | 90 days, in case your team switches it back on, then deleted |
 | Records that name a removed member, such as past orders | Kept by the team, with the member's name replaced by a placeholder |
 | Operator access log | 12 months |
+| Daily visit totals for our public page | Kept; they are totals and identify no one |
 | Technical logs | [Period set with our hosting provider] |
 | Backups | [Period], after which deleted information is gone from backups too |
 | The public demo | Erased every night at midnight US Eastern time |
@@ -148,7 +150,7 @@ No system is perfectly secure. If we learn that your team's information has been
 
 ## 12. Cookies and device storage
 
-Gearbox uses one cookie, which keeps you signed in. On shared shop devices it also stores a kiosk token in the browser. We use no advertising or analytics cookies and no third-party trackers.
+Gearbox uses one cookie, which keeps you signed in. On shared shop devices it also stores a kiosk token in the browser. We use no advertising or analytics cookies and no third-party trackers. Our public home page notes in your browser's session storage that it has counted your visit, so reloading it isn't counted again; the note is gone when you close the tab.
 
 ## 13. Apps built by teams
 

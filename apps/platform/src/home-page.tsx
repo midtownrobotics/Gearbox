@@ -11,6 +11,7 @@ import {
   FaUserShield,
 } from "react-icons/fa";
 import { Link } from "react-router-dom";
+import { api } from "./api";
 import attendanceIcon from "./assets/app-icons/attendance.svg";
 import edgeIcon from "./assets/app-icons/edge.svg";
 import inventoryIcon from "./assets/app-icons/inventory.svg";
@@ -150,7 +151,24 @@ const STEPS = [
   },
 ];
 
+/**
+ * Counts this visit for the operators' console, once per browser tab session (a note in session
+ * storage, so reloading doesn't count again). Nothing about the visitor is sent or kept.
+ */
+function useCountVisit() {
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem("g3_visit_counted")) return;
+      sessionStorage.setItem("g3_visit_counted", "1");
+    } catch {
+      // Storage refused (a private window): count it anyway.
+    }
+    void api.visits.$post().catch(() => {});
+  }, []);
+}
+
 export function HomePage() {
+  useCountVisit();
   return (
     <Page banner={<BetaBar />}>
       <Hero />
