@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { type EngagementSettings, defaultEngagementSettings } from "../src/engagement";
 import worker from "../src/index";
 import type { AppEnv } from "../src/types";
+import { seedManualMatch } from "./manual-match";
 
 const bindings = env as unknown as AppEnv["Bindings"];
 const db = bindings.SCOUTING_DB;
@@ -230,6 +231,8 @@ describe("optional engagement", () => {
         .bind(teamKey, eventKey, match, student.id, Date.now())
         .run();
       const body = new FormData();
+      body.set("matchKey", await seedManualMatch(db, teamKey, eventKey, match, admin.id));
+      body.set("teamName", "9999");
       body.set("answers", JSON.stringify({ auto: 5 }));
       return callAs(student, `/scouting/scouting-forms/${id}/submissions`, {
         method: "POST",

@@ -4,6 +4,7 @@ import { admin, kioskAdmin, otherStudent, student } from "@g3/testing/users";
 import { call, callAs, jsonAs } from "@g3/testing/worker";
 import { describe, expect, it } from "vitest";
 import type { AppEnv } from "../src/types";
+import { seedManualMatch } from "./manual-match";
 
 // Scouting, served under /scouting. Strategy leads (G3ID admins, or people a G3ID
 // admin made a lead) manage forms; anyone signed in scouts and keeps tier lists.
@@ -125,6 +126,8 @@ describe("number answers", () => {
       .bind(teamKey, eventKey, student.id, Date.now())
       .run();
     const body = new FormData();
+    body.set("matchKey", await seedManualMatch(db, teamKey, eventKey, 1, admin.id));
+    body.set("teamName", "9999");
     body.set("answers", JSON.stringify(answers));
     const response = await callAs(student, `/scouting/scouting-forms/${id}/submissions`, {
       method: "POST",
@@ -269,9 +272,9 @@ describe("scouting window", () => {
     expect(await windowOf()).toEqual({ seconds: 120 });
   });
 
-  it("keeps the window out of what a scout can read", async () => {
+  it("lets scouts read the submission window for their deadline warning", async () => {
     expect(await jsonAs(otherStudent, "/scouting/event-context")).toMatchObject({
-      submissionWindowSeconds: null,
+      submissionWindowSeconds: 120,
     });
   });
 });

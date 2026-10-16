@@ -104,6 +104,7 @@ The apps are being brought into one design language. The plan of record is `docs
 
 ### Optional Scouting engagement
 
+- Match scouting forms require multipart `matchKey` and assigned `teamName`. `/event-context?assign=true` exposes `submissionClosesAt` and `serverNow` in milliseconds, plus public `submissionWindowSeconds`, for the deadline warning. The cutoff and automatic advance share `matchSubmissionClosesAt`; expired final matches stop assigning teams. The UI clears the entire draft on expiry or match/team changes; the worker rejects stale snapshots and revalidates after drawing uploads, cleaning up rejected files. Manual schedules reset when the lead changes the match or assignment; pit scouting has no match deadline. See [deadline validation](docs/roadmap/scouting-form-deadlines.md).
 - Scouting credentials use `teamApiKey` (`workers/scouting/src/api-keys.ts`): saved keys belong to their authenticated team; legacy deployment keys are available only to the original site team. Never return the keys in browser responses or exports.
 - Scouting points and match predictions are off by default. Identity admins configure them on Scouting's Admin page; Strategy leads and kiosk PIN sessions cannot change these controls.
 - `workers/scouting/src/engagement.ts` reads team-keyed D1 settings. `/scouting/me` includes the settings; `/scouting/engagement-settings` reads them and accepts admin-only PUT updates. Predictions, combined picks and team standings have separate switches, and the points label defaults to "Scout Points".

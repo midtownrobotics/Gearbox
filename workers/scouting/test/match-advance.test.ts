@@ -32,7 +32,9 @@ function matches(endedAt: number): TbaMatch[] {
   }));
 }
 type EventContext = {
-  currentMatch: { matchNumber: number } | null;
+  currentMatch: { key: string; matchNumber: number } | null;
+  assignedTeam: string | null;
+  submissionClosesAt: number | null;
   submissionWindowSeconds: number | null;
 };
 type Settings = { values: { submissionWindowSeconds: number } };
@@ -101,7 +103,7 @@ describe("automatic match advancing", () => {
       body: { eventKey: a.eventKey, currentMatchNumber: 1, submissionWindowSeconds: 60 },
     });
     expect(await jsonAs<EventContext>(a.student, "/scouting/event-context")).toMatchObject({
-      submissionWindowSeconds: null,
+      submissionWindowSeconds: 60,
       currentMatch: { matchNumber: 2 },
     });
     expect(await jsonAs<EventContext>(b.admin, "/scouting/event-context")).toMatchObject({
@@ -165,11 +167,11 @@ describe("automatic match advancing", () => {
       },
       201,
     );
-    expect(
-      (await jsonAs<EventContext>(team.student, "/scouting/event-context?assign=true")).currentMatch
-        ?.matchNumber,
-    ).toBe(1);
+    const context = await jsonAs<EventContext>(team.student, "/scouting/event-context?assign=true");
+    expect(context.currentMatch?.matchNumber).toBe(1);
     const body = new FormData();
+    body.set("matchKey", context.currentMatch?.key ?? "");
+    body.set("teamName", context.assignedTeam ?? "");
     body.set("answers", JSON.stringify({ auto: 5 }));
     expect(
       (

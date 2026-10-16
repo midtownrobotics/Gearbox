@@ -11,11 +11,22 @@ export default workerTestConfig({
   },
   outbound: async (request) => {
     const url = new URL(request.url);
-    if (url.hostname === "www.thebluealliance.com" && url.pathname.endsWith("/2099qagrits"))
-      return Response.json({
-        name: "Georgia Robotics Invitational Tournament",
-        short_name: "GRITS",
-      });
+    if (url.hostname === "www.thebluealliance.com") {
+      const events: Record<string, { name: string; short_name: string | null }> = {
+        "/api/v3/event/2099qagrits": {
+          name: "Georgia Robotics Invitational Tournament",
+          short_name: "GRITS",
+        },
+        "/api/v3/event/2099qashort": {
+          name: "Test STING Offseason Event",
+          short_name: "Test STING",
+        },
+        "/api/v3/event/2099qafull": { name: "Test Championship", short_name: null },
+        "/api/v3/event/2099qacache": { name: "Cached Test Event", short_name: "Cached Test" },
+      };
+      if (events[url.pathname]) return Response.json(events[url.pathname]);
+      return new Response("Unavailable", { status: 503 });
+    }
     if (url.hostname !== "api.statbotics.io") return new Response("Not mocked", { status: 503 });
     const event = url.searchParams.get("event") || "";
     const calls = (statboticsCalls.get(event) || 0) + 1;

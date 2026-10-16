@@ -20,6 +20,19 @@ export function matchOrder(match: TbaMatch) {
   return level * 100_000 + match.set_number * 1_000 + match.match_number;
 }
 
+export function matchSubmissionClosesAt(
+  match: TbaMatch | undefined,
+  windowSeconds = DEFAULT_SUBMISSION_WINDOW,
+) {
+  if (!match) return null;
+  const hasResult = match.alliances.red.score >= 0 && match.alliances.blue.score >= 0;
+  const endedAt =
+    match.post_result_time ??
+    (match.actual_time ? match.actual_time + 150 : null) ??
+    (hasResult ? (match.predicted_time ?? match.time ?? 0) + 150 : null);
+  return endedAt ? (endedAt + windowSeconds) * 1000 : null;
+}
+
 export function automaticTbaMatch(
   matches: TbaMatch[],
   windowSeconds = DEFAULT_SUBMISSION_WINDOW,
@@ -34,12 +47,8 @@ export function automaticTbaMatch(
   if (!ordered.length) return undefined;
   for (let index = 0; index < ordered.length - 1; index += 1) {
     const match = ordered[index];
-    const hasResult = match.alliances.red.score >= 0 && match.alliances.blue.score >= 0;
-    const endedAt =
-      match.post_result_time ??
-      (match.actual_time ? match.actual_time + 150 : null) ??
-      (hasResult ? (match.predicted_time ?? match.time ?? 0) + 150 : null);
-    if (!endedAt || now < endedAt + windowSeconds) return match;
+    const closesAt = matchSubmissionClosesAt(match, windowSeconds);
+    if (closesAt === null || now * 1000 < closesAt) return match;
   }
   return ordered.at(-1);
 }

@@ -1,10 +1,11 @@
 import { inTeam, requestTeamId, withTeam } from "@g3/auth";
 import { corsOrigin } from "@g3/site-config";
 import { withApiPrefix } from "@g3/site-config/worker";
-import { sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { type Context, Hono } from "hono";
 import { cors } from "hono/cors";
 import packageJson from "../package.json";
+import { analysisEventNames } from "./analysis-events";
 import { teamApiKey } from "./api-keys";
 import { all, batch, dbOf, first } from "./db";
 import { adoptLegacyRows, seedTeam } from "./db/bootstrap";
@@ -40,6 +41,7 @@ import {
   MIN_SUBMISSION_WINDOW,
   automaticTbaMatch,
   matchOrder,
+  matchSubmissionClosesAt,
   submissionWindow,
 } from "./match-advance";
 import { requireAuth } from "./middleware/auth";
@@ -389,7 +391,8 @@ async function resolveEventLink(c: Context<AppEnv>) {
     dbOf(c),
     sql`SELECT event_key, current_match_number, tba_auth_key, schedule_mode, submission_window_seconds FROM (SELECT * FROM ${strategyEventConfig} WHERE ${inTeam(strategyEventConfig, c.get("teamId"))}) AS scoped_strategy_event_config WHERE id = 1`,
   );
-  if (!config?.event_key) return { eventKey: null, matchKey: null, matchNumber: null };
+  if (!config?.event_key)
+    return { eventKey: null, matchKey: null, matchNumber: null, submissionClosesAt: null };
   let current: TbaMatch | undefined;
   try {
     const matches = (await getEventMatches(c, config.event_key)).sort(
@@ -411,6 +414,13 @@ async function resolveEventLink(c: Context<AppEnv>) {
     eventKey: config.event_key,
     matchKey: current?.key ?? null,
     matchNumber: current?.match_number ?? config.current_match_number,
+    submissionClosesAt:
+      config.schedule_mode === "manual"
+        ? null
+        : matchSubmissionClosesAt(
+            current,
+            config.submission_window_seconds ?? DEFAULT_SUBMISSION_WINDOW,
+          ),
   };
 }
 
@@ -500,8 +510,14 @@ app.get("/event-context", requireAuth, async (c) => {
     activeScoutIds.push(c.get("userId"));
     activeScoutIds.sort();
   }
+  const submissionClosesAt =
+    config?.schedule_mode === "manual" ? null : matchSubmissionClosesAt(current, windowSeconds);
   const assignedTeam =
-    c.req.query("assign") === "true" && current && eventKey && currentMatchNumber
+    c.req.query("assign") === "true" &&
+    current &&
+    eventKey &&
+    currentMatchNumber &&
+    (submissionClosesAt === null || Date.now() < submissionClosesAt)
       ? await getOrCreateScoutAssignment(
           c,
           eventKey,
@@ -533,7 +549,9 @@ app.get("/event-context", requireAuth, async (c) => {
       : false,
     nexusApiKey: "",
     scheduleMode: admin ? config?.schedule_mode || "tba" : config?.schedule_mode || "tba",
-    submissionWindowSeconds: admin ? windowSeconds : null,
+    submissionWindowSeconds: windowSeconds,
+    submissionClosesAt,
+    serverNow: Date.now(),
     // Compatibility for a page loaded before the seconds-based editor was deployed.
     autoAdvanceDelayMinutes: admin ? windowSeconds / 60 : null,
     manualEvent:
@@ -889,6 +907,18 @@ app.post("/scouting-forms/:id/submissions", requireAuth, async (c) => {
     if (!fields.length) return c.json({ error: "This scouting form has no fields." }, 409);
     if (!eventLink.eventKey || !eventLink.matchNumber)
       return c.json({ error: "No current match is configured." }, 409);
+    if (!eventLink.matchKey)
+      return c.json(
+        { error: "Could not verify the current match. Refresh the form and try again." },
+        409,
+      );
+    if (eventLink.submissionClosesAt !== null && Date.now() >= eventLink.submissionClosesAt)
+      return c.json(
+        { error: "Time expired for this match. Refresh the form for the next match." },
+        409,
+      );
+    if (text(form.get("matchKey"), 200) !== eventLink.matchKey)
+      return c.json({ error: "The match changed. Refresh the form before submitting." }, 409);
     const existing = await first<Record<string, unknown>>(
       dbOf(c),
       sql`SELECT s.id
@@ -906,6 +936,11 @@ app.post("/scouting-forms/:id/submissions", requireAuth, async (c) => {
     );
     if (!assignment)
       return c.json({ error: "No team is assigned. Refresh the form and try again." }, 409);
+    if (teamName !== assignment.team_number)
+      return c.json(
+        { error: "Your assigned team changed. Refresh the form before submitting." },
+        409,
+      );
     teamName = assignment.team_number;
   }
   if (!teamName) return c.json({ error: "A valid team number is required." }, 400);
@@ -976,6 +1011,37 @@ app.post("/scouting-forms/:id/submissions", requireAuth, async (c) => {
     drawingFields[field.id] = { key, contentType: fieldDrawing.type };
   }
   const submittedAt = Date.now();
+  if (formDefinition.form_kind === "scouting") {
+    const latest = await resolveEventLink(c);
+    const latestAssignment = await dbOf(c)
+      .select({ teamNumber: scoutingMatchAssignments.team_number })
+      .from(scoutingMatchAssignments)
+      .where(
+        and(
+          inTeam(scoutingMatchAssignments, c.get("teamId")),
+          eq(scoutingMatchAssignments.event_key, eventLink.eventKey as string),
+          eq(scoutingMatchAssignments.match_number, eventLink.matchNumber as number),
+          eq(scoutingMatchAssignments.user_id, c.get("userId")),
+        ),
+      )
+      .get();
+    if (
+      latestAssignment?.teamNumber !== teamName ||
+      latest.matchKey !== eventLink.matchKey ||
+      latest.eventKey !== eventLink.eventKey ||
+      (latest.submissionClosesAt !== null && Date.now() >= latest.submissionClosesAt)
+    ) {
+      const keys = [
+        drawingKey,
+        ...Object.values(drawingFields).map((drawing) => drawing.key),
+      ].filter((key): key is string => Boolean(key));
+      if (keys.length) await c.env.FIELD_MAPS.delete(keys);
+      return c.json(
+        { error: "The match changed or time expired. Refresh the form before submitting." },
+        409,
+      );
+    }
+  }
   const submissionStatement = dbOf(c)
     .insert(scoutingFormSubmissions)
     .values(
@@ -1320,6 +1386,10 @@ app.get("/analysis", requireAuth, async (c) => {
     ),
   ]);
   let teamMatches: Record<string, unknown>[] = [];
+  const eventNames = await analysisEventNames(c, [
+    ...rows.results.map((row) => String(row.event_key || "")),
+    ...teamComments.results.map((row) => String(row.event_key || "")),
+  ]);
   if (team && eventConfig?.event_key) {
     try {
       const matches = (await getEventMatches(c, eventConfig.event_key)).sort(
@@ -1375,6 +1445,7 @@ app.get("/analysis", requireAuth, async (c) => {
     })),
     teamComments: teamComments.results,
     teamMatches,
+    eventNames,
   });
 });
 
