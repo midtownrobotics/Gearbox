@@ -20,6 +20,17 @@ export const manifest = defineManifest({
       editedBy: "admin",
       page: "/admin",
     },
+    {
+      key: "submissionWindowSeconds",
+      label: "Auto-advance delay",
+      type: "number",
+      default: 120,
+      min: 0,
+      max: 1800,
+      help: "seconds",
+      editedBy: "admin",
+      page: "/admin",
+    },
   ],
   // Engagement (engagement.ts): each switched on and off on Scouting's Admin page.
   plugins: [
