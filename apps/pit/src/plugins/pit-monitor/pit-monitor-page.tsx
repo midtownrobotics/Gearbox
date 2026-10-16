@@ -555,6 +555,8 @@ export function PitMonitorPage() {
   const [monitor, setMonitor] = useState<MonitorData | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [loading, setLoading] = useState(true);
+  // The team's stream link (Admin), shown when it has one.
+  const [iframeUrl, setIframeUrl] = useState<string | null>(null);
   // The newest match logs, while the team has a paired log downloader; null hides the box.
   const [recentLogs, setRecentLogs] = useState<MatchLog[] | null>(null);
 
@@ -600,9 +602,17 @@ export function PitMonitorPage() {
     setLoading(false);
   }
 
+  async function loadSettings() {
+    const response = await api.monitor.settings.$get();
+    if (!response.ok) return;
+    const settings = (await response.json()) as { iframeUrl?: string };
+    setIframeUrl(settings.iframeUrl || null);
+  }
+
   // biome-ignore lint/correctness/useExhaustiveDependencies: loadAll is stable
   useEffect(() => {
     void loadAll();
+    void loadSettings().catch(() => {});
     let requestInFlight = false;
     const refresh = async () => {
       if (document.visibilityState !== "visible" || requestInFlight) return;
@@ -668,8 +678,25 @@ export function PitMonitorPage() {
             {hasNexus && nexus && <UpcomingMatchesSection nexus={nexus} teamNumber={teamNumber} />}
           </div>
 
-          {/* Right: recent logs + batteries + checklist + issues */}
+          {/* Right: the stream (when set) + recent logs + batteries + checklist + issues */}
           <div className="space-y-5">
+            {iframeUrl && (
+              <div className="space-y-2">
+                <h2 className="text-xs font-bold uppercase tracking-widest text-secondary-600">
+                  Monitor Feed
+                </h2>
+                <div className="bg-surface border border-secondary-200 rounded-xl overflow-hidden">
+                  <iframe
+                    src={iframeUrl}
+                    title="Custom monitor feed"
+                    className="w-full"
+                    style={{ height: "500px" }}
+                    frameBorder="0"
+                    allowFullScreen
+                  />
+                </div>
+              </div>
+            )}
             {recentLogs && <RecentLogsSection logs={recentLogs} />}
             <BatteriesSection batteries={batteries} />
             <ChecklistSection lists={lists} issues={issues} />
