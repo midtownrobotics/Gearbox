@@ -77,6 +77,8 @@ const APPS: App[] = [
       checklistIssues: "checklist_issues",
       checklistArchives: "checklist_archives",
       batteries: "batteries",
+      logDownloaders: "log_downloaders",
+      logDownloaderCodes: "log_downloader_codes",
     },
   },
   {

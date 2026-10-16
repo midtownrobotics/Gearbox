@@ -2,6 +2,7 @@
 // folder, so the downloader finds its files whichever folder it's started from.
 
 import { isAbsolute, join, resolve } from "node:path";
+import { teamAppUrlVia } from "@g3/site-config";
 
 const packageDir = join(import.meta.dirname, "..");
 const fromPackage = (path: string) => (isAbsolute(path) ? path : resolve(packageDir, path));
@@ -22,6 +23,13 @@ if (!Number.isInteger(teamNumber) || teamNumber < 1 || teamNumber > 99999) {
 const port = Number(setting("PORT") ?? 3000);
 if (!Number.isInteger(port) || port < 1 || port > 65535) fail("PORT must be a port number.");
 
+const pitUrl = (setting("PIT_URL") ?? teamAppUrlVia(undefined, `frc${teamNumber}`, "pit")).replace(
+  /\/+$/,
+  "",
+);
+if (!/^https?:\/\/[^/]+/.test(pitUrl))
+  fail("PIT_URL must be an address like https://1648-pit.frcgearbox.com.");
+
 /** The robot network's first three parts, as in WPILib's IP configurations: 10.TE.AM. */
 const robotNetworkBaseIp = `10.${Math.floor(teamNumber / 100)}.${teamNumber % 100}`;
 
@@ -31,6 +39,8 @@ export const config = {
   rioIp: `${robotNetworkBaseIp}.2`,
   /** Null when logs stay on this computer only. */
   driveFolderId: setting("DRIVE_FOLDER_ID") ?? null,
+  /** The team's Pit on Gearbox, which the downloader pairs with. */
+  pitUrl,
   googleKeyFile: fromPackage(setting("GOOGLE_KEY_FILE") ?? "service-account-key.json"),
   dataDir: fromPackage(setting("DATA_DIR") ?? "data"),
   port,

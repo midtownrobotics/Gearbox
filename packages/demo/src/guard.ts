@@ -37,6 +37,7 @@ export const DEMO_BLOCKED: readonly Blocked[] = [
   { app: "platform", method: "PUT", path: /^\/team\/notification-settings/ },
   // Integrations: keys, webhooks and boxes stay unconnected.
   { app: "edge", method: "POST", path: /^\/box\/key/ },
+  { app: "pit", method: "POST", path: /^\/downloaders\/(codes|pair)/ },
   { app: "edge", method: "*", path: /^\/switch\// },
   { app: "edge", method: "*", path: /^\/print\// },
   { app: "shop", method: "POST", path: /^\/admin\/(onshape|slack)\// },

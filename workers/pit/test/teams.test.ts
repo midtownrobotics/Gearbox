@@ -81,12 +81,27 @@ async function seed(team: TeamUsers): Promise<Seeded> {
     { method: "POST", body: { type: "match", details: `Qual ${tag}` } },
     201,
   );
+  // A paired log downloader, as the downloader pairs: on the team's address, with no session.
+  const { code } = await jsonAs<{ code: string }>(
+    team.mentor,
+    "/downloaders/codes",
+    { method: "POST" },
+    201,
+  );
+  const paired = (await (
+    await call("/downloaders/pair", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Team-Id": team.teamId },
+      body: JSON.stringify({ code, name: `Downloader ${tag}` }),
+    })
+  ).json()) as { id: number };
   return {
     params: (path, name) => {
       if (name === "itemId") return String(item.id);
       if (name === "issueId") return String(issue.id);
       if (name === "id") {
         if (path.startsWith("/batteries")) return String(battery.id);
+        if (path.startsWith("/downloaders")) return String(paired.id);
         return String(path.startsWith("/archives") ? archive.id : list.id);
       }
       return undefined;
@@ -104,6 +119,7 @@ async function snapshot(teamId: string) {
     "checklist_issues",
     "checklist_archives",
     "batteries",
+    "log_downloaders",
   ]) {
     out[table] = (
       await database
@@ -118,10 +134,16 @@ async function snapshot(teamId: string) {
       .bind(teamId)
       .all()
   ).results;
+  out.log_downloader_codes = (
+    await database
+      .prepare("SELECT * FROM log_downloader_codes WHERE team_id = ? ORDER BY code")
+      .bind(teamId)
+      .all()
+  ).results;
   return out;
 }
 
-it("keeps every team's checklists, archives, batteries and settings to itself", async () => {
+it("keeps every team's checklists, archives, batteries, settings and log downloaders to itself", async () => {
   const { problems, requests } = await checkIsolation({
     app,
     seed,
@@ -142,6 +164,7 @@ it("keeps every team's checklists, archives, batteries and settings to itself", 
       "PATCH /batteries/:id/state": { state: "Broken" },
       "PATCH /batteries/:id/voltage": { voltage: 1 },
       "PATCH /admin/settings": { eventKey: "2026mine" },
+      "POST /downloaders/pair": { code: "123456", name: "Mine now" },
     }),
   });
   expect(problems).toEqual([]);

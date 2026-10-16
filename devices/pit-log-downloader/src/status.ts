@@ -25,8 +25,25 @@ export type LogStatus = {
   driveUrl: string | null;
 };
 
+/** Pairing with the team's Pit on Gearbox (src/gearbox.ts). */
+export type GearboxStatus = {
+  /** The Pit it pairs with. */
+  pitUrl: string;
+  /** Null until it's paired. */
+  paired: { name: string; pairedAt: number } | null;
+  /**
+   * The last check of its key: "ok", "unreachable" (no internet, or Gearbox didn't answer),
+   * "removed" (Pit no longer knows it, so it unpaired), or null before any check.
+   */
+  connection: "ok" | "unreachable" | "removed" | null;
+  checkedAt: number | null;
+  /** The name it pairs under unless one is given: this computer's. */
+  defaultName: string;
+};
+
 export type Status = {
   version: string;
+  gearbox: GearboxStatus;
   connection: {
     robot: boolean;
     internet: boolean;

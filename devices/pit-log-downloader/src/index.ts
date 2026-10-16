@@ -7,6 +7,13 @@ import { type drive_v3, google } from "googleapis";
 import isOnline from "is-online";
 import { NodeSSH } from "node-ssh";
 import { config } from "./config.ts";
+import {
+  PairingError,
+  checkGearbox,
+  gearboxStatus,
+  pairWithGearbox,
+  unpairFromGearbox,
+} from "./gearbox.ts";
 import type { LogStatus, MatchTypeName, Status } from "./status.ts";
 
 const kRobotNetworkBaseIp = config.robotNetworkBaseIp;
@@ -29,6 +36,7 @@ let driveUpdating = false;
 // Live state surfaced by the status endpoint / dashboard.
 let internetConnected = false;
 let lastInternetCheck = 0;
+let lastGearboxCheck = 0;
 let rioLogs: { id: string; name: string; filename: string; origin: string }[] = [];
 let rioLogsCheckedAt: number | null = null;
 let downloadingIds: string[] = [];
@@ -120,6 +128,12 @@ async function logicLoop() {
     internetConnected = await isOnline().catch(() => false);
   }
 
+  // Whether Gearbox still knows this downloader, once a minute while it's online.
+  if (internetConnected && Date.now() - lastGearboxCheck > 60_000) {
+    lastGearboxCheck = Date.now();
+    await checkGearbox();
+  }
+
   if (recentPoll !== robotConnected && recentPoll) {
     logWithTimestamp("Robot network found.");
     const res = await downloadLogs();
@@ -163,7 +177,8 @@ async function downloadLogs() {
 
     const readdirAsync = (dir: string) =>
       new Promise<string[]>((resolve, reject) =>
-        sftp.readdir(dir, (err, list) =>
+        // Typed here: @types/ssh2 would bring an old @types/node into the whole workspace.
+        sftp.readdir(dir, (err: Error | undefined, list: { filename: string }[]) =>
           err ? reject(err) : resolve(list.map((i) => i.filename)),
         ),
       );
@@ -357,6 +372,25 @@ function logWithTimestamp(message: string) {
 
 const app = express();
 
+// The API is for the status page on this computer. A page from anywhere else reaching it through a
+// name that points here (DNS rebinding) is turned away by the Host check, unless HOST opens the
+// page to other computers; and a change must be JSON, which no other site's page can send here
+// without the browser asking first.
+const kLoopback = new Set(["localhost", "127.0.0.1", "[::1]", "::1"]);
+const kOpen = !kLoopback.has(config.host);
+app.use("/api", (req, res, next) => {
+  if (!kOpen && !kLoopback.has(req.hostname)) {
+    res.status(403).json({ error: "Open the status page at localhost." });
+    return;
+  }
+  if (req.method !== "GET" && req.method !== "HEAD" && !req.is("application/json")) {
+    res.status(415).json({ error: "Send JSON." });
+    return;
+  }
+  next();
+});
+app.use("/api", express.json());
+
 // Everything the status page shows, in one payload.
 app.get("/api/status", (_req, res) => {
   const matchTypeNames: Record<MatchType, MatchTypeName> = {
@@ -397,6 +431,7 @@ app.get("/api/status", (_req, res) => {
 
   const status: Status = {
     version: kVersion,
+    gearbox: gearboxStatus(),
     connection: {
       robot: robotConnected,
       internet: internetConnected,
@@ -448,6 +483,31 @@ app.get("/api/download", (req, res) => {
   }
 
   res.download(filePath);
+});
+
+// Pairing with the team's Pit on Gearbox, with a code from Pit's Logs page.
+app.post("/api/gearbox/pair", async (req, res) => {
+  const code = typeof req.body?.code === "string" ? req.body.code.replace(/\s/g, "") : "";
+  const name = typeof req.body?.name === "string" ? req.body.name : "";
+  if (!/^\d{6}$/.test(code)) {
+    res.status(400).json({ error: "The code is 6 digits." });
+    return;
+  }
+  try {
+    await pairWithGearbox(code, name);
+    logWithTimestamp("Paired with Gearbox.");
+    res.json(gearboxStatus());
+  } catch (err) {
+    const message = err instanceof PairingError ? err.message : "Couldn't pair with Gearbox.";
+    if (!(err instanceof PairingError)) console.error(err);
+    res.status(400).json({ error: message });
+  }
+});
+
+app.delete("/api/gearbox", async (_req, res) => {
+  await unpairFromGearbox();
+  logWithTimestamp("Unpaired from Gearbox.");
+  res.json(gearboxStatus());
 });
 
 app.use("/api", (_req, res) => {

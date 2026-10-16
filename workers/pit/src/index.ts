@@ -26,9 +26,12 @@ import {
   checklistIssues,
   checklistItems,
   checklistLists,
+  logDownloaderCodes,
+  logDownloaders,
   settings,
 } from "./db/schema";
 import { demoWords, loadDemo } from "./demo";
+import { downloaderRoutes, downloaderSelfRoutes } from "./downloaders";
 import { manifest } from "./manifest";
 import { SETTING_KEYS, type SettingKey, getSetting, teamNumberOf } from "./settings";
 import type { AppEnv } from "./types";
@@ -204,15 +207,25 @@ const app = base
   .get("/internal/demo/words", (c) => c.json({ words: demoWords() }))
   .get("/internal/teams/:teamId/export", async (c) => {
     const teamId = c.req.param("teamId");
-    const tables = await exportTeamRows(createDb(c.env.PIT_DB), teamId, [
-      settings,
-      batteries,
-      checklistLists,
-      checklistItems,
-      checklistIssues,
-      checklistArchives,
-    ]);
-    return c.json(teamExport(manifest, teamId, tables));
+    const tables = await exportTeamRows(
+      createDb(c.env.PIT_DB),
+      teamId,
+      [
+        settings,
+        batteries,
+        checklistLists,
+        checklistItems,
+        checklistIssues,
+        checklistArchives,
+        logDownloaders,
+      ],
+      { log_downloaders: ["keyHash"] },
+    );
+    return c.json(
+      teamExport(manifest, teamId, tables, [
+        "Log downloaders' keys and pairing codes aren't included: pair a downloader again on the Logs page.",
+      ]),
+    );
   })
   .delete("/internal/teams/:teamId", async (c) => {
     await deleteTeamRows(createDb(c.env.PIT_DB), c.req.param("teamId"), [
@@ -222,6 +235,8 @@ const app = base
       checklistLists,
       batteries,
       settings,
+      logDownloaders,
+      logDownloaderCodes,
     ]);
     return c.json({ ok: true });
   })
@@ -803,6 +818,10 @@ const app = base
 
   // Checklist archives: "Archive and reset" and the Archives page (./archives.ts).
   .route("/archives", archiveRoutes)
+
+  // Log downloaders: pairing on Pit's Logs page, and the downloader's own key (./downloaders.ts).
+  .route("/downloaders", downloaderRoutes)
+  .route("/downloader", downloaderSelfRoutes)
 
   // Global reset — unchecks all items across all lists, preserves issues, archives nothing
   .post("/reset", requireAuth, async (c) => {

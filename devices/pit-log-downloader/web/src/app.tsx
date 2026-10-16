@@ -1,6 +1,7 @@
 import { AppNavBar, ErrorBanner, Loading, Page, buttonClass } from "@g3/ui";
 import { useEffect, useState } from "react";
 import type { Status } from "../../src/status.ts";
+import { GearboxCard } from "./gearbox-card";
 import { ActivityCard, ConnectionTiles, Counts, LogsCard, RobotCard, SettingsCard } from "./parts";
 
 const POLL_INTERVAL_MS = 3000;
@@ -9,7 +10,10 @@ const POLL_INTERVAL_MS = 3000;
 function useStatus() {
   const [status, setStatus] = useState<Status | null>(null);
   const [lost, setLost] = useState(false);
+  // Bumped to ask again at once, after a change.
+  const [asked, setAsked] = useState(0);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `asked` starts it again, asking at once
   useEffect(() => {
     let current = true;
     const load = async () => {
@@ -34,13 +38,13 @@ function useStatus() {
       clearInterval(interval);
       document.removeEventListener("visibilitychange", load);
     };
-  }, []);
+  }, [asked]);
 
-  return { status, lost };
+  return { status, lost, refresh: () => setAsked((n) => n + 1) };
 }
 
 export function App() {
-  const { status, lost } = useStatus();
+  const { status, lost, refresh } = useStatus();
   const driveFolderUrl = status?.settings.driveFolderUrl;
 
   return (
@@ -79,6 +83,11 @@ export function App() {
           <>
             <ConnectionTiles status={status} />
             <Counts status={status} />
+            <GearboxCard
+              gearbox={status.gearbox}
+              teamNumber={status.settings.teamNumber}
+              onChange={refresh}
+            />
             <LogsCard status={status} />
             <div className="grid gap-5 lg:grid-cols-2">
               <RobotCard status={status} />

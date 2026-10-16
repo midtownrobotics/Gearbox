@@ -10,5 +10,8 @@ export type AppEnv = {
     PIT_DB: D1Database;
     G3ID: Fetcher;
   };
-  Variables: G3AuthVariables;
+  Variables: G3AuthVariables & {
+    /** The paired log downloader a request came from (`requireDownloader`). */
+    downloaderId: number;
+  };
 };

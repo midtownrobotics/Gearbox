@@ -55,6 +55,7 @@ As of 10 October 2026, five of the six Phase 0 steps are done on `main`, Phase 1
 | Change | Roadmap step | Pull request |
 | --- | --- | --- |
 | The pit log downloader moved into the repository (`devices/pit-log-downloader`), with its team number, Drive folder and paths in a settings file instead of the code, so any team can run it on Linux, Windows or macOS. Its status page is now React from the shared Gearbox parts, in the built-in colors with light and dark mode | Pit log downloader: L.1 | This PR |
+| Pit's checklist archives page is Archives, and its new Logs page pairs the team's log downloaders: setup steps for each system, a 6-digit pairing code, and each downloader's own key for Pit's API | Pit log downloader: L.2 | This PR |
 | The team's admins see the operator access log, as the privacy policy draft already promised: Portal's Operator Access page lists each time an operator opened the team's member list, handed over its ownership or suspended or reactivated it, with when and the reason given, but not which operator | 2.8 | This PR |
 | ID only signs people in: each member's Account page (sign-ins, kiosk PIN) and the admins' Members and Kiosk Devices pages moved to Portal, ID's old addresses redirect, signing in or linking a sign-in lands on Portal, and ID is no longer a tile on Portal or in the All Apps menu. Status badges show only Pending and Rejected | 4.5 (decisions of 15 October) | This PR |
 | A team's name is the one in its Team Appearance: saving a new one renames it in G3ID and the platform's registry (the console, ID's sign-in page, the gateway's lookup). Every app sends a signed-out visitor straight to sign in, the sign-in app is called "ID", and ID's sign-in pages link to the platform's team finder ("Not team N? Find your team") | 4.5 (decisions of 15 October) | This PR |
@@ -485,8 +486,9 @@ A tool a team runs on a computer in the pit: when the computer joins the robot's
 | Step | Change | Where | Status |
 | --- | --- | --- | --- |
 | L.1 | Moved in, runnable on Linux, Windows and macOS: settings (team number, Drive folder, key file, data folder) in a `config.env`, a startup check on all three in CI, and its status page rebuilt in React from `@g3/ui` | `devices/pit-log-downloader` | Done (this PR) |
-| L.2 | Connect it to Pit: the downloader tells the team's Pit which match logs it has, and Pit shows them beside the match and its checklist archive. Needs a way for the downloader to sign in as the team (like a kiosk or a box key) | `devices/pit-log-downloader`, `workers/pit`, `apps/pit` | Not started |
-| L.3 | Where logs are kept: today the team's own Google Drive. Keeping them on the platform (R2) instead would be a hosting decision for the owners and a change to the privacy draft | `docs/legal/` | Needs a decision |
+| L.2 | Pairing: Pit's Logs page shows a team with no downloader how to set one up on Windows, macOS or Linux and gives a mentor or admin a 6-digit code (10 minutes, once, 5 wrong tries), which the downloader trades on the team's Pit address for a key of its own (only its SHA-256 kept). Mentors and admins remove one; the downloader can unpair itself | `devices/pit-log-downloader`, `workers/pit`, `apps/pit` | Done (this PR) |
+| L.3 | Logs in Pit: the paired downloader tells Pit which match logs it has, and Pit's Logs page lists them, beside the match and its checklist archive | `devices/pit-log-downloader`, `workers/pit`, `apps/pit` | Not started |
+| L.4 | Where logs are kept: today the team's own Google Drive. Keeping them on the platform (R2) instead would be a hosting decision for the owners and a change to the privacy draft | `docs/legal/` | Needs a decision |
 
 ## Moving G3 in as the first team
 

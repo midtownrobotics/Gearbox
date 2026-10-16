@@ -71,6 +71,19 @@ restarts the downloader when `src/` changes and reloads the status page as you e
   (`@g3/ui`). It has the Gearbox top bar with no team: the built-in colors, light and dark mode,
   and no sign-in. `start` builds it into `dist/web`; `watch` serves it through Vite instead.
 
+## Pairing with Gearbox
+
+Pairing connects the downloader to your team's Pit on Gearbox (for now it only pairs; listing
+logs in Pit comes next).
+
+1. On Pit's **Logs** page, a mentor or admin chooses **Get a pairing code**.
+2. On the status page, choose **Pair with Gearbox** and enter the code within 10 minutes. The
+   computer's name is what Pit lists it as.
+
+The downloader keeps its key in `data/gearbox.json` (readable only by you). Unpair on the status
+page, or remove it on Pit's Logs page; either stops the key working. It pairs with
+`https://<TEAM_NUMBER>-pit.frcgearbox.com` unless `PIT_URL` says otherwise.
+
 ## Settings
 
 All are in `config.env`. Relative paths start from `devices/pit-log-downloader`.
@@ -82,6 +95,7 @@ All are in `config.env`. Relative paths start from `devices/pit-log-downloader`.
 | `GOOGLE_KEY_FILE` | The service account's JSON key | `service-account-key.json` |
 | `DATA_DIR` | Where logs and the list of them (`logs.json`) are kept | `data` |
 | `PORT` | The status page's port | `3000` |
+| `PIT_URL` | The team's Pit to pair with | `https://<TEAM_NUMBER>-pit.frcgearbox.com` |
 | `HOST` | Who can open the status page: `127.0.0.1` for this computer only, `0.0.0.0` for anyone on its networks | `127.0.0.1` |
 
 ## Moving from the old Pit-Log-Downloader repository
