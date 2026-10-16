@@ -22,7 +22,8 @@ import {
 
 // The match logs the team's downloaders uploaded, by event (the one uploaded to last first), each
 // event's matches latest first. Anyone signed in downloads them, one or all in a zip; mentors and
-// admins delete them, export and delete all, and choose what happens once Pit has its limit.
+// admins choose what happens once Pit has its limit, and admins delete them (one, or all after an
+// export).
 
 const whenFormat = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
 const TYPE_ORDER = { e: 0, q: 1, p: 2 } as const;
@@ -82,7 +83,7 @@ function Storage({
             <a className={buttonClass("secondary", "sm")} href={matchLogsZipUrl()}>
               Download all
             </a>
-            {data.canManage && !exported && (
+            {data.canDelete && !exported && (
               <Button
                 variant="secondary"
                 size="sm"
@@ -201,7 +202,7 @@ export function MatchLogs() {
                   <a className={buttonClass("secondary", "sm")} href={matchLogFileUrl(log.id)}>
                     Download
                   </a>
-                  {data.canManage && (
+                  {data.canDelete && (
                     <ConfirmButton
                       label="Delete"
                       size="sm"
