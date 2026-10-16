@@ -1,5 +1,5 @@
-// `pnpm --filter @g3/pit-log-downloader smoke`: starts the downloader with no robot, no Drive and
-// an empty data folder, waits for its status API and page to answer, and stops it. CI runs it on Linux,
+// `pnpm --filter @g3/pit-log-downloader smoke`: starts the downloader with no settings, no robot,
+// no Drive and an empty data folder (so not paired with Gearbox), waits for its status API and page to answer, and stops it. CI runs it on Linux,
 // Windows and macOS.
 
 import { spawn } from "node:child_process";
@@ -11,7 +11,7 @@ import type { Status } from "../src/status.ts";
 const dataDir = mkdtempSync(join(tmpdir(), "pit-log-downloader-"));
 const port = 3917;
 const child = spawn(process.execPath, [join(import.meta.dirname, "../src/index.ts")], {
-  env: { ...process.env, TEAM_NUMBER: "1648", DATA_DIR: dataDir, PORT: String(port) },
+  env: { ...process.env, DATA_DIR: dataDir, PORT: String(port) },
   stdio: "inherit",
 });
 
@@ -24,7 +24,7 @@ for (let i = 0; i < 40 && child.exitCode === null; i++) {
   if (!status) continue;
   const page = await fetch(`http://127.0.0.1:${port}/`).then((r) => r.text());
   failure =
-    status.settings?.rioIp !== "10.16.48.2" || status.logs?.length !== 0
+    status.gearbox?.paired !== null || status.settings?.rioIp !== null || status.logs?.length !== 0
       ? `unexpected status: ${JSON.stringify(status.settings)}`
       : !page.includes('<div id="root">')
         ? "the status page isn't built"

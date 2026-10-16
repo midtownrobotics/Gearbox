@@ -1,4 +1,4 @@
-import { Button, Card, ConfirmButton, Dialog, ErrorBanner, Field, TextField } from "@g3/ui";
+import { Button, Card, ConfirmButton, ErrorBanner, Field, TextField } from "@g3/ui";
 import { type FormEvent, useState } from "react";
 import type { GearboxStatus } from "../../src/status.ts";
 
@@ -18,11 +18,15 @@ async function send(method: "POST" | "DELETE", path: string, body?: unknown) {
   }
 }
 
-function PairDialog({
+/**
+ * Pairing, which the downloader needs before it does anything: the team number and a code from
+ * the team's Pit. The whole page until it's paired.
+ */
+export function PairingCard({
   gearbox,
-  onClose,
   onPaired,
-}: { gearbox: GearboxStatus; onClose: () => void; onPaired: () => void }) {
+}: { gearbox: GearboxStatus; onPaired: () => void }) {
+  const [teamNumber, setTeamNumber] = useState("");
   const [code, setCode] = useState("");
   const [name, setName] = useState(gearbox.defaultName);
   const [busy, setBusy] = useState(false);
@@ -31,20 +35,39 @@ function PairDialog({
   async function submit(e: FormEvent) {
     e.preventDefault();
     setBusy(true);
-    const problem = await send("POST", "/api/gearbox/pair", { code, name });
+    const problem = await send("POST", "/api/gearbox/pair", { teamNumber, code, name });
     setBusy(false);
     if (problem) setError(problem);
     else onPaired();
   }
 
   return (
-    <Dialog title="Pair with Gearbox" onClose={onClose} centered>
-      <form onSubmit={submit} className="space-y-4">
+    <Card>
+      <form onSubmit={submit} className="max-w-md space-y-4">
+        {gearbox.connection === "removed" && (
+          <ErrorBanner message="This computer was removed from Pit. Pair it again to keep copying logs." />
+        )}
         <p className="text-sm text-secondary-600">
-          On your team's Pit, open Logs and choose Get a pairing code. Enter the code here within 10
-          minutes.
+          On your team's Pit, a mentor or admin opens Logs and chooses Get a pairing code. Enter it
+          here within 10 minutes.
         </p>
+        {gearbox.pitUrl && (
+          <p className="text-sm text-secondary-600">
+            Pairs with the Pit at <span className="font-mono">{gearbox.pitUrl}</span>.
+          </p>
+        )}
         {error && <ErrorBanner message={error} />}
+        <Field label="Team number">
+          <TextField
+            typeable
+            value={teamNumber}
+            onChange={(e) => setTeamNumber(e.target.value.replace(/\D/g, "").slice(0, 5))}
+            inputMode="numeric"
+            placeholder="1648"
+            required
+            autoFocus
+          />
+        </Field>
         <Field label="Pairing code">
           <TextField
             typeable
@@ -53,9 +76,8 @@ function PairDialog({
             inputMode="numeric"
             autoComplete="one-time-code"
             placeholder="123456"
-            className="font-mono text-lg tracking-widest"
+            className="font-mono tracking-widest"
             required
-            autoFocus
           />
         </Field>
         <Field label="This computer's name in Pit">
@@ -66,36 +88,22 @@ function PairDialog({
             maxLength={60}
           />
         </Field>
-        <div className="flex justify-end gap-2">
-          <Button variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button type="submit" disabled={busy || code.length !== 6}>
-            {busy ? "Pairing…" : "Pair"}
-          </Button>
-        </div>
+        <Button type="submit" disabled={busy || !teamNumber || code.length !== 6}>
+          {busy ? "Pairing…" : "Pair"}
+        </Button>
       </form>
-    </Dialog>
+    </Card>
   );
 }
 
+/** Once paired: which Pit, and Unpair, after which it does nothing until it's paired again. */
 export function GearboxCard({
   gearbox,
-  teamNumber,
   onChange,
-}: { gearbox: GearboxStatus; teamNumber: number; onChange: () => void }) {
-  const [pairing, setPairing] = useState(false);
+}: { gearbox: GearboxStatus; onChange: () => void }) {
   const [error, setError] = useState<string | null>(null);
-  const pitLink = (
-    <a
-      className="text-primary-600 underline"
-      href={gearbox.pitUrl}
-      target="_blank"
-      rel="noreferrer"
-    >
-      team {teamNumber}'s Pit
-    </a>
-  );
+  const paired = gearbox.paired;
+  if (!paired) return null;
 
   return (
     <Card title="Gearbox">
@@ -104,51 +112,36 @@ export function GearboxCard({
           <ErrorBanner message={error} />
         </div>
       )}
-      {gearbox.paired ? (
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="text-sm">
-            <p className="text-secondary-900">
-              Paired with {pitLink} as <span className="font-semibold">{gearbox.paired.name}</span>.
-            </p>
-            {gearbox.connection === "unreachable" && (
-              <p className="mt-1 text-amber-700">
-                Can't reach Gearbox right now. It tries again every minute.
-              </p>
-            )}
-          </div>
-          <ConfirmButton
-            label="Unpair"
-            size="sm"
-            question="Unpair this computer? Pit stops listing it, and you'll need a new code to pair it again."
-            onConfirm={async () => {
-              setError(await send("DELETE", "/api/gearbox"));
-              onChange();
-            }}
-          />
-        </div>
-      ) : (
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <p className="text-sm text-secondary-600">
-            {gearbox.connection === "removed" ? (
-              "This computer was removed from Pit. Pair it again to reconnect."
-            ) : (
-              <>Pair this computer with {pitLink} on Gearbox.</>
-            )}
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="text-sm">
+          <p className="text-secondary-900">
+            Paired with{" "}
+            <a
+              className="text-primary-600 underline"
+              href={paired.pitUrl}
+              target="_blank"
+              rel="noreferrer"
+            >
+              team {paired.teamNumber}'s Pit
+            </a>{" "}
+            as <span className="font-semibold">{paired.name}</span>.
           </p>
-          <Button onClick={() => setPairing(true)}>Pair with Gearbox</Button>
+          {gearbox.connection === "unreachable" && (
+            <p className="mt-1 text-amber-700">
+              Can't reach Gearbox right now. It tries again every minute.
+            </p>
+          )}
         </div>
-      )}
-      {pairing && (
-        <PairDialog
-          gearbox={gearbox}
-          onClose={() => setPairing(false)}
-          onPaired={() => {
-            setPairing(false);
-            setError(null);
+        <ConfirmButton
+          label="Unpair"
+          size="sm"
+          question="Unpair this computer? It stops copying logs until it's paired again, which needs a new code from Pit."
+          onConfirm={async () => {
+            setError(await send("DELETE", "/api/gearbox"));
             onChange();
           }}
         />
-      )}
+      </div>
     </Card>
   );
 }

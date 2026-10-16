@@ -1,7 +1,7 @@
 import { AppNavBar, ErrorBanner, Loading, Page, buttonClass } from "@g3/ui";
 import { useEffect, useState } from "react";
 import type { Status } from "../../src/status.ts";
-import { GearboxCard } from "./gearbox-card";
+import { GearboxCard, PairingCard } from "./gearbox-card";
 import { ActivityCard, ConnectionTiles, Counts, LogsCard, RobotCard, SettingsCard } from "./parts";
 
 const POLL_INTERVAL_MS = 3000;
@@ -46,12 +46,15 @@ function useStatus() {
 export function App() {
   const { status, lost, refresh } = useStatus();
   const driveFolderUrl = status?.settings.driveFolderUrl;
+  // Until it's paired, pairing is all there is.
+  const unpaired = status !== null && !status.gearbox.paired;
+  const teamNumber = status?.gearbox.paired?.teamNumber;
 
   return (
     <div className="flex flex-1 flex-col bg-page">
       {/* A tool on this computer, not a team's app: built-in colors, no sign-in, no app list. */}
       <AppNavBar
-        title={status ? `${status.settings.teamNumber} PIT LOGS` : "PIT LOGS"}
+        title={teamNumber ? `${teamNumber} PIT LOGS` : "PIT LOGS"}
         icon="/favicon.svg"
         items={[]}
         team={false}
@@ -60,10 +63,15 @@ export function App() {
         version={status ? `Pit log downloader ${status.version}` : undefined}
       />
       <Page
-        title="Match logs"
-        description="Logs are copied off the robot whenever this computer joins its network."
-        width="wide"
+        title={unpaired ? "Pair with Gearbox" : "Match logs"}
+        description={
+          unpaired
+            ? "Pair this computer with your team's Pit to start copying the robot's match logs."
+            : "Logs are copied off the robot whenever this computer joins its network."
+        }
+        width={unpaired ? "narrow" : "wide"}
         actions={
+          !unpaired &&
           driveFolderUrl && (
             <a
               className={buttonClass("secondary")}
@@ -79,15 +87,13 @@ export function App() {
         {lost && (
           <ErrorBanner message="Can't reach the downloader. Check that it's still running on this computer." />
         )}
-        {status ? (
+        {status && unpaired ? (
+          <PairingCard gearbox={status.gearbox} onPaired={refresh} />
+        ) : status ? (
           <>
             <ConnectionTiles status={status} />
             <Counts status={status} />
-            <GearboxCard
-              gearbox={status.gearbox}
-              teamNumber={status.settings.teamNumber}
-              onChange={refresh}
-            />
+            <GearboxCard gearbox={status.gearbox} onChange={refresh} />
             <LogsCard status={status} />
             <div className="grid gap-5 lg:grid-cols-2">
               <RobotCard status={status} />

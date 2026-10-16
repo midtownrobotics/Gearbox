@@ -1,4 +1,13 @@
-import { Button, Card, ConfirmButton, ErrorBanner, Loading, Page, SuccessBanner } from "@g3/ui";
+import {
+  Button,
+  Card,
+  ConfirmButton,
+  ErrorBanner,
+  Loading,
+  Page,
+  SuccessBanner,
+  useTeamNames,
+} from "@g3/ui";
 import { useCallback, useEffect, useState } from "react";
 import {
   type LogDownloader,
@@ -38,6 +47,7 @@ function useCountdown(until: number | null) {
 }
 
 function PairingCode({ canManage }: { canManage: boolean }) {
+  const { number } = useTeamNames();
   const [code, setCode] = useState<{ code: string; expiresAt: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -73,7 +83,8 @@ function PairingCode({ canManage }: { canManage: boolean }) {
             {code.code}
           </p>
           <p className="text-sm text-secondary-600">
-            Enter it in the downloader within {Math.floor(left / 60_000)}:
+            Enter it in the downloader, with team number {number}, within{" "}
+            {Math.floor(left / 60_000)}:
             {String(Math.floor((left % 60_000) / 1000)).padStart(2, "0")}. It works once.
           </p>
         </div>

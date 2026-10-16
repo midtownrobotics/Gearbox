@@ -27,10 +27,13 @@ export type LogStatus = {
 
 /** Pairing with the team's Pit on Gearbox (src/gearbox.ts). */
 export type GearboxStatus = {
-  /** The Pit it pairs with. */
-  pitUrl: string;
-  /** Null until it's paired. */
-  paired: { name: string; pairedAt: number } | null;
+  /**
+   * The Pit it's set to pair with when that isn't the team's usual address (PIT_URL, or the local
+   * Pit with --dev); null for the usual one.
+   */
+  pitUrl: string | null;
+  /** Null until it's paired: then the downloader does nothing but ask to be. */
+  paired: { teamNumber: number; pitUrl: string; name: string; pairedAt: number } | null;
   /**
    * The last check of its key: "ok", "unreachable" (no internet, or Gearbox didn't answer),
    * "removed" (Pit no longer knows it, so it unpaired), or null before any check.
@@ -54,10 +57,11 @@ export type Status = {
     rioLogsCheckedAt: number | null;
   };
   settings: {
-    teamNumber: number;
+    /** The paired team's, or null before pairing. */
+    teamNumber: number | null;
     /** "10.16.48" */
-    robotNetwork: string;
-    rioIp: string;
+    robotNetwork: string | null;
+    rioIp: string | null;
     /** Null when logs stay on this computer. */
     driveFolderUrl: string | null;
     rioLogDirs: string[];

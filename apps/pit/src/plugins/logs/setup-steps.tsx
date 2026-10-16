@@ -69,20 +69,16 @@ const Note = ({ children }: { children: ReactNode }) => (
 export function SetupSteps() {
   const [system, setSystem] = useState<System>(guessSystem);
   const { number } = useTeamNames();
-  // The downloader finds the team's usual Pit address from its number; anywhere else (staging,
-  // a local Pit) it's told this one.
+  // The downloader finds the team's usual Pit address from the team number it's paired with. A
+  // local Pit (pnpm dev) it finds with --dev; any other (staging) it's told in config.env.
   const pitUrl = window.location.origin;
-  const settings = [
-    `TEAM_NUMBER=${number}`,
-    ...(pitUrl === teamAppUrlVia(undefined, `frc${number}`, "pit") ? [] : [`PIT_URL=${pitUrl}`]),
-  ];
+  const { hostname } = window.location;
+  const local = hostname === "localhost" || hostname.endsWith(".localhost");
+  const elsewhere = !local && pitUrl !== teamAppUrlVia(undefined, `frc${number}`, "pit");
   const windows = system === "windows";
-  const configPath = windows
-    ? "devices\\pit-log-downloader\\config.env"
-    : "devices/pit-log-downloader/config.env";
   const writeConfig = windows
-    ? `Set-Content ${configPath} "${settings.join("`n")}"`
-    : `printf '${settings.join("\\n")}\\n' > ${configPath}`;
+    ? `Set-Content devices\\pit-log-downloader\\config.env "PIT_URL=${pitUrl}"`
+    : `echo "PIT_URL=${pitUrl}" > devices/pit-log-downloader/config.env`;
 
   return (
     <div className="space-y-4">
@@ -124,14 +120,16 @@ export function SetupSteps() {
             ].join("\n")}
           </Command>
         </Step>
-        <Step n={3} title="Set your team">
-          <Command>{writeConfig}</Command>
-        </Step>
-        <Step n={4} title="Start it">
-          <Command>pnpm --filter @g3/pit-log-downloader start</Command>
+        {elsewhere && (
+          <Step n={3} title="Point it at this Pit">
+            <Command>{writeConfig}</Command>
+          </Step>
+        )}
+        <Step n={elsewhere ? 4 : 3} title="Start it">
+          <Command>{`pnpm --filter @g3/pit-log-downloader start${local ? " -- --dev" : ""}`}</Command>
           <Note>
-            Leave it running, open http://localhost:3000 on that computer and choose Pair with
-            Gearbox.
+            Leave it running and open http://localhost:3000 on that computer. It asks for your team
+            number, {number}, and a pairing code.
           </Note>
         </Step>
       </ol>

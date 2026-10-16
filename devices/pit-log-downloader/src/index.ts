@@ -6,18 +6,17 @@ import express from "express";
 import { type drive_v3, google } from "googleapis";
 import isOnline from "is-online";
 import { NodeSSH } from "node-ssh";
-import { config } from "./config.ts";
+import { config, parseTeamNumber, robotNetworkOf } from "./config.ts";
 import {
   PairingError,
   checkGearbox,
+  currentPairing,
   gearboxStatus,
   pairWithGearbox,
   unpairFromGearbox,
 } from "./gearbox.ts";
 import type { LogStatus, MatchTypeName, Status } from "./status.ts";
 
-const kRobotNetworkBaseIp = config.robotNetworkBaseIp;
-const kRioIp = config.rioIp;
 const kLogFolderId = config.driveFolderId;
 const kLogFileRegex = /^akit_[^_]+_[^_]+_[^_]+_[qep]\d+\.wpilog$/;
 const kRioLogDirs = ["/u/logs", "/home/lvuser/logs"];
@@ -101,7 +100,22 @@ const logs: Log[] = (JSON.parse(fs.readFileSync(kLogsJson).toString()) as Log[])
   return { ...log, locations: drive ? { rio, drive } : { rio } };
 });
 
-logWithTimestamp(`Started for team ${config.teamNumber}. Logs are kept in ${kLogsDir}.`);
+/** The paired team's robot network ("10.16.48"), or null before pairing. */
+function robotNetwork() {
+  const pairing = currentPairing();
+  return pairing ? robotNetworkOf(pairing.teamNumber) : null;
+}
+
+{
+  const pairing = currentPairing();
+  const page = `http://${config.host === "0.0.0.0" ? "localhost" : config.host}:${config.port}`;
+  logWithTimestamp(
+    pairing
+      ? `Paired with team ${pairing.teamNumber}'s Pit as ${pairing.name}. Logs are kept in ${kLogsDir}.`
+      : `Not paired with Gearbox yet: open ${page} to pair it.`,
+  );
+  if (config.dev) logWithTimestamp(`--dev: pairing with the local Pit at ${config.pitUrl}.`);
+}
 if (!kLogFolderId) {
   logWithTimestamp("No DRIVE_FOLDER_ID is set, so logs stay on this computer.");
 } else if (!fs.existsSync(config.googleKeyFile)) {
@@ -120,8 +134,6 @@ async function poll() {
 poll();
 
 async function logicLoop() {
-  const recentPoll = isRobotNetworkConnected();
-
   // Internet checks hit the network, so they run on a slower cadence than the poll.
   if (Date.now() - lastInternetCheck > 15000) {
     lastInternetCheck = Date.now();
@@ -129,14 +141,23 @@ async function logicLoop() {
   }
 
   // Whether Gearbox still knows this downloader, once a minute while it's online.
-  if (internetConnected && Date.now() - lastGearboxCheck > 60_000) {
+  if (currentPairing() && internetConnected && Date.now() - lastGearboxCheck > 60_000) {
     lastGearboxCheck = Date.now();
     await checkGearbox();
   }
 
+  // Nothing else until it's paired (again): pairing is what gives it its team.
+  const network = robotNetwork();
+  if (!network) {
+    if (robotConnected) logWithTimestamp("Stopped until it's paired with Gearbox again.");
+    robotConnected = false;
+    return;
+  }
+  const recentPoll = isRobotNetworkConnected(network);
+
   if (recentPoll !== robotConnected && recentPoll) {
     logWithTimestamp("Robot network found.");
-    const res = await downloadLogs();
+    const res = await downloadLogs(`${network}.2`);
     if (!res) return;
   }
 
@@ -152,16 +173,16 @@ async function logicLoop() {
   fs.writeFileSync(kLogsJson, JSON.stringify(logs));
 }
 
-function isRobotNetworkConnected() {
+function isRobotNetworkConnected(network: string) {
   return Object.values(os.networkInterfaces())
     .flat()
-    .some((n) => n?.address.startsWith(`${kRobotNetworkBaseIp}.`));
+    .some((n) => n?.address.startsWith(`${network}.`));
 }
 
-async function downloadLogs() {
+async function downloadLogs(rioIp: string) {
   try {
     await ssh.connect({
-      host: kRioIp,
+      host: rioIp,
       username: "admin",
       password: "",
     });
@@ -441,9 +462,9 @@ app.get("/api/status", (_req, res) => {
       rioLogsCheckedAt,
     },
     settings: {
-      teamNumber: config.teamNumber,
-      robotNetwork: kRobotNetworkBaseIp,
-      rioIp: kRioIp,
+      teamNumber: currentPairing()?.teamNumber ?? null,
+      robotNetwork: robotNetwork(),
+      rioIp: robotNetwork() && `${robotNetwork()}.2`,
       driveFolderUrl: kLogFolderId
         ? `https://drive.google.com/drive/folders/${kLogFolderId}`
         : null,
@@ -489,13 +510,18 @@ app.get("/api/download", (req, res) => {
 app.post("/api/gearbox/pair", async (req, res) => {
   const code = typeof req.body?.code === "string" ? req.body.code.replace(/\s/g, "") : "";
   const name = typeof req.body?.name === "string" ? req.body.name : "";
+  const teamNumber = parseTeamNumber(req.body?.teamNumber);
+  if (!teamNumber) {
+    res.status(400).json({ error: "Enter your FRC team number." });
+    return;
+  }
   if (!/^\d{6}$/.test(code)) {
     res.status(400).json({ error: "The code is 6 digits." });
     return;
   }
   try {
-    await pairWithGearbox(code, name);
-    logWithTimestamp("Paired with Gearbox.");
+    await pairWithGearbox(teamNumber, code, name);
+    logWithTimestamp(`Paired with team ${teamNumber}'s Pit.`);
     res.json(gearboxStatus());
   } catch (err) {
     const message = err instanceof PairingError ? err.message : "Couldn't pair with Gearbox.";
@@ -506,7 +532,7 @@ app.post("/api/gearbox/pair", async (req, res) => {
 
 app.delete("/api/gearbox", async (_req, res) => {
   await unpairFromGearbox();
-  logWithTimestamp("Unpaired from Gearbox.");
+  logWithTimestamp("Unpaired from Gearbox. It does nothing until it's paired again.");
   res.json(gearboxStatus());
 });
 
@@ -516,8 +542,8 @@ app.use("/api", (_req, res) => {
 
 const server = createServer(app);
 
-if (process.argv.includes("--dev")) {
-  // `watch`: the page is served by Vite, which reloads it as its files change.
+if (process.argv.includes("--watch-page")) {
+  // `watch` (--watch-page): the page is served by Vite, which reloads it as its files change.
   const { createServer: createVite } = await import("vite");
   const vite = await createVite({
     configFile: path.join(kPackageDir, "vite.config.ts"),
