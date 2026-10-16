@@ -156,7 +156,6 @@ describe("signing a team up with Discord", () => {
   it("connects the server and signs the founder in on the team's own address, in one step", async () => {
     const number = newNumber();
     const signupId = await signUp(number);
-    expect(await (await call(`/signup/${signupId}`)).json()).toMatchObject({ discord: true });
     const guild = snowflake("5");
     const back = await connectDiscord(signupId, snowflake("5"), guild);
     const to = new URL(back.headers.get("Location") as string);

@@ -91,7 +91,7 @@ Pages still name the bot "Gearbot" (`slackBotName`); on staging it's Gearbot Sta
 
 ## Discord (once)
 
-A team uses Slack or Discord, one at a time (`docs/roadmap/discord.md`). One Discord app serves every team, with one bot token; a team's connection is only its server's id. Until the app is set up, Discord is off everywhere: no Discord buttons show, and teams keep using Slack.
+A team uses Slack or Discord, one at a time (`docs/roadmap/discord.md`). One Discord app serves every team, with one bot token; a team's connection is only its server's id. Discord is always offered, so the app's settings below are required, like Slack's: without them, Discord's buttons lead to errors.
 
 1. **Make the app** at discord.com/developers/applications, named **Gearbot** (`discordBotName` in `site.ts`).
    - **Bot:** Public Bot on. No privileged intents: Gearbox never reads messages. Reset and copy the token.
@@ -106,7 +106,7 @@ A team uses Slack or Discord, one at a time (`docs/roadmap/discord.md`). One Dis
    pnpm exec wrangler secret put DISCORD_CLIENT_SECRET --env production
    ```
 3. **Migrations:** G3ID's `0019_discord.sql` (the `discord_installations` table, and `discord` as a sign-in provider) and the platform's `0011_discord.sql` run before the Workers deploy, as usual.
-4. **Staging:** a second app, "Gearbot Staging", with the redirects `https://id-dev.g3robotics.com/api/auth/discord/callback` and `https://dev.g3robotics.com/api/signup/discord/callback`. Put its client ID in `infra/staging/resources.json` as `"discord": { "clientId": "..." }`, run `pnpm configure` (staging has no Discord without it), and put the same three secrets with `--env staging`.
+4. **Staging:** a second app, "Gearbot Staging", with the redirects `https://id-dev.g3robotics.com/api/auth/discord/callback` and `https://dev.g3robotics.com/api/signup/discord/callback`. Put its client ID in `infra/staging/resources.json` as `"discord": { "clientId": "..." }`, run `pnpm configure`, and put the same three secrets with `--env staging`.
 5. **Local dev:** set `DISCORD_CLIENT_ID` in `workers/g3id/wrangler.toml`'s `[vars]` (and the platform's, to try sign-up), and `DISCORD_CLIENT_SECRET` and `DISCORD_BOT_TOKEN` in each Worker's `.dev.vars`.
 
 Admins connect their server on the home's Admin → Integrations (Connect Discord: it takes the admin to Discord to pick a server they manage, and links the admin's Discord to their account). A team on Slack disconnects Slack first. Members then sign in with Discord if they're in the server; someone new waits for an admin's approval, as with Slack. A private channel needs Gearbot's role allowed in it before the bot can post there; the channel picker says so.

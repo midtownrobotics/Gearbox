@@ -88,7 +88,7 @@ const APPS: App[] = [
     demo: "schedule",
     icon: scheduleIcon,
     blurb:
-      "Who does what at each event, 15 minutes at a time. Drag roles across the grid, publish it, and Slack reminds people before their role changes.",
+      "Who does what at each event, 15 minutes at a time. Drag roles across the grid, publish it, and Slack or Discord reminds people before their role changes.",
   },
   {
     name: "Edge",
@@ -102,7 +102,7 @@ const APPS: App[] = [
 
 /** What every app shares: one line after the apps. */
 const SHARED = [
-  { icon: FaSlack, text: "One sign-in through your team's Slack" },
+  { icon: FaSlack, text: "One sign-in through your team's Slack or Discord" },
   { icon: FaUserShield, text: "Admin, mentor and student roles in every app" },
   { icon: FaPalette, text: "Your name, logo and colors everywhere" },
 ];
@@ -235,7 +235,7 @@ function Hero() {
           </h1>
           <p className="max-w-xl text-lg text-secondary-600">
             Orders, shop tracking, pit checklists and scouting that all share one sign-in through
-            your team's Slack. Free, open source, and built by an FRC team.
+            your team's Slack or Discord. Free, open source, and built by an FRC team.
           </p>
           <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-3">
@@ -248,7 +248,8 @@ function Hero() {
               <MyTeamButton large />
             </div>
             <p className="text-sm text-secondary-500">
-              Takes about two minutes. You'll need to be able to add an app to your team's Slack.
+              Takes about two minutes. You'll need to be able to add an app to your team's Slack or
+              Discord.
             </p>
           </div>
           <div className="space-y-2 border-t border-line pt-5">

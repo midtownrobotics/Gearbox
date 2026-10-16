@@ -14,10 +14,6 @@ export type TeamDiscord = {
   guildName: string | null;
 };
 
-/** Whether this server can take Discord at all: the app's settings are in place. */
-export const discordConfigured = (env: Env) =>
-  Boolean(env.DISCORD_CLIENT_ID && env.DISCORD_CLIENT_SECRET && env.DISCORD_BOT_TOKEN);
-
 /** A team's Discord server, or null if it hasn't connected one. */
 export async function discordForTeam(env: Env, teamId: string): Promise<TeamDiscord | null> {
   const row = await createDb(env.DB)

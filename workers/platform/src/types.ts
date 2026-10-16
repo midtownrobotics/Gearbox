@@ -20,9 +20,9 @@ export type AppEnv = {
     /** The Slack app (G3ID's): installed into a team's workspace during sign-up. */
     SLACK_CLIENT_ID: string;
     SLACK_CLIENT_SECRET?: string;
-    /** The Discord app (G3ID's): added to a team's server during sign-up. Without it, no Discord. */
-    DISCORD_CLIENT_ID?: string;
-    DISCORD_CLIENT_SECRET?: string;
+    /** The Discord app (G3ID's): added to a team's server during sign-up. Always set. */
+    DISCORD_CLIENT_ID: string;
+    DISCORD_CLIENT_SECRET: string;
     /** Local dev only: the dev gateway (http://localhost:8796), for the platform's and teams' addresses. */
     LOCAL_GATEWAY_URL?: string;
   };

@@ -6,7 +6,7 @@ import { setCookie } from "hono/cookie";
 import { createDb } from "../../db";
 import { coreUserIdentities, coreUsers } from "../../db/schema";
 import { sessionCookieOptions } from "../../lib/cookie";
-import { discordConfigured, saveDiscordInstallation } from "../../lib/discord-install";
+import { saveDiscordInstallation } from "../../lib/discord-install";
 import { signInWithDiscord } from "../../lib/discord-sign-in";
 import { takeHandoff } from "../../lib/handoff";
 import { newId } from "../../lib/id";
@@ -42,7 +42,7 @@ async function saveState(env: Env, state: DiscordState): Promise<string> {
   return key;
 }
 
-const app = (env: Env) => ({ DISCORD_CLIENT_ID: env.DISCORD_CLIENT_ID ?? "" });
+const app = (env: Env) => ({ DISCORD_CLIENT_ID: env.DISCORD_CLIENT_ID });
 
 export const discordAuthRouter = new Hono<AppEnv>()
   // A sign-in finished elsewhere (the platform's sign-up with Discord), spent on the team's own
@@ -60,7 +60,6 @@ export const discordAuthRouter = new Hono<AppEnv>()
     const team = requestTeamId(c);
     const error = (msg: string) =>
       c.redirect(`${teamFrontend(c.env, team)}/login/error?error=${encodeURIComponent(msg)}`);
-    if (!discordConfigured(c.env)) return error("Discord sign-in isn't set up on this server.");
     const off = await methodOff(c.env, team, "discord");
     if (off) return error(off);
     const redirect = sanitizeRedirect(c.req.query("redirect"), team);
@@ -79,7 +78,6 @@ export const discordAuthRouter = new Hono<AppEnv>()
     const team = await teamOfUser(createDb(c.env.DB), userId);
     const error = (msg: string) =>
       c.redirect(`${teamFrontend(c.env, team)}/login/error?error=${encodeURIComponent(msg)}`);
-    if (!discordConfigured(c.env)) return error("Discord isn't set up on this server.");
     const off = await methodOff(c.env, team, "discord");
     if (off) return error(off);
     const state = await saveState(c.env, { team, redirect: null, linkUserId: userId });
@@ -92,9 +90,6 @@ export const discordAuthRouter = new Hono<AppEnv>()
   })
   // A team admin adds the bot to the team's Discord server (from Portal's Integrations page).
   .get("/discord/install", requireAdmin, async (c) => {
-    if (!discordConfigured(c.env)) {
-      return c.json({ error: "Connecting Discord isn't set up on this server." }, 503);
-    }
     const userId = c.get("userId") as string;
     const team = await teamOfUser(createDb(c.env.DB), userId);
     const state = await saveState(c.env, {
@@ -135,8 +130,8 @@ export const discordAuthRouter = new Hono<AppEnv>()
 
     const done = await exchangeCode(
       {
-        DISCORD_CLIENT_ID: c.env.DISCORD_CLIENT_ID ?? "",
-        DISCORD_CLIENT_SECRET: c.env.DISCORD_CLIENT_SECRET ?? "",
+        DISCORD_CLIENT_ID: c.env.DISCORD_CLIENT_ID,
+        DISCORD_CLIENT_SECRET: c.env.DISCORD_CLIENT_SECRET,
       },
       code,
       providerRedirectUri(c.env, "discord", st.team),

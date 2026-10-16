@@ -33,7 +33,7 @@ SLACK_TEAM_ID = "T04LF3F0D"
 SLACK_APP_ID = "A08M9C82LEL"
 STEAM_REDIRECT_URI = "http://localhost:5173/api/auth/steam/callback"
 # Discord (docs/deploy.md, "Discord"): set DISCORD_CLIENT_ID here and DISCORD_CLIENT_SECRET and
-# DISCORD_BOT_TOKEN in .dev.vars to try it locally. Without them Discord is off.
+# DISCORD_BOT_TOKEN in .dev.vars. Discord is always offered, so they're required.
 DISCORD_REDIRECT_URI = "http://localhost:5173/api/auth/discord/callback"
 FRONTEND_URL = "http://localhost:5173"
 # Local dev: every team's addresses go through the dev gateway (http://<number>-id.gearbox.localhost:8796).

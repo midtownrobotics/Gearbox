@@ -155,8 +155,6 @@ const routes = app
       name: team.name,
       step: step(team),
       workspaceName: team.slackWorkspaceName,
-      // Whether this server can sign a team up with Discord.
-      discord: Boolean(c.env.DISCORD_CLIENT_ID && c.env.DISCORD_CLIENT_SECRET),
     });
   })
   // Step 2: install the Slack app into the team's workspace.
@@ -235,7 +233,7 @@ const routes = app
   // Step 2, with Discord: add the bot to the team's server and sign the founder in.
   .get("/signup/:signupId/discord", async (c) => {
     const team = await signupFor(c.env, c.req.param("signupId"));
-    if (!team || team.status !== "pending" || !c.env.DISCORD_CLIENT_ID) {
+    if (!team || team.status !== "pending") {
       return c.redirect(`${site(c.env)}/signup`);
     }
     return c.redirect(
@@ -258,8 +256,8 @@ const routes = app
 
     const done = await exchangeCode(
       {
-        DISCORD_CLIENT_ID: c.env.DISCORD_CLIENT_ID ?? "",
-        DISCORD_CLIENT_SECRET: c.env.DISCORD_CLIENT_SECRET ?? "",
+        DISCORD_CLIENT_ID: c.env.DISCORD_CLIENT_ID,
+        DISCORD_CLIENT_SECRET: c.env.DISCORD_CLIENT_SECRET,
       },
       code,
       DISCORD_REDIRECT_URI,

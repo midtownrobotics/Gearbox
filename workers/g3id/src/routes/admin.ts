@@ -16,11 +16,7 @@ import {
   teamUiSettings,
 } from "../db/schema";
 import { CHAT_LABELS, chatForTeam, listChatChannels } from "../lib/chat";
-import {
-  discordConfigured,
-  discordForTeam,
-  removeDiscordInstallation,
-} from "../lib/discord-install";
+import { discordForTeam, removeDiscordInstallation } from "../lib/discord-install";
 import { dmMember } from "../lib/member-dm";
 import { methodOff } from "../lib/sign-in-methods";
 import { removeInstallation, slackForTeam } from "../lib/slack-install";
@@ -521,14 +517,13 @@ export const adminRouter = new Hono<AppEnv>()
       connected: teamDiscord !== null,
       guildId: teamDiscord?.guildId ?? null,
       guildName: teamDiscord?.guildName ?? null,
-      canConnect: discordConfigured(c.env),
     });
   })
   // Disconnects Discord: the bot leaves the server and the team forgets it.
   .delete("/discord", async (c) => {
     const team = c.get("adminTeamId") as string;
     const teamDiscord = await discordForTeam(c.env, team);
-    if (teamDiscord && c.env.DISCORD_BOT_TOKEN) {
+    if (teamDiscord) {
       await leaveGuild({ DISCORD_BOT_TOKEN: c.env.DISCORD_BOT_TOKEN }, teamDiscord.guildId).catch(
         (err) => console.error("[discord] leaving the server failed", err),
       );

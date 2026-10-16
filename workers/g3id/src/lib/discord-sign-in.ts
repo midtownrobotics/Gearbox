@@ -61,7 +61,7 @@ export async function signInWithDiscord(
 
   // Someone new: only the team's own Discord server's members sign up.
   const teamDiscord = await discordForTeam(env, teamId);
-  if (!teamDiscord || !env.DISCORD_BOT_TOKEN) {
+  if (!teamDiscord) {
     return {
       result: "failed",
       message:

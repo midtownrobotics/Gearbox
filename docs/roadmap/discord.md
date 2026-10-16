@@ -2,7 +2,7 @@
 
 Goal: a team that uses Discord instead of Slack can do everything a Slack team can. That means sign up, connect its server, let members join and sign in, link Discord to an account, and get every DM and channel post Gearbox sends today. Everything lands in one branch (`discord-support`) and one pull request.
 
-Status: **built in this branch** (D.1 to D.8). The decisions below were confirmed on 16 October 2026. Discord stays off until its app is made and configured (`docs/deploy.md`, "Discord").
+Status: **built in this branch** (D.1 to D.8). The decisions below were confirmed on 16 October 2026. Discord is always offered; its app's settings are required, like Slack's (`docs/deploy.md`, "Discord").
 
 ## What Slack does today
 

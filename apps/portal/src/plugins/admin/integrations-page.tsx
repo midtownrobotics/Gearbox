@@ -42,7 +42,6 @@ type DiscordStatus = {
   connected: boolean;
   guildId: string | null;
   guildName: string | null;
-  canConnect: boolean;
 };
 
 /** What the team uses an integration for, by the app that uses it ("id" and null: always). */
@@ -357,12 +356,12 @@ export function IntegrationsPage() {
           status={discordStatus}
           uses={usesOf(DISCORD_USES)}
         >
-          {typeof discord !== "string" && discord.canConnect && slackOn && (
+          {typeof discord !== "string" && slackOn && (
             <p className="text-sm text-secondary-500">
               Your team uses Slack. Disconnect it to use Discord instead.
             </p>
           )}
-          {typeof discord !== "string" && discord.canConnect && !slackOn && (
+          {typeof discord !== "string" && !slackOn && (
             <>
               <a href={`${apiPath("id")}/auth/discord/install`} className={linkButton}>
                 {discord.connected ? "Reconnect" : "Connect Discord"}
@@ -377,9 +376,6 @@ export function IntegrationsPage() {
                 />
               )}
             </>
-          )}
-          {typeof discord !== "string" && !discord.canConnect && (
-            <p className="text-sm text-secondary-500">Connecting Discord isn't set up here yet.</p>
           )}
         </IntegrationCard>
 

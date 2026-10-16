@@ -19,10 +19,10 @@ export type TeamChat =
   | ({ provider: "slack" } & TeamSlack)
   | ({ provider: "discord"; bot: { DISCORD_BOT_TOKEN: string } } & TeamDiscord);
 
-/** The team's chat, or null when it has neither (or Discord isn't set up on this server). */
+/** The team's chat, or null when it has neither. */
 export async function chatForTeam(env: Env, teamId: string): Promise<TeamChat | null> {
   const teamDiscord = await discordForTeam(env, teamId);
-  if (teamDiscord && env.DISCORD_BOT_TOKEN) {
+  if (teamDiscord) {
     return {
       provider: "discord",
       bot: { DISCORD_BOT_TOKEN: env.DISCORD_BOT_TOKEN },

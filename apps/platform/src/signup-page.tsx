@@ -6,8 +6,9 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "./api";
 import { Page } from "./layout";
 
-// Signing a team up: its details, then its Slack, then a code the founder sends to the Slack bot.
-// The sign-up's id is in the URL (?id=), so Slack's install can send the founder back here.
+// Signing a team up: its details, then its Slack (and a code the founder sends to the Slack bot) or
+// its Discord (adding the bot signs the founder in). The sign-up's id is in the URL (?id=), so
+// Slack's install can send the founder back here.
 
 /** Countries with FRC teams, named in the browser's language. */
 const COUNTRIES = [
@@ -40,8 +41,6 @@ type Signup = {
   name: string;
   step: "connect" | "code" | "done";
   workspaceName: string | null;
-  /** Whether a team can sign up with Discord here. */
-  discord: boolean;
 };
 
 const field =
@@ -67,8 +66,8 @@ export function SignupPage() {
               Your team's apps, in about two minutes.
             </h1>
             <p className="text-secondary-600">
-              Gearbox is free. Your team signs in with its own Slack, so nobody needs another
-              password.
+              Gearbox is free. Your team signs in with its own Slack or Discord, so nobody needs
+              another password.
             </p>
           </div>
           <ol className="space-y-3">
@@ -96,8 +95,8 @@ export function SignupPage() {
             ))}
           </ol>
           <p className="text-sm text-secondary-500">
-            You'll need permission to add apps to your team's Slack workspace. The person who signs
-            up becomes the team's first admin.
+            You'll need permission to add apps to your team's Slack workspace or Discord server. The
+            person who signs up becomes the team's first admin.
           </p>
         </div>
         <div className="space-y-4">
@@ -294,7 +293,7 @@ function SignupSteps({
         Team <span className="font-semibold text-secondary-900">{signup.teamNumber}</span>,{" "}
         {signup.name}
       </p>
-      {signup.step === "connect" && <ConnectChat signupId={signupId} discord={signup.discord} />}
+      {signup.step === "connect" && <ConnectChat signupId={signupId} />}
       {signup.step === "code" && (
         <SendCode signupId={signupId} workspace={signup.workspaceName} onError={onError} />
       )}
@@ -313,13 +312,13 @@ function SignupSteps({
   );
 }
 
-function ConnectChat({ signupId, discord }: { signupId: string; discord: boolean }) {
+function ConnectChat({ signupId }: { signupId: string }) {
   return (
     <div className="space-y-4">
       <h2 className="text-lg font-semibold text-secondary-900">Connect your team's chat</h2>
       <p className="text-sm text-secondary-600">
         Your team signs in with Slack or Discord, whichever it uses. Add {site.slackBotName} to your
-        Slack workspace{discord ? " or your Discord server" : ""} to continue.
+        Slack workspace or your Discord server to continue.
       </p>
       <a
         href={`/api/signup/${signupId}/slack`}
@@ -328,21 +327,17 @@ function ConnectChat({ signupId, discord }: { signupId: string; discord: boolean
         <FaSlack size={18} />
         Add to Slack
       </a>
-      {discord && (
-        <>
-          <a
-            href={`/api/signup/${signupId}/discord`}
-            className="flex items-center justify-center gap-2 rounded-lg bg-[#5865f2] hover:bg-[#4752c4] py-2.5 font-semibold text-white transition-colors"
-          >
-            <FaDiscord size={18} />
-            Add to Discord
-          </a>
-          <p className="text-xs text-secondary-500">
-            With Discord, you need to be able to manage the server. Adding {site.discordBotName}{" "}
-            also signs you in as your team's first admin.
-          </p>
-        </>
-      )}
+      <a
+        href={`/api/signup/${signupId}/discord`}
+        className="flex items-center justify-center gap-2 rounded-lg bg-[#5865f2] hover:bg-[#4752c4] py-2.5 font-semibold text-white transition-colors"
+      >
+        <FaDiscord size={18} />
+        Add to Discord
+      </a>
+      <p className="text-xs text-secondary-500">
+        With Discord, you need to be able to manage the server. Adding {site.discordBotName} also
+        signs you in as your team's first admin.
+      </p>
     </div>
   );
 }
