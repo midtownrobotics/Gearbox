@@ -199,6 +199,7 @@ crons = ["15 7 * * *", "0 * * * *"]
 
 [env.staging.vars]
 SLACK_CLIENT_ID = "4695117013.12279756431623"
+DISCORD_CLIENT_ID = "1560731248853258314"
 
 [env.staging.build]
 command = "GEARBOX_STAGING=1 pnpm --filter @g3/platform build"

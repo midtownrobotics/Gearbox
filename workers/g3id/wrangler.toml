@@ -137,6 +137,7 @@ GITHUB_REDIRECT_URI = "https://id-dev.g3robotics.com/api/auth/github/callback"
 SLACK_APP_ID = "A0C87N8CPJB"
 STEAM_REDIRECT_URI = "https://id-dev.g3robotics.com/api/auth/steam/callback"
 FRONTEND_URL = "https://1648-id-dev.g3robotics.com"
+DISCORD_CLIENT_ID = "1560731248853258314"
 
 [env.staging.build]
 command = "GEARBOX_STAGING=1 pnpm --filter @g3/g3id build"
