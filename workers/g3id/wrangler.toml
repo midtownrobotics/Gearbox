@@ -72,6 +72,8 @@ SLACK_TEAM_ID = "T04LF3F0D"
 SLACK_APP_ID = "A08M9C82LEL"
 STEAM_REDIRECT_URI = "https://id.frcgearbox.com/api/auth/steam/callback"
 FRONTEND_URL = "https://1648-id.frcgearbox.com"
+# The Discord app's client ID (not secret). Secrets: DISCORD_CLIENT_SECRET, DISCORD_BOT_TOKEN.
+DISCORD_CLIENT_ID = "1560731248853258314"
 
 [observability]
 enabled = false

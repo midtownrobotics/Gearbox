@@ -125,6 +125,8 @@ crons = ["15 7 * * *", "0 * * * *"]
 
 [env.production.vars]
 SLACK_CLIENT_ID = "4695117013.8723416088496"
+# The Discord app's client ID (the same app as G3ID's). Secret: DISCORD_CLIENT_SECRET.
+DISCORD_CLIENT_ID = "1560731248853258314"
 
 # The platform's pages, served by this worker in production; only /api/* runs the worker code,
 # and other paths fall back to index.html for the app's router. Wrangler builds the page before
