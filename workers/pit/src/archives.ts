@@ -9,7 +9,7 @@ import type { AppEnv } from "./types";
 
 // Checklist archives: "Archive and reset" saves the checklists as they stand (what's checked,
 // which issues are open and which were resolved since the archive before), then unchecks
-// everything. Open issues are left alone. The Logs page reads the archives back.
+// everything. Open issues are left alone. The Archives page reads the archives back.
 
 export const ARCHIVE_TYPES = ["match", "practice", "other"] as const;
 export type ArchiveType = (typeof ARCHIVE_TYPES)[number];
@@ -45,7 +45,7 @@ export type ArchiveSnapshot = { lists: ArchivedList[] };
 
 const EVENT_MAX = 60;
 const DETAILS_MAX = 120;
-/** How many archives the Logs page gets at a time. */
+/** How many archives the Archives page gets at a time. */
 const PAGE_SIZE = 50;
 
 function parseId(raw: string | undefined): number | null {
@@ -244,7 +244,7 @@ const pageValidator = validator("query", (value) => {
   return { before: before as string | undefined };
 });
 
-/** What the Logs page lists: an archive without its snapshot. */
+/** What the Archives page lists: an archive without its snapshot. */
 const header = {
   id: checklistArchives.id,
   event: checklistArchives.event,

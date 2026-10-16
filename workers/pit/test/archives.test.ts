@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { nexusNextMatch, tbaMatchLabel } from "../src/archives";
 
 // Checklist archives: "Archive and reset" saves the checklists as they stand, unchecks every item
-// and leaves open issues; the Logs page reads the archives back. A resolved issue is kept until
+// and leaves open issues; the Archives page reads the archives back. A resolved issue is kept until
 // the next archive has said so. Each test has a team of its own, so "the archive before" is always
 // one the test made.
 
@@ -51,7 +51,7 @@ async function report(team: TeamUsers, listId: number, itemId: number, text: str
   );
 }
 
-/** Archives and resets, and gives the archive back as the Logs page reads it. */
+/** Archives and resets, and gives the archive back as the Archives page reads it. */
 async function archive(team: TeamUsers, body: Record<string, unknown> = { type: "other" }) {
   const made = await jsonAs<Header>(team.student, "/archives", { method: "POST", body }, 201);
   return jsonAs<Archive>(team.student, `/archives/${made.id}`);

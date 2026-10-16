@@ -23,6 +23,7 @@ export const APPS: [name: string, packageJson: string][] = [
   ["Orders", "workers/orders/package.json"],
   ["Edge", "workers/edge/package.json"],
   ["Edge agent", "devices/edge-agent/package.json"],
+  ["Pit log downloader", "devices/pit-log-downloader/package.json"],
   ["Scouting", "workers/scouting/package.json"],
   ["Skill Tree", "workers/skill-tree/package.json"],
   ["Attendance", "workers/attendance/package.json"],

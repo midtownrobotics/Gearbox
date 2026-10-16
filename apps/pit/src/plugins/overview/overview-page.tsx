@@ -208,7 +208,7 @@ function MatchTile({
     );
   }
   return (
-    <Link to="/logs" className={tileClass}>
+    <Link to="/archives" className={tileClass}>
       <Stat
         label="Last archive"
         value={

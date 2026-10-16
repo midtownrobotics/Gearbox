@@ -393,7 +393,7 @@ export function ChecklistRunnerPage() {
         <div className="flex flex-wrap gap-2 border-t border-secondary-200 pt-4">
           <ConfirmButton
             label="Reset this list"
-            question="Uncheck every item on this list? Nothing is saved to Logs."
+            question="Uncheck every item on this list? Nothing is saved to Archives."
             confirmLabel="Uncheck every item"
             onConfirm={handleReset}
           />

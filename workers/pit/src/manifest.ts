@@ -37,6 +37,18 @@ export const manifest = defineManifest({
       editedBy: "admin",
       page: "/admin",
     },
+    {
+      key: "matchLogsWhenFull",
+      label: "When Pit has 20 match logs",
+      type: "choice",
+      choices: [
+        { value: "skip-new", label: "Don't save new ones" },
+        { value: "delete-oldest", label: "Delete the oldest" },
+      ],
+      default: "skip-new",
+      editedBy: "mentor",
+      page: "/logs",
+    },
   ],
   plugins: [],
 });

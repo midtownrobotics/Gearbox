@@ -183,7 +183,7 @@ See "What landed". What it settled, and what it left:
   - Checklists: items checked, with a bar.
   - Open issues: how many, and how many are new since the last archive. It opens Checklists at its issues.
   - Batteries: the Next Up battery is the main value, with its voltage; the In Robot one is under it, with how long it has been in. Both are labeled. Erik chose this on 12 October: the next battery is what the crew needs at a glance.
-  - Next match, with the last archive under it. Away from an event, or when nobody can say the next match, this tile is the last archive and opens Logs.
+  - Next match, with the last archive under it. Away from an event, or when nobody can say the next match, this tile is the last archive and opens Archives.
 - **No connection.** Each tile's figure is asked for on its own and keeps what it last had; one nobody has answered shows "—", never an error. `prefetchAll` asks for the issues and archives as the app opens, so their saved copies are there whichever page was opened first. A visitor is asked to sign in only once the worker has said nobody is signed in (`signedOut` in `shared/use-auth.ts`), not when it couldn't be reached.
 - **Widths.** Every page is `narrow`. The Monitor keeps the full width and its own header.
 - **Sizes.** `size="lg"` only for "Archive and reset" and the pop-up's Archive button, which were large before. The rest are the default size, which is no smaller than they were.

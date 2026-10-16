@@ -10,8 +10,25 @@ import { settings } from "./db/schema";
 export const SETTING_KEYS = ["eventKey", "nexusEventKey", "iframeUrl"] as const;
 export type SettingKey = (typeof SETTING_KEYS)[number];
 
+/**
+ * What Pit does with a new match log once the team has MAX_LOGS (match-logs.ts): `skip-new`
+ * leaves it on the downloader (the default), `delete-oldest` deletes the oldest log to make room.
+ * Mentors and admins choose on the Logs page.
+ */
+export const WHEN_FULL = ["skip-new", "delete-oldest"] as const;
+export type WhenFull = (typeof WHEN_FULL)[number];
+
+export async function getWhenFull(db: Db, team: string): Promise<WhenFull> {
+  const value = await getSetting(db, team, "matchLogsWhenFull");
+  return (WHEN_FULL as readonly string[]).includes(value) ? (value as WhenFull) : "skip-new";
+}
+
 /** One of the team's settings, or "" when it hasn't set it. */
-export async function getSetting(db: Db, team: string, key: SettingKey): Promise<string> {
+export async function getSetting(
+  db: Db,
+  team: string,
+  key: SettingKey | "matchLogsWhenFull",
+): Promise<string> {
   const [row] = await db
     .select()
     .from(settings)

@@ -5,6 +5,7 @@ import { useBatteryCache } from "../../shared/battery-cache-context";
 import { ElapsedTime, STATE_TONES, voltageColor } from "../../shared/battery-display";
 import { useFullscreen } from "../../shared/fullscreen-context";
 import { fetchBatteries } from "../../shared/getters/batteries";
+import { type MatchLog, fetchDownloaders, fetchMatchLogs } from "../../shared/getters/downloaders";
 import { fetchAllIssues } from "../../shared/getters/issues";
 import { fetchLists } from "../../shared/getters/lists";
 import type {
@@ -422,6 +423,40 @@ function BatteriesSection({ batteries }: { batteries: Battery[] }) {
   );
 }
 
+/** The team's newest match logs from its log downloaders. */
+function RecentLogsSection({ logs }: { logs: MatchLog[] }) {
+  const when = new Intl.DateTimeFormat(undefined, {
+    weekday: "short",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+  return (
+    <div className="space-y-2">
+      <h2 className="text-xs font-bold uppercase tracking-widest text-secondary-600">
+        Recent Logs
+      </h2>
+      <div className="bg-surface border border-secondary-200 rounded-xl p-5">
+        {logs.length === 0 ? (
+          <p className="text-secondary-500">No match logs yet.</p>
+        ) : (
+          <ul className="divide-y divide-secondary-200">
+            {logs.map((log) => (
+              <li key={log.id} className="flex items-baseline justify-between gap-3 py-2">
+                <span className="font-semibold text-secondary-900">
+                  {log.name} <span className="font-normal text-secondary-500">{log.event}</span>
+                </span>
+                <span className="text-sm text-secondary-500">
+                  {log.uploadedAt ? when.format(log.uploadedAt) : ""}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function ChecklistSection({
   lists,
   issues,
@@ -520,7 +555,10 @@ export function PitMonitorPage() {
   const [monitor, setMonitor] = useState<MonitorData | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [loading, setLoading] = useState(true);
+  // The team's stream link (Admin), shown when it has one.
   const [iframeUrl, setIframeUrl] = useState<string | null>(null);
+  // The newest match logs, while the team has a paired log downloader; null hides the box.
+  const [recentLogs, setRecentLogs] = useState<MatchLog[] | null>(null);
 
   const handleFullscreen = async () => {
     if (!isFullscreen) {
@@ -539,7 +577,7 @@ export function PitMonitorPage() {
   };
 
   async function loadAll() {
-    const [b, l, i, m] = await Promise.all([
+    const [b, l, i, m, logs] = await Promise.all([
       fetchBatteries().catch(() => [] as Battery[]),
       fetchLists().catch(() => [] as ChecklistList[]),
       fetchAllIssues().catch(() => [] as ChecklistIssueSummary[]),
@@ -547,12 +585,19 @@ export function PitMonitorPage() {
         .$get()
         .then((r) => (r.ok ? (r.json() as Promise<MonitorData>) : null))
         .catch(() => null),
+      fetchDownloaders()
+        .then(async ({ downloaders }) =>
+          downloaders.length ? (await fetchMatchLogs()).logs.slice(0, 3) : null,
+        )
+        .catch(() => undefined),
     ]);
     setBatteries(b);
     setCachedBatteries(b);
     setLists(l);
     setIssues(i);
     setMonitor(m);
+    // Kept as it was when it couldn't be asked.
+    if (logs !== undefined) setRecentLogs(logs);
     setLastUpdated(new Date());
     setLoading(false);
   }
@@ -561,7 +606,7 @@ export function PitMonitorPage() {
     const response = await api.monitor.settings.$get();
     if (!response.ok) return;
     const settings = (await response.json()) as { iframeUrl?: string };
-    setIframeUrl(settings.iframeUrl ?? null);
+    setIframeUrl(settings.iframeUrl || null);
   }
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: loadAll is stable
@@ -633,7 +678,7 @@ export function PitMonitorPage() {
             {hasNexus && nexus && <UpcomingMatchesSection nexus={nexus} teamNumber={teamNumber} />}
           </div>
 
-          {/* Right: custom iframe + batteries + checklist + issues */}
+          {/* Right: the stream (when set) + recent logs + batteries + checklist + issues */}
           <div className="space-y-5">
             {iframeUrl && (
               <div className="space-y-2">
@@ -652,6 +697,7 @@ export function PitMonitorPage() {
                 </div>
               </div>
             )}
+            {recentLogs && <RecentLogsSection logs={recentLogs} />}
             <BatteriesSection batteries={batteries} />
             <ChecklistSection lists={lists} issues={issues} />
           </div>

@@ -17,8 +17,13 @@ describe("Pit's team settings", () => {
       team.mentor,
       "/team-settings",
     );
-    expect(state.values).toEqual({ ...values, nexusEventKey: null });
-    expect(state.canEdit).toEqual([]);
+    expect(state.values).toEqual({
+      ...values,
+      nexusEventKey: null,
+      matchLogsWhenFull: "skip-new",
+    });
+    // Mentors choose only what happens to match logs when Pit is full.
+    expect(state.canEdit).toEqual(["matchLogsWhenFull"]);
     const res = await callAs(team.mentor, "/team-settings", {
       method: "PUT",
       body: { values: { eventKey: "2026xyz" } },
