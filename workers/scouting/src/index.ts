@@ -73,13 +73,9 @@ app.use(
   }),
 );
 
-function nonZeroEntry(value: unknown) {
-  if (typeof value === "number") return Number.isFinite(value) && value !== 0;
-  if (typeof value === "boolean") return value;
-  if (typeof value === "string") return value.trim() !== "" && Number(value.trim()) !== 0;
-  if (Array.isArray(value)) return value.length > 0 && value.every(nonZeroEntry);
-  return false;
-}
+/** What a scout is told when a field on a match form has no answer yet. */
+const needsAnswer = (label: string) =>
+  `${label} needs an answer before this form can be submitted.`;
 
 /**
  * A counter's answer as a whole count. A counter reads 0 in the app until it's
@@ -108,17 +104,19 @@ function scoutingRating(field: ScoutingField, value: unknown) {
   return Math.abs(steps - Math.round(steps)) < 1e-9 ? numeric : null;
 }
 
-function validScoutingEntry(field: ScoutingField, value: unknown) {
-  if (field.type === "mcq")
-    return typeof value === "string" && field.options.includes(value) && nonZeroEntry(value);
+/**
+ * Whether a field on a match form has been answered. Every field needs an answer, but what the
+ * answer says is the scout's: a choice named "0", a rating of 0 and a note reading "0" are all
+ * answers, since a robot that did nothing did nothing. Counts and ratings have their own rules
+ * above, and a field map its drawing.
+ */
+function answeredScoutingEntry(field: ScoutingField, value: unknown) {
+  if (field.type === "mcq") return typeof value === "string" && field.options.includes(value);
   if (field.type === "multiSelect") {
     const selected = stringArray(value, 30);
-    return (
-      selected.length > 0 &&
-      selected.every((option) => field.options.includes(option) && nonZeroEntry(option))
-    );
+    return selected.length > 0 && selected.every((option) => field.options.includes(option));
   }
-  return nonZeroEntry(value);
+  return text(value, 3000) !== "";
 }
 
 app.get("/health", (c) =>
@@ -952,25 +950,16 @@ app.post("/scouting-forms/:id/submissions", requireAuth, async (c) => {
     }
     if (formDefinition.form_kind === "scouting" && field.type === "slider") {
       const rating = scoutingRating(field, value);
-      if (rating === null)
-        return c.json(
-          { error: `${field.label} needs an answer before this form can be submitted.` },
-          400,
-        );
+      if (rating === null) return c.json({ error: needsAnswer(field.label) }, 400);
       cleanAnswers[field.id] = rating;
       continue;
     }
     if (
       formDefinition.form_kind === "scouting" &&
       field.type !== "fieldMap" &&
-      !validScoutingEntry(field, value)
+      !answeredScoutingEntry(field, value)
     ) {
-      return c.json(
-        {
-          error: `${field.label} must have a value other than 0 before this form can be submitted.`,
-        },
-        400,
-      );
+      return c.json({ error: needsAnswer(field.label) }, 400);
     }
     if (
       field.required &&

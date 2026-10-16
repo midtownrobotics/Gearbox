@@ -182,6 +182,47 @@ describe("number answers", () => {
     expect((await submitRating(9)).status).toBe(400);
     expect((await submitRating(-1)).status).toBe(400);
   });
+
+  // A choice, a note or a selection reading "0" is the scout's answer, not a blank.
+  const choice = { id: "climbs", label: "Climbs", type: "mcq", options: ["0", "1", "2"] };
+  const picks = { id: "issues", label: "Issues", type: "multiSelect", options: ["0", "Tipped"] };
+  const note = { id: "notes", label: "Notes", type: "shortText" };
+
+  it("keeps a choice of 0", async () => {
+    expect(await submitAnswers(choice, { climbs: "0" })).toEqual({
+      status: 201,
+      stored: { climbs: "0" },
+    });
+  });
+
+  it("keeps a selection of 0", async () => {
+    expect(await submitAnswers(picks, { issues: ["0"] })).toEqual({
+      status: 201,
+      stored: { issues: ["0"] },
+    });
+    expect(await submitAnswers(picks, { issues: ["0", "Tipped"] })).toEqual({
+      status: 201,
+      stored: { issues: ["0", "Tipped"] },
+    });
+  });
+
+  it("keeps a note of 0", async () => {
+    expect(await submitAnswers(note, { notes: "0" })).toEqual({
+      status: 201,
+      stored: { notes: "0" },
+    });
+  });
+
+  it("still needs every field answered", async () => {
+    expect((await submitAnswers(choice, {})).status).toBe(400);
+    expect((await submitAnswers(picks, { issues: [] })).status).toBe(400);
+    expect((await submitAnswers(note, { notes: "   " })).status).toBe(400);
+  });
+
+  it("refuses a choice that isn't one of the form's own", async () => {
+    expect((await submitAnswers(choice, { climbs: "7" })).status).toBe(400);
+    expect((await submitAnswers(picks, { issues: ["Burned"] })).status).toBe(400);
+  });
 });
 
 // How long a finished match stays the current one, so a scout can still send its form in.
