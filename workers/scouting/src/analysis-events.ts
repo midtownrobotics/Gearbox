@@ -1,6 +1,7 @@
 import { inTeam } from "@g3/auth";
 import { inArray } from "drizzle-orm";
 import type { Context } from "hono";
+import { teamApiKey } from "./api-keys";
 import { dbOf } from "./db";
 import { manualEvents, strategyEventConfig } from "./db/schema";
 import type { AppEnv } from "./types";
@@ -24,7 +25,7 @@ export async function analysisEventNames(c: Context<AppEnv>, eventKeys: string[]
     .from(strategyEventConfig)
     .where(inTeam(strategyEventConfig, c.get("teamId")))
     .get();
-  const authKey = config?.authKey || c.env.TBA_AUTH_KEY;
+  const authKey = teamApiKey(c.get("teamId"), config?.authKey, c.env.TBA_AUTH_KEY);
 
   async function resolve(key: string) {
     try {

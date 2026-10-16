@@ -2,7 +2,11 @@ import { workerTestConfig } from "@g3/testing/config";
 
 export default workerTestConfig({
   d1: "SCOUTING_DB",
-  vars: { LOCAL_AUTH_BYPASS: "false" },
+  vars: {
+    LOCAL_AUTH_BYPASS: "false",
+    TBA_AUTH_KEY: "legacy-tba-test-key",
+    NEXUS_API_KEY: "legacy-nexus-test-key",
+  },
   outbound: async (request) => {
     const url = new URL(request.url);
     if (url.hostname === "www.thebluealliance.com") {

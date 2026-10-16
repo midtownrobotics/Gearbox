@@ -1,4 +1,5 @@
 import { inTeam, teamSettingsRoutes, withTeam } from "@g3/auth";
+import { teamApiKey } from "./api-keys";
 import { dbOf } from "./db";
 import { scoutingEngagementSettings, strategyEventConfig } from "./db/schema";
 import { getEngagementSettings } from "./engagement";
@@ -16,7 +17,9 @@ export const teamSettingsRouter = teamSettingsRoutes<AppEnv>(manifest, "Scouting
     return {
       values: { pointsLabel: settings.pointsLabel },
       integrations: {
-        "the blue alliance": { connected: Boolean(config?.tbaKey || c.env.TBA_AUTH_KEY) },
+        "the blue alliance": {
+          connected: Boolean(teamApiKey(c.get("teamId"), config?.tbaKey, c.env.TBA_AUTH_KEY)),
+        },
       },
     };
   },
