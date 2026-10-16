@@ -86,4 +86,49 @@ for (const table of order) {
 }
 db.exec("COMMIT");
 assert.deepEqual(db.prepare("PRAGMA foreign_key_check").all(), []);
+const beforeDelay = db
+  .prepare("SELECT * FROM strategy_event_config")
+  .all()
+  .map((row) => ({ ...row }));
+db.exec(fs.readFileSync(`${md}/0034_auto_advance_delay.sql`, "utf8"));
+const afterDelay = db.prepare("SELECT * FROM strategy_event_config").all();
+assert.deepEqual(
+  afterDelay.map(({ auto_advance_delay_minutes, ...row }) => {
+    assert.equal(auto_advance_delay_minutes, 2);
+    return row;
+  }),
+  beforeDelay,
+);
+for (const value of [-1, 31, 1.5])
+  assert.throws(() =>
+    db.prepare("UPDATE strategy_event_config SET auto_advance_delay_minutes = ?").run(value),
+  );
+console.log(
+  "Auto-advance migration preserves event configuration, defaults existing teams to two minutes and rejects invalid delays.",
+);
+db.prepare("UPDATE strategy_event_config SET auto_advance_delay_minutes = 5").run();
+db.exec(fs.readFileSync(`${md}/0035_submission_window.sql`, "utf8"));
+const converted = db.prepare("SELECT * FROM strategy_event_config").get();
+assert.equal(converted.submission_window_seconds, 300);
+assert.equal("auto_advance_delay_minutes" in converted, false);
+const { submission_window_seconds, ...preserved } = converted;
+assert.deepEqual(preserved, beforeDelay[0]);
+db.prepare(
+  "INSERT INTO strategy_event_config (team_id, id, updated_by, updated_at) VALUES ('migration-test-new', 1, 'test', 1)",
+).run();
+assert.equal(
+  db
+    .prepare(
+      "SELECT submission_window_seconds FROM strategy_event_config WHERE team_id = 'migration-test-new'",
+    )
+    .get().submission_window_seconds,
+  120,
+);
+for (const value of [-1, 1801, 30.5])
+  assert.throws(() =>
+    db.prepare("UPDATE strategy_event_config SET submission_window_seconds = ?").run(value),
+  );
+console.log(
+  "Seconds-based window migration preserves saved delays, defaults new teams to 120 seconds and removes the duplicate setting.",
+);
 db.close();

@@ -3,6 +3,7 @@ import {
   Button,
   Card,
   Chip,
+  Dialog,
   ErrorBanner,
   Loading,
   Page as SharedPage,
@@ -19,6 +20,7 @@ import {
   Check,
   CheckCircle2,
   GripVertical,
+  Info,
   Maximize2,
   Megaphone,
   Minimize2,
@@ -777,7 +779,52 @@ type LiveStrategyUser = {
   current_page?: string;
 };
 
-function LiveStrategy() {
+/** A button beside a heading that explains the section in the page. */
+function InfoButton({ title, children }: { title: string; children: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        type="button"
+        className="info-button"
+        aria-label={`What is ${title}?`}
+        onClick={() => setOpen(true)}
+      >
+        <Info size={16} />
+      </button>
+      {open && (
+        <Dialog title={title} onClose={() => setOpen(false)} centered>
+          {children}
+        </Dialog>
+      )}
+    </>
+  );
+}
+
+/** What the Match schedule section's info button explains. */
+function ScheduleSourceInfo() {
+  return (
+    <InfoButton title="Match schedule">
+      <p>
+        Scouting normally reads the match schedule from The Blue Alliance, and moves everyone on to
+        the next match as the event runs.
+      </p>
+      <p>
+        If your event isn't on The Blue Alliance — an off-season, a practice day or a scrimmage —
+        switch to a manual schedule and enter the teams and matches yourself, by typing them or
+        scanning a photo of the printed schedule. You then set which match everyone is scouting on
+        the Competition overview.
+      </p>
+      <p>
+        A manual schedule is deleted three days after the competition ends, and switching back to
+        The Blue Alliance deletes its teams and matches. Scouting submissions are kept either way.
+      </p>
+    </InfoButton>
+  );
+}
+
+/** Who is in the app right now, inside the Competition overview. */
+function LiveUsers() {
   const [users, setUsers] = useState<LiveStrategyUser[]>([]);
   useEffect(() => {
     const load = () =>
@@ -791,8 +838,8 @@ function LiveStrategy() {
     return () => window.clearInterval(interval);
   }, []);
   return (
-    <Card className="live-strategy">
-      <h2>See Live Users</h2>
+    <div className="live-strategy">
+      <h3>Live users</h3>
       {users.map((user) => (
         <div key={user.user_id}>
           <span className="live-dot" />
@@ -802,7 +849,7 @@ function LiveStrategy() {
         </div>
       ))}
       {!users.length && <div className="forms-empty">No one is currently online.</div>}
-    </Card>
+    </div>
   );
 }
 
@@ -931,9 +978,14 @@ type EventContext = {
   hasNexusApiKey: boolean;
   nexusApiKey: string;
   scheduleMode: "tba" | "manual";
+  submissionWindowSeconds: number | null;
   manualEvent: { event_name: string; ends_at: number; delete_after: number } | null;
   manualTeamNames: Record<string, string>;
 };
+
+/** What the worker takes for the scouting window after a match (`submissionWindow` there). */
+const MIN_SUBMISSION_WINDOW = 0;
+const MAX_SUBMISSION_WINDOW = 1800;
 
 async function prepareScheduleFiles(files: File[]) {
   const prepared: File[] = [];
@@ -1171,6 +1223,13 @@ function ManualModeManager() {
   if (context?.scheduleMode !== "manual")
     return (
       <Card className="manual-mode-switch">
+        <div className="section-heading">
+          <h2>
+            Match schedule
+            <ScheduleSourceInfo />
+          </h2>
+          <span>Coming from The Blue Alliance.</span>
+        </div>
         <Button
           variant="primary"
           type="button"
@@ -1211,9 +1270,12 @@ function ManualModeManager() {
   return (
     <Card className="manual-schedule-panel">
       <header>
-        <div>
-          <strong>All-manual mode</strong>
-          <span>{context.manualEvent?.event_name}</span>
+        <div className="section-heading">
+          <h2>
+            Match schedule
+            <ScheduleSourceInfo />
+          </h2>
+          <span>Entered by hand for {context.manualEvent?.event_name}.</span>
         </div>
         <Button
           variant="primary"
@@ -1466,6 +1528,7 @@ function EventStatus({
   const [tbaAuthKey, setTbaAuthKey] = useState("");
   const [nexusEventKey, setNexusEventKey] = useState("");
   const [nexusApiKey, setNexusApiKey] = useState("");
+  const [submissionWindow, setSubmissionWindow] = useState("");
   const [showTbaAuthKey, setShowTbaAuthKey] = useState(false);
   const [showNexusApiKey, setShowNexusApiKey] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -1477,6 +1540,7 @@ function EventStatus({
       setEventKey(result.eventKey);
       setMatchNumber(result.currentMatchNumber?.toString() ?? "");
       setNexusEventKey(result.nexusEventKey || result.eventKey);
+      setSubmissionWindow(result.submissionWindowSeconds?.toString() ?? "");
     }
   }, []);
   useEffect(() => {
@@ -1499,6 +1563,7 @@ function EventStatus({
         tbaAuthKey,
         nexusEventKey,
         nexusApiKey,
+        submissionWindowSeconds: submissionWindow,
       }),
     }).finally(() => setSaving(false));
     setTbaAuthKey("");
@@ -1516,10 +1581,45 @@ function EventStatus({
   return (
     <div className="event-context">
       {isAdmin && (
-        <Card className="event-admin-panel">
+        <Card className="event-admin-panel competition-overview">
           <header>
-            <h2>Event Configuration</h2>
+            <h2>Competition overview</h2>
           </header>
+          <LiveUsers />
+          <section className="match-submission-status">
+            <h3>
+              {context?.currentMatch
+                ? `${context.currentMatch.label} submissions`
+                : "Current match submissions"}
+            </h3>
+            <div className="match-submission-scroll">
+              {currentMatchSubmissions.length ? (
+                currentMatchSubmissions.map((submission) => (
+                  <button
+                    type="button"
+                    className="submission-chip"
+                    key={submission.id}
+                    onClick={() => onOpenSubmission(submission.id)}
+                  >
+                    <strong>{submission.submitted_by_name}</strong>
+                    <span>Team {submission.team_name}</span>
+                  </button>
+                ))
+              ) : (
+                <span>No submissions yet</span>
+              )}
+            </div>
+          </section>
+          <div className="online-admins">
+            <strong>
+              <Users size={16} /> Online Strategy leads
+            </strong>
+            <span>
+              {context?.onlineAdmins.length
+                ? context.onlineAdmins.map((admin) => admin.display_name).join(", ")
+                : "No other Strategy leads online"}
+            </span>
+          </div>
           <form
             onFocus={() => {
               editingRef.current = true;
@@ -1530,7 +1630,7 @@ function EventStatus({
                 !(await questions.confirm(
                   context?.scheduleMode === "manual"
                     ? "Update the current manual match?"
-                    : "Update the active TBA event and current match?",
+                    : "Update the match everyone is scouting?",
                 ))
               )
                 return;
@@ -1579,6 +1679,37 @@ function EventStatus({
                 </Button>
               )}
             </label>
+            <Button variant="primary" type="submit" disabled={saving}>
+              {saving ? "Updating…" : "Update match"}
+            </Button>
+          </form>
+          {context?.currentMatch && <p>Current: {context.currentMatch.label}</p>}
+          {context?.scheduleError && <p className="event-error">{context.scheduleError}</p>}
+        </Card>
+      )}
+      <div className="next-match-status">
+        <CalendarClock size={20} />
+        <div>
+          <span>Next Team {pageTeamNumber} match</span>
+          <strong>{next?.label ?? "Schedule unavailable"}</strong>
+          {next?.scheduledAt && <time>{new Date(next.scheduledAt).toLocaleString()}</time>}
+        </div>
+      </div>
+      {isAdmin && (
+        <Card className="event-admin-panel">
+          <header>
+            <h2>Event Configuration</h2>
+          </header>
+          <form
+            onFocus={() => {
+              editingRef.current = true;
+            }}
+            onSubmit={async (event) => {
+              event.preventDefault();
+              if (!(await questions.confirm("Update this event's settings?"))) return;
+              await updateEvent(matchNumber);
+            }}
+          >
             {context?.scheduleMode !== "manual" && (
               <label>
                 <strong>TBA Event Key</strong>
@@ -1647,46 +1778,28 @@ function EventStatus({
                 </div>
               </label>
             )}
+            {context?.scheduleMode !== "manual" && (
+              <label className="window-field">
+                <strong>Auto-advance delay (seconds)</strong>
+                <input
+                  className={inputClass}
+                  type="number"
+                  min={MIN_SUBMISSION_WINDOW}
+                  max={MAX_SUBMISSION_WINDOW}
+                  step="1"
+                  value={submissionWindow}
+                  onChange={(event) => setSubmissionWindow(event.target.value)}
+                  placeholder="120"
+                />
+                <small className="field-hint">
+                  Wait after a match finishes. 0 advances immediately.
+                </small>
+              </label>
+            )}
             <Button variant="primary" type="submit" disabled={saving}>
               {saving ? "Updating…" : "Update event"}
             </Button>
           </form>
-          {context?.currentMatch && <p>Current: {context.currentMatch.label}</p>}
-          <section className="match-submission-status">
-            <h3>
-              {context?.currentMatch
-                ? `${context.currentMatch.label} submissions`
-                : "Current match submissions"}
-            </h3>
-            <div className="match-submission-scroll">
-              {currentMatchSubmissions.length ? (
-                currentMatchSubmissions.map((submission) => (
-                  <button
-                    type="button"
-                    className="submission-chip"
-                    key={submission.id}
-                    onClick={() => onOpenSubmission(submission.id)}
-                  >
-                    <strong>{submission.submitted_by_name}</strong>
-                    <span>Team {submission.team_name}</span>
-                  </button>
-                ))
-              ) : (
-                <span>No submissions yet</span>
-              )}
-            </div>
-          </section>
-          {context?.scheduleError && <p className="event-error">{context.scheduleError}</p>}
-          <div className="online-admins">
-            <strong>
-              <Users size={16} /> Online Strategy leads
-            </strong>
-            <span>
-              {context?.onlineAdmins.length
-                ? context.onlineAdmins.map((admin) => admin.display_name).join(", ")
-                : "No other Strategy leads online"}
-            </span>
-          </div>
           <details className="team-schedule">
             <summary>Team {pageTeamNumber} schedule</summary>
             {context?.teamSchedule.map((match) => (
@@ -1699,14 +1812,6 @@ function EventStatus({
           </details>
         </Card>
       )}
-      <div className="next-match-status">
-        <CalendarClock size={20} />
-        <div>
-          <span>Next Team {pageTeamNumber} match</span>
-          <strong>{next?.label ?? "Schedule unavailable"}</strong>
-          {next?.scheduledAt && <time>{new Date(next.scheduledAt).toLocaleString()}</time>}
-        </div>
-      </div>
     </div>
   );
 }
@@ -1893,12 +1998,11 @@ export function ScoutingAdminPage({
       className="scouting-page-frame"
       contentClassName="page scouting-admin-page"
     >
+      <AnnouncementManager />
+      <EventStatus isAdmin isG3IdAdmin={isG3IdAdmin} onOpenSubmission={onOpenSubmission} />
       {engagement}
       <ManualModeManager />
-      <EventStatus isAdmin isG3IdAdmin={isG3IdAdmin} onOpenSubmission={onOpenSubmission} />
       <AdminManager isG3IdAdmin={isG3IdAdmin} />
-      <LiveStrategy />
-      <AnnouncementManager />
     </SharedPage>
   );
 }

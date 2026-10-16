@@ -54,6 +54,7 @@ As of 10 October 2026, five of the six Phase 0 steps are done on `main`, Phase 1
 
 | Change | Roadmap step | Pull request |
 | --- | --- | --- |
+| Scouting combines the Competition overview and zero-rating fixes with report filters, prediction reliability and isolated credentials. One seconds-based advance delay defaults to 120 seconds and preserves saved values. See [combined validation](scouting-merged-validation.md) | Phase 3: Scouting integration | This PR |
 | Scouting reserves legacy deployment API keys for their original team. Other teams use their own saved credentials; configuration status and event validation enforce the same rule. See [credential isolation](scouting-api-key-isolation.md) | Phase 3: Scouting credentials | This PR |
 | Scouting separates match and pit forms and adds report-type filters and sorting. Analysis uses named competitions across statistics, auto paths and comparisons; public TBA names are cached while manual names remain private to their team. See [validation](scouting-report-validation.md) | Phase 3: Scouting report organization | This PR |
 | Scouting's inline mobile maps expose labeled Undo and Clear, with larger controls and no toolbar covering the drawing. All three canvas editors handle canceled and secondary pointers, auto-route clearing is undoable, and phone fullscreen preserves the field's proportions. [Mobile validation](scouting-mobile-validation.md) covers all pages and mouse/touch drawing workflows | Phase 3: Scouting mobile usability | This PR |
