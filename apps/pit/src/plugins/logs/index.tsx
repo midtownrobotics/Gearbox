@@ -4,5 +4,5 @@ import { LogsPage } from "./logs-page";
 export const logsPlugin: Plugin = {
   name: "logs",
   routes: [{ path: "/logs", element: <LogsPage /> }],
-  navItems: [{ label: "Logs", to: "/logs", order: 2 }],
+  navItems: [{ label: "Logs", to: "/logs", order: 3 }],
 };

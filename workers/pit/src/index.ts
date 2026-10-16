@@ -801,7 +801,7 @@ const app = base
     return c.json(updated);
   })
 
-  // Checklist archives: "Archive and reset" and the Logs page (./archives.ts).
+  // Checklist archives: "Archive and reset" and the Archives page (./archives.ts).
   .route("/archives", archiveRoutes)
 
   // Global reset — unchecks all items across all lists, preserves issues, archives nothing
