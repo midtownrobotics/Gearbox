@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers";
 import { teamKey } from "@g3/site-config";
-import { admin, kioskAdmin, student } from "@g3/testing/users";
+import { admin, kioskAdmin, otherStudent, student } from "@g3/testing/users";
 import { call, callAs, jsonAs } from "@g3/testing/worker";
 import { describe, expect, it } from "vitest";
 import type { AppEnv } from "../src/types";
@@ -95,21 +95,21 @@ describe("tier lists", () => {
   });
 });
 
-describe("counter answers", () => {
+// A number a scout records is their answer, 0 included: a robot that scored
+// nothing scored nothing. Counters have no maximum to set on a form, so a count
+// past the field's stored default (fuel, cycles) is an answer too.
+describe("number answers", () => {
   const db = (env as unknown as AppEnv["Bindings"]).SCOUTING_DB;
 
-  // A counter has no maximum to set on a form, so a scout counting past the
-  // field's stored default (fuel, cycles) must still be able to submit, and a
-  // count of 0 is a real answer: the robot scored nothing.
-  const submitCount = async (count: unknown) => {
+  const submitAnswers = async (
+    field: Record<string, unknown>,
+    answers: Record<string, unknown>,
+  ) => {
     const eventKey = `manual-${crypto.randomUUID()}`;
     const { id } = await jsonAs<{ id: string }>(
       admin,
       "/scouting/scouting-forms",
-      {
-        method: "POST",
-        body: { name: "Fuel", fields: [{ id: "autoFuel", label: "Auto Fuel", type: "counter" }] },
-      },
+      { method: "POST", body: { name: "Match", fields: [field] } },
       201,
     );
     await db
@@ -125,39 +125,153 @@ describe("counter answers", () => {
       .bind(teamKey, eventKey, student.id, Date.now())
       .run();
     const body = new FormData();
-    body.set("answers", JSON.stringify(count === undefined ? {} : { autoFuel: count }));
+    body.set("answers", JSON.stringify(answers));
     const response = await callAs(student, `/scouting/scouting-forms/${id}/submissions`, {
       method: "POST",
       body,
     });
-    return { response, formId: id };
-  };
-  const storedCount = (formId: string) =>
-    db
+    const stored = await db
       .prepare("SELECT answers_json FROM scouting_form_submissions WHERE form_id = ?")
-      .bind(formId)
+      .bind(id)
       .first<{ answers_json: string }>();
+    return { status: response.status, stored: JSON.parse(stored?.answers_json ?? "{}") };
+  };
+
+  const counter = { id: "autoFuel", label: "Auto Fuel", type: "counter" };
+  const submitCount = (count: unknown) =>
+    submitAnswers(counter, count === undefined ? {} : { autoFuel: count });
+  // A rating slider carries its own range, and this one starts at 0.
+  const slider = {
+    id: "defense",
+    label: "Defense rating",
+    type: "slider",
+    min: 0,
+    max: 5,
+    step: 1,
+  };
+  const submitRating = (rating: unknown) =>
+    submitAnswers(slider, rating === undefined ? {} : { defense: rating });
 
   it("takes a count past the field's default range", async () => {
-    const { response, formId } = await submitCount(30);
-    expect(response.status).toBe(201);
-    expect(JSON.parse((await storedCount(formId))?.answers_json ?? "{}")).toEqual({ autoFuel: 30 });
+    expect(await submitCount(30)).toEqual({ status: 201, stored: { autoFuel: 30 } });
   });
 
   it("keeps a count of 0, so a robot that scored nothing is recorded", async () => {
-    const { response, formId } = await submitCount(0);
-    expect(response.status).toBe(201);
-    expect(JSON.parse((await storedCount(formId))?.answers_json ?? "{}")).toEqual({ autoFuel: 0 });
+    expect(await submitCount(0)).toEqual({ status: 201, stored: { autoFuel: 0 } });
   });
 
   it("counts an untouched counter as 0, the number the app shows", async () => {
-    const { response, formId } = await submitCount(undefined);
-    expect(response.status).toBe(201);
-    expect(JSON.parse((await storedCount(formId))?.answers_json ?? "{}")).toEqual({ autoFuel: 0 });
+    expect(await submitCount(undefined)).toEqual({ status: 201, stored: { autoFuel: 0 } });
   });
 
   it("refuses a count that isn't a whole number of 0 or more", async () => {
-    expect((await submitCount(-5)).response.status).toBe(400);
-    expect((await submitCount(2.5)).response.status).toBe(400);
+    expect((await submitCount(-5)).status).toBe(400);
+    expect((await submitCount(2.5)).status).toBe(400);
+  });
+
+  it("keeps a rating of 0 when the slider's range starts there", async () => {
+    expect(await submitRating(0)).toEqual({ status: 201, stored: { defense: 0 } });
+    expect(await submitRating(5)).toEqual({ status: 201, stored: { defense: 5 } });
+  });
+
+  it("still needs the slider answered, since it records nothing until it's moved", async () => {
+    expect((await submitRating(undefined)).status).toBe(400);
+  });
+
+  it("refuses a rating outside the slider's range", async () => {
+    expect((await submitRating(9)).status).toBe(400);
+    expect((await submitRating(-1)).status).toBe(400);
+  });
+
+  // A choice, a note or a selection reading "0" is the scout's answer, not a blank.
+  const choice = { id: "climbs", label: "Climbs", type: "mcq", options: ["0", "1", "2"] };
+  const picks = { id: "issues", label: "Issues", type: "multiSelect", options: ["0", "Tipped"] };
+  const note = { id: "notes", label: "Notes", type: "shortText" };
+
+  it("keeps a choice of 0", async () => {
+    expect(await submitAnswers(choice, { climbs: "0" })).toEqual({
+      status: 201,
+      stored: { climbs: "0" },
+    });
+  });
+
+  it("keeps a selection of 0", async () => {
+    expect(await submitAnswers(picks, { issues: ["0"] })).toEqual({
+      status: 201,
+      stored: { issues: ["0"] },
+    });
+    expect(await submitAnswers(picks, { issues: ["0", "Tipped"] })).toEqual({
+      status: 201,
+      stored: { issues: ["0", "Tipped"] },
+    });
+  });
+
+  it("keeps a note of 0", async () => {
+    expect(await submitAnswers(note, { notes: "0" })).toEqual({
+      status: 201,
+      stored: { notes: "0" },
+    });
+  });
+
+  it("still needs every field answered", async () => {
+    expect((await submitAnswers(choice, {})).status).toBe(400);
+    expect((await submitAnswers(picks, { issues: [] })).status).toBe(400);
+    expect((await submitAnswers(note, { notes: "   " })).status).toBe(400);
+  });
+
+  it("refuses a choice that isn't one of the form's own", async () => {
+    expect((await submitAnswers(choice, { climbs: "7" })).status).toBe(400);
+    expect((await submitAnswers(picks, { issues: ["Burned"] })).status).toBe(400);
+  });
+});
+
+// How long a finished match stays the current one, so a scout can still send its form in.
+describe("scouting window", () => {
+  const db = (env as unknown as AppEnv["Bindings"]).SCOUTING_DB;
+  const windowOf = () =>
+    db
+      .prepare(
+        "SELECT submission_window_seconds AS seconds FROM strategy_event_config WHERE team_id = ? AND id = 1",
+      )
+      .bind(teamKey)
+      .first<{ seconds: number }>();
+  const save = (submissionWindowSeconds: unknown) =>
+    callAs(admin, "/scouting/event-context", {
+      method: "PUT",
+      body: { eventKey: "", submissionWindowSeconds },
+    });
+
+  it("uses the shared window and is a strategy lead's to change", async () => {
+    expect((await save(180)).status).toBe(200);
+    expect(await windowOf()).toEqual({ seconds: 180 });
+    expect(await jsonAs(admin, "/scouting/event-context")).toMatchObject({
+      submissionWindowSeconds: 180,
+    });
+    expect(
+      (await callAs(otherStudent, "/scouting/event-context", { method: "PUT", body: {} })).status,
+    ).toBe(403);
+  });
+
+  it("keeps the saved window when a form doesn't send one", async () => {
+    await save(240);
+    expect(
+      (await callAs(admin, "/scouting/event-context", { method: "PUT", body: { eventKey: "" } }))
+        .status,
+    ).toBe(200);
+    expect(await windowOf()).toEqual({ seconds: 240 });
+  });
+
+  it("refuses a window outside what a match allows", async () => {
+    await save(120);
+    expect((await save(-1)).status).toBe(400);
+    expect((await save(4000)).status).toBe(400);
+    expect((await save(30.5)).status).toBe(400);
+    expect(await windowOf()).toEqual({ seconds: 120 });
+  });
+
+  it("keeps the window out of what a scout can read", async () => {
+    expect(await jsonAs(otherStudent, "/scouting/event-context")).toMatchObject({
+      submissionWindowSeconds: null,
+    });
   });
 });

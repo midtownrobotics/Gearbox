@@ -20,6 +20,7 @@ type Report = {
   id: string;
   teamName: string;
   formName: string;
+  formKind: "scouting" | "pit";
   fields: ScoutingField[];
   answers: Record<string, unknown>;
   drawings: Record<string, string>;
@@ -32,6 +33,11 @@ type Report = {
   archivedAt?: number | null;
   archiveReason?: string;
 };
+type ReportSort = "team" | "match" | "form" | "newest" | "starred";
+
+/** Match forms before pit forms, each group's own forms by name. */
+const FORM_KIND_ORDER: Record<Report["formKind"], number> = { scouting: 0, pit: 1 };
+
 type TeamMatch = {
   key: string;
   label: string;
@@ -113,7 +119,7 @@ export function Analysis({ initialReportId }: { initialReportId?: string | null 
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [blankPathIds, setBlankPathIds] = useState<Set<string>>(() => new Set());
-  const [reportSort, setReportSort] = useState<"team" | "match" | "newest" | "starred">("team");
+  const [reportSort, setReportSort] = useState<ReportSort>("team");
   const [tab, setTab] = useState<"stats" | "matches" | "auto" | "compare">("stats");
   const [expandedReportId, setExpandedReportId] = useState<string | null>(initialReportId ?? null);
   const [selectedPath, setSelectedPath] = useState<{
@@ -261,6 +267,15 @@ export function Analysis({ initialReportId }: { initialReportId?: string | null 
           Number.isFinite(leftTeam) && Number.isFinite(rightTeam)
             ? leftTeam - rightTeam
             : left.teamName.localeCompare(right.teamName, undefined, { numeric: true });
+        return teamOrder || right.createdAt - left.createdAt;
+      }
+      if (reportSort === "form") {
+        const kindOrder =
+          (FORM_KIND_ORDER[left.formKind] ?? 2) - (FORM_KIND_ORDER[right.formKind] ?? 2);
+        if (kindOrder !== 0) return kindOrder;
+        const nameOrder = left.formName.localeCompare(right.formName, undefined, { numeric: true });
+        if (nameOrder !== 0) return nameOrder;
+        const teamOrder = left.teamName.localeCompare(right.teamName, undefined, { numeric: true });
         return teamOrder || right.createdAt - left.createdAt;
       }
       if (reportSort === "newest") return right.createdAt - left.createdAt;
@@ -438,12 +453,11 @@ export function Analysis({ initialReportId }: { initialReportId?: string | null 
               <select
                 className={inputClass}
                 value={reportSort}
-                onChange={(event) =>
-                  setReportSort(event.target.value as "team" | "match" | "newest" | "starred")
-                }
+                onChange={(event) => setReportSort(event.target.value as ReportSort)}
               >
                 <option value="team">Team number, newest first</option>
                 <option value="match">Competition and match</option>
+                <option value="form">Form, match forms first</option>
                 <option value="newest">Newest first</option>
                 <option value="starred">Highlights first</option>
               </select>
