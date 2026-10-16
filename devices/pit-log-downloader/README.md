@@ -75,8 +75,10 @@ pnpm --filter @g3/pit-log-downloader start -- --dev   # pairs with the Pit under
 pnpm --filter @g3/pit-log-downloader watch -- --dev   # the same, reloading as you edit
 ```
 
-`--dev` pairs with the Pit worker running here under `pnpm dev` (its address in the repo's
-`.dev-ports.json`), for any team number, instead of the team's Pit on Gearbox. A pairing made
+`--dev` pairs with the team's Pit under `pnpm dev`, through the dev gateway
+(`http://1648-pit.gearbox.localhost:8796`, the gateway's address from the repo's
+`.dev-ports.json`), instead of its Pit on Gearbox. A team other than the site's needs to be
+signed up in the local platform first. A pairing made
 with or without it only works the same way: switching asks to pair again. `watch` restarts the
 downloader when `src/` changes and reloads the status page as you edit it.
 

@@ -7,7 +7,7 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { config, pitHeaders, pitUrlFor } from "./config.ts";
+import { config, pitUrlFor } from "./config.ts";
 import type { GearboxStatus } from "./status.ts";
 
 export type Pairing = {
@@ -56,7 +56,6 @@ export const currentPairing = () => pairing;
 /** A request to a team's Pit API, with this downloader's key when it has one. */
 function pit(teamNumber: number, apiPath: string, init: RequestInit = {}) {
   const headers = new Headers(init.headers);
-  for (const [name, value] of Object.entries(pitHeaders(teamNumber))) headers.set(name, value);
   if (pairing) headers.set("Authorization", `Bearer ${pairing.key}`);
   if (init.body) headers.set("Content-Type", "application/json");
   return fetch(`${pitUrlFor(teamNumber)}/api${apiPath}`, {
@@ -79,7 +78,8 @@ export function gearboxStatus(): GearboxStatus {
           pairedAt: pairing.pairedAt,
         }
       : null,
-    pitUrl: config.pitUrl,
+    // Shown on the pairing screen when it isn't the team's usual Pit on Gearbox.
+    pitUrl: config.pitUrl ?? (config.devGateway ? pitUrlFor("<team>") : null),
     connection,
     checkedAt,
     defaultName: defaultName(),

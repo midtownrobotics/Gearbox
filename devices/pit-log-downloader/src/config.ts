@@ -26,19 +26,18 @@ if (pitUrl && !/^https?:\/\/[^/]+$/.test(pitUrl)) {
 }
 
 /**
- * `--dev` (`pnpm --filter @g3/pit-log-downloader start -- --dev`): pair with the Pit worker
- * running here under `pnpm dev`, at its port in the repo's .dev-ports.json.
+ * `--dev` (`pnpm --filter @g3/pit-log-downloader start -- --dev`): pair with the team's Pit under
+ * `pnpm dev`, through the dev gateway (http://1648-pit.gearbox.localhost:8796), whose address is
+ * in the repo's .dev-ports.json.
  */
-const dev = process.argv.includes("--dev");
-
-function localPitUrl() {
+function devGateway() {
   try {
     const ports = JSON.parse(readFileSync(join(packageDir, "../../.dev-ports.json"), "utf8")) as {
       workers: Record<string, { url: string }>;
     };
-    return ports.workers.pit.url.replace(/\/+$/, "");
+    return ports.workers.gateway.url.replace(/\/+$/, "");
   } catch {
-    return fail("--dev needs the repo's .dev-ports.json to find the local Pit.");
+    return fail("--dev needs the repo's .dev-ports.json to find the dev gateway.");
   }
 }
 
@@ -49,26 +48,25 @@ export const config = {
    * The Pit to pair with when it isn't the team's usual address (staging, a local Pit); null for
    * the usual one, worked out from the team number given when pairing.
    */
-  pitUrl: pitUrl ?? (dev ? localPitUrl() : null),
-  /** Pairing with the local Pit (`--dev`), which takes the team from a header, like the gateway. */
-  dev: dev && !pitUrl,
+  pitUrl,
+  /** The dev gateway (`--dev`), whose team addresses are the team's Pit; null otherwise. */
+  devGateway: process.argv.includes("--dev") && !pitUrl ? devGateway() : null,
   googleKeyFile: fromPackage(setting("GOOGLE_KEY_FILE") ?? "service-account-key.json"),
   dataDir: fromPackage(setting("DATA_DIR") ?? "data"),
   port,
   host: setting("HOST") ?? "127.0.0.1",
 };
 
-/** A team's Pit: PIT_URL, else its usual address (https://1648-pit.frcgearbox.com). */
-export const pitUrlFor = (teamNumber: number) =>
-  config.pitUrl ?? teamAppUrlVia(undefined, `frc${teamNumber}`, "pit");
+/**
+ * A team's Pit: PIT_URL, else its usual address (https://1648-pit.frcgearbox.com), or with --dev
+ * its address on the dev gateway (http://1648-pit.gearbox.localhost:8796).
+ */
+export const pitUrlFor = (teamNumber: number | string) =>
+  config.pitUrl ?? teamAppUrlVia(config.devGateway ?? undefined, `frc${teamNumber}`, "pit");
 
 /** The robot network's first three parts, as in WPILib's IP configurations: 10.TE.AM. */
 export const robotNetworkOf = (teamNumber: number) =>
   `10.${Math.floor(teamNumber / 100)}.${teamNumber % 100}`;
-
-/** Headers for the team's Pit: the team itself, on the local Pit, which has no gateway. */
-export const pitHeaders = (teamNumber: number): Record<string, string> =>
-  config.dev ? { "X-Team-Id": `frc${teamNumber}` } : {};
 
 /** An FRC team number, or null. */
 export function parseTeamNumber(value: unknown): number | null {

@@ -6,7 +6,7 @@ import express from "express";
 import { type drive_v3, google } from "googleapis";
 import isOnline from "is-online";
 import { NodeSSH } from "node-ssh";
-import { config, parseTeamNumber, robotNetworkOf } from "./config.ts";
+import { config, parseTeamNumber, pitUrlFor, robotNetworkOf } from "./config.ts";
 import {
   PairingError,
   checkGearbox,
@@ -114,7 +114,9 @@ function robotNetwork() {
       ? `Paired with team ${pairing.teamNumber}'s Pit as ${pairing.name}. Logs are kept in ${kLogsDir}.`
       : `Not paired with Gearbox yet: open ${page} to pair it.`,
   );
-  if (config.dev) logWithTimestamp(`--dev: pairing with the local Pit at ${config.pitUrl}.`);
+  if (config.devGateway) {
+    logWithTimestamp(`--dev: pairing through the dev gateway, at ${pitUrlFor("<team>")}.`);
+  }
 }
 if (!kLogFolderId) {
   logWithTimestamp("No DRIVE_FOLDER_ID is set, so logs stay on this computer.");

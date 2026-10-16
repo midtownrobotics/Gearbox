@@ -28,8 +28,8 @@ export type LogStatus = {
 /** Pairing with the team's Pit on Gearbox (src/gearbox.ts). */
 export type GearboxStatus = {
   /**
-   * The Pit it's set to pair with when that isn't the team's usual address (PIT_URL, or the local
-   * Pit with --dev); null for the usual one.
+   * The Pit it's set to pair with when that isn't the team's usual address (PIT_URL, or the dev
+   * gateway's "http://<team>-pit.gearbox.localhost:8796" with --dev); null for the usual one.
    */
   pitUrl: string | null;
   /** Null until it's paired: then the downloader does nothing but ask to be. */
