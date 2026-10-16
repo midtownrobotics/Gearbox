@@ -27,8 +27,8 @@ export function Header() {
         <a href="/#how" className="g3-nav-text-link hidden md:block">
           Set up
         </a>
-        <a href="/#customize" className="g3-nav-text-link hidden md:block">
-          Make it yours
+        <a href="/#open-source" className="g3-nav-text-link hidden md:block">
+          Open source
         </a>
         <span className="text-sm">
           <MyTeamButton />
@@ -55,6 +55,10 @@ export function Footer() {
           <p>
             Free, open source (MIT), and run by volunteers from {site.team.name}, FRC Team{" "}
             {site.team.number}.
+          </p>
+          <p>
+            With thanks to Team 4414 (TideApps), Team 6328, FRCBOM, FRCTools and FRCDesign, whose
+            work Gearbox builds on.
           </p>
         </div>
         <div className="flex flex-wrap gap-x-5 gap-y-2">

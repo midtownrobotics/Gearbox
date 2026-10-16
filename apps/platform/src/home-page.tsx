@@ -1,23 +1,18 @@
-import { type AppName, demoTeamId, demoUrl, site, teamAppUrl } from "@g3/site-config";
+import { type AppName, demoTeamId, site, teamAppUrl } from "@g3/site-config";
 import { type ReactNode, useEffect, useState } from "react";
 import {
-  FaChalkboardTeacher,
   FaCodeBranch,
   FaGithub,
-  FaHome,
-  FaKey,
   FaPalette,
   FaServer,
   FaSlack,
   FaSlidersH,
   FaToggleOn,
-  FaUserGraduate,
   FaUserShield,
 } from "react-icons/fa";
 import { Link } from "react-router-dom";
 import attendanceIcon from "./assets/app-icons/attendance.svg";
 import edgeIcon from "./assets/app-icons/edge.svg";
-import idIcon from "./assets/app-icons/id.svg";
 import inventoryIcon from "./assets/app-icons/inventory.svg";
 import ordersIcon from "./assets/app-icons/orders.svg";
 import pitIcon from "./assets/app-icons/pit.svg";
@@ -28,14 +23,14 @@ import skillsIcon from "./assets/app-icons/skills.svg";
 import { Page } from "./layout";
 import { MyTeamButton } from "./team-pages";
 
-// The platform's public page: what Gearbox is, its apps, how a team makes it its own, and how to
-// sign up. Written from the release announcement.
+// The platform's public page: what Gearbox is, its apps, how to try them in the demo, how to sign
+// up, and that it's open source. Every section is a click from the demo, which shows the product.
 
-/** `demo`: the app in the public demo, where its card links (none for one the demo doesn't have). */
-type App = { name: string; icon: string; blurb: string; demo?: AppName };
-
-/** Sign-in, on every team: in the launcher mock, not the app list. */
-const SIGN_IN: App = { name: "Sign-in", icon: idIcon, blurb: "" };
+/**
+ * `demo`: the app in the public demo, where its card and launcher tile link. `soon`: not open to
+ * other teams yet (Edge: only its box link is done, roadmap "Edge: an app any team can run").
+ */
+type App = { name: string; icon: string; blurb: string; demo: AppName; soon?: boolean };
 
 const APPS: App[] = [
   {
@@ -98,32 +93,17 @@ const APPS: App[] = [
     name: "Edge",
     demo: "edge",
     icon: edgeIcon,
+    soon: true,
     blurb:
-      "Optional, with a small box on your shop's network: see how much data each device uses, block distractions, and print from any app.",
+      "With a small box on your shop's network: see how much data each device uses, block distractions, and print from any app.",
   },
 ];
 
-const FOUNDATION = [
-  {
-    icon: FaSlack,
-    title: "Sign in once",
-    body: "Members join from your Slack workspace and an admin lets them in. That one account works in every app. (Slack is required today; other options are planned.)",
-  },
-  {
-    icon: FaUserShield,
-    title: "Roles that follow you",
-    body: "Admin, mentor or student is set once and respected everywhere, so mentors approve orders and sign off skills with the same account.",
-  },
-  {
-    icon: FaHome,
-    title: "A home for your team",
-    body: "Your own address on frcgearbox.com with your apps and the links your team uses most, from your website to The Blue Alliance.",
-  },
-  {
-    icon: FaPalette,
-    title: "Your colors, everywhere",
-    body: "Set your name, logo and colors once and every app picks them up, light mode and dark.",
-  },
+/** What every app shares: one line after the apps. */
+const SHARED = [
+  { icon: FaSlack, text: "One sign-in through your team's Slack" },
+  { icon: FaUserShield, text: "Admin, mentor and student roles in every app" },
+  { icon: FaPalette, text: "Your name, logo and colors everywhere" },
 ];
 
 const CUSTOMIZE = [
@@ -149,33 +129,11 @@ const CUSTOMIZE = [
   },
 ];
 
-const DEMO_ROLES = [
-  {
-    role: "student",
-    icon: FaUserGraduate,
-    title: "Student",
-    body: "Request parts, check off the pit list, work through the skill trees and see your schedule.",
-  },
-  {
-    role: "mentor",
-    icon: FaChalkboardTeacher,
-    title: "Mentor",
-    body: "Approve orders and build carts, sign off skills, and plan who does what at an event.",
-  },
-  {
-    role: "admin",
-    icon: FaKey,
-    title: "Admin",
-    body: "Everything a mentor does, plus each app's settings and the team's admin pages.",
-  },
-] as const;
+const DEMO_ROLES = ["student", "mentor", "admin"] as const;
 
-const DEMO_NOTES = [
-  "It starts fresh every night at midnight Eastern.",
-  "Everyone shares it, so you'll see what other visitors changed today.",
-  "Text is picked from examples with a rotate button instead of typed.",
-  "Slack, printing and Onshape aren't connected, so those parts are switched off.",
-];
+/** Into the demo as a role, through its sign-in page. */
+const demoAs = (role: (typeof DEMO_ROLES)[number]) =>
+  `${teamAppUrl(demoTeamId, "id")}/demo?role=${role}`;
 
 const STEPS = [
   {
@@ -196,15 +154,34 @@ export function HomePage() {
   return (
     <Page>
       <Hero />
-      <Foundation />
       <Apps />
+      <Shared />
       <Demo />
-      <MakeItYours />
       <HowItWorks />
-      <Feedback />
-      <Thanks />
+      <OpenSource />
       <FinalCall />
     </Page>
+  );
+}
+
+/** "Try it as a student", "… a mentor", "… an admin": small buttons into the demo. */
+function DemoButtons({ dark = false }: { dark?: boolean }) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {DEMO_ROLES.map((role) => (
+        <a
+          key={role}
+          href={demoAs(role)}
+          className={`rounded-lg border px-4 py-2 text-sm font-semibold shadow-sm transition-colors ${
+            dark
+              ? "border-[#333333] bg-[#1a1a1a] text-[#ffffff] hover:bg-[#262626]"
+              : "border-line bg-surface text-secondary-900 hover:bg-inset"
+          }`}
+        >
+          Try it as {role === "admin" ? "an" : "a"} {role}
+        </a>
+      ))}
+    </div>
   );
 }
 
@@ -218,33 +195,36 @@ function Hero() {
       <div className="relative mx-auto grid max-w-6xl items-center gap-12 px-5 py-16 sm:py-24 lg:grid-cols-[1.1fr_1fr]">
         <div className="space-y-6">
           <p className="text-sm font-semibold uppercase tracking-widest text-primary-500">
-            FRC productivity for the modern era
+            Free · Open source · Built by FRC Team {site.team.number}
           </p>
-          <h1 className="text-4xl font-bold leading-tight tracking-tight text-secondary-900 sm:text-5xl">
-            Run your whole team from one place.
-          </h1>
+          <div className="space-y-3">
+            <span className="inline-block rounded-full border border-primary-200 bg-primary-50 px-3 py-0.5 text-xs font-semibold text-primary-700">
+              Open beta
+            </span>
+            <h1 className="text-4xl font-bold leading-tight tracking-tight text-secondary-900 sm:text-5xl">
+              Run your whole team from one place.
+            </h1>
+          </div>
           <p className="max-w-xl text-lg text-secondary-600">
-            Parts, shop, pit, scouting, attendance and training in apps that share your members,
-            roles and branding. Free, open source and made by an FRC team.
+            Orders, shop tracking, pit checklists and scouting that all share one sign-in through
+            your team's Slack. Free, open source, and built by an FRC team.
           </p>
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <Link
               to="/signup"
               className="rounded-lg bg-primary-600 px-6 py-3 font-semibold text-white shadow-sm transition-colors hover:bg-primary-500"
             >
               Sign up your team
             </Link>
-            <a
-              href={demoUrl}
-              className="rounded-lg border border-line bg-surface px-6 py-3 font-semibold text-secondary-900 shadow-sm transition-colors hover:bg-inset"
-            >
-              Try the demo
-            </a>
             <MyTeamButton large />
           </div>
-          <p className="text-sm text-secondary-500">
-            Takes about two minutes. You'll need to be able to add an app to your team's Slack.
-          </p>
+          <DemoButtons />
+          <div className="space-y-1 text-sm text-secondary-500">
+            <p>
+              Takes about two minutes. You'll need to be able to add an app to your team's Slack.
+            </p>
+            <p>Tested by {site.team.name} through the 2026 offseason.</p>
+          </div>
         </div>
         <LauncherMock />
       </div>
@@ -254,29 +234,29 @@ function Hero() {
 
 /** A moment from each app, shown in turn on the launcher mock. */
 const MOMENTS: { app: string; label: string; text: string }[] = [
-  { app: "Sign-in", label: "New member", text: "Jordan joined from Slack" },
   { app: "Orders", label: "Order approved", text: '4× 1/2" hex bearings' },
   { app: "Shop", label: "Part finished", text: "Intake side plate · 2 of 2 cut" },
   { app: "Pit", label: "Battery ready", text: "Battery 7 charged for Q42" },
   { app: "Scouting", label: "Pick list updated", text: "Team 9999 moved to the top tier" },
+  { app: "Schedule", label: "Shift reminder", text: "Pit crew shift starts in 15 min" },
   { app: "Skill Tree", label: "Skill signed off", text: "CAD Basics · complete" },
 ];
 
-const LAUNCHER_APPS = [
-  SIGN_IN,
-  ...APPS.filter((app) => !["Attendance", "Inventory", "Schedule", "Edge"].includes(app.name)),
-];
+const LAUNCHER_APPS = MOMENTS.map((moment) => APPS.find((app) => app.name === moment.app) as App);
+
+/** How long each moment shows, long enough to read. */
+const MOMENT_MS = 4300;
 
 /** What a team's home looks like once it's signed up, with a moment from each app in turn. */
 function LauncherMock() {
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
   const moment = MOMENTS[index];
-  const app = LAUNCHER_APPS.find((a) => a.name === moment.app) ?? LAUNCHER_APPS[0];
+  const app = LAUNCHER_APPS[index];
 
   useEffect(() => {
     if (paused) return;
-    const timer = setTimeout(() => setIndex((index + 1) % MOMENTS.length), 3200);
+    const timer = setTimeout(() => setIndex((index + 1) % MOMENTS.length), MOMENT_MS);
     return () => clearTimeout(timer);
   }, [index, paused]);
 
@@ -299,19 +279,19 @@ function LauncherMock() {
           </span>
         </div>
         <div className="grid grid-cols-3 gap-x-3 gap-y-5">
-          {LAUNCHER_APPS.map((tile) => {
-            const active = tile.name === moment.app;
+          {LAUNCHER_APPS.map((tile, i) => {
+            const active = i === index;
             return (
-              <button
+              <a
                 key={tile.name}
-                type="button"
-                onClick={() => setIndex(MOMENTS.findIndex((m) => m.app === tile.name))}
+                href={teamAppUrl(demoTeamId, tile.demo)}
+                onFocus={() => setIndex(i)}
                 className="flex flex-col items-center gap-1.5"
-                aria-label={`Show ${tile.name}`}
+                aria-label={`Open ${tile.name} in the demo`}
               >
                 <span
                   className={`rounded-[13px] p-0.5 transition-all duration-300 ${
-                    active ? "scale-110 ring-2 ring-primary-500" : "opacity-60"
+                    active ? "scale-110 ring-2 ring-primary-500" : "opacity-60 hover:opacity-100"
                   }`}
                 >
                   <AppTile app={tile} size="sm" />
@@ -323,14 +303,15 @@ function LauncherMock() {
                 >
                   {tile.name}
                 </span>
-              </button>
+              </a>
             );
           })}
         </div>
       </div>
+      {/* Kept inside the screen on a narrow phone; it overhangs the card from sm up. */}
       <div
         aria-live="polite"
-        className="absolute -bottom-6 -left-4 w-64 -rotate-2 overflow-hidden rounded-xl border border-line bg-surface shadow-lg"
+        className="absolute -bottom-6 left-0 w-64 max-w-[85%] -rotate-2 overflow-hidden rounded-xl border border-line bg-surface shadow-lg sm:-left-4"
       >
         <div key={index} className="moment-in flex items-center gap-3 px-4 py-3">
           <img src={app.icon} alt="" className="h-8 w-8 shrink-0 rounded-[7px]" />
@@ -385,172 +366,68 @@ function Section({
   );
 }
 
-function Foundation() {
-  return (
-    <Section eyebrow="Why Gearbox" title="Stop juggling a dozen tools.">
-      <p className="-mt-4 mb-10 max-w-3xl text-secondary-600">
-        Spreadsheets, forms and whiteboards each want their own login and their own roster. Gearbox
-        started as {site.team.name}'s ({site.team.number}) answer to that, and now any team can use
-        it.
-      </p>
-      <div className="grid gap-4 sm:grid-cols-2">
-        {FOUNDATION.map(({ icon: Icon, title, body }) => (
-          <div key={title} className="flex gap-4 rounded-xl border border-line bg-surface p-6">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-50 text-primary-600">
-              <Icon />
-            </span>
-            <div>
-              <h3 className="font-semibold text-secondary-900">{title}</h3>
-              <p className="mt-1 text-sm text-secondary-600">{body}</p>
-            </div>
-          </div>
-        ))}
-      </div>
-    </Section>
-  );
-}
-
 function Apps() {
   return (
     <Section id="apps" eyebrow="The apps" title="Everything a build season runs on.">
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {APPS.map((app) => (
-          <div
+          <a
             key={app.name}
-            className="flex gap-4 rounded-xl border border-line bg-surface p-5 transition-shadow hover:shadow-md"
+            href={teamAppUrl(demoTeamId, app.demo)}
+            className="group flex gap-4 rounded-xl border border-line bg-surface p-5 transition-shadow hover:border-primary-500 hover:shadow-md"
           >
             <AppTile app={app} size="lg" />
             <div className="flex flex-col">
-              <h3 className="font-semibold text-secondary-900">{app.name}</h3>
+              <h3 className="flex flex-wrap items-center gap-2 font-semibold text-secondary-900">
+                {app.name}
+                {app.soon && (
+                  <span className="rounded-full bg-inset px-2 py-0.5 text-xs font-medium text-secondary-600">
+                    Coming soon
+                  </span>
+                )}
+              </h3>
               <p className="mt-1 flex-1 text-sm text-secondary-600">{app.blurb}</p>
-              {app.demo && (
-                <a
-                  href={teamAppUrl(demoTeamId, app.demo)}
-                  className="mt-3 self-start text-sm font-semibold text-primary-600 hover:text-primary-700"
-                >
-                  See it in the demo →
-                </a>
-              )}
+              <span className="mt-3 text-sm font-semibold text-primary-600 group-hover:text-primary-700">
+                See it in the demo →
+              </span>
             </div>
-          </div>
+          </a>
         ))}
       </div>
-      <p className="mt-6 text-sm text-secondary-600">
-        Turn on only the ones your team needs, and try every one of them in the{" "}
-        <a href="#demo" className="font-semibold text-primary-600 hover:text-primary-700">
-          demo
-        </a>
-        .
-      </p>
+      <p className="mt-6 text-sm text-secondary-600">Turn on only the ones your team needs.</p>
     </Section>
+  );
+}
+
+/** What every app shares, in one strip. */
+function Shared() {
+  return (
+    <section className="border-t border-line bg-inset">
+      <ul className="mx-auto grid max-w-6xl gap-4 px-5 py-8 sm:grid-cols-3">
+        {SHARED.map(({ icon: Icon, text }) => (
+          <li key={text} className="flex items-center gap-3 text-sm font-medium text-secondary-900">
+            <span className="text-primary-600">
+              <Icon />
+            </span>
+            {text}
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
 function Demo() {
-  const pick = (role: string) => `${teamAppUrl(demoTeamId, "id")}/demo?role=${role}`;
   return (
-    <Section id="demo" eyebrow="Try it" title="Look around before you sign up.">
-      <p className="-mt-4 mb-10 max-w-3xl text-secondary-600">
-        The demo is a whole team with a season already underway: orders in every stage, parts on the
-        shop floor, checklists, attendance and a schedule. No account needed. Pick who you'd like to
-        be.
-      </p>
-      <div className="grid gap-4 md:grid-cols-3">
-        {DEMO_ROLES.map(({ role, icon: Icon, title, body }) => (
-          <a
-            key={role}
-            href={pick(role)}
-            className="group flex flex-col rounded-xl border border-line bg-surface p-6 transition-shadow hover:border-primary-500 hover:shadow-md"
-          >
-            <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-50 text-primary-600">
-              <Icon />
-            </span>
-            <h3 className="mt-4 font-semibold text-secondary-900">
-              Try it as a {title.toLowerCase()}
-            </h3>
-            <p className="mt-1 flex-1 text-sm text-secondary-600">{body}</p>
-            <span className="mt-4 text-sm font-semibold text-primary-600 group-hover:text-primary-700">
-              Open the demo →
-            </span>
-          </a>
-        ))}
-      </div>
-      <div className="mt-8 flex flex-col gap-6 rounded-xl border border-line bg-inset p-6 md:flex-row md:items-center md:justify-between">
-        <ul className="space-y-1.5 text-sm text-secondary-600">
-          {DEMO_NOTES.map((note) => (
-            <li key={note} className="flex gap-2">
-              <span aria-hidden="true" className="text-primary-500">
-                •
-              </span>
-              {note}
-            </li>
-          ))}
-        </ul>
-        <a
-          href={demoUrl}
-          className="shrink-0 self-start rounded-lg bg-primary-600 px-6 py-3 font-semibold text-white shadow-sm transition-colors hover:bg-primary-500 md:self-center"
-        >
-          Try the demo
-        </a>
-      </div>
-    </Section>
-  );
-}
-
-function MakeItYours() {
-  return (
-    <section id="customize" className="scroll-mt-16 border-t border-line bg-[#111111]">
-      <div className="mx-auto grid max-w-6xl items-center gap-12 px-5 py-16 sm:py-20 lg:grid-cols-[1fr_1fr]">
+    <section id="demo" className="scroll-mt-16 border-t border-line">
+      <div className="mx-auto flex max-w-6xl flex-col gap-6 px-5 py-14 md:flex-row md:items-center md:justify-between">
         <div>
-          <p className="text-sm font-semibold uppercase tracking-widest text-[#e05a6f]">
-            Make it yours
+          <p className="text-sm font-semibold uppercase tracking-widest text-primary-500">Try it</p>
+          <p className="mt-2 text-xl font-semibold text-secondary-900">
+            A whole team mid-season, no account needed. Resets nightly.
           </p>
-          <h2 className="mt-2 text-3xl font-bold tracking-tight text-[#ffffff] sm:text-4xl">
-            Shape it to how your team works.
-          </h2>
-          <p className="mt-4 text-[#b8b8b8]">
-            Customize Gearbox as deeply as your team wants. It's MIT licensed, and every change is a
-            public pull request.
-          </p>
-          <ul className="mt-8 space-y-5">
-            {CUSTOMIZE.map(({ icon: Icon, title, body }) => (
-              <li key={title} className="flex gap-4">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#2a2a2a] text-[#ffffff]">
-                  <Icon />
-                </span>
-                <div>
-                  <h3 className="font-semibold text-[#ffffff]">{title}</h3>
-                  <p className="mt-0.5 text-sm text-[#b8b8b8]">{body}</p>
-                </div>
-              </li>
-            ))}
-          </ul>
         </div>
-        <div className="overflow-hidden rounded-xl border border-[#333333] bg-[#0a0a0a] font-mono text-sm shadow-2xl">
-          <div className="flex items-center gap-1.5 border-b border-[#333333] px-4 py-3">
-            <span className="h-3 w-3 rounded-full bg-[#ff5f57]" />
-            <span className="h-3 w-3 rounded-full bg-[#febc2e]" />
-            <span className="h-3 w-3 rounded-full bg-[#28c840]" />
-          </div>
-          <pre className="overflow-x-auto p-5 leading-7 text-[#d4d4d4]">
-            <span className="text-[#6a6a6a]"># every app, on your machine</span>
-            {"\n"}
-            <span className="text-[#e05a6f]">$</span> git clone{" "}
-            {site.sourceUrl.replace("https://", "")}
-            {"\n"}
-            <span className="text-[#e05a6f]">$</span> cd Gearbox && pnpm install
-            {"\n"}
-            <span className="text-[#e05a6f]">$</span> pnpm dev
-            {"\n"}
-            <span className="text-[#28c840]">✓</span> g3id, orders, shop, pit, scouting …
-          </pre>
-          <a
-            href={site.sourceUrl}
-            className="flex items-center justify-center gap-2 border-t border-[#333333] py-3 font-sans text-sm font-semibold text-[#ffffff] hover:bg-[#1a1a1a]"
-          >
-            <FaGithub /> Contribute on GitHub
-          </a>
-        </div>
+        <DemoButtons />
       </div>
     </section>
   );
@@ -577,40 +454,69 @@ function HowItWorks() {
   );
 }
 
-function Feedback() {
+function OpenSource() {
   return (
-    <Section eyebrow="Feedback" title="Something missing for your team?">
-      <div className="max-w-3xl space-y-4 text-secondary-600">
-        <p>
-          We built these apps around our own season, so they won't suit everyone out of the box. Let
-          us know what would make Gearbox work for you, or borrow the ideas for your own tools.
-        </p>
-        <a
-          href={site.sourceUrl}
-          className="inline-flex items-center gap-2 rounded-lg border border-line bg-surface px-5 py-2.5 font-semibold text-secondary-900 transition-colors hover:border-primary-500"
-        >
-          <FaGithub /> Share feedback on GitHub
-        </a>
+    <section id="open-source" className="scroll-mt-16 border-t border-line bg-[#111111]">
+      <div className="mx-auto grid max-w-6xl items-center gap-12 px-5 py-16 sm:py-20 lg:grid-cols-[1fr_1fr]">
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-widest text-[#e05a6f]">
+            Open source
+          </p>
+          <h2 className="mt-2 text-3xl font-bold tracking-tight text-[#ffffff] sm:text-4xl">
+            Shape it to how your team works.
+          </h2>
+          <p className="mt-4 text-[#b8b8b8]">
+            Customize Gearbox as deeply as your team wants. It's MIT licensed, and every change is a
+            public pull request.
+          </p>
+          <ul className="mt-8 space-y-5">
+            {CUSTOMIZE.map(({ icon: Icon, title, body }) => (
+              <li key={title} className="flex gap-4">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#2a2a2a] text-[#ffffff]">
+                  <Icon />
+                </span>
+                <div>
+                  <h3 className="font-semibold text-[#ffffff]">{title}</h3>
+                  <p className="mt-0.5 text-sm text-[#b8b8b8]">{body}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+          <a
+            href={`${site.sourceUrl}/issues`}
+            className="mt-8 inline-block text-sm font-semibold text-[#e05a6f] hover:text-[#ffffff]"
+          >
+            Missing something? Open an issue →
+          </a>
+        </div>
+        <div className="overflow-hidden rounded-xl border border-[#333333] bg-[#0a0a0a] font-mono text-sm shadow-2xl">
+          <div className="flex items-center gap-1.5 border-b border-[#333333] px-4 py-3">
+            <span className="h-3 w-3 rounded-full bg-[#ff5f57]" />
+            <span className="h-3 w-3 rounded-full bg-[#febc2e]" />
+            <span className="h-3 w-3 rounded-full bg-[#28c840]" />
+          </div>
+          <pre className="overflow-x-auto p-5 leading-7 text-[#d4d4d4]">
+            <span className="text-[#6a6a6a]"># every app, on your machine</span>
+            {"\n"}
+            <span className="text-[#e05a6f]">$</span> git clone{" "}
+            {site.sourceUrl.replace("https://", "")}
+            {"\n"}
+            <span className="text-[#e05a6f]">$</span> cd {site.sourceUrl.split("/").pop()} && pnpm
+            install
+            {"\n"}
+            <span className="text-[#e05a6f]">$</span> pnpm dev
+            {"\n"}
+            <span className="text-[#28c840]">✓</span> g3id, orders, shop, pit, scouting …
+          </pre>
+          <a
+            href={site.sourceUrl}
+            className="flex items-center justify-center gap-2 border-t border-[#333333] py-3 font-sans text-sm font-semibold text-[#ffffff] hover:bg-[#1a1a1a]"
+          >
+            <FaGithub /> Contribute on GitHub
+          </a>
+        </div>
       </div>
-    </Section>
-  );
-}
-
-function Thanks() {
-  return (
-    <Section eyebrow="Thanks" title="Standing on the shoulders of other teams.">
-      <ul className="grid max-w-4xl gap-4 text-sm text-secondary-600 md:grid-cols-3">
-        <li className="rounded-xl border border-line bg-surface p-5">
-          Team 4414's TideApps showed us what team-built web apps could be.
-        </li>
-        <li className="rounded-xl border border-line bg-surface p-5">
-          Our Onshape integration builds on work by Team 6328, FRCBOM's David Masin and crummyh.
-        </li>
-        <li className="rounded-xl border border-line bg-surface p-5">
-          Orders takes cues from FRCTools, and its catalog grew out of the FRCDesign library.
-        </li>
-      </ul>
-    </Section>
+    </section>
   );
 }
 
@@ -619,7 +525,7 @@ function FinalCall() {
     <section className="bg-[#1a1a1a]">
       <div className="mx-auto flex max-w-6xl flex-col items-start gap-6 px-5 py-16 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-3xl font-bold text-[#ffffff]">Ready for build season?</h2>
+          <h2 className="text-3xl font-bold text-[#ffffff]">Get set up before Kickoff.</h2>
           <p className="mt-2 text-[#b8b8b8]">Set your team up now. It's free.</p>
         </div>
         <Link

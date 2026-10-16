@@ -1,0 +1,5 @@
+---
+"@g3/worker-platform": minor
+---
+
+The landing page is shorter and leads into the demo: an open beta badge, Try it as a student, mentor or admin buttons in the hero, app cards and launcher tiles that open the demo, and link previews when the page is shared.
