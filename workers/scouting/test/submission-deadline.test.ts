@@ -18,6 +18,7 @@ const bindings = env as unknown as AppEnv["Bindings"];
 const db = createDb(bindings.SCOUTING_DB);
 type Context = {
   currentMatch: { key: string; matchNumber: number } | null;
+  scoutMatch: { key: string; matchNumber: number } | null;
   assignedTeam: string | null;
   submissionClosesAt: number | null;
   serverNow: number;
@@ -84,7 +85,8 @@ async function fixture(manual = false) {
   const context = () => jsonAs<Context>(team.student, "/scouting/event-context?assign=true");
   const submit = (snapshot: Partial<Context>, overrideTeam?: string, drawing = false) => {
     const body = new FormData();
-    if (snapshot.currentMatch) body.set("matchKey", snapshot.currentMatch.key);
+    const match = snapshot.scoutMatch ?? snapshot.currentMatch;
+    if (match) body.set("matchKey", match.key);
     body.set("teamName", overrideTeam ?? snapshot.assignedTeam ?? "");
     body.set("answers", JSON.stringify({ score: 5 }));
     if (drawing) body.set("drawing", new File(["test-image"], "auto.png", { type: "image/png" }));
@@ -134,6 +136,28 @@ describe("scouting submission deadlines", () => {
     expect((await f.submit(old)).status).toBe(409);
     expect(await f.reports()).toEqual([]);
     expect((await f.submit(next)).status).toBe(201);
+  });
+  it("moves a scout who has sent their report on without waiting out the window", async () => {
+    const f = await fixture();
+    const first = await f.context();
+    expect(first.scoutMatch?.matchNumber).toBe(1);
+    expect((await f.submit(first)).status).toBe(201);
+    // Match 1 has a result and match 2 has started, but match 1's window is still open.
+    const moved = await f.context();
+    expect(moved.currentMatch?.matchNumber).toBe(1);
+    expect(moved.scoutMatch?.matchNumber).toBe(2);
+    expect(moved.scoutMatch?.key).toBe(f.keys[1]);
+    expect(moved.assignedTeam).toBeTruthy();
+    expect(moved.submissionClosesAt).toBeNull();
+    expect((await f.submit(moved)).status).toBe(201);
+    expect((await f.reports()).map((report) => report.match_key).sort()).toEqual(f.keys);
+  });
+  it("keeps a scout on the match while their report for it is missing", async () => {
+    const f = await fixture();
+    const context = await f.context();
+    expect(context.currentMatch?.matchNumber).toBe(1);
+    expect(context.scoutMatch?.matchNumber).toBe(1);
+    expect(context.submissionClosesAt).toBeGreaterThan(context.serverNow);
   });
   it("rejects missing match identity and wrong-team snapshots without saving", async () => {
     const f = await fixture();

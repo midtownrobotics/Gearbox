@@ -227,6 +227,14 @@ function FieldInput({
   );
 }
 
+/**
+ * The match a scout fills in: the team's current match until their report for it is in, then the
+ * one on the field. `currentMatch` is the fallback for a page loaded against an older worker.
+ */
+function scoutMatchOf(context: EventContext | null) {
+  return context?.scoutMatch ?? context?.currentMatch ?? null;
+}
+
 function EntryForm({
   form,
   context,
@@ -239,15 +247,43 @@ function EntryForm({
   // A new assignment always starts with an empty draft, including every canvas.
   const assignment =
     form.kind === "scouting"
-      ? `${context?.currentMatch?.key ?? ""}:${context?.assignedTeam ?? ""}`
+      ? `${scoutMatchOf(context)?.key ?? ""}:${context?.assignedTeam ?? ""}`
       : "pit";
+  // A sent report moves the scout on at once, which replaces the draft below, so the match it was
+  // for is named out here and stays up long enough to read.
+  const [sent, setSent] = useState<string | null>(null);
+  useEffect(() => {
+    if (!sent) return;
+    const clear = window.setTimeout(() => setSent(null), 12_000);
+    return () => window.clearTimeout(clear);
+  }, [sent]);
+  const nowOn = scoutMatchOf(context)?.label ?? null;
   return (
-    <EntryDraft
-      key={`${form.id}:${assignment}`}
-      form={form}
-      context={context}
-      refreshContext={refreshContext}
-    />
+    <>
+      <EntryDraft
+        key={`${form.id}:${assignment}`}
+        form={form}
+        context={context}
+        refreshContext={refreshContext}
+        onSent={setSent}
+      />
+      {sent && (
+        <div className="status-toast success" role="status" aria-live="polite">
+          <CheckCircle2 size={21} />
+          <div>
+            <strong>{sent} report sent</strong>
+            <span>
+              {nowOn && nowOn !== sent
+                ? `You're on ${nowOn} now, with an empty form.`
+                : "Waiting for the next match."}
+            </span>
+          </div>
+          <button type="button" onClick={() => setSent(null)} aria-label="Dismiss notification">
+            <X size={17} />
+          </button>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -255,10 +291,12 @@ function EntryDraft({
   form,
   context,
   refreshContext,
+  onSent,
 }: {
   form: ScoutingForm;
   context: EventContext | null;
   refreshContext: () => Promise<void>;
+  onSent: (matchLabel: string) => void;
 }) {
   const [teamName, setTeamName] = useState(
     form.kind === "scouting" ? (context?.assignedTeam ?? "") : "",
@@ -275,7 +313,7 @@ function EntryDraft({
   const expiredRef = useRef(false);
   const [expired, setExpired] = useState(false);
   const [, tick] = useState(0);
-  const currentMatch = context?.currentMatch ?? null;
+  const currentMatch = scoutMatchOf(context);
   const closesAt = context?.submissionClosesAt ?? null;
   const clockOffset = useMemo(
     () => (context?.serverNow ? context.serverNow - Date.now() : 0),
@@ -343,8 +381,12 @@ function EntryDraft({
       setAnswers({});
       drawnFields.current.clear();
       setCanvasKey((value) => value + 1);
-      setMessageType("success");
-      setMessage("Report submitted.");
+      if (form.kind === "scouting") {
+        onSent(currentMatch?.label ?? "Match");
+      } else {
+        setMessageType("success");
+        setMessage("Report submitted.");
+      }
       await refreshContext();
     } catch (error) {
       if (!mounted.current || isExpired()) return;
@@ -1063,6 +1105,8 @@ type EventContext = {
   eventKey: string;
   currentMatchNumber: number | null;
   currentMatch: EventMatch | null;
+  /** The match this scout's form is for: the current one, or the next once their report is in. */
+  scoutMatch?: EventMatch | null;
   tbaCurrentMatch: EventMatch | null;
   assignedTeam: string | null;
   hasSubmittedCurrentMatch: boolean;

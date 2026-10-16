@@ -52,3 +52,19 @@ export function automaticTbaMatch(
   }
   return ordered.at(-1);
 }
+
+/**
+ * The match a scout moves to once their report for `held` is in. The window after a match keeps
+ * everyone on it so a late report still lands on the right match, but a scout who has already
+ * sent theirs has nothing left to wait for, and waiting the window out would put them on the
+ * match in front of them late. Returns `held` while nothing has started after it.
+ */
+export function matchAfterSubmitting(
+  matches: TbaMatch[],
+  held: TbaMatch | undefined,
+  now = Math.floor(Date.now() / 1000),
+) {
+  if (!held) return held;
+  const next = automaticTbaMatch(matches, 0, now);
+  return next && next.key !== held.key ? next : held;
+}

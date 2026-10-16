@@ -40,6 +40,7 @@ import {
   MAX_SUBMISSION_WINDOW,
   MIN_SUBMISSION_WINDOW,
   automaticTbaMatch,
+  matchAfterSubmitting,
   matchOrder,
   matchSubmissionClosesAt,
   submissionWindow,
@@ -380,6 +381,21 @@ app.get("/teams/search", requireAuth, async (c) => {
   }
 });
 
+/** Whether the scout has already sent a match report in for this match of this event. */
+async function hasScoutSubmitted(c: Context<AppEnv>, eventKey: string, matchNumber: number) {
+  const existing = await first<{ id: string }>(
+    dbOf(c),
+    sql`SELECT s.id
+       FROM (SELECT * FROM ${scoutingFormSubmissions} WHERE ${inTeam(scoutingFormSubmissions, c.get("teamId"))}) AS s
+       JOIN (SELECT * FROM ${scoutingForms} WHERE ${inTeam(scoutingForms, c.get("teamId"))}) AS f ON f.id = s.form_id
+      WHERE f.form_kind = 'scouting' AND s.submitted_by = ${c.get("userId")}
+        AND s.event_key = ${eventKey} AND s.match_number = ${matchNumber}
+        AND s.archived_at IS NULL
+      LIMIT 1`,
+  );
+  return Boolean(existing);
+}
+
 async function resolveEventLink(c: Context<AppEnv>) {
   const config = await first<{
     event_key: string;
@@ -405,8 +421,12 @@ async function resolveEventLink(c: Context<AppEnv>) {
               match.comp_level === "qm" && match.match_number === config.current_match_number,
           )
         : automaticTbaMatch(matches, config.submission_window_seconds ?? DEFAULT_SUBMISSION_WINDOW);
-    if (config.schedule_mode !== "manual")
+    if (config.schedule_mode !== "manual") {
       await persistAutomaticMatch(c, config.current_match_number, current);
+      // Same as /event-context: a scout whose report is in is already on the next match.
+      if (current && (await hasScoutSubmitted(c, config.event_key, current.match_number)))
+        current = matchAfterSubmitting(matches, current);
+    }
   } catch {
     // Keep the configured event link when TBA is temporarily unavailable.
   }
@@ -494,6 +514,19 @@ app.get("/event-context", requireAuth, async (c) => {
     (row) => Number(row.match_number) === currentMatchNumber,
   );
   const submittedUserIds = new Set(currentMatchSubmissions.map((row) => String(row.submitted_by)));
+  // The window after a match is there for reports still being written, so a scout who has sent
+  // theirs in goes straight to the match on the field instead of waiting the window out and
+  // reaching it late. The team's own current match (above) is unchanged, so the leads' overview
+  // still follows the match being scouted.
+  const scoutMatch =
+    config?.schedule_mode !== "manual" && current && submittedUserIds.has(c.get("userId"))
+      ? matchAfterSubmitting(matches, current)
+      : current;
+  const scoutMatchNumber = scoutMatch?.match_number ?? currentMatchNumber;
+  const hasSubmittedScoutMatch = (eventMatchSubmissions?.results ?? []).some(
+    (row) =>
+      String(row.submitted_by) === c.get("userId") && Number(row.match_number) === scoutMatchNumber,
+  );
   const onlineScouts = current
     ? await all<Record<string, unknown>>(
         dbOf(c),
@@ -511,27 +544,28 @@ app.get("/event-context", requireAuth, async (c) => {
     activeScoutIds.sort();
   }
   const submissionClosesAt =
-    config?.schedule_mode === "manual" ? null : matchSubmissionClosesAt(current, windowSeconds);
+    config?.schedule_mode === "manual" ? null : matchSubmissionClosesAt(scoutMatch, windowSeconds);
   const assignedTeam =
     c.req.query("assign") === "true" &&
-    current &&
+    scoutMatch &&
     eventKey &&
-    currentMatchNumber &&
+    scoutMatchNumber &&
     (submissionClosesAt === null || Date.now() < submissionClosesAt)
       ? await getOrCreateScoutAssignment(
           c,
           eventKey,
-          currentMatchNumber,
-          publicMatch(current).teams,
+          scoutMatchNumber,
+          publicMatch(scoutMatch).teams,
         )
       : null;
   return c.json({
     eventKey: admin ? eventKey : "",
     currentMatchNumber: admin ? currentMatchNumber : null,
     currentMatch: current ? publicMatch(current) : null,
+    scoutMatch: scoutMatch ? publicMatch(scoutMatch) : null,
     tbaCurrentMatch: tbaCurrent ? publicMatch(tbaCurrent) : null,
     assignedTeam,
-    hasSubmittedCurrentMatch: submittedUserIds.has(c.get("userId")),
+    hasSubmittedCurrentMatch: hasSubmittedScoutMatch,
     onlineScoutCount: activeScoutIds.length,
     matchSubmissions: admin ? (eventMatchSubmissions?.results ?? []) : [],
     nextTeamMatch: nextTeamMatch ? publicMatch(nextTeamMatch) : null,
