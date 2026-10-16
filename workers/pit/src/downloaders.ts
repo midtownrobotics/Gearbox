@@ -1,4 +1,5 @@
 import {
+  TEAM_HEADER,
   inTeam,
   logTeamChange,
   requestTeamId,
@@ -246,6 +247,16 @@ export const downloaderSelfRoutes = new Hono<AppEnv>()
       .get();
     if (!me) return c.json({ error: "Unauthorized." }, 401);
     return c.json({ ...me, teamNumber: teamNumberOf(teamId) });
+  })
+
+  // The team's appearance (colors, names, logo), for the downloader's status page: from G3ID's
+  // public /team/ui for the downloader's team, so the downloader only ever talks to its Pit.
+  .get("/team-ui", requireDownloader, async (c) => {
+    const res = await c.env.G3ID.fetch(
+      new Request("http://g3id/api/team/ui", { headers: { [TEAM_HEADER]: c.get("teamId") } }),
+    ).catch(() => null);
+    if (!res?.ok) return c.json({ error: "The team's appearance isn't available right now." }, 502);
+    return c.json(await res.json());
   })
 
   // Unpairing from the downloader's own page.

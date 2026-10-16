@@ -7,6 +7,7 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import { type TeamUiSettings, teamUiDefaults } from "@g3/site-config";
 import { config, pitUrlFor } from "./config.ts";
 import type { GearboxStatus } from "./status.ts";
 
@@ -21,6 +22,9 @@ export type Pairing = {
 };
 
 const kPairingFile = path.join(config.dataDir, "gearbox.json");
+/** The team's appearance as Pit last gave it, for when this computer is offline. */
+const kAppearanceFile = path.join(config.dataDir, "appearance.json");
+const kAppearanceMaxAgeMs = 60_000;
 const kTimeoutMs = 10_000;
 
 let pairing: Pairing | null = load();
@@ -141,6 +145,45 @@ export async function pairWithGearbox(teamNumber: number, code: string, name: st
   checkedAt = Date.now();
 }
 
+let appearance: { teamNumber: number; settings: TeamUiSettings; fetchedAt: number } | null = null;
+
+/**
+ * The paired team's appearance (Team Appearance on Gearbox), for the status page: from its Pit
+ * at most once a minute, else as it was last fetched (kept in DATA_DIR), else the team's
+ * defaults. Null before pairing.
+ */
+export async function teamAppearance(): Promise<TeamUiSettings | null> {
+  if (!pairing) return null;
+  const { teamNumber } = pairing;
+  if (
+    appearance?.teamNumber === teamNumber &&
+    Date.now() - appearance.fetchedAt < kAppearanceMaxAgeMs
+  ) {
+    return appearance.settings;
+  }
+  try {
+    const res = await pit(teamNumber, "/downloader/team-ui");
+    if (res.ok) {
+      appearance = {
+        teamNumber,
+        settings: (await res.json()) as TeamUiSettings,
+        fetchedAt: Date.now(),
+      };
+      fs.writeFileSync(kAppearanceFile, JSON.stringify(appearance));
+      return appearance.settings;
+    }
+  } catch {
+    // Offline: the copy kept below.
+  }
+  try {
+    const saved = JSON.parse(fs.readFileSync(kAppearanceFile, "utf8")) as typeof appearance;
+    if (saved?.teamNumber === teamNumber) return saved.settings;
+  } catch {
+    // None kept yet.
+  }
+  return teamUiDefaults(`frc${teamNumber}`);
+}
+
 /** Forgets the pairing, and tells Pit to remove this downloader when it can. */
 export async function unpairFromGearbox(): Promise<void> {
   if (pairing)
@@ -148,4 +191,6 @@ export async function unpairFromGearbox(): Promise<void> {
   save(null);
   connection = null;
   checkedAt = null;
+  appearance = null;
+  fs.rmSync(kAppearanceFile, { force: true });
 }

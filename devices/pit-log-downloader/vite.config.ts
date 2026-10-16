@@ -8,6 +8,9 @@ import { defineConfig } from "vite";
 export default defineConfig({
   root: fileURLToPath(new URL("./web", import.meta.url)),
   plugins: [react(), tailwindcss()],
+  // @g3/ui loads the team's appearance from G3ID's /team/ui; here the server answers it, for the
+  // team the downloader is paired with (src/gearbox.ts).
+  define: { "import.meta.env.VITE_G3ID_API_URL": JSON.stringify("/api/gearbox") },
   build: {
     outDir: fileURLToPath(new URL("./dist/web", import.meta.url)),
     emptyOutDir: true,

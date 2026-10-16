@@ -136,6 +136,23 @@ describe("a paired downloader", () => {
     expect((await call("/downloader/me", asDownloader(team, key))).status).toBe(401);
   });
 
+  it("gets its own team's appearance, and nobody else does", async () => {
+    const other = teamUsers(newTeamId());
+    const { code } = await jsonAs<{ code: string }>(
+      other.mentor,
+      "/downloaders/codes",
+      { method: "POST" },
+      201,
+    );
+    const { key } = (await (await pair(other.teamId, { code, name: "Styled" })).json()) as {
+      key: string;
+    };
+    const res = await call("/downloader/team-ui", asDownloader(other.teamId, key));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ shortName: other.teamId.replace("frc", "") });
+    expect((await callAs(student, "/downloader/team-ui")).status).toBe(401);
+  });
+
   it("can unpair itself", async () => {
     const team = mentor.teamId;
     const { code } = await newCode();

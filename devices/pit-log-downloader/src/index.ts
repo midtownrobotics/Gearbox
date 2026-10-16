@@ -13,6 +13,7 @@ import {
   currentPairing,
   gearboxStatus,
   pairWithGearbox,
+  teamAppearance,
   unpairFromGearbox,
 } from "./gearbox.ts";
 import type { LogStatus, MatchTypeName, Status } from "./status.ts";
@@ -539,6 +540,16 @@ app.post("/api/gearbox/pair", async (req, res) => {
     if (!(err instanceof PairingError)) console.error(err);
     res.status(400).json({ error: message });
   }
+});
+
+// The paired team's appearance, which the page's @g3/ui loads as G3ID's /team/ui (vite.config).
+app.get("/api/gearbox/team/ui", async (_req, res) => {
+  const settings = await teamAppearance();
+  if (!settings) {
+    res.status(404).json({ error: "Not paired with Gearbox." });
+    return;
+  }
+  res.set("Cache-Control", "no-store").json(settings);
 });
 
 app.delete("/api/gearbox", async (_req, res) => {

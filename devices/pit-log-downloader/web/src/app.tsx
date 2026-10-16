@@ -1,4 +1,14 @@
-import { AppNavBar, Button, ErrorBanner, Loading, Page, buttonClass } from "@g3/ui";
+import {
+  AppNavBar,
+  Button,
+  ErrorBanner,
+  Loading,
+  Page,
+  buttonClass,
+  refreshTeamUiSettings,
+  useTeamIcon,
+  useTeamUiSettings,
+} from "@g3/ui";
 import { useEffect, useState } from "react";
 import type { Status } from "../../src/status.ts";
 import { GearboxCard, PairingCard } from "./gearbox-card";
@@ -10,10 +20,7 @@ const POLL_INTERVAL_MS = 3000;
 function useStatus() {
   const [status, setStatus] = useState<Status | null>(null);
   const [lost, setLost] = useState(false);
-  // Bumped to ask again at once, after a change.
-  const [asked, setAsked] = useState(0);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: `asked` starts it again, asking at once
   useEffect(() => {
     let current = true;
     const load = async () => {
@@ -38,9 +45,9 @@ function useStatus() {
       clearInterval(interval);
       document.removeEventListener("visibilitychange", load);
     };
-  }, [asked]);
+  }, []);
 
-  return { status, lost, refresh: () => setAsked((n) => n + 1) };
+  return { status, lost };
 }
 
 /** The downloader has stopped answering: how to start it again, as it last said. */
@@ -79,18 +86,31 @@ function Stopped({ restartCommand }: { restartCommand?: string }) {
 }
 
 export function App() {
-  const { status, lost, refresh } = useStatus();
+  const { status, lost } = useStatus();
   const driveFolderUrl = status?.settings.driveFolderUrl;
   // Until it's paired, pairing is all there is.
   const unpaired = status !== null && !status.gearbox.paired;
   const teamNumber = status?.gearbox.paired?.teamNumber;
 
+  // Once paired, the page takes its team's appearance from Gearbox (Team Appearance): colors,
+  // names, logo. Until it has loaded, the bar shows the team's number, never another team's name.
+  const teamUi = useTeamUiSettings(Boolean(teamNumber));
+  const [appearanceLoaded, setAppearanceLoaded] = useState(false);
+  useEffect(() => {
+    if (teamNumber) void refreshTeamUiSettings().then(() => setAppearanceLoaded(true));
+  }, [teamNumber]);
+  const styled = Boolean(teamNumber) && appearanceLoaded;
+  const appIcon = useTeamIcon(styled ? "/favicon.svg" : undefined) ?? "/favicon.svg";
+  // A logo is on the internet: offline, the app's icon in the team's color.
+  const icon = styled && teamUi.logoUrl && status?.connection.internet ? teamUi.logoUrl : appIcon;
+  const shortName = styled ? teamUi.shortName : teamNumber;
+
   return (
     <div className="flex flex-1 flex-col bg-page">
-      {/* A tool on this computer, not a team's app: built-in colors, no sign-in, no app list. */}
+      {/* A tool on this computer: no sign-in and no app list, and its team's look once paired. */}
       <AppNavBar
-        title={teamNumber ? `${teamNumber} PIT LOGS` : "PIT LOGS"}
-        icon="/favicon.svg"
+        title={shortName ? `${shortName} PIT LOGS`.toUpperCase() : "PIT LOGS"}
+        icon={icon}
         items={[]}
         team={false}
         allApps={false}
@@ -121,12 +141,14 @@ export function App() {
       >
         {lost && <Stopped restartCommand={status?.restartCommand} />}
         {status && unpaired ? (
-          <PairingCard gearbox={status.gearbox} onPaired={refresh} />
+          // Pairing (and unpairing) reloads the page, which then takes the team's appearance or
+          // drops it.
+          <PairingCard gearbox={status.gearbox} onPaired={() => window.location.reload()} />
         ) : status ? (
           <>
             <ConnectionTiles status={status} />
             <Counts status={status} />
-            <GearboxCard gearbox={status.gearbox} onChange={refresh} />
+            <GearboxCard gearbox={status.gearbox} onChange={() => window.location.reload()} />
             <LogsCard status={status} />
             <div className="grid gap-5 lg:grid-cols-2">
               <RobotCard status={status} />

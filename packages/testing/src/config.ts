@@ -1,5 +1,6 @@
 import { fileURLToPath } from "node:url";
 import { cloudflareTest, readD1Migrations } from "@cloudflare/vitest-pool-workers";
+import { teamKey, teamUiDefaults } from "@g3/site-config";
 import { defineConfig } from "vitest/config";
 import { type TestUser, teamUsers, userFromCookie } from "./users.ts";
 
@@ -63,6 +64,11 @@ export const g3idStub: ServiceStub = async (request) => {
     return json(ids.map((id) => ({ id, displayName: id })));
   }
   if (url.pathname === "/auth/logout") return json({ ok: true });
+  // The team's appearance, for the team the request says, like G3ID's public /team/ui: the team's
+  // defaults, since tests save none.
+  if (url.pathname === "/team/ui") {
+    return json(teamUiDefaults(request.headers.get("X-Team-Id") ?? teamKey));
+  }
   // The member list (admins only, like the real one): the standard test users of their team.
   if (url.pathname === "/users") {
     if (!user || user.sessionType === "pin" || !user.isAdmin)

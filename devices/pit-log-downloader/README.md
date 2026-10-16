@@ -39,7 +39,8 @@ knows its team: on first start, the status page only asks to pair.
 2. On the status page, enter your team number and the code within 10 minutes. The computer's
    name is what Pit lists it as.
 
-Then it copies logs whenever the computer joins the robot's network (`10.TE.AM.x`, from the team
+Then the status page takes your team's colors, names and logo from Gearbox, and it copies logs
+whenever the computer joins the robot's network (`10.TE.AM.x`, from the team
 number). It keeps its key in `data/gearbox.json` (readable only by you). Unpairing on the status
 page, or removing it on Pit's Logs page, stops it until it's paired again with a new code.
 
@@ -85,8 +86,9 @@ downloader when `src/` changes and reloads the status page as you edit it.
 - `src/`: the downloader and its API (`/api/status`, `/api/download`, `/api/gearbox`), on Node
   with Express. `src/status.ts` is what `/api/status` answers, shared with the page.
 - `web/`: the status page, in React with Vite and Tailwind, built from the shared Gearbox parts
-  (`@g3/ui`). It has the Gearbox top bar with no team: the built-in colors, light and dark mode,
-  and no sign-in. `start` builds it into `dist/web`; `watch` serves it through Vite instead.
+  (`@g3/ui`). It has the Gearbox top bar with no sign-in, light and dark mode, and once paired
+  the team's Team Appearance from Gearbox (kept in `data/appearance.json` for when it's
+  offline). `start` builds it into `dist/web`; `watch` serves it through Vite instead.
 
 ## Moving from the old Pit-Log-Downloader repository
 
