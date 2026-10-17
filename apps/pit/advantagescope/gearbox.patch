@@ -1,3 +1,23 @@
+diff --git a/src/hub/Sidebar.ts b/src/hub/Sidebar.ts
+index 9a7924f..4a224c6 100644
+--- a/src/hub/Sidebar.ts
++++ b/src/hub/Sidebar.ts
+@@ -703,8 +703,13 @@ export default class Sidebar {
+       // Search expand callback
+       let highlightForSearch = () => {
+         if (this.searchKey !== null && field.fullKey === this.searchKey) {
+-          // @ts-expect-error
+-          fieldElement.scrollIntoViewIfNeeded(); // Available in Chromium but not standard
++          // Gearbox: Firefox and Safari don't have it; there, the standard call scrolls only as needed.
++          if ("scrollIntoViewIfNeeded" in fieldElement) {
++            // @ts-expect-error
++            fieldElement.scrollIntoViewIfNeeded(); // Available in Chromium but not standard
++          } else {
++            (fieldElement as HTMLElement).scrollIntoView({ block: "nearest" });
++          }
+           fieldElementContainer.classList.add("highlight");
+           setTimeout(() => fieldElementContainer.classList.remove("highlight"), 3000);
+         }
 diff --git a/src/main/lite/assetLoader.ts b/src/main/lite/assetLoader.ts
 index cb79b2d..e0a7b4d 100644
 --- a/src/main/lite/assetLoader.ts
