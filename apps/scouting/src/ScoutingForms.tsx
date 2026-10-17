@@ -267,6 +267,7 @@ function EntryDraft({
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState<"success" | "error">("success");
   const [saving, setSaving] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
   const [canvasKey, setCanvasKey] = useState(0);
   const canvases = useRef<Record<string, HTMLCanvasElement | null>>({});
   const canvasAdapters = useRef<Record<string, RefObject<HTMLCanvasElement | null>>>({});
@@ -286,7 +287,12 @@ function EntryDraft({
     (expiredRef.current || (closesAt !== null && Date.now() + clockOffset >= closesAt));
   const blocked =
     form.kind === "scouting" &&
-    (expired || isExpired() || !currentMatch || !teamName || context?.hasSubmittedCurrentMatch);
+    (expired ||
+      isExpired() ||
+      !currentMatch ||
+      !teamName ||
+      submitted ||
+      context?.hasSubmittedCurrentMatch);
   useEffect(() => {
     mounted.current = true;
     return () => {
@@ -340,12 +346,13 @@ function EntryDraft({
       if (!mounted.current || isExpired()) return;
       await api(`/scouting-forms/${form.id}/submissions`, { method: "POST", body: payload });
       if (!mounted.current || isExpired()) return;
+      if (form.kind === "scouting") setSubmitted(true);
       setAnswers({});
       drawnFields.current.clear();
       setCanvasKey((value) => value + 1);
       setMessageType("success");
       setMessage("Report submitted.");
-      await refreshContext();
+      await refreshContext().catch(() => {});
     } catch (error) {
       if (!mounted.current || isExpired()) return;
       setMessageType("error");
@@ -480,7 +487,7 @@ function EntryDraft({
         <Check size={17} />{" "}
         {saving
           ? "Submitting…"
-          : form.kind === "scouting" && context?.hasSubmittedCurrentMatch
+          : form.kind === "scouting" && (submitted || context?.hasSubmittedCurrentMatch)
             ? "Already submitted"
             : form.kind === "scouting" && !teamName
               ? "Waiting for team"
@@ -1957,11 +1964,15 @@ export function ScoutingForms({
       )
       .finally(() => setLoading(false));
   }, [load]);
+  const contextRequest = useRef(0);
+  const refreshContext = useCallback(async () => {
+    const request = ++contextRequest.current;
+    // A poll started before submission must not restore the completed match.
+    const next = await api<EventContext>("/event-context?assign=true", { cache: "no-store" });
+    if (request === contextRequest.current) setContext(next);
+  }, []);
   useEffect(() => {
-    const loadMatch = () =>
-      api<EventContext>("/event-context?assign=true")
-        .then(setContext)
-        .catch(() => undefined);
+    const loadMatch = () => refreshContext().catch(() => undefined);
     loadMatch();
     const interval = window.setInterval(() => {
       if (document.visibilityState === "visible") loadMatch();
@@ -1976,7 +1987,7 @@ export function ScoutingForms({
       window.removeEventListener("focus", resume);
       document.removeEventListener("visibilitychange", resume);
     };
-  }, []);
+  }, [refreshContext]);
   useEffect(() => {
     document.body.classList.toggle("scouting-workspace-open", isFullscreen);
     if (!isFullscreen) return;
@@ -2091,9 +2102,7 @@ export function ScoutingForms({
             key={selected.id}
             form={selected}
             context={context}
-            refreshContext={async () => {
-              setContext(await api<EventContext>("/event-context?assign=true"));
-            }}
+            refreshContext={refreshContext}
           />
         ))}
       {selected?.kind === "pit" &&

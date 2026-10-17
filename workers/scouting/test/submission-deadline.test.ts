@@ -21,6 +21,7 @@ type Context = {
   assignedTeam: string | null;
   submissionClosesAt: number | null;
   serverNow: number;
+  hasSubmittedCurrentMatch: boolean;
 };
 function match(key: string, number: number, endedAt: number | null): TbaMatch {
   return {
@@ -123,6 +124,44 @@ describe("scouting submission deadlines", () => {
         answers_json: '{"score":5}',
       },
     ]);
+  });
+  it("unlocks the next match immediately after submitting, before the shared cutoff", async () => {
+    const f = await fixture();
+    const first = await f.context();
+    expect(first.submissionClosesAt).toBeGreaterThan(first.serverNow);
+    // A scheduled future match cannot be submitted before it becomes this scout's form.
+    expect(
+      (await f.submit({ ...first, currentMatch: { key: f.keys[1], matchNumber: 2 } })).status,
+    ).toBe(409);
+    expect((await f.submit(first)).status).toBe(201);
+    const next = await f.context();
+    expect(next.currentMatch?.matchNumber).toBe(2);
+    expect(next.assignedTeam).toBeTruthy();
+    expect(next.submissionClosesAt).toBeNull();
+    expect(next.hasSubmittedCurrentMatch).toBe(false);
+    const unfinished = await jsonAs<Context>(
+      f.team.otherStudent,
+      "/scouting/event-context?assign=true",
+    );
+    expect(unfinished.currentMatch?.matchNumber).toBe(1);
+    expect(unfinished.hasSubmittedCurrentMatch).toBe(false);
+    expect(
+      (await jsonAs<Context>(f.team.admin, "/scouting/event-context")).currentMatch?.matchNumber,
+    ).toBe(1);
+    expect((await f.submit(first)).status).toBe(409);
+    expect((await f.submit(next)).status).toBe(201);
+    expect((await f.reports()).map((report) => report.match_number).sort()).toEqual([1, 2]);
+    const finished = await f.context();
+    expect(finished.hasSubmittedCurrentMatch).toBe(true);
+  });
+  it("keeps manual scheduling under the lead's control after submission", async () => {
+    const f = await fixture(true);
+    const first = await f.context();
+    expect((await f.submit(first)).status).toBe(201);
+    expect(await f.context()).toMatchObject({
+      currentMatch: { matchNumber: 1 },
+      hasSubmittedCurrentMatch: true,
+    });
   });
   it("rejects an old draft even when the scout already has the next assignment", async () => {
     const f = await fixture();

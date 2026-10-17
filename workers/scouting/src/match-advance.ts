@@ -52,3 +52,28 @@ export function automaticTbaMatch(
   }
   return ordered.at(-1);
 }
+
+/** Completed scouts can prepare the next form while others finish the live match. */
+export function nextScoutMatch(
+  matches: TbaMatch[],
+  current: TbaMatch | undefined,
+  submitted: Set<number>,
+  windowSeconds = DEFAULT_SUBMISSION_WINDOW,
+  now = Date.now(),
+) {
+  if (!current) return undefined;
+  const remaining = matches
+    .filter(
+      (match) =>
+        match.comp_level === current.comp_level && matchOrder(match) >= matchOrder(current),
+    )
+    .sort((left, right) => matchOrder(left) - matchOrder(right));
+  return (
+    remaining.find((match) => {
+      const closesAt = matchSubmissionClosesAt(match, windowSeconds);
+      return !submitted.has(match.match_number) && (closesAt === null || now < closesAt);
+    }) ??
+    remaining.at(-1) ??
+    current
+  );
+}

@@ -42,6 +42,7 @@ import {
   automaticTbaMatch,
   matchOrder,
   matchSubmissionClosesAt,
+  nextScoutMatch,
   submissionWindow,
 } from "./match-advance";
 import { requireAuth } from "./middleware/auth";
@@ -380,7 +381,21 @@ app.get("/teams/search", requireAuth, async (c) => {
   }
 });
 
-async function resolveEventLink(c: Context<AppEnv>) {
+async function submittedScoutMatches(c: Context<AppEnv>, eventKey: string) {
+  const rows = await all<{ match_number: number }>(
+    dbOf(c),
+    sql`
+    SELECT DISTINCT s.match_number
+    FROM (SELECT * FROM ${scoutingFormSubmissions} WHERE ${inTeam(scoutingFormSubmissions, c.get("teamId"))}) AS s
+    JOIN (SELECT * FROM ${scoutingForms} WHERE ${inTeam(scoutingForms, c.get("teamId"))}) AS f ON f.id = s.form_id
+    WHERE f.form_kind = 'scouting' AND s.submitted_by = ${c.get("userId")}
+      AND s.event_key = ${eventKey} AND s.match_number IS NOT NULL
+  `,
+  );
+  return new Set(rows.results.map((row) => Number(row.match_number)));
+}
+
+async function resolveEventLink(c: Context<AppEnv>, forScout = false) {
   const config = await first<{
     event_key: string;
     current_match_number: number | null;
@@ -407,6 +422,13 @@ async function resolveEventLink(c: Context<AppEnv>) {
         : automaticTbaMatch(matches, config.submission_window_seconds ?? DEFAULT_SUBMISSION_WINDOW);
     if (config.schedule_mode !== "manual")
       await persistAutomaticMatch(c, config.current_match_number, current);
+    if (forScout && config.schedule_mode !== "manual")
+      current = nextScoutMatch(
+        matches,
+        current,
+        await submittedScoutMatches(c, config.event_key),
+        config.submission_window_seconds ?? DEFAULT_SUBMISSION_WINDOW,
+      );
   } catch {
     // Keep the configured event link when TBA is temporarily unavailable.
   }
@@ -459,12 +481,15 @@ app.get("/event-context", requireAuth, async (c) => {
   const windowSeconds = config?.submission_window_seconds ?? DEFAULT_SUBMISSION_WINDOW;
   const tbaCurrent =
     config?.schedule_mode === "manual" ? undefined : automaticTbaMatch(matches, windowSeconds);
-  const current =
+  let current =
     (config?.schedule_mode === "manual" ? configuredCurrent : tbaCurrent) ??
     configuredCurrent ??
     (config?.schedule_mode === "manual" ? matches[0] : matches.at(-1));
   if (config?.schedule_mode !== "manual")
     await persistAutomaticMatch(c, config?.current_match_number, current);
+  const completedMatches = eventKey ? await submittedScoutMatches(c, eventKey) : new Set<number>();
+  if (c.req.query("assign") === "true" && config?.schedule_mode !== "manual")
+    current = nextScoutMatch(matches, current, completedMatches, windowSeconds);
   const teamSchedule = matches.filter((match) =>
     [...match.alliances.red.team_keys, ...match.alliances.blue.team_keys].includes(ourTeam(c)),
   );
@@ -531,7 +556,7 @@ app.get("/event-context", requireAuth, async (c) => {
     currentMatch: current ? publicMatch(current) : null,
     tbaCurrentMatch: tbaCurrent ? publicMatch(tbaCurrent) : null,
     assignedTeam,
-    hasSubmittedCurrentMatch: submittedUserIds.has(c.get("userId")),
+    hasSubmittedCurrentMatch: completedMatches.has(currentMatchNumber ?? 0),
     onlineScoutCount: activeScoutIds.length,
     matchSubmissions: admin ? (eventMatchSubmissions?.results ?? []) : [],
     nextTeamMatch: nextTeamMatch ? publicMatch(nextTeamMatch) : null,
@@ -902,7 +927,7 @@ app.post("/scouting-forms/:id/submissions", requireAuth, async (c) => {
   let teamName = teamNumber(form.get("teamName"));
   const answers = parseJson<Record<string, unknown>>(form.get("answers"), {});
   const fields = parseJson<ScoutingField[]>(formDefinition.fields_json, []);
-  const eventLink = await resolveEventLink(c);
+  const eventLink = await resolveEventLink(c, formDefinition.form_kind === "scouting");
   if (formDefinition.form_kind === "scouting") {
     if (!fields.length) return c.json({ error: "This scouting form has no fields." }, 409);
     if (!eventLink.eventKey || !eventLink.matchNumber)
@@ -1012,7 +1037,7 @@ app.post("/scouting-forms/:id/submissions", requireAuth, async (c) => {
   }
   const submittedAt = Date.now();
   if (formDefinition.form_kind === "scouting") {
-    const latest = await resolveEventLink(c);
+    const latest = await resolveEventLink(c, true);
     const latestAssignment = await dbOf(c)
       .select({ teamNumber: scoutingMatchAssignments.team_number })
       .from(scoutingMatchAssignments)
