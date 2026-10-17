@@ -7,7 +7,7 @@ export type ZipEntry = {
   path: string;
   /** Unzipped bytes, as the zip says. */
   size: number;
-  read(): Promise<Uint8Array>;
+  read(): Promise<Uint8Array<ArrayBuffer>>;
 };
 
 export class ZipError extends Error {}
@@ -17,7 +17,7 @@ const CENTRAL = 0x02014b50;
 const LOCAL = 0x04034b50;
 
 /** The zip's files (not its folders). Throws ZipError when it isn't a zip this can read. */
-export function readZip(bytes: Uint8Array): ZipEntry[] {
+export function readZip(bytes: Uint8Array<ArrayBuffer>): ZipEntry[] {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const u16 = (at: number) => view.getUint16(at, true);
   const u32 = (at: number) => view.getUint32(at, true);
@@ -50,8 +50,10 @@ export function readZip(bytes: Uint8Array): ZipEntry[] {
 
     if (path.endsWith("/")) continue;
     if (flags & 1) throw new ZipError("The zip is encrypted.");
-    if (method !== 0 && method !== 8) throw new ZipError("The zip uses a compression it can't read.");
-    if (local + 30 > bytes.length || u32(local) !== LOCAL) throw new ZipError("The zip is damaged.");
+    if (method !== 0 && method !== 8)
+      throw new ZipError("The zip uses a compression it can't read.");
+    if (local + 30 > bytes.length || u32(local) !== LOCAL)
+      throw new ZipError("The zip is damaged.");
     const start = local + 30 + u16(local + 26) + u16(local + 28);
     if (start + compressed > bytes.length) throw new ZipError("The zip is damaged.");
     const data = bytes.subarray(start, start + compressed);
@@ -61,7 +63,9 @@ export function readZip(bytes: Uint8Array): ZipEntry[] {
       size,
       async read() {
         if (method === 0) return data;
-        const stream = new Blob([data]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+        const stream = new Blob([data])
+          .stream()
+          .pipeThrough(new DecompressionStream("deflate-raw"));
         return new Uint8Array(await new Response(stream).arrayBuffer());
       },
     });

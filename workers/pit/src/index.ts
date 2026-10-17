@@ -18,6 +18,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { validator } from "hono/validator";
 import packageJson from "../package.json";
+import { deleteTeamScopeFiles, scopeRoutes } from "./advantagescope";
 import { archiveRoutes } from "./archives";
 import { createDb } from "./db";
 import {
@@ -29,6 +30,8 @@ import {
   logDownloaderCodes,
   logDownloaders,
   matchLogs,
+  scopeAssets,
+  scopeSettings,
   settings,
 } from "./db/schema";
 import { demoWords, loadDemo } from "./demo";
@@ -221,6 +224,8 @@ const app = base
         checklistArchives,
         logDownloaders,
         matchLogs,
+        scopeSettings,
+        scopeAssets,
       ],
       { log_downloaders: ["keyHash"], match_logs: ["uploadId"] },
     );
@@ -228,12 +233,16 @@ const app = base
       teamExport(manifest, teamId, tables, [
         "Log downloaders' keys and pairing codes aren't included: pair a downloader again on the Logs page.",
         "The match log files aren't included: download them on the Logs page.",
+        "AdvantageScope's asset files aren't included, only their names and configs: upload them again in AdvantageScope.",
       ]),
     );
   })
   .delete("/internal/teams/:teamId", async (c) => {
     await deleteTeamLogFiles(c.env.LOGS, c.req.param("teamId"));
+    await deleteTeamScopeFiles(c.env.LOGS, c.req.param("teamId"));
     await deleteTeamRows(createDb(c.env.PIT_DB), c.req.param("teamId"), [
+      scopeAssets,
+      scopeSettings,
       matchLogs,
       checklistArchives,
       checklistIssues,
@@ -832,6 +841,9 @@ const app = base
 
   // Match logs the downloaders uploaded (./match-logs.ts).
   .route("/logs", matchLogRoutes)
+
+  // AdvantageScope Lite at /scope/: its logs, assets and the team's settings (./advantagescope.ts).
+  .route("/scope", scopeRoutes)
 
   // Global reset — unchecks all items across all lists, preserves issues, archives nothing
   .post("/reset", requireAuth, async (c) => {

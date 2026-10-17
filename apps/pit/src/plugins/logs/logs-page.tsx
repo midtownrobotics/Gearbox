@@ -6,9 +6,11 @@ import {
   Loading,
   Page,
   SuccessBanner,
+  buttonClass,
   useTeamNames,
 } from "@g3/ui";
 import { useCallback, useEffect, useState } from "react";
+import { advantageScopeUrl } from "../../shared/getters/advantagescope";
 import {
   type LogDownloader,
   createPairingCode,
@@ -16,6 +18,7 @@ import {
   removeDownloader,
 } from "../../shared/getters/downloaders";
 import { MatchLogs } from "./match-logs";
+import { ScopeAssets } from "./scope-assets";
 import { SetupSteps } from "./setup-steps";
 
 // Logs: the robot's match logs, which the team's paired log downloaders (devices/pit-log-
@@ -193,7 +196,16 @@ export function LogsPage() {
   }, [pairing, load]);
 
   return (
-    <Page title="Logs" description="The robot's match logs." width="narrow">
+    <Page
+      title="Logs"
+      description="The robot's match logs."
+      width="narrow"
+      actions={
+        <a className={buttonClass("primary", "sm")} href={advantageScopeUrl()}>
+          Open AdvantageScope
+        </a>
+      }
+    >
       <p className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
         Logs is in beta and isn't fully set up yet: things may change, and logs here may not be
         kept.
@@ -234,6 +246,7 @@ export function LogsPage() {
               </div>
             )}
           </Card>
+          <ScopeAssets />
           {adding && (
             <Card title="Add a log downloader">
               <AddDownloader canManage={data.canManage} />

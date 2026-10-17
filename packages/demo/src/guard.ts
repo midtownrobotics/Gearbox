@@ -47,6 +47,11 @@ export const DEMO_BLOCKED: readonly Blocked[] = [
   { app: "shop", method: "*", path: /^\/print\// },
   { app: "orders", method: "*", path: /^\/share-a-cart\/(connect|callback|disconnect)/ },
   { app: "orders", method: "POST", path: /^\/orders\/import/ },
+  // AdvantageScope: its layout is the team's (each visitor's stays in their tab), and assets are
+  // uploads.
+  { app: "pit", method: "PUT", path: /^\/scope\/settings/ },
+  { app: "pit", method: "POST", path: /^\/scope\/assets/ },
+  { app: "pit", method: "DELETE", path: /^\/scope\/assets/ },
   // Scouting: reading a photographed schedule runs Workers AI.
   { app: "scouting", method: "POST", path: /^\/scouting\/manual-schedule\/extract/ },
   // Integration keys and every app's settings form (no page saves through it yet).
