@@ -1,3 +1,4 @@
+import { authorizeUrl, exchangeCode } from "@g3/discord";
 import {
   consoleUrlVia,
   platformUrl,
@@ -27,13 +28,20 @@ import type { AppEnv } from "./types";
 //
 // Signing a team up, all on the platform's site:
 //   1. POST /signup: the team's number, name, country, and the terms. A pending team.
-//   2. GET /signup/:id/slack: "Add to Slack" installs the bot into the team's workspace; Slack
-//      sends the founder back to /signup/slack/callback. G3ID gets the team and its workspace.
-//   3. POST /signup/:id/code: a code (from G3ID) the founder sends to the bot from that workspace.
-//      The team has no members yet, so G3ID makes them its first admin. GET /signup/:id/status
-//      sees it, makes the team active, and hands back G3ID's link that signs them in on their
-//      team's own address.
-// Everyone after that joins through the team's Slack, like G3's members do. No second sign-up on
+//   2. The team's chat, Slack or Discord (docs/roadmap/discord.md):
+//      - Slack: GET /signup/:id/slack: "Add to Slack" installs the bot into the team's workspace;
+//        Slack sends the founder back to /signup/slack/callback. G3ID gets the team and its
+//        workspace. Then 3.
+//      - Discord: GET /signup/:id/discord: "Add to Discord" adds the bot to the team's server and
+//        signs the founder in, in one authorize; Discord sends them back to
+//        /signup/discord/callback. G3ID gets the team and its server and makes the founder its
+//        first admin; the team is active, and the founder lands on G3ID's /auth/handoff on the
+//        team's own address, which signs them in there. No step 3.
+//   3. POST /signup/:id/code: a code (from G3ID) the founder sends to the Slack bot from that
+//      workspace. The team has no members yet, so G3ID makes them its first admin. GET
+//      /signup/:id/status sees it, makes the team active, and hands back G3ID's link that signs
+//      them in on their team's own address.
+// Everyone after that joins through the team's chat, like G3's members do. No second sign-up on
 // other providers: accounts are G3ID's.
 
 const app = new Hono<AppEnv>();
@@ -47,6 +55,7 @@ app.onError((err, c) => {
 const SIGNUP_EXPIRES_S = 60 * 60;
 
 const SLACK_REDIRECT_URI = `${platformUrl}/api/signup/slack/callback`;
+const DISCORD_REDIRECT_URI = `${platformUrl}/api/signup/discord/callback`;
 
 /** The platform's own address: through the dev gateway in local dev. */
 const site = (env: AppEnv["Bindings"]) => platformUrlVia(env.LOCAL_GATEWAY_URL || undefined);
@@ -58,10 +67,10 @@ async function signupFor(env: AppEnv["Bindings"], signupId: string) {
   return db(env).select().from(teams).where(eq(teams.signupId, signupId)).get();
 }
 
-/** Where a sign-up is: Slack to connect, the founder's code to send, or done. */
-function step(team: typeof teams.$inferSelect): "slack" | "code" | "done" {
+/** Where a sign-up is: a chat to connect, the founder's Slack code to send, or done. */
+function step(team: typeof teams.$inferSelect): "connect" | "code" | "done" {
   if (team.status === "active") return "done";
-  return team.slackWorkspaceId ? "code" : "slack";
+  return team.slackWorkspaceId ? "code" : "connect";
 }
 
 const routes = app
@@ -221,6 +230,75 @@ const routes = app
       .where(eq(teams.id, team.id));
     return back();
   })
+  // Step 2, with Discord: add the bot to the team's server and sign the founder in.
+  .get("/signup/:signupId/discord", async (c) => {
+    const team = await signupFor(c.env, c.req.param("signupId"));
+    if (!team || team.status !== "pending") {
+      return c.redirect(`${site(c.env)}/signup`);
+    }
+    return c.redirect(
+      authorizeUrl(
+        { DISCORD_CLIENT_ID: c.env.DISCORD_CLIENT_ID },
+        { redirectUri: DISCORD_REDIRECT_URI, state: team.signupId as string, install: true },
+      ),
+    );
+  })
+  .get("/signup/discord/callback", async (c) => {
+    const signupId = c.req.query("state") ?? "";
+    const back = (error?: string) =>
+      c.redirect(
+        `${site(c.env)}/signup?id=${encodeURIComponent(signupId)}${error ? `&error=${encodeURIComponent(error)}` : ""}`,
+      );
+    const team = await signupFor(c.env, signupId);
+    if (!team || team.status !== "pending" || team.slackWorkspaceId) return back();
+    const code = c.req.query("code");
+    if (!code) return back("Discord wasn't connected. Try again to continue.");
+
+    const done = await exchangeCode(
+      {
+        DISCORD_CLIENT_ID: c.env.DISCORD_CLIENT_ID,
+        DISCORD_CLIENT_SECRET: c.env.DISCORD_CLIENT_SECRET,
+      },
+      code,
+      DISCORD_REDIRECT_URI,
+    );
+    if (!done?.guild) return back("Discord didn't finish connecting. Please try again.");
+
+    // G3ID gets the team (its tables point at it), its server and its founder.
+    await g3id(c.env, "/teams", {
+      method: "PUT",
+      body: { id: team.id, teamNumber: team.teamNumber, name: team.name },
+    });
+    const res = await g3id(c.env, `/teams/${encodeURIComponent(team.id)}/discord-founder`, {
+      method: "POST",
+      body: { guild: done.guild, user: done.user },
+    });
+    const founder = (await res.json().catch(() => ({}))) as {
+      userId?: string;
+      token?: string;
+      error?: string;
+    };
+    if (!res.ok || !founder.userId || !founder.token) {
+      return back(founder.error ?? "Discord didn't finish connecting. Please try again.");
+    }
+
+    await db(c.env)
+      .update(teams)
+      .set({
+        status: "active",
+        founderUserId: founder.userId,
+        ownerUserId: founder.userId,
+        discordGuildId: done.guild.id,
+        discordGuildName: done.guild.name,
+        updatedAt: now(),
+      })
+      .where(and(eq(teams.id, team.id), eq(teams.status, "pending")));
+    // G3ID sets the session cookie on the team's own domain, then opens where notifications go.
+    const home = `${teamAppUrlVia(c.env.LOCAL_GATEWAY_URL, team.id, "portal")}/admin/notifications?welcome=1`;
+    return c.redirect(
+      `${teamAppUrlVia(c.env.LOCAL_GATEWAY_URL, team.id, "id")}/api/auth/handoff?token=${founder.token}&redirect=${encodeURIComponent(home)}`,
+    );
+  })
   // Someone says a team number was signed up by people who aren't that team. Kept for an operator,
   // who gets in touch by email; a false registration can mean deleting the team and its data.
   .post("/reports", async (c) => {
@@ -272,12 +350,12 @@ const routes = app
         message,
         createdAt: now(),
       });
-    // Every operator hears of it on Slack: the number and where to read it, never the reporter's
+    // Every operator hears of it on their chat: the number and where to read it, never the reporter's
     // details, which stay in the console.
     c.executionCtx.waitUntil(
       tellOperators(
         c.env,
-        `:triangular_flag_on_post: New report about team ${teamNumber}. Read it in the console: ${consoleUrlVia(c.env.LOCAL_GATEWAY_URL || undefined)}/console/reports`,
+        `🚩 New report about team ${teamNumber}. Read it in the console: ${consoleUrlVia(c.env.LOCAL_GATEWAY_URL || undefined)}/console/reports`,
       ),
     );
     return c.json({ ok: true }, 201);

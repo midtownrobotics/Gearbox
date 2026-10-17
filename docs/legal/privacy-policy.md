@@ -31,16 +31,16 @@ We collect only what the apps need to work.
 | Kind | What it includes | Where it comes from |
 | --- | --- | --- |
 | Account | Name, email address, when you last signed in | You, or the sign-in service you use |
-| Sign-in links | Your identifier at each service you link, such as Google, GitHub, Slack or Steam. A password is stored only as a one-way hash. For Google and GitHub, the access token they issue when you sign in | You, when you link a service |
+| Sign-in links | Your identifier at each service you link, such as Google, GitHub, Slack, Discord or Steam, and the email or username it gives us. A password is stored only as a one-way hash. For Google and GitHub, the access token they issue when you sign in | You, when you link a service |
 | Team membership | Your team, your role, your status, and a kiosk PIN if your team uses kiosks | Your team's admins |
 | Sessions and devices | A session identifier in a cookie, and for shared shop devices a kiosk token | Created when you sign in |
 | Attendance | When you signed in and out, and hours added by an admin | You and your team's admins |
 | Orders | Part requests, reasons, approvals, costs, budgets and vendors | Members and mentors |
 | Inventory | What the team owns, how many and where, and a history of who counted, moved, checked out or received each part | Members and mentors |
 | Shop | Parts, production steps, who did them, who made a part obsolete, drawings and files; for each Onshape release, its name and notes, who made and approved it (their Onshape names) and its comments | Members, mentors and Onshape, if connected |
-| Pit | Checklists, issues and battery records, and archives of the checklists with who archived each one and when; the computers paired as log downloaders, with each one's name, who paired it, when, and when it was last heard from; and the robot's match logs those computers upload (the robot's own data from each match; at most 20 per team), kept until the team deletes them | Members |
+| Pit | Checklists, issues and battery records, and archives of the checklists with who archived each one and when; the computers paired as log downloaders, with each one's name, who paired it, when, when it was last heard from and what it last said it was doing (connected to the robot, copying, uploading); and the robot's match logs those computers upload (the robot's own data from each match; at most 20 per team), kept until the team deletes them; AdvantageScope's preferences and layout for the team, with who last changed each; and the field, robot and joystick models mentors upload to it, with who uploaded each and when | Members |
 | Skill Tree | Each member's progress on skills and who signed it off | Members and mentors |
-| Schedule | Each event's days and periods, which members are attending, each one's role for every 15 minutes, who may edit schedules, and which Slack reminders were sent; each member's own list of friends, which only that member can see | Mentors and the students they trust; each member, for their friends |
+| Schedule | Each event's days and periods, which members are attending, each one's role for every 15 minutes, who may edit schedules, and which chat reminders (Slack or Discord) were sent; each member's own list of friends, which only that member can see | Mentors and the students they trust; each member, for their friends |
 | Scouting | Match and pit observations, notes on other teams, robot photos, schedules; when engagement is enabled, point balances and awards, match picks and their results | Members and optional scouting activities |
 | Uploaded files | Whatever your team uploads | Members |
 | Technical logs | Internet address, browser type, the page requested and the time | Recorded automatically by our hosting provider |
@@ -57,7 +57,7 @@ We use your information to:
 
 - sign you in and show you your own team's apps and data;
 - run the apps your team has switched on;
-- send the messages your team sets up, such as a Slack notice when an order is approved;
+- send the messages your team sets up, such as a Slack or Discord notice when an order is approved;
 - keep Gearbox secure, find faults and stop abuse; and
 - contact team owners about their team, these policies or the service.
 
@@ -91,6 +91,7 @@ Scouting engagement is off by default. An admin can enable points and match pred
 | Cloudflare | Hosting, storage and network delivery | Always. All Gearbox data is held on Cloudflare |
 | Google, GitHub, Steam | Sign-in | Only if you choose to sign in with or link that service |
 | Slack | Sign-in and team notifications | Only if your team connects its Slack workspace |
+| Discord | Sign-in and team notifications. When someone new signs in with Discord, we check with Discord that they're in your team's server; the answer isn't stored | Only if your team connects its Discord server |
 | Onshape | Part and drawing data for Shop | Only if your team connects Onshape |
 | The Blue Alliance, Nexus, Statbotics | Public event and match schedules and predictions for Pit and Scouting | Team and event numbers only |
 | Share-A-Cart | Building vendor carts in Orders | Only if your team connects it; it receives the items in a cart |

@@ -181,8 +181,12 @@ export const authRouter = new Hono<AppEnv>()
       return c.json({ error: "Identity not found." }, 404);
     }
 
-    if (identity.provider === "slack") {
-      return c.json({ error: "Cannot unlink Slack." }, 400);
+    // Members join through the team's chat, so it stays linked.
+    if (identity.provider === "slack" || identity.provider === "discord") {
+      return c.json(
+        { error: `Cannot unlink ${identity.provider === "slack" ? "Slack" : "Discord"}.` },
+        400,
+      );
     }
 
     if (identity.provider !== (c.req.query("provider") ?? identity.provider)) {

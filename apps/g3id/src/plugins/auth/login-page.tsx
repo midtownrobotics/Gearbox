@@ -1,6 +1,6 @@
 import { ErrorBanner, NotYourTeam, PublicSiteLink, buttonClass, useTeamNames } from "@g3/ui";
 import { useEffect, useState } from "react";
-import { FaGithub, FaGoogle, FaSlack, FaSteam } from "react-icons/fa";
+import { FaDiscord, FaGithub, FaGoogle, FaSlack, FaSteam } from "react-icons/fa";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../../lib/api";
 
@@ -8,6 +8,7 @@ const apiBase = import.meta.env.VITE_API_BASE_URL ?? "";
 
 const PROVIDERS = [
   { method: "slack", label: "Slack", Icon: FaSlack },
+  { method: "discord", label: "Discord", Icon: FaDiscord },
   { method: "google", label: "Google", Icon: FaGoogle },
   { method: "github", label: "GitHub", Icon: FaGithub },
   { method: "steam", label: "Steam", Icon: FaSteam },
@@ -57,7 +58,10 @@ export function LoginPage() {
         {error && <ErrorBanner message={error} />}
 
         <div className="space-y-3">
-          {PROVIDERS.filter((p) => methods[p.method] !== false).map(({ method, label, Icon }) => (
+          {PROVIDERS.filter((p) =>
+            // Discord only for a team that uses it; the others until the team says they're off.
+            p.method === "discord" ? methods.discord === true : methods[p.method] !== false,
+          ).map(({ method, label, Icon }) => (
             <a
               key={method}
               href={`${apiBase}${method === "slack" ? "/auth/slack/initiate" : `/auth/${method}`}${rp}`}

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { saveInstallation } from "../src/lib/slack-install";
 import { createTeam, createUser, g3id, sessionCookie, testEnv } from "./helpers";
 
-// The team's Slack channels, for choosing one by name (GET /admin/slack/channels). Slack is
+// The team's Slack channels, for choosing one by name (GET /admin/chat/channels). Slack is
 // stubbed in vitest.config.mts.
 
 async function teamWithSlack(botToken = "xoxb-theirs") {
@@ -19,7 +19,7 @@ async function teamWithSlack(botToken = "xoxb-theirs") {
 }
 
 const channelsAs = async (teamId: string, user: { isAdmin?: boolean } = { isAdmin: true }) =>
-  g3id("/admin/slack/channels", {
+  g3id("/admin/chat/channels", {
     cookie: await sessionCookie(await createUser({ teamId, ...user })),
   });
 
@@ -28,10 +28,11 @@ describe("the team's Slack channels", () => {
     const res = await channelsAs(await teamWithSlack());
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({
+      provider: "slack",
       channels: [
-        { id: "C0000000001", name: "announcements", isPrivate: false, isMember: true },
-        { id: "G0000000003", name: "mentors", isPrivate: true, isMember: true },
-        { id: "C0000000002", name: "shop", isPrivate: false, isMember: false },
+        { id: "C0000000001", name: "announcements", isPrivate: false, canPost: true },
+        { id: "G0000000003", name: "mentors", isPrivate: true, canPost: true },
+        { id: "C0000000002", name: "shop", isPrivate: false, canPost: false },
       ],
     });
   });
@@ -43,7 +44,7 @@ describe("the team's Slack channels", () => {
   it("says when the team has no Slack, or has to connect it again", async () => {
     const none = await channelsAs(await createTeam());
     expect(none.status).toBe(404);
-    expect(await none.json()).toMatchObject({ code: "no_slack" });
+    expect(await none.json()).toMatchObject({ code: "no_chat" });
     const old = await channelsAs(await teamWithSlack("xoxb-old"));
     expect(old.status).toBe(409);
     expect(await old.json()).toMatchObject({ code: "reconnect" });

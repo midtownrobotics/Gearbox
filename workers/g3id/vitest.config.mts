@@ -1,4 +1,5 @@
 import { workerTestConfig } from "@g3/testing/config";
+import { fakeDiscord } from "@g3/testing/discord";
 
 const sent: { channel: string; text: string }[] = [];
 
@@ -6,6 +7,8 @@ const sent: { channel: string; text: string }[] = [];
 // in the code ("ws:T123"), its channels are three made-up ones, and messages go nowhere.
 const slack = (request: Request) => {
   const url = new URL(request.url);
+  // Discord's API: @g3/testing's fake (packages/testing/src/discord.ts).
+  if (url.hostname === "discord.com") return fakeDiscord(request);
   if (url.hostname !== "slack.com") return new Response("Not stubbed", { status: 502 });
   if (url.pathname === "/api/oauth.v2.access") {
     return request.formData().then((form) => {
@@ -89,6 +92,10 @@ export default workerTestConfig({
     SLACK_CLIENT_SECRET: "test-secret",
     SLACK_SIGNING_SECRET: "test-signing-secret",
     SLACK_BOT_TOKEN: "xoxb-site",
+    // The Discord app's settings (one app for every team).
+    DISCORD_CLIENT_ID: "test-discord-client",
+    DISCORD_CLIENT_SECRET: "test-discord-secret",
+    DISCORD_BOT_TOKEN: "test-discord-bot",
     SECRETS_KEY: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
     // Production addresses for other teams, not the dev gateway's.
     LOCAL_GATEWAY_URL: "",

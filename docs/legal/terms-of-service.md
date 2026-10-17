@@ -86,7 +86,7 @@ Your team chooses which apps to switch on. We may add, change or remove apps.
 
 ## 8. Other services you connect
 
-Gearbox can connect to services run by others, such as Slack, Google, GitHub, Steam, Onshape and The Blue Alliance. Your use of each is governed by that service's own terms and privacy policy. We are not responsible for those services. When you connect one, you allow Gearbox to exchange with it the data that connection needs.
+Gearbox can connect to services run by others, such as Slack, Discord, Google, GitHub, Steam, Onshape and The Blue Alliance. Your use of each is governed by that service's own terms and privacy policy. We are not responsible for those services. When you connect one, you allow Gearbox to exchange with it the data that connection needs.
 
 ## 9. The demo
 
@@ -178,7 +178,7 @@ Your team decides why and how its members' personal information is used, and is 
 
 Your team gives us general permission to use sub-processors. The current list is published at [address]. Today it has one entry: Cloudflare, Inc., which provides hosting, storage and network delivery.
 
-We will post any addition at least 30 days before it takes effect. A team that objects may close its account and export its data first. Services your team chooses to connect, such as Slack or Onshape, are your team's own providers and not our sub-processors.
+We will post any addition at least 30 days before it takes effect. A team that objects may close its account and export its data first. Services your team chooses to connect, such as Slack, Discord or Onshape, are your team's own providers and not our sub-processors.
 
 ### A6. Security measures
 

@@ -6,6 +6,7 @@ import type { AppEnv } from "../types";
 import { newId } from "./id";
 import { dmAdmins } from "./member-dm";
 import { createSession } from "./session";
+import { methodOff } from "./sign-in-methods";
 import { slackForTeam, teamForWorkspace } from "./slack-install";
 import { teamUrl } from "./team";
 
@@ -107,6 +108,9 @@ export async function handleSlackCode(opts: {
   if (!workspaceTeam) {
     return { success: false, message: "This Slack workspace isn't connected to a team." };
   }
+  // A team that moved to Discord no longer signs anyone in through Slack.
+  const off = await methodOff(env, workspaceTeam, "slack");
+  if (off) return { success: false, message: `❌ ${off}` };
 
   // Rate limit: 5 attempts per 15 minutes per Slack user
   const rateLimitKey = `rate_limit:slack:${slackUserId}`;
@@ -340,7 +344,7 @@ export async function handleSlackCode(opts: {
     await dmAdmins(
       env,
       record.teamId,
-      `:wave: ${slackUser.displayName} (${email}) signed up and is waiting for approval: ${teamUrl(env, record.teamId, "portal")}/admin/members/${userId}`,
+      `👋 ${slackUser.displayName} (${email}) signed up and is waiting for approval: ${teamUrl(env, record.teamId, "portal")}/admin/members/${userId}`,
     );
   } catch (err) {
     console.error("[slack] telling admins about a sign-up failed", err);

@@ -164,3 +164,74 @@ describe("a paired downloader", () => {
     expect((await call("/downloader/me", asDownloader(team, key))).status).toBe(401);
   });
 });
+
+describe("what a downloader is doing", () => {
+  const status = {
+    robot: true,
+    rioReachable: true,
+    copying: 2,
+    uploading: "Qual-12",
+    pendingUpload: 3,
+    version: "1.2.0",
+  };
+
+  it("is listed for the team, online while it keeps saying", async () => {
+    const team = teamUsers(newTeamId());
+    const { code } = await newCode(team.mentor);
+    const { key } = (await (await pair(team.teamId, { code, name: "Pit laptop" })).json()) as {
+      key: string;
+    };
+    type Listed = { downloaders: { status: unknown; online: boolean }[] };
+    const before = await jsonAs<Listed>(team.student, "/downloaders");
+    expect(before.downloaders[0]).toMatchObject({ status: null, online: false });
+
+    const sent = await call("/downloader/status", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${key}`,
+        "X-Team-Id": team.teamId,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(status),
+    });
+    expect(sent.status).toBe(200);
+    const after = await jsonAs<Listed>(team.student, "/downloaders");
+    expect(after.downloaders[0]).toMatchObject({ status, online: true });
+
+    // Not a status, and not without its key.
+    const bad = await call("/downloader/status", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${key}`,
+        "X-Team-Id": team.teamId,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ ...status, copying: -1 }),
+    });
+    expect(bad.status).toBe(400);
+    const keyless = await call("/downloader/status", {
+      method: "POST",
+      headers: { "X-Team-Id": team.teamId, "Content-Type": "application/json" },
+      body: JSON.stringify(status),
+    });
+    expect(keyless.status).toBe(401);
+  });
+
+  it("gets the team's stored logs, to say which are in Gearbox", async () => {
+    const team = teamUsers(newTeamId());
+    const { code } = await newCode(team.mentor);
+    const { key } = (await (await pair(team.teamId, { code, name: "Pit laptop" })).json()) as {
+      key: string;
+    };
+    await database
+      .prepare(
+        `INSERT INTO match_logs (team_id, event, name, match_type, match_number, size, r2_key, status, downloader_name, created_at)
+         VALUES (?, 'gagai1', 'Qual-1', 'q', 1, 10, 'k1', 'stored', 'x', 1),
+                (?, 'gagai1', 'Qual-2', 'q', 2, 10, 'k2', 'uploading', 'x', 1)`,
+      )
+      .bind(team.teamId, team.teamId)
+      .run();
+    const res = await call("/downloader/logs", asDownloader(team.teamId, key));
+    expect(await res.json()).toEqual({ logs: [{ event: "gagai1", name: "Qual-1" }] });
+  });
+});

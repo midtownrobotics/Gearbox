@@ -1,4 +1,4 @@
-import { SlackChannelPicker } from "@g3/ui";
+import { ChannelPicker, chatName, useTeamChat } from "@g3/ui";
 import { useEffect, useState } from "react";
 import { FaTimes } from "react-icons/fa";
 import { Link, useSearchParams } from "react-router-dom";
@@ -14,7 +14,8 @@ import {
 } from "../../lib/platform";
 
 // Where the platform's notifications go for this team (workers/platform/src/notifications.ts):
-// for each type, who sees it on the home page, and the Slack channel and members it's sent to.
+// for each type, who sees it on the home page, and the channel and members it's sent to on the
+// team's chat (Slack or Discord).
 
 const AUDIENCES: { value: PortalAudience; label: string }[] = [
   { value: "everyone", label: "Everyone" },
@@ -31,6 +32,7 @@ const TYPE_HINTS: Record<NotificationType, string> = {
 type Loaded = { settings: NotificationSettings; members: DmCandidate[] };
 
 export function NotificationsPage() {
+  const chat = chatName(useTeamChat());
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [draft, setDraft] = useState<NotificationSettings | null>(null);
   const [error, setError] = useState("");
@@ -90,7 +92,7 @@ export function NotificationsPage() {
       <h1 className="mb-2 text-3xl font-bold text-secondary-900">Notifications</h1>
       <p className="mb-6 text-secondary-600">
         Updates, downtime and anything that needs your attention. Gearbox is an early beta, so we
-        recommend turning on every kind, on the home page and in Slack.
+        recommend turning on every kind, on the home page and in {chat}.
       </p>
       {error && (
         <p role="alert" className="mb-4 rounded-md border border-red-500 p-3 text-red-700">
@@ -155,6 +157,7 @@ function TypeCard({
   onChange: (change: Partial<NotificationTypeSettings>) => void;
 }) {
   const style = NOTIFICATION_STYLES[type];
+  const chat = chatName(useTeamChat());
   return (
     <section
       className={`space-y-5 rounded-lg border border-l-4 border-line bg-surface p-4 ${style.stripe}`}
@@ -203,20 +206,20 @@ function TypeCard({
           htmlFor={`channel-${type}`}
           className="mb-1 block text-sm font-medium text-secondary-800"
         >
-          Slack channel
+          {chat} channel
         </label>
-        <SlackChannelPicker
+        <ChannelPicker
           id={`channel-${type}`}
-          value={value.slackChannel}
-          onChange={(slackChannel) => onChange({ slackChannel })}
+          value={value.channel}
+          onChange={(channel) => onChange({ channel })}
         />
       </div>
 
       <PeopleList
         type={type}
-        chosen={value.slackUsers}
+        chosen={value.users}
         members={members}
-        onChange={(slackUsers) => onChange({ slackUsers })}
+        onChange={(users) => onChange({ users })}
       />
     </section>
   );
@@ -233,13 +236,14 @@ function PeopleList({
   members: DmCandidate[];
   onChange: (userIds: string[]) => void;
 }) {
+  const chat = chatName(useTeamChat());
   const byId = new Map(members.map((m) => [m.id, m]));
   const available = members.filter((m) => !chosen.includes(m.id));
   const id = `people-${type}`;
   return (
     <div>
       <label htmlFor={id} className="mb-1 block text-sm font-medium text-secondary-800">
-        Direct messages on Slack
+        Direct messages on {chat}
       </label>
       {chosen.length > 0 && (
         <ul className="mb-2 flex flex-wrap gap-2">
@@ -249,7 +253,7 @@ function PeopleList({
               <Chip
                 key={userId}
                 label={m?.displayName ?? "Former member"}
-                warning={m && !m.hasSlack ? "hasn't linked Slack" : undefined}
+                warning={m && !m.hasChat ? `hasn't linked ${chat}` : undefined}
                 onRemove={() => onChange(chosen.filter((x) => x !== userId))}
               />
             );
@@ -264,10 +268,10 @@ function PeopleList({
       >
         <option value="">Add a person…</option>
         {available.map((m) => (
-          <option key={m.id} value={m.id} disabled={!m.hasSlack}>
+          <option key={m.id} value={m.id} disabled={!m.hasChat}>
             {m.displayName}
             {m.isAdmin ? " (admin)" : ""}
-            {m.hasSlack ? "" : " (no Slack linked)"}
+            {m.hasChat ? "" : ` (no ${chat} linked)`}
           </option>
         ))}
       </select>

@@ -1,6 +1,11 @@
-// A team's members with their roles, and messages to them on the team's Slack, from G3ID over the
-// service binding (its /api/internal routes are never reachable through the gateway). Apps keep no
-// list of people of their own, and never hold a team's Slack token.
+// A team's members with their roles, and messages to them on the team's chat (Slack or Discord,
+// whichever it connected), from G3ID over the service binding (its /api/internal routes are never
+// reachable through the gateway). Apps keep no list of people of their own, never hold a team's
+// chat token, and never know which chat a team uses.
+//
+// Messages are written in Gearbox's chat format, which Discord reads as it is and G3ID turns into
+// Slack's mrkdwn: **bold**, [label](https://...), "> " quotes, Unicode emoji (not :names:) and line
+// breaks.
 
 export type Member = {
   id: string;
@@ -9,8 +14,8 @@ export type Member = {
   status: "pending" | "active" | "rejected" | "merged";
   isAdmin: boolean;
   isMentor: boolean;
-  /** Has linked a Slack account (so the team's bot can DM them). */
-  hasSlack?: boolean;
+  /** Has linked the team's chat (Slack or Discord), so the team's bot can DM them. */
+  hasChat?: boolean;
 };
 
 /** The team's members (any status), or null when G3ID can't be reached. */
@@ -31,34 +36,9 @@ export async function activeMembers(env: { G3ID: Fetcher }, teamId: string) {
 }
 
 /**
- * Sends a Slack direct message from the team's own bot. Returns false when it wasn't sent (the
- * team hasn't connected Slack, or Slack refused); it never throws for that, so callers can fire
- * and forget.
- */
-export async function sendTeamDM(
-  env: { G3ID: Fetcher },
-  teamId: string,
-  slackUserId: string,
-  text: string,
-): Promise<boolean> {
-  const res = await env.G3ID.fetch(
-    new Request(`http://g3id/api/internal/teams/${encodeURIComponent(teamId)}/slack/dm`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ slackUserId, text }),
-    }),
-  );
-  if (!res.ok && res.status !== 404) {
-    console.error("[slack] team DM failed", res.status, await res.text().catch(() => ""));
-  }
-  return res.ok;
-}
-
-/**
- * Sends a Slack direct message from the team's own bot to members by their G3ID ids, for an app
- * that knows who but not their Slack account. Only active members with Slack linked get it.
- * Returns how many were sent (0 when the team has no Slack, or G3ID couldn't be reached); it never
- * throws, so callers can fire and forget.
+ * Sends a direct message from the team's own bot to members by their G3ID ids. Only active
+ * members with the team's chat linked get it. Returns how many were sent (0 when the team has no
+ * chat, or G3ID couldn't be reached); it never throws, so callers can fire and forget.
  */
 export async function sendMemberDM(
   env: { G3ID: Fetcher },
@@ -68,7 +48,7 @@ export async function sendMemberDM(
 ): Promise<number> {
   try {
     const res = await env.G3ID.fetch(
-      new Request(`http://g3id/api/internal/teams/${encodeURIComponent(teamId)}/slack/dm-members`, {
+      new Request(`http://g3id/api/internal/teams/${encodeURIComponent(teamId)}/chat/dm-members`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userIds, text }),
@@ -76,17 +56,18 @@ export async function sendMemberDM(
     );
     if (res.ok) return ((await res.json()) as { sent?: number }).sent ?? 0;
     if (res.status !== 404) {
-      console.error("[slack] member DM failed", res.status, await res.text().catch(() => ""));
+      console.error("[chat] member DM failed", res.status, await res.text().catch(() => ""));
     }
   } catch (err) {
-    console.error("[slack] member DM failed", err);
+    console.error("[chat] member DM failed", err);
   }
   return 0;
 }
 
 /**
- * Posts to one of the team's Slack channels from its own bot. Never throws: gives back why it
- * wasn't posted (the team has no Slack, or Slack's refusal, like "not_in_channel").
+ * Posts to one of the team's channels (a Slack or Discord channel id) from its own bot. Never
+ * throws: gives back why it wasn't posted (the team has no chat, or the service's refusal, like
+ * "not_in_channel").
  */
 export async function sendTeamMessage(
   env: { G3ID: Fetcher },
@@ -96,7 +77,7 @@ export async function sendTeamMessage(
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
     const res = await env.G3ID.fetch(
-      new Request(`http://g3id/api/internal/teams/${encodeURIComponent(teamId)}/slack/message`, {
+      new Request(`http://g3id/api/internal/teams/${encodeURIComponent(teamId)}/chat/message`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ channel, text }),

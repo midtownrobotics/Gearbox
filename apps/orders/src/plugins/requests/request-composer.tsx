@@ -1,4 +1,13 @@
-import { Button, Card, ErrorBanner, Field, SuccessBanner, TextField } from "@g3/ui";
+import {
+  Button,
+  Card,
+  ErrorBanner,
+  Field,
+  SuccessBanner,
+  TextField,
+  chatName,
+  useTeamChat,
+} from "@g3/ui";
 import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api, getErrorMessage } from "../../shared/api";
@@ -45,6 +54,7 @@ export function useRequestComposer({
   /** Its row was removed: leave without saving. */
   onCancel?: () => void;
 } = {}) {
+  const chat = chatName(useTeamChat());
   const [params, setParams] = useSearchParams();
   const categories = useLoad(async () => {
     const res = await api.categories.$get({ query: {} });
@@ -261,7 +271,7 @@ export function useRequestComposer({
               <p className="text-xs text-secondary-500">
                 {wishlist
                   ? "Nothing is requested yet: anyone can promote it to a request later."
-                  : "You'll get a Slack DM when a mentor approves each one."}
+                  : `You'll get a ${chat} DM when a mentor approves each one.`}
               </p>
               <div className="flex items-center gap-2">
                 {!wishlist && (lists.data?.length ?? 0) > 0 && (

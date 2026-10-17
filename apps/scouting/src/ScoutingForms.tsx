@@ -2,12 +2,16 @@ import { pageTeamNumber } from "@g3/site-config";
 import {
   Button,
   Card,
+  Chip,
+  Dialog,
   ErrorBanner,
   Loading,
   Page as SharedPage,
   TextField,
+  chatName,
   inputClass,
   useQuestions,
+  useTeamChat,
   useTeamNames,
 } from "@g3/ui";
 import {
@@ -18,6 +22,7 @@ import {
   Check,
   CheckCircle2,
   GripVertical,
+  Info,
   Maximize2,
   Megaphone,
   Minimize2,
@@ -36,6 +41,7 @@ import {
   type SyntheticEvent,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -225,39 +231,131 @@ function EntryForm({
   form,
   context,
   refreshContext,
+  scheduleUnavailable,
 }: {
   form: ScoutingForm;
   context: EventContext | null;
   refreshContext: () => Promise<void>;
+  scheduleUnavailable: boolean;
 }) {
-  const [teamName, setTeamName] = useState("");
+  // A new assignment always starts with an empty draft, including every canvas.
+  const assignment =
+    form.kind === "scouting"
+      ? `${context?.currentMatch?.key ?? ""}:${context?.assignedTeam ?? ""}`
+      : "pit";
+  return (
+    <EntryDraft
+      key={`${form.id}:${assignment}`}
+      form={form}
+      context={context}
+      refreshContext={refreshContext}
+      scheduleUnavailable={scheduleUnavailable}
+    />
+  );
+}
+
+function EntryDraft({
+  form,
+  context,
+  refreshContext,
+  scheduleUnavailable,
+}: {
+  form: ScoutingForm;
+  context: EventContext | null;
+  refreshContext: () => Promise<void>;
+  scheduleUnavailable: boolean;
+}) {
+  const [teamName, setTeamName] = useState(
+    form.kind === "scouting" ? (context?.assignedTeam ?? "") : "",
+  );
   const [answers, setAnswers] = useState<Record<string, unknown>>({});
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState<"success" | "error">("success");
   const [saving, setSaving] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
   const [canvasKey, setCanvasKey] = useState(0);
   const canvases = useRef<Record<string, HTMLCanvasElement | null>>({});
   const canvasAdapters = useRef<Record<string, RefObject<HTMLCanvasElement | null>>>({});
   const drawnFields = useRef(new Set<string>());
-  const assignedMatchKey = useRef<string | null>(null);
+  const mounted = useRef(true);
+  const expiredRef = useRef(false);
+  const expiredContext = useRef<number | undefined>(undefined);
+  const [expired, setExpired] = useState(false);
+  const [, tick] = useState(0);
   const currentMatch = context?.currentMatch ?? null;
+  const closesAt = context?.submissionClosesAt ?? null;
+  const clock = useMemo(
+    () => ({ time: context?.serverNow ?? Date.now(), started: performance.now() }),
+    [context?.serverNow],
+  );
+  const serverNow = useCallback(() => clock.time + performance.now() - clock.started, [clock]);
+  const remainingSeconds =
+    closesAt === null ? 0 : Math.max(0, Math.ceil((closesAt - serverNow()) / 1000));
+  const isExpired = () =>
+    form.kind === "scouting" &&
+    (expiredRef.current || (closesAt !== null && serverNow() >= closesAt));
+  const blocked =
+    form.kind === "scouting" &&
+    (expired ||
+      isExpired() ||
+      !currentMatch ||
+      !teamName ||
+      submitted ||
+      context?.hasSubmittedCurrentMatch);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
   useEffect(() => {
     if (form.kind !== "scouting") return;
-    const matchKey = context?.currentMatch?.key ?? null;
-    if (context?.assignedTeam) {
+    // A fresh server response can extend a cutoff or correct the device clock.
+    // Reopen an empty form; never restore answers cleared at the old deadline.
+    if (
+      expiredRef.current &&
+      context?.serverNow !== expiredContext.current &&
+      context?.assignedTeam &&
+      (closesAt === null || serverNow() < closesAt)
+    ) {
+      expiredRef.current = false;
+      setExpired(false);
       setTeamName(context.assignedTeam);
-    } else if (matchKey && assignedMatchKey.current !== matchKey) {
-      setTeamName("");
     }
-    if (matchKey) assignedMatchKey.current = matchKey;
-  }, [context?.assignedTeam, context?.currentMatch?.key, form.kind]);
+    if (closesAt === null) return;
+    function checkDeadline() {
+      tick((value) => value + 1);
+      if (serverNow() < (closesAt as number) || expiredRef.current) return;
+      expiredRef.current = true;
+      expiredContext.current = context?.serverNow;
+      setExpired(true);
+      setTeamName("");
+      setAnswers({});
+      drawnFields.current.clear();
+      setCanvasKey((value) => value + 1);
+      setMessage("");
+      void refreshContext().catch(() => {});
+    }
+    checkDeadline();
+    const timer = window.setInterval(checkDeadline, 500);
+    window.addEventListener("focus", checkDeadline);
+    document.addEventListener("visibilitychange", checkDeadline);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", checkDeadline);
+      document.removeEventListener("visibilitychange", checkDeadline);
+    };
+  }, [form.kind, closesAt, serverNow, refreshContext, context?.serverNow, context?.assignedTeam]);
   async function submit(event: SyntheticEvent) {
     event.preventDefault();
+    if (saving || blocked || isExpired() || (form.kind === "scouting" && scheduleUnavailable))
+      return;
     setSaving(true);
     setMessage("");
     try {
       const payload = new FormData();
       payload.set("teamName", teamName);
+      if (form.kind === "scouting") payload.set("matchKey", currentMatch?.key ?? "");
       payload.set("answers", JSON.stringify(answers));
       for (const field of form.fields.filter((item) => item.type === "fieldMap")) {
         if (!drawnFields.current.has(field.id)) continue;
@@ -269,18 +367,23 @@ function EntryForm({
           if (blob) payload.set(`drawing:${field.id}`, blob, `${field.id}.png`);
         }
       }
+      if (!mounted.current || isExpired()) return;
       await api(`/scouting-forms/${form.id}/submissions`, { method: "POST", body: payload });
+      if (!mounted.current || isExpired()) return;
+      if (form.kind === "scouting") setSubmitted(true);
       setAnswers({});
       drawnFields.current.clear();
       setCanvasKey((value) => value + 1);
       setMessageType("success");
       setMessage("Report submitted.");
-      await refreshContext();
+      await refreshContext().catch(() => {});
     } catch (error) {
+      if (!mounted.current || isExpired()) return;
       setMessageType("error");
       setMessage(error instanceof Error ? error.message : "Could not submit report.");
+      if (form.kind === "scouting") void refreshContext().catch(() => {});
     } finally {
-      setSaving(false);
+      if (mounted.current) setSaving(false);
     }
   }
   function canvasAdapter(fieldId: string) {
@@ -320,60 +423,99 @@ function EntryForm({
           )}
         </div>
       </div>
-      <label className="team-entry" htmlFor={`team-${form.id}`}>
-        <span>
-          Team number <b>*</b>
-        </span>
-        <TeamLookupInput
-          value={teamName}
-          onChange={setTeamName}
-          size="lg"
-          inputMode="numeric"
-          readOnly={form.kind === "scouting"}
-        />
-      </label>
-      <div className="scouting-questions">
-        {form.fields.map((field) => {
-          const mapRef = field.type === "fieldMap" ? canvasAdapter(field.id) : undefined;
-          return (
-            <div
-              className={`scouting-question ${field.type === "fieldMap" ? "wide" : ""}`}
-              key={field.id}
-            >
-              <label htmlFor={`field-${field.id}`}>
-                {field.label}
-                {field.required && <b> *</b>}
-              </label>
-              <FieldInput
-                field={field}
-                value={answers[field.id]}
-                setValue={(value) => setAnswers((current) => ({ ...current, [field.id]: value }))}
-                canvasRef={mapRef}
-                canvasKey={canvasKey}
-                onDrawingChange={(hasDrawing) => {
-                  if (hasDrawing) drawnFields.current.add(field.id);
-                  else drawnFields.current.delete(field.id);
-                }}
-              />
-            </div>
-          );
-        })}
-      </div>
+      {form.kind === "scouting" && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">
+          {expired || isExpired() ? (
+            <span role="status">
+              Time expired. Previous answers cleared. Waiting for the next match.
+            </span>
+          ) : context?.scheduleMode === "manual" ? (
+            <span>Manual schedule: this form resets when the match or assigned team changes.</span>
+          ) : closesAt !== null ? (
+            <span>
+              Submit by{" "}
+              <strong>
+                {new Date(closesAt).toLocaleTimeString([], {
+                  hour: "numeric",
+                  minute: "2-digit",
+                  second: "2-digit",
+                })}
+              </strong>
+              .{" "}
+              <span role="timer" aria-live="off">
+                {Math.floor(remainingSeconds / 60)}:{String(remainingSeconds % 60).padStart(2, "0")}{" "}
+                remaining.
+              </span>{" "}
+              Answers and drawings reset when time runs out.
+            </span>
+          ) : (
+            <span>
+              Submit within {Math.floor((context?.submissionWindowSeconds ?? 120) / 60)}:
+              {String((context?.submissionWindowSeconds ?? 120) % 60).padStart(2, "0")} after the
+              match ends. Answers and drawings reset at the deadline.
+            </span>
+          )}
+        </div>
+      )}
+      <fieldset
+        className="m-0 grid min-w-0 gap-[22px] border-0 p-0 disabled:pointer-events-none"
+        disabled={saving || !!blocked}
+      >
+        <label className="team-entry" htmlFor={`team-${form.id}`}>
+          <span>
+            Team number <b>*</b>
+          </span>
+          <TeamLookupInput
+            value={teamName}
+            onChange={setTeamName}
+            size="lg"
+            inputMode="numeric"
+            readOnly={form.kind === "scouting"}
+          />
+        </label>
+        <div className="scouting-questions">
+          {form.fields.map((field) => {
+            const mapRef = field.type === "fieldMap" ? canvasAdapter(field.id) : undefined;
+            return (
+              <div
+                className={`scouting-question ${field.type === "fieldMap" ? "wide" : ""}`}
+                key={field.id}
+              >
+                <label htmlFor={`field-${field.id}`}>
+                  {field.label}
+                  {field.required && <b> *</b>}
+                </label>
+                <FieldInput
+                  field={field}
+                  value={answers[field.id]}
+                  setValue={(value) => setAnswers((current) => ({ ...current, [field.id]: value }))}
+                  canvasRef={mapRef}
+                  canvasKey={canvasKey}
+                  onDrawingChange={(hasDrawing) => {
+                    if (hasDrawing) drawnFields.current.add(field.id);
+                    else drawnFields.current.delete(field.id);
+                  }}
+                />
+              </div>
+            );
+          })}
+        </div>
+      </fieldset>
       <Button
         variant="primary"
         type="submit"
-        disabled={
-          saving || (form.kind === "scouting" && (context?.hasSubmittedCurrentMatch || !teamName))
-        }
+        disabled={saving || !!blocked || (form.kind === "scouting" && scheduleUnavailable)}
       >
         <Check size={17} />{" "}
         {saving
           ? "Submitting…"
-          : form.kind === "scouting" && context?.hasSubmittedCurrentMatch
-            ? "Already submitted"
-            : form.kind === "scouting" && !teamName
-              ? "Waiting for team"
-              : "Submit report"}
+          : form.kind === "scouting" && scheduleUnavailable
+            ? "Waiting for schedule"
+            : form.kind === "scouting" && (submitted || context?.hasSubmittedCurrentMatch)
+              ? "Already submitted"
+              : form.kind === "scouting" && !teamName
+                ? "Waiting for team"
+                : "Submit report"}
       </Button>
       {message && (
         <div className={`status-toast ${messageType}`} role="status" aria-live="polite">
@@ -776,7 +918,52 @@ type LiveStrategyUser = {
   current_page?: string;
 };
 
-function LiveStrategy() {
+/** A button beside a heading that explains the section in the page. */
+function InfoButton({ title, children }: { title: string; children: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        type="button"
+        className="info-button"
+        aria-label={`What is ${title}?`}
+        onClick={() => setOpen(true)}
+      >
+        <Info size={16} />
+      </button>
+      {open && (
+        <Dialog title={title} onClose={() => setOpen(false)} centered>
+          {children}
+        </Dialog>
+      )}
+    </>
+  );
+}
+
+/** What the Match schedule section's info button explains. */
+function ScheduleSourceInfo() {
+  return (
+    <InfoButton title="Match schedule">
+      <p>
+        Scouting normally reads the match schedule from The Blue Alliance, and moves everyone on to
+        the next match as the event runs.
+      </p>
+      <p>
+        If your event isn't on The Blue Alliance — an off-season, a practice day or a scrimmage —
+        switch to a manual schedule and enter the teams and matches yourself, by typing them or
+        scanning a photo of the printed schedule. You then set which match everyone is scouting on
+        the Competition overview.
+      </p>
+      <p>
+        A manual schedule is deleted three days after the competition ends, and switching back to
+        The Blue Alliance deletes its teams and matches. Scouting submissions are kept either way.
+      </p>
+    </InfoButton>
+  );
+}
+
+/** Who is in the app right now, inside the Competition overview. */
+function LiveUsers() {
   const [users, setUsers] = useState<LiveStrategyUser[]>([]);
   useEffect(() => {
     const load = () =>
@@ -790,8 +977,8 @@ function LiveStrategy() {
     return () => window.clearInterval(interval);
   }, []);
   return (
-    <Card className="live-strategy">
-      <h2>See Live Users</h2>
+    <div className="live-strategy">
+      <h3>Live users</h3>
       {users.map((user) => (
         <div key={user.user_id}>
           <span className="live-dot" />
@@ -801,12 +988,13 @@ function LiveStrategy() {
         </div>
       ))}
       {!users.length && <div className="forms-empty">No one is currently online.</div>}
-    </Card>
+    </div>
   );
 }
 
 function ServiceIssueReport() {
   const questions = useQuestions();
+  const chat = chatName(useTeamChat());
   const [open, setOpen] = useState(false);
   const [report, setReport] = useState({ teamName: "", issueType: "mechanical", description: "" });
   const [message, setMessage] = useState("");
@@ -831,7 +1019,7 @@ function ServiceIssueReport() {
         try {
           await api("/service-tickets", { method: "POST", body: JSON.stringify(report) });
           setMessageType("success");
-          setMessage("Service crew alerted through Slack.");
+          setMessage(`Service crew alerted through ${chat}.`);
           setReport({ teamName: "", issueType: "mechanical", description: "" });
         } catch (error) {
           setMessageType("error");
@@ -930,9 +1118,16 @@ type EventContext = {
   hasNexusApiKey: boolean;
   nexusApiKey: string;
   scheduleMode: "tba" | "manual";
+  submissionWindowSeconds: number | null;
+  submissionClosesAt: number | null;
+  serverNow: number;
   manualEvent: { event_name: string; ends_at: number; delete_after: number } | null;
   manualTeamNames: Record<string, string>;
 };
+
+/** What the worker takes for the scouting window after a match (`submissionWindow` there). */
+const MIN_SUBMISSION_WINDOW = 0;
+const MAX_SUBMISSION_WINDOW = 1800;
 
 async function prepareScheduleFiles(files: File[]) {
   const prepared: File[] = [];
@@ -1170,6 +1365,13 @@ function ManualModeManager() {
   if (context?.scheduleMode !== "manual")
     return (
       <Card className="manual-mode-switch">
+        <div className="section-heading">
+          <h2>
+            Match schedule
+            <ScheduleSourceInfo />
+          </h2>
+          <span>Coming from The Blue Alliance.</span>
+        </div>
         <Button
           variant="primary"
           type="button"
@@ -1210,9 +1412,12 @@ function ManualModeManager() {
   return (
     <Card className="manual-schedule-panel">
       <header>
-        <div>
-          <strong>All-manual mode</strong>
-          <span>{context.manualEvent?.event_name}</span>
+        <div className="section-heading">
+          <h2>
+            Match schedule
+            <ScheduleSourceInfo />
+          </h2>
+          <span>Entered by hand for {context.manualEvent?.event_name}.</span>
         </div>
         <Button
           variant="primary"
@@ -1465,6 +1670,7 @@ function EventStatus({
   const [tbaAuthKey, setTbaAuthKey] = useState("");
   const [nexusEventKey, setNexusEventKey] = useState("");
   const [nexusApiKey, setNexusApiKey] = useState("");
+  const [submissionWindow, setSubmissionWindow] = useState("");
   const [showTbaAuthKey, setShowTbaAuthKey] = useState(false);
   const [showNexusApiKey, setShowNexusApiKey] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -1476,6 +1682,7 @@ function EventStatus({
       setEventKey(result.eventKey);
       setMatchNumber(result.currentMatchNumber?.toString() ?? "");
       setNexusEventKey(result.nexusEventKey || result.eventKey);
+      setSubmissionWindow(result.submissionWindowSeconds?.toString() ?? "");
     }
   }, []);
   useEffect(() => {
@@ -1498,6 +1705,7 @@ function EventStatus({
         tbaAuthKey,
         nexusEventKey,
         nexusApiKey,
+        submissionWindowSeconds: submissionWindow,
       }),
     }).finally(() => setSaving(false));
     setTbaAuthKey("");
@@ -1515,10 +1723,45 @@ function EventStatus({
   return (
     <div className="event-context">
       {isAdmin && (
-        <Card className="event-admin-panel">
+        <Card className="event-admin-panel competition-overview">
           <header>
-            <h2>Event Configuration</h2>
+            <h2>Competition overview</h2>
           </header>
+          <LiveUsers />
+          <section className="match-submission-status">
+            <h3>
+              {context?.currentMatch
+                ? `${context.currentMatch.label} submissions`
+                : "Current match submissions"}
+            </h3>
+            <div className="match-submission-scroll">
+              {currentMatchSubmissions.length ? (
+                currentMatchSubmissions.map((submission) => (
+                  <button
+                    type="button"
+                    className="submission-chip"
+                    key={submission.id}
+                    onClick={() => onOpenSubmission(submission.id)}
+                  >
+                    <strong>{submission.submitted_by_name}</strong>
+                    <span>Team {submission.team_name}</span>
+                  </button>
+                ))
+              ) : (
+                <span>No submissions yet</span>
+              )}
+            </div>
+          </section>
+          <div className="online-admins">
+            <strong>
+              <Users size={16} /> Online Strategy leads
+            </strong>
+            <span>
+              {context?.onlineAdmins.length
+                ? context.onlineAdmins.map((admin) => admin.display_name).join(", ")
+                : "No other Strategy leads online"}
+            </span>
+          </div>
           <form
             onFocus={() => {
               editingRef.current = true;
@@ -1529,7 +1772,7 @@ function EventStatus({
                 !(await questions.confirm(
                   context?.scheduleMode === "manual"
                     ? "Update the current manual match?"
-                    : "Update the active TBA event and current match?",
+                    : "Update the match everyone is scouting?",
                 ))
               )
                 return;
@@ -1578,6 +1821,37 @@ function EventStatus({
                 </Button>
               )}
             </label>
+            <Button variant="primary" type="submit" disabled={saving}>
+              {saving ? "Updating…" : "Update match"}
+            </Button>
+          </form>
+          {context?.currentMatch && <p>Current: {context.currentMatch.label}</p>}
+          {context?.scheduleError && <p className="event-error">{context.scheduleError}</p>}
+        </Card>
+      )}
+      <div className="next-match-status">
+        <CalendarClock size={20} />
+        <div>
+          <span>Next Team {pageTeamNumber} match</span>
+          <strong>{next?.label ?? "Schedule unavailable"}</strong>
+          {next?.scheduledAt && <time>{new Date(next.scheduledAt).toLocaleString()}</time>}
+        </div>
+      </div>
+      {isAdmin && (
+        <Card className="event-admin-panel">
+          <header>
+            <h2>Event Configuration</h2>
+          </header>
+          <form
+            onFocus={() => {
+              editingRef.current = true;
+            }}
+            onSubmit={async (event) => {
+              event.preventDefault();
+              if (!(await questions.confirm("Update this event's settings?"))) return;
+              await updateEvent(matchNumber);
+            }}
+          >
             {context?.scheduleMode !== "manual" && (
               <label>
                 <strong>TBA Event Key</strong>
@@ -1646,46 +1920,28 @@ function EventStatus({
                 </div>
               </label>
             )}
+            {context?.scheduleMode !== "manual" && (
+              <label className="window-field">
+                <strong>Auto-advance delay (seconds)</strong>
+                <input
+                  className={inputClass}
+                  type="number"
+                  min={MIN_SUBMISSION_WINDOW}
+                  max={MAX_SUBMISSION_WINDOW}
+                  step="1"
+                  value={submissionWindow}
+                  onChange={(event) => setSubmissionWindow(event.target.value)}
+                  placeholder="120"
+                />
+                <small className="field-hint">
+                  Wait after a match finishes. 0 advances immediately.
+                </small>
+              </label>
+            )}
             <Button variant="primary" type="submit" disabled={saving}>
               {saving ? "Updating…" : "Update event"}
             </Button>
           </form>
-          {context?.currentMatch && <p>Current: {context.currentMatch.label}</p>}
-          <section className="match-submission-status">
-            <h3>
-              {context?.currentMatch
-                ? `${context.currentMatch.label} submissions`
-                : "Current match submissions"}
-            </h3>
-            <div className="match-submission-scroll">
-              {currentMatchSubmissions.length ? (
-                currentMatchSubmissions.map((submission) => (
-                  <button
-                    type="button"
-                    className="submission-chip"
-                    key={submission.id}
-                    onClick={() => onOpenSubmission(submission.id)}
-                  >
-                    <strong>{submission.submitted_by_name}</strong>
-                    <span>Team {submission.team_name}</span>
-                  </button>
-                ))
-              ) : (
-                <span>No submissions yet</span>
-              )}
-            </div>
-          </section>
-          {context?.scheduleError && <p className="event-error">{context.scheduleError}</p>}
-          <div className="online-admins">
-            <strong>
-              <Users size={16} /> Online Strategy leads
-            </strong>
-            <span>
-              {context?.onlineAdmins.length
-                ? context.onlineAdmins.map((admin) => admin.display_name).join(", ")
-                : "No other Strategy leads online"}
-            </span>
-          </div>
           <details className="team-schedule">
             <summary>Team {pageTeamNumber} schedule</summary>
             {context?.teamSchedule.map((match) => (
@@ -1698,14 +1954,6 @@ function EventStatus({
           </details>
         </Card>
       )}
-      <div className="next-match-status">
-        <CalendarClock size={20} />
-        <div>
-          <span>Next Team {pageTeamNumber} match</span>
-          <strong>{next?.label ?? "Schedule unavailable"}</strong>
-          {next?.scheduledAt && <time>{new Date(next.scheduledAt).toLocaleString()}</time>}
-        </div>
-      </div>
     </div>
   );
 }
@@ -1740,17 +1988,40 @@ export function ScoutingForms({
       )
       .finally(() => setLoading(false));
   }, [load]);
+  const contextRequest = useRef(0);
+  const [contextError, setContextError] = useState("");
+  const refreshContext = useCallback(async () => {
+    const request = ++contextRequest.current;
+    // A poll started before submission must not restore the completed match.
+    try {
+      const next = await api<EventContext>("/event-context?assign=true", { cache: "no-store" });
+      if (request === contextRequest.current) {
+        setContext(next);
+        setContextError("");
+      }
+    } catch (error) {
+      if (request === contextRequest.current)
+        setContextError("Could not refresh the match schedule. Retrying.");
+      throw error;
+    }
+  }, []);
   useEffect(() => {
-    const loadMatch = () =>
-      api<EventContext>("/event-context?assign=true")
-        .then(setContext)
-        .catch(() => undefined);
+    const loadMatch = () => refreshContext().catch(() => undefined);
     loadMatch();
     const interval = window.setInterval(() => {
       if (document.visibilityState === "visible") loadMatch();
     }, 10_000);
-    return () => window.clearInterval(interval);
-  }, []);
+    const resume = () => {
+      if (document.visibilityState === "visible") void loadMatch();
+    };
+    window.addEventListener("focus", resume);
+    document.addEventListener("visibilitychange", resume);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", resume);
+      document.removeEventListener("visibilitychange", resume);
+    };
+  }, [refreshContext]);
   useEffect(() => {
     document.body.classList.toggle("scouting-workspace-open", isFullscreen);
     if (!isFullscreen) return;
@@ -1794,35 +2065,56 @@ export function ScoutingForms({
       {!loading && !loadError && !forms.length && (
         <p className="text-sm text-secondary-500">No scouting forms are available.</p>
       )}
-      <div className="form-choice-grid">
-        {forms.map((form) => (
-          <div
-            className={selected?.id === form.id ? "form-choice active" : "form-choice"}
-            key={form.id}
-          >
-            <button
-              type="button"
+      {forms.length > 0 && (
+        <div className="flex flex-wrap gap-2" role="group" aria-label="Scouting form type">
+          {(["scouting", "pit"] as const).map((kind) => (
+            <Chip
+              key={kind}
+              selected={selected?.kind === kind}
+              className="min-h-11"
+              disabled={!forms.some((form) => form.kind === kind)}
               onClick={() => {
-                setSelected(form);
+                if (selected?.kind === kind) return;
+                setSelected(forms.find((form) => form.kind === kind) ?? null);
                 setEditing(false);
               }}
             >
-              <strong>{form.name}</strong>
-            </button>
-            {isAdmin && (
+              {kind === "pit" ? "Pit scouting" : "Match scouting"}
+            </Chip>
+          ))}
+        </div>
+      )}
+      <div className="form-choice-grid">
+        {forms
+          .filter((form) => form.kind === selected?.kind)
+          .map((form) => (
+            <div
+              className={selected?.id === form.id ? "form-choice active" : "form-choice"}
+              key={form.id}
+            >
               <button
                 type="button"
-                className="edit-form-button"
                 onClick={() => {
                   setSelected(form);
-                  setEditing(true);
+                  setEditing(false);
                 }}
               >
-                <Pencil size={15} /> Edit
+                <strong>{form.name}</strong>
               </button>
-            )}
-          </div>
-        ))}
+              {isAdmin && (
+                <button
+                  type="button"
+                  className="edit-form-button"
+                  onClick={() => {
+                    setSelected(form);
+                    setEditing(true);
+                  }}
+                >
+                  <Pencil size={15} /> Edit
+                </button>
+              )}
+            </div>
+          ))}
       </div>
       {selected &&
         (editing && isAdmin ? (
@@ -1840,14 +2132,16 @@ export function ScoutingForms({
             }}
           />
         ) : (
-          <EntryForm
-            key={selected.id}
-            form={selected}
-            context={context}
-            refreshContext={async () => {
-              setContext(await api<EventContext>("/event-context"));
-            }}
-          />
+          <>
+            {contextError && selected.kind === "scouting" && <ErrorBanner message={contextError} />}
+            <EntryForm
+              key={selected.id}
+              form={selected}
+              context={context}
+              refreshContext={refreshContext}
+              scheduleUnavailable={!!contextError}
+            />
+          </>
         ))}
       {selected?.kind === "pit" &&
         (canManageServiceCrew ? <Operations embedded /> : <ServiceIssueReport />)}
@@ -1871,12 +2165,11 @@ export function ScoutingAdminPage({
       className="scouting-page-frame"
       contentClassName="page scouting-admin-page"
     >
+      <AnnouncementManager />
+      <EventStatus isAdmin isG3IdAdmin={isG3IdAdmin} onOpenSubmission={onOpenSubmission} />
       {engagement}
       <ManualModeManager />
-      <EventStatus isAdmin isG3IdAdmin={isG3IdAdmin} onOpenSubmission={onOpenSubmission} />
       <AdminManager isG3IdAdmin={isG3IdAdmin} />
-      <LiveStrategy />
-      <AnnouncementManager />
     </SharedPage>
   );
 }

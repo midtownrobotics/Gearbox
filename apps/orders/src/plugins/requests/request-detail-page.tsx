@@ -46,7 +46,7 @@ export function RequestDetailPage() {
   const [editing, setEditing] = useState(false);
   const navigate = useNavigate();
   // Back to where the request was opened from (a list, Approvals, a filtered search); straight
-  // to Requests when the page was opened directly (a link in Slack, a new tab).
+  // to Requests when the page was opened directly (a link in a chat message, a new tab).
   const cameFromApp = useLocation().key !== "default";
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);

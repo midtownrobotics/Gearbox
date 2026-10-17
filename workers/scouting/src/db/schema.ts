@@ -430,6 +430,7 @@ export const strategyEventConfig = sqliteTable(
     nexus_event_key: text("nexus_event_key"),
     nexus_api_key: text("nexus_api_key"),
     schedule_mode: text("schedule_mode").notNull().default("tba"),
+    submission_window_seconds: integer("submission_window_seconds").notNull().default(120),
   },
   (t) => [primaryKey({ columns: [t.teamId, t.id] })],
 );

@@ -80,6 +80,8 @@ const APPS: App[] = [
       logDownloaders: "log_downloaders",
       logDownloaderCodes: "log_downloader_codes",
       matchLogs: "match_logs",
+      scopeSettings: "scope_settings",
+      scopeAssets: "scope_assets",
     },
   },
   {

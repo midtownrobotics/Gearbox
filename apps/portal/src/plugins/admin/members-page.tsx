@@ -299,7 +299,7 @@ export function MembersPage() {
     const activeUsers = users.filter((u) => u.status === "active");
     if (activeUsers.length === 0) return;
 
-    const authMethods = ["Slack", "Google", "GitHub", "Steam"];
+    const authMethods = ["Slack", "Discord", "Google", "GitHub", "Steam"];
     const headers = [
       "Name",
       "Email",
@@ -314,6 +314,7 @@ export function MembersPage() {
       const providerSet = new Set(u.identities.map((i) => i.provider));
       const authValues = {
         slack: providerSet.has("slack"),
+        discord: providerSet.has("discord"),
         google: providerSet.has("google"),
         github: providerSet.has("github"),
         steam: providerSet.has("steam"),
@@ -326,6 +327,7 @@ export function MembersPage() {
         u.isAdmin ? "TRUE" : "FALSE",
         u.isMentor ? "TRUE" : "FALSE",
         authValues.slack ? "TRUE" : "FALSE",
+        authValues.discord ? "TRUE" : "FALSE",
         authValues.google ? "TRUE" : "FALSE",
         authValues.github ? "TRUE" : "FALSE",
         authValues.steam ? "TRUE" : "FALSE",

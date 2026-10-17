@@ -30,11 +30,19 @@ A worker with a service binding to another worker can't be deployed until that w
 
 ## Staging
 
-Staging is a second copy of everything, deployed from `main` on every push by `.github/workflows/staging.yml` through the same `deploy.yml` as production (migrations, then each app's worker, then the gateway). Its addresses are production's with `-dev` on the first part, on g3robotics.com: `1648-orders-dev.g3robotics.com`, a team's home at `1648-dev.g3robotics.com`, sign-in callbacks at `id-dev.g3robotics.com`, the console at `admin-dev.g3robotics.com` and the platform at `dev.g3robotics.com` (`site.staging` in `site.ts`). A different domain from production's, so the two never share a cookie; every page has a "Staging" banner.
+Staging is a second copy of everything, deployed from `main` (or the branch in `STAGING_BRANCH`, below) on every push by `.github/workflows/staging.yml` through the same `deploy.yml` as production (migrations, then each app's worker, then the gateway). Its addresses are production's with `-dev` on the first part, on g3robotics.com: `1648-orders-dev.g3robotics.com`, a team's home at `1648-dev.g3robotics.com`, sign-in callbacks at `id-dev.g3robotics.com`, the console at `admin-dev.g3robotics.com` and the platform at `dev.g3robotics.com` (`site.staging` in `site.ts`). A different domain from production's, so the two never share a cookie; every page has a "Staging" banner.
 
 Each worker's `[env.staging]` is written by `pnpm configure` from its `[env.production]` (below the "Staging" line at the end of each `wrangler.toml`): `-staging` worker names, databases and buckets, staging's addresses, and the ids in `infra/staging/resources.json`. Change `[env.production]` and run `pnpm configure`; never edit the staging part. Production's gateway answers only G3's retired addresses on g3robotics.com, by exact name, and staging's gateway only `*-dev.g3robotics.com` and `dev.g3robotics.com`.
 
 To deploy staging by hand: `pnpm db:migrate:staging`, then `pnpm deploy:staging` (or one worker's `deploy:staging`).
+
+### Trying a branch on staging
+
+Staging deploys from `main` unless the repository variable `STAGING_BRANCH` names another branch (GitHub → Settings → Secrets and variables → Actions → Variables). Set it to a feature branch and every push to that branch deploys staging, migrations included, while pushes to `main` don't. Delete the variable (or set it to `main`) to go back. To deploy a branch once without changing the variable, run the workflow by hand on it (Actions → staging → Run workflow, then pick the branch).
+
+- **Migrations stay applied.** A branch's migrations are applied to staging's databases and aren't undone when staging goes back to `main`. If the branch's schema changes don't land as they are, staging's databases have to be put right by hand.
+- **One branch at a time.** Whatever deployed last is what staging runs, so say when you take it over.
+- **With `PRODUCTION_BRANCH` set to `main`,** a push to `main` while staging is on another branch still deploys production, without staging first.
 
 ### Setting staging up (once)
 
@@ -54,7 +62,7 @@ To deploy staging by hand: `pnpm db:migrate:staging`, then `pnpm deploy:staging`
 `pnpm staging:copy-team` copies the site team's data (G3's) from production's databases into staging's, replacing what staging has for it, so a release and its migrations can be tried on real data first. Production is only read. Run `pnpm staging:copy-team -- --dry-run` first: it shows how many rows each table would bring and writes the SQL it would run. `--only g3id,orders` limits it to some databases.
 
 - **What's copied:** every table's rows for G3, the tables that belong to it through another (sign-ins through accounts, the skill trees through the tree set), Orders' starter catalog, and all of Scouting (only G3 has it).
-- **What isn't:** sessions, sign-in and kiosk codes, kiosks and PINs, the Slack installation, settings encrypted with production's `SECRETS_KEY` (Onshape's keys, Share-A-Cart), sign-in providers' tokens, the edge box's key, each student's browsing (Edge's site usage), caches, the platform's operator records, KV (everyone signs in again on staging) and R2 files (drawings and field maps show as missing). Staging's own sessions and kiosks for G3 are cleared.
+- **What isn't:** sessions, sign-in and kiosk codes, kiosks and PINs, the Slack and Discord installations, settings encrypted with production's `SECRETS_KEY` (Onshape's keys, Share-A-Cart), sign-in providers' tokens, the edge box's key, each student's browsing (Edge's site usage), caches, the platform's operator records, KV (everyone signs in again on staging) and R2 files (drawings and field maps show as missing). Staging's own sessions and kiosks for G3 are cleared.
 - **First:** staging must be on the same migrations as production; a database that isn't is skipped with a note. Deploy staging (or `pnpm db:migrate:staging`) and run it again.
 - **Only G3:** copying another team's data would go against the privacy draft (operators look at a team's data only to fix what it reports, and a removed member is gone within 30 days), so the script doesn't offer it. G3's copy on staging should be refreshed or cleared after a member is removed in production.
 
@@ -80,6 +88,28 @@ Staging has its own Slack app ("Gearbot Staging"), installed in G3's workspace: 
 3. **Connect it:** on staging, sign in as an admin, open the home's Admin → Integrations, and Connect Slack. Members can then sign in with Slack there by DMing their code to Gearbot Staging.
 
 Pages still name the bot "Gearbot" (`slackBotName`); on staging it's Gearbot Staging.
+
+## Discord (once)
+
+A team uses Slack or Discord, one at a time (`docs/roadmap/discord.md`). One Discord app serves every team, with one bot token; a team's connection is only its server's id. Discord is always offered, so the app's settings below are required, like Slack's: without them, Discord's buttons lead to errors.
+
+1. **Make the app** at discord.com/developers/applications, named **Gearbot** (`discordBotName` in `site.ts`).
+   - **Bot:** Public Bot on. No privileged intents: Gearbox never reads messages. Reset and copy the token.
+   - **OAuth2 → Redirects:** `https://id.frcgearbox.com/api/auth/discord/callback` (signing in, linking, and admins connecting their server) and `https://frcgearbox.com/api/signup/discord/callback` (team sign-up). For local dev, also `http://localhost:5173/api/auth/discord/callback`.
+   - The bot asks for View Channels and Send Messages when it's added (`DISCORD_BOT_PERMISSIONS` in `@g3/discord`).
+2. **Config:** set `DISCORD_CLIENT_ID` (OAuth2 → Client ID) in `[env.production.vars]` of `workers/g3id/wrangler.toml` and `workers/platform/wrangler.toml`, then run `pnpm configure`. Secrets, with `export WRANGLER_HIDE_BANNER=true` first:
+   ```bash
+   cd workers/g3id
+   pnpm exec wrangler secret put DISCORD_CLIENT_SECRET --env production
+   pnpm exec wrangler secret put DISCORD_BOT_TOKEN --env production
+   cd ../platform
+   pnpm exec wrangler secret put DISCORD_CLIENT_SECRET --env production
+   ```
+3. **Migrations:** G3ID's `0019_discord.sql` (the `discord_installations` table, and `discord` as a sign-in provider) and the platform's `0011_discord.sql` run before the Workers deploy, as usual.
+4. **Staging:** a second app, "Gearbot Staging", with the redirects `https://id-dev.g3robotics.com/api/auth/discord/callback` and `https://dev.g3robotics.com/api/signup/discord/callback`. Put its client ID in `infra/staging/resources.json` as `"discord": { "clientId": "..." }`, run `pnpm configure`, and put the same three secrets with `--env staging`.
+5. **Local dev:** set `DISCORD_CLIENT_ID` in `workers/g3id/wrangler.toml`'s `[vars]` (and the platform's, to try sign-up), and `DISCORD_CLIENT_SECRET` and `DISCORD_BOT_TOKEN` in each Worker's `.dev.vars`.
+
+Admins connect their server on the home's Admin → Integrations (Connect Discord: it takes the admin to Discord to pick a server they manage, and links the admin's Discord to their account). A team on Slack disconnects Slack first. Members then sign in with Discord if they're in the server; someone new waits for an admin's approval, as with Slack. A private channel needs Gearbot's role allowed in it before the bot can post there; the channel picker says so.
 
 ## Switching over from Pages and per-app API domains (once, done)
 

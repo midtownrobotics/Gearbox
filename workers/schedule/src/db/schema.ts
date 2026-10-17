@@ -7,14 +7,14 @@ import { foreignKey, index, integer, primaryKey, sqliteTable, text } from "drizz
 // day, slot n being n × 15 minutes after midnight. A range starts at its first slot and ends
 // before its last (Lunch 12:00–1:15 is 48–53). See lib/slots.ts.
 
-/** One event's schedule. Students and Slack see it only once it's published. */
+/** One event's schedule. Students and chat reminders see it only once it's published. */
 export const schedules = sqliteTable(
   "schedules",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
     teamId: text("team_id").notNull(),
     name: text("name").notNull(),
-    /** IANA zone of the event ("America/Chicago"), for "now" and Slack. */
+    /** IANA zone of the event ("America/Chicago"), for "now" and chat reminders. */
     timeZone: text("time_zone").notNull(),
     /** Minutes before a role change to DM the person; null for none. */
     notifyMinutes: integer("notify_minutes").default(5),
@@ -125,7 +125,7 @@ export const assignments = sqliteTable(
   ],
 );
 
-/** Slack DMs already sent for a role change at a block, so none is sent twice. */
+/** Chat DMs (Slack or Discord) already sent for a role change at a block, so none is sent twice. */
 export const notificationsSent = sqliteTable(
   "notifications_sent",
   {
