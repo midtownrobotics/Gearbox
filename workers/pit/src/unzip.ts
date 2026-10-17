@@ -82,7 +82,7 @@ export function readZip(bytes: Uint8Array<ArrayBuffer>): ZipEntry[] {
     const stream = () => {
       // The zip's own bytes, a slice at a time: never copied whole.
       let offset = 0;
-      const raw = new ReadableStream<Uint8Array>({
+      const raw = new ReadableStream<Uint8Array<ArrayBuffer>>({
         pull(controller) {
           if (offset >= data.length) return controller.close();
           controller.enqueue(data.subarray(offset, offset + CHUNK));
