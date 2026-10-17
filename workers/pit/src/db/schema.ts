@@ -121,6 +121,9 @@ export const logDownloaders = sqliteTable(
     pairedByName: text("paired_by_name").notNull(),
     pairedAt: integer("paired_at").notNull(),
     lastSeenAt: integer("last_seen_at"),
+    /** JSON, what it last said it was doing (`DownloaderStatus`, migration 0017). */
+    status: text("status"),
+    statusAt: integer("status_at"),
   },
   (t) => [uniqueIndex("log_downloaders_key_idx").on(t.teamId, t.keyHash)],
 );

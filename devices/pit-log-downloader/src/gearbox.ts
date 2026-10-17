@@ -28,6 +28,8 @@ const kAppearanceMaxAgeMs = 60_000;
 const kTimeoutMs = 10_000;
 
 let pairing: Pairing | null = load();
+/** The logs Pit has ("<event>/<name>"), from the last time it was asked; null until then. */
+let inPit: Set<string> | null = null;
 let connection: GearboxStatus["connection"] = null;
 let checkedAt: number | null = null;
 
@@ -51,6 +53,7 @@ function save(next: Pairing | null) {
     fs.writeFileSync(kPairingFile, JSON.stringify(next, null, 2), { mode: 0o600 });
   } else {
     fs.rmSync(kPairingFile, { force: true });
+    inPit = null;
   }
 }
 
@@ -297,4 +300,52 @@ export async function unpairFromGearbox(): Promise<void> {
   checkedAt = null;
   appearance = null;
   fs.rmSync(kAppearanceFile, { force: true });
+}
+
+/** What this downloader is doing, as it tells Pit (Pit's Logs page and Monitor show it). */
+export type ReportedStatus = {
+  robot: boolean;
+  rioReachable: boolean | null;
+  copying: number;
+  uploading: string | null;
+  pendingUpload: number;
+  version: string;
+};
+
+/** Tells Pit what it's doing. Nothing happens when Pit can't be reached; it's sent again soon. */
+export async function reportStatus(status: ReportedStatus): Promise<void> {
+  if (!pairing) return;
+  await pit(pairing.teamNumber, "/downloader/status", {
+    method: "POST",
+    body: JSON.stringify(status),
+  }).catch(() => null);
+}
+
+const pitKey = (event: string, name: string) => `${event}/${name}`;
+
+/** Whether Pit has this log, as of the last time it was asked; null when that isn't known. */
+export const inGearbox = (event: string, name: string) =>
+  inPit ? inPit.has(pitKey(event, name)) : null;
+
+/** Notes a log Pit now has, or no longer has, without asking it again. */
+export function noteInGearbox(event: string, name: string, has: boolean) {
+  if (!inPit) return;
+  if (has) inPit.add(pitKey(event, name));
+  else inPit.delete(pitKey(event, name));
+}
+
+/** Asks Pit which logs it has, so the page's "In Gearbox" stays true when one is deleted there. */
+export async function refreshGearboxLogs(): Promise<void> {
+  if (!pairing) {
+    inPit = null;
+    return;
+  }
+  try {
+    const res = await pit(pairing.teamNumber, "/downloader/logs");
+    if (!res.ok) return;
+    const body = (await res.json()) as { logs: { event: string; name: string }[] };
+    inPit = new Set(body.logs.map((log) => pitKey(log.event, log.name)));
+  } catch {
+    // Offline: what it last knew stands.
+  }
 }

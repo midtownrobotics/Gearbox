@@ -3,9 +3,15 @@ import { useEffect, useState } from "react";
 import { api } from "../../shared/api";
 import { useBatteryCache } from "../../shared/battery-cache-context";
 import { ElapsedTime, STATE_TONES, voltageColor } from "../../shared/battery-display";
+import { DownloaderStatusRows, currentDownloader } from "../../shared/downloader-status";
 import { useFullscreen } from "../../shared/fullscreen-context";
 import { fetchBatteries } from "../../shared/getters/batteries";
-import { type MatchLog, fetchDownloaders, fetchMatchLogs } from "../../shared/getters/downloaders";
+import {
+  type LogDownloader,
+  type MatchLog,
+  fetchDownloaders,
+  fetchMatchLogs,
+} from "../../shared/getters/downloaders";
 import { fetchAllIssues } from "../../shared/getters/issues";
 import { fetchLists } from "../../shared/getters/lists";
 import type {
@@ -453,8 +459,8 @@ function InThePitSection({ people }: { people: PersonInThePit[] }) {
   );
 }
 
-/** The team's newest match logs from its log downloaders. */
-function RecentLogsSection({ logs }: { logs: MatchLog[] }) {
+/** What the team's log downloader is doing, and its newest match logs. */
+function LogsSection({ downloader, logs }: { downloader: LogDownloader | null; logs: MatchLog[] }) {
   const when = new Intl.DateTimeFormat(undefined, {
     weekday: "short",
     hour: "numeric",
@@ -462,10 +468,13 @@ function RecentLogsSection({ logs }: { logs: MatchLog[] }) {
   });
   return (
     <div className="space-y-2">
-      <h2 className="text-xs font-bold uppercase tracking-widest text-secondary-600">
-        Recent Logs
-      </h2>
+      <h2 className="text-xs font-bold uppercase tracking-widest text-secondary-600">Logs</h2>
       <div className="bg-surface border border-secondary-200 rounded-xl p-5">
+        {downloader && (
+          <div className="mb-3 border-b border-secondary-200 pb-3">
+            <DownloaderStatusRows downloader={downloader} />
+          </div>
+        )}
         {logs.length === 0 ? (
           <p className="text-secondary-500">No match logs yet.</p>
         ) : (
@@ -587,8 +596,12 @@ export function PitMonitorPage() {
   const [loading, setLoading] = useState(true);
   // The team's stream link (Admin), shown when it has one.
   const [iframeUrl, setIframeUrl] = useState<string | null>(null);
-  // The newest match logs, while the team has a paired log downloader; null hides the box.
-  const [recentLogs, setRecentLogs] = useState<MatchLog[] | null>(null);
+  // The log downloader's status and the newest match logs, while the team has a paired
+  // downloader; null hides the box.
+  const [logsBox, setLogsBox] = useState<{
+    downloader: LogDownloader | null;
+    logs: MatchLog[];
+  } | null>(null);
   const connection = useConnection();
   // Who's in the pit on the team's Schedule; hidden while Schedule is off or hasn't answered.
   const inThePit = useInThePit();
@@ -621,7 +634,12 @@ export function PitMonitorPage() {
         .catch(() => undefined),
       fetchDownloaders()
         .then(async ({ downloaders }) =>
-          downloaders.length ? (await fetchMatchLogs()).logs.slice(0, 3) : null,
+          downloaders.length
+            ? {
+                downloader: currentDownloader(downloaders),
+                logs: (await fetchMatchLogs()).logs.slice(0, 3),
+              }
+            : null,
         )
         .catch(() => undefined),
     ]);
@@ -632,7 +650,7 @@ export function PitMonitorPage() {
     if (l !== undefined) setLists(l);
     if (i !== undefined) setIssues(i);
     if (m !== undefined) setMonitor(m);
-    if (logs !== undefined) setRecentLogs(logs);
+    if (logs !== undefined) setLogsBox(logs);
     if ([b, l, i, m, logs].every((part) => part !== undefined)) setLastUpdated(new Date());
     setLoading(false);
   }
@@ -709,6 +727,7 @@ export function PitMonitorPage() {
           {/* Left: Nexus status (only with real Nexus data) + ranking + upcoming matches. In the
               column, so the right one starts at the top instead of under it. */}
           <div className="space-y-5">
+            {inThePit && <InThePitSection people={inThePit} />}
             {nexus?.isRealNexus && <NexusSection nexus={nexus} teamNumber={teamNumber} />}
             {monitor?.ranking && (
               <RankingSection
@@ -720,7 +739,7 @@ export function PitMonitorPage() {
             {hasNexus && nexus && <UpcomingMatchesSection nexus={nexus} teamNumber={teamNumber} />}
           </div>
 
-          {/* Right: the stream (when set) + recent logs + batteries + checklist + issues */}
+          {/* Right: the stream (when set) + logs + batteries + checklist + issues */}
           <div className="space-y-5">
             {iframeUrl && (
               <div className="space-y-2">
@@ -739,8 +758,7 @@ export function PitMonitorPage() {
                 </div>
               </div>
             )}
-            {inThePit && <InThePitSection people={inThePit} />}
-            {recentLogs && <RecentLogsSection logs={recentLogs} />}
+            {logsBox && <LogsSection downloader={logsBox.downloader} logs={logsBox.logs} />}
             <BatteriesSection batteries={batteries} />
             <ChecklistSection lists={lists} issues={issues} />
           </div>

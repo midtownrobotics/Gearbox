@@ -11,6 +11,7 @@ import {
 } from "@g3/ui";
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { DownloaderStatusRows, currentDownloader } from "../../shared/downloader-status";
 import { advantageScopePage } from "../../shared/getters/advantagescope";
 import {
   type LogDownloader,
@@ -30,6 +31,8 @@ const whenFormat = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", tim
 
 /** How often the page looks for a newly paired downloader while a code may be in use. */
 const PAIRING_POLL_MS = 3000;
+/** How often it asks again what the downloader is doing (it tells Pit every 10 s). */
+const STATUS_POLL_MS = 10_000;
 
 function ago(time: number | null) {
   if (!time) return "never";
@@ -196,6 +199,17 @@ export function LogsPage() {
     return () => clearInterval(timer);
   }, [pairing, load]);
 
+  // What the downloader is doing, kept current.
+  const hasDownloader = Boolean(data?.downloaders.length);
+  useEffect(() => {
+    if (!hasDownloader) return;
+    const timer = setInterval(() => {
+      if (document.visibilityState === "visible") void load();
+    }, STATUS_POLL_MS);
+    return () => clearInterval(timer);
+  }, [hasDownloader, load]);
+  const shown = data ? currentDownloader(data.downloaders) : null;
+
   return (
     <Page
       title="Logs"
@@ -227,6 +241,11 @@ export function LogsPage() {
         </Card>
       ) : (
         <>
+          {shown && (
+            <Card title="Log downloader">
+              <DownloaderStatusRows downloader={shown} />
+            </Card>
+          )}
           <MatchLogs />
           <Card title="Log downloaders">
             <ul className="divide-y divide-secondary-200">
