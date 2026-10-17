@@ -2268,8 +2268,6 @@ export function App() {
         <AnnouncementBanner />
         {visiblePage === "forms" && (
           <ScoutingForms
-            key={user.userId}
-            scoutId={user.userId}
             isAdmin={user.isAdmin}
             canManageServiceCrew={user.isAdmin || user.isHelper}
           />

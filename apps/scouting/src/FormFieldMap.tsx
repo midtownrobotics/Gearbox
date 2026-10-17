@@ -29,24 +29,14 @@ function drawingColorAt(hex: string, progress: number) {
 export function FormFieldMap({
   canvasRef,
   onDrawingChange,
-  initialDrawing,
-  onDrawingSave,
-  onRestoreComplete,
 }: {
   canvasRef: RefObject<HTMLCanvasElement | null>;
   onDrawingChange?: (hasDrawing: boolean) => void;
-  initialDrawing?: string;
-  onDrawingSave?: (drawing: string | null) => void;
-  onRestoreComplete?: (success: boolean) => void;
 }) {
   const base = useRef<HTMLCanvasElement | null>(null);
   const committed = useRef<HTMLCanvasElement | null>(null);
   const history = useRef<HistoryEntry[]>([]);
   const hasDrawing = useRef(false);
-  const initialDrawingRef = useRef(initialDrawing);
-  const restoring = useRef(!!initialDrawing);
-  const onDrawingSaveRef = useRef(onDrawingSave);
-  const onRestoreCompleteRef = useRef(onRestoreComplete);
   const onDrawingChangeRef = useRef(onDrawingChange);
   const drawing = useRef(false);
   const activePointer = useRef<number | null>(null);
@@ -60,9 +50,7 @@ export function FormFieldMap({
 
   useEffect(() => {
     onDrawingChangeRef.current = onDrawingChange;
-    onDrawingSaveRef.current = onDrawingSave;
-    onRestoreCompleteRef.current = onRestoreComplete;
-  }, [onDrawingChange, onDrawingSave, onRestoreComplete]);
+  }, [onDrawingChange]);
 
   const loadBlob = useCallback(
     (blob: Blob) => {
@@ -95,29 +83,6 @@ export function FormFieldMap({
         history.current = [];
         hasDrawing.current = false;
         onDrawingChangeRef.current?.(false);
-        if (initialDrawingRef.current) {
-          const savedImage = new Image();
-          savedImage.onload = () => {
-            if (canvasRef.current !== canvas) return;
-            context.clearRect(0, 0, canvas.width, canvas.height);
-            context.drawImage(savedImage, 0, 0, canvas.width, canvas.height);
-            const saved = document.createElement("canvas");
-            saved.width = canvas.width;
-            saved.height = canvas.height;
-            saved.getContext("2d")?.drawImage(canvas, 0, 0);
-            committed.current = saved;
-            hasDrawing.current = true;
-            restoring.current = false;
-            initialDrawingRef.current = undefined;
-            onDrawingChangeRef.current?.(true);
-            onRestoreCompleteRef.current?.(true);
-          };
-          savedImage.onerror = () => {
-            restoring.current = false;
-            onRestoreCompleteRef.current?.(false);
-          };
-          savedImage.src = initialDrawingRef.current;
-        } else restoring.current = false;
         URL.revokeObjectURL(image.src);
       };
       image.src = URL.createObjectURL(blob);
@@ -126,13 +91,8 @@ export function FormFieldMap({
   );
 
   const loadRebuilt = useCallback(async () => {
-    try {
-      const response = await fetch("/field-2026.svg");
-      if (!response.ok) throw new Error("Field unavailable");
-      loadBlob(await response.blob());
-    } catch {
-      if (initialDrawingRef.current) onRestoreCompleteRef.current?.(false);
-    }
+    const response = await fetch("/field-2026.svg");
+    if (response.ok) loadBlob(await response.blob());
   }, [loadBlob]);
 
   useEffect(() => {
@@ -191,9 +151,6 @@ export function FormFieldMap({
     saved.height = canvas.height;
     saved.getContext("2d")?.drawImage(canvas, 0, 0);
     committed.current = saved;
-  }
-  function saveDrawing(canvas: HTMLCanvasElement) {
-    onDrawingSaveRef.current?.(hasDrawing.current ? canvas.toDataURL("image/png") : null);
   }
   function arrow(context: CanvasRenderingContext2D, from: Point, to: Point) {
     const angle = Math.atan2(to.y - from.y, to.x - from.x);
@@ -287,7 +244,6 @@ export function FormFieldMap({
     context.drawImage(base.current, 0, 0);
     commitCanvas(canvas);
     setHasDrawing(false);
-    saveDrawing(canvas);
   }
   function undo() {
     const canvas = canvasRef.current;
@@ -297,7 +253,6 @@ export function FormFieldMap({
       context.putImageData(entry.image, 0, 0);
       commitCanvas(canvas);
       setHasDrawing(entry.hasDrawing);
-      saveDrawing(canvas);
     }
   }
   function finishDrawing(canvas: HTMLCanvasElement) {
@@ -308,7 +263,6 @@ export function FormFieldMap({
     }
     if (path.current.length > 1) setHasDrawing(true);
     commitCanvas(canvas);
-    saveDrawing(canvas);
     drawing.current = false;
     start.current = null;
     last.current = null;
@@ -414,13 +368,7 @@ export function FormFieldMap({
           ref={canvasRef}
           aria-label="Drawable field map"
           onPointerDown={(event) => {
-            if (
-              event.button !== 0 ||
-              activePointer.current !== null ||
-              !base.current ||
-              restoring.current
-            )
-              return;
+            if (event.button !== 0 || activePointer.current !== null || !base.current) return;
             activePointer.current = event.pointerId;
             snapshot();
             drawing.current = true;
