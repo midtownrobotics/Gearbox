@@ -39,6 +39,15 @@ function match(key: string, number: number, endedAt: number | null): TbaMatch {
     },
   };
 }
+async function cacheSchedule(eventKey: string, rows: TbaMatch[], expiresAt = Date.now() + 600000) {
+  await db
+    .insert(tbaMatchCache)
+    .values({ event_key: eventKey, matches_json: JSON.stringify(rows), expires_at: expiresAt })
+    .onConflictDoUpdate({
+      target: tbaMatchCache.event_key,
+      set: { matches_json: JSON.stringify(rows), expires_at: expiresAt },
+    });
+}
 async function fixture(manual = false) {
   const team = teamUsers(newTeamId());
   const eventKey = manual
@@ -60,17 +69,7 @@ async function fixture(manual = false) {
       await seedManualMatch(bindings.SCOUTING_DB, team.teamId, eventKey, number, team.admin.id);
   async function schedule(endedAt: number | null, final = false) {
     const rows = [match(keys[0], 1, endedAt), ...(final ? [] : [match(keys[1], 2, null)])];
-    await db
-      .insert(tbaMatchCache)
-      .values({
-        event_key: eventKey,
-        matches_json: JSON.stringify(rows),
-        expires_at: Date.now() + 600000,
-      })
-      .onConflictDoUpdate({
-        target: tbaMatchCache.event_key,
-        set: { matches_json: JSON.stringify(rows) },
-      });
+    await cacheSchedule(eventKey, rows);
   }
   if (!manual) await schedule(Math.floor(Date.now() / 1000) - 30);
   const { id } = await jsonAs<{ id: string }>(
@@ -104,6 +103,65 @@ async function fixture(manual = false) {
 }
 
 describe("scouting submission deadlines", () => {
+  it("allows the next report regardless of scheduled start but cannot run through future matches", async () => {
+    const f = await fixture();
+    const now = Math.floor(Date.now() / 1000);
+    const rows = [
+      match(f.keys[0], 1, now - 30),
+      ...[2, 3].map((number) => ({
+        ...match(`${f.eventKey}_qm${number}`, number, null),
+        time: now + number * 3600,
+      })),
+    ];
+    await cacheSchedule(f.eventKey, rows);
+    expect((await f.submit(await f.context())).status).toBe(201);
+    const next = await f.context();
+    expect(next.currentMatch?.matchNumber).toBe(2);
+    // Start times can be inaccurate; neither the page nor the worker uses a start-time gate.
+    expect((await f.submit(next)).status).toBe(201);
+    const capped = await f.context();
+    expect(capped.currentMatch?.matchNumber).toBe(2);
+    expect(capped.hasSubmittedCurrentMatch).toBe(true);
+    expect(
+      (await f.submit({ ...next, currentMatch: { key: rows[2].key, matchNumber: 3 } })).status,
+    ).toBe(409);
+    expect((await f.reports()).length).toBe(2);
+    // Once the shared match advances, the following form becomes available normally.
+    rows[0].post_result_time = now - 121;
+    await cacheSchedule(f.eventKey, rows);
+    const following = await f.context();
+    expect(following.currentMatch?.matchNumber).toBe(3);
+    expect(following.hasSubmittedCurrentMatch).toBe(false);
+    expect((await f.submit(following)).status).toBe(201);
+  });
+  it("returns a retryable error during schedule failure and keeps Admin configuration accessible", async () => {
+    const f = await fixture();
+    const original = await f.context();
+    await cacheSchedule(f.eventKey, [], 0);
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("Temporary TBA failure")));
+    try {
+      const response = await callAs(f.team.student, "/scouting/event-context?assign=true");
+      expect(response.status).toBe(503);
+      expect(await response.json()).toMatchObject({
+        error: expect.stringContaining("refresh the match schedule"),
+      });
+      expect((await callAs(f.team.admin, "/scouting/event-context")).status).toBe(200);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+    await f.schedule(Math.floor(Date.now() / 1000) - 30);
+    expect(await f.context()).toMatchObject({
+      currentMatch: original.currentMatch,
+      assignedTeam: original.assignedTeam,
+    });
+    expect((await f.submit(original)).status).toBe(201);
+  });
+  it("treats a temporarily empty schedule as unavailable instead of clearing an assignment", async () => {
+    const f = await fixture();
+    await f.context();
+    await cacheSchedule(f.eventKey, []);
+    expect((await callAs(f.team.student, "/scouting/event-context?assign=true")).status).toBe(503);
+  });
   it("uses one exact boundary for the countdown and match advance", () => {
     const first = match("a", 1, 2000000000);
     const next = match("b", 2, null);

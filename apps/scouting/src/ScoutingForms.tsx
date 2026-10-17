@@ -231,10 +231,12 @@ function EntryForm({
   form,
   context,
   refreshContext,
+  scheduleUnavailable,
 }: {
   form: ScoutingForm;
   context: EventContext | null;
   refreshContext: () => Promise<void>;
+  scheduleUnavailable: boolean;
 }) {
   // A new assignment always starts with an empty draft, including every canvas.
   const assignment =
@@ -247,6 +249,7 @@ function EntryForm({
       form={form}
       context={context}
       refreshContext={refreshContext}
+      scheduleUnavailable={scheduleUnavailable}
     />
   );
 }
@@ -255,10 +258,12 @@ function EntryDraft({
   form,
   context,
   refreshContext,
+  scheduleUnavailable,
 }: {
   form: ScoutingForm;
   context: EventContext | null;
   refreshContext: () => Promise<void>;
+  scheduleUnavailable: boolean;
 }) {
   const [teamName, setTeamName] = useState(
     form.kind === "scouting" ? (context?.assignedTeam ?? "") : "",
@@ -325,7 +330,8 @@ function EntryDraft({
   }, [form.kind, closesAt, clockOffset, refreshContext]);
   async function submit(event: SyntheticEvent) {
     event.preventDefault();
-    if (saving || blocked || isExpired()) return;
+    if (saving || blocked || isExpired() || (form.kind === "scouting" && scheduleUnavailable))
+      return;
     setSaving(true);
     setMessage("");
     try {
@@ -483,15 +489,21 @@ function EntryDraft({
           })}
         </div>
       </fieldset>
-      <Button variant="primary" type="submit" disabled={saving || !!blocked}>
+      <Button
+        variant="primary"
+        type="submit"
+        disabled={saving || !!blocked || (form.kind === "scouting" && scheduleUnavailable)}
+      >
         <Check size={17} />{" "}
         {saving
           ? "Submitting…"
-          : form.kind === "scouting" && (submitted || context?.hasSubmittedCurrentMatch)
-            ? "Already submitted"
-            : form.kind === "scouting" && !teamName
-              ? "Waiting for team"
-              : "Submit report"}
+          : form.kind === "scouting" && scheduleUnavailable
+            ? "Waiting for schedule"
+            : form.kind === "scouting" && (submitted || context?.hasSubmittedCurrentMatch)
+              ? "Already submitted"
+              : form.kind === "scouting" && !teamName
+                ? "Waiting for team"
+                : "Submit report"}
       </Button>
       {message && (
         <div className={`status-toast ${messageType}`} role="status" aria-live="polite">
@@ -1965,11 +1977,21 @@ export function ScoutingForms({
       .finally(() => setLoading(false));
   }, [load]);
   const contextRequest = useRef(0);
+  const [contextError, setContextError] = useState("");
   const refreshContext = useCallback(async () => {
     const request = ++contextRequest.current;
     // A poll started before submission must not restore the completed match.
-    const next = await api<EventContext>("/event-context?assign=true", { cache: "no-store" });
-    if (request === contextRequest.current) setContext(next);
+    try {
+      const next = await api<EventContext>("/event-context?assign=true", { cache: "no-store" });
+      if (request === contextRequest.current) {
+        setContext(next);
+        setContextError("");
+      }
+    } catch (error) {
+      if (request === contextRequest.current)
+        setContextError("Could not refresh the match schedule. Retrying.");
+      throw error;
+    }
   }, []);
   useEffect(() => {
     const loadMatch = () => refreshContext().catch(() => undefined);
@@ -2098,12 +2120,16 @@ export function ScoutingForms({
             }}
           />
         ) : (
-          <EntryForm
-            key={selected.id}
-            form={selected}
-            context={context}
-            refreshContext={refreshContext}
-          />
+          <>
+            {contextError && selected.kind === "scouting" && <ErrorBanner message={contextError} />}
+            <EntryForm
+              key={selected.id}
+              form={selected}
+              context={context}
+              refreshContext={refreshContext}
+              scheduleUnavailable={!!contextError}
+            />
+          </>
         ))}
       {selected?.kind === "pit" &&
         (canManageServiceCrew ? <Operations embedded /> : <ServiceIssueReport />)}

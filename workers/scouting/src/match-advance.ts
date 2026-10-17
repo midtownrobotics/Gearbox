@@ -53,7 +53,7 @@ export function automaticTbaMatch(
   return ordered.at(-1);
 }
 
-/** Completed scouts can prepare the next form while others finish the live match. */
+/** Allow the live match and its immediate successor, without a start-time submission gate. */
 export function nextScoutMatch(
   matches: TbaMatch[],
   current: TbaMatch | undefined,
@@ -67,7 +67,8 @@ export function nextScoutMatch(
       (match) =>
         match.comp_level === current.comp_level && matchOrder(match) >= matchOrder(current),
     )
-    .sort((left, right) => matchOrder(left) - matchOrder(right));
+    .sort((left, right) => matchOrder(left) - matchOrder(right))
+    .slice(0, 2);
   return (
     remaining.find((match) => {
       const closesAt = matchSubmissionClosesAt(match, windowSeconds);

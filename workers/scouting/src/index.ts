@@ -473,6 +473,9 @@ app.get("/event-context", requireAuth, async (c) => {
       scheduleError = error instanceof Error ? error.message : "Could not load the TBA schedule.";
     }
   }
+  // An unavailable schedule is not a new assignment. Forms keep their last valid draft.
+  if (eventKey && c.req.query("assign") === "true" && (scheduleError || !matches.length))
+    return c.json({ error: "Could not refresh the match schedule. Try again shortly." }, 503);
   const configuredCurrent = config?.current_match_number
     ? matches.find(
         (match) => match.comp_level === "qm" && match.match_number === config.current_match_number,
