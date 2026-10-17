@@ -2270,6 +2270,7 @@ export function App() {
           <ScoutingForms
             isAdmin={user.isAdmin}
             canManageServiceCrew={user.isAdmin || user.isHelper}
+            userId={user.userId}
           />
         )}
         {visiblePage === "predictions" && (
