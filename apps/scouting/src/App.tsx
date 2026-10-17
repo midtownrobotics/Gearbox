@@ -49,6 +49,7 @@ import { type EngagementSettings, EngagementSettingsPanel } from "./EngagementSe
 import { MatchPredictions } from "./Game";
 import { Operations } from "./Operations";
 import { ScoutingAdminPage, ScoutingForms } from "./ScoutingForms";
+import { SortableTierRow, SortableTiers } from "./SortableTiers";
 import { API_URL, api } from "./api";
 import { clearInputError, showTeamNumberError } from "./input-validation";
 import {
@@ -311,23 +312,23 @@ function TierLists() {
     setNewItem("");
   }
 
-  function drop(targetTierId: string, targetIndex?: number) {
-    if (!dragged) return;
+  function drop(targetTierId: string, targetIndex?: number, source = dragged) {
+    if (!source) return;
     setCurrent((value) => ({
       ...value,
       tiers: value.tiers.map((tier) => {
         if (tier.id === targetTierId) {
-          const sourceIndex = tier.items.indexOf(dragged.item);
-          const items = tier.items.filter((item) => item !== dragged.item);
+          const sourceIndex = tier.items.indexOf(source.item);
+          const items = tier.items.filter((item) => item !== source.item);
           let insertAt = targetIndex ?? tier.items.length;
-          if (tier.id === dragged.tierId && sourceIndex >= 0 && sourceIndex < insertAt) {
+          if (tier.id === source.tierId && sourceIndex >= 0 && sourceIndex < insertAt) {
             insertAt--;
           }
-          items.splice(insertAt, 0, dragged.item);
+          items.splice(insertAt, 0, source.item);
           return { ...tier, items };
         }
-        if (tier.id === dragged.tierId) {
-          return { ...tier, items: tier.items.filter((item) => item !== dragged.item) };
+        if (tier.id === source.tierId) {
+          return { ...tier, items: tier.items.filter((item) => item !== source.item) };
         }
         return tier;
       }),
@@ -429,77 +430,125 @@ function TierLists() {
             <CirclePlus size={18} /> Add to top tier
           </button>
         </div>
-        <div className="tier-board">
+        <SortableTiers
+          ids={current.tiers.map((tier) => tier.id)}
+          onMove={(from, to) =>
+            setCurrent((value) => {
+              const tiers = [...value.tiers];
+              const [moved] = tiers.splice(from, 1);
+              tiers.splice(to, 0, moved);
+              return { ...value, tiers };
+            })
+          }
+        >
           {current.tiers.map((tier) => (
-            <div
-              className="tier-row"
+            <SortableTierRow
+              id={tier.id}
+              name={tier.name}
               key={tier.id}
-              onDragOver={(event) => event.preventDefault()}
-              onDrop={(event) => {
-                event.preventDefault();
-                drop(tier.id);
-              }}
+              onItemDrop={() => drop(tier.id)}
             >
-              <div className="tier-label" style={{ background: tier.color }}>
-                <TextField
-                  variant="plain"
-                  kind="tier"
-                  value={tier.name}
-                  onChange={(event) => updateTier(tier.id, { name: event.target.value })}
-                  aria-label="Tier name"
-                />
-                <div className="tier-color-options" aria-label={`${tier.name} color`}>
-                  {TIER_COLORS.map((option) => (
-                    <button
-                      type="button"
-                      key={option}
-                      className={tier.color === option ? "selected" : ""}
-                      style={{ backgroundColor: option }}
-                      aria-label={`Set ${tier.name} to ${option}`}
-                      aria-pressed={tier.color === option}
-                      onClick={() => updateTier(tier.id, { color: option })}
-                    />
-                  ))}
-                </div>
-              </div>
-              <div className="tier-items">
-                {tier.items.map((item, index) => (
-                  <div
-                    className="tier-chip"
-                    draggable
-                    key={item}
-                    onDragStart={(event) => {
-                      event.dataTransfer.effectAllowed = "move";
-                      event.dataTransfer.setData("text/plain", item);
-                      setDragged({ tierId: tier.id, item });
-                    }}
-                    onDragEnd={() => setDragged(null)}
-                    onDragOver={(event) => event.preventDefault()}
-                    onDrop={(event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      const bounds = event.currentTarget.getBoundingClientRect();
-                      const after = event.clientX >= bounds.left + bounds.width / 2;
-                      drop(tier.id, index + (after ? 1 : 0));
-                    }}
-                  >
-                    <span>{item}</span>
-                    <button
-                      type="button"
-                      aria-label={`Remove ${item}`}
-                      onClick={() =>
-                        updateTier(tier.id, { items: tier.items.filter((value) => value !== item) })
-                      }
-                    >
-                      <X size={13} />
-                    </button>
+              {(handle) => (
+                <>
+                  <div className="tier-label" style={{ background: tier.color }}>
+                    <div className="tier-label-heading">
+                      {handle}
+                      <TextField
+                        variant="plain"
+                        kind="tier"
+                        value={tier.name}
+                        onChange={(event) => updateTier(tier.id, { name: event.target.value })}
+                        aria-label="Tier name"
+                      />
+                    </div>
+                    <div className="tier-color-options" aria-label={`${tier.name} color`}>
+                      {TIER_COLORS.map((option) => (
+                        <button
+                          type="button"
+                          key={option}
+                          className={tier.color === option ? "selected" : ""}
+                          style={{ backgroundColor: option }}
+                          aria-label={`Set ${tier.name} to ${option}`}
+                          aria-pressed={tier.color === option}
+                          onClick={() => updateTier(tier.id, { color: option })}
+                        />
+                      ))}
+                    </div>
                   </div>
-                ))}
-                {!tier.items.length && <span className="drop-hint">Drop entries here</span>}
-              </div>
-            </div>
+                  <div className="tier-items">
+                    {tier.items.map((item, index) => (
+                      <div
+                        className="tier-chip"
+                        draggable
+                        key={item}
+                        onDragStart={(event) => {
+                          event.dataTransfer.effectAllowed = "move";
+                          event.dataTransfer.setData("text/plain", item);
+                          setDragged({ tierId: tier.id, item });
+                        }}
+                        onDragEnd={() => setDragged(null)}
+                        onDragOver={(event) => event.preventDefault()}
+                        onDrop={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          const bounds = event.currentTarget.getBoundingClientRect();
+                          const after = event.clientX >= bounds.left + bounds.width / 2;
+                          drop(tier.id, index + (after ? 1 : 0));
+                        }}
+                      >
+                        <span>{item}</span>
+                        <div className="tier-move-controls" draggable={false}>
+                          <button
+                            type="button"
+                            disabled={index === 0}
+                            aria-label={`Move ${item} left`}
+                            onClick={() => drop(tier.id, index - 1, { tierId: tier.id, item })}
+                          >
+                            ←
+                          </button>
+                          <button
+                            type="button"
+                            disabled={index === tier.items.length - 1}
+                            aria-label={`Move ${item} right`}
+                            onClick={() => drop(tier.id, index + 2, { tierId: tier.id, item })}
+                          >
+                            →
+                          </button>
+                          <select
+                            className={inputClass}
+                            value={tier.id}
+                            aria-label={`Move ${item} to tier`}
+                            onChange={(event) =>
+                              drop(event.target.value, undefined, { tierId: tier.id, item })
+                            }
+                          >
+                            {current.tiers.map((target) => (
+                              <option key={target.id} value={target.id}>
+                                {target.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <button
+                          type="button"
+                          aria-label={`Remove ${item}`}
+                          onClick={() =>
+                            updateTier(tier.id, {
+                              items: tier.items.filter((value) => value !== item),
+                            })
+                          }
+                        >
+                          <X size={13} />
+                        </button>
+                      </div>
+                    ))}
+                    {!tier.items.length && <span className="drop-hint">Drop entries here</span>}
+                  </div>
+                </>
+              )}
+            </SortableTierRow>
           ))}
-        </div>
+        </SortableTiers>
         <button
           type="button"
           className="add-tier-button"
