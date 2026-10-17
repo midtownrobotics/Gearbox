@@ -266,15 +266,24 @@ function TierLists() {
     setNewItem("");
   }
 
-  function drop(targetTierId: string) {
-    if (!dragged || dragged.tierId === targetTierId) return;
+  function drop(targetTierId: string, targetIndex?: number) {
+    if (!dragged) return;
     setCurrent((value) => ({
       ...value,
       tiers: value.tiers.map((tier) => {
+        if (tier.id === targetTierId) {
+          const sourceIndex = tier.items.indexOf(dragged.item);
+          const items = tier.items.filter((item) => item !== dragged.item);
+          let insertAt = targetIndex ?? tier.items.length;
+          if (tier.id === dragged.tierId && sourceIndex >= 0 && sourceIndex < insertAt) {
+            insertAt--;
+          }
+          items.splice(insertAt, 0, dragged.item);
+          return { ...tier, items };
+        }
         if (tier.id === dragged.tierId) {
           return { ...tier, items: tier.items.filter((item) => item !== dragged.item) };
         }
-        if (tier.id === targetTierId) return { ...tier, items: [...tier.items, dragged.item] };
         return tier;
       }),
     }));
@@ -376,7 +385,10 @@ function TierLists() {
               className="tier-row"
               key={tier.id}
               onDragOver={(event) => event.preventDefault()}
-              onDrop={() => drop(tier.id)}
+              onDrop={(event) => {
+                event.preventDefault();
+                drop(tier.id);
+              }}
             >
               <div className="tier-label" style={{ background: tier.color }}>
                 <TextField
@@ -401,12 +413,25 @@ function TierLists() {
                 </div>
               </div>
               <div className="tier-items">
-                {tier.items.map((item) => (
+                {tier.items.map((item, index) => (
                   <div
                     className="tier-chip"
                     draggable
                     key={item}
-                    onDragStart={() => setDragged({ tierId: tier.id, item })}
+                    onDragStart={(event) => {
+                      event.dataTransfer.effectAllowed = "move";
+                      event.dataTransfer.setData("text/plain", item);
+                      setDragged({ tierId: tier.id, item });
+                    }}
+                    onDragEnd={() => setDragged(null)}
+                    onDragOver={(event) => event.preventDefault()}
+                    onDrop={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      const bounds = event.currentTarget.getBoundingClientRect();
+                      const after = event.clientX >= bounds.left + bounds.width / 2;
+                      drop(tier.id, index + (after ? 1 : 0));
+                    }}
                   >
                     <span>{item}</span>
                     <button
