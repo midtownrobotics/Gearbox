@@ -1247,7 +1247,6 @@ app.get("/scouting-submissions/:id/drawing", requireAuth, async (c) => {
 });
 
 app.get("/scouting-submissions/:id/drawings/:fieldId", requireAuth, async (c) => {
-  if (!(await isStrategyAdmin(c))) return c.json({ error: "Strategy lead access required." }, 403);
   const row = await first<{ drawing_fields_json: string }>(
     dbOf(c),
     sql`SELECT drawing_fields_json FROM (SELECT * FROM ${scoutingFormSubmissions} WHERE ${inTeam(scoutingFormSubmissions, c.get("teamId"))}) AS scoped_scouting_form_submissions WHERE id = ${c.req.param("id")}`,
@@ -1427,7 +1426,6 @@ app.delete("/strategy-admins/:userId", requireAuth, async (c) => {
 });
 
 app.get("/analysis", requireAuth, async (c) => {
-  if (!(await isStrategyAdmin(c))) return c.json({ error: "Strategy lead access required." }, 403);
   const team = teamNumber(c.req.query("team"));
   const teamB = teamNumber(c.req.query("teamB"));
   const includeArchived = c.req.query("archived") === "true";

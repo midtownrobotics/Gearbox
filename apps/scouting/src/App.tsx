@@ -2112,6 +2112,7 @@ export function App() {
           id: "predictions" as const,
           label: user.engagement.predictionsEnabled ? "Match Predictions" : "Scouting Points",
         },
+        { id: "analysis" as const, label: "Analysis" },
         ...(user.isHelper ? [{ id: "service" as const, label: "Service Tickets" }] : []),
       ];
 
@@ -2170,8 +2171,8 @@ export function App() {
         {visiblePage === "tiers" && <TierLists />}
         {visiblePage === "maps" && <FieldMaps user={user} />}
         {visiblePage === "autos" && <AutoLibrary />}
-        {visiblePage === "analysis" && user.isAdmin && (
-          <Analysis initialReportId={analysisReportId} />
+        {visiblePage === "analysis" && (
+          <Analysis initialReportId={analysisReportId} canManageReports={user.isAdmin} />
         )}
         {visiblePage === "service" && (user.isAdmin || user.isHelper) && <Operations />}
       </div>
