@@ -28,7 +28,7 @@ const SETTING_KEY = /^AdvantageScopeLite\/[A-Za-z0-9._/-]{1,80}$/;
 
 /** The largest asset zip taken, the most a team keeps in all, and how many assets. */
 export const MAX_UPLOAD = 50 * 1024 * 1024;
-export const MAX_ASSET_BYTES = 50 * 1024 * 1024;
+export const MAX_ASSET_BYTES = 100 * 1024 * 1024;
 export const MAX_ASSETS = 10;
 const ASSET_NAME = /^[A-Za-z0-9][A-Za-z0-9_. -]{0,99}$/;
 const FILE_NAME = /^[A-Za-z0-9][A-Za-z0-9_. -]{0,99}$/;
@@ -303,7 +303,7 @@ export const scopeRoutes = new Hono<AppEnv>()
       kept.reduce((sum, row) => sum + row.size, 0) +
       found.reduce((sum, asset) => sum + asset.files.reduce((s, f) => s + f.entry.size, 0), 0);
     if (total > MAX_ASSET_BYTES) {
-      return c.json({ error: "The team's assets would be over 50 MB." }, 413);
+      return c.json({ error: "The team's assets would be over 100 MB." }, 413);
     }
     // Every file is unzipped once and checked against its stated size, and each config.json read,
     // before anything is stored, so a bad zip changes nothing.
