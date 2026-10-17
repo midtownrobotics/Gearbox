@@ -29,6 +29,8 @@ type Report = {
   eventKey?: string;
   matchKey?: string;
   matchNumber?: number;
+  /** Sent after its match moved on, from a draft kept on the scout's device. */
+  late?: boolean;
   starredFieldIds: string[];
   archivedAt?: number | null;
   archiveReason?: string;
@@ -586,6 +588,7 @@ export function Analysis({ initialReportId }: { initialReportId?: string | null 
                             <span>{eventLabel(report.eventKey)}</span>
                             <span>{report.submittedByName}</span>
                             <time>{new Date(report.createdAt).toLocaleString()}</time>
+                            {report.late && <span>Sent late</span>}
                           </div>
                           <button
                             type="button"

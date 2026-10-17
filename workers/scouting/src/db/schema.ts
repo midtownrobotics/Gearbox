@@ -310,6 +310,7 @@ export const scoutingFormSubmissions = sqliteTable(
     archived_by: text("archived_by"),
     archive_reason: text("archive_reason"),
     fields_json: text("fields_json"),
+    submitted_late: integer("submitted_late").notNull().default(0),
   },
   (t) => [
     primaryKey({ columns: [t.teamId, t.id] }),
@@ -431,6 +432,7 @@ export const strategyEventConfig = sqliteTable(
     nexus_api_key: text("nexus_api_key"),
     schedule_mode: text("schedule_mode").notNull().default("tba"),
     submission_window_seconds: integer("submission_window_seconds").notNull().default(120),
+    late_window_seconds: integer("late_window_seconds").notNull().default(600),
   },
   (t) => [primaryKey({ columns: [t.teamId, t.id] })],
 );

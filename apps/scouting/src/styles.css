@@ -9099,3 +9099,24 @@
     }
   }
 }
+
+/* The move-on bar is fixed to the bottom: keep toasts and the form's last button clear of it. */
+@layer components {
+  body.scouting-move-bar-open .status-toast {
+    bottom: calc(max(20px, env(safe-area-inset-bottom)) + 150px);
+  }
+
+  body.scouting-move-bar-open .scouting-forms-page {
+    padding-bottom: 170px;
+  }
+
+  @media (min-width: 640px) {
+    body.scouting-move-bar-open .status-toast {
+      bottom: calc(max(20px, env(safe-area-inset-bottom)) + 96px);
+    }
+
+    body.scouting-move-bar-open .scouting-forms-page {
+      padding-bottom: 116px;
+    }
+  }
+}

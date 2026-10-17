@@ -95,13 +95,18 @@ async function fixture(manual = false) {
       body,
     });
   };
+  const lateWindow = (seconds: number) =>
+    db
+      .update(strategyEventConfig)
+      .set({ late_window_seconds: seconds })
+      .where(inTeam(strategyEventConfig, team.teamId));
   const reports = () =>
     db
       .select()
       .from(scoutingFormSubmissions)
       .where(inTeam(scoutingFormSubmissions, team.teamId))
       .all();
-  return { team, eventKey, keys, schedule, context, submit, reports };
+  return { team, eventKey, keys, schedule, context, submit, reports, lateWindow };
 }
 
 describe("scouting submission deadlines", () => {
@@ -126,16 +131,58 @@ describe("scouting submission deadlines", () => {
       },
     ]);
   });
-  it("rejects an old draft even when the scout already has the next assignment", async () => {
+  it("lands a report that missed the move on its own match, marked late", async () => {
     const f = await fixture();
     const old = await f.context();
     await f.schedule(Math.floor(Date.now() / 1000) - 121);
     const next = await f.context();
     expect(next.currentMatch?.matchNumber).toBe(2);
     expect(next.assignedTeam).toBeTruthy();
+    expect((await f.submit(old)).status).toBe(201);
     expect((await f.submit(old)).status).toBe(409);
-    expect(await f.reports()).toEqual([]);
     expect((await f.submit(next)).status).toBe(201);
+    const reports = await f.reports();
+    expect(reports.find((report) => report.match_key === f.keys[0])).toMatchObject({
+      match_number: 1,
+      team_name: old.assignedTeam,
+      submitted_late: 1,
+    });
+    expect(reports.find((report) => report.match_key === f.keys[1])).toMatchObject({
+      submitted_late: 0,
+    });
+  });
+  it("refuses a late report once the team's late window has passed", async () => {
+    const f = await fixture();
+    const old = await f.context();
+    await f.lateWindow(60);
+    // Match 1 moved on 80 seconds ago (ended 200 s ago, 120 s window): past a 60 s late window.
+    await f.schedule(Math.floor(Date.now() / 1000) - 200);
+    const response = await f.submit(old);
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ error: expect.stringContaining("too late") });
+    expect(await f.reports()).toEqual([]);
+  });
+  it("never takes a report for a match that hasn't come up yet", async () => {
+    const f = await fixture();
+    const context = await f.context();
+    const response = await f.submit({ ...context, scoutMatch: { key: f.keys[1], matchNumber: 2 } });
+    expect(response.status).toBe(409);
+    expect(await f.reports()).toEqual([]);
+  });
+  it("lets admins set the late window, within its limits", async () => {
+    const f = await fixture();
+    const save = (lateWindowSeconds: unknown) =>
+      callAs(f.team.admin, "/scouting/event-context", {
+        method: "PUT",
+        body: { eventKey: "", lateWindowSeconds },
+      });
+    expect((await save(4000)).status).toBe(400);
+    expect((await save(-1)).status).toBe(400);
+    expect((await save(300)).status).toBe(200);
+    expect(
+      (await jsonAs<{ lateWindowSeconds: number }>(f.team.student, "/scouting/event-context"))
+        .lateWindowSeconds,
+    ).toBe(300);
   });
   it("moves a scout who has sent their report on without waiting out the window", async () => {
     const f = await fixture();
@@ -166,7 +213,7 @@ describe("scouting submission deadlines", () => {
     expect((await f.submit(context, "9999")).status).toBe(409);
     expect(await f.reports()).toEqual([]);
   });
-  it("closes the final match instead of keeping an expired form usable", async () => {
+  it("stops assigning the final match once it closes, but still takes its report late", async () => {
     const f = await fixture();
     const old = await f.context();
     await f.schedule(Math.floor(Date.now() / 1000) - 121, true);
@@ -174,12 +221,10 @@ describe("scouting submission deadlines", () => {
     expect(expired.currentMatch?.matchNumber).toBe(1);
     expect(expired.assignedTeam).toBeNull();
     expect(expired.submissionClosesAt).toBeLessThan(expired.serverNow);
-    const response = await f.submit(old);
-    expect(response.status).toBe(409);
-    expect(await response.json()).toMatchObject({ error: expect.stringContaining("Time expired") });
-    expect(await f.reports()).toEqual([]);
+    expect((await f.submit(old)).status).toBe(201);
+    expect(await f.reports()).toMatchObject([{ match_key: f.keys[0], submitted_late: 1 }]);
   });
-  it("resets manual match identity without inventing an automatic deadline", async () => {
+  it("takes a manual match's report late after the lead moves on", async () => {
     const f = await fixture(true);
     const old = await f.context();
     expect(old.submissionClosesAt).toBeNull();
@@ -189,8 +234,12 @@ describe("scouting submission deadlines", () => {
     });
     const next = await f.context();
     expect(next.currentMatch?.matchNumber).toBe(2);
-    expect((await f.submit(old)).status).toBe(409);
+    expect(next.submissionClosesAt).toBeNull();
+    expect((await f.submit(old)).status).toBe(201);
     expect((await f.submit(next)).status).toBe(201);
+    const reports = await f.reports();
+    expect(reports.find((report) => report.match_number === 1)?.submitted_late).toBe(1);
+    expect(reports.find((report) => report.match_number === 2)?.submitted_late).toBe(0);
   });
   it("rejects a changed assignment within the same match", async () => {
     const f = await fixture();
@@ -202,9 +251,26 @@ describe("scouting submission deadlines", () => {
     expect((await f.submit(old)).status).toBe(409);
     expect(await f.reports()).toEqual([]);
   });
-  it("rechecks after uploading a drawing and removes it if the match expired", async () => {
+  it("records a report as late when its match moves on during the upload", async () => {
     const f = await fixture();
     const old = await f.context();
+    const originalPut = bindings.FIELD_MAPS.put.bind(bindings.FIELD_MAPS);
+    const upload = vi.spyOn(bindings.FIELD_MAPS, "put").mockImplementationOnce(async (...args) => {
+      const result = await originalPut(...args);
+      await f.schedule(Math.floor(Date.now() / 1000) - 121);
+      return result;
+    });
+    try {
+      expect((await f.submit(old, undefined, true)).status).toBe(201);
+      expect(await f.reports()).toMatchObject([{ match_key: f.keys[0], submitted_late: 1 }]);
+    } finally {
+      upload.mockRestore();
+    }
+  });
+  it("rechecks after uploading a drawing and removes it if it became too late", async () => {
+    const f = await fixture();
+    const old = await f.context();
+    await f.lateWindow(0);
     const originalPut = bindings.FIELD_MAPS.put.bind(bindings.FIELD_MAPS);
     const upload = vi.spyOn(bindings.FIELD_MAPS, "put").mockImplementationOnce(async (...args) => {
       const result = await originalPut(...args);

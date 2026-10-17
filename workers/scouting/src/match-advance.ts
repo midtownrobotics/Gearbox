@@ -15,6 +15,20 @@ export function submissionWindow(value: unknown) {
     : null;
 }
 
+/**
+ * How long after a match moves on a scout can still send their report for it. The report lands on
+ * the match it was written for and is marked late, so nothing a scout wrote is thrown away.
+ */
+export const DEFAULT_LATE_WINDOW = 600;
+export const MAX_LATE_WINDOW = 3600;
+
+export function lateWindow(value: unknown) {
+  const seconds = finiteNumber(value);
+  return seconds !== null && Number.isInteger(seconds) && seconds >= 0 && seconds <= MAX_LATE_WINDOW
+    ? seconds
+    : null;
+}
+
 export function matchOrder(match: TbaMatch) {
   const level = { qm: 0, ef: 1, qf: 2, sf: 3, f: 4 }[match.comp_level] ?? 5;
   return level * 100_000 + match.set_number * 1_000 + match.match_number;
