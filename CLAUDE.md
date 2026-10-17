@@ -35,6 +35,12 @@ These apps are being turned from one team's tools into a hosted platform that ma
 
 **Keep the roadmap current.** When a change completes or advances a step, update `docs/roadmap/roadmap.md` in the same PR: the step's Status, the Progress table, and a row in "What landed". If a change makes part of the plan wrong, fix the plan there and say so in the PR description. A roadmap-only change takes an empty changeset.
 
+## Docs (docs.<platform>)
+
+The docs site, for the admins who set up and run a team's apps, is at `docs.<platform>` (and `/docs` on the platform's own host), served by the platform worker for no team (`DOCS_HOSTS`, `docsUrl(app)` in `@g3/site-config`; the shared bar's menu has a Help link to the app's part). Its pages are Markdown in each app's own folder: `apps/<app>/docs/*.md` (one section per app, named by the folder; `apps/platform/docs` is "Getting started", `apps/portal/docs` the team's admin pages), built into HTML at build time by `apps/platform/docs-plugin.ts`. Each file has front matter (`title`, `summary`, `order`); `index.md` is the section's front page. Links between pages are docs paths (`/orders/setup#share-a-cart`, or `setup` within the section); `team:<app>/<path>` opens that page on the reader's own team. `- [ ]` lists are checklists the reader ticks, kept in their browser. `pnpm --filter @g3/platform test` (and its build) fails on a broken link or heading.
+
+**Keep the docs current.** A change to how an app is set up or used (a page, a setting, a button's name, who can do something) updates that app's `docs/` in the same PR. A new app adds a `docs/` folder with `index.md` and `setup.md`. Write for a team's admins: what to do and where, in the words the pages use, never how it works underneath.
+
 ## UI Alignment (read before changing a page)
 
 The apps are being brought into one design language. The plan of record is `docs/roadmap/ui-alignment.md`: the decisions, the rules a page follows, each step's status and what each app still needs. **Read it before changing how a page looks or behaves**, and update its Progress table in the same PR as a step.

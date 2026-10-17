@@ -20,3 +20,114 @@
     animation: none;
   }
 }
+
+/* The docs' pages (src/docs): Markdown built into HTML, in the shared colors. */
+.docs-prose {
+  color: var(--color-secondary-800);
+  line-height: 1.7;
+}
+.docs-prose > * + * {
+  margin-top: 1rem;
+}
+.docs-prose h2 {
+  margin-top: 2.5rem;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--color-secondary-900);
+  scroll-margin-top: 1.5rem;
+}
+.docs-prose h3 {
+  margin-top: 2rem;
+  font-size: 1.15rem;
+  font-weight: 650;
+  color: var(--color-secondary-900);
+  scroll-margin-top: 1.5rem;
+}
+.docs-prose a {
+  color: var(--color-primary-700);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.docs-prose a:hover {
+  color: var(--color-primary-900);
+}
+.docs-prose strong {
+  font-weight: 650;
+  color: var(--color-secondary-900);
+}
+.docs-prose ul,
+.docs-prose ol {
+  padding-left: 1.5rem;
+}
+.docs-prose ul {
+  list-style: disc;
+}
+.docs-prose ol {
+  list-style: decimal;
+}
+.docs-prose li + li {
+  margin-top: 0.35rem;
+}
+.docs-prose li > ul,
+.docs-prose li > ol {
+  margin-top: 0.35rem;
+}
+/* A checklist: no bullets, a box to tick instead. */
+.docs-prose li:has(> input[type="checkbox"]) {
+  list-style: none;
+  margin-left: -1.5rem;
+  padding-left: 1.75rem;
+  text-indent: -1.75rem;
+}
+.docs-prose input[type="checkbox"] {
+  width: 1rem;
+  height: 1rem;
+  margin-right: 0.6rem;
+  vertical-align: -2px;
+  accent-color: var(--color-primary-600);
+  cursor: pointer;
+}
+.docs-prose code {
+  border-radius: 0.3rem;
+  background: var(--g3-inset);
+  padding: 0.1rem 0.35rem;
+  font-size: 0.875em;
+}
+.docs-prose pre {
+  overflow-x: auto;
+  border: 1px solid var(--g3-line);
+  border-radius: 0.6rem;
+  background: var(--g3-inset);
+  padding: 0.9rem 1rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+.docs-prose pre code {
+  background: none;
+  padding: 0;
+}
+.docs-prose blockquote {
+  border-left: 3px solid var(--color-primary-500);
+  border-radius: 0 0.5rem 0.5rem 0;
+  background: var(--g3-inset);
+  padding: 0.75rem 1rem;
+  color: var(--color-secondary-700);
+}
+.docs-prose table {
+  display: block;
+  overflow-x: auto;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+.docs-prose th,
+.docs-prose td {
+  border: 1px solid var(--g3-line);
+  padding: 0.45rem 0.7rem;
+  text-align: left;
+  vertical-align: top;
+}
+.docs-prose th {
+  background: var(--g3-inset);
+  font-weight: 650;
+  color: var(--color-secondary-900);
+}

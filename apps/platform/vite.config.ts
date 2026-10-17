@@ -3,6 +3,7 @@ import { siteConfig } from "@g3/site-config/vite";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { type Plugin, defineConfig } from "vite";
+import { gearboxDocs } from "./docs-plugin";
 
 /**
  * Link previews (Chief Delphi, Discord, Slack): crawlers don't run the page, so the cards come
@@ -35,7 +36,7 @@ function linkPreviews(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [siteConfig(), linkPreviews(), react(), tailwindcss()],
+  plugins: [siteConfig(), linkPreviews(), gearboxDocs(), react(), tailwindcss()],
   server: {
     port: 5185,
     strictPort: true,

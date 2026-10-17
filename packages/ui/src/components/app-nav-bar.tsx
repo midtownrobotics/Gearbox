@@ -1,7 +1,9 @@
 import {
+  type AppName,
   allAppsUrl,
   appUrl,
   completeAppOrder,
+  docsUrl,
   isDemoPage,
   platformUrl,
   portalAppLabels,
@@ -142,6 +144,9 @@ export function AppNavBar({
             : []),
         ]
       : [];
+  // The docs for the app this page is (the docs' front page when it isn't known).
+  const thisApp = appLinks.find((app) => new URL(app.href, window.location.href).host === here);
+  const help = team ? docsUrl(thisApp?.key as AppName | undefined) : null;
   // Whether the bar has an app list to offer (or may, while it's being asked).
   const hasApps = allApps && user !== null;
   // With no pages and no apps there's nothing for a menu; the bar keeps its controls on phones too.
@@ -315,6 +320,11 @@ export function AppNavBar({
           <div className="g3-nav-drawer-foot">
             {actions && <div className="g3-nav-actions">{actions}</div>}
             <ThemeToggle labeled />
+            {help && (
+              <a className="g3-nav-text-link" href={help}>
+                Help
+              </a>
+            )}
             {version && <span className="g3-nav-version">{version}</span>}
           </div>
         </div>

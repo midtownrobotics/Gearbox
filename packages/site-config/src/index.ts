@@ -203,6 +203,23 @@ export function consoleUrl(_teamId?: string): string {
   return consoleUrlVia(localGateway);
 }
 
+/**
+ * The docs (how to set up and use the platform and each app), served by the platform worker at
+ * docs.<platform domain>, for no team (also at /docs on the platform's own host).
+ */
+export const DOCS_HOSTS = [platformHost("docs")] as const;
+
+/** The docs' address, or given the dev gateway, its address there. */
+export function docsUrlVia(gateway: string | undefined): string {
+  return gateway ? onGateway(gateway, "docs") : `https://${platformHost("docs")}`;
+}
+
+/** An app's part of the docs (`skillTree` → /skill-tree), or their front page. */
+export function docsUrl(app?: AppName): string {
+  const base = docsUrlVia(localGateway);
+  return app ? `${base}/${app.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}` : base;
+}
+
 /** The demo's short address (demo.<platform domain>), which leads to the demo team's home. */
 export const DEMO_HOST_LABEL = "demo";
 
