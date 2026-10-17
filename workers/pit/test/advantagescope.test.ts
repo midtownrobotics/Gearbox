@@ -8,8 +8,13 @@ import { describe, expect, it } from "vitest";
 
 const bucket = (env as unknown as { LOGS: R2Bucket }).LOGS;
 
-/** A zip of `files`, each stored or deflated (no CRCs: the reader doesn't check them). */
-async function makeZip(files: { path: string; text: string | Uint8Array; deflate?: boolean }[]) {
+/**
+ * A zip of `files`, each stored or deflated (no CRCs: the reader doesn't check them). `claims` is
+ * the unzipped size the zip states, when it should lie.
+ */
+async function makeZip(
+  files: { path: string; text: string | Uint8Array; deflate?: boolean; claims?: number }[],
+) {
   const encoder = new TextEncoder();
   const locals: Uint8Array[] = [];
   const centrals: Uint8Array[] = [];
@@ -29,7 +34,7 @@ async function makeZip(files: { path: string; text: string | Uint8Array; deflate
     lv.setUint32(0, 0x04034b50, true);
     lv.setUint16(8, file.deflate ? 8 : 0, true);
     lv.setUint32(18, data.length, true);
-    lv.setUint32(22, raw.length, true);
+    lv.setUint32(22, file.claims ?? raw.length, true);
     lv.setUint16(26, name.length, true);
     local.set(name, 30);
     local.set(data, 30 + name.length);
@@ -38,7 +43,7 @@ async function makeZip(files: { path: string; text: string | Uint8Array; deflate
     cv.setUint32(0, 0x02014b50, true);
     cv.setUint16(10, file.deflate ? 8 : 0, true);
     cv.setUint32(20, data.length, true);
-    cv.setUint32(24, raw.length, true);
+    cv.setUint32(24, file.claims ?? raw.length, true);
     cv.setUint16(28, name.length, true);
     cv.setUint32(42, offset, true);
     central.set(name, 46);
@@ -280,6 +285,58 @@ describe("assets", () => {
       "config.json",
       "image.png",
     ]);
+  });
+
+  it("keeps a team's assets to 10 MB, 10 assets, and what the zip says it holds", async () => {
+    const team = teamUsers(newTeamId());
+    const post = (name: string, zip: Uint8Array) =>
+      callAs(team.mentor, "/scope/assets", { method: "POST", body: uploadForm(name, zip) });
+    const robot = async (name: string, bytes: number) =>
+      makeZip([
+        { path: `${name}/config.json`, text: config },
+        { path: `${name}/model.glb`, text: "x".repeat(bytes), deflate: true },
+      ]);
+    const MB = 1024 * 1024;
+
+    // Over 10 MB in one zip, stored.
+    expect(
+      (
+        await post(
+          "Big.zip",
+          await makeZip([
+            { path: "Robot_Big/config.json", text: config },
+            { path: "Robot_Big/model.glb", text: new Uint8Array(10 * MB + 1) },
+          ]),
+        )
+      ).status,
+    ).toBe(413);
+    // Small zipped but over 10 MB unzipped, and over the team's 10 MB with another.
+    expect((await post("Huge.zip", await robot("Robot_Huge", 11 * MB))).status).toBe(413);
+    expect((await post("One.zip", await robot("Robot_One", 6 * MB))).status).toBe(200);
+    expect((await post("Two.zip", await robot("Robot_Two", 6 * MB))).status).toBe(413);
+    // Replacing one counts its new size, not both.
+    expect((await post("One.zip", await robot("Robot_One", 7 * MB))).status).toBe(200);
+
+    // A zip that says its files are smaller than they unzip to.
+    const lying = await makeZip([
+      { path: "Robot_Liar/config.json", text: config },
+      { path: "Robot_Liar/model.glb", text: "x".repeat(MB), deflate: true, claims: 10 },
+    ]);
+    expect((await post("Liar.zip", lying)).status).toBe(400);
+
+    const list = await jsonAs<{ assets: { name: string; size: number }[] }>(
+      team.student,
+      "/scope/asset-list",
+    );
+    expect(list.assets.map((asset) => asset.name)).toEqual(["Robot_One"]);
+    expect(list.assets[0].size).toBeGreaterThan(7 * MB);
+
+    // At most 10 assets.
+    await jsonAs(team.mentor, "/scope/assets/Robot_One", { method: "DELETE" });
+    for (let i = 0; i < 10; i++) {
+      expect((await post(`R${i}.zip`, await robot(`Robot_R${i}`, 10))).status).toBe(200);
+    }
+    expect((await post("R10.zip", await robot("Robot_R10", 10))).status).toBe(409);
   });
 
   it("refuses what isn't an asset zip, and a mentor removes one", async () => {

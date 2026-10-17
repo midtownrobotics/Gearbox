@@ -61,12 +61,30 @@ export function readZip(bytes: Uint8Array<ArrayBuffer>): ZipEntry[] {
     entries.push({
       path,
       size,
+      // Never more than the zip says: a file can't unzip past its stated size.
       async read() {
-        if (method === 0) return data;
-        const stream = new Blob([data])
+        if (method === 0) {
+          if (data.length !== size) throw new ZipError("The zip is damaged.");
+          return data;
+        }
+        const reader = new Blob([data])
           .stream()
-          .pipeThrough(new DecompressionStream("deflate-raw"));
-        return new Uint8Array(await new Response(stream).arrayBuffer());
+          .pipeThrough(new DecompressionStream("deflate-raw"))
+          .getReader();
+        const out = new Uint8Array(size);
+        let length = 0;
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          if (length + value.length > size) {
+            await reader.cancel();
+            throw new ZipError("The zip is damaged.");
+          }
+          out.set(value, length);
+          length += value.length;
+        }
+        if (length !== size) throw new ZipError("The zip is damaged.");
+        return out;
       },
     });
   }

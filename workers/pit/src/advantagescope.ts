@@ -26,9 +26,9 @@ const MAX_SETTING = 512 * 1024;
 const SETTING_KEY = /^AdvantageScopeLite\/[A-Za-z0-9._/-]{1,80}$/;
 
 /** The largest asset zip taken, the most a team keeps in all, and how many assets. */
-export const MAX_UPLOAD = 40 * 1024 * 1024;
-export const MAX_ASSET_BYTES = 200 * 1024 * 1024;
-export const MAX_ASSETS = 30;
+export const MAX_UPLOAD = 10 * 1024 * 1024;
+export const MAX_ASSET_BYTES = 10 * 1024 * 1024;
+export const MAX_ASSETS = 10;
 const ASSET_NAME = /^[A-Za-z0-9][A-Za-z0-9_. -]{0,99}$/;
 const FILE_NAME = /^[A-Za-z0-9][A-Za-z0-9_. -]{0,99}$/;
 
@@ -270,7 +270,7 @@ export const scopeRoutes = new Hono<AppEnv>()
       return c.json({ error: "Uploaded asset must be a zip." }, 400);
     }
     if (upload.size > MAX_UPLOAD) {
-      return c.json({ error: "The zip is over 40 MB: upload its assets one at a time." }, 413);
+      return c.json({ error: "The zip is over 10 MB." }, 413);
     }
     let found: Awaited<ReturnType<typeof assetsIn>>;
     try {
@@ -305,27 +305,37 @@ export const scopeRoutes = new Hono<AppEnv>()
       kept.reduce((sum, row) => sum + row.size, 0) +
       found.reduce((sum, asset) => sum + asset.files.reduce((s, f) => s + f.size, 0), 0);
     if (total > MAX_ASSET_BYTES) {
-      return c.json({ error: "The team's assets would be over 200 MB." }, 413);
+      return c.json({ error: "The team's assets would be over 10 MB." }, 413);
     }
-    // Every config.json is read before anything is stored, so a bad one changes nothing.
-    const configs = new Map<string, unknown>();
+    // Everything is read (at most MAX_ASSET_BYTES, as the zip states and unzipping holds it to)
+    // and each config.json checked before anything is stored, so a bad zip changes nothing.
+    const read: { name: string; config: unknown; files: { name: string; bytes: Uint8Array }[] }[] =
+      [];
     for (const asset of found) {
-      const file = asset.files.find((f) => f.name === "config.json");
+      const files: { name: string; bytes: Uint8Array }[] = [];
       try {
-        configs.set(asset.name, JSON.parse(new TextDecoder().decode(await file?.read())));
+        for (const file of asset.files) files.push({ name: file.name, bytes: await file.read() });
+      } catch (err) {
+        if (err instanceof ZipError) return c.json({ error: err.message }, 400);
+        throw err;
+      }
+      let config: unknown;
+      try {
+        const bytes = files.find((f) => f.name === "config.json")?.bytes;
+        config = JSON.parse(new TextDecoder().decode(bytes));
       } catch {
         return c.json({ error: `${asset.name}'s config.json isn't valid JSON.` }, 400);
       }
+      read.push({ name: asset.name, config, files });
     }
 
     const now = Date.now();
     const userId = c.get("userId");
-    for (const asset of found) {
+    for (const asset of read) {
       const files: AssetFile[] = [];
       for (const file of asset.files) {
-        const bytes = await file.read();
-        await c.env.LOGS.put(assetKey(teamId, asset.name, file.name), bytes);
-        files.push({ name: file.name, size: bytes.length });
+        await c.env.LOGS.put(assetKey(teamId, asset.name, file.name), file.bytes);
+        files.push({ name: file.name, size: file.bytes.length });
       }
       // Files of the version replaced that this one doesn't have.
       const before = existing.find((row) => row.name === asset.name);
@@ -339,7 +349,7 @@ export const scopeRoutes = new Hono<AppEnv>()
       }
       const values = {
         files: JSON.stringify(files),
-        config: JSON.stringify(configs.get(asset.name)),
+        config: JSON.stringify(asset.config),
         size: files.reduce((sum, f) => sum + f.size, 0),
         uploadedBy: userId,
         uploadedAt: now,

@@ -13,7 +13,11 @@ const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" });
 const megabytes = (bytes: number) => `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 
 export function ScopeAssets() {
-  const [data, setData] = useState<{ assets: ScopeAsset[]; canManage: boolean } | null>(null);
+  const [data, setData] = useState<{
+    assets: ScopeAsset[];
+    canManage: boolean;
+    limit: number;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(
@@ -33,13 +37,17 @@ export function ScopeAssets() {
 
   if (!data) return error ? <ErrorBanner message={error} /> : null;
   if (data.assets.length === 0 && !data.canManage) return null;
+  const used = data.assets.reduce((sum, asset) => sum + asset.size, 0);
   return (
     <Card title="AdvantageScope assets">
       {error && <ErrorBanner message={error} />}
+      <p className="mb-3 text-sm text-secondary-500">
+        {megabytes(used)} of {megabytes(data.limit)} used.
+      </p>
       {data.assets.length === 0 ? (
         <p className="text-sm text-secondary-500">
-          Add your robot or another field in AdvantageScope with File › Upload Asset. Everyone on
-          the team sees them.
+          Add your robot or another field in AdvantageScope with File › Upload Asset (a zip of up to
+          10 MB). Everyone on the team sees them.
         </p>
       ) : (
         <ul className="divide-y divide-secondary-200">
