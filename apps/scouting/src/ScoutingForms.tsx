@@ -1,4 +1,4 @@
-import { pageTeamNumber } from "@g3/site-config";
+import { pageTeamId, pageTeamNumber } from "@g3/site-config";
 import {
   Button,
   Card,
@@ -50,6 +50,7 @@ import { Operations } from "./Operations";
 import { TeamLookupInput } from "./TeamLookupInput";
 import { api } from "./api";
 import { clearInputError, showTeamNumberError } from "./input-validation";
+import { type ScoutingDraft, readScoutingDraft } from "./scouting-drafts";
 
 export type FieldType =
   | "shortText"
@@ -99,6 +100,9 @@ function FieldInput({
   canvasRef,
   canvasKey,
   onDrawingChange,
+  initialDrawing,
+  onDrawingSave,
+  onRestoreComplete,
 }: {
   field: ScoutingField;
   value: unknown;
@@ -106,11 +110,23 @@ function FieldInput({
   canvasRef?: RefObject<HTMLCanvasElement | null>;
   canvasKey?: number;
   onDrawingChange?: (hasDrawing: boolean) => void;
+  initialDrawing?: string;
+  onDrawingSave?: (drawing: string | null) => void;
+  onRestoreComplete?: (success: boolean) => void;
 }) {
   const inputId = `field-${field.id}`;
   const [counterInterval, setCounterInterval] = useState<(typeof COUNTER_INTERVALS)[number]>(1);
   if (field.type === "fieldMap" && canvasRef)
-    return <FormFieldMap key={canvasKey} canvasRef={canvasRef} onDrawingChange={onDrawingChange} />;
+    return (
+      <FormFieldMap
+        key={canvasKey}
+        canvasRef={canvasRef}
+        onDrawingChange={onDrawingChange}
+        initialDrawing={initialDrawing}
+        onDrawingSave={onDrawingSave}
+        onRestoreComplete={onRestoreComplete}
+      />
+    );
   if (field.type === "counter") {
     const current = Number(value ?? 0);
     return (
@@ -228,23 +244,27 @@ function FieldInput({
 }
 
 function EntryForm({
+  scoutId,
   form,
   context,
   refreshContext,
   scheduleUnavailable,
 }: {
+  scoutId: string;
   form: ScoutingForm;
   context: EventContext | null;
   refreshContext: () => Promise<void>;
   scheduleUnavailable: boolean;
 }) {
-  // A new assignment always starts with an empty draft, including every canvas.
+  // Restore only the same scout's still-active assignment.
   const assignment =
     form.kind === "scouting"
       ? `${context?.currentMatch?.key ?? ""}:${context?.assignedTeam ?? ""}`
       : "pit";
   return (
     <EntryDraft
+      scoutId={scoutId}
+      assignment={assignment}
       key={`${form.id}:${assignment}`}
       form={form}
       context={context}
@@ -255,20 +275,61 @@ function EntryForm({
 }
 
 function EntryDraft({
+  scoutId,
+  assignment,
   form,
   context,
   refreshContext,
   scheduleUnavailable,
 }: {
+  scoutId: string;
+  assignment: string;
   form: ScoutingForm;
   context: EventContext | null;
   refreshContext: () => Promise<void>;
   scheduleUnavailable: boolean;
 }) {
+  const draftKey = `scouting-draft:v1:${JSON.stringify([pageTeamId, scoutId, form.id])}`;
+  const fields = JSON.stringify(form.fields);
+  const [draftError, setDraftError] = useState("");
+  const [restored] = useState(() => {
+    if (
+      form.kind === "scouting" &&
+      (!context?.assignedTeam ||
+        !context.currentMatch ||
+        context.hasSubmittedCurrentMatch ||
+        (context.submissionClosesAt !== null &&
+          context.submissionClosesAt <= (context.serverNow ?? Date.now())))
+    )
+      return null;
+    try {
+      return readScoutingDraft(
+        localStorage,
+        draftKey,
+        assignment,
+        fields,
+        context?.serverNow ?? Date.now(),
+      );
+    } catch {
+      return null;
+    }
+  });
   const [teamName, setTeamName] = useState(
-    form.kind === "scouting" ? (context?.assignedTeam ?? "") : "",
+    restored?.teamName ?? (form.kind === "scouting" ? (context?.assignedTeam ?? "") : ""),
   );
-  const [answers, setAnswers] = useState<Record<string, unknown>>({});
+  const [answers, setAnswers] = useState<Record<string, unknown>>(restored?.answers ?? {});
+  const [draftSaved, setDraftSaved] = useState(!!restored);
+  const [pendingDrawings, setPendingDrawings] = useState(
+    () => new Set(Object.keys(restored?.drawings ?? {})),
+  );
+  const draft = useRef<ScoutingDraft>({
+    assignment,
+    fields,
+    expiresAt: form.kind === "scouting" ? (context?.submissionClosesAt ?? null) : null,
+    teamName: restored?.teamName ?? (form.kind === "scouting" ? (context?.assignedTeam ?? "") : ""),
+    answers: restored?.answers ?? {},
+    drawings: restored?.drawings ?? {},
+  });
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState<"success" | "error">("success");
   const [saving, setSaving] = useState(false);
@@ -283,7 +344,7 @@ function EntryDraft({
   const [expired, setExpired] = useState(false);
   const [, tick] = useState(0);
   const currentMatch = context?.currentMatch ?? null;
-  const closesAt = context?.submissionClosesAt ?? null;
+  const closesAt = form.kind === "scouting" ? (context?.submissionClosesAt ?? null) : null;
   const clock = useMemo(
     () => ({ time: context?.serverNow ?? Date.now(), started: performance.now() }),
     [context?.serverNow],
@@ -294,6 +355,39 @@ function EntryDraft({
   const isExpired = () =>
     form.kind === "scouting" &&
     (expiredRef.current || (closesAt !== null && serverNow() >= closesAt));
+  const clearDraft = useCallback(() => {
+    setDraftSaved(false);
+    setPendingDrawings(new Set());
+    draft.current = { ...draft.current, answers: {}, drawings: {}, teamName: "" };
+    try {
+      const raw = localStorage.getItem(draftKey);
+      if (raw && JSON.parse(raw).assignment === assignment) localStorage.removeItem(draftKey);
+      setDraftError("");
+    } catch {
+      setDraftError("Could not clear this device's saved draft.");
+    }
+  }, [assignment, draftKey]);
+  useEffect(() => {
+    if (form.kind !== "scouting" || !context?.hasSubmittedCurrentMatch) return;
+    clearDraft();
+    setAnswers({});
+    drawnFields.current.clear();
+    setCanvasKey((value) => value + 1);
+  }, [clearDraft, form.kind, context?.hasSubmittedCurrentMatch]);
+  function saveDraft(patch: Partial<ScoutingDraft>) {
+    if (isExpired() || submitted || (form.kind === "scouting" && context?.hasSubmittedCurrentMatch))
+      return;
+    draft.current = { ...draft.current, ...patch, expiresAt: closesAt };
+    try {
+      localStorage.setItem(draftKey, JSON.stringify(draft.current));
+      setDraftSaved(true);
+      setDraftError("");
+    } catch {
+      setDraftError(
+        "Draft could not be saved on this device. Keep this page open until you submit.",
+      );
+    }
+  }
   const blocked =
     form.kind === "scouting" &&
     (expired ||
@@ -328,6 +422,7 @@ function EntryDraft({
       if (serverNow() < (closesAt as number) || expiredRef.current) return;
       expiredRef.current = true;
       expiredContext.current = context?.serverNow;
+      clearDraft();
       setExpired(true);
       setTeamName("");
       setAnswers({});
@@ -345,10 +440,24 @@ function EntryDraft({
       window.removeEventListener("focus", checkDeadline);
       document.removeEventListener("visibilitychange", checkDeadline);
     };
-  }, [form.kind, closesAt, serverNow, refreshContext, context?.serverNow, context?.assignedTeam]);
+  }, [
+    form.kind,
+    closesAt,
+    serverNow,
+    refreshContext,
+    context?.serverNow,
+    context?.assignedTeam,
+    clearDraft,
+  ]);
   async function submit(event: SyntheticEvent) {
     event.preventDefault();
-    if (saving || blocked || isExpired() || (form.kind === "scouting" && scheduleUnavailable))
+    if (
+      saving ||
+      blocked ||
+      pendingDrawings.size > 0 ||
+      isExpired() ||
+      (form.kind === "scouting" && scheduleUnavailable)
+    )
       return;
     setSaving(true);
     setMessage("");
@@ -369,6 +478,7 @@ function EntryDraft({
       }
       if (!mounted.current || isExpired()) return;
       await api(`/scouting-forms/${form.id}/submissions`, { method: "POST", body: payload });
+      clearDraft();
       if (!mounted.current || isExpired()) return;
       if (form.kind === "scouting") setSubmitted(true);
       setAnswers({});
@@ -402,6 +512,12 @@ function EntryDraft({
   }
   return (
     <form className="scouting-entry" onSubmit={submit}>
+      {draftSaved && !submitted && !expired && (
+        <p role="status">
+          {restored ? "Draft restored on this device." : "Draft saved on this device."}
+        </p>
+      )}
+      {draftError && <ErrorBanner message={draftError} />}
       <div className="scouting-form-title">
         <div className="scouting-form-heading-row">
           <h2>{form.name}</h2>
@@ -467,7 +583,10 @@ function EntryDraft({
           </span>
           <TeamLookupInput
             value={teamName}
-            onChange={setTeamName}
+            onChange={(value) => {
+              setTeamName(value);
+              saveDraft({ teamName: value });
+            }}
             size="lg"
             inputMode="numeric"
             readOnly={form.kind === "scouting"}
@@ -488,7 +607,35 @@ function EntryDraft({
                 <FieldInput
                   field={field}
                   value={answers[field.id]}
-                  setValue={(value) => setAnswers((current) => ({ ...current, [field.id]: value }))}
+                  setValue={(value) => {
+                    const next = { ...draft.current.answers, [field.id]: value };
+                    setAnswers(next);
+                    saveDraft({ answers: next, teamName });
+                  }}
+                  initialDrawing={draft.current.drawings[field.id]}
+                  onDrawingSave={(drawing) => {
+                    setPendingDrawings((pending) => {
+                      const next = new Set(pending);
+                      next.delete(field.id);
+                      return next;
+                    });
+                    const drawings = { ...draft.current.drawings };
+                    if (drawing) drawings[field.id] = drawing;
+                    else delete drawings[field.id];
+                    saveDraft({ drawings, teamName });
+                  }}
+                  onRestoreComplete={(success) => {
+                    if (success)
+                      setPendingDrawings((pending) => {
+                        const next = new Set(pending);
+                        next.delete(field.id);
+                        return next;
+                      });
+                    else
+                      setDraftError(
+                        "A saved drawing could not load. Reload or redraw it before submitting.",
+                      );
+                  }}
                   canvasRef={mapRef}
                   canvasKey={canvasKey}
                   onDrawingChange={(hasDrawing) => {
@@ -504,18 +651,25 @@ function EntryDraft({
       <Button
         variant="primary"
         type="submit"
-        disabled={saving || !!blocked || (form.kind === "scouting" && scheduleUnavailable)}
+        disabled={
+          saving ||
+          !!blocked ||
+          pendingDrawings.size > 0 ||
+          (form.kind === "scouting" && scheduleUnavailable)
+        }
       >
         <Check size={17} />{" "}
-        {saving
-          ? "Submitting…"
-          : form.kind === "scouting" && scheduleUnavailable
-            ? "Waiting for schedule"
-            : form.kind === "scouting" && (submitted || context?.hasSubmittedCurrentMatch)
-              ? "Already submitted"
-              : form.kind === "scouting" && !teamName
-                ? "Waiting for team"
-                : "Submit report"}
+        {pendingDrawings.size > 0
+          ? "Restoring drawings…"
+          : saving
+            ? "Submitting…"
+            : form.kind === "scouting" && scheduleUnavailable
+              ? "Waiting for schedule"
+              : form.kind === "scouting" && (submitted || context?.hasSubmittedCurrentMatch)
+                ? "Already submitted"
+                : form.kind === "scouting" && !teamName
+                  ? "Waiting for team"
+                  : "Submit report"}
       </Button>
       {message && (
         <div className={`status-toast ${messageType}`} role="status" aria-live="polite">
@@ -1959,9 +2113,11 @@ function EventStatus({
 }
 
 export function ScoutingForms({
+  scoutId,
   isAdmin,
   canManageServiceCrew,
 }: {
+  scoutId: string;
   isAdmin: boolean;
   canManageServiceCrew: boolean;
 }) {
@@ -2135,6 +2291,7 @@ export function ScoutingForms({
           <>
             {contextError && selected.kind === "scouting" && <ErrorBanner message={contextError} />}
             <EntryForm
+              scoutId={scoutId}
               key={selected.id}
               form={selected}
               context={context}

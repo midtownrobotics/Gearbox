@@ -311,23 +311,23 @@ function TierLists() {
     setNewItem("");
   }
 
-  function drop(targetTierId: string, targetIndex?: number) {
-    if (!dragged) return;
+  function drop(targetTierId: string, targetIndex?: number, source = dragged) {
+    if (!source) return;
     setCurrent((value) => ({
       ...value,
       tiers: value.tiers.map((tier) => {
         if (tier.id === targetTierId) {
-          const sourceIndex = tier.items.indexOf(dragged.item);
-          const items = tier.items.filter((item) => item !== dragged.item);
+          const sourceIndex = tier.items.indexOf(source.item);
+          const items = tier.items.filter((item) => item !== source.item);
           let insertAt = targetIndex ?? tier.items.length;
-          if (tier.id === dragged.tierId && sourceIndex >= 0 && sourceIndex < insertAt) {
+          if (tier.id === source.tierId && sourceIndex >= 0 && sourceIndex < insertAt) {
             insertAt--;
           }
-          items.splice(insertAt, 0, dragged.item);
+          items.splice(insertAt, 0, source.item);
           return { ...tier, items };
         }
-        if (tier.id === dragged.tierId) {
-          return { ...tier, items: tier.items.filter((item) => item !== dragged.item) };
+        if (tier.id === source.tierId) {
+          return { ...tier, items: tier.items.filter((item) => item !== source.item) };
         }
         return tier;
       }),
@@ -484,6 +484,38 @@ function TierLists() {
                     }}
                   >
                     <span>{item}</span>
+                    <div className="tier-move-controls" draggable={false}>
+                      <button
+                        type="button"
+                        disabled={index === 0}
+                        aria-label={`Move ${item} left`}
+                        onClick={() => drop(tier.id, index - 1, { tierId: tier.id, item })}
+                      >
+                        ←
+                      </button>
+                      <button
+                        type="button"
+                        disabled={index === tier.items.length - 1}
+                        aria-label={`Move ${item} right`}
+                        onClick={() => drop(tier.id, index + 2, { tierId: tier.id, item })}
+                      >
+                        →
+                      </button>
+                      <select
+                        className={inputClass}
+                        value={tier.id}
+                        aria-label={`Move ${item} to tier`}
+                        onChange={(event) =>
+                          drop(event.target.value, undefined, { tierId: tier.id, item })
+                        }
+                      >
+                        {current.tiers.map((target) => (
+                          <option key={target.id} value={target.id}>
+                            {target.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                     <button
                       type="button"
                       aria-label={`Remove ${item}`}
@@ -2219,6 +2251,8 @@ export function App() {
         <AnnouncementBanner />
         {visiblePage === "forms" && (
           <ScoutingForms
+            key={user.userId}
+            scoutId={user.userId}
             isAdmin={user.isAdmin}
             canManageServiceCrew={user.isAdmin || user.isHelper}
           />

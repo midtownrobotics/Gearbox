@@ -8595,6 +8595,29 @@
     white-space: normal;
     overflow-wrap: anywhere;
   }
+  .tier-move-controls {
+    display: flex;
+    align-items: center;
+    gap: .25rem;
+  }
+  .tier-move-controls button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .tier-move-controls select {
+    width: auto;
+    max-width: 7rem;
+    min-height: 44px;
+  }
+  @media (any-pointer: coarse) {
+    .scouting-content .tier-chip {
+      flex-wrap: wrap;
+    }
+    .tier-move-controls {
+      flex-basis: 100%;
+      order: 1;
+    }
+  }
   .scouting-content .tier-chip > button {
     flex-shrink: 0;
     min-width: 32px;
