@@ -43,6 +43,8 @@ let rioCheck: Promise<void> | null = null;
 let lastRioCheck = 0;
 /** While on the robot's network, its logs are listed again this often: new matches, or a retry. */
 const kRioCheckMs = 30_000;
+/** A copy that moves no bytes for this long is stopped (and tried again at the next check). */
+const kStallMs = 30_000;
 let lastStatusReport = 0;
 let lastGearboxLogsCheck = 0;
 let uploadingRunning = false;
@@ -205,6 +207,8 @@ async function logicLoop() {
   if (onNetwork !== robotConnected) {
     logWithTimestamp(onNetwork ? "Robot network found." : "Robot network lost.");
     robotConnected = onNetwork;
+    // A copy in progress can't finish now: closing the connection ends it at once.
+    if (!onNetwork) ssh.dispose();
     rioReachable = null;
     lastRioCheck = 0;
   }
@@ -256,6 +260,11 @@ async function downloadLogs(rioIp: string) {
       host: rioIp,
       username: "admin",
       password: "",
+      readyTimeout: 10_000,
+      // A network that goes away mid-copy closes the connection (about 15 s), instead of
+      // leaving the copy waiting forever.
+      keepaliveInterval: 5_000,
+      keepaliveCountMax: 3,
     });
   } catch (err) {
     // Said once, not on every try while it doesn't answer.
@@ -264,6 +273,8 @@ async function downloadLogs(rioIp: string) {
   }
 
   const foundOnRio: typeof rioLogs = [];
+  /** The connection closed midway: what was found isn't the whole list. */
+  let cutOff = false;
 
   try {
     const sftp = await ssh.requestSFTP();
@@ -276,7 +287,7 @@ async function downloadLogs(rioIp: string) {
         ),
       );
 
-    for (const origin of kRioLogDirs) {
+    origins: for (const origin of kRioLogDirs) {
       const res = await readdirAsync(origin).catch(() =>
         logWithTimestamp(`Could not read dir: ${origin}`),
       );
@@ -318,14 +329,38 @@ async function downloadLogs(rioIp: string) {
         if (!logs.some((l) => l.id === log.id && l.status.downloaded)) {
           logWithTimestamp(`Copying ${log.name} off the robot.`);
           downloadingIds.push(log.id);
+          // Copied beside the log, then renamed: a copy cut off midway never looks like a log.
+          const localPath = localPathOf(log);
+          const partPath = `${localPath}.part`;
+          // A copy that stops moving (or the robot's network going) closes the connection, which
+          // ends the copy as a failure; the next check copies it again.
+          let lastProgress = Date.now();
+          const watchdog = setInterval(() => {
+            if (!robotConnected || Date.now() - lastProgress > kStallMs) ssh.dispose();
+          }, 1000);
           try {
-            const localPath = localPathOf(log);
             fs.mkdirSync(path.dirname(localPath), { recursive: true });
-            await ssh.getFile(localPath, log.locations.rio.path);
+            await ssh.getFile(partPath, log.locations.rio.path, null, {
+              step: () => {
+                lastProgress = Date.now();
+              },
+            });
+            fs.renameSync(partPath, localPath);
             logs.push(log);
           } catch (err) {
-            logWithTimestamp(`Could not download log file: ${log.id}`);
+            fs.rmSync(partPath, { force: true });
+            logWithTimestamp(
+              robotConnected
+                ? `Could not copy ${log.name} off the robot. Trying again soon.`
+                : `Copying ${log.name} stopped: the robot's network is gone.`,
+            );
+            // The connection is gone with it: the rest wait for the next check.
+            if (!ssh.isConnected()) {
+              cutOff = true;
+              break origins;
+            }
           } finally {
+            clearInterval(watchdog);
             downloadingIds = downloadingIds.filter((id) => id !== log.id);
           }
         }
@@ -337,6 +372,7 @@ async function downloadLogs(rioIp: string) {
   } finally {
     ssh.dispose();
   }
+  if (cutOff) return false;
 
   rioLogs = foundOnRio;
   rioLogsCheckedAt = Date.now();
