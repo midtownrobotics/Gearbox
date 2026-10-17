@@ -37,13 +37,21 @@ export function automaticTbaMatch(
   matches: TbaMatch[],
   windowSeconds = DEFAULT_SUBMISSION_WINDOW,
   now = Math.floor(Date.now() / 1000),
+  minimumMatchNumber: number | null = null,
 ) {
   const qualifications = matches
     .filter((match) => match.comp_level === "qm")
     .sort((left, right) => matchOrder(left) - matchOrder(right));
-  const ordered = qualifications.length
-    ? qualifications
-    : [...matches].sort((left, right) => matchOrder(left) - matchOrder(right));
+  const ordered = (
+    qualifications.length
+      ? qualifications
+      : [...matches].sort((left, right) => matchOrder(left) - matchOrder(right))
+  ).filter(
+    (match) =>
+      match.comp_level !== "qm" ||
+      minimumMatchNumber === null ||
+      match.match_number >= minimumMatchNumber,
+  );
   if (!ordered.length) return undefined;
   for (let index = 0; index < ordered.length - 1; index += 1) {
     const match = ordered[index];
@@ -51,4 +59,30 @@ export function automaticTbaMatch(
     if (closesAt === null || now * 1000 < closesAt) return match;
   }
   return ordered.at(-1);
+}
+
+/** Allow the live match and its immediate successor, without a start-time submission gate. */
+export function nextScoutMatch(
+  matches: TbaMatch[],
+  current: TbaMatch | undefined,
+  submitted: Set<number>,
+  windowSeconds = DEFAULT_SUBMISSION_WINDOW,
+  now = Date.now(),
+) {
+  if (!current) return undefined;
+  const remaining = matches
+    .filter(
+      (match) =>
+        match.comp_level === current.comp_level && matchOrder(match) >= matchOrder(current),
+    )
+    .sort((left, right) => matchOrder(left) - matchOrder(right))
+    .slice(0, 2);
+  return (
+    remaining.find((match) => {
+      const closesAt = matchSubmissionClosesAt(match, windowSeconds);
+      return !submitted.has(match.match_number) && (closesAt === null || now < closesAt);
+    }) ??
+    remaining.at(-1) ??
+    current
+  );
 }

@@ -231,10 +231,12 @@ function EntryForm({
   form,
   context,
   refreshContext,
+  scheduleUnavailable,
 }: {
   form: ScoutingForm;
   context: EventContext | null;
   refreshContext: () => Promise<void>;
+  scheduleUnavailable: boolean;
 }) {
   // A new assignment always starts with an empty draft, including every canvas.
   const assignment =
@@ -247,6 +249,7 @@ function EntryForm({
       form={form}
       context={context}
       refreshContext={refreshContext}
+      scheduleUnavailable={scheduleUnavailable}
     />
   );
 }
@@ -255,10 +258,12 @@ function EntryDraft({
   form,
   context,
   refreshContext,
+  scheduleUnavailable,
 }: {
   form: ScoutingForm;
   context: EventContext | null;
   refreshContext: () => Promise<void>;
+  scheduleUnavailable: boolean;
 }) {
   const [teamName, setTeamName] = useState(
     form.kind === "scouting" ? (context?.assignedTeam ?? "") : "",
@@ -267,26 +272,36 @@ function EntryDraft({
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState<"success" | "error">("success");
   const [saving, setSaving] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
   const [canvasKey, setCanvasKey] = useState(0);
   const canvases = useRef<Record<string, HTMLCanvasElement | null>>({});
   const canvasAdapters = useRef<Record<string, RefObject<HTMLCanvasElement | null>>>({});
   const drawnFields = useRef(new Set<string>());
   const mounted = useRef(true);
   const expiredRef = useRef(false);
+  const expiredContext = useRef<number | undefined>(undefined);
   const [expired, setExpired] = useState(false);
   const [, tick] = useState(0);
   const currentMatch = context?.currentMatch ?? null;
   const closesAt = context?.submissionClosesAt ?? null;
-  const clockOffset = useMemo(
-    () => (context?.serverNow ? context.serverNow - Date.now() : 0),
+  const clock = useMemo(
+    () => ({ time: context?.serverNow ?? Date.now(), started: performance.now() }),
     [context?.serverNow],
   );
+  const serverNow = useCallback(() => clock.time + performance.now() - clock.started, [clock]);
+  const remainingSeconds =
+    closesAt === null ? 0 : Math.max(0, Math.ceil((closesAt - serverNow()) / 1000));
   const isExpired = () =>
     form.kind === "scouting" &&
-    (expiredRef.current || (closesAt !== null && Date.now() + clockOffset >= closesAt));
+    (expiredRef.current || (closesAt !== null && serverNow() >= closesAt));
   const blocked =
     form.kind === "scouting" &&
-    (expired || isExpired() || !currentMatch || !teamName || context?.hasSubmittedCurrentMatch);
+    (expired ||
+      isExpired() ||
+      !currentMatch ||
+      !teamName ||
+      submitted ||
+      context?.hasSubmittedCurrentMatch);
   useEffect(() => {
     mounted.current = true;
     return () => {
@@ -294,11 +309,25 @@ function EntryDraft({
     };
   }, []);
   useEffect(() => {
-    if (form.kind !== "scouting" || closesAt === null) return;
+    if (form.kind !== "scouting") return;
+    // A fresh server response can extend a cutoff or correct the device clock.
+    // Reopen an empty form; never restore answers cleared at the old deadline.
+    if (
+      expiredRef.current &&
+      context?.serverNow !== expiredContext.current &&
+      context?.assignedTeam &&
+      (closesAt === null || serverNow() < closesAt)
+    ) {
+      expiredRef.current = false;
+      setExpired(false);
+      setTeamName(context.assignedTeam);
+    }
+    if (closesAt === null) return;
     function checkDeadline() {
       tick((value) => value + 1);
-      if (Date.now() + clockOffset < (closesAt as number) || expiredRef.current) return;
+      if (serverNow() < (closesAt as number) || expiredRef.current) return;
       expiredRef.current = true;
+      expiredContext.current = context?.serverNow;
       setExpired(true);
       setTeamName("");
       setAnswers({});
@@ -316,10 +345,11 @@ function EntryDraft({
       window.removeEventListener("focus", checkDeadline);
       document.removeEventListener("visibilitychange", checkDeadline);
     };
-  }, [form.kind, closesAt, clockOffset, refreshContext]);
+  }, [form.kind, closesAt, serverNow, refreshContext, context?.serverNow, context?.assignedTeam]);
   async function submit(event: SyntheticEvent) {
     event.preventDefault();
-    if (saving || blocked || isExpired()) return;
+    if (saving || blocked || isExpired() || (form.kind === "scouting" && scheduleUnavailable))
+      return;
     setSaving(true);
     setMessage("");
     try {
@@ -340,12 +370,13 @@ function EntryDraft({
       if (!mounted.current || isExpired()) return;
       await api(`/scouting-forms/${form.id}/submissions`, { method: "POST", body: payload });
       if (!mounted.current || isExpired()) return;
+      if (form.kind === "scouting") setSubmitted(true);
       setAnswers({});
       drawnFields.current.clear();
       setCanvasKey((value) => value + 1);
       setMessageType("success");
       setMessage("Report submitted.");
-      await refreshContext();
+      await refreshContext().catch(() => {});
     } catch (error) {
       if (!mounted.current || isExpired()) return;
       setMessageType("error");
@@ -412,13 +443,7 @@ function EntryDraft({
               </strong>
               .{" "}
               <span role="timer" aria-live="off">
-                {Math.floor(
-                  Math.max(0, Math.ceil((closesAt - Date.now() - clockOffset) / 1000)) / 60,
-                )}
-                :
-                {String(
-                  Math.max(0, Math.ceil((closesAt - Date.now() - clockOffset) / 1000)) % 60,
-                ).padStart(2, "0")}{" "}
+                {Math.floor(remainingSeconds / 60)}:{String(remainingSeconds % 60).padStart(2, "0")}{" "}
                 remaining.
               </span>{" "}
               Answers and drawings reset when time runs out.
@@ -476,15 +501,21 @@ function EntryDraft({
           })}
         </div>
       </fieldset>
-      <Button variant="primary" type="submit" disabled={saving || !!blocked}>
+      <Button
+        variant="primary"
+        type="submit"
+        disabled={saving || !!blocked || (form.kind === "scouting" && scheduleUnavailable)}
+      >
         <Check size={17} />{" "}
         {saving
           ? "Submitting…"
-          : form.kind === "scouting" && context?.hasSubmittedCurrentMatch
-            ? "Already submitted"
-            : form.kind === "scouting" && !teamName
-              ? "Waiting for team"
-              : "Submit report"}
+          : form.kind === "scouting" && scheduleUnavailable
+            ? "Waiting for schedule"
+            : form.kind === "scouting" && (submitted || context?.hasSubmittedCurrentMatch)
+              ? "Already submitted"
+              : form.kind === "scouting" && !teamName
+                ? "Waiting for team"
+                : "Submit report"}
       </Button>
       {message && (
         <div className={`status-toast ${messageType}`} role="status" aria-live="polite">
@@ -1957,11 +1988,25 @@ export function ScoutingForms({
       )
       .finally(() => setLoading(false));
   }, [load]);
+  const contextRequest = useRef(0);
+  const [contextError, setContextError] = useState("");
+  const refreshContext = useCallback(async () => {
+    const request = ++contextRequest.current;
+    // A poll started before submission must not restore the completed match.
+    try {
+      const next = await api<EventContext>("/event-context?assign=true", { cache: "no-store" });
+      if (request === contextRequest.current) {
+        setContext(next);
+        setContextError("");
+      }
+    } catch (error) {
+      if (request === contextRequest.current)
+        setContextError("Could not refresh the match schedule. Retrying.");
+      throw error;
+    }
+  }, []);
   useEffect(() => {
-    const loadMatch = () =>
-      api<EventContext>("/event-context?assign=true")
-        .then(setContext)
-        .catch(() => undefined);
+    const loadMatch = () => refreshContext().catch(() => undefined);
     loadMatch();
     const interval = window.setInterval(() => {
       if (document.visibilityState === "visible") loadMatch();
@@ -1976,7 +2021,7 @@ export function ScoutingForms({
       window.removeEventListener("focus", resume);
       document.removeEventListener("visibilitychange", resume);
     };
-  }, []);
+  }, [refreshContext]);
   useEffect(() => {
     document.body.classList.toggle("scouting-workspace-open", isFullscreen);
     if (!isFullscreen) return;
@@ -2087,14 +2132,16 @@ export function ScoutingForms({
             }}
           />
         ) : (
-          <EntryForm
-            key={selected.id}
-            form={selected}
-            context={context}
-            refreshContext={async () => {
-              setContext(await api<EventContext>("/event-context?assign=true"));
-            }}
-          />
+          <>
+            {contextError && selected.kind === "scouting" && <ErrorBanner message={contextError} />}
+            <EntryForm
+              key={selected.id}
+              form={selected}
+              context={context}
+              refreshContext={refreshContext}
+              scheduleUnavailable={!!contextError}
+            />
+          </>
         ))}
       {selected?.kind === "pit" &&
         (canManageServiceCrew ? <Operations embedded /> : <ServiceIssueReport />)}

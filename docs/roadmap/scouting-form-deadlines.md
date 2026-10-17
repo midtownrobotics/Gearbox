@@ -4,6 +4,8 @@ Match forms now show the team's configured submission window (120 seconds by def
 
 At expiry, the draft's answers, counters, selections and drawings clear, the assigned team clears, and submission locks while the page refreshes its assignment. A changed match or assigned team mounts an empty draft. Returning to the page refreshes assignments immediately. Pit forms do not reset with match timing.
 
+After a successful submission in TBA mode, the scout immediately receives their next unsubmitted match instead of waiting for the shared cutoff. Its own timing applies to the empty new draft; other scouts retain their current match until they submit or its deadline passes. See [next-match regression validation](scouting-next-match-validation.md).
+
 Normal match submissions must include `matchKey` and the assigned `teamName`. The worker checks the current schedule, cutoff and assignment, and repeats those checks after drawing uploads. Rejected uploads are removed. An old draft is never silently reassigned to a new match or team. Previously loaded clients without `matchKey` receive a refresh error; reloading loads the updated form. Existing saved reports and settings are preserved, with no new migration.
 
 Validation on 16 October 2026:
