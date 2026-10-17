@@ -174,3 +174,39 @@ export const matchLogs = sqliteTable(
   },
   (t) => [uniqueIndex("match_logs_name_idx").on(t.teamId, t.event, t.name)],
 );
+
+/**
+ * AdvantageScope Lite's preferences and layout for the team (migration 0016,
+ * ../advantagescope.ts): each value it would keep in localStorage, by its key.
+ */
+export const scopeSettings = sqliteTable(
+  "scope_settings",
+  {
+    teamId: text("team_id").notNull(),
+    key: text("key").notNull(),
+    value: text("value").notNull(),
+    updatedBy: text("updated_by").notNull(),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.teamId, t.key] })],
+);
+
+/** A field, robot or joystick asset the team uploaded to AdvantageScope, its files in LOGS. */
+export const scopeAssets = sqliteTable(
+  "scope_assets",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    teamId: text("team_id").notNull(),
+    /** The asset's folder name ("Robot_Comet"), which says its kind. */
+    name: text("name").notNull(),
+    /** JSON: [{ name, size }], the files under the asset's R2 prefix. */
+    files: text("files").notNull(),
+    /** JSON: its config.json. */
+    config: text("config").notNull(),
+    /** Bytes, all its files. */
+    size: integer("size").notNull(),
+    uploadedBy: text("uploaded_by").notNull(),
+    uploadedAt: integer("uploaded_at").notNull(),
+  },
+  (t) => [uniqueIndex("scope_assets_name_idx").on(t.teamId, t.name)],
+);
