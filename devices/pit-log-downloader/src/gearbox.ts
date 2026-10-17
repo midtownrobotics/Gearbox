@@ -5,6 +5,7 @@
 // user) and sent as `Authorization: Bearer <key>` to Pit's /api/downloader/* routes.
 
 import * as fs from "node:fs";
+import * as net from "node:net";
 import * as os from "node:os";
 import * as path from "node:path";
 import { type TeamUiSettings, teamUiDefaults } from "@g3/site-config";
@@ -26,6 +27,11 @@ const kPairingFile = path.join(config.dataDir, "gearbox.json");
 const kAppearanceFile = path.join(config.dataDir, "appearance.json");
 const kAppearanceMaxAgeMs = 60_000;
 const kTimeoutMs = 10_000;
+
+// Node tries each of a host's addresses for only 250 ms before the next one. On a pit or school
+// network with no IPv6 and a slow first connect, every address fails and Gearbox looks offline
+// while a browser reaches it fine. Give each address 2 seconds instead.
+net.setDefaultAutoSelectFamilyAttemptTimeout(2_000);
 
 let pairing: Pairing | null = load();
 let connection: GearboxStatus["connection"] = null;
@@ -123,7 +129,8 @@ export async function pairWithGearbox(teamNumber: number, code: string, name: st
       method: "POST",
       body: JSON.stringify({ code, name: name.trim() || defaultName() }),
     });
-  } catch {
+  } catch (error) {
+    console.warn(`[gearbox] couldn't reach ${pitUrl}:`, (error as Error).cause ?? error);
     throw new PairingError(`Couldn't reach Gearbox at ${pitUrl}. Check the internet connection.`);
   }
   const body = (await res.json().catch(() => null)) as {
