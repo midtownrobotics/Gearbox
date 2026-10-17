@@ -1,0 +1,236 @@
+diff --git a/src/hub/Sidebar.ts b/src/hub/Sidebar.ts
+index 9a7924f..4a224c6 100644
+--- a/src/hub/Sidebar.ts
++++ b/src/hub/Sidebar.ts
+@@ -703,8 +703,13 @@ export default class Sidebar {
+       // Search expand callback
+       let highlightForSearch = () => {
+         if (this.searchKey !== null && field.fullKey === this.searchKey) {
+-          // @ts-expect-error
+-          fieldElement.scrollIntoViewIfNeeded(); // Available in Chromium but not standard
++          // Gearbox: Firefox and Safari don't have it; there, the standard call scrolls only as needed.
++          if ("scrollIntoViewIfNeeded" in fieldElement) {
++            // @ts-expect-error
++            fieldElement.scrollIntoViewIfNeeded(); // Available in Chromium but not standard
++          } else {
++            (fieldElement as HTMLElement).scrollIntoView({ block: "nearest" });
++          }
+           fieldElementContainer.classList.add("highlight");
+           setTimeout(() => fieldElementContainer.classList.remove("highlight"), 3000);
+         }
+diff --git a/src/main/lite/assetLoader.ts b/src/main/lite/assetLoader.ts
+index cb79b2d..e0a7b4d 100644
+--- a/src/main/lite/assetLoader.ts
++++ b/src/main/lite/assetLoader.ts
+@@ -18,10 +18,34 @@ export async function loadAssets(): Promise<AdvantageScopeAssets> {
+     loadFailures: []
+   };
+ 
+-  // Request asset index
+-  let response = await fetch("assets");
+-  let assetIndex = await response.json();
++  // Gearbox: the assets built in, as static files, then the team's own uploads, kept by Pit. One
++  // the team uploaded replaces the built-in one with the same name.
+   let currentPath = window.location.pathname;
++  let assetIndex: { [path: string]: any } = {};
++  let assetBase: { [name: string]: string } = {};
++  for (let [indexUrl, base] of [
++    ["bundledAssets/index.json", currentPath + "bundledAssets/"],
++    ["/api/scope/assets", "/api/scope/assets/"]
++  ]) {
++    let index: { [path: string]: any };
++    try {
++      let response = await fetch(indexUrl);
++      if (!response.ok) continue;
++      index = await response.json();
++    } catch (e) {
++      continue;
++    }
++    for (let path of Object.keys(index)) {
++      let name = path.split("/")[0];
++      if (assetBase[name] !== base) {
++        for (let old of Object.keys(assetIndex)) {
++          if (old.split("/")[0] === name) delete assetIndex[old];
++        }
++        assetBase[name] = base;
++      }
++      assetIndex[path] = index[path];
++    }
++  }
+ 
+   // Filter and sort index
+   let configPaths = Object.keys(assetIndex)
+@@ -45,7 +69,7 @@ export async function loadAssets(): Promise<AdvantageScopeAssets> {
+       } else if (config === "invalid") {
+         return;
+       }
+-      config.path = currentPath + `assets/${encodeURIComponent(name)}/image.png`;
++      config.path = assetBase[name] + `${encodeURIComponent(name)}/image.png`;
+       if (`${name}/image.png` in assetIndex) {
+         assets.field2ds.push(config);
+         assets.loadFailures.splice(assets.loadFailures.indexOf(name), 1);
+@@ -59,7 +83,7 @@ export async function loadAssets(): Promise<AdvantageScopeAssets> {
+       } else if (config === "invalid") {
+         return;
+       }
+-      config.path = currentPath + `assets/${encodeURIComponent(name)}/model.glb`;
++      config.path = assetBase[name] + `${encodeURIComponent(name)}/model.glb`;
+       if (
+         `${name}/model.glb` in assetIndex &&
+         config.gamePieces.every((_, index) => `${name}/model_${index}.glb` in assetIndex)
+@@ -71,7 +95,7 @@ export async function loadAssets(): Promise<AdvantageScopeAssets> {
+       // ***** 3D ROBOT *****
+       let config = parseRobot(configRaw);
+       if (config === "invalid") return;
+-      config.path = currentPath + `assets/${encodeURIComponent(name)}/model.glb`;
++      config.path = assetBase[name] + `${encodeURIComponent(name)}/model.glb`;
+       if (
+         `${name}/model.glb` in assetIndex &&
+         config.components.every((_, index) => `${name}/model_${index}.glb` in assetIndex)
+@@ -83,7 +107,7 @@ export async function loadAssets(): Promise<AdvantageScopeAssets> {
+       // ***** JOYSTICK *****
+       let config = parseJoystick(configRaw);
+       if (config === "invalid") return;
+-      config.path = currentPath + `assets/${encodeURIComponent(name)}/image.png`;
++      config.path = assetBase[name] + `${encodeURIComponent(name)}/image.png`;
+       if (`${name}/image.png` in assetIndex) {
+         assets.joysticks.push(config);
+         assets.loadFailures.splice(assets.loadFailures.indexOf(name), 1);
+diff --git a/src/main/lite/main.ts b/src/main/lite/main.ts
+index f8e6a0d..0ef2333 100644
+--- a/src/main/lite/main.ts
++++ b/src/main/lite/main.ts
+@@ -32,6 +32,7 @@ import { GITHUB_REPOSITORY } from "../github";
+ import { loadAssets } from "./assetLoader";
+ import { isAlpha, isBeta, isBetaExpired, isBetaWelcomeComplete, saveBetaWelcomeComplete } from "./betaUtil";
+ import { LocalStorageKeys } from "./localStorageKeys";
++import { localStorage, storageReady } from "./teamStorage";
+ 
+ let HUB_FRAME: HTMLIFrameElement;
+ let POPUP_FRAME: HTMLIFrameElement;
+@@ -191,7 +192,7 @@ function openDownload() {
+         let updateList = async () => {
+           let response: Response;
+           try {
+-            response = await fetch(`logs?folder=${encodeURIComponent(path)}`);
++            response = await fetch(`/api/scope/logs?folder=${encodeURIComponent(path)}`);
+           } catch (e) {
+             sendMessage(port, "show-error", "Fetch failed");
+             return;
+@@ -238,6 +239,10 @@ async function openUploadAsset() {
+ }
+ 
+ async function initHub() {
++  // Gearbox: the team's settings and the assets before the hub is connected, which then saves its
++  // state every 250 ms: connected first, its empty state would replace the team's before it's read.
++  await Promise.all([storageReady, assetsPromise]);
++
+   // Create message ports
+   const channel = new MessageChannel();
+   HUB_FRAME.contentWindow?.postMessage("port", "*", [channel.port1]);
+@@ -265,6 +270,13 @@ async function initHub() {
+   if (state !== null) sendMessage(hubPort, "restore-state", JSON.parse(state));
+   sendMessage(hubPort, "show-when-ready");
+ 
++  // Gearbox: Pit's Logs page opens a match log here with ?log=<file name>.
++  let log = new URLSearchParams(location.search).get("log");
++  if (log !== null) {
++    history.replaceState(null, "", location.pathname);
++    sendMessage(hubPort, "open-files", { files: [log], merge: false });
++  }
++
+   // Add cursor event handlers
+   HUB_FRAME.contentWindow?.addEventListener("contextmenu", (event) => {
+     event.preventDefault();
+@@ -333,7 +345,7 @@ async function handleHubMessage(message: NamedMessage) {
+         let prefsRaw = localStorage.getItem(LocalStorageKeys.PREFS);
+         if (prefsRaw !== null) mergePreferences(prefs, JSON.parse(prefsRaw));
+ 
+-        let response = await fetch(`logs/${encodeURIComponent(path)}?folder=${encodeURIComponent(prefs.remotePath)}`);
++        let response = await fetch(`/api/scope/logs/${encodeURIComponent(path)}?folder=${encodeURIComponent(prefs.remotePath)}`);
+         let buffer = await response.arrayBuffer();
+         let array = new Uint8Array(buffer);
+ 
+diff --git a/src/main/lite/teamStorage.ts b/src/main/lite/teamStorage.ts
+new file mode 100644
+index 0000000..4b91ca1
+--- /dev/null
++++ b/src/main/lite/teamStorage.ts
+@@ -0,0 +1,64 @@
++// Gearbox: AdvantageScope Lite's preferences and layout belong to the team, not to one browser.
++// Pit keeps them (GET/PUT /api/scope/settings), and main.ts reads and writes them through this
++// `localStorage` in place of the browser's.
++
++const ENDPOINT = "/api/scope/settings";
++const SAVE_DELAY_MS = 1000;
++
++const values = new Map<string, string>();
++const unsaved = new Map<string, string>();
++let loaded = false;
++let saveTimer: number | null = null;
++
++/** Resolves once the team's settings are in (or couldn't be read: then nothing is saved). */
++export const storageReady: Promise<void> = (async () => {
++  try {
++    const response = await fetch(ENDPOINT, { credentials: "same-origin" });
++    if (response.status === 401) {
++      // Signed out: to the team's sign-in page, coming back here.
++      location.replace("/api/scope/sign-in?return=" + encodeURIComponent(location.href));
++      await new Promise(() => {});
++    }
++    if (!response.ok) return;
++    const body = (await response.json()) as { settings: { [key: string]: string } };
++    for (const [key, value] of Object.entries(body.settings)) values.set(key, value);
++    loaded = true;
++  } catch {
++    // Offline: the defaults, without overwriting what the team has saved.
++  }
++})();
++
++function save(keepalive = false) {
++  if (saveTimer !== null) {
++    window.clearTimeout(saveTimer);
++    saveTimer = null;
++  }
++  if (unsaved.size === 0) return;
++  const body = JSON.stringify({ settings: Object.fromEntries(unsaved) });
++  unsaved.clear();
++  fetch(ENDPOINT, {
++    method: "PUT",
++    credentials: "same-origin",
++    headers: { "Content-Type": "application/json" },
++    body: body,
++    keepalive: keepalive && body.length < 60000
++  }).catch(() => {});
++}
++
++window.addEventListener("pagehide", () => save(true));
++document.addEventListener("visibilitychange", () => {
++  if (document.visibilityState === "hidden") save(true);
++});
++
++export const localStorage = {
++  getItem(key: string): string | null {
++    return values.get(key) ?? null;
++  },
++  setItem(key: string, value: string) {
++    if (values.get(key) === value) return;
++    values.set(key, value);
++    if (!loaded) return;
++    unsaved.set(key, value);
++    if (saveTimer === null) saveTimer = window.setTimeout(() => save(), SAVE_DELAY_MS);
++  }
++};
+diff --git a/src/uploadAsset.ts b/src/uploadAsset.ts
+index 207bf5a..931e2a9 100644
+--- a/src/uploadAsset.ts
++++ b/src/uploadAsset.ts
+@@ -29,7 +29,7 @@ window.addEventListener("message", (event) => {
+   function confirm() {
+     if (ASSET_INPUT.files !== null && ASSET_INPUT.files.length > 0) {
+       PROGRESS_TEXT.innerText = "Uploading file...";
+-      const API_ENDPOINT = "../uploadAsset";
++      const API_ENDPOINT = "/api/scope/assets";
+       const request = new XMLHttpRequest();
+       const formData = new FormData();
+ 

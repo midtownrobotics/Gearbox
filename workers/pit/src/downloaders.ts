@@ -80,6 +80,24 @@ export const requireDownloader = createMiddleware<AppEnv>(async (c, next) => {
   await next();
 });
 
+/** What a downloader last said it was doing (POST /downloader/status). */
+export type DownloaderStatus = {
+  /** On the robot's network. */
+  robot: boolean;
+  /** Whether it reached the roboRIO when it last tried, while on its network; null before. */
+  rioReachable: boolean | null;
+  /** Logs it's copying off the robot now. */
+  copying: number;
+  /** The log it's uploading to Pit now ("Qual-13"), or null. */
+  uploading: string | null;
+  /** Logs waiting to upload. */
+  pendingUpload: number;
+  version: string;
+};
+
+/** A downloader that said what it was doing this recently is online (it says every 10 s). */
+export const ONLINE_MS = 45_000;
+
 /** The team's paired downloaders, as Pit's Logs page lists them (never a key's hash). */
 export type LogDownloader = {
   id: number;
@@ -88,6 +106,10 @@ export type LogDownloader = {
   pairedByName: string;
   pairedAt: number;
   lastSeenAt: number | null;
+  /** What it last said it was doing, and whether that was recent enough to say it's online. */
+  status: DownloaderStatus | null;
+  statusAt: number | null;
+  online: boolean;
 };
 
 const listColumns = {
@@ -97,17 +119,53 @@ const listColumns = {
   pairedByName: logDownloaders.pairedByName,
   pairedAt: logDownloaders.pairedAt,
   lastSeenAt: logDownloaders.lastSeenAt,
+  status: logDownloaders.status,
+  statusAt: logDownloaders.statusAt,
 };
+
+/** A status as the downloader sent it, or null when it isn't one. */
+function parseStatus(body: unknown): DownloaderStatus | null {
+  const b = body as Record<string, unknown> | null;
+  if (!b || typeof b !== "object") return null;
+  const count = (v: unknown) => (Number.isInteger(v) && (v as number) >= 0 ? (v as number) : null);
+  const copying = count(b.copying);
+  const pendingUpload = count(b.pendingUpload);
+  if (
+    typeof b.robot !== "boolean" ||
+    !(b.rioReachable === null || typeof b.rioReachable === "boolean") ||
+    copying === null ||
+    pendingUpload === null ||
+    !(b.uploading === null || (typeof b.uploading === "string" && b.uploading.length <= 40)) ||
+    typeof b.version !== "string" ||
+    b.version.length > 40
+  ) {
+    return null;
+  }
+  return {
+    robot: b.robot,
+    rioReachable: b.rioReachable,
+    copying,
+    uploading: b.uploading,
+    pendingUpload,
+    version: b.version,
+  };
+}
 
 /** Pit's side: list, get a pairing code, remove (`/downloaders`). */
 export const downloaderRoutes = new Hono<AppEnv>()
   .get("/", requireAuth, async (c) => {
     const db = createDb(c.env.PIT_DB);
-    const downloaders: LogDownloader[] = await db
+    const rows = await db
       .select(listColumns)
       .from(logDownloaders)
       .where(inTeam(logDownloaders, c.get("teamId")))
       .orderBy(desc(logDownloaders.pairedAt));
+    const now = Date.now();
+    const downloaders: LogDownloader[] = rows.map((row) => ({
+      ...row,
+      status: row.status ? (JSON.parse(row.status) as DownloaderStatus) : null,
+      online: row.statusAt !== null && now - row.statusAt < ONLINE_MS,
+    }));
     return c.json({
       downloaders,
       canManage: c.get("userIsMentor") || c.get("userIsAdmin"),
@@ -257,6 +315,17 @@ export const downloaderSelfRoutes = new Hono<AppEnv>()
     ).catch(() => null);
     if (!res?.ok) return c.json({ error: "The team's appearance isn't available right now." }, 502);
     return c.json(await res.json());
+  })
+
+  // What it's doing, every few seconds while it's online: Pit's Logs page and Monitor show it.
+  .post("/status", requireDownloader, async (c) => {
+    const status = parseStatus(await c.req.json().catch(() => null));
+    if (!status) return c.json({ error: "Not a status." }, 400);
+    await createDb(c.env.PIT_DB)
+      .update(logDownloaders)
+      .set({ status: JSON.stringify(status), statusAt: Date.now() })
+      .where(inTeam(logDownloaders, c.get("teamId"), eq(logDownloaders.id, c.get("downloaderId"))));
+    return c.json({ ok: true });
   })
 
   // Unpairing from the downloader's own page.

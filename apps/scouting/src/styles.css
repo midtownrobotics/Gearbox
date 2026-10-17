@@ -3858,6 +3858,41 @@
     place-items: center;
     padding: 9px;
   }
+  .tier-label-heading {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-width: 0;
+  }
+  .tier-label-heading input {
+    min-width: 0;
+  }
+  .tier-drag-handle {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    cursor: grab;
+    touch-action: none;
+  }
+  .tier-drag-handle:focus-visible {
+    outline: 2px solid var(--g3-brand);
+    outline-offset: 2px;
+  }
+  .tier-row-dragging {
+    position: relative;
+    z-index: 1;
+    box-shadow: 0 6px 18px rgb(0 0 0 / 20%);
+  }
+  .tier-row-dragging .tier-drag-handle {
+    cursor: grabbing;
+  }
 
   .tier-label input[type="text"],
   .tier-label input:not([type]) {
@@ -6833,7 +6868,9 @@
     body,
     #root {
       max-width: 100%;
-      overflow-x: hidden;
+      /* hidden also computes overflow-y to auto. That makes body a scroll container
+         with no vertical range; its overscroll lock then traps Android touch swipes. */
+      overflow-x: clip;
     }
 
     .mobile-header {
@@ -8594,6 +8631,29 @@
     min-width: 0;
     white-space: normal;
     overflow-wrap: anywhere;
+  }
+  .tier-move-controls {
+    display: flex;
+    align-items: center;
+    gap: .25rem;
+  }
+  .tier-move-controls button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .tier-move-controls select {
+    width: auto;
+    max-width: 7rem;
+    min-height: 44px;
+  }
+  @media (any-pointer: coarse) {
+    .scouting-content .tier-chip {
+      flex-wrap: wrap;
+    }
+    .tier-move-controls {
+      flex-basis: 100%;
+      order: 1;
+    }
   }
   .scouting-content .tier-chip > button {
     flex-shrink: 0;

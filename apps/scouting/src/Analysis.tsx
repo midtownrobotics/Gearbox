@@ -106,7 +106,13 @@ function imageHasAutoPath(image: HTMLImageElement) {
   }
 }
 
-export function Analysis({ initialReportId }: { initialReportId?: string | null }) {
+export function Analysis({
+  initialReportId,
+  canManageReports,
+}: {
+  initialReportId?: string | null;
+  canManageReports: boolean;
+}) {
   const questions = useQuestions();
   const [team, setTeam] = useState("");
   const [searched, setSearched] = useState("");
@@ -593,6 +599,7 @@ export function Analysis({ initialReportId }: { initialReportId?: string | null 
                           <button
                             type="button"
                             className={`star-button ${report.starredFieldIds.includes("__report") ? "active" : ""}`}
+                            disabled={!canManageReports}
                             onClick={() => toggleStar(report, "__report")}
                             aria-label={
                               report.starredFieldIds.includes("__report")
@@ -607,16 +614,18 @@ export function Analysis({ initialReportId }: { initialReportId?: string | null 
                           >
                             <Star size={16} fill="currentColor" />
                           </button>
-                          <Button
-                            variant="danger"
-                            type="button"
-                            className="delete-report-button"
-                            onClick={() => permanentlyDeleteReport(report)}
-                            aria-label={`Permanently delete report for ${report.teamName}`}
-                            title="Remove bad data"
-                          >
-                            <Trash2 size={17} />
-                          </Button>
+                          {canManageReports && (
+                            <Button
+                              variant="danger"
+                              type="button"
+                              className="delete-report-button"
+                              onClick={() => permanentlyDeleteReport(report)}
+                              aria-label={`Permanently delete report for ${report.teamName}`}
+                              title="Remove bad data"
+                            >
+                              <Trash2 size={17} />
+                            </Button>
+                          )}
                         </header>
                         <dl>
                           {report.fields
@@ -637,6 +646,7 @@ export function Analysis({ initialReportId }: { initialReportId?: string | null 
                                 <button
                                   type="button"
                                   className={`star-button ${report.starredFieldIds.includes(field.id) ? "active" : ""}`}
+                                  disabled={!canManageReports}
                                   onClick={() => toggleStar(report, field.id)}
                                   aria-label={
                                     report.starredFieldIds.includes(field.id)
@@ -737,16 +747,18 @@ export function Analysis({ initialReportId }: { initialReportId?: string | null 
                       {new Date(report.createdAt).toLocaleDateString()}
                     </span>
                   </div>
-                  <Button
-                    variant="danger"
-                    type="button"
-                    className="delete-report-button"
-                    onClick={() => permanentlyDeleteReport(report)}
-                    aria-label={`Permanently delete report for ${report.teamName}`}
-                    title="Remove bad data"
-                  >
-                    <Trash2 size={17} />
-                  </Button>
+                  {canManageReports && (
+                    <Button
+                      variant="danger"
+                      type="button"
+                      className="delete-report-button"
+                      onClick={() => permanentlyDeleteReport(report)}
+                      aria-label={`Permanently delete report for ${report.teamName}`}
+                      title="Remove bad data"
+                    >
+                      <Trash2 size={17} />
+                    </Button>
+                  )}
                 </article>
               );
             })}

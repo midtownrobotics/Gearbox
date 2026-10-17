@@ -26,6 +26,7 @@ bucket_name = "g3-bucket"
 
 [vars]
 FRONTEND_URL = "http://localhost:5175"
+LOCAL_GATEWAY_URL = "http://localhost:8796"
 # TBA_AUTH_KEY and NEXUS_API_KEY are secrets — set via `.dev.vars` locally and `wrangler secret put` in prod
 
 [env.production]

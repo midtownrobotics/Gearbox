@@ -52,6 +52,28 @@ jobs:
       - name: Site config is applied
         run: pnpm configure --check
 
+      # AdvantageScope Lite for Pit (/scope/): built from vendor/advantagescope only when its
+      # release, the patch or the build script changed, else restored from the cache. Pit's own
+      # build (below) then finds it built.
+      - name: AdvantageScope's release
+        id: advantagescope
+        run: echo "commit=$(git ls-files -s vendor/advantagescope | cut -d' ' -f2)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@v4
+        id: advantagescope-cache
+        with:
+          path: apps/pit/public/scope
+          key: advantagescope-${{ steps.advantagescope.outputs.commit }}-${{ hashFiles('apps/pit/advantagescope/*') }}
+
+      - uses: mymindstorm/setup-emsdk@v14
+        if: steps.advantagescope-cache.outputs.cache-hit != 'true'
+        with:
+          version: 4.0.12
+
+      - name: Build AdvantageScope
+        if: steps.advantagescope-cache.outputs.cache-hit != 'true'
+        run: pnpm --filter @g3/pit scope:build
+
       - name: Migrations
         run: pnpm ${{ inputs.environment == 'production' && 'db:migrate:remote' || 'db:migrate:staging' }}
 

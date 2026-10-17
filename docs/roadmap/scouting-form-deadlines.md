@@ -5,6 +5,8 @@ to the wrong match and without throwing away anything a scout wrote. These are t
 
 ## The match a report is for
 
+After a successful report in TBA mode the scout is given their next match at once rather than waiting for the shared cutoff, capped at one match ahead (`nextScoutMatch`); other scouts keep theirs until they send or it closes, and Admin's overview stays on the shared match. See [next-match validation](scouting-next-match-validation.md).
+
 A report goes to the match its form was filled in for: the page sends that match's `matchKey`,
 never "whichever match is current when it arrives". `reportMatch` in `workers/scouting/src/index.ts`
 takes it:

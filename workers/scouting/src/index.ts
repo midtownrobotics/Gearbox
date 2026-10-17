@@ -43,9 +43,9 @@ import {
   MIN_SUBMISSION_WINDOW,
   automaticTbaMatch,
   lateWindow,
-  matchAfterSubmitting,
   matchOrder,
   matchSubmissionClosesAt,
+  nextScoutMatch,
   submissionWindow,
 } from "./match-advance";
 import { requireAuth } from "./middleware/auth";
@@ -59,7 +59,7 @@ import { finiteNumber, id, parseJson, stringArray, teamNumber, text } from "./ut
 const ourTeam = requestTeamId;
 
 type Tier = { id: string; name: string; color: string; items: string[] };
-type TierListInput = { name?: unknown; description?: unknown; tiers?: unknown };
+type TierListInput = { id?: unknown; name?: unknown; description?: unknown; tiers?: unknown };
 type ScoutingField = {
   id: string;
   label: string;
@@ -175,15 +175,29 @@ function publicMatch(match: TbaMatch) {
 
 async function persistAutomaticMatch(
   c: Context<AppEnv>,
-  configuredMatchNumber: number | null | undefined,
+  eventKey: string,
   match: TbaMatch | undefined,
 ) {
-  if (!match || match.comp_level !== "qm" || match.match_number === configuredMatchNumber) return;
+  if (!match || match.comp_level !== "qm") return null;
   await dbOf(c)
     .update(strategyEventConfig)
     .set({ current_match_number: match.match_number, updated_at: Date.now() })
-    .where(inTeam(strategyEventConfig, c.get("teamId"), sql`id = 1 AND schedule_mode = 'tba'`))
+    .where(
+      inTeam(
+        strategyEventConfig,
+        c.get("teamId"),
+        sql`id = 1 AND schedule_mode = 'tba' AND event_key = ${eventKey}
+      AND (current_match_number IS NULL OR current_match_number < ${match.match_number})`,
+      ),
+    )
     .run();
+  const saved = await first<{ current_match_number: number }>(
+    dbOf(c),
+    sql`
+    SELECT current_match_number FROM ${strategyEventConfig}
+    WHERE ${inTeam(strategyEventConfig, c.get("teamId"))} AND id = 1 AND schedule_mode = 'tba' AND event_key = ${eventKey}`,
+  );
+  return saved?.current_match_number ?? null;
 }
 
 async function getOrCreateScoutAssignment(
@@ -210,32 +224,22 @@ async function getOrCreateScoutAssignment(
   if (submitted) return submitted.team_name;
 
   if (!teams.length) return null;
-  const assignedCounts = await all<{ team_number: string; assignment_count: number }>(
-    dbOf(c),
-    sql`SELECT team_number, COUNT(*) AS assignment_count
-       FROM (SELECT * FROM ${scoutingMatchAssignments} WHERE ${inTeam(scoutingMatchAssignments, c.get("teamId"))}) AS scoped_scouting_match_assignments
-      WHERE event_key = ${eventKey} AND match_number = ${matchNumber}
-      GROUP BY team_number`,
-  );
-  const counts = new Map(
-    assignedCounts.results.map((row) => [row.team_number, Number(row.assignment_count)]),
-  );
-  const team = teams.reduce((best, candidate) =>
-    (counts.get(candidate) ?? 0) < (counts.get(best) ?? 0) ? candidate : best,
-  );
-  await dbOf(c)
-    .insert(scoutingMatchAssignments)
-    .values(
-      withTeam(c.get("teamId"), {
-        event_key: eventKey,
-        match_number: matchNumber,
-        user_id: c.get("userId"),
-        team_number: team,
-        assigned_at: Date.now(),
-      }),
-    )
-    .onConflictDoNothing()
-    .run();
+  // Counting coverage and claiming a team happen in one SQLite statement, so
+  // concurrent scouts see earlier claims. Only an invalid lineup assignment is replaced.
+  const candidates = JSON.stringify(teams);
+  await dbOf(c).run(sql`
+    INSERT INTO ${scoutingMatchAssignments} (team_id, event_key, match_number, user_id, team_number, assigned_at)
+    SELECT ${c.get("teamId")}, ${eventKey}, ${matchNumber}, ${c.get("userId")}, candidate.value, ${Date.now()}
+    FROM json_each(${candidates}) AS candidate WHERE 1 = 1
+    ORDER BY (
+      SELECT COUNT(*) FROM ${scoutingMatchAssignments}
+      WHERE ${inTeam(scoutingMatchAssignments, c.get("teamId"))}
+        AND event_key = ${eventKey} AND match_number = ${matchNumber} AND team_number = candidate.value
+    ), candidate.key LIMIT 1
+    ON CONFLICT (team_id, event_key, match_number, user_id) DO UPDATE
+      SET team_number = excluded.team_number, assigned_at = excluded.assigned_at
+      WHERE ${scoutingMatchAssignments.team_number} NOT IN (SELECT value FROM json_each(${candidates}))
+  `);
   return (
     (
       await first<{ team_number: string }>(
@@ -384,22 +388,21 @@ app.get("/teams/search", requireAuth, async (c) => {
   }
 });
 
-/** Whether the scout has already sent a match report in for this match of this event. */
-async function hasScoutSubmitted(c: Context<AppEnv>, eventKey: string, matchNumber: number) {
-  const existing = await first<{ id: string }>(
+async function submittedScoutMatches(c: Context<AppEnv>, eventKey: string) {
+  const rows = await all<{ match_number: number }>(
     dbOf(c),
-    sql`SELECT s.id
-       FROM (SELECT * FROM ${scoutingFormSubmissions} WHERE ${inTeam(scoutingFormSubmissions, c.get("teamId"))}) AS s
-       JOIN (SELECT * FROM ${scoutingForms} WHERE ${inTeam(scoutingForms, c.get("teamId"))}) AS f ON f.id = s.form_id
-      WHERE f.form_kind = 'scouting' AND s.submitted_by = ${c.get("userId")}
-        AND s.event_key = ${eventKey} AND s.match_number = ${matchNumber}
-        AND s.archived_at IS NULL
-      LIMIT 1`,
+    sql`
+    SELECT DISTINCT s.match_number
+    FROM (SELECT * FROM ${scoutingFormSubmissions} WHERE ${inTeam(scoutingFormSubmissions, c.get("teamId"))}) AS s
+    JOIN (SELECT * FROM ${scoutingForms} WHERE ${inTeam(scoutingForms, c.get("teamId"))}) AS f ON f.id = s.form_id
+    WHERE f.form_kind = 'scouting' AND s.submitted_by = ${c.get("userId")}
+      AND s.event_key = ${eventKey} AND s.match_number IS NOT NULL
+  `,
   );
-  return Boolean(existing);
+  return new Set(rows.results.map((row) => Number(row.match_number)));
 }
 
-async function resolveEventLink(c: Context<AppEnv>) {
+async function resolveEventLink(c: Context<AppEnv>, forScout = false) {
   const config = await first<{
     event_key: string;
     current_match_number: number | null;
@@ -414,33 +417,56 @@ async function resolveEventLink(c: Context<AppEnv>) {
   const manual = config?.schedule_mode === "manual";
   const windowSeconds = config?.submission_window_seconds ?? DEFAULT_SUBMISSION_WINDOW;
   const lateWindowSeconds = config?.late_window_seconds ?? DEFAULT_LATE_WINDOW;
+  if (!config?.event_key)
+    return {
+      eventKey: null,
+      matchKey: null,
+      matchNumber: null,
+      submissionClosesAt: null,
+      teams: [] as string[],
+      current: undefined as TbaMatch | undefined,
+      matches: [] as TbaMatch[],
+      manual,
+      windowSeconds,
+      lateWindowSeconds,
+    };
   let matches: TbaMatch[] = [];
   let current: TbaMatch | undefined;
-  if (config?.event_key) {
-    try {
-      matches = (await getEventMatches(c, config.event_key)).sort(
-        (a, b) => matchOrder(a) - matchOrder(b),
+  try {
+    matches = (await getEventMatches(c, config.event_key)).sort(
+      (a, b) => matchOrder(a) - matchOrder(b),
+    );
+    current = manual
+      ? matches.find(
+          (match) =>
+            match.comp_level === "qm" && match.match_number === config.current_match_number,
+        )
+      : automaticTbaMatch(matches, windowSeconds, undefined, config.current_match_number);
+    if (!manual) {
+      const minimum = await persistAutomaticMatch(c, config.event_key, current);
+      current = automaticTbaMatch(
+        matches,
+        windowSeconds,
+        undefined,
+        minimum ?? config.current_match_number,
       );
-      current = manual
-        ? matches.find(
-            (match) =>
-              match.comp_level === "qm" && match.match_number === config.current_match_number,
-          )
-        : automaticTbaMatch(matches, windowSeconds);
-      if (!manual) {
-        await persistAutomaticMatch(c, config.current_match_number, current);
-        // Same as /event-context: a scout whose report is in is already on the next match.
-        if (current && (await hasScoutSubmitted(c, config.event_key, current.match_number)))
-          current = matchAfterSubmitting(matches, current);
-      }
-    } catch {
-      // Keep the configured event link when TBA is temporarily unavailable.
+      // A scout whose report is in is already on the next match.
+      if (forScout)
+        current = nextScoutMatch(
+          matches,
+          current,
+          await submittedScoutMatches(c, config.event_key),
+          windowSeconds,
+        );
     }
+  } catch {
+    // Keep the configured event link when TBA is temporarily unavailable.
   }
   return {
-    eventKey: config?.event_key || null,
+    eventKey: config.event_key,
     matchKey: current?.key ?? null,
-    matchNumber: config?.event_key ? (current?.match_number ?? config.current_match_number) : null,
+    matchNumber: current?.match_number ?? config.current_match_number,
+    teams: current ? publicMatch(current).teams : [],
     submissionClosesAt: manual ? null : matchSubmissionClosesAt(current, windowSeconds),
     current,
     matches,
@@ -533,20 +559,40 @@ app.get("/event-context", requireAuth, async (c) => {
       scheduleError = error instanceof Error ? error.message : "Could not load the TBA schedule.";
     }
   }
+  // An unavailable schedule is not a new assignment. Forms keep their last valid draft.
+  if (eventKey && c.req.query("assign") === "true" && (scheduleError || !matches.length))
+    return c.json({ error: "Could not refresh the match schedule. Try again shortly." }, 503);
   const configuredCurrent = config?.current_match_number
     ? matches.find(
         (match) => match.comp_level === "qm" && match.match_number === config.current_match_number,
       )
     : undefined;
   const windowSeconds = config?.submission_window_seconds ?? DEFAULT_SUBMISSION_WINDOW;
-  const tbaCurrent =
-    config?.schedule_mode === "manual" ? undefined : automaticTbaMatch(matches, windowSeconds);
-  const current =
-    (config?.schedule_mode === "manual" ? configuredCurrent : tbaCurrent) ??
-    configuredCurrent ??
-    (config?.schedule_mode === "manual" ? matches[0] : matches.at(-1));
-  if (config?.schedule_mode !== "manual")
-    await persistAutomaticMatch(c, config?.current_match_number, current);
+  let tbaCurrent =
+    config?.schedule_mode === "manual"
+      ? undefined
+      : automaticTbaMatch(matches, windowSeconds, undefined, config?.current_match_number);
+  if (config?.schedule_mode !== "manual") {
+    const minimum = await persistAutomaticMatch(c, eventKey, tbaCurrent);
+    tbaCurrent = automaticTbaMatch(
+      matches,
+      windowSeconds,
+      undefined,
+      minimum ?? config?.current_match_number,
+    );
+  }
+  let current =
+    config?.schedule_mode === "manual"
+      ? (configuredCurrent ?? (config.current_match_number ? undefined : matches[0]))
+      : tbaCurrent;
+  if (eventKey && c.req.query("assign") === "true" && !current)
+    return c.json(
+      { error: "The current match is unavailable. Your draft is kept; try again shortly." },
+      503,
+    );
+  const completedMatches = eventKey ? await submittedScoutMatches(c, eventKey) : new Set<number>();
+  if (c.req.query("assign") === "true" && config?.schedule_mode !== "manual")
+    current = nextScoutMatch(matches, current, completedMatches, windowSeconds);
   const teamSchedule = matches.filter((match) =>
     [...match.alliances.red.team_keys, ...match.alliances.blue.team_keys].includes(ourTeam(c)),
   );
@@ -576,23 +622,11 @@ app.get("/event-context", requireAuth, async (c) => {
     (row) => Number(row.match_number) === currentMatchNumber,
   );
   const submittedUserIds = new Set(currentMatchSubmissions.map((row) => String(row.submitted_by)));
-  // The window after a match is there for reports still being written, so a scout who has sent
-  // theirs in goes straight to the match on the field instead of waiting the window out and
-  // reaching it late. The team's own current match (above) is unchanged, so the leads' overview
-  // still follows the match being scouted.
-  const scoutMatch =
-    config?.schedule_mode !== "manual" && current && submittedUserIds.has(c.get("userId"))
-      ? matchAfterSubmitting(matches, current)
-      : current;
-  const scoutMatchNumber = scoutMatch?.match_number ?? currentMatchNumber;
-  // The match after the scout's, for when it starts: how long they have, and what's next.
-  const upcomingMatch = scoutMatch
-    ? matches.find((match) => matchOrder(match) > matchOrder(scoutMatch))
+  // The match after this one, for the bar and the done screen: what's next and when it starts.
+  // Under ?assign=true `current` is already the scout's own match (nextScoutMatch above).
+  const upcomingMatch = current
+    ? matches.find((match) => matchOrder(match) > matchOrder(current))
     : undefined;
-  const hasSubmittedScoutMatch = (eventMatchSubmissions?.results ?? []).some(
-    (row) =>
-      String(row.submitted_by) === c.get("userId") && Number(row.match_number) === scoutMatchNumber,
-  );
   const onlineScouts = current
     ? await all<Record<string, unknown>>(
         dbOf(c),
@@ -610,29 +644,28 @@ app.get("/event-context", requireAuth, async (c) => {
     activeScoutIds.sort();
   }
   const submissionClosesAt =
-    config?.schedule_mode === "manual" ? null : matchSubmissionClosesAt(scoutMatch, windowSeconds);
+    config?.schedule_mode === "manual" ? null : matchSubmissionClosesAt(current, windowSeconds);
   const assignedTeam =
     c.req.query("assign") === "true" &&
-    scoutMatch &&
+    current &&
     eventKey &&
-    scoutMatchNumber &&
+    currentMatchNumber &&
     (submissionClosesAt === null || Date.now() < submissionClosesAt)
       ? await getOrCreateScoutAssignment(
           c,
           eventKey,
-          scoutMatchNumber,
-          publicMatch(scoutMatch).teams,
+          currentMatchNumber,
+          publicMatch(current).teams,
         )
       : null;
   return c.json({
     eventKey: admin ? eventKey : "",
     currentMatchNumber: admin ? currentMatchNumber : null,
     currentMatch: current ? publicMatch(current) : null,
-    scoutMatch: scoutMatch ? publicMatch(scoutMatch) : null,
     upcomingMatch: upcomingMatch ? publicMatch(upcomingMatch) : null,
     tbaCurrentMatch: tbaCurrent ? publicMatch(tbaCurrent) : null,
     assignedTeam,
-    hasSubmittedCurrentMatch: hasSubmittedScoutMatch,
+    hasSubmittedCurrentMatch: completedMatches.has(currentMatchNumber ?? 0),
     onlineScoutCount: activeScoutIds.length,
     matchSubmissions: admin ? (eventMatchSubmissions?.results ?? []) : [],
     nextTeamMatch: nextTeamMatch ? publicMatch(nextTeamMatch) : null,
@@ -682,17 +715,18 @@ app.put("/event-context", requireAuth, async (c) => {
   const body = await c.req.json<Record<string, unknown>>();
   const activeConfig = await first<{
     event_key: string;
+    current_match_number: number | null;
     tba_auth_key: string | null;
     schedule_mode: string;
     submission_window_seconds: number | null;
     late_window_seconds: number | null;
   }>(
     dbOf(c),
-    sql`SELECT event_key, tba_auth_key, schedule_mode, submission_window_seconds, late_window_seconds FROM (SELECT * FROM ${strategyEventConfig} WHERE ${inTeam(strategyEventConfig, c.get("teamId"))}) AS scoped_strategy_event_config WHERE id = 1`,
+    sql`SELECT event_key, current_match_number, tba_auth_key, schedule_mode, submission_window_seconds, late_window_seconds FROM (SELECT * FROM ${strategyEventConfig} WHERE ${inTeam(strategyEventConfig, c.get("teamId"))}) AS scoped_strategy_event_config WHERE id = 1`,
   );
   const eventKey =
-    activeConfig?.schedule_mode === "manual"
-      ? activeConfig.event_key
+    activeConfig?.schedule_mode === "manual" || body.eventKey === undefined
+      ? (activeConfig?.event_key ?? "")
       : text(body.eventKey, 30).toLowerCase();
   const tbaAuthKey = text(body.tbaAuthKey, 200);
   const nexusEventKey = text(body.nexusEventKey, 30).toLowerCase() || eventKey;
@@ -719,15 +753,20 @@ app.put("/event-context", requireAuth, async (c) => {
     }
   }
   const requestedMatch = body.currentMatchNumber;
-  const currentMatchNumber =
-    requestedMatch === "" || requestedMatch === null || requestedMatch === undefined
-      ? null
-      : Number(requestedMatch);
+  let currentMatchNumber =
+    requestedMatch === undefined
+      ? (activeConfig?.current_match_number ?? null)
+      : requestedMatch === "" || requestedMatch === null
+        ? null
+        : Number(requestedMatch);
   if (
     currentMatchNumber !== null &&
     (!Number.isInteger(currentMatchNumber) || currentMatchNumber < 1)
   )
     return c.json({ error: "Current match must be a positive qualification match number." }, 400);
+  // The saved minimum belongs to its event, not the next competition's schedule.
+  if (activeConfig?.schedule_mode !== "manual" && eventKey !== activeConfig?.event_key)
+    currentMatchNumber = null;
   // The match form on the same page sends no window of its own, so leave it as it was.
   const storedWindow = activeConfig?.submission_window_seconds ?? DEFAULT_SUBMISSION_WINDOW;
   const requestedWindow =
@@ -1017,7 +1056,7 @@ app.post("/scouting-forms/:id/submissions", requireAuth, async (c) => {
   let teamName = teamNumber(form.get("teamName"));
   const answers = parseJson<Record<string, unknown>>(form.get("answers"), {});
   const fields = parseJson<ScoutingField[]>(formDefinition.fields_json, []);
-  const eventLink = await resolveEventLink(c);
+  const eventLink = await resolveEventLink(c, formDefinition.form_kind === "scouting");
   // Where the report is saved: the match its form was for (a match report), else the team's.
   let reportEvent = {
     eventKey: eventLink.eventKey,
@@ -1030,6 +1069,12 @@ app.post("/scouting-forms/:id/submissions", requireAuth, async (c) => {
     if (!fields.length) return c.json({ error: "This scouting form has no fields." }, 409);
     const target = await reportMatch(c, eventLink, reportMatchKey);
     if ("error" in target) return c.json({ error: target.error }, 409);
+    // The lineup for the match the report is for, which is its own when it's late.
+    if (!publicMatch(target.match).teams.includes(teamName))
+      return c.json(
+        { error: "The teams in this match changed. Refresh the form for your updated assignment." },
+        409,
+      );
     reportEvent = {
       eventKey: eventLink.eventKey,
       matchKey: target.match.key,
@@ -1131,7 +1176,7 @@ app.post("/scouting-forms/:id/submissions", requireAuth, async (c) => {
   if (formDefinition.form_kind === "scouting") {
     // The schedule can move while drawings upload: check again, and record a report as late if it
     // became late meanwhile.
-    const latest = await resolveEventLink(c);
+    const latest = await resolveEventLink(c, true);
     const latestTarget = await reportMatch(c, latest, reportMatchKey);
     const latestAssignment = await dbOf(c)
       .select({ teamNumber: scoutingMatchAssignments.team_number })
@@ -1146,10 +1191,12 @@ app.post("/scouting-forms/:id/submissions", requireAuth, async (c) => {
       )
       .get();
     if ("match" in latestTarget) reportEvent.late = reportEvent.late || latestTarget.late;
+    // The lineup checked is the report's own match, which for a late one isn't the current match.
     if (
       latestAssignment?.teamNumber !== teamName ||
       "error" in latestTarget ||
       latestTarget.match.key !== reportEvent.matchKey ||
+      !publicMatch(latestTarget.match).teams.includes(teamName) ||
       latest.eventKey !== reportEvent.eventKey
     ) {
       const keys = [
@@ -1297,7 +1344,6 @@ app.get("/scouting-submissions/:id/drawing", requireAuth, async (c) => {
 });
 
 app.get("/scouting-submissions/:id/drawings/:fieldId", requireAuth, async (c) => {
-  if (!(await isStrategyAdmin(c))) return c.json({ error: "Strategy lead access required." }, 403);
   const row = await first<{ drawing_fields_json: string }>(
     dbOf(c),
     sql`SELECT drawing_fields_json FROM (SELECT * FROM ${scoutingFormSubmissions} WHERE ${inTeam(scoutingFormSubmissions, c.get("teamId"))}) AS scoped_scouting_form_submissions WHERE id = ${c.req.param("id")}`,
@@ -1337,7 +1383,7 @@ app.post("/tier-lists", requireAuth, async (c) => {
   const name = text(body.name, 120);
   if (!name) return c.json({ error: "Name is required." }, 400);
   const tiers = Array.isArray(body.tiers) ? body.tiers : [];
-  const recordId = id("tier");
+  const recordId = text(body.id, 100) || id("tier");
   const now = Date.now();
   await dbOf(c)
     .insert(tierLists)
@@ -1352,6 +1398,15 @@ app.post("/tier-lists", requireAuth, async (c) => {
         updated_at: now,
       }),
     )
+    .onConflictDoUpdate({
+      target: [tierLists.teamId, tierLists.id],
+      set: {
+        name,
+        description: text(body.description, 500),
+        tiers_json: JSON.stringify(tiers),
+        updated_at: now,
+      },
+    })
     .run();
   return c.json({ id: recordId }, 201);
 });
@@ -1477,7 +1532,6 @@ app.delete("/strategy-admins/:userId", requireAuth, async (c) => {
 });
 
 app.get("/analysis", requireAuth, async (c) => {
-  if (!(await isStrategyAdmin(c))) return c.json({ error: "Strategy lead access required." }, 403);
   const team = teamNumber(c.req.query("team"));
   const teamB = teamNumber(c.req.query("teamB"));
   const includeArchived = c.req.query("archived") === "true";

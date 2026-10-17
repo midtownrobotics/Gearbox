@@ -60,7 +60,7 @@ import {
   loadDraft,
   saveDraft,
 } from "./match-drafts";
-import { DoneScreen, MoveOnBar, ParkedDrafts, clock, timeOf } from "./match-handover";
+import { DoneScreen, MoveOnBar, ParkedDrafts, clock as clockText, timeOf } from "./match-handover";
 
 export type FieldType =
   | "shortText"
@@ -250,14 +250,6 @@ function FieldInput({
   );
 }
 
-/**
- * The match a scout fills in: the team's current match until their report for it is in, then the
- * one on the field. `currentMatch` is the fallback for a page loaded against an older worker.
- */
-function scoutMatchOf(context: EventContext | null) {
-  return context?.scoutMatch ?? context?.currentMatch ?? null;
-}
-
 /** How long the bar counts down before the form moves on, and what "more time" adds each time. */
 const WARNING_SECONDS = 20;
 const EXTENSION_SECONDS = 30;
@@ -269,36 +261,43 @@ const DONE_OPENS_AFTER_MS = 60_000;
 type DraftTarget = { match: EventMatch; team: string; closesAt: number | null };
 type SentReport = { matchKey: string; label: string; team: string; at: number; late: boolean };
 
-function useNow(intervalMs: number) {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), intervalMs);
-    return () => window.clearInterval(timer);
-  }, [intervalMs]);
-  return now;
-}
-
 function EntryForm({
   form,
   context,
   refreshContext,
+  scheduleUnavailable,
   userId,
 }: {
   form: ScoutingForm;
   context: EventContext | null;
   refreshContext: () => Promise<void>;
+  scheduleUnavailable: boolean;
   userId: string;
 }) {
   if (form.kind !== "scouting")
-    return <EntryDraft form={form} userId={userId} target={null} refreshContext={refreshContext} />;
+    return (
+      <EntryDraft
+        form={form}
+        userId={userId}
+        target={null}
+        refreshContext={refreshContext}
+        scheduleUnavailable={scheduleUnavailable}
+      />
+    );
   return (
-    <MatchEntry form={form} context={context} refreshContext={refreshContext} userId={userId} />
+    <MatchEntry
+      form={form}
+      context={context}
+      refreshContext={refreshContext}
+      scheduleUnavailable={scheduleUnavailable}
+      userId={userId}
+    />
   );
 }
 
 /**
- * A match form through a match: it follows the server's match for the scout, but never pulls a
- * form with answers in it out from under them. Near the match's close a bar counts down, with
+ * A match form through a match: it follows the match the worker gives this scout, but never pulls
+ * a form with answers in it out from under them. Near the match's close a bar counts down, with
  * time to add; when it runs out, the answers stay on the device, offered above the next form to
  * send late. A sent report shows what went where until the next match starts.
  */
@@ -306,19 +305,28 @@ function MatchEntry({
   form,
   context,
   refreshContext,
+  scheduleUnavailable,
   userId,
 }: {
   form: ScoutingForm;
   context: EventContext | null;
   refreshContext: () => Promise<void>;
+  scheduleUnavailable: boolean;
   userId: string;
 }) {
-  const clockOffset = useMemo(
-    () => (context?.serverNow ? context.serverNow - Date.now() : 0),
+  // Server time, kept off the device's own clock so changing it can't expire a draft.
+  const clock = useMemo(
+    () => ({ time: context?.serverNow ?? Date.now(), started: performance.now() }),
     [context?.serverNow],
   );
-  const now = useNow(1000) + clockOffset;
-  const liveMatch = scoutMatchOf(context);
+  const serverNow = useCallback(() => clock.time + performance.now() - clock.started, [clock]);
+  const [, tick] = useState(0);
+  useEffect(() => {
+    const timer = window.setInterval(() => tick((value) => value + 1), 500);
+    return () => window.clearInterval(timer);
+  }, []);
+  const now = serverNow();
+  const liveMatch = context?.currentMatch ?? null;
   const liveTeam = context?.assignedTeam ?? null;
   const liveClosesAt = context?.submissionClosesAt ?? null;
   const live = useMemo<DraftTarget | null>(
@@ -342,7 +350,7 @@ function MatchEntry({
     [userId, form.id],
   );
 
-  // Follow the server's match and team. A form with answers waits for the countdown below.
+  // Follow the worker's match and team. A form with answers waits for the countdown below.
   useEffect(() => {
     setTarget((current) => {
       if (!live) return current && dirty ? current : null;
@@ -371,11 +379,11 @@ function MatchEntry({
     return () => window.clearTimeout(clear);
   }, [switchedTo]);
 
-  // The server has moved past the match this form is for.
+  // The worker has moved past the match this form is for.
   const serverMoved = target !== null && (!live || live.match.key !== target.match.key);
   useEffect(() => {
-    if (serverMoved && dirty) setMovedSeenAt((seen) => seen ?? Date.now() + clockOffset);
-  }, [serverMoved, dirty, clockOffset]);
+    if (serverMoved && dirty) setMovedSeenAt((seen) => seen ?? serverNow());
+  }, [serverMoved, dirty, serverNow]);
 
   // When the form moves on: the match's close, else (a manual schedule) a short count from the
   // moment the lead moved on, plus whatever time the scout added.
@@ -406,8 +414,8 @@ function MatchEntry({
     live.match.key !== sent.matchKey &&
     !context?.hasSubmittedCurrentMatch;
   useEffect(() => {
-    setReadyAt((at) => (nextReady ? (at ?? Date.now() + clockOffset) : null));
-  }, [nextReady, clockOffset]);
+    setReadyAt((at) => (nextReady ? (at ?? serverNow()) : null));
+  }, [nextReady, serverNow]);
   const nextStartsAt = nextReady ? (live?.match.scheduledAt ?? null) : null;
   const opensAt =
     readyAt === null
@@ -457,17 +465,22 @@ function MatchEntry({
     }
   }
 
-  const waitingOnScore = Boolean(context?.hasSubmittedCurrentMatch);
-  const showDone = sent !== null || waitingOnScore;
+  const showDone = sent !== null || Boolean(context?.hasSubmittedCurrentMatch);
   const doneLabel = sent?.label ?? liveMatch?.label ?? "Match";
   const upcoming = context?.upcomingMatch ?? null;
   let banner: ReactNode = null;
-  if (target && context?.scheduleMode === "manual") {
+  if (scheduleUnavailable) {
+    banner = (
+      <span role="status">
+        Can't reach the match schedule. Your answers are kept; sending waits until it's back.
+      </span>
+    );
+  } else if (target && context?.scheduleMode === "manual") {
     banner = <span>Manual schedule: this form moves on when the lead changes the match.</span>;
   } else if (target && target.closesAt === null) {
     banner = (
       <span>
-        Send within {clock(context?.submissionWindowSeconds ?? 120)} after the match ends.
+        Send within {clockText(context?.submissionWindowSeconds ?? 120)} after the match ends.
       </span>
     );
   } else if (target && target.closesAt !== null && now < target.closesAt) {
@@ -483,7 +496,7 @@ function MatchEntry({
         </strong>
         .{" "}
         <span role="timer" aria-live="off">
-          {clock((target.closesAt - now) / 1000)} left.
+          {clockText((target.closesAt - now) / 1000)} left.
         </span>
       </span>
     );
@@ -539,6 +552,7 @@ function MatchEntry({
             target={target}
             banner={banner}
             formRef={formRef}
+            scheduleUnavailable={scheduleUnavailable}
             refreshContext={refreshContext}
             onSubmitted={onSubmitted}
             onDirtyChange={setDirty}
@@ -580,6 +594,7 @@ function EntryDraft({
   target,
   banner,
   formRef,
+  scheduleUnavailable,
   refreshContext,
   onSubmitted,
   onDirtyChange,
@@ -591,6 +606,7 @@ function EntryDraft({
   target: DraftTarget | null;
   banner?: ReactNode;
   formRef?: RefObject<HTMLFormElement | null>;
+  scheduleUnavailable: boolean;
   refreshContext: () => Promise<void>;
   onSubmitted?: (report: SentReport) => void;
   onDirtyChange?: (dirty: boolean) => void;
@@ -698,7 +714,7 @@ function EntryDraft({
 
   async function submit(event: SyntheticEvent) {
     event.preventDefault();
-    if (saving || blocked) return;
+    if (saving || blocked || (isMatch && scheduleUnavailable)) return;
     setSaving(true);
     setMessage("");
     try {
@@ -741,7 +757,7 @@ function EntryDraft({
         setMessageType("success");
         setMessage("Report submitted.");
       }
-      await refreshContext();
+      await refreshContext().catch(() => {});
     } catch (error) {
       if (!mounted.current) return;
       setMessageType("error");
@@ -789,7 +805,7 @@ function EntryDraft({
         </div>
       </div>
       {isMatch && banner && (
-        <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+        <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">
           {banner}
           {restored && <span className="block">Your saved answers are back.</span>}
         </div>
@@ -837,9 +853,19 @@ function EntryDraft({
           })}
         </div>
       </fieldset>
-      <Button variant="primary" type="submit" disabled={saving || blocked}>
+      <Button
+        variant="primary"
+        type="submit"
+        disabled={saving || blocked || (isMatch && scheduleUnavailable)}
+      >
         <Check size={17} />{" "}
-        {saving ? "Submitting…" : isMatch && !teamName ? "Waiting for team" : "Submit report"}
+        {saving
+          ? "Submitting…"
+          : isMatch && scheduleUnavailable
+            ? "Waiting for schedule"
+            : isMatch && !teamName
+              ? "Waiting for team"
+              : "Submit report"}
       </Button>
       {message && (
         <div className={`status-toast ${messageType}`} role="status" aria-live="polite">
@@ -1418,9 +1444,7 @@ type EventContext = {
   eventKey: string;
   currentMatchNumber: number | null;
   currentMatch: EventMatch | null;
-  /** The match this scout's form is for: the current one, or the next once their report is in. */
-  scoutMatch?: EventMatch | null;
-  /** The match after the scout's. */
+  /** The match after this scout's, for the countdown bar and the done screen. */
   upcomingMatch?: EventMatch | null;
   tbaCurrentMatch: EventMatch | null;
   assignedTeam: string | null;
@@ -2332,9 +2356,6 @@ export function ScoutingForms({
   const [editing, setEditing] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [context, setContext] = useState<EventContext | null>(null);
-  const refreshContext = useCallback(async () => {
-    setContext(await api<EventContext>("/event-context?assign=true"));
-  }, []);
   const load = useCallback(async () => {
     const result = await api<{ forms: ScoutingForm[] }>("/scouting-forms");
     setLoadError("");
@@ -2350,11 +2371,25 @@ export function ScoutingForms({
       )
       .finally(() => setLoading(false));
   }, [load]);
+  const contextRequest = useRef(0);
+  const [contextError, setContextError] = useState("");
+  const refreshContext = useCallback(async () => {
+    const request = ++contextRequest.current;
+    // A poll started before submission must not restore the completed match.
+    try {
+      const next = await api<EventContext>("/event-context?assign=true", { cache: "no-store" });
+      if (request === contextRequest.current) {
+        setContext(next);
+        setContextError("");
+      }
+    } catch (error) {
+      if (request === contextRequest.current)
+        setContextError("Could not refresh the match schedule. Retrying.");
+      throw error;
+    }
+  }, []);
   useEffect(() => {
-    const loadMatch = () =>
-      api<EventContext>("/event-context?assign=true")
-        .then(setContext)
-        .catch(() => undefined);
+    const loadMatch = () => refreshContext().catch(() => undefined);
     loadMatch();
     const interval = window.setInterval(() => {
       if (document.visibilityState === "visible") loadMatch();
@@ -2369,7 +2404,7 @@ export function ScoutingForms({
       window.removeEventListener("focus", resume);
       document.removeEventListener("visibilitychange", resume);
     };
-  }, []);
+  }, [refreshContext]);
   useEffect(() => {
     document.body.classList.toggle("scouting-workspace-open", isFullscreen);
     if (!isFullscreen) return;
@@ -2480,13 +2515,17 @@ export function ScoutingForms({
             }}
           />
         ) : (
-          <EntryForm
-            key={selected.id}
-            form={selected}
-            context={context}
-            refreshContext={refreshContext}
-            userId={userId}
-          />
+          <>
+            {contextError && selected.kind === "scouting" && <ErrorBanner message={contextError} />}
+            <EntryForm
+              key={selected.id}
+              form={selected}
+              context={context}
+              refreshContext={refreshContext}
+              scheduleUnavailable={!!contextError}
+              userId={userId}
+            />
+          </>
         ))}
       {selected?.kind === "pit" &&
         (canManageServiceCrew ? <Operations embedded /> : <ServiceIssueReport />)}

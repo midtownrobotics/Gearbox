@@ -195,6 +195,14 @@ export const matchLogRoutes = new Hono<AppEnv>()
 
 /** The downloader's side (`/downloader/logs`), with its key: start an upload, send parts, finish. */
 export const logUploadRoutes = new Hono<AppEnv>()
+  // The logs Pit has, so the downloader's page says which are in Gearbox (deleted here, they aren't).
+  .get("/", requireDownloader, async (c) => {
+    const logs = await createDb(c.env.PIT_DB)
+      .select({ event: matchLogs.event, name: matchLogs.name })
+      .from(matchLogs)
+      .where(inTeam(matchLogs, c.get("teamId"), eq(matchLogs.status, "stored")));
+    return c.json({ logs });
+  })
   // Starts uploading a gzipped log, or says Pit already has it (the same event, name and size),
   // or that the team is full and keeps what it has (409, `full`).
   .post("/", requireDownloader, async (c) => {

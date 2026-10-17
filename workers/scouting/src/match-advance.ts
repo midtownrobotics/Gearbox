@@ -51,13 +51,21 @@ export function automaticTbaMatch(
   matches: TbaMatch[],
   windowSeconds = DEFAULT_SUBMISSION_WINDOW,
   now = Math.floor(Date.now() / 1000),
+  minimumMatchNumber: number | null = null,
 ) {
   const qualifications = matches
     .filter((match) => match.comp_level === "qm")
     .sort((left, right) => matchOrder(left) - matchOrder(right));
-  const ordered = qualifications.length
-    ? qualifications
-    : [...matches].sort((left, right) => matchOrder(left) - matchOrder(right));
+  const ordered = (
+    qualifications.length
+      ? qualifications
+      : [...matches].sort((left, right) => matchOrder(left) - matchOrder(right))
+  ).filter(
+    (match) =>
+      match.comp_level !== "qm" ||
+      minimumMatchNumber === null ||
+      match.match_number >= minimumMatchNumber,
+  );
   if (!ordered.length) return undefined;
   for (let index = 0; index < ordered.length - 1; index += 1) {
     const match = ordered[index];
@@ -67,18 +75,28 @@ export function automaticTbaMatch(
   return ordered.at(-1);
 }
 
-/**
- * The match a scout moves to once their report for `held` is in. The window after a match keeps
- * everyone on it so a late report still lands on the right match, but a scout who has already
- * sent theirs has nothing left to wait for, and waiting the window out would put them on the
- * match in front of them late. Returns `held` while nothing has started after it.
- */
-export function matchAfterSubmitting(
+/** Allow the live match and its immediate successor, without a start-time submission gate. */
+export function nextScoutMatch(
   matches: TbaMatch[],
-  held: TbaMatch | undefined,
-  now = Math.floor(Date.now() / 1000),
+  current: TbaMatch | undefined,
+  submitted: Set<number>,
+  windowSeconds = DEFAULT_SUBMISSION_WINDOW,
+  now = Date.now(),
 ) {
-  if (!held) return held;
-  const next = automaticTbaMatch(matches, 0, now);
-  return next && next.key !== held.key ? next : held;
+  if (!current) return undefined;
+  const remaining = matches
+    .filter(
+      (match) =>
+        match.comp_level === current.comp_level && matchOrder(match) >= matchOrder(current),
+    )
+    .sort((left, right) => matchOrder(left) - matchOrder(right))
+    .slice(0, 2);
+  return (
+    remaining.find((match) => {
+      const closesAt = matchSubmissionClosesAt(match, windowSeconds);
+      return !submitted.has(match.match_number) && (closesAt === null || now < closesAt);
+    }) ??
+    remaining.at(-1) ??
+    current
+  );
 }
