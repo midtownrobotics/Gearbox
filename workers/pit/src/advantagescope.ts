@@ -11,6 +11,7 @@ import { asc, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { createDb } from "./db";
 import { matchLogs, scopeAssets, scopeSettings } from "./db/schema";
+import { multipartFile } from "./multipart";
 import type { AppEnv } from "./types";
 import { type ZipEntry, ZipError, readZip } from "./unzip";
 
@@ -26,8 +27,8 @@ const MAX_SETTING = 512 * 1024;
 const SETTING_KEY = /^AdvantageScopeLite\/[A-Za-z0-9._/-]{1,80}$/;
 
 /** The largest asset zip taken, the most a team keeps in all, and how many assets. */
-export const MAX_UPLOAD = 10 * 1024 * 1024;
-export const MAX_ASSET_BYTES = 10 * 1024 * 1024;
+export const MAX_UPLOAD = 50 * 1024 * 1024;
+export const MAX_ASSET_BYTES = 50 * 1024 * 1024;
 export const MAX_ASSETS = 10;
 const ASSET_NAME = /^[A-Za-z0-9][A-Za-z0-9_. -]{0,99}$/;
 const FILE_NAME = /^[A-Za-z0-9][A-Za-z0-9_. -]{0,99}$/;
@@ -56,35 +57,27 @@ export type ScopeAsset = { name: string; size: number; uploadedAt: number };
 /** The assets in an uploaded zip: each folder holding a config.json, with the files beside it. */
 async function assetsIn(zip: ZipEntry[], zipName: string) {
   // A zip of asset zips (AdvantageScope's collections) is read one level down.
-  const entries: { path: string; size: number; read(): Promise<Uint8Array<ArrayBuffer>> }[] = [];
+  const entries: { path: string; entry: ZipEntry }[] = [];
   for (const entry of zip) {
     const path = `${zipName}/${entry.path}`;
     if (path.split("/").some((part) => part.startsWith(".") || part === "__MACOSX")) continue;
     if (entry.path.toLowerCase().endsWith(".zip")) {
-      const inner = readZip(await entry.read());
-      for (const file of inner) {
-        entries.push({
-          path: `${path.slice(0, -4)}/${file.path}`,
-          size: file.size,
-          read: file.read,
-        });
+      if (entry.size > MAX_UPLOAD) throw new ZipError("A zip in the zip is over 50 MB.");
+      for (const inner of readZip(await entry.read())) {
+        entries.push({ path: `${path.slice(0, -4)}/${inner.path}`, entry: inner });
       }
     } else {
-      entries.push({ path, size: entry.size, read: entry.read });
+      entries.push({ path, entry });
     }
   }
   const folders = entries
-    .filter((entry) => entry.path.endsWith("/config.json"))
-    .map((entry) => entry.path.slice(0, -"/config.json".length));
+    .filter(({ path }) => path.endsWith("/config.json"))
+    .map(({ path }) => path.slice(0, -"/config.json".length));
   return folders.map((folder) => ({
     name: folder.split("/").pop() ?? "",
     files: entries
-      .filter((entry) => entry.path.slice(0, entry.path.lastIndexOf("/")) === folder)
-      .map((entry) => ({
-        name: entry.path.slice(folder.length + 1),
-        size: entry.size,
-        read: entry.read,
-      })),
+      .filter(({ path }) => path.slice(0, path.lastIndexOf("/")) === folder)
+      .map(({ path, entry }) => ({ name: path.slice(folder.length + 1), entry })),
   }));
 }
 
@@ -264,20 +257,25 @@ export const scopeRoutes = new Hono<AppEnv>()
   // Upload Asset: a zip of one asset, or of several (each a folder or a zip of its own). An asset
   // with a name the team has replaces it. Mentors and admins only: everyone sees them.
   .post("/assets", requireMentor, async (c) => {
-    const form = await c.req.formData().catch(() => null);
-    const upload = form?.get("file") as File | string | null | undefined;
-    if (!(upload instanceof File) || !upload.name.toLowerCase().endsWith(".zip")) {
+    // The zip is held once, as the request's body: up to MAX_UPLOAD, and nothing unzipped is
+    // held whole (each file is checked, then streamed to R2), so it stays in a Worker's memory.
+    if (Number(c.req.header("Content-Length") ?? 0) > MAX_UPLOAD + 64 * 1024) {
+      return c.json({ error: "The zip is over 50 MB." }, 413);
+    }
+    const upload = multipartFile(
+      new Uint8Array(await c.req.arrayBuffer()),
+      c.req.header("Content-Type") ?? "",
+      "file",
+    );
+    if (!upload || !upload.name.toLowerCase().endsWith(".zip")) {
       return c.json({ error: "Uploaded asset must be a zip." }, 400);
     }
-    if (upload.size > MAX_UPLOAD) {
-      return c.json({ error: "The zip is over 10 MB." }, 413);
+    if (upload.bytes.length > MAX_UPLOAD) {
+      return c.json({ error: "The zip is over 50 MB." }, 413);
     }
     let found: Awaited<ReturnType<typeof assetsIn>>;
     try {
-      found = await assetsIn(
-        readZip(new Uint8Array(await upload.arrayBuffer())),
-        upload.name.slice(0, -4),
-      );
+      found = await assetsIn(readZip(upload.bytes), upload.name.slice(0, -4));
     } catch (err) {
       if (err instanceof ZipError) return c.json({ error: err.message }, 400);
       throw err;
@@ -303,39 +301,44 @@ export const scopeRoutes = new Hono<AppEnv>()
 
     const total =
       kept.reduce((sum, row) => sum + row.size, 0) +
-      found.reduce((sum, asset) => sum + asset.files.reduce((s, f) => s + f.size, 0), 0);
+      found.reduce((sum, asset) => sum + asset.files.reduce((s, f) => s + f.entry.size, 0), 0);
     if (total > MAX_ASSET_BYTES) {
-      return c.json({ error: "The team's assets would be over 10 MB." }, 413);
+      return c.json({ error: "The team's assets would be over 50 MB." }, 413);
     }
-    // Everything is read (at most MAX_ASSET_BYTES, as the zip states and unzipping holds it to)
-    // and each config.json checked before anything is stored, so a bad zip changes nothing.
-    const read: { name: string; config: unknown; files: { name: string; bytes: Uint8Array }[] }[] =
-      [];
-    for (const asset of found) {
-      const files: { name: string; bytes: Uint8Array }[] = [];
-      try {
-        for (const file of asset.files) files.push({ name: file.name, bytes: await file.read() });
-      } catch (err) {
-        if (err instanceof ZipError) return c.json({ error: err.message }, 400);
-        throw err;
+    // Every file is unzipped once and checked against its stated size, and each config.json read,
+    // before anything is stored, so a bad zip changes nothing.
+    const configs = new Map<string, unknown>();
+    try {
+      for (const asset of found) {
+        for (const file of asset.files) {
+          if (file.name !== "config.json") {
+            await file.entry.stream().pipeTo(new WritableStream());
+            continue;
+          }
+          const text = new TextDecoder().decode(await file.entry.read());
+          try {
+            configs.set(asset.name, JSON.parse(text));
+          } catch {
+            return c.json({ error: `${asset.name}'s config.json isn't valid JSON.` }, 400);
+          }
+        }
       }
-      let config: unknown;
-      try {
-        const bytes = files.find((f) => f.name === "config.json")?.bytes;
-        config = JSON.parse(new TextDecoder().decode(bytes));
-      } catch {
-        return c.json({ error: `${asset.name}'s config.json isn't valid JSON.` }, 400);
-      }
-      read.push({ name: asset.name, config, files });
+    } catch (err) {
+      if (err instanceof ZipError) return c.json({ error: err.message }, 400);
+      return c.json({ error: "The zip is damaged." }, 400);
     }
 
     const now = Date.now();
     const userId = c.get("userId");
-    for (const asset of read) {
+    for (const asset of found) {
       const files: AssetFile[] = [];
       for (const file of asset.files) {
-        await c.env.LOGS.put(assetKey(teamId, asset.name, file.name), file.bytes);
-        files.push({ name: file.name, size: file.bytes.length });
+        // Streamed: unzipped into R2 a piece at a time, at the size checked above.
+        const { readable, writable } = new FixedLengthStream(file.entry.size);
+        const piping = file.entry.stream().pipeTo(writable);
+        await c.env.LOGS.put(assetKey(teamId, asset.name, file.name), readable);
+        await piping;
+        files.push({ name: file.name, size: file.entry.size });
       }
       // Files of the version replaced that this one doesn't have.
       const before = existing.find((row) => row.name === asset.name);
@@ -349,7 +352,7 @@ export const scopeRoutes = new Hono<AppEnv>()
       }
       const values = {
         files: JSON.stringify(files),
-        config: JSON.stringify(asset.config),
+        config: JSON.stringify(configs.get(asset.name)),
         size: files.reduce((sum, f) => sum + f.size, 0),
         uploadedBy: userId,
         uploadedAt: now,

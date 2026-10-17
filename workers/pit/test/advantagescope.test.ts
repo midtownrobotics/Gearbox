@@ -2,6 +2,7 @@ import { env } from "cloudflare:test";
 import { newTeamId, teamUsers } from "@g3/testing/users";
 import { call, callAs, jsonAs } from "@g3/testing/worker";
 import { describe, expect, it } from "vitest";
+import { MAX_ASSETS, MAX_ASSET_BYTES, MAX_UPLOAD } from "../src/advantagescope";
 
 // AdvantageScope Lite at /scope/: the team's settings, its match logs as AdvantageScope's log
 // folder, and the assets a mentor uploads.
@@ -287,7 +288,7 @@ describe("assets", () => {
     ]);
   });
 
-  it("keeps a team's assets to 10 MB, 10 assets, and what the zip says it holds", async () => {
+  it("keeps a team's assets to 50 MB, 10 assets, and what the zip says it holds", async () => {
     const team = teamUsers(newTeamId());
     const post = (name: string, zip: Uint8Array) =>
       callAs(team.mentor, "/scope/assets", { method: "POST", body: uploadForm(name, zip) });
@@ -297,25 +298,26 @@ describe("assets", () => {
         { path: `${name}/model.glb`, text: "x".repeat(bytes), deflate: true },
       ]);
     const MB = 1024 * 1024;
+    const part = (share: number) => Math.round(MAX_ASSET_BYTES * share);
 
-    // Over 10 MB in one zip, stored.
+    // Over the limit in one zip, stored.
     expect(
       (
         await post(
           "Big.zip",
           await makeZip([
             { path: "Robot_Big/config.json", text: config },
-            { path: "Robot_Big/model.glb", text: new Uint8Array(10 * MB + 1) },
+            { path: "Robot_Big/model.glb", text: new Uint8Array(MAX_UPLOAD + 1) },
           ]),
         )
       ).status,
     ).toBe(413);
-    // Small zipped but over 10 MB unzipped, and over the team's 10 MB with another.
-    expect((await post("Huge.zip", await robot("Robot_Huge", 11 * MB))).status).toBe(413);
-    expect((await post("One.zip", await robot("Robot_One", 6 * MB))).status).toBe(200);
-    expect((await post("Two.zip", await robot("Robot_Two", 6 * MB))).status).toBe(413);
+    // Small zipped but over the limit unzipped, and over the team's limit with another.
+    expect((await post("Huge.zip", await robot("Robot_Huge", part(1.1)))).status).toBe(413);
+    expect((await post("One.zip", await robot("Robot_One", part(0.6)))).status).toBe(200);
+    expect((await post("Two.zip", await robot("Robot_Two", part(0.6)))).status).toBe(413);
     // Replacing one counts its new size, not both.
-    expect((await post("One.zip", await robot("Robot_One", 7 * MB))).status).toBe(200);
+    expect((await post("One.zip", await robot("Robot_One", part(0.7)))).status).toBe(200);
 
     // A zip that says its files are smaller than they unzip to.
     const lying = await makeZip([
@@ -329,14 +331,14 @@ describe("assets", () => {
       "/scope/asset-list",
     );
     expect(list.assets.map((asset) => asset.name)).toEqual(["Robot_One"]);
-    expect(list.assets[0].size).toBeGreaterThan(7 * MB);
+    expect(list.assets[0].size).toBeGreaterThan(part(0.7));
 
-    // At most 10 assets.
+    // At most MAX_ASSETS.
     await jsonAs(team.mentor, "/scope/assets/Robot_One", { method: "DELETE" });
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < MAX_ASSETS; i++) {
       expect((await post(`R${i}.zip`, await robot(`Robot_R${i}`, 10))).status).toBe(200);
     }
-    expect((await post("R10.zip", await robot("Robot_R10", 10))).status).toBe(409);
+    expect((await post("Rx.zip", await robot("Robot_Rx", 10))).status).toBe(409);
   });
 
   it("refuses what isn't an asset zip, and a mentor removes one", async () => {

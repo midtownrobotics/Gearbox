@@ -47,7 +47,7 @@ export function ScopeAssets() {
       {data.assets.length === 0 ? (
         <p className="text-sm text-secondary-500">
           Add your robot or another field in AdvantageScope with File › Upload Asset (a zip of up to
-          10 MB). Everyone on the team sees them.
+          50 MB). Everyone on the team sees them.
         </p>
       ) : (
         <ul className="divide-y divide-secondary-200">
