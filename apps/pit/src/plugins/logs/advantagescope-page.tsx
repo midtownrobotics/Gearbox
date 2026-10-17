@@ -1,4 +1,4 @@
-import { ErrorBanner, Page, buttonClass, inputClass } from "@g3/ui";
+import { ErrorBanner, Page, inputClass } from "@g3/ui";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { scopeLogFile, scopeUrl } from "../../shared/getters/advantagescope";
@@ -70,14 +70,6 @@ export function AdvantageScopePage() {
               </optgroup>
             ))}
           </select>
-          <a
-            className={buttonClass("secondary", "sm")}
-            href={scopeUrl(file || undefined)}
-            target="_blank"
-            rel="noreferrer"
-          >
-            Open on its own
-          </a>
         </div>
       }
     >
