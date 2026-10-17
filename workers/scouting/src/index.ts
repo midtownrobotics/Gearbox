@@ -172,15 +172,29 @@ function publicMatch(match: TbaMatch) {
 
 async function persistAutomaticMatch(
   c: Context<AppEnv>,
-  configuredMatchNumber: number | null | undefined,
+  eventKey: string,
   match: TbaMatch | undefined,
 ) {
-  if (!match || match.comp_level !== "qm" || match.match_number === configuredMatchNumber) return;
+  if (!match || match.comp_level !== "qm") return null;
   await dbOf(c)
     .update(strategyEventConfig)
     .set({ current_match_number: match.match_number, updated_at: Date.now() })
-    .where(inTeam(strategyEventConfig, c.get("teamId"), sql`id = 1 AND schedule_mode = 'tba'`))
+    .where(
+      inTeam(
+        strategyEventConfig,
+        c.get("teamId"),
+        sql`id = 1 AND schedule_mode = 'tba' AND event_key = ${eventKey}
+      AND (current_match_number IS NULL OR current_match_number < ${match.match_number})`,
+      ),
+    )
     .run();
+  const saved = await first<{ current_match_number: number }>(
+    dbOf(c),
+    sql`
+    SELECT current_match_number FROM ${strategyEventConfig}
+    WHERE ${inTeam(strategyEventConfig, c.get("teamId"))} AND id = 1 AND schedule_mode = 'tba' AND event_key = ${eventKey}`,
+  );
+  return saved?.current_match_number ?? null;
 }
 
 async function getOrCreateScoutAssignment(
@@ -207,32 +221,22 @@ async function getOrCreateScoutAssignment(
   if (submitted) return submitted.team_name;
 
   if (!teams.length) return null;
-  const assignedCounts = await all<{ team_number: string; assignment_count: number }>(
-    dbOf(c),
-    sql`SELECT team_number, COUNT(*) AS assignment_count
-       FROM (SELECT * FROM ${scoutingMatchAssignments} WHERE ${inTeam(scoutingMatchAssignments, c.get("teamId"))}) AS scoped_scouting_match_assignments
-      WHERE event_key = ${eventKey} AND match_number = ${matchNumber}
-      GROUP BY team_number`,
-  );
-  const counts = new Map(
-    assignedCounts.results.map((row) => [row.team_number, Number(row.assignment_count)]),
-  );
-  const team = teams.reduce((best, candidate) =>
-    (counts.get(candidate) ?? 0) < (counts.get(best) ?? 0) ? candidate : best,
-  );
-  await dbOf(c)
-    .insert(scoutingMatchAssignments)
-    .values(
-      withTeam(c.get("teamId"), {
-        event_key: eventKey,
-        match_number: matchNumber,
-        user_id: c.get("userId"),
-        team_number: team,
-        assigned_at: Date.now(),
-      }),
-    )
-    .onConflictDoNothing()
-    .run();
+  // Counting coverage and claiming a team happen in one SQLite statement, so
+  // concurrent scouts see earlier claims. Only an invalid lineup assignment is replaced.
+  const candidates = JSON.stringify(teams);
+  await dbOf(c).run(sql`
+    INSERT INTO ${scoutingMatchAssignments} (team_id, event_key, match_number, user_id, team_number, assigned_at)
+    SELECT ${c.get("teamId")}, ${eventKey}, ${matchNumber}, ${c.get("userId")}, candidate.value, ${Date.now()}
+    FROM json_each(${candidates}) AS candidate WHERE 1 = 1
+    ORDER BY (
+      SELECT COUNT(*) FROM ${scoutingMatchAssignments}
+      WHERE ${inTeam(scoutingMatchAssignments, c.get("teamId"))}
+        AND event_key = ${eventKey} AND match_number = ${matchNumber} AND team_number = candidate.value
+    ), candidate.key LIMIT 1
+    ON CONFLICT (team_id, event_key, match_number, user_id) DO UPDATE
+      SET team_number = excluded.team_number, assigned_at = excluded.assigned_at
+      WHERE ${scoutingMatchAssignments.team_number} NOT IN (SELECT value FROM json_each(${candidates}))
+  `);
   return (
     (
       await first<{ team_number: string }>(
@@ -407,7 +411,13 @@ async function resolveEventLink(c: Context<AppEnv>, forScout = false) {
     sql`SELECT event_key, current_match_number, tba_auth_key, schedule_mode, submission_window_seconds FROM (SELECT * FROM ${strategyEventConfig} WHERE ${inTeam(strategyEventConfig, c.get("teamId"))}) AS scoped_strategy_event_config WHERE id = 1`,
   );
   if (!config?.event_key)
-    return { eventKey: null, matchKey: null, matchNumber: null, submissionClosesAt: null };
+    return {
+      eventKey: null,
+      matchKey: null,
+      matchNumber: null,
+      submissionClosesAt: null,
+      teams: [] as string[],
+    };
   let current: TbaMatch | undefined;
   try {
     const matches = (await getEventMatches(c, config.event_key)).sort(
@@ -419,9 +429,21 @@ async function resolveEventLink(c: Context<AppEnv>, forScout = false) {
             (match) =>
               match.comp_level === "qm" && match.match_number === config.current_match_number,
           )
-        : automaticTbaMatch(matches, config.submission_window_seconds ?? DEFAULT_SUBMISSION_WINDOW);
-    if (config.schedule_mode !== "manual")
-      await persistAutomaticMatch(c, config.current_match_number, current);
+        : automaticTbaMatch(
+            matches,
+            config.submission_window_seconds ?? DEFAULT_SUBMISSION_WINDOW,
+            undefined,
+            config.current_match_number,
+          );
+    if (config.schedule_mode !== "manual") {
+      const minimum = await persistAutomaticMatch(c, config.event_key, current);
+      current = automaticTbaMatch(
+        matches,
+        config.submission_window_seconds ?? DEFAULT_SUBMISSION_WINDOW,
+        undefined,
+        minimum ?? config.current_match_number,
+      );
+    }
     if (forScout && config.schedule_mode !== "manual")
       current = nextScoutMatch(
         matches,
@@ -436,6 +458,7 @@ async function resolveEventLink(c: Context<AppEnv>, forScout = false) {
     eventKey: config.event_key,
     matchKey: current?.key ?? null,
     matchNumber: current?.match_number ?? config.current_match_number,
+    teams: current ? publicMatch(current).teams : [],
     submissionClosesAt:
       config.schedule_mode === "manual"
         ? null
@@ -482,14 +505,28 @@ app.get("/event-context", requireAuth, async (c) => {
       )
     : undefined;
   const windowSeconds = config?.submission_window_seconds ?? DEFAULT_SUBMISSION_WINDOW;
-  const tbaCurrent =
-    config?.schedule_mode === "manual" ? undefined : automaticTbaMatch(matches, windowSeconds);
+  let tbaCurrent =
+    config?.schedule_mode === "manual"
+      ? undefined
+      : automaticTbaMatch(matches, windowSeconds, undefined, config?.current_match_number);
+  if (config?.schedule_mode !== "manual") {
+    const minimum = await persistAutomaticMatch(c, eventKey, tbaCurrent);
+    tbaCurrent = automaticTbaMatch(
+      matches,
+      windowSeconds,
+      undefined,
+      minimum ?? config?.current_match_number,
+    );
+  }
   let current =
-    (config?.schedule_mode === "manual" ? configuredCurrent : tbaCurrent) ??
-    configuredCurrent ??
-    (config?.schedule_mode === "manual" ? matches[0] : matches.at(-1));
-  if (config?.schedule_mode !== "manual")
-    await persistAutomaticMatch(c, config?.current_match_number, current);
+    config?.schedule_mode === "manual"
+      ? (configuredCurrent ?? (config.current_match_number ? undefined : matches[0]))
+      : tbaCurrent;
+  if (eventKey && c.req.query("assign") === "true" && !current)
+    return c.json(
+      { error: "The current match is unavailable. Your draft is kept; try again shortly." },
+      503,
+    );
   const completedMatches = eventKey ? await submittedScoutMatches(c, eventKey) : new Set<number>();
   if (c.req.query("assign") === "true" && config?.schedule_mode !== "manual")
     current = nextScoutMatch(matches, current, completedMatches, windowSeconds);
@@ -608,16 +645,17 @@ app.put("/event-context", requireAuth, async (c) => {
   const body = await c.req.json<Record<string, unknown>>();
   const activeConfig = await first<{
     event_key: string;
+    current_match_number: number | null;
     tba_auth_key: string | null;
     schedule_mode: string;
     submission_window_seconds: number | null;
   }>(
     dbOf(c),
-    sql`SELECT event_key, tba_auth_key, schedule_mode, submission_window_seconds FROM (SELECT * FROM ${strategyEventConfig} WHERE ${inTeam(strategyEventConfig, c.get("teamId"))}) AS scoped_strategy_event_config WHERE id = 1`,
+    sql`SELECT event_key, current_match_number, tba_auth_key, schedule_mode, submission_window_seconds FROM (SELECT * FROM ${strategyEventConfig} WHERE ${inTeam(strategyEventConfig, c.get("teamId"))}) AS scoped_strategy_event_config WHERE id = 1`,
   );
   const eventKey =
-    activeConfig?.schedule_mode === "manual"
-      ? activeConfig.event_key
+    activeConfig?.schedule_mode === "manual" || body.eventKey === undefined
+      ? (activeConfig?.event_key ?? "")
       : text(body.eventKey, 30).toLowerCase();
   const tbaAuthKey = text(body.tbaAuthKey, 200);
   const nexusEventKey = text(body.nexusEventKey, 30).toLowerCase() || eventKey;
@@ -644,15 +682,20 @@ app.put("/event-context", requireAuth, async (c) => {
     }
   }
   const requestedMatch = body.currentMatchNumber;
-  const currentMatchNumber =
-    requestedMatch === "" || requestedMatch === null || requestedMatch === undefined
-      ? null
-      : Number(requestedMatch);
+  let currentMatchNumber =
+    requestedMatch === undefined
+      ? (activeConfig?.current_match_number ?? null)
+      : requestedMatch === "" || requestedMatch === null
+        ? null
+        : Number(requestedMatch);
   if (
     currentMatchNumber !== null &&
     (!Number.isInteger(currentMatchNumber) || currentMatchNumber < 1)
   )
     return c.json({ error: "Current match must be a positive qualification match number." }, 400);
+  // The saved minimum belongs to its event, not the next competition's schedule.
+  if (activeConfig?.schedule_mode !== "manual" && eventKey !== activeConfig?.event_key)
+    currentMatchNumber = null;
   // The match form on the same page sends no window of its own, so leave it as it was.
   const storedWindow = activeConfig?.submission_window_seconds ?? DEFAULT_SUBMISSION_WINDOW;
   const requestedWindow =
@@ -947,6 +990,11 @@ app.post("/scouting-forms/:id/submissions", requireAuth, async (c) => {
       );
     if (text(form.get("matchKey"), 200) !== eventLink.matchKey)
       return c.json({ error: "The match changed. Refresh the form before submitting." }, 409);
+    if (!eventLink.teams.includes(teamName))
+      return c.json(
+        { error: "The teams in this match changed. Refresh the form for your updated assignment." },
+        409,
+      );
     const existing = await first<Record<string, unknown>>(
       dbOf(c),
       sql`SELECT s.id
@@ -1054,6 +1102,7 @@ app.post("/scouting-forms/:id/submissions", requireAuth, async (c) => {
       )
       .get();
     if (
+      !latest.teams.includes(teamName) ||
       latestAssignment?.teamNumber !== teamName ||
       latest.matchKey !== eventLink.matchKey ||
       latest.eventKey !== eventLink.eventKey ||

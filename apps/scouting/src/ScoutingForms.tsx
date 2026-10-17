@@ -279,17 +279,21 @@ function EntryDraft({
   const drawnFields = useRef(new Set<string>());
   const mounted = useRef(true);
   const expiredRef = useRef(false);
+  const expiredContext = useRef<number | undefined>(undefined);
   const [expired, setExpired] = useState(false);
   const [, tick] = useState(0);
   const currentMatch = context?.currentMatch ?? null;
   const closesAt = context?.submissionClosesAt ?? null;
-  const clockOffset = useMemo(
-    () => (context?.serverNow ? context.serverNow - Date.now() : 0),
+  const clock = useMemo(
+    () => ({ time: context?.serverNow ?? Date.now(), started: performance.now() }),
     [context?.serverNow],
   );
+  const serverNow = useCallback(() => clock.time + performance.now() - clock.started, [clock]);
+  const remainingSeconds =
+    closesAt === null ? 0 : Math.max(0, Math.ceil((closesAt - serverNow()) / 1000));
   const isExpired = () =>
     form.kind === "scouting" &&
-    (expiredRef.current || (closesAt !== null && Date.now() + clockOffset >= closesAt));
+    (expiredRef.current || (closesAt !== null && serverNow() >= closesAt));
   const blocked =
     form.kind === "scouting" &&
     (expired ||
@@ -305,11 +309,25 @@ function EntryDraft({
     };
   }, []);
   useEffect(() => {
-    if (form.kind !== "scouting" || closesAt === null) return;
+    if (form.kind !== "scouting") return;
+    // A fresh server response can extend a cutoff or correct the device clock.
+    // Reopen an empty form; never restore answers cleared at the old deadline.
+    if (
+      expiredRef.current &&
+      context?.serverNow !== expiredContext.current &&
+      context?.assignedTeam &&
+      (closesAt === null || serverNow() < closesAt)
+    ) {
+      expiredRef.current = false;
+      setExpired(false);
+      setTeamName(context.assignedTeam);
+    }
+    if (closesAt === null) return;
     function checkDeadline() {
       tick((value) => value + 1);
-      if (Date.now() + clockOffset < (closesAt as number) || expiredRef.current) return;
+      if (serverNow() < (closesAt as number) || expiredRef.current) return;
       expiredRef.current = true;
+      expiredContext.current = context?.serverNow;
       setExpired(true);
       setTeamName("");
       setAnswers({});
@@ -327,7 +345,7 @@ function EntryDraft({
       window.removeEventListener("focus", checkDeadline);
       document.removeEventListener("visibilitychange", checkDeadline);
     };
-  }, [form.kind, closesAt, clockOffset, refreshContext]);
+  }, [form.kind, closesAt, serverNow, refreshContext, context?.serverNow, context?.assignedTeam]);
   async function submit(event: SyntheticEvent) {
     event.preventDefault();
     if (saving || blocked || isExpired() || (form.kind === "scouting" && scheduleUnavailable))
@@ -425,13 +443,7 @@ function EntryDraft({
               </strong>
               .{" "}
               <span role="timer" aria-live="off">
-                {Math.floor(
-                  Math.max(0, Math.ceil((closesAt - Date.now() - clockOffset) / 1000)) / 60,
-                )}
-                :
-                {String(
-                  Math.max(0, Math.ceil((closesAt - Date.now() - clockOffset) / 1000)) % 60,
-                ).padStart(2, "0")}{" "}
+                {Math.floor(remainingSeconds / 60)}:{String(remainingSeconds % 60).padStart(2, "0")}{" "}
                 remaining.
               </span>{" "}
               Answers and drawings reset when time runs out.

@@ -1,10 +1,12 @@
 import { env } from "cloudflare:workers";
 import { inTeam, withTeam } from "@g3/auth";
-import { newTeamId, teamUsers } from "@g3/testing/users";
+import { newTeamId, teamUsers, testUser } from "@g3/testing/users";
 import { callAs, jsonAs } from "@g3/testing/worker";
 import { describe, expect, it, vi } from "vitest";
 import { createDb } from "../src/db";
 import {
+  boylebucksAccounts,
+  boylebucksLedger,
   scoutingFormSubmissions,
   scoutingMatchAssignments,
   strategyEventConfig,
@@ -298,5 +300,280 @@ describe("scouting submission deadlines", () => {
     } finally {
       upload.mockRestore();
     }
+  });
+});
+
+async function enablePoints(f: Awaited<ReturnType<typeof fixture>>) {
+  await jsonAs(f.team.admin, "/scouting/engagement-settings", {
+    method: "PUT",
+    body: {
+      enabled: true,
+      predictionsEnabled: false,
+      combinationsEnabled: false,
+      leaderboardEnabled: false,
+      pointsLabel: "Scout Points",
+    },
+  });
+}
+
+function replacedLineup(row: TbaMatch) {
+  return {
+    ...row,
+    alliances: {
+      red: { team_keys: ["frc201", "frc202", "frc203"], score: row.alliances.red.score },
+      blue: { team_keys: ["frc204", "frc205", "frc206"], score: row.alliances.blue.score },
+    },
+  };
+}
+
+describe("scouting overlap integrity", () => {
+  it("repairs changed lineups without rewriting saved reports, rewards or drawings", async () => {
+    const f = await fixture();
+    await enablePoints(f);
+    expect((await f.submit(await f.context(), undefined, true)).status).toBe(201);
+    const saved = await f.reports();
+    const ledger = await db
+      .select()
+      .from(boylebucksLedger)
+      .where(inTeam(boylebucksLedger, f.team.teamId))
+      .all();
+    const originalImage = await bindings.FIELD_MAPS.get(saved[0].drawing_r2_key as string);
+    expect(originalImage).not.toBeNull();
+    const originalBytes = await originalImage?.arrayBuffer();
+    expect(originalBytes?.byteLength).toBeGreaterThan(0);
+    const old = await f.context();
+    const rows = [
+      match(f.keys[0], 1, Math.floor(Date.now() / 1000) - 30),
+      replacedLineup(match(f.keys[1], 2, null)),
+    ];
+    await cacheSchedule(f.eventKey, rows);
+    expect((await f.submit(old)).status).toBe(409);
+    const repaired = await f.context();
+    expect(["201", "202", "203", "204", "205", "206"]).toContain(repaired.assignedTeam);
+    expect(repaired.assignedTeam).not.toBe(old.assignedTeam);
+    expect((await f.submit(old)).status).toBe(409);
+    expect((await f.submit(repaired)).status).toBe(201);
+    expect((await f.reports()).find((row) => row.id === saved[0].id)).toEqual(saved[0]);
+    const afterLedger = await db
+      .select()
+      .from(boylebucksLedger)
+      .where(inTeam(boylebucksLedger, f.team.teamId))
+      .all();
+    expect(afterLedger.find((row) => row.id === ledger[0].id)).toEqual(ledger[0]);
+    expect(
+      await (await bindings.FIELD_MAPS.get(saved[0].drawing_r2_key as string))?.arrayBuffer(),
+    ).toEqual(originalBytes);
+  });
+
+  it("rejects a lineup change during upload and removes only that rejected upload", async () => {
+    const f = await fixture();
+    const old = await f.context();
+    const put = bindings.FIELD_MAPS.put.bind(bindings.FIELD_MAPS);
+    const spy = vi.spyOn(bindings.FIELD_MAPS, "put").mockImplementationOnce(async (...args) => {
+      const result = await put(...args);
+      await cacheSchedule(f.eventKey, [
+        replacedLineup(match(f.keys[0], 1, Math.floor(Date.now() / 1000) - 30)),
+        match(f.keys[1], 2, null),
+      ]);
+      return result;
+    });
+    try {
+      expect((await f.submit(old, undefined, true)).status).toBe(409);
+      expect(await f.reports()).toEqual([]);
+      expect(
+        (
+          await bindings.FIELD_MAPS.list({
+            prefix: `teams/${encodeURIComponent(f.team.teamId)}/scouting-submissions/`,
+          })
+        ).objects,
+      ).toEqual([]);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it("claims six different teams even when all scouts reach the assignment write together", async () => {
+    const f = await fixture();
+    const users = Array.from({ length: 6 }, (_, index) =>
+      testUser({ id: `simultaneous-${index}`, teamId: f.team.teamId }),
+    );
+    let arrived = 0;
+    let release = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const prepare = bindings.SCOUTING_DB.prepare.bind(bindings.SCOUTING_DB);
+    const spy = vi.spyOn(bindings.SCOUTING_DB, "prepare").mockImplementation((query) => {
+      const statement = prepare(query);
+      if (!query.includes("INSERT INTO") || !query.includes('"scouting_match_assignments"'))
+        return statement;
+      const bind = statement.bind.bind(statement);
+      vi.spyOn(statement, "bind").mockImplementation((...values) => {
+        const bound = bind(...values);
+        const run = bound.run.bind(bound);
+        vi.spyOn(bound, "run").mockImplementation(async () => {
+          arrived++;
+          if (arrived === 6) release();
+          await gate;
+          return run();
+        });
+        return bound;
+      });
+      return statement;
+    });
+    const timeout = setTimeout(release, 2000);
+    try {
+      const contexts = await Promise.all(
+        users.map((user) => jsonAs<Context>(user, "/scouting/event-context?assign=true")),
+      );
+      expect(arrived).toBe(6);
+      expect(new Set(contexts.map((context) => context.assignedTeam)).size).toBe(6);
+      const again = await jsonAs<Context>(users[0], "/scouting/event-context?assign=true");
+      expect(again.assignedTeam).toBe(contexts[0].assignedTeam);
+    } finally {
+      release();
+      clearTimeout(timeout);
+      spy.mockRestore();
+    }
+  });
+
+  it("keeps assignment coverage private to each team using a shared public schedule", async () => {
+    const a = await fixture();
+    const b = await fixture();
+    await db.insert(scoutingMatchAssignments).values(
+      withTeam(b.team.teamId, {
+        event_key: a.eventKey,
+        match_number: 1,
+        user_id: b.team.student.id,
+        team_number: "101",
+        assigned_at: Date.now(),
+      }),
+    );
+    const before = await db
+      .select()
+      .from(scoutingMatchAssignments)
+      .where(inTeam(scoutingMatchAssignments, b.team.teamId))
+      .all();
+    expect((await a.context()).assignedTeam).toBe("101");
+    expect(
+      await db
+        .select()
+        .from(scoutingMatchAssignments)
+        .where(inTeam(scoutingMatchAssignments, b.team.teamId))
+        .all(),
+    ).toEqual(before);
+  });
+
+  it("never moves an ahead scout backward when an earlier result or delay is corrected", async () => {
+    const f = await fixture();
+    const now = Math.floor(Date.now() / 1000);
+    const rows = [
+      match(f.keys[0], 1, now - 30),
+      match(f.keys[1], 2, null),
+      match(`${f.eventKey}_qm3`, 3, null),
+    ];
+    await cacheSchedule(f.eventKey, rows);
+    expect((await f.submit(await f.context())).status).toBe(201);
+    const second = await f.context();
+    rows[0].post_result_time = now - 121;
+    await cacheSchedule(f.eventKey, rows);
+    expect(await f.context()).toMatchObject({
+      currentMatch: second.currentMatch,
+      assignedTeam: second.assignedTeam,
+    });
+    expect((await f.submit(second)).status).toBe(201);
+    const third = await f.context();
+    expect(third.currentMatch?.matchNumber).toBe(3);
+    const stored = await f.reports();
+    rows[0].post_result_time = now - 30;
+    await cacheSchedule(f.eventKey, rows);
+    await jsonAs(f.team.admin, "/scouting/event-context", {
+      method: "PUT",
+      body: { currentMatchNumber: 2, submissionWindowSeconds: 300 },
+    });
+    expect(await f.context()).toMatchObject({
+      currentMatch: third.currentMatch,
+      assignedTeam: third.assignedTeam,
+      hasSubmittedCurrentMatch: false,
+    });
+    expect(await f.reports()).toEqual(stored);
+    expect((await f.submit(third)).status).toBe(201);
+  });
+
+  it("keeps a partial schedule from rolling back the saved current match", async () => {
+    const f = await fixture();
+    expect((await f.submit(await f.context())).status).toBe(201);
+    await f.schedule(Math.floor(Date.now() / 1000) - 121);
+    const current = await f.context();
+    expect(current.currentMatch?.matchNumber).toBe(2);
+    await cacheSchedule(f.eventKey, [match(f.keys[0], 1, Math.floor(Date.now() / 1000) - 121)]);
+    expect((await callAs(f.team.student, "/scouting/event-context?assign=true")).status).toBe(503);
+    expect(
+      await db
+        .select({ number: strategyEventConfig.current_match_number })
+        .from(strategyEventConfig)
+        .where(inTeam(strategyEventConfig, f.team.teamId))
+        .get(),
+    ).toEqual({ number: 2 });
+    await f.schedule(Math.floor(Date.now() / 1000) - 121);
+    expect(await f.context()).toMatchObject({
+      currentMatch: current.currentMatch,
+      assignedTeam: current.assignedTeam,
+    });
+  });
+
+  it("starts a new event with its own cursor and preserves the old event's reports", async () => {
+    const f = await fixture();
+    await f.schedule(Math.floor(Date.now() / 1000) - 121);
+    const second = await f.context();
+    expect(second.currentMatch?.matchNumber).toBe(2);
+    expect((await f.submit(second)).status).toBe(201);
+    const stored = await f.reports();
+    const eventKey = `2099qa${crypto.randomUUID().replaceAll("-", "").slice(0, 12)}`;
+    const schedule = [
+      match(`${eventKey}_qm1`, 1, Math.floor(Date.now() / 1000) - 30),
+      match(`${eventKey}_qm2`, 2, null),
+    ];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input) =>
+        Response.json(String(input).endsWith("/matches") ? schedule : { key: eventKey }),
+      ),
+    );
+    try {
+      await jsonAs(f.team.admin, "/scouting/event-context", {
+        method: "PUT",
+        body: { eventKey, currentMatchNumber: 2, tbaAuthKey: "test-only-key" },
+      });
+      expect((await f.context()).currentMatch?.matchNumber).toBe(1);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+    expect(await f.reports()).toEqual(stored);
+  });
+
+  it("saves one report, one reward and one retained drawing for concurrent duplicate submissions", async () => {
+    const f = await fixture();
+    await enablePoints(f);
+    const snapshot = await f.context();
+    const responses = await Promise.all([
+      f.submit(snapshot, undefined, true),
+      f.submit(snapshot, undefined, true),
+    ]);
+    expect(responses.map((response) => response.status).sort()).toEqual([201, 409]);
+    expect((await f.reports()).length).toBe(1);
+    const accounts = await db
+      .select()
+      .from(boylebucksAccounts)
+      .where(inTeam(boylebucksAccounts, f.team.teamId))
+      .all();
+    expect(accounts[0].balance).toBe(10);
+    expect(
+      (
+        await bindings.FIELD_MAPS.list({
+          prefix: `teams/${encodeURIComponent(f.team.teamId)}/scouting-submissions/`,
+        })
+      ).objects.length,
+    ).toBe(1);
   });
 });

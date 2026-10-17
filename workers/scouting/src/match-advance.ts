@@ -37,13 +37,21 @@ export function automaticTbaMatch(
   matches: TbaMatch[],
   windowSeconds = DEFAULT_SUBMISSION_WINDOW,
   now = Math.floor(Date.now() / 1000),
+  minimumMatchNumber: number | null = null,
 ) {
   const qualifications = matches
     .filter((match) => match.comp_level === "qm")
     .sort((left, right) => matchOrder(left) - matchOrder(right));
-  const ordered = qualifications.length
-    ? qualifications
-    : [...matches].sort((left, right) => matchOrder(left) - matchOrder(right));
+  const ordered = (
+    qualifications.length
+      ? qualifications
+      : [...matches].sort((left, right) => matchOrder(left) - matchOrder(right))
+  ).filter(
+    (match) =>
+      match.comp_level !== "qm" ||
+      minimumMatchNumber === null ||
+      match.match_number >= minimumMatchNumber,
+  );
   if (!ordered.length) return undefined;
   for (let index = 0; index < ordered.length - 1; index += 1) {
     const match = ordered[index];
