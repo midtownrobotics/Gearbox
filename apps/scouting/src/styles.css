@@ -6833,7 +6833,9 @@
     body,
     #root {
       max-width: 100%;
-      overflow-x: hidden;
+      /* hidden also computes overflow-y to auto. That makes body a scroll container
+         with no vertical range; its overscroll lock then traps Android touch swipes. */
+      overflow-x: clip;
     }
 
     .mobile-header {
