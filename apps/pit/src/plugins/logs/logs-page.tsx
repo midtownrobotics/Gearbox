@@ -10,7 +10,8 @@ import {
   useTeamNames,
 } from "@g3/ui";
 import { useCallback, useEffect, useState } from "react";
-import { advantageScopeUrl } from "../../shared/getters/advantagescope";
+import { Link } from "react-router-dom";
+import { advantageScopePage } from "../../shared/getters/advantagescope";
 import {
   type LogDownloader,
   createPairingCode,
@@ -201,9 +202,9 @@ export function LogsPage() {
       description="The robot's match logs."
       width="narrow"
       actions={
-        <a className={buttonClass("primary", "sm")} href={advantageScopeUrl()}>
+        <Link className={buttonClass("primary", "sm")} to={advantageScopePage()}>
           Open AdvantageScope
-        </a>
+        </Link>
       }
     >
       <p className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm text-amber-800">

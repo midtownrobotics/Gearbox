@@ -8,7 +8,8 @@ import {
   buttonClass,
 } from "@g3/ui";
 import { useCallback, useEffect, useState } from "react";
-import { advantageScopeUrl } from "../../shared/getters/advantagescope";
+import { Link } from "react-router-dom";
+import { advantageScopePage } from "../../shared/getters/advantagescope";
 import {
   type MatchLog,
   type MatchLogs as MatchLogsData,
@@ -200,9 +201,9 @@ export function MatchLogs() {
                       {log.uploadedAt ? ` · ${whenFormat.format(log.uploadedAt)}` : ""}
                     </p>
                   </div>
-                  <a className={buttonClass("secondary", "sm")} href={advantageScopeUrl(log)}>
+                  <Link className={buttonClass("secondary", "sm")} to={advantageScopePage(log)}>
                     Open in AdvantageScope
-                  </a>
+                  </Link>
                   <a className={buttonClass("secondary", "sm")} href={matchLogFileUrl(log.id)}>
                     Download
                   </a>
