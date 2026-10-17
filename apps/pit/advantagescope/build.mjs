@@ -64,8 +64,15 @@ if (!fs.existsSync(path.join(source, "package.json"))) {
   run("git", ["submodule", "update", "--init", "--depth", "1", "vendor/advantagescope"], repo);
 }
 
-// A fresh copy of the release, keeping what's slow to fetch again (dependencies, downloaded assets).
-const KEEP = ["node_modules", "docs/node_modules", "lite/static/bundledAssets"];
+// A fresh copy of the release, keeping what's slow to fetch again (dependencies, downloaded assets,
+// the dependencies' licenses).
+const KEEP = [
+  "node_modules",
+  "docs/node_modules",
+  "lite/static/bundledAssets",
+  "src/licenses.json",
+  "ThirdPartyLicenses.txt",
+];
 fs.mkdirSync(work, { recursive: true });
 for (const keep of KEEP) {
   const from = path.join(work, keep);
@@ -90,6 +97,7 @@ if (!fs.existsSync(path.join(work, "src/main/lite/teamStorage.ts"))) {
 }
 
 // Dependencies, without their install scripts (Electron's download, docs, the desktop app's).
+let installed = false;
 for (const dir of [work, path.join(work, "docs")]) {
   const lock = sha(path.join(dir, "package-lock.json"));
   const marker = path.join(dir, "node_modules", ".gearbox-lock");
@@ -97,11 +105,16 @@ for (const dir of [work, path.join(work, "docs")]) {
     log(`installing dependencies in ${path.relative(work, dir) || "."}`);
     run("npm", ["ci", "--ignore-scripts", "--no-audit", "--no-fund"], dir);
     fs.writeFileSync(marker, lock);
+    installed = true;
   }
 }
 
 const lite = { ASCOPE_DISTRIBUTION: "LITE" };
-run("node", ["getLicenses.mjs"], work);
+// The dependencies' licenses, fetched from GitHub: again only when the dependencies changed.
+const licenses = ["src/licenses.json", "ThirdPartyLicenses.txt"];
+if (installed || !licenses.every((file) => fs.existsSync(path.join(work, file)))) {
+  run("node", ["getLicenses.mjs"], work);
+}
 run("node", ["bundleLiteAssets.mjs"], work, lite);
 run("npm", ["run", "compile"], work, lite);
 run("node", ["wasmCompile.mjs"], work);
