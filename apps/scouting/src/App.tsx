@@ -58,6 +58,7 @@ import {
   saveFieldMapPreset,
   saveLocalFieldMap,
 } from "./local-field-maps";
+import { TierListAutosave } from "./tier-list-autosave";
 import { type ParsedTrajectory, parseTrajectoryFile, trajectoryToPng } from "./trajectory-files";
 
 type Page = "forms" | "predictions" | "admin" | "analysis" | "service" | "autos" | "tiers" | "maps";
@@ -234,23 +235,67 @@ function EmptyState({
 function TierLists() {
   const [lists, setLists] = useState<TierList[]>([]);
   const [current, setCurrent] = useState<TierList>({
+    id: crypto.randomUUID(),
     name: "2026 Team Rankings",
     description: "Overall event pick-list discussion",
     tiers: defaultTiers,
   });
   const [newItem, setNewItem] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [ready, setReady] = useState(false);
+  const [loadError, setLoadError] = useState("");
+  const storedIds = useRef(new Set<string>());
+  const observed = useRef(current);
+  const [autosave] = useState(
+    () =>
+      new TierListAutosave<TierList>(async (id, value) => {
+        const exists = storedIds.current.has(id);
+        await api(exists ? `/tier-lists/${encodeURIComponent(id)}` : "/tier-lists", {
+          method: exists ? "PUT" : "POST",
+          body: JSON.stringify(value),
+        });
+        storedIds.current.add(id);
+      }),
+  );
+  const [saveStatus, setSaveStatus] = useState(autosave.status);
   const [dragged, setDragged] = useState<{ tierId: string; item: string } | null>(null);
 
   const load = useCallback(async () => {
     const data = await api<{ tierLists: TierList[] }>("/tier-lists");
     setLists(data.tierLists);
-    if (data.tierLists[0]) setCurrent(data.tierLists[0]);
+    storedIds.current = new Set(data.tierLists.map((list) => list.id as string));
+    if (data.tierLists[0]) {
+      observed.current = data.tierLists[0];
+      setCurrent(data.tierLists[0]);
+    }
+    setLoadError("");
+    setReady(true);
   }, []);
 
   useEffect(() => {
-    load().catch(() => undefined);
+    load().catch(() => setLoadError("Could not load tier lists. Please try again."));
   }, [load]);
+
+  useEffect(() => autosave.subscribe(setSaveStatus), [autosave]);
+
+  useEffect(() => {
+    if (!ready || current === observed.current) return;
+    observed.current = current;
+    autosave.enqueue(current.id as string, current);
+    setLists((values) => [current, ...values.filter((list) => list.id !== current.id)]);
+  }, [autosave, current, ready]);
+
+  useEffect(() => {
+    const warnIfPending = (event: BeforeUnloadEvent) => {
+      if (!autosave.status.pending) return;
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warnIfPending);
+    return () => {
+      window.removeEventListener("beforeunload", warnIfPending);
+      void autosave.flush();
+    };
+  }, [autosave]);
 
   function updateTier(tierId: string, patch: Partial<Tier>) {
     setCurrent((value) => ({
@@ -290,26 +335,20 @@ function TierLists() {
     setDragged(null);
   }
 
-  async function save() {
-    setSaving(true);
-    try {
-      if (current.id) {
-        await api(`/tier-lists/${current.id}`, {
-          method: "PUT",
-          body: JSON.stringify(current),
-        });
-      } else {
-        const created = await api<{ id: string }>("/tier-lists", {
-          method: "POST",
-          body: JSON.stringify(current),
-        });
-        setCurrent((value) => ({ ...value, id: created.id }));
-      }
-      await load();
-    } finally {
-      setSaving(false);
-    }
-  }
+  if (loadError)
+    return (
+      <div role="alert">
+        {loadError}{" "}
+        <Button
+          onClick={() =>
+            load().catch(() => setLoadError("Could not load tier lists. Please try again."))
+          }
+        >
+          Retry
+        </Button>
+      </div>
+    );
+  if (!ready) return <PageLoading />;
 
   return (
     <SharedPage
@@ -324,10 +363,15 @@ function TierLists() {
           value={current.id ?? "new"}
           onChange={(event) => {
             const selected = lists.find((list) => list.id === event.target.value);
-            if (selected) setCurrent(selected);
+            if (selected) {
+              observed.current = selected;
+              setCurrent(selected);
+            }
           }}
         >
-          <option value="new">New unsaved list</option>
+          {!lists.some((list) => list.id === current.id) && (
+            <option value={current.id}>{current.name}</option>
+          )}
           {lists.map((list) => (
             <option key={list.id} value={list.id}>
               {list.name}
@@ -339,6 +383,7 @@ function TierLists() {
           type="button"
           onClick={() =>
             setCurrent({
+              id: crypto.randomUUID(),
               name: "Untitled tier list",
               description: "",
               tiers: defaultTiers.map((tier) => ({
@@ -351,9 +396,15 @@ function TierLists() {
         >
           <Plus size={17} /> New
         </Button>
-        <Button variant="primary" type="button" onClick={save} disabled={saving}>
-          {saving ? <Loader2 size={17} className="spin" /> : <Save size={17} />} Save list
-        </Button>
+        <span role="status" aria-live="polite">
+          {saveStatus.error
+            ? `Could not save: ${saveStatus.error} Retrying automatically.`
+            : saveStatus.pending || saveStatus.saving
+              ? "Saving…"
+              : storedIds.current.has(current.id as string)
+                ? "All changes saved"
+                : "Changes save automatically"}
+        </span>
       </div>
     >
       <Card className="editor-card">
@@ -365,7 +416,6 @@ function TierLists() {
             onChange={(event) => setCurrent({ ...current, name: event.target.value })}
             aria-label="Tier list name"
           />
-          <span>Updated {timeAgo(current.updatedAt)}</span>
         </div>
         <div className="add-row">
           <TextField

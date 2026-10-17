@@ -56,7 +56,7 @@ import { finiteNumber, id, parseJson, stringArray, teamNumber, text } from "./ut
 const ourTeam = requestTeamId;
 
 type Tier = { id: string; name: string; color: string; items: string[] };
-type TierListInput = { name?: unknown; description?: unknown; tiers?: unknown };
+type TierListInput = { id?: unknown; name?: unknown; description?: unknown; tiers?: unknown };
 type ScoutingField = {
   id: string;
   label: string;
@@ -1286,7 +1286,7 @@ app.post("/tier-lists", requireAuth, async (c) => {
   const name = text(body.name, 120);
   if (!name) return c.json({ error: "Name is required." }, 400);
   const tiers = Array.isArray(body.tiers) ? body.tiers : [];
-  const recordId = id("tier");
+  const recordId = text(body.id, 100) || id("tier");
   const now = Date.now();
   await dbOf(c)
     .insert(tierLists)
@@ -1301,6 +1301,15 @@ app.post("/tier-lists", requireAuth, async (c) => {
         updated_at: now,
       }),
     )
+    .onConflictDoUpdate({
+      target: [tierLists.teamId, tierLists.id],
+      set: {
+        name,
+        description: text(body.description, 500),
+        tiers_json: JSON.stringify(tiers),
+        updated_at: now,
+      },
+    })
     .run();
   return c.json({ id: recordId }, 201);
 });
