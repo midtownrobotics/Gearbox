@@ -81,8 +81,13 @@ for (const keep of KEEP) {
   const kept = path.join(here, `.keep-${keep.replaceAll("/", "-")}`);
   if (fs.existsSync(kept)) fs.renameSync(kept, path.join(work, keep));
 }
+// A repository of its own: inside Gearbox's, git apply would skip every path silently.
 log("applying gearbox.patch");
+run("git", ["init", "-q"], work);
 run("git", ["apply", "--whitespace=nowarn", patch], work);
+if (!fs.existsSync(path.join(work, "src/main/lite/teamStorage.ts"))) {
+  throw new Error("gearbox.patch didn't apply.");
+}
 
 // Dependencies, without their install scripts (Electron's download, docs, the desktop app's).
 for (const dir of [work, path.join(work, "docs")]) {
