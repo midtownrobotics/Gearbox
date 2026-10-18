@@ -1,5 +1,16 @@
 # @g3/pit-log-downloader
 
+## 2.1.0
+
+### Minor Changes
+
+- 3c67e43: Pit's Logs page and Monitor show what the log downloader is doing: online, connected to the robot, copying and uploading. The Monitor's Recent Logs is now Logs, and In the pit now is at the top of its left column. On the downloader, the robot shows as connected as soon as the computer joins its network, the page no longer stalls while logs copy, it checks the robot again for new logs while connected, and "In Gearbox" follows what Pit has. Deployers: apply Pit's migration 0017 first.
+
+### Patch Changes
+
+- 011e4d8: Pairing and uploads no longer fail with "Couldn't reach Gearbox" on networks without IPv6 or with a slow first connection.
+- 6077315: A log copy cut off by the robot leaving (or one that stops moving) now ends and is tried again the next time the robot is connected, instead of staying stuck on Copying.
+
 ## 2.0.0
 
 ### Major Changes
