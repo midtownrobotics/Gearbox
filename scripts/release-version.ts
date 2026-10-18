@@ -62,7 +62,10 @@ export function applyRelease(root: string): ReleaseSummary {
   // The changesets' summaries by app, read before `changeset version` deletes them.
   const notes = new Map<string, string[]>();
   const dir = join(root, ".changeset");
-  for (const file of readdirSync(dir).filter((f) => f.endsWith(".md") && f !== "README.md")) {
+  const changesets = readdirSync(dir).filter((f) => f.endsWith(".md") && f !== "README.md");
+  // Changesets 3 fails when there's nothing to apply, as on the run its own release commit starts.
+  if (changesets.length === 0) return { platform: null, apps: [], entry: null };
+  for (const file of changesets) {
     const [, front = "", body = ""] =
       readFileSync(join(dir, file), "utf8").match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/) ?? [];
     const apps = new Set(
