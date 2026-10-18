@@ -23,11 +23,21 @@ export async function getWhenFull(db: Db, team: string): Promise<WhenFull> {
   return (WHEN_FULL as readonly string[]).includes(value) ? (value as WhenFull) : "skip-new";
 }
 
+/**
+ * Settings Pit keeps for itself, not among the team's settings: the battery timers' state
+ * (battery-timers.ts) and, in dev and staging, the event snapshot (event-snapshot.ts).
+ */
+export type InternalSettingKey =
+  | "batteryTimersPaused"
+  | "batteryTimersAppliedAt"
+  | "batteryTimersEvents"
+  | "eventSnapshotSince";
+
 /** One of the team's settings, or "" when it hasn't set it. */
 export async function getSetting(
   db: Db,
   team: string,
-  key: SettingKey | "matchLogsWhenFull",
+  key: SettingKey | "matchLogsWhenFull" | InternalSettingKey,
 ): Promise<string> {
   const [row] = await db
     .select()

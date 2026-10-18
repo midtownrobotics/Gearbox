@@ -13,6 +13,8 @@ export type AppEnv = {
     /** Match logs from the team's log downloaders, in Shop's bucket under pit/teams/<team>/logs/ (match-logs.ts). */
     LOGS: R2Bucket;
     G3ID: Fetcher;
+    /** Schedule, for when the team's events open and close (battery-timers.ts). Optional. */
+    SCHEDULE?: Fetcher;
   };
   Variables: G3AuthVariables & {
     /** The paired log downloader a request came from (`requireDownloader`). */

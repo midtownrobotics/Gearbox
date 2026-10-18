@@ -92,6 +92,7 @@ export async function loadDemo(db: Db, teamId: string) {
         name: battery.name,
         state: battery.state,
         stateSince: (now - HOUR) * 1000,
+        countingSince: (now - HOUR) * 1000,
         voltage: battery.voltage,
         useCount: battery.uses,
         createdAt: now - 90 * 24 * HOUR,

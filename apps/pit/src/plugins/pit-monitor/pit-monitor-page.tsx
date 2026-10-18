@@ -1,8 +1,8 @@
-import { Button, ProgressBar, useTeamNames } from "@g3/ui";
-import { useEffect, useState } from "react";
+import { Badge, Button, ProgressBar, tones, useTeamNames } from "@g3/ui";
+import { type RefObject, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { api } from "../../shared/api";
 import { useBatteryCache } from "../../shared/battery-cache-context";
-import { ElapsedTime, STATE_TONES, voltageColor } from "../../shared/battery-display";
+import { ElapsedTime, STATE_TONES, timerMs, voltageColor } from "../../shared/battery-display";
 import { DownloaderStatusRows, currentDownloader } from "../../shared/downloader-status";
 import { useFullscreen } from "../../shared/fullscreen-context";
 import { fetchBatteries } from "../../shared/getters/batteries";
@@ -25,6 +25,18 @@ import { ConnectionIndicator, OfflineOverlay, useConnection } from "./connection
 
 const REFRESH_MS = 15_000;
 
+/**
+ * The match list and the checklists, the tallest parts: on a wide screen each shrinks to what's
+ * left of its column and scrolls inside, and on a narrow one it's never taller than the window.
+ */
+const SCROLL_SECTION = "flex min-h-40 max-h-[80dvh] shrink flex-col lg:max-h-none";
+/** Wide enough for two columns (Tailwind's lg). */
+const WIDE = "(min-width: 1024px)";
+/** Space under the columns, the page's own padding. */
+const BOTTOM_GAP = 20;
+/** Below this, the columns aren't fit to the window: the page scrolls instead. */
+const MIN_FIT_HEIGHT = 480;
+
 // ── External data types ────────────────────────────────────────────────────
 
 type RankingRow = {
@@ -44,12 +56,17 @@ type NexusMatchTime = {
   actualOnFieldTime?: number | null;
 };
 
+/** A played match's score, from The Blue Alliance. */
+type MatchResult = { red: number; blue: number; winner: "red" | "blue" | "tie" };
+
 type NexusMatch = {
   label: string;
   status: "Queuing soon" | "Now queuing" | "On deck" | "On field";
   redTeams?: (string | null | undefined)[] | null;
   blueTeams?: (string | null | undefined)[] | null;
   times: NexusMatchTime;
+  /** Null until it's been played (and always for practice matches). */
+  result?: MatchResult | null;
 };
 
 type NexusData = {
@@ -65,6 +82,8 @@ type ContextRankings = {
 
 type MonitorData = {
   teamNumber: string;
+  /** A past event shown instead of the team's (dev and staging only: Pit > Admin). */
+  snapshot?: { event: string; name: string } | null;
   nexus: NexusData | null;
   ranking: RankingRow | null;
   contextRankings?: ContextRankings | null;
@@ -95,6 +114,36 @@ function teamInMatch(m: NexusMatch, team: string): boolean {
   return (
     m.blueTeams?.some((t) => t === team) === true || m.redTeams?.some((t) => t === team) === true
   );
+}
+
+/**
+ * How tall an element can be to end at the bottom of the window, on a wide screen; null on a
+ * narrow one, or when too little of the window is left.
+ */
+function useFitToWindow(ref: RefObject<HTMLElement | null>, ready: boolean): number | null {
+  const [height, setHeight] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    const element = ref.current;
+    if (!ready || !element) return;
+    const wide = window.matchMedia(WIDE);
+    const measure = () => {
+      const top = element.getBoundingClientRect().top + window.scrollY;
+      const fits = window.innerHeight - top - BOTTOM_GAP;
+      setHeight(wide.matches && fits >= MIN_FIT_HEIGHT ? fits : null);
+    };
+    measure();
+    // Anything above it changing size (the bar hidden in full screen, a banner) moves it.
+    const observer = new ResizeObserver(measure);
+    observer.observe(document.body);
+    window.addEventListener("resize", measure);
+    wide.addEventListener("change", measure);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", measure);
+      wide.removeEventListener("change", measure);
+    };
+  }, [ref, ready]);
+  return height;
 }
 
 // ── Isolated timer components ──────────────────────────────────────────────
@@ -185,83 +234,153 @@ function NexusSection({ nexus, teamNumber }: { nexus: NexusData; teamNumber: str
   );
 }
 
-function UpcomingMatchesSection({
+/** The team's result in a played match: a green W, a red L, or a gray T. */
+function MatchOutcome({ match, teamNumber }: { match: NexusMatch; teamNumber: string }) {
+  const result = match.result;
+  if (!result) return null;
+  const ourSide = match.redTeams?.includes(teamNumber) ? "red" : "blue";
+  if (result.winner === "tie") {
+    return <span className="font-black text-secondary-500">T</span>;
+  }
+  return result.winner === ourSide ? (
+    <span className="font-black text-emerald-600">W</span>
+  ) : (
+    <span className="font-black text-red-600">L</span>
+  );
+}
+
+/** A score, bold for the winner; "—" before the match is played. */
+function Score({
+  match,
+  side,
+}: {
+  match: NexusMatch;
+  side: "red" | "blue";
+}) {
+  const result = match.result;
+  const color = side === "red" ? "text-red-700" : "text-blue-700";
+  if (!result) return <span className="text-secondary-400">—</span>;
+  const won = result.winner === side;
+  return <span className={`${color} ${won ? "font-black" : "font-medium"}`}>{result[side]}</span>;
+}
+
+/**
+ * The team's matches at the event, played ones with their scores. The list scrolls so the next
+ * match is near the top, with the last one played above it.
+ */
+function MatchesSection({
   nexus,
   teamNumber,
 }: {
   nexus: NexusData;
   teamNumber: string;
 }) {
-  const upcoming = nexus.matches.filter(
-    (m) => teamInMatch(m, teamNumber) && m.status !== "On field",
-  );
+  const matches = nexus.matches.filter((m) => teamInMatch(m, teamNumber));
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const headRef = useRef<HTMLTableSectionElement>(null);
+  const nextIndex = matches.findIndex((m) => !m.result);
+  const nextLabel = nextIndex >= 0 ? matches[nextIndex].label : null;
 
-  if (upcoming.length === 0) return null;
+  // When the next match changes, and when the list's size or its rows' do (it's fit to the
+  // window once the page has its data, and the team's font may load after).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: scrolls only when the next match changes
+  useEffect(() => {
+    const scroller = scrollerRef.current;
+    if (!scroller || nextIndex < 0) return;
+    const toNext = () => {
+      const row = scroller.querySelectorAll("tbody tr")[Math.max(0, nextIndex - 1)];
+      if (!row) return;
+      scroller.scrollTop +=
+        row.getBoundingClientRect().top -
+        scroller.getBoundingClientRect().top -
+        (headRef.current?.offsetHeight ?? 0);
+    };
+    toNext();
+    const observer = new ResizeObserver(toNext);
+    observer.observe(scroller);
+    if (scroller.firstElementChild) observer.observe(scroller.firstElementChild);
+    return () => observer.disconnect();
+  }, [nextLabel]);
+
+  if (matches.length === 0) return null;
 
   return (
-    <div className="space-y-2">
-      <h2 className="text-xs font-bold uppercase tracking-widest text-secondary-600">
-        Upcoming Matches
+    <div className={`${SCROLL_SECTION} space-y-2`}>
+      <h2 className="shrink-0 text-xs font-bold uppercase tracking-widest text-secondary-600">
+        Matches
       </h2>
-      <div
-        className="bg-surface border border-secondary-200 rounded-xl overflow-hidden flex flex-col"
-        style={{ maxHeight: "400px" }}
-      >
-        <div className="overflow-y-auto flex-1">
+      <div className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-secondary-200 bg-surface">
+        <div ref={scrollerRef} className="min-h-0 overflow-y-auto">
           <table className="w-full text-sm">
-            <thead className="sticky top-0 bg-surface border-b border-secondary-200">
+            <thead
+              ref={headRef}
+              className="sticky top-0 z-10 bg-surface shadow-[inset_0_-1px_0_var(--g3-line)]"
+            >
               <tr className="text-secondary-600 text-xs uppercase tracking-wide">
-                <th className="text-left px-4 py-2 font-semibold">Match</th>
-                <th className="text-left px-4 py-2 font-semibold">Queue</th>
-                <th className="text-left px-4 py-2 font-semibold">Start</th>
-                <th className="text-left px-4 py-2 font-semibold">Blue</th>
-                <th className="text-left px-4 py-2 font-semibold">Red</th>
+                <th className="text-left px-3 py-2 font-semibold">Match</th>
+                <th className="text-left px-3 py-2 font-semibold">Queue</th>
+                <th className="text-left px-3 py-2 font-semibold">Start</th>
+                <th className="text-left px-3 py-2 font-semibold">Blue</th>
+                <th colSpan={2} className="px-2 py-2 text-center font-semibold">
+                  Score
+                </th>
+                <th className="text-left px-3 py-2 font-semibold">Red</th>
               </tr>
             </thead>
             <tbody>
-              {upcoming.map((m) => {
-                const isOurMatch = teamInMatch(m, teamNumber);
+              {matches.map((m) => {
+                const played = !!m.result;
                 return (
                   <tr
                     key={m.label}
-                    className={`border-b border-secondary-200/50 last:border-0 ${isOurMatch ? "bg-primary-50" : ""}`}
+                    className={`border-b border-secondary-200/50 last:border-0 ${played ? "" : "bg-primary-50"}`}
                   >
                     <td
-                      className={`px-4 py-2.5 font-semibold ${isOurMatch ? "text-primary-700" : "text-secondary-900"}`}
+                      className={`whitespace-nowrap px-3 py-2.5 font-semibold ${played ? "text-secondary-900" : "text-primary-700"}`}
                     >
-                      {m.label}
+                      {m.label.replace(/^Qualification\b/, "Qual")}
                     </td>
-                    <td
-                      className={`px-4 py-2.5 tabular-nums ${isOurMatch ? "text-primary-600 font-semibold" : "text-secondary-600"}`}
-                    >
-                      {m.times.actualQueueTime
-                        ? formatTime(m.times.actualQueueTime)
-                        : m.times.estimatedQueueTime
-                          ? formatTime(m.times.estimatedQueueTime)
-                          : "—"}
-                    </td>
-                    <td
-                      className={`px-4 py-2.5 tabular-nums ${isOurMatch ? "text-primary-600 font-semibold" : "text-secondary-600"}`}
-                    >
-                      {formatTime(m.times.estimatedStartTime)}
-                    </td>
-                    <td className="px-4 py-2.5">
+                    {played ? (
+                      <td colSpan={2} className="px-3 py-2.5 text-base">
+                        <MatchOutcome match={m} teamNumber={teamNumber} />
+                      </td>
+                    ) : (
+                      <>
+                        <td className="whitespace-nowrap px-3 py-2.5 tabular-nums font-semibold text-primary-600">
+                          {m.times.actualQueueTime
+                            ? formatTime(m.times.actualQueueTime)
+                            : m.times.estimatedQueueTime
+                              ? formatTime(m.times.estimatedQueueTime)
+                              : "—"}
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-2.5 tabular-nums font-semibold text-primary-600">
+                          {formatTime(m.times.estimatedStartTime)}
+                        </td>
+                      </>
+                    )}
+                    <td className="px-3 py-2.5">
                       <span
                         className={
                           m.blueTeams?.includes(teamNumber)
-                            ? "text-blue-600 font-bold bg-blue-100 px-2 py-1 rounded"
-                            : "text-secondary-600"
+                            ? "whitespace-nowrap rounded bg-blue-100 px-2 py-1 font-bold text-blue-600"
+                            : "whitespace-nowrap text-secondary-600"
                         }
                       >
                         {m.blueTeams?.filter(Boolean).join(", ")}
                       </span>
                     </td>
-                    <td className="px-4 py-2.5">
+                    <td className="py-2.5 pl-2 pr-1 text-right tabular-nums">
+                      <Score match={m} side="blue" />
+                    </td>
+                    <td className="py-2.5 pl-1 pr-2 text-left tabular-nums">
+                      <Score match={m} side="red" />
+                    </td>
+                    <td className="px-3 py-2.5">
                       <span
                         className={
                           m.redTeams?.includes(teamNumber)
-                            ? "text-red-600 font-bold bg-red-100 px-2 py-1 rounded"
-                            : "text-secondary-600"
+                            ? "whitespace-nowrap rounded bg-red-100 px-2 py-1 font-bold text-red-600"
+                            : "whitespace-nowrap text-secondary-600"
                         }
                       >
                         {m.redTeams?.filter(Boolean).join(", ")}
@@ -393,7 +512,7 @@ function BatteryTile({
         <div className="space-y-1">
           <p className="text-xl font-black text-secondary-900">{battery.name}</p>
           <p className="text-xs tabular-nums text-secondary-600">
-            <ElapsedTime sinceMs={battery.stateSince} />
+            <ElapsedTime battery={battery} />
           </p>
           {state !== "Charging" && battery.voltage != null && (
             <p
@@ -413,9 +532,10 @@ function BatteryTile({
 function BatteriesSection({ batteries }: { batteries: Battery[] }) {
   const inRobot = batteries.find((b) => b.state === "In Robot");
   const nextUp = batteries.find((b) => b.state === "Next Up");
+  const now = Date.now();
   const longestCharging = batteries
     .filter((b) => b.state === "Charging")
-    .sort((a, b) => a.stateSince - b.stateSince)[0];
+    .sort((a, b) => timerMs(b, now) - timerMs(a, now))[0];
 
   return (
     <div className="space-y-2">
@@ -509,9 +629,9 @@ function ChecklistSection({
   const allDone = totalItems > 0 && totalChecked === totalItems;
 
   return (
-    <div className="space-y-4">
-      {/* Progress */}
-      <div className="space-y-3">
+    <div className={`${SCROLL_SECTION} gap-3`}>
+      {/* Overall progress stays at the top; the lists and issues scroll under it. */}
+      <div className="shrink-0 space-y-3">
         <h2 className="text-xs font-bold uppercase tracking-widest text-secondary-600">
           Checklist Progress
         </h2>
@@ -530,6 +650,8 @@ function ChecklistSection({
           </div>
           <ProgressBar percent={globalPct} done={allDone} className="!h-3" />
         </div>
+      </div>
+      <div className="min-h-0 space-y-4 overflow-y-auto">
         <div className="space-y-2">
           {lists.map((list) => {
             const pct =
@@ -550,33 +672,33 @@ function ChecklistSection({
             );
           })}
         </div>
-      </div>
 
-      {/* Issues */}
-      <div className="space-y-2 pt-2 border-t border-secondary-200">
-        <h2 className="text-xs font-bold uppercase tracking-widest text-secondary-600">
-          Open Issues{" "}
-          {issues.length > 0 && (
-            <span className="text-secondary-900 normal-case">{issues.length}</span>
+        {/* Issues */}
+        <div className="space-y-2 pt-2 border-t border-secondary-200">
+          <h2 className="text-xs font-bold uppercase tracking-widest text-secondary-600">
+            Open Issues{" "}
+            {issues.length > 0 && (
+              <span className="text-secondary-900 normal-case">{issues.length}</span>
+            )}
+          </h2>
+          {issues.length === 0 ? (
+            <p className="text-emerald-600 text-sm font-semibold">No open issues ✓</p>
+          ) : (
+            <div className="space-y-2">
+              {issues.map((issue) => (
+                <div
+                  key={issue.id}
+                  className="bg-amber-100 border border-amber-300 rounded-xl px-4 py-3"
+                >
+                  <p className="text-sm text-secondary-900 leading-snug">{issue.text}</p>
+                  <p className="text-xs text-secondary-600 mt-0.5">
+                    {issue.listName} · {issue.itemName}
+                  </p>
+                </div>
+              ))}
+            </div>
           )}
-        </h2>
-        {issues.length === 0 ? (
-          <p className="text-emerald-600 text-sm font-semibold">No open issues ✓</p>
-        ) : (
-          <div className="space-y-2">
-            {issues.map((issue) => (
-              <div
-                key={issue.id}
-                className="bg-amber-100 border border-amber-300 rounded-xl px-4 py-3"
-              >
-                <p className="text-sm text-secondary-900 leading-snug">{issue.text}</p>
-                <p className="text-xs text-secondary-600 mt-0.5">
-                  {issue.listName} · {issue.itemName}
-                </p>
-              </div>
-            ))}
-          </div>
-        )}
+        </div>
       </div>
     </div>
   );
@@ -603,6 +725,8 @@ export function PitMonitorPage() {
     logs: MatchLog[];
   } | null>(null);
   const connection = useConnection();
+  const gridRef = useRef<HTMLDivElement>(null);
+  const fitHeight = useFitToWindow(gridRef, !loading);
   // Who's in the pit on the team's Schedule; hidden while Schedule is off or hasn't answered.
   const inThePit = useInThePit();
 
@@ -708,7 +832,12 @@ export function PitMonitorPage() {
       <div className="px-6 py-5 space-y-5">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-secondary-200 pb-4">
-          <h1 className="text-2xl font-black tracking-tight">{names.appTitle("Pit")} Monitor</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-black tracking-tight">{names.appTitle("Pit")} Monitor</h1>
+            {monitor?.snapshot && (
+              <Badge colors={tones.warning}>Snapshot: {monitor.snapshot.name}</Badge>
+            )}
+          </div>
           <div className="flex items-center gap-4">
             <ConnectionIndicator connection={connection} />
             {lastUpdated && (
@@ -722,11 +851,16 @@ export function PitMonitorPage() {
           </div>
         </div>
 
-        {/* Main grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Left: Nexus status (only with real Nexus data) + ranking + upcoming matches. In the
+        {/* Main grid: on a wide screen it ends at the bottom of the window, and the match list
+            and checklists scroll inside their columns instead of the page scrolling. */}
+        <div
+          ref={gridRef}
+          className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:grid-rows-[minmax(0,1fr)]"
+          style={fitHeight ? { height: fitHeight } : undefined}
+        >
+          {/* Left: Nexus status (only with real Nexus data) + ranking + the team's matches. In the
               column, so the right one starts at the top instead of under it. */}
-          <div className="space-y-5">
+          <div className="flex min-h-0 flex-col gap-5">
             {inThePit && <InThePitSection people={inThePit} />}
             {nexus?.isRealNexus && <NexusSection nexus={nexus} teamNumber={teamNumber} />}
             {monitor?.ranking && (
@@ -736,11 +870,11 @@ export function PitMonitorPage() {
                 teamNumber={teamNumber}
               />
             )}
-            {hasNexus && nexus && <UpcomingMatchesSection nexus={nexus} teamNumber={teamNumber} />}
+            {hasNexus && nexus && <MatchesSection nexus={nexus} teamNumber={teamNumber} />}
           </div>
 
           {/* Right: the stream (when set) + logs + batteries + checklist + issues */}
-          <div className="space-y-5">
+          <div className="flex min-h-0 flex-col gap-5">
             {iframeUrl && (
               <div className="space-y-2">
                 <h2 className="text-xs font-bold uppercase tracking-widest text-secondary-600">

@@ -9,6 +9,7 @@ import { createDb } from "./db";
 import { EXPORTED_TABLES, TEAM_TABLES } from "./db/schema";
 import { demoWords, loadDemo } from "./demo";
 import { canEdit } from "./lib/editors";
+import { eventDays } from "./lib/event-days";
 import { manifest } from "./manifest";
 import { sendReminders } from "./reminders";
 import { friendsRouter } from "./routes/friends";
@@ -58,6 +59,10 @@ const app = base
       ]),
     );
   })
+  // When the team's events open and close each day: Pit's battery timers pause overnight.
+  .get("/internal/teams/:teamId/event-days", async (c) =>
+    c.json({ events: await eventDays(createDb(c.env.SCHEDULE_DB), c.req.param("teamId")) }),
+  )
   // When an operator deletes the team (the platform's console), or 90 days after the team switches
   // the app off (the platform's app library), its data goes too.
   .delete("/internal/teams/:teamId", async (c) => {

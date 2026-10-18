@@ -11,7 +11,10 @@ import {
 // Every table is one team's data and carries the team (migration 0011): every query goes through
 // inTeam/withTeam from @g3/auth (roadmap Phase 3).
 
-/** A team's Pit settings by name: eventKey, nexusEventKey, iframeUrl. */
+/**
+ * A team's Pit settings by name: eventKey, nexusEventKey, iframeUrl, matchLogsWhenFull, and the
+ * battery timers' state (../battery-timers.ts).
+ */
 export const settings = sqliteTable(
   "settings",
   {
@@ -61,6 +64,10 @@ export const batteries = sqliteTable("batteries", {
   voltage: real("voltage"),
   useCount: integer("use_count").notNull().default(0), // times put in the robot
   createdAt: integer("created_at").notNull(),
+  // Its timer (migration 0018, ../battery-timers.ts): ms counted in its state up to
+  // `countingSince`, which is null while the team's timers are paused.
+  countedMs: integer("counted_ms").notNull().default(0),
+  countingSince: integer("counting_since"),
 });
 
 export const checklistIssues = sqliteTable(
