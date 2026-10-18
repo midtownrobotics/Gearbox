@@ -1,5 +1,5 @@
 // `pnpm release:version`: turns the pending changesets into a release. The release workflow runs
-// it on `public` after main is merged in (and release-preview.ts runs it in a scratch copy to name
+// it on `public` after staging is merged in (and release-preview.ts runs it in a scratch copy to name
 // the release PR):
 //   1. `changeset version` bumps each changed app (page + worker together) and writes its
 //      CHANGELOG.md;
