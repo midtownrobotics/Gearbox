@@ -58,6 +58,7 @@ export type TeamRow = {
   country: string;
   status: TeamStatus;
   slackWorkspaceName: string | null;
+  discordGuildName: string | null;
   createdAt: number;
   openReports: number;
   isSite: boolean;
@@ -106,6 +107,7 @@ export type TeamDetail = {
     country: string;
     status: TeamStatus;
     slackWorkspaceName: string | null;
+    discordGuildName: string | null;
     founder: { id: string; name: string } | null;
     owner: { id: string; name: string } | null;
     termsAcceptedAt: number | null;

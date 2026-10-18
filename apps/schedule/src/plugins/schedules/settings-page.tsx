@@ -12,7 +12,9 @@ import {
   Switch,
   TextField,
   Toggle,
+  chatName,
   inputClass,
+  useTeamChat,
 } from "@g3/ui";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -94,6 +96,7 @@ const reminderLabel = (minutes: number | null) =>
 
 function DetailsCard({ detail, reload }: CardProps) {
   const navigate = useNavigate();
+  const chat = chatName(useTeamChat());
   const { schedule } = detail;
   const param = { id: String(schedule.id) };
   const [name, setName] = useState(schedule.name);
@@ -143,8 +146,8 @@ function DetailsCard({ detail, reload }: CardProps) {
           <TimeZoneSelect value={timeZone} onChange={setTimeZone} />
         </Field>
         <Field
-          label="Slack reminders"
-          hint="A message before each change of role, to everyone with Slack linked."
+          label={`${chat} reminders`}
+          hint={`A message before each change of role, to everyone with ${chat} linked.`}
         >
           <select
             className={inputClass}
@@ -168,7 +171,7 @@ function DetailsCard({ detail, reload }: CardProps) {
           label="Published"
           description={
             schedule.published
-              ? "Everyone on the team can see it, and Slack reminders are on."
+              ? `Everyone on the team can see it, and ${chat} reminders are on.`
               : "Only mentors and trusted students can see it. Students see it once it's published."
           }
           checked={schedule.published}

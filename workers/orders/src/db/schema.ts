@@ -149,7 +149,10 @@ export const orderRequests = sqliteTable(
     teamId: teamId(),
     requesterId: text("requester_id").notNull(),
     requesterName: text("requester_name").notNull(),
-    /** The requester's linked Slack user, captured at submit time, for notifications. */
+    /**
+     * The requester's Slack user, captured at submit time by older versions. No longer written:
+     * approval DMs go to the requester by their ID account, on Slack or Discord.
+     */
     requesterSlackId: text("requester_slack_id"),
     url: text("url").notNull(),
     vendor: text("vendor").notNull(),

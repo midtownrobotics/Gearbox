@@ -12,7 +12,7 @@ export type AppRole = "admin" | "mentor" | "member" | "kiosk";
 
 /** Something outside the app that it uses when the team has it. */
 export type AppIntegration =
-  | "slack"
+  | "slack or discord"
   | "edge box"
   | "onshape"
   | "share-a-cart"

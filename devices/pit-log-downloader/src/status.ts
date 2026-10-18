@@ -11,8 +11,10 @@ export type LogStatus = {
   matchType: MatchTypeName;
   matchNumber: number;
   downloaded: boolean;
-  /** In the team's Pit on Gearbox. */
+  /** Uploaded to the team's Pit (it isn't uploaded again, even if it's deleted there). */
   uploaded: boolean;
+  /** In the team's Pit now, as of Pit's list (asked once a minute); null when that isn't known. */
+  inGearbox: boolean | null;
   /** Kept to part of the match when uploaded. */
   trimmed: boolean;
   /** What it comes to gzipped for Pit, once worked out. */
@@ -59,7 +61,10 @@ export type Status = {
   restartCommand: string;
   gearbox: GearboxStatus;
   connection: {
+    /** On the robot's network. */
     robot: boolean;
+    /** Whether the roboRIO answered the last time it was tried; null before (or off its network). */
+    rioReachable: boolean | null;
     internet: boolean;
     /** Uploading to Gearbox right now. */
     uploadingRunning: boolean;

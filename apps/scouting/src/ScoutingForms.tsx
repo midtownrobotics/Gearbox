@@ -2,12 +2,17 @@ import { pageTeamNumber } from "@g3/site-config";
 import {
   Button,
   Card,
+  Chip,
+  Dialog,
   ErrorBanner,
   Loading,
   Page as SharedPage,
   TextField,
+  chatName,
   inputClass,
+  tones,
   useQuestions,
+  useTeamChat,
   useTeamNames,
 } from "@g3/ui";
 import {
@@ -18,6 +23,7 @@ import {
   Check,
   CheckCircle2,
   GripVertical,
+  Info,
   Maximize2,
   Megaphone,
   Minimize2,
@@ -36,6 +42,7 @@ import {
   type SyntheticEvent,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -44,6 +51,16 @@ import { Operations } from "./Operations";
 import { TeamLookupInput } from "./TeamLookupInput";
 import { api } from "./api";
 import { clearInputError, showTeamNumberError } from "./input-validation";
+import {
+  type MatchDraft,
+  dataUrlToBlob,
+  deleteDraft,
+  hasContent,
+  listDrafts,
+  loadDraft,
+  saveDraft,
+} from "./match-drafts";
+import { DoneScreen, MoveOnBar, ParkedDrafts, clock as clockText, timeOf } from "./match-handover";
 
 export type FieldType =
   | "shortText"
@@ -93,6 +110,8 @@ function FieldInput({
   canvasRef,
   canvasKey,
   onDrawingChange,
+  onCommit,
+  initialImage,
 }: {
   field: ScoutingField;
   value: unknown;
@@ -100,11 +119,21 @@ function FieldInput({
   canvasRef?: RefObject<HTMLCanvasElement | null>;
   canvasKey?: number;
   onDrawingChange?: (hasDrawing: boolean) => void;
+  onCommit?: (canvas: HTMLCanvasElement) => void;
+  initialImage?: string;
 }) {
   const inputId = `field-${field.id}`;
   const [counterInterval, setCounterInterval] = useState<(typeof COUNTER_INTERVALS)[number]>(1);
   if (field.type === "fieldMap" && canvasRef)
-    return <FormFieldMap key={canvasKey} canvasRef={canvasRef} onDrawingChange={onDrawingChange} />;
+    return (
+      <FormFieldMap
+        key={canvasKey}
+        canvasRef={canvasRef}
+        onDrawingChange={onDrawingChange}
+        onCommit={onCommit}
+        initialImage={initialImage}
+      />
+    );
   if (field.type === "counter") {
     const current = Number(value ?? 0);
     return (
@@ -221,17 +250,382 @@ function FieldInput({
   );
 }
 
+/** How long the bar counts down before the form moves on, and what "more time" adds each time. */
+const WARNING_SECONDS = 20;
+const EXTENSION_SECONDS = 30;
+const MAX_EXTENSIONS = 3;
+/** Without a start time for the next match, how long the done screen waits before opening it. */
+const DONE_OPENS_AFTER_MS = 60_000;
+
+/** The match and team a match form is filled in for, and when that match moves on. */
+type DraftTarget = { match: EventMatch; team: string; closesAt: number | null };
+type SentReport = { matchKey: string; label: string; team: string; at: number; late: boolean };
+
 function EntryForm({
   form,
   context,
   refreshContext,
+  scheduleUnavailable,
+  userId,
 }: {
   form: ScoutingForm;
   context: EventContext | null;
   refreshContext: () => Promise<void>;
+  scheduleUnavailable: boolean;
+  userId: string;
 }) {
-  const [teamName, setTeamName] = useState("");
-  const [answers, setAnswers] = useState<Record<string, unknown>>({});
+  if (form.kind !== "scouting")
+    return (
+      <EntryDraft
+        form={form}
+        userId={userId}
+        target={null}
+        refreshContext={refreshContext}
+        scheduleUnavailable={scheduleUnavailable}
+      />
+    );
+  return (
+    <MatchEntry
+      form={form}
+      context={context}
+      refreshContext={refreshContext}
+      scheduleUnavailable={scheduleUnavailable}
+      userId={userId}
+    />
+  );
+}
+
+/**
+ * A match form through a match: it follows the match the worker gives this scout, but never pulls
+ * a form with answers in it out from under them. Near the match's close a bar counts down, with
+ * time to add; when it runs out, the answers stay on the device, offered above the next form to
+ * send late. A sent report shows what went where until the next match starts.
+ */
+function MatchEntry({
+  form,
+  context,
+  refreshContext,
+  scheduleUnavailable,
+  userId,
+}: {
+  form: ScoutingForm;
+  context: EventContext | null;
+  refreshContext: () => Promise<void>;
+  scheduleUnavailable: boolean;
+  userId: string;
+}) {
+  // Server time, kept off the device's own clock so changing it can't expire a draft.
+  const clock = useMemo(
+    () => ({ time: context?.serverNow ?? Date.now(), started: performance.now() }),
+    [context?.serverNow],
+  );
+  const serverNow = useCallback(() => clock.time + performance.now() - clock.started, [clock]);
+  const [, tick] = useState(0);
+  useEffect(() => {
+    const timer = window.setInterval(() => tick((value) => value + 1), 500);
+    return () => window.clearInterval(timer);
+  }, []);
+  const now = serverNow();
+  const liveMatch = context?.currentMatch ?? null;
+  const liveTeam = context?.assignedTeam ?? null;
+  const liveClosesAt = context?.submissionClosesAt ?? null;
+  const live = useMemo<DraftTarget | null>(
+    () =>
+      liveMatch && liveTeam ? { match: liveMatch, team: liveTeam, closesAt: liveClosesAt } : null,
+    [liveMatch, liveTeam, liveClosesAt],
+  );
+  const [target, setTarget] = useState<DraftTarget | null>(live);
+  const [dirty, setDirty] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [extensions, setExtensions] = useState(0);
+  const [movedSeenAt, setMovedSeenAt] = useState<number | null>(null);
+  const [sent, setSent] = useState<SentReport | null>(null);
+  const [readyAt, setReadyAt] = useState<number | null>(null);
+  const [switchedTo, setSwitchedTo] = useState<string | null>(null);
+  const [parked, setParked] = useState<MatchDraft[]>([]);
+  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const formRef = useRef<HTMLFormElement | null>(null);
+  const refreshParked = useCallback(
+    () => setParked(listDrafts(userId, form.id)),
+    [userId, form.id],
+  );
+
+  // Follow the worker's match and team. A form with answers waits for the countdown below.
+  useEffect(() => {
+    setTarget((current) => {
+      if (!live) return current && dirty ? current : null;
+      if (!current) return live;
+      if (current.match.key !== live.match.key) return dirty ? current : live;
+      if (current.team !== live.team) return live;
+      return current.closesAt === live.closesAt ? current : { ...current, closesAt: live.closesAt };
+    });
+  }, [live, dirty]);
+
+  const targetKey = target ? `${target.match.key}:${target.team}` : "";
+  const targetName = target ? `${target.match.label} · Team ${target.team}` : null;
+  const lastTargetKey = useRef("");
+  useEffect(() => {
+    setExtensions(0);
+    setMovedSeenAt(null);
+    refreshParked();
+    // Said only when the form changes match under the scout, not when it first loads.
+    const previous = lastTargetKey.current;
+    lastTargetKey.current = targetKey;
+    if (previous && targetKey && targetName) setSwitchedTo(targetName);
+  }, [targetKey, targetName, refreshParked]);
+  useEffect(() => {
+    if (!switchedTo) return;
+    const clear = window.setTimeout(() => setSwitchedTo(null), 8_000);
+    return () => window.clearTimeout(clear);
+  }, [switchedTo]);
+
+  // The worker has moved past the match this form is for.
+  const serverMoved = target !== null && (!live || live.match.key !== target.match.key);
+  useEffect(() => {
+    if (serverMoved && dirty) setMovedSeenAt((seen) => seen ?? serverNow());
+  }, [serverMoved, dirty, serverNow]);
+
+  // When the form moves on: the match's close, else (a manual schedule) a short count from the
+  // moment the lead moved on, plus whatever time the scout added.
+  const deadline =
+    target?.closesAt ?? (movedSeenAt === null ? null : movedSeenAt + WARNING_SECONDS * 1000);
+  const moveAt = deadline === null ? null : deadline + extensions * EXTENSION_SECONDS * 1000;
+  const lateWindowSeconds = context?.lateWindowSeconds ?? 600;
+  const maxExtensions = Math.min(MAX_EXTENSIONS, Math.floor(lateWindowSeconds / EXTENSION_SECONDS));
+  const nextMatch = serverMoved ? (live?.match ?? null) : (context?.upcomingMatch ?? null);
+  const nextStarted = nextMatch?.scheduledAt != null && now >= nextMatch.scheduledAt;
+  const showBar =
+    target !== null && dirty && !sent && moveAt !== null && now >= moveAt - WARNING_SECONDS * 1000;
+  const moveDue = target !== null && dirty && moveAt !== null && now >= moveAt;
+  useEffect(() => {
+    if (moveDue) void refreshContext().catch(() => {});
+  }, [moveDue, refreshContext]);
+  useEffect(() => {
+    if (!moveDue || !serverMoved) return;
+    // Its answers are already saved on the device, and offered above the next form.
+    setDirty(false);
+    setTarget(live);
+  }, [moveDue, serverMoved, live]);
+
+  // Once a report is in: the done screen until the next match starts, or a minute without a time.
+  const nextReady =
+    sent !== null &&
+    live !== null &&
+    live.match.key !== sent.matchKey &&
+    !context?.hasSubmittedCurrentMatch;
+  useEffect(() => {
+    setReadyAt((at) => (nextReady ? (at ?? serverNow()) : null));
+  }, [nextReady, serverNow]);
+  const nextStartsAt = nextReady ? (live?.match.scheduledAt ?? null) : null;
+  const opensAt =
+    readyAt === null
+      ? null
+      : nextStartsAt !== null && nextStartsAt > readyAt
+        ? nextStartsAt
+        : readyAt + DONE_OPENS_AFTER_MS;
+  useEffect(() => {
+    if (opensAt !== null && now >= opensAt) setSent(null);
+  }, [opensAt, now]);
+  const onSubmitted = useCallback((report: SentReport) => {
+    setSent(report);
+    setDirty(false);
+  }, []);
+
+  useEffect(() => {
+    if (!message) return;
+    const clear = window.setTimeout(() => setMessage(null), 10_000);
+    return () => window.clearTimeout(clear);
+  }, [message]);
+
+  async function sendParked(draft: MatchDraft) {
+    const payload = new FormData();
+    payload.set("teamName", draft.teamName);
+    payload.set("matchKey", draft.matchKey);
+    payload.set("answers", JSON.stringify(draft.answers));
+    try {
+      for (const field of form.fields.filter((item) => item.type === "fieldMap")) {
+        const drawing = draft.drawings[field.id];
+        if (drawing)
+          payload.set(`drawing:${field.id}`, await dataUrlToBlob(drawing), `${field.id}.jpg`);
+      }
+      const result = await api<{ late?: boolean }>(`/scouting-forms/${form.id}/submissions`, {
+        method: "POST",
+        body: payload,
+      });
+      deleteDraft(userId, form.id, draft.matchKey);
+      refreshParked();
+      setMessage({
+        type: "success",
+        text: `${draft.matchLabel} report sent${result?.late ? ", marked late" : ""}.`,
+      });
+      void refreshContext().catch(() => {});
+      return null;
+    } catch (error) {
+      return error instanceof Error ? error.message : "Could not send the report.";
+    }
+  }
+
+  const showDone = sent !== null || Boolean(context?.hasSubmittedCurrentMatch);
+  const doneLabel = sent?.label ?? liveMatch?.label ?? "Match";
+  const upcoming = context?.upcomingMatch ?? null;
+  let banner: ReactNode = null;
+  if (scheduleUnavailable) {
+    banner = (
+      <span role="status">
+        Can't reach the match schedule. Your answers are kept; sending waits until it's back.
+      </span>
+    );
+  } else if (target && context?.scheduleMode === "manual") {
+    banner = <span>Manual schedule: this form moves on when the lead changes the match.</span>;
+  } else if (target && target.closesAt === null) {
+    banner = (
+      <span>
+        Send within {clockText(context?.submissionWindowSeconds ?? 120)} after the match ends.
+      </span>
+    );
+  } else if (target && target.closesAt !== null && now < target.closesAt) {
+    banner = (
+      <span>
+        Send by{" "}
+        <strong>
+          {new Date(target.closesAt).toLocaleTimeString([], {
+            hour: "numeric",
+            minute: "2-digit",
+            second: "2-digit",
+          })}
+        </strong>
+        .{" "}
+        <span role="timer" aria-live="off">
+          {clockText((target.closesAt - now) / 1000)} left.
+        </span>
+      </span>
+    );
+  } else if (target) {
+    banner = <span>Time’s up for {target.match.label}. Send it now: it’s marked late.</span>;
+  }
+  return (
+    <>
+      <ParkedDrafts
+        drafts={parked.filter((draft) => draft.matchKey !== target?.match.key)}
+        onSend={sendParked}
+        onDiscard={(draft) => {
+          deleteDraft(userId, form.id, draft.matchKey);
+          refreshParked();
+        }}
+      />
+      {showDone ? (
+        <DoneScreen
+          sentLabel={doneLabel}
+          detail={
+            sent
+              ? `${sent.late ? "Sent late" : "Sent"} ${timeOf(sent.at)} · Team ${sent.team}`
+              : null
+          }
+          next={
+            nextReady && live
+              ? { label: live.match.label, team: live.team, startsAt: live.match.scheduledAt }
+              : null
+          }
+          waiting={
+            upcoming
+              ? `${upcoming.label} opens once ${doneLabel} is scored.`
+              : "No more matches on the schedule for now."
+          }
+          now={now}
+          opensAt={opensAt}
+          onStart={() => setSent(null)}
+        />
+      ) : (
+        <>
+          {switchedTo && (
+            <p
+              className={`m-0 rounded-lg border px-4 py-2 text-sm font-semibold ${tones.info}`}
+              role="status"
+            >
+              Now scouting {switchedTo}
+            </p>
+          )}
+          <EntryDraft
+            key={`${form.id}:${targetKey}`}
+            form={form}
+            userId={userId}
+            target={target}
+            banner={banner}
+            formRef={formRef}
+            scheduleUnavailable={scheduleUnavailable}
+            refreshContext={refreshContext}
+            onSubmitted={onSubmitted}
+            onDirtyChange={setDirty}
+            onSavingChange={setSaving}
+          />
+        </>
+      )}
+      {showBar && target && (
+        <MoveOnBar
+          matchLabel={target.match.label}
+          nextLabel={nextMatch?.label ?? null}
+          secondsLeft={moveAt === null ? 0 : (moveAt - now) / 1000}
+          extendSeconds={EXTENSION_SECONDS}
+          canExtend={extensions < maxExtensions && !nextStarted}
+          sending={saving}
+          onSend={() => formRef.current?.requestSubmit()}
+          onExtend={() => setExtensions((count) => count + 1)}
+        />
+      )}
+      {message && (
+        <div className={`status-toast ${message.type}`} role="status" aria-live="polite">
+          {message.type === "success" ? <CheckCircle2 size={21} /> : <AlertCircle size={21} />}
+          <div>
+            <strong>{message.type === "success" ? "Success" : "Couldn’t send"}</strong>
+            <span>{message.text}</span>
+          </div>
+          <button type="button" onClick={() => setMessage(null)} aria-label="Dismiss notification">
+            <X size={17} />
+          </button>
+        </div>
+      )}
+    </>
+  );
+}
+
+function EntryDraft({
+  form,
+  userId,
+  target,
+  banner,
+  formRef,
+  scheduleUnavailable,
+  refreshContext,
+  onSubmitted,
+  onDirtyChange,
+  onSavingChange,
+}: {
+  form: ScoutingForm;
+  userId: string;
+  /** A match form's match and team; null for a pit form, or a match form with no match yet. */
+  target: DraftTarget | null;
+  banner?: ReactNode;
+  formRef?: RefObject<HTMLFormElement | null>;
+  scheduleUnavailable: boolean;
+  refreshContext: () => Promise<void>;
+  onSubmitted?: (report: SentReport) => void;
+  onDirtyChange?: (dirty: boolean) => void;
+  onSavingChange?: (saving: boolean) => void;
+}) {
+  const isMatch = form.kind === "scouting";
+  const match = target?.match ?? null;
+  // A draft this device kept for this match and team picks up where it left off.
+  const [restored] = useState(() => {
+    if (!isMatch || !target) return null;
+    const draft = loadDraft(userId, form.id, target.match.key);
+    return draft && draft.teamName === target.team && hasContent(draft) ? draft : null;
+  });
+  const [teamName, setTeamName] = useState(isMatch ? (target?.team ?? "") : "");
+  const [answers, setAnswers] = useState<Record<string, unknown>>(restored?.answers ?? {});
+  const [initialDrawings, setInitialDrawings] = useState(restored?.drawings ?? {});
+  const [hasDrawings, setHasDrawings] = useState(
+    Boolean(restored && Object.keys(restored.drawings).length),
+  );
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState<"success" | "error">("success");
   const [saving, setSaving] = useState(false);
@@ -239,25 +633,94 @@ function EntryForm({
   const canvases = useRef<Record<string, HTMLCanvasElement | null>>({});
   const canvasAdapters = useRef<Record<string, RefObject<HTMLCanvasElement | null>>>({});
   const drawnFields = useRef(new Set<string>());
-  const assignedMatchKey = useRef<string | null>(null);
-  const currentMatch = context?.currentMatch ?? null;
+  const drawings = useRef<Record<string, string>>({ ...(restored?.drawings ?? {}) });
+  // Field maps with a saved drawing on its way back: their first "no drawing" is the blank field
+  // loading, not the scout clearing it.
+  const restoring = useRef(new Set(Object.keys(restored?.drawings ?? {})));
+  const answersRef = useRef(answers);
+  const pendingSave = useRef(false);
+  const mounted = useRef(true);
+  const blocked = isMatch && (!match || !teamName);
+  const dirty = isMatch && (hasDrawings || hasContent({ answers, drawings: {} }));
+
+  const persist = useCallback(() => {
+    pendingSave.current = false;
+    if (!isMatch || !target) return;
+    saveDraft(userId, {
+      formId: form.id,
+      matchKey: target.match.key,
+      matchLabel: target.match.label,
+      teamName: target.team,
+      answers: answersRef.current,
+      drawings: { ...drawings.current },
+      savedAt: Date.now(),
+    });
+  }, [isMatch, target, userId, form.id]);
+  const persistRef = useRef(persist);
   useEffect(() => {
-    if (form.kind !== "scouting") return;
-    const matchKey = context?.currentMatch?.key ?? null;
-    if (context?.assignedTeam) {
-      setTeamName(context.assignedTeam);
-    } else if (matchKey && assignedMatchKey.current !== matchKey) {
-      setTeamName("");
+    persistRef.current = persist;
+  }, [persist]);
+  useEffect(() => {
+    answersRef.current = answers;
+    pendingSave.current = true;
+    const timer = window.setTimeout(() => persistRef.current(), 300);
+    return () => window.clearTimeout(timer);
+  }, [answers]);
+  useEffect(() => {
+    // Leaving the page or the app saves what's typed at once.
+    const flush = () => {
+      if (pendingSave.current) persistRef.current();
+    };
+    document.addEventListener("visibilitychange", flush);
+    window.addEventListener("pagehide", flush);
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      document.removeEventListener("visibilitychange", flush);
+      window.removeEventListener("pagehide", flush);
+      flush();
+    };
+  }, []);
+  useEffect(() => {
+    onDirtyChange?.(dirty);
+  }, [dirty, onDirtyChange]);
+  useEffect(() => {
+    onSavingChange?.(saving);
+  }, [saving, onSavingChange]);
+
+  function drawingChanged(fieldId: string, hasDrawing: boolean) {
+    if (hasDrawing) {
+      restoring.current.delete(fieldId);
+      drawnFields.current.add(fieldId);
+      return;
     }
-    if (matchKey) assignedMatchKey.current = matchKey;
-  }, [context?.assignedTeam, context?.currentMatch?.key, form.kind]);
+    if (restoring.current.has(fieldId)) return;
+    drawnFields.current.delete(fieldId);
+    if (!(fieldId in drawings.current)) return;
+    delete drawings.current[fieldId];
+    setHasDrawings(Object.keys(drawings.current).length > 0);
+    persist();
+  }
+  function drawingCommitted(fieldId: string, canvas: HTMLCanvasElement) {
+    if (!isMatch || !drawnFields.current.has(fieldId)) return;
+    try {
+      drawings.current[fieldId] = canvas.toDataURL("image/jpeg", 0.85);
+    } catch {
+      return;
+    }
+    setHasDrawings(true);
+    persist();
+  }
+
   async function submit(event: SyntheticEvent) {
     event.preventDefault();
+    if (saving || blocked || (isMatch && scheduleUnavailable)) return;
     setSaving(true);
     setMessage("");
     try {
       const payload = new FormData();
       payload.set("teamName", teamName);
+      if (isMatch) payload.set("matchKey", match?.key ?? "");
       payload.set("answers", JSON.stringify(answers));
       for (const field of form.fields.filter((item) => item.type === "fieldMap")) {
         if (!drawnFields.current.has(field.id)) continue;
@@ -269,18 +732,39 @@ function EntryForm({
           if (blob) payload.set(`drawing:${field.id}`, blob, `${field.id}.png`);
         }
       }
-      await api(`/scouting-forms/${form.id}/submissions`, { method: "POST", body: payload });
-      setAnswers({});
+      const result = await api<{ late?: boolean }>(`/scouting-forms/${form.id}/submissions`, {
+        method: "POST",
+        body: payload,
+      });
+      if (!mounted.current) return;
+      if (isMatch && target) deleteDraft(userId, form.id, target.match.key);
+      drawings.current = {};
+      answersRef.current = {};
       drawnFields.current.clear();
+      setHasDrawings(false);
+      setInitialDrawings({});
+      setAnswers({});
       setCanvasKey((value) => value + 1);
-      setMessageType("success");
-      setMessage("Report submitted.");
-      await refreshContext();
+      if (isMatch && target) {
+        onSubmitted?.({
+          matchKey: target.match.key,
+          label: target.match.label,
+          team: target.team,
+          at: Date.now(),
+          late: Boolean(result?.late),
+        });
+      } else {
+        setMessageType("success");
+        setMessage("Report submitted.");
+      }
+      await refreshContext().catch(() => {});
     } catch (error) {
+      if (!mounted.current) return;
       setMessageType("error");
       setMessage(error instanceof Error ? error.message : "Could not submit report.");
+      if (isMatch) void refreshContext().catch(() => {});
     } finally {
-      setSaving(false);
+      if (mounted.current) setSaving(false);
     }
   }
   function canvasAdapter(fieldId: string) {
@@ -298,20 +782,20 @@ function EntryForm({
     return adapter;
   }
   return (
-    <form className="scouting-entry" onSubmit={submit}>
+    <form className="scouting-entry" onSubmit={submit} ref={formRef}>
       <div className="scouting-form-title">
         <div className="scouting-form-heading-row">
           <h2>{form.name}</h2>
-          {form.kind === "scouting" && (
+          {isMatch && (
             <div className="scouting-match-summary">
               <strong className="scouting-match-number">
                 Match Number:
-                <span>{currentMatch?.matchNumber ?? "--"}</span>
+                <span>{match?.matchNumber ?? "--"}</span>
               </strong>
-              {currentMatch ? (
+              {match ? (
                 <div className="scouting-match-teams">
-                  <span className="red-alliance">Red: {currentMatch.redTeams.join(", ")}</span>
-                  <span className="blue-alliance">Blue: {currentMatch.blueTeams.join(", ")}</span>
+                  <span className="red-alliance">Red: {match.redTeams.join(", ")}</span>
+                  <span className="blue-alliance">Blue: {match.blueTeams.join(", ")}</span>
                 </div>
               ) : (
                 <span>Teams unavailable</span>
@@ -320,58 +804,66 @@ function EntryForm({
           )}
         </div>
       </div>
-      <label className="team-entry" htmlFor={`team-${form.id}`}>
-        <span>
-          Team number <b>*</b>
-        </span>
-        <TeamLookupInput
-          value={teamName}
-          onChange={setTeamName}
-          size="lg"
-          inputMode="numeric"
-          readOnly={form.kind === "scouting"}
-        />
-      </label>
-      <div className="scouting-questions">
-        {form.fields.map((field) => {
-          const mapRef = field.type === "fieldMap" ? canvasAdapter(field.id) : undefined;
-          return (
-            <div
-              className={`scouting-question ${field.type === "fieldMap" ? "wide" : ""}`}
-              key={field.id}
-            >
-              <label htmlFor={`field-${field.id}`}>
-                {field.label}
-                {field.required && <b> *</b>}
-              </label>
-              <FieldInput
-                field={field}
-                value={answers[field.id]}
-                setValue={(value) => setAnswers((current) => ({ ...current, [field.id]: value }))}
-                canvasRef={mapRef}
-                canvasKey={canvasKey}
-                onDrawingChange={(hasDrawing) => {
-                  if (hasDrawing) drawnFields.current.add(field.id);
-                  else drawnFields.current.delete(field.id);
-                }}
-              />
-            </div>
-          );
-        })}
-      </div>
+      {isMatch && banner && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">
+          {banner}
+          {restored && <span className="block">Your saved answers are back.</span>}
+        </div>
+      )}
+      <fieldset
+        className="m-0 grid min-w-0 gap-[22px] border-0 p-0 disabled:pointer-events-none"
+        disabled={saving || blocked}
+      >
+        <label className="team-entry" htmlFor={`team-${form.id}`}>
+          <span>
+            Team number <b>*</b>
+          </span>
+          <TeamLookupInput
+            value={teamName}
+            onChange={setTeamName}
+            size="lg"
+            inputMode="numeric"
+            readOnly={isMatch}
+          />
+        </label>
+        <div className="scouting-questions">
+          {form.fields.map((field) => {
+            const mapRef = field.type === "fieldMap" ? canvasAdapter(field.id) : undefined;
+            return (
+              <div
+                className={`scouting-question ${field.type === "fieldMap" ? "wide" : ""}`}
+                key={field.id}
+              >
+                <label htmlFor={`field-${field.id}`}>
+                  {field.label}
+                  {field.required && <b> *</b>}
+                </label>
+                <FieldInput
+                  field={field}
+                  value={answers[field.id]}
+                  setValue={(value) => setAnswers((current) => ({ ...current, [field.id]: value }))}
+                  canvasRef={mapRef}
+                  canvasKey={canvasKey}
+                  initialImage={initialDrawings[field.id]}
+                  onDrawingChange={(hasDrawing) => drawingChanged(field.id, hasDrawing)}
+                  onCommit={(canvas) => drawingCommitted(field.id, canvas)}
+                />
+              </div>
+            );
+          })}
+        </div>
+      </fieldset>
       <Button
         variant="primary"
         type="submit"
-        disabled={
-          saving || (form.kind === "scouting" && (context?.hasSubmittedCurrentMatch || !teamName))
-        }
+        disabled={saving || blocked || (isMatch && scheduleUnavailable)}
       >
         <Check size={17} />{" "}
         {saving
           ? "Submitting…"
-          : form.kind === "scouting" && context?.hasSubmittedCurrentMatch
-            ? "Already submitted"
-            : form.kind === "scouting" && !teamName
+          : isMatch && scheduleUnavailable
+            ? "Waiting for schedule"
+            : isMatch && !teamName
               ? "Waiting for team"
               : "Submit report"}
       </Button>
@@ -776,7 +1268,52 @@ type LiveStrategyUser = {
   current_page?: string;
 };
 
-function LiveStrategy() {
+/** A button beside a heading that explains the section in the page. */
+function InfoButton({ title, children }: { title: string; children: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        type="button"
+        className="info-button"
+        aria-label={`What is ${title}?`}
+        onClick={() => setOpen(true)}
+      >
+        <Info size={16} />
+      </button>
+      {open && (
+        <Dialog title={title} onClose={() => setOpen(false)} centered>
+          {children}
+        </Dialog>
+      )}
+    </>
+  );
+}
+
+/** What the Match schedule section's info button explains. */
+function ScheduleSourceInfo() {
+  return (
+    <InfoButton title="Match schedule">
+      <p>
+        Scouting normally reads the match schedule from The Blue Alliance, and moves everyone on to
+        the next match as the event runs.
+      </p>
+      <p>
+        If your event isn't on The Blue Alliance — an off-season, a practice day or a scrimmage —
+        switch to a manual schedule and enter the teams and matches yourself, by typing them or
+        scanning a photo of the printed schedule. You then set which match everyone is scouting on
+        the Competition overview.
+      </p>
+      <p>
+        A manual schedule is deleted three days after the competition ends, and switching back to
+        The Blue Alliance deletes its teams and matches. Scouting submissions are kept either way.
+      </p>
+    </InfoButton>
+  );
+}
+
+/** Who is in the app right now, inside the Competition overview. */
+function LiveUsers() {
   const [users, setUsers] = useState<LiveStrategyUser[]>([]);
   useEffect(() => {
     const load = () =>
@@ -790,8 +1327,8 @@ function LiveStrategy() {
     return () => window.clearInterval(interval);
   }, []);
   return (
-    <Card className="live-strategy">
-      <h2>See Live Users</h2>
+    <div className="live-strategy">
+      <h3>Live users</h3>
       {users.map((user) => (
         <div key={user.user_id}>
           <span className="live-dot" />
@@ -801,12 +1338,13 @@ function LiveStrategy() {
         </div>
       ))}
       {!users.length && <div className="forms-empty">No one is currently online.</div>}
-    </Card>
+    </div>
   );
 }
 
 function ServiceIssueReport() {
   const questions = useQuestions();
+  const chat = chatName(useTeamChat());
   const [open, setOpen] = useState(false);
   const [report, setReport] = useState({ teamName: "", issueType: "mechanical", description: "" });
   const [message, setMessage] = useState("");
@@ -831,7 +1369,7 @@ function ServiceIssueReport() {
         try {
           await api("/service-tickets", { method: "POST", body: JSON.stringify(report) });
           setMessageType("success");
-          setMessage("Service crew alerted through Slack.");
+          setMessage(`Service crew alerted through ${chat}.`);
           setReport({ teamName: "", issueType: "mechanical", description: "" });
         } catch (error) {
           setMessageType("error");
@@ -906,6 +1444,8 @@ type EventContext = {
   eventKey: string;
   currentMatchNumber: number | null;
   currentMatch: EventMatch | null;
+  /** The match after this scout's, for the countdown bar and the done screen. */
+  upcomingMatch?: EventMatch | null;
   tbaCurrentMatch: EventMatch | null;
   assignedTeam: string | null;
   hasSubmittedCurrentMatch: boolean;
@@ -918,6 +1458,7 @@ type EventContext = {
     created_at: number;
     match_number: number;
     match_key: string | null;
+    submitted_late?: number;
   }[];
   nextTeamMatch: EventMatch | null;
   teamSchedule: EventMatch[];
@@ -930,9 +1471,19 @@ type EventContext = {
   hasNexusApiKey: boolean;
   nexusApiKey: string;
   scheduleMode: "tba" | "manual";
+  submissionWindowSeconds: number | null;
+  lateWindowSeconds?: number;
+  submissionClosesAt: number | null;
+  serverNow: number;
   manualEvent: { event_name: string; ends_at: number; delete_after: number } | null;
   manualTeamNames: Record<string, string>;
 };
+
+/** What the worker takes for the scouting window after a match (`submissionWindow` there). */
+const MIN_SUBMISSION_WINDOW = 0;
+const MAX_SUBMISSION_WINDOW = 1800;
+/** And for how long it takes a late report (`lateWindow` there). */
+const MAX_LATE_WINDOW = 3600;
 
 async function prepareScheduleFiles(files: File[]) {
   const prepared: File[] = [];
@@ -1170,6 +1721,13 @@ function ManualModeManager() {
   if (context?.scheduleMode !== "manual")
     return (
       <Card className="manual-mode-switch">
+        <div className="section-heading">
+          <h2>
+            Match schedule
+            <ScheduleSourceInfo />
+          </h2>
+          <span>Coming from The Blue Alliance.</span>
+        </div>
         <Button
           variant="primary"
           type="button"
@@ -1210,9 +1768,12 @@ function ManualModeManager() {
   return (
     <Card className="manual-schedule-panel">
       <header>
-        <div>
-          <strong>All-manual mode</strong>
-          <span>{context.manualEvent?.event_name}</span>
+        <div className="section-heading">
+          <h2>
+            Match schedule
+            <ScheduleSourceInfo />
+          </h2>
+          <span>Entered by hand for {context.manualEvent?.event_name}.</span>
         </div>
         <Button
           variant="primary"
@@ -1465,6 +2026,8 @@ function EventStatus({
   const [tbaAuthKey, setTbaAuthKey] = useState("");
   const [nexusEventKey, setNexusEventKey] = useState("");
   const [nexusApiKey, setNexusApiKey] = useState("");
+  const [submissionWindow, setSubmissionWindow] = useState("");
+  const [lateWindow, setLateWindow] = useState("");
   const [showTbaAuthKey, setShowTbaAuthKey] = useState(false);
   const [showNexusApiKey, setShowNexusApiKey] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -1476,6 +2039,8 @@ function EventStatus({
       setEventKey(result.eventKey);
       setMatchNumber(result.currentMatchNumber?.toString() ?? "");
       setNexusEventKey(result.nexusEventKey || result.eventKey);
+      setSubmissionWindow(result.submissionWindowSeconds?.toString() ?? "");
+      setLateWindow(result.lateWindowSeconds?.toString() ?? "");
     }
   }, []);
   useEffect(() => {
@@ -1498,6 +2063,8 @@ function EventStatus({
         tbaAuthKey,
         nexusEventKey,
         nexusApiKey,
+        submissionWindowSeconds: submissionWindow,
+        lateWindowSeconds: lateWindow,
       }),
     }).finally(() => setSaving(false));
     setTbaAuthKey("");
@@ -1515,10 +2082,48 @@ function EventStatus({
   return (
     <div className="event-context">
       {isAdmin && (
-        <Card className="event-admin-panel">
+        <Card className="event-admin-panel competition-overview">
           <header>
-            <h2>Event Configuration</h2>
+            <h2>Competition overview</h2>
           </header>
+          <LiveUsers />
+          <section className="match-submission-status">
+            <h3>
+              {context?.currentMatch
+                ? `${context.currentMatch.label} submissions`
+                : "Current match submissions"}
+            </h3>
+            <div className="match-submission-scroll">
+              {currentMatchSubmissions.length ? (
+                currentMatchSubmissions.map((submission) => (
+                  <button
+                    type="button"
+                    className="submission-chip"
+                    key={submission.id}
+                    onClick={() => onOpenSubmission(submission.id)}
+                  >
+                    <strong>{submission.submitted_by_name}</strong>
+                    <span>
+                      Team {submission.team_name}
+                      {submission.submitted_late ? " · Late" : ""}
+                    </span>
+                  </button>
+                ))
+              ) : (
+                <span>No submissions yet</span>
+              )}
+            </div>
+          </section>
+          <div className="online-admins">
+            <strong>
+              <Users size={16} /> Online Strategy leads
+            </strong>
+            <span>
+              {context?.onlineAdmins.length
+                ? context.onlineAdmins.map((admin) => admin.display_name).join(", ")
+                : "No other Strategy leads online"}
+            </span>
+          </div>
           <form
             onFocus={() => {
               editingRef.current = true;
@@ -1529,7 +2134,7 @@ function EventStatus({
                 !(await questions.confirm(
                   context?.scheduleMode === "manual"
                     ? "Update the current manual match?"
-                    : "Update the active TBA event and current match?",
+                    : "Update the match everyone is scouting?",
                 ))
               )
                 return;
@@ -1578,6 +2183,37 @@ function EventStatus({
                 </Button>
               )}
             </label>
+            <Button variant="primary" type="submit" disabled={saving}>
+              {saving ? "Updating…" : "Update match"}
+            </Button>
+          </form>
+          {context?.currentMatch && <p>Current: {context.currentMatch.label}</p>}
+          {context?.scheduleError && <p className="event-error">{context.scheduleError}</p>}
+        </Card>
+      )}
+      <div className="next-match-status">
+        <CalendarClock size={20} />
+        <div>
+          <span>Next Team {pageTeamNumber} match</span>
+          <strong>{next?.label ?? "Schedule unavailable"}</strong>
+          {next?.scheduledAt && <time>{new Date(next.scheduledAt).toLocaleString()}</time>}
+        </div>
+      </div>
+      {isAdmin && (
+        <Card className="event-admin-panel">
+          <header>
+            <h2>Event Configuration</h2>
+          </header>
+          <form
+            onFocus={() => {
+              editingRef.current = true;
+            }}
+            onSubmit={async (event) => {
+              event.preventDefault();
+              if (!(await questions.confirm("Update this event's settings?"))) return;
+              await updateEvent(matchNumber);
+            }}
+          >
             {context?.scheduleMode !== "manual" && (
               <label>
                 <strong>TBA Event Key</strong>
@@ -1646,46 +2282,46 @@ function EventStatus({
                 </div>
               </label>
             )}
+            {context?.scheduleMode !== "manual" && (
+              <label className="window-field">
+                <strong>Move on after a match (seconds)</strong>
+                <input
+                  className={inputClass}
+                  type="number"
+                  min={MIN_SUBMISSION_WINDOW}
+                  max={MAX_SUBMISSION_WINDOW}
+                  step="1"
+                  value={submissionWindow}
+                  onChange={(event) => setSubmissionWindow(event.target.value)}
+                  placeholder="120"
+                />
+                <small className="field-hint">
+                  How long scouts have after a match is scored before their form moves to the next
+                  match. Anyone who has sent theirs moves on right away.
+                </small>
+              </label>
+            )}
+            <label className="window-field">
+              <strong>Accept late reports for (seconds)</strong>
+              <input
+                className={inputClass}
+                type="number"
+                min={0}
+                max={MAX_LATE_WINDOW}
+                step="1"
+                value={lateWindow}
+                onChange={(event) => setLateWindow(event.target.value)}
+                placeholder="600"
+              />
+              <small className="field-hint">
+                A report that missed the move can still be sent this long after, and goes to its own
+                match, marked late. 0 takes none.
+              </small>
+            </label>
             <Button variant="primary" type="submit" disabled={saving}>
               {saving ? "Updating…" : "Update event"}
             </Button>
           </form>
-          {context?.currentMatch && <p>Current: {context.currentMatch.label}</p>}
-          <section className="match-submission-status">
-            <h3>
-              {context?.currentMatch
-                ? `${context.currentMatch.label} submissions`
-                : "Current match submissions"}
-            </h3>
-            <div className="match-submission-scroll">
-              {currentMatchSubmissions.length ? (
-                currentMatchSubmissions.map((submission) => (
-                  <button
-                    type="button"
-                    className="submission-chip"
-                    key={submission.id}
-                    onClick={() => onOpenSubmission(submission.id)}
-                  >
-                    <strong>{submission.submitted_by_name}</strong>
-                    <span>Team {submission.team_name}</span>
-                  </button>
-                ))
-              ) : (
-                <span>No submissions yet</span>
-              )}
-            </div>
-          </section>
-          {context?.scheduleError && <p className="event-error">{context.scheduleError}</p>}
-          <div className="online-admins">
-            <strong>
-              <Users size={16} /> Online Strategy leads
-            </strong>
-            <span>
-              {context?.onlineAdmins.length
-                ? context.onlineAdmins.map((admin) => admin.display_name).join(", ")
-                : "No other Strategy leads online"}
-            </span>
-          </div>
           <details className="team-schedule">
             <summary>Team {pageTeamNumber} schedule</summary>
             {context?.teamSchedule.map((match) => (
@@ -1698,14 +2334,6 @@ function EventStatus({
           </details>
         </Card>
       )}
-      <div className="next-match-status">
-        <CalendarClock size={20} />
-        <div>
-          <span>Next Team {pageTeamNumber} match</span>
-          <strong>{next?.label ?? "Schedule unavailable"}</strong>
-          {next?.scheduledAt && <time>{new Date(next.scheduledAt).toLocaleString()}</time>}
-        </div>
-      </div>
     </div>
   );
 }
@@ -1713,9 +2341,12 @@ function EventStatus({
 export function ScoutingForms({
   isAdmin,
   canManageServiceCrew,
+  userId,
 }: {
   isAdmin: boolean;
   canManageServiceCrew: boolean;
+  /** Whose drafts this device keeps. */
+  userId: string;
 }) {
   const names = useTeamNames();
   const [loadError, setLoadError] = useState("");
@@ -1740,17 +2371,40 @@ export function ScoutingForms({
       )
       .finally(() => setLoading(false));
   }, [load]);
+  const contextRequest = useRef(0);
+  const [contextError, setContextError] = useState("");
+  const refreshContext = useCallback(async () => {
+    const request = ++contextRequest.current;
+    // A poll started before submission must not restore the completed match.
+    try {
+      const next = await api<EventContext>("/event-context?assign=true", { cache: "no-store" });
+      if (request === contextRequest.current) {
+        setContext(next);
+        setContextError("");
+      }
+    } catch (error) {
+      if (request === contextRequest.current)
+        setContextError("Could not refresh the match schedule. Retrying.");
+      throw error;
+    }
+  }, []);
   useEffect(() => {
-    const loadMatch = () =>
-      api<EventContext>("/event-context?assign=true")
-        .then(setContext)
-        .catch(() => undefined);
+    const loadMatch = () => refreshContext().catch(() => undefined);
     loadMatch();
     const interval = window.setInterval(() => {
       if (document.visibilityState === "visible") loadMatch();
     }, 10_000);
-    return () => window.clearInterval(interval);
-  }, []);
+    const resume = () => {
+      if (document.visibilityState === "visible") void loadMatch();
+    };
+    window.addEventListener("focus", resume);
+    document.addEventListener("visibilitychange", resume);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", resume);
+      document.removeEventListener("visibilitychange", resume);
+    };
+  }, [refreshContext]);
   useEffect(() => {
     document.body.classList.toggle("scouting-workspace-open", isFullscreen);
     if (!isFullscreen) return;
@@ -1794,35 +2448,56 @@ export function ScoutingForms({
       {!loading && !loadError && !forms.length && (
         <p className="text-sm text-secondary-500">No scouting forms are available.</p>
       )}
-      <div className="form-choice-grid">
-        {forms.map((form) => (
-          <div
-            className={selected?.id === form.id ? "form-choice active" : "form-choice"}
-            key={form.id}
-          >
-            <button
-              type="button"
+      {forms.length > 0 && (
+        <div className="flex flex-wrap gap-2" role="group" aria-label="Scouting form type">
+          {(["scouting", "pit"] as const).map((kind) => (
+            <Chip
+              key={kind}
+              selected={selected?.kind === kind}
+              className="min-h-11"
+              disabled={!forms.some((form) => form.kind === kind)}
               onClick={() => {
-                setSelected(form);
+                if (selected?.kind === kind) return;
+                setSelected(forms.find((form) => form.kind === kind) ?? null);
                 setEditing(false);
               }}
             >
-              <strong>{form.name}</strong>
-            </button>
-            {isAdmin && (
+              {kind === "pit" ? "Pit scouting" : "Match scouting"}
+            </Chip>
+          ))}
+        </div>
+      )}
+      <div className="form-choice-grid">
+        {forms
+          .filter((form) => form.kind === selected?.kind)
+          .map((form) => (
+            <div
+              className={selected?.id === form.id ? "form-choice active" : "form-choice"}
+              key={form.id}
+            >
               <button
                 type="button"
-                className="edit-form-button"
                 onClick={() => {
                   setSelected(form);
-                  setEditing(true);
+                  setEditing(false);
                 }}
               >
-                <Pencil size={15} /> Edit
+                <strong>{form.name}</strong>
               </button>
-            )}
-          </div>
-        ))}
+              {isAdmin && (
+                <button
+                  type="button"
+                  className="edit-form-button"
+                  onClick={() => {
+                    setSelected(form);
+                    setEditing(true);
+                  }}
+                >
+                  <Pencil size={15} /> Edit
+                </button>
+              )}
+            </div>
+          ))}
       </div>
       {selected &&
         (editing && isAdmin ? (
@@ -1840,14 +2515,17 @@ export function ScoutingForms({
             }}
           />
         ) : (
-          <EntryForm
-            key={selected.id}
-            form={selected}
-            context={context}
-            refreshContext={async () => {
-              setContext(await api<EventContext>("/event-context"));
-            }}
-          />
+          <>
+            {contextError && selected.kind === "scouting" && <ErrorBanner message={contextError} />}
+            <EntryForm
+              key={selected.id}
+              form={selected}
+              context={context}
+              refreshContext={refreshContext}
+              scheduleUnavailable={!!contextError}
+              userId={userId}
+            />
+          </>
         ))}
       {selected?.kind === "pit" &&
         (canManageServiceCrew ? <Operations embedded /> : <ServiceIssueReport />)}
@@ -1871,12 +2549,11 @@ export function ScoutingAdminPage({
       className="scouting-page-frame"
       contentClassName="page scouting-admin-page"
     >
+      <AnnouncementManager />
+      <EventStatus isAdmin isG3IdAdmin={isG3IdAdmin} onOpenSubmission={onOpenSubmission} />
       {engagement}
       <ManualModeManager />
-      <EventStatus isAdmin isG3IdAdmin={isG3IdAdmin} onOpenSubmission={onOpenSubmission} />
       <AdminManager isG3IdAdmin={isG3IdAdmin} />
-      <LiveStrategy />
-      <AnnouncementManager />
     </SharedPage>
   );
 }

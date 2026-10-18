@@ -1,4 +1,4 @@
-// `pnpm release:tag [--push]`: tags a release once its versions are on main. The release bot runs
+// `pnpm release:tag [--push]`: tags a release once its versions are on staging. The release bot runs
 // it after the "Release" PR is merged. Tags the platform (v2026.10.1) and each app's new version
 // (@g3/worker-orders@1.5.0, ...; `changeset tag` skips ones already tagged). Does nothing if the
 // platform version is already tagged, so it's safe to run on every push.

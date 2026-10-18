@@ -15,7 +15,11 @@ import {
   currentPairing,
   deleteFromGearbox,
   gearboxStatus,
+  inGearbox,
+  noteInGearbox,
   pairWithGearbox,
+  refreshGearboxLogs,
+  reportStatus,
   teamAppearance,
   unpairFromGearbox,
   uploadLog,
@@ -30,7 +34,19 @@ const kLogsDir = path.join(config.dataDir, "logs");
 
 const ssh = new NodeSSH();
 
+/** On the robot's network (an address in 10.TE.AM.x). */
 let robotConnected = false;
+/** Whether the roboRIO answered the last time it was tried, while on its network; null before. */
+let rioReachable: boolean | null = null;
+/** Listing and copying the robot's logs, which runs beside the loop; null when it isn't. */
+let rioCheck: Promise<void> | null = null;
+let lastRioCheck = 0;
+/** While on the robot's network, its logs are listed again this often: new matches, or a retry. */
+const kRioCheckMs = 30_000;
+/** A copy that moves no bytes for this long is stopped (and tried again at the next check). */
+const kStallMs = 30_000;
+let lastStatusReport = 0;
+let lastGearboxLogsCheck = 0;
 let uploadingRunning = false;
 /** Pit said it's full and keeps what it has: uploads wait until then (ms). */
 let pitFullUntil = 0;
@@ -171,30 +187,65 @@ async function logicLoop() {
     await checkGearbox();
   }
 
+  // Which logs Pit has, once a minute while online: one deleted there isn't "In Gearbox".
+  if (currentPairing() && internetConnected && Date.now() - lastGearboxLogsCheck > 60_000) {
+    lastGearboxLogsCheck = Date.now();
+    await refreshGearboxLogs();
+  }
+
   // Nothing else until it's paired (again): pairing is what gives it its team.
   const network = robotNetwork();
   if (!network) {
     if (robotConnected) logWithTimestamp("Stopped until it's paired with Gearbox again.");
     robotConnected = false;
+    rioReachable = null;
     return;
   }
-  const recentPoll = isRobotNetworkConnected(network);
 
-  if (recentPoll !== robotConnected && recentPoll) {
-    logWithTimestamp("Robot network found.");
-    const res = await downloadLogs(`${network}.2`);
-    if (!res) return;
+  // The robot is connected as soon as this computer is on its network, whatever is copying.
+  const onNetwork = isRobotNetworkConnected(network);
+  if (onNetwork !== robotConnected) {
+    logWithTimestamp(onNetwork ? "Robot network found." : "Robot network lost.");
+    robotConnected = onNetwork;
+    // A copy in progress can't finish now: closing the connection ends it at once.
+    if (!onNetwork) ssh.dispose();
+    rioReachable = null;
+    lastRioCheck = 0;
   }
 
-  if (recentPoll !== robotConnected && !recentPoll) {
-    logWithTimestamp("Robot network lost.");
+  // Its logs are listed and copied beside the loop, so the page and uploads never wait for it,
+  // and listed again every so often while connected (new matches, or a roboRIO that didn't answer).
+  if (onNetwork && !rioCheck && Date.now() - lastRioCheck > kRioCheckMs) {
+    lastRioCheck = Date.now();
+    rioCheck = downloadLogs(`${network}.2`)
+      .then((reached) => {
+        if (robotConnected) rioReachable = reached;
+      })
+      .finally(() => {
+        rioCheck = null;
+        saveLogs();
+      });
   }
 
   // Sizes are worked out offline too, so a log that needs trimming says so at once.
   uploadLogs(internetConnected).catch((err) => logWithTimestamp(`Could not upload logs: ${err}`));
 
-  robotConnected = recentPoll;
-  fs.writeFileSync(kLogsJson, JSON.stringify(logs));
+  // What it's doing, for Pit's Logs page and Monitor, every 10 s while online.
+  if (currentPairing() && internetConnected && Date.now() - lastStatusReport > 10_000) {
+    lastStatusReport = Date.now();
+    void reportStatus({
+      robot: robotConnected,
+      rioReachable,
+      copying: downloadingIds.length,
+      uploading: logs.find((log) => log.id === uploadingId)?.name ?? null,
+      pendingUpload: logs.filter(
+        (log) => log.status.downloaded && !log.status.uploaded && !log.deleted && !needsTrim(log),
+      ).length,
+      version: kVersion,
+    });
+  }
+
+  saveLogs();
 }
 
 function isRobotNetworkConnected(network: string) {
@@ -209,13 +260,21 @@ async function downloadLogs(rioIp: string) {
       host: rioIp,
       username: "admin",
       password: "",
+      readyTimeout: 10_000,
+      // A network that goes away mid-copy closes the connection (about 15 s), instead of
+      // leaving the copy waiting forever.
+      keepaliveInterval: 5_000,
+      keepaliveCountMax: 3,
     });
   } catch (err) {
-    logWithTimestamp(`Could not connect to robot: ${err}`);
+    // Said once, not on every try while it doesn't answer.
+    if (rioReachable !== false) logWithTimestamp(`Could not connect to the roboRIO: ${err}`);
     return false;
   }
 
   const foundOnRio: typeof rioLogs = [];
+  /** The connection closed midway: what was found isn't the whole list. */
+  let cutOff = false;
 
   try {
     const sftp = await ssh.requestSFTP();
@@ -228,7 +287,7 @@ async function downloadLogs(rioIp: string) {
         ),
       );
 
-    for (const origin of kRioLogDirs) {
+    origins: for (const origin of kRioLogDirs) {
       const res = await readdirAsync(origin).catch(() =>
         logWithTimestamp(`Could not read dir: ${origin}`),
       );
@@ -265,20 +324,43 @@ async function downloadLogs(rioIp: string) {
           },
         };
 
-        logWithTimestamp(`Found log: ${log.name}`);
-
         foundOnRio.push({ id: log.id, name: log.name, filename, origin });
 
         if (!logs.some((l) => l.id === log.id && l.status.downloaded)) {
+          logWithTimestamp(`Copying ${log.name} off the robot.`);
           downloadingIds.push(log.id);
+          // Copied beside the log, then renamed: a copy cut off midway never looks like a log.
+          const localPath = localPathOf(log);
+          const partPath = `${localPath}.part`;
+          // A copy that stops moving (or the robot's network going) closes the connection, which
+          // ends the copy as a failure; the next check copies it again.
+          let lastProgress = Date.now();
+          const watchdog = setInterval(() => {
+            if (!robotConnected || Date.now() - lastProgress > kStallMs) ssh.dispose();
+          }, 1000);
           try {
-            const localPath = localPathOf(log);
             fs.mkdirSync(path.dirname(localPath), { recursive: true });
-            await ssh.getFile(localPath, log.locations.rio.path);
+            await ssh.getFile(partPath, log.locations.rio.path, null, {
+              step: () => {
+                lastProgress = Date.now();
+              },
+            });
+            fs.renameSync(partPath, localPath);
             logs.push(log);
           } catch (err) {
-            logWithTimestamp(`Could not download log file: ${log.id}`);
+            fs.rmSync(partPath, { force: true });
+            logWithTimestamp(
+              robotConnected
+                ? `Could not copy ${log.name} off the robot. Trying again soon.`
+                : `Copying ${log.name} stopped: the robot's network is gone.`,
+            );
+            // The connection is gone with it: the rest wait for the next check.
+            if (!ssh.isConnected()) {
+              cutOff = true;
+              break origins;
+            }
           } finally {
+            clearInterval(watchdog);
             downloadingIds = downloadingIds.filter((id) => id !== log.id);
           }
         }
@@ -290,6 +372,7 @@ async function downloadLogs(rioIp: string) {
   } finally {
     ssh.dispose();
   }
+  if (cutOff) return false;
 
   rioLogs = foundOnRio;
   rioLogsCheckedAt = Date.now();
@@ -297,7 +380,9 @@ async function downloadLogs(rioIp: string) {
   return true;
 }
 
-const saveLogs = () => fs.writeFileSync(kLogsJson, JSON.stringify(logs));
+function saveLogs() {
+  fs.writeFileSync(kLogsJson, JSON.stringify(logs));
+}
 
 /** The log as it goes to Pit: trimmed, if it is, and gzipped. Notes its size. */
 async function prepare(log: Log) {
@@ -341,6 +426,7 @@ async function uploadLogs(online: boolean) {
           trimmed: Boolean(log.trim),
         });
         log.status.uploaded = true;
+        noteInGearbox(log.match.event, log.name, true);
         saveLogs();
         logWithTimestamp(
           done === "uploaded"
@@ -422,6 +508,7 @@ app.get("/api/status", (_req, res) => {
         matchNumber: log.match.number,
         downloaded: log.status.downloaded,
         uploaded: log.status.uploaded,
+        inGearbox: inGearbox(log.match.event, log.name),
         trimmed: Boolean(log.trim),
         uploadSize: log.uploadSize ?? null,
         needsTrim: needsTrim(log),
@@ -441,6 +528,7 @@ app.get("/api/status", (_req, res) => {
     gearbox: gearboxStatus(),
     connection: {
       robot: robotConnected,
+      rioReachable,
       internet: internetConnected,
       uploadingRunning,
       pitFull: Date.now() < pitFullUntil,
@@ -457,7 +545,7 @@ app.get("/api/status", (_req, res) => {
     },
     counts: {
       downloaded: decorated.filter((l) => l.downloaded).length,
-      uploaded: decorated.filter((l) => l.uploaded).length,
+      uploaded: decorated.filter((l) => l.inGearbox ?? l.uploaded).length,
       pendingUpload: decorated.filter((l) => l.downloaded && !l.uploaded && !l.needsTrim).length,
       needsTrim: decorated.filter((l) => l.needsTrim && !l.uploaded).length,
       onRobot: rioLogs.length,
@@ -564,6 +652,7 @@ app.delete("/api/logs/:id", async (req, res) => {
       });
       return;
     }
+    noteInGearbox(log.match.event, log.name, false);
     logWithTimestamp(`Deleted ${log.name} from Gearbox.`);
   }
   fs.rmSync(localPathOf(log), { force: true });

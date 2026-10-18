@@ -111,15 +111,15 @@ export type TeamNotification = {
 
 export type NotificationTypeSettings = {
   portal: PortalAudience;
-  /** A Slack channel's id, or null. */
-  slackChannel: string | null;
-  /** G3ID user ids. */
-  slackUsers: string[];
+  /** A channel's id on the team's chat (Slack or Discord), or null. */
+  channel: string | null;
+  /** G3ID user ids, DMed on the team's chat. */
+  users: string[];
 };
 
 export type NotificationSettings = Record<NotificationType, NotificationTypeSettings>;
 
-export type DmCandidate = { id: string; displayName: string; isAdmin: boolean; hasSlack: boolean };
+export type DmCandidate = { id: string; displayName: string; isAdmin: boolean; hasChat: boolean };
 
 export const NOTIFICATION_TYPES: { type: NotificationType; label: string }[] = [
   { type: "critical", label: "Critical" },

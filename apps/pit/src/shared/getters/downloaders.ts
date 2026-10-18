@@ -10,6 +10,25 @@ export type LogDownloader = {
   /** Milliseconds. */
   pairedAt: number;
   lastSeenAt: number | null;
+  /** What it last said it was doing (every 10 s while it's online), and when. */
+  status: DownloaderStatus | null;
+  statusAt: number | null;
+  /** It said so recently. */
+  online: boolean;
+};
+
+/** What a downloader says it's doing (workers/pit/src/downloaders.ts). */
+export type DownloaderStatus = {
+  /** On the robot's network. */
+  robot: boolean;
+  /** Whether the roboRIO answered when it last tried; null before. */
+  rioReachable: boolean | null;
+  /** Logs it's copying off the robot. */
+  copying: number;
+  /** The log it's uploading ("Qual-13"), or null. */
+  uploading: string | null;
+  pendingUpload: number;
+  version: string;
 };
 
 /** The team's paired downloaders, and whether the user may pair and remove them. */

@@ -49,6 +49,7 @@ import { type EngagementSettings, EngagementSettingsPanel } from "./EngagementSe
 import { MatchPredictions } from "./Game";
 import { Operations } from "./Operations";
 import { ScoutingAdminPage, ScoutingForms } from "./ScoutingForms";
+import { SortableTierRow, SortableTiers } from "./SortableTiers";
 import { API_URL, api } from "./api";
 import { clearInputError, showTeamNumberError } from "./input-validation";
 import {
@@ -58,6 +59,7 @@ import {
   saveFieldMapPreset,
   saveLocalFieldMap,
 } from "./local-field-maps";
+import { TierListAutosave } from "./tier-list-autosave";
 import { type ParsedTrajectory, parseTrajectoryFile, trajectoryToPng } from "./trajectory-files";
 
 type Page = "forms" | "predictions" | "admin" | "analysis" | "service" | "autos" | "tiers" | "maps";
@@ -234,23 +236,67 @@ function EmptyState({
 function TierLists() {
   const [lists, setLists] = useState<TierList[]>([]);
   const [current, setCurrent] = useState<TierList>({
+    id: crypto.randomUUID(),
     name: "2026 Team Rankings",
     description: "Overall event pick-list discussion",
     tiers: defaultTiers,
   });
   const [newItem, setNewItem] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [ready, setReady] = useState(false);
+  const [loadError, setLoadError] = useState("");
+  const storedIds = useRef(new Set<string>());
+  const observed = useRef(current);
+  const [autosave] = useState(
+    () =>
+      new TierListAutosave<TierList>(async (id, value) => {
+        const exists = storedIds.current.has(id);
+        await api(exists ? `/tier-lists/${encodeURIComponent(id)}` : "/tier-lists", {
+          method: exists ? "PUT" : "POST",
+          body: JSON.stringify(value),
+        });
+        storedIds.current.add(id);
+      }),
+  );
+  const [saveStatus, setSaveStatus] = useState(autosave.status);
   const [dragged, setDragged] = useState<{ tierId: string; item: string } | null>(null);
 
   const load = useCallback(async () => {
     const data = await api<{ tierLists: TierList[] }>("/tier-lists");
     setLists(data.tierLists);
-    if (data.tierLists[0]) setCurrent(data.tierLists[0]);
+    storedIds.current = new Set(data.tierLists.map((list) => list.id as string));
+    if (data.tierLists[0]) {
+      observed.current = data.tierLists[0];
+      setCurrent(data.tierLists[0]);
+    }
+    setLoadError("");
+    setReady(true);
   }, []);
 
   useEffect(() => {
-    load().catch(() => undefined);
+    load().catch(() => setLoadError("Could not load tier lists. Please try again."));
   }, [load]);
+
+  useEffect(() => autosave.subscribe(setSaveStatus), [autosave]);
+
+  useEffect(() => {
+    if (!ready || current === observed.current) return;
+    observed.current = current;
+    autosave.enqueue(current.id as string, current);
+    setLists((values) => [current, ...values.filter((list) => list.id !== current.id)]);
+  }, [autosave, current, ready]);
+
+  useEffect(() => {
+    const warnIfPending = (event: BeforeUnloadEvent) => {
+      if (!autosave.status.pending) return;
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warnIfPending);
+    return () => {
+      window.removeEventListener("beforeunload", warnIfPending);
+      void autosave.flush();
+    };
+  }, [autosave]);
 
   function updateTier(tierId: string, patch: Partial<Tier>) {
     setCurrent((value) => ({
@@ -266,41 +312,44 @@ function TierLists() {
     setNewItem("");
   }
 
-  function drop(targetTierId: string) {
-    if (!dragged || dragged.tierId === targetTierId) return;
+  function drop(targetTierId: string, targetIndex?: number, source = dragged) {
+    if (!source) return;
     setCurrent((value) => ({
       ...value,
       tiers: value.tiers.map((tier) => {
-        if (tier.id === dragged.tierId) {
-          return { ...tier, items: tier.items.filter((item) => item !== dragged.item) };
+        if (tier.id === targetTierId) {
+          const sourceIndex = tier.items.indexOf(source.item);
+          const items = tier.items.filter((item) => item !== source.item);
+          let insertAt = targetIndex ?? tier.items.length;
+          if (tier.id === source.tierId && sourceIndex >= 0 && sourceIndex < insertAt) {
+            insertAt--;
+          }
+          items.splice(insertAt, 0, source.item);
+          return { ...tier, items };
         }
-        if (tier.id === targetTierId) return { ...tier, items: [...tier.items, dragged.item] };
+        if (tier.id === source.tierId) {
+          return { ...tier, items: tier.items.filter((item) => item !== source.item) };
+        }
         return tier;
       }),
     }));
     setDragged(null);
   }
 
-  async function save() {
-    setSaving(true);
-    try {
-      if (current.id) {
-        await api(`/tier-lists/${current.id}`, {
-          method: "PUT",
-          body: JSON.stringify(current),
-        });
-      } else {
-        const created = await api<{ id: string }>("/tier-lists", {
-          method: "POST",
-          body: JSON.stringify(current),
-        });
-        setCurrent((value) => ({ ...value, id: created.id }));
-      }
-      await load();
-    } finally {
-      setSaving(false);
-    }
-  }
+  if (loadError)
+    return (
+      <div role="alert">
+        {loadError}{" "}
+        <Button
+          onClick={() =>
+            load().catch(() => setLoadError("Could not load tier lists. Please try again."))
+          }
+        >
+          Retry
+        </Button>
+      </div>
+    );
+  if (!ready) return <PageLoading />;
 
   return (
     <SharedPage
@@ -315,10 +364,15 @@ function TierLists() {
           value={current.id ?? "new"}
           onChange={(event) => {
             const selected = lists.find((list) => list.id === event.target.value);
-            if (selected) setCurrent(selected);
+            if (selected) {
+              observed.current = selected;
+              setCurrent(selected);
+            }
           }}
         >
-          <option value="new">New unsaved list</option>
+          {!lists.some((list) => list.id === current.id) && (
+            <option value={current.id}>{current.name}</option>
+          )}
           {lists.map((list) => (
             <option key={list.id} value={list.id}>
               {list.name}
@@ -330,6 +384,7 @@ function TierLists() {
           type="button"
           onClick={() =>
             setCurrent({
+              id: crypto.randomUUID(),
               name: "Untitled tier list",
               description: "",
               tiers: defaultTiers.map((tier) => ({
@@ -342,9 +397,15 @@ function TierLists() {
         >
           <Plus size={17} /> New
         </Button>
-        <Button variant="primary" type="button" onClick={save} disabled={saving}>
-          {saving ? <Loader2 size={17} className="spin" /> : <Save size={17} />} Save list
-        </Button>
+        <span role="status" aria-live="polite">
+          {saveStatus.error
+            ? `Could not save: ${saveStatus.error} Retrying automatically.`
+            : saveStatus.pending || saveStatus.saving
+              ? "Saving…"
+              : storedIds.current.has(current.id as string)
+                ? "All changes saved"
+                : "Changes save automatically"}
+        </span>
       </div>
     >
       <Card className="editor-card">
@@ -356,7 +417,6 @@ function TierLists() {
             onChange={(event) => setCurrent({ ...current, name: event.target.value })}
             aria-label="Tier list name"
           />
-          <span>Updated {timeAgo(current.updatedAt)}</span>
         </div>
         <div className="add-row">
           <TextField
@@ -370,61 +430,125 @@ function TierLists() {
             <CirclePlus size={18} /> Add to top tier
           </button>
         </div>
-        <div className="tier-board">
+        <SortableTiers
+          ids={current.tiers.map((tier) => tier.id)}
+          onMove={(from, to) =>
+            setCurrent((value) => {
+              const tiers = [...value.tiers];
+              const [moved] = tiers.splice(from, 1);
+              tiers.splice(to, 0, moved);
+              return { ...value, tiers };
+            })
+          }
+        >
           {current.tiers.map((tier) => (
-            <div
-              className="tier-row"
+            <SortableTierRow
+              id={tier.id}
+              name={tier.name}
               key={tier.id}
-              onDragOver={(event) => event.preventDefault()}
-              onDrop={() => drop(tier.id)}
+              onItemDrop={() => drop(tier.id)}
             >
-              <div className="tier-label" style={{ background: tier.color }}>
-                <TextField
-                  variant="plain"
-                  kind="tier"
-                  value={tier.name}
-                  onChange={(event) => updateTier(tier.id, { name: event.target.value })}
-                  aria-label="Tier name"
-                />
-                <div className="tier-color-options" aria-label={`${tier.name} color`}>
-                  {TIER_COLORS.map((option) => (
-                    <button
-                      type="button"
-                      key={option}
-                      className={tier.color === option ? "selected" : ""}
-                      style={{ backgroundColor: option }}
-                      aria-label={`Set ${tier.name} to ${option}`}
-                      aria-pressed={tier.color === option}
-                      onClick={() => updateTier(tier.id, { color: option })}
-                    />
-                  ))}
-                </div>
-              </div>
-              <div className="tier-items">
-                {tier.items.map((item) => (
-                  <div
-                    className="tier-chip"
-                    draggable
-                    key={item}
-                    onDragStart={() => setDragged({ tierId: tier.id, item })}
-                  >
-                    <span>{item}</span>
-                    <button
-                      type="button"
-                      aria-label={`Remove ${item}`}
-                      onClick={() =>
-                        updateTier(tier.id, { items: tier.items.filter((value) => value !== item) })
-                      }
-                    >
-                      <X size={13} />
-                    </button>
+              {(handle) => (
+                <>
+                  <div className="tier-label" style={{ background: tier.color }}>
+                    <div className="tier-label-heading">
+                      {handle}
+                      <TextField
+                        variant="plain"
+                        kind="tier"
+                        value={tier.name}
+                        onChange={(event) => updateTier(tier.id, { name: event.target.value })}
+                        aria-label="Tier name"
+                      />
+                    </div>
+                    <div className="tier-color-options" aria-label={`${tier.name} color`}>
+                      {TIER_COLORS.map((option) => (
+                        <button
+                          type="button"
+                          key={option}
+                          className={tier.color === option ? "selected" : ""}
+                          style={{ backgroundColor: option }}
+                          aria-label={`Set ${tier.name} to ${option}`}
+                          aria-pressed={tier.color === option}
+                          onClick={() => updateTier(tier.id, { color: option })}
+                        />
+                      ))}
+                    </div>
                   </div>
-                ))}
-                {!tier.items.length && <span className="drop-hint">Drop entries here</span>}
-              </div>
-            </div>
+                  <div className="tier-items">
+                    {tier.items.map((item, index) => (
+                      <div
+                        className="tier-chip"
+                        draggable
+                        key={item}
+                        onDragStart={(event) => {
+                          event.dataTransfer.effectAllowed = "move";
+                          event.dataTransfer.setData("text/plain", item);
+                          setDragged({ tierId: tier.id, item });
+                        }}
+                        onDragEnd={() => setDragged(null)}
+                        onDragOver={(event) => event.preventDefault()}
+                        onDrop={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          const bounds = event.currentTarget.getBoundingClientRect();
+                          const after = event.clientX >= bounds.left + bounds.width / 2;
+                          drop(tier.id, index + (after ? 1 : 0));
+                        }}
+                      >
+                        <span>{item}</span>
+                        <div className="tier-move-controls" draggable={false}>
+                          <button
+                            type="button"
+                            disabled={index === 0}
+                            aria-label={`Move ${item} left`}
+                            onClick={() => drop(tier.id, index - 1, { tierId: tier.id, item })}
+                          >
+                            ←
+                          </button>
+                          <button
+                            type="button"
+                            disabled={index === tier.items.length - 1}
+                            aria-label={`Move ${item} right`}
+                            onClick={() => drop(tier.id, index + 2, { tierId: tier.id, item })}
+                          >
+                            →
+                          </button>
+                          <select
+                            className={inputClass}
+                            value={tier.id}
+                            aria-label={`Move ${item} to tier`}
+                            onChange={(event) =>
+                              drop(event.target.value, undefined, { tierId: tier.id, item })
+                            }
+                          >
+                            {current.tiers.map((target) => (
+                              <option key={target.id} value={target.id}>
+                                {target.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <button
+                          type="button"
+                          aria-label={`Remove ${item}`}
+                          onClick={() =>
+                            updateTier(tier.id, {
+                              items: tier.items.filter((value) => value !== item),
+                            })
+                          }
+                        >
+                          <X size={13} />
+                        </button>
+                      </div>
+                    ))}
+                    {!tier.items.length && <span className="drop-hint">Drop entries here</span>}
+                  </div>
+                </>
+              )}
+            </SortableTierRow>
           ))}
-        </div>
+        </SortableTiers>
         <button
           type="button"
           className="add-tier-button"
@@ -2112,6 +2236,7 @@ export function App() {
           id: "predictions" as const,
           label: user.engagement.predictionsEnabled ? "Match Predictions" : "Scouting Points",
         },
+        { id: "analysis" as const, label: "Analysis" },
         ...(user.isHelper ? [{ id: "service" as const, label: "Service Tickets" }] : []),
       ];
 
@@ -2145,6 +2270,7 @@ export function App() {
           <ScoutingForms
             isAdmin={user.isAdmin}
             canManageServiceCrew={user.isAdmin || user.isHelper}
+            userId={user.userId}
           />
         )}
         {visiblePage === "predictions" && (
@@ -2170,8 +2296,8 @@ export function App() {
         {visiblePage === "tiers" && <TierLists />}
         {visiblePage === "maps" && <FieldMaps user={user} />}
         {visiblePage === "autos" && <AutoLibrary />}
-        {visiblePage === "analysis" && user.isAdmin && (
-          <Analysis initialReportId={analysisReportId} />
+        {visiblePage === "analysis" && (
+          <Analysis initialReportId={analysisReportId} canManageReports={user.isAdmin} />
         )}
         {visiblePage === "service" && (user.isAdmin || user.isHelper) && <Operations />}
       </div>

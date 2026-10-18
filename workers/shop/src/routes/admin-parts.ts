@@ -15,12 +15,12 @@ import {
 import { onshapeConfig, saveOnshapeConfig } from "../lib/onshape-config";
 import { exportDrawingAsPDF, storeDrawingInR2 } from "../lib/onshape-export";
 import { registerOnShapeWebhook, unregisterOnShapeWebhooks } from "../lib/onshape-webhook";
-import { SETTING, getSetting, setSetting } from "../lib/settings";
+import { SETTING, getSetting, isChannelId, setSetting } from "../lib/settings";
 import { shopUrl } from "../lib/urls";
 import type { AppEnv } from "../types";
 
-const RELEASE_CHANNEL_KEY = SETTING.slackReleaseChannel;
-const SUMMARY_CHANNEL_KEY = SETTING.slackSummaryChannel;
+const RELEASE_CHANNEL_KEY = SETTING.releaseChannel;
+const SUMMARY_CHANNEL_KEY = SETTING.summaryChannel;
 
 /** Where the team's Onshape webhook calls back: its own Shop address. */
 const eventsUrl = (env: AppEnv["Bindings"], teamId: string) =>
@@ -332,26 +332,29 @@ export const adminPartsRouter = new Hono<AppEnv>()
       return c.json({ error: err instanceof Error ? err.message : "Failed to update config" }, 500);
     }
   })
-  .get("/slack/config", requireAdmin, async (c) => {
+  .get("/chat/config", requireAdmin, async (c) => {
     const db = createShopDb(c.env.SHOP_DB);
     const teamId = c.get("teamId");
     const [release, summary] = await Promise.all([
       getSetting(db, teamId, RELEASE_CHANNEL_KEY),
       getSetting(db, teamId, SUMMARY_CHANNEL_KEY),
     ]);
-    return c.json({ slackReleaseChannelId: release ?? "", slackSummaryChannelId: summary ?? "" });
+    return c.json({ releaseChannelId: release ?? "", summaryChannelId: summary ?? "" });
   })
-  .post("/slack/config", requireAdmin, async (c) => {
+  .post("/chat/config", requireAdmin, async (c) => {
     const db = createShopDb(c.env.SHOP_DB);
     const body = await c.req.json<{
-      slackReleaseChannelId?: string;
-      slackSummaryChannelId?: string;
+      releaseChannelId?: string;
+      summaryChannelId?: string;
     }>();
-    const release = body.slackReleaseChannelId?.trim();
-    const summary = body.slackSummaryChannelId?.trim();
+    const release = body.releaseChannelId?.trim();
+    const summary = body.summaryChannelId?.trim();
 
     if (!release) {
-      return c.json({ error: "Slack channel ID is required" }, 400);
+      return c.json({ error: "Choose a channel for releases." }, 400);
+    }
+    if (!isChannelId(release) || (summary && !isChannelId(summary))) {
+      return c.json({ error: "Choose a Slack or Discord channel." }, 400);
     }
 
     try {
@@ -363,18 +366,18 @@ export const adminPartsRouter = new Hono<AppEnv>()
       await setSetting(db, teamId, RELEASE_CHANNEL_KEY, release);
       if (summary) await setSetting(db, teamId, SUMMARY_CHANNEL_KEY, summary);
       const changed = [
-        ...(oldRelease !== release ? ["Slack channel for releases"] : []),
-        ...(summary && oldSummary !== summary ? ["Slack channel for daily summaries"] : []),
+        ...(oldRelease !== release ? ["Channel for releases"] : []),
+        ...(summary && oldSummary !== summary ? ["Channel for daily summaries"] : []),
       ];
       if (changed.length > 0) {
         await logTeamChange(c.env, teamId, {
           userId: c.get("userId"),
           app: "shop",
-          what: "Shop's Slack channels",
+          what: "Shop's chat channels",
           changed,
         });
       }
-      return c.json({ slackReleaseChannelId: release, slackSummaryChannelId: summary ?? "" });
+      return c.json({ releaseChannelId: release, summaryChannelId: summary ?? "" });
     } catch (err) {
       return c.json(
         { error: err instanceof Error ? err.message : "Failed to update setting" },
@@ -384,7 +387,7 @@ export const adminPartsRouter = new Hono<AppEnv>()
   })
   // Posts the Overview (start of day) or Reflection (end of day) to the summary channel. The
   // browser sends the start of its local day and its time zone, since the worker runs in UTC.
-  .post("/slack/daily-summary", requireAdmin, async (c) => {
+  .post("/chat/daily-summary", requireAdmin, async (c) => {
     const body = await c.req.json<{
       kind?: unknown;
       since?: unknown;
@@ -415,7 +418,7 @@ export const adminPartsRouter = new Hono<AppEnv>()
     const teamId = c.get("teamId");
     const channel = await getSetting(db, teamId, SUMMARY_CHANNEL_KEY);
     if (!channel) {
-      return c.json({ error: "Set the daily summary channel in Slack Configuration first." }, 400);
+      return c.json({ error: "Choose the daily summary channel first." }, 400);
     }
 
     let text: string;
@@ -440,12 +443,15 @@ export const adminPartsRouter = new Hono<AppEnv>()
       text = formatReflection(stats, { dayLabel, timeZone, names });
     }
 
-    // On the team's own Slack (G3ID holds its bot token).
+    // On the team's own chat, Slack or Discord (G3ID holds the bot's token).
     const sent = await sendTeamMessage(c.env, teamId, channel, text);
     if (!sent.ok) {
       const reason = sent.error;
-      const hint = reason.includes("not_in_channel") ? " Invite the Slack bot to the channel." : "";
-      return c.json({ error: `Couldn't post to Slack: ${reason}.${hint}` }, 502);
+      const hint =
+        reason.includes("not_in_channel") || reason.includes("missing_permissions")
+          ? " Give the Gearbox bot access to the channel."
+          : "";
+      return c.json({ error: `Couldn't post the summary: ${reason}.${hint}` }, 502);
     }
     return c.json({ text, channel });
   })

@@ -29,15 +29,23 @@ function drawingColorAt(hex: string, progress: number) {
 export function FormFieldMap({
   canvasRef,
   onDrawingChange,
+  onCommit,
+  initialImage,
 }: {
   canvasRef: RefObject<HTMLCanvasElement | null>;
   onDrawingChange?: (hasDrawing: boolean) => void;
+  /** After each finished stroke, undo or clear, with the canvas as it now is. */
+  onCommit?: (canvas: HTMLCanvasElement) => void;
+  /** A drawing saved earlier (a data URL of the whole canvas), drawn over the field once loaded. */
+  initialImage?: string;
 }) {
   const base = useRef<HTMLCanvasElement | null>(null);
   const committed = useRef<HTMLCanvasElement | null>(null);
   const history = useRef<HistoryEntry[]>([]);
   const hasDrawing = useRef(false);
   const onDrawingChangeRef = useRef(onDrawingChange);
+  const onCommitRef = useRef(onCommit);
+  const initialImageRef = useRef(initialImage);
   const drawing = useRef(false);
   const activePointer = useRef<number | null>(null);
   const start = useRef<Point | null>(null);
@@ -50,7 +58,8 @@ export function FormFieldMap({
 
   useEffect(() => {
     onDrawingChangeRef.current = onDrawingChange;
-  }, [onDrawingChange]);
+    onCommitRef.current = onCommit;
+  }, [onDrawingChange, onCommit]);
 
   const loadBlob = useCallback(
     (blob: Blob) => {
@@ -84,6 +93,21 @@ export function FormFieldMap({
         hasDrawing.current = false;
         onDrawingChangeRef.current?.(false);
         URL.revokeObjectURL(image.src);
+        // A saved drawing goes over the clean field, so Clear still goes back to the field alone.
+        const saved = initialImageRef.current;
+        initialImageRef.current = undefined;
+        if (saved) {
+          const restored = new Image();
+          restored.onload = () => {
+            const target = canvasRef.current;
+            const targetContext = target?.getContext("2d");
+            if (!target || !targetContext || hasDrawing.current) return;
+            targetContext.drawImage(restored, 0, 0, target.width, target.height);
+            commitCanvas(target, false);
+            setHasDrawing(true);
+          };
+          restored.src = saved;
+        }
       };
       image.src = URL.createObjectURL(blob);
     },
@@ -145,12 +169,13 @@ export function FormFieldMap({
     hasDrawing.current = value;
     onDrawingChangeRef.current?.(value);
   }
-  function commitCanvas(canvas: HTMLCanvasElement) {
+  function commitCanvas(canvas: HTMLCanvasElement, report = true) {
     const saved = document.createElement("canvas");
     saved.width = canvas.width;
     saved.height = canvas.height;
     saved.getContext("2d")?.drawImage(canvas, 0, 0);
     committed.current = saved;
+    if (report) onCommitRef.current?.(canvas);
   }
   function arrow(context: CanvasRenderingContext2D, from: Point, to: Point) {
     const angle = Math.atan2(to.y - from.y, to.x - from.x);

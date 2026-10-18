@@ -8,6 +8,11 @@ compatibility_date = "2026-05-17"
 binding = "G3ID"
 service = "g3id"
 
+# When the team's events open and close (src/battery-timers.ts).
+[[services]]
+binding = "SCHEDULE"
+service = "schedule"
+
 [[kv_namespaces]]
 binding = "SESSIONS"
 id = "c27ba19a75fb4eb6b93f9d2d47de6c0f"
@@ -26,6 +31,7 @@ bucket_name = "g3-bucket"
 
 [vars]
 FRONTEND_URL = "http://localhost:5175"
+LOCAL_GATEWAY_URL = "http://localhost:8796"
 # TBA_AUTH_KEY and NEXUS_API_KEY are secrets — set via `.dev.vars` locally and `wrangler secret put` in prod
 
 [env.production]
@@ -36,6 +42,10 @@ workers_dev = false
 [[env.production.services]]
 binding = "G3ID"
 service = "g3id-production"
+
+[[env.production.services]]
+binding = "SCHEDULE"
+service = "schedule-production"
 
 [[env.production.kv_namespaces]]
 binding = "SESSIONS"
@@ -78,6 +88,10 @@ __G3_STAGING__ = "true"
 [[env.staging.services]]
 binding = "G3ID"
 service = "g3id-staging"
+
+[[env.staging.services]]
+binding = "SCHEDULE"
+service = "schedule-staging"
 
 [[env.staging.kv_namespaces]]
 binding = "SESSIONS"

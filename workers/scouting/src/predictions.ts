@@ -3,6 +3,7 @@ import { inTeam, withTeam } from "@g3/auth";
 import { sql } from "drizzle-orm";
 import { Hono } from "hono";
 
+import { analysisEventNames } from "./analysis-events";
 import { type Db, type WriteQuery, all, batch, createDb, dbOf, first } from "./db";
 import { adoptLegacyRows } from "./db/bootstrap";
 import {
@@ -16,6 +17,7 @@ import {
 import { getEngagementSettings } from "./engagement";
 
 import { requireAuth } from "./middleware/auth";
+import { statboticsFailureMessage, statboticsMatches } from "./statbotics";
 
 import type { AppEnv } from "./types";
 
@@ -158,29 +160,16 @@ function normalizeGameMatch(value: unknown): GameMatch | null {
   };
 }
 
-async function getStatboticsMatches(eventKey: string) {
-  const url = `https://api.statbotics.io/v3/matches?event=${encodeURIComponent(eventKey)}&limit=500`;
-  for (let attempt = 1; attempt <= 3; attempt += 1) {
-    const response = await fetch(url, {
-      headers: { Accept: "application/json", "User-Agent": "Gearbox-Strategy/1.0" },
-    });
-    if (response.ok) {
-      const body = (await response.json()) as unknown;
-      if (!Array.isArray(body)) throw new Error("Statbotics returned an unexpected response.");
-      return body
-        .map(normalizeGameMatch)
-        .filter((match): match is GameMatch => Boolean(match))
-        .sort(
-          (left, right) =>
-            (left.startTime ?? Number.MAX_SAFE_INTEGER) -
-              (right.startTime ?? Number.MAX_SAFE_INTEGER) || left.key.localeCompare(right.key),
-        );
-    }
-    if (attempt === 3 || (response.status !== 429 && response.status < 500))
-      throw new Error(`Statbotics returned ${response.status}.`);
-    await new Promise((resolve) => setTimeout(resolve, attempt * 300));
-  }
-  return [];
+async function getStatboticsMatches(eventKey: string, fresh = false) {
+  const body = await statboticsMatches(eventKey, fresh);
+  return body
+    .map(normalizeGameMatch)
+    .filter((match): match is GameMatch => Boolean(match))
+    .sort(
+      (left, right) =>
+        (left.startTime ?? Number.MAX_SAFE_INTEGER) -
+          (right.startTime ?? Number.MAX_SAFE_INTEGER) || left.key.localeCompare(right.key),
+    );
 }
 
 function localDemoGameMatches(teamId: string): GameMatch[] {
@@ -226,10 +215,15 @@ function localDemoGameMatches(teamId: string): GameMatch[] {
   }));
 }
 
-async function gameMatches(env: AppEnv["Bindings"], eventKey: string, teamId: string) {
+async function gameMatches(
+  env: AppEnv["Bindings"],
+  eventKey: string,
+  teamId: string,
+  fresh = false,
+) {
   if (env.LOCAL_AUTH_BYPASS === "true" && eventKey === "local-demo")
     return localDemoGameMatches(teamId);
-  return getStatboticsMatches(eventKey);
+  return getStatboticsMatches(eventKey, fresh);
 }
 
 async function settleGameBets(db: Db, teamId: string, eventKey: string, matches: GameMatch[]) {
@@ -480,14 +474,19 @@ predictionsRoutes.get("/game", requireAuth, async (c) => {
   }
   let matches: GameMatch[] = [];
   let statsError = "";
-  if (settings.predictionsEnabled && config?.event_key) {
+  let eventName = config?.event_key ?? "";
+  if (settings.predictionsEnabled && config?.event_key && c.req.query("summary") !== "true") {
+    // Resolve the name alongside predictions so failures still respect the loading deadline.
+    const names = analysisEventNames(c, [config.event_key]);
     try {
       matches = await gameMatches(c.env, config.event_key, c.get("teamId"));
       await settleGameBets(dbOf(c), c.get("teamId"), config.event_key, matches);
       await settleGameParlays(dbOf(c), c.get("teamId"), config.event_key, matches);
     } catch (error) {
-      statsError = error instanceof Error ? error.message : "Statbotics is unavailable.";
+      eventName = (await names)[config.event_key] || eventName;
+      statsError = statboticsFailureMessage(error, eventName);
     }
+    eventName = (await names)[config.event_key] || eventName;
   }
   const account = await first<Record<string, number>>(
     dbOf(c),
@@ -584,6 +583,7 @@ predictionsRoutes.get("/game", requireAuth, async (c) => {
     });
   return c.json({
     eventKey: config?.event_key ?? "",
+    eventName,
     account: account ?? { balance: 0, earned: 0, wagered: 0 },
     settings,
     leaderboard: leaderboard.results,
@@ -617,10 +617,11 @@ predictionsRoutes.post("/game/bets", requireAuth, async (c) => {
   if (!config?.event_key) return c.json({ error: "No event is configured." }, 409);
   let matches: GameMatch[];
   try {
-    matches = await gameMatches(c.env, config.event_key, c.get("teamId"));
+    matches = await gameMatches(c.env, config.event_key, c.get("teamId"), true);
   } catch (error) {
+    const names = await analysisEventNames(c, [config.event_key]);
     return c.json(
-      { error: error instanceof Error ? error.message : "Statbotics is unavailable." },
+      { error: statboticsFailureMessage(error, names[config.event_key] || config.event_key) },
       503,
     );
   }
@@ -742,10 +743,11 @@ predictionsRoutes.post("/game/parlays", requireAuth, async (c) => {
   if (!config?.event_key) return c.json({ error: "No event is configured." }, 409);
   let matches: GameMatch[];
   try {
-    matches = await gameMatches(c.env, config.event_key, c.get("teamId"));
+    matches = await gameMatches(c.env, config.event_key, c.get("teamId"), true);
   } catch (error) {
+    const names = await analysisEventNames(c, [config.event_key]);
     return c.json(
-      { error: error instanceof Error ? error.message : "Statbotics is unavailable." },
+      { error: statboticsFailureMessage(error, names[config.event_key] || config.event_key) },
       503,
     );
   }

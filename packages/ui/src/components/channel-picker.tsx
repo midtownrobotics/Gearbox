@@ -1,41 +1,47 @@
 import { apiPath, appUrl, site } from "@g3/site-config";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 
-// Choosing one of the team's Slack channels by name (G3ID's /admin/slack/channels, through
-// /api/~id; admins only). Gives back the channel's ID, which is what's saved. When the channels
-// can't be listed (no Slack yet, or a connection from before the bot could read them), it says
-// what to do and takes an ID typed in instead, so a page still works. Styled by
-// slack-channel-picker.css: plain CSS, like the top bar, so it's the same in every app.
+// Choosing one of the team's channels by name, on its chat: Slack or Discord, whichever it uses
+// (G3ID's /admin/chat/channels, through /api/~id; admins only). Gives back the channel's ID,
+// which is what's saved. When the channels can't be listed (no chat yet, or a Slack connection
+// from before the bot could read them), it says what to do and takes an ID typed in instead, so a
+// page still works. Styled by channel-picker.css: plain CSS, like the top bar, so it's the same in
+// every app.
 
-export type SlackChannelOption = {
+export type ChannelOption = {
   id: string;
   name: string;
   isPrivate: boolean;
-  /** The bot is in it, so it can post there. */
-  isMember: boolean;
+  /** The bot can post there (Slack: it's in the channel). */
+  canPost: boolean;
 };
+
+type Provider = "slack" | "discord";
 
 type Listing =
   | { state: "loading" }
-  | { state: "ready"; channels: SlackChannelOption[] }
+  | { state: "ready"; provider: Provider; channels: ChannelOption[] }
   | { state: "unavailable"; code: string; error: string };
 
 /** Asked once per page load and shared by every picker on the page. */
 let listing: Promise<Listing> | null = null;
 
 function loadChannels(): Promise<Listing> {
-  listing ??= fetch(`${apiPath("id")}/admin/slack/channels`, { credentials: "include" })
+  listing ??= fetch(`${apiPath("id")}/admin/chat/channels`, { credentials: "include" })
     .then(async (res) => {
       const data = (await res.json().catch(() => ({}))) as {
-        channels?: SlackChannelOption[];
+        provider?: Provider;
+        channels?: ChannelOption[];
         code?: string;
         error?: string;
       };
-      if (res.ok && data.channels) return { state: "ready", channels: data.channels } as const;
+      if (res.ok && data.channels && data.provider) {
+        return { state: "ready", provider: data.provider, channels: data.channels } as const;
+      }
       return {
         state: "unavailable",
         code: data.code ?? "error",
-        error: data.error ?? "Couldn't list your Slack channels.",
+        error: data.error ?? "Couldn't list your team's channels.",
       } as const;
     })
     .catch(
@@ -43,22 +49,24 @@ function loadChannels(): Promise<Listing> {
         ({
           state: "unavailable",
           code: "error",
-          error: "Couldn't list your Slack channels.",
+          error: "Couldn't list your team's channels.",
         }) as const,
     );
   // Try again next time if it failed for a reason that might pass.
   listing.then((l) => {
-    if (l.state === "unavailable" && l.code !== "no_slack" && l.code !== "reconnect")
-      listing = null;
+    if (l.state === "unavailable" && l.code !== "no_chat" && l.code !== "reconnect") listing = null;
   });
   return listing;
 }
 
-/** A Slack channel ID: C or G, then 8 or more capitals and digits (C0123456789). */
-const CHANNEL_ID = /^[CG][A-Z0-9]{8,}$/;
+/**
+ * A channel ID: Slack's (C or G, then 8 or more capitals and digits: C0123456789) or Discord's
+ * (17 to 20 digits).
+ */
+const CHANNEL_ID = /^(?:[CG][A-Z0-9]{8,}|\d{17,20})$/;
 const SHOWN = 50;
 
-export function SlackChannelPicker({
+export function ChannelPicker({
   value,
   onChange,
   id,
@@ -106,7 +114,7 @@ export function SlackChannelPicker({
     return found.slice(0, SHOWN);
   }, [channels, query]);
 
-  function choose(channel: SlackChannelOption) {
+  function choose(channel: ChannelOption) {
     onChange(channel.id);
     setEditing(false);
     setOpen(false);
@@ -119,9 +127,9 @@ export function SlackChannelPicker({
 
   if (value && !editing) {
     return (
-      <div className="g3-slack-picker">
-        <div className="g3-slack-chosen">
-          <span className="g3-slack-name">
+      <div className="g3-channel-picker">
+        <div className="g3-channel-chosen">
+          <span className="g3-channel-name">
             {list.state === "loading" ? (
               "Loading…"
             ) : chosen ? (
@@ -135,7 +143,7 @@ export function SlackChannelPicker({
           </span>
           <button
             type="button"
-            className="g3-slack-button"
+            className="g3-channel-button"
             disabled={disabled}
             onClick={() => {
               setEditing(true);
@@ -148,7 +156,7 @@ export function SlackChannelPicker({
           {clearable && (
             <button
               type="button"
-              className="g3-slack-button"
+              className="g3-channel-button"
               disabled={disabled}
               onClick={() => onChange(null)}
             >
@@ -156,15 +164,17 @@ export function SlackChannelPicker({
             </button>
           )}
         </div>
-        {chosen && !chosen.isMember && <NotInChannel name={chosen.name} />}
+        {chosen && !chosen.canPost && list.state === "ready" && (
+          <CantPost name={chosen.name} provider={list.provider} />
+        )}
       </div>
     );
   }
 
   return (
-    <div className="g3-slack-picker">
-      <div className="g3-slack-search">
-        <span className="g3-slack-hash" aria-hidden>
+    <div className="g3-channel-picker">
+      <div className="g3-channel-search">
+        <span className="g3-channel-hash" aria-hidden>
           #
         </span>
         <input
@@ -206,7 +216,7 @@ export function SlackChannelPicker({
         {editing && value && (
           <button
             type="button"
-            className="g3-slack-button"
+            className="g3-channel-button"
             onClick={() => {
               setEditing(false);
               setQuery("");
@@ -222,11 +232,11 @@ export function SlackChannelPicker({
           id={listId}
           role="listbox"
           tabIndex={-1}
-          className="g3-slack-options"
+          className="g3-channel-options"
           // Scrolling the list mustn't take focus from the input (which would close it).
           onMouseDown={(e) => e.preventDefault()}
         >
-          {matches.length === 0 && <div className="g3-slack-empty">No channel by that name.</div>}
+          {matches.length === 0 && <div className="g3-channel-empty">No channel by that name.</div>}
           {matches.map((c, i) => (
             <div
               key={c.id}
@@ -234,7 +244,7 @@ export function SlackChannelPicker({
               role="option"
               tabIndex={-1}
               aria-selected={i === active}
-              className="g3-slack-option"
+              className="g3-channel-option"
               // Before the input's blur closes the list.
               onMouseDown={(e) => {
                 e.preventDefault();
@@ -243,9 +253,11 @@ export function SlackChannelPicker({
               onMouseEnter={() => setActive(i)}
             >
               <ChannelMark channel={c} />
-              <span className="g3-slack-option-name">{c.name}</span>
-              {!c.isMember && (
-                <span className="g3-slack-option-note">{site.slackBotName} isn't in it</span>
+              <span className="g3-channel-option-name">{c.name}</span>
+              {!c.canPost && (
+                <span className="g3-channel-option-note">
+                  {botName(list.provider)} can't post here
+                </span>
               )}
             </div>
           ))}
@@ -255,17 +267,31 @@ export function SlackChannelPicker({
   );
 }
 
-function ChannelMark({ channel }: { channel: SlackChannelOption }) {
+function ChannelMark({ channel }: { channel: ChannelOption }) {
   return (
-    <span className="g3-slack-hash" aria-label={channel.isPrivate ? "Private channel" : undefined}>
+    <span
+      className="g3-channel-hash"
+      aria-label={channel.isPrivate ? "Private channel" : undefined}
+    >
       {channel.isPrivate ? "🔒" : "#"}
     </span>
   );
 }
 
-function NotInChannel({ name }: { name: string }) {
+const botName = (provider: Provider) =>
+  provider === "slack" ? site.slackBotName : site.discordBotName;
+
+function CantPost({ name, provider }: { name: string; provider: Provider }) {
+  if (provider === "discord") {
+    return (
+      <p className="g3-channel-warning">
+        {site.discordBotName} can't post in #{name} yet, so messages won't arrive. In Discord, edit
+        the channel's permissions so {site.discordBotName} can view the channel and send messages.
+      </p>
+    );
+  }
   return (
-    <p className="g3-slack-warning">
+    <p className="g3-channel-warning">
       {site.slackBotName} isn't in #{name} yet, so messages won't arrive. In Slack, open the channel
       and type <code>/invite @{site.slackBotName}</code>.
     </p>
@@ -291,17 +317,17 @@ function Fallback({
   const integrations = `${appUrl("portal")}/admin/integrations`;
   const valid = !text.trim() || CHANNEL_ID.test(text.trim());
   return (
-    <div className="g3-slack-picker">
-      <p className="g3-slack-warning">
+    <div className="g3-channel-picker">
+      <p className="g3-channel-warning">
         {list.error}{" "}
-        {(list.code === "no_slack" || list.code === "reconnect") && (
+        {(list.code === "no_chat" || list.code === "reconnect") && (
           <a href={integrations}>Go to Integrations</a>
         )}
       </p>
       <input
         id={inputId}
-        className="g3-slack-id"
-        placeholder="Or enter the channel ID, like C0123456789"
+        className="g3-channel-id"
+        placeholder="Or enter the channel's ID"
         disabled={disabled}
         value={text}
         onChange={(e) => {
@@ -312,8 +338,9 @@ function Fallback({
         }}
       />
       {!valid && (
-        <p className="g3-slack-error">
-          That isn't a channel ID. Copy it from the channel's details in Slack.
+        <p className="g3-channel-error">
+          That isn't a channel ID. In Slack it's in the channel's details; in Discord, right-click
+          the channel and choose Copy Channel ID.
         </p>
       )}
     </div>

@@ -1,16 +1,16 @@
 import { teamSettingsRoutes } from "@g3/auth";
 import { createShopDb } from "../db";
 import { onshapeConfig } from "../lib/onshape-config";
-import { SETTING, getSetting, setSetting } from "../lib/settings";
+import { SETTING, getSetting, isChannelId, setSetting } from "../lib/settings";
 import { manifest } from "../manifest";
 import type { AppEnv } from "../types";
 
-// The team's Shop settings for the team's dashboard (roadmap 4.5), by manifest key: the Slack
-// channels for releases and daily summaries (empty: no posts). The Onshape connection is saved on
+// The team's Shop settings for the team's dashboard (roadmap 4.5), by manifest key: the channels
+// (Slack or Discord) for releases and daily summaries (empty: no posts). The Onshape connection is saved on
 // Shop's Admin page, which also registers the webhook; this only reports whether it's set up.
 const CHANNELS = {
-  slackReleaseChannelId: SETTING.slackReleaseChannel,
-  slackSummaryChannelId: SETTING.slackSummaryChannel,
+  releaseChannelId: SETTING.releaseChannel,
+  summaryChannelId: SETTING.summaryChannel,
 } as const;
 
 export const teamSettingsRouter = teamSettingsRoutes<AppEnv>(manifest, "Shop settings", {
@@ -18,13 +18,13 @@ export const teamSettingsRouter = teamSettingsRoutes<AppEnv>(manifest, "Shop set
     const db = createShopDb(c.env.SHOP_DB);
     const teamId = c.get("teamId");
     const [release, summary, onshape] = await Promise.all([
-      getSetting(db, teamId, CHANNELS.slackReleaseChannelId),
-      getSetting(db, teamId, CHANNELS.slackSummaryChannelId),
+      getSetting(db, teamId, CHANNELS.releaseChannelId),
+      getSetting(db, teamId, CHANNELS.summaryChannelId),
       onshapeConfig(c.env, db, teamId).catch(() => null),
     ]);
     const connected = Boolean(onshape?.credentials && onshape.companyId && onshape.documentId);
     return {
-      values: { slackReleaseChannelId: release, slackSummaryChannelId: summary },
+      values: { releaseChannelId: release, summaryChannelId: summary },
       secretsSet: {
         apiKey: Boolean(onshape?.credentials),
         secretKey: Boolean(onshape?.credentials),
@@ -55,8 +55,8 @@ export const teamSettingsRouter = teamSettingsRoutes<AppEnv>(manifest, "Shop set
     const teamId = c.get("teamId");
     for (const [key, value] of Object.entries(changes)) {
       const row = CHANNELS[key as keyof typeof CHANNELS];
-      if (typeof value === "string" && !/^[A-Z0-9]{8,12}$/.test(value)) {
-        return "A Slack channel ID looks like C0123456789 (in the channel's details in Slack).";
+      if (typeof value === "string" && !isChannelId(value)) {
+        return "Choose a Slack or Discord channel.";
       }
       await setSetting(db, teamId, row, typeof value === "string" ? value : "");
     }

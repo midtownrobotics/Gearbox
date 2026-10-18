@@ -200,17 +200,17 @@ describe("teams from before the library", () => {
 });
 
 describe("telling the team's admins", () => {
-  it("DMs every admin on the team's Slack when an app goes on or off", async () => {
+  it("DMs every admin on the team's chat when an app goes on or off", async () => {
     const team = await newTeam();
     const dms = async () =>
       (await (
-        await testEnv.G3ID.fetch(`http://g3id/api/internal/teams/${team.teamId}/slack/dm-admins`)
+        await testEnv.G3ID.fetch(`http://g3id/api/internal/teams/${team.teamId}/chat/dm-admins`)
       ).json()) as { text: string }[];
     await switchApp(team.admin, "pit", true);
     await switchApp(team.admin, "pit", false);
     const [on, off] = (await dms()).map((d) => d.text);
-    expect(on).toContain("switched *Pit* on");
-    expect(off).toContain("switched *Pit* off");
+    expect(on).toContain("switched **Pit** on");
+    expect(off).toContain("switched **Pit** off");
     expect(off).toMatch(/kept until \w+ \d+, \d{4}/);
     // Each says where to change it back: the team's own Apps page.
     expect(off).toContain(`${team.teamId.replace("frc", "")}.`);

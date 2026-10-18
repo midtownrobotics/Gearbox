@@ -38,6 +38,11 @@ apps/scouting/eng.traineddata
 # Edge box: raw configs copied from g3-edge (real MACs etc). Scrubbed copies live in infra/edge/.
 infra/edge/local/
 
+# AdvantageScope Lite for Pit, built from vendor/advantagescope (apps/pit/advantagescope/build.mjs).
+apps/pit/public/scope/
+apps/pit/advantagescope/.build/
+apps/pit/advantagescope/.keep-*/
+
 # Other
 *-prod.sql
 

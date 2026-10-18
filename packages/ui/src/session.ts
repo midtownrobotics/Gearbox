@@ -121,3 +121,38 @@ export function useAppOn(app: string): boolean | undefined {
   if (apps === null) return undefined;
   return apps === "all" || apps.has(app);
 }
+
+/** The chat a team uses: Slack, Discord, or none yet. */
+export type TeamChat = "slack" | "discord" | null;
+
+let teamChat: Promise<TeamChat> | null = null;
+
+/** The team's chat (G3ID's public /team/chat, for the page's team), asked once per page load. */
+function loadTeamChat(): Promise<TeamChat> {
+  teamChat ??= fetch(`${apiPath("id")}/team/chat`, { credentials: "include" })
+    .then(async (res) => {
+      if (!res.ok) return null;
+      return ((await res.json()) as { provider: TeamChat }).provider ?? null;
+    })
+    .catch(() => null);
+  return teamChat;
+}
+
+/**
+ * The chat the page's team uses, so text can name it ("You'll get a Discord DM"): "slack",
+ * "discord" or null (none). Undefined while it's being asked; `chatName` gives its name.
+ */
+export function useTeamChat(): TeamChat | undefined {
+  const [value, setValue] = useState<TeamChat | undefined>(undefined);
+  useEffect(() => {
+    let live = true;
+    loadTeamChat().then((chat) => live && setValue(chat));
+    return () => {
+      live = false;
+    };
+  }, []);
+  return value;
+}
+
+/** A chat's name in text. Slack while it isn't known, as before Discord. */
+export const chatName = (chat: TeamChat | undefined) => (chat === "discord" ? "Discord" : "Slack");

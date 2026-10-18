@@ -46,7 +46,7 @@ export function TeamsPage() {
                 <th className="py-2 pr-4">Number</th>
                 <th className="py-2 pr-4">Name</th>
                 <th className="py-2 pr-4">Status</th>
-                <th className="py-2 pr-4">Slack</th>
+                <th className="py-2 pr-4">Chat</th>
                 <th className="py-2 pr-4">Country</th>
                 <th className="py-2 pr-4">Signed up</th>
                 <th className="py-2">Open reports</th>
@@ -70,7 +70,10 @@ export function TeamsPage() {
                   <td className="py-2 pr-4">
                     <StatusBadge status={team.status} />
                   </td>
-                  <td className="py-2 pr-4 text-secondary-600">{team.slackWorkspaceName ?? "—"}</td>
+                  <td className="py-2 pr-4 text-secondary-600">
+                    {team.slackWorkspaceName ??
+                      (team.discordGuildName ? `${team.discordGuildName} (Discord)` : "—")}
+                  </td>
                   <td className="py-2 pr-4 text-secondary-600">{team.country}</td>
                   <td className="py-2 pr-4 text-secondary-600">{formatDate(team.createdAt)}</td>
                   <td className="py-2">

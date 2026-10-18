@@ -6,7 +6,7 @@ import { nowSeconds } from "./lib/input";
 import { SLOT_MINUTES, clockLabel, slotAt } from "./lib/slots";
 import type { AppEnv } from "./types";
 
-// Slack reminders, run every minute (wrangler.toml's cron). Each published schedule with
+// Chat reminders (Slack or Discord), run every minute (wrangler.toml's cron). Each published schedule with
 // reminders on DMs each attendee `notify_minutes` before a block where their role changes:
 // "At 10:00 AM you're on Pit until 12:15 PM". Only a change gets a message, not every block, and
 // `notifications_sent` makes sure each one goes once even if runs overlap or repeat.
@@ -99,7 +99,7 @@ async function remind(env: AppEnv["Bindings"], db: Db, due: Due) {
       .returning({ userId: notificationsSent.userId })
       .get();
     if (!claimed) continue;
-    const text = `${due.name}: at ${clockLabel(slot)} you're on *${roleNames.get(role) ?? "a new role"}* until ${clockLabel(end)}.`;
+    const text = `${due.name}: at ${clockLabel(slot)} you're on **${roleNames.get(role) ?? "a new role"}** until ${clockLabel(end)}.`;
     await sendMemberDM(env, teamId, [userId], text);
   }
 }

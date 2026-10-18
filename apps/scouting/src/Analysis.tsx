@@ -1,37 +1,12 @@
 import { pageTeamNumber } from "@g3/site-config";
-import { Button, Page as SharedPage, inputClass, useQuestions } from "@g3/ui";
-import {
-  BarChart3,
-  ChevronDown,
-  Map as MapIcon,
-  Scale,
-  Search,
-  Star,
-  Trash2,
-  Users,
-  X,
-} from "lucide-react";
+import { Button, Chip, Page as SharedPage, inputClass, useQuestions } from "@g3/ui";
+import { BarChart3, Map as MapIcon, Scale, Search, Star, Trash2, Users, X } from "lucide-react";
 import { type SyntheticEvent, useEffect, useState } from "react";
-import type { ScoutingField } from "./ScoutingForms";
+import { AnalysisTeamTable, type TeamComment } from "./AnalysisTeamTable";
 import { TeamLookupInput } from "./TeamLookupInput";
+import type { Report } from "./analysis-table";
 import { API_URL, api } from "./api";
 
-type Report = {
-  id: string;
-  teamName: string;
-  formName: string;
-  fields: ScoutingField[];
-  answers: Record<string, unknown>;
-  drawings: Record<string, string>;
-  submittedByName: string;
-  createdAt: number;
-  eventKey?: string;
-  matchKey?: string;
-  matchNumber?: number;
-  starredFieldIds: string[];
-  archivedAt?: number | null;
-  archiveReason?: string;
-};
 type TeamMatch = {
   key: string;
   label: string;
@@ -44,14 +19,6 @@ type TeamMatch = {
   /** Whether this team played with or against our team. */
   relationToTeam: "with" | "against" | "none";
   played: boolean;
-};
-type TeamComment = {
-  id: string;
-  team_name: string;
-  comment: string;
-  event_key?: string;
-  created_by_name: string;
-  created_at: number;
 };
 
 const AUTO_PATH_COLORS = [
@@ -98,7 +65,13 @@ function imageHasAutoPath(image: HTMLImageElement) {
   }
 }
 
-export function Analysis({ initialReportId }: { initialReportId?: string | null }) {
+export function Analysis({
+  initialReportId,
+  canManageReports,
+}: {
+  initialReportId?: string | null;
+  canManageReports: boolean;
+}) {
   const questions = useQuestions();
   const [team, setTeam] = useState("");
   const [searched, setSearched] = useState("");
@@ -109,13 +82,14 @@ export function Analysis({ initialReportId }: { initialReportId?: string | null 
   const [teamMatches, setTeamMatches] = useState<TeamMatch[]>([]);
   const [teamComments, setTeamComments] = useState<TeamComment[]>([]);
   const [competition, setCompetition] = useState("all");
+  const [reportKind, setReportKind] = useState<"all" | "scouting" | "pit">("scouting");
+  const [eventNames, setEventNames] = useState<Record<string, string>>({});
+  const [currentEventKey, setCurrentEventKey] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [blankPathIds, setBlankPathIds] = useState<Set<string>>(() => new Set());
-  const [reportSort, setReportSort] = useState<"team" | "match" | "newest" | "starred">("team");
   const [tab, setTab] = useState<"stats" | "matches" | "auto" | "compare">("stats");
-  const [expandedReportId, setExpandedReportId] = useState<string | null>(initialReportId ?? null);
   const [selectedPath, setSelectedPath] = useState<{
     url: string;
     teamName: string;
@@ -130,6 +104,8 @@ export function Analysis({ initialReportId }: { initialReportId?: string | null 
         reports: Report[];
         teamMatches: TeamMatch[];
         teamComments: TeamComment[];
+        eventNames: Record<string, string>;
+        currentEventKey?: string | null;
       }>(
         `/analysis?team=${encodeURIComponent(teamFilter)}${tab === "compare" ? `&teamB=${encodeURIComponent(teamBFilter)}` : ""}`,
       );
@@ -141,11 +117,20 @@ export function Analysis({ initialReportId }: { initialReportId?: string | null 
           : result.reports,
       );
       setBlankPathIds(new Set());
-      setCompetition("all");
       setSearched(teamFilter);
       setSearchedB(tab === "compare" ? teamBFilter : "");
       setTeamComments(result.teamComments);
       setTeamMatches(result.teamMatches);
+      setEventNames(result.eventNames ?? {});
+      setCurrentEventKey(result.currentEventKey || null);
+      // The page opens on the event being scouted now, or on a report someone linked to.
+      const linkedReport = result.reports.find((report) => report.id === initialReportId);
+      if (!loaded && linkedReport) {
+        setReportKind(linkedReport.formKind || "scouting");
+        setCompetition(linkedReport.eventKey || "Unassigned");
+      } else if (!loaded) {
+        setCompetition(result.currentEventKey || "all");
+      }
       setReportsB(
         tab === "compare"
           ? result.reports.filter(
@@ -170,16 +155,6 @@ export function Analysis({ initialReportId }: { initialReportId?: string | null 
   useEffect(() => {
     loadData("", "").catch(() => undefined);
   }, []);
-  useEffect(() => {
-    if (!loaded || !initialReportId) return;
-    setExpandedReportId(initialReportId);
-    window.setTimeout(() => {
-      document.getElementById(`report-${initialReportId}`)?.scrollIntoView({
-        behavior: "smooth",
-        block: "center",
-      });
-    }, 0);
-  }, [initialReportId, loaded]);
   useEffect(() => {
     if (!selectedPath) return;
     const closeOnEscape = (event: KeyboardEvent) => {
@@ -240,74 +215,47 @@ export function Analysis({ initialReportId }: { initialReportId?: string | null 
     );
   }
 
-  const activeReports = reports.filter((report) => !report.archivedAt);
-  const activeReportsB = reportsB.filter((report) => !report.archivedAt);
+  const eventLabel = (key?: string) => (key ? eventNames[key] || key : "Unassigned");
+  // Stats shows match or pit scouting, each as its own table.
+  const shownKind = tab === "stats" && reportKind === "all" ? "scouting" : reportKind;
+  const matchesReportFilters = (report: Report) =>
+    (shownKind === "all" || (report.formKind || "scouting") === shownKind) &&
+    (competition === "all" || (report.eventKey || "Unassigned") === competition);
+  const activeReports = reports.filter(
+    (report) => !report.archivedAt && matchesReportFilters(report),
+  );
+  const activeReportsB = reportsB.filter(
+    (report) => !report.archivedAt && matchesReportFilters(report),
+  );
   const summaryA = numericSummary(activeReports);
   const summaryB = numericSummary(activeReportsB);
   const comparisonLabels = [...new Set([...summaryA.keys(), ...summaryB.keys()])];
   const competitions = [
     ...new Set([
+      ...(currentEventKey ? [currentEventKey] : []),
       ...reports.map((report) => report.eventKey || "Unassigned"),
+      ...reportsB.map((report) => report.eventKey || "Unassigned"),
       ...teamComments.map((comment) => comment.event_key || "Unassigned"),
     ]),
-  ].sort();
-  const visibleReports = reports
-    .filter((report) => competition === "all" || (report.eventKey || "Unassigned") === competition)
-    .sort((left, right) => {
-      if (reportSort === "team") {
-        const leftTeam = Number(left.teamName);
-        const rightTeam = Number(right.teamName);
-        const teamOrder =
-          Number.isFinite(leftTeam) && Number.isFinite(rightTeam)
-            ? leftTeam - rightTeam
-            : left.teamName.localeCompare(right.teamName, undefined, { numeric: true });
-        return teamOrder || right.createdAt - left.createdAt;
-      }
-      if (reportSort === "newest") return right.createdAt - left.createdAt;
-      if (reportSort === "starred") {
-        const starOrder =
-          Number(right.starredFieldIds.length > 0) - Number(left.starredFieldIds.length > 0);
-        if (starOrder !== 0) return starOrder;
-        return right.createdAt - left.createdAt;
-      }
-      const eventOrder = (left.eventKey || "Unassigned").localeCompare(
-        right.eventKey || "Unassigned",
-      );
-      if (eventOrder !== 0) return eventOrder;
-      const leftDay = new Date(left.createdAt).setHours(0, 0, 0, 0);
-      const rightDay = new Date(right.createdAt).setHours(0, 0, 0, 0);
-      const dayOrder = rightDay - leftDay;
-      if (dayOrder !== 0) return dayOrder;
-      const matchOrder =
-        (left.matchNumber ?? Number.MAX_SAFE_INTEGER) -
-        (right.matchNumber ?? Number.MAX_SAFE_INTEGER);
-      if (matchOrder !== 0) return matchOrder;
-      const teamOrder = Number(left.teamName) - Number(right.teamName);
-      if (teamOrder !== 0) return teamOrder;
-      const starOrder =
-        Number(right.starredFieldIds.length > 0) - Number(left.starredFieldIds.length > 0);
-      return starOrder || right.createdAt - left.createdAt;
-    });
-  const visibleActiveReports = visibleReports.filter((report) => !report.archivedAt);
-  const visibleSummary = numericSummary(visibleActiveReports);
-  const summaryMetrics = [...visibleSummary]
-    .sort(([left], [right]) => left.localeCompare(right))
-    .slice(0, 6);
+  ].sort(
+    (left, right) => eventLabel(left).localeCompare(eventLabel(right)) || left.localeCompare(right),
+  );
   const coveredMatches = new Set(
-    visibleActiveReports.flatMap((report) => (report.matchNumber ? [report.matchNumber] : [])),
+    activeReports.flatMap((report) =>
+      report.matchKey || report.matchNumber ? [report.matchKey || report.matchNumber] : [],
+    ),
   ).size;
-  const scoutCount = new Set(visibleActiveReports.map((report) => report.submittedByName)).size;
-  const highlightedReports = visibleActiveReports.filter(
+  const teamCount = new Set(activeReports.map((report) => report.teamName)).size;
+  const scoutCount = new Set(activeReports.map((report) => report.submittedByName)).size;
+  const highlightedReports = activeReports.filter(
     (report) => report.starredFieldIds.length > 0,
   ).length;
 
-  const autoFields = activeReports
-    .filter((report) => competition === "all" || (report.eventKey || "Unassigned") === competition)
-    .flatMap((report) =>
-      report.fields
-        .filter((field) => field.type === "fieldMap" && report.drawings[field.id])
-        .map((field) => ({ report, field, url: report.drawings[field.id] })),
-    );
+  const autoFields = activeReports.flatMap((report) =>
+    report.fields
+      .filter((field) => field.type === "fieldMap" && report.drawings[field.id])
+      .map((field) => ({ report, field, url: report.drawings[field.id] })),
+  );
   const visibleAutoFields = autoFields.filter(
     ({ report, field }) => !blankPathIds.has(`${report.id}-${field.id}`),
   );
@@ -316,9 +264,7 @@ export function Analysis({ initialReportId }: { initialReportId?: string | null 
       (comment) => competition === "all" || (comment.event_key || "Unassigned") === competition,
     )
     .sort((left, right) => {
-      const eventOrder = (left.event_key || "Unassigned").localeCompare(
-        right.event_key || "Unassigned",
-      );
+      const eventOrder = eventLabel(left.event_key).localeCompare(eventLabel(right.event_key));
       return eventOrder || right.created_at - left.created_at;
     });
   const commentsByTeam = new Map<string, TeamComment[]>();
@@ -328,6 +274,11 @@ export function Analysis({ initialReportId }: { initialReportId?: string | null 
       comment,
     ]);
   }
+  // Comments on a team with a row are in its row; the rest are listed under the table.
+  const teamsWithRows = new Set(activeReports.map((report) => report.teamName));
+  const commentsWithoutReports = [...commentsByTeam].filter(
+    ([teamNumber]) => !teamsWithRows.has(teamNumber),
+  );
   return (
     <SharedPage
       title={<>Analysis</>}
@@ -413,54 +364,75 @@ export function Analysis({ initialReportId }: { initialReportId?: string | null 
           Compare
         </button>
       </div>
-      {tab === "stats" ? (
-        <div className="analysis-results-stack">
-          <div className="analysis-controls">
-            {competitions.length > 0 && (
-              <label className="competition-filter">
-                Competition
-                <select
-                  className={inputClass}
-                  value={competition}
-                  onChange={(event) => setCompetition(event.target.value)}
-                >
-                  <option value="all">All competitions</option>
-                  {competitions.map((eventKey) => (
-                    <option value={eventKey} key={eventKey}>
-                      {eventKey}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
+      {tab !== "matches" && (
+        <div className="analysis-controls">
+          {tab === "stats" ? (
+            <fieldset className="flex flex-wrap gap-2">
+              <legend className="sr-only">Report type</legend>
+              <Chip selected={shownKind === "scouting"} onClick={() => setReportKind("scouting")}>
+                Match scouting
+              </Chip>
+              <Chip selected={shownKind === "pit"} onClick={() => setReportKind("pit")}>
+                Pit scouting
+              </Chip>
+            </fieldset>
+          ) : (
             <label className="competition-filter">
-              Sort reports
+              Report type
               <select
                 className={inputClass}
-                value={reportSort}
-                onChange={(event) =>
-                  setReportSort(event.target.value as "team" | "match" | "newest" | "starred")
-                }
+                value={reportKind}
+                aria-label="Report type"
+                onChange={(event) => setReportKind(event.target.value as typeof reportKind)}
               >
-                <option value="team">Team number, newest first</option>
-                <option value="match">Competition and match</option>
-                <option value="newest">Newest first</option>
-                <option value="starred">Highlights first</option>
+                <option value="scouting">Match scouting</option>
+                <option value="pit">Pit scouting</option>
+                <option value="all">All reports</option>
               </select>
             </label>
-          </div>
-          {loaded && visibleActiveReports.length > 0 && (
+          )}
+          {competitions.length > 0 && (
+            <label className="competition-filter">
+              Competition
+              <select
+                className={inputClass}
+                value={competition}
+                aria-label="Competition"
+                onChange={(event) => setCompetition(event.target.value)}
+              >
+                <option value="all">All competitions</option>
+                {competitions.map((eventKey) => (
+                  <option value={eventKey} key={eventKey}>
+                    {eventLabel(eventKey)}
+                    {eventKey === currentEventKey ? " (now)" : ""}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+        </div>
+      )}
+      {tab === "stats" ? (
+        <div className="analysis-results-stack">
+          {loaded && activeReports.length > 0 && (
             <section className="analysis-overview" aria-label="Scouting summary">
               <div>
                 <BarChart3 size={18} />
-                <strong>{visibleActiveReports.length}</strong>
+                <strong>{activeReports.length}</strong>
                 <span>Reports</span>
               </div>
               <div>
-                <Scale size={18} />
-                <strong>{coveredMatches}</strong>
-                <span>Matches</span>
+                <Users size={18} />
+                <strong>{teamCount}</strong>
+                <span>Teams</span>
               </div>
+              {shownKind === "scouting" && (
+                <div>
+                  <Scale size={18} />
+                  <strong>{coveredMatches}</strong>
+                  <span>Matches</span>
+                </div>
+              )}
               <div>
                 <Users size={18} />
                 <strong>{scoutCount}</strong>
@@ -471,30 +443,41 @@ export function Analysis({ initialReportId }: { initialReportId?: string | null 
                 <strong>{highlightedReports}</strong>
                 <span>Highlights</span>
               </div>
-              {summaryMetrics.map(([label, average]) => (
-                <div className="analysis-average" key={label}>
-                  <strong>{average.toFixed(1)}</strong>
-                  <span>{label}</span>
-                  <small>Average</small>
-                </div>
-              ))}
             </section>
           )}
-          {loaded && !reports.length && !teamComments.length && (
+          {loaded && !activeReports.length && (
             <div className="forms-empty">
-              {searched ? `No reports found for team ${searched}.` : "No reports found."}
+              {searched
+                ? `No ${shownKind === "pit" ? "pit" : "match"} scouting reports for team ${searched}${competition === "all" ? "" : ` at ${eventLabel(competition)}`}.`
+                : `No ${shownKind === "pit" ? "pit" : "match"} scouting reports${competition === "all" ? "" : ` at ${eventLabel(competition)}`} yet.`}
             </div>
           )}
-          {commentsByTeam.size > 0 && (
-            <section className="team-comment-directory">
-              {[...commentsByTeam].map(([teamNumber, comments]) => (
+          {activeReports.length > 0 && (
+            <AnalysisTeamTable
+              key={shownKind}
+              kind={shownKind === "pit" ? "pit" : "scouting"}
+              reports={activeReports}
+              commentsByTeam={commentsByTeam}
+              eventLabel={eventLabel}
+              focusReportId={initialReportId}
+              canManageReports={canManageReports}
+              onToggleStar={(report) => toggleStar(report, "__report")}
+              onDelete={permanentlyDeleteReport}
+              onViewDrawing={({ url, teamName, label }) =>
+                setSelectedPath({ url: `${API_URL}${url}`, teamName, label })
+              }
+            />
+          )}
+          {commentsWithoutReports.length > 0 && (
+            <section className="team-comment-directory" aria-label="Comments on other teams">
+              {commentsWithoutReports.map(([teamNumber, comments]) => (
                 <article key={teamNumber}>
                   <h2>Team {teamNumber}</h2>
                   {comments.map((comment) => (
                     <div key={comment.id}>
                       <p>{comment.comment}</p>
                       <small>
-                        {comment.event_key || "Unassigned"} · {comment.created_by_name} ·{" "}
+                        {eventLabel(comment.event_key)} · {comment.created_by_name} ·{" "}
                         {new Date(comment.created_at).toLocaleString()}
                       </small>
                     </div>
@@ -503,110 +486,6 @@ export function Analysis({ initialReportId }: { initialReportId?: string | null 
               ))}
             </section>
           )}
-          <div className="analysis-reports">
-            {visibleReports.map((report) => {
-              const expanded = expandedReportId === report.id;
-              return (
-                <div className={`report-result ${expanded ? "expanded" : ""}`} key={report.id}>
-                  <article
-                    id={`report-${report.id}`}
-                    className={`${report.starredFieldIds.length ? "starred-report" : ""} ${report.archivedAt ? "archived-report" : ""}`}
-                  >
-                    <button
-                      type="button"
-                      className="report-summary-button"
-                      aria-expanded={expanded}
-                      aria-controls={`report-details-${report.id}`}
-                      onClick={() => setExpandedReportId(expanded ? null : report.id)}
-                    >
-                      <span>
-                        <strong>Team {report.teamName}</strong>
-                        <small>{report.formName}</small>
-                      </span>
-                      <strong className="report-match-number">
-                        {report.matchNumber ? `Match ${report.matchNumber}` : "No match"}
-                      </strong>
-                      <ChevronDown size={18} className={expanded ? "expanded" : ""} />
-                    </button>
-                    {expanded && (
-                      <div className="report-details" id={`report-details-${report.id}`}>
-                        <header>
-                          <div className="report-metadata">
-                            <span>{report.eventKey || "Unassigned competition"}</span>
-                            <span>{report.submittedByName}</span>
-                            <time>{new Date(report.createdAt).toLocaleString()}</time>
-                          </div>
-                          <button
-                            type="button"
-                            className={`star-button ${report.starredFieldIds.includes("__report") ? "active" : ""}`}
-                            onClick={() => toggleStar(report, "__report")}
-                            aria-label={
-                              report.starredFieldIds.includes("__report")
-                                ? `Unstar team ${report.teamName} report`
-                                : `Star team ${report.teamName} report`
-                            }
-                            title={
-                              report.starredFieldIds.includes("__report")
-                                ? "Unstar report"
-                                : "Star report"
-                            }
-                          >
-                            <Star size={16} fill="currentColor" />
-                          </button>
-                          <Button
-                            variant="danger"
-                            type="button"
-                            className="delete-report-button"
-                            onClick={() => permanentlyDeleteReport(report)}
-                            aria-label={`Permanently delete report for ${report.teamName}`}
-                            title="Remove bad data"
-                          >
-                            <Trash2 size={17} />
-                          </Button>
-                        </header>
-                        <dl>
-                          {report.fields
-                            .filter((field) => field.type !== "fieldMap")
-                            .map((field) => (
-                              <div
-                                className={
-                                  report.starredFieldIds.includes(field.id) ? "starred-answer" : ""
-                                }
-                                key={field.id}
-                              >
-                                <dt>{field.label}</dt>
-                                <dd>
-                                  {Array.isArray(report.answers[field.id])
-                                    ? (report.answers[field.id] as unknown[]).join(", ")
-                                    : String(report.answers[field.id] ?? "—")}
-                                </dd>
-                                <button
-                                  type="button"
-                                  className={`star-button ${report.starredFieldIds.includes(field.id) ? "active" : ""}`}
-                                  onClick={() => toggleStar(report, field.id)}
-                                  aria-label={
-                                    report.starredFieldIds.includes(field.id)
-                                      ? `Remove highlight from ${field.label}`
-                                      : `Highlight ${field.label}`
-                                  }
-                                  title={
-                                    report.starredFieldIds.includes(field.id)
-                                      ? "Remove highlight"
-                                      : "Highlight answer"
-                                  }
-                                >
-                                  <Star size={15} fill="currentColor" />
-                                </button>
-                              </div>
-                            ))}
-                        </dl>
-                      </div>
-                    )}
-                  </article>
-                </div>
-              );
-            })}
-          </div>
         </div>
       ) : tab === "matches" ? (
         <div className="match-history">
@@ -645,23 +524,6 @@ export function Analysis({ initialReportId }: { initialReportId?: string | null 
         </div>
       ) : tab === "auto" ? (
         <div className="analysis-results-stack">
-          {competitions.length > 0 && (
-            <label className="competition-filter">
-              Competition
-              <select
-                className={inputClass}
-                value={competition}
-                onChange={(event) => setCompetition(event.target.value)}
-              >
-                <option value="all">All competitions</option>
-                {competitions.map((eventKey) => (
-                  <option value={eventKey} key={eventKey}>
-                    {eventKey}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
           <div className="auto-path-grid">
             {visibleAutoFields.map(({ report, field, url }) => {
               const pathId = `${report.id}-${field.id}`;
@@ -696,20 +558,22 @@ export function Analysis({ initialReportId }: { initialReportId?: string | null 
                       Team {report.teamName} · {field.label}
                     </strong>
                     <span>
-                      {report.eventKey || "Unassigned"} · {report.formName} ·{" "}
+                      {eventLabel(report.eventKey)} · {report.formName} ·{" "}
                       {new Date(report.createdAt).toLocaleDateString()}
                     </span>
                   </div>
-                  <Button
-                    variant="danger"
-                    type="button"
-                    className="delete-report-button"
-                    onClick={() => permanentlyDeleteReport(report)}
-                    aria-label={`Permanently delete report for ${report.teamName}`}
-                    title="Remove bad data"
-                  >
-                    <Trash2 size={17} />
-                  </Button>
+                  {canManageReports && (
+                    <Button
+                      variant="danger"
+                      type="button"
+                      className="delete-report-button"
+                      onClick={() => permanentlyDeleteReport(report)}
+                      aria-label={`Permanently delete report for ${report.teamName}`}
+                      title="Remove bad data"
+                    >
+                      <Trash2 size={17} />
+                    </Button>
+                  )}
                 </article>
               );
             })}

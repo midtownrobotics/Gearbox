@@ -63,6 +63,8 @@ export const site = {
   /** Links on the app list (Gearbox). Leave one empty to hide it. */
   links: {
     slack: "https://g3robotics.slack.com",
+    /** The team's Discord invite, for a team on Discord. */
+    discord: "",
     github: "https://github.com/midtownrobotics",
     instagram: "https://www.instagram.com/g3robotics1648/",
   },
@@ -81,4 +83,9 @@ export const site = {
    * and sign-up ask people to message. Keep it the same as the app's name in Slack's settings.
    */
   slackBotName: "Gearbot",
+  /**
+   * The Discord app's name (one app, added to every team's server), which pages name when the bot
+   * needs access to a channel. Keep it the same as the app's name in Discord's settings.
+   */
+  discordBotName: "Gearbot",
 } as const;

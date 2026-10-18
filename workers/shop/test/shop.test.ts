@@ -25,18 +25,18 @@ describe("sign-in and roles", () => {
   });
 
   it("keeps settings to admins, never kiosk PIN sessions", async () => {
-    for (const path of ["/admin/slack/config", "/admin/onshape/config"]) {
+    for (const path of ["/admin/chat/config", "/admin/onshape/config"]) {
       expect((await callAs(student, path)).status).toBe(403);
       expect((await callAs(kioskAdmin, path)).status).toBe(403);
       expect((await callAs(admin, path)).status).toBe(200);
     }
-    const set = await callAs(admin, "/admin/slack/config", {
+    const set = await callAs(admin, "/admin/chat/config", {
       method: "POST",
-      body: { slackReleaseChannelId: "C123" },
+      body: { releaseChannelId: "C123" },
     });
     expect(set.status).toBe(200);
-    expect(await jsonAs(admin, "/admin/slack/config")).toMatchObject({
-      slackReleaseChannelId: "C123",
+    expect(await jsonAs(admin, "/admin/chat/config")).toMatchObject({
+      releaseChannelId: "C123",
     });
   });
 });

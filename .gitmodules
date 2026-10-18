@@ -1,0 +1,4 @@
+[submodule "vendor/advantagescope"]
+	path = vendor/advantagescope
+	url = https://github.com/Mechanical-Advantage/AdvantageScope.git
+	shallow = true

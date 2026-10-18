@@ -2842,8 +2842,8 @@
     .manual-schedule-panel {
       padding: .8rem;
     }
-    .manual-schedule-panel > header button,
-    .manual-mode-switch button,
+    .manual-schedule-panel > header > button,
+    .manual-mode-switch > button,
     .manual-editor-heading button {
       width: 100%;
       justify-content: center;
@@ -2979,10 +2979,10 @@
     gap: 10px;
     margin-top: 16px;
   }
-  .live-strategy h2 {
+  .live-strategy h3 {
     grid-column: 1 / -1;
     margin: 0 0 4px;
-    font-size: 18px;
+    font-size: 15px;
   }
   .live-strategy > div:not(.forms-empty) {
     display: grid;
@@ -3155,6 +3155,71 @@
   .event-admin-panel > header h2 {
     margin: 0;
     font-size: 18px;
+  }
+
+  /* The Competition overview: what's happening right now, above the event's settings. */
+  .competition-overview .live-strategy {
+    margin-top: 14px;
+  }
+
+  .competition-overview > form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* The hint under the scouting window field needs a row of its own. */
+  .event-admin-panel label.window-field {
+    grid-template-rows: auto 46px auto;
+  }
+
+  /* A section's own heading, with the button that explains it. */
+  .section-heading {
+    display: grid;
+    gap: 2px;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .manual-schedule-panel > header > .section-heading {
+    align-items: start;
+  }
+
+  .section-heading h2 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    font-size: 18px;
+  }
+
+  .section-heading > span {
+    color: var(--text-muted, var(--g3-light-muted));
+    font-size: 12px;
+  }
+
+  .info-button {
+    display: grid;
+    place-items: center;
+    flex: 0 0 44px;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: 1px solid var(--border, var(--g3-light-line));
+    border-radius: 50%;
+    color: var(--text-muted, var(--g3-light-muted));
+    background: transparent;
+    cursor: pointer;
+  }
+
+  .info-button:hover {
+    border-color: var(--g3-brand);
+    color: var(--g3-brand);
+  }
+
+  .field-hint {
+    color: var(--text-muted, var(--g3-light-muted));
+    font-size: 11px;
+    font-weight: 400;
+    line-height: 1.4;
   }
 
   .event-admin-panel > header p {
@@ -3792,6 +3857,41 @@
     min-height: 84px;
     place-items: center;
     padding: 9px;
+  }
+  .tier-label-heading {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-width: 0;
+  }
+  .tier-label-heading input {
+    min-width: 0;
+  }
+  .tier-drag-handle {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    cursor: grab;
+    touch-action: none;
+  }
+  .tier-drag-handle:focus-visible {
+    outline: 2px solid var(--g3-brand);
+    outline-offset: 2px;
+  }
+  .tier-row-dragging {
+    position: relative;
+    z-index: 1;
+    box-shadow: 0 6px 18px rgb(0 0 0 / 20%);
+  }
+  .tier-row-dragging .tier-drag-handle {
+    cursor: grabbing;
   }
 
   .tier-label input[type="text"],
@@ -6768,7 +6868,9 @@
     body,
     #root {
       max-width: 100%;
-      overflow-x: hidden;
+      /* hidden also computes overflow-y to auto. That makes body a scroll container
+         with no vertical range; its overscroll lock then traps Android touch swipes. */
+      overflow-x: clip;
     }
 
     .mobile-header {
@@ -8530,6 +8632,29 @@
     white-space: normal;
     overflow-wrap: anywhere;
   }
+  .tier-move-controls {
+    display: flex;
+    align-items: center;
+    gap: .25rem;
+  }
+  .tier-move-controls button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .tier-move-controls select {
+    width: auto;
+    max-width: 7rem;
+    min-height: 44px;
+  }
+  @media (any-pointer: coarse) {
+    .scouting-content .tier-chip {
+      flex-wrap: wrap;
+    }
+    .tier-move-controls {
+      flex-basis: 100%;
+      order: 1;
+    }
+  }
   .scouting-content .tier-chip > button {
     flex-shrink: 0;
     min-width: 32px;
@@ -9031,6 +9156,27 @@
   @media (min-width: 600px) and (max-width: 1024px) and (max-height: 500px) {
     .scouting-content .map-editor .map-toolbar {
       grid-template-columns: repeat(6, minmax(0, 1fr));
+    }
+  }
+}
+
+/* The move-on bar is fixed to the bottom: keep toasts and the form's last button clear of it. */
+@layer components {
+  body.scouting-move-bar-open .status-toast {
+    bottom: calc(max(20px, env(safe-area-inset-bottom)) + 150px);
+  }
+
+  body.scouting-move-bar-open .scouting-forms-page {
+    padding-bottom: 170px;
+  }
+
+  @media (min-width: 640px) {
+    body.scouting-move-bar-open .status-toast {
+      bottom: calc(max(20px, env(safe-area-inset-bottom)) + 96px);
+    }
+
+    body.scouting-move-bar-open .scouting-forms-page {
+      padding-bottom: 116px;
     }
   }
 }

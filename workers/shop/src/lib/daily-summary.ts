@@ -19,7 +19,7 @@ export type ReflectionStats = {
   lastAt: number | null;
 };
 
-// Two daily Slack messages, both simply generated from shop data:
+// Two daily chat messages (Slack or Discord), both simply generated from shop data:
 // - Overview (start of day): where the work is waiting and which machines need help.
 // - Reflection (end of day): what got done.
 
@@ -139,8 +139,8 @@ export function formatReflection(
     });
 
   const lines = [
-    `*Shop reflection for ${opts.dayLabel}*`,
-    `:white_check_mark: *${stats.partsCompleted}* ${stats.partsCompleted === 1 ? "part" : "parts"} completed today  ·  *${stats.partsLeft}* left to do`,
+    `**Shop reflection for ${opts.dayLabel}**`,
+    `✅ **${stats.partsCompleted}** ${stats.partsCompleted === 1 ? "part" : "parts"} completed today  ·  **${stats.partsLeft}** left to do`,
   ];
 
   if (stats.stepsCompleted === 0) {
@@ -302,8 +302,8 @@ export function formatOverview(
   opts: { dayLabel: string; now: number },
 ): string {
   const lines = [
-    `*Shop overview for ${opts.dayLabel}*`,
-    `:clipboard: *${stats.partsLeft}* ${stats.partsLeft === 1 ? "part" : "parts"} left to do  ·  *${stats.ready}* ready to work on  ·  *${stats.inProgress}* in progress`,
+    `**Shop overview for ${opts.dayLabel}**`,
+    `📋 **${stats.partsLeft}** ${stats.partsLeft === 1 ? "part" : "parts"} left to do  ·  **${stats.ready}** ready to work on  ·  **${stats.inProgress}** in progress`,
   ];
   if (stats.partsLeft === 0) {
     lines.push("", "Nothing in the queue — every part is done.");

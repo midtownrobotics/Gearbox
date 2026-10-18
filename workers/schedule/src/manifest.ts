@@ -7,7 +7,7 @@ export const manifest = defineManifest({
   name: "Schedule",
   summary: "Who does what at each event, 15 minutes at a time.",
   roles: ["admin", "mentor", "member", "kiosk"],
-  integrations: ["slack"],
+  integrations: ["slack or discord"],
   availability: "every team",
   version: packageJson.version,
   hooks: { seed: false, delete: true, export: true, demo: true },

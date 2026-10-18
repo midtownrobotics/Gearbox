@@ -28,7 +28,10 @@ export const teamUiSettings = sqliteTable("team_ui_settings", {
   updatedBy: text("updated_by").references(() => coreUsers.id, { onDelete: "set null" }),
 });
 
-/** The sign-in methods a team allows (migration 0016); no row: all of them. Slack is always on. */
+/**
+ * The sign-in methods a team allows (migration 0016); no row: all of them. The team's chat (Slack
+ * or Discord) is always on.
+ */
 export const teamSignInMethods = sqliteTable("team_sign_in_methods", {
   teamId: text("team_id").primaryKey(),
   google: integer("google").notNull().default(1),
@@ -89,7 +92,7 @@ export const coreUserIdentities = sqliteTable(
   (table) => [
     check(
       "core_user_identities_provider_check",
-      sql`${table.provider} IN ('local', 'google', 'slack', 'github', 'onshape', 'steam')`,
+      sql`${table.provider} IN ('local', 'google', 'slack', 'discord', 'github', 'steam')`,
     ),
     unique("core_user_identities_provider_provider_id_uniq").on(table.provider, table.providerId),
     index("core_user_identities_user_id_idx").on(table.userId),
@@ -195,6 +198,21 @@ export const slackInstallations = sqliteTable("slack_installations", {
   botUserId: text("bot_user_id"),
   /** Encrypted with SECRETS_KEY (`encryptSecret` in @g3/auth). */
   botTokenEncrypted: text("bot_token_encrypted").notNull(),
+  installedBy: text("installed_by").references(() => coreUsers.id),
+  createdAt: integer("created_at").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+});
+
+/**
+ * Each team's Discord server (migration 0019). One Discord app and bot token serve every team, so
+ * this holds no secret. A team has this or a Slack installation, not both.
+ */
+export const discordInstallations = sqliteTable("discord_installations", {
+  teamId: text("team_id")
+    .primaryKey()
+    .references(() => teams.id),
+  guildId: text("guild_id").notNull().unique(),
+  guildName: text("guild_name"),
   installedBy: text("installed_by").references(() => coreUsers.id),
   createdAt: integer("created_at").notNull(),
   updatedAt: integer("updated_at").notNull(),

@@ -24,7 +24,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const method = init?.method?.toUpperCase() ?? "GET";
-  if (method !== "GET") return request<T>(path, init);
+  if (method !== "GET" || init?.cache === "no-store") return request<T>(path, init);
   const existing = inflightGets.get(path);
   if (existing) return existing as Promise<T>;
   const pending = request<T>(path, init).finally(() => inflightGets.delete(path));

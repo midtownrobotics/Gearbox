@@ -105,6 +105,8 @@ type Resources = {
   kv: Record<string, string>;
   /** Staging's own Slack app (not production's): its client and app ids, which aren't secrets. */
   slack?: { clientId?: string; appId?: string };
+  /** Staging's own Discord app (docs/roadmap/discord.md): its client id, which isn't a secret. */
+  discord?: { clientId?: string };
 };
 const NOT_CREATED = "not-created-run-pnpm-staging-create";
 
@@ -169,6 +171,12 @@ function stagingSections(tables: { name: string; lines: string[] }[], resources:
         if (!id) continue;
         line = `${slack[0]}"${id}"`;
       } else if (/^SLACK_/.test(line)) continue;
+      // The same for Discord: staging's own app, or no Discord on staging.
+      if (/^DISCORD_CLIENT_ID = /.test(line)) {
+        const id = resources.discord?.clientId;
+        if (!id) continue;
+        line = `DISCORD_CLIENT_ID = "${id}"`;
+      } else if (/^DISCORD_/.test(line)) continue;
       lines.push(line);
     }
     while (lines.length && lines[lines.length - 1] === "") lines.pop();
