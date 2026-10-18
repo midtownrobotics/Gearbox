@@ -120,9 +120,21 @@ run("npm", ["run", "compile"], work, lite);
 run("node", ["wasmCompile.mjs"], work);
 run("npm", ["run", "build-embed"], path.join(work, "docs"));
 
-// The page, with its links (www, the docs) copied as files.
+// The page, with its links (www, docs/build) copied as files. Not fs.cpSync's dereference: it
+// left docs/build a link into .build, which a cached public/scope (deploy.yml) restores without,
+// so Vite's copy of public/ failed on it.
+const copyFollowingLinks = (from, to) => {
+  if (!fs.statSync(from).isDirectory()) return fs.copyFileSync(from, to);
+  fs.mkdirSync(to, { recursive: true });
+  for (const name of fs.readdirSync(from))
+    copyFollowingLinks(path.join(from, name), path.join(to, name));
+};
 fs.rmSync(out, { recursive: true, force: true });
-fs.cpSync(path.join(work, "lite/static"), out, { recursive: true, dereference: true });
+copyFollowingLinks(path.join(work, "lite/static"), out);
+const links = fs
+  .readdirSync(out, { recursive: true })
+  .filter((file) => fs.lstatSync(path.join(out, file)).isSymbolicLink());
+if (links.length) throw new Error(`Links left in public/scope: ${links.join(", ")}`);
 fs.copyFileSync(path.join(work, "LICENSE"), path.join(out, "LICENSE"));
 
 // The built-in assets' index, in the form AdvantageScope's Python server answers /assets: each
