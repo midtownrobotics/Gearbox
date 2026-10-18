@@ -20,6 +20,7 @@ import { validator } from "hono/validator";
 import packageJson from "../package.json";
 import { deleteTeamScopeFiles, scopeRoutes } from "./advantagescope";
 import { archiveRoutes } from "./archives";
+import { catchUp, freshTimer, timerRoutes } from "./battery-timers";
 import { createDb } from "./db";
 import {
   batteries,
@@ -38,6 +39,7 @@ import { demoWords, loadDemo } from "./demo";
 import { downloaderRoutes, downloaderSelfRoutes } from "./downloaders";
 import { manifest } from "./manifest";
 import { deleteTeamLogFiles, logUploadRoutes, matchLogRoutes } from "./match-logs";
+import { type TbaMatch, scheduleFromTba, withResults } from "./monitor-matches";
 import { SETTING_KEYS, type SettingKey, getSetting, getWhenFull, teamNumberOf } from "./settings";
 import type { AppEnv } from "./types";
 
@@ -137,28 +139,6 @@ interface NexusMonitorData {
   matches?: unknown[];
   isRealNexus?: boolean;
   [key: string]: unknown;
-}
-
-interface TbaScheduleMatch {
-  comp_level?: string;
-  match_number?: number;
-  predicted_time?: number | null;
-  time?: number | null;
-  alliances?: {
-    blue?: { team_keys?: string[] };
-    red?: { team_keys?: string[] };
-  };
-}
-
-interface MonitorScheduleMatch {
-  label: string;
-  status: "Queuing soon";
-  blueTeams: string[] | null;
-  redTeams: string[] | null;
-  times: {
-    estimatedStartTime: number | null;
-    estimatedQueueTime: number | null;
-  };
 }
 
 const settingsValidator = validator("json", (value, c): Partial<Record<SettingKey, string>> => {
@@ -719,6 +699,7 @@ const app = base
   .get("/batteries", requireAuth, async (c) => {
     const db = createDb(c.env.PIT_DB);
     const team = c.get("teamId");
+    await catchUp(c.env, db, team);
     const rows = await db
       .select()
       .from(batteries)
@@ -726,15 +707,24 @@ const app = base
       .orderBy(batteries.createdAt);
     return c.json(rows);
   })
+  // Pause All and Unpause All, and the timers' automatic changes on event days.
+  .route("/batteries/timers", timerRoutes)
 
   .post("/batteries", requireAuth, listNameValidator, async (c) => {
     const { name } = c.req.valid("json");
     const db = createDb(c.env.PIT_DB);
     const team = c.get("teamId");
     const now = Math.floor(Date.now() / 1000);
-    const result = await db
-      .insert(batteries)
-      .values(withTeam(team, { name, state: "Idle", stateSince: Date.now(), createdAt: now }));
+    const { paused } = await catchUp(c.env, db, team);
+    const result = await db.insert(batteries).values(
+      withTeam(team, {
+        name,
+        state: "Idle",
+        stateSince: Date.now(),
+        createdAt: now,
+        ...freshTimer(paused),
+      }),
+    );
     const [created] = await db
       .select()
       .from(batteries)
@@ -772,6 +762,8 @@ const app = base
     const enteringRobot = state === "In Robot" && existing.state !== "In Robot";
     const baseUseCount = typeof existing.useCount === "number" ? existing.useCount : 0;
     const newUseCount = enteringRobot ? baseUseCount + 1 : baseUseCount;
+    // Its timer starts again from zero, paused while the team's timers are.
+    const { paused } = await catchUp(c.env, db, team);
     await db
       .update(batteries)
       .set({
@@ -779,6 +771,7 @@ const app = base
         stateSince: Date.now(),
         voltage: tracksVoltage ? (existing.voltage ?? null) : null,
         useCount: newUseCount,
+        ...freshTimer(paused),
       })
       .where(inTeam(batteries, team, eq(batteries.id, id)));
     const [updated] = await db
@@ -971,42 +964,18 @@ const app = base
       contextRankings = { top3, context };
     }
 
-    // Fallback to Blue Alliance schedule if Nexus is unavailable
+    // Nexus's schedule with The Blue Alliance's scores, else The Blue Alliance's own.
+    const tbaMatches = Array.isArray(tbaSchedule) ? (tbaSchedule as TbaMatch[]) : [];
     let finalNexus = nexus as NexusMonitorData | null;
     const isRealNexus = Boolean(finalNexus?.matches?.length);
-    if (!isRealNexus && tbaSchedule && Array.isArray(tbaSchedule)) {
-      // Build a Nexus-like schedule from Blue Alliance data
-      const tbaMatches = tbaSchedule as TbaScheduleMatch[];
-      finalNexus = {
-        matches: tbaMatches
-          .filter((match) => match.comp_level && match.match_number)
-          .map<MonitorScheduleMatch>((match) => ({
-            label: `${match.comp_level?.toUpperCase()}${match.match_number}`,
-            status: "Queuing soon" as const, // Blue Alliance doesn't provide status, default to queuing soon
-            blueTeams:
-              match.alliances?.blue?.team_keys?.map((teamKey) => teamKey.replace("frc", "")) ??
-              null,
-            redTeams:
-              match.alliances?.red?.team_keys?.map((teamKey) => teamKey.replace("frc", "")) ?? null,
-            times: {
-              estimatedStartTime: match.predicted_time
-                ? match.predicted_time * 1000
-                : match.time
-                  ? match.time * 1000
-                  : null,
-              estimatedQueueTime: match.predicted_time ? (match.predicted_time - 300) * 1000 : null, // Estimate queue 5min before
-            },
-          }))
-          .sort((a, b) => {
-            const timeA = a.times.estimatedStartTime ?? 0;
-            const timeB = b.times.estimatedStartTime ?? 0;
-            return timeA - timeB;
-          }),
-        isRealNexus: false,
-      };
-    }
     if (finalNexus && isRealNexus) {
-      finalNexus.isRealNexus = true;
+      finalNexus = {
+        ...finalNexus,
+        matches: withResults(finalNexus.matches ?? [], tbaMatches),
+        isRealNexus: true,
+      };
+    } else if (tbaMatches.length > 0) {
+      finalNexus = { matches: scheduleFromTba(tbaMatches), isRealNexus: false };
     }
 
     return c.json({ teamNumber: team, nexus: finalNexus, ranking, contextRankings });

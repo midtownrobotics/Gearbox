@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../../shared/api";
-import { formatElapsed } from "../../shared/battery-display";
+import { formatDuration } from "../../shared/battery-display";
 
 /** How often the Monitor asks Pit whether it can still reach it. */
 const CHECK_MS = 1_000;
@@ -125,7 +125,7 @@ export function OfflineOverlay({ connection }: { connection: Connection }) {
         </h2>
         <p className="mt-4 text-xl text-secondary-700">
           {lastOkAt
-            ? `Last connected ${new Date(lastOkAt).toLocaleTimeString()} (${formatElapsed(lastOkAt)} ago). What's shown may be out of date.`
+            ? `Last connected ${new Date(lastOkAt).toLocaleTimeString()} (${formatDuration(Date.now() - lastOkAt)} ago). What's shown may be out of date.`
             : "Pit can't be reached. What's shown may be out of date."}
         </p>
         <p className="mt-2 text-secondary-500">Reconnecting…</p>

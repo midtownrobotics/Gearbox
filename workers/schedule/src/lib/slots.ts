@@ -93,3 +93,24 @@ export function isTimeZone(value: unknown): value is string {
     return false;
   }
 }
+
+/**
+ * The moment (Unix ms) a slot of a day is in an event's time zone: the other way round from
+ * `slotAt`. Slot 96 is the next midnight. The zone's offset is looked up twice, so a day that
+ * changes to or from daylight saving time still lands on the wall-clock time.
+ */
+export function momentOf(day: string, slot: number, timeZone: string): number {
+  const [year, month, date] = day.split("-").map(Number);
+  const wall = Date.UTC(year, month - 1, date, 0, slot * SLOT_MINUTES);
+  let moment = wall;
+  for (let i = 0; i < 2; i++) moment = wall - offsetAt(moment, timeZone);
+  return moment;
+}
+
+/** How far ahead of UTC a zone's clocks are at a moment, in ms. */
+function offsetAt(moment: number, timeZone: string): number {
+  const here = slotAt(new Date(moment), timeZone);
+  const [year, month, date] = here.day.split("-").map(Number);
+  const minute = Math.floor(moment / 60_000) * 60_000;
+  return Date.UTC(year, month - 1, date, 0, here.minutes) - minute;
+}

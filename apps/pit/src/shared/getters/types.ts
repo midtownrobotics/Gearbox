@@ -8,6 +8,15 @@ export type Battery = {
   voltage: number | null;
   useCount: number;
   createdAt: number;
+  /** Its timer: ms counted in its state up to `countingSince`, null while the timers are paused. */
+  countedMs: number;
+  countingSince: number | null;
+};
+
+/** The team's battery timers: paused or not, and the next change the Schedule's event makes. */
+export type BatteryTimers = {
+  paused: boolean;
+  next: { at: number; kind: "reset" | "pause" | "resume" } | null;
 };
 
 export type ChecklistList = {
