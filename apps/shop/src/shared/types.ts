@@ -128,6 +128,9 @@ export type PartFile = {
 };
 
 /** A step a failed quality report names as the likely cause, as it was when reported. */
+/** One line of the checklist a report went through, and whether the part met it. */
+export type QualityAnswer = { label: string; ok: boolean };
+
 export type QualitySuspect = {
   processId: number;
   name: string;
@@ -136,7 +139,7 @@ export type QualitySuspect = {
   completedBy: string | null;
 };
 
-export type QualityOutcome = "passed" | "sent_back" | "not_sent_back";
+export type QualityOutcome = "passed" | "sent_back" | "not_sent_back" | "fixed" | "replaced";
 
 /** A quality report on a part at a Quality Control step; the part and step as they were then. */
 export type QualityReport = {
@@ -151,10 +154,8 @@ export type QualityReport = {
   processName: string;
   reportedBy: string;
   createdAt: number;
-  dimensionsOk: number;
-  thicknessOk: number;
-  positionsOk: number;
-  sizesOk: number;
+  /** The checklist as it read when the report was written, in the team's order. */
+  checks: QualityAnswer[];
   passed: number;
   unsure: number;
   suspects: QualitySuspect[];
@@ -163,16 +164,15 @@ export type QualityReport = {
   sentBackProcessId: number | null;
   sentBackProcessName: string | null;
   sentBackStatus: "todo" | "doing" | null;
+  /** What has to be done to fix the part, as written onto the part's notes. */
+  fixNote: string | null;
+  /** The part made to replace this one; its instance may later be deleted. */
+  replacementInstanceId: number | null;
+  replacementInstanceNumber: number | null;
   outcomeBy: string | null;
   outcomeAt: number | null;
 };
 
-/** The four checks of a quality report, in order, with what each asks. */
-export const QUALITY_CHECKS = [
-  { key: "dimensions", field: "dimensionsOk", label: "Part has the proper dimensions" },
-  { key: "thickness", field: "thicknessOk", label: "Part is the proper thickness" },
-  { key: "positions", field: "positionsOk", label: "Features are positioned correctly" },
-  { key: "sizes", field: "sizesOk", label: "Features are the proper size" },
-] as const;
-
-export type QualityCheckKey = (typeof QUALITY_CHECKS)[number]["key"];
+/** How many lines a team's quality checklist can have, and how long each can be. */
+export const MAX_CHECKLIST_ITEMS = 20;
+export const MAX_CHECK_LABEL = 120;

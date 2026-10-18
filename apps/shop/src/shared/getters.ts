@@ -10,7 +10,7 @@ import type {
   PartInstance,
   PartInstanceProcess,
   Process,
-  QualityCheckKey,
+  QualityAnswer,
   QualityReport,
   QualitySuspect,
   StagingBatch,
@@ -293,7 +293,7 @@ export async function fetchQualityReports(): Promise<QualityReport[]> {
 export async function submitQualityReport(input: {
   partInstanceId: number;
   processId: number;
-  checks: Record<QualityCheckKey, boolean>;
+  checks: QualityAnswer[];
   suspectProcessIds: number[];
   unsure: boolean;
   notes: string;
@@ -303,15 +303,35 @@ export async function submitQualityReport(input: {
   return res.json() as Promise<{ report: QualityReport; history: QualitySuspect[] }>;
 }
 
-/** Sends a failed report's part back to an earlier step; every step after it waits again. */
+/**
+ * Sends a failed report's part to one of its steps; every step after it waits again. With a fix
+ * note, the note goes onto the part's notes and the report counts as a fix.
+ */
 export async function sendBackFromReport(
   reportId: number,
   processId: number,
   status: "todo" | "doing",
+  fixNote?: string,
 ): Promise<void> {
   const res = await api["quality-reports"][":id"]["send-back"].$post({
     param: { id: String(reportId) },
-    json: { processId, status },
+    json: { processId, status, fix: Boolean(fixNote), fixNote: fixNote ?? "" },
   });
   if (!res.ok) throw new Error(await getErrorMessage(res as unknown as Response));
+}
+
+/** Obsoletes a failed report's part and adds a new one of the same part, started from the top. */
+export async function replaceFromReport(reportId: number): Promise<PartInstance> {
+  const res = await api["quality-reports"][":id"].replace.$post({
+    param: { id: String(reportId) },
+  });
+  if (!res.ok) throw new Error(await getErrorMessage(res as unknown as Response));
+  return ((await res.json()) as { replacement: PartInstance }).replacement;
+}
+
+/** The team's quality checklist, replaced in this order (admins). */
+export async function saveQualityChecklist(checklist: string[]): Promise<string[]> {
+  const res = await api.admin.quality.checklist.$put({ json: { checklist } });
+  if (!res.ok) throw new Error(await getErrorMessage(res as unknown as Response));
+  return ((await res.json()) as { checklist: string[] }).checklist;
 }

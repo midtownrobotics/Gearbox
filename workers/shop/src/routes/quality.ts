@@ -13,6 +13,7 @@ import { validator } from "hono/validator";
 import { createShopDb } from "../db";
 import { shopManagers } from "../db/schema";
 import { qualityCheck, qualityProcesses, qualityReportsOn, saveQualityCheck } from "../lib/quality";
+import { checklistFor, parseChecklist, saveChecklist } from "../lib/quality-checklist";
 import { SETTING, setSetting } from "../lib/settings";
 import { manifest } from "../manifest";
 import type { AppEnv } from "../types";
@@ -88,10 +89,11 @@ export const qualityRouter = new Hono<AppEnv>()
   .get("/", requireAdmin, async (c) => {
     const db = createShopDb(c.env.SHOP_DB);
     const teamId = c.get("teamId");
-    const [check, reports, steps, rows, members] = await Promise.all([
+    const [check, reports, steps, checklist, rows, members] = await Promise.all([
       qualityCheck(db, teamId),
       qualityReportsOn(db, teamId),
       qualityProcesses(db, teamId),
+      checklistFor(db, teamId),
       db
         .select({ userId: shopManagers.userId })
         .from(shopManagers)
@@ -123,6 +125,7 @@ export const qualityRouter = new Hono<AppEnv>()
       qualityProcessId: check.processId,
       qualityReports: reports,
       qualityProcesses: steps,
+      checklist,
       people,
       peopleLoaded: Boolean(members),
     });
@@ -207,4 +210,28 @@ export const qualityRouter = new Hono<AppEnv>()
       qualityProcessId: next.processId,
       qualityReports: reports,
     });
+  })
+  /**
+   * Replaces the checklist every quality report goes through. Reports already written keep the
+   * lines they were answered against, so the table of old reports doesn't change.
+   */
+  .put("/checklist", requireAdmin, async (c) => {
+    const body = (await c.req.json().catch(() => null)) as { checklist?: unknown } | null;
+    const parsed = parseChecklist(body?.checklist);
+    if ("error" in parsed) return c.json({ error: parsed.error }, 400);
+
+    const db = createShopDb(c.env.SHOP_DB);
+    const teamId = c.get("teamId");
+    const before = await checklistFor(db, teamId);
+    if (before.join("\n") === parsed.labels.join("\n")) {
+      return c.json({ checklist: before });
+    }
+
+    await saveChecklist(db, teamId, parsed.labels);
+    await logTeamChange(c.env, teamId, {
+      userId: c.get("userId"),
+      app: "shop",
+      what: "Quality checklist",
+    });
+    return c.json({ checklist: parsed.labels });
   });

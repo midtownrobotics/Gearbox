@@ -89,6 +89,7 @@ const APPS: App[] = [
       adminSettings: "admin_settings",
       shopManagers: "shop_managers",
       qualityReports: "quality_reports",
+      qualityCheckItems: "quality_check_items",
     },
   },
   {

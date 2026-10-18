@@ -1,11 +1,14 @@
 import { inTeam, requireAdmin, requireAuth, withTeam } from "@g3/auth";
-import { and, asc, desc, eq, gt, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, inArray, lt, max, sql } from "drizzle-orm";
+import type { BatchItem } from "drizzle-orm/batch";
 import { type Context, Hono } from "hono";
 import { validator } from "hono/validator";
 import { createShopDb } from "../db";
 import {
+  type QualityAnswer,
   type QualitySuspect,
   actions,
+  partDefinitionProcessBlueprints,
   partDefinitions,
   partInstanceProcesses,
   partInstances,
@@ -13,6 +16,7 @@ import {
   qualityReports,
 } from "../db/schema";
 import { canQualityCheck, qualityReportsOn } from "../lib/quality";
+import { MAX_CHECKLIST_ITEMS, checklistFor } from "../lib/quality-checklist";
 import { finished, promoteNextSteps } from "../lib/steps";
 import type { AppEnv } from "../types";
 import { recordAction } from "./actions";
@@ -25,13 +29,11 @@ import { recordAction } from "./actions";
 
 type ShopDb = ReturnType<typeof createShopDb>;
 
-export const QUALITY_CHECKS = ["dimensions", "thickness", "positions", "sizes"] as const;
-type Checks = Record<(typeof QUALITY_CHECKS)[number], boolean>;
-
 type ReportInput = {
   partInstanceId: number;
   processId: number;
-  checks: Checks;
+  /** One answer per line of the team's checklist, as the reporter was shown it. */
+  checks: QualityAnswer[];
   suspectProcessIds: number[];
   unsure: boolean;
   notes: string | null;
@@ -44,9 +46,17 @@ const reportValidator = validator("json", (value, c): ReportInput => {
   const bad = (error: string) => c.json({ error }, 400) as never;
   if (!isId(v.partInstanceId)) return bad("partInstanceId must be a positive integer.");
   if (!isId(v.processId)) return bad("processId must be a positive integer.");
-  const checks = (v.checks ?? {}) as Record<string, unknown>;
-  if (QUALITY_CHECKS.some((k) => typeof checks[k] !== "boolean")) {
-    return bad(`checks must say true or false for ${QUALITY_CHECKS.join(", ")}.`);
+  if (!Array.isArray(v.checks) || v.checks.length === 0) {
+    return bad("checks must be the checklist, each line with its answer.");
+  }
+  if (v.checks.length > MAX_CHECKLIST_ITEMS) return bad("That's more lines than a checklist has.");
+  const checks: QualityAnswer[] = [];
+  for (const raw of v.checks) {
+    const line = (raw ?? {}) as { label?: unknown; ok?: unknown };
+    if (typeof line.label !== "string" || typeof line.ok !== "boolean") {
+      return bad("Every line of checks needs a label and an answer.");
+    }
+    checks.push({ label: line.label.trim(), ok: line.ok });
   }
   const suspects = v.suspectProcessIds ?? [];
   if (!Array.isArray(suspects) || suspects.length > 25 || !suspects.every(isId)) {
@@ -63,7 +73,7 @@ const reportValidator = validator("json", (value, c): ReportInput => {
   return {
     partInstanceId: v.partInstanceId,
     processId: v.processId,
-    checks: Object.fromEntries(QUALITY_CHECKS.map((k) => [k, checks[k] === true])) as Checks,
+    checks,
     suspectProcessIds: [...new Set(suspects as number[])],
     unsure: v.unsure === true,
     notes: notes || null,
@@ -72,15 +82,28 @@ const reportValidator = validator("json", (value, c): ReportInput => {
 
 const sendBackValidator = validator(
   "json",
-  (value, c): { processId: number; status: "todo" | "doing" } => {
-    const v = (value ?? {}) as { processId?: unknown; status?: unknown };
-    if (!isId(v.processId)) {
-      return c.json({ error: "processId must be a positive integer." }, 400) as never;
-    }
+  (value, c): { processId: number; status: "todo" | "doing"; fix: boolean; fixNote: string } => {
+    const v = (value ?? {}) as {
+      processId?: unknown;
+      status?: unknown;
+      fix?: unknown;
+      fixNote?: unknown;
+    };
+    const bad = (error: string) => c.json({ error }, 400) as never;
+    if (!isId(v.processId)) return bad("processId must be a positive integer.");
     if (v.status !== "todo" && v.status !== "doing") {
-      return c.json({ error: "status must be 'todo' or 'doing'." }, 400) as never;
+      return bad("status must be 'todo' or 'doing'.");
     }
-    return { processId: v.processId, status: v.status };
+    if (v.fix !== undefined && typeof v.fix !== "boolean") return bad("fix must be true or false.");
+    if (v.fixNote !== undefined && v.fixNote !== null && typeof v.fixNote !== "string") {
+      return bad("fixNote must be text.");
+    }
+    const fixNote = typeof v.fixNote === "string" ? v.fixNote.trim() : "";
+    if (fixNote.length > 2000) return bad("A fix note can be 2,000 characters at most.");
+    // A fix is what gets written onto the part, so it can't be blank.
+    if (v.fix === true && !fixNote) return bad("Say what has to be done to fix the part.");
+    if (v.fix !== true && fixNote) return bad("fixNote is only for a fix.");
+    return { processId: v.processId, status: v.status, fix: v.fix === true, fixNote };
   },
 );
 
@@ -153,6 +176,45 @@ async function historyBefore(
   }));
 }
 
+/**
+ * A failed report still waiting to be dealt with, its part's steps, and the check the part is
+ * standing at. Every outcome route starts here, so none of them acts on a part someone else has
+ * already moved on.
+ */
+async function openReport(
+  db: ShopDb,
+  teamId: string,
+  id: number,
+): Promise<
+  | { error: string; status: 404 | 409 }
+  | {
+      report: typeof qualityReports.$inferSelect;
+      steps: (typeof partInstanceProcesses.$inferSelect)[];
+      check: typeof partInstanceProcesses.$inferSelect;
+    }
+> {
+  const report = await db
+    .select()
+    .from(qualityReports)
+    .where(inTeam(qualityReports, teamId, eq(qualityReports.id, id)))
+    .get();
+  if (!report) return { error: "Report not found.", status: 404 };
+  if (report.outcome !== "not_sent_back") {
+    return { error: "This report's part has already been dealt with.", status: 409 };
+  }
+  const steps = await stepsOf(db, teamId, report.partInstanceId);
+  const check = steps.find(
+    (s) => s.processId === report.processId && (s.status === "todo" || s.status === "doing"),
+  );
+  if (!check) {
+    return {
+      error: `The part has moved on from ${report.processName} since this report.`,
+      status: 409,
+    };
+  }
+  return { report, steps, check };
+}
+
 export const qualityReportsRouter = new Hono<AppEnv>()
   /** Every report the team has, newest first (the Admin page's table). */
   .get("/", requireAdmin, async (c) => {
@@ -211,7 +273,18 @@ export const qualityReportsRouter = new Hono<AppEnv>()
       return c.json({ error: `This part isn't waiting at ${process.name} right now.` }, 409);
     }
 
-    const passed = Object.values(body.checks).every(Boolean);
+    // The report is answered against the team's list as it stands now. If an admin changed it
+    // while this form was open, the reporter checked a different part than we'd be recording.
+    const checklist = await checklistFor(db, teamId);
+    const answered = body.checks.map((a) => a.label);
+    if (checklist.length !== answered.length || checklist.some((l, i) => l !== answered[i])) {
+      return c.json(
+        { error: "The checklist has changed. Open the report again to check the part against it." },
+        409,
+      );
+    }
+
+    const passed = body.checks.every((a) => a.ok);
     const earlierIds = new Set(steps.filter((s) => s.index < step.index).map((s) => s.processId));
     if (!passed) {
       if (body.suspectProcessIds.length === 0 && !body.unsure) {
@@ -263,10 +336,7 @@ export const qualityReportsRouter = new Hono<AppEnv>()
           processName: process.name,
           reportedBy: c.get("userId"),
           createdAt: now,
-          dimensionsOk: body.checks.dimensions ? 1 : 0,
-          thicknessOk: body.checks.thickness ? 1 : 0,
-          positionsOk: body.checks.positions ? 1 : 0,
-          sizesOk: body.checks.sizes ? 1 : 0,
+          checks: body.checks,
           passed: passed ? 1 : 0,
           unsure: !passed && body.unsure ? 1 : 0,
           suspects,
@@ -290,53 +360,103 @@ export const qualityReportsRouter = new Hono<AppEnv>()
     return c.json({ report, history }, 201);
   })
   /**
-   * Sends a failed report's part back to an earlier step, as To Do or In Progress. Every step
-   * after that one goes back to Waiting, so the part is made through each again, Quality Control
-   * included.
+   * Sends a failed report's part to any step it has, as To Do or In Progress. Every step after
+   * that one goes back to Waiting, so the part is made through each again, Quality Control
+   * included. With `fix`, the note is added to the part's notes so whoever picks it up reads what
+   * has to be done, and the report is a fix rather than a plain send back.
    */
   .post("/:id/send-back", requireAuth, sendBackValidator, async (c) => {
-    const { processId, status } = c.req.valid("json");
+    const { processId, status, fix, fixNote } = c.req.valid("json");
     const db = createShopDb(c.env.SHOP_DB);
     const teamId = c.get("teamId");
     if (!(await canQualityCheck(db, teamId, user(c)))) return c.json({ error: NOT_A_MANAGER }, 403);
 
-    const report = await db
-      .select()
-      .from(qualityReports)
-      .where(inTeam(qualityReports, teamId, eq(qualityReports.id, Number(c.req.param("id")))))
-      .get();
-    if (!report) return c.json({ error: "Report not found." }, 404);
-    if (report.outcome !== "not_sent_back") {
-      return c.json({ error: "This report's part has already been passed or sent back." }, 409);
-    }
+    const open = await openReport(db, teamId, Number(c.req.param("id")));
+    if ("error" in open) return c.json({ error: open.error }, open.status);
+    const { report, steps, check } = open;
 
-    const steps = await stepsOf(db, teamId, report.partInstanceId);
-    const check = steps.find(
-      (s) => s.processId === report.processId && (s.status === "todo" || s.status === "doing"),
-    );
-    if (!check) {
-      return c.json(
-        { error: `The part has moved on from ${report.processName} since this report.` },
-        409,
-      );
-    }
-    // The latest run of that step before the check, if the pipeline has it twice.
-    const target = steps.filter((s) => s.processId === processId && s.index < check.index).pop();
-    if (!target) {
-      return c.json({ error: "Send it back to a step that comes before the check." }, 400);
-    }
-    const targetName = await db
-      .select({ name: processes.name })
+    const chosen = await db
+      .select({ id: processes.id, name: processes.name, type: processes.type })
       .from(processes)
       .where(inTeam(processes, teamId, eq(processes.id, processId)))
       .get();
+    if (!chosen) return c.json({ error: "Process not found." }, 404);
+
+    // Any step of the part: the latest run before the check if it has one (the usual case, and
+    // the right one when the pipeline holds the same process twice), else its first run after.
+    const runs = steps.filter((s) => s.processId === processId);
+    const target = runs.filter((s) => s.index < check.index).pop() ?? runs[0];
+    // A fix can send the part to a process it has never been through (sanding a failed part), and
+    // that step joins this one part's list, just before the check. Only a plain process: a File
+    // Producer or Consumer has to be paired across the whole list, and a second Quality Control
+    // step would be a second check.
+    if (!target) {
+      if (!fix) return c.json({ error: "Send it back to a step this part has." }, 400);
+      if (chosen.type !== "regular") {
+        return c.json(
+          { error: `${chosen.name} can't be added to one part. Pick a plain process.` },
+          400,
+        );
+      }
+    }
+
+    // The note goes on the part definition, which is what the shop view shows as Notes.
+    const definition = fix
+      ? await db
+          .select({ id: partDefinitions.id, notes: partDefinitions.notes })
+          .from(partDefinitions)
+          .where(inTeam(partDefinitions, teamId, eq(partDefinitions.id, report.partDefinitionId)))
+          .get()
+      : null;
+    if (fix && !definition) return c.json({ error: "Part not found." }, 404);
 
     const now = Date.now();
-    await db.batch([
-      db
-        .update(partInstanceProcesses)
-        .set({ status, completedAt: null, batchId: null })
-        .where(inTeam(partInstanceProcesses, teamId, eq(partInstanceProcesses.id, target.id))),
+    // Where the part ends up waiting, and so which steps have to be done over.
+    const landsAt = target ? target.index : check.index;
+    const writes: BatchItem<"sqlite">[] = target
+      ? [
+          db
+            .update(partInstanceProcesses)
+            .set({ status, completedAt: null, batchId: null })
+            .where(inTeam(partInstanceProcesses, teamId, eq(partInstanceProcesses.id, target.id))),
+        ]
+      : [
+          // Open a gap at the check's index for the new step. The shift goes through negative
+          // indexes so it never collides with a row it hasn't moved yet; the batch is one
+          // transaction, so nothing outside it sees them.
+          db
+            .update(partInstanceProcesses)
+            .set({ index: sql`-(${partInstanceProcesses.index} + 1)` })
+            .where(
+              inTeam(
+                partInstanceProcesses,
+                teamId,
+                eq(partInstanceProcesses.partInstanceId, report.partInstanceId),
+                gte(partInstanceProcesses.index, check.index),
+              ),
+            ),
+          db
+            .update(partInstanceProcesses)
+            .set({ index: sql`-${partInstanceProcesses.index}` })
+            .where(
+              inTeam(
+                partInstanceProcesses,
+                teamId,
+                eq(partInstanceProcesses.partInstanceId, report.partInstanceId),
+                lt(partInstanceProcesses.index, 0),
+              ),
+            ),
+          db.insert(partInstanceProcesses).values(
+            withTeam(teamId, {
+              partInstanceId: report.partInstanceId,
+              processId,
+              index: check.index,
+              status,
+              createdAt: now,
+            }),
+          ),
+        ];
+    writes.push(
       db
         .update(partInstanceProcesses)
         .set({ status: "waiting", completedAt: null, batchId: null })
@@ -345,16 +465,17 @@ export const qualityReportsRouter = new Hono<AppEnv>()
             partInstanceProcesses,
             teamId,
             eq(partInstanceProcesses.partInstanceId, report.partInstanceId),
-            gt(partInstanceProcesses.index, target.index),
+            gt(partInstanceProcesses.index, landsAt),
           ),
         ),
       db
         .update(qualityReports)
         .set({
-          outcome: "sent_back",
+          outcome: fix ? "fixed" : "sent_back",
           sentBackProcessId: processId,
-          sentBackProcessName: targetName?.name ?? `Process #${processId}`,
+          sentBackProcessName: chosen.name,
           sentBackStatus: status,
+          fixNote: fix ? fixNote : null,
           outcomeBy: c.get("userId"),
           outcomeAt: now,
         })
@@ -365,6 +486,118 @@ export const qualityReportsRouter = new Hono<AppEnv>()
             and(eq(qualityReports.id, report.id), eq(qualityReports.outcome, "not_sent_back")),
           ),
         ),
-    ]);
+    );
+    if (definition) {
+      const line = `Fix for #${report.instanceNumber}: ${fixNote}`;
+      const before = definition.notes?.trim();
+      writes.push(
+        db
+          .update(partDefinitions)
+          .set({ notes: before ? `${before}\n${line}` : line })
+          .where(inTeam(partDefinitions, teamId, eq(partDefinitions.id, definition.id))),
+      );
+    }
+    const [first, ...rest] = writes;
+    await db.batch([first, ...rest]);
     return c.json({ ok: true });
+  })
+  /**
+   * Starts the part over: makes the failed report's part obsolete and adds a new one of the same
+   * part, with the part's steps from the start. The report is claimed before the new part is made,
+   * so two taps can't leave two replacements.
+   */
+  .post("/:id/replace", requireAuth, async (c) => {
+    const db = createShopDb(c.env.SHOP_DB);
+    const teamId = c.get("teamId");
+    if (!(await canQualityCheck(db, teamId, user(c)))) return c.json({ error: NOT_A_MANAGER }, 403);
+
+    const open = await openReport(db, teamId, Number(c.req.param("id")));
+    if ("error" in open) return c.json({ error: open.error }, open.status);
+    const { report } = open;
+
+    const now = Date.now();
+    const claimed = await db
+      .update(qualityReports)
+      .set({ outcome: "replaced", outcomeBy: c.get("userId"), outcomeAt: now })
+      .where(
+        inTeam(
+          qualityReports,
+          teamId,
+          and(eq(qualityReports.id, report.id), eq(qualityReports.outcome, "not_sent_back")),
+        ),
+      )
+      .returning({ id: qualityReports.id })
+      .get();
+    if (!claimed) {
+      return c.json({ error: "This report's part has already been dealt with." }, 409);
+    }
+
+    const [highest, blueprints] = await Promise.all([
+      db
+        .select({ max: max(partInstances.instanceNumber) })
+        .from(partInstances)
+        .where(
+          inTeam(
+            partInstances,
+            teamId,
+            eq(partInstances.partDefinitionId, report.partDefinitionId),
+          ),
+        )
+        .get(),
+      db
+        .select()
+        .from(partDefinitionProcessBlueprints)
+        .where(
+          inTeam(
+            partDefinitionProcessBlueprints,
+            teamId,
+            eq(partDefinitionProcessBlueprints.partDefinitionId, report.partDefinitionId),
+          ),
+        )
+        .orderBy(asc(partDefinitionProcessBlueprints.index))
+        .all(),
+    ]);
+
+    const replacement = await db
+      .insert(partInstances)
+      .values(
+        withTeam(teamId, {
+          partDefinitionId: report.partDefinitionId,
+          instanceNumber: (highest?.max ?? 0) + 1,
+          createdAt: now,
+        }),
+      )
+      .returning()
+      .get();
+
+    if (blueprints.length > 0) {
+      await db.insert(partInstanceProcesses).values(
+        withTeam(
+          teamId,
+          blueprints.map((bp, i) => ({
+            partInstanceId: replacement.id,
+            processId: bp.processId,
+            index: bp.index,
+            status: (i === 0 ? "todo" : "waiting") as "todo" | "waiting",
+            createdAt: now,
+          })),
+        ),
+      );
+    }
+
+    await db.batch([
+      db
+        .update(partInstances)
+        .set({ isStale: 1, obsoletedAt: now, obsoletedBy: c.get("userId") })
+        .where(inTeam(partInstances, teamId, eq(partInstances.id, report.partInstanceId))),
+      db
+        .update(qualityReports)
+        .set({
+          replacementInstanceId: replacement.id,
+          replacementInstanceNumber: replacement.instanceNumber,
+        })
+        .where(inTeam(qualityReports, teamId, eq(qualityReports.id, report.id))),
+    ]);
+
+    return c.json({ replacement });
   });

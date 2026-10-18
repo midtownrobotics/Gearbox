@@ -78,7 +78,7 @@ export const manifest = defineManifest({
       label: "Require quality control",
       type: "boolean",
       default: false,
-      help: "Every part ends with the quality control process below",
+      help: "Every part ends with the quality control process the team picks",
       editedBy: "admin",
       page: "/admin",
     },

@@ -249,8 +249,27 @@ export const adminSettings = sqliteTable(
   (t) => [unique().on(t.teamId, t.key)],
 );
 
-export const QUALITY_OUTCOMES = ["passed", "sent_back", "not_sent_back"] as const;
+export const QUALITY_OUTCOMES = [
+  "passed",
+  "sent_back",
+  "not_sent_back",
+  // Sent to a step with a note on the part saying what to do, and obsoleted for a new part.
+  "fixed",
+  "replaced",
+] as const;
 export type QualityOutcome = (typeof QUALITY_OUTCOMES)[number];
+
+/** One line of the checklist a report went through, and whether the part met it. */
+export type QualityAnswer = { label: string; ok: boolean };
+
+/** The team's quality checklist: what every report is answered against, in order. */
+export const qualityCheckItems = sqliteTable("quality_check_items", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  teamId: teamId(),
+  label: text("label").notNull(),
+  position: integer("position").notNull(),
+  createdAt: integer("created_at").notNull(),
+});
 
 /** A step a failed quality report names as the likely cause, as it was when reported. */
 export type QualitySuspect = {
@@ -278,10 +297,8 @@ export const qualityReports = sqliteTable("quality_reports", {
   processName: text("process_name").notNull(),
   reportedBy: text("reported_by").notNull(),
   createdAt: integer("created_at").notNull(),
-  dimensionsOk: integer("dimensions_ok").notNull(),
-  thicknessOk: integer("thickness_ok").notNull(),
-  positionsOk: integer("positions_ok").notNull(),
-  sizesOk: integer("sizes_ok").notNull(),
+  /** The checklist as it read when the report was written, in the team's order. */
+  checks: text("checks", { mode: "json" }).$type<QualityAnswer[]>().notNull().default([]),
   passed: integer("passed").notNull(),
   unsure: integer("unsure").notNull().default(0),
   suspects: text("suspects", { mode: "json" }).$type<QualitySuspect[]>().notNull().default([]),
@@ -290,6 +307,11 @@ export const qualityReports = sqliteTable("quality_reports", {
   sentBackProcessId: integer("sent_back_process_id"),
   sentBackProcessName: text("sent_back_process_name"),
   sentBackStatus: text("sent_back_status", { enum: ["todo", "doing"] }),
+  /** What has to be done to fix the part, as written onto the part's notes. */
+  fixNote: text("fix_note"),
+  /** The part made to replace this one; its instance may later be deleted. */
+  replacementInstanceId: integer("replacement_instance_id"),
+  replacementInstanceNumber: integer("replacement_instance_number"),
   outcomeBy: text("outcome_by"),
   outcomeAt: integer("outcome_at"),
 });

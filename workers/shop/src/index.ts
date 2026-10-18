@@ -8,6 +8,7 @@ import packageJson from "../package.json";
 import { createShopDb } from "./db";
 import { type BOMQueueMessage, processBOMQueue } from "./lib/bom-queue-consumer";
 import { isShopManager, qualityCheck, qualityReportsOn } from "./lib/quality";
+import { checklistFor } from "./lib/quality-checklist";
 import { actionsRouter } from "./routes/actions";
 import { adminPartsRouter } from "./routes/admin-parts";
 import { drawingsRouter } from "./routes/drawings";
@@ -59,6 +60,8 @@ const app = base
       isShopManager(db, teamId, c.get("userId")),
       qualityReportsOn(db, teamId),
     ]);
+    // Only a team using reports needs the checklist, and only then is one worth making for it.
+    const checklist = reports ? await checklistFor(db, teamId) : [];
     return c.json({
       userId: c.get("userId"),
       isAdmin: c.get("userIsAdmin"),
@@ -70,6 +73,7 @@ const app = base
       isShopManager: manager,
       qualityCheck: check,
       qualityReports: reports,
+      qualityChecklist: checklist,
     });
   })
   .route("/drawings", drawingsRouter)

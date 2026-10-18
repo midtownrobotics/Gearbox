@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../../shared/api";
 import { getErrorMessage } from "../../shared/api-error";
-import { fetchQualityReports } from "../../shared/getters";
-import { QUALITY_CHECKS, type QualityReport } from "../../shared/types";
+import { fetchQualityReports, saveQualityChecklist } from "../../shared/getters";
+import { MAX_CHECKLIST_ITEMS, MAX_CHECK_LABEL, type QualityReport } from "../../shared/types";
 import { ErrorBanner, InfoTip } from "../../shared/ui";
+import { useRefreshAuthUser } from "../../shared/use-auth";
 import { useUserNames } from "../../shared/use-user-names";
+import { inputCls, sectionHeading } from "./admin-styles";
 
 type SortKey = "time" | "reporter" | "part" | "result" | "outcome";
 
@@ -19,16 +21,22 @@ function when(at: number) {
   });
 }
 
-/** The checks a report says the part failed, by label. */
+/** The lines of its checklist a report says the part failed. */
 function failedChecks(r: QualityReport) {
-  return QUALITY_CHECKS.filter((c) => !r[c.field]).map((c) => c.label);
+  return r.checks.filter((c) => !c.ok).map((c) => c.label);
 }
 
 /** What happened to the part after the report. */
 function outcomeLabel(r: QualityReport) {
   if (r.outcome === "passed") return "Passed";
   if (r.outcome === "not_sent_back") return "Not sent back";
+  if (r.outcome === "replaced") {
+    return r.replacementInstanceNumber
+      ? `Started over as #${r.replacementInstanceNumber}`
+      : "Started over";
+  }
   const status = r.sentBackStatus ? ` (${STATUS_LABELS[r.sentBackStatus]})` : "";
+  if (r.outcome === "fixed") return `Fixed at ${r.sentBackProcessName}${status}`;
   return `Sent back to ${r.sentBackProcessName}${status}`;
 }
 
@@ -38,9 +46,11 @@ function outcomeLabel(r: QualityReport) {
  */
 export function QualityReports() {
   const [enabled, setEnabled] = useState<boolean | null>(null);
+  const [checklist, setChecklist] = useState<string[] | null>(null);
   const [reports, setReports] = useState<QualityReport[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const refreshAuth = useRefreshAuthUser();
 
   const [search, setSearch] = useState("");
   const [reporterFilter, setReporterFilter] = useState("all");
@@ -57,7 +67,9 @@ export function QualityReports() {
       .$get()
       .then(async (res) => {
         if (!res.ok) throw new Error(await getErrorMessage(res as unknown as Response));
-        setEnabled(((await res.json()) as { qualityReports: boolean }).qualityReports);
+        const state = (await res.json()) as { qualityReports: boolean; checklist: string[] };
+        setEnabled(state.qualityReports);
+        setChecklist(state.checklist);
       })
       .catch((e) => setError(e instanceof Error ? e.message : "Failed to load the setting."));
     fetchQualityReports()
@@ -74,6 +86,8 @@ export function QualityReports() {
       setError(await getErrorMessage(res as unknown as Response));
     } else {
       setError(null);
+      // The shop floor reads this from /me, so it has to hear about the change.
+      refreshAuth();
     }
     setBusy(false);
   }
@@ -268,6 +282,8 @@ export function QualityReports() {
               <option value="all">Anything happened</option>
               <option value="passed">Passed</option>
               <option value="sent_back">Sent back</option>
+              <option value="fixed">Fixed</option>
+              <option value="replaced">Started over</option>
               <option value="not_sent_back">Not sent back</option>
             </select>
             <label className="flex items-center gap-1.5 text-xs text-steel">
@@ -371,10 +387,15 @@ export function QualityReports() {
                     </td>
                     <td className="px-3 py-2 min-w-44">
                       <span className="text-ink">{outcome}</span>
-                      {r.outcome === "sent_back" && r.outcomeAt && (
+                      {r.outcome !== "not_sent_back" && r.outcomeAt && (
                         <span className="block text-xs text-steel-dark">
                           {when(r.outcomeAt)}
                           {r.outcomeBy ? ` by ${resolveName(r.outcomeBy)}` : ""}
+                        </span>
+                      )}
+                      {r.fixNote && (
+                        <span className="block text-xs text-steel-dark whitespace-pre-wrap">
+                          {r.fixNote}
                         </span>
                       )}
                     </td>
@@ -391,6 +412,112 @@ export function QualityReports() {
           </p>
         </div>
       )}
+
+      {checklist && <Checklist saved={checklist} onSaved={setChecklist} />}
+    </div>
+  );
+}
+
+/**
+ * The checklist every report goes through: one line per question, in the order reporters see
+ * them. Reports already written keep the lines they were answered against.
+ */
+function Checklist({ saved, onSaved }: { saved: string[]; onSaved: (next: string[]) => void }) {
+  const [lines, setLines] = useState<string[]>(saved);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const cleaned = lines.map((l) => l.trim()).filter(Boolean);
+  const changed = cleaned.join("\n") !== saved.join("\n");
+  const duplicate = new Set(cleaned.map((l) => l.toLowerCase())).size !== cleaned.length;
+
+  async function save() {
+    setBusy(true);
+    setError(null);
+    try {
+      const next = await saveQualityChecklist(cleaned);
+      setLines(next);
+      onSaved(next);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "The checklist didn't save.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="space-y-3 border-t border-steel/20 pt-4">
+      <div>
+        <h3 className={sectionHeading}>Checklist</h3>
+        <p className="text-xs text-steel mt-1">
+          What a shop manager checks the part against. A report passes only when every line is
+          ticked.
+        </p>
+      </div>
+
+      <div className="space-y-2 max-w-xl">
+        {lines.map((line, i) => (
+          // The row's place in the list is its identity: the text is what's being edited.
+          // biome-ignore lint/suspicious/noArrayIndexKey: the index is the row
+          <div key={i} className="flex items-center gap-2">
+            <input
+              type="text"
+              aria-label={`Checklist line ${i + 1}`}
+              value={line}
+              maxLength={MAX_CHECK_LABEL}
+              disabled={busy}
+              onChange={(e) => setLines(lines.map((l, j) => (j === i ? e.target.value : l)))}
+              className={inputCls}
+            />
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => setLines(lines.filter((_, j) => j !== i))}
+              aria-label={`Remove line ${i + 1}`}
+              title="Remove this line"
+              className="text-steel hover:text-crimson px-1 transition-colors disabled:opacity-50"
+            >
+              ✕
+            </button>
+          </div>
+        ))}
+        {lines.length === 0 && (
+          <p className="text-sm text-steel">
+            A checklist needs at least one line before anyone can report.
+          </p>
+        )}
+      </div>
+
+      {duplicate && <p className="text-xs text-amber-700">Two lines say the same thing.</p>}
+      {error && <ErrorBanner message={error} />}
+
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          disabled={busy || lines.length >= MAX_CHECKLIST_ITEMS}
+          onClick={() => setLines([...lines, ""])}
+          className="px-3 py-2 rounded-lg border border-steel/40 text-sm font-semibold text-ink hover:bg-mist transition-colors disabled:opacity-50"
+        >
+          Add a line
+        </button>
+        <button
+          type="button"
+          disabled={busy || !changed || cleaned.length === 0 || duplicate}
+          onClick={save}
+          className="px-4 py-2 rounded-lg bg-crimson hover:bg-crimson-dark text-paper text-sm font-semibold transition-colors disabled:opacity-50"
+        >
+          {busy ? "Saving…" : "Save checklist"}
+        </button>
+        {changed && !busy && (
+          <button
+            type="button"
+            onClick={() => setLines(saved)}
+            className="text-sm text-steel hover:text-ink transition-colors"
+          >
+            Undo changes
+          </button>
+        )}
+      </div>
     </div>
   );
 }

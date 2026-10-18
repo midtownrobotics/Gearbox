@@ -9,8 +9,13 @@ import type { TeamUsers } from "@g3/testing/users";
 import { call, callAs, jsonAs } from "@g3/testing/worker";
 import { expect, it } from "vitest";
 import { app } from "../src/index";
+import { STARTER_CHECKLIST } from "../src/lib/quality-checklist";
 import { drawingKey, teamPrefix } from "../src/lib/storage";
 import { eventually, onshapeEvent } from "./onshape";
+
+/** The starter checklist answered, for a report that passes or fails its first line. */
+const passingChecks = () => STARTER_CHECKLIST.map((label) => ({ label, ok: true }));
+const failingChecks = () => passingChecks().map((a, i) => (i === 0 ? { ...a, ok: false } : a));
 
 // Two teams, each with its own subsystem, process, part with instances and a staging batch, a
 // part file, a drawing in R2 (and an uploaded one), a part from its Onshape webhook, its Onshape
@@ -39,6 +44,7 @@ const TABLES = [
   "admin_settings",
   "shop_managers",
   "quality_reports",
+  "quality_check_items",
 ];
 
 type Id = { id: number };
@@ -198,7 +204,7 @@ async function seed(team: TeamUsers): Promise<Seeded> {
       body: {
         partInstanceId: checkedInstance.id,
         processId: check.id,
-        checks: { dimensions: false, thickness: true, positions: true, sizes: true },
+        checks: failingChecks(),
         unsure: true,
         notes: `Problem ${tag}`,
       },
@@ -296,9 +302,15 @@ it("keeps every team's shop to itself", async () => {
         "POST /quality-reports": {
           partInstanceId: d.checkedInstance,
           processId: d.check,
-          checks: { dimensions: true, thickness: true, positions: true, sizes: true },
+          checks: passingChecks(),
         },
-        "POST /quality-reports/:id/send-back": { processId: d.process, status: "todo" },
+        "POST /quality-reports/:id/send-back": {
+          processId: d.process,
+          status: "todo",
+          fix: false,
+          fixNote: "",
+        },
+        "PUT /admin/quality/checklist": { checklist: STARTER_CHECKLIST.slice() },
       };
     },
   });

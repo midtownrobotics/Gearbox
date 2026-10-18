@@ -1,6 +1,7 @@
 import { admin, kioskAdmin, mentor, newTeamId, student, teamUsers } from "@g3/testing/users";
 import { call, callAs, jsonAs } from "@g3/testing/worker";
 import { describe, expect, it } from "vitest";
+import { STARTER_CHECKLIST } from "../src/lib/quality-checklist";
 
 // G3 Shop: parts and processes for anyone signed in, kiosk presence for kiosk PIN sessions, and
 // settings for admins (never from a kiosk).
@@ -452,10 +453,15 @@ describe("quality reports", () => {
     suspects: { processId: number; completedBy: string | null; completedAt: number | null }[];
     notes: string | null;
     sentBackProcessName: string | null;
+    fixNote: string | null;
+    replacementInstanceNumber: number | null;
+    checks: { label: string; ok: boolean }[];
   };
   const post = (body?: unknown) => ({ method: "POST" as const, body });
   const put = (body: unknown) => ({ method: "PUT" as const, body });
-  const allGood = { dimensions: true, thickness: true, positions: true, sizes: true };
+  const allGood = STARTER_CHECKLIST.map((label) => ({ label, ok: true }));
+  /** The starter checklist with one line failed. */
+  const oneBad = allGood.map((a, i) => (i === 1 ? { ...a, ok: false } : a));
 
   /**
    * A team of its own with reports on, and a part made through Mill and Deburr (by its student)
@@ -503,7 +509,7 @@ describe("quality reports", () => {
       (
         await jsonAs<Step[]>(student, `/part-instance-processes?partInstanceId=${instance.id}`)
       ).sort((a, b) => a.index - b.index);
-    return { team, mill, deburr, check, instance, steps };
+    return { team, mill, deburr, check, instance, part, steps };
   }
 
   it("finish a Quality Control step only with a report while they're on", async () => {
@@ -535,8 +541,7 @@ describe("quality reports", () => {
 
   it("record a problem with who did the likely step, then send the part back", async () => {
     const { team, mill, deburr, check, instance, steps } = await seed();
-    const failed = { ...allGood, thickness: false };
-    const base = { partInstanceId: instance.id, processId: check.id, checks: failed };
+    const base = { partInstanceId: instance.id, processId: check.id, checks: oneBad };
     // A failed check needs a likely step, or Unsure, and only one the part went through.
     expect((await callAs(team.admin, "/quality-reports", post(base))).status).toBe(400);
     expect(
@@ -577,12 +582,14 @@ describe("quality reports", () => {
         )
       ).status,
     ).toBe(403);
+    // Only a step this part actually has.
+    const spare = await jsonAs<Id>(team.student, "/processes", post({ name: "Lathe" }), 201);
     expect(
       (
         await callAs(
           team.admin,
           `/quality-reports/${report.id}/send-back`,
-          post({ processId: check.id, status: "todo" }),
+          post({ processId: spare.id, status: "todo" }),
         )
       ).status,
     ).toBe(400);
@@ -619,5 +626,222 @@ describe("quality reports", () => {
       post({ partInstanceId: 1, processId: 1, checks: allGood }),
     );
     expect(res.status).toBe(409);
+  });
+
+  it("sends a part to any of its steps, the check itself included", async () => {
+    const { team, check, instance, steps } = await seed();
+    const { report } = await jsonAs<{ report: Report }>(
+      team.admin,
+      "/quality-reports",
+      post({ partInstanceId: instance.id, processId: check.id, checks: oneBad, unsure: true }),
+      201,
+    );
+    // Back to the check itself: it's to do again and nothing before it is touched.
+    await jsonAs(
+      team.admin,
+      `/quality-reports/${report.id}/send-back`,
+      post({ processId: check.id, status: "doing" }),
+    );
+    expect((await steps()).map((s) => s.status)).toEqual(["done", "done", "doing"]);
+  });
+
+  it("writes a fix onto the part's notes and needs the note", async () => {
+    const { team, mill, check, instance, part, steps } = await seed();
+    const { report } = await jsonAs<{ report: Report }>(
+      team.admin,
+      "/quality-reports",
+      post({ partInstanceId: instance.id, processId: check.id, checks: oneBad, unsure: true }),
+      201,
+    );
+    // A fix without a note is refused: the note is what the shop reads.
+    expect(
+      (
+        await callAs(
+          team.admin,
+          `/quality-reports/${report.id}/send-back`,
+          post({ processId: mill.id, status: "todo", fix: true, fixNote: "  " }),
+        )
+      ).status,
+    ).toBe(400);
+
+    await jsonAs(
+      team.admin,
+      `/quality-reports/${report.id}/send-back`,
+      post({ processId: mill.id, status: "todo", fix: true, fixNote: "Deburr the top edge" }),
+    );
+    expect((await steps()).map((s) => s.status)).toEqual(["todo", "waiting", "waiting"]);
+
+    const definitions = await jsonAs<{ id: number; notes: string | null }[]>(
+      team.student,
+      "/part-definitions",
+    );
+    expect(definitions.find((d) => d.id === part.id)?.notes).toContain("Deburr the top edge");
+    const reports = await jsonAs<Report[]>(team.admin, "/quality-reports");
+    expect(reports.find((r) => r.id === report.id)).toMatchObject({
+      outcome: "fixed",
+      fixNote: "Deburr the top edge",
+      sentBackProcessName: "Mill",
+    });
+  });
+
+  it("adds a step this part never had when a fix sends it there", async () => {
+    const { team, check, instance, steps } = await seed();
+    const sanding = await jsonAs<Id>(team.student, "/processes", post({ name: "Sanding" }), 201);
+    const { report } = await jsonAs<{ report: Report }>(
+      team.admin,
+      "/quality-reports",
+      post({ partInstanceId: instance.id, processId: check.id, checks: oneBad, unsure: true }),
+      201,
+    );
+
+    // A plain send back can only reach a step the part has.
+    expect(
+      (
+        await callAs(
+          team.admin,
+          `/quality-reports/${report.id}/send-back`,
+          post({ processId: sanding.id, status: "todo" }),
+        )
+      ).status,
+    ).toBe(400);
+    // Nor can a file step join one part: those have to be paired across the whole list.
+    const nest = await jsonAs<Id>(
+      team.student,
+      "/processes",
+      post({ name: "Nest", type: "file_producer" }),
+      201,
+    );
+    expect(
+      (
+        await callAs(
+          team.admin,
+          `/quality-reports/${report.id}/send-back`,
+          post({ processId: nest.id, status: "todo", fix: true, fixNote: "Re-nest it" }),
+        )
+      ).status,
+    ).toBe(400);
+
+    await jsonAs(
+      team.admin,
+      `/quality-reports/${report.id}/send-back`,
+      post({ processId: sanding.id, status: "todo", fix: true, fixNote: "Sand the face" }),
+    );
+    // Sanding slots in before the check, which waits its turn again at the end.
+    const after = await steps();
+    expect(after.map((s) => [s.processId, s.status])).toEqual([
+      [expect.any(Number), "done"],
+      [expect.any(Number), "done"],
+      [sanding.id, "todo"],
+      [check.id, "waiting"],
+    ]);
+    expect(after.map((s) => s.index)).toEqual([0, 1, 2, 3]);
+  });
+
+  it("obsoletes the part and starts a new one over", async () => {
+    const { team, check, instance, part } = await seed();
+    const { report } = await jsonAs<{ report: Report }>(
+      team.admin,
+      "/quality-reports",
+      post({ partInstanceId: instance.id, processId: check.id, checks: oneBad, unsure: true }),
+      201,
+    );
+    expect(
+      (await callAs(team.student, `/quality-reports/${report.id}/replace`, post())).status,
+    ).toBe(403);
+
+    const { replacement } = await jsonAs<{ replacement: { id: number; instanceNumber: number } }>(
+      team.admin,
+      `/quality-reports/${report.id}/replace`,
+      post(),
+    );
+    const instances = await jsonAs<{ id: number; isStale: number; obsoletedBy: string | null }[]>(
+      team.student,
+      `/part-instances?partDefinitionId=${part.id}`,
+    );
+    expect(instances.find((i) => i.id === instance.id)).toMatchObject({
+      isStale: 1,
+      obsoletedBy: team.admin.id,
+    });
+    // The new one starts at the first step with the whole pipeline ahead of it.
+    const fresh = await jsonAs<Step[]>(
+      team.student,
+      `/part-instance-processes?partInstanceId=${replacement.id}`,
+    );
+    expect(fresh.sort((a, b) => a.index - b.index).map((s) => s.status)).toEqual([
+      "todo",
+      "waiting",
+      "waiting",
+    ]);
+    // And only once.
+    expect((await callAs(team.admin, `/quality-reports/${report.id}/replace`, post())).status).toBe(
+      409,
+    );
+    const reports = await jsonAs<Report[]>(team.admin, "/quality-reports");
+    expect(reports.find((r) => r.id === report.id)).toMatchObject({
+      outcome: "replaced",
+      replacementInstanceNumber: replacement.instanceNumber,
+    });
+  });
+
+  it("asks the team's own checklist, and keeps what old reports were answered against", async () => {
+    const { team, check, instance } = await seed();
+    expect(await jsonAs<{ qualityChecklist: string[] }>(team.admin, "/me")).toMatchObject({
+      qualityChecklist: [...STARTER_CHECKLIST],
+    });
+
+    // A blank line, a repeat, and an empty list are all refused.
+    for (const checklist of [["Flat?", " "], ["Flat?", "flat?"], []]) {
+      expect(
+        (await callAs(team.admin, "/admin/quality/checklist", put({ checklist }))).status,
+      ).toBe(400);
+    }
+    expect(
+      (await callAs(team.student, "/admin/quality/checklist", put({ checklist: ["Flat?"] })))
+        .status,
+    ).toBe(403);
+
+    const saved = await jsonAs<{ checklist: string[] }>(
+      team.admin,
+      "/admin/quality/checklist",
+      put({ checklist: ["Is it flat?", "Are the holes round?"] }),
+    );
+    expect(saved.checklist).toEqual(["Is it flat?", "Are the holes round?"]);
+    expect(await jsonAs<{ qualityChecklist: string[] }>(team.admin, "/me")).toMatchObject({
+      qualityChecklist: ["Is it flat?", "Are the holes round?"],
+    });
+
+    // The old four no longer answer the new list.
+    expect(
+      (
+        await callAs(
+          team.admin,
+          "/quality-reports",
+          post({ partInstanceId: instance.id, processId: check.id, checks: allGood }),
+        )
+      ).status,
+    ).toBe(409);
+
+    const { report } = await jsonAs<{ report: Report }>(
+      team.admin,
+      "/quality-reports",
+      post({
+        partInstanceId: instance.id,
+        processId: check.id,
+        checks: [
+          { label: "Is it flat?", ok: true },
+          { label: "Are the holes round?", ok: true },
+        ],
+      }),
+      201,
+    );
+    expect(report).toMatchObject({ passed: 1, outcome: "passed" });
+
+    // Changing the list again leaves that report saying what it was asked.
+    await jsonAs(team.admin, "/admin/quality/checklist", put({ checklist: ["Only this now"] }));
+    const reports = await jsonAs<Report[]>(team.admin, "/quality-reports");
+    expect(reports.find((r) => r.id === report.id)?.checks).toEqual([
+      { label: "Is it flat?", ok: true },
+      { label: "Are the holes round?", ok: true },
+    ]);
   });
 });

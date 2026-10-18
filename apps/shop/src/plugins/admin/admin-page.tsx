@@ -5,8 +5,10 @@ import { getErrorMessage } from "../../shared/api-error";
 import { enableKioskMode } from "../../shared/kiosk";
 import { PROCESS_TYPE_LABELS, type Process, type ProcessType } from "../../shared/types";
 import { ErrorBanner, InfoTip, PageLoading } from "../../shared/ui";
+import { useRefreshAuthUser } from "../../shared/use-auth";
 import { useShopData } from "../../shared/use-shop-data";
 import { ActionsLog } from "./actions-log";
+import { inputCls, sectionHeading } from "./admin-styles";
 import { QualityReports } from "./quality-reports";
 
 export function AdminPage() {
@@ -156,12 +158,7 @@ export function AdminPage() {
           <QualityControlSettings />
         </Section>
 
-        {/* Section 4: Quality Reports */}
-        <Section title="Quality Reports" defaultOpen={false}>
-          <QualityReports />
-        </Section>
-
-        {/* Section 5: Data Management */}
+        {/* Section 4: Data Management */}
         <Section title="Data Management" defaultOpen={false}>
           <button
             type="button"
@@ -176,17 +173,17 @@ export function AdminPage() {
           </p>
         </Section>
 
-        {/* Section 6: Kiosk Mode */}
+        {/* Section 5: Kiosk Mode */}
         <Section title="Kiosk Mode" defaultOpen={false}>
           <KioskModeSettings />
         </Section>
 
-        {/* Section 7: OnShape Configuration */}
+        {/* Section 6: OnShape Configuration */}
         <Section title="OnShape Configuration" defaultOpen={false}>
           {data ? <OnShapeConfig /> : <p className="text-sm text-steel">Loading…</p>}
         </Section>
 
-        {/* Section 8: Slack Configuration */}
+        {/* Section 7: Slack Configuration */}
         <Section title="Slack Configuration" defaultOpen={false}>
           <SlackSettings />
         </Section>
@@ -208,8 +205,6 @@ type QualityState = {
   }[];
   peopleLoaded: boolean;
 };
-
-const sectionHeading = "text-sm font-bold uppercase tracking-wider text-steel-dark";
 
 /** Picks someone who isn't a shop manager yet, by typing a name or opening the list. */
 function PersonPicker({
@@ -303,6 +298,8 @@ function QualityControlSettings() {
   const [state, setState] = useState<QualityState | null>(null);
   const [busy, setBusy] = useState(false);
   const [banner, setBanner] = useState<string | null>(null);
+  const [pickingProcess, setPickingProcess] = useState(false);
+  const refreshAuth = useRefreshAuthUser();
 
   const load = useCallback(async () => {
     const res = await api.admin.quality.$get();
@@ -335,6 +332,8 @@ function QualityControlSettings() {
     });
     setBanner(res.ok ? null : await getErrorMessage(res as unknown as Response));
     await load();
+    // Whoever changed is told by /me whether they may sign a step off.
+    refreshAuth();
     setBusy(false);
   }
 
@@ -346,12 +345,39 @@ function QualityControlSettings() {
     const res = await api.admin.quality.settings.$put({ json: next });
     setBanner(res.ok ? null : await getErrorMessage(res as unknown as Response));
     await load();
+    // The shop floor reads the check from /me, so it has to hear about the change.
+    refreshAuth();
     setBusy(false);
   }
 
   if (!state) return <p className="text-sm text-steel">Loading…</p>;
 
   const steps = state.qualityProcesses;
+  const checkOn = state.requireQualityCheck || pickingProcess;
+
+  // The worker only saves "required" with a process, so turning it on without one just shows
+  // the picker; picking a process saves both.
+  async function toggleCheck(on: boolean) {
+    if (on) {
+      if (state?.qualityProcessId == null) {
+        setPickingProcess(true);
+        return;
+      }
+      await saveCheck({ requireQualityCheck: true });
+      return;
+    }
+    setPickingProcess(false);
+    if (state?.requireQualityCheck) await saveCheck({ requireQualityCheck: false });
+  }
+
+  async function pickProcess(id: number | null) {
+    if (id === null) {
+      await saveCheck({ requireQualityCheck: false, qualityProcessId: null });
+      return;
+    }
+    await saveCheck({ qualityProcessId: id, requireQualityCheck: true });
+    setPickingProcess(false);
+  }
   const managers = state.people.filter((p) => p.isManager);
 
   return (
@@ -409,46 +435,53 @@ function QualityControlSettings() {
       </div>
 
       <div className="space-y-3">
-        <h3 className={sectionHeading}>Quality Control Process</h3>
+        <h3 className={sectionHeading}>Require Quality Control</h3>
         {steps.length === 0 ? (
           <p className="text-xs text-steel">
             Add a process with the type Quality Control under Shop Settings first.
           </p>
         ) : (
           <>
-            <select
-              aria-label="Quality control process"
-              value={state.qualityProcessId ?? ""}
-              disabled={busy}
-              onChange={(e) => saveCheck({ qualityProcessId: Number(e.target.value) || null })}
-              className={`${inputCls} max-w-sm`}
-            >
-              <option value="">— Select —</option>
-              {steps.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
             <div className="flex items-center gap-2 text-sm text-ink">
               <label className="flex items-center gap-2 cursor-pointer select-none">
                 <input
                   type="checkbox"
-                  checked={state.requireQualityCheck}
-                  disabled={busy || state.qualityProcessId === null}
-                  onChange={(e) => saveCheck({ requireQualityCheck: e.target.checked })}
+                  checked={checkOn}
+                  disabled={busy}
+                  onChange={(e) => toggleCheck(e.target.checked)}
                   className="accent-crimson w-4 h-4"
                 />
                 Require quality control
               </label>
               <InfoTip label="What requiring quality control does">
-                The process above goes at the end of every part's processes from now on, so nothing
-                finishes without a shop manager signing it off. Parts already being made keep the
-                steps they have. Pick a process first to turn this on.
+                The process you pick goes at the end of every part's processes from now on, so
+                nothing finishes without a shop manager signing it off. Parts already being made
+                keep the steps they have.
               </InfoTip>
             </div>
+            {checkOn && (
+              <select
+                aria-label="Process to require"
+                value={state.qualityProcessId ?? ""}
+                disabled={busy}
+                onChange={(e) => pickProcess(Number(e.target.value) || null)}
+                className={`${inputCls} max-w-sm`}
+              >
+                <option value="">— Pick a process to require —</option>
+                {steps.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            )}
           </>
         )}
+      </div>
+
+      <div className="space-y-3">
+        <h3 className={sectionHeading}>Quality Reports</h3>
+        <QualityReports />
       </div>
     </div>
   );
@@ -724,9 +757,6 @@ type OnShapeStatus = {
   fromWorkerSecrets: boolean;
   webhookUrl: string;
 };
-
-const inputCls =
-  "w-full bg-paper border border-steel/40 rounded-lg px-3 py-2 text-sm text-ink placeholder-steel focus:outline-none focus:border-crimson";
 
 /**
  * The team's Onshape connection: the document Shop follows, and the team's own API keys and

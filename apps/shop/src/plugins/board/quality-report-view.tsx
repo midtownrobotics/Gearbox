@@ -1,23 +1,12 @@
 import { useState } from "react";
 import type { InstanceRow } from "../../shared/derive";
-import { sendBackFromReport, submitQualityReport } from "../../shared/getters";
-import {
-  QUALITY_CHECKS,
-  type QualityCheckKey,
-  type QualityReport,
-  type QualitySuspect,
-} from "../../shared/types";
+import { replaceFromReport, sendBackFromReport, submitQualityReport } from "../../shared/getters";
+import type { QualityReport, QualitySuspect } from "../../shared/types";
+import { useAuthUser } from "../../shared/use-auth";
 import type { ShopData } from "../../shared/use-shop-data";
 import { useUserNames } from "../../shared/use-user-names";
 import { DrawingPreview } from "../parts/drawing-preview";
 import { shopButton, shopButtonPlain } from "./shop-view";
-
-const NO_CHECKS: Record<QualityCheckKey, boolean> = {
-  dimensions: false,
-  thickness: false,
-  positions: false,
-  sizes: false,
-};
 
 /** The value the Unsure choice takes among the likely steps. */
 const UNSURE = 0;
@@ -57,8 +46,20 @@ export function QualityReportView({
         (id) => ({ id, name: processName(id) }),
       )
     : [];
+  // Every step of the part, so it can be sent to any of them, not only one before the check.
+  const allSteps = [...new Set(row.procs.map((p) => p.processId))].map((id) => ({
+    id,
+    name: processName(id),
+  }));
+  // A fix can also send it to a plain process the part has never had (sanding a failed part),
+  // which joins this one part's steps just before the check.
+  const extraSteps = data.processes
+    .filter((p) => p.type === "regular" && !allSteps.some((s) => s.id === p.id))
+    .map((p) => ({ id: p.id, name: p.name }));
+  // The team's checklist, as the Admin page has it.
+  const checklist = useAuthUser()?.qualityChecklist ?? [];
 
-  const [checks, setChecks] = useState(NO_CHECKS);
+  const [ticked, setTicked] = useState<Record<string, boolean>>({});
   const [likely, setLikely] = useState<number[]>([]);
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
@@ -67,7 +68,8 @@ export function QualityReportView({
     null,
   );
 
-  const passing = QUALITY_CHECKS.every((c) => checks[c.key]);
+  const answers = checklist.map((label) => ({ label, ok: ticked[label] === true }));
+  const passing = answers.length > 0 && answers.every((a) => a.ok);
 
   function toggleLikely(id: number) {
     setLikely((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -85,7 +87,7 @@ export function QualityReportView({
       const result = await submitQualityReport({
         partInstanceId: row.instance.id,
         processId: step.processId,
-        checks,
+        checks: answers,
         suspectProcessIds: passing ? [] : likely.filter((id) => id !== UNSURE),
         unsure: !passing && likely.includes(UNSURE),
         notes,
@@ -133,6 +135,8 @@ export function QualityReportView({
               report={failed.report}
               history={failed.history}
               earlier={earlier}
+              allSteps={allSteps}
+              extraSteps={extraSteps}
               checkName={step ? processName(step.processId) : "the check"}
               onDone={async () => {
                 await onChanged();
@@ -148,18 +152,23 @@ export function QualityReportView({
                 <p className="text-xs text-steel">
                   If one doesn't apply to this part, check it anyway.
                 </p>
-                {QUALITY_CHECKS.map((c) => (
+                {checklist.length === 0 && (
+                  <p className="text-sm text-steel">
+                    An admin needs to set up the quality checklist first.
+                  </p>
+                )}
+                {checklist.map((label) => (
                   <label
-                    key={c.key}
+                    key={label}
                     className="flex cursor-pointer select-none items-center gap-3 rounded-lg border border-steel/30 bg-mist px-3.5 py-3 text-sm text-ink"
                   >
                     <input
                       type="checkbox"
-                      checked={checks[c.key]}
-                      onChange={(e) => setChecks({ ...checks, [c.key]: e.target.checked })}
+                      checked={ticked[label] === true}
+                      onChange={(e) => setTicked({ ...ticked, [label]: e.target.checked })}
                       className="h-5 w-5 accent-crimson"
                     />
-                    {c.label}
+                    {label}
                   </label>
                 ))}
               </fieldset>
@@ -212,7 +221,7 @@ export function QualityReportView({
                 <button
                   type="button"
                   onClick={submit}
-                  disabled={busy || (!passing && likely.length === 0)}
+                  disabled={busy || checklist.length === 0 || (!passing && likely.length === 0)}
                   className={`${shopButton} text-paper ${
                     passing
                       ? "bg-emerald-600 hover:bg-emerald-700"
@@ -230,42 +239,68 @@ export function QualityReportView({
   );
 }
 
+/** What can be done with a part that failed its check. */
+type Outcome = "send-back" | "fix" | "replace";
+
 /**
  * After a failed report: who finished the steps it likely went wrong at and when (every step
- * before the check when the reporter was unsure), then where to send the part back to.
+ * before the check when the reporter was unsure), then what to do with the part. It can go to any
+ * of its steps, go to one with a note on the part saying what to fix, or be obsoleted and made
+ * again from the top.
  */
 function SendBack({
   report,
   history,
   earlier,
+  allSteps,
+  extraSteps,
   checkName,
   onDone,
 }: {
   report: QualityReport;
   history: QualitySuspect[];
   earlier: { id: number; name: string }[];
+  allSteps: { id: number; name: string }[];
+  /** Plain processes the part doesn't have, which a fix can add to it. */
+  extraSteps: { id: number; name: string }[];
   checkName: string;
   onDone: () => Promise<void>;
 }) {
   const shown = report.suspects.length > 0 ? report.suspects : history;
   const resolveName = useUserNames(shown.map((s) => s.completedBy));
-  // Start at the earliest step named, else the first step.
+  // Start at the earliest step named as a likely cause, else the part's first step.
   const first =
-    earlier.find((p) => report.suspects.some((s) => s.processId === p.id)) ?? earlier[0];
+    earlier.find((p) => report.suspects.some((s) => s.processId === p.id)) ?? allSteps[0];
+  const [outcome, setOutcome] = useState<Outcome>("send-back");
   const [target, setTarget] = useState<number | null>(first?.id ?? null);
   const [status, setStatus] = useState<"todo" | "doing">("todo");
+  const [fixNote, setFixNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function sendBack() {
-    if (target === null) return;
+  const note = fixNote.trim();
+  const added = extraSteps.find((p) => p.id === target);
+  // Only a fix can add a step, so a step picked for one isn't offered for a plain send back.
+  const addsStep = outcome === "fix" && Boolean(added);
+  const addedName = added?.name ?? "";
+  const canSubmit =
+    outcome === "replace"
+      ? true
+      : target !== null &&
+        (outcome === "send-back" ? allSteps.some((s) => s.id === target) : note.length > 0);
+
+  async function apply() {
     setBusy(true);
     setError(null);
     try {
-      await sendBackFromReport(report.id, target, status);
+      if (outcome === "replace") {
+        await replaceFromReport(report.id);
+      } else if (target !== null) {
+        await sendBackFromReport(report.id, target, status, outcome === "fix" ? note : undefined);
+      }
       await onDone();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "The part wasn't sent back.");
+      setError(err instanceof Error ? err.message : "That didn't go through.");
       setBusy(false);
     }
   }
@@ -299,21 +334,110 @@ function SendBack({
         )}
       </div>
 
-      {earlier.length > 0 ? (
+      <fieldset className="space-y-2">
+        <legend className="mb-1 text-base font-semibold text-ink">What now?</legend>
+        {(
+          [
+            ["send-back", "Send it back", "It goes to a step and is made through the rest again."],
+            [
+              "fix",
+              "Fix it",
+              "It goes to a step, with a note on the part saying what to do. The step can be one this part doesn't have yet.",
+            ],
+            [
+              "replace",
+              "Start over",
+              "This one becomes obsolete and a new one starts at the first step.",
+            ],
+          ] as const
+        ).map(([value, label, hint]) => (
+          <label
+            key={value}
+            className="flex cursor-pointer select-none items-start gap-3 rounded-lg border border-steel/30 bg-mist px-3.5 py-3 text-sm text-ink"
+          >
+            <input
+              type="radio"
+              name="quality-outcome"
+              checked={outcome === value}
+              onChange={() => {
+                setOutcome(value);
+                // Only a fix can add a step, so drop one picked for a fix when leaving it.
+                if (value !== "fix" && extraSteps.some((p) => p.id === target)) {
+                  setTarget(first?.id ?? null);
+                }
+              }}
+              className="mt-0.5 h-5 w-5 accent-crimson"
+            />
+            <span>
+              <span className="font-semibold">{label}</span>
+              <span className="block text-xs text-steel-dark">{hint}</span>
+            </span>
+          </label>
+        ))}
+      </fieldset>
+
+      {outcome === "fix" && (
+        <div className="space-y-1">
+          <label htmlFor="quality-fix-note" className="text-base font-semibold text-ink">
+            What has to be done to fix it
+          </label>
+          <textarea
+            id="quality-fix-note"
+            value={fixNote}
+            onChange={(e) => setFixNote(e.target.value)}
+            rows={3}
+            maxLength={2000}
+            placeholder="Deburr the top edge and open the two 0.25&quot; holes to size."
+            className="w-full rounded-lg border border-steel/40 bg-paper px-3 py-2 text-sm text-ink placeholder-steel focus:border-crimson focus:outline-none"
+          />
+          <p className="text-xs text-steel">
+            This goes onto the part's notes, so whoever picks it up reads it.
+          </p>
+        </div>
+      )}
+
+      {outcome !== "replace" && allSteps.length > 0 && (
         <div className="space-y-3">
-          <h2 className="text-base font-semibold text-ink">Send the part back to</h2>
+          <h2 className="text-base font-semibold text-ink">
+            {outcome === "fix" ? "Send it to" : "Send the part back to"}
+          </h2>
           <select
-            aria-label="Step to send the part back to"
+            aria-label="Step to send the part to"
             value={target ?? ""}
             onChange={(e) => setTarget(Number(e.target.value) || null)}
             className="w-full rounded-lg border border-steel/40 bg-paper px-3 py-2 text-sm text-ink focus:border-crimson focus:outline-none"
           >
-            {earlier.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
+            {outcome === "fix" && extraSteps.length > 0 ? (
+              <>
+                <optgroup label="This part's steps">
+                  {allSteps.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label="Add a step to this part">
+                  {extraSteps.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </optgroup>
+              </>
+            ) : (
+              allSteps.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))
+            )}
           </select>
+          {addsStep && (
+            <p className="text-xs text-steel-dark">
+              {addedName} isn't one of this part's steps. It's added to this part only, just before{" "}
+              {checkName}.
+            </p>
+          )}
           <div className="flex gap-4">
             {(
               [
@@ -340,21 +464,36 @@ function SendBack({
             Every step after it, {checkName} included, is done again.
           </p>
         </div>
-      ) : null}
+      )}
+
+      {outcome === "replace" && (
+        <p className="text-sm text-steel-dark">
+          This part is marked obsolete and a new one of the same part is added, waiting at its first
+          step. The obsolete one keeps its reports.
+        </p>
+      )}
 
       {error && <p className="text-sm text-crimson-dark">{error}</p>}
 
       <div className="mt-auto grid grid-cols-1 gap-2 border-t border-steel/30 pt-4">
-        {earlier.length > 0 && (
-          <button
-            type="button"
-            onClick={sendBack}
-            disabled={busy || target === null}
-            className={`${shopButton} bg-amber-500 text-white hover:bg-amber-600`}
-          >
-            {busy ? "Sending…" : "↶ Send Back"}
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={apply}
+          disabled={busy || !canSubmit}
+          className={`${shopButton} text-white disabled:bg-steel/40 ${
+            outcome === "replace"
+              ? "bg-crimson hover:bg-crimson-dark"
+              : "bg-amber-500 hover:bg-amber-600"
+          }`}
+        >
+          {busy
+            ? "Working…"
+            : outcome === "replace"
+              ? "Obsolete and Start Over"
+              : outcome === "fix"
+                ? "Send to Fix"
+                : "↶ Send Back"}
+        </button>
         <button type="button" onClick={onDone} disabled={busy} className={shopButtonPlain}>
           Leave it at {checkName} for now
         </button>
