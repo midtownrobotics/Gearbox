@@ -1,5 +1,41 @@
 # @g3/worker-platform
 
+## 3.0.0
+
+### Major Changes
+
+- db2c78c: Teams can use Discord instead of Slack: connect your server on Integrations (or when signing your team up), sign in with Discord, and get everything Gearbox sends (approvals, releases, daily summaries, reminders, service alerts and notifications) on Discord. Deployers run G3ID's and the platform's migrations first, and set up the Discord app (docs/deploy.md, "Discord") to switch it on.
+
+### Patch Changes
+
+- Updated dependencies [db2c78c]
+- Updated dependencies [3c67e43]
+- Updated dependencies [3c67e43]
+- Updated dependencies [fe63d3f]
+- Updated dependencies [c429a6e]
+- Updated dependencies [2aa06eb]
+- Updated dependencies [c6d1e89]
+- Updated dependencies [c6d1e89]
+- Updated dependencies [f29e1e4]
+- Updated dependencies [7f8f724]
+- Updated dependencies [c6d1e89]
+- Updated dependencies [c6d1e89]
+- Updated dependencies [f9bd8ec]
+- Updated dependencies [1585566]
+- Updated dependencies [1585566]
+- Updated dependencies [f29e1e4]
+- Updated dependencies [c6d1e89]
+- Updated dependencies [f9bd8ec]
+- Updated dependencies [c6d1e89]
+- Updated dependencies [da8964e]
+  - @g3/worker-g3id@3.0.0
+  - @g3/worker-portal@2.1.0
+  - @g3/worker-shop@2.1.0
+  - @g3/worker-orders@2.1.0
+  - @g3/worker-schedule@0.2.0
+  - @g3/worker-scouting@2.1.0
+  - @g3/worker-pit@3.0.0
+
 ## 2.0.0
 
 ### Major Changes

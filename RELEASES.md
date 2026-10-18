@@ -16,6 +16,86 @@ Each release of the whole platform, newest first, with the version of every app 
 
 <!-- releases -->
 
+## 2026.10.2 (2026-10-18)
+
+| App | Version |
+| --- | --- |
+| **G3ID** | **3.0.0** (was 2.0.0) |
+| **Portal** | **2.1.0** (was 2.0.0) |
+| **Platform** | **3.0.0** (was 2.0.0) |
+| **Shop** | **2.1.0** (was 2.0.0) |
+| **Pit** | **3.0.0** (was 2.0.0) |
+| **Orders** | **2.1.0** (was 2.0.0) |
+| Edge | 2.0.0 |
+| Edge agent | 0.5.0 |
+| **Pit log downloader** | **2.1.0** (was 2.0.0) |
+| **Scouting** | **2.1.0** (was 2.0.0) |
+| Skill Tree | 2.0.0 |
+| Attendance | 2.0.0 |
+| Inventory | 1.0.0 |
+| **Schedule** | **0.2.0** (was 0.1.0) |
+
+### G3ID 3.0.0
+
+- Teams can use Discord instead of Slack: connect your server on Integrations (or when signing your team up), sign in with Discord, and get everything Gearbox sends (approvals, releases, daily summaries, reminders, service alerts and notifications) on Discord. Deployers run G3ID's and the platform's migrations first, and set up the Discord app (docs/deploy.md, "Discord") to switch it on.
+
+### Portal 2.1.0
+
+- Teams can use Discord instead of Slack: connect your server on Integrations (or when signing your team up), sign in with Discord, and get everything Gearbox sends (approvals, releases, daily summaries, reminders, service alerts and notifications) on Discord. Deployers run G3ID's and the platform's migrations first, and set up the Discord app (docs/deploy.md, "Discord") to switch it on.
+
+### Platform 3.0.0
+
+- Teams can use Discord instead of Slack: connect your server on Integrations (or when signing your team up), sign in with Discord, and get everything Gearbox sends (approvals, releases, daily summaries, reminders, service alerts and notifications) on Discord. Deployers run G3ID's and the platform's migrations first, and set up the Discord app (docs/deploy.md, "Discord") to switch it on.
+
+### Shop 2.1.0
+
+- Teams can use Discord instead of Slack: connect your server on Integrations (or when signing your team up), sign in with Discord, and get everything Gearbox sends (approvals, releases, daily summaries, reminders, service alerts and notifications) on Discord. Deployers run G3ID's and the platform's migrations first, and set up the Discord app (docs/deploy.md, "Discord") to switch it on.
+
+### Pit 3.0.0
+
+- AdvantageScope is in Pit: open it from the Logs page, and open any match log in it with one click. Its preferences and layout are shared by the whole team, and mentors can add your robot or another field for everyone. Deployers: apply Pit's migration 0016 first.
+- Pit's Logs page and Monitor show what the log downloader is doing: online, connected to the robot, copying and uploading. The Monitor's Recent Logs is now Logs, and In the pit now is at the top of its left column. On the downloader, the robot shows as connected as soon as the computer joins its network, the page no longer stalls while logs copy, it checks the robot again for new logs while connected, and "In Gearbox" follows what Pit has. Deployers: apply Pit's migration 0017 first.
+- The Monitor shows whether it's online, checked every second, and covers the screen with a big Offline notice when Pit can't be reached. A failed refresh keeps what it last showed.
+- Pit deploys again when AdvantageScope comes from the build cache.
+- Pit's Monitor keeps the team's played matches in its match list, with the blue and red scores and a green W or red L in place of the time; the list opens at the next match. On a wide screen the Monitor fits the window: the match list and the checklists scroll on their own, with the column names and the overall progress bar kept at the top. The Batteries page has Pause All and Unpause All, which stop and restart every battery's timer without changing any battery's state. On the days of a published Schedule event, the timers go back to zero and pause when the first day opens, pause when each day closes, and carry on when the next day opens. In dev and staging only, Pit's Admin page has Use event snapshot, which shows GRITS 2026 halfway through qualifications on the Monitor instead of the team's event. Deployers: apply Pit's migration 0018 first, and deploy Schedule with Pit (Pit's new `SCHEDULE` service binding).
+
+### Orders 2.1.0
+
+- Teams can use Discord instead of Slack: connect your server on Integrations (or when signing your team up), sign in with Discord, and get everything Gearbox sends (approvals, releases, daily summaries, reminders, service alerts and notifications) on Discord. Deployers run G3ID's and the platform's migrations first, and set up the Discord app (docs/deploy.md, "Discord") to switch it on.
+
+### Pit log downloader 2.1.0
+
+- Pit's Logs page and Monitor show what the log downloader is doing: online, connected to the robot, copying and uploading. The Monitor's Recent Logs is now Logs, and In the pit now is at the top of its left column. On the downloader, the robot shows as connected as soon as the computer joins its network, the page no longer stalls while logs copy, it checks the robot again for new logs while connected, and "In Gearbox" follows what Pit has. Deployers: apply Pit's migration 0017 first.
+- Pairing and uploads no longer fail with "Couldn't reach Gearbox" on networks without IPv6 or with a slow first connection.
+- A log copy cut off by the robot leaving (or one that stops moving) now ends and is tried again the next time the robot is connected, instead of staying stuck on Copying.
+
+### Scouting 2.1.0
+
+- Teams can use Discord instead of Slack: connect your server on Integrations (or when signing your team up), sign in with Discord, and get everything Gearbox sends (approvals, releases, daily summaries, reminders, service alerts and notifications) on Discord. Deployers run G3ID's and the platform's migrations first, and set up the Discord app (docs/deploy.md, "Discord") to switch it on.
+- Scouting's Admin page opens with the announcement box, then a Competition overview: who's in the app, this match's submissions, the Strategy leads online, the match everyone is scouting, and the next team match. The manual schedule section is now called Match schedule and explains itself. Strategy leads also set how long scouts have to send a form in after a match ends (two minutes to start, with whole-second precision). Apply migrations through 0035 before deploying; saved minute-based delays are preserved.
+- Analysis sorts reports by form, so a team's match forms and its pit form no longer sit mixed together.
+- Allow signed-in team members to open Analysis and view their team's reports and drawings. Keep report management restricted to Strategy leads and admins.
+- Analysis now lists teams instead of single reports: match scouting shows each team's average for every number and its most common answer to every choice at the current event, and pit scouting shows each team's answers. Sort by any column, and click a team's number to see each of its reports, labeled with the match and scout.
+- Restore Android touch scrolling across Scouting pages by clipping horizontal overflow without creating nested vertical scroll containers.
+- Keep Scouting API credentials private to each team. Restrict legacy deployment-key fallbacks to the original team, and report missing credentials correctly for other teams.
+- Default automatic match advancing to two minutes after a match finishes and let teams customize the delay in Scouting Admin.
+- Show the match submission deadline and countdown, clear answers and drawings at expiry or assignment changes, and reject stale match or team submissions before saving reports or awarding points.
+- Match forms never lose a scout's work: answers and drawings are kept on the device, a bar counts down before the form moves on (with +30 s to finish), a report that missed the move can still be sent and goes to its own match marked late, and a done screen shows what was sent and the next match. Admins set how long late reports are accepted.
+- A scout who has sent a match report in moves to the match on the field at once, instead of waiting out the window after the finished match, and the confirmation names the match the report went to and the match they are on now.
+- Open a scout's next match immediately after saving a report, without a start-time submission gate. Limit automatic progression to one match ahead of the shared current match, preserve drafts during schedule failures, and prevent stale polls from restoring completed forms. Keep expired and wrong-team report protection. Claim scout assignments atomically, repair changed lineups, and validate team membership before and after drawing uploads. Keep automatic match advancement forward-only, preserve omitted event settings, and reopen empty forms after a confirmed deadline extension. Anchor countdowns to server time so device clock changes do not erase drafts.
+- Load scouting points and history before external predictions, limit Statbotics requests to three seconds, and reuse recent public match data. Name the active event in prediction errors and distinguish missing events from server failures and timeouts. Keep points and standings usable during outages, allow retrying failed loads, and validate submitted picks against fresh data.
+- Separate match and pit scouting forms, filter and sort reports by type, and show competition names instead of event codes. Apply report type and competition filters to statistics, auto paths and team comparisons.
+- Every answer on a scouting form takes 0. A rating of 0, a choice named "0", a selection including it and a note reading "0" were all refused as if the field were blank; a robot that did nothing is now recorded as doing nothing. Each field still needs an answer, and says so instead of blaming 0.
+- Save tier list edits automatically, serialize pending changes, and retry failed saves. Use stable list IDs so retrying a new list does not create duplicates.
+- Allow tier list entries to be dragged left or right within a tier and inserted before or after entries in other tiers.
+- Reorder whole tiers by dragging their handles with the repository's dnd-kit sorting library, or using Space and arrow keys. Preserve tier contents and autosave the new order.
+- Add touch-friendly tier entry movement buttons and a tier selector alongside drag-and-drop.
+
+### Schedule 0.2.0
+
+- Teams can use Discord instead of Slack: connect your server on Integrations (or when signing your team up), sign in with Discord, and get everything Gearbox sends (approvals, releases, daily summaries, reminders, service alerts and notifications) on Discord. Deployers run G3ID's and the platform's migrations first, and set up the Discord app (docs/deploy.md, "Discord") to switch it on.
+- Pit's Monitor keeps the team's played matches in its match list, with the blue and red scores and a green W or red L in place of the time; the list opens at the next match. On a wide screen the Monitor fits the window: the match list and the checklists scroll on their own, with the column names and the overall progress bar kept at the top. The Batteries page has Pause All and Unpause All, which stop and restart every battery's timer without changing any battery's state. On the days of a published Schedule event, the timers go back to zero and pause when the first day opens, pause when each day closes, and carry on when the next day opens. In dev and staging only, Pit's Admin page has Use event snapshot, which shows GRITS 2026 halfway through qualifications on the Monitor instead of the team's event. Deployers: apply Pit's migration 0018 first, and deploy Schedule with Pit (Pit's new `SCHEDULE` service binding).
+
 ## 2026.10.1 (2026-10-16)
 
 | App | Version |

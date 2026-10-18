@@ -1,5 +1,21 @@
 # @g3/worker-pit
 
+## 3.0.0
+
+### Major Changes
+
+- 3c67e43: AdvantageScope is in Pit: open it from the Logs page, and open any match log in it with one click. Its preferences and layout are shared by the whole team, and mentors can add your robot or another field for everyone. Deployers: apply Pit's migration 0016 first.
+- 3c67e43: Pit's Logs page and Monitor show what the log downloader is doing: online, connected to the robot, copying and uploading. The Monitor's Recent Logs is now Logs, and In the pit now is at the top of its left column. On the downloader, the robot shows as connected as soon as the computer joins its network, the page no longer stalls while logs copy, it checks the robot again for new logs while connected, and "In Gearbox" follows what Pit has. Deployers: apply Pit's migration 0017 first.
+- 2aa06eb: Pit's Monitor keeps the team's played matches in its match list, with the blue and red scores and a green W or red L in place of the time; the list opens at the next match. On a wide screen the Monitor fits the window: the match list and the checklists scroll on their own, with the column names and the overall progress bar kept at the top. The Batteries page has Pause All and Unpause All, which stop and restart every battery's timer without changing any battery's state. On the days of a published Schedule event, the timers go back to zero and pause when the first day opens, pause when each day closes, and carry on when the next day opens. In dev and staging only, Pit's Admin page has Use event snapshot, which shows GRITS 2026 halfway through qualifications on the Monitor instead of the team's event. Deployers: apply Pit's migration 0018 first, and deploy Schedule with Pit (Pit's new `SCHEDULE` service binding).
+
+### Minor Changes
+
+- fe63d3f: The Monitor shows whether it's online, checked every second, and covers the screen with a big Offline notice when Pit can't be reached. A failed refresh keeps what it last showed.
+
+### Patch Changes
+
+- c429a6e: Pit deploys again when AdvantageScope comes from the build cache.
+
 ## 2.0.0
 
 ### Major Changes
