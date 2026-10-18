@@ -221,6 +221,7 @@ it("keeps every team's checklists, archives, batteries, settings and log downloa
       "PATCH /batteries/:id/state": { state: "Broken" },
       "PATCH /batteries/:id/voltage": { voltage: 1 },
       "POST /batteries/timers": { paused: true },
+      "PUT /admin/event-snapshot": { on: true },
       "PATCH /admin/settings": { eventKey: "2026mine" },
       "POST /downloaders/pair": { code: "123456", name: "Mine now" },
       "PUT /logs/settings": { whenFull: "delete-oldest" },

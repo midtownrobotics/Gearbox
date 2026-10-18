@@ -1,4 +1,4 @@
-import { Button, ProgressBar, useTeamNames } from "@g3/ui";
+import { Badge, Button, ProgressBar, tones, useTeamNames } from "@g3/ui";
 import { type RefObject, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { api } from "../../shared/api";
 import { useBatteryCache } from "../../shared/battery-cache-context";
@@ -82,6 +82,8 @@ type ContextRankings = {
 
 type MonitorData = {
   teamNumber: string;
+  /** A past event shown instead of the team's (dev and staging only: Pit > Admin). */
+  snapshot?: { event: string; name: string } | null;
   nexus: NexusData | null;
   ranking: RankingRow | null;
   contextRankings?: ContextRankings | null;
@@ -315,14 +317,14 @@ function MatchesSection({
               className="sticky top-0 z-10 bg-surface shadow-[inset_0_-1px_0_var(--g3-line)]"
             >
               <tr className="text-secondary-600 text-xs uppercase tracking-wide">
-                <th className="text-left px-4 py-2 font-semibold">Match</th>
-                <th className="text-left px-4 py-2 font-semibold">Queue</th>
-                <th className="text-left px-4 py-2 font-semibold">Start</th>
-                <th className="text-left px-4 py-2 font-semibold">Blue</th>
+                <th className="text-left px-3 py-2 font-semibold">Match</th>
+                <th className="text-left px-3 py-2 font-semibold">Queue</th>
+                <th className="text-left px-3 py-2 font-semibold">Start</th>
+                <th className="text-left px-3 py-2 font-semibold">Blue</th>
                 <th colSpan={2} className="px-2 py-2 text-center font-semibold">
                   Score
                 </th>
-                <th className="text-left px-4 py-2 font-semibold">Red</th>
+                <th className="text-left px-3 py-2 font-semibold">Red</th>
               </tr>
             </thead>
             <tbody>
@@ -334,34 +336,34 @@ function MatchesSection({
                     className={`border-b border-secondary-200/50 last:border-0 ${played ? "" : "bg-primary-50"}`}
                   >
                     <td
-                      className={`px-4 py-2.5 font-semibold ${played ? "text-secondary-900" : "text-primary-700"}`}
+                      className={`whitespace-nowrap px-3 py-2.5 font-semibold ${played ? "text-secondary-900" : "text-primary-700"}`}
                     >
-                      {m.label}
+                      {m.label.replace(/^Qualification\b/, "Qual")}
                     </td>
                     {played ? (
-                      <td colSpan={2} className="px-4 py-2.5 text-base">
+                      <td colSpan={2} className="px-3 py-2.5 text-base">
                         <MatchOutcome match={m} teamNumber={teamNumber} />
                       </td>
                     ) : (
                       <>
-                        <td className="px-4 py-2.5 tabular-nums font-semibold text-primary-600">
+                        <td className="whitespace-nowrap px-3 py-2.5 tabular-nums font-semibold text-primary-600">
                           {m.times.actualQueueTime
                             ? formatTime(m.times.actualQueueTime)
                             : m.times.estimatedQueueTime
                               ? formatTime(m.times.estimatedQueueTime)
                               : "—"}
                         </td>
-                        <td className="px-4 py-2.5 tabular-nums font-semibold text-primary-600">
+                        <td className="whitespace-nowrap px-3 py-2.5 tabular-nums font-semibold text-primary-600">
                           {formatTime(m.times.estimatedStartTime)}
                         </td>
                       </>
                     )}
-                    <td className="px-4 py-2.5">
+                    <td className="px-3 py-2.5">
                       <span
                         className={
                           m.blueTeams?.includes(teamNumber)
-                            ? "text-blue-600 font-bold bg-blue-100 px-2 py-1 rounded"
-                            : "text-secondary-600"
+                            ? "whitespace-nowrap rounded bg-blue-100 px-2 py-1 font-bold text-blue-600"
+                            : "whitespace-nowrap text-secondary-600"
                         }
                       >
                         {m.blueTeams?.filter(Boolean).join(", ")}
@@ -373,12 +375,12 @@ function MatchesSection({
                     <td className="py-2.5 pl-1 pr-2 text-left tabular-nums">
                       <Score match={m} side="red" />
                     </td>
-                    <td className="px-4 py-2.5">
+                    <td className="px-3 py-2.5">
                       <span
                         className={
                           m.redTeams?.includes(teamNumber)
-                            ? "text-red-600 font-bold bg-red-100 px-2 py-1 rounded"
-                            : "text-secondary-600"
+                            ? "whitespace-nowrap rounded bg-red-100 px-2 py-1 font-bold text-red-600"
+                            : "whitespace-nowrap text-secondary-600"
                         }
                       >
                         {m.redTeams?.filter(Boolean).join(", ")}
@@ -830,7 +832,12 @@ export function PitMonitorPage() {
       <div className="px-6 py-5 space-y-5">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-secondary-200 pb-4">
-          <h1 className="text-2xl font-black tracking-tight">{names.appTitle("Pit")} Monitor</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-black tracking-tight">{names.appTitle("Pit")} Monitor</h1>
+            {monitor?.snapshot && (
+              <Badge colors={tones.warning}>Snapshot: {monitor.snapshot.name}</Badge>
+            )}
+          </div>
           <div className="flex items-center gap-4">
             <ConnectionIndicator connection={connection} />
             {lastUpdated && (

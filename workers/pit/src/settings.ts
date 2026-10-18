@@ -24,13 +24,14 @@ export async function getWhenFull(db: Db, team: string): Promise<WhenFull> {
 }
 
 /**
- * Settings Pit keeps for itself, never edited on the Admin page: the battery timers' state
- * (battery-timers.ts).
+ * Settings Pit keeps for itself, not among the team's settings: the battery timers' state
+ * (battery-timers.ts) and, in dev and staging, the event snapshot (event-snapshot.ts).
  */
 export type InternalSettingKey =
   | "batteryTimersPaused"
   | "batteryTimersAppliedAt"
-  | "batteryTimersEvents";
+  | "batteryTimersEvents"
+  | "eventSnapshotSince";
 
 /** One of the team's settings, or "" when it hasn't set it. */
 export async function getSetting(

@@ -112,3 +112,29 @@ export function withResults(nexusMatches: unknown[], tbaMatches: TbaMatch[]): un
     };
   });
 }
+
+export type RankingInfo = { rank: number; team: string };
+
+/**
+ * The top 3 and the three teams "around us": #4–6 for a top-3 team, three below for #4, a mix for
+ * #5 and #6 (so they don't repeat the top 3), else the three just above.
+ */
+export function contextRankingsFor(
+  rankings: RankingInfo[],
+  ourRank: number,
+): { top3: RankingInfo[]; context: RankingInfo[] } {
+  const near =
+    ourRank <= 3
+      ? [4, 5, 6]
+      : ourRank === 4
+        ? [5, 6, 7]
+        : ourRank === 5
+          ? [4, 6, 7]
+          : ourRank === 6
+            ? [4, 5, 7]
+            : [ourRank - 3, ourRank - 2, ourRank - 1];
+  return {
+    top3: rankings.slice(0, 3),
+    context: near.flatMap((rank) => rankings.find((r) => r.rank === rank) ?? []),
+  };
+}

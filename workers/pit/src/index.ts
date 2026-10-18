@@ -37,9 +37,10 @@ import {
 } from "./db/schema";
 import { demoWords, loadDemo } from "./demo";
 import { downloaderRoutes, downloaderSelfRoutes } from "./downloaders";
+import { eventSnapshotRoutes, snapshotMonitorData } from "./event-snapshot";
 import { manifest } from "./manifest";
 import { deleteTeamLogFiles, logUploadRoutes, matchLogRoutes } from "./match-logs";
-import { type TbaMatch, scheduleFromTba, withResults } from "./monitor-matches";
+import { type TbaMatch, contextRankingsFor, scheduleFromTba, withResults } from "./monitor-matches";
 import { SETTING_KEYS, type SettingKey, getSetting, getWhenFull, teamNumberOf } from "./settings";
 import type { AppEnv } from "./types";
 
@@ -849,6 +850,9 @@ const app = base
   // Pit monitor — proxies external APIs so the frontend avoids CORS
   .get("/monitor/data", requireAuth, async (c) => {
     const db = createDb(c.env.PIT_DB);
+    // In dev and staging, an admin can show a past event instead (./event-snapshot.ts).
+    const snapshot = await snapshotMonitorData(c.env, db, c.get("teamId"));
+    if (snapshot) return c.json(snapshot);
     const team = teamNumberOf(c.get("teamId"));
     const [eventKey, nexusEventKey] = await Promise.all([
       getSetting(db, c.get("teamId"), "eventKey"),
@@ -917,52 +921,17 @@ const app = base
           }
         : null;
 
-    // Build context rankings: top 3 and teams around us
-    interface RankingInfo {
-      rank: number;
-      team: string;
-    }
-    type ContextRankings = { top3: RankingInfo[]; context: RankingInfo[] } | null;
-    let contextRankings: ContextRankings = null;
-    if (tbaRankingsAny?.rankings && Array.isArray(tbaRankingsAny.rankings) && ourRank) {
-      interface TbaRanking {
-        rank: number;
-        team_key: string;
-      }
-      const top3 = tbaRankingsAny.rankings.slice(0, 3).map((r: TbaRanking) => ({
-        rank: r.rank as number,
-        team: (r.team_key as string).replace("frc", ""),
-      }));
-
-      // Logic for "around us" based on rank position
-      let contextRanks: number[] = [];
-      if (ourRank <= 3) {
-        // Top 3: show #4, #5, #6
-        contextRanks = [4, 5, 6];
-      } else if (ourRank === 4) {
-        // #4: show 3 below us (#5, #6, #7) to avoid intersecting with top 3
-        contextRanks = [5, 6, 7];
-      } else if (ourRank === 5) {
-        // #5: show 1 above and 2 below
-        contextRanks = [4, 6, 7];
-      } else if (ourRank === 6) {
-        // #6: show 2 above and 1 below
-        contextRanks = [4, 5, 7];
-      } else {
-        // #7+: show 3 above us
-        contextRanks = [ourRank - 3, ourRank - 2, ourRank - 1];
-      }
-
-      const context = contextRanks
-        .map((r) => tbaRankingsAny.rankings.find((rank: TbaRanking) => rank.rank === r))
-        .filter(Boolean)
-        .map((r: TbaRanking) => ({
-          rank: r.rank as number,
-          team: (r.team_key as string).replace("frc", ""),
-        }));
-
-      contextRankings = { top3, context };
-    }
+    // The top 3 and the teams around us.
+    const contextRankings =
+      Array.isArray(tbaRankingsAny?.rankings) && ourRank
+        ? contextRankingsFor(
+            (tbaRankingsAny.rankings as { rank: number; team_key: string }[]).map((r) => ({
+              rank: r.rank,
+              team: r.team_key.replace("frc", ""),
+            })),
+            ourRank,
+          )
+        : null;
 
     // Nexus's schedule with The Blue Alliance's scores, else The Blue Alliance's own.
     const tbaMatches = Array.isArray(tbaSchedule) ? (tbaSchedule as TbaMatch[]) : [];
@@ -1001,6 +970,9 @@ const app = base
     ]);
     return c.json({ eventKey, nexusEventKey, iframeUrl, teamNumber: teamNumberOf(team) });
   })
+
+  // Use event snapshot (dev and staging only).
+  .route("/admin/event-snapshot", eventSnapshotRoutes)
 
   .patch("/admin/settings", requireAdmin, settingsValidator, async (c) => {
     const updates = c.req.valid("json");
