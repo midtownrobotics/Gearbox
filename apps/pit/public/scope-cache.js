@@ -1,0 +1,157 @@
+// Imported into Pit's service worker (vite.config.ts, workbox.importScripts). Keeps AdvantageScope's
+// field and robot models and images on the device, so each is downloaded once, not on every load:
+// the browser's own cache drops files this big. A file is kept with its version from its asset
+// index (the built-in assets' and the team's uploads'), and downloaded again only when the index
+// gives another version. Without a connection, the copy kept is used whatever its version.
+//
+// Match logs too, each one once opened: kept gzipped, as Pit stores them, and unzipped as
+// AdvantageScope reads one. A kept log is checked with Pit first (its ETag: an answer of a few
+// bytes), and used as it is when Pit doesn't answer in a few seconds. Pit's AdvantageScope page
+// reads this cache to show which logs are on the device, and lets go of logs Pit no longer has.
+// Its Logs page saves logs ahead (X-Gearbox-Save): kept, and answered 204 with no body.
+
+const SCOPE_CACHE = "scope-assets";
+const VERSION = "X-Gearbox-Version";
+/** Each asset index, and where its files are. */
+const INDEXES = [
+  { index: "/scope/bundledAssets/index.json", files: "/scope/bundledAssets/" },
+  { index: "/api/scope/assets", files: "/api/scope/assets/" },
+];
+const LOG_CACHE = "scope-logs";
+const LOG_FILES = "/api/scope/logs/";
+/** How long a kept log waits for Pit to say it's still the log, before it's used anyway. */
+const LOG_CHECK_MS = 4000;
+/** Each index as last read, by its path. */
+const versions = new Map();
+
+/** The asset index from the network (saved for offline), and the files it no longer lists let go. */
+async function readIndex(event, entry) {
+  const cache = await caches.open(SCOPE_CACHE);
+  let response;
+  try {
+    response = await fetch(event.request);
+  } catch (err) {
+    const saved = await cache.match(entry.index);
+    if (saved) return saved;
+    throw err;
+  }
+  if (!response.ok) return response;
+  const index = await response
+    .clone()
+    .json()
+    .catch(() => null);
+  if (!index || typeof index !== "object") return response;
+  versions.set(entry.index, index);
+  event.waitUntil(
+    (async () => {
+      await cache.put(entry.index, response.clone());
+      for (const request of await cache.keys()) {
+        const path = new URL(request.url).pathname;
+        if (path === entry.index || !path.startsWith(entry.files)) continue;
+        const saved = await cache.match(request);
+        if (saved?.headers.get(VERSION) !== index[fileKey(entry, path)]) {
+          await cache.delete(request);
+        }
+      }
+    })(),
+  );
+  return response;
+}
+
+/** "Robot_Comet/model.glb" for /api/scope/assets/Robot_Comet/model.glb. */
+const fileKey = (entry, path) => decodeURIComponent(path.slice(entry.files.length));
+
+/** A file: the copy kept when it's the index's version, else downloaded and kept. */
+async function readFile(event, entry) {
+  const cache = await caches.open(SCOPE_CACHE);
+  const path = new URL(event.request.url).pathname;
+  const saved = await cache.match(path);
+  let index = versions.get(entry.index);
+  if (!index) {
+    index = await (await cache.match(entry.index))?.json().catch(() => null);
+    if (index) versions.set(entry.index, index);
+  }
+  const version = index?.[fileKey(entry, path)];
+  if (saved && typeof version === "string" && saved.headers.get(VERSION) === version) return saved;
+
+  let response;
+  try {
+    response = await fetch(event.request);
+  } catch (err) {
+    if (saved) return saved;
+    throw err;
+  }
+  if (response.status !== 200 || typeof version !== "string") return response;
+  // The body as downloaded is already unzipped, so its encoding and length go.
+  const headers = new Headers(response.headers);
+  headers.set(VERSION, version);
+  headers.delete("Content-Encoding");
+  headers.delete("Content-Length");
+  const kept = new Response(response.clone().body, { status: 200, headers });
+  event.waitUntil(cache.put(path, kept).catch(() => {}));
+  return response;
+}
+
+/** A kept log as AdvantageScope reads it: the .wpilog, unzipped. */
+const unzipped = (gzipped) =>
+  new Response(gzipped.body.pipeThrough(new DecompressionStream("gzip")), {
+    headers: { "Content-Type": "application/octet-stream" },
+  });
+
+/** A match log: the copy kept while Pit says it's still the log (or doesn't answer), else downloaded and kept. */
+async function readLog(event) {
+  const saving = event.request.headers.has("X-Gearbox-Save");
+  const cache = await caches.open(LOG_CACHE);
+  const path = new URL(event.request.url).pathname;
+  const saved = await cache.match(path);
+  const etag = saved?.headers.get("ETag");
+  const abort = new AbortController();
+  const timer = etag && !saving ? setTimeout(() => abort.abort(), LOG_CHECK_MS) : null;
+  let response;
+  try {
+    response = await fetch(event.request.url, {
+      credentials: "same-origin",
+      headers: { "X-Gearbox-Raw": "gzip", ...(etag ? { "If-None-Match": etag } : {}) },
+      signal: abort.signal,
+    });
+  } catch (err) {
+    if (saved && !saving) return unzipped(saved);
+    throw err;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+  if (response.status === 304 && saved)
+    return saving ? new Response(null, { status: 204 }) : unzipped(saved);
+  if (response.status === 404) event.waitUntil(cache.delete(path));
+  // As stored: gzipped (a Pit from before sends it unzipped, which isn't kept).
+  if (response.status !== 200 || response.headers.get("Content-Type") !== "application/gzip") {
+    return response;
+  }
+  const headers = { "Content-Type": "application/gzip", ETag: response.headers.get("ETag") ?? "" };
+  const keep = async (body) => {
+    await cache.put(path, new Response(body, { headers }));
+    // Pit's pages mark the log as on the device.
+    for (const client of await self.clients.matchAll({ type: "window" })) {
+      client.postMessage({ type: "scope-log-saved", path });
+    }
+  };
+  if (saving) {
+    await keep(response.body);
+    return new Response(null, { status: 204 });
+  }
+  const [kept, read] = response.body.tee();
+  event.waitUntil(keep(kept).catch(() => {}));
+  return unzipped(new Response(read));
+}
+
+self.addEventListener("fetch", (event) => {
+  const { request } = event;
+  if (request.method !== "GET" || request.headers.has("Range")) return;
+  const url = new URL(request.url);
+  if (url.origin !== self.location.origin) return;
+  const index = INDEXES.find((entry) => url.pathname === entry.index);
+  if (index) return event.respondWith(readIndex(event, index));
+  if (url.pathname.startsWith(LOG_FILES)) return event.respondWith(readLog(event));
+  const files = INDEXES.find((entry) => url.pathname.startsWith(entry.files));
+  if (files) event.respondWith(readFile(event, files));
+});

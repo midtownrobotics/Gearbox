@@ -11,6 +11,7 @@ import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { gzipSync } from "node:zlib";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.resolve(here, "../../..");
@@ -138,16 +139,26 @@ if (links.length) throw new Error(`Links left in public/scope: ${links.join(", "
 fs.copyFileSync(path.join(work, "LICENSE"), path.join(out, "LICENSE"));
 
 // The built-in assets' index, in the form AdvantageScope's Python server answers /assets: each
-// file's path in its asset's folder, with config.json's contents (the patch reads it).
+// file's path in its asset's folder, with config.json's contents (the patch reads it), and for
+// every other file its version, which Pit's service worker keeps its saved copy by
+// (apps/pit/public/scope-cache.js). Each model is also written gzipped beside itself, which Pit's worker
+// sends: Cloudflare doesn't compress models, and they shrink to about a third.
 const assets = path.join(out, "bundledAssets");
 const index = {};
 for (const name of fs.readdirSync(assets)) {
   const folder = path.join(assets, name);
   if (name.startsWith(".") || !fs.statSync(folder).isDirectory()) continue;
   for (const file of fs.readdirSync(folder)) {
-    if (file.startsWith(".")) continue;
-    index[`${name}/${file}`] =
-      file === "config.json" ? JSON.parse(fs.readFileSync(path.join(folder, file), "utf8")) : null;
+    if (file.startsWith(".") || file.endsWith(".gz")) continue;
+    const bytes = fs.readFileSync(path.join(folder, file));
+    if (file === "config.json") {
+      index[`${name}/${file}`] = JSON.parse(bytes.toString("utf8"));
+      continue;
+    }
+    index[`${name}/${file}`] = createHash("sha256").update(bytes).digest("hex").slice(0, 16);
+    if (file.toLowerCase().endsWith(".glb")) {
+      fs.writeFileSync(path.join(folder, `${file}.gz`), gzipSync(bytes, { level: 9 }));
+    }
   }
 }
 fs.writeFileSync(path.join(assets, "index.json"), JSON.stringify(index));

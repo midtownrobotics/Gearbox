@@ -2,7 +2,7 @@ import { env } from "cloudflare:test";
 import { newTeamId, teamUsers } from "@g3/testing/users";
 import { call, callAs, jsonAs } from "@g3/testing/worker";
 import { describe, expect, it } from "vitest";
-import { MAX_ASSETS, MAX_ASSET_BYTES, MAX_UPLOAD } from "../src/advantagescope";
+import { MAX_ASSETS, MAX_ASSET_BYTES, MAX_UPLOAD, bundledAsset } from "../src/advantagescope";
 
 // AdvantageScope Lite at /scope/: the team's settings, its match logs as AdvantageScope's log
 // folder, and the assets a mentor uploads.
@@ -202,6 +202,28 @@ describe("logs", () => {
     expect((await callAs(b.student, "/scope/logs/archimedes_Qual-7.wpilog")).status).toBe(404);
     expect((await callAs(a.student, "/scope/logs/nonsense.wpilog")).status).toBe(404);
   });
+
+  it("gives the service worker a log as stored, and says when its copy is still the log", async () => {
+    const team = teamUsers(newTeamId());
+    await uploadLog(team, "newton", "more wpilog bytes");
+    const raw = await callAs(team.student, "/scope/logs/newton_Qual-7.wpilog", {
+      headers: { "X-Gearbox-Raw": "gzip" },
+    });
+    expect(raw.headers.get("Content-Type")).toBe("application/gzip");
+    expect(raw.headers.get("Content-Encoding")).toBeNull();
+    const bytes = new Uint8Array(await raw.arrayBuffer());
+    expect([bytes[0], bytes[1]]).toEqual([0x1f, 0x8b]);
+    const etag = raw.headers.get("ETag") ?? "";
+    expect(etag).toMatch(/^"log-\d+"$/);
+    const again = await callAs(team.student, "/scope/logs/newton_Qual-7.wpilog", {
+      headers: { "If-None-Match": etag },
+    });
+    expect(again.status).toBe(304);
+    const other = await callAs(team.student, "/scope/logs/newton_Qual-7.wpilog", {
+      headers: { "If-None-Match": '"log-0"' },
+    });
+    expect(other.status).toBe(200);
+  });
 });
 
 describe("assets", () => {
@@ -226,15 +248,18 @@ describe("assets", () => {
       }),
     ).toEqual({ ok: true, assets: ["Robot_Comet"] });
 
-    expect(await jsonAs(a.student, "/scope/assets")).toEqual({
-      "Robot_Comet/config.json": JSON.parse(config),
-      "Robot_Comet/model.glb": null,
-    });
+    const index = await jsonAs<Record<string, unknown>>(a.student, "/scope/assets");
+    expect(Object.keys(index).sort()).toEqual(["Robot_Comet/config.json", "Robot_Comet/model.glb"]);
+    expect(index["Robot_Comet/config.json"]).toEqual(JSON.parse(config));
+    // A version for the service worker's saved copy.
+    expect(index["Robot_Comet/model.glb"]).toMatch(/^\d+-400$/);
     expect(await jsonAs(b.student, "/scope/assets")).toEqual({});
 
+    // Stored and sent gzipped.
     const model = await callAs(a.student, "/scope/assets/Robot_Comet/model.glb");
     expect(model.headers.get("Content-Type")).toBe("model/gltf-binary");
-    expect(await model.text()).toBe("glb ".repeat(100));
+    expect(model.headers.get("Content-Encoding")).toBe("gzip");
+    expect(await text(model)).toBe("glb ".repeat(100));
     const etag = model.headers.get("ETag") ?? "";
     const again = await callAs(a.student, "/scope/assets/Robot_Comet/model.glb", {
       headers: { "If-None-Match": etag },
@@ -248,6 +273,42 @@ describe("assets", () => {
     );
     expect(list.assets.map((asset) => asset.name)).toEqual(["Robot_Comet"]);
     expect(list.canManage).toBe(false);
+  });
+
+  it("stores a model bigger than a part gzipped, in parts", async () => {
+    const team = teamUsers(newTeamId());
+    // Random bytes don't shrink, so the gzipped model is over one 8 MiB part.
+    const model = new Uint8Array(9 * 1024 * 1024);
+    for (let at = 0; at < model.length; at += 65536) {
+      crypto.getRandomValues(model.subarray(at, at + 65536));
+    }
+    const zip = await makeZip([
+      { path: "Robot_Big/config.json", text: config },
+      { path: "Robot_Big/model.glb", text: model },
+    ]);
+    expect(
+      await jsonAs(team.mentor, "/scope/assets", {
+        method: "POST",
+        body: uploadForm("Robot_Big.zip", zip),
+      }),
+    ).toEqual({ ok: true, assets: ["Robot_Big"] });
+    const res = await callAs(team.student, "/scope/assets/Robot_Big/model.glb");
+    expect(res.headers.get("Content-Encoding")).toBe("gzip");
+    let unzipped = new Uint8Array(await res.arrayBuffer());
+    // As sent, unless the test's fetch already unzipped it.
+    if (unzipped[0] === 0x1f && unzipped[1] === 0x8b) {
+      unzipped = new Uint8Array(
+        await new Response(
+          new Blob([unzipped]).stream().pipeThrough(new DecompressionStream("gzip")),
+        ).arrayBuffer(),
+      );
+    }
+    const stored = await bucket.get(`pit/teams/${team.teamId}/scope-assets/Robot_Big/model.glb`);
+    expect(stored?.httpMetadata?.contentEncoding).toBe("gzip");
+    expect(unzipped.length).toBe(model.length);
+    expect(unzipped.every((byte, i) => byte === model[i])).toBe(true);
+    const list = await jsonAs<{ assets: { size: number }[] }>(team.student, "/scope/asset-list");
+    expect(list.assets[0].size).toBe(model.length + config.length);
   });
 
   it("replaces an asset with the same name, and takes a zip of asset zips", async () => {
@@ -369,5 +430,42 @@ describe("assets", () => {
     expect(await jsonAs(team.student, "/scope/assets")).toEqual({});
     const listed = await bucket.list({ prefix: `pit/teams/${team.teamId}/scope-assets/` });
     expect(listed.objects).toEqual([]);
+  });
+});
+
+describe("built-in assets", () => {
+  const files = new Map<string, Response>();
+  const assets = {
+    fetch: async (input: RequestInfo | URL) => {
+      const path = new URL(input instanceof Request ? input.url : input).pathname;
+      return (
+        files.get(path)?.clone() ??
+        new Response("<html></html>", { headers: { "Content-Type": "text/html" } })
+      );
+    },
+  } as unknown as Fetcher;
+  const base = "https://1648-pit.example/scope/bundledAssets/Robot_Kit";
+
+  it("sends a model from its gzipped copy, and anything else as it is", async () => {
+    files.set(
+      "/scope/bundledAssets/Robot_Kit/model.glb.gz",
+      new Response("zipped", {
+        headers: { "Content-Type": "application/gzip", ETag: '"z"' },
+      }),
+    );
+    files.set("/scope/bundledAssets/Robot_Kit/image.png", new Response("png"));
+    const model = await bundledAsset(new Request(`${base}/model.glb`), assets);
+    expect(model.headers.get("Content-Type")).toBe("model/gltf-binary");
+    expect(model.headers.get("Content-Encoding")).toBe("gzip");
+    expect(model.headers.get("ETag")).toBe('"z"');
+    expect(await model.text()).toBe("zipped");
+    expect(await (await bundledAsset(new Request(`${base}/image.png`), assets)).text()).toBe("png");
+  });
+
+  it("sends the model itself without a gzipped copy", async () => {
+    files.set("/scope/bundledAssets/Robot_Kit/model_0.glb", new Response("raw"));
+    const res = await bundledAsset(new Request(`${base}/model_0.glb`), assets);
+    expect(res.headers.get("Content-Encoding")).toBeNull();
+    expect(await res.text()).toBe("raw");
   });
 });
