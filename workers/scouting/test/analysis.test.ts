@@ -11,6 +11,7 @@ const db = createDb((env as unknown as AppEnv["Bindings"]).SCOUTING_DB);
 type Analysis = {
   reports: { id: string; formKind: string; eventKey: string }[];
   eventNames: Record<string, string>;
+  currentEventKey: string | null;
 };
 
 async function reportsFor(eventKeys: string[], authKey = "test-key") {
@@ -131,6 +132,18 @@ describe("analysis report types and event names", () => {
     expect(first.eventNames).toEqual({ "manual-shared": "Private A" });
     expect(second.eventNames).toEqual({ "manual-shared": "Private B" });
     expect(second.reports.map((report) => report.id)).not.toContain(first.reports[0].id);
+  });
+
+  it("says which event the team is scouting now", async () => {
+    const team = await reportsFor(["2099qaoffline"], "");
+    expect((await jsonAs<Analysis>(team.student, "/scouting/analysis")).currentEventKey).toBeNull();
+    await db
+      .update(strategyEventConfig)
+      .set({ event_key: "manual-current" })
+      .where(inTeam(strategyEventConfig, team.teamId))
+      .run();
+    const result = await jsonAs<Analysis>(team.student, "/scouting/analysis");
+    expect(result.currentEventKey).toBe("manual-current");
   });
 
   it("does not lose reports when TBA is unavailable or unconfigured", async () => {

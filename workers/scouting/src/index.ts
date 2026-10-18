@@ -1628,6 +1628,7 @@ app.get("/analysis", requireAuth, async (c) => {
     teamComments: teamComments.results,
     teamMatches,
     eventNames,
+    currentEventKey: eventConfig?.event_key || null,
   });
 });
 
