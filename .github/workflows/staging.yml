@@ -1,15 +1,15 @@
 name: staging
 
 # Roadmap 0.2: every push to the staging branch deploys staging (<label>-dev.g3robotics.com)
-# through deploy.yml. The staging branch is main, unless the repository variable STAGING_BRANCH
+# through deploy.yml. It deploys the staging branch, unless the repository variable STAGING_BRANCH
 # names another (a feature branch to try on staging); running this workflow by hand deploys the
 # branch it's run on. A push to any other branch starts a run that skips both jobs: a trigger's
 # branch list can't read a variable.
 #
 # Production deploys from public, through release.yml, unless the repository variable
-# PRODUCTION_BRANCH is "main" (a stopgap while releases aren't being cut): then each push to main
+# PRODUCTION_BRANCH is "staging" (a stopgap while releases aren't being cut): then each push to staging
 # also deploys production, once staging's deploy has gone through, and release.yml doesn't.
-# While staging is on another branch, a push to main deploys production without staging first.
+# While the staging environment follows another branch, a push to staging deploys production without staging first.
 
 on:
   push:
@@ -18,7 +18,7 @@ on:
 
 jobs:
   deploy:
-    if: github.event_name == 'workflow_dispatch' || github.ref_name == (vars.STAGING_BRANCH || 'main')
+    if: github.event_name == 'workflow_dispatch' || github.ref_name == (vars.STAGING_BRANCH || 'staging')
     uses: ./.github/workflows/deploy.yml
     with:
       environment: staging
@@ -28,8 +28,8 @@ jobs:
     needs: deploy
     # Runs when staging went through, or was skipped because it's on another branch.
     if: >-
-      !cancelled() && github.event_name == 'push' && github.ref_name == 'main'
-      && vars.PRODUCTION_BRANCH == 'main'
+      !cancelled() && github.event_name == 'push' && github.ref_name == 'staging'
+      && vars.PRODUCTION_BRANCH == 'staging'
       && (needs.deploy.result == 'success' || needs.deploy.result == 'skipped')
     uses: ./.github/workflows/deploy.yml
     with:

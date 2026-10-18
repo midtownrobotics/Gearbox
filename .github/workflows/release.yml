@@ -1,21 +1,21 @@
 name: release
 
-# main is where work lands; public is what's released (and deployed). Merging main into public
+# staging is where work lands; public is what's released (and deployed). Merging staging into public
 # makes a release: this applies the pending changesets on public (versions, changelogs, platform
-# CalVer, RELEASES.md), commits and tags it, then merges public back into main so main has the
+# CalVer, RELEASES.md), commits and tags it, then merges public back into staging so staging has the
 # new versions and the used changesets are gone there too. (A real merge, not a cherry-pick, so
-# main and public share history and the next main → public merge stays clean. It's the only merge
-# commit on main; the deploy key bypasses main's linear-history rule for it.) See RELEASES.md.
+# staging and public share history and the next staging → public merge stays clean. It's the only merge
+# commit on staging; the deploy key bypasses staging's linear-history rule for it.) See RELEASES.md.
 #
 # Pushes go through a deploy key (secret RELEASE_DEPLOY_KEY) that's on the bypass list of the
-# main and public rulesets, since both only accept changes through pull requests. Its push to
+# staging and public rulesets, since both only accept changes through pull requests. Its push to
 # public starts this workflow again, which then finds nothing to release.
 #
 # Then it deploys production (deploy.yml): migrations, every worker, the gateway. Only a run that
 # finds nothing left to release deploys, so what goes live is always a released commit: merging
 # the release PR commits the release, and that push starts this workflow again, which deploys it.
 # A push to public with no changesets deploys straight away. While the repository variable
-# PRODUCTION_BRANCH is "main", production deploys from main instead (staging.yml) and this doesn't.
+# PRODUCTION_BRANCH is "staging", production deploys from staging instead (staging.yml) and this doesn't.
 
 on:
   push:
@@ -72,20 +72,20 @@ jobs:
       - name: Tag it
         run: pnpm release:tag --push
 
-      - name: Merge public back into main
+      - name: Merge public back into staging
         if: steps.commit.outputs.released == 'true'
         run: |
           version=$(node -p 'require("./package.json").version')
-          git fetch origin main
-          git checkout -B main origin/main
-          git merge --no-ff public -m "Merge release $version into main"
-          git push origin main
+          git fetch origin staging
+          git checkout -B staging origin/staging
+          git merge --no-ff public -m "Merge release $version into staging"
+          git push origin staging
 
   deploy:
     needs: release
-    # Not while production deploys from main (PRODUCTION_BRANCH, staging.yml): public is behind
-    # main, so deploying it would put older code back.
-    if: needs.release.outputs.released != 'true' && vars.PRODUCTION_BRANCH != 'main'
+    # Not while production deploys from staging (PRODUCTION_BRANCH, staging.yml): public is behind
+    # staging, so deploying it would put older code back.
+    if: needs.release.outputs.released != 'true' && vars.PRODUCTION_BRANCH != 'staging'
     uses: ./.github/workflows/deploy.yml
     with:
       environment: production

@@ -3,7 +3,7 @@ name: ci
 on:
   pull_request:
   push:
-    branches: [main, public]
+    branches: [staging, public]
 
 jobs:
   lint-and-test:
@@ -11,7 +11,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          # Full history, so changeset status can compare with main.
+          # Full history, so changeset status can compare with staging.
           fetch-depth: 0
 
       - uses: pnpm/action-setup@v4
@@ -46,10 +46,10 @@ jobs:
       - name: Site config is applied
         run: pnpm configure --check
 
-      # A PR into main that changes an app needs a changeset (pnpm changeset). Not for main → public:
+      # A PR into staging that changes an app needs a changeset (pnpm changeset). Not for staging → public:
       # that's a release, which uses them up.
       - name: Changesets
-        if: github.event_name == 'pull_request' && github.base_ref == 'main'
+        if: github.event_name == 'pull_request' && github.base_ref == 'staging'
         run: pnpm changeset status --since=origin/${{ github.base_ref }}
 
       - name: Build Scouting page

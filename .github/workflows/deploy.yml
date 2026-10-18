@@ -2,7 +2,7 @@ name: deploy
 
 # Deploys every worker to one environment (roadmap 0.2): migrations first, then each app's
 # worker (each builds its page first, [env.<environment>.build]), then the gateway, which binds
-# to them. Called by staging.yml (main, or STAGING_BRANCH → staging) and release.yml (public → production, once a
+# to them. Called by staging.yml (staging, or STAGING_BRANCH → staging) and release.yml (public → production, once a
 # release is committed). Needs the CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID secrets in a
 # GitHub environment named like the one deployed to (docs/deploy.md).
 
