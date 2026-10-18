@@ -9,12 +9,18 @@ import type { TeamUsers } from "@g3/testing/users";
 import { call, callAs, jsonAs } from "@g3/testing/worker";
 import { expect, it } from "vitest";
 import { app } from "../src/index";
+import { STARTER_CHECKLIST } from "../src/lib/quality-checklist";
 import { drawingKey, teamPrefix } from "../src/lib/storage";
 import { eventually, onshapeEvent } from "./onshape";
 
+/** The starter checklist answered, for a report that passes or fails its first line. */
+const passingChecks = () => STARTER_CHECKLIST.map((label) => ({ label, ok: true }));
+const failingChecks = () => passingChecks().map((a, i) => (i === 0 ? { ...a, ok: false } : a));
+
 // Two teams, each with its own subsystem, processes, part with instances, a batch with a part
-// file and an instance sent back out of it, a drawing in R2 (and an uploaded one), a part from its Onshape webhook, its Onshape
-// and chat settings, and a kiosk at the shop. Every route, called as team A's admin, mentor,
+// file and an instance sent back out of it, a drawing in R2 (and an uploaded one), a part from its
+// Onshape webhook, its Onshape and chat settings, a shop manager, a required quality check, a
+// failed quality report, and a kiosk at the shop. Every route, called as team A's admin, mentor,
 // student and kiosk session with team B's ids, must show none of B's and change nothing of B's,
 // in D1 or in R2.
 
@@ -36,6 +42,9 @@ const TABLES = [
   "staging_batches",
   "staging_batch_removals",
   "admin_settings",
+  "shop_managers",
+  "quality_reports",
+  "quality_check_items",
 ];
 
 type Id = { id: number };
@@ -168,6 +177,65 @@ async function seed(team: TeamUsers): Promise<Seeded> {
   const uploaded = await jsonAs<Id>(student, "/drawings/upload", { method: "POST", body: upload });
   // Someone at the team's kiosk.
   await jsonAs(kioskAdmin, "/kiosk-presence/heartbeat", { method: "POST" });
+  // Its own shop manager and quality check.
+  await jsonAs(admin, `/admin/quality/managers/${student.id}`, {
+    method: "PUT",
+    body: { manager: true },
+  });
+  const check = await jsonAs<Id>(
+    admin,
+    "/processes",
+    { method: "POST", body: { name: `QC ${tag}`, type: "quality_control" } },
+    201,
+  );
+  await jsonAs(admin, "/admin/quality/settings", {
+    method: "PUT",
+    body: { requireQualityCheck: true, qualityProcessId: check.id, qualityReports: true },
+  });
+  // A part that failed its quality report (the check is appended to it), the marker in its notes.
+  // Made through a plain process: a File Producer needs a consumer and moves only in a batch.
+  const cut = await makeProcess("Cut", "regular");
+  const checked = await jsonAs<Id>(
+    student,
+    "/part-definitions",
+    {
+      method: "POST",
+      body: {
+        onshapePartNumber: `QR-${crypto.randomUUID().slice(0, 8)}`,
+        revision: "A",
+        subsystemId: subsystem.id,
+        name: `Checked ${tag}`,
+        processIds: [cut.id],
+      },
+    },
+    201,
+  );
+  const [checkedInstance] = await jsonAs<Id[]>(
+    student,
+    "/part-instances",
+    { method: "POST", body: { partDefinitionId: checked.id, quantity: 1 } },
+    201,
+  );
+  await jsonAs(
+    student,
+    `/part-instance-processes/${checkedInstance.id}/processes/${cut.id}/done`,
+    { method: "POST" },
+  );
+  const { report } = await jsonAs<{ report: Id }>(
+    admin,
+    "/quality-reports",
+    {
+      method: "POST",
+      body: {
+        partInstanceId: checkedInstance.id,
+        processId: check.id,
+        checks: failingChecks(),
+        unsure: true,
+        notes: `Problem ${tag}`,
+      },
+    },
+    201,
+  );
 
   const ids: Record<string, number> = {
     "part-definitions": part.id,
@@ -175,6 +243,7 @@ async function seed(team: TeamUsers): Promise<Seeded> {
     "part-files": file.id,
     "staging-batches": batch.id,
     processes: process.id,
+    "quality-reports": report.id,
   };
   return {
     params: (path, name) => {
@@ -184,6 +253,7 @@ async function seed(team: TeamUsers): Promise<Seeded> {
       if (name === "partNumber") return partNumber;
       if (name === "revision") return "A";
       if (name === "drawingId") return String(uploaded.id);
+      if (name === "userId") return student.id;
       const id = ids[path.split("/")[1]];
       return id === undefined ? undefined : String(id);
     },
@@ -194,6 +264,8 @@ async function seed(team: TeamUsers): Promise<Seeded> {
       part: part.id,
       instance: instances[2].id,
       file: file.id,
+      check: check.id,
+      checkedInstance: checkedInstance.id,
     },
   };
 }
@@ -257,6 +329,20 @@ it("keeps every team's shop to itself", async () => {
         "POST /admin/chat/config": { releaseChannelId: "CMINE" },
         "POST /admin/onshape/config": { documentId: "mine" },
         "POST /admin/chat/daily-summary": { kind: "overview", since: Date.now() - 1000 },
+        "PUT /admin/quality/managers/:userId": { manager: true },
+        "PUT /admin/quality/settings": { requireQualityCheck: true, qualityProcessId: d.check },
+        "POST /quality-reports": {
+          partInstanceId: d.checkedInstance,
+          processId: d.check,
+          checks: passingChecks(),
+        },
+        "POST /quality-reports/:id/send-back": {
+          processId: d.process,
+          status: "todo",
+          fix: false,
+          fixNote: "",
+        },
+        "PUT /admin/quality/checklist": { checklist: STARTER_CHECKLIST.slice() },
       };
     },
   });

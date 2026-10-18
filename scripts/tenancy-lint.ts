@@ -124,6 +124,9 @@ const APPS: App[] = [
       stagingBatches: "staging_batches",
       stagingBatchRemovals: "staging_batch_removals",
       adminSettings: "admin_settings",
+      shopManagers: "shop_managers",
+      qualityReports: "quality_reports",
+      qualityCheckItems: "quality_check_items",
     },
   },
   {

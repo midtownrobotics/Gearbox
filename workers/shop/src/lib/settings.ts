@@ -12,6 +12,12 @@ export const SETTING = {
   /** A Slack or Discord channel id, on whichever the team uses (the row keys are from before Discord). */
   releaseChannel: "slack_release_channel_id",
   summaryChannel: "slack_summary_channel_id",
+  /** "1" when every part ends with the quality check. */
+  qualityCheckRequired: "quality_check_required",
+  /** The Quality Control process the required check uses. */
+  qualityCheckProcess: "quality_check_process_id",
+  /** "1" when Quality Control steps are finished by a quality report. */
+  qualityReports: "quality_reports_enabled",
   onshapeDocument: "onshape_document_id",
   onshapeMainAssembly: "onshape_main_assembly_id",
   onshapeCompany: "onshape_company_id",
