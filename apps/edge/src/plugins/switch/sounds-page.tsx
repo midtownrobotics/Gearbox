@@ -280,6 +280,7 @@ type PlaybackSettingsValue = {
   soundSettings: Record<string, SwitchClipSettings>;
 };
 type ClipDraft = {
+  pauseAfterSeconds: string;
   delaySeconds: string;
   volumePercent: string;
   increaseVolume: boolean;
@@ -303,6 +304,10 @@ function PlaybackSettings({
         return [
           name,
           {
+            pauseAfterSeconds: String(
+              clip.pauseAfterSeconds ??
+                (initial.selectedSounds.indexOf(name) > 0 ? clip.delaySeconds : 0),
+            ),
             delaySeconds: String(clip.delaySeconds),
             volumePercent: String(clip.volumePercent),
             increaseVolume: clip.increaseVolume,
@@ -327,9 +332,9 @@ function PlaybackSettings({
   return (
     <Card title="Playback settings">
       <p className="mb-3 text-sm text-secondary-500">
-        Select clips and arrange their order. The first clip waits its delay before playing; later
-        clips wait their delays after finishing. This applies on each repeat of the list. One
-        selected clip repeats alone; none stays silent. Closing cancels any delay and cuts off
+        Set a delay before the first clip and a separate delay after each clip. For example: wait 1
+        second, play clip 1, wait 1 second, play clip 2. Delays also apply when the list repeats.
+        One selected clip repeats alone; none stays silent. Closing cancels delays and cuts off
         audio.
       </p>
       <form
@@ -341,6 +346,7 @@ function PlaybackSettings({
               Object.entries(clips).map(([name, clip]) => [
                 name,
                 {
+                  pauseAfterSeconds: Number(clip.pauseAfterSeconds),
                   delaySeconds: Number(clip.delaySeconds),
                   volumePercent: Number(clip.volumePercent),
                   increaseVolume: clip.increaseVolume,
@@ -391,7 +397,7 @@ function PlaybackSettings({
                         disabled={busy || index === 0}
                         onClick={() => move(index, -1)}
                       >
-                        ?
+                        &uarr;
                       </Button>
                       <Button
                         type="button"
@@ -400,18 +406,30 @@ function PlaybackSettings({
                         disabled={busy || index === selected.length - 1}
                         onClick={() => move(index, 1)}
                       >
-                        ?
+                        &darr;
                       </Button>
                     </div>
                   )}
                 </div>
                 <div className="grid grid-cols-2 gap-3">
+                  {index === 0 && (
+                    <label className="col-span-2 min-w-0 text-xs font-medium">
+                      Before first clip (sec)
+                      <input
+                        className={inputClass}
+                        type="number"
+                        inputMode="decimal"
+                        min="0"
+                        max="3600"
+                        step="0.1"
+                        required
+                        value={clip.delaySeconds}
+                        onChange={(event) => update(name, { delaySeconds: event.target.value })}
+                      />
+                    </label>
+                  )}
                   <label className="min-w-0 text-xs font-medium">
-                    {index === 0
-                      ? "Delay before (sec)"
-                      : index > 0
-                        ? "Delay after (sec)"
-                        : "Delay (sec)"}
+                    After clip (sec)
                     <input
                       className={`${inputClass} mt-1 w-full min-w-0`}
                       type="number"
@@ -420,8 +438,8 @@ function PlaybackSettings({
                       max="3600"
                       step="0.1"
                       required
-                      value={clip.delaySeconds}
-                      onChange={(event) => update(name, { delaySeconds: event.target.value })}
+                      value={clip.pauseAfterSeconds}
+                      onChange={(event) => update(name, { pauseAfterSeconds: event.target.value })}
                     />
                   </label>
                   <label className="min-w-0 text-xs font-medium">

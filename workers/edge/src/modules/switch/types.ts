@@ -6,6 +6,7 @@ export interface SwitchSound {
 }
 
 export interface SwitchClipSettings {
+  pauseAfterSeconds?: number;
   delaySeconds: number;
   volumePercent: number;
   increaseVolume: boolean;

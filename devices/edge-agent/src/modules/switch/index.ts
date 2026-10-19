@@ -126,14 +126,9 @@ export function createSwitchModule(ctx: ModuleContext, soundPlayer?: SoundPlayer
       } catch {
         return; // Stopped (closed, a test, Stop) or failed: lastError says which.
       }
-      if (
-        !firstClip &&
-        clip &&
-        clip.delaySeconds > 0 &&
-        current === opening &&
-        !detector.state().rawGrounded
-      ) {
-        await waitDelay(clip.delaySeconds);
+      const pauseAfter = clip?.pauseAfterSeconds ?? (!firstClip ? (clip?.delaySeconds ?? 0) : 0);
+      if (pauseAfter > 0 && current === opening && !detector.state().rawGrounded) {
+        await waitDelay(pauseAfter);
       }
       const left = MIN_REPEAT_MS - (Date.now() - began);
       if (left > 0) await Bun.sleep(left);
@@ -230,6 +225,11 @@ export function createSwitchModule(ctx: ModuleContext, soundPlayer?: SoundPlayer
                 number >= 0 &&
                 number <= 100,
             ) ||
+            (clip.pauseAfterSeconds !== undefined &&
+              (typeof clip.pauseAfterSeconds !== "number" ||
+                !Number.isFinite(clip.pauseAfterSeconds) ||
+                clip.pauseAfterSeconds < 0 ||
+                clip.pauseAfterSeconds > 3600)) ||
             typeof clip.delaySeconds !== "number" ||
             !Number.isFinite(clip.delaySeconds) ||
             clip.delaySeconds < 0 ||

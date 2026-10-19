@@ -246,12 +246,14 @@ describe("switch module integration", () => {
             selectedSounds: ["second.wav", "welcome.wav"],
             soundSettings: {
               "second.wav": {
+                pauseAfterSeconds: 0.2,
                 delaySeconds: 0.1,
                 volumePercent: 40,
                 increaseVolume: true,
                 volumeIncreasePercent: 35,
               },
               "welcome.wav": {
+                pauseAfterSeconds: 0.2,
                 delaySeconds: 0.2,
                 volumePercent: 20,
                 increaseVolume: true,
@@ -269,10 +271,12 @@ describe("switch module integration", () => {
       expect(played).toBe(5);
       await Bun.sleep(120);
       expect(played).toBe(6);
-      // After a full-length first clip, the second starts without a leading delay.
+      // The first clip has independent leading and trailing delays.
       await Bun.sleep(1000);
       finishDoor();
       await Bun.sleep(50);
+      expect(played).toBe(6);
+      await Bun.sleep(220);
       expect(played).toBe(7);
       expect(paths.slice(5, 7)).toEqual([
         join(soundDir, "second.wav"),
@@ -320,6 +324,7 @@ describe("switch module integration", () => {
       expect(restored.status().volumeIncreasePercent).toBe(35);
       expect(restored.status().soundSettings).toEqual({
         "welcome.wav": {
+          pauseAfterSeconds: 0.2,
           delaySeconds: 0.2,
           volumePercent: 20,
           increaseVolume: true,
