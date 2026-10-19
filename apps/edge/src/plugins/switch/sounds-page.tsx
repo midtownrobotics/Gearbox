@@ -395,7 +395,7 @@ function PlaybackSettings({
           }}
         >
           <SortableContext items={selected} strategy={verticalListSortingStrategy}>
-            <div className="mb-3 space-y-2.5">
+            <div className="mb-4 space-y-4">
               {names.map((name) => {
                 const index = selected.indexOf(name);
                 const clip = clips[name];
@@ -404,9 +404,9 @@ function PlaybackSettings({
                   <SortableClip key={name} name={name} disabled={busy || index < 0}>
                     {(handle) => (
                       <fieldset disabled={busy} aria-label={name} className="min-w-0">
-                        <div className="flex items-center gap-2 rounded-t-lg border-b border-secondary-200 bg-secondary-50 px-3">
+                        <div className="flex items-center gap-3 rounded-t-lg border-b border-secondary-200 bg-secondary-50 px-3 py-2">
                           {index >= 0 && handle}
-                          <label className="flex min-h-8 min-w-0 flex-1 items-center gap-2 text-sm font-medium">
+                          <label className="flex min-h-11 min-w-0 flex-1 items-center gap-2 text-sm font-medium">
                             <input
                               type="checkbox"
                               className="h-4 w-4 shrink-0"
@@ -428,7 +428,7 @@ function PlaybackSettings({
                           )}
                         </div>
                         {index >= 0 && (
-                          <div className="space-y-0.5 px-3 py-2">
+                          <div className="space-y-1 px-4 py-3">
                             {index === 0 && (
                               <CompactSlider
                                 label="Before first"
@@ -538,13 +538,13 @@ function CompactSlider({
 }) {
   return (
     <div
-      className={`flex min-h-7 min-w-0 items-center gap-3 text-xs ${disabled ? "text-secondary-400" : "text-secondary-700"}`}
+      className={`flex min-h-10 min-w-0 items-center gap-3 text-sm ${disabled ? "text-secondary-400" : "text-secondary-700"}`}
     >
       <div className="w-20 shrink-0 font-medium">{control ?? label}</div>
       <input
         disabled={disabled}
         aria-label={label}
-        className="h-7 min-w-0 flex-1 cursor-pointer accent-primary-600 disabled:cursor-default disabled:opacity-35"
+        className="h-10 min-w-0 flex-1 cursor-pointer accent-primary-600 disabled:cursor-default disabled:opacity-35"
         type="range"
         min="0"
         max={Math.max(max, Number(value) || 0)}
@@ -556,7 +556,7 @@ function CompactSlider({
         <input
           disabled={disabled}
           aria-label={`${label} exact value`}
-          className="h-7 w-12 rounded bg-secondary-50 px-1 text-right text-xs tabular-nums outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-transparent [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+          className="h-8 w-12 rounded border border-secondary-200 bg-secondary-50 px-1 text-right text-sm tabular-nums outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-transparent [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
           type="number"
           inputMode="decimal"
           min="0"
@@ -605,9 +605,9 @@ function SortableClip({
           disabled={disabled}
           aria-label={`Reorder ${name}`}
           title="Drag to reorder, or press Space and use arrow keys"
-          className="flex h-9 w-7 shrink-0 touch-none items-center justify-center rounded text-secondary-400 hover:bg-secondary-100 hover:text-secondary-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-500 active:cursor-grabbing disabled:opacity-30 cursor-grab"
+          className="flex h-12 w-11 shrink-0 touch-none items-center justify-center rounded-lg border border-secondary-300 bg-surface text-secondary-500 shadow-sm hover:bg-secondary-100 hover:text-secondary-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-500 active:cursor-grabbing disabled:opacity-30 cursor-grab"
         >
-          <svg viewBox="0 0 10 16" width="10" height="16" fill="currentColor" aria-hidden="true">
+          <svg viewBox="0 0 10 16" width="16" height="24" fill="currentColor" aria-hidden="true">
             {[3, 8, 13].map((y) => (
               <g key={y}>
                 <circle cx="2.5" cy={y} r="1.5" />
