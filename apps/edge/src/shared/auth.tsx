@@ -7,6 +7,7 @@ export type AuthUser = {
   userId: string;
   displayName: string;
   isAdmin: boolean;
+  isMentor: boolean;
   /** The team's box's time zone: the app shows its days and times. */
   timeZone: string;
 };
