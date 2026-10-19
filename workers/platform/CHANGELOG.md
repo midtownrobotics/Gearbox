@@ -1,5 +1,13 @@
 # @g3/worker-platform
 
+## 3.0.2
+
+### Patch Changes
+
+- Updated dependencies [1273a89]
+  - @g3/worker-edge@2.2.0
+  - @g3/worker-orders@2.1.0
+
 ## 3.0.1
 
 ### Patch Changes

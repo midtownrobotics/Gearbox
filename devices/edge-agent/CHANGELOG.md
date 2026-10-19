@@ -1,5 +1,11 @@
 # @g3/edge-agent
 
+## 0.7.0
+
+### Minor Changes
+
+- 1273a89: Admins and mentors can manage Door Sounds. Only admins can test, approve, reject, or delete sounds. Signed-in students can submit WAV files for review and see their own submission status. Pending audio stays outside the playable library until an admin approves it; the Edge box keeps the review queue across restarts. Install the updated agent before enabling submissions in the UI.
+
 ## 0.6.0
 
 ### Minor Changes
