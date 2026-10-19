@@ -16,6 +16,38 @@ Each release of the whole platform, newest first, with the version of every app 
 
 <!-- releases -->
 
+## 2026.10.4 (2026-10-19)
+
+| App | Version |
+| --- | --- |
+| G3ID | 3.0.0 |
+| Portal | 2.1.0 |
+| **Platform** | **3.0.2** (was 3.0.1) |
+| Shop | 2.1.0 |
+| Pit | 3.0.0 |
+| Orders | 2.1.0 |
+| **Edge** | **2.2.0** (was 2.1.0) |
+| **Edge agent** | **0.7.0** (was 0.6.0) |
+| Pit log downloader | 2.1.0 |
+| Scouting | 2.1.0 |
+| Skill Tree | 2.0.0 |
+| Attendance | 2.0.0 |
+| Inventory | 1.0.0 |
+| Schedule | 0.2.0 |
+
+### Platform 3.0.2
+
+- Updated (no notes).
+
+### Edge 2.2.0
+
+- Admins and mentors can manage Door Sounds. Only admins can test, approve, reject, or delete sounds. Signed-in students can submit WAV files for review and see their own submission status. Pending audio stays outside the playable library until an admin approves it; the Edge box keeps the review queue across restarts. Install the updated agent before enabling submissions in the UI.
+- Door Sounds is available to admins and mentors. Students can suggest sounds on a separate page and track approval status. Admins can test pending clips, stop playback, approve or decline submissions, upload directly, and delete approved clips. The general warning and introductory playback description have been removed.
+
+### Edge agent 0.7.0
+
+- Admins and mentors can manage Door Sounds. Only admins can test, approve, reject, or delete sounds. Signed-in students can submit WAV files for review and see their own submission status. Pending audio stays outside the playable library until an admin approves it; the Edge box keeps the review queue across restarts. Install the updated agent before enabling submissions in the UI.
+
 ## 2026.10.3 (2026-10-19)
 
 | App | Version |
