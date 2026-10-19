@@ -14,7 +14,17 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Button, Card, ConfirmButton, ErrorBanner, Loading, Page, Stat, inputClass } from "@g3/ui";
+import {
+  Button,
+  Card,
+  ConfirmButton,
+  ErrorBanner,
+  Loading,
+  Page,
+  Stat,
+  TextField,
+  inputClass,
+} from "@g3/ui";
 import type { SwitchClipSettings } from "@g3/worker-edge/switch-types";
 import type { ReactNode } from "react";
 import { useRef, useState } from "react";
@@ -604,8 +614,8 @@ function ClipRename({
         <div className="flex flex-wrap items-center gap-2 py-1">
           <label className="min-w-0 flex-1 text-xs text-secondary-500">
             Clip name
-            <input
-              className={`${inputClass} mt-1 w-full`}
+            <TextField
+              className="mt-1 w-full"
               aria-label={`New name for ${name}`}
               value={draft}
               maxLength={100}
