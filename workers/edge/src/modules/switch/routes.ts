@@ -40,6 +40,17 @@ export const switchRouter = new Hono<AppEnv>()
     if ("error" in result) return c.json({ error: result.error }, result.status);
     return c.json(result.data);
   })
+  .put("/settings", requireAdmin, async (c) => {
+    const body = await c.req.json().catch(() => null);
+    if (!body) return c.json({ error: "Expected playback settings." }, 400);
+    const result = await relay<{ ok: true }>(c, "/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if ("error" in result) return c.json({ error: result.error }, result.status);
+    return c.json(result.data);
+  })
   .get("/sounds", requireAdmin, async (c) => {
     const result = await relay<{ sounds: SwitchSound[] }>(c, "/sounds");
     if ("error" in result) return c.json({ error: result.error }, result.status);
@@ -75,6 +86,29 @@ export const switchRouter = new Hono<AppEnv>()
         headers: { "Content-Type": "audio/wav" },
         body: data,
         timeoutMs: 60_000,
+      },
+    );
+    if ("error" in result) return c.json({ error: result.error }, result.status);
+    return c.json(result.data);
+  })
+  .patch("/sounds/:name", requireAdmin, async (c) => {
+    const name = soundName(c);
+    const body = await c.req.json().catch(() => null);
+    if (!name || typeof body?.name !== "string" || !validSwitchSoundName(body.name))
+      return c.json(
+        {
+          error:
+            "Use a WAV filename with letters, numbers, spaces, dots, dashes or underscores (5-100 characters).",
+        },
+        400,
+      );
+    const result = await relay<{ ok: true; sounds: SwitchSound[] }>(
+      c,
+      `/sounds/${encodeURIComponent(name)}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: body.name }),
       },
     );
     if ("error" in result) return c.json({ error: result.error }, result.status);

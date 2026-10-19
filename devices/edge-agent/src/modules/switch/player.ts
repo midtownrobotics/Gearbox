@@ -1,5 +1,8 @@
+import { readFile } from "node:fs/promises";
+import { scaleWaveVolume } from "./volume";
+
 export interface SoundPlayer {
-  play(path?: string): Promise<string>;
+  play(path?: string, volumePercent?: number): Promise<string>;
   stop(): void;
 }
 
@@ -48,8 +51,8 @@ export function createSoundPlayer(
   player: string,
   device: string,
   sounds: () => Promise<string[]>,
-  spawnSound: (command: string[]) => PlaybackProcess = (command) =>
-    Bun.spawn(command, { stdout: "ignore", stderr: "pipe" }),
+  spawnSound: (command: string[], audio?: Uint8Array) => PlaybackProcess = (command, audio) =>
+    Bun.spawn(command, { stdin: audio ?? "ignore", stdout: "ignore", stderr: "pipe" }),
   playbackTimeoutMs = PLAYBACK_TIMEOUT_MS,
 ): SoundPlayer {
   let next = 0;
@@ -75,7 +78,7 @@ export function createSoundPlayer(
   }
 
   return {
-    async play(path) {
+    async play(path, volumePercent = 100) {
       if (playbackFault) throw playbackFault;
       stop();
       const requestedGeneration = generation;
@@ -85,7 +88,10 @@ export function createSoundPlayer(
       if (requestedGeneration !== generation) throw new SoundStoppedError();
       if (available.length === 0) throw new Error("No switch sounds are configured.");
       const sound = available[next++ % available.length];
-      const process = spawnSound(soundCommand(player, device, sound));
+      const audio =
+        volumePercent === 100 ? undefined : scaleWaveVolume(await readFile(sound), volumePercent);
+      if (requestedGeneration !== generation) throw new SoundStoppedError();
+      const process = spawnSound(soundCommand(player, device, audio ? "-" : sound), audio);
       active = process;
       released = process.exited.catch(() => {});
       let exitCode: number;

@@ -5,7 +5,19 @@ export interface SwitchSound {
   size: number;
 }
 
-export interface SwitchState {
+export interface SwitchClipSettings {
+  delaySeconds: number;
+  volumePercent: number;
+}
+
+export interface SwitchPlaybackSettings {
+  soundSettings: Record<string, SwitchClipSettings>;
+  volumePercent: number;
+  delaySeconds: number;
+  selectedSounds: string[];
+}
+
+export interface SwitchState extends SwitchPlaybackSettings {
   input: "gpio" | "placeholder";
   gpio: string | null;
   audioDevice: string;
