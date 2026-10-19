@@ -431,7 +431,7 @@ function PlaybackSettings({
                           <div className="space-y-1 px-4 py-3">
                             {index === 0 && (
                               <CompactSlider
-                                label="Before first"
+                                label="Delay before first clip"
                                 unit="s"
                                 value={clip.delaySeconds}
                                 max={10}
@@ -441,7 +441,7 @@ function PlaybackSettings({
                               />
                             )}
                             <CompactSlider
-                              label="Gap after"
+                              label="Pause after this clip"
                               unit="s"
                               value={clip.pauseAfterSeconds}
                               max={60}
@@ -450,7 +450,7 @@ function PlaybackSettings({
                               onChange={(value) => update(name, { pauseAfterSeconds: value })}
                             />
                             <CompactSlider
-                              label="Volume"
+                              label="Clip volume"
                               unit="%"
                               value={clip.volumePercent}
                               max={100}
@@ -458,7 +458,7 @@ function PlaybackSettings({
                               onChange={(value) => update(name, { volumePercent: value })}
                             />
                             <CompactSlider
-                              label="Increase"
+                              label="Volume increase over previous clip"
                               unit="pt"
                               value={clip.volumeIncreasePercent}
                               max={100}
@@ -467,18 +467,18 @@ function PlaybackSettings({
                               control={
                                 <label
                                   title="Louder than the previous clip"
-                                  className="flex items-center gap-1 text-secondary-600"
+                                  className="flex items-center gap-1.5 text-secondary-600"
                                 >
                                   <input
                                     type="checkbox"
-                                    className="h-3.5 w-3.5"
+                                    className="h-3.5 w-3.5 shrink-0"
                                     aria-label={`Make ${name} louder than the previous clip`}
                                     checked={clip.increaseVolume}
                                     onChange={(event) =>
                                       update(name, { increaseVolume: event.target.checked })
                                     }
                                   />
-                                  Boost
+                                  Louder than previous
                                 </label>
                               }
                               onChange={(value) => update(name, { volumeIncreasePercent: value })}
@@ -498,13 +498,13 @@ function PlaybackSettings({
           <p className="py-1">
             The first clip has a starting delay; every clip has a gap after it. One selected clip
             repeats alone. No selections means silence. Saving stops playback until the next
-            opening. Boost uses the previous clip volume plus this clip increase, capped at 100%.
-            The first clip starts at its own volume on each opening. Otherwise, each clip uses its
-            own volume. Tests use the saved clip volume immediately. 0% is silent; 100% keeps the
-            original level. Volume control requires uncompressed PCM or floating-point WAVs;
-            recordings can differ in loudness. Saving stops playback until the next opening. Drag
-            with a finger or mouse; keyboard users can focus the grip, press Space, use arrow keys,
-            then press Space to drop or Escape to cancel.
+            opening. Louder than previous adds the chosen number of percentage points to the
+            previous clip volume, capped at 100%. The first clip starts at its own volume on each
+            opening. Otherwise, each clip uses its own volume. Tests use the saved clip volume
+            immediately. 0% is silent; 100% keeps the original level. Volume control requires
+            uncompressed PCM or floating-point WAVs; recordings can differ in loudness. Saving stops
+            playback until the next opening. Drag with a finger or mouse; keyboard users can focus
+            the grip, press Space, use arrow keys, then press Space to drop or Escape to cancel.
           </p>
         </details>
         <Button type="submit" disabled={busy} className="w-full sm:w-auto">
@@ -538,9 +538,11 @@ function CompactSlider({
 }) {
   return (
     <div
-      className={`flex min-h-10 min-w-0 items-center gap-3 text-sm ${disabled ? "text-secondary-400" : "text-secondary-700"}`}
+      className={`flex min-h-10 min-w-0 items-center gap-2 text-sm ${disabled ? "text-secondary-400" : "text-secondary-700"}`}
     >
-      <div className="w-20 shrink-0 font-medium">{control ?? label}</div>
+      <div className="w-28 shrink-0 text-xs font-medium leading-snug sm:w-40">
+        {control ?? label}
+      </div>
       <input
         disabled={disabled}
         aria-label={label}
