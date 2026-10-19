@@ -327,9 +327,10 @@ function PlaybackSettings({
   return (
     <Card title="Playback settings">
       <p className="mb-3 text-sm text-secondary-500">
-        Select clips and arrange their order. Each clip waits its own delay before playing,
-        including repeats. One selected clip repeats alone; none stays silent. Closing the door
-        cancels any delay and cuts off audio immediately.
+        Select clips and arrange their order. The first clip waits its delay before playing; later
+        clips wait their delays after finishing. This applies on each repeat of the list. One
+        selected clip repeats alone; none stays silent. Closing cancels any delay and cuts off
+        audio.
       </p>
       <form
         onSubmit={(event) => {
@@ -406,7 +407,11 @@ function PlaybackSettings({
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <label className="min-w-0 text-xs font-medium">
-                    Delay before (sec)
+                    {index === 0
+                      ? "Delay before (sec)"
+                      : index > 0
+                        ? "Delay after (sec)"
+                        : "Delay (sec)"}
                     <input
                       className={`${inputClass} mt-1 w-full min-w-0`}
                       type="number"
@@ -465,10 +470,10 @@ function PlaybackSettings({
           })}
         </div>
         <p className="mb-3 text-xs text-secondary-500">
-          ?Louder than previous? uses the previous clip?s volume plus this clip?s increase, capped
-          at 100%. The first clip starts at its own volume on each opening. Otherwise, each clip
-          uses its own volume. Tests use the saved clip volume immediately. 0% is silent; 100% keeps
-          the original level. Volume control requires uncompressed PCM or floating-point WAVs;
+          Louder than previous uses the previous clip volume plus this clip increase, capped at
+          100%. The first clip starts at its own volume on each opening. Otherwise, each clip uses
+          its own volume. Tests use the saved clip volume immediately. 0% is silent; 100% keeps the
+          original level. Volume control requires uncompressed PCM or floating-point WAVs;
           recordings can differ in loudness. Saving stops playback until the next opening.
         </p>
         <Button type="submit" disabled={busy} className="w-full sm:w-auto">

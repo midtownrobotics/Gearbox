@@ -269,8 +269,10 @@ describe("switch module integration", () => {
       expect(played).toBe(5);
       await Bun.sleep(120);
       expect(played).toBe(6);
+      // After a full-length first clip, the second starts without a leading delay.
+      await Bun.sleep(1000);
       finishDoor();
-      await Bun.sleep(1350);
+      await Bun.sleep(50);
       expect(played).toBe(7);
       expect(paths.slice(5, 7)).toEqual([
         join(soundDir, "second.wav"),
@@ -278,7 +280,7 @@ describe("switch module integration", () => {
       ]);
       expect(volumes.slice(5, 7)).toEqual([40, 75]);
       finishDoor();
-      await Bun.sleep(1100);
+      await Bun.sleep(1250);
       expect(volumes[7]).toBe(100);
       await input(true);
       await Bun.sleep(30);
@@ -287,17 +289,21 @@ describe("switch module integration", () => {
       expect(played).toBe(8);
       await Bun.sleep(120);
       expect(volumes[8]).toBe(40);
-      // Close while waiting for the next clip's own delay: it must never start.
       finishDoor();
       await Bun.sleep(1050);
-      expect(played).toBe(9);
+      expect(played).toBe(10);
+      // Close in the second clip's trailing delay; the playlist must not restart.
+      await Bun.sleep(1000);
+      finishDoor();
+      await Bun.sleep(50);
+      expect(played).toBe(10);
       await input(true);
-      await Bun.sleep(250);
-      expect(played).toBe(9);
+      await Bun.sleep(400);
+      expect(played).toBe(10);
       expect((await settings({ delaySeconds: 0, selectedSounds: [] })).status).toBe(200);
       await input(false);
       await Bun.sleep(30);
-      expect(played).toBe(9);
+      expect(played).toBe(10);
       await input(true);
       await Bun.sleep(30);
       await module.routes.request("/sounds/second.wav", { method: "DELETE" });

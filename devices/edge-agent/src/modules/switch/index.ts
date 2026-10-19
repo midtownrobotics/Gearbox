@@ -100,10 +100,11 @@ export function createSwitchModule(ctx: ModuleContext, soundPlayer?: SoundPlayer
     let next = 0;
     let previousVolume: number | undefined;
     while (paths.length > 0 && current === opening && !detector.state().rawGrounded) {
+      const firstClip = next % paths.length === 0;
       const path = paths[next % paths.length];
       const name = path.split(/[\\/]/).pop() ?? "";
       const clip = clipSettings(name);
-      if (clip && clip.delaySeconds > 0) await waitDelay(clip.delaySeconds);
+      if (firstClip && clip && clip.delaySeconds > 0) await waitDelay(clip.delaySeconds);
       if (current !== opening || detector.state().rawGrounded) return;
       const began = Date.now();
       try {
@@ -124,6 +125,15 @@ export function createSwitchModule(ctx: ModuleContext, soundPlayer?: SoundPlayer
         await play(path, volume);
       } catch {
         return; // Stopped (closed, a test, Stop) or failed: lastError says which.
+      }
+      if (
+        !firstClip &&
+        clip &&
+        clip.delaySeconds > 0 &&
+        current === opening &&
+        !detector.state().rawGrounded
+      ) {
+        await waitDelay(clip.delaySeconds);
       }
       const left = MIN_REPEAT_MS - (Date.now() - began);
       if (left > 0) await Bun.sleep(left);
