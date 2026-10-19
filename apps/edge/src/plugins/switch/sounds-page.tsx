@@ -125,59 +125,6 @@ export function DoorSoundsPage() {
         </p>
       )}
 
-      <Card title="Door switch">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm text-secondary-500">
-            Selected clips play in order with their own delays and volumes. Closing the door cuts
-            off the clip or cancels the delay.
-          </p>
-          <Button variant="secondary" onClick={state.reload}>
-            Refresh status
-          </Button>
-        </div>
-        <div className="grid gap-4 sm:grid-cols-3">
-          <Stat label="Door" value={data.grounded ? "Closed" : "Open"} />
-          <Stat label="Openings" value={data.triggerCount} />
-          <Stat
-            label="Last opened"
-            value={data.lastTriggeredAt ? formatDateTime(data.lastTriggeredAt) : "Never"}
-          />
-        </div>
-        <dl className="mt-5 grid gap-4 border-t border-secondary-100 pt-4 sm:grid-cols-2">
-          <div className="min-w-0">
-            <dt className="text-xs font-bold uppercase tracking-widest text-secondary-400">
-              Input
-            </dt>
-            <dd className="mt-1 break-words text-sm text-secondary-900">
-              {data.input === "gpio" ? (data.gpio ?? "GPIO") : "Mock input"}
-            </dd>
-          </div>
-          <div className="min-w-0">
-            <dt className="text-xs font-bold uppercase tracking-widest text-secondary-400">
-              Audio output
-            </dt>
-            <dd className="mt-1 break-all font-mono text-sm text-secondary-900">
-              {data.audioDevice}
-            </dd>
-          </div>
-          {data.lastSound && (
-            <div className="min-w-0 sm:col-span-2">
-              <dt className="text-xs font-bold uppercase tracking-widest text-secondary-400">
-                Last sound
-              </dt>
-              <dd className="mt-1 break-all text-sm text-secondary-900">
-                {data.lastSound.split(/[\\/]/).pop()}
-              </dd>
-            </div>
-          )}
-        </dl>
-        {data.lastError && (
-          <div className="mt-4 break-words">
-            <ErrorBanner message={data.lastError} />
-          </div>
-        )}
-      </Card>
-
       <PlaybackSettings
         key={JSON.stringify([
           data.delaySeconds,
@@ -203,91 +150,155 @@ export function DoorSoundsPage() {
           )
         }
       />
-      <Card title="Upload a sound">
-        <p className="mb-2 text-xs text-secondary-500">
-          Upload a WAV file up to 10 MB. Select it in playback settings to include it.
-        </p>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <input
-            ref={fileInput}
-            type="file"
-            accept=".wav,audio/wav,audio/x-wav"
-            onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-            className={`${inputClass} min-w-0 flex-1`}
-          />
-          <Button disabled={!file || busy !== null} onClick={() => void upload()}>
-            {busy === "upload" ? "Uploading…" : "Upload sound"}
-          </Button>
-        </div>
-      </Card>
-
-      <Card title="Sounds on the Orange Pi">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm text-secondary-500">
-            One sound plays at a time: a test or door opening replaces the one playing.
-          </p>
-          <Button
-            variant="secondary"
-            disabled={busy !== null}
-            onClick={() =>
-              void act("stop", () => request("/stop", { method: "POST" }), "Stopped the sound.")
-            }
-          >
-            {busy === "stop" ? "Stopping…" : "Stop sound"}
-          </Button>
-        </div>
-        {data.sounds.length === 0 ? (
-          <p className="text-sm text-secondary-500">No uploaded sounds yet.</p>
-        ) : (
-          <div className="divide-y divide-secondary-100">
-            {data.sounds.map((sound) => (
-              <div
-                key={sound.name}
-                className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0 last:pb-0"
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="break-all font-medium text-secondary-900">{sound.name}</p>
-                  <p className="text-xs text-secondary-500">{bytes(sound.size)}</p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    variant="secondary"
-                    disabled={busy !== null}
-                    onClick={() =>
-                      void act(
-                        `test-${sound.name}`,
-                        () =>
-                          request(`/sounds/${encodeURIComponent(sound.name)}/test`, {
-                            method: "POST",
-                          }),
-                        `Playing ${sound.name} on the box.`,
-                      )
-                    }
-                  >
-                    {busy === `test-${sound.name}` ? "Playing…" : "Test on Orange Pi"}
-                  </Button>
-                  <ConfirmButton
-                    label={busy === `delete-${sound.name}` ? "Deleting…" : "Delete"}
-                    confirmLabel="Delete"
-                    question={`Delete ${sound.name} from the box?`}
-                    disabled={busy !== null}
-                    onConfirm={() =>
-                      void act(
-                        `delete-${sound.name}`,
-                        () =>
-                          request(`/sounds/${encodeURIComponent(sound.name)}`, {
-                            method: "DELETE",
-                          }),
-                        `Deleted ${sound.name}.`,
-                      )
-                    }
-                  />
-                </div>
-              </div>
-            ))}
+      <details className="mx-auto w-full max-w-3xl rounded-xl border border-secondary-200 bg-surface px-4 py-2">
+        <summary className="cursor-pointer py-1 text-sm font-medium text-secondary-600">
+          Door status
+        </summary>
+        <Card title="Door switch">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-secondary-500">
+              Selected clips play in order with their own delays and volumes. Closing the door cuts
+              off the clip or cancels the delay.
+            </p>
+            <Button variant="secondary" onClick={state.reload}>
+              Refresh status
+            </Button>
           </div>
-        )}
-      </Card>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Stat label="Door" value={data.grounded ? "Closed" : "Open"} />
+            <Stat label="Openings" value={data.triggerCount} />
+            <Stat
+              label="Last opened"
+              value={data.lastTriggeredAt ? formatDateTime(data.lastTriggeredAt) : "Never"}
+            />
+          </div>
+          <dl className="mt-5 grid gap-4 border-t border-secondary-100 pt-4 sm:grid-cols-2">
+            <div className="min-w-0">
+              <dt className="text-xs font-bold uppercase tracking-widest text-secondary-400">
+                Input
+              </dt>
+              <dd className="mt-1 break-words text-sm text-secondary-900">
+                {data.input === "gpio" ? (data.gpio ?? "GPIO") : "Mock input"}
+              </dd>
+            </div>
+            <div className="min-w-0">
+              <dt className="text-xs font-bold uppercase tracking-widest text-secondary-400">
+                Audio output
+              </dt>
+              <dd className="mt-1 break-all font-mono text-sm text-secondary-900">
+                {data.audioDevice}
+              </dd>
+            </div>
+            {data.lastSound && (
+              <div className="min-w-0 sm:col-span-2">
+                <dt className="text-xs font-bold uppercase tracking-widest text-secondary-400">
+                  Last sound
+                </dt>
+                <dd className="mt-1 break-all text-sm text-secondary-900">
+                  {data.lastSound.split(/[\\/]/).pop()}
+                </dd>
+              </div>
+            )}
+          </dl>
+          {data.lastError && (
+            <div className="mt-4 break-words">
+              <ErrorBanner message={data.lastError} />
+            </div>
+          )}
+        </Card>
+      </details>
+      <details className="mx-auto w-full max-w-3xl rounded-xl border border-secondary-200 bg-surface px-4 py-2">
+        <summary className="cursor-pointer py-1 text-sm font-medium text-secondary-600">
+          Upload and manage sound files
+        </summary>
+        <div className="mt-2 space-y-3">
+          <Card title="Upload a sound" className="mx-auto w-full max-w-3xl">
+            <p className="mb-2 text-xs text-secondary-500">
+              Upload a WAV file up to 10 MB. Select it in playback settings to include it.
+            </p>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <input
+                ref={fileInput}
+                type="file"
+                accept=".wav,audio/wav,audio/x-wav"
+                onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+                className={`${inputClass} min-w-0 flex-1`}
+              />
+              <Button disabled={!file || busy !== null} onClick={() => void upload()}>
+                {busy === "upload" ? "Uploading…" : "Upload sound"}
+              </Button>
+            </div>
+          </Card>
+
+          <Card title="Sounds on the Orange Pi" className="mx-auto w-full max-w-3xl">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm text-secondary-500">
+                One sound plays at a time: a test or door opening replaces the one playing.
+              </p>
+              <Button
+                variant="secondary"
+                disabled={busy !== null}
+                onClick={() =>
+                  void act("stop", () => request("/stop", { method: "POST" }), "Stopped the sound.")
+                }
+              >
+                {busy === "stop" ? "Stopping…" : "Stop sound"}
+              </Button>
+            </div>
+            {data.sounds.length === 0 ? (
+              <p className="text-sm text-secondary-500">No uploaded sounds yet.</p>
+            ) : (
+              <div className="divide-y divide-secondary-100">
+                {data.sounds.map((sound) => (
+                  <div
+                    key={sound.name}
+                    className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0 last:pb-0"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="break-all font-medium text-secondary-900">{sound.name}</p>
+                      <p className="text-xs text-secondary-500">{bytes(sound.size)}</p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        variant="secondary"
+                        disabled={busy !== null}
+                        onClick={() =>
+                          void act(
+                            `test-${sound.name}`,
+                            () =>
+                              request(`/sounds/${encodeURIComponent(sound.name)}/test`, {
+                                method: "POST",
+                              }),
+                            `Playing ${sound.name} on the box.`,
+                          )
+                        }
+                      >
+                        {busy === `test-${sound.name}` ? "Playing…" : "Test on Orange Pi"}
+                      </Button>
+                      <ConfirmButton
+                        label={busy === `delete-${sound.name}` ? "Deleting…" : "Delete"}
+                        confirmLabel="Delete"
+                        question={`Delete ${sound.name} from the box?`}
+                        disabled={busy !== null}
+                        onConfirm={() =>
+                          void act(
+                            `delete-${sound.name}`,
+                            () =>
+                              request(`/sounds/${encodeURIComponent(sound.name)}`, {
+                                method: "DELETE",
+                              }),
+                            `Deleted ${sound.name}.`,
+                          )
+                        }
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+        </div>
+      </details>
     </Page>
   );
 }
@@ -346,8 +357,8 @@ function PlaybackSettings({
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
   return (
-    <Card title="Playback settings">
-      <p className="mb-3 text-sm text-secondary-500">
+    <Card title="Playback settings" className="mx-auto w-full max-w-3xl">
+      <p className="mb-2 text-xs text-secondary-500">
         Drag the grip to reorder. Play top to bottom, then repeat. Closing the door stops playback.
       </p>
       <form
@@ -384,7 +395,7 @@ function PlaybackSettings({
           }}
         >
           <SortableContext items={selected} strategy={verticalListSortingStrategy}>
-            <div className="mb-2 space-y-2">
+            <div className="mb-3 space-y-2.5">
               {names.map((name) => {
                 const index = selected.indexOf(name);
                 const clip = clips[name];
@@ -393,7 +404,7 @@ function PlaybackSettings({
                   <SortableClip key={name} name={name} disabled={busy || index < 0}>
                     {(handle) => (
                       <fieldset disabled={busy} aria-label={name} className="min-w-0">
-                        <div className="flex items-center gap-2 rounded-t-lg border-b border-secondary-200 bg-secondary-50 px-2">
+                        <div className="flex items-center gap-2 rounded-t-lg border-b border-secondary-200 bg-secondary-50 px-3">
                           {index >= 0 && handle}
                           <label className="flex min-h-8 min-w-0 flex-1 items-center gap-2 text-sm font-medium">
                             <input
@@ -408,7 +419,7 @@ function PlaybackSettings({
                                 )
                               }
                             />
-                            <span className="break-all">{name}</span>
+                            <span className="truncate">{name}</span>
                           </label>
                           {index >= 0 && (
                             <span className="shrink-0 rounded bg-surface px-1.5 py-0.5 text-xs font-semibold tabular-nums text-secondary-500">
@@ -417,7 +428,7 @@ function PlaybackSettings({
                           )}
                         </div>
                         {index >= 0 && (
-                          <div className="grid grid-cols-2 items-start gap-x-3 gap-y-1 px-2 py-1.5 sm:grid-cols-4">
+                          <div className="space-y-0.5 px-3 py-2">
                             {index === 0 && (
                               <CompactSlider
                                 label="Before first"
@@ -526,30 +537,14 @@ function CompactSlider({
   onChange(value: string): void;
 }) {
   return (
-    <div className="min-w-0">
-      <div className="flex items-center justify-between gap-1 text-xs">
-        {control ?? <span className="text-secondary-600">{label}</span>}
-        <label className="flex items-center gap-0.5 text-secondary-700">
-          <input
-            disabled={disabled}
-            aria-label={`${label} exact value`}
-            className="h-6 w-12 rounded border border-secondary-200 bg-transparent px-1 text-right tabular-nums focus:outline-none focus:ring-1 focus:ring-primary-500"
-            type="number"
-            inputMode="decimal"
-            min="0"
-            max={limit}
-            step={step}
-            required
-            value={value}
-            onChange={(event) => onChange(event.target.value)}
-          />
-          <span>{unit}</span>
-        </label>
-      </div>
+    <div
+      className={`flex min-h-7 min-w-0 items-center gap-3 text-xs ${disabled ? "text-secondary-400" : "text-secondary-700"}`}
+    >
+      <div className="w-20 shrink-0 font-medium">{control ?? label}</div>
       <input
         disabled={disabled}
         aria-label={label}
-        className="block h-6 w-full cursor-pointer accent-primary-600 disabled:cursor-default"
+        className="h-7 min-w-0 flex-1 cursor-pointer accent-primary-600 disabled:cursor-default disabled:opacity-35"
         type="range"
         min="0"
         max={Math.max(max, Number(value) || 0)}
@@ -557,6 +552,22 @@ function CompactSlider({
         value={value || "0"}
         onChange={(event) => onChange(event.target.value)}
       />
+      <label className="flex w-16 shrink-0 items-center justify-end gap-1 tabular-nums">
+        <input
+          disabled={disabled}
+          aria-label={`${label} exact value`}
+          className="h-7 w-12 rounded bg-secondary-50 px-1 text-right text-xs tabular-nums outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-transparent [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+          type="number"
+          inputMode="decimal"
+          min="0"
+          max={limit}
+          step={step}
+          required
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+        />
+        <span className="w-3 text-secondary-400">{unit}</span>
+      </label>
     </div>
   );
 }
