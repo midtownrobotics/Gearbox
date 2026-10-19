@@ -1,5 +1,22 @@
+import {
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { Button, Card, ConfirmButton, ErrorBanner, Loading, Page, Stat, inputClass } from "@g3/ui";
 import type { SwitchClipSettings } from "@g3/worker-edge/switch-types";
+import type { ReactNode } from "react";
 import { useRef, useState } from "react";
 import { getErrorMessage } from "../../shared/api";
 import { formatDateTime } from "../../shared/format";
@@ -324,15 +341,14 @@ function PlaybackSettings({
   function update(name: string, patch: Partial<ClipDraft>) {
     setClips((current) => ({ ...current, [name]: { ...current[name], ...patch } }));
   }
-  function move(index: number, direction: number) {
-    const next = [...selected];
-    [next[index], next[index + direction]] = [next[index + direction], next[index]];
-    setSelected(next);
-  }
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
   return (
     <Card title="Playback settings">
       <p className="mb-3 text-sm text-secondary-500">
-        Play top to bottom, then repeat. Closing the door stops audio and cancels delays.
+        Drag the grip to reorder. Play top to bottom, then repeat. Closing the door stops playback.
       </p>
       <form
         onSubmit={(event) => {
@@ -354,132 +370,130 @@ function PlaybackSettings({
           });
         }}
       >
-        <div className="mb-2 divide-y divide-secondary-100">
-          {names.map((name) => {
-            const index = selected.indexOf(name);
-            const clip = clips[name];
-            if (!clip) return null;
-            return (
-              <fieldset
-                key={name}
-                disabled={busy}
-                aria-label={name}
-                className="min-w-0 py-2 first:pt-0"
-              >
-                <div className="flex items-center gap-2">
-                  <label className="flex min-h-9 min-w-0 flex-1 items-center gap-2 text-sm font-medium">
-                    <input
-                      type="checkbox"
-                      className="h-4 w-4 shrink-0"
-                      checked={index >= 0}
-                      onChange={(event) =>
-                        setSelected(
-                          event.target.checked
-                            ? [...selected, name]
-                            : selected.filter((sound) => sound !== name),
-                        )
-                      }
-                    />
-                    <span className="break-all">
-                      {index >= 0 ? `${index + 1}. ` : ""}
-                      {name}
-                    </span>
-                  </label>
-                  {index >= 0 && (
-                    <div className="flex shrink-0 gap-1">
-                      <button
-                        type="button"
-                        className="h-9 w-9 rounded border border-secondary-200 text-sm hover:bg-secondary-50 disabled:opacity-30"
-                        aria-label={`Move ${name} up`}
-                        disabled={busy || index === 0}
-                        onClick={() => move(index, -1)}
-                      >
-                        &uarr;
-                      </button>
-                      <button
-                        type="button"
-                        className="h-9 w-9 rounded border border-secondary-200 text-sm hover:bg-secondary-50 disabled:opacity-30"
-                        aria-label={`Move ${name} down`}
-                        disabled={busy || index === selected.length - 1}
-                        onClick={() => move(index, 1)}
-                      >
-                        &darr;
-                      </button>
-                    </div>
-                  )}
-                </div>
-                {index >= 0 && (
-                  <div className="mt-1 grid grid-cols-2 gap-x-4 gap-y-1 sm:grid-cols-3">
-                    {index === 0 && (
-                      <CompactSlider
-                        label="Before first"
-                        unit="s"
-                        value={clip.delaySeconds}
-                        max={60}
-                        limit={3600}
-                        step={0.1}
-                        onChange={(value) => update(name, { delaySeconds: value })}
-                      />
-                    )}
-                    <CompactSlider
-                      label="Gap after"
-                      unit="s"
-                      value={clip.pauseAfterSeconds}
-                      max={60}
-                      limit={3600}
-                      step={0.1}
-                      onChange={(value) => update(name, { pauseAfterSeconds: value })}
-                    />
-                    <CompactSlider
-                      label="Volume"
-                      unit="%"
-                      value={clip.volumePercent}
-                      max={100}
-                      step={0.1}
-                      onChange={(value) => update(name, { volumePercent: value })}
-                    />
-                    <div className="col-span-2 flex items-center gap-3 sm:col-span-3">
-                      <label className="flex min-h-8 shrink-0 items-center gap-1.5 text-xs">
-                        <input
-                          type="checkbox"
-                          className="h-4 w-4"
-                          checked={clip.increaseVolume}
-                          onChange={(event) =>
-                            update(name, { increaseVolume: event.target.checked })
-                          }
-                        />
-                        Louder than previous
-                      </label>
-                      {clip.increaseVolume && (
-                        <div className="min-w-0 max-w-56 flex-1">
-                          <CompactSlider
-                            label="Increase"
-                            unit="pt"
-                            value={clip.volumeIncreasePercent}
-                            max={100}
-                            step={0.1}
-                            onChange={(value) => update(name, { volumeIncreasePercent: value })}
-                          />
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          modifiers={[({ transform }) => ({ ...transform, x: 0 })]}
+          onDragEnd={({ active, over }) => {
+            if (busy || !over || active.id === over.id) return;
+            setSelected((current) => {
+              const from = current.indexOf(String(active.id));
+              const to = current.indexOf(String(over.id));
+              return from < 0 || to < 0 ? current : arrayMove(current, from, to);
+            });
+          }}
+        >
+          <SortableContext items={selected} strategy={verticalListSortingStrategy}>
+            <div className="mb-2 space-y-2">
+              {names.map((name) => {
+                const index = selected.indexOf(name);
+                const clip = clips[name];
+                if (!clip) return null;
+                return (
+                  <SortableClip key={name} name={name} disabled={busy || index < 0}>
+                    {(handle) => (
+                      <fieldset disabled={busy} aria-label={name} className="min-w-0">
+                        <div className="flex items-center gap-2 rounded-t-lg border-b border-secondary-200 bg-secondary-50 px-2">
+                          {index >= 0 && handle}
+                          <label className="flex min-h-8 min-w-0 flex-1 items-center gap-2 text-sm font-medium">
+                            <input
+                              type="checkbox"
+                              className="h-4 w-4 shrink-0"
+                              checked={index >= 0}
+                              onChange={(event) =>
+                                setSelected(
+                                  event.target.checked
+                                    ? [...selected, name]
+                                    : selected.filter((sound) => sound !== name),
+                                )
+                              }
+                            />
+                            <span className="break-all">{name}</span>
+                          </label>
+                          {index >= 0 && (
+                            <span className="shrink-0 rounded bg-surface px-1.5 py-0.5 text-xs font-semibold tabular-nums text-secondary-500">
+                              {index + 1}
+                            </span>
+                          )}
                         </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </fieldset>
-            );
-          })}
-        </div>
+                        {index >= 0 && (
+                          <div className="grid grid-cols-2 items-start gap-x-3 gap-y-1 px-2 py-1.5 sm:grid-cols-4">
+                            {index === 0 && (
+                              <CompactSlider
+                                label="Before first"
+                                unit="s"
+                                value={clip.delaySeconds}
+                                max={10}
+                                limit={3600}
+                                step={0.1}
+                                onChange={(value) => update(name, { delaySeconds: value })}
+                              />
+                            )}
+                            <CompactSlider
+                              label="Gap after"
+                              unit="s"
+                              value={clip.pauseAfterSeconds}
+                              max={60}
+                              limit={3600}
+                              step={0.1}
+                              onChange={(value) => update(name, { pauseAfterSeconds: value })}
+                            />
+                            <CompactSlider
+                              label="Volume"
+                              unit="%"
+                              value={clip.volumePercent}
+                              max={100}
+                              step={0.1}
+                              onChange={(value) => update(name, { volumePercent: value })}
+                            />
+                            <CompactSlider
+                              label="Increase"
+                              unit="pt"
+                              value={clip.volumeIncreasePercent}
+                              max={100}
+                              step={0.1}
+                              disabled={!clip.increaseVolume}
+                              control={
+                                <label
+                                  title="Louder than the previous clip"
+                                  className="flex items-center gap-1 text-secondary-600"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    className="h-3.5 w-3.5"
+                                    aria-label={`Make ${name} louder than the previous clip`}
+                                    checked={clip.increaseVolume}
+                                    onChange={(event) =>
+                                      update(name, { increaseVolume: event.target.checked })
+                                    }
+                                  />
+                                  Boost
+                                </label>
+                              }
+                              onChange={(value) => update(name, { volumeIncreasePercent: value })}
+                            />
+                          </div>
+                        )}
+                      </fieldset>
+                    )}
+                  </SortableClip>
+                );
+              })}
+            </div>
+          </SortableContext>
+        </DndContext>
         <details className="mb-2 text-xs text-secondary-500">
           <summary className="cursor-pointer py-1">How playback works</summary>
           <p className="py-1">
             The first clip has a starting delay; every clip has a gap after it. One selected clip
             repeats alone. No selections means silence. Saving stops playback until the next
-            opening. Louder than previous uses the previous clip volume plus this clip increase,
-            capped at 100%. The first clip starts at its own volume on each opening. Otherwise, each
-            clip uses its own volume. Tests use the saved clip volume immediately. 0% is silent;
-            100% keeps the original level. Volume control requires uncompressed PCM or
-            floating-point WAVs; recordings can differ in loudness. Saving stops playback until the
-            next opening.
+            opening. Boost uses the previous clip volume plus this clip increase, capped at 100%.
+            The first clip starts at its own volume on each opening. Otherwise, each clip uses its
+            own volume. Tests use the saved clip volume immediately. 0% is silent; 100% keeps the
+            original level. Volume control requires uncompressed PCM or floating-point WAVs;
+            recordings can differ in loudness. Saving stops playback until the next opening. Drag
+            with a finger or mouse; keyboard users can focus the grip, press Space, use arrow keys,
+            then press Space to drop or Escape to cancel.
           </p>
         </details>
         <Button type="submit" disabled={busy} className="w-full sm:w-auto">
@@ -496,6 +510,8 @@ function CompactSlider({
   value,
   max,
   limit = max,
+  disabled = false,
+  control,
   step,
   onChange,
 }: {
@@ -504,15 +520,18 @@ function CompactSlider({
   value: string;
   max: number;
   limit?: number;
+  disabled?: boolean;
+  control?: ReactNode;
   step: number;
   onChange(value: string): void;
 }) {
   return (
     <div className="min-w-0">
       <div className="flex items-center justify-between gap-1 text-xs">
-        <span className="text-secondary-600">{label}</span>
+        {control ?? <span className="text-secondary-600">{label}</span>}
         <label className="flex items-center gap-0.5 text-secondary-700">
           <input
+            disabled={disabled}
             aria-label={`${label} exact value`}
             className="h-6 w-12 rounded border border-secondary-200 bg-transparent px-1 text-right tabular-nums focus:outline-none focus:ring-1 focus:ring-primary-500"
             type="number"
@@ -528,6 +547,7 @@ function CompactSlider({
         </label>
       </div>
       <input
+        disabled={disabled}
         aria-label={label}
         className="block h-6 w-full cursor-pointer accent-primary-600 disabled:cursor-default"
         type="range"
@@ -537,6 +557,55 @@ function CompactSlider({
         value={value || "0"}
         onChange={(event) => onChange(event.target.value)}
       />
+    </div>
+  );
+}
+
+function SortableClip({
+  name,
+  disabled,
+  children,
+}: {
+  name: string;
+  disabled: boolean;
+  children(handle: ReactNode): ReactNode;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    setActivatorNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: name, disabled });
+  return (
+    <div
+      ref={setNodeRef}
+      style={{ transform: CSS.Translate.toString(transform), transition }}
+      className={`min-w-0 rounded-lg border bg-surface ${isDragging ? "relative z-10 border-primary-400 shadow-lg ring-1 ring-primary-200" : "border-secondary-300 shadow-sm"}`}
+    >
+      {children(
+        <button
+          type="button"
+          ref={setActivatorNodeRef}
+          {...attributes}
+          {...listeners}
+          disabled={disabled}
+          aria-label={`Reorder ${name}`}
+          title="Drag to reorder, or press Space and use arrow keys"
+          className="flex h-9 w-7 shrink-0 touch-none items-center justify-center rounded text-secondary-400 hover:bg-secondary-100 hover:text-secondary-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-500 active:cursor-grabbing disabled:opacity-30 cursor-grab"
+        >
+          <svg viewBox="0 0 10 16" width="10" height="16" fill="currentColor" aria-hidden="true">
+            {[3, 8, 13].map((y) => (
+              <g key={y}>
+                <circle cx="2.5" cy={y} r="1.5" />
+                <circle cx="7.5" cy={y} r="1.5" />
+              </g>
+            ))}
+          </svg>
+        </button>,
+      )}
     </div>
   );
 }
