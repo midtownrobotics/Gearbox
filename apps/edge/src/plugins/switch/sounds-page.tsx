@@ -28,19 +28,12 @@ import {
 import type { SwitchClipSettings } from "@g3/worker-edge/switch-types";
 import type { ReactNode } from "react";
 import { useRef, useState } from "react";
-import { getErrorMessage } from "../../shared/api";
+import { Link } from "react-router-dom";
+import { useAuthUser } from "../../shared/auth";
 import { formatDateTime } from "../../shared/format";
 import { useLoad } from "../../shared/use-load";
-
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "";
-async function request(path: string, init?: RequestInit) {
-  const response = await fetch(`${API_BASE}/switch${path}`, {
-    ...init,
-    credentials: "include",
-  });
-  if (!response.ok) throw new Error(await getErrorMessage(response));
-  return response.json();
-}
+import { soundRequest as request } from "./sound-api";
+import { SoundReviewQueue } from "./submissions-page";
 
 async function loadState() {
   return request("/state") as Promise<{
@@ -67,6 +60,23 @@ function bytes(value: number) {
 }
 
 export function DoorSoundsPage() {
+  const user = useAuthUser();
+  if (!user.isAdmin && !user.isMentor)
+    return (
+      <Page title="Door Sounds">
+        <p className="text-sm text-secondary-600">
+          Door Sounds is available to admins and mentors.
+        </p>
+        <Link className="text-primary-600 underline" to="/sound-requests">
+          Suggest a sound for admin approval
+        </Link>
+      </Page>
+    );
+  return <ManageDoorSoundsPage />;
+}
+
+function ManageDoorSoundsPage() {
+  const user = useAuthUser();
   const state = useLoad(loadState, []);
   const fileInput = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -125,7 +135,22 @@ export function DoorSoundsPage() {
 
   const data = state.data;
   return (
-    <Page title="Door Sounds">
+    <Page
+      title="Door Sounds"
+      actions={
+        user.isAdmin && (
+          <Button
+            variant="secondary"
+            disabled={busy !== null}
+            onClick={() =>
+              void act("stop", () => request("/stop", { method: "POST" }), "Stopped the sound.")
+            }
+          >
+            Stop sound
+          </Button>
+        )
+      }
+    >
       {actionError && <ErrorBanner message={actionError} />}
       {message && (
         <p className="break-words rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm text-emerald-800">
@@ -133,6 +158,7 @@ export function DoorSoundsPage() {
         </p>
       )}
 
+      {user.isAdmin && <SoundReviewQueue onApproved={state.reload} />}
       <PlaybackSettings
         key={JSON.stringify([
           data.delaySeconds,
@@ -231,98 +257,104 @@ export function DoorSoundsPage() {
           )}
         </Card>
       </details>
-      <details className="mx-auto w-full max-w-3xl rounded-xl border border-secondary-200 bg-surface px-4 py-2">
-        <summary className="cursor-pointer py-1 text-sm font-medium text-secondary-600">
-          Upload and manage sound files
-        </summary>
-        <div className="mt-2 space-y-3">
-          <Card title="Upload a sound" className="mx-auto w-full max-w-3xl">
-            <p className="mb-2 text-xs text-secondary-500">
-              Upload a WAV file up to 10 MB. Select it in playback settings to include it.
-            </p>
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              <input
-                ref={fileInput}
-                type="file"
-                accept=".wav,audio/wav,audio/x-wav"
-                onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-                className={`${inputClass} min-w-0 flex-1`}
-              />
-              <Button disabled={!file || busy !== null} onClick={() => void upload()}>
-                {busy === "upload" ? "Uploading…" : "Upload sound"}
-              </Button>
-            </div>
-          </Card>
-
-          <Card title="Sounds on the Orange Pi" className="mx-auto w-full max-w-3xl">
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <p className="text-sm text-secondary-500">
-                One sound plays at a time: a test or door opening replaces the one playing.
+      {user.isAdmin && (
+        <details className="mx-auto w-full max-w-3xl rounded-xl border border-secondary-200 bg-surface px-4 py-2">
+          <summary className="cursor-pointer py-1 text-sm font-medium text-secondary-600">
+            Upload and manage sound files
+          </summary>
+          <div className="mt-2 space-y-3">
+            <Card title="Upload a sound" className="mx-auto w-full max-w-3xl">
+              <p className="mb-2 text-xs text-secondary-500">
+                Upload a WAV file up to 10 MB. Select it in playback settings to include it.
               </p>
-              <Button
-                variant="secondary"
-                disabled={busy !== null}
-                onClick={() =>
-                  void act("stop", () => request("/stop", { method: "POST" }), "Stopped the sound.")
-                }
-              >
-                {busy === "stop" ? "Stopping…" : "Stop sound"}
-              </Button>
-            </div>
-            {data.sounds.length === 0 ? (
-              <p className="text-sm text-secondary-500">No uploaded sounds yet.</p>
-            ) : (
-              <div className="divide-y divide-secondary-100">
-                {data.sounds.map((sound) => (
-                  <div
-                    key={sound.name}
-                    className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0 last:pb-0"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <p className="break-all font-medium text-secondary-900">{sound.name}</p>
-                      <p className="text-xs text-secondary-500">{bytes(sound.size)}</p>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        variant="secondary"
-                        disabled={busy !== null}
-                        onClick={() =>
-                          void act(
-                            `test-${sound.name}`,
-                            () =>
-                              request(`/sounds/${encodeURIComponent(sound.name)}/test`, {
-                                method: "POST",
-                              }),
-                            `Playing ${sound.name} on the box.`,
-                          )
-                        }
-                      >
-                        {busy === `test-${sound.name}` ? "Playing…" : "Test on Orange Pi"}
-                      </Button>
-                      <ConfirmButton
-                        label={busy === `delete-${sound.name}` ? "Deleting…" : "Delete"}
-                        confirmLabel="Delete"
-                        question={`Delete ${sound.name} from the box?`}
-                        disabled={busy !== null}
-                        onConfirm={() =>
-                          void act(
-                            `delete-${sound.name}`,
-                            () =>
-                              request(`/sounds/${encodeURIComponent(sound.name)}`, {
-                                method: "DELETE",
-                              }),
-                            `Deleted ${sound.name}.`,
-                          )
-                        }
-                      />
-                    </div>
-                  </div>
-                ))}
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <input
+                  ref={fileInput}
+                  type="file"
+                  accept=".wav,audio/wav,audio/x-wav"
+                  onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+                  className={`${inputClass} min-w-0 flex-1`}
+                />
+                <Button disabled={!file || busy !== null} onClick={() => void upload()}>
+                  {busy === "upload" ? "Uploading…" : "Upload sound"}
+                </Button>
               </div>
-            )}
-          </Card>
-        </div>
-      </details>
+            </Card>
+
+            <Card title="Sounds on the Orange Pi" className="mx-auto w-full max-w-3xl">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <p className="text-sm text-secondary-500">
+                  One sound plays at a time: a test or door opening replaces the one playing.
+                </p>
+                <Button
+                  variant="secondary"
+                  disabled={busy !== null}
+                  onClick={() =>
+                    void act(
+                      "stop",
+                      () => request("/stop", { method: "POST" }),
+                      "Stopped the sound.",
+                    )
+                  }
+                >
+                  {busy === "stop" ? "Stopping…" : "Stop sound"}
+                </Button>
+              </div>
+              {data.sounds.length === 0 ? (
+                <p className="text-sm text-secondary-500">No uploaded sounds yet.</p>
+              ) : (
+                <div className="divide-y divide-secondary-100">
+                  {data.sounds.map((sound) => (
+                    <div
+                      key={sound.name}
+                      className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0 last:pb-0"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="break-all font-medium text-secondary-900">{sound.name}</p>
+                        <p className="text-xs text-secondary-500">{bytes(sound.size)}</p>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          variant="secondary"
+                          disabled={busy !== null}
+                          onClick={() =>
+                            void act(
+                              `test-${sound.name}`,
+                              () =>
+                                request(`/sounds/${encodeURIComponent(sound.name)}/test`, {
+                                  method: "POST",
+                                }),
+                              `Playing ${sound.name} on the box.`,
+                            )
+                          }
+                        >
+                          {busy === `test-${sound.name}` ? "Playing…" : "Test on Orange Pi"}
+                        </Button>
+                        <ConfirmButton
+                          label={busy === `delete-${sound.name}` ? "Deleting…" : "Delete"}
+                          confirmLabel="Delete"
+                          question={`Delete ${sound.name} from the box?`}
+                          disabled={busy !== null}
+                          onConfirm={() =>
+                            void act(
+                              `delete-${sound.name}`,
+                              () =>
+                                request(`/sounds/${encodeURIComponent(sound.name)}`, {
+                                  method: "DELETE",
+                                }),
+                              `Deleted ${sound.name}.`,
+                            )
+                          }
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card>
+          </div>
+        </details>
+      )}
     </Page>
   );
 }
@@ -389,9 +421,6 @@ function PlaybackSettings({
   );
   return (
     <Card title="Playback settings" className="mx-auto w-full max-w-3xl">
-      <p className="mb-2 text-xs text-secondary-500">
-        Drag the grip to reorder. Play top to bottom, then repeat. Closing the door stops playback.
-      </p>
       <form
         onSubmit={(event) => {
           event.preventDefault();
