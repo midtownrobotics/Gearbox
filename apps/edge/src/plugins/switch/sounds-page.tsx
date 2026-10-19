@@ -1,4 +1,5 @@
 import { Button, Card, ConfirmButton, ErrorBanner, Loading, Page, Stat, inputClass } from "@g3/ui";
+import type { SwitchClipSettings } from "@g3/worker-edge/switch-types";
 import { useRef, useState } from "react";
 import { getErrorMessage } from "../../shared/api";
 import { formatDateTime } from "../../shared/format";
@@ -24,6 +25,7 @@ async function loadState() {
     lastTriggeredAt: number | null;
     lastSound: string | null;
     lastError: string | null;
+    soundSettings: Record<string, SwitchClipSettings>;
     volumePercent: number;
     increaseVolume: boolean;
     volumeIncreasePercent: number;
@@ -109,8 +111,8 @@ export function DoorSoundsPage() {
       <Card title="Door switch">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-secondary-500">
-            Sound starts after the opening delay and repeats while the door stays open. Closing the
-            door cuts off the clip or cancels the delay.
+            Selected clips play in order with their own delays and volumes. Closing the door cuts
+            off the clip or cancels the delay.
           </p>
           <Button variant="secondary" onClick={state.reload}>
             Refresh status
@@ -164,6 +166,7 @@ export function DoorSoundsPage() {
           data.delaySeconds,
           data.selectedSounds,
           data.sounds,
+          data.soundSettings,
           data.volumePercent,
           data.increaseVolume,
           data.volumeIncreasePercent,
@@ -273,11 +276,14 @@ export function DoorSoundsPage() {
 }
 
 type PlaybackSettingsValue = {
-  delaySeconds: number;
   selectedSounds: string[];
-  volumePercent: number;
+  soundSettings: Record<string, SwitchClipSettings>;
+};
+type ClipDraft = {
+  delaySeconds: string;
+  volumePercent: string;
   increaseVolume: boolean;
-  volumeIncreasePercent: number;
+  volumeIncreasePercent: string;
 };
 
 function PlaybackSettings({
@@ -285,19 +291,34 @@ function PlaybackSettings({
   busy,
   save,
 }: {
-  initial: PlaybackSettingsValue & { sounds: { name: string }[] };
+  initial: PlaybackSettingsValue & SwitchClipSettings & { sounds: { name: string }[] };
   busy: boolean;
   save(settings: PlaybackSettingsValue): Promise<boolean>;
 }) {
-  const [volume, setVolume] = useState(String(initial.volumePercent));
-  const [increase, setIncrease] = useState(initial.increaseVolume);
-  const [step, setStep] = useState(String(initial.volumeIncreasePercent));
-  const [delay, setDelay] = useState(String(initial.delaySeconds));
   const [selected, setSelected] = useState(initial.selectedSounds);
+  const [clips, setClips] = useState<Record<string, ClipDraft>>(() =>
+    Object.fromEntries(
+      initial.sounds.map(({ name }) => {
+        const clip = initial.soundSettings[name] ?? initial;
+        return [
+          name,
+          {
+            delaySeconds: String(clip.delaySeconds),
+            volumePercent: String(clip.volumePercent),
+            increaseVolume: clip.increaseVolume,
+            volumeIncreasePercent: String(clip.volumeIncreasePercent),
+          },
+        ];
+      }),
+    ),
+  );
   const names = [
     ...selected,
     ...initial.sounds.map((sound) => sound.name).filter((name) => !selected.includes(name)),
   ];
+  function update(name: string, patch: Partial<ClipDraft>) {
+    setClips((current) => ({ ...current, [name]: { ...current[name], ...patch } }));
+  }
   function move(index: number, direction: number) {
     const next = [...selected];
     [next[index], next[index + direction]] = [next[index + direction], next[index]];
@@ -305,129 +326,152 @@ function PlaybackSettings({
   }
   return (
     <Card title="Playback settings">
-      <p className="mb-4 text-sm text-secondary-500">
-        Select sounds and arrange their order. Each opening starts with the first selected sound
-        after the delay, then plays down the list and repeats while open. With one selected, only
-        that sound repeats. With none selected, the door stays silent. Closing the door cuts off
-        audio immediately. Saving stops playback and applies to the next opening.
+      <p className="mb-3 text-sm text-secondary-500">
+        Select clips and arrange their order. Each clip waits its own delay before playing,
+        including repeats. One selected clip repeats alone; none stays silent. Closing the door
+        cancels any delay and cuts off audio immediately.
       </p>
       <form
         onSubmit={(event) => {
           event.preventDefault();
           void save({
-            delaySeconds: Number(delay),
             selectedSounds: selected,
-            volumePercent: Number(volume),
-            increaseVolume: increase,
-            volumeIncreasePercent: Number(step),
+            soundSettings: Object.fromEntries(
+              Object.entries(clips).map(([name, clip]) => [
+                name,
+                {
+                  delaySeconds: Number(clip.delaySeconds),
+                  volumePercent: Number(clip.volumePercent),
+                  increaseVolume: clip.increaseVolume,
+                  volumeIncreasePercent: Number(clip.volumeIncreasePercent),
+                },
+              ]),
+            ),
           });
         }}
       >
-        <label className="mb-4 block text-sm font-medium">
-          Opening delay (seconds)
-          <input
-            className={inputClass}
-            type="number"
-            min="0"
-            max="3600"
-            step="0.1"
-            required
-            value={delay}
-            disabled={busy}
-            onChange={(event) => setDelay(event.target.value)}
-          />
-        </label>
-        <label className="mb-4 block text-sm font-medium">
-          Starting volume (%)
-          <input
-            className={inputClass}
-            type="number"
-            min="0"
-            max="100"
-            step="1"
-            required
-            value={volume}
-            disabled={busy}
-            onChange={(event) => setVolume(event.target.value)}
-          />
-        </label>
-        <label className="mb-4 flex items-center gap-2 text-sm font-medium">
-          <input
-            type="checkbox"
-            checked={increase}
-            disabled={busy}
-            onChange={(event) => setIncrease(event.target.checked)}
-          />
-          Make each successive clip louder
-        </label>
-        <label className="mb-4 block text-sm font-medium">
-          Increase per clip (percentage points)
-          <input
-            className={inputClass}
-            type="number"
-            min="0"
-            max="100"
-            step="1"
-            required
-            value={step}
-            disabled={busy || !increase}
-            onChange={(event) => setStep(event.target.value)}
-          />
-        </label>
-        <p className="mb-4 text-sm text-secondary-500">
-          When enabled, each successive clip, including repeats, adds this increase up to 100%. Each
-          opening resets to the starting volume. Tests use the saved starting volume. 0% is silent;
-          100% keeps the file's original level. Volume control requires uncompressed PCM or
-          floating-point WAV files. Different recordings may have different loudness.
-        </p>
-        <div className="mb-4 space-y-3">
+        <div className="mb-3 space-y-3">
           {names.map((name) => {
             const index = selected.indexOf(name);
+            const clip = clips[name];
+            if (!clip) return null;
             return (
-              <div key={name} className="flex flex-wrap items-center gap-3">
-                <label className="flex min-w-0 flex-1 items-center gap-2 break-all">
-                  <input
-                    type="checkbox"
-                    checked={index >= 0}
-                    disabled={busy}
-                    onChange={(event) =>
-                      setSelected(
-                        event.target.checked
-                          ? [...selected, name]
-                          : selected.filter((sound) => sound !== name),
-                      )
-                    }
-                  />
-                  {index >= 0 ? `${index + 1}. ` : ""}
-                  {name}
-                </label>
-                {index >= 0 && (
-                  <>
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      aria-label={`Move ${name} up`}
-                      disabled={busy || index === 0}
-                      onClick={() => move(index, -1)}
-                    >
-                      Move up
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      aria-label={`Move ${name} down`}
-                      disabled={busy || index === selected.length - 1}
-                      onClick={() => move(index, 1)}
-                    >
-                      Move down
-                    </Button>
-                  </>
-                )}
-              </div>
+              <fieldset
+                key={name}
+                disabled={busy}
+                aria-label={name}
+                className="min-w-0 rounded-lg border border-secondary-200 p-3"
+              >
+                <div className="mb-3 flex items-start gap-2">
+                  <label className="flex min-h-10 min-w-0 flex-1 items-center gap-2 text-sm font-medium">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 shrink-0"
+                      checked={index >= 0}
+                      onChange={(event) =>
+                        setSelected(
+                          event.target.checked
+                            ? [...selected, name]
+                            : selected.filter((sound) => sound !== name),
+                        )
+                      }
+                    />
+                    <span className="break-all">
+                      {index >= 0 ? `${index + 1}. ` : ""}
+                      {name}
+                    </span>
+                  </label>
+                  {index >= 0 && (
+                    <div className="flex shrink-0 gap-1">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        aria-label={`Move ${name} up`}
+                        disabled={busy || index === 0}
+                        onClick={() => move(index, -1)}
+                      >
+                        ?
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        aria-label={`Move ${name} down`}
+                        disabled={busy || index === selected.length - 1}
+                        onClick={() => move(index, 1)}
+                      >
+                        ?
+                      </Button>
+                    </div>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="min-w-0 text-xs font-medium">
+                    Delay before (sec)
+                    <input
+                      className={`${inputClass} mt-1 w-full min-w-0`}
+                      type="number"
+                      inputMode="decimal"
+                      min="0"
+                      max="3600"
+                      step="0.1"
+                      required
+                      value={clip.delaySeconds}
+                      onChange={(event) => update(name, { delaySeconds: event.target.value })}
+                    />
+                  </label>
+                  <label className="min-w-0 text-xs font-medium">
+                    Volume (%)
+                    <input
+                      className={`${inputClass} mt-1 w-full min-w-0`}
+                      type="number"
+                      inputMode="numeric"
+                      min="0"
+                      max="100"
+                      step="1"
+                      required
+                      value={clip.volumePercent}
+                      onChange={(event) => update(name, { volumePercent: event.target.value })}
+                    />
+                  </label>
+                  <label className="flex min-h-11 items-center gap-2 text-xs font-medium">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 shrink-0"
+                      checked={clip.increaseVolume}
+                      onChange={(event) => update(name, { increaseVolume: event.target.checked })}
+                    />
+                    Louder than previous
+                  </label>
+                  <label className="min-w-0 text-xs font-medium">
+                    Increase (points)
+                    <input
+                      className={`${inputClass} mt-1 w-full min-w-0`}
+                      type="number"
+                      inputMode="numeric"
+                      min="0"
+                      max="100"
+                      step="1"
+                      required
+                      disabled={!clip.increaseVolume || busy}
+                      value={clip.volumeIncreasePercent}
+                      onChange={(event) =>
+                        update(name, { volumeIncreasePercent: event.target.value })
+                      }
+                    />
+                  </label>
+                </div>
+              </fieldset>
             );
           })}
         </div>
-        <Button type="submit" disabled={busy}>
+        <p className="mb-3 text-xs text-secondary-500">
+          ?Louder than previous? uses the previous clip?s volume plus this clip?s increase, capped
+          at 100%. The first clip starts at its own volume on each opening. Otherwise, each clip
+          uses its own volume. Tests use the saved clip volume immediately. 0% is silent; 100% keeps
+          the original level. Volume control requires uncompressed PCM or floating-point WAVs;
+          recordings can differ in loudness. Saving stops playback until the next opening.
+        </p>
+        <Button type="submit" disabled={busy} className="w-full sm:w-auto">
           Save playback settings
         </Button>
       </form>

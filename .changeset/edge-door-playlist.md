@@ -4,6 +4,5 @@
 "@g3/edge-agent": minor
 ---
 
-Door Sounds now has a saved opening delay in seconds and selectable sounds with Move up/down controls. Each opening starts at the first selection, plays in order, and repeats while open; a single selection repeats alone. Closing the door cancels the delay or cuts off the clip immediately.
 
-Set a starting volume and optionally increase it by a tunable number of percentage points per clip, including repeats, up to 100%. Each opening resets the volume. Volume control works with uncompressed PCM and floating-point WAV files.
+Door Sounds now has an ordered multi-selection with compact controls beneath each clip for delay, volume, and an optional tunable increase over the previous clip. Each clip waits its own delay, including repeats. Each opening starts at the first selection and its volume; closing cancels any delay or cuts off playback immediately. Preferences persist on the Edge box. Volume control supports uncompressed PCM and floating-point WAVs.

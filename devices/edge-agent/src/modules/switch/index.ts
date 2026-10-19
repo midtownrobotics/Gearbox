@@ -28,12 +28,16 @@ export function createSwitchModule(ctx: ModuleContext, soundPlayer?: SoundPlayer
   } | null;
   let settings: SwitchPlaybackSettings | null = saved
     ? {
+        soundSettings: {},
         volumePercent: 100,
         increaseVolume: false,
         volumeIncreasePercent: 10,
         ...JSON.parse(saved.value),
       }
     : null;
+  function clipSettings(name: string) {
+    return settings?.soundSettings[name];
+  }
   const availableSounds = () => library.paths();
   const player =
     soundPlayer ??
@@ -52,6 +56,21 @@ export function createSwitchModule(ctx: ModuleContext, soundPlayer?: SoundPlayer
   let reading = false;
   // Bumped whenever the repeat for an opening must end: the door closed, a test, or Stop.
   let opening = 0;
+  let cancelDelay: (() => void) | null = null;
+
+  function waitDelay(seconds: number) {
+    return new Promise<void>((resolve) => {
+      const timeout = setTimeout(() => {
+        cancelDelay = null;
+        resolve();
+      }, seconds * 1000);
+      cancelDelay = () => {
+        clearTimeout(timeout);
+        cancelDelay = null;
+        resolve();
+      };
+    });
+  }
 
   async function play(path?: string, volume = settings?.volumePercent ?? 100) {
     try {
@@ -70,23 +89,39 @@ export function createSwitchModule(ctx: ModuleContext, soundPlayer?: SoundPlayer
 
   /** Plays sounds back to back for as long as the door stays open. */
   async function playWhileOpen() {
+    cancelDelay?.();
     const current = ++opening;
     const delay = settings?.delaySeconds ?? 0;
-    if (delay > 0) await Bun.sleep(delay * 1000);
+    if (delay > 0) await waitDelay(delay);
     if (current !== opening || detector.state().rawGrounded) return;
     const paths = settings
       ? settings.selectedSounds.map((name) => library.soundPath(name))
       : await library.paths();
     let next = 0;
+    let previousVolume: number | undefined;
     while (paths.length > 0 && current === opening && !detector.state().rawGrounded) {
+      const path = paths[next % paths.length];
+      const name = path.split(/[\\/]/).pop() ?? "";
+      const clip = clipSettings(name);
+      if (clip && clip.delaySeconds > 0) await waitDelay(clip.delaySeconds);
+      if (current !== opening || detector.state().rawGrounded) return;
       const began = Date.now();
       try {
-        const volume = Math.min(
-          100,
-          (settings?.volumePercent ?? 100) +
-            (settings?.increaseVolume ? next * settings.volumeIncreasePercent : 0),
-        );
-        await play(paths[next++ % paths.length], volume);
+        const volume = clip
+          ? Math.min(
+              100,
+              clip.increaseVolume && previousVolume !== undefined
+                ? previousVolume + clip.volumeIncreasePercent
+                : clip.volumePercent,
+            )
+          : Math.min(
+              100,
+              (settings?.volumePercent ?? 100) +
+                (settings?.increaseVolume ? next * settings.volumeIncreasePercent : 0),
+            );
+        previousVolume = volume;
+        next++;
+        await play(path, volume);
       } catch {
         return; // Stopped (closed, a test, Stop) or failed: lastError says which.
       }
@@ -98,6 +133,7 @@ export function createSwitchModule(ctx: ModuleContext, soundPlayer?: SoundPlayer
   /** Silences the sound and ends any repeat. */
   function silence() {
     opening++;
+    cancelDelay?.();
     player.stop();
   }
 
@@ -137,6 +173,7 @@ export function createSwitchModule(ctx: ModuleContext, soundPlayer?: SoundPlayer
     lastTriggeredAt,
     lastSound,
     lastError,
+    soundSettings: settings?.soundSettings ?? {},
     volumePercent: settings?.volumePercent ?? 100,
     increaseVolume: settings?.increaseVolume ?? false,
     volumeIncreasePercent: settings?.volumeIncreasePercent ?? 10,
@@ -158,12 +195,37 @@ export function createSwitchModule(ctx: ModuleContext, soundPlayer?: SoundPlayer
       if (!body || typeof body !== "object" || Array.isArray(body))
         return c.json({ error: "Expected playback settings." }, 400);
       if (body) {
+        body.soundSettings ??= settings?.soundSettings ?? {};
+        body.delaySeconds ??= 0;
         body.volumePercent ??= settings?.volumePercent ?? 100;
         body.increaseVolume ??= settings?.increaseVolume ?? false;
         body.volumeIncreasePercent ??= settings?.volumeIncreasePercent ?? 10;
       }
       if (
         !body ||
+        !body.soundSettings ||
+        typeof body.soundSettings !== "object" ||
+        Array.isArray(body.soundSettings) ||
+        Object.values(body.soundSettings).some((value) => {
+          const clip = value as Record<string, unknown> | null;
+          return (
+            !clip ||
+            typeof clip !== "object" ||
+            Array.isArray(clip) ||
+            typeof clip.increaseVolume !== "boolean" ||
+            ![clip.volumePercent, clip.volumeIncreasePercent].every(
+              (number) =>
+                typeof number === "number" &&
+                Number.isFinite(number) &&
+                number >= 0 &&
+                number <= 100,
+            ) ||
+            typeof clip.delaySeconds !== "number" ||
+            !Number.isFinite(clip.delaySeconds) ||
+            clip.delaySeconds < 0 ||
+            clip.delaySeconds > 3600
+          );
+        }) ||
         typeof body.increaseVolume !== "boolean" ||
         ![body.volumePercent, body.volumeIncreasePercent].every(
           (value) =>
@@ -186,12 +248,14 @@ export function createSwitchModule(ctx: ModuleContext, soundPlayer?: SoundPlayer
         );
       }
       try {
-        for (const name of body.selectedSounds) library.soundPath(name);
+        for (const name of [...body.selectedSounds, ...Object.keys(body.soundSettings)])
+          library.soundPath(name);
         const next = {
+          soundSettings: body.soundSettings as SwitchPlaybackSettings["soundSettings"],
           volumePercent: body.volumePercent as number,
           increaseVolume: body.increaseVolume as boolean,
           volumeIncreasePercent: body.volumeIncreasePercent as number,
-          delaySeconds: body.delaySeconds,
+          delaySeconds: Object.keys(body.soundSettings).length > 0 ? 0 : body.delaySeconds,
           selectedSounds: body.selectedSounds as string[],
         };
         ctx.db.run("INSERT OR REPLACE INTO switch_settings (id, value) VALUES (1, ?)", [
@@ -236,7 +300,11 @@ export function createSwitchModule(ctx: ModuleContext, soundPlayer?: SoundPlayer
         // A sound can outlast the worker's request deadline. Acknowledge the
         // test immediately; playback errors remain visible in /state.
         opening++; // A test replaces the door's sound, repeat included.
-        void play(sound).catch(() => {});
+        cancelDelay?.();
+        void play(
+          sound,
+          clipSettings(c.req.param("name"))?.volumePercent ?? settings?.volumePercent ?? 100,
+        ).catch(() => {});
         return c.json({ ok: true, sound });
       } catch (error) {
         return c.json({ error: error instanceof Error ? error.message : String(error) }, 400);
@@ -252,8 +320,11 @@ export function createSwitchModule(ctx: ModuleContext, soundPlayer?: SoundPlayer
         const name = c.req.param("name");
         await library.remove(name);
         if (settings) {
+          const soundSettings = { ...settings.soundSettings };
+          delete soundSettings[name];
           settings = {
             ...settings,
+            soundSettings,
             selectedSounds: settings.selectedSounds.filter((sound) => sound !== name),
           };
           ctx.db.run("INSERT OR REPLACE INTO switch_settings (id, value) VALUES (1, ?)", [
