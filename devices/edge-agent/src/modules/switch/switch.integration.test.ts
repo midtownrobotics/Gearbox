@@ -117,12 +117,6 @@ describe("switch module integration", () => {
         (await settings({ delaySeconds: 0, selectedSounds: [], volumePercent: 101 })).status,
       ).toBe(400);
       expect(
-        (await settings({ delaySeconds: 0, selectedSounds: [], increaseVolume: "yes" })).status,
-      ).toBe(400);
-      expect(
-        (await settings({ delaySeconds: 0, selectedSounds: [], volumeIncreasePercent: -1 })).status,
-      ).toBe(400);
-      expect(
         (
           await settings({
             selectedSounds: [],
@@ -130,8 +124,8 @@ describe("switch module integration", () => {
               "welcome.wav": {
                 delaySeconds: -1,
                 volumePercent: 20,
-                increaseVolume: false,
-                volumeIncreasePercent: 5,
+                increaseVolume: true,
+                volumeIncreasePercent: 35,
               },
             },
           })
@@ -145,8 +139,6 @@ describe("switch module integration", () => {
               "missing.wav": {
                 delaySeconds: 0,
                 volumePercent: 20,
-                increaseVolume: false,
-                volumeIncreasePercent: 5,
               },
             },
           })
@@ -254,13 +246,9 @@ describe("switch module integration", () => {
               "welcome.wav": {
                 delaySeconds: 0.2,
                 volumePercent: 20,
-                increaseVolume: true,
-                volumeIncreasePercent: 35,
               },
             },
             volumePercent: 40,
-            increaseVolume: true,
-            volumeIncreasePercent: 35,
           })
         ).status,
       ).toBe(200);
@@ -280,10 +268,10 @@ describe("switch module integration", () => {
         join(soundDir, "second.wav"),
         join(soundDir, "welcome.wav"),
       ]);
-      expect(volumes.slice(5, 7)).toEqual([40, 75]);
+      expect(volumes.slice(5, 7)).toEqual([40, 20]);
       finishDoor();
       await Bun.sleep(1250);
-      expect(volumes[7]).toBe(100);
+      expect(volumes[7]).toBe(40);
       await input(true);
       await Bun.sleep(30);
       await input(false);
@@ -318,14 +306,10 @@ describe("switch module integration", () => {
       expect(restored.status().selectedSounds).toEqual([]);
       expect(restored.status().delaySeconds).toBe(0);
       expect(restored.status().volumePercent).toBe(40);
-      expect(restored.status().increaseVolume).toBe(true);
-      expect(restored.status().volumeIncreasePercent).toBe(35);
       expect(restored.status().soundSettings).toEqual({
         "welcome.wav": {
           delaySeconds: 0.2,
           volumePercent: 20,
-          increaseVolume: true,
-          volumeIncreasePercent: 35,
         },
       });
       const remove = await module.routes.request("/sounds/welcome.wav", { method: "DELETE" });

@@ -8,15 +8,11 @@ export interface SwitchSound {
 export interface SwitchClipSettings {
   delaySeconds: number;
   volumePercent: number;
-  increaseVolume: boolean;
-  volumeIncreasePercent: number;
 }
 
 export interface SwitchPlaybackSettings {
   soundSettings: Record<string, SwitchClipSettings>;
   volumePercent: number;
-  increaseVolume: boolean;
-  volumeIncreasePercent: number;
   delaySeconds: number;
   selectedSounds: string[];
 }

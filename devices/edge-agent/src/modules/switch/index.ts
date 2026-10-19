@@ -26,13 +26,21 @@ export function createSwitchModule(ctx: ModuleContext, soundPlayer?: SoundPlayer
   const saved = ctx.db.query("SELECT value FROM switch_settings WHERE id = 1").get() as {
     value: string;
   } | null;
-  let settings: SwitchPlaybackSettings | null = saved
+  function clipValues(sounds: SwitchPlaybackSettings["soundSettings"]) {
+    return Object.fromEntries(
+      Object.entries(sounds).map(([name, clip]) => [
+        name,
+        { delaySeconds: clip.delaySeconds, volumePercent: clip.volumePercent },
+      ]),
+    );
+  }
+  const previous = saved ? JSON.parse(saved.value) : null;
+  let settings: SwitchPlaybackSettings | null = previous
     ? {
-        soundSettings: {},
-        volumePercent: 100,
-        increaseVolume: false,
-        volumeIncreasePercent: 10,
-        ...JSON.parse(saved.value),
+        soundSettings: clipValues(previous.soundSettings ?? {}),
+        volumePercent: previous.volumePercent ?? 100,
+        delaySeconds: previous.delaySeconds,
+        selectedSounds: previous.selectedSounds,
       }
     : null;
   function clipSettings(name: string) {
@@ -98,7 +106,6 @@ export function createSwitchModule(ctx: ModuleContext, soundPlayer?: SoundPlayer
       ? settings.selectedSounds.map((name) => library.soundPath(name))
       : await library.paths();
     let next = 0;
-    let previousVolume: number | undefined;
     while (paths.length > 0 && current === opening && !detector.state().rawGrounded) {
       const path = paths[next % paths.length];
       const name = path.split(/[\\/]/).pop() ?? "";
@@ -107,19 +114,7 @@ export function createSwitchModule(ctx: ModuleContext, soundPlayer?: SoundPlayer
       if (current !== opening || detector.state().rawGrounded) return;
       const began = Date.now();
       try {
-        const volume = clip
-          ? Math.min(
-              100,
-              clip.increaseVolume && previousVolume !== undefined
-                ? previousVolume + clip.volumeIncreasePercent
-                : clip.volumePercent,
-            )
-          : Math.min(
-              100,
-              (settings?.volumePercent ?? 100) +
-                (settings?.increaseVolume ? next * settings.volumeIncreasePercent : 0),
-            );
-        previousVolume = volume;
+        const volume = clip?.volumePercent ?? settings?.volumePercent ?? 100;
         next++;
         await play(path, volume);
       } catch {
@@ -175,8 +170,6 @@ export function createSwitchModule(ctx: ModuleContext, soundPlayer?: SoundPlayer
     lastError,
     soundSettings: settings?.soundSettings ?? {},
     volumePercent: settings?.volumePercent ?? 100,
-    increaseVolume: settings?.increaseVolume ?? false,
-    volumeIncreasePercent: settings?.volumeIncreasePercent ?? 10,
     delaySeconds: settings?.delaySeconds ?? 0,
     selectedSounds: settings?.selectedSounds ?? null,
   });
@@ -198,8 +191,6 @@ export function createSwitchModule(ctx: ModuleContext, soundPlayer?: SoundPlayer
         body.soundSettings ??= settings?.soundSettings ?? {};
         body.delaySeconds ??= 0;
         body.volumePercent ??= settings?.volumePercent ?? 100;
-        body.increaseVolume ??= settings?.increaseVolume ?? false;
-        body.volumeIncreasePercent ??= settings?.volumeIncreasePercent ?? 10;
       }
       if (
         !body ||
@@ -212,8 +203,7 @@ export function createSwitchModule(ctx: ModuleContext, soundPlayer?: SoundPlayer
             !clip ||
             typeof clip !== "object" ||
             Array.isArray(clip) ||
-            typeof clip.increaseVolume !== "boolean" ||
-            ![clip.volumePercent, clip.volumeIncreasePercent].every(
+            ![clip.volumePercent].every(
               (number) =>
                 typeof number === "number" &&
                 Number.isFinite(number) &&
@@ -226,8 +216,7 @@ export function createSwitchModule(ctx: ModuleContext, soundPlayer?: SoundPlayer
             clip.delaySeconds > 3600
           );
         }) ||
-        typeof body.increaseVolume !== "boolean" ||
-        ![body.volumePercent, body.volumeIncreasePercent].every(
+        ![body.volumePercent].every(
           (value) =>
             typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 100,
         ) ||
@@ -251,10 +240,8 @@ export function createSwitchModule(ctx: ModuleContext, soundPlayer?: SoundPlayer
         for (const name of [...body.selectedSounds, ...Object.keys(body.soundSettings)])
           library.soundPath(name);
         const next = {
-          soundSettings: body.soundSettings as SwitchPlaybackSettings["soundSettings"],
+          soundSettings: clipValues(body.soundSettings as SwitchPlaybackSettings["soundSettings"]),
           volumePercent: body.volumePercent as number,
-          increaseVolume: body.increaseVolume as boolean,
-          volumeIncreasePercent: body.volumeIncreasePercent as number,
           delaySeconds: Object.keys(body.soundSettings).length > 0 ? 0 : body.delaySeconds,
           selectedSounds: body.selectedSounds as string[],
         };

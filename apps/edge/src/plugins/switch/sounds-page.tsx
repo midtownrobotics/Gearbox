@@ -44,8 +44,6 @@ async function loadState() {
     lastError: string | null;
     soundSettings: Record<string, SwitchClipSettings>;
     volumePercent: number;
-    increaseVolume: boolean;
-    volumeIncreasePercent: number;
     delaySeconds: number;
     selectedSounds: string[];
     sounds: { name: string; size: number }[];
@@ -132,8 +130,6 @@ export function DoorSoundsPage() {
           data.sounds,
           data.soundSettings,
           data.volumePercent,
-          data.increaseVolume,
-          data.volumeIncreasePercent,
         ])}
         initial={data}
         busy={busy !== null}
@@ -310,8 +306,6 @@ type PlaybackSettingsValue = {
 type ClipDraft = {
   delaySeconds: string;
   volumePercent: string;
-  increaseVolume: boolean;
-  volumeIncreasePercent: string;
 };
 
 function PlaybackSettings({
@@ -333,8 +327,6 @@ function PlaybackSettings({
           {
             delaySeconds: String(clip.delaySeconds),
             volumePercent: String(clip.volumePercent),
-            increaseVolume: clip.increaseVolume,
-            volumeIncreasePercent: String(clip.volumeIncreasePercent),
           },
         ];
       }),
@@ -367,8 +359,6 @@ function PlaybackSettings({
                 {
                   delaySeconds: Number(clip.delaySeconds),
                   volumePercent: Number(clip.volumePercent),
-                  increaseVolume: clip.increaseVolume,
-                  volumeIncreasePercent: Number(clip.volumeIncreasePercent),
                 },
               ]),
             ),
@@ -440,32 +430,6 @@ function PlaybackSettings({
                               step={0.1}
                               onChange={(value) => update(name, { volumePercent: value })}
                             />
-                            <CompactSlider
-                              label="Volume increase over previous clip"
-                              unit="pt"
-                              value={clip.volumeIncreasePercent}
-                              max={100}
-                              step={0.1}
-                              disabled={!clip.increaseVolume}
-                              control={
-                                <label
-                                  title="Louder than the previous clip"
-                                  className="flex items-center gap-1.5 text-secondary-600"
-                                >
-                                  <input
-                                    type="checkbox"
-                                    className="h-3.5 w-3.5 shrink-0"
-                                    aria-label={`Make ${name} louder than the previous clip`}
-                                    checked={clip.increaseVolume}
-                                    onChange={(event) =>
-                                      update(name, { increaseVolume: event.target.checked })
-                                    }
-                                  />
-                                  Louder than previous
-                                </label>
-                              }
-                              onChange={(value) => update(name, { volumeIncreasePercent: value })}
-                            />
                           </div>
                         )}
                       </fieldset>
@@ -480,14 +444,12 @@ function PlaybackSettings({
           <summary className="cursor-pointer py-1">How playback works</summary>
           <p className="py-1">
             Each clip waits its pause before playing, including repeats. One selected clip repeats
-            alone. No selections means silence. Saving stops playback until the next opening. Louder
-            than previous adds the chosen number of percentage points to the previous clip volume,
-            capped at 100%. The first clip starts at its own volume on each opening. Otherwise, each
-            clip uses its own volume. Tests use the saved clip volume immediately. 0% is silent;
-            100% keeps the original level. Volume control requires uncompressed PCM or
-            floating-point WAVs; recordings can differ in loudness. Saving stops playback until the
-            next opening. Drag with a finger or mouse; keyboard users can focus the grip, press
-            Space, use arrow keys, then press Space to drop or Escape to cancel.
+            alone. No selections means silence. Each clip always uses its own volume. Tests use the
+            saved clip volume immediately. 0% is silent; 100% keeps the original level. Volume
+            control requires uncompressed PCM or floating-point WAVs; recordings can differ in
+            loudness. Saving stops playback until the next opening. Drag with a finger or mouse;
+            keyboard users can focus the grip, press Space, use arrow keys, then press Space to drop
+            or Escape to cancel.
           </p>
         </details>
         <Button type="submit" disabled={busy} className="w-full sm:w-auto">
@@ -504,8 +466,6 @@ function CompactSlider({
   value,
   max,
   limit = max,
-  disabled = false,
-  control,
   step,
   onChange,
 }: {
@@ -514,20 +474,13 @@ function CompactSlider({
   value: string;
   max: number;
   limit?: number;
-  disabled?: boolean;
-  control?: ReactNode;
   step: number;
   onChange(value: string): void;
 }) {
   return (
-    <div
-      className={`flex min-h-10 min-w-0 items-center gap-2 text-sm ${disabled ? "text-secondary-400" : "text-secondary-700"}`}
-    >
-      <div className="w-28 shrink-0 text-xs font-medium leading-snug sm:w-40">
-        {control ?? label}
-      </div>
+    <div className="flex min-h-10 min-w-0 items-center gap-2 text-sm text-secondary-700">
+      <div className="w-28 shrink-0 text-xs font-medium leading-snug sm:w-40">{label}</div>
       <input
-        disabled={disabled}
         aria-label={label}
         className="h-10 min-w-0 flex-1 cursor-pointer accent-primary-600 disabled:cursor-default disabled:opacity-35"
         type="range"
@@ -539,7 +492,6 @@ function CompactSlider({
       />
       <label className="flex w-16 shrink-0 items-center justify-end gap-1 tabular-nums">
         <input
-          disabled={disabled}
           aria-label={`${label} exact value`}
           className="h-8 w-12 rounded border border-secondary-200 bg-secondary-50 px-1 text-right text-sm tabular-nums outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-transparent [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
           type="number"
