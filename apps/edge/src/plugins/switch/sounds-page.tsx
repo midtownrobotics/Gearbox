@@ -187,7 +187,7 @@ export function DoorSoundsPage() {
         }
       />
       <Card title="Upload a sound">
-        <p className="mb-3 text-sm text-secondary-500">
+        <p className="mb-2 text-xs text-secondary-500">
           Upload a WAV file up to 10 MB. Select it in playback settings to include it.
         </p>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -332,10 +332,7 @@ function PlaybackSettings({
   return (
     <Card title="Playback settings">
       <p className="mb-3 text-sm text-secondary-500">
-        Set a delay before the first clip and a separate delay after each clip. For example: wait 1
-        second, play clip 1, wait 1 second, play clip 2. Delays also apply when the list repeats.
-        One selected clip repeats alone; none stays silent. Closing cancels delays and cuts off
-        audio.
+        Play top to bottom, then repeat. Closing the door stops audio and cancels delays.
       </p>
       <form
         onSubmit={(event) => {
@@ -357,7 +354,7 @@ function PlaybackSettings({
           });
         }}
       >
-        <div className="mb-3 space-y-3">
+        <div className="mb-2 divide-y divide-secondary-100">
           {names.map((name) => {
             const index = selected.indexOf(name);
             const clip = clips[name];
@@ -367,10 +364,10 @@ function PlaybackSettings({
                 key={name}
                 disabled={busy}
                 aria-label={name}
-                className="min-w-0 rounded-lg border border-secondary-200 p-3"
+                className="min-w-0 py-2 first:pt-0"
               >
-                <div className="mb-3 flex items-start gap-2">
-                  <label className="flex min-h-10 min-w-0 flex-1 items-center gap-2 text-sm font-medium">
+                <div className="flex items-center gap-2">
+                  <label className="flex min-h-9 min-w-0 flex-1 items-center gap-2 text-sm font-medium">
                     <input
                       type="checkbox"
                       className="h-4 w-4 shrink-0"
@@ -390,114 +387,156 @@ function PlaybackSettings({
                   </label>
                   {index >= 0 && (
                     <div className="flex shrink-0 gap-1">
-                      <Button
+                      <button
                         type="button"
-                        variant="secondary"
+                        className="h-9 w-9 rounded border border-secondary-200 text-sm hover:bg-secondary-50 disabled:opacity-30"
                         aria-label={`Move ${name} up`}
                         disabled={busy || index === 0}
                         onClick={() => move(index, -1)}
                       >
                         &uarr;
-                      </Button>
-                      <Button
+                      </button>
+                      <button
                         type="button"
-                        variant="secondary"
+                        className="h-9 w-9 rounded border border-secondary-200 text-sm hover:bg-secondary-50 disabled:opacity-30"
                         aria-label={`Move ${name} down`}
                         disabled={busy || index === selected.length - 1}
                         onClick={() => move(index, 1)}
                       >
                         &darr;
-                      </Button>
+                      </button>
                     </div>
                   )}
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  {index === 0 && (
-                    <label className="col-span-2 min-w-0 text-xs font-medium">
-                      Before first clip (sec)
-                      <input
-                        className={inputClass}
-                        type="number"
-                        inputMode="decimal"
-                        min="0"
-                        max="3600"
-                        step="0.1"
-                        required
+                {index >= 0 && (
+                  <div className="mt-1 grid grid-cols-2 gap-x-4 gap-y-1 sm:grid-cols-3">
+                    {index === 0 && (
+                      <CompactSlider
+                        label="Before first"
+                        unit="s"
                         value={clip.delaySeconds}
-                        onChange={(event) => update(name, { delaySeconds: event.target.value })}
+                        max={60}
+                        limit={3600}
+                        step={0.1}
+                        onChange={(value) => update(name, { delaySeconds: value })}
                       />
-                    </label>
-                  )}
-                  <label className="min-w-0 text-xs font-medium">
-                    After clip (sec)
-                    <input
-                      className={`${inputClass} mt-1 w-full min-w-0`}
-                      type="number"
-                      inputMode="decimal"
-                      min="0"
-                      max="3600"
-                      step="0.1"
-                      required
+                    )}
+                    <CompactSlider
+                      label="Gap after"
+                      unit="s"
                       value={clip.pauseAfterSeconds}
-                      onChange={(event) => update(name, { pauseAfterSeconds: event.target.value })}
+                      max={60}
+                      limit={3600}
+                      step={0.1}
+                      onChange={(value) => update(name, { pauseAfterSeconds: value })}
                     />
-                  </label>
-                  <label className="min-w-0 text-xs font-medium">
-                    Volume (%)
-                    <input
-                      className={`${inputClass} mt-1 w-full min-w-0`}
-                      type="number"
-                      inputMode="numeric"
-                      min="0"
-                      max="100"
-                      step="1"
-                      required
+                    <CompactSlider
+                      label="Volume"
+                      unit="%"
                       value={clip.volumePercent}
-                      onChange={(event) => update(name, { volumePercent: event.target.value })}
+                      max={100}
+                      step={0.1}
+                      onChange={(value) => update(name, { volumePercent: value })}
                     />
-                  </label>
-                  <label className="flex min-h-11 items-center gap-2 text-xs font-medium">
-                    <input
-                      type="checkbox"
-                      className="h-4 w-4 shrink-0"
-                      checked={clip.increaseVolume}
-                      onChange={(event) => update(name, { increaseVolume: event.target.checked })}
-                    />
-                    Louder than previous
-                  </label>
-                  <label className="min-w-0 text-xs font-medium">
-                    Increase (points)
-                    <input
-                      className={`${inputClass} mt-1 w-full min-w-0`}
-                      type="number"
-                      inputMode="numeric"
-                      min="0"
-                      max="100"
-                      step="1"
-                      required
-                      disabled={!clip.increaseVolume || busy}
-                      value={clip.volumeIncreasePercent}
-                      onChange={(event) =>
-                        update(name, { volumeIncreasePercent: event.target.value })
-                      }
-                    />
-                  </label>
-                </div>
+                    <div className="col-span-2 flex items-center gap-3 sm:col-span-3">
+                      <label className="flex min-h-8 shrink-0 items-center gap-1.5 text-xs">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4"
+                          checked={clip.increaseVolume}
+                          onChange={(event) =>
+                            update(name, { increaseVolume: event.target.checked })
+                          }
+                        />
+                        Louder than previous
+                      </label>
+                      {clip.increaseVolume && (
+                        <div className="min-w-0 max-w-56 flex-1">
+                          <CompactSlider
+                            label="Increase"
+                            unit="pt"
+                            value={clip.volumeIncreasePercent}
+                            max={100}
+                            step={0.1}
+                            onChange={(value) => update(name, { volumeIncreasePercent: value })}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </fieldset>
             );
           })}
         </div>
-        <p className="mb-3 text-xs text-secondary-500">
-          Louder than previous uses the previous clip volume plus this clip increase, capped at
-          100%. The first clip starts at its own volume on each opening. Otherwise, each clip uses
-          its own volume. Tests use the saved clip volume immediately. 0% is silent; 100% keeps the
-          original level. Volume control requires uncompressed PCM or floating-point WAVs;
-          recordings can differ in loudness. Saving stops playback until the next opening.
-        </p>
+        <details className="mb-2 text-xs text-secondary-500">
+          <summary className="cursor-pointer py-1">How playback works</summary>
+          <p className="py-1">
+            The first clip has a starting delay; every clip has a gap after it. One selected clip
+            repeats alone. No selections means silence. Saving stops playback until the next
+            opening. Louder than previous uses the previous clip volume plus this clip increase,
+            capped at 100%. The first clip starts at its own volume on each opening. Otherwise, each
+            clip uses its own volume. Tests use the saved clip volume immediately. 0% is silent;
+            100% keeps the original level. Volume control requires uncompressed PCM or
+            floating-point WAVs; recordings can differ in loudness. Saving stops playback until the
+            next opening.
+          </p>
+        </details>
         <Button type="submit" disabled={busy} className="w-full sm:w-auto">
           Save playback settings
         </Button>
       </form>
     </Card>
+  );
+}
+
+function CompactSlider({
+  label,
+  unit,
+  value,
+  max,
+  limit = max,
+  step,
+  onChange,
+}: {
+  label: string;
+  unit: string;
+  value: string;
+  max: number;
+  limit?: number;
+  step: number;
+  onChange(value: string): void;
+}) {
+  return (
+    <div className="min-w-0">
+      <div className="flex items-center justify-between gap-1 text-xs">
+        <span className="text-secondary-600">{label}</span>
+        <label className="flex items-center gap-0.5 text-secondary-700">
+          <input
+            aria-label={`${label} exact value`}
+            className="h-6 w-12 rounded border border-secondary-200 bg-transparent px-1 text-right tabular-nums focus:outline-none focus:ring-1 focus:ring-primary-500"
+            type="number"
+            inputMode="decimal"
+            min="0"
+            max={limit}
+            step={step}
+            required
+            value={value}
+            onChange={(event) => onChange(event.target.value)}
+          />
+          <span>{unit}</span>
+        </label>
+      </div>
+      <input
+        aria-label={label}
+        className="block h-6 w-full cursor-pointer accent-primary-600 disabled:cursor-default"
+        type="range"
+        min="0"
+        max={Math.max(max, Number(value) || 0)}
+        step={step}
+        value={value || "0"}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    </div>
   );
 }
