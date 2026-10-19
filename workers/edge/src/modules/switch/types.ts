@@ -42,3 +42,14 @@ export function isWaveFile(data: Uint8Array) {
     text.decode(data.subarray(0, 4)) === "RIFF" && text.decode(data.subarray(8, 12)) === "WAVE"
   );
 }
+
+export interface SwitchSubmission {
+  id: string;
+  name: string;
+  userId: string;
+  submittedBy: string;
+  size: number;
+  submittedAt: number;
+  status: "pending" | "approved" | "rejected";
+  reviewedBy: string | null;
+}
