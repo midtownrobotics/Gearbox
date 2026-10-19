@@ -246,14 +246,12 @@ describe("switch module integration", () => {
             selectedSounds: ["second.wav", "welcome.wav"],
             soundSettings: {
               "second.wav": {
-                pauseAfterSeconds: 0.2,
                 delaySeconds: 0.1,
                 volumePercent: 40,
                 increaseVolume: true,
                 volumeIncreasePercent: 35,
               },
               "welcome.wav": {
-                pauseAfterSeconds: 0.2,
                 delaySeconds: 0.2,
                 volumePercent: 20,
                 increaseVolume: true,
@@ -271,7 +269,7 @@ describe("switch module integration", () => {
       expect(played).toBe(5);
       await Bun.sleep(120);
       expect(played).toBe(6);
-      // The first clip has independent leading and trailing delays.
+      // Each clip has its own pause before playback.
       await Bun.sleep(1000);
       finishDoor();
       await Bun.sleep(50);
@@ -294,9 +292,9 @@ describe("switch module integration", () => {
       await Bun.sleep(120);
       expect(volumes[8]).toBe(40);
       finishDoor();
-      await Bun.sleep(1050);
+      await Bun.sleep(1250);
       expect(played).toBe(10);
-      // Close in the second clip's trailing delay; the playlist must not restart.
+      // Close in the first clip's next leading pause; the playlist must not restart.
       await Bun.sleep(1000);
       finishDoor();
       await Bun.sleep(50);
@@ -324,7 +322,6 @@ describe("switch module integration", () => {
       expect(restored.status().volumeIncreasePercent).toBe(35);
       expect(restored.status().soundSettings).toEqual({
         "welcome.wav": {
-          pauseAfterSeconds: 0.2,
           delaySeconds: 0.2,
           volumePercent: 20,
           increaseVolume: true,

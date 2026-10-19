@@ -308,7 +308,6 @@ type PlaybackSettingsValue = {
   soundSettings: Record<string, SwitchClipSettings>;
 };
 type ClipDraft = {
-  pauseAfterSeconds: string;
   delaySeconds: string;
   volumePercent: string;
   increaseVolume: boolean;
@@ -332,10 +331,6 @@ function PlaybackSettings({
         return [
           name,
           {
-            pauseAfterSeconds: String(
-              clip.pauseAfterSeconds ??
-                (initial.selectedSounds.indexOf(name) > 0 ? clip.delaySeconds : 0),
-            ),
             delaySeconds: String(clip.delaySeconds),
             volumePercent: String(clip.volumePercent),
             increaseVolume: clip.increaseVolume,
@@ -370,7 +365,6 @@ function PlaybackSettings({
               Object.entries(clips).map(([name, clip]) => [
                 name,
                 {
-                  pauseAfterSeconds: Number(clip.pauseAfterSeconds),
                   delaySeconds: Number(clip.delaySeconds),
                   volumePercent: Number(clip.volumePercent),
                   increaseVolume: clip.increaseVolume,
@@ -429,25 +423,14 @@ function PlaybackSettings({
                         </div>
                         {index >= 0 && (
                           <div className="space-y-1 px-4 py-3">
-                            {index === 0 && (
-                              <CompactSlider
-                                label="Delay before first clip"
-                                unit="s"
-                                value={clip.delaySeconds}
-                                max={10}
-                                limit={3600}
-                                step={0.1}
-                                onChange={(value) => update(name, { delaySeconds: value })}
-                              />
-                            )}
                             <CompactSlider
-                              label="Pause after this clip"
+                              label="Pause before this clip"
                               unit="s"
-                              value={clip.pauseAfterSeconds}
-                              max={60}
+                              value={clip.delaySeconds}
+                              max={10}
                               limit={3600}
                               step={0.1}
-                              onChange={(value) => update(name, { pauseAfterSeconds: value })}
+                              onChange={(value) => update(name, { delaySeconds: value })}
                             />
                             <CompactSlider
                               label="Clip volume"
@@ -496,15 +479,15 @@ function PlaybackSettings({
         <details className="mb-2 text-xs text-secondary-500">
           <summary className="cursor-pointer py-1">How playback works</summary>
           <p className="py-1">
-            The first clip has a starting delay; every clip has a gap after it. One selected clip
-            repeats alone. No selections means silence. Saving stops playback until the next
-            opening. Louder than previous adds the chosen number of percentage points to the
-            previous clip volume, capped at 100%. The first clip starts at its own volume on each
-            opening. Otherwise, each clip uses its own volume. Tests use the saved clip volume
-            immediately. 0% is silent; 100% keeps the original level. Volume control requires
-            uncompressed PCM or floating-point WAVs; recordings can differ in loudness. Saving stops
-            playback until the next opening. Drag with a finger or mouse; keyboard users can focus
-            the grip, press Space, use arrow keys, then press Space to drop or Escape to cancel.
+            Each clip waits its pause before playing, including repeats. One selected clip repeats
+            alone. No selections means silence. Saving stops playback until the next opening. Louder
+            than previous adds the chosen number of percentage points to the previous clip volume,
+            capped at 100%. The first clip starts at its own volume on each opening. Otherwise, each
+            clip uses its own volume. Tests use the saved clip volume immediately. 0% is silent;
+            100% keeps the original level. Volume control requires uncompressed PCM or
+            floating-point WAVs; recordings can differ in loudness. Saving stops playback until the
+            next opening. Drag with a finger or mouse; keyboard users can focus the grip, press
+            Space, use arrow keys, then press Space to drop or Escape to cancel.
           </p>
         </details>
         <Button type="submit" disabled={busy} className="w-full sm:w-auto">
