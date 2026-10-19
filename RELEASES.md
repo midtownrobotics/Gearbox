@@ -16,6 +16,37 @@ Each release of the whole platform, newest first, with the version of every app 
 
 <!-- releases -->
 
+## 2026.10.3 (2026-10-19)
+
+| App | Version |
+| --- | --- |
+| G3ID | 3.0.0 |
+| Portal | 2.1.0 |
+| **Platform** | **3.0.1** (was 3.0.0) |
+| Shop | 2.1.0 |
+| Pit | 3.0.0 |
+| Orders | 2.1.0 |
+| **Edge** | **2.1.0** (was 2.0.0) |
+| **Edge agent** | **0.6.0** (was 0.5.0) |
+| Pit log downloader | 2.1.0 |
+| Scouting | 2.1.0 |
+| Skill Tree | 2.0.0 |
+| Attendance | 2.0.0 |
+| Inventory | 1.0.0 |
+| Schedule | 0.2.0 |
+
+### Platform 3.0.1
+
+- Updated (no notes).
+
+### Edge 2.1.0
+
+- Door Sounds now has an ordered multi-selection with touch and keyboard drag handles, clearly separated clip cards, and compact sliders beneath each clip for pause and volume. Each clip has a single Pause before this clip slider that also applies on repeats. Each opening starts at the first selection and its volume; closing cancels any delay or cuts off playback immediately. Preferences persist on the Edge box. Volume control supports uncompressed PCM and floating-point WAVs. Rename clips inline while keeping their volume, pause, and playlist position.
+
+### Edge agent 0.6.0
+
+- Door Sounds now has an ordered multi-selection with touch and keyboard drag handles, clearly separated clip cards, and compact sliders beneath each clip for pause and volume. Each clip has a single Pause before this clip slider that also applies on repeats. Each opening starts at the first selection and its volume; closing cancels any delay or cuts off playback immediately. Preferences persist on the Edge box. Volume control supports uncompressed PCM and floating-point WAVs. Rename clips inline while keeping their volume, pause, and playlist position.
+
 ## 2026.10.2 (2026-10-18)
 
 | App | Version |
