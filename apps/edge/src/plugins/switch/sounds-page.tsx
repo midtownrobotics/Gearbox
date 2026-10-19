@@ -24,6 +24,9 @@ async function loadState() {
     lastTriggeredAt: number | null;
     lastSound: string | null;
     lastError: string | null;
+    volumePercent: number;
+    increaseVolume: boolean;
+    volumeIncreasePercent: number;
     delaySeconds: number;
     selectedSounds: string[];
     sounds: { name: string; size: number }[];
@@ -157,7 +160,14 @@ export function DoorSoundsPage() {
       </Card>
 
       <PlaybackSettings
-        key={JSON.stringify([data.delaySeconds, data.selectedSounds, data.sounds])}
+        key={JSON.stringify([
+          data.delaySeconds,
+          data.selectedSounds,
+          data.sounds,
+          data.volumePercent,
+          data.increaseVolume,
+          data.volumeIncreasePercent,
+        ])}
         initial={data}
         busy={busy !== null}
         save={(settings) =>
@@ -262,15 +272,26 @@ export function DoorSoundsPage() {
   );
 }
 
+type PlaybackSettingsValue = {
+  delaySeconds: number;
+  selectedSounds: string[];
+  volumePercent: number;
+  increaseVolume: boolean;
+  volumeIncreasePercent: number;
+};
+
 function PlaybackSettings({
   initial,
   busy,
   save,
 }: {
-  initial: { delaySeconds: number; selectedSounds: string[]; sounds: { name: string }[] };
+  initial: PlaybackSettingsValue & { sounds: { name: string }[] };
   busy: boolean;
-  save(settings: { delaySeconds: number; selectedSounds: string[] }): Promise<boolean>;
+  save(settings: PlaybackSettingsValue): Promise<boolean>;
 }) {
+  const [volume, setVolume] = useState(String(initial.volumePercent));
+  const [increase, setIncrease] = useState(initial.increaseVolume);
+  const [step, setStep] = useState(String(initial.volumeIncreasePercent));
   const [delay, setDelay] = useState(String(initial.delaySeconds));
   const [selected, setSelected] = useState(initial.selectedSounds);
   const names = [
@@ -293,7 +314,13 @@ function PlaybackSettings({
       <form
         onSubmit={(event) => {
           event.preventDefault();
-          void save({ delaySeconds: Number(delay), selectedSounds: selected });
+          void save({
+            delaySeconds: Number(delay),
+            selectedSounds: selected,
+            volumePercent: Number(volume),
+            increaseVolume: increase,
+            volumeIncreasePercent: Number(step),
+          });
         }}
       >
         <label className="mb-4 block text-sm font-medium">
@@ -310,6 +337,49 @@ function PlaybackSettings({
             onChange={(event) => setDelay(event.target.value)}
           />
         </label>
+        <label className="mb-4 block text-sm font-medium">
+          Starting volume (%)
+          <input
+            className={inputClass}
+            type="number"
+            min="0"
+            max="100"
+            step="1"
+            required
+            value={volume}
+            disabled={busy}
+            onChange={(event) => setVolume(event.target.value)}
+          />
+        </label>
+        <label className="mb-4 flex items-center gap-2 text-sm font-medium">
+          <input
+            type="checkbox"
+            checked={increase}
+            disabled={busy}
+            onChange={(event) => setIncrease(event.target.checked)}
+          />
+          Make each successive clip louder
+        </label>
+        <label className="mb-4 block text-sm font-medium">
+          Increase per clip (percentage points)
+          <input
+            className={inputClass}
+            type="number"
+            min="0"
+            max="100"
+            step="1"
+            required
+            value={step}
+            disabled={busy || !increase}
+            onChange={(event) => setStep(event.target.value)}
+          />
+        </label>
+        <p className="mb-4 text-sm text-secondary-500">
+          When enabled, each successive clip, including repeats, adds this increase up to 100%. Each
+          opening resets to the starting volume. Tests use the saved starting volume. 0% is silent;
+          100% keeps the file's original level. Volume control requires uncompressed PCM or
+          floating-point WAV files. Different recordings may have different loudness.
+        </p>
         <div className="mb-4 space-y-3">
           {names.map((name) => {
             const index = selected.indexOf(name);

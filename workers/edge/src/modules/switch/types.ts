@@ -6,6 +6,9 @@ export interface SwitchSound {
 }
 
 export interface SwitchPlaybackSettings {
+  volumePercent: number;
+  increaseVolume: boolean;
+  volumeIncreasePercent: number;
   delaySeconds: number;
   selectedSounds: string[];
 }

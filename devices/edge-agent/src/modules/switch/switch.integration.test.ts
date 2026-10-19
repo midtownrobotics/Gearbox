@@ -43,6 +43,7 @@ describe("switch module integration", () => {
     };
     const db = new Database(":memory:");
     let played = 0;
+    const volumes: (number | undefined)[] = [];
     const paths: (string | undefined)[] = [];
     let stopped = 0;
     let finishManual = () => {};
@@ -58,7 +59,8 @@ describe("switch module integration", () => {
         sync: { applied: 0 },
       },
       {
-        async play(path) {
+        async play(path, volume) {
+          volumes.push(volume);
           played++;
           paths.push(path);
           if (played === 1) {
@@ -111,6 +113,15 @@ describe("switch module integration", () => {
       expect((await settings({ delaySeconds: 0, selectedSounds: ["welcome.wav"] })).status).toBe(
         200,
       );
+      expect(
+        (await settings({ delaySeconds: 0, selectedSounds: [], volumePercent: 101 })).status,
+      ).toBe(400);
+      expect(
+        (await settings({ delaySeconds: 0, selectedSounds: [], increaseVolume: "yes" })).status,
+      ).toBe(400);
+      expect(
+        (await settings({ delaySeconds: 0, selectedSounds: [], volumeIncreasePercent: -1 })).status,
+      ).toBe(400);
       stopped = 0;
       const play = await module.routes.request("/sounds/welcome.wav/test", { method: "POST" });
       expect(play.status).toBe(200);
@@ -199,7 +210,15 @@ describe("switch module integration", () => {
       // The playlist starts from the first selection on each opening.
       await module.routes.request("/sounds?name=second.wav", { method: "POST", body: wave });
       expect(
-        (await settings({ delaySeconds: 0, selectedSounds: ["second.wav", "welcome.wav"] })).status,
+        (
+          await settings({
+            delaySeconds: 0,
+            selectedSounds: ["second.wav", "welcome.wav"],
+            volumePercent: 40,
+            increaseVolume: true,
+            volumeIncreasePercent: 35,
+          })
+        ).status,
       ).toBe(200);
       await input(false);
       await Bun.sleep(30);
@@ -211,12 +230,21 @@ describe("switch module integration", () => {
         join(soundDir, "second.wav"),
         join(soundDir, "welcome.wav"),
       ]);
+      expect(volumes.slice(5, 7)).toEqual([40, 75]);
+      finishDoor();
+      await Bun.sleep(1100);
+      expect(volumes[7]).toBe(100);
+      await input(true);
+      await Bun.sleep(30);
+      await input(false);
+      await Bun.sleep(30);
+      expect(volumes[8]).toBe(40);
       await input(true);
       await Bun.sleep(30);
       expect((await settings({ delaySeconds: 0, selectedSounds: [] })).status).toBe(200);
       await input(false);
       await Bun.sleep(30);
-      expect(played).toBe(7);
+      expect(played).toBe(9);
       await input(true);
       await Bun.sleep(30);
       await module.routes.request("/sounds/second.wav", { method: "DELETE" });
@@ -228,6 +256,9 @@ describe("switch module integration", () => {
       });
       expect(restored.status().selectedSounds).toEqual([]);
       expect(restored.status().delaySeconds).toBe(0);
+      expect(restored.status().volumePercent).toBe(40);
+      expect(restored.status().increaseVolume).toBe(true);
+      expect(restored.status().volumeIncreasePercent).toBe(35);
       const remove = await module.routes.request("/sounds/welcome.wav", { method: "DELETE" });
       expect(remove.status).toBe(200);
       expect(((await remove.json()) as { sounds: SwitchSound[] }).sounds).toEqual([]);

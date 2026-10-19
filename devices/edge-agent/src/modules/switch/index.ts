@@ -1,4 +1,4 @@
-import { MAX_SWITCH_SOUND_BYTES } from "@g3/worker-edge/switch-types";
+import { MAX_SWITCH_SOUND_BYTES, type SwitchPlaybackSettings } from "@g3/worker-edge/switch-types";
 import { Hono } from "hono";
 import type { EdgeModule, ModuleContext } from "../../core/module";
 import { SwitchDetector } from "./detector";
@@ -26,8 +26,13 @@ export function createSwitchModule(ctx: ModuleContext, soundPlayer?: SoundPlayer
   const saved = ctx.db.query("SELECT value FROM switch_settings WHERE id = 1").get() as {
     value: string;
   } | null;
-  let settings: { delaySeconds: number; selectedSounds: string[] } | null = saved
-    ? JSON.parse(saved.value)
+  let settings: SwitchPlaybackSettings | null = saved
+    ? {
+        volumePercent: 100,
+        increaseVolume: false,
+        volumeIncreasePercent: 10,
+        ...JSON.parse(saved.value),
+      }
     : null;
   const availableSounds = () => library.paths();
   const player =
@@ -48,9 +53,9 @@ export function createSwitchModule(ctx: ModuleContext, soundPlayer?: SoundPlayer
   // Bumped whenever the repeat for an opening must end: the door closed, a test, or Stop.
   let opening = 0;
 
-  async function play(path?: string) {
+  async function play(path?: string, volume = settings?.volumePercent ?? 100) {
     try {
-      const sound = await player.play(path);
+      const sound = await player.play(path, volume);
       lastSound = sound;
       lastError = null;
       console.log(`[switch] played ${sound}`);
@@ -76,7 +81,12 @@ export function createSwitchModule(ctx: ModuleContext, soundPlayer?: SoundPlayer
     while (paths.length > 0 && current === opening && !detector.state().rawGrounded) {
       const began = Date.now();
       try {
-        await play(paths[next++ % paths.length]);
+        const volume = Math.min(
+          100,
+          (settings?.volumePercent ?? 100) +
+            (settings?.increaseVolume ? next * settings.volumeIncreasePercent : 0),
+        );
+        await play(paths[next++ % paths.length], volume);
       } catch {
         return; // Stopped (closed, a test, Stop) or failed: lastError says which.
       }
@@ -127,6 +137,9 @@ export function createSwitchModule(ctx: ModuleContext, soundPlayer?: SoundPlayer
     lastTriggeredAt,
     lastSound,
     lastError,
+    volumePercent: settings?.volumePercent ?? 100,
+    increaseVolume: settings?.increaseVolume ?? false,
+    volumeIncreasePercent: settings?.volumeIncreasePercent ?? 10,
     delaySeconds: settings?.delaySeconds ?? 0,
     selectedSounds: settings?.selectedSounds ?? null,
   });
@@ -142,8 +155,20 @@ export function createSwitchModule(ctx: ModuleContext, soundPlayer?: SoundPlayer
     })
     .put("/settings", async (c) => {
       const body = await c.req.json().catch(() => null);
+      if (!body || typeof body !== "object" || Array.isArray(body))
+        return c.json({ error: "Expected playback settings." }, 400);
+      if (body) {
+        body.volumePercent ??= settings?.volumePercent ?? 100;
+        body.increaseVolume ??= settings?.increaseVolume ?? false;
+        body.volumeIncreasePercent ??= settings?.volumeIncreasePercent ?? 10;
+      }
       if (
         !body ||
+        typeof body.increaseVolume !== "boolean" ||
+        ![body.volumePercent, body.volumeIncreasePercent].every(
+          (value) =>
+            typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 100,
+        ) ||
         typeof body.delaySeconds !== "number" ||
         !Number.isFinite(body.delaySeconds) ||
         body.delaySeconds < 0 ||
@@ -153,13 +178,19 @@ export function createSwitchModule(ctx: ModuleContext, soundPlayer?: SoundPlayer
         new Set(body.selectedSounds).size !== body.selectedSounds.length
       ) {
         return c.json(
-          { error: "Choose unique sounds and a delay between 0 and 3600 seconds." },
+          {
+            error:
+              "Choose unique sounds, a delay between 0 and 3600 seconds, and volume values between 0 and 100.",
+          },
           400,
         );
       }
       try {
         for (const name of body.selectedSounds) library.soundPath(name);
         const next = {
+          volumePercent: body.volumePercent as number,
+          increaseVolume: body.increaseVolume as boolean,
+          volumeIncreasePercent: body.volumeIncreasePercent as number,
           delaySeconds: body.delaySeconds,
           selectedSounds: body.selectedSounds as string[],
         };
