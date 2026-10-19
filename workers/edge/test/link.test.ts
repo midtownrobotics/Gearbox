@@ -1,4 +1,4 @@
-import { admin, asUser, student } from "@g3/testing/users";
+import { admin, asUser, kioskAdmin, mentor, student } from "@g3/testing/users";
 import { call, callAs, jsonAs } from "@g3/testing/worker";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import {
@@ -183,6 +183,99 @@ describe("the box's link", () => {
     expect((await callAs(student, "/switch/stop", { method: "POST" })).status).toBe(403);
     expect(await jsonAs(admin, "/switch/stop", { method: "POST" })).toEqual({ ok: true });
     expect(seen).toEqual(["POST /switch/stop"]);
+  });
+
+  it("locks management to mentors and admins, and testing, deletion and review to admins", async () => {
+    const seen: string[] = [];
+    await connectAgent(({ method, path }) => {
+      seen.push(`${method} ${path}`);
+      return Response.json({ ok: true, sounds: [] });
+    });
+    for (const path of ["/switch/state", "/switch/sounds"]) {
+      expect((await callAs(student, path)).status).toBe(403);
+      expect((await callAs(mentor, path)).status).toBe(200);
+      expect((await callAs(admin, path)).status).toBe(200);
+    }
+    for (const user of [student, mentor]) {
+      expect((await callAs(user, "/switch/sounds/clip.wav/test", { method: "POST" })).status).toBe(
+        403,
+      );
+      expect((await callAs(user, "/switch/sounds/clip.wav", { method: "DELETE" })).status).toBe(
+        403,
+      );
+      for (const action of ["approve", "reject", "test"])
+        expect(
+          (
+            await callAs(
+              user,
+              `/switch/submissions/00000000-0000-0000-0000-000000000001/${action}`,
+              { method: "POST" },
+            )
+          ).status,
+        ).toBe(403);
+    }
+    expect((await callAs(admin, "/switch/sounds/clip.wav/test", { method: "POST" })).status).toBe(
+      200,
+    );
+    expect((await callAs(admin, "/switch/sounds/clip.wav", { method: "DELETE" })).status).toBe(200);
+    expect(
+      (
+        await callAs(mentor, "/switch/settings", {
+          method: "PUT",
+          body: JSON.stringify({ selectedSounds: [] }),
+        })
+      ).status,
+    ).toBe(200);
+    expect(
+      (
+        await callAs(student, "/switch/settings", {
+          method: "PUT",
+          body: JSON.stringify({ selectedSounds: [] }),
+        })
+      ).status,
+    ).toBe(403);
+    expect(
+      (
+        await callAs(mentor, "/switch/sounds/clip.wav", {
+          method: "PATCH",
+          body: JSON.stringify({ name: "new.wav" }),
+        })
+      ).status,
+    ).toBe(200);
+    expect(
+      (
+        await callAs(admin, "/switch/submissions/00000000-0000-0000-0000-000000000001/approve", {
+          method: "POST",
+        })
+      ).status,
+    ).toBe(200);
+    expect(seen).toContain(
+      `POST /switch/submissions/00000000-0000-0000-0000-000000000001/approve?reviewedBy=${admin.id}`,
+    );
+    expect(seen).not.toContain("GET /switch/submissions");
+  });
+  it("uses the authenticated student identity for uploads and only lists their submissions", async () => {
+    const seen: { path: string; body: number }[] = [];
+    await connectAgent(({ path, body }) => {
+      seen.push({ path, body: body.length });
+      return Response.json(
+        { submissions: [], submission: { status: "pending" } },
+        { status: body.length ? 201 : 200 },
+      );
+    });
+    expect((await callAs(student, "/switch/submissions?userId=someone-else")).status).toBe(200);
+    expect(seen[0].path).toBe(`/switch/submissions?userId=${student.id}`);
+    const audio = new Uint8Array([82, 73, 70, 70, 0, 0, 0, 0, 87, 65, 86, 69]);
+    const uploaded = await call(
+      "/switch/submissions?name=Student.wav&userId=admin&submittedBy=Admin",
+      { ...asUser(student, { method: "POST" }), body: audio },
+    );
+    expect(uploaded.status).toBe(201);
+    const params = new URL(`http://agent${seen[1].path}`).searchParams;
+    expect(params.get("userId")).toBe(student.id);
+    expect(params.get("submittedBy")).toBe(student.displayName);
+    expect(seen[1].body).toBe(audio.length);
+    expect((await callAs(kioskAdmin, "/switch/submissions")).status).toBe(403);
   });
 
   it("answers heartbeats", async () => {

@@ -10,6 +10,7 @@ import {
   createSoundPlayer,
 } from "./player";
 import { SoundLibrary } from "./sounds";
+import { SoundSubmissions } from "./submissions";
 
 // A sound that ends at once (a tiny or broken file) mustn't make the repeat spin.
 const MIN_REPEAT_MS = 1_000;
@@ -20,6 +21,7 @@ export function createSwitchModule(ctx: ModuleContext, soundPlayer?: SoundPlayer
     : new GpioSwitchInput(ctx.config.switchGpioValuePath);
   const detector = new SwitchDetector(ctx.config.switchDebounceMilliseconds);
   const library = new SoundLibrary(ctx.config.switchSoundDir, ctx.config.switchSounds);
+  const submissions = new SoundSubmissions(ctx.config.switchSoundDir, library);
   ctx.db.run(
     "CREATE TABLE IF NOT EXISTS switch_settings (id INTEGER PRIMARY KEY, value TEXT NOT NULL)",
   );
@@ -266,6 +268,49 @@ export function createSwitchModule(ctx: ModuleContext, soundPlayer?: SoundPlayer
       input.setGrounded(body.grounded);
       poll();
       return c.json({ ok: true, ...status() });
+    })
+    .get("/submissions", async (c) =>
+      c.json({ submissions: await submissions.list(c.req.query("userId")) }),
+    )
+    .post("/submissions", async (c) => {
+      try {
+        if (Number(c.req.header("Content-Length") ?? 0) > MAX_SWITCH_SOUND_BYTES)
+          throw new Error("WAV files must be between 1 byte and 10 MB.");
+        const submission = await submissions.submit(
+          c.req.query("name") ?? "",
+          new Uint8Array(await c.req.arrayBuffer()),
+          c.req.query("userId") ?? "",
+          c.req.query("submittedBy") ?? "",
+        );
+        return c.json({ submission }, 201);
+      } catch (error) {
+        return c.json({ error: error instanceof Error ? error.message : String(error) }, 400);
+      }
+    })
+    .post("/submissions/:id/test", async (c) => {
+      try {
+        const path = await submissions.soundPath(c.req.param("id"));
+        silence();
+        void play(path, 25).catch(() => {});
+        return c.json({ ok: true });
+      } catch (error) {
+        return c.json({ error: error instanceof Error ? error.message : String(error) }, 400);
+      }
+    })
+    .post("/submissions/:id/:action", async (c) => {
+      const action = c.req.param("action");
+      if (action !== "approve" && action !== "reject")
+        return c.json({ error: "Invalid review action." }, 400);
+      try {
+        const submission = await submissions.review(
+          c.req.param("id"),
+          action === "approve" ? "approved" : "rejected",
+          c.req.query("reviewedBy") ?? "admin",
+        );
+        return c.json({ submission });
+      } catch (error) {
+        return c.json({ error: error instanceof Error ? error.message : String(error) }, 400);
+      }
     })
     .get("/sounds", async (c) => c.json({ sounds: await library.list() }))
     .post("/sounds", async (c) => {
