@@ -20,6 +20,15 @@ export function createSwitchModule(ctx: ModuleContext, soundPlayer?: SoundPlayer
     : new GpioSwitchInput(ctx.config.switchGpioValuePath);
   const detector = new SwitchDetector(ctx.config.switchDebounceMilliseconds);
   const library = new SoundLibrary(ctx.config.switchSoundDir, ctx.config.switchSounds);
+  ctx.db.run(
+    "CREATE TABLE IF NOT EXISTS switch_settings (id INTEGER PRIMARY KEY, value TEXT NOT NULL)",
+  );
+  const saved = ctx.db.query("SELECT value FROM switch_settings WHERE id = 1").get() as {
+    value: string;
+  } | null;
+  let settings: { delaySeconds: number; selectedSounds: string[] } | null = saved
+    ? JSON.parse(saved.value)
+    : null;
   const availableSounds = () => library.paths();
   const player =
     soundPlayer ??
@@ -57,10 +66,17 @@ export function createSwitchModule(ctx: ModuleContext, soundPlayer?: SoundPlayer
   /** Plays sounds back to back for as long as the door stays open. */
   async function playWhileOpen() {
     const current = ++opening;
-    while (current === opening && !detector.state().rawGrounded) {
+    const delay = settings?.delaySeconds ?? 0;
+    if (delay > 0) await Bun.sleep(delay * 1000);
+    if (current !== opening || detector.state().rawGrounded) return;
+    const paths = settings
+      ? settings.selectedSounds.map((name) => library.soundPath(name))
+      : await library.paths();
+    let next = 0;
+    while (paths.length > 0 && current === opening && !detector.state().rawGrounded) {
       const began = Date.now();
       try {
-        await play();
+        await play(paths[next++ % paths.length]);
       } catch {
         return; // Stopped (closed, a test, Stop) or failed: lastError says which.
       }
@@ -96,7 +112,9 @@ export function createSwitchModule(ctx: ModuleContext, soundPlayer?: SoundPlayer
     triggerCount++;
     lastTriggeredAt = Math.floor(Date.now() / 1000);
     console.log("[switch] door opened");
-    void playWhileOpen();
+    void playWhileOpen().catch((error) => {
+      lastError = error instanceof Error ? error.message : String(error);
+    });
   }
 
   const status = () => ({
@@ -109,10 +127,52 @@ export function createSwitchModule(ctx: ModuleContext, soundPlayer?: SoundPlayer
     lastTriggeredAt,
     lastSound,
     lastError,
+    delaySeconds: settings?.delaySeconds ?? 0,
+    selectedSounds: settings?.selectedSounds ?? null,
   });
 
   const routes = new Hono()
-    .get("/state", async (c) => c.json({ ...status(), sounds: await library.list() }))
+    .get("/state", async (c) => {
+      const sounds = await library.list();
+      return c.json({
+        ...status(),
+        selectedSounds: settings?.selectedSounds ?? sounds.map((sound) => sound.name),
+        sounds,
+      });
+    })
+    .put("/settings", async (c) => {
+      const body = await c.req.json().catch(() => null);
+      if (
+        !body ||
+        typeof body.delaySeconds !== "number" ||
+        !Number.isFinite(body.delaySeconds) ||
+        body.delaySeconds < 0 ||
+        body.delaySeconds > 3600 ||
+        !Array.isArray(body.selectedSounds) ||
+        body.selectedSounds.some((name: unknown) => typeof name !== "string") ||
+        new Set(body.selectedSounds).size !== body.selectedSounds.length
+      ) {
+        return c.json(
+          { error: "Choose unique sounds and a delay between 0 and 3600 seconds." },
+          400,
+        );
+      }
+      try {
+        for (const name of body.selectedSounds) library.soundPath(name);
+        const next = {
+          delaySeconds: body.delaySeconds,
+          selectedSounds: body.selectedSounds as string[],
+        };
+        ctx.db.run("INSERT OR REPLACE INTO switch_settings (id, value) VALUES (1, ?)", [
+          JSON.stringify(next),
+        ]);
+        settings = next;
+        silence();
+        return c.json({ ok: true });
+      } catch (error) {
+        return c.json({ error: error instanceof Error ? error.message : String(error) }, 400);
+      }
+    })
     .post("/input", async (c) => {
       if (!(input instanceof PlaceholderSwitchInput)) {
         return c.json({ error: "The software input is only available in mock mode." }, 400);
@@ -158,7 +218,18 @@ export function createSwitchModule(ctx: ModuleContext, soundPlayer?: SoundPlayer
     })
     .delete("/sounds/:name", async (c) => {
       try {
-        await library.remove(c.req.param("name"));
+        const name = c.req.param("name");
+        await library.remove(name);
+        if (settings) {
+          settings = {
+            ...settings,
+            selectedSounds: settings.selectedSounds.filter((sound) => sound !== name),
+          };
+          ctx.db.run("INSERT OR REPLACE INTO switch_settings (id, value) VALUES (1, ?)", [
+            JSON.stringify(settings),
+          ]);
+        }
+        silence();
         return c.json({ ok: true, sounds: await library.list() });
       } catch (error) {
         return c.json({ error: error instanceof Error ? error.message : String(error) }, 400);

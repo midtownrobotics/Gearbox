@@ -24,6 +24,8 @@ async function loadState() {
     lastTriggeredAt: number | null;
     lastSound: string | null;
     lastError: string | null;
+    delaySeconds: number;
+    selectedSounds: string[];
     sounds: { name: string; size: number }[];
   }>;
 }
@@ -104,7 +106,8 @@ export function DoorSoundsPage() {
       <Card title="Door switch">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-secondary-500">
-            Sound starts when the door opens, repeats while it stays open, and stops when it closes.
+            Sound starts after the opening delay and repeats while the door stays open. Closing the
+            door cuts off the clip or cancels the delay.
           </p>
           <Button variant="secondary" onClick={state.reload}>
             Refresh status
@@ -153,9 +156,26 @@ export function DoorSoundsPage() {
         )}
       </Card>
 
+      <PlaybackSettings
+        key={JSON.stringify([data.delaySeconds, data.selectedSounds, data.sounds])}
+        initial={data}
+        busy={busy !== null}
+        save={(settings) =>
+          act(
+            "settings",
+            () =>
+              request("/settings", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(settings),
+              }),
+            "Saved settings. Playback starts on the next door opening.",
+          )
+        }
+      />
       <Card title="Upload a sound">
         <p className="mb-3 text-sm text-secondary-500">
-          Upload a WAV file up to 10 MB. It joins the rotation right away.
+          Upload a WAV file up to 10 MB. Select it in playback settings to include it.
         </p>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <input
@@ -239,5 +259,108 @@ export function DoorSoundsPage() {
         )}
       </Card>
     </Page>
+  );
+}
+
+function PlaybackSettings({
+  initial,
+  busy,
+  save,
+}: {
+  initial: { delaySeconds: number; selectedSounds: string[]; sounds: { name: string }[] };
+  busy: boolean;
+  save(settings: { delaySeconds: number; selectedSounds: string[] }): Promise<boolean>;
+}) {
+  const [delay, setDelay] = useState(String(initial.delaySeconds));
+  const [selected, setSelected] = useState(initial.selectedSounds);
+  const names = [
+    ...selected,
+    ...initial.sounds.map((sound) => sound.name).filter((name) => !selected.includes(name)),
+  ];
+  function move(index: number, direction: number) {
+    const next = [...selected];
+    [next[index], next[index + direction]] = [next[index + direction], next[index]];
+    setSelected(next);
+  }
+  return (
+    <Card title="Playback settings">
+      <p className="mb-4 text-sm text-secondary-500">
+        Select sounds and arrange their order. Each opening starts with the first selected sound
+        after the delay, then plays down the list and repeats while open. With one selected, only
+        that sound repeats. With none selected, the door stays silent. Closing the door cuts off
+        audio immediately. Saving stops playback and applies to the next opening.
+      </p>
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          void save({ delaySeconds: Number(delay), selectedSounds: selected });
+        }}
+      >
+        <label className="mb-4 block text-sm font-medium">
+          Opening delay (seconds)
+          <input
+            className={inputClass}
+            type="number"
+            min="0"
+            max="3600"
+            step="0.1"
+            required
+            value={delay}
+            disabled={busy}
+            onChange={(event) => setDelay(event.target.value)}
+          />
+        </label>
+        <div className="mb-4 space-y-3">
+          {names.map((name) => {
+            const index = selected.indexOf(name);
+            return (
+              <div key={name} className="flex flex-wrap items-center gap-3">
+                <label className="flex min-w-0 flex-1 items-center gap-2 break-all">
+                  <input
+                    type="checkbox"
+                    checked={index >= 0}
+                    disabled={busy}
+                    onChange={(event) =>
+                      setSelected(
+                        event.target.checked
+                          ? [...selected, name]
+                          : selected.filter((sound) => sound !== name),
+                      )
+                    }
+                  />
+                  {index >= 0 ? `${index + 1}. ` : ""}
+                  {name}
+                </label>
+                {index >= 0 && (
+                  <>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      aria-label={`Move ${name} up`}
+                      disabled={busy || index === 0}
+                      onClick={() => move(index, -1)}
+                    >
+                      Move up
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      aria-label={`Move ${name} down`}
+                      disabled={busy || index === selected.length - 1}
+                      onClick={() => move(index, 1)}
+                    >
+                      Move down
+                    </Button>
+                  </>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        <Button type="submit" disabled={busy}>
+          Save playback settings
+        </Button>
+      </form>
+    </Card>
   );
 }

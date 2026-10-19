@@ -40,6 +40,17 @@ export const switchRouter = new Hono<AppEnv>()
     if ("error" in result) return c.json({ error: result.error }, result.status);
     return c.json(result.data);
   })
+  .put("/settings", requireAdmin, async (c) => {
+    const body = await c.req.json().catch(() => null);
+    if (!body) return c.json({ error: "Expected playback settings." }, 400);
+    const result = await relay<{ ok: true }>(c, "/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if ("error" in result) return c.json({ error: result.error }, result.status);
+    return c.json(result.data);
+  })
   .get("/sounds", requireAdmin, async (c) => {
     const result = await relay<{ sounds: SwitchSound[] }>(c, "/sounds");
     if ("error" in result) return c.json({ error: result.error }, result.status);
