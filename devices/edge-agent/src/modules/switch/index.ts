@@ -281,6 +281,44 @@ export function createSwitchModule(ctx: ModuleContext, soundPlayer?: SoundPlayer
         return c.json({ error: error instanceof Error ? error.message : String(error) }, 400);
       }
     })
+    .patch("/sounds/:name", async (c) => {
+      const name = c.req.param("name");
+      const body = await c.req.json().catch(() => null);
+      if (typeof body?.name !== "string") return c.json({ error: "Enter a WAV filename." }, 400);
+      const newName = body.name;
+      try {
+        await library.rename(name, newName);
+        const soundSettings = { ...settings?.soundSettings };
+        if (Object.hasOwn(soundSettings, name)) {
+          const clip = soundSettings[name];
+          delete soundSettings[name];
+          soundSettings[newName] = clip;
+        }
+        const next = settings
+          ? {
+              ...settings,
+              soundSettings,
+              selectedSounds: settings.selectedSounds.map((sound) =>
+                sound === name ? newName : sound,
+              ),
+            }
+          : null;
+        try {
+          if (next)
+            ctx.db.run("INSERT OR REPLACE INTO switch_settings (id, value) VALUES (1, ?)", [
+              JSON.stringify(next),
+            ]);
+        } catch (error) {
+          await library.rename(newName, name);
+          throw error;
+        }
+        settings = next;
+        silence();
+        return c.json({ ok: true, sounds: await library.list() });
+      } catch (error) {
+        return c.json({ error: error instanceof Error ? error.message : String(error) }, 400);
+      }
+    })
     .post("/sounds/:name/test", async (c) => {
       try {
         const sound = library.soundPath(c.req.param("name"));

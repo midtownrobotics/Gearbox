@@ -296,6 +296,36 @@ describe("switch module integration", () => {
       expect(played).toBe(10);
       await input(true);
       await Bun.sleep(30);
+      // Renaming keeps playlist position and per-clip settings, including after reload.
+      await settings({ selectedSounds: ["second.wav", "welcome.wav"] });
+      const rename = (name: string, next: string) =>
+        routes.request(`/sounds/${encodeURIComponent(name)}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: next }),
+        });
+      expect((await rename("welcome.wav", "second.wav")).status).toBe(400);
+      expect((await rename("welcome.wav", "../bad.wav")).status).toBe(400);
+      expect((await rename("welcome.wav", "Greeting.wav")).status).toBe(200);
+      const renamed = (await (await routes.request("/state")).json()) as SwitchState;
+      expect(renamed.selectedSounds).toEqual(["second.wav", "Greeting.wav"]);
+      expect(renamed.soundSettings["Greeting.wav"]).toEqual({
+        delaySeconds: 0.2,
+        volumePercent: 20,
+      });
+      expect(renamed.soundSettings["welcome.wav"]).toBeUndefined();
+      expect(renamed.sounds.map((sound) => sound.name)).toEqual(["Greeting.wav", "second.wav"]);
+      const reloaded = createSwitchModule({
+        config,
+        db,
+        worker: {} as WorkerClient,
+        sync: { applied: 0 },
+      });
+      expect(reloaded.status().selectedSounds).toEqual(["second.wav", "Greeting.wav"]);
+      expect(reloaded.status().soundSettings).toEqual(renamed.soundSettings);
+      expect((await rename("Greeting.wav", "Greeting.wav")).status).toBe(200);
+      expect((await rename("Greeting.wav", "welcome.wav")).status).toBe(200);
+      await settings({ selectedSounds: [] });
       await module.routes.request("/sounds/second.wav", { method: "DELETE" });
       const restored = createSwitchModule({
         config,

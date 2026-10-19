@@ -133,6 +133,24 @@ export function DoorSoundsPage() {
         ])}
         initial={data}
         busy={busy !== null}
+        rename={(name, newName, settings) =>
+          act(
+            "rename",
+            async () => {
+              await request("/settings", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(settings),
+              });
+              await request(`/sounds/${encodeURIComponent(name)}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ name: newName }),
+              });
+            },
+            `Renamed ${name} to ${newName}.`,
+          )
+        }
         save={(settings) =>
           act(
             "settings",
@@ -312,10 +330,12 @@ function PlaybackSettings({
   initial,
   busy,
   save,
+  rename,
 }: {
   initial: PlaybackSettingsValue & SwitchClipSettings & { sounds: { name: string }[] };
   busy: boolean;
   save(settings: PlaybackSettingsValue): Promise<boolean>;
+  rename(name: string, newName: string, settings: PlaybackSettingsValue): Promise<boolean>;
 }) {
   const [selected, setSelected] = useState(initial.selectedSounds);
   const [clips, setClips] = useState<Record<string, ClipDraft>>(() =>
@@ -339,6 +359,20 @@ function PlaybackSettings({
   function update(name: string, patch: Partial<ClipDraft>) {
     setClips((current) => ({ ...current, [name]: { ...current[name], ...patch } }));
   }
+  function values(): PlaybackSettingsValue {
+    return {
+      selectedSounds: selected,
+      soundSettings: Object.fromEntries(
+        Object.entries(clips).map(([name, clip]) => [
+          name,
+          {
+            delaySeconds: Number(clip.delaySeconds),
+            volumePercent: Number(clip.volumePercent),
+          },
+        ]),
+      ),
+    };
+  }
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -351,18 +385,7 @@ function PlaybackSettings({
       <form
         onSubmit={(event) => {
           event.preventDefault();
-          void save({
-            selectedSounds: selected,
-            soundSettings: Object.fromEntries(
-              Object.entries(clips).map(([name, clip]) => [
-                name,
-                {
-                  delaySeconds: Number(clip.delaySeconds),
-                  volumePercent: Number(clip.volumePercent),
-                },
-              ]),
-            ),
-          });
+          void save(values());
         }}
       >
         <DndContext
@@ -411,6 +434,11 @@ function PlaybackSettings({
                             </span>
                           )}
                         </div>
+                        <ClipRename
+                          name={name}
+                          busy={busy}
+                          rename={(newName) => rename(name, newName, values())}
+                        />
                         {index >= 0 && (
                           <div className="space-y-1 px-4 py-3">
                             <CompactSlider
@@ -553,6 +581,82 @@ function SortableClip({
             ))}
           </svg>
         </button>,
+      )}
+    </div>
+  );
+}
+
+function ClipRename({
+  name,
+  busy,
+  rename,
+}: { name: string; busy: boolean; rename(newName: string): Promise<boolean> }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(name.replace(/\.wav$/i, ""));
+  async function submit() {
+    const trimmed = draft.trim();
+    const newName = /\.wav$/i.test(trimmed) ? trimmed : `${trimmed}.wav`;
+    if (await rename(newName)) setEditing(false);
+  }
+  return (
+    <div className="px-3 pt-1">
+      {editing ? (
+        <div className="flex flex-wrap items-center gap-2 py-1">
+          <label className="min-w-0 flex-1 text-xs text-secondary-500">
+            Clip name
+            <input
+              className={`${inputClass} mt-1 w-full`}
+              aria-label={`New name for ${name}`}
+              value={draft}
+              maxLength={100}
+              disabled={busy}
+              onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  if (event.currentTarget.form?.reportValidity()) void submit();
+                }
+                if (event.key === "Escape") {
+                  event.preventDefault();
+                  setEditing(false);
+                }
+              }}
+            />
+          </label>
+          <Button
+            type="button"
+            disabled={busy || !draft.trim()}
+            onClick={(event) => {
+              if (event.currentTarget.form?.reportValidity()) void submit();
+            }}
+          >
+            Save name
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={busy}
+            onClick={() => setEditing(false)}
+          >
+            Cancel
+          </Button>
+          <p className="w-full text-xs text-secondary-500">
+            The .wav extension is kept automatically.
+          </p>
+        </div>
+      ) : (
+        <button
+          type="button"
+          disabled={busy}
+          aria-label={`Rename ${name}`}
+          className="rounded px-1 py-1 text-xs font-medium text-primary-600 hover:bg-secondary-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-500 disabled:opacity-50"
+          onClick={() => {
+            setDraft(name.replace(/\.wav$/i, ""));
+            setEditing(true);
+          }}
+        >
+          Rename clip
+        </button>
       )}
     </div>
   );

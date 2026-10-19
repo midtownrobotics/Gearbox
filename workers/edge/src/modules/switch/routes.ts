@@ -91,6 +91,29 @@ export const switchRouter = new Hono<AppEnv>()
     if ("error" in result) return c.json({ error: result.error }, result.status);
     return c.json(result.data);
   })
+  .patch("/sounds/:name", requireAdmin, async (c) => {
+    const name = soundName(c);
+    const body = await c.req.json().catch(() => null);
+    if (!name || typeof body?.name !== "string" || !validSwitchSoundName(body.name))
+      return c.json(
+        {
+          error:
+            "Use a WAV filename with letters, numbers, spaces, dots, dashes or underscores (5-100 characters).",
+        },
+        400,
+      );
+    const result = await relay<{ ok: true; sounds: SwitchSound[] }>(
+      c,
+      `/sounds/${encodeURIComponent(name)}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: body.name }),
+      },
+    );
+    if ("error" in result) return c.json({ error: result.error }, result.status);
+    return c.json(result.data);
+  })
   .post("/sounds/:name/test", requireAdmin, async (c) => {
     const name = soundName(c);
     if (!name) return c.json({ error: "Invalid sound name." }, 400);
