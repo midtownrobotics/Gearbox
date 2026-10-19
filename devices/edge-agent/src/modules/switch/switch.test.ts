@@ -217,6 +217,29 @@ describe("SoundLibrary", () => {
     }
   });
 
+  test("renames without overwriting another clip or changing file contents", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "g3-switch-rename-"));
+    const library = new SoundLibrary(directory, []);
+    try {
+      await library.upload("first.wav", wave);
+      await library.upload("second.wav", wave);
+      await expect(library.rename("first.wav", "second.wav")).rejects.toThrow("already exists");
+      await expect(library.rename("first.wav", "../bad.wav")).rejects.toThrow("Invalid");
+      await expect(library.rename("missing.wav", "new.wav")).rejects.toThrow("not found");
+      await library.rename("first.wav", "Renamed clip.wav");
+      expect(
+        new Uint8Array(await Bun.file(library.soundPath("Renamed clip.wav")).arrayBuffer()),
+      ).toEqual(wave);
+      expect((await library.list()).map((sound) => sound.name)).toEqual([
+        "Renamed clip.wav",
+        "second.wav",
+      ]);
+      expect(() => library.soundPath("first.wav")).toThrow("not found");
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
   test("rejects invalid names, traversal, non-WAV data, and oversized files", async () => {
     const directory = await mkdtemp(join(tmpdir(), "g3-switch-sounds-"));
     const library = new SoundLibrary(directory, []);
