@@ -44,6 +44,10 @@ Staging deploys from `staging` unless the repository variable `STAGING_BRANCH` n
 - **One branch at a time.** Whatever deployed last is what staging runs, so say when you take it over.
 - **With `PRODUCTION_BRANCH` set to `staging`,** a push to `staging` while the staging environment follows another branch still deploys production, without staging first.
 
+### dev-env
+
+`dev-env` only takes merges: branches go into it, and nothing on it goes anywhere else. `.github/workflows/dev-env-guard.yml` fails a pull request from `dev-env`, or from any branch holding `dev-env`'s own commits (dev-env merged into it, or the branch started from it), and the `staging` and `public` rulesets require its `dev-env-guard` check. A branch you merged into `dev-env` can still go to `staging` as it is. If the check fails, make the branch again from `staging` and cherry-pick only your own commits. Git can't stop a merge on someone's computer, so the check is what keeps it out of `staging` and `public`.
+
 ### Setting staging up (once)
 
 1. **Resources:** `pnpm staging:create` (with a Wrangler login; `-- --dry-run` first to see what it would make). It makes each staging D1 database, the KV namespaces (Sessions and Rate limit), Shop's and Scouting's R2 buckets and Shop's queue, writes their ids into `infra/staging/resources.json` and the `wrangler.toml` files, and deploys an empty placeholder for each staging Worker so the first deploy can bind them to each other. Commit the changed files.
