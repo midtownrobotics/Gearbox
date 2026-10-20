@@ -87,6 +87,13 @@ export function AddPartPage() {
   }
 
   const infoRequiredBy = partInfoRequiredBy(processIds, data?.processes ?? []);
+  // The team's quality check, which the worker puts at the end of every part.
+  const qualityStep = user.qualityCheck.required
+    ? (data?.processes.find(
+        (p) => p.id === user.qualityCheck.processId && p.type === "quality_control",
+      ) ?? null)
+    : null;
+  const pickable = (data?.processes ?? []).filter((p) => p.id !== qualityStep?.id);
 
   async function handleSubmit() {
     if (
@@ -368,7 +375,7 @@ export function AddPartPage() {
                           className={`${inputClass} flex-1`}
                         >
                           <option value={0}>Remove</option>
-                          {processes.map((p) => (
+                          {pickable.map((p) => (
                             <option key={p.id} value={p.id}>
                               {p.name}
                             </option>
@@ -389,13 +396,22 @@ export function AddPartPage() {
                         className={`${inputClass} flex-1 border-dashed !text-secondary-500`}
                       >
                         <option value={0}>Add a process…</option>
-                        {processes.map((p) => (
+                        {pickable.map((p) => (
                           <option key={p.id} value={p.id}>
                             {p.name}
                           </option>
                         ))}
                       </select>
                     </div>
+                    {qualityStep && (
+                      <div className="flex items-center gap-2">
+                        <span className="w-6 shrink-0" />
+                        <p className="flex-1 bg-inset border border-secondary-200 rounded-lg px-3 py-2 text-sm text-secondary-600">
+                          Last: {qualityStep.name} — the team requires quality control on every
+                          part.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

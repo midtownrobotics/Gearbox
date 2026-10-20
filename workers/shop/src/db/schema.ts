@@ -53,7 +53,12 @@ export const partInstances = sqliteTable(
   (t) => [unique().on(t.partDefinitionId, t.instanceNumber)],
 );
 
-export const PROCESS_TYPES = ["regular", "file_producer", "file_consumer"] as const;
+export const PROCESS_TYPES = [
+  "regular",
+  "file_producer",
+  "file_consumer",
+  "quality_control",
+] as const;
 export type ProcessType = (typeof PROCESS_TYPES)[number];
 
 export const processes = sqliteTable("processes", {
@@ -65,6 +70,23 @@ export const processes = sqliteTable("processes", {
   requiresPartInfo: integer("requires_part_info").notNull().default(0),
   createdAt: integer("created_at").notNull(),
 });
+
+/**
+ * The team's shop managers: who may check off its Quality Control steps. The team's G3ID admins
+ * may too, without a row here (but not from a kiosk, where G3ID reports no roles).
+ */
+export const shopManagers = sqliteTable(
+  "shop_managers",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    teamId: teamId(),
+    /** Their G3ID user id. */
+    userId: text("user_id").notNull(),
+    addedBy: text("added_by").notNull(),
+    addedAt: integer("added_at").notNull(),
+  },
+  (t) => [unique().on(t.teamId, t.userId)],
+);
 
 export const partDefinitionProcessBlueprints = sqliteTable(
   "part_definition_process_blueprints",
@@ -267,3 +289,70 @@ export const adminSettings = sqliteTable(
   },
   (t) => [unique().on(t.teamId, t.key)],
 );
+
+export const QUALITY_OUTCOMES = [
+  "passed",
+  "sent_back",
+  "not_sent_back",
+  // Sent to a step with a note on the part saying what to do, and obsoleted for a new part.
+  "fixed",
+  "replaced",
+] as const;
+export type QualityOutcome = (typeof QUALITY_OUTCOMES)[number];
+
+/** One line of the checklist a report went through, and whether the part met it. */
+export type QualityAnswer = { label: string; ok: boolean };
+
+/** The team's quality checklist: what every report is answered against, in order. */
+export const qualityCheckItems = sqliteTable("quality_check_items", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  teamId: teamId(),
+  label: text("label").notNull(),
+  position: integer("position").notNull(),
+  createdAt: integer("created_at").notNull(),
+});
+
+/** A step a failed quality report names as the likely cause, as it was when reported. */
+export type QualitySuspect = {
+  processId: number;
+  name: string;
+  /** When the step was last finished, and by whom (a G3ID user id); null when not recorded. */
+  completedAt: number | null;
+  completedBy: string | null;
+};
+
+/**
+ * A quality report on a part at a Quality Control step. It keeps the part and step as they were,
+ * with no foreign keys, so it outlives obsolete instances deleted from the Admin page.
+ */
+export const qualityReports = sqliteTable("quality_reports", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  teamId: teamId(),
+  partInstanceId: integer("part_instance_id").notNull(),
+  partDefinitionId: integer("part_definition_id").notNull(),
+  partName: text("part_name").notNull(),
+  partNumber: text("part_number").notNull(),
+  revision: text("revision"),
+  instanceNumber: integer("instance_number").notNull(),
+  processId: integer("process_id").notNull(),
+  processName: text("process_name").notNull(),
+  reportedBy: text("reported_by").notNull(),
+  createdAt: integer("created_at").notNull(),
+  /** The checklist as it read when the report was written, in the team's order. */
+  checks: text("checks", { mode: "json" }).$type<QualityAnswer[]>().notNull().default([]),
+  passed: integer("passed").notNull(),
+  unsure: integer("unsure").notNull().default(0),
+  suspects: text("suspects", { mode: "json" }).$type<QualitySuspect[]>().notNull().default([]),
+  notes: text("notes"),
+  outcome: text("outcome", { enum: QUALITY_OUTCOMES }).notNull(),
+  sentBackProcessId: integer("sent_back_process_id"),
+  sentBackProcessName: text("sent_back_process_name"),
+  sentBackStatus: text("sent_back_status", { enum: ["todo", "doing"] }),
+  /** What has to be done to fix the part, as written onto the part's notes. */
+  fixNote: text("fix_note"),
+  /** The part made to replace this one; its instance may later be deleted. */
+  replacementInstanceId: integer("replacement_instance_id"),
+  replacementInstanceNumber: integer("replacement_instance_number"),
+  outcomeBy: text("outcome_by"),
+  outcomeAt: integer("outcome_at"),
+});

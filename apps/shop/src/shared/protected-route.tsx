@@ -2,7 +2,7 @@ import { PageLoading } from "@g3/ui";
 import type { ReactNode } from "react";
 import { redirectToLogin } from "./api-error";
 import { KioskShell } from "./kiosk-shell";
-import { AuthUserContext, useAuth } from "./use-auth";
+import { AuthRefreshContext, AuthUserContext, useAuth } from "./use-auth";
 
 export function ProtectedRoute({ children }: { children: ReactNode }) {
   const auth = useAuth();
@@ -15,8 +15,10 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthUserContext.Provider value={auth.user}>
-      <KioskShell>{children}</KioskShell>
-    </AuthUserContext.Provider>
+    <AuthRefreshContext.Provider value={auth.refresh}>
+      <AuthUserContext.Provider value={auth.user}>
+        <KioskShell>{children}</KioskShell>
+      </AuthUserContext.Provider>
+    </AuthRefreshContext.Provider>
   );
 }
