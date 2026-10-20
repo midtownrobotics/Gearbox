@@ -16,7 +16,8 @@ import fixtures from "./fixtures/team-rows.json";
 const bindings = env as unknown as AppEnv["Bindings"];
 const db = bindings.SCOUTING_DB;
 // Tables added after team ownership (0033) aren't in the fixtures, which that migration's test uses.
-const PLAYOFF_TABLES = [
+const LATER_TABLES = [
+  "scout_nudges",
   "playoff_forms",
   "playoff_sessions",
   "playoff_matches",
@@ -24,10 +25,10 @@ const PLAYOFF_TABLES = [
   "playoff_claims",
   "playoff_reports",
 ];
-const tableNames = [...Object.keys(fixtures), ...PLAYOFF_TABLES];
+const tableNames = [...Object.keys(fixtures), ...LATER_TABLES];
 const fixtureTables = Object.keys(fixtures);
 
-/** A running playoff session with a started match, a scout, their slot and report. */
+/** A running playoff session with a started match, a scout, their slot and report; a nudge. */
 async function seedPlayoffs(team: TeamUsers, marker: string) {
   const session = `playoff_sessions-${team.teamId}`;
   const now = Date.now();
@@ -47,6 +48,11 @@ async function seedPlayoffs(team: TeamUsers, marker: string) {
     },
   ]);
   await db.batch([
+    db
+      .prepare(
+        "INSERT INTO scout_nudges (team_id, id, user_id, nudged_by, nudged_at) VALUES (?, ?, ?, ?, ?)",
+      )
+      .bind(team.teamId, `scout_nudges-${team.teamId}`, team.student.id, team.admin.id, now),
     db
       .prepare(
         "INSERT INTO playoff_forms (team_id, fields_json, updated_by, updated_at) VALUES (?, ?, ?, ?)",

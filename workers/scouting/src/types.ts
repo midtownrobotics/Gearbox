@@ -7,6 +7,9 @@ export type AppEnv = {
     SCOUTING_DB: D1Database;
     FIELD_MAPS: R2Bucket;
     G3ID: Fetcher;
+    /** The team's Schedule app: who's on scouting duty (scout-nudges.ts). */
+    SCHEDULE?: Fetcher;
+    LOCAL_GATEWAY_URL?: string;
     TBA_AUTH_KEY?: string;
     NEXUS_API_KEY?: string;
     AI: Ai;

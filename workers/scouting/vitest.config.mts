@@ -1,6 +1,8 @@
 import { workerTestConfig } from "@g3/testing/config";
 
 const statboticsCalls = new Map<string, number>();
+/** Who the Schedule stub has on scouting duty, by team; tests set it with a PUT to the stub. */
+const onDuty = new Map<string, unknown[]>();
 
 export default workerTestConfig({
   d1: "SCOUTING_DB",
@@ -8,6 +10,25 @@ export default workerTestConfig({
     LOCAL_AUTH_BYPASS: "false",
     TBA_AUTH_KEY: "legacy-tba-test-key",
     NEXUS_API_KEY: "legacy-nexus-test-key",
+  },
+  services: {
+    // The team's Schedule: who's on scouting duty now (`/internal/teams/:id/now`), nobody until
+    // a test says (`PUT /test/teams/:id/now` with `{ people }` on env.SCHEDULE).
+    SCHEDULE: async (request) => {
+      const url = new URL(request.url);
+      const set = url.pathname.match(/^\/test\/teams\/([^/]+)\/now$/);
+      if (set && request.method === "PUT") {
+        onDuty.set(
+          decodeURIComponent(set[1]),
+          ((await request.json()) as { people: unknown[] }).people,
+        );
+        return Response.json({ ok: true });
+      }
+      const now = url.pathname.match(/^\/api\/internal\/teams\/([^/]+)\/now$/);
+      if (now && url.searchParams.get("type") === "scouting")
+        return Response.json({ people: onDuty.get(decodeURIComponent(now[1])) ?? [] });
+      return new Response("Not found", { status: 404 });
+    },
   },
   outbound: async (request) => {
     const url = new URL(request.url);

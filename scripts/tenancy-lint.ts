@@ -49,6 +49,7 @@ const APPS: App[] = [
       playoffSessions: "playoff_sessions",
       robotImages: "robot_images",
       robotTeams: "robot_teams",
+      scoutNudges: "scout_nudges",
       scoutingEngagementSettings: "scouting_engagement_settings",
       scoutingFormSubmissions: "scouting_form_submissions",
       scoutingForms: "scouting_forms",

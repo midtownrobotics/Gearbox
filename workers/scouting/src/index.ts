@@ -52,6 +52,7 @@ import { requireAuth } from "./middleware/auth";
 import { playoffRoutes } from "./playoffs";
 import { predictionsRoutes, settleConfiguredGame } from "./predictions";
 import { getG3IdUsers, isServiceHelper, isStrategyAdmin } from "./roles";
+import { scoutNudgeRoutes } from "./scout-nudges";
 import { teamSettingsRouter } from "./team-settings";
 import type { AppEnv, TbaMatch, TbaTeam } from "./types";
 import { finiteNumber, id, parseJson, stringArray, teamNumber, text } from "./utils";
@@ -855,6 +856,8 @@ app.put("/presence", requireAuth, async (c) => {
     .catch(() => ({}));
   const allowedPages = new Set([
     "forms",
+    "playoffs",
+    "predictions",
     "admin",
     "analysis",
     "service",
@@ -969,6 +972,7 @@ app.route("/", engagementRoutes);
 app.route("/", predictionsRoutes);
 app.route("/", manualRoutes);
 app.route("/", playoffRoutes);
+app.route("/", scoutNudgeRoutes);
 
 app.get("/scouting-forms", requireAuth, async (c) => {
   await seedTeam(dbOf(c), c.get("teamId"));

@@ -1342,6 +1342,148 @@ function LiveUsers() {
   );
 }
 
+type InactiveScout = {
+  userId: string;
+  name: string;
+  roleName: string;
+  until: number;
+  lastSeenAt: number | null;
+  elsewhere: string | null;
+  inactiveSince: number | null;
+  canNudge: boolean;
+  nudgedAt: number | null;
+};
+type InactiveScoutsOverview =
+  | { available: false }
+  | {
+      available: true;
+      chat: "slack" | "discord";
+      scouts: InactiveScout[];
+      onDuty: number;
+      error?: string;
+    };
+
+/** How long before the same person can be nudged again (the worker's NUDGE_GAP_MS). */
+const NUDGE_GAP_MS = 5 * 60_000;
+const PAGE_NAMES: Record<string, string> = {
+  admin: "Admin",
+  analysis: "Analysis",
+  service: "Service Tickets",
+  autos: "Auto Library",
+  tiers: "Tier Lists",
+  maps: "Field Maps",
+  predictions: "Match Predictions",
+};
+
+function minutesText(ms: number) {
+  const minutes = Math.floor(ms / 60_000);
+  if (minutes < 1) return "under a minute";
+  if (minutes < 60) return `${minutes} min`;
+  return `${Math.floor(minutes / 60)} h ${minutes % 60} min`;
+}
+
+/**
+ * People the team's Schedule has on scouting duty who aren't scouting now, with a button that
+ * asks one to come scout on the team's chat. Only for a team with Schedule and a chat.
+ */
+function InactiveScouts() {
+  const [overview, setOverview] = useState<InactiveScoutsOverview | null>(null);
+  const [now, setNow] = useState(Date.now());
+  const [sending, setSending] = useState<string | null>(null);
+  const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
+  const load = useCallback(
+    () =>
+      api<InactiveScoutsOverview>("/inactive-scouts", { cache: "no-store" })
+        .then((result) => {
+          setOverview(result);
+          setNow(Date.now());
+        })
+        .catch(() => undefined),
+    [],
+  );
+  useEffect(() => {
+    void load();
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible") void load();
+    }, 30_000);
+    return () => window.clearInterval(interval);
+  }, [load]);
+  if (!overview?.available) return null;
+  const chat = overview.chat === "slack" ? "Slack" : "Discord";
+  return (
+    <section className="inactive-scouts">
+      <h3>Inactive scouts</h3>
+      {overview.error ? (
+        <span>{overview.error}</span>
+      ) : overview.onDuty === 0 ? (
+        <span>Nobody is on scouting duty in Schedule right now.</span>
+      ) : overview.scouts.length === 0 ? (
+        <span>Everyone on scouting duty is scouting.</span>
+      ) : (
+        <ul>
+          {overview.scouts.map((scout) => {
+            const nudgedRecently = scout.nudgedAt !== null && now - scout.nudgedAt < NUDGE_GAP_MS;
+            return (
+              <li key={scout.userId}>
+                <div>
+                  <strong>{scout.name}</strong>
+                  <span>
+                    {scout.inactiveSince !== null
+                      ? `Away ${minutesText(now - scout.inactiveSince)}`
+                      : `On ${PAGE_NAMES[scout.elsewhere ?? ""] ?? "another page"}`}
+                    {" · "}
+                    {scout.roleName} until{" "}
+                    {new Date(scout.until).toLocaleTimeString([], {
+                      hour: "numeric",
+                      minute: "2-digit",
+                    })}
+                  </span>
+                </div>
+                {!scout.canNudge ? (
+                  <small>Hasn't linked {chat}</small>
+                ) : nudgedRecently ? (
+                  <small>Nudged {minutesText(now - (scout.nudgedAt ?? now))} ago</small>
+                ) : (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    disabled={sending !== null}
+                    onClick={async () => {
+                      setSending(scout.userId);
+                      setMessage(null);
+                      try {
+                        await api(`/inactive-scouts/${encodeURIComponent(scout.userId)}/nudge`, {
+                          method: "POST",
+                        });
+                        setMessage({ text: `Nudged ${scout.name} on ${chat}.`, error: false });
+                        await load();
+                      } catch (error) {
+                        setMessage({
+                          text: error instanceof Error ? error.message : "Couldn't nudge them.",
+                          error: true,
+                        });
+                      } finally {
+                        setSending(null);
+                      }
+                    }}
+                  >
+                    <Megaphone size={14} /> {sending === scout.userId ? "Nudging…" : "Nudge"}
+                  </Button>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {message && (
+        <span role="status" className={message.error ? "inactive-scouts-error" : undefined}>
+          {message.text}
+        </span>
+      )}
+    </section>
+  );
+}
+
 function ServiceIssueReport() {
   const questions = useQuestions();
   const chat = chatName(useTeamChat());
@@ -2114,6 +2256,7 @@ function EventStatus({
               )}
             </div>
           </section>
+          <InactiveScouts />
           <div className="online-admins">
             <strong>
               <Users size={16} /> Online Strategy leads

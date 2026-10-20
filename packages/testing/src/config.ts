@@ -37,6 +37,8 @@ const chatMessages = new Map<string, Record<string, unknown>[]>();
 const teamLogs = new Map<string, Record<string, unknown>[]>();
 const adminDms = new Map<string, Record<string, unknown>[]>();
 const memberDms = new Map<string, Record<string, unknown>[]>();
+/** Teams whose chat a test switched off (`PUT /test/teams/:id/chat`); every other team has Slack. */
+const teamsWithoutChat = new Set<string>();
 
 /**
  * G3ID as other workers see it: /auth/me answers for the user in the test cookie (users.ts), like
@@ -68,6 +70,20 @@ export const g3idStub: ServiceStub = async (request) => {
   if (url.pathname === "/team/ui") {
     return json(teamUiDefaults(request.headers.get("X-Team-Id") ?? teamKey));
   }
+  // The team's chat, like G3ID's public /team/chat: Slack, unless a test switched it off with
+  // `PUT /test/teams/:id/chat { provider: null }` on env.G3ID (stub only).
+  if (url.pathname === "/team/chat") {
+    const team = request.headers.get("X-Team-Id") ?? teamKey;
+    return json({ provider: teamsWithoutChat.has(team) ? null : "slack" });
+  }
+  const chatSwitch = url.pathname.match(/^\/test\/teams\/([^/]+)\/chat$/);
+  if (chatSwitch && request.method === "PUT") {
+    const team = decodeURIComponent(chatSwitch[1]);
+    const { provider } = (await request.json()) as { provider: string | null };
+    if (provider) teamsWithoutChat.delete(team);
+    else teamsWithoutChat.add(team);
+    return json({ ok: true });
+  }
   // The member list (admins only, like the real one): the standard test users of their team.
   if (url.pathname === "/users") {
     if (!user || user.sessionType === "pin" || !user.isAdmin)
@@ -83,7 +99,8 @@ export const g3idStub: ServiceStub = async (request) => {
     });
   }
   // A team's members with their roles, for other workers over the service binding (the platform
-  // SDK's teamMembers). Any team's: the standard users, with ids of their own.
+  // SDK's teamMembers). Any team's: the standard users, with ids of their own. Everyone but the
+  // other student has linked the team's chat (`hasChat`), when it has one.
   const members = url.pathname.match(/^\/internal\/teams\/([^/]+)\/members$/);
   if (members) {
     return json(
@@ -95,6 +112,9 @@ export const g3idStub: ServiceStub = async (request) => {
           status: "active",
           isAdmin,
           isMentor,
+          hasChat:
+            !teamsWithoutChat.has(decodeURIComponent(members[1])) &&
+            id !== teamUsers(decodeURIComponent(members[1])).otherStudent.id,
         }),
       ),
     );

@@ -17,6 +17,11 @@ binding = "AI"
 binding = "G3ID"
 service = "g3id"
 
+# Who's on scouting duty now, for the inactive scouts (src/scout-nudges.ts).
+[[services]]
+binding = "SCHEDULE"
+service = "schedule"
+
 [[d1_databases]]
 binding = "SCOUTING_DB"
 database_name = "g3-scouting-local"
@@ -30,6 +35,8 @@ bucket_name = "g3-scouting"
 [vars]
 FRONTEND_URL = "http://localhost:5182"
 LOCAL_AUTH_BYPASS = "true"
+# Links in chat messages go through the dev gateway (production builds them from site.ts).
+LOCAL_GATEWAY_URL = "http://localhost:8796"
 # Secret: TBA_AUTH_KEY (event schedules). Messages to members go through G3ID (Slack or Discord).
 
 [env.production]
@@ -46,6 +53,10 @@ binding = "AI"
 [[env.production.services]]
 binding = "G3ID"
 service = "g3id-production"
+
+[[env.production.services]]
+binding = "SCHEDULE"
+service = "schedule-production"
 
 [[env.production.d1_databases]]
 binding = "SCOUTING_DB"
@@ -91,6 +102,10 @@ binding = "AI"
 [[env.staging.services]]
 binding = "G3ID"
 service = "g3id-staging"
+
+[[env.staging.services]]
+binding = "SCHEDULE"
+service = "schedule-staging"
 
 [[env.staging.d1_databases]]
 binding = "SCOUTING_DB"

@@ -3328,6 +3328,51 @@
     border-top: 1px solid var(--border, var(--g3-light-line));
   }
 
+  /* Inactive scouts (Competition overview): on scouting duty in Schedule, not scouting now. */
+  .inactive-scouts {
+    display: grid;
+    gap: 8px;
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border, var(--g3-light-line));
+  }
+  .inactive-scouts h3 {
+    margin: 0 0 2px;
+    font-size: 15px;
+  }
+  .inactive-scouts ul {
+    display: grid;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .inactive-scouts li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px 12px;
+    padding: 10px 14px;
+    border: 1px solid var(--border, var(--g3-light-line));
+    border-radius: 10px;
+    background: var(--surface, white);
+  }
+  .inactive-scouts li > div {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+  }
+  .inactive-scouts li span,
+  .inactive-scouts small,
+  .inactive-scouts > span {
+    color: var(--text-muted, color-mix(in srgb, var(--g3-light-muted), var(--g3-light-surface) 12%));
+    font-size: 13px;
+  }
+  .inactive-scouts > .inactive-scouts-error {
+    color: var(--scouting-danger);
+  }
+
   .match-submission-status {
     display: grid;
     gap: 8px;

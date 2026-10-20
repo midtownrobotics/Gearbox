@@ -3,7 +3,7 @@ import { and, eq, gte, inArray, isNotNull } from "drizzle-orm";
 import type { Db } from "../db";
 import { assignments, roles, scheduleDays, schedules } from "../db/schema";
 import type { RoleType } from "./roles";
-import { slotAt, timeOf } from "./slots";
+import { momentOf, slotAt, timeOf } from "./slots";
 
 // Who has a role of one type right now, across the team's published schedules: Pit's "In the pit
 // now". A schedule counts while now, in its event's time zone, is within one of its days' hours.
@@ -16,6 +16,9 @@ export type PersonNow = {
   roleColor: string;
   /** When the role ends, as the event's wall-clock time ("12:15"; "24:00" for midnight). */
   until: string;
+  /** When this stretch of the role started and ends, as moments (ms), for other apps' clocks. */
+  startsAt: number;
+  endsAt: number;
   scheduleId: number;
   scheduleName: string;
 };
@@ -62,7 +65,7 @@ export async function peopleNow(
   for (const day of days) {
     const here = slotAt(now, day.timeZone);
     if (here.day !== day.day || here.slot < day.start || here.slot >= day.end) continue;
-    // From now to the end of the day: enough to see where each person's role ends.
+    // The whole day: enough to see where each person's role started and ends.
     const cells = await db
       .select({
         userId: assignments.userId,
@@ -80,7 +83,7 @@ export async function peopleNow(
           teamId,
           eq(assignments.scheduleId, day.id),
           eq(assignments.day, day.day),
-          gte(assignments.slot, here.slot),
+          gte(assignments.slot, day.start),
         ),
       )
       .all();
@@ -95,6 +98,8 @@ export async function peopleNow(
       if (!current || current.roleType !== type || seen.has(userId)) continue;
       let end = here.slot + 1;
       while (slots.get(end)?.roleId === current.roleId) end++;
+      let start = here.slot;
+      while (slots.get(start - 1)?.roleId === current.roleId) start--;
       seen.add(userId);
       out.push({
         userId,
@@ -102,6 +107,8 @@ export async function peopleNow(
         roleName: current.roleName,
         roleColor: current.roleColor,
         until: timeOf(end),
+        startsAt: momentOf(day.day, start, day.timeZone),
+        endsAt: momentOf(day.day, end, day.timeZone),
         scheduleId: day.id,
         scheduleName: day.name,
       });

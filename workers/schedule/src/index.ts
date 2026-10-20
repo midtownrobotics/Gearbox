@@ -10,6 +10,8 @@ import { EXPORTED_TABLES, TEAM_TABLES } from "./db/schema";
 import { demoWords, loadDemo } from "./demo";
 import { canEdit } from "./lib/editors";
 import { eventDays } from "./lib/event-days";
+import { peopleNow } from "./lib/now";
+import { isRoleType } from "./lib/roles";
 import { manifest } from "./manifest";
 import { sendReminders } from "./reminders";
 import { friendsRouter } from "./routes/friends";
@@ -58,6 +60,14 @@ const app = base
         "Each member's friends are private to them, so they aren't included.",
       ]),
     );
+  })
+  // Who has a role of a type right now (`?type=scouting`), for other workers: Scouting's inactive
+  // scouts. The same answer as /now, without a person signed in.
+  .get("/internal/teams/:teamId/now", async (c) => {
+    const type = c.req.query("type");
+    if (!isRoleType(type)) return c.json({ error: "Unknown role type." }, 400);
+    const people = await peopleNow(c.env, createDb(c.env.SCHEDULE_DB), c.req.param("teamId"), type);
+    return c.json({ people });
   })
   // When the team's events open and close each day: Pit's battery timers pause overnight.
   .get("/internal/teams/:teamId/event-days", async (c) =>

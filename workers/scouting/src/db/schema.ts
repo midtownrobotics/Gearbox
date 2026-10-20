@@ -503,6 +503,18 @@ export const serviceTickets = sqliteTable(
   (t) => [primaryKey({ columns: [t.teamId, t.id] })],
 );
 
+export const scoutNudges = sqliteTable(
+  "scout_nudges",
+  {
+    teamId: text("team_id").notNull(),
+    id: text("id").notNull(),
+    user_id: text("user_id").notNull(),
+    nudged_by: text("nudged_by").notNull(),
+    nudged_at: integer("nudged_at").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.teamId, t.id] })],
+);
+
 export const strategyAdmins = sqliteTable(
   "strategy_admins",
   {

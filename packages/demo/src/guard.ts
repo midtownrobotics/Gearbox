@@ -56,6 +56,8 @@ export const DEMO_BLOCKED: readonly Blocked[] = [
   { app: "scouting", method: "POST", path: /^\/scouting\/manual-schedule\/extract/ },
   // and so does reading a photo of the playoff alliances.
   { app: "scouting", method: "POST", path: /^\/scouting\/playoffs\/alliances\/scan/ },
+  // Nudging a scout sends them a message.
+  { app: "scouting", method: "POST", path: /^\/scouting\/inactive-scouts\/[^/]+\/nudge/ },
   // Integration keys and every app's settings form (no page saves through it yet).
   { app: "shop", method: "PUT", path: /^\/team-settings/ },
   { app: "orders", method: "PUT", path: /^\/team-settings/ },

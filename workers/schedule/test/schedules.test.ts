@@ -1,6 +1,6 @@
 import { env } from "cloudflare:test";
 import { admin, kioskAdmin, mentor, otherStudent, student } from "@g3/testing/users";
-import { callAs, jsonAs } from "@g3/testing/worker";
+import { call, callAs, jsonAs } from "@g3/testing/worker";
 import { describe, expect, it } from "vitest";
 import { createDb } from "../src/db";
 import { peopleNow } from "../src/lib/now";
@@ -328,8 +328,19 @@ describe("who's on a role type now", () => {
 
     await jsonAs(mentor, `/schedules/${id}`, { method: "PATCH", body: { published: true } });
     expect(await at(halfPastTen)).toMatchObject([
-      { userId: student.id, roleId: pit.id, until: "11:30" },
+      // 10:00 and 11:30 in Chicago are 16:00 and 17:30 UTC.
+      {
+        userId: student.id,
+        roleId: pit.id,
+        until: "11:30",
+        startsAt: Date.parse(`${DAY}T16:00:00Z`),
+        endsAt: Date.parse(`${DAY}T17:30:00Z`),
+      },
     ]);
+    // Other workers ask the same over the binding, for any team, without a person signed in.
+    const internal = await call(`/internal/teams/${student.teamId}/now?type=pit`);
+    expect(internal.status).toBe(200);
+    expect((await call(`/internal/teams/${student.teamId}/now?type=drive`)).status).toBe(400);
     expect((await at(`${DAY}T17:15:00Z`)).map((p) => p.userId).sort()).toEqual(
       [student.id, otherStudent.id].sort(),
     );
