@@ -1,0 +1,36 @@
+name: reset-dev-env
+
+# Run by hand (Actions → reset-dev-env → Run workflow): puts dev-env back to staging, dropping
+# everything merged into it since. While the staging environment follows dev-env (the repository
+# variable STAGING_BRANCH), it then deploys staging from it: a push made with GITHUB_TOKEN doesn't
+# start staging.yml on its own. docs/deploy.md, "dev-env".
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: reset-dev-env
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  reset:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: staging
+          fetch-depth: 0
+
+      - name: Put dev-env back to staging
+        run: |
+          echo "dev-env was $(git rev-parse --short origin/dev-env 2>/dev/null || echo 'missing'), now $(git rev-parse --short origin/staging)"
+          git push --force origin origin/staging:refs/heads/dev-env
+
+      - name: Deploy staging from dev-env
+        if: vars.STAGING_BRANCH == 'dev-env'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run staging.yml --ref dev-env
