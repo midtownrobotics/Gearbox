@@ -13,12 +13,14 @@ CREATE TABLE playoff_sessions (
   team_id TEXT NOT NULL,
   id TEXT NOT NULL,
   event_name TEXT NOT NULL,
-  format TEXT NOT NULL CHECK (format IN ('double8', 'double4')),
+  format TEXT NOT NULL CHECK (format IN ('double8', 'double4', 'roundrobin6', 'roundrobin4')),
   status TEXT NOT NULL CHECK (status IN ('setup', 'live', 'finished')),
   alliances_json TEXT NOT NULL DEFAULT '[]',
   assign_mode TEXT NOT NULL DEFAULT 'claim' CHECK (assign_mode IN ('claim', 'auto', 'admin')),
   skip_own INTEGER NOT NULL DEFAULT 1 CHECK (skip_own IN (0, 1)),
   current_match_id TEXT,
+  -- A round robin's finalists when a strategy lead chose them: [red seed, blue seed].
+  finalists_json TEXT,
   created_by TEXT NOT NULL,
   created_at INTEGER NOT NULL,
   started_at INTEGER,
@@ -38,7 +40,8 @@ CREATE TABLE playoff_matches (
   red_teams_json TEXT NOT NULL DEFAULT '[]',
   blue_teams_json TEXT NOT NULL DEFAULT '[]',
   started_at INTEGER,
-  winner TEXT CHECK (winner IN ('red', 'blue')),
+  -- 'tie' only in a round robin.
+  winner TEXT CHECK (winner IN ('red', 'blue', 'tie')),
   decided_at INTEGER,
   PRIMARY KEY (team_id, session_id, match_id),
   FOREIGN KEY (team_id, session_id) REFERENCES playoff_sessions (team_id, id)

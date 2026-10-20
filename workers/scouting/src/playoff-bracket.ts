@@ -1,35 +1,62 @@
 /**
- * Playoff brackets for playoff scouting: FRC's double elimination brackets, which match feeds
- * which, and, from the winners chosen so far, which alliances meet in each match. Nothing here
- * touches the database; `playoffs.ts` stores the winners and asks this for the rest.
+ * Playoff brackets for playoff scouting: FRC's double elimination brackets and round robins,
+ * which match feeds which, and, from the results chosen so far, which alliances meet in each
+ * match. Nothing here touches the database; `playoffs.ts` stores the results and asks this for
+ * the rest.
  */
 
-export type BracketFormat = "double8" | "double4";
+export type BracketFormat = "double8" | "double4" | "roundrobin6" | "roundrobin4";
 export type Side = "red" | "blue";
+/** A match's result: a side won, or (in a round robin only) it was a tie. */
+export type Result = Side | "tie";
 
 /** Where an alliance in a match comes from: its seed, or the winner or loser of an earlier match. */
 type Source = { seed: number } | { winner: string } | { loser: string };
 
-type MatchDefinition = {
-  id: string;
-  round: string;
-  /** Upper (winners') or lower (losers') bracket, or the finals. */
-  bracket: "upper" | "lower" | "finals";
-  red: Source;
-  blue: Source;
-};
+type Stage = "upper" | "lower" | "roundrobin" | "finals";
+
+type MatchDefinition = { id: string; round: string; bracket: Stage; red: Source; blue: Source };
 
 type FormatDefinition = {
   label: string;
   alliances: number;
   matches: MatchDefinition[];
-  /** The matches whose winners meet in the best-of-three finals: red, then blue. */
-  finals: [string, string];
+  /**
+   * Who meets in the best-of-three finals: the winners of two matches (double elimination), or
+   * the top two of the round robin's standings.
+   */
+  finals: [string, string] | "standings";
 };
 
 const seed = (n: number): Source => ({ seed: n });
 const won = (id: string): Source => ({ winner: id });
 const lost = (id: string): Source => ({ loser: id });
+
+/**
+ * Every alliance plays every other once, by the circle method: one match each per round, so
+ * nobody plays twice in a row, and every alliance red within one match of half the time.
+ */
+function roundRobin(alliances: number): MatchDefinition[] {
+  const order = Array.from({ length: alliances }, (_, index) => index + 1);
+  const matches: MatchDefinition[] = [];
+  for (let round = 0; round < alliances - 1; round += 1) {
+    for (let index = 0; index < alliances / 2; index += 1) {
+      const pair = [order[index], order[alliances - 1 - index]];
+      // The alliance that stays put changes color each round; the others by place in the circle.
+      const first = index === 0 ? round % 2 === 0 : index % 2 === 0;
+      const [red, blue] = first ? pair : [pair[1], pair[0]];
+      matches.push({
+        id: `M${matches.length + 1}`,
+        round: `Round ${round + 1}`,
+        bracket: "roundrobin",
+        red: seed(red),
+        blue: seed(blue),
+      });
+    }
+    order.splice(1, 0, order.pop() as number);
+  }
+  return matches;
+}
 
 /** FRC's brackets, in the order the matches are played. */
 export const FORMATS: Record<BracketFormat, FormatDefinition> = {
@@ -65,6 +92,18 @@ export const FORMATS: Record<BracketFormat, FormatDefinition> = {
     ],
     finals: ["M4", "M5"],
   },
+  roundrobin6: {
+    label: "6 alliances, round robin",
+    alliances: 6,
+    matches: roundRobin(6),
+    finals: "standings",
+  },
+  roundrobin4: {
+    label: "4 alliances, round robin",
+    alliances: 4,
+    matches: roundRobin(4),
+    finals: "standings",
+  },
 };
 
 export const FINALS = ["F1", "F2", "F3"] as const;
@@ -73,20 +112,31 @@ export function isFormat(value: unknown): value is BracketFormat {
   return typeof value === "string" && value in FORMATS;
 }
 
+export const isRoundRobin = (format: BracketFormat) => FORMATS[format].finals === "standings";
+
 export type BracketMatch = {
   id: string;
   label: string;
   round: string;
-  bracket: "upper" | "lower" | "finals";
+  bracket: Stage;
   /** The alliances' seeds, once the matches before have been decided. */
   red: number | null;
   blue: number | null;
   /** Where each alliance comes from, for a match whose alliances aren't known yet. */
   redFrom: string;
   blueFrom: string;
-  winner: Side | null;
+  winner: Result | null;
   /** False for a third final that won't be played: one alliance has already won two. */
   needed: boolean;
+};
+
+/** An alliance's round robin record: 2 points a win, 1 a tie. */
+export type Standing = {
+  seed: number;
+  wins: number;
+  losses: number;
+  ties: number;
+  points: number;
 };
 
 function describe(source: Source) {
@@ -104,30 +154,79 @@ export function matchIds(format: BracketFormat) {
   return [...FORMATS[format].matches.map((match) => match.id), ...FINALS];
 }
 
+/** The round robin's standings, most points first (seed breaks a tie, only for showing them). */
+export function standings(format: BracketFormat, bracket: BracketMatch[]): Standing[] {
+  if (!isRoundRobin(format)) return [];
+  const table = new Map<number, Standing>(
+    Array.from({ length: FORMATS[format].alliances }, (_, index) => [
+      index + 1,
+      { seed: index + 1, wins: 0, losses: 0, ties: 0, points: 0 },
+    ]),
+  );
+  for (const match of bracket) {
+    if (match.bracket !== "roundrobin" || !match.winner || !match.red || !match.blue) continue;
+    const red = table.get(match.red) as Standing;
+    const blue = table.get(match.blue) as Standing;
+    if (match.winner === "tie") {
+      red.ties += 1;
+      blue.ties += 1;
+    } else {
+      const [winner, loser] = match.winner === "red" ? [red, blue] : [blue, red];
+      winner.wins += 1;
+      loser.losses += 1;
+    }
+  }
+  return Array.from(table.values())
+    .map((row) => ({ ...row, points: row.wins * 2 + row.ties }))
+    .sort((a, b) => b.points - a.points || a.seed - b.seed);
+}
+
 /**
- * The bracket as it stands: each match's alliances from the winners chosen so far. A winner
- * recorded for a match whose alliances aren't known (which the routes never store) is ignored.
+ * The round robin's finalists, higher ranked first (red): the ones chosen, else the top two once
+ * every round robin match has a result and nobody is level on points with second place. Null
+ * while that's still open: a strategy lead chooses them.
+ */
+export function roundRobinFinalists(
+  format: BracketFormat,
+  bracket: BracketMatch[],
+  chosen: [number, number] | null,
+): [number, number] | null {
+  const played = bracket.filter((match) => match.bracket === "roundrobin");
+  if (!played.length || played.some((match) => !match.winner)) return null;
+  if (chosen) return chosen;
+  const table = standings(format, bracket);
+  if (table.length > 2 && table[1].points === table[2].points) return null;
+  return [table[0].seed, table[1].seed];
+}
+
+/**
+ * The bracket as it stands: each match's alliances from the results chosen so far. A result
+ * recorded for a match whose alliances aren't known (which the routes never store), or a tie
+ * outside a round robin, is ignored. `finalists` are a round robin's chosen finalists.
  */
 export function resolveBracket(
   format: BracketFormat,
-  winners: Record<string, Side | null | undefined>,
+  results: Record<string, Result | null | undefined>,
+  finalists: [number, number] | null = null,
 ): BracketMatch[] {
   const definition = FORMATS[format];
-  const results = new Map<string, { winner: number; loser: number }>();
+  const outcomes = new Map<string, { winner: number; loser: number }>();
   const resolve = (source: Source) => {
     if ("seed" in source) return source.seed;
-    const result = results.get("winner" in source ? source.winner : source.loser);
-    if (!result) return null;
-    return "winner" in source ? result.winner : result.loser;
+    const outcome = outcomes.get("winner" in source ? source.winner : source.loser);
+    if (!outcome) return null;
+    return "winner" in source ? outcome.winner : outcome.loser;
   };
   const out: BracketMatch[] = [];
   const decide = (match: BracketMatch) => {
-    const winner = winners[match.id];
-    if ((winner === "red" || winner === "blue") && match.red && match.blue && match.needed) {
-      match.winner = winner;
-      results.set(match.id, {
-        winner: winner === "red" ? match.red : match.blue,
-        loser: winner === "red" ? match.blue : match.red,
+    const result = results[match.id];
+    if (!match.red || !match.blue || !match.needed) return;
+    if (result === "tie" && match.bracket === "roundrobin") match.winner = "tie";
+    if (result === "red" || result === "blue") {
+      match.winner = result;
+      outcomes.set(match.id, {
+        winner: result === "red" ? match.red : match.blue,
+        loser: result === "red" ? match.blue : match.red,
       });
     }
   };
@@ -147,9 +246,22 @@ export function resolveBracket(
     decide(resolved);
     out.push(resolved);
   }
-  const [redFinalist, blueFinalist] = definition.finals;
-  const red = results.get(redFinalist)?.winner ?? null;
-  const blue = results.get(blueFinalist)?.winner ?? null;
+  let red: number | null;
+  let blue: number | null;
+  let redFrom: string;
+  let blueFrom: string;
+  if (definition.finals === "standings") {
+    [red, blue] = roundRobinFinalists(format, out, finalists) ?? [null, null];
+    [redFrom, blueFrom] = ["Round robin first", "Round robin second"];
+  } else {
+    const [redFinalist, blueFinalist] = definition.finals;
+    red = outcomes.get(redFinalist)?.winner ?? null;
+    blue = outcomes.get(blueFinalist)?.winner ?? null;
+    [redFrom, blueFrom] = [
+      `Winner of ${matchLabel(redFinalist)}`,
+      `Winner of ${matchLabel(blueFinalist)}`,
+    ];
+  }
   const wins: Record<Side, number> = { red: 0, blue: 0 };
   for (const id of FINALS) {
     const final: BracketMatch = {
@@ -159,14 +271,14 @@ export function resolveBracket(
       bracket: "finals",
       red,
       blue,
-      redFrom: `Winner of ${matchLabel(redFinalist)}`,
-      blueFrom: `Winner of ${matchLabel(blueFinalist)}`,
+      redFrom,
+      blueFrom,
       winner: null,
       // Best of three: a final is played only while neither alliance has won two.
       needed: wins.red < 2 && wins.blue < 2,
     };
     decide(final);
-    if (final.winner) wins[final.winner] += 1;
+    if (final.winner === "red" || final.winner === "blue") wins[final.winner] += 1;
     out.push(final);
   }
   return out;
@@ -185,9 +297,18 @@ export function nextMatch(bracket: BracketMatch[]) {
   return bracket.find((match) => match.needed && !match.winner && match.red && match.blue) ?? null;
 }
 
+/** True once a round robin is over and its finalists are still to be chosen. */
+export function needsFinalists(format: BracketFormat, bracket: BracketMatch[]) {
+  if (!isRoundRobin(format)) return false;
+  const played = bracket.filter((match) => match.bracket === "roundrobin");
+  const finals = bracket.find((match) => match.bracket === "finals");
+  return played.every((match) => match.winner) && !finals?.red;
+}
+
 /**
  * The matches whose alliances depend on this one's result: those fed by its winner or loser,
- * and, for a final, the finals after it (whether they're played depends on it).
+ * and, for a final, the finals after it (whether they're played depends on it). Every round
+ * robin result can change who's in the finals.
  */
 export function dependents(format: BracketFormat, id: string): string[] {
   const definition = FORMATS[format];
@@ -196,7 +317,12 @@ export function dependents(format: BracketFormat, id: string): string[] {
   const direct = definition.matches
     .filter((match) => fedBy(match.red) || fedBy(match.blue))
     .map((match) => match.id);
-  if (definition.finals.includes(id)) direct.push(...FINALS);
+  if (
+    definition.finals === "standings"
+      ? !id.startsWith("F")
+      : (definition.finals as string[]).includes(id)
+  )
+    direct.push(...FINALS);
   if (id.startsWith("F")) direct.push(...FINALS.filter((final) => final > id));
   const all = new Set<string>();
   for (const next of direct) {

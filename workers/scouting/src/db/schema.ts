@@ -261,6 +261,7 @@ export const playoffSessions = sqliteTable(
     assign_mode: text("assign_mode").notNull().default("claim"),
     skip_own: integer("skip_own").notNull().default(1),
     current_match_id: text("current_match_id"),
+    finalists_json: text("finalists_json"),
     created_by: text("created_by").notNull(),
     created_at: integer("created_at").notNull(),
     started_at: integer("started_at"),

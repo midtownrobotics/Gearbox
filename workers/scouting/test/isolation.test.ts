@@ -326,6 +326,7 @@ describe("team isolation", () => {
           blue: ["401", "402"],
         },
         "POST /scouting/playoffs/matches/:matchId/winner": { winner: "red" },
+        "PUT /scouting/playoffs/finalists": { seeds: [1, 2] },
         "PUT /scouting/playoffs/matches/:matchId/reports/:slot": { answers: { notes: "Changed" } },
       }),
     });

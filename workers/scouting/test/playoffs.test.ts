@@ -1,7 +1,16 @@
 import { SITE_TEAM, newTeamId, teamUsers } from "@g3/testing/users";
 import { callAs, jsonAs } from "@g3/testing/worker";
 import { describe, expect, it } from "vitest";
-import { champion, dependents, matchIds, nextMatch, resolveBracket } from "../src/playoff-bracket";
+import {
+  FORMATS,
+  champion,
+  dependents,
+  matchIds,
+  needsFinalists,
+  nextMatch,
+  resolveBracket,
+  standings,
+} from "../src/playoff-bracket";
 import {
   STARTER_FIELDS,
   alliancesFromScan,
@@ -101,6 +110,61 @@ describe("playoff brackets", () => {
   it("ignores a winner for a match whose alliances aren't known", () => {
     const bracket = resolveBracket("double8", { M7: "red" });
     expect(bracket.find((m) => m.id === "M7")?.winner).toBeNull();
+  });
+});
+
+describe("round robins", () => {
+  it("plays every pair once, each alliance once a round", () => {
+    for (const format of ["roundrobin4", "roundrobin6"] as const) {
+      const n = FORMATS[format].alliances;
+      const bracket = resolveBracket(format, {});
+      const played = bracket.filter((m) => m.bracket === "roundrobin");
+      expect(played).toHaveLength((n * (n - 1)) / 2);
+      const pairs = new Set(played.map((m) => [m.red, m.blue].sort().join("-")));
+      expect(pairs.size).toBe(played.length);
+      for (const round of new Set(played.map((m) => m.round))) {
+        const seeds = played.filter((m) => m.round === round).flatMap((m) => [m.red, m.blue]);
+        expect(new Set(seeds).size).toBe(n);
+      }
+      // Every alliance is red within one match of half the time.
+      for (let seed = 1; seed <= n; seed += 1)
+        expect(
+          Math.abs(played.filter((m) => m.red === seed).length * 2 - (n - 1)),
+        ).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it("ranks by points, sends the top two to the finals, and asks when they're level", () => {
+    // M1 1v4, M2 3v2, M3 3v1, M4 2v4, M5 1v2, M6 4v3.
+    const results = { M1: "red", M2: "red", M3: "tie", M4: "red", M5: "red", M6: "tie" } as const;
+    let bracket = resolveBracket("roundrobin4", results);
+    expect(standings("roundrobin4", bracket).map((row) => [row.seed, row.points])).toEqual([
+      [1, 5],
+      [3, 4],
+      [2, 2],
+      [4, 1],
+    ]);
+    const final = bracket.find((m) => m.id === "F1");
+    expect([final?.red, final?.blue]).toEqual([1, 3]);
+    expect(nextMatch(bracket)?.id).toBe("F1");
+    expect(dependents("roundrobin4", "M3")).toEqual(["F1", "F2", "F3"]);
+    // All ties: everyone has 3 points, so a lead chooses.
+    const ties = Object.fromEntries(
+      matchIds("roundrobin4")
+        .slice(0, 6)
+        .map((id) => [id, "tie" as const]),
+    );
+    bracket = resolveBracket("roundrobin4", ties);
+    expect(needsFinalists("roundrobin4", bracket)).toBe(true);
+    expect(nextMatch(bracket)).toBeNull();
+    bracket = resolveBracket("roundrobin4", ties, [4, 2]);
+    expect(needsFinalists("roundrobin4", bracket)).toBe(false);
+    expect(bracket.find((m) => m.id === "F1")?.red).toBe(4);
+    // A final can't be a tie.
+    expect(
+      resolveBracket("roundrobin4", { ...ties, F1: "tie" }, [4, 2]).find((m) => m.id === "F1")
+        ?.winner,
+    ).toBeNull();
   });
 });
 
@@ -384,6 +448,75 @@ describe("a playoff session", () => {
       ).status,
     ).toBe(403);
     await jsonAs(team.admin, `/scouting/playoffs/sessions/${sessions[0].id}`, { method: "DELETE" });
+  });
+
+  it("runs a round robin, with ties and finalists chosen by a lead", async () => {
+    const team = teamUsers(newTeamId());
+    await jsonAs(
+      team.admin,
+      "/scouting/playoffs/setup",
+      {
+        method: "POST",
+        body: { format: "roundrobin4" },
+      },
+      201,
+    );
+    await jsonAs(team.admin, "/scouting/playoffs/setup", {
+      method: "PUT",
+      body: {
+        alliances: [1, 2, 3, 4].map((seed) => ({
+          seed,
+          teams: [`${seed}1`, `${seed}2`, `${seed}3`],
+        })),
+      },
+    });
+    await jsonAs(team.admin, "/scouting/playoffs/start", { method: "POST" });
+    for (const match of ["M1", "M2", "M3", "M4", "M5", "M6"]) {
+      expect((await state(team.admin)).session?.currentMatchId).toBe(match);
+      await jsonAs(team.admin, `/scouting/playoffs/matches/${match}/winner`, {
+        method: "POST",
+        body: { winner: "tie" },
+      });
+    }
+    // Everyone level: no finals until a lead chooses.
+    let live = (await state(team.student)).session as unknown as {
+      currentMatchId: string | null;
+      needsFinalists: boolean;
+      standings: { seed: number; points: number }[];
+    };
+    expect(live.currentMatchId).toBeNull();
+    expect(live.needsFinalists).toBe(true);
+    expect(live.standings.every((row) => row.points === 3)).toBe(true);
+    const choose = (user: typeof team.admin, seeds: number[]) =>
+      callAs(user, "/scouting/playoffs/finalists", { method: "PUT", body: { seeds } });
+    expect((await choose(team.student, [2, 3])).status).toBe(403);
+    expect((await choose(team.admin, [2, 2])).status).toBe(400);
+    expect((await choose(team.admin, [2, 3])).status).toBe(200);
+    live = (await state(team.student)).session as unknown as typeof live;
+    expect(live.currentMatchId).toBe("F1");
+    const current = (await state(team.admin)).session?.current;
+    expect([current?.red, current?.blue]).toEqual([2, 3]);
+    // Finals can't tie; once one starts, the round robin and the finalists are settled.
+    expect(
+      (
+        await callAs(team.admin, "/scouting/playoffs/matches/F1/winner", {
+          method: "POST",
+          body: { winner: "tie" },
+        })
+      ).status,
+    ).toBe(400);
+    await jsonAs(team.admin, "/scouting/playoffs/matches/F1/start", { method: "POST" });
+    expect((await choose(team.admin, [1, 4])).status).toBe(409);
+    expect(
+      (await callAs(team.admin, "/scouting/playoffs/matches/M6/winner", { method: "DELETE" }))
+        .status,
+    ).toBe(409);
+    for (const final of ["F1", "F2"])
+      await jsonAs(team.admin, `/scouting/playoffs/matches/${final}/winner`, {
+        method: "POST",
+        body: { winner: "blue" },
+      });
+    expect((await state(team.admin)).session?.champion).toBe(3);
   });
 
   it("keeps the team's questions from session to session", async () => {

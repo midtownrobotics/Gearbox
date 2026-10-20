@@ -19,13 +19,17 @@ import {
   type BracketFormat,
   type BracketMatch,
   FORMATS,
+  type Result,
   type Side,
   champion,
   dependents,
   isFormat,
+  isRoundRobin,
   matchIds,
+  needsFinalists,
   nextMatch,
   resolveBracket,
+  standings,
 } from "./playoff-bracket";
 import { isStrategyAdmin } from "./roles";
 import type { AppEnv, TbaTeam } from "./types";
@@ -270,11 +274,19 @@ async function matchRows(db: Db, teamId: string, sessionId: string) {
   return new Map(rows.map((row) => [row.match_id, row]));
 }
 
+/** A round robin's finalists, when a strategy lead chose them. */
+function chosenFinalists(session: SessionRow): [number, number] | null {
+  const chosen = parseJson<unknown>(session.finalists_json, null);
+  return Array.isArray(chosen) && chosen.length === 2 && chosen.every(Number.isInteger)
+    ? [chosen[0], chosen[1]]
+    : null;
+}
+
 function bracketOf(session: SessionRow, rows: Map<string, MatchRow>) {
-  const winners = Object.fromEntries(
-    Array.from(rows.values()).map((row) => [row.match_id, row.winner as Side | null]),
+  const results = Object.fromEntries(
+    Array.from(rows.values()).map((row) => [row.match_id, row.winner as Result | null]),
   );
-  return resolveBracket(formatOf(session), winners);
+  return resolveBracket(formatOf(session), results, chosenFinalists(session));
 }
 
 /** The robots an alliance has on the field in a match: the lineup set for it, else its first three. */
@@ -338,6 +350,9 @@ function bracketView(session: SessionRow, rows: Map<string, MatchRow>, ours: str
     ourSeed,
     alliances,
     champion: champion(bracket),
+    roundRobin: isRoundRobin(formatOf(session)),
+    standings: standings(formatOf(session), bracket),
+    needsFinalists: needsFinalists(formatOf(session), bracket),
     bracket: bracket.map((match) => {
       const row = rows.get(match.id);
       return {
@@ -1244,7 +1259,12 @@ playoffRoutes.post("/playoffs/matches/:matchId/winner", requireAuth, async (c) =
   if (!live) return noSession(c);
   const { session, match } = live;
   const body = await c.req.json<{ winner?: unknown }>().catch(() => ({}) as { winner?: unknown });
-  const winner = body.winner === "red" || body.winner === "blue" ? body.winner : null;
+  const winner =
+    body.winner === "red" || body.winner === "blue"
+      ? body.winner
+      : body.winner === "tie" && match.bracket === "roundrobin"
+        ? "tie"
+        : null;
   if (!winner) return c.json({ error: "Choose the alliance that won." }, 400);
   if (!match.red || !match.blue || !match.needed)
     return c.json({ error: "This match isn't being played." }, 409);
@@ -1301,7 +1321,12 @@ playoffRoutes.delete("/playoffs/matches/:matchId/winner", requireAuth, async (c)
       ),
     db
       .update(playoffSessions)
-      .set({ current_match_id: match.id, updated_at: Date.now() })
+      .set({
+        current_match_id: match.id,
+        // An open round robin has no finalists yet; they're chosen again once it's over.
+        ...(match.bracket === "roundrobin" ? { finalists_json: null } : {}),
+        updated_at: Date.now(),
+      })
       .where(inTeam(playoffSessions, teamId, eq(playoffSessions.id, session.id))),
   ];
   if (later.length)
@@ -1329,6 +1354,65 @@ playoffRoutes.delete("/playoffs/matches/:matchId/winner", requireAuth, async (c)
         ),
     );
   await batch(db, statements);
+  return c.json({ ok: true });
+});
+
+/**
+ * A round robin's finalists, chosen by a strategy lead: when alliances are level on points for a
+ * place in the finals, or to follow the event's own ranking. Higher ranked first (red).
+ */
+playoffRoutes.put("/playoffs/finalists", requireAuth, async (c) => {
+  if (!(await isStrategyAdmin(c))) return leadsOnly(c);
+  const db = dbOf(c);
+  const teamId = c.get("teamId");
+  const session = await activeSession(db, teamId);
+  if (!session || session.status !== "live") return noSession(c);
+  const format = formatOf(session);
+  if (!isRoundRobin(format))
+    return c.json({ error: "Only a round robin has finalists to choose." }, 400);
+  const rows = await matchRows(db, teamId, session.id);
+  const bracket = bracketOf(session, rows);
+  if (bracket.some((match) => match.bracket === "roundrobin" && !match.winner))
+    return c.json({ error: "Every round robin match needs a result first." }, 409);
+  if (rows.get("F1")?.started_at) return c.json({ error: "The finals have started." }, 409);
+  const body = await c.req.json<{ seeds?: unknown }>().catch(() => ({}) as { seeds?: unknown });
+  const seeds = Array.isArray(body.seeds) ? body.seeds.map(Number) : [];
+  const count = FORMATS[format].alliances;
+  if (
+    seeds.length !== 2 ||
+    seeds[0] === seeds[1] ||
+    seeds.some((seed) => !Number.isInteger(seed) || seed < 1 || seed > count)
+  )
+    return c.json({ error: "Choose two different alliances." }, 400);
+  const finals = matchIds(format).filter((matchId) => matchId.startsWith("F"));
+  await batch(db, [
+    db
+      .update(playoffSessions)
+      .set({ finalists_json: JSON.stringify(seeds), updated_at: Date.now() })
+      .where(inTeam(playoffSessions, teamId, eq(playoffSessions.id, session.id))),
+    // Finals not yet started start over with the alliances chosen.
+    db
+      .delete(playoffClaims)
+      .where(
+        inTeam(
+          playoffClaims,
+          teamId,
+          eq(playoffClaims.session_id, session.id),
+          inArray(playoffClaims.match_id, finals),
+        ),
+      ),
+    db
+      .delete(playoffMatches)
+      .where(
+        inTeam(
+          playoffMatches,
+          teamId,
+          eq(playoffMatches.session_id, session.id),
+          inArray(playoffMatches.match_id, finals),
+        ),
+      ),
+  ]);
+  await advance(c, { ...session, finalists_json: JSON.stringify(seeds) });
   return c.json({ ok: true });
 });
 

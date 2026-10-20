@@ -43,12 +43,13 @@ type BracketMatch = {
   id: string;
   label: string;
   round: string;
-  bracket: "upper" | "lower" | "finals";
+  bracket: "upper" | "lower" | "roundrobin" | "finals";
   red: number | null;
   blue: number | null;
   redFrom: string;
   blueFrom: string;
-  winner: Side | null;
+  /** "tie" only in a round robin. */
+  winner: Side | "tie" | null;
   needed: boolean;
   redTeams: string[];
   blueTeams: string[];
@@ -63,6 +64,9 @@ type Slot = {
   claim: { userId: string; name: string } | null;
 };
 type LiveMatch = BracketMatch & { slots: Slot[] };
+type Standing = { seed: number; wins: number; losses: number; ties: number; points: number };
+/** What a round robin adds to a session: its standings, and whether its finalists are open. */
+type RoundRobinView = { roundRobin: boolean; standings: Standing[]; needsFinalists: boolean };
 type SessionSummary = {
   id: string;
   eventName: string;
@@ -72,28 +76,29 @@ type SessionSummary = {
   startedAt: number | null;
   finishedAt: number | null;
 };
-type ActiveSession = SessionSummary & {
-  assignMode: AssignMode;
-  skipOwn: boolean;
-  currentMatchId: string | null;
-  openMatchId: string | null;
-  ourSeed: number | null;
-  alliances: Alliance[];
-  champion: number | null;
-  bracket: BracketMatch[];
-  current: LiveMatch | null;
-  open: LiveMatch | null;
-  participants: { userId: string; name: string; scouted: number }[];
-  me: {
-    joined: boolean;
-    reports: {
-      matchId: string;
-      slot: string;
-      answers: Record<string, unknown>;
-      updatedAt: number;
-    }[];
+type ActiveSession = SessionSummary &
+  RoundRobinView & {
+    assignMode: AssignMode;
+    skipOwn: boolean;
+    currentMatchId: string | null;
+    openMatchId: string | null;
+    ourSeed: number | null;
+    alliances: Alliance[];
+    champion: number | null;
+    bracket: BracketMatch[];
+    current: LiveMatch | null;
+    open: LiveMatch | null;
+    participants: { userId: string; name: string; scouted: number }[];
+    me: {
+      joined: boolean;
+      reports: {
+        matchId: string;
+        slot: string;
+        answers: Record<string, unknown>;
+        updatedAt: number;
+      }[];
+    };
   };
-};
 type PlayoffState = {
   canManage: boolean;
   ourTeam: string;
@@ -112,7 +117,7 @@ type Report = {
   by: string;
   updatedAt: number;
 };
-type SessionData = {
+type SessionData = RoundRobinView & {
   session: SessionSummary;
   ourSeed: number | null;
   alliances: Alliance[];
@@ -874,6 +879,7 @@ function Live({
         bracket={session.bracket}
         currentId={session.currentMatchId}
         ourSeed={session.ourSeed}
+        standings={session.roundRobin ? session.standings : []}
       />
       {session.me.joined && (
         <div>
@@ -900,9 +906,15 @@ function MatchHeader({ session }: { session: ActiveSession }) {
           <Trophy size={20} />
           {session.champion
             ? `Alliance ${session.champion} won the playoffs.`
-            : "No match to play."}
+            : session.needsFinalists
+              ? "The round robin is over."
+              : "No match to play."}
         </p>
-        <p className="mt-1 text-sm text-secondary-500">{session.eventName}</p>
+        <p className="mt-1 text-sm text-secondary-500">
+          {session.needsFinalists
+            ? "Alliances are level on points for the finals. A strategy lead chooses the finalists."
+            : session.eventName}
+        </p>
       </Card>
     );
   return (
@@ -1188,12 +1200,27 @@ function LeadControls({
                 Alliance {current[side]} won
               </Button>
             ))}
+            {current.bracket === "roundrobin" && (
+              <Button
+                size="lg"
+                variant="secondary"
+                disabled={action.busy}
+                onClick={() =>
+                  void action.run(
+                    `/playoffs/matches/${current.id}/winner`,
+                    json("POST", { winner: "tie" }),
+                  )
+                }
+              >
+                Tie
+              </Button>
+            )}
           </div>
         )}
+        {session.roundRobin && <Finalists session={session} action={action} />}
         {lastDecided && (
           <p className="flex flex-wrap items-center gap-2 text-sm text-secondary-600">
-            {lastDecided.label}: Alliance{" "}
-            {lastDecided.winner ? lastDecided[lastDecided.winner] : ""} won.
+            {lastDecided.label}: {resultText(lastDecided)}.
             <Button
               variant="secondary"
               size="sm"
@@ -1379,18 +1406,112 @@ function Lineups({
   );
 }
 
+/** "Alliance 3 won" or "Tie". */
+function resultText(match: BracketMatch) {
+  if (match.winner === "tie") return "Tie";
+  return match.winner ? `Alliance ${match[match.winner]} won` : "";
+}
+
+/** A round robin's standings: 2 points a win, 1 a tie. */
+function StandingsTable({ standings, ourSeed }: { standings: Standing[]; ourSeed: number | null }) {
+  return (
+    <table className="mb-5 w-full max-w-md text-sm">
+      <thead>
+        <tr className="text-left text-xs text-secondary-500">
+          <th className="py-1 font-medium">Alliance</th>
+          <th className="py-1 text-right font-medium">W-L-T</th>
+          <th className="py-1 text-right font-medium">Points</th>
+        </tr>
+      </thead>
+      <tbody>
+        {standings.map((row) => (
+          <tr key={row.seed} className="border-t border-line">
+            <td className="py-1.5 text-secondary-900">
+              Alliance {row.seed}
+              {ourSeed === row.seed && <span className="text-secondary-500"> (us)</span>}
+            </td>
+            <td className="py-1.5 text-right text-secondary-700">
+              {row.wins}-{row.losses}-{row.ties}
+            </td>
+            <td className="py-1.5 text-right font-semibold text-secondary-900">{row.points}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+/**
+ * Choosing a round robin's finalists: needed when alliances are level on points for a place,
+ * and open until the finals start in case the event ranks them otherwise.
+ */
+function Finalists({
+  session,
+  action,
+}: {
+  session: ActiveSession;
+  action: ReturnType<typeof useAction>;
+}) {
+  const played = session.bracket.filter((match) => match.bracket === "roundrobin");
+  const finals = session.bracket.filter((match) => match.bracket === "finals");
+  const [first, second] = session.standings;
+  const [red, setRed] = useState(finals[0]?.red ?? first?.seed ?? 1);
+  const [blue, setBlue] = useState(finals[0]?.blue ?? second?.seed ?? 2);
+  if (!played.every((match) => match.winner) || finals.some((match) => match.startedAt))
+    return null;
+  const pick = (value: number, set: (seed: number) => void, label: string) => (
+    <Field label={label}>
+      <select
+        className={inputClass}
+        value={value}
+        onChange={(event) => set(Number(event.target.value))}
+      >
+        {session.standings.map((row) => (
+          <option key={row.seed} value={row.seed}>
+            Alliance {row.seed} ({row.points} points)
+          </option>
+        ))}
+      </select>
+    </Field>
+  );
+  return (
+    <div className="space-y-2 rounded-lg border border-line bg-inset p-3">
+      <h3 className="text-sm font-semibold text-secondary-800">Finalists</h3>
+      <p className="text-sm text-secondary-600">
+        {session.needsFinalists
+          ? "Alliances are level on points for a place in the finals. Choose the two that play, by the event's own ranking."
+          : "The top two play the finals. Change them if the event ranks the alliances differently."}
+      </p>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {pick(red, setRed, "Ranked first")}
+        {pick(blue, setBlue, "Ranked second")}
+      </div>
+      <Button
+        size="sm"
+        disabled={action.busy || red === blue}
+        onClick={() => void action.run("/playoffs/finalists", json("PUT", { seeds: [red, blue] }))}
+      >
+        Set finalists
+      </Button>
+    </div>
+  );
+}
+
 function BracketCard({
   bracket,
   currentId,
   ourSeed,
+  standings,
 }: {
   bracket: BracketMatch[];
   currentId: string | null;
   ourSeed: number | null;
+  standings: Standing[];
 }) {
   const rounds = Array.from(new Set(bracket.map((match) => match.round)));
   return (
     <Card title="Bracket">
+      {standings.length > 0 && <StandingsTable standings={standings} ourSeed={ourSeed} />}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {rounds.map((round) => (
           <div key={round}>
@@ -1416,7 +1537,7 @@ function BracketCard({
                             className={
                               match.winner === side
                                 ? "font-semibold text-secondary-900"
-                                : match.winner
+                                : match.winner && match.winner !== "tie"
                                   ? "text-secondary-400 line-through"
                                   : ""
                             }
@@ -1612,7 +1733,12 @@ function ByAlliance({ data, search }: { data: SessionData; search: string }) {
                             }
                           >
                             {" "}
-                            · {match.winner === side ? "Won" : "Lost"}
+                            ·{" "}
+                            {match.winner === "tie"
+                              ? "Tied"
+                              : match.winner === side
+                                ? "Won"
+                                : "Lost"}
                           </span>
                         )}
                       </h3>
@@ -1653,6 +1779,7 @@ function ByMatch({ data, search }: { data: SessionData; search: string }) {
                   Alliance {match[side]}
                   {data.ourSeed === match[side] ? " (us)" : ""}
                   {match.winner === side && <span className="text-emerald-700"> · Won</span>}
+                  {match.winner === "tie" && <span className="text-secondary-500"> · Tied</span>}
                 </h3>
                 <p className="text-xs text-secondary-500">
                   {(side === "red" ? match.redTeams : match.blueTeams).join(" · ")}
