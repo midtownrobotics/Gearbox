@@ -23,6 +23,7 @@ export const authRouter = new Hono<AppEnv>()
         teamId: coreUsers.teamId,
         email: coreUsers.email,
         displayName: coreUsers.displayName,
+        username: coreUsers.username,
         status: coreUsers.status,
         isAdmin: coreUsers.isAdmin,
         isMentor: coreUsers.isMentor,

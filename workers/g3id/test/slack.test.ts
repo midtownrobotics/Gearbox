@@ -220,6 +220,34 @@ describe("sign-in and link codes", () => {
     });
   });
 
+  it("keeps a linked Slack account's name, and the member's username, for their account page", async () => {
+    const team = await createTeam();
+    const ws = workspace();
+    await install(team, ws);
+    const userId = await createUser({ teamId: team, username: "gracie" });
+    const { code } = await createLinkCode(db(), team, userId);
+    const slackUserId = `U${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
+    const res = await handleSlackCode({
+      code,
+      slackUserId,
+      workspaceId: ws,
+      type: "link",
+      env: testEnv,
+    });
+    expect(res.success).toBe(true);
+
+    const me = (await (
+      await g3id("/auth/me", {
+        cookie: await sessionCookie(userId),
+        headers: { "X-Team-Id": team },
+      })
+    ).json()) as { username: string; identities: { provider: string; providerEmail: string }[] };
+    expect(me.username).toBe("gracie");
+    expect(me.identities).toEqual([
+      expect.objectContaining({ provider: "slack", providerEmail: `Member ${slackUserId}` }),
+    ]);
+  });
+
   it("clears out codes that expired more than a day ago", async () => {
     const team = await createTeam();
     const old = Math.floor(Date.now() / 1000) - 2 * 86400;

@@ -215,12 +215,18 @@ export async function handleSlackCode(opts: {
       return { success: false, message: `❌ ${msg}` };
     }
 
+    // Their Slack name, so their account page can tell this Slack account from another.
+    const teamSlack = await slackForTeam(env, workspaceTeam);
+    const slackName = teamSlack
+      ? (await getUserInfo(slackUserId, teamSlack.slack).catch(() => null))?.displayName
+      : null;
     const ts = Math.floor(Date.now() / 1000);
     await db.insert(coreUserIdentities).values({
       id: newId(),
       userId,
       provider: "slack",
       providerId: slackUserId,
+      providerEmail: slackName && slackName !== "Unknown" ? slackName : null,
       createdAt: ts,
       updatedAt: ts,
     });
@@ -342,6 +348,7 @@ export async function handleSlackCode(opts: {
       userId,
       provider: "slack",
       providerId: slackUserId,
+      providerEmail: slackUser.displayName,
       createdAt: ts,
       updatedAt: ts,
     }),
