@@ -7,6 +7,9 @@ import {
   manualEvents,
   manualMatches,
   manualTeams,
+  playoffMatches,
+  playoffReports,
+  playoffSessions,
   scoutingFormSubmissions,
   scoutingForms,
   scoutingMatchAssignments,
@@ -17,6 +20,8 @@ import {
   teamComments,
   tierLists,
 } from "./db/schema";
+import { resolveBracket } from "./playoff-bracket";
+import { STARTER_FIELDS, fieldsForSlot } from "./playoffs";
 
 // The public demo's Scouting (roadmap 5.3), loaded after its nightly reset: an event in progress
 // with a schedule entered by hand (so nothing depends on The Blue Alliance), match and pit
@@ -352,7 +357,100 @@ export async function loadDemo(db: Db, teamId: string) {
       event_key: eventKey,
     }),
   );
+  await loadDemoPlayoffs(db, teamId, now);
   return { matches: MATCHES, reports };
+}
+
+const PLAYOFF_EVENT = "Demo Offseason Event";
+/** The last event's playoffs, with the demo team on alliance 2. */
+const PLAYOFF_ALLIANCES = [
+  [1, 2, 3],
+  [0, 4, 5],
+  [6, 7, 8],
+  [9, 10, 11],
+].map((picks, index) => ({
+  seed: index + 1,
+  teams: picks.map((pick) => (TEAMS[pick] as (typeof TEAMS)[number]).number),
+}));
+const PLAYOFF_RESULTS = {
+  M1: "red",
+  M2: "red",
+  M3: "blue",
+  M4: "blue",
+  M5: "red",
+  F1: "red",
+  F2: "red",
+} as const;
+
+/** A finished playoff session from the week before, with a few reports per match. */
+async function loadDemoPlayoffs(db: Db, teamId: string, now: number) {
+  const sessionId = "demo-playoffs";
+  const startedAt = now - 7 * 24 * HOUR;
+  const mentor = DEMO_PEOPLE[1] as DemoPerson;
+  await db.insert(playoffSessions).values(
+    withTeam(teamId, {
+      id: sessionId,
+      event_name: PLAYOFF_EVENT,
+      format: "double4",
+      status: "finished",
+      alliances_json: JSON.stringify(PLAYOFF_ALLIANCES),
+      created_by: mentor.id,
+      created_at: startedAt - HOUR,
+      started_at: startedAt,
+      finished_at: startedAt + 4 * HOUR,
+      updated_at: startedAt + 4 * HOUR,
+    }),
+  );
+  const bracket = resolveBracket("double4", PLAYOFF_RESULTS);
+  for (const [index, match] of bracket.filter((item) => item.winner).entries()) {
+    const at = startedAt + index * 0.4 * HOUR;
+    await db.insert(playoffMatches).values(
+      withTeam(teamId, {
+        session_id: sessionId,
+        match_id: match.id,
+        started_at: at,
+        winner: match.winner,
+        decided_at: at + 0.2 * HOUR,
+      }),
+    );
+    // The whole red alliance and one robot on each side.
+    const slots = (["red", "blue"] as const).flatMap((side) => {
+      const seed = match[side] as number;
+      const team = PLAYOFF_ALLIANCES[seed - 1]?.teams[index % 3] as string;
+      return side === "red"
+        ? [
+            { slot: "red:overall", seed, team: "" },
+            { slot: `red:${team}`, seed, team },
+          ]
+        : [{ slot: `blue:${team}`, seed, team }];
+    });
+    for (const [n, slot] of slots.entries()) {
+      const scout = DEMO_STUDENTS[(index + n) % DEMO_STUDENTS.length] as DemoPerson;
+      const fields = fieldsForSlot(STARTER_FIELDS, slot.slot);
+      const pick = (list: readonly string[], k: number) =>
+        list[(index + n + k) % list.length] as string;
+      await db.insert(playoffReports).values(
+        withTeam(teamId, {
+          id: `demo-playoff-${match.id}-${n}`,
+          session_id: sessionId,
+          match_id: match.id,
+          slot: slot.slot,
+          alliance_seed: slot.seed,
+          team_number: slot.team,
+          answers_json: JSON.stringify({
+            ...(slot.team ? { bay: String(((index + n) % 3) + 1) } : {}),
+            auto: pick(SAFE_TEXT.observation, 0),
+            strategy: pick(SAFE_TEXT.strategy, 1),
+          }),
+          fields_json: JSON.stringify(fields),
+          submitted_by: scout.id,
+          submitted_by_name: scout.name,
+          created_at: at + 0.15 * HOUR,
+          updated_at: at + 0.15 * HOUR,
+        }),
+      );
+    }
+  }
 }
 
 /** The words in the demo's Scouting data, for the gateway. */
@@ -360,4 +458,6 @@ export const demoWords = (): string[] =>
   vocabularyOf(TEAMS, EVENT_NAME, MATCH_FIELDS, PIT_FIELDS, TIERS, AUTO, "Pick list", [
     "Scouts for the next four matches are posted. Check your assignments.",
     "Scouting Pit",
+    PLAYOFF_EVENT,
+    ...STARTER_FIELDS.map((field) => field.label),
   ]);

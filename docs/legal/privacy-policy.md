@@ -41,7 +41,7 @@ We collect only what the apps need to work.
 | Pit | Checklists, issues and battery records, and archives of the checklists with who archived each one and when; the computers paired as log downloaders, with each one's name, who paired it, when, when it was last heard from and what it last said it was doing (connected to the robot, copying, uploading); and the robot's match logs those computers upload (the robot's own data from each match; at most 20 per team), kept until the team deletes them; AdvantageScope's preferences and layout for the team, with who last changed each; and the field, robot and joystick models mentors upload to it, with who uploaded each and when | Members |
 | Skill Tree | Each member's progress on skills and who signed it off | Members and mentors |
 | Schedule | Each event's days and periods, which members are attending, each one's role for every 15 minutes, who may edit schedules, and which chat reminders (Slack or Discord) were sent; each member's own list of friends, which only that member can see | Mentors and the students they trust; each member, for their friends |
-| Scouting | Match and pit observations, notes on other teams, robot photos, schedules; when engagement is enabled, point balances and awards, match picks and their results | Members and optional scouting activities |
+| Scouting | Match, pit and playoff observations (with the scout's name), notes on other teams, robot photos, schedules; when engagement is enabled, point balances and awards, match picks and their results | Members and optional scouting activities |
 | Uploaded files | Whatever your team uploads | Members |
 | Technical logs | Internet address, browser type, the page requested and the time | Recorded automatically by our hosting provider |
 | Visits to our public page | How many visits frcgearbox.com's home page had each day, and how many of them were by someone signed in. Only these daily totals: nothing that identifies a visitor | Counted when the page opens |
@@ -95,7 +95,7 @@ Scouting engagement is off by default. An admin can enable points and match pred
 | Onshape | Part and drawing data for Shop | Only if your team connects Onshape |
 | The Blue Alliance, Nexus, Statbotics | Public event and match schedules and predictions for Pit and Scouting | Team and event numbers only |
 | Share-A-Cart | Building vendor carts in Orders | Only if your team connects it; it receives the items in a cart |
-| Cloudflare Workers AI | Reading a photographed match schedule in Scouting | Only when a member uses that feature; it receives the photo |
+| Cloudflare Workers AI | Reading a photographed match schedule or playoff alliance table in Scouting | Only when a member uses that feature; it receives the photo |
 
 Each of these services has its own privacy policy. Services your team connects are your team's choice, and your team can disconnect them.
 
@@ -151,7 +151,7 @@ No system is perfectly secure. If we learn that your team's information has been
 
 ## 12. Cookies and device storage
 
-Gearbox uses one cookie, which keeps you signed in. On shared shop devices it also stores a kiosk token in the browser. We use no advertising or analytics cookies and no third-party trackers. Our public home page notes in your browser's session storage that it has counted your visit, so reloading it isn't counted again; the note is gone when you close the tab. While you fill in a scouting form for a match, your answers and drawings are kept in your browser's storage until the report is sent or you discard it, so they aren't lost if the page closes or the form moves to the next match; drafts more than 12 hours old are removed.
+Gearbox uses one cookie, which keeps you signed in. On shared shop devices it also stores a kiosk token in the browser. We use no advertising or analytics cookies and no third-party trackers. Our public home page notes in your browser's session storage that it has counted your visit, so reloading it isn't counted again; the note is gone when you close the tab. While you fill in a scouting form for a match, your answers and drawings are kept in your browser's storage until the report is sent or you discard it, so they aren't lost if the page closes or the form moves to the next match; Playoff scouting answers are kept the same way until they're sent. Drafts more than 12 hours old are removed.
 
 ## 13. Apps built by teams
 

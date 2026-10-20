@@ -77,8 +77,16 @@ console.log(
 const bootstrap = fs.readFileSync(path.join(__dirname, "../src/db/bootstrap.ts"), "utf8");
 const order = bootstrap.match(/export const teamTables = \[([\s\S]*?)\];/)[1].match(/\b\w+(?=,)/g);
 db.exec("BEGIN");
+const existing = new Set(
+  db
+    .prepare("SELECT name FROM sqlite_master WHERE type = 'table'")
+    .all()
+    .map((row) => row.name),
+);
 for (const table of order) {
   const name = table.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
+  // Tables added after 0033 come later in this script.
+  if (!existing.has(name)) continue;
   db.prepare(`UPDATE ${name} SET team_id = ? WHERE team_id = ?`).run(
     "test-original-owner",
     "__legacy_scouting__",
@@ -130,5 +138,27 @@ for (const value of [-1, 1801, 30.5])
   );
 console.log(
   "Seconds-based window migration preserves saved delays, defaults new teams to 120 seconds and removes the duplicate setting.",
+);
+db.exec(fs.readFileSync(`${md}/0036_late_reports.sql`, "utf8"));
+db.exec(fs.readFileSync(`${md}/0037_playoff_scouting.sql`, "utf8"));
+const session = (id, status) =>
+  db
+    .prepare(
+      "INSERT INTO playoff_sessions (team_id, id, event_name, format, status, created_by, created_at, updated_at) VALUES ('playoff-team', ?, 'Event', 'double8', ?, 'test', 1, 1)",
+    )
+    .run(id, status);
+session("one", "finished");
+session("two", "live");
+assert.throws(() => session("three", "setup"));
+session("four", "finished");
+assert.throws(() =>
+  db
+    .prepare(
+      "INSERT INTO playoff_sessions (team_id, id, event_name, format, status, created_by, created_at, updated_at) VALUES ('playoff-team', 'five', 'Event', 'double6', 'finished', 'test', 1, 1)",
+    )
+    .run(),
+);
+console.log(
+  "Playoff sessions allow one being set up or running per team, and known brackets only.",
 );
 db.close();

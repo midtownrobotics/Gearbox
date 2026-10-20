@@ -52,8 +52,10 @@ export const DEMO_BLOCKED: readonly Blocked[] = [
   { app: "pit", method: "PUT", path: /^\/scope\/settings/ },
   { app: "pit", method: "POST", path: /^\/scope\/assets/ },
   { app: "pit", method: "DELETE", path: /^\/scope\/assets/ },
-  // Scouting: reading a photographed schedule runs Workers AI.
+  // Scouting: reading a photographed schedule runs Workers AI,
   { app: "scouting", method: "POST", path: /^\/scouting\/manual-schedule\/extract/ },
+  // and so does reading a photo of the playoff alliances.
+  { app: "scouting", method: "POST", path: /^\/scouting\/playoffs\/alliances\/scan/ },
   // Integration keys and every app's settings form (no page saves through it yet).
   { app: "shop", method: "PUT", path: /^\/team-settings/ },
   { app: "orders", method: "PUT", path: /^\/team-settings/ },

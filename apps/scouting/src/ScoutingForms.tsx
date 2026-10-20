@@ -103,7 +103,7 @@ const TYPES: { type: FieldType; label: string }[] = [
 
 const COUNTER_INTERVALS = [1, 5, 10, 20] as const;
 
-function FieldInput({
+export function FieldInput({
   field,
   value,
   setValue,

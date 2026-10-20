@@ -1,4 +1,5 @@
 import {
+  type AnySQLiteColumn,
   foreignKey,
   integer,
   primaryKey,
@@ -234,6 +235,116 @@ export const manualTeams = sqliteTable(
     })
       .onDelete("cascade")
       .onUpdate("cascade"),
+  ],
+);
+
+export const playoffForms = sqliteTable(
+  "playoff_forms",
+  {
+    teamId: text("team_id").notNull(),
+    fields_json: text("fields_json").notNull(),
+    updated_by: text("updated_by").notNull(),
+    updated_at: integer("updated_at").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.teamId] })],
+);
+
+export const playoffSessions = sqliteTable(
+  "playoff_sessions",
+  {
+    teamId: text("team_id").notNull(),
+    id: text("id").notNull(),
+    event_name: text("event_name").notNull(),
+    format: text("format").notNull(),
+    status: text("status").notNull(),
+    alliances_json: text("alliances_json").notNull().default("[]"),
+    assign_mode: text("assign_mode").notNull().default("claim"),
+    skip_own: integer("skip_own").notNull().default(1),
+    current_match_id: text("current_match_id"),
+    created_by: text("created_by").notNull(),
+    created_at: integer("created_at").notNull(),
+    started_at: integer("started_at"),
+    finished_at: integer("finished_at"),
+    updated_at: integer("updated_at").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.teamId, t.id] })],
+);
+
+const playoffSession = (t: { teamId: AnySQLiteColumn; session_id: AnySQLiteColumn }) =>
+  foreignKey({
+    columns: [t.teamId, t.session_id],
+    foreignColumns: [playoffSessions.teamId, playoffSessions.id],
+  })
+    .onDelete("cascade")
+    .onUpdate("cascade");
+
+export const playoffMatches = sqliteTable(
+  "playoff_matches",
+  {
+    teamId: text("team_id").notNull(),
+    session_id: text("session_id").notNull(),
+    match_id: text("match_id").notNull(),
+    red_teams_json: text("red_teams_json").notNull().default("[]"),
+    blue_teams_json: text("blue_teams_json").notNull().default("[]"),
+    started_at: integer("started_at"),
+    winner: text("winner"),
+    decided_at: integer("decided_at"),
+  },
+  (t) => [primaryKey({ columns: [t.teamId, t.session_id, t.match_id] }), playoffSession(t)],
+);
+
+export const playoffParticipants = sqliteTable(
+  "playoff_participants",
+  {
+    teamId: text("team_id").notNull(),
+    session_id: text("session_id").notNull(),
+    user_id: text("user_id").notNull(),
+    display_name: text("display_name").notNull(),
+    joined_at: integer("joined_at").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.teamId, t.session_id, t.user_id] }), playoffSession(t)],
+);
+
+export const playoffClaims = sqliteTable(
+  "playoff_claims",
+  {
+    teamId: text("team_id").notNull(),
+    session_id: text("session_id").notNull(),
+    match_id: text("match_id").notNull(),
+    slot: text("slot").notNull(),
+    user_id: text("user_id").notNull(),
+    display_name: text("display_name").notNull(),
+    assigned_by: text("assigned_by"),
+    claimed_at: integer("claimed_at").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.teamId, t.session_id, t.match_id, t.slot] }),
+    unique().on(t.teamId, t.session_id, t.match_id, t.user_id),
+    playoffSession(t),
+  ],
+);
+
+export const playoffReports = sqliteTable(
+  "playoff_reports",
+  {
+    teamId: text("team_id").notNull(),
+    id: text("id").notNull(),
+    session_id: text("session_id").notNull(),
+    match_id: text("match_id").notNull(),
+    slot: text("slot").notNull(),
+    alliance_seed: integer("alliance_seed").notNull(),
+    team_number: text("team_number").notNull().default(""),
+    answers_json: text("answers_json").notNull(),
+    fields_json: text("fields_json").notNull(),
+    submitted_by: text("submitted_by").notNull(),
+    submitted_by_name: text("submitted_by_name").notNull(),
+    created_at: integer("created_at").notNull(),
+    updated_at: integer("updated_at").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.teamId, t.id] }),
+    unique().on(t.teamId, t.session_id, t.match_id, t.slot, t.submitted_by),
+    playoffSession(t),
   ],
 );
 

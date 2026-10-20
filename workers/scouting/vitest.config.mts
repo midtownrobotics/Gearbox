@@ -25,6 +25,11 @@ export default workerTestConfig({
         "/api/v3/event/2099qacache": { name: "Cached Test Event", short_name: "Cached Test" },
       };
       if (events[url.pathname]) return Response.json(events[url.pathname]);
+      if (url.pathname === "/api/v3/event/2099qaplayoffs/alliances")
+        return Response.json([
+          { name: "Alliance 1", picks: ["frc1261", "frc1771", "frc4509"], backup: null },
+          { name: "Alliance 2", picks: ["frc2974", "frc4188", "frc6925"], backup: null },
+        ]);
       return new Response("Unavailable", { status: 503 });
     }
     if (url.hostname !== "api.statbotics.io") return new Response("Not mocked", { status: 503 });

@@ -15,7 +15,83 @@ import fixtures from "./fixtures/team-rows.json";
 
 const bindings = env as unknown as AppEnv["Bindings"];
 const db = bindings.SCOUTING_DB;
-const tableNames = Object.keys(fixtures);
+// Tables added after team ownership (0033) aren't in the fixtures, which that migration's test uses.
+const PLAYOFF_TABLES = [
+  "playoff_forms",
+  "playoff_sessions",
+  "playoff_matches",
+  "playoff_participants",
+  "playoff_claims",
+  "playoff_reports",
+];
+const tableNames = [...Object.keys(fixtures), ...PLAYOFF_TABLES];
+const fixtureTables = Object.keys(fixtures);
+
+/** A running playoff session with a started match, a scout, their slot and report. */
+async function seedPlayoffs(team: TeamUsers, marker: string) {
+  const session = `playoff_sessions-${team.teamId}`;
+  const now = Date.now();
+  const alliances = JSON.stringify(
+    [1, 2, 3, 4].map((seed) => ({ seed, teams: [`${seed}01`, `${seed}02`, `${seed}03`] })),
+  );
+  const fields = JSON.stringify([
+    {
+      id: "notes",
+      label: marker,
+      type: "longText",
+      options: [],
+      min: 0,
+      max: 10,
+      step: 1,
+      appliesTo: "both",
+    },
+  ]);
+  await db.batch([
+    db
+      .prepare(
+        "INSERT INTO playoff_forms (team_id, fields_json, updated_by, updated_at) VALUES (?, ?, ?, ?)",
+      )
+      .bind(team.teamId, fields, team.admin.id, now),
+    db
+      .prepare(
+        `INSERT INTO playoff_sessions (team_id, id, event_name, format, status, alliances_json, current_match_id, created_by, created_at, started_at, updated_at)
+         VALUES (?, ?, ?, 'double4', 'live', ?, 'M1', ?, ?, ?, ?)`,
+      )
+      .bind(team.teamId, session, marker, alliances, team.admin.id, now, now, now),
+    db
+      .prepare(
+        "INSERT INTO playoff_matches (team_id, session_id, match_id, started_at) VALUES (?, ?, 'M1', ?)",
+      )
+      .bind(team.teamId, session, now),
+    db
+      .prepare(
+        "INSERT INTO playoff_participants (team_id, session_id, user_id, display_name, joined_at) VALUES (?, ?, ?, ?, ?)",
+      )
+      .bind(team.teamId, session, team.student.id, marker, now),
+    db
+      .prepare(
+        "INSERT INTO playoff_claims (team_id, session_id, match_id, slot, user_id, display_name, claimed_at) VALUES (?, ?, 'M1', 'red:overall', ?, ?, ?)",
+      )
+      .bind(team.teamId, session, team.student.id, marker, now),
+    db
+      .prepare(
+        `INSERT INTO playoff_reports (team_id, id, session_id, match_id, slot, alliance_seed, team_number, answers_json, fields_json, submitted_by, submitted_by_name, created_at, updated_at)
+         VALUES (?, ?, ?, 'M1', 'red:overall', 1, '', ?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(
+        team.teamId,
+        `playoff_reports-${team.teamId}`,
+        session,
+        JSON.stringify({ notes: marker }),
+        fields,
+        team.student.id,
+        marker,
+        now,
+        now,
+      ),
+  ]);
+  return session;
+}
 
 async function snapshot(teamId: string) {
   const rows = await db.batch(
@@ -42,7 +118,7 @@ async function seed(team: TeamUsers): Promise<Seeded> {
     "boylebucks_accounts",
     "game_parlays",
   ];
-  for (const name of [...parents, ...tableNames.filter((name) => !parents.includes(name))]) {
+  for (const name of [...parents, ...fixtureTables.filter((name) => !parents.includes(name))]) {
     const row: Record<string, string | number | null> = {
       team_id: team.teamId,
       ...(fixtures as Record<string, Record<string, string | number>>)[name],
@@ -146,28 +222,35 @@ async function seed(team: TeamUsers): Promise<Seeded> {
       .bind(...columns.map((column) => row[column]))
       .run();
   }
+  const playoffSession = await seedPlayoffs(team, marker);
   return {
     markers: [marker],
     params: (path, name) =>
-      name === "userId"
-        ? team.student.id
-        : name === "email"
-          ? team.student.email
-          : name === "fieldId"
-            ? "path"
-            : path.includes("scouting-forms")
-              ? ids.scouting_forms
-              : path.includes("scouting-submissions") || path.includes("analysis/reports")
-                ? ids.scouting_form_submissions
-                : path.includes("tier-lists")
-                  ? ids.tier_lists
-                  : path.includes("field-maps")
-                    ? ids.field_maps
-                    : path.includes("autos")
-                      ? ids.auto_routines
-                      : path.includes("service-tickets")
-                        ? ids.service_tickets
-                        : "1",
+      name === "matchId"
+        ? "M1"
+        : name === "slot"
+          ? "red:overall"
+          : path.includes("playoffs/sessions")
+            ? playoffSession
+            : name === "userId"
+              ? team.student.id
+              : name === "email"
+                ? team.student.email
+                : name === "fieldId"
+                  ? "path"
+                  : path.includes("scouting-forms")
+                    ? ids.scouting_forms
+                    : path.includes("scouting-submissions") || path.includes("analysis/reports")
+                      ? ids.scouting_form_submissions
+                      : path.includes("tier-lists")
+                        ? ids.tier_lists
+                        : path.includes("field-maps")
+                          ? ids.field_maps
+                          : path.includes("autos")
+                            ? ids.auto_routines
+                            : path.includes("service-tickets")
+                              ? ids.service_tickets
+                              : "1",
     data: { teamId: team.teamId, userId: team.student.id, ticketId: ids.service_tickets, key },
   };
 }
@@ -207,7 +290,11 @@ describe("team isolation", () => {
       seed,
       snapshot,
       // Health has no private data; AI extraction is covered with scoped cache/quotas separately.
-      skip: ["GET /scouting/health", "POST /scouting/manual-schedule/extract"],
+      skip: [
+        "GET /scouting/health",
+        "POST /scouting/manual-schedule/extract",
+        "POST /scouting/playoffs/alliances/scan",
+      ],
       bodies: (b) => ({
         "PUT /scouting/scouting-forms/:id": {
           name: "Changed",
@@ -225,6 +312,21 @@ describe("team isolation", () => {
           sourceTicketId: b.data?.ticketId,
         },
         "PUT /team-settings": { values: { pointsLabel: "Own points" } },
+        "PUT /scouting/playoffs/setup": { eventName: "Changed", assignMode: "auto" },
+        "PUT /scouting/playoffs/questions": {
+          fields: [{ id: "notes", label: "Changed", type: "longText", appliesTo: "both" }],
+        },
+        "PUT /scouting/playoffs/matches/:matchId/claim": { slot: "red:overall" },
+        "PUT /scouting/playoffs/matches/:matchId/assign": {
+          slot: "red:overall",
+          userId: b.data?.userId,
+        },
+        "PUT /scouting/playoffs/matches/:matchId/lineup": {
+          red: ["101", "102"],
+          blue: ["401", "402"],
+        },
+        "POST /scouting/playoffs/matches/:matchId/winner": { winner: "red" },
+        "PUT /scouting/playoffs/matches/:matchId/reports/:slot": { answers: { notes: "Changed" } },
       }),
     });
     expect(result.requests).toBeGreaterThan(150);

@@ -49,6 +49,7 @@ import {
   submissionWindow,
 } from "./match-advance";
 import { requireAuth } from "./middleware/auth";
+import { playoffRoutes } from "./playoffs";
 import { predictionsRoutes, settleConfiguredGame } from "./predictions";
 import { getG3IdUsers, isServiceHelper, isStrategyAdmin } from "./roles";
 import { teamSettingsRouter } from "./team-settings";
@@ -967,6 +968,7 @@ function parseScoutingFields(value: unknown): ScoutingField[] | null {
 app.route("/", engagementRoutes);
 app.route("/", predictionsRoutes);
 app.route("/", manualRoutes);
+app.route("/", playoffRoutes);
 
 app.get("/scouting-forms", requireAuth, async (c) => {
   await seedTeam(dbOf(c), c.get("teamId"));

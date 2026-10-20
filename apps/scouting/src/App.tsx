@@ -48,6 +48,7 @@ import { Analysis } from "./Analysis";
 import { type EngagementSettings, EngagementSettingsPanel } from "./EngagementSettings";
 import { MatchPredictions } from "./Game";
 import { Operations } from "./Operations";
+import { PlayoffScouting } from "./Playoffs";
 import { ScoutingAdminPage, ScoutingForms } from "./ScoutingForms";
 import { SortableTierRow, SortableTiers } from "./SortableTiers";
 import { API_URL, api } from "./api";
@@ -62,7 +63,16 @@ import {
 import { TierListAutosave } from "./tier-list-autosave";
 import { type ParsedTrajectory, parseTrajectoryFile, trajectoryToPng } from "./trajectory-files";
 
-type Page = "forms" | "predictions" | "admin" | "analysis" | "service" | "autos" | "tiers" | "maps";
+type Page =
+  | "forms"
+  | "playoffs"
+  | "predictions"
+  | "admin"
+  | "analysis"
+  | "service"
+  | "autos"
+  | "tiers"
+  | "maps";
 type User = {
   userId: string;
   displayName: string;
@@ -2158,6 +2168,7 @@ export function App() {
   const navigate = useNavigate();
   const paths: Record<Page, string> = {
     forms: "/",
+    playoffs: "/playoffs",
     predictions: "/predictions",
     admin: "/admin",
     analysis: "/analysis",
@@ -2217,6 +2228,7 @@ export function App() {
 
   const adminNav = [
     { id: "forms" as const, label: "Scouting Forms" },
+    { id: "playoffs" as const, label: "Playoff Scouting" },
     {
       id: "predictions" as const,
       label: user.engagement.predictionsEnabled ? "Match Predictions" : "Scouting Points",
@@ -2232,6 +2244,7 @@ export function App() {
     ? adminNav
     : [
         { id: "forms" as const, label: "Scouting Forms" },
+        { id: "playoffs" as const, label: "Playoff Scouting" },
         {
           id: "predictions" as const,
           label: user.engagement.predictionsEnabled ? "Match Predictions" : "Scouting Points",
@@ -2273,6 +2286,7 @@ export function App() {
             userId={user.userId}
           />
         )}
+        {visiblePage === "playoffs" && <PlayoffScouting userId={user.userId} />}
         {visiblePage === "predictions" && (
           <MatchPredictions predictionsEnabled={user.engagement.predictionsEnabled} />
         )}
