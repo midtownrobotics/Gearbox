@@ -216,11 +216,9 @@ async function seed(team: TeamUsers): Promise<Seeded> {
     { method: "POST", body: { partDefinitionId: checked.id, quantity: 1 } },
     201,
   );
-  await jsonAs(
-    student,
-    `/part-instance-processes/${checkedInstance.id}/processes/${cut.id}/done`,
-    { method: "POST" },
-  );
+  await jsonAs(student, `/part-instance-processes/${checkedInstance.id}/processes/${cut.id}/done`, {
+    method: "POST",
+  });
   const { report } = await jsonAs<{ report: Id }>(
     admin,
     "/quality-reports",

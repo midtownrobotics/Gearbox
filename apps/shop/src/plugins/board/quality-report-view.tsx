@@ -1,3 +1,4 @@
+import { TextField } from "@g3/ui";
 import { useState } from "react";
 import type { InstanceRow } from "../../shared/derive";
 import { replaceFromReport, sendBackFromReport, submitQualityReport } from "../../shared/getters";
@@ -207,13 +208,14 @@ export function QualityReportView({
                 >
                   Notes / Likely Reasons / Problems
                 </label>
-                <textarea
+                <TextField
+                  multiline
+                  kind="note"
                   id="quality-notes"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   rows={4}
                   maxLength={2000}
-                  className="w-full rounded-lg border border-secondary-300 bg-surface px-3 py-2 text-sm text-secondary-900 placeholder-secondary-400 focus:border-primary-500 focus:outline-none"
                 />
               </div>
 
@@ -386,14 +388,15 @@ function SendBack({
           <label htmlFor="quality-fix-note" className="text-base font-semibold text-secondary-900">
             What has to be done to fix it
           </label>
-          <textarea
+          <TextField
+            multiline
+            kind="note"
             id="quality-fix-note"
             value={fixNote}
             onChange={(e) => setFixNote(e.target.value)}
             rows={3}
             maxLength={2000}
             placeholder="Deburr the top edge and open the two 0.25&quot; holes to size."
-            className="w-full rounded-lg border border-secondary-300 bg-surface px-3 py-2 text-sm text-secondary-900 placeholder-secondary-400 focus:border-primary-500 focus:outline-none"
           />
           <p className="text-xs text-secondary-500">
             This goes onto the part's notes, so whoever picks it up reads it.

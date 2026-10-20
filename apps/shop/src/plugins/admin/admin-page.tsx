@@ -255,8 +255,8 @@ function PersonPicker({
 
   return (
     <div className="relative max-w-sm">
-      <input
-        type="text"
+      <TextField
+        typeable
         role="combobox"
         aria-expanded={open}
         aria-controls={listId}
@@ -275,7 +275,6 @@ function PersonPicker({
           if (e.key === "Escape") setOpen(false);
           if (e.key === "Enter" && matches.length > 0) pick(matches[0].id);
         }}
-        className={inputClass}
       />
       {open && people.length > 0 && (
         <div

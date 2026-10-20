@@ -1,4 +1,4 @@
-import { ErrorBanner, inputClass } from "@g3/ui";
+import { ErrorBanner, TextField } from "@g3/ui";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../../shared/api";
 import { getErrorMessage } from "../../shared/api-error";
@@ -231,12 +231,12 @@ export function QualityReports() {
       ) : (
         <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-2">
-            <input
-              type="text"
+            <TextField
+              variant="search"
               placeholder="Search reports…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="flex-1 min-w-40 bg-surface border border-secondary-300 rounded-lg px-3 py-2 text-sm text-secondary-900 placeholder-secondary-400 focus:outline-none focus:border-primary-500"
+              className="flex-1 min-w-40"
             />
             <select
               aria-label="Reported by"
@@ -463,14 +463,13 @@ function Checklist({ saved, onSaved }: { saved: string[]; onSaved: (next: string
           // The row's place in the list is its identity: the text is what's being edited.
           // biome-ignore lint/suspicious/noArrayIndexKey: the index is the row
           <div key={i} className="flex items-center gap-2">
-            <input
-              type="text"
+            <TextField
+              kind="checklist"
               aria-label={`Checklist line ${i + 1}`}
               value={line}
               maxLength={MAX_CHECK_LABEL}
               disabled={busy}
               onChange={(e) => setLines(lines.map((l, j) => (j === i ? e.target.value : l)))}
-              className={inputClass}
             />
             <button
               type="button"
