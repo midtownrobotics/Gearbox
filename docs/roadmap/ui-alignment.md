@@ -278,7 +278,7 @@ From reading the code on 11 October. None was confirmed in a running app, and on
 
 ## How to work on this
 
-- Branch off `main`; never change files on `main`. A merge to `main` goes live.
+- Branch off `staging`; never change files on `staging`. A merge to `staging` goes live.
 - One step, or one app of a step, per pull request, with a changeset naming each app whose pages change: **patch** for a restyle or a rename, **minor** for a new page such as Pit's Overview, **major** only if an address stops working without a redirect.
 - Don't change what an app does while restyling it. If a page needs a behavior change to fit the rules (an address for a filter, a question before a delete), say so in the pull request.
 - The rules in `CLAUDE.md` apply: no fixed colors except for meaning, `text-on-primary` on a fill in the team's color, short page text, US English, sign-in only through `@g3/auth`.

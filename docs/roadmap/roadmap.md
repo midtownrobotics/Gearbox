@@ -122,7 +122,7 @@ As of 10 October 2026, five of the six Phase 0 steps are done on `main`, Phase 1
 - **Internal names stay.** The team decided that `@g3/*` packages, the `G3ID` binding, and cookie and database names are not branding, and none of them are renamed in this roadmap. Step 1.1 covers only what users see, and the cookie rename (1.2) is dropped: in step 2.5 the `g3_session` cookie keeps its name and only moves to the frcgearbox.com domain.
 - **One team per account.** A user belongs to exactly one team, held as `team_id` on the user row. There is no memberships table, and `is_admin`, `is_mentor` and `status` stay on the user as they are today (steps 2.1, 2.2).
 - **The site config is the bridge to team records.** It is compiled into each app today, so one build serves one team. Step 2.10 replaces it with team context resolved on each request.
-- **Releases shape deploys.** `main` deploys to staging and `public` to production (0.2). An approved variant goes live with the next release (Phase 6).
+- **Releases shape deploys.** `staging` deploys to staging and `public` to production (0.2). An approved variant goes live with the next release (Phase 6).
 - **Operator tools live in the platform, not G3ID.** The operator flag, the console's API and its log are the platform Worker's, with the console in the platform app at `admin.<domain>` (step 2.8). G3ID only carries out what touches its accounts, through internal routes.
 - **Changesets apply to everyone.** A variant's pull request needs one, like any other change to an app (6.4).
 - **One app-level role list is gone before Phase 2.** Skill Tree kept its own list of mentors. It now uses the mentor and admin roles from sign-in, so step 2.2 has one less place to map roles from. Scouting's strategy admins are the list still left.
@@ -251,7 +251,7 @@ Seven choices were confirmed on 3 October 2026, one more on 6 October, widened t
 | Certificates | The free certificate for `*.frcgearbox.com`, one wildcard DNS record, one wildcard route | A Custom Domain and its own certificate per hostname |
 | Frontends | Each app's Worker serves its own built frontend (Workers static assets) behind the gateway | Nine Cloudflare Pages projects |
 | Attendance storage | D1 | The Firebase project `g3-attendance` |
-| Deploys | GitHub Actions (`.github/workflows/deploy.yml`): `main` deploys to staging and `public` to production, migrations first. Decided 12 October 2026, replacing Cloudflare's Git integration (Workers Builds), which deployed each Worker on its own with no migrations step | `wrangler deploy` by hand and Pages Git builds |
+| Deploys | GitHub Actions (`.github/workflows/deploy.yml`): `staging` deploys to staging and `public` to production, migrations first. Decided 12 October 2026, replacing Cloudflare's Git integration (Workers Builds), which deployed each Worker on its own with no migrations step | `wrangler deploy` by hand and Pages Git builds |
 | Variant apps | Reviewed pull requests merged into this repo | New |
 | Staging address | Production's addresses with `-dev` on the first part, on g3robotics.com: `1648-orders-dev.g3robotics.com`, the platform at `dev.g3robotics.com` (decided 11 October 2026, after G3's cutover). One level deep, so the free certificate covers it, and a domain apart from production's, so they never share a cookie; G3's retired addresses there stay production's | New |
 | Demo rate limit | Cloudflare's Rate Limiting binding on the gateway, 60 changes a minute per visitor on the public demo team only (confirmed 15 October 2026). Included in Workers Paid | New |
@@ -682,7 +682,7 @@ The risk that matters most is one team seeing another team's data. Most of the s
 | Teams outside the United States | Open to all where wording can manage it. The conditions are in the Terms and privacy section |
 | Code license | MIT for the whole repo |
 | Review of the terms | Offline, before applications open. Drafting proceeds now |
-| How `public` reaches Cloudflare | GitHub Actions: the release workflow commits the release, then deploys it through `deploy.yml` (migrations, workers, gateway), the same way `main` deploys staging. Cloudflare's Git integration (Workers Builds) was used until 12 October 2026 |
+| How `public` reaches Cloudflare | GitHub Actions: the release workflow commits the release, then deploys it through `deploy.yml` (migrations, workers, gateway), the same way `staging` deploys staging. Cloudflare's Git integration (Workers Builds) was used until 12 October 2026 |
 | Edge | An optional app any team can run with its own box (changed 6 October 2026, once the box no longer needed a tunnel). Its plan is the Edge section, not a phase |
 | Single-team apps | A public category: listed for every team, run only by the author team. Teams discuss them off the platform |
 | Contact address | contact@frcgearbox.com, as written in both drafts |

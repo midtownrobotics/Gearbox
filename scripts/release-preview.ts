@@ -1,7 +1,7 @@
-// `pnpm release:preview [--github-output <file> --body-file <file>]`: what merging main into public would release,
+// `pnpm release:preview [--github-output <file> --body-file <file>]`: what merging staging into public would release,
 // without changing anything. Runs the release (release-version.ts) in a throwaway git worktree of
 // HEAD and reports the result: the platform version, the apps that change and their notes. The
-// release-PR workflow uses it to title and describe the open main → public PR.
+// release-PR workflow uses it to title and describe the open staging → public PR.
 
 import { execFileSync } from "node:child_process";
 import {
@@ -37,9 +37,9 @@ const title = summary.platform
   ? `Release ${summary.platform}: ${summary.apps.map((a) => `${a.name} ${a.to}`).join(", ")}`
   : "Release: no app version changes yet";
 const intro = [
-  "Merging this releases main: the versions below are applied to `public` (package.json files,",
-  "changelogs, RELEASES.md), tagged, and merged back into main. This PR stays open and is",
-  "updated after every push to main.",
+  "Merging this releases staging: the versions below are applied to `public` (package.json files,",
+  "changelogs, RELEASES.md), tagged, and merged back into staging. This PR stays open and is",
+  "updated after every push to staging.",
   "",
 ].join("\n");
 const outro = [
@@ -48,7 +48,7 @@ const outro = [
 ].join("\n");
 const entry =
   summary.entry ??
-  "No changesets are waiting, so merging would bring public up to date with main without changing any version.";
+  "No changesets are waiting, so merging would bring public up to date with staging without changing any version.";
 
 // GitHub refuses a PR body over 65,536 characters: cut a long entry at a line and say so.
 const MAX_BODY = 60_000;

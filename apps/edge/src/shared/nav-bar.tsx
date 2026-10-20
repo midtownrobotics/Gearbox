@@ -11,7 +11,10 @@ const routerLink = linkWith(Link);
 export function NavBar({ items }: { items: PluginNavItem[] }) {
   const user = useAuthUser();
   const { pathname } = useLocation();
-  const shown = items.filter((item) => !item.adminOnly || user.isAdmin);
+  const shown = items.filter(
+    (item) =>
+      (!item.adminOnly || user.isAdmin) && (!item.mentorOnly || user.isAdmin || user.isMentor),
+  );
   const active = activePath(
     pathname,
     shown.map((item) => item.to),

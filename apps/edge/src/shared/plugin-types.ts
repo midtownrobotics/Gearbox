@@ -13,6 +13,7 @@ export interface PluginNavItem {
   group?: string;
   /** Only shown to G3ID admins. */
   adminOnly?: boolean;
+  mentorOnly?: boolean;
 }
 
 export interface Plugin {

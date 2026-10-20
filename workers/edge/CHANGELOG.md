@@ -1,5 +1,19 @@
 # @g3/worker-edge
 
+## 2.2.0
+
+### Minor Changes
+
+- 1273a89: Admins and mentors can manage Door Sounds. Only admins can test, approve, reject, or delete sounds. Signed-in students can submit WAV files for review and see their own submission status. Pending audio stays outside the playable library until an admin approves it; the Edge box keeps the review queue across restarts. Install the updated agent before enabling submissions in the UI.
+
+## 2.1.0
+
+### Minor Changes
+
+- 74955c0: Door Sounds now has an ordered multi-selection with touch and keyboard drag handles, clearly separated clip cards, and compact sliders beneath each clip for pause and volume. Each clip has a single Pause before this clip slider that also applies on repeats. Each opening starts at the first selection and its volume; closing cancels any delay or cuts off playback immediately. Preferences persist on the Edge box. Volume control supports uncompressed PCM and floating-point WAVs.
+  
+  Rename clips inline while keeping their volume, pause, and playlist position.
+
 ## 2.0.0
 
 ### Major Changes

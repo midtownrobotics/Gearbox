@@ -1,4 +1,4 @@
-import { MAX_SWITCH_SOUND_BYTES } from "@g3/worker-edge/switch-types";
+import { MAX_SWITCH_SOUND_BYTES, type SwitchPlaybackSettings } from "@g3/worker-edge/switch-types";
 import { Hono } from "hono";
 import type { EdgeModule, ModuleContext } from "../../core/module";
 import { SwitchDetector } from "./detector";
@@ -10,6 +10,7 @@ import {
   createSoundPlayer,
 } from "./player";
 import { SoundLibrary } from "./sounds";
+import { SoundSubmissions } from "./submissions";
 
 // A sound that ends at once (a tiny or broken file) mustn't make the repeat spin.
 const MIN_REPEAT_MS = 1_000;
@@ -20,6 +21,33 @@ export function createSwitchModule(ctx: ModuleContext, soundPlayer?: SoundPlayer
     : new GpioSwitchInput(ctx.config.switchGpioValuePath);
   const detector = new SwitchDetector(ctx.config.switchDebounceMilliseconds);
   const library = new SoundLibrary(ctx.config.switchSoundDir, ctx.config.switchSounds);
+  const submissions = new SoundSubmissions(ctx.config.switchSoundDir, library);
+  ctx.db.run(
+    "CREATE TABLE IF NOT EXISTS switch_settings (id INTEGER PRIMARY KEY, value TEXT NOT NULL)",
+  );
+  const saved = ctx.db.query("SELECT value FROM switch_settings WHERE id = 1").get() as {
+    value: string;
+  } | null;
+  function clipValues(sounds: SwitchPlaybackSettings["soundSettings"]) {
+    return Object.fromEntries(
+      Object.entries(sounds).map(([name, clip]) => [
+        name,
+        { delaySeconds: clip.delaySeconds, volumePercent: clip.volumePercent },
+      ]),
+    );
+  }
+  const previous = saved ? JSON.parse(saved.value) : null;
+  let settings: SwitchPlaybackSettings | null = previous
+    ? {
+        soundSettings: clipValues(previous.soundSettings ?? {}),
+        volumePercent: previous.volumePercent ?? 100,
+        delaySeconds: previous.delaySeconds,
+        selectedSounds: previous.selectedSounds,
+      }
+    : null;
+  function clipSettings(name: string) {
+    return settings?.soundSettings[name];
+  }
   const availableSounds = () => library.paths();
   const player =
     soundPlayer ??
@@ -38,10 +66,25 @@ export function createSwitchModule(ctx: ModuleContext, soundPlayer?: SoundPlayer
   let reading = false;
   // Bumped whenever the repeat for an opening must end: the door closed, a test, or Stop.
   let opening = 0;
+  let cancelDelay: (() => void) | null = null;
 
-  async function play(path?: string) {
+  function waitDelay(seconds: number) {
+    return new Promise<void>((resolve) => {
+      const timeout = setTimeout(() => {
+        cancelDelay = null;
+        resolve();
+      }, seconds * 1000);
+      cancelDelay = () => {
+        clearTimeout(timeout);
+        cancelDelay = null;
+        resolve();
+      };
+    });
+  }
+
+  async function play(path?: string, volume = settings?.volumePercent ?? 100) {
     try {
-      const sound = await player.play(path);
+      const sound = await player.play(path, volume);
       lastSound = sound;
       lastError = null;
       console.log(`[switch] played ${sound}`);
@@ -56,11 +99,26 @@ export function createSwitchModule(ctx: ModuleContext, soundPlayer?: SoundPlayer
 
   /** Plays sounds back to back for as long as the door stays open. */
   async function playWhileOpen() {
+    cancelDelay?.();
     const current = ++opening;
-    while (current === opening && !detector.state().rawGrounded) {
+    const delay = settings?.delaySeconds ?? 0;
+    if (delay > 0) await waitDelay(delay);
+    if (current !== opening || detector.state().rawGrounded) return;
+    const paths = settings
+      ? settings.selectedSounds.map((name) => library.soundPath(name))
+      : await library.paths();
+    let next = 0;
+    while (paths.length > 0 && current === opening && !detector.state().rawGrounded) {
+      const path = paths[next % paths.length];
+      const name = path.split(/[\\/]/).pop() ?? "";
+      const clip = clipSettings(name);
+      if (clip && clip.delaySeconds > 0) await waitDelay(clip.delaySeconds);
+      if (current !== opening || detector.state().rawGrounded) return;
       const began = Date.now();
       try {
-        await play();
+        const volume = clip?.volumePercent ?? settings?.volumePercent ?? 100;
+        next++;
+        await play(path, volume);
       } catch {
         return; // Stopped (closed, a test, Stop) or failed: lastError says which.
       }
@@ -72,6 +130,7 @@ export function createSwitchModule(ctx: ModuleContext, soundPlayer?: SoundPlayer
   /** Silences the sound and ends any repeat. */
   function silence() {
     opening++;
+    cancelDelay?.();
     player.stop();
   }
 
@@ -96,7 +155,9 @@ export function createSwitchModule(ctx: ModuleContext, soundPlayer?: SoundPlayer
     triggerCount++;
     lastTriggeredAt = Math.floor(Date.now() / 1000);
     console.log("[switch] door opened");
-    void playWhileOpen();
+    void playWhileOpen().catch((error) => {
+      lastError = error instanceof Error ? error.message : String(error);
+    });
   }
 
   const status = () => ({
@@ -109,10 +170,93 @@ export function createSwitchModule(ctx: ModuleContext, soundPlayer?: SoundPlayer
     lastTriggeredAt,
     lastSound,
     lastError,
+    soundSettings: settings?.soundSettings ?? {},
+    volumePercent: settings?.volumePercent ?? 100,
+    delaySeconds: settings?.delaySeconds ?? 0,
+    selectedSounds: settings?.selectedSounds ?? null,
   });
 
   const routes = new Hono()
-    .get("/state", async (c) => c.json({ ...status(), sounds: await library.list() }))
+    .get("/state", async (c) => {
+      const sounds = await library.list();
+      return c.json({
+        ...status(),
+        selectedSounds: settings?.selectedSounds ?? sounds.map((sound) => sound.name),
+        sounds,
+      });
+    })
+    .put("/settings", async (c) => {
+      const body = await c.req.json().catch(() => null);
+      if (!body || typeof body !== "object" || Array.isArray(body))
+        return c.json({ error: "Expected playback settings." }, 400);
+      if (body) {
+        body.soundSettings ??= settings?.soundSettings ?? {};
+        body.delaySeconds ??= 0;
+        body.volumePercent ??= settings?.volumePercent ?? 100;
+      }
+      if (
+        !body ||
+        !body.soundSettings ||
+        typeof body.soundSettings !== "object" ||
+        Array.isArray(body.soundSettings) ||
+        Object.values(body.soundSettings).some((value) => {
+          const clip = value as Record<string, unknown> | null;
+          return (
+            !clip ||
+            typeof clip !== "object" ||
+            Array.isArray(clip) ||
+            ![clip.volumePercent].every(
+              (number) =>
+                typeof number === "number" &&
+                Number.isFinite(number) &&
+                number >= 0 &&
+                number <= 100,
+            ) ||
+            typeof clip.delaySeconds !== "number" ||
+            !Number.isFinite(clip.delaySeconds) ||
+            clip.delaySeconds < 0 ||
+            clip.delaySeconds > 3600
+          );
+        }) ||
+        ![body.volumePercent].every(
+          (value) =>
+            typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 100,
+        ) ||
+        typeof body.delaySeconds !== "number" ||
+        !Number.isFinite(body.delaySeconds) ||
+        body.delaySeconds < 0 ||
+        body.delaySeconds > 3600 ||
+        !Array.isArray(body.selectedSounds) ||
+        body.selectedSounds.some((name: unknown) => typeof name !== "string") ||
+        new Set(body.selectedSounds).size !== body.selectedSounds.length
+      ) {
+        return c.json(
+          {
+            error:
+              "Choose unique sounds, a delay between 0 and 3600 seconds, and volume values between 0 and 100.",
+          },
+          400,
+        );
+      }
+      try {
+        for (const name of [...body.selectedSounds, ...Object.keys(body.soundSettings)])
+          library.soundPath(name);
+        const next = {
+          soundSettings: clipValues(body.soundSettings as SwitchPlaybackSettings["soundSettings"]),
+          volumePercent: body.volumePercent as number,
+          delaySeconds: Object.keys(body.soundSettings).length > 0 ? 0 : body.delaySeconds,
+          selectedSounds: body.selectedSounds as string[],
+        };
+        ctx.db.run("INSERT OR REPLACE INTO switch_settings (id, value) VALUES (1, ?)", [
+          JSON.stringify(next),
+        ]);
+        settings = next;
+        silence();
+        return c.json({ ok: true });
+      } catch (error) {
+        return c.json({ error: error instanceof Error ? error.message : String(error) }, 400);
+      }
+    })
     .post("/input", async (c) => {
       if (!(input instanceof PlaceholderSwitchInput)) {
         return c.json({ error: "The software input is only available in mock mode." }, 400);
@@ -124,6 +268,49 @@ export function createSwitchModule(ctx: ModuleContext, soundPlayer?: SoundPlayer
       input.setGrounded(body.grounded);
       poll();
       return c.json({ ok: true, ...status() });
+    })
+    .get("/submissions", async (c) =>
+      c.json({ submissions: await submissions.list(c.req.query("userId")) }),
+    )
+    .post("/submissions", async (c) => {
+      try {
+        if (Number(c.req.header("Content-Length") ?? 0) > MAX_SWITCH_SOUND_BYTES)
+          throw new Error("WAV files must be between 1 byte and 10 MB.");
+        const submission = await submissions.submit(
+          c.req.query("name") ?? "",
+          new Uint8Array(await c.req.arrayBuffer()),
+          c.req.query("userId") ?? "",
+          c.req.query("submittedBy") ?? "",
+        );
+        return c.json({ submission }, 201);
+      } catch (error) {
+        return c.json({ error: error instanceof Error ? error.message : String(error) }, 400);
+      }
+    })
+    .post("/submissions/:id/test", async (c) => {
+      try {
+        const path = await submissions.soundPath(c.req.param("id"));
+        silence();
+        void play(path, 25).catch(() => {});
+        return c.json({ ok: true });
+      } catch (error) {
+        return c.json({ error: error instanceof Error ? error.message : String(error) }, 400);
+      }
+    })
+    .post("/submissions/:id/:action", async (c) => {
+      const action = c.req.param("action");
+      if (action !== "approve" && action !== "reject")
+        return c.json({ error: "Invalid review action." }, 400);
+      try {
+        const submission = await submissions.review(
+          c.req.param("id"),
+          action === "approve" ? "approved" : "rejected",
+          c.req.query("reviewedBy") ?? "admin",
+        );
+        return c.json({ submission });
+      } catch (error) {
+        return c.json({ error: error instanceof Error ? error.message : String(error) }, 400);
+      }
     })
     .get("/sounds", async (c) => c.json({ sounds: await library.list() }))
     .post("/sounds", async (c) => {
@@ -139,13 +326,55 @@ export function createSwitchModule(ctx: ModuleContext, soundPlayer?: SoundPlayer
         return c.json({ error: error instanceof Error ? error.message : String(error) }, 400);
       }
     })
+    .patch("/sounds/:name", async (c) => {
+      const name = c.req.param("name");
+      const body = await c.req.json().catch(() => null);
+      if (typeof body?.name !== "string") return c.json({ error: "Enter a WAV filename." }, 400);
+      const newName = body.name;
+      try {
+        await library.rename(name, newName);
+        const soundSettings = { ...settings?.soundSettings };
+        if (Object.hasOwn(soundSettings, name)) {
+          const clip = soundSettings[name];
+          delete soundSettings[name];
+          soundSettings[newName] = clip;
+        }
+        const next = settings
+          ? {
+              ...settings,
+              soundSettings,
+              selectedSounds: settings.selectedSounds.map((sound) =>
+                sound === name ? newName : sound,
+              ),
+            }
+          : null;
+        try {
+          if (next)
+            ctx.db.run("INSERT OR REPLACE INTO switch_settings (id, value) VALUES (1, ?)", [
+              JSON.stringify(next),
+            ]);
+        } catch (error) {
+          await library.rename(newName, name);
+          throw error;
+        }
+        settings = next;
+        silence();
+        return c.json({ ok: true, sounds: await library.list() });
+      } catch (error) {
+        return c.json({ error: error instanceof Error ? error.message : String(error) }, 400);
+      }
+    })
     .post("/sounds/:name/test", async (c) => {
       try {
         const sound = library.soundPath(c.req.param("name"));
         // A sound can outlast the worker's request deadline. Acknowledge the
         // test immediately; playback errors remain visible in /state.
         opening++; // A test replaces the door's sound, repeat included.
-        void play(sound).catch(() => {});
+        cancelDelay?.();
+        void play(
+          sound,
+          clipSettings(c.req.param("name"))?.volumePercent ?? settings?.volumePercent ?? 100,
+        ).catch(() => {});
         return c.json({ ok: true, sound });
       } catch (error) {
         return c.json({ error: error instanceof Error ? error.message : String(error) }, 400);
@@ -158,7 +387,21 @@ export function createSwitchModule(ctx: ModuleContext, soundPlayer?: SoundPlayer
     })
     .delete("/sounds/:name", async (c) => {
       try {
-        await library.remove(c.req.param("name"));
+        const name = c.req.param("name");
+        await library.remove(name);
+        if (settings) {
+          const soundSettings = { ...settings.soundSettings };
+          delete soundSettings[name];
+          settings = {
+            ...settings,
+            soundSettings,
+            selectedSounds: settings.selectedSounds.filter((sound) => sound !== name),
+          };
+          ctx.db.run("INSERT OR REPLACE INTO switch_settings (id, value) VALUES (1, ?)", [
+            JSON.stringify(settings),
+          ]);
+        }
+        silence();
         return c.json({ ok: true, sounds: await library.list() });
       } catch (error) {
         return c.json({ error: error instanceof Error ? error.message : String(error) }, 400);

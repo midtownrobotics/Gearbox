@@ -15,7 +15,7 @@ on:
       - "pnpm-workspace.yaml"
       - ".github/workflows/pit-log-downloader.yml"
   push:
-    branches: [main]
+    branches: [staging]
     paths:
       - "devices/pit-log-downloader/**"
       # Its status page is built from these.
