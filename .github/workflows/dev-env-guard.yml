@@ -1,6 +1,6 @@
 name: dev-env-guard
 
-# dev-env only takes merges: nothing on it may reach another branch. A pull request fails when it's
+# dev-env only takes merges: nothing on it may reach staging or public. A pull request into either fails when it's
 # from dev-env, or when its branch holds any of dev-env's own commits (those on dev-env's first-parent
 # line that aren't on staging or public: the commits made on it and the merges into it). Branches merged
 # into dev-env stay mergeable elsewhere: their commits aren't on dev-env's first-parent line.
@@ -24,8 +24,8 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           SAME_REPO: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
         run: |
-          if [ "$BASE_REF" = "dev-env" ]; then
-            echo "Merging into dev-env is fine."
+          if [ "$BASE_REF" != "staging" ] && [ "$BASE_REF" != "public" ]; then
+            echo "Only pull requests into staging or public are checked."
             exit 0
           fi
           if [ "$HEAD_REF" = "dev-env" ] && [ "$SAME_REPO" = "true" ]; then

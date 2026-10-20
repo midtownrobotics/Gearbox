@@ -46,7 +46,7 @@ Staging deploys from `staging` unless the repository variable `STAGING_BRANCH` n
 
 ### dev-env
 
-`dev-env` only takes merges: branches go into it, and nothing on it goes anywhere else. `.github/workflows/dev-env-guard.yml` fails a pull request from `dev-env`, or from any branch holding `dev-env`'s own commits (dev-env merged into it, or the branch started from it), and the `staging` and `public` rulesets require its `dev-env-guard` check. A branch you merged into `dev-env` can still go to `staging` as it is. If the check fails, make the branch again from `staging` and cherry-pick only your own commits. Git can't stop a merge on someone's computer, so the check is what keeps it out of `staging` and `public`.
+`dev-env` only takes merges: branches go into it, and nothing on it goes anywhere else. `.github/workflows/dev-env-guard.yml` fails a pull request into `staging` or `public` from `dev-env`, or from any branch holding `dev-env`'s own commits (dev-env merged into it, or the branch started from it), and the `staging` and `public` rulesets require its `dev-env-guard` check. A branch you merged into `dev-env` can still go to `staging` as it is. If the check fails, make the branch again from `staging` and cherry-pick only your own commits. Git can't stop a merge on someone's computer, so the check is what keeps it out of `staging` and `public`.
 
 ### Setting staging up (once)
 
