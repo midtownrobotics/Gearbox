@@ -3,6 +3,7 @@ import type { Plugin } from "../../shared/plugin-types";
 import { DemoPage } from "./demo-page";
 import { EmailLoginPage } from "./email-login-page";
 import { LoginPage } from "./login-page";
+import { NamePage } from "./name-page";
 import { OAuthErrorPage } from "./oauth-error-page";
 import { PendingPage } from "./pending-page";
 import { SignupPage } from "./signup-page";
@@ -17,6 +18,7 @@ export const authPlugin: Plugin = {
     { path: "/login/error", element: <OAuthErrorPage /> },
     { path: "/login/slack", element: <SlackLoginPage /> },
     { path: "/signup", element: <SignupPage /> },
+    { path: "/signup/name", element: <NamePage /> },
     { path: "/signup/pending", element: <PendingPage /> },
     // ID only signs people in: the account page is on the team's home now.
     { path: "/dashboard", element: <Moved app="portal" to="/account" /> },
