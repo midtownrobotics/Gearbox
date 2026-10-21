@@ -14,6 +14,7 @@ import {
 } from "@g3/ui";
 import { CheckCircle, Hand, MessageSquarePlus, Plus, Trash2 } from "lucide-react";
 import { type SyntheticEvent, useCallback, useEffect, useState } from "react";
+import { SERVICE_CATEGORIES, ServiceCategories } from "./ServiceCategories";
 import { TeamLookupInput } from "./TeamLookupInput";
 import { api } from "./api";
 
@@ -21,6 +22,7 @@ type Ticket = {
   id: string;
   team_name: string;
   issue_type: string;
+  issueTypes?: string[];
   description: string;
   status: string;
   claimed_by_name?: string;
@@ -52,7 +54,12 @@ export function Operations({ embedded = false }: { embedded?: boolean }) {
     isAdmin: false,
   });
   const [ticketView, setTicketView] = useState<"active" | "closed">("active");
-  const [ticket, setTicket] = useState({ teamName: "", issueType: "mechanical", description: "" });
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [ticket, setTicket] = useState({
+    teamName: "",
+    issueTypes: [] as string[],
+    description: "",
+  });
   const [helperId, setHelperId] = useState("");
   const [skills, setSkills] = useState("");
   const load = useCallback(
@@ -69,12 +76,12 @@ export function Operations({ embedded = false }: { embedded?: boolean }) {
     event.preventDefault();
     if (
       !(await questions.confirm(
-        `Open a ${ticket.issueType} service ticket for team ${ticket.teamName}? Helpers will be notified in ${chat}.`,
+        `Open a ${ticket.issueTypes.join(", ")} service ticket for team ${ticket.teamName}? Helpers will be notified in ${chat}.`,
       ))
     )
       return;
     await api("/service-tickets", { method: "POST", body: JSON.stringify(ticket) });
-    setTicket({ teamName: "", issueType: "mechanical", description: "" });
+    setTicket({ teamName: "", issueTypes: [] as string[], description: "" });
     setTicketView("active");
     await load("active");
   }
@@ -93,6 +100,19 @@ export function Operations({ embedded = false }: { embedded?: boolean }) {
         <Chip selected={ticketView === "closed"} onClick={() => setTicketView("closed")}>
           Closed tickets
         </Chip>
+        <select
+          className={inputClass}
+          aria-label="Filter issue category"
+          value={categoryFilter}
+          onChange={(event) => setCategoryFilter(event.target.value)}
+        >
+          <option value="all">All issue categories</option>
+          {SERVICE_CATEGORIES.map(([key, label]) => (
+            <option key={key} value={key}>
+              {label}
+            </option>
+          ))}
+        </select>
       </div>
       {ticketView === "active" && (
         <Card title="New service ticket">
@@ -103,19 +123,10 @@ export function Operations({ embedded = false }: { embedded?: boolean }) {
                 onChange={(teamName) => setTicket({ ...ticket, teamName })}
               />
             </Field>
-            <Field label="Issue type">
-              <select
-                aria-label="Issue type"
-                className={inputClass}
-                value={ticket.issueType}
-                onChange={(e) => setTicket({ ...ticket, issueType: e.target.value })}
-              >
-                <option value="mechanical">Mechanical</option>
-                <option value="electrical">Electrical</option>
-                <option value="programming">Programming</option>
-                <option value="other">Other</option>
-              </select>
-            </Field>
+            <ServiceCategories
+              value={ticket.issueTypes}
+              onChange={(issueTypes) => setTicket({ ...ticket, issueTypes })}
+            />
             <div className="sm:col-span-2">
               <Field label="Description">
                 <TextField
@@ -130,7 +141,7 @@ export function Operations({ embedded = false }: { embedded?: boolean }) {
               </Field>
             </div>
             <div className="flex justify-end sm:col-span-2">
-              <Button variant="primary" type="submit">
+              <Button variant="primary" type="submit" disabled={!ticket.issueTypes.length}>
                 <Plus size={16} /> Open ticket
               </Button>
             </div>
@@ -138,118 +149,140 @@ export function Operations({ embedded = false }: { embedded?: boolean }) {
         </Card>
       )}
       <div className="grid min-w-0 items-start gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {data.tickets.map((item) => (
-          <Card key={item.id} className="service-ticket flex min-w-0 flex-col gap-3">
-            <header className="flex flex-wrap items-start justify-between gap-2">
-              <strong className="text-base text-secondary-900">Team {item.team_name}</strong>
-              <Badge>
-                <span className="capitalize">{item.issue_type}</span>
-              </Badge>
-            </header>
-            {item.description && (
-              <p className="whitespace-pre-wrap text-sm text-secondary-700 [overflow-wrap:anywhere]">
-                {item.description}
-              </p>
-            )}
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge
-                colors={
-                  item.status === "closed"
-                    ? tones.success
-                    : item.status === "claimed"
-                      ? tones.info
-                      : tones.warning
-                }
-              >
-                {item.status === "closed"
-                  ? "Closed"
-                  : item.status === "claimed"
-                    ? "Claimed"
-                    : "Open"}
-              </Badge>
-              {item.status === "claimed" && (
-                <span className="min-w-0 text-sm text-secondary-500 [overflow-wrap:anywhere]">
-                  Claimed by {item.claimed_by_name}
-                </span>
+        {data.tickets
+          .filter(
+            (item) =>
+              categoryFilter === "all" ||
+              (item.issueTypes?.length ? item.issueTypes : [item.issue_type]).includes(
+                categoryFilter,
+              ),
+          )
+          .map((item) => (
+            <Card key={item.id} className="service-ticket flex min-w-0 flex-col gap-3">
+              <header className="flex flex-wrap items-start justify-between gap-2">
+                <strong className="text-base text-secondary-900">Team {item.team_name}</strong>
+                <Badge>
+                  <span>
+                    {(item.issueTypes?.length ? item.issueTypes : [item.issue_type])
+                      .map((key) => SERVICE_CATEGORIES.find(([value]) => value === key)?.[1] ?? key)
+                      .join(", ")}
+                  </span>
+                </Badge>
+              </header>
+              {item.description && (
+                <p className="whitespace-pre-wrap text-sm text-secondary-700 [overflow-wrap:anywhere]">
+                  {item.description}
+                </p>
               )}
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {item.status === "open" && (
-                <Button
-                  variant="primary"
-                  type="button"
-                  onClick={async () => {
-                    if (
-                      !(await questions.confirm(
-                        `Claim the service ticket for team ${item.team_name}?`,
-                      ))
-                    )
-                      return;
-                    await api(`/service-tickets/${item.id}`, {
-                      method: "PUT",
-                      body: JSON.stringify({ action: "claim" }),
-                    });
-                    await load();
-                  }}
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge
+                  colors={
+                    item.status === "closed"
+                      ? tones.success
+                      : item.status === "claimed"
+                        ? tones.info
+                        : tones.warning
+                  }
                 >
-                  <Hand size={15} /> Claim
-                </Button>
+                  {item.status === "closed"
+                    ? "Closed"
+                    : item.status === "claimed"
+                      ? "Claimed"
+                      : "Open"}
+                </Badge>
+                {item.status === "claimed" && (
+                  <span className="min-w-0 text-sm text-secondary-500 [overflow-wrap:anywhere]">
+                    Claimed by {item.claimed_by_name}
+                  </span>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {item.status === "open" && (
+                  <Button
+                    variant="primary"
+                    type="button"
+                    onClick={async () => {
+                      if (
+                        !(await questions.confirm(
+                          `Claim the service ticket for team ${item.team_name}?`,
+                        ))
+                      )
+                        return;
+                      await api(`/service-tickets/${item.id}`, {
+                        method: "PUT",
+                        body: JSON.stringify({ action: "claim" }),
+                      });
+                      await load();
+                    }}
+                  >
+                    <Hand size={15} /> Claim
+                  </Button>
+                )}
+                {item.status !== "closed" && (
+                  <Button
+                    variant="secondary"
+                    type="button"
+                    onClick={async () => {
+                      const resolution = await questions.prompt("Closure comment (required):");
+                      if (
+                        !resolution ||
+                        !(await questions.confirm(`Close the ticket for team ${item.team_name}?`))
+                      )
+                        return;
+                      await api(`/service-tickets/${item.id}`, {
+                        method: "PUT",
+                        body: JSON.stringify({ action: "close", resolution }),
+                      });
+                      await load();
+                    }}
+                  >
+                    <CheckCircle size={15} /> Close
+                  </Button>
+                )}
+              </div>
+              {item.resolution && (
+                <div className="rounded-lg bg-inset p-3 text-sm text-secondary-700 whitespace-pre-wrap [overflow-wrap:anywhere]">
+                  {item.resolution}
+                </div>
               )}
-              {item.status !== "closed" && (
+              {item.status === "closed" && (
                 <Button
                   variant="secondary"
                   type="button"
                   onClick={async () => {
-                    const resolution = await questions.prompt("Closure comment (required):");
-                    if (
-                      !resolution ||
-                      !(await questions.confirm(`Close the ticket for team ${item.team_name}?`))
-                    )
-                      return;
-                    await api(`/service-tickets/${item.id}`, {
-                      method: "PUT",
-                      body: JSON.stringify({ action: "close", resolution }),
+                    const comment = await questions.prompt(
+                      `Add a lasting comment about team ${item.team_name}:`,
+                    );
+                    if (!comment) return;
+                    await api("/team-comments", {
+                      method: "POST",
+                      body: JSON.stringify({
+                        teamName: item.team_name,
+                        comment,
+                        sourceTicketId: item.id,
+                      }),
                     });
-                    await load();
+                    questions.notify("Team comment saved.");
                   }}
                 >
-                  <CheckCircle size={15} /> Close
+                  <MessageSquarePlus size={15} /> Add team comment
                 </Button>
               )}
-            </div>
-            {item.resolution && (
-              <div className="rounded-lg bg-inset p-3 text-sm text-secondary-700 whitespace-pre-wrap [overflow-wrap:anywhere]">
-                {item.resolution}
-              </div>
-            )}
-            {item.status === "closed" && (
-              <Button
-                variant="secondary"
-                type="button"
-                onClick={async () => {
-                  const comment = await questions.prompt(
-                    `Add a lasting comment about team ${item.team_name}:`,
-                  );
-                  if (!comment) return;
-                  await api("/team-comments", {
-                    method: "POST",
-                    body: JSON.stringify({
-                      teamName: item.team_name,
-                      comment,
-                      sourceTicketId: item.id,
-                    }),
-                  });
-                  questions.notify("Team comment saved.");
-                }}
-              >
-                <MessageSquarePlus size={15} /> Add team comment
-              </Button>
-            )}
-          </Card>
-        ))}
-        {!data.tickets.length && (
+            </Card>
+          ))}
+        {!data.tickets.some(
+          (item) =>
+            categoryFilter === "all" ||
+            (item.issueTypes?.length ? item.issueTypes : [item.issue_type]).includes(
+              categoryFilter,
+            ),
+        ) && (
           <Card className="col-span-full text-sm text-secondary-500">
-            {ticketView === "closed" ? "No closed tickets." : "No active tickets."}
+            {categoryFilter !== "all"
+              ? "No tickets in this category."
+              : ticketView === "closed"
+                ? "No closed tickets."
+                : "No active tickets."}
           </Card>
         )}
       </div>
