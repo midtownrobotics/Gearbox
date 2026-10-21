@@ -74,20 +74,26 @@ function MatchPaths({ match, ...props }: Props & { match: AutoPathMatch }) {
         <div className="auto-path-grid px-3 pb-3">
           {match.paths.map((path) => (
             <article key={`${path.report.id}-${path.field.id}`}>
-              <button
-                type="button"
-                className="auto-path-image-link"
-                aria-label={`Open full-size path for team ${path.report.teamName}, ${matchLabel(path.report)}`}
-                title="Open full-size drawing"
-                onClick={() => props.onView(path)}
-              >
-                <img
-                  src={props.imageUrl(path.url)}
-                  alt={`Team ${path.report.teamName} - ${matchLabel(path.report)} - ${path.field.label}`}
-                  crossOrigin="use-credentials"
-                  onLoad={(event) => props.onImageLoad(path, event.currentTarget)}
-                />
-              </button>
+              {path.report.answers[path.field.id] === "no-minimal-movement" ? (
+                <p className="rounded-lg bg-inset px-4 py-6 text-sm font-semibold">
+                  No/minimal movement
+                </p>
+              ) : (
+                <button
+                  type="button"
+                  className="auto-path-image-link"
+                  aria-label={`Open full-size path for team ${path.report.teamName}, ${matchLabel(path.report)}`}
+                  title="Open full-size drawing"
+                  onClick={() => props.onView(path)}
+                >
+                  <img
+                    src={props.imageUrl(path.url)}
+                    alt={`Team ${path.report.teamName} - ${matchLabel(path.report)} - ${path.field.label}`}
+                    crossOrigin="use-credentials"
+                    onLoad={(event) => props.onImageLoad(path, event.currentTarget)}
+                  />
+                </button>
+              )}
               <div>
                 <MapIcon size={16} aria-hidden="true" />
                 <strong>{path.field.label}</strong>

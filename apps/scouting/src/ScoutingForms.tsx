@@ -48,6 +48,8 @@ import {
 } from "react";
 import { FormFieldMap } from "./FormFieldMap";
 import { Operations } from "./Operations";
+import { PitCoverage } from "./PitCoverage";
+import { ServiceCategories } from "./ServiceCategories";
 import { TeamLookupInput } from "./TeamLookupInput";
 import { api } from "./api";
 import { clearInputError, showTeamNumberError } from "./input-validation";
@@ -126,13 +128,25 @@ function FieldInput({
   const [counterInterval, setCounterInterval] = useState<(typeof COUNTER_INTERVALS)[number]>(1);
   if (field.type === "fieldMap" && canvasRef)
     return (
-      <FormFieldMap
-        key={canvasKey}
-        canvasRef={canvasRef}
-        onDrawingChange={onDrawingChange}
-        onCommit={onCommit}
-        initialImage={initialImage}
-      />
+      <div className="space-y-3">
+        {value !== "no-minimal-movement" && (
+          <FormFieldMap
+            key={canvasKey}
+            canvasRef={canvasRef}
+            onDrawingChange={onDrawingChange}
+            onCommit={onCommit}
+            initialImage={initialImage}
+          />
+        )}
+        <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border border-line px-3 py-2 text-sm">
+          <input
+            type="checkbox"
+            checked={value === "no-minimal-movement"}
+            onChange={(event) => setValue(event.target.checked ? "no-minimal-movement" : "")}
+          />
+          No/minimal movement
+        </label>
+      </div>
     );
   if (field.type === "counter") {
     const current = Number(value ?? 0);
@@ -198,6 +212,32 @@ function FieldInput({
         value={String(value ?? "")}
         onChange={(event) => setValue(event.target.value)}
       />
+    );
+  if (
+    field.type === "mcq" &&
+    field.options.length === 2 &&
+    field.options.every((option) => ["yes", "no"].includes(option.trim().toLowerCase()))
+  )
+    return (
+      <fieldset className="flex flex-wrap gap-2">
+        <legend className="sr-only">{field.label}</legend>
+        {field.options.map((option) => (
+          <label
+            key={option}
+            className="flex min-h-11 min-w-24 cursor-pointer items-center gap-3 rounded-lg border border-line px-4 py-2 text-sm has-[:checked]:border-primary-500 has-[:checked]:bg-primary-50"
+          >
+            <input
+              type="radio"
+              name={inputId}
+              value={option}
+              checked={value === option}
+              required={field.required}
+              onChange={() => setValue(option)}
+            />
+            {option}
+          </label>
+        ))}
+      </fieldset>
     );
   if (field.type === "mcq")
     return (
@@ -267,12 +307,14 @@ function EntryForm({
   refreshContext,
   scheduleUnavailable,
   userId,
+  pitTeam,
 }: {
   form: ScoutingForm;
   context: EventContext | null;
   refreshContext: () => Promise<void>;
   scheduleUnavailable: boolean;
   userId: string;
+  pitTeam?: string;
 }) {
   if (form.kind !== "scouting")
     return (
@@ -280,6 +322,7 @@ function EntryForm({
         form={form}
         userId={userId}
         target={null}
+        initialTeam={pitTeam}
         refreshContext={refreshContext}
         scheduleUnavailable={scheduleUnavailable}
       />
@@ -412,7 +455,7 @@ function MatchEntry({
     sent !== null &&
     live !== null &&
     live.match.key !== sent.matchKey &&
-    !context?.hasSubmittedCurrentMatch;
+    !(context?.submittedFormIds?.includes(form.id) ?? context?.hasSubmittedCurrentMatch);
   useEffect(() => {
     setReadyAt((at) => (nextReady ? (at ?? serverNow()) : null));
   }, [nextReady, serverNow]);
@@ -465,7 +508,9 @@ function MatchEntry({
     }
   }
 
-  const showDone = sent !== null || Boolean(context?.hasSubmittedCurrentMatch);
+  const showDone =
+    sent !== null ||
+    Boolean(context?.submittedFormIds?.includes(form.id) ?? context?.hasSubmittedCurrentMatch);
   const doneLabel = sent?.label ?? liveMatch?.label ?? "Match";
   const upcoming = context?.upcomingMatch ?? null;
   let banner: ReactNode = null;
@@ -527,9 +572,11 @@ function MatchEntry({
               : null
           }
           waiting={
-            upcoming
-              ? `${upcoming.label} opens once ${doneLabel} is scored.`
-              : "No more matches on the schedule for now."
+            context?.submittedFormIds?.includes(form.id) && !context.hasSubmittedCurrentMatch
+              ? "This form is submitted. Choose another active match form above to finish this match."
+              : upcoming
+                ? `${upcoming.label} opens once ${doneLabel} is scored.`
+                : "No more matches on the schedule for now."
           }
           now={now}
           opensAt={opensAt}
@@ -590,6 +637,7 @@ function MatchEntry({
 
 function EntryDraft({
   form,
+  initialTeam,
   userId,
   target,
   banner,
@@ -601,6 +649,7 @@ function EntryDraft({
   onSavingChange,
 }: {
   form: ScoutingForm;
+  initialTeam?: string;
   userId: string;
   /** A match form's match and team; null for a pit form, or a match form with no match yet. */
   target: DraftTarget | null;
@@ -616,11 +665,18 @@ function EntryDraft({
   const match = target?.match ?? null;
   // A draft this device kept for this match and team picks up where it left off.
   const [restored] = useState(() => {
-    if (!isMatch || !target) return null;
-    const draft = loadDraft(userId, form.id, target.match.key);
-    return draft && draft.teamName === target.team && hasContent(draft) ? draft : null;
+    const draft = isMatch
+      ? loadDraft(userId, form.id, target?.match.key ?? "")
+      : initialTeam
+        ? loadDraft(userId, form.id, `__pit__:${initialTeam}`)
+        : listDrafts(userId, form.id).find((item) => item.matchKey.startsWith("__pit__"));
+    return draft && (!isMatch || draft.teamName === target?.team) && hasContent(draft)
+      ? draft
+      : null;
   });
-  const [teamName, setTeamName] = useState(isMatch ? (target?.team ?? "") : "");
+  const [teamName, setTeamName] = useState(
+    isMatch ? (target?.team ?? "") : (initialTeam ?? restored?.teamName ?? ""),
+  );
   const [answers, setAnswers] = useState<Record<string, unknown>>(restored?.answers ?? {});
   const [initialDrawings, setInitialDrawings] = useState(restored?.drawings ?? {});
   const [hasDrawings, setHasDrawings] = useState(
@@ -645,17 +701,17 @@ function EntryDraft({
 
   const persist = useCallback(() => {
     pendingSave.current = false;
-    if (!isMatch || !target) return;
+    if (isMatch && !target) return;
     saveDraft(userId, {
       formId: form.id,
-      matchKey: target.match.key,
-      matchLabel: target.match.label,
-      teamName: target.team,
+      matchKey: target?.match.key ?? `__pit__:${teamName}`,
+      matchLabel: target?.match.label ?? "Pit scouting",
+      teamName: target?.team ?? teamName,
       answers: answersRef.current,
       drawings: { ...drawings.current },
       savedAt: Date.now(),
     });
-  }, [isMatch, target, userId, form.id]);
+  }, [isMatch, target, userId, form.id, teamName]);
   const persistRef = useRef(persist);
   useEffect(() => {
     persistRef.current = persist;
@@ -663,9 +719,9 @@ function EntryDraft({
   useEffect(() => {
     answersRef.current = answers;
     pendingSave.current = true;
-    const timer = window.setTimeout(() => persistRef.current(), 300);
+    const timer = window.setTimeout(persist, 300);
     return () => window.clearTimeout(timer);
-  }, [answers]);
+  }, [answers, persist]);
   useEffect(() => {
     // Leaving the page or the app saves what's typed at once.
     const flush = () => {
@@ -702,7 +758,7 @@ function EntryDraft({
     persist();
   }
   function drawingCommitted(fieldId: string, canvas: HTMLCanvasElement) {
-    if (!isMatch || !drawnFields.current.has(fieldId)) return;
+    if (!drawnFields.current.has(fieldId)) return;
     try {
       drawings.current[fieldId] = canvas.toDataURL("image/jpeg", 0.85);
     } catch {
@@ -737,7 +793,7 @@ function EntryDraft({
         body: payload,
       });
       if (!mounted.current) return;
-      if (isMatch && target) deleteDraft(userId, form.id, target.match.key);
+      deleteDraft(userId, form.id, target?.match.key ?? `__pit__:${teamName}`);
       drawings.current = {};
       answersRef.current = {};
       drawnFields.current.clear();
@@ -782,7 +838,7 @@ function EntryDraft({
     return adapter;
   }
   return (
-    <form className="scouting-entry" onSubmit={submit} ref={formRef}>
+    <form id={`entry-${form.id}`} className="scouting-entry" onSubmit={submit} ref={formRef}>
       <div className="scouting-form-title">
         <div className="scouting-form-heading-row">
           <h2>{form.name}</h2>
@@ -841,7 +897,20 @@ function EntryDraft({
                 <FieldInput
                   field={field}
                   value={answers[field.id]}
-                  setValue={(value) => setAnswers((current) => ({ ...current, [field.id]: value }))}
+                  setValue={(value) => {
+                    if (field.type === "fieldMap") {
+                      delete drawings.current[field.id];
+                      drawnFields.current.delete(field.id);
+                      restoring.current.delete(field.id);
+                      setInitialDrawings((current) => {
+                        const next = { ...current };
+                        delete next[field.id];
+                        return next;
+                      });
+                      setHasDrawings(Object.keys(drawings.current).length > 0);
+                    }
+                    setAnswers((current) => ({ ...current, [field.id]: value }));
+                  }}
                   canvasRef={mapRef}
                   canvasKey={canvasKey}
                   initialImage={initialDrawings[field.id]}
@@ -959,6 +1028,27 @@ function Editor({
           <AlertCircle size={18} /> {saveError}
         </div>
       )}
+      <div className="grid gap-4 rounded-lg border border-line p-4 sm:grid-cols-[minmax(0,1fr)_auto]">
+        <label className="grid gap-1 text-sm font-semibold">
+          Form name
+          <TextField
+            kind="title"
+            value={draft.name}
+            maxLength={120}
+            onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))}
+          />
+        </label>
+        <label className="flex min-h-11 cursor-pointer items-center gap-2 self-end text-sm">
+          <input
+            type="checkbox"
+            checked={draft.isActive}
+            onChange={(event) =>
+              setDraft((current) => ({ ...current, isActive: event.target.checked }))
+            }
+          />
+          Active for scouts
+        </label>
+      </div>
       <div className="designer-field-list">
         {draft.fields.map((field, index) => (
           <div
@@ -1346,7 +1436,11 @@ function ServiceIssueReport() {
   const questions = useQuestions();
   const chat = chatName(useTeamChat());
   const [open, setOpen] = useState(false);
-  const [report, setReport] = useState({ teamName: "", issueType: "mechanical", description: "" });
+  const [report, setReport] = useState({
+    teamName: "",
+    issueTypes: [] as string[],
+    description: "",
+  });
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState<"success" | "error">("success");
   if (!open)
@@ -1362,7 +1456,7 @@ function ServiceIssueReport() {
         event.preventDefault();
         if (
           !(await questions.confirm(
-            `Alert the service crew about a ${report.issueType} issue for team ${report.teamName}?`,
+            `Alert the service crew about a ${report.issueTypes.join(", ")} issue for team ${report.teamName}?`,
           ))
         )
           return;
@@ -1370,7 +1464,7 @@ function ServiceIssueReport() {
           await api("/service-tickets", { method: "POST", body: JSON.stringify(report) });
           setMessageType("success");
           setMessage(`Service crew alerted through ${chat}.`);
-          setReport({ teamName: "", issueType: "mechanical", description: "" });
+          setReport({ teamName: "", issueTypes: [] as string[], description: "" });
         } catch (error) {
           setMessageType("error");
           setMessage(error instanceof Error ? error.message : "Could not alert the service crew.");
@@ -1393,23 +1487,17 @@ function ServiceIssueReport() {
         onInvalid={showTeamNumberError}
         placeholder="Team number"
       />
-      <select
-        className={inputClass}
-        value={report.issueType}
-        onChange={(event) => setReport({ ...report, issueType: event.target.value })}
-      >
-        <option value="mechanical">Mechanical</option>
-        <option value="electrical">Electrical</option>
-        <option value="programming">Programming</option>
-        <option value="other">Other</option>
-      </select>
+      <ServiceCategories
+        value={report.issueTypes}
+        onChange={(issueTypes) => setReport({ ...report, issueTypes })}
+      />
       <TextField
         kind="note"
         value={report.description}
         onChange={(event) => setReport({ ...report, description: event.target.value })}
         placeholder="What appears to be broken?"
       />
-      <Button variant="primary" type="submit">
+      <Button variant="primary" type="submit" disabled={!report.issueTypes.length}>
         Alert helpers
       </Button>
       <Button variant="secondary" type="button" onClick={() => setOpen(false)}>
@@ -1449,6 +1537,7 @@ type EventContext = {
   tbaCurrentMatch: EventMatch | null;
   assignedTeam: string | null;
   hasSubmittedCurrentMatch: boolean;
+  submittedFormIds?: string[];
   onlineScoutCount: number;
   matchSubmissions: {
     id: string;
@@ -2354,16 +2443,24 @@ export function ScoutingForms({
   const [forms, setForms] = useState<ScoutingForm[]>([]);
   const [selected, setSelected] = useState<ScoutingForm | null>(null);
   const [editing, setEditing] = useState(false);
+  const [pitTeam, setPitTeam] = useState<string | undefined>();
+  const [category, setCategory] = useState<"scouting" | "pit">("scouting");
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [context, setContext] = useState<EventContext | null>(null);
   const load = useCallback(async () => {
     const result = await api<{ forms: ScoutingForm[] }>("/scouting-forms");
     setLoadError("");
-    setForms(result.forms);
-    setSelected(
-      (current) => result.forms.find((form) => form.id === current?.id) ?? result.forms[0] ?? null,
+    const visible = result.forms.filter(
+      (form) => isAdmin || (form.isActive && form.fields.length > 0),
     );
-  }, []);
+    setForms(visible);
+    setSelected(
+      (current) =>
+        visible.find((form) => form.id === current?.id) ??
+        visible.find((form) => form.isActive && form.kind === category) ??
+        null,
+    );
+  }, [isAdmin, category]);
   useEffect(() => {
     load()
       .catch((cause) =>
@@ -2448,17 +2545,20 @@ export function ScoutingForms({
       {!loading && !loadError && !forms.length && (
         <p className="text-sm text-secondary-500">No scouting forms are available.</p>
       )}
-      {forms.length > 0 && (
+      {
         <div className="flex flex-wrap gap-2" role="group" aria-label="Scouting form type">
           {(["scouting", "pit"] as const).map((kind) => (
             <Chip
               key={kind}
-              selected={selected?.kind === kind}
+              selected={category === kind}
               className="min-h-11"
-              disabled={!forms.some((form) => form.kind === kind)}
               onClick={() => {
-                if (selected?.kind === kind) return;
-                setSelected(forms.find((form) => form.kind === kind) ?? null);
+                setCategory(kind);
+                setSelected(
+                  forms.find((form) => form.kind === kind && form.isActive) ??
+                    (isAdmin ? forms.find((form) => form.kind === kind) : null) ??
+                    null,
+                );
                 setEditing(false);
               }}
             >
@@ -2466,10 +2566,66 @@ export function ScoutingForms({
             </Chip>
           ))}
         </div>
+      }
+      {isAdmin && (
+        <Button
+          variant="secondary"
+          type="button"
+          onClick={() => {
+            setSelected({
+              id: "new",
+              name: "",
+              kind: category,
+              description: "",
+              isActive: true,
+              fields: [
+                {
+                  id: crypto.randomUUID(),
+                  label: "Notes",
+                  type: "longText",
+                  required: false,
+                  options: [],
+                  min: 0,
+                  max: 10,
+                  step: 1,
+                },
+              ],
+            });
+            setEditing(true);
+          }}
+        >
+          <Plus size={16} />
+          New {category === "pit" ? "pit" : "match"} form
+        </Button>
+      )}
+      {category === "scouting" &&
+        forms.filter((form) => form.kind === "scouting" && form.isActive && form.fields.length > 0)
+          .length > 1 && (
+          <p className="text-sm text-secondary-500">
+            Complete each active match form for your assigned team. Your answers are saved when you
+            switch forms.
+          </p>
+        )}
+      {category === "pit" && (
+        <PitCoverage
+          refreshKey={context?.serverNow}
+          onStart={
+            selected?.kind === "pit" && selected.isActive && selected.fields.length > 0 && !editing
+              ? (team) => {
+                  setPitTeam(team);
+                  window.requestAnimationFrame(() =>
+                    document
+                      .getElementById(`entry-${selected.id}`)
+                      ?.scrollIntoView({ behavior: "smooth", block: "start" }),
+                  );
+                }
+              : undefined
+          }
+        />
       )}
       <div className="form-choice-grid">
         {forms
-          .filter((form) => form.kind === selected?.kind)
+          .filter((form) => form.kind === category)
           .map((form) => (
             <div
               className={selected?.id === form.id ? "form-choice active" : "form-choice"}
@@ -2483,6 +2639,15 @@ export function ScoutingForms({
                 }}
               >
                 <strong>{form.name}</strong>
+                <span
+                  className={`text-xs ${form.isActive ? "text-secondary-500" : "text-amber-700"}`}
+                >
+                  {!form.isActive
+                    ? "Inactive"
+                    : form.kind === "scouting" && context?.submittedFormIds?.includes(form.id)
+                      ? "Submitted for this match"
+                      : "Active"}
+                </span>
               </button>
               {isAdmin && (
                 <button
@@ -2506,20 +2671,29 @@ export function ScoutingForms({
             form={selected}
             close={() => setEditing(false)}
             save={async (form) => {
-              await api(`/scouting-forms/${form.id}`, {
-                method: "PUT",
-                body: JSON.stringify(form),
-              });
+              const saved = await api<{ id?: string }>(
+                form.id === "new" ? "/scouting-forms" : `/scouting-forms/${form.id}`,
+                {
+                  method: form.id === "new" ? "POST" : "PUT",
+                  body: JSON.stringify(form),
+                },
+              );
               await load();
+              setSelected({ ...form, id: saved.id ?? form.id });
               setEditing(false);
             }}
           />
+        ) : !selected.isActive ? (
+          <p className="text-sm text-secondary-500">
+            This form is inactive. Edit it to make it available to scouts.
+          </p>
         ) : (
           <>
             {contextError && selected.kind === "scouting" && <ErrorBanner message={contextError} />}
             <EntryForm
-              key={selected.id}
+              key={`${selected.id}:${pitTeam ?? ""}`}
               form={selected}
+              pitTeam={pitTeam}
               context={context}
               refreshContext={refreshContext}
               scheduleUnavailable={!!contextError}
