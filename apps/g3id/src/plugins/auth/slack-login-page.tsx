@@ -10,7 +10,8 @@ type PollStatus =
   | { status: "success"; action?: string }
   | { status: "failed"; message: string }
   | { status: "expired" }
-  | { status: "signup_pending" };
+  /** `nameToken`: someone new, who enters their name next. */
+  | { status: "signup_pending"; nameToken?: string | null };
 
 type BotInfo = {
   appId: string;
@@ -73,7 +74,11 @@ export function SlackLoginPage() {
           return;
         }
         if (data.status === "signup_pending") {
-          navigate("/signup/pending");
+          navigate(
+            data.nameToken
+              ? `/signup/name?token=${encodeURIComponent(data.nameToken)}`
+              : "/signup/pending",
+          );
           return;
         }
         setPollStatus(data);

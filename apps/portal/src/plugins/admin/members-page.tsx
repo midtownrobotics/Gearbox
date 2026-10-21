@@ -20,6 +20,7 @@ import {
   STATUS_STYLES,
   type User,
   matchesSearch,
+  otherUsername,
   relativeTime,
 } from "./members-shared";
 
@@ -302,6 +303,7 @@ export function MembersPage() {
     const authMethods = ["Slack", "Discord", "Google", "GitHub", "Steam"];
     const headers = [
       "Name",
+      "Username",
       "Email",
       "Joined Date",
       "Last Sign-in",
@@ -321,6 +323,7 @@ export function MembersPage() {
       };
       return [
         u.displayName,
+        u.username ?? "",
         u.email,
         new Date(u.createdAt * 1000).toLocaleDateString(),
         u.lastLoginAt ? new Date(u.lastLoginAt * 1000).toLocaleString() : "Never",
@@ -460,6 +463,11 @@ export function MembersPage() {
                       <span className="text-secondary-900 font-semibold group-hover:text-primary-600 group-hover:underline">
                         {user.displayName}
                       </span>
+                      {otherUsername(user) && (
+                        <span className="text-sm text-secondary-500" title="Username">
+                          {otherUsername(user)}
+                        </span>
+                      )}
                       {user.isAdmin === 1 && (
                         <span className="text-xs px-1.5 py-0.5 rounded bg-primary-50 text-primary-600 border border-primary-200">
                           Admin

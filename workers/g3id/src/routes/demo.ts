@@ -47,6 +47,7 @@ async function resetDemoTeam(env: AppEnv["Bindings"]) {
         teamId: demoTeamId,
         email: person.email,
         displayName: person.name,
+        username: person.name,
         status: "active",
         isAdmin: person.isAdmin ? 1 : 0,
         isMentor: person.isMentor ? 1 : 0,
