@@ -229,7 +229,8 @@ export function Analysis({
   );
   const summaryA = numericSummary(activeReports);
   const summaryB = numericSummary(activeReportsB);
-  const comparisonLabels = [...new Set([...summaryA.keys(), ...summaryB.keys()])];
+  const comparisonLabels =
+    searched && searchedB ? [...new Set([...summaryA.keys(), ...summaryB.keys()])] : [];
   const competitions = [
     ...new Set([
       ...(currentEventKey ? [currentEventKey] : []),
@@ -286,7 +287,11 @@ export function Analysis({
       className="scouting-page-frame"
       contentClassName="page analysis-page"
       description=<span>
-        {searched ? `Team ${searched}` : `${reports.length} scouting reports`}
+        {tab === "compare" && searched && searchedB
+          ? `Team ${searched} and Team ${searchedB}`
+          : searched
+            ? `Team ${searched}`
+            : `${reports.length} scouting reports`}
       </span>
     >
       <form className="analysis-search" onSubmit={search}>
@@ -295,7 +300,7 @@ export function Analysis({
           required={tab === "compare"}
           value={team}
           onChange={setTeam}
-          placeholder={tab === "compare" ? "Team A number or name" : "Team number or name"}
+          placeholder="Team number or name"
         />
         {tab === "compare" && (
           <>
@@ -304,7 +309,7 @@ export function Analysis({
               required
               value={teamB}
               onChange={setTeamB}
-              placeholder="Team B number or name"
+              placeholder="Another team number or name"
             />
           </>
         )}
@@ -589,14 +594,12 @@ export function Analysis({
           {searched && searchedB && (
             <div className="comparison-scoreboard">
               <div>
-                <span>Team A</span>
-                <strong>{searched}</strong>
+                <strong>Team {searched}</strong>
                 <small>{activeReports.length} reports</small>
               </div>
               <Scale size={28} />
               <div>
-                <span>Team B</span>
-                <strong>{searchedB}</strong>
+                <strong>Team {searchedB}</strong>
                 <small>{activeReportsB.length} reports</small>
               </div>
             </div>
@@ -613,16 +616,21 @@ export function Analysis({
             return (
               <div className="comparison-row" key={label}>
                 <strong className={winner === "left" ? "winner" : ""}>
+                  <small className="comparison-team-name">Team {searched}</small>
                   {left?.toFixed(1) ?? "—"}
                 </strong>
                 <span>{label}</span>
                 <strong className={winner === "right" ? "winner" : ""}>
+                  <small className="comparison-team-name">Team {searchedB}</small>
                   {right?.toFixed(1) ?? "—"}
                 </strong>
               </div>
             );
           })}
-          {searched && !comparisonLabels.length && (
+          {(!searched || !searchedB) && (
+            <div className="forms-empty">Choose two teams and select Compare.</div>
+          )}
+          {searched && searchedB && !comparisonLabels.length && (
             <div className="forms-empty">No comparable slider or counter data was found.</div>
           )}
         </div>
