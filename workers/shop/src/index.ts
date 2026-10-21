@@ -14,6 +14,7 @@ import { adminPartsRouter } from "./routes/admin-parts";
 import { drawingsRouter } from "./routes/drawings";
 import { internalRouter } from "./routes/internal";
 import { clearPresence, kioskPresenceRouter } from "./routes/kiosk-presence";
+import { leaderboardRouter } from "./routes/leaderboard";
 import { onshapeExportRouter } from "./routes/onshape-export";
 import { onshapeLinksRouter } from "./routes/onshape-links";
 import { onshapeWebhooksRouter } from "./routes/onshape-webhooks";
@@ -119,6 +120,7 @@ const app = base
   .route("/part-files", partFilesRouter)
   .route("/staging-batches", stagingBatchesRouter)
   .route("/actions", actionsRouter)
+  .route("/leaderboard", leaderboardRouter)
   .route("/kiosk-presence", kioskPresenceRouter)
   .route("/admin", adminPartsRouter)
   .route("/admin/quality", qualityRouter)

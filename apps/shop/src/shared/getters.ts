@@ -16,6 +16,7 @@ import type {
   QualityAnswer,
   QualityReport,
   QualitySuspect,
+  Standing,
   Subsystem,
 } from "./types";
 
@@ -84,6 +85,13 @@ export async function fetchActions(): Promise<Action[]> {
   const res = await api.actions.$get();
   if (!res.ok) throw new Error(`Failed to fetch actions (${res.status})`);
   return res.json() as Promise<Action[]>;
+}
+
+/** Everyone's steps completed and points, for the Leaderboard. */
+export async function fetchLeaderboard(): Promise<Standing[]> {
+  const res = await api.leaderboard.$get();
+  if (!res.ok) throw new Error(`Failed to fetch leaderboard (${res.status})`);
+  return (await res.json()).standings;
 }
 
 /** Who is logged in at which kiosk device right now. */

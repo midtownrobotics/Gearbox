@@ -70,6 +70,9 @@ export type Action = {
   createdAt: number;
 };
 
+/** One person on the Leaderboard: steps completed, and points for how long they usually take. */
+export type Standing = { userId: string; steps: number; points: number };
+
 export type KioskPresence = {
   id: number;
   kioskDeviceId: number;

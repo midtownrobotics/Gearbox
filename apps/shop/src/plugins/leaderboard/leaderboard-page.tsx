@@ -1,7 +1,8 @@
-import { ErrorBanner, Loading, Page } from "@g3/ui";
+import { Chip, ErrorBanner, Loading, Page } from "@g3/ui";
 import { useEffect, useMemo, useState } from "react";
-import { fetchActions } from "../../shared/getters";
-import type { Action } from "../../shared/types";
+import { useSearchParams } from "react-router-dom";
+import { fetchLeaderboard } from "../../shared/getters";
+import type { Standing } from "../../shared/types";
 import { useUserNames } from "../../shared/use-user-names";
 
 const MEDALS: Record<number, { emoji: string; ring: string }> = {
@@ -10,30 +11,49 @@ const MEDALS: Record<number, { emoji: string; ring: string }> = {
   2: { emoji: "🥉", ring: "bg-orange-50 border-orange-400" },
 };
 
+type Ranking = "points" | "steps";
+
+const RANKINGS: Record<
+  Ranking,
+  { label: string; description: string; unit: (n: number) => string }
+> = {
+  points: {
+    label: "By time",
+    description:
+      "Each step is worth about the minutes it usually takes the team, so longer work counts for more.",
+    unit: (n) => (n === 1 ? "point" : "points"),
+  },
+  steps: {
+    label: "By steps",
+    description: "Ranked by steps completed on the shop floor.",
+    unit: (n) => (n === 1 ? "step" : "steps"),
+  },
+};
+
 export function LeaderboardPage() {
-  const [actions, setActions] = useState<Action[] | null>(null);
+  const [standings, setStandings] = useState<Standing[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [params, setParams] = useSearchParams();
+  const ranking: Ranking = params.get("by") === "steps" ? "steps" : "points";
 
   useEffect(() => {
-    fetchActions()
-      .then(setActions)
+    fetchLeaderboard()
+      .then(setStandings)
       .catch((e) => setError(e instanceof Error ? e.message : "Failed to load leaderboard."));
   }, []);
 
-  const standings = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const a of actions ?? []) {
-      if (a.action !== "completed") continue;
-      counts.set(a.userId, (counts.get(a.userId) ?? 0) + 1);
-    }
-    return [...counts.entries()]
-      .map(([userId, completed]) => ({ userId, completed }))
-      .sort((a, b) => b.completed - a.completed);
-  }, [actions]);
+  const ranked = useMemo(
+    () =>
+      (standings ?? [])
+        .filter((s) => s[ranking] > 0)
+        .sort((a, b) => b[ranking] - a[ranking] || b.steps - a.steps),
+    [standings, ranking],
+  );
 
-  const resolveName = useUserNames(standings.map((s) => s.userId));
+  const resolveName = useUserNames(ranked.map((s) => s.userId));
+  const { description, unit } = RANKINGS[ranking];
 
-  if (error || !actions)
+  if (error || !standings)
     return (
       <Page title="Leaderboard" width="narrow">
         {error ? <ErrorBanner message={error} /> : <Loading />}
@@ -41,48 +61,56 @@ export function LeaderboardPage() {
     );
 
   return (
-    <Page title="Leaderboard" description="Ranked by parts marked complete." width="narrow">
-      {standings.length === 0 ? (
+    <Page title="Leaderboard" description={description} width="narrow">
+      <div className="flex gap-2 mb-4">
+        {(Object.keys(RANKINGS) as Ranking[]).map((key) => (
+          <Chip
+            key={key}
+            selected={ranking === key}
+            onClick={() => setParams(key === "points" ? {} : { by: key }, { replace: true })}
+          >
+            {RANKINGS[key].label}
+          </Chip>
+        ))}
+      </div>
+      {ranked.length === 0 ? (
         <p className="text-secondary-500 text-sm">
-          No parts completed yet. Finish a part on the shop floor to get on the board.
+          Nothing completed yet. Finish a step on the shop floor to get on the board.
         </p>
       ) : (
-        <>
-          <div className="space-y-2">
-            {standings.map((s, i) => {
-              const medal = MEDALS[i];
-              return (
-                <div
-                  key={s.userId}
-                  className={`flex items-center gap-4 rounded-xl border px-5 ${
-                    medal ? `${medal.ring} py-4` : "bg-surface border-secondary-200 py-3"
-                  }`}
+        <div className="space-y-2">
+          {ranked.map((s, i) => {
+            const medal = MEDALS[i];
+            const value = s[ranking];
+            return (
+              <div
+                key={s.userId}
+                className={`flex items-center gap-4 rounded-xl border px-5 ${
+                  medal ? `${medal.ring} py-4` : "bg-surface border-secondary-200 py-3"
+                }`}
+              >
+                <span
+                  className={`font-display shrink-0 text-center ${medal ? "text-3xl w-10" : "text-xl w-10 text-secondary-400"}`}
                 >
+                  {medal ? medal.emoji : `#${i + 1}`}
+                </span>
+                <span
+                  className={`flex-1 min-w-0 truncate font-semibold ${medal ? "text-lg text-secondary-900" : "text-secondary-900"}`}
+                >
+                  {resolveName(s.userId)}
+                </span>
+                <span className="shrink-0 text-right">
                   <span
-                    className={`font-display shrink-0 text-center ${medal ? "text-3xl w-10" : "text-xl w-10 text-secondary-400"}`}
+                    className={`font-bold ${medal ? "text-2xl text-secondary-900" : "text-lg text-secondary-500"}`}
                   >
-                    {medal ? medal.emoji : `#${i + 1}`}
+                    {value.toLocaleString()}
                   </span>
-                  <span
-                    className={`flex-1 min-w-0 truncate font-semibold ${medal ? "text-lg text-secondary-900" : "text-secondary-900"}`}
-                  >
-                    {resolveName(s.userId)}
-                  </span>
-                  <span className="shrink-0 text-right">
-                    <span
-                      className={`font-bold ${medal ? "text-2xl text-secondary-900" : "text-lg text-secondary-500"}`}
-                    >
-                      {s.completed}
-                    </span>
-                    <span className="text-xs text-secondary-400 ml-1.5">
-                      part{s.completed === 1 ? "" : "s"}
-                    </span>
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </>
+                  <span className="text-xs text-secondary-400 ml-1.5">{unit(value)}</span>
+                </span>
+              </div>
+            );
+          })}
+        </div>
       )}
     </Page>
   );
