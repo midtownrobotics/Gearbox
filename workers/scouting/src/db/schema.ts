@@ -375,6 +375,7 @@ export const serviceTickets = sqliteTable(
     id: text("id").notNull(),
     team_name: text("team_name").notNull(),
     issue_type: text("issue_type").notNull(),
+    issue_types_json: text("issue_types_json").notNull().default("[]"),
     description: text("description").notNull().default(""),
     status: text("status").notNull().default("open"),
     claimed_by: text("claimed_by"),
