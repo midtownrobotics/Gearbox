@@ -13,6 +13,9 @@ import type {
   PartInstance,
   PartInstanceProcess,
   Process,
+  QualityAnswer,
+  QualityReport,
+  QualitySuspect,
   Subsystem,
 } from "./types";
 
@@ -329,4 +332,61 @@ export async function bulkMoveInstances(
   });
   if (!res.ok) throw new Error(await getErrorMessage(res as unknown as Response));
   return ((await res.json()) as { moved: number }).moved;
+}
+
+/** Every quality report the team has, newest first (admins only). */
+export async function fetchQualityReports(): Promise<QualityReport[]> {
+  const res = await api["quality-reports"].$get();
+  if (!res.ok) throw new Error(await getErrorMessage(res as unknown as Response));
+  return res.json() as Promise<QualityReport[]>;
+}
+
+/**
+ * Files a quality report on a part waiting at a Quality Control step. Passing finishes the step.
+ * Also gives back every step before it, with who last finished each and when.
+ */
+export async function submitQualityReport(input: {
+  partInstanceId: number;
+  processId: number;
+  checks: QualityAnswer[];
+  suspectProcessIds: number[];
+  unsure: boolean;
+  notes: string;
+}): Promise<{ report: QualityReport; history: QualitySuspect[] }> {
+  const res = await api["quality-reports"].$post({ json: input });
+  if (!res.ok) throw new Error(await getErrorMessage(res as unknown as Response));
+  return res.json() as Promise<{ report: QualityReport; history: QualitySuspect[] }>;
+}
+
+/**
+ * Sends a failed report's part to one of its steps; every step after it waits again. With a fix
+ * note, the note goes onto the part's notes and the report counts as a fix.
+ */
+export async function sendBackFromReport(
+  reportId: number,
+  processId: number,
+  status: "todo" | "doing",
+  fixNote?: string,
+): Promise<void> {
+  const res = await api["quality-reports"][":id"]["send-back"].$post({
+    param: { id: String(reportId) },
+    json: { processId, status, fix: Boolean(fixNote), fixNote: fixNote ?? "" },
+  });
+  if (!res.ok) throw new Error(await getErrorMessage(res as unknown as Response));
+}
+
+/** Obsoletes a failed report's part and adds a new one of the same part, started from the top. */
+export async function replaceFromReport(reportId: number): Promise<PartInstance> {
+  const res = await api["quality-reports"][":id"].replace.$post({
+    param: { id: String(reportId) },
+  });
+  if (!res.ok) throw new Error(await getErrorMessage(res as unknown as Response));
+  return ((await res.json()) as { replacement: PartInstance }).replacement;
+}
+
+/** The team's quality checklist, replaced in this order (admins). */
+export async function saveQualityChecklist(checklist: string[]): Promise<string[]> {
+  const res = await api.admin.quality.checklist.$put({ json: { checklist } });
+  if (!res.ok) throw new Error(await getErrorMessage(res as unknown as Response));
+  return ((await res.json()) as { checklist: string[] }).checklist;
 }

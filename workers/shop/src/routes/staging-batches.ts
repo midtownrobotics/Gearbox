@@ -21,6 +21,7 @@ import {
   teamFile,
   unstageFrom,
 } from "../lib/batches";
+import { qualityCheckBlock } from "../lib/quality";
 import type { AppEnv } from "../types";
 
 // Batches: instances that share one file, moved as one unit. The rules are in lib/batches.ts.
@@ -255,6 +256,20 @@ export const stagingBatchesRouter = new Hono<AppEnv>()
     const teamId = c.get("teamId");
     const batch = await batchRow(db, teamId, Number(c.req.param("id")));
     const { at, to } = c.req.valid("json");
+    // Finishing a batch finishes each of its parts' steps there, so the step's quality-check
+    // rules apply to it as they do one part at a time.
+    if (to === "done") {
+      const processId = at === "producer" ? batch.processId : batch.consumerProcessId;
+      if (processId !== null) {
+        const blocked = await qualityCheckBlock(
+          db,
+          teamId,
+          { id: c.get("userId"), isAdmin: c.get("userIsAdmin") },
+          [processId],
+        );
+        if (blocked) return c.json({ error: blocked }, 403);
+      }
+    }
     const move = at === "producer" ? moveAtProducer : moveAtConsumer;
     await move(db, teamId, batch, to, c.get("userId"));
     return c.json({ ok: true });

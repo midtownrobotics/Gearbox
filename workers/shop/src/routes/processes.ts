@@ -1,9 +1,10 @@
 import { inTeam, requireAuth, withTeam } from "@g3/auth";
 import { eq } from "drizzle-orm";
-import { Hono } from "hono";
+import { type Context, Hono } from "hono";
 import { validator } from "hono/validator";
 import { createShopDb } from "../db";
 import { PROCESS_TYPES, type ProcessType, processes } from "../db/schema";
+import { forgetQualityCheck } from "../lib/quality";
 import type { AppEnv } from "../types";
 
 const isProcessType = (v: unknown): v is ProcessType =>
@@ -49,6 +50,13 @@ const updateProcessValidator = validator(
   },
 );
 
+/**
+ * A Quality Control step is a permission boundary (only shop managers and admins check one off),
+ * so only an admin may make one, or take the type away again.
+ */
+const qualityTypeNeedsAdmin = (c: Context<AppEnv>, ...types: (ProcessType | undefined)[]) =>
+  types.includes("quality_control") && !c.get("userIsAdmin");
+
 export const processesRouter = new Hono<AppEnv>()
   .get("/", requireAuth, async (c) => {
     const db = createShopDb(c.env.SHOP_DB);
@@ -61,6 +69,9 @@ export const processesRouter = new Hono<AppEnv>()
   })
   .post("/", requireAuth, createProcessValidator, async (c) => {
     const { name, type, requiresPartInfo } = c.req.valid("json");
+    if (qualityTypeNeedsAdmin(c, type)) {
+      return c.json({ error: "Only an admin can add a Quality Control process." }, 403);
+    }
 
     const db = createShopDb(c.env.SHOP_DB);
     const row = await db
@@ -83,16 +94,31 @@ export const processesRouter = new Hono<AppEnv>()
     const { type, requiresPartInfo } = c.req.valid("json");
 
     const db = createShopDb(c.env.SHOP_DB);
+    const teamId = c.get("teamId");
+    if (type !== undefined) {
+      const current = await db
+        .select({ type: processes.type })
+        .from(processes)
+        .where(inTeam(processes, teamId, eq(processes.id, id)))
+        .get();
+      if (!current) return c.json({ error: "Process not found." }, 404);
+      if (qualityTypeNeedsAdmin(c, type, current.type)) {
+        return c.json({ error: "Only an admin can change a Quality Control process's type." }, 403);
+      }
+    }
     const row = await db
       .update(processes)
       .set({
         ...(type !== undefined && { type }),
         ...(requiresPartInfo !== undefined && { requiresPartInfo: requiresPartInfo ? 1 : 0 }),
       })
-      .where(inTeam(processes, c.get("teamId"), eq(processes.id, id)))
+      .where(inTeam(processes, teamId, eq(processes.id, id)))
       .returning()
       .get();
 
     if (!row) return c.json({ error: "Process not found." }, 404);
+    if (type !== undefined && type !== "quality_control") {
+      await forgetQualityCheck(db, teamId, id);
+    }
     return c.json(row);
   });

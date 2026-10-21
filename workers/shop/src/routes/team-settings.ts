@@ -1,6 +1,7 @@
 import { teamSettingsRoutes } from "@g3/auth";
 import { createShopDb } from "../db";
 import { onshapeConfig } from "../lib/onshape-config";
+import { qualityCheck, qualityReportsOn, saveQualityCheck } from "../lib/quality";
 import { SETTING, getSetting, isChannelId, setSetting } from "../lib/settings";
 import { manifest } from "../manifest";
 import type { AppEnv } from "../types";
@@ -17,14 +18,22 @@ export const teamSettingsRouter = teamSettingsRoutes<AppEnv>(manifest, "Shop set
   async read(c) {
     const db = createShopDb(c.env.SHOP_DB);
     const teamId = c.get("teamId");
-    const [release, summary, onshape] = await Promise.all([
+    const [release, summary, onshape, quality, reports] = await Promise.all([
       getSetting(db, teamId, CHANNELS.releaseChannelId),
       getSetting(db, teamId, CHANNELS.summaryChannelId),
       onshapeConfig(c.env, db, teamId).catch(() => null),
+      qualityCheck(db, teamId),
+      qualityReportsOn(db, teamId),
     ]);
     const connected = Boolean(onshape?.credentials && onshape.companyId && onshape.documentId);
     return {
-      values: { releaseChannelId: release, summaryChannelId: summary },
+      values: {
+        releaseChannelId: release,
+        summaryChannelId: summary,
+        requireQualityCheck: quality.required,
+        qualityProcessId: quality.processId === null ? null : String(quality.processId),
+        qualityReports: reports,
+      },
       secretsSet: {
         apiKey: Boolean(onshape?.credentials),
         secretKey: Boolean(onshape?.credentials),
@@ -53,8 +62,34 @@ export const teamSettingsRouter = teamSettingsRoutes<AppEnv>(manifest, "Shop set
   async save(c, changes) {
     const db = createShopDb(c.env.SHOP_DB);
     const teamId = c.get("teamId");
+
+    // The quality check is two settings that only make sense together.
+    if ("requireQualityCheck" in changes || "qualityProcessId" in changes) {
+      const before = await qualityCheck(db, teamId);
+      const processId = changes.qualityProcessId;
+      const refused = await saveQualityCheck(db, teamId, {
+        required:
+          typeof changes.requireQualityCheck === "boolean"
+            ? changes.requireQualityCheck
+            : before.required,
+        processId:
+          processId === undefined
+            ? before.processId
+            : processId === null || processId === ""
+              ? null
+              : Number(processId),
+      });
+      if (refused) return refused;
+    }
+
+    if (typeof changes.qualityReports === "boolean") {
+      await setSetting(db, teamId, SETTING.qualityReports, changes.qualityReports ? "1" : "");
+    }
+
     for (const [key, value] of Object.entries(changes)) {
       const row = CHANNELS[key as keyof typeof CHANNELS];
+      // The quality settings were saved above; only the channels are left.
+      if (!row) continue;
       if (typeof value === "string" && !isChannelId(value)) {
         return "Choose a Slack or Discord channel.";
       }
