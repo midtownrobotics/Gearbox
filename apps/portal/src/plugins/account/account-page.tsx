@@ -54,6 +54,13 @@ const PROVIDER_LABELS: Record<string, string> = {
   steam: "Steam",
 };
 
+/** The services a member can link more than one account of, in the order their buttons show. */
+const MULTI_ACCOUNT = [
+  { provider: "google", Icon: FaGoogle },
+  { provider: "github", Icon: FaGithub },
+  { provider: "steam", Icon: FaSteam },
+];
+
 const isChat = (provider: string) => provider === "slack" || provider === "discord";
 
 /**
@@ -306,7 +313,6 @@ export function AccountPage() {
         <div className="space-y-2">
           {identities.map((identity) => {
             const name = accountName(identity, me, joinedWith);
-            const isUsername = identity.id === joinedWith && !!me.username;
             const label = PROVIDER_LABELS[identity.provider] ?? identity.provider;
 
             return (
@@ -332,21 +338,9 @@ export function AccountPage() {
                       ))}
                   </div>
                   <p className="text-secondary-500 text-xs">
-                    {isUsername ? "Your username · " : ""}
                     Added {new Date(identity.createdAt * 1000).toLocaleDateString()}
                   </p>
                 </div>
-                {(identity.provider === "steam" ||
-                  identity.provider === "google" ||
-                  identity.provider === "github") &&
-                  linkable(identity.provider) && (
-                    <a
-                      href={linkUrl(identity.provider)}
-                      className={`${buttonClass("secondary", "sm")} ml-auto`}
-                    >
-                      Add another
-                    </a>
-                  )}
                 {/* The team's chat stays linked: members join through it. */}
                 {identity.provider !== "slack" &&
                   identity.provider !== "discord" &&
@@ -365,25 +359,23 @@ export function AccountPage() {
           })}
         </div>
 
+        {/* One button per service: Connect it, or add another account of it once one is linked. */}
         <div className="mt-3 space-y-2">
-          {linkable("google") && !me.identities.some((i) => i.provider === "google") && (
-            <a href={linkUrl("google")} className={`${buttonClass()} w-full`}>
-              <FaGoogle size={16} />
-              Connect Google
-            </a>
-          )}
-          {linkable("github") && !me.identities.some((i) => i.provider === "github") && (
-            <a href={linkUrl("github")} className={`${buttonClass()} w-full`}>
-              <FaGithub size={16} />
-              Connect GitHub
-            </a>
-          )}
-          {linkable("steam") && !me.identities.some((i) => i.provider === "steam") && (
-            <a href={linkUrl("steam")} className={`${buttonClass()} w-full`}>
-              <FaSteam size={16} />
-              Connect Steam
-            </a>
-          )}
+          {MULTI_ACCOUNT.filter(({ provider }) => linkable(provider)).map(({ provider, Icon }) => {
+            const linked = me.identities.some((i) => i.provider === provider);
+            return (
+              <a
+                key={provider}
+                href={linkUrl(provider)}
+                className={`${buttonClass(linked ? "secondary" : "primary")} w-full`}
+              >
+                <Icon size={16} />
+                {linked
+                  ? `Add another ${PROVIDER_LABELS[provider]} account`
+                  : `Connect ${PROVIDER_LABELS[provider]}`}
+              </a>
+            );
+          })}
         </div>
         {methods.discord === true && !me.identities.some((i) => i.provider === "discord") && (
           <a href={linkUrl("discord")} className={`${buttonClass()} mt-3 w-full`}>
