@@ -1,9 +1,11 @@
 import { pageTeamNumber } from "@g3/site-config";
 import { Button, Chip, Page as SharedPage, inputClass, useQuestions } from "@g3/ui";
-import { BarChart3, Map as MapIcon, Scale, Search, Star, Trash2, Users, X } from "lucide-react";
+import { BarChart3, Scale, Search, Star, Users, X } from "lucide-react";
 import { type SyntheticEvent, useEffect, useState } from "react";
+import { AnalysisAutoPaths } from "./AnalysisAutoPaths";
 import { AnalysisTeamTable, type TeamComment } from "./AnalysisTeamTable";
 import { TeamLookupInput } from "./TeamLookupInput";
+import { matchLabel } from "./analysis-table";
 import type { Report } from "./analysis-table";
 import { API_URL, api } from "./api";
 
@@ -528,67 +530,26 @@ export function Analysis({
           )}
         </div>
       ) : tab === "auto" ? (
-        <div className="analysis-results-stack">
-          <div className="auto-path-grid">
-            {visibleAutoFields.map(({ report, field, url }) => {
-              const pathId = `${report.id}-${field.id}`;
-              return (
-                <article key={pathId}>
-                  <button
-                    type="button"
-                    className="auto-path-image-link"
-                    aria-label={`Open full-size path for team ${report.teamName}`}
-                    title="Open full-size drawing"
-                    onClick={() =>
-                      setSelectedPath({
-                        url: `${API_URL}${url}`,
-                        teamName: report.teamName,
-                        label: field.label,
-                      })
-                    }
-                  >
-                    <img
-                      src={`${API_URL}${url}`}
-                      alt={`${report.teamName} ${field.label}`}
-                      crossOrigin="use-credentials"
-                      onLoad={(event) => {
-                        if (imageHasAutoPath(event.currentTarget)) return;
-                        setBlankPathIds((current) => new Set(current).add(pathId));
-                      }}
-                    />
-                  </button>
-                  <div>
-                    <MapIcon size={16} />
-                    <strong>
-                      Team {report.teamName} · {field.label}
-                    </strong>
-                    <span>
-                      {eventLabel(report.eventKey)} · {report.formName} ·{" "}
-                      {new Date(report.createdAt).toLocaleDateString()}
-                    </span>
-                  </div>
-                  {canManageReports && (
-                    <Button
-                      variant="danger"
-                      type="button"
-                      className="delete-report-button"
-                      onClick={() => permanentlyDeleteReport(report)}
-                      aria-label={`Permanently delete report for ${report.teamName}`}
-                      title="Remove bad data"
-                    >
-                      <Trash2 size={17} />
-                    </Button>
-                  )}
-                </article>
-              );
-            })}
-            {loaded && !visibleAutoFields.length && (
-              <div className="forms-empty">
-                No autonomous paths reported{searched ? ` for ${searched}` : ""}.
-              </div>
-            )}
-          </div>
-        </div>
+        <AnalysisAutoPaths
+          paths={visibleAutoFields}
+          loaded={loaded}
+          searched={searched}
+          eventLabel={eventLabel}
+          imageUrl={(url) => API_URL + url}
+          canManageReports={canManageReports}
+          onDelete={permanentlyDeleteReport}
+          onView={({ report, field, url }) =>
+            setSelectedPath({
+              url: API_URL + url,
+              teamName: report.teamName,
+              label: `${matchLabel(report)} - ${field.label}`,
+            })
+          }
+          onImageLoad={({ report, field }, image) => {
+            if (imageHasAutoPath(image)) return;
+            setBlankPathIds((current) => new Set(current).add(`${report.id}-${field.id}`));
+          }}
+        />
       ) : (
         <div className="team-comparison">
           {searched && searchedB && (
