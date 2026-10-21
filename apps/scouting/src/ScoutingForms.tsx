@@ -2444,6 +2444,7 @@ export function ScoutingForms({
   const [selected, setSelected] = useState<ScoutingForm | null>(null);
   const [editing, setEditing] = useState(false);
   const [pitTeam, setPitTeam] = useState<string | undefined>();
+  const [pitSelection, setPitSelection] = useState(0);
   const [category, setCategory] = useState<"scouting" | "pit">("scouting");
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [context, setContext] = useState<EventContext | null>(null);
@@ -2553,6 +2554,8 @@ export function ScoutingForms({
               selected={category === kind}
               className="min-h-11"
               onClick={() => {
+                if (category === kind) return;
+                setPitTeam(undefined);
                 setCategory(kind);
                 setSelected(
                   forms.find((form) => form.kind === kind && form.isActive) ??
@@ -2591,6 +2594,7 @@ export function ScoutingForms({
                 },
               ],
             });
+            setPitTeam(undefined);
             setEditing(true);
           }}
         >
@@ -2613,6 +2617,7 @@ export function ScoutingForms({
             selected?.kind === "pit" && selected.isActive && selected.fields.length > 0 && !editing
               ? (team) => {
                   setPitTeam(team);
+                  setPitSelection((current) => current + 1);
                   window.requestAnimationFrame(() =>
                     document
                       .getElementById(`entry-${selected.id}`)
@@ -2634,6 +2639,7 @@ export function ScoutingForms({
               <button
                 type="button"
                 onClick={() => {
+                  setPitTeam(undefined);
                   setSelected(form);
                   setEditing(false);
                 }}
@@ -2654,6 +2660,7 @@ export function ScoutingForms({
                   type="button"
                   className="edit-form-button"
                   onClick={() => {
+                    setPitTeam(undefined);
                     setSelected(form);
                     setEditing(true);
                   }}
@@ -2691,7 +2698,7 @@ export function ScoutingForms({
           <>
             {contextError && selected.kind === "scouting" && <ErrorBanner message={contextError} />}
             <EntryForm
-              key={`${selected.id}:${pitTeam ?? ""}`}
+              key={`${selected.id}:${pitTeam ?? ""}:${pitSelection}`}
               form={selected}
               pitTeam={pitTeam}
               context={context}
