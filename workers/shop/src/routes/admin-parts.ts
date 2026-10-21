@@ -15,6 +15,7 @@ import {
 import { onshapeConfig, saveOnshapeConfig } from "../lib/onshape-config";
 import { exportDrawingAsPDF, storeDrawingInR2 } from "../lib/onshape-export";
 import { registerOnShapeWebhook, unregisterOnShapeWebhooks } from "../lib/onshape-webhook";
+import { RecognitionError, partRecognitionOn, recognizePart } from "../lib/part-recognition";
 import { SETTING, getSetting, isChannelId, setSetting } from "../lib/settings";
 import { shopUrl } from "../lib/urls";
 import type { AppEnv } from "../types";
@@ -195,6 +196,88 @@ export const adminPartsRouter = new Hono<AppEnv>()
       );
     }
   })
+  /**
+   * Part recognition for one part waiting on Ingest (by its onshape_parts id): its material, size
+   * and a plate's thickness, from the team's Onshape. Each part is asked about once; the answer is
+   * kept on its row, except when Onshape couldn't measure it, so a later try can.
+   */
+  .post("/onshape/recognize/:id", requireAuth, async (c) => {
+    const db = createShopDb(c.env.SHOP_DB);
+    const teamId = c.get("teamId");
+    const id = Number(c.req.param("id"));
+    if (!Number.isInteger(id) || id < 1) return c.json({ error: "Unknown part." }, 404);
+    if (!(await partRecognitionOn(db, teamId))) {
+      return c.json({ error: "Part recognition is off. An admin can turn it on." }, 403);
+    }
+
+    const part = await db
+      .select()
+      .from(schema.onshapeParts)
+      .where(inTeam(schema.onshapeParts, teamId, eq(schema.onshapeParts.id, id)))
+      .get();
+    if (!part) return c.json({ error: "Unknown part." }, 404);
+    if (part.recognition) return c.json(part.recognition);
+    if (!part.entityId || !part.versionId) {
+      return c.json({ error: "Onshape didn't say where this part is." }, 422);
+    }
+
+    const config = await onshapeConfig(c.env, db, teamId);
+    if (!config.credentials) {
+      return c.json({ error: "Add the team's Onshape API keys first." }, 400);
+    }
+    const release = part.releaseId
+      ? await db
+          .select({ documentId: schema.onshapeReleases.documentId })
+          .from(schema.onshapeReleases)
+          .where(
+            inTeam(schema.onshapeReleases, teamId, eq(schema.onshapeReleases.id, part.releaseId)),
+          )
+          .get()
+      : undefined;
+    const documentId = release?.documentId ?? config.documentId;
+    if (!documentId) return c.json({ error: "Onshape didn't say where this part is." }, 422);
+
+    try {
+      const recognition = await recognizePart(config.credentials, {
+        documentId,
+        versionId: part.versionId,
+        elementId: part.entityId,
+        partNumber: part.partNumber,
+        name: part.name,
+      });
+      if (recognition.size) {
+        await db
+          .update(schema.onshapeParts)
+          .set({ recognition })
+          .where(inTeam(schema.onshapeParts, teamId, eq(schema.onshapeParts.id, part.id)));
+      }
+      return c.json(recognition);
+    } catch (err) {
+      if (err instanceof RecognitionError) return c.json({ error: err.message }, 502);
+      console.error("[Part Recognition]", part.partNumber, err);
+      return c.json({ error: "Couldn't reach Onshape." }, 502);
+    }
+  })
+  /** Turns part recognition on Ingest on or off for the team. */
+  .post("/onshape/recognition", requireAdmin, async (c) => {
+    const body = (await c.req.json().catch(() => ({}))) as { enabled?: unknown };
+    if (typeof body.enabled !== "boolean") {
+      return c.json({ error: "enabled must be true or false." }, 400);
+    }
+    const db = createShopDb(c.env.SHOP_DB);
+    const teamId = c.get("teamId");
+    const before = await partRecognitionOn(db, teamId);
+    await setSetting(db, teamId, SETTING.partRecognition, body.enabled ? "1" : "");
+    if (before !== body.enabled) {
+      await logTeamChange(c.env, teamId, {
+        userId: c.get("userId"),
+        app: "shop",
+        what: "Shop settings",
+        changed: ["Part recognition"],
+      });
+    }
+    return c.json({ partRecognition: body.enabled });
+  })
   .delete("/parts/:partNumber", requireAuth, async (c) => {
     const partNumber = c.req.param("partNumber");
 
@@ -236,8 +319,13 @@ export const adminPartsRouter = new Hono<AppEnv>()
    * only whether they're set (and whether they're still the site team's worker secrets).
    */
   .get("/onshape/config", requireAdmin, async (c) => {
-    const config = await onshapeConfig(c.env, createShopDb(c.env.SHOP_DB), c.get("teamId"));
+    const db = createShopDb(c.env.SHOP_DB);
+    const [config, recognition] = await Promise.all([
+      onshapeConfig(c.env, db, c.get("teamId")),
+      partRecognitionOn(db, c.get("teamId")),
+    ]);
     return c.json({
+      partRecognition: recognition,
       documentId: config.documentId ?? "",
       mainAssemblyId: config.mainAssemblyId ?? "",
       companyId: config.companyId ?? "",

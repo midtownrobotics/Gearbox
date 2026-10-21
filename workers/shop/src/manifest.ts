@@ -100,6 +100,15 @@ export const manifest = defineManifest({
       editedBy: "admin",
       page: "/admin",
     },
+    {
+      key: "partRecognition",
+      label: "Part recognition",
+      type: "boolean",
+      default: false,
+      help: "Ingest can fill in each part's material and thickness from Onshape",
+      editedBy: "admin",
+      page: "/admin",
+    },
   ],
   plugins: [],
 });

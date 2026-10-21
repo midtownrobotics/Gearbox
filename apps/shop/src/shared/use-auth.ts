@@ -17,6 +17,8 @@ export type AuthUser = {
   qualityReports: boolean;
   /** The team's quality checklist, in order; empty while quality reports are off. */
   qualityChecklist: string[];
+  /** Ingest can fill in parts' material and thickness from Onshape. */
+  partRecognition: boolean;
 };
 
 type AuthState =

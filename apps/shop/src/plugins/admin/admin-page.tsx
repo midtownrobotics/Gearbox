@@ -8,6 +8,7 @@ import {
   Page,
   SuccessBanner,
   TextField,
+  Toggle,
   chatName,
   focusRing,
   inputClass,
@@ -757,6 +758,7 @@ type OnShapeStatus = {
   hasWebhookKeys: boolean;
   fromWorkerSecrets: boolean;
   webhookUrl: string;
+  partRecognition: boolean;
 };
 
 /**
@@ -776,6 +778,8 @@ function OnShapeConfig() {
   const [urlInput, setUrlInput] = useState("");
   const [saving, setSaving] = useState(false);
   const [banner, setBanner] = useState<{ ok: boolean; text: string } | null>(null);
+  const [savingRecognition, setSavingRecognition] = useState(false);
+  const refreshAuth = useRefreshAuthUser();
 
   function parseUrl() {
     // Format: https://cad.onshape.com/documents/[DOCID]/[not used]/[not used]/e/[MAINASSEMBLYID]
@@ -864,6 +868,22 @@ function OnShapeConfig() {
       setBanner({ ok: false, text: err instanceof Error ? err.message : "Failed to save config" });
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function setRecognition(enabled: boolean) {
+    setSavingRecognition(true);
+    try {
+      const res = await api.admin.onshape.recognition.$post({ json: { enabled } });
+      if (!res.ok) {
+        setBanner({ ok: false, text: await getErrorMessage(res as unknown as Response) });
+        return;
+      }
+      setStatus((prev) => (prev ? { ...prev, partRecognition: enabled } : prev));
+      // Ingest reads the setting from /me.
+      refreshAuth();
+    } finally {
+      setSavingRecognition(false);
     }
   }
 
@@ -988,6 +1008,21 @@ function OnShapeConfig() {
           {saving ? "Saving…" : "Save"}
         </Button>
       </div>
+
+      {status && (
+        <div className="border-t border-secondary-200 pt-4">
+          <Toggle
+            label="Part recognition"
+            description="Ingest gets a Recognize parts checkbox that fills in each part's material and, for plates, its thickness from Onshape. Each part it reads uses some of your team's Onshape API allowance."
+            checked={status.partRecognition}
+            disabled={savingRecognition || !status.hasApiKey}
+            onChange={setRecognition}
+          />
+          {!status.hasApiKey && (
+            <p className="mt-2 text-xs text-secondary-500">Save the API keys first.</p>
+          )}
+        </div>
+      )}
     </div>
   );
 }

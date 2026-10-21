@@ -21,6 +21,7 @@ describe("Shop's team settings", () => {
       requireQualityCheck: false,
       qualityProcessId: null,
       qualityReports: false,
+      partRecognition: false,
     });
     expect(state.integrations.onshape).toMatchObject({ connected: false });
     await jsonAs(team.admin, "/team-settings", {

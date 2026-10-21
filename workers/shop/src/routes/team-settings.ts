@@ -1,6 +1,7 @@
 import { teamSettingsRoutes } from "@g3/auth";
 import { createShopDb } from "../db";
 import { onshapeConfig } from "../lib/onshape-config";
+import { partRecognitionOn } from "../lib/part-recognition";
 import { qualityCheck, qualityReportsOn, saveQualityCheck } from "../lib/quality";
 import { SETTING, getSetting, isChannelId, setSetting } from "../lib/settings";
 import { manifest } from "../manifest";
@@ -18,12 +19,13 @@ export const teamSettingsRouter = teamSettingsRoutes<AppEnv>(manifest, "Shop set
   async read(c) {
     const db = createShopDb(c.env.SHOP_DB);
     const teamId = c.get("teamId");
-    const [release, summary, onshape, quality, reports] = await Promise.all([
+    const [release, summary, onshape, quality, reports, recognition] = await Promise.all([
       getSetting(db, teamId, CHANNELS.releaseChannelId),
       getSetting(db, teamId, CHANNELS.summaryChannelId),
       onshapeConfig(c.env, db, teamId).catch(() => null),
       qualityCheck(db, teamId),
       qualityReportsOn(db, teamId),
+      partRecognitionOn(db, teamId),
     ]);
     const connected = Boolean(onshape?.credentials && onshape.companyId && onshape.documentId);
     return {
@@ -33,6 +35,7 @@ export const teamSettingsRouter = teamSettingsRoutes<AppEnv>(manifest, "Shop set
         requireQualityCheck: quality.required,
         qualityProcessId: quality.processId === null ? null : String(quality.processId),
         qualityReports: reports,
+        partRecognition: recognition,
       },
       secretsSet: {
         apiKey: Boolean(onshape?.credentials),
@@ -86,9 +89,13 @@ export const teamSettingsRouter = teamSettingsRoutes<AppEnv>(manifest, "Shop set
       await setSetting(db, teamId, SETTING.qualityReports, changes.qualityReports ? "1" : "");
     }
 
+    if (typeof changes.partRecognition === "boolean") {
+      await setSetting(db, teamId, SETTING.partRecognition, changes.partRecognition ? "1" : "");
+    }
+
     for (const [key, value] of Object.entries(changes)) {
       const row = CHANNELS[key as keyof typeof CHANNELS];
-      // The quality settings were saved above; only the channels are left.
+      // The quality and recognition settings were saved above; only the channels are left.
       if (!row) continue;
       if (typeof value === "string" && !isChannelId(value)) {
         return "Choose a Slack or Discord channel.";

@@ -1,5 +1,6 @@
 import { integer, sqliteTable, text, unique } from "drizzle-orm/sqlite-core";
 import type { ReleaseApprover, ReleaseComment } from "../lib/onshape-release";
+import type { Recognition } from "../lib/part-recognition";
 
 // Every table is one team's data (roadmap Phase 3, migration 0016): it has `team_id`, and every
 // query on it goes through inTeam/withTeam from @g3/auth. Files in R2 are under teams/<team>/
@@ -195,6 +196,8 @@ export const onshapeParts = sqliteTable(
     revision: text("revision"),
     name: text("name"),
     description: text("description"),
+    // What part recognition found (migration 0024); null until it's run for this part.
+    recognition: text("recognition", { mode: "json" }).$type<Recognition>(),
     createdAt: integer("created_at").notNull(),
   },
   (t) => [unique().on(t.teamId, t.onshapeReleaseId, t.partNumber)],

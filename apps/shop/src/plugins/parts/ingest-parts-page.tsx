@@ -14,7 +14,7 @@ import {
   inputClass,
   tones,
 } from "@g3/ui";
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../../shared/api";
 import { getErrorMessage } from "../../shared/api-error";
@@ -89,6 +89,57 @@ type LocalPartData = {
   material?: string;
   thickness?: string;
 };
+
+/** What part recognition read from Onshape (the worker's lib/part-recognition.ts). */
+type Recognition = {
+  material: string | null;
+  thickness: string | null;
+  /** Meters, largest first. */
+  size: [number, number, number] | null;
+};
+
+type RecognitionState =
+  | { status: "loading" }
+  | { status: "done"; recognition: Recognition }
+  | { status: "error"; message: string };
+
+/** Parts recognized at once: each is a few seconds of Onshape's time. */
+const RECOGNIZE_AT_ONCE = 3;
+const RECOGNIZE_KEY = "shop-ingest-recognize";
+
+function rememberedRecognize() {
+  try {
+    return window.localStorage.getItem(RECOGNIZE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+/** A part's size as the shop reads it: millimeters when its thickness is, else inches. */
+function formatSize(recognition: Recognition) {
+  if (!recognition.size) return null;
+  const mm = recognition.thickness?.endsWith("mm");
+  const sides = recognition.size.map((m) =>
+    mm ? String(Math.round(m * 1000 * 10) / 10) : (m / 0.0254).toFixed(2),
+  );
+  return `${sides.join(" × ")} ${mm ? "mm" : "in"}`;
+}
+
+/** Under a part's material and thickness: recognition's progress, or the size it found. */
+function RecognitionNote({ state }: { state?: RecognitionState }) {
+  if (!state) return null;
+  if (state.status === "loading") {
+    return <p className="mt-1 text-secondary-400">Recognizing…</p>;
+  }
+  if (state.status === "error") {
+    return <p className="mt-1 text-red-700">{state.message}</p>;
+  }
+  const size = formatSize(state.recognition);
+  if (!size && !state.recognition.material) {
+    return <p className="mt-1 text-secondary-400">Nothing recognized</p>;
+  }
+  return size ? <p className="mt-1 text-secondary-400">Size {size}</p> : null;
+}
 
 const INGEST_COLUMNS = 9;
 
@@ -399,6 +450,72 @@ export function IngestPartsPage() {
   }
   const [editingProcessPartIdx, setEditingProcessPartIdx] = useState<number | null>(null);
   const [ingestingAll, setIngestingAll] = useState(false);
+
+  // Part recognition (when an admin has it on): what Onshape says each part's material and
+  // thickness are, by the pending part's id. It only fills what nobody has typed.
+  const [recognize, setRecognize] = useState(rememberedRecognize);
+  const [recognized, setRecognized] = useState<Record<number, RecognitionState>>({});
+  const recognizedRef = useRef<Record<number, RecognitionState>>({});
+  const recognitionOn = !!user?.partRecognition && recognize;
+  const recognitionOnRef = useRef(recognitionOn);
+  recognitionOnRef.current = recognitionOn;
+
+  function setRecognition(id: number, state: RecognitionState) {
+    recognizedRef.current = { ...recognizedRef.current, [id]: state };
+    setRecognized(recognizedRef.current);
+  }
+
+  function toggleRecognize(on: boolean) {
+    setRecognize(on);
+    try {
+      window.localStorage.setItem(RECOGNIZE_KEY, on ? "1" : "");
+    } catch {}
+    // Parts that failed are tried again the next time it's checked.
+    if (!on) {
+      recognizedRef.current = Object.fromEntries(
+        Object.entries(recognizedRef.current).filter(([, s]) => s.status === "done"),
+      );
+      setRecognized(recognizedRef.current);
+    }
+  }
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: setRecognition only writes the ref and state
+  useEffect(() => {
+    if (!recognitionOn || !pendingData) return;
+    const todo = pendingData.parts.filter((p) => p.entityId && !recognizedRef.current[p.id]);
+    let next = 0;
+    async function work() {
+      while (recognitionOnRef.current && next < todo.length) {
+        const part = todo[next++];
+        if (recognizedRef.current[part.id]) continue;
+        setRecognition(part.id, { status: "loading" });
+        try {
+          const res = await api.admin.onshape.recognize[":id"].$post({
+            param: { id: String(part.id) },
+          });
+          setRecognition(
+            part.id,
+            res.ok
+              ? { status: "done", recognition: (await res.json()) as Recognition }
+              : { status: "error", message: await getErrorMessage(res as unknown as Response) },
+          );
+        } catch {
+          setRecognition(part.id, { status: "error", message: "Couldn't reach Shop." });
+        }
+      }
+    }
+    void Promise.all(Array.from({ length: Math.min(RECOGNIZE_AT_ONCE, todo.length) }, work));
+  }, [recognitionOn, pendingData]);
+
+  const recognitionOf = (part: PendingPart) => {
+    const state = recognitionOn ? recognized[part.id] : undefined;
+    return state?.status === "done" ? state.recognition : null;
+  };
+  /** A part's material and thickness: what was typed, else what recognition found. */
+  const materialOf = (part: PendingPart) =>
+    localPartData[part.partNumber]?.material ?? recognitionOf(part)?.material ?? "";
+  const thicknessOf = (part: PendingPart) =>
+    localPartData[part.partNumber]?.thickness ?? recognitionOf(part)?.thickness ?? "";
   // The link a member clicked while the list has changes that aren't ingested yet.
   const [leavingTo, setLeavingTo] = useState<string | null>(null);
 
@@ -584,6 +701,20 @@ export function IngestPartsPage() {
       >
         <>
           {qualityNote}
+          {user?.partRecognition && (
+            <label className="flex w-fit items-center gap-2 text-sm text-secondary-900 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={recognize}
+                onChange={(e) => toggleRecognize(e.target.checked)}
+                className="accent-primary-500 w-4 h-4"
+              />
+              Recognize parts
+              <span className="text-secondary-500">
+                Fills in material and thickness from Onshape. Check what it finds.
+              </span>
+            </label>
+          )}
           <div className="bg-surface border border-secondary-200 rounded-xl overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -771,16 +902,18 @@ export function IngestPartsPage() {
                             })()}
                         </td>
                         <td className="px-4 py-3 text-secondary-400 text-xs">
-                          {data &&
-                          partInfoRequiredBy(
-                            localPartData[part.partNumber]?.processIds ?? [],
-                            data.processes,
-                          ).length > 0 ? (
+                          {(data &&
+                            partInfoRequiredBy(
+                              localPartData[part.partNumber]?.processIds ?? [],
+                              data.processes,
+                            ).length > 0) ||
+                          recognitionOf(part)?.material ||
+                          recognitionOf(part)?.thickness ? (
                             <div className="flex gap-1.5">
                               <TextField
                                 variant="plain"
                                 kind="material"
-                                value={localPartData[part.partNumber]?.material ?? ""}
+                                value={materialOf(part)}
                                 onChange={(e) =>
                                   updateLocal(part.partNumber, { material: e.target.value })
                                 }
@@ -791,7 +924,7 @@ export function IngestPartsPage() {
                               <TextField
                                 variant="plain"
                                 kind="size"
-                                value={localPartData[part.partNumber]?.thickness ?? ""}
+                                value={thicknessOf(part)}
                                 onChange={(e) =>
                                   updateLocal(part.partNumber, { thickness: e.target.value })
                                 }
@@ -801,8 +934,9 @@ export function IngestPartsPage() {
                               />
                             </div>
                           ) : (
-                            <span className="text-secondary-400">—</span>
+                            !recognized[part.id] && <span className="text-secondary-400">—</span>
                           )}
+                          {recognitionOn && <RecognitionNote state={recognized[part.id]} />}
                         </td>
                         <td className="px-4 py-3 text-secondary-400 text-center">
                           <DrawingStatusCell part={part} localPartData={localPartData} />
@@ -844,7 +978,7 @@ export function IngestPartsPage() {
                     const infoOk =
                       !data ||
                       partInfoRequiredBy(partData?.processIds ?? [], data.processes).length === 0 ||
-                      (!!partData?.material?.trim() && !!partData?.thickness?.trim());
+                      (!!materialOf(p).trim() && !!thicknessOf(p).trim());
                     const filesOk =
                       !data || !pipelineFileError(partData?.processIds ?? [], data.processes);
                     return partData?.subsystemId && revision && name && infoOk && filesOk;
@@ -869,8 +1003,8 @@ export function IngestPartsPage() {
                           notes: part.description || undefined,
                           partDrawingUrl: "",
                           processIds: partData.processIds || [],
-                          material: partData.material?.trim() || undefined,
-                          thickness: partData.thickness?.trim() || undefined,
+                          material: materialOf(part).trim() || undefined,
+                          thickness: thicknessOf(part).trim() || undefined,
                         },
                       });
 
@@ -988,6 +1122,8 @@ export function IngestPartsPage() {
             subsystems={pendingData.subsystems}
             processes={pickable}
             localPartData={localPartData[currentPart.partNumber]}
+            recognition={recognitionOf(currentPart)}
+            recognitionState={recognitionOn ? recognized[currentPart.id] : undefined}
             onUpdateLocalPartData={(partData) => updateLocal(currentPart.partNumber, partData)}
             onRemoveFromLocal={() => {
               const newLocalData = { ...localPartData };
@@ -1017,6 +1153,8 @@ function PartIngestCard({
   subsystems,
   processes,
   localPartData,
+  recognition,
+  recognitionState,
   onUpdateLocalPartData,
   onRemoveFromLocal,
   onNext,
@@ -1028,6 +1166,9 @@ function PartIngestCard({
   subsystems: Subsystem[];
   processes: Process[];
   localPartData?: LocalPartData;
+  /** What part recognition found, while Recognize parts is checked. */
+  recognition: Recognition | null;
+  recognitionState?: RecognitionState;
   onUpdateLocalPartData: (partData: Partial<LocalPartData>) => void;
   onRemoveFromLocal: () => void;
   onNext: () => void;
@@ -1045,10 +1186,28 @@ function PartIngestCard({
     partDrawingUrl: "",
     isPriority: false,
     processIds: localPartData?.processIds ?? [],
-    material: localPartData?.material ?? "",
-    thickness: localPartData?.thickness ?? "",
+    material: localPartData?.material ?? recognition?.material ?? "",
+    thickness: localPartData?.thickness ?? recognition?.thickness ?? "",
   });
   const infoRequiredBy = partInfoRequiredBy(form.processIds, processes);
+  const showInfo = infoRequiredBy.length > 0 || !!recognition?.material || !!recognition?.thickness;
+
+  // Recognition that finishes while the card is open fills what nobody has typed.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: only when recognition arrives
+  useEffect(() => {
+    if (!recognition) return;
+    setForm((prev) => ({
+      ...prev,
+      material:
+        localPartData?.material === undefined && !prev.material
+          ? (recognition.material ?? "")
+          : prev.material,
+      thickness:
+        localPartData?.thickness === undefined && !prev.thickness
+          ? (recognition.thickness ?? "")
+          : prev.thickness,
+    }));
+  }, [recognition]);
   const [quantityInput, setQuantityInput] = useState<string>(
     String(localPartData?.quantity ?? part.quantity ?? 1),
   );
@@ -1441,24 +1600,28 @@ function PartIngestCard({
           onChange={(v) => setForm({ ...form, notes: v })}
           placeholder="Optional"
         />
-        {infoRequiredBy.length > 0 && (
+        {showInfo && (
           <>
             <LabeledText
               kind="material"
               label="Material"
-              required
+              required={infoRequiredBy.length > 0}
               value={form.material}
               onChange={(v) => {
                 setForm({ ...form, material: v });
                 onUpdateLocalPartData({ material: v });
               }}
               placeholder="e.g. 4140"
-              hint={`Required by ${infoRequiredBy.join(", ")}`}
+              hint={
+                infoRequiredBy.length > 0
+                  ? `Required by ${infoRequiredBy.join(", ")}`
+                  : "From Onshape. Check it's right."
+              }
             />
             <LabeledText
               kind="size"
               label="Thickness"
-              required
+              required={infoRequiredBy.length > 0}
               value={form.thickness}
               onChange={(v) => {
                 setForm({ ...form, thickness: v });
@@ -1467,6 +1630,11 @@ function PartIngestCard({
               placeholder='e.g. 0.25"'
             />
           </>
+        )}
+        {recognitionState && (
+          <div className="sm:col-span-2 text-xs">
+            <RecognitionNote state={recognitionState} />
+          </div>
         )}
         <div className="sm:col-span-2 space-y-1">
           <div className="flex items-center justify-between">

@@ -7,6 +7,7 @@ import { cors } from "hono/cors";
 import packageJson from "../package.json";
 import { createShopDb } from "./db";
 import { type BOMQueueMessage, processBOMQueue } from "./lib/bom-queue-consumer";
+import { partRecognitionOn } from "./lib/part-recognition";
 import { isShopManager, qualityCheck, qualityReportsOn } from "./lib/quality";
 import { checklistFor } from "./lib/quality-checklist";
 import { actionsRouter } from "./routes/actions";
@@ -55,10 +56,11 @@ const app = base
   .get("/me", requireAuth, async (c) => {
     const db = createShopDb(c.env.SHOP_DB);
     const teamId = c.get("teamId");
-    const [check, manager, reports] = await Promise.all([
+    const [check, manager, reports, recognition] = await Promise.all([
       qualityCheck(db, teamId),
       isShopManager(db, teamId, c.get("userId")),
       qualityReportsOn(db, teamId),
+      partRecognitionOn(db, teamId),
     ]);
     // Only a team using reports needs the checklist, and only then is one worth making for it.
     const checklist = reports ? await checklistFor(db, teamId) : [];
@@ -74,6 +76,7 @@ const app = base
       qualityCheck: check,
       qualityReports: reports,
       qualityChecklist: checklist,
+      partRecognition: recognition,
     });
   })
   .route("/drawings", drawingsRouter)
