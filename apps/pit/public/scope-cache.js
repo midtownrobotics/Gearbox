@@ -157,6 +157,18 @@ async function readLog(event) {
 }
 
 /**
+ * A kept copy as an answer of its own, with no address: a page answered with one that has
+ * another address (www/hub for www/hub.html) isn't run by this service worker in Firefox, so the
+ * workers it starts would go to the network for their models.
+ */
+const asAnswer = (saved) =>
+  new Response(saved.body, {
+    status: saved.status,
+    statusText: saved.statusText,
+    headers: saved.headers,
+  });
+
+/**
  * AdvantageScope's own files: from the network, a copy kept (again only when it changed), and
  * the copy without a connection. Kept by path: the page's ?log= doesn't change it.
  */
@@ -172,7 +184,7 @@ async function readApp(event) {
     const saved =
       (await cache.match(path)) ??
       (path.endsWith(".html") ? await cache.match(path.slice(0, -".html".length)) : undefined);
-    if (saved) return saved;
+    if (saved) return asAnswer(saved);
     throw err;
   }
   if (response.status !== 200) return response;

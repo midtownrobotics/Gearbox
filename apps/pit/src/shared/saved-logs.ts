@@ -59,3 +59,51 @@ export async function saveLog(log: MatchLog) {
   });
   if (res.status !== 204) throw new Error(`Couldn't save the log (${res.status})`);
 }
+
+/** A built-in field or robot a team at an FRC event may show: not FTC's, and not a joystick. */
+function frcAsset(name: string, config: unknown) {
+  if (!/^(Field2d|Field3d|Robot)_/.test(name) || name.includes("FTC")) return false;
+  return !(config && typeof config === "object" && "isFTC" in config && config.isFTC === true);
+}
+
+/** Every file of an asset index but config.json, at its address, as AdvantageScope asks for it. */
+function assetFiles(index: Record<string, unknown>, base: string, keep: typeof frcAsset) {
+  return Object.keys(index).flatMap((path) => {
+    const [name, file] = path.split("/");
+    if (!name || !file || file === "config.json") return [];
+    if (!keep(name, index[`${name}/config.json`])) return [];
+    return [`${base}${encodeURIComponent(name)}/${file}`];
+  });
+}
+
+const readIndex = async (url: string) => {
+  const res = await fetch(url, { credentials: "same-origin" });
+  return res.ok ? ((await res.json()) as Record<string, unknown>) : {};
+};
+
+/**
+ * Saves AdvantageScope on this device, so it opens offline: its own files, the team's uploaded
+ * fields and robots, and the built-in FRC ones. Each goes through Pit's service worker, which
+ * keeps it (public/scope-cache.js); one it has already is checked, not downloaded again.
+ */
+export async function saveAdvantageScope(progress: (done: number, of: number) => void) {
+  const appFiles = (await (await fetch("/scope/files.json")).json()) as string[];
+  const urls = [
+    "/scope/",
+    ...appFiles.map((file) => `/scope/${encodeURI(file)}`),
+    "/api/scope/settings",
+    "/api/scope/logs",
+    ...assetFiles(await readIndex("/api/scope/assets"), "/api/scope/assets/", () => true),
+    ...assetFiles(
+      await readIndex("/scope/bundledAssets/index.json"),
+      "/scope/bundledAssets/",
+      frcAsset,
+    ),
+  ];
+  for (const [done, url] of urls.entries()) {
+    progress(done, urls.length);
+    const res = await fetch(url, { credentials: "same-origin" });
+    if (!res.ok) throw new Error(`Couldn't save ${url} (${res.status})`);
+    await res.arrayBuffer();
+  }
+}
