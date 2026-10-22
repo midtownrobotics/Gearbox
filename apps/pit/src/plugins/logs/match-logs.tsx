@@ -22,7 +22,7 @@ import {
   matchLogsZipUrl,
   setWhenFull,
 } from "../../shared/getters/downloaders";
-import { canSaveLogs, saveLog, useSavedLogs } from "../../shared/saved-logs";
+import { canSaveLogs, saveAdvantageScope, saveLog, useSavedLogs } from "../../shared/saved-logs";
 
 // The match logs the team's downloaders uploaded, by event (the one uploaded to last first), each
 // event's matches latest first. Anyone signed in downloads them, one or all in a zip; mentors and
@@ -155,20 +155,32 @@ function Storage({
   );
 }
 
-/** How many logs are on this device for AdvantageScope, and saving the rest. */
+/**
+ * How many logs are on this device, and saving AdvantageScope (its own files and the team's fields
+ * and robots) and the rest of the logs, so they open without a connection.
+ */
 function OnThisDevice({
   logs,
   saved,
   onError,
 }: { logs: MatchLog[]; saved: Set<number>; onError: (message: string) => void }) {
-  const [saving, setSaving] = useState<{ done: number; of: number } | null>(null);
+  const [saving, setSaving] = useState<string | null>(null);
   const missing = logs.filter((log) => !saved.has(log.id));
   const bytes = missing.reduce((sum, log) => sum + log.size, 0);
 
   const saveAll = async () => {
+    try {
+      await saveAdvantageScope((done, of) =>
+        setSaving(`Saving AdvantageScope (${Math.round((done / of) * 100)}%)…`),
+      );
+    } catch {
+      setSaving(null);
+      onError("Couldn't save AdvantageScope. Check your connection and try again.");
+      return;
+    }
     let failed = false;
     for (const [done, log] of missing.entries()) {
-      setSaving({ done, of: missing.length });
+      setSaving(`Saving log ${done + 1} of ${missing.length}…`);
       try {
         await saveLog(log);
       } catch {
@@ -187,21 +199,21 @@ function OnThisDevice({
             {saved.size} of {logs.length} logs on this device
           </p>
           <p className="text-secondary-500">
-            Logs on this device open in AdvantageScope without downloading, even offline.
+            Save AdvantageScope, your team's fields and robots, and the logs to open them without a
+            connection.
           </p>
         </div>
-        {(missing.length > 0 || saving) && (
-          <Button
-            variant="secondary"
-            size="sm"
-            disabled={Boolean(saving)}
-            onClick={() => void saveAll()}
-          >
-            {saving
-              ? `Saving ${saving.done + 1} of ${saving.of}…`
-              : `Save all to this device (${size(bytes)})`}
-          </Button>
-        )}
+        <Button
+          variant="secondary"
+          size="sm"
+          disabled={Boolean(saving)}
+          onClick={() => void saveAll()}
+        >
+          {saving ??
+            (missing.length > 0
+              ? `Save all to this device (logs: ${size(bytes)})`
+              : "Save AdvantageScope to this device")}
+        </Button>
       </div>
     </Card>
   );
@@ -234,9 +246,7 @@ export function MatchLogs() {
     <div className="space-y-5">
       {error && <ErrorBanner message={error} />}
       <Storage data={data} onChange={() => void load()} onError={setError} />
-      {data.logs.length > 0 && canSaveLogs() && (
-        <OnThisDevice logs={data.logs} saved={saved} onError={setError} />
-      )}
+      {canSaveLogs() && <OnThisDevice logs={data.logs} saved={saved} onError={setError} />}
       {data.logs.length === 0 ? (
         <Card>
           <p className="text-sm text-secondary-500">

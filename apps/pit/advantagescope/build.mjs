@@ -163,5 +163,18 @@ for (const name of fs.readdirSync(assets)) {
 }
 fs.writeFileSync(path.join(assets, "index.json"), JSON.stringify(index));
 
+// AdvantageScope's own files (all but the built-in assets), which Pit's Logs page saves on a
+// device so AdvantageScope opens offline (apps/pit/src/shared/saved-logs.ts).
+const appFiles = fs
+  .readdirSync(out, { recursive: true })
+  .map((file) => file.split(path.sep).join("/"))
+  .filter(
+    (file) =>
+      !file.startsWith("bundledAssets/") &&
+      !file.split("/").some((part) => part.startsWith(".")) &&
+      fs.statSync(path.join(out, file)).isFile(),
+  );
+fs.writeFileSync(path.join(out, "files.json"), JSON.stringify(appFiles));
+
 fs.writeFileSync(stampFile, stamp);
 log(`built ${commit.slice(0, 7)} into apps/pit/public/scope`);
