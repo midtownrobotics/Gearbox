@@ -205,15 +205,43 @@ async function readApp(event) {
   return response;
 }
 
+/**
+ * Answers a request, writing to the service worker's own console what asked (a page or a
+ * worker) and what it got, for finding out why something doesn't open offline.
+ */
+function answer(event, read) {
+  const { request } = event;
+  const path = new URL(request.url).pathname;
+  const asked = `${request.destination || "fetch"} ${path}`;
+  event.respondWith(
+    read(event).then(
+      (response) => {
+        console.debug(
+          "[scope-cache]",
+          asked,
+          "→",
+          response.status,
+          response.url ? "network" : "kept",
+        );
+        return response;
+      },
+      (err) => {
+        console.warn("[scope-cache]", asked, "→ failed:", err);
+        throw err;
+      },
+    ),
+  );
+}
+
 self.addEventListener("fetch", (event) => {
   const { request } = event;
   if (request.method !== "GET" || request.headers.has("Range")) return;
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
   const index = INDEXES.find((entry) => url.pathname === entry.index);
-  if (index) return event.respondWith(readIndex(event, index));
-  if (url.pathname.startsWith(LOG_FILES)) return event.respondWith(readLog(event));
-  if (isApp(url.pathname)) return event.respondWith(readApp(event));
+  if (index) return answer(event, (e) => readIndex(e, index));
+  if (url.pathname.startsWith(LOG_FILES)) return answer(event, readLog);
+  if (isApp(url.pathname)) return answer(event, readApp);
   const files = INDEXES.find((entry) => url.pathname.startsWith(entry.files));
-  if (files) event.respondWith(readFile(event, files));
+  if (files) answer(event, (e) => readFile(e, files));
 });
