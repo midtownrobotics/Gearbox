@@ -68,6 +68,8 @@ export default defineConfig({
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
         // AdvantageScope (/scope/) is its own page, too large to keep offline.
         globIgnores: ["scope/**"],
+        // Except its field and robot models and images: kept on the device once downloaded.
+        importScripts: ["/scope-cache.js"],
         // A link to the API is a page load too: it must reach the worker, not get the app's
         // page like every other address does.
         navigateFallbackDenylist: [/^\/api\//, /^\/scope(\/|$)/],

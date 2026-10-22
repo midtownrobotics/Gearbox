@@ -4,6 +4,8 @@ import { useSearchParams } from "react-router-dom";
 import { useFullscreen } from "../../shared/fullscreen-context";
 import { scopeLogFile, scopeUrl } from "../../shared/getters/advantagescope";
 import { type MatchLog, fetchMatchLogs } from "../../shared/getters/downloaders";
+import { useSavedLogs } from "../../shared/saved-logs";
+import { size } from "./match-logs";
 
 // AdvantageScope inside Pit: the team's match logs to choose from, and AdvantageScope Lite (served
 // at /scope/) in a frame below, as its makers ship it. The chosen log is in the address. Full
@@ -42,6 +44,13 @@ export function AdvantageScopePage() {
   const [failed, setFailed] = useState(false);
   const { isFullscreen, setFullscreen } = useFullscreen();
   const { ref, height } = useFillHeight(isFullscreen);
+  const saved = useSavedLogs(logs);
+
+  // AdvantageScope's models and the logs opened are kept on the device (public/scope-cache.js):
+  // asked to stay there, rather than be cleared when the browser wants room.
+  useEffect(() => {
+    void navigator.storage?.persist?.().catch(() => {});
+  }, []);
 
   useEffect(() => {
     fetchMatchLogs()
@@ -103,8 +112,9 @@ export function AdvantageScopePage() {
             {byEvent(logs ?? []).map(([event, list]) => (
               <optgroup key={event} label={event}>
                 {list.map((log) => (
+                  // Whether it opens from the device, or what it downloads.
                   <option key={log.id} value={scopeLogFile(log)}>
-                    {log.name}
+                    {log.name} · {saved.has(log.id) ? "On this device" : size(log.size)}
                   </option>
                 ))}
               </optgroup>

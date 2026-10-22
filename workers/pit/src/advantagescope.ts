@@ -51,6 +51,57 @@ const CONTENT_TYPES: Record<string, string> = {
 
 type AssetFile = { name: string; size: number };
 
+/** Models are stored gzipped (they shrink to about a third; images are compressed already). */
+const gzipped = (file: string) => file.toLowerCase().endsWith(".glb");
+/** R2 takes a stream only at a known length, so a gzipped file goes up in parts this size. */
+const GZIP_PART = 8 * 1024 * 1024;
+
+const joined = (chunks: Uint8Array[], length: number) => {
+  const bytes = new Uint8Array(length);
+  let at = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, at);
+    at += chunk.length;
+  }
+  return bytes;
+};
+
+/** Stores `stream` gzipped at `key`, holding at most a part of it at a time. */
+async function putGzipped(bucket: R2Bucket, key: string, stream: ReadableStream<Uint8Array>) {
+  const httpMetadata = { contentEncoding: "gzip" };
+  // Typed for the page's typecheck too, whose DOM streams type CompressionStream another way.
+  const gzip = new CompressionStream("gzip") as unknown as TransformStream<Uint8Array, Uint8Array>;
+  const reader = stream.pipeThrough(gzip).getReader();
+  let chunks: Uint8Array[] = [];
+  let held = 0;
+  let upload: R2MultipartUpload | null = null;
+  const parts: R2UploadedPart[] = [];
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (value) {
+        chunks.push(value);
+        held += value.length;
+      }
+      // Every part but the last is the same size.
+      while (held >= GZIP_PART || (done && upload && held > 0)) {
+        const bytes = joined(chunks, held);
+        const size = Math.min(GZIP_PART, held);
+        upload ??= await bucket.createMultipartUpload(key, { httpMetadata });
+        parts.push(await upload.uploadPart(parts.length + 1, bytes.slice(0, size)));
+        chunks = [bytes.slice(size)];
+        held -= size;
+      }
+      if (done) break;
+    }
+    if (upload) await upload.complete(parts);
+    else await bucket.put(key, joined(chunks, held), { httpMetadata });
+  } catch (err) {
+    await upload?.abort().catch(() => {});
+    throw err;
+  }
+}
+
 /** An asset the team uploaded, as Pit's Logs page lists it. */
 export type ScopeAsset = { name: string; size: number; uploadedAt: number };
 
@@ -166,12 +217,14 @@ export const scopeRoutes = new Hono<AppEnv>()
     );
   })
 
-  // One log as a .wpilog: stored gzipped, so the browser unzips it as it downloads.
+  // One log as a .wpilog: stored gzipped, so the browser unzips it as it downloads. Pit's service
+  // worker asks for it as stored (X-Gearbox-Raw), to keep it gzipped on the device, and checks
+  // the copy it has by its ETag: a log's row, which a log uploaded again doesn't keep.
   .get("/logs/:file", requireAuth, async (c) => {
     const match = LOG_FILE.exec(c.req.param("file"));
     const log = match
       ? await createDb(c.env.PIT_DB)
-          .select({ r2Key: matchLogs.r2Key })
+          .select({ id: matchLogs.id, r2Key: matchLogs.r2Key })
           .from(matchLogs)
           .where(
             inTeam(
@@ -184,13 +237,22 @@ export const scopeRoutes = new Hono<AppEnv>()
           )
           .get()
       : undefined;
-    const object = log ? await c.env.LOGS.get(log.r2Key) : null;
+    if (!log) return c.json({ error: "Log not found." }, 404);
+    const etag = `"log-${log.id}"`;
+    if (c.req.header("If-None-Match") === etag) {
+      return new Response(null, { status: 304, headers: { ETag: etag } });
+    }
+    const object = await c.env.LOGS.get(log.r2Key);
     if (!object) return c.json({ error: "Log not found." }, 404);
+    const raw = c.req.header("X-Gearbox-Raw") === "gzip";
     return new Response(object.body, {
       encodeBody: "manual",
       headers: {
-        "Content-Type": "application/octet-stream",
-        "Content-Encoding": "gzip",
+        ETag: etag,
+        "Cache-Control": "private, no-cache",
+        ...(raw
+          ? { "Content-Type": "application/gzip" }
+          : { "Content-Type": "application/octet-stream", "Content-Encoding": "gzip" }),
         "Content-Length": String(object.size),
       },
     });
@@ -202,11 +264,13 @@ export const scopeRoutes = new Hono<AppEnv>()
       .select()
       .from(scopeAssets)
       .where(inTeam(scopeAssets, c.get("teamId")));
+    // Each other file's value is its version (AdvantageScope reads only config.json's), which Pit's
+    // service worker keeps its saved copy by (apps/pit/public/scope-cache.js).
     const index: Record<string, unknown> = {};
     for (const row of rows) {
       for (const file of JSON.parse(row.files) as AssetFile[]) {
         index[`${row.name}/${file.name}`] =
-          file.name === "config.json" ? JSON.parse(row.config) : null;
+          file.name === "config.json" ? JSON.parse(row.config) : `${row.uploadedAt}-${file.size}`;
       }
     }
     return c.json(index);
@@ -243,7 +307,7 @@ export const scopeRoutes = new Hono<AppEnv>()
       ? await c.env.LOGS.get(assetKey(c.get("teamId"), name, file), { onlyIf: c.req.raw.headers })
       : null;
     if (!object) return c.json({ error: "Asset not found." }, 404);
-    const headers = {
+    const headers: Record<string, string> = {
       ETag: object.httpEtag,
       "Cache-Control": "private, no-cache",
       "Content-Type":
@@ -251,6 +315,12 @@ export const scopeRoutes = new Hono<AppEnv>()
     };
     // Unchanged since the browser last had it.
     if (!("body" in object)) return new Response(null, { status: 304, headers });
+    // Stored gzipped (a model, uploaded since models are): the browser unzips it as it downloads.
+    if (object.httpMetadata?.contentEncoding === "gzip") {
+      headers["Content-Encoding"] = "gzip";
+      headers["Content-Length"] = String(object.size);
+      return new Response((object as R2ObjectBody).body, { encodeBody: "manual", headers });
+    }
     return new Response((object as R2ObjectBody).body, { headers });
   })
 
@@ -333,10 +403,16 @@ export const scopeRoutes = new Hono<AppEnv>()
     for (const asset of found) {
       const files: AssetFile[] = [];
       for (const file of asset.files) {
+        const key = assetKey(teamId, asset.name, file.name);
+        if (gzipped(file.name)) {
+          await putGzipped(c.env.LOGS, key, file.entry.stream());
+          files.push({ name: file.name, size: file.entry.size });
+          continue;
+        }
         // Streamed: unzipped into R2 a piece at a time, at the size checked above.
         const { readable, writable } = new FixedLengthStream(file.entry.size);
         const piping = file.entry.stream().pipeTo(writable);
-        await c.env.LOGS.put(assetKey(teamId, asset.name, file.name), readable);
+        await c.env.LOGS.put(key, readable);
         await piping;
         files.push({ name: file.name, size: file.entry.size });
       }
@@ -390,6 +466,32 @@ export const scopeRoutes = new Hono<AppEnv>()
     });
     return c.json({ ok: true });
   });
+
+/**
+ * AdvantageScope's built-in assets (/scope/bundledAssets/), from the page's static files. A model
+ * is also built gzipped beside itself (advantagescope/build.mjs: Cloudflare doesn't compress
+ * models), and sent from that, which the browser unzips as it downloads.
+ */
+export async function bundledAsset(request: Request, assets: Fetcher) {
+  const url = new URL(request.url);
+  if (request.method !== "GET" || request.headers.has("Range") || !gzipped(url.pathname)) {
+    return assets.fetch(request);
+  }
+  url.pathname += ".gz";
+  const zipped = await assets.fetch(new Request(url, request));
+  // No gzipped copy (the page's index.html comes back instead): the model as it is.
+  if (
+    (zipped.status !== 200 && zipped.status !== 304) ||
+    zipped.headers.get("Content-Type")?.includes("html")
+  ) {
+    return assets.fetch(request);
+  }
+  const headers = new Headers(zipped.headers);
+  headers.set("Content-Type", "model/gltf-binary");
+  if (zipped.status === 304) return new Response(null, { status: 304, headers });
+  headers.set("Content-Encoding", "gzip");
+  return new Response(zipped.body, { encodeBody: "manual", headers });
+}
 
 /** Deletes every AdvantageScope asset file of a team (with its data, when the team or Pit goes). */
 export async function deleteTeamScopeFiles(bucket: R2Bucket, teamId: string) {

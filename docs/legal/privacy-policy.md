@@ -151,7 +151,7 @@ No system is perfectly secure. If we learn that your team's information has been
 
 ## 12. Cookies and device storage
 
-Gearbox uses one cookie, which keeps you signed in. On shared shop devices it also stores a kiosk token in the browser. We use no advertising or analytics cookies and no third-party trackers. Our public home page notes in your browser's session storage that it has counted your visit, so reloading it isn't counted again; the note is gone when you close the tab. While you fill in a scouting form for a match, your answers and drawings are kept in your browser's storage until the report is sent or you discard it, so they aren't lost if the page closes or the form moves to the next match; drafts more than 12 hours old are removed.
+Gearbox uses one cookie, which keeps you signed in. On shared shop devices it also stores a kiosk token in the browser. We use no advertising or analytics cookies and no third-party trackers. Our public home page notes in your browser's session storage that it has counted your visit, so reloading it isn't counted again; the note is gone when you close the tab. While you fill in a scouting form for a match, your answers and drawings are kept in your browser's storage until the report is sent or you discard it, so they aren't lost if the page closes or the form moves to the next match; drafts more than 12 hours old are removed. When you use AdvantageScope in Pit, the field and robot models and the match logs you open or save to the device are kept in your browser's storage, so they aren't downloaded again; a log is removed from it once your team no longer has it in Pit, and you can clear it all by clearing the site's data in your browser.
 
 ## 13. Apps built by teams
 

@@ -18,7 +18,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { validator } from "hono/validator";
 import packageJson from "../package.json";
-import { deleteTeamScopeFiles, scopeRoutes } from "./advantagescope";
+import { bundledAsset, deleteTeamScopeFiles, scopeRoutes } from "./advantagescope";
 import { archiveRoutes } from "./archives";
 import { catchUp, freshTimer, timerRoutes } from "./battery-timers";
 import { createDb } from "./db";
@@ -1038,4 +1038,10 @@ const app = base
 export type PitApp = typeof app;
 /** The Hono app itself, for the isolation test (test/teams.test.ts). */
 export { app };
-export default { fetch: withApiPrefix(app.fetch) };
+export default {
+  fetch: withApiPrefix((request: Request, env: AppEnv["Bindings"], ctx: ExecutionContext) =>
+    env.ASSETS && new URL(request.url).pathname.startsWith("/scope/bundledAssets/")
+      ? bundledAsset(request, env.ASSETS)
+      : app.fetch(request, env, ctx),
+  ),
+};
