@@ -171,8 +171,12 @@ async function readApp(event) {
     if (saved) return saved;
     throw err;
   }
-  // A redirect can't answer a page load from the cache, so only what came straight back is kept.
-  if (response.status !== 200 || response.redirected) return response;
+  if (response.status !== 200) return response;
+  // Cloudflare sends www/hub.html on to www/hub, and a redirected answer can't answer a page load
+  // from the cache: kept, and answered, as the page itself, at the address asked for.
+  if (response.redirected) {
+    response = new Response(response.body, { status: 200, headers: response.headers });
+  }
   const copy = response.clone();
   event.waitUntil(
     (async () => {
