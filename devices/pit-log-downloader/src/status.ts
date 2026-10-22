@@ -11,7 +11,10 @@ export type LogStatus = {
   matchType: MatchTypeName;
   matchNumber: number;
   downloaded: boolean;
-  /** Uploaded to the team's Pit (it isn't uploaded again, even if it's deleted there). */
+  /**
+   * Uploaded to the team's Pit (it isn't uploaded again on its own if it's deleted there; Upload
+   * again on the status page does).
+   */
   uploaded: boolean;
   /** In the team's Pit now, as of Pit's list (asked once a minute); null when that isn't known. */
   inGearbox: boolean | null;

@@ -671,6 +671,24 @@ app.delete("/api/logs/:id", async (req, res) => {
   res.json({ ok: true });
 });
 
+// A log uploaded and then deleted in Pit isn't uploaded again on its own; this uploads it again.
+app.post("/api/logs/:id/upload", (req, res) => {
+  const log = logs.find((l) => l.id === req.params.id && !l.deleted);
+  if (!log || !log.status.downloaded || !fs.existsSync(localPathOf(log))) {
+    res.status(404).json({ error: "That log isn't on this computer." });
+    return;
+  }
+  if (inGearbox(log.match.event, log.name)) {
+    res.status(409).json({ error: "Gearbox has it already." });
+    return;
+  }
+  log.status.uploaded = false;
+  saveLogs();
+  logWithTimestamp(`${log.name} goes to Gearbox again.`);
+  uploadLogs(internetConnected).catch((err) => logWithTimestamp(`Could not upload logs: ${err}`));
+  res.json({ ok: true });
+});
+
 app.get("/api/logs/:id/trim", async (req, res) => {
   const log = logs.find((l) => l.id === req.params.id);
   if (!log || !fs.existsSync(localPathOf(log))) {
