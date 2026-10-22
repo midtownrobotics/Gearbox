@@ -167,7 +167,11 @@ async function readApp(event) {
   try {
     response = await fetch(event.request);
   } catch (err) {
-    const saved = await cache.match(path);
+    // A page load isn't followed through Cloudflare's redirect (www/hub.html to www/hub): the
+    // browser loads www/hub itself, and that's the copy kept.
+    const saved =
+      (await cache.match(path)) ??
+      (path.endsWith(".html") ? await cache.match(path.slice(0, -".html".length)) : undefined);
     if (saved) return saved;
     throw err;
   }
