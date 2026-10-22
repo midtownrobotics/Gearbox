@@ -20,8 +20,22 @@ function fail(message: string): never {
 const port = Number(setting("PORT") ?? 3000);
 if (!Number.isInteger(port) || port < 1 || port > 65535) fail("PORT must be a port number.");
 
-const pitUrl = setting("PIT_URL")?.replace(/\/+$/, "") ?? null;
-if (pitUrl && !/^https?:\/\/[^/]+$/.test(pitUrl)) {
+/**
+ * A Pit's address as typed (PIT_URL, or on the pairing form): its origin, so a page's address
+ * pasted from the browser works too. Null when it isn't an http or https address.
+ */
+export function parsePitUrl(value: string): string | null {
+  try {
+    const url = new URL(value.trim());
+    return url.protocol === "https:" || url.protocol === "http:" ? url.origin : null;
+  } catch {
+    return null;
+  }
+}
+
+const pitSetting = setting("PIT_URL");
+const pitUrl = pitSetting ? parsePitUrl(pitSetting) : null;
+if (pitSetting && !pitUrl) {
   fail("PIT_URL must be an address like https://1648-pit.frcgearbox.com.");
 }
 

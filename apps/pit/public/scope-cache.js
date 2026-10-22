@@ -9,6 +9,11 @@
 // bytes), and used as it is when Pit doesn't answer in a few seconds. Pit's AdvantageScope page
 // reads this cache to show which logs are on the device, and lets go of logs Pit no longer has.
 // Its Logs page saves logs ahead (X-Gearbox-Save): kept, and answered 204 with no body.
+//
+// And AdvantageScope itself (its page, scripts and WebAssembly under /scope/), with the team's
+// settings and the list of logs it starts from: from the network while there is one, a copy
+// kept each time, which is used without a connection. So it opens offline once it has been
+// opened online.
 
 const SCOPE_CACHE = "scope-assets";
 const VERSION = "X-Gearbox-Version";
@@ -21,6 +26,13 @@ const LOG_CACHE = "scope-logs";
 const LOG_FILES = "/api/scope/logs/";
 /** How long a kept log waits for Pit to say it's still the log, before it's used anyway. */
 const LOG_CHECK_MS = 4000;
+const APP_CACHE = "scope-app";
+/** Pit's answers AdvantageScope starts from, kept for offline like its own files. */
+const APP_ANSWERS = ["/api/scope/settings", "/api/scope/logs"];
+const isApp = (path) =>
+  APP_ANSWERS.includes(path) ||
+  path === "/scope" ||
+  (path.startsWith("/scope/") && !path.startsWith("/scope/bundledAssets/"));
 /** Each index as last read, by its path. */
 const versions = new Map();
 
@@ -144,6 +156,35 @@ async function readLog(event) {
   return unzipped(new Response(read));
 }
 
+/**
+ * AdvantageScope's own files: from the network, a copy kept (again only when it changed), and
+ * the copy without a connection. Kept by path: the page's ?log= doesn't change it.
+ */
+async function readApp(event) {
+  const cache = await caches.open(APP_CACHE);
+  const path = new URL(event.request.url).pathname;
+  let response;
+  try {
+    response = await fetch(event.request);
+  } catch (err) {
+    const saved = await cache.match(path);
+    if (saved) return saved;
+    throw err;
+  }
+  // A redirect can't answer a page load from the cache, so only what came straight back is kept.
+  if (response.status !== 200 || response.redirected) return response;
+  const copy = response.clone();
+  event.waitUntil(
+    (async () => {
+      const etag = response.headers.get("ETag");
+      const saved = await cache.match(path);
+      if (etag && saved?.headers.get("ETag") === etag) await copy.body?.cancel();
+      else await cache.put(path, copy);
+    })().catch(() => {}),
+  );
+  return response;
+}
+
 self.addEventListener("fetch", (event) => {
   const { request } = event;
   if (request.method !== "GET" || request.headers.has("Range")) return;
@@ -152,6 +193,7 @@ self.addEventListener("fetch", (event) => {
   const index = INDEXES.find((entry) => url.pathname === entry.index);
   if (index) return event.respondWith(readIndex(event, index));
   if (url.pathname.startsWith(LOG_FILES)) return event.respondWith(readLog(event));
+  if (isApp(url.pathname)) return event.respondWith(readApp(event));
   const files = INDEXES.find((entry) => url.pathname.startsWith(entry.files));
   if (files) event.respondWith(readFile(event, files));
 });

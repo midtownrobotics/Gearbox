@@ -66,9 +66,9 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
-        // AdvantageScope (/scope/) is its own page, too large to keep offline.
+        // AdvantageScope (/scope/) is its own page, too large to download for everyone who opens
+        // Pit: it's kept for offline as it's used instead, with its models and logs.
         globIgnores: ["scope/**"],
-        // Except its field and robot models and images: kept on the device once downloaded.
         importScripts: ["/scope-cache.js"],
         // A link to the API is a page load too: it must reach the worker, not get the app's
         // page like every other address does.
