@@ -7,7 +7,7 @@ import * as zlib from "node:zlib";
 import express from "express";
 import isOnline from "is-online";
 import { NodeSSH } from "node-ssh";
-import { config, parseTeamNumber, pitUrlFor, robotNetworkOf } from "./config.ts";
+import { config, parsePitUrl, parseTeamNumber, pitUrlFor, robotNetworkOf } from "./config.ts";
 import {
   PairingError,
   UploadRefused,
@@ -592,9 +592,16 @@ app.post("/api/gearbox/pair", async (req, res) => {
     res.status(400).json({ error: "The code is 6 digits." });
     return;
   }
+  // Another Pit than the team's usual one, typed on the pairing form (staging, a Pit of its own).
+  const typedUrl = typeof req.body?.pitUrl === "string" ? req.body.pitUrl.trim() : "";
+  const chosenUrl = typedUrl ? parsePitUrl(typedUrl) : null;
+  if (typedUrl && !chosenUrl) {
+    res.status(400).json({ error: `Enter the Pit's address, like ${pitUrlFor(teamNumber)}.` });
+    return;
+  }
   try {
-    await pairWithGearbox(teamNumber, code, name);
-    logWithTimestamp(`Paired with team ${teamNumber}'s Pit.`);
+    await pairWithGearbox(teamNumber, code, name, chosenUrl);
+    logWithTimestamp(`Paired with team ${teamNumber}'s Pit at ${currentPairing()?.pitUrl}.`);
     res.json(gearboxStatus());
   } catch (err) {
     const message = err instanceof PairingError ? err.message : "Couldn't pair with Gearbox.";
