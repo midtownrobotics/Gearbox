@@ -165,8 +165,19 @@ const asAnswer = (saved) =>
   new Response(saved.body, {
     status: saved.status,
     statusText: saved.statusText,
-    headers: saved.headers,
+    headers: unencoded(saved.headers),
   });
+
+/**
+ * A response's headers for a body Cache Storage holds: already unzipped, so its encoding (br, from
+ * Cloudflare) and length go. Kept, they make Firefox refuse the answer (the wasm's NetworkError).
+ */
+function unencoded(headers) {
+  const copy = new Headers(headers);
+  copy.delete("Content-Encoding");
+  copy.delete("Content-Length");
+  return copy;
+}
 
 /**
  * AdvantageScope's own files: from the network, a copy kept (again only when it changed), and
@@ -193,7 +204,10 @@ async function readApp(event) {
   if (response.redirected) {
     response = new Response(response.body, { status: 200, headers: response.headers });
   }
-  const copy = response.clone();
+  const copy = new Response(response.clone().body, {
+    status: 200,
+    headers: unencoded(response.headers),
+  });
   event.waitUntil(
     (async () => {
       const etag = response.headers.get("ETag");
@@ -235,6 +249,7 @@ function answer(event, read) {
 
 self.addEventListener("fetch", (event) => {
   const { request } = event;
+  console.debug("[scope-cache] seen", request.destination || "fetch", request.method, request.url);
   if (request.method !== "GET" || request.headers.has("Range")) return;
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;

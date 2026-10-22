@@ -65,7 +65,7 @@ export default defineConfig({
         enabled: false,
       },
       workbox: {
-        globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
+        globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2,ttf}"],
         // AdvantageScope (/scope/) is its own page, too large to download for everyone who opens
         // Pit: it's kept for offline as it's used instead, with its models and logs.
         globIgnores: ["scope/**"],
