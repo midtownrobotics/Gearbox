@@ -692,17 +692,16 @@ function ChecklistSection({
         </div>
       </div>
       <div className="min-h-0 space-y-4 overflow-y-auto">
-        <div className="space-y-2">
+        {/* One grid for every list, so the names take only the longest one's width (at most 60%),
+            the bars the rest, all the same length, and the counts line up at the right. */}
+        <div className="grid grid-cols-[fit-content(60%)_minmax(4rem,1fr)_auto] items-center gap-x-3 gap-y-2">
           {lists.map((list) => {
             const pct =
               list.itemCount > 0 ? Math.round((list.checkedCount / list.itemCount) * 100) : 0;
             const done = list.itemCount > 0 && list.checkedCount === list.itemCount;
             return (
-              <div
-                key={list.id}
-                className="grid grid-cols-[minmax(0,1fr)_8rem_3rem] items-center gap-3"
-              >
-                <span className="truncate text-sm text-secondary-600">{list.name}</span>
+              <div key={list.id} className="contents">
+                <span className="min-w-0 truncate text-sm text-secondary-600">{list.name}</span>
                 <ProgressBar percent={pct} done={done} />
                 <span
                   className={`text-right text-sm font-semibold tabular-nums ${done ? "text-emerald-600" : "text-secondary-700"}`}
