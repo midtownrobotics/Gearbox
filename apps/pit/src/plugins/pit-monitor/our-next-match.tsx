@@ -94,22 +94,25 @@ function AllianceTeams({
 }
 
 /**
- * The match as a bar in our alliance's color, with the alliances hanging under it like browser
- * tabs upside down: ours is the open tab, merged into the bar (it covers the bar's lower edge),
- * and the other sits behind the edge, narrower and with a lighter border. Blue is always on the
- * left and red on the right.
+ * The match as one rectangle: a bar in our alliance's color across the top, and the alliances
+ * under it like browser tabs upside down. Ours is the open tab: it covers the bar's lower edge and
+ * merges into it, with its border down its outside, its bottom and the middle. The other alliance
+ * sits behind, under the bar's edge and our tab's middle border, so only its bottom and outside
+ * edges show. Blue is always on the left and red on the right.
  */
 function AllianceBoard({ next, teamNumber }: { next: OurNextMatch; teamNumber: string }) {
   const ours = ALLIANCE[next.alliance];
+  // Which outside corner each half rounds.
+  const corner = { blue: "rounded-bl-xl", red: "rounded-br-xl" };
   const tab = (side: "red" | "blue") =>
     side === next.alliance
-      ? // Up over the bar's 3px edge, padded back down so both tabs' teams line up.
-        `relative z-10 -mt-[3px] rounded-b-xl border-[3px] border-t-0 pt-[calc(0.375rem+3px)] pb-1.5 ${ours.border} ${ours.tint}`
-      : `mx-0.5 rounded-b-lg border-2 sm:mx-1.5 border-t-0 py-1.5 ${ALLIANCE[side].border} ${ALLIANCE[side].tint}`;
+      ? // Up over the bar's 3px edge, padded back down so both halves' teams line up.
+        `relative z-10 -mt-[3px] border-[3px] border-t-0 pt-[calc(0.375rem+3px)] pb-1.5 ${corner[side]} ${ours.border} ${ours.tint}`
+      : `border-[3px] border-t-0 py-1.5 ${side === "red" ? "border-l-0" : "border-r-0"} ${corner[side]} ${ALLIANCE[side].border} ${ALLIANCE[side].tint}`;
   return (
-    <div>
+    <div className="grid grid-cols-2">
       <div
-        className={`flex flex-wrap items-end justify-between gap-x-3 rounded-xl border-[3px] px-4 pt-2 pb-1.5 ${ours.border} ${ours.tint}`}
+        className={`col-span-2 flex flex-wrap items-end justify-between gap-x-3 rounded-t-xl border-[3px] px-4 pt-2 pb-1.5 ${ours.border} ${ours.tint}`}
       >
         <div className="min-w-0">
           <h2 className={`text-xs font-bold uppercase tracking-widest ${ours.text}`}>
@@ -119,20 +122,18 @@ function AllianceBoard({ next, teamNumber }: { next: OurNextMatch; teamNumber: s
         </div>
         <p className={`pb-1 text-sm font-bold ${ours.text}`}>{ours.name}</p>
       </div>
-      <div className="grid grid-cols-2 gap-1 px-1.5 sm:px-3">
-        <AllianceTeams
-          side="blue"
-          teams={next.blueTeams}
-          teamNumber={teamNumber}
-          className={tab("blue")}
-        />
-        <AllianceTeams
-          side="red"
-          teams={next.redTeams}
-          teamNumber={teamNumber}
-          className={tab("red")}
-        />
-      </div>
+      <AllianceTeams
+        side="blue"
+        teams={next.blueTeams}
+        teamNumber={teamNumber}
+        className={tab("blue")}
+      />
+      <AllianceTeams
+        side="red"
+        teams={next.redTeams}
+        teamNumber={teamNumber}
+        className={tab("red")}
+      />
     </div>
   );
 }
