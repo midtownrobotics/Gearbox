@@ -51,18 +51,16 @@ const ALLIANCE = {
     tint: "bg-red-100",
     border: "border-red-500",
     text: "text-red-800",
-    ring: "ring-red-500",
   },
   blue: {
     name: "Blue alliance",
     tint: "bg-blue-100",
     border: "border-blue-500",
     text: "text-blue-800",
-    ring: "ring-blue-500",
   },
 };
 
-/** One alliance's teams by station, ours on a card of its own, ringed and bold. */
+/** One alliance's teams by station, ours on a card of its own, ringed in white and bold. */
 function AllianceTeams({
   side,
   teams,
@@ -82,7 +80,7 @@ function AllianceTeams({
           key={station}
           className={`rounded-md px-1 py-0.5 text-sm tabular-nums sm:px-2 sm:text-xl ${alliance.text} ${
             team === teamNumber
-              ? `bg-surface font-black ring-[3px] ${alliance.ring}`
+              ? "bg-surface font-black shadow-md ring-[3px] ring-white"
               : "font-semibold"
           }`}
         >
