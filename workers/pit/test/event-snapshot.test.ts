@@ -1,7 +1,7 @@
 import { newTeamId, teamUsers } from "@g3/testing/users";
 import { callAs, jsonAs } from "@g3/testing/worker";
 import { describe, expect, it } from "vitest";
-import { movedClock, snapshotAvailable } from "../src/event-snapshot";
+import { movedClock, snapshotAvailable, statusesAt } from "../src/event-snapshot";
 
 // The Monitor's event snapshot (GRITS 2026 halfway through qualifications), offered in dev and
 // staging only (src/event-snapshot.ts). Tests run with the dev config, so it's offered here.
@@ -73,6 +73,28 @@ describe("event snapshot", () => {
 
     await jsonAs(team.admin, "/admin/event-snapshot", { method: "PUT", body: { on: false } });
     expect(await jsonAs(team.admin, "/admin/event-snapshot")).toMatchObject({ on: false });
+  });
+
+  it("moves matches along in order, so one is always on deck between calls", () => {
+    const minute = 60_000;
+    // Nine minutes apart, then a break.
+    const starts = [0, 9, 18, 27, 120].map((m) => m * minute);
+    const at = (clock: number) => statusesAt(starts, clock * minute);
+    expect(at(0)).toEqual(["On field", "On deck", "Now queuing", "Queuing soon", "Queuing soon"]);
+    // The next match is due on the field at 4 minutes; until then it stays on deck.
+    expect(at(3.5)).toEqual(["On field", "On deck", "Now queuing", "Queuing soon", "Queuing soon"]);
+    expect(at(5.5)).toEqual(["On field", "On field", "On deck", "Now queuing", "Queuing soon"]);
+    // After the last match before the break, the one after it isn't called yet.
+    expect(at(30)).toEqual(["On field", "On field", "On field", "On field", "Queuing soon"]);
+    expect(at(95)).toEqual(["On field", "On field", "On field", "On field", "On deck"]);
+    // Before the first match goes on the field.
+    expect(at(-20)).toEqual([
+      "On deck",
+      "Now queuing",
+      "Queuing soon",
+      "Queuing soon",
+      "Queuing soon",
+    ]);
   });
 
   it("moves its clock by minutes, a match at a time, or back to the start", () => {

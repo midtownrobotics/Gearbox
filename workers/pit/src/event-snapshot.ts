@@ -61,10 +61,12 @@ const snapshot = gritsSnapshot as Snapshot;
 
 const SINCE = "eventSnapshotSince";
 
-/** Nexus's estimates, before a match starts: queuing, on deck and going on the field. */
+/** Nexus's estimates, before a match starts: queuing and going on the field. */
 const QUEUE_BEFORE_MS = 18 * 60_000;
-const ON_DECK_BEFORE_MS = 10 * 60_000;
 const ON_FIELD_BEFORE_MS = 5 * 60_000;
+/** The two matches after the one on the field are called only this close to their start, so one
+ * after a break (lunch, overnight) waits. */
+const CALLED_WITHIN_MS = 30 * 60_000;
 /** How long after its start a match's score is in. */
 const SCORED_AFTER_MS = 5 * 60_000;
 /** How far before the first match and after the last the clock can be moved. */
@@ -73,13 +75,23 @@ const CLOCK_MARGIN_MS = 60 * 60_000;
 const firstStart = Math.min(...snapshot.matches.map((match) => match.startOffsetMs));
 const lastStart = Math.max(...snapshot.matches.map((match) => match.startOffsetMs));
 
-/** Where Nexus would have a match `clock` ms after the snapshot's moment. */
-function statusAt(startOffsetMs: number, clock: number): NexusStatus {
-  const until = startOffsetMs - clock;
-  if (until <= ON_FIELD_BEFORE_MS) return "On field";
-  if (until <= ON_DECK_BEFORE_MS) return "On deck";
-  if (until <= QUEUE_BEFORE_MS) return "Now queuing";
-  return "Queuing soon";
+/**
+ * Where Nexus would have each match (start offsets, in order) `clock` ms after the snapshot's
+ * moment. Like Nexus, in order: the last match due on the field (5 minutes before its start) is on
+ * it and every one before it has been; the next is On deck and the one after Now queuing.
+ */
+export function statusesAt(starts: number[], clock: number): NexusStatus[] {
+  let onField = -1;
+  starts.forEach((start, index) => {
+    if (start - ON_FIELD_BEFORE_MS <= clock) onField = index;
+  });
+  return starts.map((start, index) => {
+    if (index <= onField) return "On field";
+    const called = start - clock <= CALLED_WITHIN_MS;
+    if (called && index === onField + 1) return "On deck";
+    if (called && index === onField + 2) return "Now queuing";
+    return "Queuing soon";
+  });
 }
 
 /** Dev (a local gateway) and staging; never production. */
@@ -99,12 +111,16 @@ export async function snapshotMonitorData(env: Bindings, db: Db, team: string) {
   if (since === null) return null;
   const ours = snapshot.rankings.find((r) => r.team === snapshot.teamNumber);
   const clock = Date.now() - since;
-  const matches = snapshot.matches.map((match) => {
+  const statuses = statusesAt(
+    snapshot.matches.map((match) => match.startOffsetMs),
+    clock,
+  );
+  const matches = snapshot.matches.map((match, index) => {
     const start = since + match.startOffsetMs;
     const scored = match.startOffsetMs + SCORED_AFTER_MS <= clock;
     return {
       label: match.label,
-      status: statusAt(match.startOffsetMs, clock),
+      status: statuses[index],
       redTeams: match.redTeams,
       blueTeams: match.blueTeams,
       times: {
