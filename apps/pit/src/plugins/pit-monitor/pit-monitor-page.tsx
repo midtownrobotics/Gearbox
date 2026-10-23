@@ -22,9 +22,11 @@ import type {
   ChecklistList,
 } from "../../shared/getters/types";
 import { type PersonInThePit, untilLabel, useInThePit } from "../../shared/in-the-pit";
+import { useAuth } from "../../shared/use-auth";
 import { ConnectionIndicator, OfflineOverlay, useConnection } from "./connection";
 import { Countdown, formatTime } from "./match-time";
 import { OurNextMatchPanel } from "./our-next-match";
+import { SnapshotClock } from "./snapshot-clock";
 
 const REFRESH_MS = 15_000;
 
@@ -86,7 +88,7 @@ type ContextRankings = {
 type MonitorData = {
   teamNumber: string;
   /** A past event shown instead of the team's (dev and staging only: Pit > Admin). */
-  snapshot?: { event: string; name: string } | null;
+  snapshot?: { event: string; name: string; clockMs: number } | null;
   nexus: NexusData | null;
   /** The team's next match; null when there's no schedule. */
   ourMatches?: OurSchedule | null;
@@ -704,6 +706,8 @@ export function PitMonitorPage() {
   const fitHeight = useFitToWindow(gridRef, !loading);
   // Who's in the pit on the team's Schedule; hidden while Schedule is off or hasn't answered.
   const inThePit = useInThePit();
+  // Admins move the event snapshot's clock (dev and staging only).
+  const isAdmin = useAuth().user?.isAdmin === true;
 
   const handleFullscreen = async () => {
     if (!isFullscreen) {
@@ -825,6 +829,10 @@ export function PitMonitorPage() {
             </Button>
           </div>
         </div>
+
+        {monitor?.snapshot && isAdmin && (
+          <SnapshotClock clockMs={monitor.snapshot.clockMs} onMoved={() => void loadAll()} />
+        )}
 
         {/* Main grid: on a wide screen it ends at the bottom of the window, and the match list
             and checklists scroll inside their columns instead of the page scrolling. */}

@@ -1,7 +1,7 @@
 import { newTeamId, teamUsers } from "@g3/testing/users";
 import { callAs, jsonAs } from "@g3/testing/worker";
 import { describe, expect, it } from "vitest";
-import { snapshotAvailable } from "../src/event-snapshot";
+import { movedClock, snapshotAvailable } from "../src/event-snapshot";
 
 // The Monitor's event snapshot (GRITS 2026 halfway through qualifications), offered in dev and
 // staging only (src/event-snapshot.ts). Tests run with the dev config, so it's offered here.
@@ -14,7 +14,7 @@ type Match = {
 };
 type MonitorData = {
   teamNumber: string;
-  snapshot: { name: string } | null;
+  snapshot: { name: string; clockMs: number } | null;
   nexus: { isRealNexus: boolean; matches: Match[] };
   ourMatches: { next: Record<string, unknown> | null; total: number } | null;
   ranking: { rank: number; wins: number; losses: number } | null;
@@ -73,5 +73,73 @@ describe("event snapshot", () => {
 
     await jsonAs(team.admin, "/admin/event-snapshot", { method: "PUT", body: { on: false } });
     expect(await jsonAs(team.admin, "/admin/event-snapshot")).toMatchObject({ on: false });
+  });
+
+  it("moves its clock by minutes, a match at a time, or back to the start", () => {
+    const minute = 60_000;
+    expect(movedClock(0, { minutes: 3 })).toBe(3 * minute);
+    // Qualification 32 starts 9 minutes after the snapshot's moment, 30 nine minutes before.
+    expect(movedClock(0, { matches: 1 })).toBe(9 * minute);
+    expect(movedClock(2 * minute, { matches: -1 })).toBe(0);
+    expect(movedClock(12 * minute, { reset: true })).toBe(0);
+    // Never more than an hour past the last match.
+    expect(movedClock(0, { minutes: 24 * 60 })).toBeLessThan(24 * 60 * minute);
+  });
+
+  it("follows its clock: statuses, scores and our next match move with it", async () => {
+    const team = teamUsers(newTeamId());
+    // Only admins, and only while it's on.
+    expect(
+      (
+        await callAs(team.admin, "/admin/event-snapshot/clock", {
+          method: "PUT",
+          body: { matches: 1 },
+        })
+      ).status,
+    ).toBe(404);
+    await jsonAs(team.admin, "/admin/event-snapshot", { method: "PUT", body: { on: true } });
+    expect(
+      (
+        await callAs(team.student, "/admin/event-snapshot/clock", {
+          method: "PUT",
+          body: { matches: 1 },
+        })
+      ).status,
+    ).toBe(403);
+    expect(
+      (
+        await callAs(team.admin, "/admin/event-snapshot/clock", {
+          method: "PUT",
+          body: { minutes: 1.5 },
+        })
+      ).status,
+    ).toBe(400);
+
+    // A match on: Qualification 32 is on the field, and 34 is queuing, one call before ours (35).
+    const moved = await jsonAs<{ clockMs: number }>(team.admin, "/admin/event-snapshot/clock", {
+      method: "PUT",
+      body: { matches: 1 },
+    });
+    expect(moved.clockMs).toBe(9 * 60_000);
+    let data = await jsonAs<MonitorData>(team.student, "/monitor/data");
+    const byLabel = (label: string) => data.nexus.matches.find((m) => m.label === label);
+    expect(data.snapshot?.clockMs).toBeGreaterThanOrEqual(9 * 60_000);
+    expect(byLabel("Qualification 32")?.status).toBe("On field");
+    expect(byLabel("Qualification 33")?.status).toBe("On deck");
+    expect(byLabel("Qualification 34")?.status).toBe("Now queuing");
+    expect(data.ourMatches?.next).toMatchObject({
+      label: "Qualification 35",
+      matchesUntilQueuing: 1,
+    });
+
+    // An hour back: the matches since haven't been played.
+    await jsonAs(team.admin, "/admin/event-snapshot/clock", {
+      method: "PUT",
+      body: { minutes: -60 },
+    });
+    data = await jsonAs<MonitorData>(team.student, "/monitor/data");
+    expect(byLabel("Qualification 30")?.result).toBeNull();
+    expect(byLabel("Qualification 30")?.status).toBe("Queuing soon");
+    expect(byLabel("Qualification 20")?.result).not.toBeNull();
   });
 });
