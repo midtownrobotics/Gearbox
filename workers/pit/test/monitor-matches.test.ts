@@ -122,8 +122,8 @@ describe("our next match", () => {
       next: {
         label: "Qualification 10",
         alliance: "blue",
-        partners: ["4", "6"],
-        opponents: ["1", "2", "3"],
+        redTeams: ["1", "2", "3"],
+        blueTeams: ["4", "1648", "6"],
         status: "Queuing soon",
         matchesUntilQueuing: 3,
         matchesUntilField: 5,

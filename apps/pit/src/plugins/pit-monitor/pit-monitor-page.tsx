@@ -34,9 +34,9 @@ const REFRESH_MS = 15_000;
  * The match list and the checklists, the tallest parts: on a wide screen each shrinks to what's
  * left of its column and scrolls inside, and on a narrow one it's never taller than the window.
  */
-const SCROLL_SECTION = "flex min-h-40 max-h-[80dvh] shrink flex-col lg:max-h-none";
-/** Wide enough for two columns (Tailwind's lg). */
-const WIDE = "(min-width: 1024px)";
+const SCROLL_SECTION = "flex min-h-40 max-h-[80dvh] shrink flex-col xl:max-h-none";
+/** Wide enough for three columns (Tailwind's xl). */
+const WIDE = "(min-width: 1280px)";
 /** Space under the columns, the page's own padding. */
 const BOTTOM_GAP = 20;
 /** Below this, the columns aren't fit to the window: the page scrolls instead. */
@@ -136,7 +136,7 @@ function useFitToWindow(ref: RefObject<HTMLElement | null>, ready: boolean): num
 
 // ── Sections ───────────────────────────────────────────────────────────────
 
-/** One of the event's queue tiles: a match, and when it's due on the field or to queue. */
+/** One of the event's queue tiles, on one line: a match, and when it's due on the field or to queue. */
 function QueueTile({
   title,
   match,
@@ -152,25 +152,30 @@ function QueueTile({
 }) {
   return (
     <div
-      className={`min-w-0 rounded-lg border px-2.5 py-1.5 ${colors} ${ours ? "ring-2 ring-current" : ""}`}
+      className={`flex min-w-0 items-center justify-between gap-3 rounded-lg border px-3 py-2 ${colors} ${ours ? "ring-2 ring-current" : ""}`}
     >
-      <p className="flex items-center justify-between gap-1 text-[10px] font-bold uppercase tracking-wide sm:tracking-widest">
-        <span className="truncate">{title}</span>
-        {ours && <span className="shrink-0">Us</span>}
-      </p>
-      <p className="truncate text-sm font-bold text-secondary-900">
-        {match.label.replace(/^Qualification\b/, "Qual")}
-      </p>
+      <div className="min-w-0">
+        <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest">
+          <span className="truncate">{title}</span>
+          {ours && <span className="shrink-0">· Us</span>}
+        </p>
+        <p className="truncate text-lg font-bold text-secondary-900">
+          {match.label.replace(/^Qualification\b/, "Qual")}
+        </p>
+      </div>
       {until.at && (
-        <p className="text-[11px] tabular-nums text-secondary-600">
-          {until.label} <Countdown targetMs={until.at} />
+        <p className="shrink-0 text-right text-xs text-secondary-600">
+          {until.label}
+          <span className="block text-base font-bold tabular-nums text-secondary-900">
+            <Countdown targetMs={until.at} />
+          </span>
         </p>
       )}
     </div>
   );
 }
 
-/** Where the event is: the matches On deck, Now queuing and Queuing soon, small, under ours. */
+/** Where the event is: the matches On deck, Now queuing and Queuing soon, one under another. */
 function NexusSection({ nexus, teamNumber }: { nexus: NexusData; teamNumber: string }) {
   const onDeck = nexus.matches.find((m) => m.status === "On deck");
   const nowQueuing = nexus.matches.find((m) => m.status === "Now queuing");
@@ -179,7 +184,7 @@ function NexusSection({ nexus, teamNumber }: { nexus: NexusData; teamNumber: str
   if (!onDeck && !nowQueuing && !queuingSoon) return null;
 
   return (
-    <div className="grid grid-cols-3 gap-2">
+    <div className="grid gap-2">
       {onDeck && (
         <QueueTile
           title="On deck"
@@ -524,8 +529,8 @@ function BatteriesSection({ batteries }: { batteries: Battery[] }) {
   return (
     <div className="space-y-2">
       <h2 className="text-xs font-bold uppercase tracking-widest text-secondary-600">Batteries</h2>
-      <div className="bg-surface border border-secondary-200 rounded-xl p-3 sm:p-4">
-        <div className="grid gap-2 sm:grid-cols-3 sm:gap-3">
+      <div className="@container bg-surface border border-secondary-200 rounded-xl p-3 sm:p-4">
+        <div className="grid gap-2 @md:grid-cols-3 @md:gap-3">
           <BatteryTile label="In Robot" battery={inRobot} state="In Robot" none="No battery" />
           <BatteryTile label="Next Up" battery={nextUp} state="Next Up" none="None" />
           <BatteryTile label="Charging" battery={longestCharging} state="Charging" none="None" />
@@ -841,39 +846,57 @@ export function PitMonitorPage() {
           <SnapshotClock clockMs={monitor.snapshot.clockMs} onMoved={() => void loadAll()} />
         )}
 
-        {/* Main grid: on a wide screen it ends at the bottom of the window, and the match list
-            and checklists scroll inside their columns instead of the page scrolling. */}
+        {/* Main grid: three columns on a wide screen, ending at the bottom of the window, with the
+            match list and the checklists scrolling inside their columns. Our next match and the
+            match list take the left two; the event's queue, batteries, logs and checklists the
+            right. On a narrower screen the areas' wrappers are `contents` and every part is in
+            one column, ordered by `order`: our match, then the queue, the pit and batteries. */}
         <div
           ref={gridRef}
-          className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:grid-rows-[minmax(0,1fr)]"
+          className="grid grid-cols-1 gap-5 xl:grid-cols-3 xl:grid-rows-[minmax(0,1fr)]"
           style={fitHeight ? { height: fitHeight } : undefined}
         >
-          {/* Left: our next match, with the event's queue under it (only with real Nexus data), who's
-              in the pit, the ranking and the team's matches. In the column, so the right one starts
-              at the top instead of under it. */}
-          <div className="flex min-h-0 flex-col gap-5">
-            <div className="space-y-2">
+          <div className="contents xl:col-span-2 xl:flex xl:min-h-0 xl:flex-col xl:gap-5">
+            <div className="order-1 xl:order-none">
               <OurNextMatchPanel
                 ourMatches={monitor?.ourMatches ?? null}
                 fromNexus={!!nexus?.isRealNexus}
-              />
-              {nexus?.isRealNexus && <NexusSection nexus={nexus} teamNumber={teamNumber} />}
-            </div>
-            {inThePit && <InThePitSection people={inThePit} />}
-            {monitor?.ranking && (
-              <RankingSection
-                ranking={monitor.ranking}
-                contextRankings={monitor.contextRankings}
                 teamNumber={teamNumber}
               />
+            </div>
+            {hasNexus && nexus && (
+              <div className={`order-5 xl:order-none ${SCROLL_SECTION}`}>
+                <MatchesSection nexus={nexus} teamNumber={teamNumber} />
+              </div>
             )}
-            {hasNexus && nexus && <MatchesSection nexus={nexus} teamNumber={teamNumber} />}
+            {(monitor?.ranking || inThePit) && (
+              <div className="contents xl:grid xl:shrink-0 xl:grid-cols-2 xl:gap-5 xl:[&>:only-child]:col-span-2">
+                {monitor?.ranking && (
+                  <div className="order-6 xl:order-none">
+                    <RankingSection
+                      ranking={monitor.ranking}
+                      contextRankings={monitor.contextRankings}
+                      teamNumber={teamNumber}
+                    />
+                  </div>
+                )}
+                {inThePit && (
+                  <div className="order-3 xl:order-none">
+                    <InThePitSection people={inThePit} />
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
-          {/* Right: the stream (when set) + logs + batteries + checklist + issues */}
-          <div className="flex min-h-0 flex-col gap-5">
+          <div className="contents xl:flex xl:min-h-0 xl:flex-col xl:gap-5">
+            {nexus?.isRealNexus && (
+              <div className="order-2 xl:order-none">
+                <NexusSection nexus={nexus} teamNumber={teamNumber} />
+              </div>
+            )}
             {iframeUrl && (
-              <div className="space-y-2">
+              <div className="order-9 space-y-2 xl:order-none">
                 <h2 className="text-xs font-bold uppercase tracking-widest text-secondary-600">
                   Monitor Feed
                 </h2>
@@ -881,17 +904,24 @@ export function PitMonitorPage() {
                   <iframe
                     src={iframeUrl}
                     title="Custom monitor feed"
-                    className="w-full"
-                    style={{ height: "500px" }}
+                    className="aspect-video w-full"
                     frameBorder="0"
                     allowFullScreen
                   />
                 </div>
               </div>
             )}
-            {logsBox && <LogsSection downloader={logsBox.downloader} logs={logsBox.logs} />}
-            <BatteriesSection batteries={batteries} />
-            <ChecklistSection lists={lists} issues={issues} />
+            <div className="order-4 xl:order-none">
+              <BatteriesSection batteries={batteries} />
+            </div>
+            {logsBox && (
+              <div className="order-7 xl:order-none">
+                <LogsSection downloader={logsBox.downloader} logs={logsBox.logs} />
+              </div>
+            )}
+            <div className={`order-8 xl:order-none ${SCROLL_SECTION}`}>
+              <ChecklistSection lists={lists} issues={issues} />
+            </div>
           </div>
         </div>
       </div>

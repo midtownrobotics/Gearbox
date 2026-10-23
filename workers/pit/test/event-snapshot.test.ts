@@ -61,8 +61,8 @@ describe("event snapshot", () => {
     expect(data.ourMatches?.next).toMatchObject({
       label: "Qualification 35",
       alliance: "blue",
-      partners: ["4026", "6905"],
-      opponents: ["1746", "3344", "5109"],
+      blueTeams: ["1648", "4026", "6905"],
+      redTeams: ["1746", "3344", "5109"],
       status: "Queuing soon",
       matchesUntilQueuing: 2,
       matchesUntilField: 4,

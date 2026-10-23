@@ -204,7 +204,7 @@ See "What landed". What it settled, and what it left:
   - The checklist editor has a Checklist card (Name, Description, Save) and one Edit button per row, which opens the row's name, description and Delete. It had a rename mark, a delete mark and a click on the description.
   - Button labels are sentence case, so "Archive and Reset" is "Archive and reset".
 - **Left as they are:**
-  - The Monitor's layout, and its red, amber and green for On Deck, Now Queuing and Queuing Soon: a wall display read from across the pit. Since then the Monitor leads with "Our next match" (`plugins/pit-monitor/our-next-match.tsx`), whose card goes from the surface color to green, amber and red as our match nears the field; the event's three tiles are smaller, under it. Those colors mean how urgent it is, so they stay fixed; everything else on it takes the team's tokens.
+  - The Monitor's layout, and its red, amber and green for On Deck, Now Queuing and Queuing Soon: a wall display read from across the pit. Since then the Monitor is three columns on a wide screen and leads with "Our next match" (`plugins/pit-monitor/our-next-match.tsx`), whose card goes from the surface color to green, amber and red as our match nears the field; the event's three tiles are one under another at the top right. The match's alliances are filled with the red and blue of the field. Those colors mean how urgent it is, so they stay fixed; everything else on it takes the team's tokens.
   - The reorder arrows (▲ ▼) and the → on a row. They wait for the Lucide icons, which no step has added yet.
   - The installed app's splash colors (the `manifest` in `apps/pit/vite.config.ts`), which are still the dark ones.
 

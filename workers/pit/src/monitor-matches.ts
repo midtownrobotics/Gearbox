@@ -142,8 +142,9 @@ export function withResults(nexusMatches: unknown[], tbaMatches: TbaMatch[]): un
 export interface OurNextMatch {
   label: string;
   alliance: "red" | "blue";
-  partners: string[];
-  opponents: string[];
+  /** Each alliance's teams by driver station (1, 2, 3); "" for one not known yet. */
+  redTeams: string[];
+  blueTeams: string[];
   /** Where Nexus says it is; null on The Blue Alliance's schedule, which doesn't say. */
   status: NexusStatus | null;
   /**
@@ -169,6 +170,10 @@ const STEPS: NexusStatus[] = ["Queuing soon", "Now queuing", "On deck", "On fiel
 
 const teamList = (teams: unknown) =>
   Array.isArray(teams) ? teams.filter((team) => team != null && team !== "").map(String) : [];
+
+/** An alliance's teams by station, keeping a place for one not known yet. */
+const stations = (teams: unknown) =>
+  Array.isArray(teams) ? teams.map((team) => (team == null ? "" : String(team))) : [];
 
 const msOrNull = (value: unknown) => (typeof value === "number" && value > 0 ? value : null);
 
@@ -200,17 +205,19 @@ export function ourSchedule(
   // The last match called to queue.
   const called = fromNexus ? lastIndex((match) => statusOf(match) >= 1) : -1;
 
-  const ours = list.flatMap((match, index) => {
-    const red = teamList(match.redTeams);
-    const blue = teamList(match.blueTeams);
-    if (red.includes(teamNumber)) return [{ match, index, ourSide: red, theirSide: blue }];
-    if (blue.includes(teamNumber)) return [{ match, index, ourSide: blue, theirSide: red }];
-    return [];
-  });
+  const ours = list.flatMap(
+    (match, index): { match: NexusMatch; index: number; alliance: "red" | "blue" }[] => {
+      const red = teamList(match.redTeams);
+      const blue = teamList(match.blueTeams);
+      if (red.includes(teamNumber)) return [{ match, index, alliance: "red" }];
+      if (blue.includes(teamNumber)) return [{ match, index, alliance: "blue" }];
+      return [];
+    },
+  );
   const found = ours.find(({ match, index }) => !match.result && index >= onField);
   if (!found) return { next: null, total: ours.length };
 
-  const { match, index, ourSide, theirSide } = found;
+  const { match, index, alliance } = found;
   const step = statusOf(match);
   const times = match.times ?? {};
   const actualQueue = msOrNull(times.actualQueueTime);
@@ -218,9 +225,9 @@ export function ourSchedule(
     total: ours.length,
     next: {
       label: typeof match.label === "string" ? match.label : "",
-      alliance: teamList(match.redTeams).includes(teamNumber) ? "red" : "blue",
-      partners: ourSide.filter((team) => team !== teamNumber),
-      opponents: theirSide,
+      alliance,
+      redTeams: stations(match.redTeams),
+      blueTeams: stations(match.blueTeams),
       status: step >= 0 ? STEPS[step] : null,
       matchesUntilQueuing: fromNexus && step <= 0 ? Math.max(1, index - called) : null,
       matchesUntilField: index - onField,

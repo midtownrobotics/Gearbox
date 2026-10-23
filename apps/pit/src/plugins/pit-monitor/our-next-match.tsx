@@ -41,96 +41,121 @@ function urgencyOf(next: OurNextMatch): Urgency {
   return near ? "soon" : "later";
 }
 
-const matches = (count: number) => `${count} ${count === 1 ? "match" : "matches"}`;
-
 const ALLIANCE = {
-  red: { name: "Red alliance", fill: "bg-red-600 text-white", team: "bg-red-100 text-red-700" },
-  blue: {
-    name: "Blue alliance",
-    fill: "bg-blue-600 text-white",
-    team: "bg-blue-100 text-blue-700",
-  },
+  red: { name: "Red alliance", fill: "bg-red-700" },
+  blue: { name: "Blue alliance", fill: "bg-blue-700" },
 };
 
-function Teams({ label, teams, color }: { label: string; teams: string[]; color: string }) {
+/** One alliance's teams by station, ours ringed and bold. */
+function AllianceTeams({
+  side,
+  teams,
+  teamNumber,
+}: { side: "red" | "blue"; teams: string[]; teamNumber: string }) {
   return (
-    <div className="flex flex-wrap items-baseline gap-1.5">
-      <span className="text-xs font-semibold uppercase tracking-wide text-secondary-600">
-        {label}
-      </span>
-      {teams.length === 0 ? (
-        <span className="text-secondary-500">—</span>
-      ) : (
-        teams.map((team) => (
-          <span key={team} className={`rounded px-2 py-0.5 font-bold tabular-nums ${color}`}>
-            {team}
-          </span>
-        ))
-      )}
+    <div
+      className={`flex flex-wrap items-center justify-evenly gap-0.5 px-1 py-2 sm:gap-1 sm:px-2 ${ALLIANCE[side].fill}`}
+    >
+      <span className="sr-only">{ALLIANCE[side].name}:</span>
+      {(teams.length ? teams : [""]).map((team, station) => (
+        <span
+          // Stations keep their place, even for a team not known yet.
+          // biome-ignore lint/suspicious/noArrayIndexKey: a station is its place in the list
+          key={station}
+          className={`rounded px-1.5 py-0.5 text-base tabular-nums text-white sm:px-2 sm:text-xl ${
+            team === teamNumber
+              ? "bg-black/25 font-black ring-2 ring-white"
+              : "font-semibold opacity-85"
+          }`}
+        >
+          {team || "—"}
+        </span>
+      ))}
     </div>
   );
 }
 
-/** A countdown with its clock time beside it, one of a row across the card. */
+/**
+ * The match in our alliance's color: its name across the top, flowing into our half below, with
+ * blue always on the left and red on the right.
+ */
+function AllianceBoard({ next, teamNumber }: { next: OurNextMatch; teamNumber: string }) {
+  const ours = ALLIANCE[next.alliance];
+  return (
+    <div className="overflow-hidden rounded-lg text-white">
+      <div
+        className={`flex flex-wrap items-end justify-between gap-x-3 px-4 pt-3 pb-2 ${ours.fill}`}
+      >
+        <div className="min-w-0">
+          <h2 className="text-xs font-bold uppercase tracking-widest opacity-85">Our next match</h2>
+          <p className="text-3xl font-black sm:text-4xl">{next.label}</p>
+        </div>
+        <p className="pb-1 text-sm font-bold">{ours.name}</p>
+      </div>
+      <div className="grid grid-cols-2">
+        <AllianceTeams side="blue" teams={next.blueTeams} teamNumber={teamNumber} />
+        <AllianceTeams side="red" teams={next.redTeams} teamNumber={teamNumber} />
+      </div>
+    </div>
+  );
+}
+
+/** A countdown under its label and clock time, centered in its third of the row. */
 function Time({ label, at, accent }: { label: string; at: number; accent: string }) {
   return (
-    <div className="min-w-0">
-      <p className="text-xs font-semibold uppercase tracking-wide text-secondary-600">{label}</p>
-      <p className="flex flex-wrap items-baseline gap-x-2">
-        <span className={`text-xl font-black tabular-nums sm:text-3xl ${accent}`}>
-          <Countdown targetMs={at} />
-        </span>
-        <span className="text-xs tabular-nums text-secondary-600 sm:text-sm">{formatTime(at)}</span>
+    <div className="min-w-0 text-center">
+      <p className="flex flex-wrap items-baseline justify-center gap-x-2 text-xs font-semibold uppercase tracking-wide text-secondary-600">
+        <span>{label}</span>
+        <span className="tabular-nums normal-case font-normal">{formatTime(at)}</span>
+      </p>
+      <p className={`text-2xl font-black tabular-nums @lg:text-4xl @3xl:text-5xl ${accent}`}>
+        <Countdown targetMs={at} />
       </p>
     </div>
   );
 }
 
 /**
- * Where our match is, at the card's top right: the matches until we're called, or once we have
- * been, Nexus's status and the matches until we're on the field.
+ * Where our match is, filling the card's height on the right: the matches until we're called on
+ * three lines, or once we have been, Nexus's status on two.
  */
 function Headline({ next, accent }: { next: OurNextMatch; accent: string }) {
-  const big = `font-black leading-none tabular-nums ${accent}`;
   if (next.matchesUntilQueuing !== null || next.status === null) {
     // Before the call (or no calls at all, on The Blue Alliance's schedule): the count is what
     // the pit reads from across the room.
+    const queuing = next.matchesUntilQueuing !== null;
     const count = next.matchesUntilQueuing ?? next.matchesUntilField;
     return (
-      <div>
-        <p className="text-sm font-bold uppercase tracking-widest text-secondary-600">
-          {next.matchesUntilQueuing !== null ? "Queuing in" : "Matches before ours"}
+      <>
+        <p className="text-lg font-bold uppercase tracking-widest text-secondary-600">
+          {queuing ? "Queuing in" : "Matches before"}
         </p>
-        <p className="mt-1 flex items-baseline gap-3 sm:justify-end">
-          <span className={`text-7xl ${big}`}>{count}</span>
-          {next.matchesUntilQueuing !== null && (
-            <span className="text-2xl font-bold text-secondary-700">
-              {count === 1 ? "match" : "matches"}
-            </span>
-          )}
+        <p className={`text-8xl font-black leading-[0.8] tabular-nums sm:text-9xl ${accent}`}>
+          {count}
         </p>
-      </div>
+        <p className="text-2xl font-bold text-secondary-700 sm:text-3xl">
+          {queuing ? (count === 1 ? "match" : "matches") : "ours"}
+        </p>
+      </>
     );
   }
-  const toField = next.matchesUntilField;
   return (
-    <div>
-      <p className={`text-5xl ${big}`}>{next.status}</p>
-      <p className="mt-2 text-xl font-bold text-secondary-700">
-        {toField === 0
-          ? "Playing now"
-          : toField === 1
-            ? "On field next"
-            : `On field in ${matches(toField)}`}
-      </p>
-    </div>
+    <p className={`text-5xl font-black leading-none sm:text-6xl ${accent}`}>
+      {next.status.split(" ").map((word) => (
+        <span key={word} className="block">
+          {word}
+        </span>
+      ))}
+    </p>
   );
 }
 
-function NextMatch({ next, fromNexus }: { next: OurNextMatch; fromNexus: boolean }) {
+function NextMatch({
+  next,
+  fromNexus,
+  teamNumber,
+}: { next: OurNextMatch; fromNexus: boolean; teamNumber: string }) {
   const style = URGENCY[urgencyOf(next)];
-  const ours = ALLIANCE[next.alliance];
-  const theirs = ALLIANCE[next.alliance === "red" ? "blue" : "red"];
   const called = next.status !== null && next.status !== "Queuing soon";
   const onField = next.status === "On field";
   const times = [
@@ -141,43 +166,29 @@ function NextMatch({ next, fromNexus }: { next: OurNextMatch; fromNexus: boolean
     next.startTime ? { label: "Start", at: next.startTime } : null,
   ].filter((time) => time !== null);
   return (
-    <div className={`rounded-xl border p-4 sm:p-5 ${style.card}`}>
-      {/* Side by side where there's room (not in the Monitor's narrower columns). */}
-      <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto] lg:grid-cols-1 xl:grid-cols-[minmax(0,1fr)_auto]">
-        <div className="min-w-0">
-          <h2 className="text-xs font-bold uppercase tracking-widest text-secondary-600">
-            Our next match
-          </h2>
-          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
-            <p className="text-3xl font-black text-secondary-900 sm:text-4xl">{next.label}</p>
-            <span className={`rounded-md px-2.5 py-1 text-sm font-bold ${ours.fill}`}>
-              {ours.name}
-            </span>
+    <div
+      className={`grid gap-4 rounded-xl border p-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:p-4 ${style.card}`}
+    >
+      <div className="min-w-0 space-y-3">
+        <AllianceBoard next={next} teamNumber={teamNumber} />
+        {times.length > 0 && (
+          <div className="@container grid auto-cols-fr grid-flow-col gap-3">
+            {times.map((time) => (
+              <Time key={time.label} label={time.label} at={time.at} accent={style.accent} />
+            ))}
           </div>
-          <div className="mt-3 flex flex-wrap gap-x-6 gap-y-2">
-            <Teams label="With" teams={next.partners} color={ours.team} />
-            <Teams label="Against" teams={next.opponents} color={theirs.team} />
-          </div>
-        </div>
-        <div className="sm:text-right lg:text-left xl:text-right">
-          <Headline next={next} accent={style.accent} />
-        </div>
+        )}
+        {(!fromNexus || next.timesFrom === "tba") && (
+          <p className="text-xs text-secondary-600">
+            {fromNexus
+              ? "Times are from The Blue Alliance's schedule."
+              : "Nexus isn't set up for this event, so times are from The Blue Alliance's schedule."}
+          </p>
+        )}
       </div>
-
-      {times.length > 0 && (
-        <div className="mt-4 grid auto-cols-fr grid-flow-col gap-3 border-t border-secondary-200 pt-3">
-          {times.map((time) => (
-            <Time key={time.label} label={time.label} at={time.at} accent={style.accent} />
-          ))}
-        </div>
-      )}
-      {(!fromNexus || next.timesFrom === "tba") && (
-        <p className="mt-3 text-xs text-secondary-600">
-          {fromNexus
-            ? "Times are from The Blue Alliance's schedule."
-            : "Nexus isn't set up for this event, so times are from The Blue Alliance's schedule."}
-        </p>
-      )}
+      <div className="flex min-w-48 flex-col items-center justify-center gap-3 text-center sm:px-4">
+        <Headline next={next} accent={style.accent} />
+      </div>
     </div>
   );
 }
@@ -189,8 +200,10 @@ function NextMatch({ next, fromNexus }: { next: OurNextMatch; fromNexus: boolean
 export function OurNextMatchPanel({
   ourMatches,
   fromNexus,
-}: { ourMatches: OurSchedule | null; fromNexus: boolean }) {
-  if (ourMatches?.next) return <NextMatch next={ourMatches.next} fromNexus={fromNexus} />;
+  teamNumber,
+}: { ourMatches: OurSchedule | null; fromNexus: boolean; teamNumber: string }) {
+  if (ourMatches?.next)
+    return <NextMatch next={ourMatches.next} fromNexus={fromNexus} teamNumber={teamNumber} />;
   const message = !ourMatches
     ? "No match schedule yet. An admin sets the event on Pit's Admin page."
     : ourMatches.total === 0
