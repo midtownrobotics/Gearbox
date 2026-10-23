@@ -34,7 +34,8 @@ const qual13: TbaMatch = {
 
 describe("match results", () => {
   it("reads a played match's score and winner, and nothing before it's played", () => {
-    expect(tbaResult(qual12)).toEqual({ red: 40, blue: 55, winner: "blue" });
+    // A season Gearbox doesn't know the bonus RPs of: no dots.
+    expect(tbaResult(qual12)).toEqual({ red: 40, blue: 55, winner: "blue", bonus: null });
     expect(tbaResult(qual13)).toBeNull();
     const tie = {
       ...qual12,
@@ -42,6 +43,23 @@ describe("match results", () => {
       alliances: { red: { score: 7 }, blue: { score: 7 } },
     };
     expect(tbaResult(tie)?.winner).toBe("tie");
+  });
+
+  it("reads a qualification match's bonus RPs for the season, and none for a playoff", () => {
+    const played: TbaMatch = {
+      ...qual12,
+      key: "2026test_qm12",
+      score_breakdown: {
+        red: { energizedAchieved: true, superchargedAchieved: false, traversalAchieved: true },
+        blue: { energizedAchieved: false, superchargedAchieved: false, traversalAchieved: false },
+      },
+    };
+    expect(tbaResult(played)?.bonus).toEqual({
+      labels: ["Energized Bonus", "Supercharged Bonus", "Traversal Bonus"],
+      red: [true, false, true],
+      blue: [false, false, false],
+    });
+    expect(tbaResult({ ...played, key: "2026test_sf1m1", comp_level: "sf" })?.bonus).toBeNull();
   });
 
   it("adds The Blue Alliance's scores to Nexus's matches by name and teams", () => {

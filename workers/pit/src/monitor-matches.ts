@@ -18,10 +18,59 @@ export interface TbaMatch {
   /** "red", "blue", or "" for a tie or a match not played yet. */
   winning_alliance?: string | null;
   alliances?: { blue?: TbaAlliance; red?: TbaAlliance };
+  /** The season's scoring details for each alliance; null until it's been played. */
+  score_breakdown?: { red?: Record<string, unknown>; blue?: Record<string, unknown> } | null;
 }
 
+/** Which of a qualification match's bonus ranking points each alliance earned, in order. */
+export type BonusRp = { labels: string[]; red: boolean[]; blue: boolean[] };
+
 /** A played match's score. `winner` takes a playoff tiebreaker into account. */
-export type MatchResult = { red: number; blue: number; winner: "red" | "blue" | "tie" };
+export type MatchResult = {
+  red: number;
+  blue: number;
+  winner: "red" | "blue" | "tie";
+  /** Qualification matches only, and only for a season Gearbox knows (`BONUS_RP`). */
+  bonus?: BonusRp | null;
+};
+
+/**
+ * Each season's bonus ranking points, as The Blue Alliance names them, with the field of
+ * `score_breakdown` that says an alliance earned it. The Blue Alliance shows them as dots by the
+ * score; the Monitor does the same. A new season adds its row.
+ */
+export const BONUS_RP: Record<number, { label: string; field: string }[]> = {
+  2023: [
+    { label: "Sustainability Bonus", field: "sustainabilityBonusAchieved" },
+    { label: "Activation Bonus", field: "activationBonusAchieved" },
+  ],
+  2024: [
+    { label: "Melody Bonus", field: "melodyBonusAchieved" },
+    { label: "Ensemble Bonus", field: "ensembleBonusAchieved" },
+  ],
+  2025: [
+    { label: "Auto Bonus", field: "autoBonusAchieved" },
+    { label: "Coral Bonus", field: "coralBonusAchieved" },
+    { label: "Barge Bonus", field: "bargeBonusAchieved" },
+  ],
+  2026: [
+    { label: "Energized Bonus", field: "energizedAchieved" },
+    { label: "Supercharged Bonus", field: "superchargedAchieved" },
+    { label: "Traversal Bonus", field: "traversalAchieved" },
+  ],
+};
+
+/** A played qualification match's bonus ranking points, or null when there's nothing to show. */
+function tbaBonusRp(match: TbaMatch): BonusRp | null {
+  const season = BONUS_RP[Number(match.key?.slice(0, 4))];
+  const { red, blue } = match.score_breakdown ?? {};
+  if (match.comp_level !== "qm" || !season || !red || !blue) return null;
+  return {
+    labels: season.map((rp) => rp.label),
+    red: season.map((rp) => red[rp.field] === true),
+    blue: season.map((rp) => blue[rp.field] === true),
+  };
+}
 
 /** Where Nexus says a match is. A match that's been played stays "On field". */
 export type NexusStatus = "Queuing soon" | "Now queuing" | "On deck" | "On field";
@@ -54,7 +103,7 @@ export function tbaResult(match: TbaMatch): MatchResult | null {
         : blue > red
           ? "blue"
           : "tie";
-  return { red, blue, winner };
+  return { red, blue, winner, bonus: tbaBonusRp(match) };
 }
 
 /** When a Blue Alliance match starts (predicted, else scheduled) and queues, in ms. */

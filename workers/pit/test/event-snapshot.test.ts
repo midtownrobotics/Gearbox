@@ -54,6 +54,14 @@ describe("event snapshot", () => {
     expect(matches).toHaveLength(59);
     expect(matches.filter((m) => m.result).length).toBe(30);
     expect(matches[30]).toMatchObject({ label: "Qualification 31", status: "On field" });
+    // Qualification 29's blue alliance earned the Energized Bonus.
+    expect(matches[28].result).toMatchObject({
+      blue: 220,
+      bonus: {
+        labels: ["Energized Bonus", "Supercharged Bonus", "Traversal Bonus"],
+        blue: [true, false, false],
+      },
+    });
     expect(matches[33].status).toBe("Queuing soon");
     // Its clock starts when it was switched on: Qualification 31 starts then.
     expect(matches[30].times.estimatedStartTime).toBeGreaterThanOrEqual(before);

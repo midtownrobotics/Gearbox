@@ -6,6 +6,7 @@ import { validator } from "hono/validator";
 import { type Db, createDb } from "./db";
 import { settings } from "./db/schema";
 import {
+  BONUS_RP,
   type MatchResult,
   type NexusStatus,
   contextRankingsFor,
@@ -37,7 +38,13 @@ type SnapshotMatch = {
   /** When it was to start, in ms from the moment the snapshot was taken. */
   startOffsetMs: number;
   /** Its score, for the matches played by then. */
-  result?: { red: number; blue: number; winner: string };
+  result?: {
+    red: number;
+    blue: number;
+    winner: string;
+    /** Which bonus RPs each alliance earned, in the season's order (`BONUS_RP`). */
+    bonus?: { red: boolean[]; blue: boolean[] };
+  };
 };
 
 type Snapshot = {
@@ -94,6 +101,17 @@ export function statusesAt(starts: number[], clock: number): NexusStatus[] {
   });
 }
 
+/** A played match's score as `GET /monitor/data` gives it, with its bonus RPs' names. */
+function resultOf(match: SnapshotMatch): MatchResult | null {
+  if (!match.result) return null;
+  const { bonus, ...score } = match.result;
+  const season = BONUS_RP[Number(snapshot.event.slice(0, 4))];
+  return {
+    ...(score as Omit<MatchResult, "bonus">),
+    bonus: bonus && season ? { labels: season.map((rp) => rp.label), ...bonus } : null,
+  };
+}
+
 /** Dev (a local gateway) and staging; never production. */
 export const snapshotAvailable = (env: Pick<Bindings, "LOCAL_GATEWAY_URL">) =>
   isStaging || Boolean(env.LOCAL_GATEWAY_URL);
@@ -128,7 +146,7 @@ export async function snapshotMonitorData(env: Bindings, db: Db, team: string) {
         estimatedOnFieldTime: start - ON_FIELD_BEFORE_MS,
         estimatedStartTime: start,
       },
-      result: scored ? ((match.result as MatchResult | undefined) ?? null) : null,
+      result: scored ? resultOf(match) : null,
     };
   });
   return {

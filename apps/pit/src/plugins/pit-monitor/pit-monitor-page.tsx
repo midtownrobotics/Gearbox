@@ -62,7 +62,13 @@ type NexusMatchTime = {
 };
 
 /** A played match's score, from The Blue Alliance. */
-type MatchResult = { red: number; blue: number; winner: "red" | "blue" | "tie" };
+type MatchResult = {
+  red: number;
+  blue: number;
+  winner: "red" | "blue" | "tie";
+  /** Which bonus ranking points each alliance earned (qualification matches). */
+  bonus?: { labels: string[]; red: boolean[]; blue: boolean[] } | null;
+};
 
 type NexusMatch = {
   label: string;
@@ -136,7 +142,10 @@ function useFitToWindow(ref: RefObject<HTMLElement | null>, ready: boolean): num
 
 // ── Sections ───────────────────────────────────────────────────────────────
 
-/** One of the event's queue tiles, on one line: a match, and when it's due on the field or to queue. */
+/**
+ * One of the event's up-next matches, laid out like a battery tile: its place in the queue, the
+ * match, and when it's due on the field or to queue.
+ */
 function QueueTile({
   title,
   match,
@@ -152,30 +161,31 @@ function QueueTile({
 }) {
   return (
     <div
-      className={`flex min-w-0 items-center justify-between gap-3 rounded-lg border px-3 py-2 ${colors} ${ours ? "ring-2 ring-current" : ""}`}
+      className={`min-w-0 rounded-xl border px-3 py-2 ${colors} ${ours ? "ring-2 ring-current" : ""}`}
     >
-      <div className="min-w-0">
-        <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest">
-          <span className="truncate">{title}</span>
-          {ours && <span className="shrink-0">· Us</span>}
-        </p>
-        <p className="truncate text-lg font-bold text-secondary-900">
-          {match.label.replace(/^Qualification\b/, "Qual")}
-        </p>
-      </div>
-      {until.at && (
-        <p className="shrink-0 text-right text-xs text-secondary-600">
-          {until.label}
-          <span className="block text-base font-bold tabular-nums text-secondary-900">
-            <Countdown targetMs={until.at} />
-          </span>
-        </p>
-      )}
+      <p className="flex items-baseline justify-between gap-2 text-xs font-bold uppercase tracking-widest">
+        <span className="truncate">{title}</span>
+        {ours && <span className="shrink-0">Us</span>}
+      </p>
+      <p className="truncate text-xl font-black text-secondary-900">
+        {match.label.replace(/^Qualification\b/, "Qual")}
+      </p>
+      {/* Kept a line tall without a time, so the three tiles stay the same height. */}
+      <p className="min-h-4 truncate text-xs tabular-nums text-secondary-600">
+        {until.at && (
+          <>
+            {until.label} <Countdown targetMs={until.at} />
+          </>
+        )}
+      </p>
     </div>
   );
 }
 
-/** Where the event is: the matches On deck, Now queuing and Queuing soon, one under another. */
+/**
+ * Where the event is: the matches On deck, Now queuing and Queuing soon, three across like the
+ * batteries when their column is wide enough.
+ */
 function NexusSection({ nexus, teamNumber }: { nexus: NexusData; teamNumber: string }) {
   const onDeck = nexus.matches.find((m) => m.status === "On deck");
   const nowQueuing = nexus.matches.find((m) => m.status === "Now queuing");
@@ -184,34 +194,39 @@ function NexusSection({ nexus, teamNumber }: { nexus: NexusData; teamNumber: str
   if (!onDeck && !nowQueuing && !queuingSoon) return null;
 
   return (
-    <div className="grid gap-2">
-      {onDeck && (
-        <QueueTile
-          title="On deck"
-          match={onDeck}
-          colors="border-red-300 bg-red-50 text-red-700"
-          ours={teamInMatch(onDeck, teamNumber)}
-          until={{ label: "On field in", at: onDeck.times.estimatedOnFieldTime }}
-        />
-      )}
-      {nowQueuing && (
-        <QueueTile
-          title="Now queuing"
-          match={nowQueuing}
-          colors="border-amber-300 bg-amber-50 text-amber-700"
-          ours={teamInMatch(nowQueuing, teamNumber)}
-          until={{ label: "On field in", at: nowQueuing.times.estimatedOnFieldTime }}
-        />
-      )}
-      {queuingSoon && (
-        <QueueTile
-          title="Queuing soon"
-          match={queuingSoon}
-          colors="border-emerald-300 bg-emerald-50 text-emerald-700"
-          ours={teamInMatch(queuingSoon, teamNumber)}
-          until={{ label: "Queue in", at: queuingSoon.times.estimatedQueueTime }}
-        />
-      )}
+    <div className="space-y-2">
+      <h2 className="text-xs font-bold uppercase tracking-widest text-secondary-600">Up next</h2>
+      <div className="@container bg-surface border border-secondary-200 rounded-xl p-3 sm:p-4">
+        <div className="grid gap-2 @md:grid-cols-3 @md:gap-3">
+          {onDeck && (
+            <QueueTile
+              title="On deck"
+              match={onDeck}
+              colors="border-red-300 bg-red-50 text-red-700"
+              ours={teamInMatch(onDeck, teamNumber)}
+              until={{ label: "On field in", at: onDeck.times.estimatedOnFieldTime }}
+            />
+          )}
+          {nowQueuing && (
+            <QueueTile
+              title="Now queuing"
+              match={nowQueuing}
+              colors="border-amber-300 bg-amber-50 text-amber-700"
+              ours={teamInMatch(nowQueuing, teamNumber)}
+              until={{ label: "On field in", at: nowQueuing.times.estimatedOnFieldTime }}
+            />
+          )}
+          {queuingSoon && (
+            <QueueTile
+              title="Queuing soon"
+              match={queuingSoon}
+              colors="border-emerald-300 bg-emerald-50 text-emerald-700"
+              ours={teamInMatch(queuingSoon, teamNumber)}
+              until={{ label: "Queue in", at: queuingSoon.times.estimatedQueueTime }}
+            />
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -244,6 +259,33 @@ function Score({
   if (!result) return <span className="text-secondary-400">—</span>;
   const won = result.winner === side;
   return <span className={`${color} ${won ? "font-black" : "font-medium"}`}>{result[side]}</span>;
+}
+
+/**
+ * A played qualification match's bonus ranking points for one alliance, as The Blue Alliance shows
+ * them: a filled dot for each one earned, an empty one for each not.
+ */
+function RpDots({ match, side }: { match: NexusMatch; side: "red" | "blue" }) {
+  const bonus = match.result?.bonus;
+  if (!bonus) return null;
+  const earned = bonus.labels.filter((_, index) => bonus[side][index]);
+  return (
+    <span
+      role="img"
+      aria-label={earned.length ? earned.join(", ") : "No bonus RPs"}
+      className="inline-flex gap-0.5"
+    >
+      {bonus[side].map((got, index) => (
+        <span
+          key={bonus.labels[index]}
+          title={bonus.labels[index]}
+          className={`size-2 rounded-full ${
+            got ? (side === "red" ? "bg-red-600" : "bg-blue-600") : "border border-secondary-400"
+          }`}
+        />
+      ))}
+    </span>
+  );
 }
 
 /**
@@ -299,14 +341,13 @@ function MatchesSection({
               className="sticky top-0 z-10 bg-surface shadow-[inset_0_-1px_0_var(--g3-line)]"
             >
               <tr className="text-secondary-600 text-xs uppercase tracking-wide">
-                <th className="text-left px-3 py-2 font-semibold">Match</th>
-                <th className="text-left px-3 py-2 font-semibold">Queue</th>
-                <th className="text-left px-3 py-2 font-semibold">Start</th>
-                <th className="text-left px-3 py-2 font-semibold">Blue</th>
+                <th className="text-left px-2 py-2 font-semibold">Match</th>
+                <th className="text-left px-2 py-2 font-semibold">Queue</th>
+                <th className="text-left px-2 py-2 font-semibold">Blue</th>
                 <th colSpan={2} className="px-2 py-2 text-center font-semibold">
                   Score
                 </th>
-                <th className="text-left px-3 py-2 font-semibold">Red</th>
+                <th className="text-left px-2 py-2 font-semibold">Red</th>
               </tr>
             </thead>
             <tbody>
@@ -318,29 +359,24 @@ function MatchesSection({
                     className={`border-b border-secondary-200/50 last:border-0 ${played ? "" : "bg-primary-50"}`}
                   >
                     <td
-                      className={`whitespace-nowrap px-3 py-2.5 font-semibold ${played ? "text-secondary-900" : "text-primary-700"}`}
+                      className={`whitespace-nowrap px-2 py-2.5 font-semibold ${played ? "text-secondary-900" : "text-primary-700"}`}
                     >
                       {m.label.replace(/^Qualification\b/, "Qual")}
                     </td>
                     {played ? (
-                      <td colSpan={2} className="px-3 py-2.5 text-base">
+                      <td className="px-2 py-2.5 text-base">
                         <MatchOutcome match={m} teamNumber={teamNumber} />
                       </td>
                     ) : (
-                      <>
-                        <td className="whitespace-nowrap px-3 py-2.5 tabular-nums font-semibold text-primary-600">
-                          {m.times.actualQueueTime
-                            ? formatTime(m.times.actualQueueTime)
-                            : m.times.estimatedQueueTime
-                              ? formatTime(m.times.estimatedQueueTime)
-                              : "—"}
-                        </td>
-                        <td className="whitespace-nowrap px-3 py-2.5 tabular-nums font-semibold text-primary-600">
-                          {formatTime(m.times.estimatedStartTime)}
-                        </td>
-                      </>
+                      <td className="whitespace-nowrap px-2 py-2.5 tabular-nums font-semibold text-primary-600">
+                        {m.times.actualQueueTime
+                          ? formatTime(m.times.actualQueueTime)
+                          : m.times.estimatedQueueTime
+                            ? formatTime(m.times.estimatedQueueTime)
+                            : "—"}
+                      </td>
                     )}
-                    <td className="px-3 py-2.5">
+                    <td className="px-2 py-2.5">
                       <span
                         className={
                           m.blueTeams?.includes(teamNumber)
@@ -351,13 +387,19 @@ function MatchesSection({
                         {m.blueTeams?.filter(Boolean).join(", ")}
                       </span>
                     </td>
-                    <td className="py-2.5 pl-2 pr-1 text-right tabular-nums">
-                      <Score match={m} side="blue" />
+                    <td className="py-2.5 pl-2 pr-1 tabular-nums">
+                      <span className="flex items-center justify-end gap-1.5">
+                        <RpDots match={m} side="blue" />
+                        <Score match={m} side="blue" />
+                      </span>
                     </td>
-                    <td className="py-2.5 pl-1 pr-2 text-left tabular-nums">
-                      <Score match={m} side="red" />
+                    <td className="py-2.5 pl-1 pr-2 tabular-nums">
+                      <span className="flex items-center gap-1.5">
+                        <Score match={m} side="red" />
+                        <RpDots match={m} side="red" />
+                      </span>
                     </td>
-                    <td className="px-3 py-2.5">
+                    <td className="px-2 py-2.5">
                       <span
                         className={
                           m.redTeams?.includes(teamNumber)
@@ -391,8 +433,9 @@ function RankingSection({
   return (
     <div className="space-y-2">
       <h2 className="text-xs font-bold uppercase tracking-widest text-secondary-600">Ranking</h2>
-      <div className="bg-surface border border-secondary-200 rounded-xl p-5">
-        <div className="flex gap-6 items-start">
+      <div className="@container bg-surface border border-secondary-200 rounded-xl p-5">
+        {/* Side by side where the column is wide enough, else the rankings around us under it. */}
+        <div className="flex flex-col gap-4 @lg:flex-row @lg:items-start @lg:gap-6">
           {/* Left: rank info */}
           <div className="flex gap-6 shrink-0">
             {ranking.rank !== null && (
@@ -430,7 +473,7 @@ function RankingSection({
 
           {/* Right: context table if available */}
           {contextRankings && (
-            <div className="flex-1 pl-6 border-l border-secondary-300">
+            <div className="flex-1 border-t border-secondary-300 pt-4 @lg:border-t-0 @lg:border-l @lg:pt-0 @lg:pl-6">
               <div className="grid grid-cols-2 gap-4">
                 {/* Left: context (around us) */}
                 <div className="space-y-2">
@@ -846,11 +889,12 @@ export function PitMonitorPage() {
           <SnapshotClock clockMs={monitor.snapshot.clockMs} onMoved={() => void loadAll()} />
         )}
 
-        {/* Main grid: three columns on a wide screen, ending at the bottom of the window, with the
-            match list and the checklists scrolling inside their columns. Our next match and the
-            match list take the left two; the event's queue, batteries, logs and checklists the
-            right. On a narrower screen the areas' wrappers are `contents` and every part is in
-            one column, ordered by `order`: our match, then the queue, the pit and batteries. */}
+        {/* Main grid: three columns on a wide screen, ending at the bottom of the window. Our next
+            match takes the left two; under it, the match list (scrolling inside its column) and
+            the ranking, who's in the pit and the logs. The right column is up next, batteries, the
+            feed and the checklists (scrolling). On a narrower screen the areas' wrappers are
+            `contents` and every part is in one column, ordered by `order`: our match, then up
+            next, the pit and batteries. */}
         <div
           ref={gridRef}
           className="grid grid-cols-1 gap-5 xl:grid-cols-3 xl:grid-rows-[minmax(0,1fr)]"
@@ -864,13 +908,13 @@ export function PitMonitorPage() {
                 teamNumber={teamNumber}
               />
             </div>
-            {hasNexus && nexus && (
-              <div className={`order-5 xl:order-none ${SCROLL_SECTION}`}>
-                <MatchesSection nexus={nexus} teamNumber={teamNumber} />
-              </div>
-            )}
-            {(monitor?.ranking || inThePit) && (
-              <div className="contents xl:grid xl:shrink-0 xl:grid-cols-2 xl:gap-5 xl:[&>:only-child]:col-span-2">
+            <div className="contents xl:grid xl:min-h-0 xl:flex-1 xl:grid-cols-2 xl:grid-rows-[minmax(0,1fr)] xl:gap-5">
+              {hasNexus && nexus && (
+                <div className={`order-5 xl:order-none ${SCROLL_SECTION}`}>
+                  <MatchesSection nexus={nexus} teamNumber={teamNumber} />
+                </div>
+              )}
+              <div className="contents xl:col-start-2 xl:flex xl:min-h-0 xl:flex-col xl:gap-5 xl:overflow-y-auto">
                 {monitor?.ranking && (
                   <div className="order-6 xl:order-none">
                     <RankingSection
@@ -885,8 +929,13 @@ export function PitMonitorPage() {
                     <InThePitSection people={inThePit} />
                   </div>
                 )}
+                {logsBox && (
+                  <div className="order-7 xl:order-none">
+                    <LogsSection downloader={logsBox.downloader} logs={logsBox.logs} />
+                  </div>
+                )}
               </div>
-            )}
+            </div>
           </div>
 
           <div className="contents xl:flex xl:min-h-0 xl:flex-col xl:gap-5">
@@ -895,6 +944,9 @@ export function PitMonitorPage() {
                 <NexusSection nexus={nexus} teamNumber={teamNumber} />
               </div>
             )}
+            <div className="order-4 xl:order-none">
+              <BatteriesSection batteries={batteries} />
+            </div>
             {iframeUrl && (
               <div className="order-9 space-y-2 xl:order-none">
                 <h2 className="text-xs font-bold uppercase tracking-widest text-secondary-600">
@@ -909,14 +961,6 @@ export function PitMonitorPage() {
                     allowFullScreen
                   />
                 </div>
-              </div>
-            )}
-            <div className="order-4 xl:order-none">
-              <BatteriesSection batteries={batteries} />
-            </div>
-            {logsBox && (
-              <div className="order-7 xl:order-none">
-                <LogsSection downloader={logsBox.downloader} logs={logsBox.logs} />
               </div>
             )}
             <div className={`order-8 xl:order-none ${SCROLL_SECTION}`}>

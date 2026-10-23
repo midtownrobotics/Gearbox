@@ -67,15 +67,12 @@ function AllianceTeams({
   side,
   teams,
   teamNumber,
-  ours,
-}: { side: "red" | "blue"; teams: string[]; teamNumber: string; ours: boolean }) {
+  className,
+}: { side: "red" | "blue"; teams: string[]; teamNumber: string; className: string }) {
   const alliance = ALLIANCE[side];
-  // Our half has the frame's own tint and an invisible border, so it's the same size as theirs
-  // and flows up into the match's name; theirs is a box of its own color inside the frame.
-  const box = ours ? "border-transparent" : `rounded-lg ${alliance.border} ${alliance.tint}`;
   return (
     <div
-      className={`flex flex-wrap items-center justify-evenly gap-0.5 border-[3px] px-1 py-1.5 sm:gap-1 sm:px-2 ${box}`}
+      className={`flex flex-wrap items-center justify-evenly gap-0.5 px-1 sm:gap-1 sm:px-2 ${className}`}
     >
       <span className="sr-only">{alliance.name}:</span>
       {(teams.length ? teams : [""]).map((team, station) => (
@@ -83,7 +80,7 @@ function AllianceTeams({
           // Stations keep their place, even for a team not known yet.
           // biome-ignore lint/suspicious/noArrayIndexKey: a station is its place in the list
           key={station}
-          className={`rounded-md px-1.5 py-0.5 text-base tabular-nums sm:px-2 sm:text-xl ${alliance.text} ${
+          className={`rounded-md px-1 py-0.5 text-sm tabular-nums sm:px-2 sm:text-xl ${alliance.text} ${
             team === teamNumber
               ? `bg-surface font-black ring-[3px] ${alliance.ring}`
               : "font-semibold"
@@ -97,14 +94,23 @@ function AllianceTeams({
 }
 
 /**
- * The match in our alliance's color: a frame with its name across the top, flowing into our half
- * below, and the other alliance's box beside it. Blue is always on the left and red on the right.
+ * The match as a bar in our alliance's color, with the alliances hanging under it like browser
+ * tabs upside down: ours is the open tab, merged into the bar (it covers the bar's lower edge),
+ * and the other sits behind the edge, narrower and with a lighter border. Blue is always on the
+ * left and red on the right.
  */
 function AllianceBoard({ next, teamNumber }: { next: OurNextMatch; teamNumber: string }) {
   const ours = ALLIANCE[next.alliance];
+  const tab = (side: "red" | "blue") =>
+    side === next.alliance
+      ? // Up over the bar's 3px edge, padded back down so both tabs' teams line up.
+        `relative z-10 -mt-[3px] rounded-b-xl border-[3px] border-t-0 pt-[calc(0.375rem+3px)] pb-1.5 ${ours.border} ${ours.tint}`
+      : `mx-0.5 rounded-b-lg border-2 sm:mx-1.5 border-t-0 py-1.5 ${ALLIANCE[side].border} ${ALLIANCE[side].tint}`;
   return (
-    <div className={`overflow-hidden rounded-xl border-[3px] ${ours.border} ${ours.tint}`}>
-      <div className="flex flex-wrap items-end justify-between gap-x-3 px-4 pt-2.5 pb-1">
+    <div>
+      <div
+        className={`flex flex-wrap items-end justify-between gap-x-3 rounded-xl border-[3px] px-4 pt-2 pb-1.5 ${ours.border} ${ours.tint}`}
+      >
         <div className="min-w-0">
           <h2 className={`text-xs font-bold uppercase tracking-widest ${ours.text}`}>
             Our next match
@@ -113,18 +119,18 @@ function AllianceBoard({ next, teamNumber }: { next: OurNextMatch; teamNumber: s
         </div>
         <p className={`pb-1 text-sm font-bold ${ours.text}`}>{ours.name}</p>
       </div>
-      <div className="grid grid-cols-2 gap-1.5 px-1.5 pb-1.5">
+      <div className="grid grid-cols-2 gap-1 px-1.5 sm:px-3">
         <AllianceTeams
           side="blue"
           teams={next.blueTeams}
           teamNumber={teamNumber}
-          ours={next.alliance === "blue"}
+          className={tab("blue")}
         />
         <AllianceTeams
           side="red"
           teams={next.redTeams}
           teamNumber={teamNumber}
-          ours={next.alliance === "red"}
+          className={tab("red")}
         />
       </div>
     </div>
@@ -194,7 +200,6 @@ function NextMatch({
       ? { label: next.queued ? "Called" : "Queue", at: next.queueTime }
       : null,
     !onField && next.onFieldTime ? { label: "On field", at: next.onFieldTime } : null,
-    next.startTime ? { label: "Start", at: next.startTime } : null,
   ].filter((time) => time !== null);
   return (
     <div
