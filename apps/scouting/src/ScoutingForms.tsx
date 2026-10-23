@@ -103,6 +103,17 @@ const TYPES: { type: FieldType; label: string }[] = [
 
 const COUNTER_INTERVALS = [1, 5, 10, 20] as const;
 
+/** A multiple choice question this few, this short choices is answered with bubbles: one tap. */
+const MAX_BUBBLE_CHOICES = 6;
+const MAX_BUBBLE_LENGTH = 20;
+function answeredWithBubbles(field: ScoutingField) {
+  return (
+    field.options.length > 0 &&
+    field.options.length <= MAX_BUBBLE_CHOICES &&
+    field.options.every((option) => option.length <= MAX_BUBBLE_LENGTH)
+  );
+}
+
 function FieldInput({
   field,
   value,
@@ -199,6 +210,42 @@ function FieldInput({
         onChange={(event) => setValue(event.target.value)}
       />
     );
+  if (field.type === "mcq" && answeredWithBubbles(field)) {
+    const selected = String(value ?? "");
+    return (
+      <div
+        className="choice-bubbles"
+        role="radiogroup"
+        aria-labelledby={`${inputId}-label`}
+        aria-required={field.required || undefined}
+      >
+        {field.options.map((option) => (
+          <label key={option} className={option === selected ? "selected" : ""}>
+            <input
+              type="radio"
+              name={inputId}
+              value={option}
+              required={field.required}
+              checked={option === selected}
+              onChange={() => setValue(option)}
+              // Tapping the chosen answer again clears it, and so does Space, which browsers
+              // don't turn into a click on a radio that's already checked.
+              onClick={() => {
+                if (option === selected) setValue("");
+              }}
+              onKeyDown={(event) => {
+                if (event.key !== " " || option !== selected) return;
+                event.preventDefault();
+                setValue("");
+              }}
+            />
+            {option === selected && <Check size={17} aria-hidden="true" />}
+            {option}
+          </label>
+        ))}
+      </div>
+    );
+  }
   if (field.type === "mcq")
     return (
       <select
@@ -834,7 +881,7 @@ function EntryDraft({
                 className={`scouting-question ${field.type === "fieldMap" ? "wide" : ""}`}
                 key={field.id}
               >
-                <label htmlFor={`field-${field.id}`}>
+                <label htmlFor={`field-${field.id}`} id={`field-${field.id}-label`}>
                   {field.label}
                   {field.required && <b> *</b>}
                 </label>
