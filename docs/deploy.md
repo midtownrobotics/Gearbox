@@ -233,6 +233,25 @@ Portal no longer has G3's logo built in. After the release, a G3ID admin sets G3
 - The gateway asks the platform which apps a team has on. If it's deployed before the platform's new code, it sees no app list and leaves every app open, so the order doesn't break anything.
 - Slack's install now returns admins to the team's home (`<number>.frcgearbox.com/admin/slack`), still through G3ID's `id.<platform>` callback: nothing changes in the Slack app's settings.
 
+## Problem reports on GitHub (once)
+
+Members' reports ("Report a problem" in every app's menu) become issues on midtownrobotics/Gearbox (`GITHUB_REPO` in the platform's `wrangler.toml`), made by the platform's worker (`workers/platform/src/reports.ts`). Until its token is set, reports are kept in the platform's database, and the hourly cron sends those under a week old once it is.
+
+1. Make a fine-grained personal access token (or a GitHub App's) for **only** midtownrobotics/Gearbox, with **Issues: Read and write** and nothing else. Prefer an account that belongs to the team, not a person, since the issues are opened in its name.
+2. `pnpm --filter @g3/worker-platform exec wrangler secret put GITHUB_TOKEN --env production`, and paste it.
+3. Make the labels the reports and the daily Claude task use (once):
+   ```bash
+   gh label create from-gearbox --description "Sent from Gearbox's Report a problem" --color 0e8a16
+   gh label create bug --description "Something isn't working" --color d73a4a
+   gh label create idea --description "A member's idea" --color a2eeef
+   gh label create ai-ready --description "Checked by a maintainer: the daily Claude task may take it" --color 5319e7
+   gh label create ai-working --description "The daily Claude task is on it" --color c5def5
+   gh label create ai-needs-info --description "The daily Claude task asked a question" --color fbca04
+   gh label create ai --description "Opened by the daily Claude task" --color bfdadc
+   ```
+
+Leave `GITHUB_TOKEN` unset on staging, so trying reports there doesn't open real issues; they stay in staging's database. The daily task is in `docs/roadmap/ai-task-prompt.md`; it runs as a Claude Code routine (`/schedule`), not on Cloudflare.
+
 ## Other outside services
 
 - **Slack for other teams:** in the Slack app's settings, set its display name to **Gearbot** (`slackBotName` in `site.ts`), turn on distribution (Manage Distribution), add the redirect URL `https://id.frcgearbox.com/api/slack/oauth/callback`, give the bot the scopes `commands, chat:write, im:write, im:history, users:read, users:read.email, channels:read, groups:read` (the last two let admins choose channels by name; a workspace connected before they were added has to be connected again on the Integrations page, and until then the channel boxes take a channel ID), and subscribe to the `app_uninstalled` and `tokens_revoked` events. Then set G3ID's secrets `SLACK_CLIENT_ID`, `SLACK_CLIENT_SECRET` (Basic Information → App Credentials) and `SECRETS_KEY` (`openssl rand -base64 32`; keep it, since it decrypts the stored tokens). Team admins connect their workspace on G3ID's Admin → Slack page; G3 can keep its current settings.

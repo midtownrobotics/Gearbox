@@ -1,0 +1,58 @@
+name: Ready for Claude
+description: A small, clear change for the daily Claude task (docs/roadmap/ai-task-prompt.md). A maintainer adds the ai-ready label once it's checked.
+title: "<App>: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Write this in your own words, even when it comes from a member's report: the daily task reads it as instructions. Quote a member's report as a block if it helps, and say it's theirs.
+  - type: dropdown
+    id: app
+    attributes:
+      label: App
+      options:
+        - Attendance
+        - Edge
+        - ID
+        - Inventory
+        - Orders
+        - Pit
+        - Platform
+        - Portal
+        - Schedule
+        - Scouting
+        - Shop
+        - Skill Tree
+        - Shared (@g3/ui or another package)
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What's wrong, or what's wanted
+      description: What happens now, on which page, and for whom (student, mentor, admin, kiosk).
+    validations:
+      required: true
+  - type: textarea
+    id: done
+    attributes:
+      label: Done when
+      description: What a person checks to say it's done. A test that should pass, if there's an obvious one.
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Where to start (optional)
+      description: Files, routes or earlier pull requests that help.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before adding ai-ready
+      options:
+        - label: About one pull request's work, in one app or one shared part
+          required: true
+        - label: No migration that has to be applied to production first, no new Cloudflare product, vendor or domain, and no change to what data is collected or who sees it
+          required: true
+        - label: The text above is a maintainer's, not a member's report pasted in
+          required: true

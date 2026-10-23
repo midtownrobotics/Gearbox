@@ -160,3 +160,34 @@ export const landingVisits = sqliteTable("landing_visits", {
   visits: integer("visits").notNull().default(0),
   signedIn: integer("signed_in").notNull().default(0),
 });
+
+export const REPORT_KINDS = ["problem", "idea"] as const;
+export type ReportKind = (typeof REPORT_KINDS)[number];
+
+/**
+ * Problems and ideas members report from any app's bar (migration 0012, src/reports.ts). Each
+ * becomes a public GitHub issue; the row keeps who sent it, to tell them when it's closed.
+ */
+export const problemReports = sqliteTable("problem_reports", {
+  id: text("id").primaryKey(),
+  teamId: text("team_id").notNull(),
+  userId: text("user_id").notNull(),
+  kind: text("kind", { enum: REPORT_KINDS }).notNull(),
+  message: text("message").notNull(),
+  /** The page it was sent from, without its query string. */
+  page: text("page").notNull(),
+  /** The app's slug, from the page's address. */
+  app: text("app"),
+  version: text("version"),
+  browser: text("browser"),
+  /** The GitHub issue, once it's made. */
+  issueNumber: integer("issue_number"),
+  issueUrl: text("issue_url"),
+  status: text("status", { enum: ["open", "fixed", "closed"] })
+    .notNull()
+    .default("open"),
+  closedAt: integer("closed_at"),
+  /** When the cron last asked GitHub about the issue. */
+  checkedAt: integer("checked_at"),
+  createdAt: integer("created_at").notNull(),
+});

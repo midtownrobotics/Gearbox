@@ -23,6 +23,13 @@ export type AppEnv = {
     /** The Discord app (G3ID's): added to a team's server during sign-up. Always set. */
     DISCORD_CLIENT_ID: string;
     DISCORD_CLIENT_SECRET: string;
+    /**
+     * Gearbox's GitHub repository ("owner/name"), where members' reports become issues
+     * (src/reports.ts), with a token that may make and read its issues. Without the token, reports
+     * are kept and wait for it.
+     */
+    GITHUB_REPO?: string;
+    GITHUB_TOKEN?: string;
     /** Local dev only: the dev gateway (http://localhost:8796), for the platform's and teams' addresses. */
     LOCAL_GATEWAY_URL?: string;
   };

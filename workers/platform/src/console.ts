@@ -11,6 +11,7 @@ import {
   numberReports,
   operatorActions,
   operators,
+  problemReports,
   teams,
 } from "./db/schema";
 import { accounts, db, g3id, now } from "./lib";
@@ -337,6 +338,8 @@ export const consoleRouter = new Hono<AppEnv>()
     const { deletedUserIds } = (await res.json()) as { deletedUserIds: string[] };
 
     await db(c.env).delete(teams).where(eq(teams.id, team.id));
+    // Its members' reports (their GitHub issues are public, and stay).
+    await db(c.env).delete(problemReports).where(eq(problemReports.teamId, team.id));
     // An operator whose account went with the team isn't one any more.
     if (deletedUserIds.length) {
       await db(c.env).delete(operators).where(inArray(operators.userId, deletedUserIds));
