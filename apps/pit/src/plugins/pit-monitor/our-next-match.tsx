@@ -202,7 +202,7 @@ function NextMatch({
   ].filter((time) => time !== null);
   return (
     <div
-      className={`grid gap-4 rounded-xl border p-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:p-4 ${style.card}`}
+      className={`grid gap-4 rounded-xl border p-3 sm:grid-cols-[minmax(0,1fr)_17rem] sm:p-4 ${style.card}`}
     >
       <div className="min-w-0 space-y-3">
         <AllianceBoard next={next} teamNumber={teamNumber} />
@@ -221,7 +221,7 @@ function NextMatch({
           </p>
         )}
       </div>
-      <div className="flex min-w-48 flex-col items-center justify-center gap-3 text-center sm:px-4">
+      <div className="flex min-w-0 flex-col items-center justify-center gap-3 text-center sm:px-4">
         <Headline next={next} accent={style.accent} />
       </div>
     </div>

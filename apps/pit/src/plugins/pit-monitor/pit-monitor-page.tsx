@@ -98,6 +98,8 @@ type MonitorData = {
   nexus: NexusData | null;
   /** The team's next match; null when there's no schedule. */
   ourMatches?: OurSchedule | null;
+  /** Sample people for "In the pit now" while the event snapshot is on. */
+  inThePit?: PersonInThePit[];
   ranking: RankingRow | null;
   contextRankings?: ContextRankings | null;
 };
@@ -256,9 +258,15 @@ function Score({
 }) {
   const result = match.result;
   const color = side === "red" ? "text-red-700" : "text-blue-700";
-  if (!result) return <span className="text-secondary-400">—</span>;
+  // Three digits wide, so the RP dots beside it line up down the list whatever the score.
+  const width = `inline-block min-w-[3ch] ${side === "blue" ? "text-right" : "text-left"}`;
+  if (!result) return <span className={`${width} text-secondary-400`}>—</span>;
   const won = result.winner === side;
-  return <span className={`${color} ${won ? "font-black" : "font-medium"}`}>{result[side]}</span>;
+  return (
+    <span className={`${width} ${color} ${won ? "font-black" : "font-medium"}`}>
+      {result[side]}
+    </span>
+  );
 }
 
 /**
@@ -690,16 +698,17 @@ function ChecklistSection({
               list.itemCount > 0 ? Math.round((list.checkedCount / list.itemCount) * 100) : 0;
             const done = list.itemCount > 0 && list.checkedCount === list.itemCount;
             return (
-              <div key={list.id} className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-secondary-600 truncate">{list.name}</span>
-                  <span
-                    className={`text-sm font-semibold tabular-nums shrink-0 ml-3 ${done ? "text-emerald-600" : "text-secondary-700"}`}
-                  >
-                    {list.checkedCount}/{list.itemCount}
-                  </span>
-                </div>
+              <div
+                key={list.id}
+                className="grid grid-cols-[minmax(0,1fr)_8rem_3rem] items-center gap-3"
+              >
+                <span className="truncate text-sm text-secondary-600">{list.name}</span>
                 <ProgressBar percent={pct} done={done} />
+                <span
+                  className={`text-right text-sm font-semibold tabular-nums ${done ? "text-emerald-600" : "text-secondary-700"}`}
+                >
+                  {list.checkedCount}/{list.itemCount}
+                </span>
               </div>
             );
           })}
@@ -760,7 +769,7 @@ export function PitMonitorPage() {
   const gridRef = useRef<HTMLDivElement>(null);
   const fitHeight = useFitToWindow(gridRef, !loading);
   // Who's in the pit on the team's Schedule; hidden while Schedule is off or hasn't answered.
-  const inThePit = useInThePit();
+  const scheduleInThePit = useInThePit();
   // Admins move the event snapshot's clock (dev and staging only).
   const isAdmin = useAuth().user?.isAdmin === true;
 
@@ -857,6 +866,8 @@ export function PitMonitorPage() {
   }
 
   const teamNumber = monitor?.teamNumber ?? "";
+  // While the event snapshot is on, its sample people; else Schedule's.
+  const inThePit = monitor?.inThePit ?? scheduleInThePit;
   const hasNexus = !!monitor?.nexus;
   const nexus = monitor?.nexus;
 
@@ -890,11 +901,11 @@ export function PitMonitorPage() {
         )}
 
         {/* Main grid: three columns on a wide screen, ending at the bottom of the window. Our next
-            match takes the left two; under it, the match list (scrolling inside its column) and
-            the ranking, who's in the pit and the logs. The right column is up next, batteries, the
-            feed and the checklists (scrolling). On a narrower screen the areas' wrappers are
-            `contents` and every part is in one column, ordered by `order`: our match, then up
-            next, the pit and batteries. */}
+            match takes the left two; under it, the ranking and the match list (scrolling) on the
+            left, up next, who's in the pit and the feed in the middle. The right column is
+            batteries, the checklists (scrolling) and logs. On a narrower screen the areas'
+            wrappers are `contents` and every part is in one column, ordered by `order`: our
+            match, then up next, the pit and batteries. */}
         <div
           ref={gridRef}
           className="grid grid-cols-1 gap-5 xl:grid-cols-3 xl:grid-rows-[minmax(0,1fr)]"
@@ -909,12 +920,7 @@ export function PitMonitorPage() {
               />
             </div>
             <div className="contents xl:grid xl:min-h-0 xl:flex-1 xl:grid-cols-2 xl:grid-rows-[minmax(0,1fr)] xl:gap-5">
-              {hasNexus && nexus && (
-                <div className={`order-5 xl:order-none ${SCROLL_SECTION}`}>
-                  <MatchesSection nexus={nexus} teamNumber={teamNumber} />
-                </div>
-              )}
-              <div className="contents xl:col-start-2 xl:flex xl:min-h-0 xl:flex-col xl:gap-5 xl:overflow-y-auto">
+              <div className="contents xl:flex xl:min-h-0 xl:flex-col xl:gap-5">
                 {monitor?.ranking && (
                   <div className="order-6 xl:order-none">
                     <RankingSection
@@ -924,14 +930,37 @@ export function PitMonitorPage() {
                     />
                   </div>
                 )}
+                {hasNexus && nexus && (
+                  <div className={`order-5 xl:order-none ${SCROLL_SECTION}`}>
+                    <MatchesSection nexus={nexus} teamNumber={teamNumber} />
+                  </div>
+                )}
+              </div>
+              <div className="contents xl:col-start-2 xl:flex xl:min-h-0 xl:flex-col xl:gap-5 xl:overflow-y-auto">
+                {nexus?.isRealNexus && (
+                  <div className="order-2 xl:order-none">
+                    <NexusSection nexus={nexus} teamNumber={teamNumber} />
+                  </div>
+                )}
                 {inThePit && (
                   <div className="order-3 xl:order-none">
                     <InThePitSection people={inThePit} />
                   </div>
                 )}
-                {logsBox && (
-                  <div className="order-7 xl:order-none">
-                    <LogsSection downloader={logsBox.downloader} logs={logsBox.logs} />
+                {iframeUrl && (
+                  <div className="order-10 space-y-2 xl:order-none">
+                    <h2 className="text-xs font-bold uppercase tracking-widest text-secondary-600">
+                      Monitor Feed
+                    </h2>
+                    <div className="bg-surface border border-secondary-200 rounded-xl overflow-hidden">
+                      <iframe
+                        src={iframeUrl}
+                        title="Custom monitor feed"
+                        className="aspect-video w-full"
+                        frameBorder="0"
+                        allowFullScreen
+                      />
+                    </div>
                   </div>
                 )}
               </div>
@@ -939,33 +968,17 @@ export function PitMonitorPage() {
           </div>
 
           <div className="contents xl:flex xl:min-h-0 xl:flex-col xl:gap-5">
-            {nexus?.isRealNexus && (
-              <div className="order-2 xl:order-none">
-                <NexusSection nexus={nexus} teamNumber={teamNumber} />
-              </div>
-            )}
             <div className="order-4 xl:order-none">
               <BatteriesSection batteries={batteries} />
             </div>
-            {iframeUrl && (
-              <div className="order-9 space-y-2 xl:order-none">
-                <h2 className="text-xs font-bold uppercase tracking-widest text-secondary-600">
-                  Monitor Feed
-                </h2>
-                <div className="bg-surface border border-secondary-200 rounded-xl overflow-hidden">
-                  <iframe
-                    src={iframeUrl}
-                    title="Custom monitor feed"
-                    className="aspect-video w-full"
-                    frameBorder="0"
-                    allowFullScreen
-                  />
-                </div>
-              </div>
-            )}
             <div className={`order-8 xl:order-none ${SCROLL_SECTION}`}>
               <ChecklistSection lists={lists} issues={issues} />
             </div>
+            {logsBox && (
+              <div className="order-9 xl:order-none">
+                <LogsSection downloader={logsBox.downloader} logs={logsBox.logs} />
+              </div>
+            )}
           </div>
         </div>
       </div>

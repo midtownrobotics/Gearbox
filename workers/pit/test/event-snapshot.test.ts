@@ -1,7 +1,7 @@
 import { newTeamId, teamUsers } from "@g3/testing/users";
 import { callAs, jsonAs } from "@g3/testing/worker";
 import { describe, expect, it } from "vitest";
-import { movedClock, snapshotAvailable, statusesAt } from "../src/event-snapshot";
+import { movedClock, sampleInThePit, snapshotAvailable, statusesAt } from "../src/event-snapshot";
 
 // The Monitor's event snapshot (GRITS 2026 halfway through qualifications), offered in dev and
 // staging only (src/event-snapshot.ts). Tests run with the dev config, so it's offered here.
@@ -103,6 +103,15 @@ describe("event snapshot", () => {
       "Queuing soon",
       "Queuing soon",
     ]);
+  });
+
+  it("puts eight sample people in the pit, until the next half hour or the one after", () => {
+    // 14:10 in New York (EDT).
+    const people = sampleInThePit(Date.parse("2026-10-23T18:10:00Z"));
+    expect(people).toHaveLength(8);
+    expect(people[0]).toMatchObject({ roleName: "Pit lead", until: "14:30" });
+    expect(people[1]).toMatchObject({ roleName: "Pit crew", until: "15:00" });
+    expect(people.every((person) => person.displayName)).toBe(true);
   });
 
   it("moves its clock by minutes, a match at a time, or back to the start", () => {

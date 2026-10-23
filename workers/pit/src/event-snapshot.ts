@@ -1,4 +1,5 @@
 import { inTeam, logTeamChange, requireAdmin, withTeam } from "@g3/auth";
+import { DEMO_STUDENTS } from "@g3/demo";
 import { isStaging } from "@g3/site-config";
 import { eq } from "drizzle-orm";
 import { Hono } from "hono";
@@ -112,6 +113,30 @@ function resultOf(match: SnapshotMatch): MatchResult | null {
   };
 }
 
+/** GRITS's time zone: Schedule gives when a role ends as the event's own clock time. */
+const SNAPSHOT_TIME_ZONE = "America/New_York";
+const PIT_SHIFT_MS = 30 * 60_000;
+
+/**
+ * Eight of the demo's students in the pit, the most the Monitor's "In the pit now" is laid out
+ * for, in Schedule's shape: half until the next half hour, half until the one after.
+ */
+export function sampleInThePit(now: number) {
+  const shiftEnd = Math.ceil((now + 1) / PIT_SHIFT_MS) * PIT_SHIFT_MS;
+  const clock = new Intl.DateTimeFormat("en-US", {
+    timeZone: SNAPSHOT_TIME_ZONE,
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  });
+  return DEMO_STUDENTS.slice(0, 8).map((person, index) => ({
+    userId: person.id,
+    displayName: person.name,
+    roleName: index === 0 ? "Pit lead" : "Pit crew",
+    until: clock.format(shiftEnd + (index % 2) * PIT_SHIFT_MS),
+  }));
+}
+
 /** Dev (a local gateway) and staging; never production. */
 export const snapshotAvailable = (env: Pick<Bindings, "LOCAL_GATEWAY_URL">) =>
   isStaging || Boolean(env.LOCAL_GATEWAY_URL);
@@ -153,6 +178,8 @@ export async function snapshotMonitorData(env: Bindings, db: Db, team: string) {
     teamNumber: snapshot.teamNumber,
     nexus: { isRealNexus: true, matches },
     ourMatches: ourSchedule(matches, snapshot.teamNumber, true),
+    // Schedule isn't part of the snapshot: sample people, so "In the pit now" is at its fullest.
+    inThePit: sampleInThePit(Date.now()),
     ranking: ours
       ? {
           rank: ours.rank,
