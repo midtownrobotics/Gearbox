@@ -475,7 +475,10 @@ function RankingSection({
   );
 }
 
-/** One of the Monitor's three batteries, in its state's color. */
+/**
+ * One of the Monitor's three batteries, in its state's color, on two lines: its state and how long
+ * it has been in it, then its name and voltage.
+ */
 function BatteryTile({
   label,
   battery,
@@ -483,24 +486,28 @@ function BatteryTile({
   none,
 }: { label: string; battery: Battery | undefined; state: BatteryState; none: string }) {
   return (
-    <div className={`rounded-xl border p-3 ${STATE_TONES[state]}`}>
-      <p className="mb-2 text-xs font-bold uppercase tracking-widest">{label}</p>
-      {battery ? (
-        <div className="space-y-1">
-          <p className="text-xl font-black text-secondary-900">{battery.name}</p>
-          <p className="text-xs tabular-nums text-secondary-600">
+    <div className={`min-w-0 rounded-xl border px-3 py-2 ${STATE_TONES[state]}`}>
+      <div className="flex items-baseline justify-between gap-2">
+        <p className="truncate text-xs font-bold uppercase tracking-widest">{label}</p>
+        {battery && (
+          <p className="shrink-0 text-xs tabular-nums text-secondary-600">
             <ElapsedTime battery={battery} />
           </p>
+        )}
+      </div>
+      {battery ? (
+        <div className="flex items-baseline justify-between gap-2">
+          <p className="min-w-0 truncate text-xl font-black text-secondary-900">{battery.name}</p>
           {state !== "Charging" && battery.voltage != null && (
             <p
-              className={`font-mono text-lg font-bold tabular-nums ${voltageColor(battery.voltage)}`}
+              className={`shrink-0 font-mono text-lg font-bold tabular-nums ${voltageColor(battery.voltage)}`}
             >
               {battery.voltage.toFixed(2)}V
             </p>
           )}
         </div>
       ) : (
-        <p className="text-xs text-secondary-600">{none}</p>
+        <p className="text-sm text-secondary-600">{none}</p>
       )}
     </div>
   );
@@ -517,8 +524,8 @@ function BatteriesSection({ batteries }: { batteries: Battery[] }) {
   return (
     <div className="space-y-2">
       <h2 className="text-xs font-bold uppercase tracking-widest text-secondary-600">Batteries</h2>
-      <div className="bg-surface border border-secondary-200 rounded-xl p-5">
-        <div className="grid grid-cols-3 gap-3">
+      <div className="bg-surface border border-secondary-200 rounded-xl p-3 sm:p-4">
+        <div className="grid gap-2 sm:grid-cols-3 sm:gap-3">
           <BatteryTile label="In Robot" battery={inRobot} state="In Robot" none="No battery" />
           <BatteryTile label="Next Up" battery={nextUp} state="Next Up" none="None" />
           <BatteryTile label="Charging" battery={longestCharging} state="Charging" none="None" />

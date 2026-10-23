@@ -1,4 +1,3 @@
-import { Badge, tones } from "@g3/ui";
 import type { OurNextMatch, OurSchedule } from "@g3/worker-pit/monitor-matches";
 import { Countdown, formatTime } from "./match-time";
 
@@ -8,31 +7,26 @@ import { Countdown, formatTime } from "./match-time";
 
 type Urgency = "later" | "soon" | "queuing" | "deck" | "field";
 
-const URGENCY: Record<Urgency, { card: string; accent: string; badge: string }> = {
+const URGENCY: Record<Urgency, { card: string; accent: string }> = {
   later: {
     card: "border-secondary-200 bg-surface",
     accent: "text-secondary-900",
-    badge: tones.neutral,
   },
   soon: {
     card: "border-emerald-300 bg-emerald-50",
     accent: "text-emerald-700",
-    badge: tones.success,
   },
   queuing: {
     card: "border-amber-400 bg-amber-50 ring-2 ring-amber-300",
     accent: "text-amber-700",
-    badge: tones.warning,
   },
   deck: {
     card: "border-red-400 bg-red-50 ring-2 ring-red-300",
     accent: "text-red-700",
-    badge: tones.danger,
   },
   field: {
     card: "border-red-500 bg-red-50 ring-4 ring-red-500",
     accent: "text-red-700",
-    badge: "bg-red-600 text-white border-red-700",
   },
 };
 
@@ -77,20 +71,25 @@ function Teams({ label, teams, color }: { label: string; teams: string[]; color:
   );
 }
 
-/** A countdown with its clock time under it. */
+/** A countdown with its clock time beside it, one of a row across the card. */
 function Time({ label, at, accent }: { label: string; at: number; accent: string }) {
   return (
     <div className="min-w-0">
       <p className="text-xs font-semibold uppercase tracking-wide text-secondary-600">{label}</p>
-      <p className={`text-xl font-black tabular-nums sm:text-3xl ${accent}`}>
-        <Countdown targetMs={at} />
+      <p className="flex flex-wrap items-baseline gap-x-2">
+        <span className={`text-xl font-black tabular-nums sm:text-3xl ${accent}`}>
+          <Countdown targetMs={at} />
+        </span>
+        <span className="text-xs tabular-nums text-secondary-600 sm:text-sm">{formatTime(at)}</span>
       </p>
-      <p className="text-xs tabular-nums text-secondary-600">{formatTime(at)}</p>
     </div>
   );
 }
 
-/** The big line: matches until we're called, or where we are once we have been. */
+/**
+ * Where our match is, at the card's top right: the matches until we're called, or once we have
+ * been, Nexus's status and the matches until we're on the field.
+ */
 function Headline({ next, accent }: { next: OurNextMatch; accent: string }) {
   const big = `font-black leading-none tabular-nums ${accent}`;
   if (next.matchesUntilQueuing !== null || next.status === null) {
@@ -102,8 +101,8 @@ function Headline({ next, accent }: { next: OurNextMatch; accent: string }) {
         <p className="text-sm font-bold uppercase tracking-widest text-secondary-600">
           {next.matchesUntilQueuing !== null ? "Queuing in" : "Matches before ours"}
         </p>
-        <p className="mt-1 flex items-baseline gap-3">
-          <span className={`text-7xl sm:text-8xl ${big}`}>{count}</span>
+        <p className="mt-1 flex items-baseline gap-3 sm:justify-end">
+          <span className={`text-7xl ${big}`}>{count}</span>
           {next.matchesUntilQueuing !== null && (
             <span className="text-2xl font-bold text-secondary-700">
               {count === 1 ? "match" : "matches"}
@@ -116,7 +115,7 @@ function Headline({ next, accent }: { next: OurNextMatch; accent: string }) {
   const toField = next.matchesUntilField;
   return (
     <div>
-      <p className={`text-5xl sm:text-6xl ${big}`}>{next.status}</p>
+      <p className={`text-5xl ${big}`}>{next.status}</p>
       <p className="mt-2 text-xl font-bold text-secondary-700">
         {toField === 0
           ? "Playing now"
@@ -134,39 +133,44 @@ function NextMatch({ next, fromNexus }: { next: OurNextMatch; fromNexus: boolean
   const theirs = ALLIANCE[next.alliance === "red" ? "blue" : "red"];
   const called = next.status !== null && next.status !== "Queuing soon";
   const onField = next.status === "On field";
+  const times = [
+    !called && next.queueTime
+      ? { label: next.queued ? "Called" : "Queue", at: next.queueTime }
+      : null,
+    !onField && next.onFieldTime ? { label: "On field", at: next.onFieldTime } : null,
+    next.startTime ? { label: "Start", at: next.startTime } : null,
+  ].filter((time) => time !== null);
   return (
     <div className={`rounded-xl border p-4 sm:p-5 ${style.card}`}>
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-xs font-bold uppercase tracking-widest text-secondary-600">
-          Our next match
-        </h2>
-        {next.status && <Badge colors={style.badge}>{next.status}</Badge>}
-      </div>
-      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
-        <p className="text-3xl font-black text-secondary-900 sm:text-4xl">{next.label}</p>
-        <span className={`rounded-md px-2.5 py-1 text-sm font-bold ${ours.fill}`}>{ours.name}</span>
-      </div>
-      <div className="mt-3 flex flex-wrap gap-x-6 gap-y-2">
-        <Teams label="With" teams={next.partners} color={ours.team} />
-        <Teams label="Against" teams={next.opponents} color={theirs.team} />
-      </div>
-
-      <div className="mt-4 grid gap-4 border-t border-secondary-200 pt-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end lg:grid-cols-1 xl:grid-cols-[minmax(0,1fr)_auto]">
-        <Headline next={next} accent={style.accent} />
-        <div className="grid grid-cols-3 gap-3 sm:flex sm:gap-6 lg:grid xl:flex">
-          {!called && next.queueTime && (
-            <Time
-              label={next.queued ? "Called" : "Queue"}
-              at={next.queueTime}
-              accent={style.accent}
-            />
-          )}
-          {!onField && next.onFieldTime && (
-            <Time label="On field" at={next.onFieldTime} accent={style.accent} />
-          )}
-          {next.startTime && <Time label="Start" at={next.startTime} accent={style.accent} />}
+      {/* Side by side where there's room (not in the Monitor's narrower columns). */}
+      <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto] lg:grid-cols-1 xl:grid-cols-[minmax(0,1fr)_auto]">
+        <div className="min-w-0">
+          <h2 className="text-xs font-bold uppercase tracking-widest text-secondary-600">
+            Our next match
+          </h2>
+          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+            <p className="text-3xl font-black text-secondary-900 sm:text-4xl">{next.label}</p>
+            <span className={`rounded-md px-2.5 py-1 text-sm font-bold ${ours.fill}`}>
+              {ours.name}
+            </span>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-x-6 gap-y-2">
+            <Teams label="With" teams={next.partners} color={ours.team} />
+            <Teams label="Against" teams={next.opponents} color={theirs.team} />
+          </div>
+        </div>
+        <div className="sm:text-right lg:text-left xl:text-right">
+          <Headline next={next} accent={style.accent} />
         </div>
       </div>
+
+      {times.length > 0 && (
+        <div className="mt-4 grid auto-cols-fr grid-flow-col gap-3 border-t border-secondary-200 pt-3">
+          {times.map((time) => (
+            <Time key={time.label} label={time.label} at={time.at} accent={style.accent} />
+          ))}
+        </div>
+      )}
       {(!fromNexus || next.timesFrom === "tba") && (
         <p className="mt-3 text-xs text-secondary-600">
           {fromNexus
