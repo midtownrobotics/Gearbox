@@ -41,31 +41,52 @@ function urgencyOf(next: OurNextMatch): Urgency {
   return near ? "soon" : "later";
 }
 
+/**
+ * The field's colors: a pale tint with a bright, heavy border, so the alliances stand out from the
+ * page's thin -300 borders while keeping its look in both themes.
+ */
 const ALLIANCE = {
-  red: { name: "Red alliance", fill: "bg-red-700" },
-  blue: { name: "Blue alliance", fill: "bg-blue-700" },
+  red: {
+    name: "Red alliance",
+    tint: "bg-red-100",
+    border: "border-red-500",
+    text: "text-red-800",
+    ring: "ring-red-500",
+  },
+  blue: {
+    name: "Blue alliance",
+    tint: "bg-blue-100",
+    border: "border-blue-500",
+    text: "text-blue-800",
+    ring: "ring-blue-500",
+  },
 };
 
-/** One alliance's teams by station, ours ringed and bold. */
+/** One alliance's teams by station, ours on a card of its own, ringed and bold. */
 function AllianceTeams({
   side,
   teams,
   teamNumber,
-}: { side: "red" | "blue"; teams: string[]; teamNumber: string }) {
+  ours,
+}: { side: "red" | "blue"; teams: string[]; teamNumber: string; ours: boolean }) {
+  const alliance = ALLIANCE[side];
+  // Our half has the frame's own tint and an invisible border, so it's the same size as theirs
+  // and flows up into the match's name; theirs is a box of its own color inside the frame.
+  const box = ours ? "border-transparent" : `rounded-lg ${alliance.border} ${alliance.tint}`;
   return (
     <div
-      className={`flex flex-wrap items-center justify-evenly gap-0.5 px-1 py-2 sm:gap-1 sm:px-2 ${ALLIANCE[side].fill}`}
+      className={`flex flex-wrap items-center justify-evenly gap-0.5 border-[3px] px-1 py-1.5 sm:gap-1 sm:px-2 ${box}`}
     >
-      <span className="sr-only">{ALLIANCE[side].name}:</span>
+      <span className="sr-only">{alliance.name}:</span>
       {(teams.length ? teams : [""]).map((team, station) => (
         <span
           // Stations keep their place, even for a team not known yet.
           // biome-ignore lint/suspicious/noArrayIndexKey: a station is its place in the list
           key={station}
-          className={`rounded px-1.5 py-0.5 text-base tabular-nums text-white sm:px-2 sm:text-xl ${
+          className={`rounded-md px-1.5 py-0.5 text-base tabular-nums sm:px-2 sm:text-xl ${alliance.text} ${
             team === teamNumber
-              ? "bg-black/25 font-black ring-2 ring-white"
-              : "font-semibold opacity-85"
+              ? `bg-surface font-black ring-[3px] ${alliance.ring}`
+              : "font-semibold"
           }`}
         >
           {team || "—"}
@@ -76,25 +97,35 @@ function AllianceTeams({
 }
 
 /**
- * The match in our alliance's color: its name across the top, flowing into our half below, with
- * blue always on the left and red on the right.
+ * The match in our alliance's color: a frame with its name across the top, flowing into our half
+ * below, and the other alliance's box beside it. Blue is always on the left and red on the right.
  */
 function AllianceBoard({ next, teamNumber }: { next: OurNextMatch; teamNumber: string }) {
   const ours = ALLIANCE[next.alliance];
   return (
-    <div className="overflow-hidden rounded-lg text-white">
-      <div
-        className={`flex flex-wrap items-end justify-between gap-x-3 px-4 pt-3 pb-2 ${ours.fill}`}
-      >
+    <div className={`overflow-hidden rounded-xl border-[3px] ${ours.border} ${ours.tint}`}>
+      <div className="flex flex-wrap items-end justify-between gap-x-3 px-4 pt-2.5 pb-1">
         <div className="min-w-0">
-          <h2 className="text-xs font-bold uppercase tracking-widest opacity-85">Our next match</h2>
-          <p className="text-3xl font-black sm:text-4xl">{next.label}</p>
+          <h2 className={`text-xs font-bold uppercase tracking-widest ${ours.text}`}>
+            Our next match
+          </h2>
+          <p className="text-3xl font-black text-secondary-900 sm:text-4xl">{next.label}</p>
         </div>
-        <p className="pb-1 text-sm font-bold">{ours.name}</p>
+        <p className={`pb-1 text-sm font-bold ${ours.text}`}>{ours.name}</p>
       </div>
-      <div className="grid grid-cols-2">
-        <AllianceTeams side="blue" teams={next.blueTeams} teamNumber={teamNumber} />
-        <AllianceTeams side="red" teams={next.redTeams} teamNumber={teamNumber} />
+      <div className="grid grid-cols-2 gap-1.5 px-1.5 pb-1.5">
+        <AllianceTeams
+          side="blue"
+          teams={next.blueTeams}
+          teamNumber={teamNumber}
+          ours={next.alliance === "blue"}
+        />
+        <AllianceTeams
+          side="red"
+          teams={next.redTeams}
+          teamNumber={teamNumber}
+          ours={next.alliance === "red"}
+        />
       </div>
     </div>
   );
