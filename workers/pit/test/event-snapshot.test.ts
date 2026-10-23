@@ -16,6 +16,7 @@ type MonitorData = {
   teamNumber: string;
   snapshot: { name: string } | null;
   nexus: { isRealNexus: boolean; matches: Match[] };
+  ourMatches: { next: Record<string, unknown> | null; total: number } | null;
   ranking: { rank: number; wins: number; losses: number } | null;
   contextRankings: { top3: unknown[]; context: unknown[] } | null;
 };
@@ -56,6 +57,17 @@ describe("event snapshot", () => {
     expect(matches[33].status).toBe("Queuing soon");
     // Its clock starts when it was switched on: Qualification 31 starts then.
     expect(matches[30].times.estimatedStartTime).toBeGreaterThanOrEqual(before);
+    // 1648 plays Qualification 35, two calls after Qualification 33's.
+    expect(data.ourMatches?.next).toMatchObject({
+      label: "Qualification 35",
+      alliance: "blue",
+      partners: ["4026", "6905"],
+      opponents: ["1746", "3344", "5109"],
+      status: "Queuing soon",
+      matchesUntilQueuing: 2,
+      matchesUntilField: 4,
+      timesFrom: "nexus",
+    });
     expect(data.ranking).toMatchObject({ rank: 16, wins: 2, losses: 2 });
     expect(data.contextRankings?.top3).toHaveLength(3);
 

@@ -23,6 +23,9 @@ export interface TbaMatch {
 /** A played match's score. `winner` takes a playoff tiebreaker into account. */
 export type MatchResult = { red: number; blue: number; winner: "red" | "blue" | "tie" };
 
+/** Where Nexus says a match is. A match that's been played stays "On field". */
+export type NexusStatus = "Queuing soon" | "Now queuing" | "On deck" | "On field";
+
 export interface MonitorScheduleMatch {
   label: string;
   status: "Queuing soon";
@@ -54,6 +57,19 @@ export function tbaResult(match: TbaMatch): MatchResult | null {
   return { red, blue, winner };
 }
 
+/** When a Blue Alliance match starts (predicted, else scheduled) and queues, in ms. */
+function tbaTimes(match: TbaMatch): MonitorScheduleMatch["times"] {
+  return {
+    estimatedStartTime: match.predicted_time
+      ? match.predicted_time * 1000
+      : match.time
+        ? match.time * 1000
+        : null,
+    // About 5 minutes before it starts.
+    estimatedQueueTime: match.predicted_time ? (match.predicted_time - 300) * 1000 : null,
+  };
+}
+
 /** The Blue Alliance's schedule in Nexus's shape, for an event Nexus doesn't have. */
 export function scheduleFromTba(matches: TbaMatch[]): MonitorScheduleMatch[] {
   return matches
@@ -63,21 +79,22 @@ export function scheduleFromTba(matches: TbaMatch[]): MonitorScheduleMatch[] {
       status: "Queuing soon", // The Blue Alliance doesn't say where a match is
       blueTeams: teamsOf(match.alliances?.blue),
       redTeams: teamsOf(match.alliances?.red),
-      times: {
-        estimatedStartTime: match.predicted_time
-          ? match.predicted_time * 1000
-          : match.time
-            ? match.time * 1000
-            : null,
-        // About 5 minutes before it starts.
-        estimatedQueueTime: match.predicted_time ? (match.predicted_time - 300) * 1000 : null,
-      },
+      times: tbaTimes(match),
       result: tbaResult(match),
     }))
     .sort((a, b) => (a.times.estimatedStartTime ?? 0) - (b.times.estimatedStartTime ?? 0));
 }
 
-type NexusMatch = { label?: unknown; redTeams?: unknown; blueTeams?: unknown };
+type NexusMatch = {
+  label?: unknown;
+  status?: unknown;
+  redTeams?: unknown;
+  blueTeams?: unknown;
+  times?: Record<string, unknown> | null;
+  result?: MatchResult | null;
+  /** Its times are The Blue Alliance's: Nexus had none. */
+  timesFromTba?: boolean;
+};
 
 /** Whether every team Nexus has on each alliance is on the same one at The Blue Alliance. */
 function sameAlliances(nexus: NexusMatch, tba: TbaMatch): boolean {
@@ -93,7 +110,8 @@ function sameAlliances(nexus: NexusMatch, tba: TbaMatch): boolean {
 /**
  * Nexus's matches, each with its score from The Blue Alliance once it's been played (null before,
  * and for practice matches, which The Blue Alliance doesn't have). Matched by name ("Qualification
- * 12" is qm12) and checked by who's playing.
+ * 12" is qm12) and checked by who's playing. A match Nexus has no times for takes The Blue
+ * Alliance's, marked `timesFromTba`.
  */
 export function withResults(nexusMatches: unknown[], tbaMatches: TbaMatch[]): unknown[] {
   const byLabel = new Map<string, TbaMatch>();
@@ -106,11 +124,113 @@ export function withResults(nexusMatches: unknown[], tbaMatches: TbaMatch[]): un
     const label =
       typeof match.label === "string" ? match.label.replace(/^Qualification\b/, "Qual") : "";
     const tba = byLabel.get(label);
+    const same = tba && sameAlliances(match, tba) ? tba : null;
+    const times = match.times ?? {};
+    const timed = Boolean(times.estimatedQueueTime || times.estimatedStartTime);
+    const tbaTimed = same && !timed ? tbaTimes(same) : null;
     return {
       ...match,
-      result: tba && sameAlliances(match, tba) ? tbaResult(tba) : null,
+      ...(tbaTimed?.estimatedStartTime
+        ? { times: { ...times, ...tbaTimed }, timesFromTba: true }
+        : {}),
+      result: same ? tbaResult(same) : null,
     };
   });
+}
+
+/** The team's next match, for the Monitor's "Our next match". */
+export interface OurNextMatch {
+  label: string;
+  alliance: "red" | "blue";
+  partners: string[];
+  opponents: string[];
+  /** Where Nexus says it is; null on The Blue Alliance's schedule, which doesn't say. */
+  status: NexusStatus | null;
+  /**
+   * Matches to go until it's called to queue (1: it's the next one called), while Nexus has it
+   * "Queuing soon"; null once it's been called, and on The Blue Alliance's schedule.
+   */
+  matchesUntilQueuing: number | null;
+  /** Matches to go until it's on the field: 0 while it is. */
+  matchesUntilField: number;
+  /** When it was called to queue (`queued`), else when it's expected to be. In ms, like the rest. */
+  queueTime: number | null;
+  queued: boolean;
+  onFieldTime: number | null;
+  startTime: number | null;
+  /** Whose times they are. */
+  timesFrom: "nexus" | "tba";
+}
+
+/** The team's next match (null when it has none to come), and how many matches it has in all. */
+export type OurSchedule = { next: OurNextMatch | null; total: number };
+
+const STEPS: NexusStatus[] = ["Queuing soon", "Now queuing", "On deck", "On field"];
+
+const teamList = (teams: unknown) =>
+  Array.isArray(teams) ? teams.filter((team) => team != null && team !== "").map(String) : [];
+
+const msOrNull = (value: unknown) => (typeof value === "number" && value > 0 ? value : null);
+
+/**
+ * The team's next match from the Monitor's schedule (in order), and how far off it is.
+ *
+ * With Nexus, the event is at its last match "On field": a match of ours before it is over even
+ * while its score isn't in yet. Ours is called to queue once every match before it has been
+ * (the last one Nexus has past "Queuing soon"). On The Blue Alliance's schedule, which says
+ * nothing about queuing, the event is at the match after the last one with a score.
+ */
+export function ourSchedule(
+  matches: unknown[],
+  teamNumber: string,
+  fromNexus: boolean,
+): OurSchedule {
+  const list = matches.map((raw) => (raw ?? {}) as NexusMatch);
+  const statusOf = (match: NexusMatch) =>
+    fromNexus ? STEPS.indexOf(match.status as NexusStatus) : -1;
+  const lastIndex = (test: (match: NexusMatch) => boolean) => {
+    for (let index = list.length - 1; index >= 0; index--) if (test(list[index])) return index;
+    return -1;
+  };
+
+  // The match on the field now, or -1 before the first.
+  const onField = fromNexus
+    ? lastIndex((match) => statusOf(match) === 3)
+    : lastIndex((match) => !!match.result) + 1;
+  // The last match called to queue.
+  const called = fromNexus ? lastIndex((match) => statusOf(match) >= 1) : -1;
+
+  const ours = list.flatMap((match, index) => {
+    const red = teamList(match.redTeams);
+    const blue = teamList(match.blueTeams);
+    if (red.includes(teamNumber)) return [{ match, index, ourSide: red, theirSide: blue }];
+    if (blue.includes(teamNumber)) return [{ match, index, ourSide: blue, theirSide: red }];
+    return [];
+  });
+  const found = ours.find(({ match, index }) => !match.result && index >= onField);
+  if (!found) return { next: null, total: ours.length };
+
+  const { match, index, ourSide, theirSide } = found;
+  const step = statusOf(match);
+  const times = match.times ?? {};
+  const actualQueue = msOrNull(times.actualQueueTime);
+  return {
+    total: ours.length,
+    next: {
+      label: typeof match.label === "string" ? match.label : "",
+      alliance: teamList(match.redTeams).includes(teamNumber) ? "red" : "blue",
+      partners: ourSide.filter((team) => team !== teamNumber),
+      opponents: theirSide,
+      status: step >= 0 ? STEPS[step] : null,
+      matchesUntilQueuing: fromNexus && step <= 0 ? Math.max(1, index - called) : null,
+      matchesUntilField: index - onField,
+      queueTime: actualQueue ?? msOrNull(times.estimatedQueueTime),
+      queued: actualQueue !== null,
+      onFieldTime: msOrNull(times.actualOnFieldTime) ?? msOrNull(times.estimatedOnFieldTime),
+      startTime: msOrNull(times.estimatedStartTime),
+      timesFrom: fromNexus && !match.timesFromTba ? "nexus" : "tba",
+    },
+  };
 }
 
 export type RankingInfo = { rank: number; team: string };

@@ -5,7 +5,7 @@ import { Hono } from "hono";
 import { validator } from "hono/validator";
 import { type Db, createDb } from "./db";
 import { settings } from "./db/schema";
-import { type MatchResult, contextRankingsFor } from "./monitor-matches";
+import { type MatchResult, contextRankingsFor, ourSchedule } from "./monitor-matches";
 import { getSetting } from "./settings";
 import gritsSnapshot from "./snapshots/2026gagr.json";
 import type { AppEnv } from "./types";
@@ -73,26 +73,25 @@ export async function snapshotMonitorData(env: Bindings, db: Db, team: string) {
   const since = await snapshotSince(env, db, team);
   if (since === null) return null;
   const ours = snapshot.rankings.find((r) => r.team === snapshot.teamNumber);
+  const matches = snapshot.matches.map((match) => {
+    const start = since + match.startOffsetMs;
+    return {
+      label: match.label,
+      status: match.status,
+      redTeams: match.redTeams,
+      blueTeams: match.blueTeams,
+      times: {
+        estimatedQueueTime: start - QUEUE_BEFORE_MS,
+        estimatedOnFieldTime: start - ON_FIELD_BEFORE_MS,
+        estimatedStartTime: start,
+      },
+      result: (match.result as MatchResult | undefined) ?? null,
+    };
+  });
   return {
     teamNumber: snapshot.teamNumber,
-    nexus: {
-      isRealNexus: true,
-      matches: snapshot.matches.map((match) => {
-        const start = since + match.startOffsetMs;
-        return {
-          label: match.label,
-          status: match.status,
-          redTeams: match.redTeams,
-          blueTeams: match.blueTeams,
-          times: {
-            estimatedQueueTime: start - QUEUE_BEFORE_MS,
-            estimatedOnFieldTime: start - ON_FIELD_BEFORE_MS,
-            estimatedStartTime: start,
-          },
-          result: (match.result as MatchResult | undefined) ?? null,
-        };
-      }),
-    },
+    nexus: { isRealNexus: true, matches },
+    ourMatches: ourSchedule(matches, snapshot.teamNumber, true),
     ranking: ours
       ? {
           rank: ours.rank,

@@ -40,7 +40,13 @@ import { downloaderRoutes, downloaderSelfRoutes } from "./downloaders";
 import { eventSnapshotRoutes, snapshotMonitorData } from "./event-snapshot";
 import { manifest } from "./manifest";
 import { deleteTeamLogFiles, logUploadRoutes, matchLogRoutes } from "./match-logs";
-import { type TbaMatch, contextRankingsFor, scheduleFromTba, withResults } from "./monitor-matches";
+import {
+  type TbaMatch,
+  contextRankingsFor,
+  ourSchedule,
+  scheduleFromTba,
+  withResults,
+} from "./monitor-matches";
 import { SETTING_KEYS, type SettingKey, getSetting, getWhenFull, teamNumberOf } from "./settings";
 import type { AppEnv } from "./types";
 
@@ -947,7 +953,12 @@ const app = base
       finalNexus = { matches: scheduleFromTba(tbaMatches), isRealNexus: false };
     }
 
-    return c.json({ teamNumber: team, nexus: finalNexus, ranking, contextRankings });
+    // The team's next match and how far off it is, for the Monitor's "Our next match".
+    const ourMatches = finalNexus?.matches
+      ? ourSchedule(finalNexus.matches, team, finalNexus.isRealNexus === true)
+      : null;
+
+    return c.json({ teamNumber: team, nexus: finalNexus, ourMatches, ranking, contextRankings });
   })
 
   // Pit monitor settings — read-only, public (display-only settings like iframe URL)

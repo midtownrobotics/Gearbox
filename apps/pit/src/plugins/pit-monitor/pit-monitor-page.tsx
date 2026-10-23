@@ -1,4 +1,5 @@
 import { Badge, Button, ProgressBar, tones, useTeamNames } from "@g3/ui";
+import type { OurSchedule } from "@g3/worker-pit/monitor-matches";
 import { type RefObject, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { api } from "../../shared/api";
 import { useBatteryCache } from "../../shared/battery-cache-context";
@@ -22,6 +23,8 @@ import type {
 } from "../../shared/getters/types";
 import { type PersonInThePit, untilLabel, useInThePit } from "../../shared/in-the-pit";
 import { ConnectionIndicator, OfflineOverlay, useConnection } from "./connection";
+import { Countdown, formatTime } from "./match-time";
+import { OurNextMatchPanel } from "./our-next-match";
 
 const REFRESH_MS = 15_000;
 
@@ -85,30 +88,13 @@ type MonitorData = {
   /** A past event shown instead of the team's (dev and staging only: Pit > Admin). */
   snapshot?: { event: string; name: string } | null;
   nexus: NexusData | null;
+  /** The team's next match; null when there's no schedule. */
+  ourMatches?: OurSchedule | null;
   ranking: RankingRow | null;
   contextRankings?: ContextRankings | null;
 };
 
 // ── Helpers ────────────────────────────────────────────────────────────────
-
-function formatCountdown(targetMs: number): string {
-  const remaining = targetMs - Date.now();
-  if (remaining <= 0) return "Now";
-  const totalSeconds = Math.floor(remaining / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  if (minutes >= 60) return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
-  if (minutes > 0) return `${minutes}m ${seconds}s`;
-  return `${seconds}s`;
-}
-
-function formatTime(ms?: number | null): string {
-  if (!ms) return "—";
-  const d = new Date(ms);
-  const h = d.getHours() % 12 || 12;
-  const m = d.getMinutes().toString().padStart(2, "0");
-  return `${h}:${m} ${d.getHours() >= 12 ? "PM" : "AM"}`;
-}
 
 function teamInMatch(m: NexusMatch, team: string): boolean {
   return (
@@ -146,19 +132,43 @@ function useFitToWindow(ref: RefObject<HTMLElement | null>, ready: boolean): num
   return height;
 }
 
-// ── Isolated timer components ──────────────────────────────────────────────
-
-function Countdown({ targetMs }: { targetMs: number }) {
-  const [text, setText] = useState(() => formatCountdown(targetMs));
-  useEffect(() => {
-    const interval = setInterval(() => setText(formatCountdown(targetMs)), 250);
-    return () => clearInterval(interval);
-  }, [targetMs]);
-  return <>{text}</>;
-}
-
 // ── Sections ───────────────────────────────────────────────────────────────
 
+/** One of the event's queue tiles: a match, and when it's due on the field or to queue. */
+function QueueTile({
+  title,
+  match,
+  colors,
+  ours,
+  until,
+}: {
+  title: string;
+  match: NexusMatch;
+  colors: string;
+  ours: boolean;
+  until: { label: string; at: number | null | undefined };
+}) {
+  return (
+    <div
+      className={`min-w-0 rounded-lg border px-2.5 py-1.5 ${colors} ${ours ? "ring-2 ring-current" : ""}`}
+    >
+      <p className="flex items-center justify-between gap-1 text-[10px] font-bold uppercase tracking-wide sm:tracking-widest">
+        <span className="truncate">{title}</span>
+        {ours && <span className="shrink-0">Us</span>}
+      </p>
+      <p className="truncate text-sm font-bold text-secondary-900">
+        {match.label.replace(/^Qualification\b/, "Qual")}
+      </p>
+      {until.at && (
+        <p className="text-[11px] tabular-nums text-secondary-600">
+          {until.label} <Countdown targetMs={until.at} />
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** Where the event is: the matches On deck, Now queuing and Queuing soon, small, under ours. */
 function NexusSection({ nexus, teamNumber }: { nexus: NexusData; teamNumber: string }) {
   const onDeck = nexus.matches.find((m) => m.status === "On deck");
   const nowQueuing = nexus.matches.find((m) => m.status === "Now queuing");
@@ -169,66 +179,31 @@ function NexusSection({ nexus, teamNumber }: { nexus: NexusData; teamNumber: str
   return (
     <div className="grid grid-cols-3 gap-2">
       {onDeck && (
-        <div
-          className={`rounded-xl p-2.5 border ${teamInMatch(onDeck, teamNumber) ? "bg-red-100 border-red-300 ring-2 ring-red-400" : "bg-red-100 border-red-300"}`}
-        >
-          <div className="space-y-1">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-red-600">
-              On Deck {teamInMatch(onDeck, teamNumber) && "!"}
-            </p>
-            <p className="text-lg font-black text-secondary-900">{onDeck.label}</p>
-            {onDeck.times.estimatedOnFieldTime && (
-              <div>
-                <p className="text-[10px] text-secondary-600">On field in</p>
-                <p className="text-sm font-bold text-red-600 tabular-nums">
-                  <Countdown targetMs={onDeck.times.estimatedOnFieldTime} />
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
+        <QueueTile
+          title="On deck"
+          match={onDeck}
+          colors="border-red-300 bg-red-50 text-red-700"
+          ours={teamInMatch(onDeck, teamNumber)}
+          until={{ label: "On field in", at: onDeck.times.estimatedOnFieldTime }}
+        />
       )}
-
       {nowQueuing && (
-        <div
-          className={`rounded-xl p-2.5 border ${teamInMatch(nowQueuing, teamNumber) ? "bg-amber-100 border-amber-300 ring-2 ring-amber-400" : "bg-amber-100 border-amber-300"}`}
-        >
-          <div className="space-y-1">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-secondary-900">
-              Now Queuing {teamInMatch(nowQueuing, teamNumber) && "!"}
-            </p>
-            <p className="text-lg font-black text-secondary-900">{nowQueuing.label}</p>
-            {nowQueuing.times.estimatedOnFieldTime && (
-              <div>
-                <p className="text-[10px] text-secondary-600">On field in</p>
-                <p className="text-sm font-bold text-secondary-900 tabular-nums">
-                  <Countdown targetMs={nowQueuing.times.estimatedOnFieldTime} />
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
+        <QueueTile
+          title="Now queuing"
+          match={nowQueuing}
+          colors="border-amber-300 bg-amber-50 text-amber-700"
+          ours={teamInMatch(nowQueuing, teamNumber)}
+          until={{ label: "On field in", at: nowQueuing.times.estimatedOnFieldTime }}
+        />
       )}
-
       {queuingSoon && (
-        <div
-          className={`rounded-xl p-2.5 border ${teamInMatch(queuingSoon, teamNumber) ? "bg-emerald-50 border-emerald-400 ring-2 ring-emerald-400" : "bg-emerald-50 border-emerald-300"}`}
-        >
-          <div className="space-y-1">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-600">
-              Queuing Soon {teamInMatch(queuingSoon, teamNumber) && "!"}
-            </p>
-            <p className="text-lg font-black text-secondary-900">{queuingSoon.label}</p>
-            {queuingSoon.times.estimatedQueueTime && (
-              <div>
-                <p className="text-[10px] text-secondary-600">Queue in</p>
-                <p className="text-sm font-bold text-emerald-600 tabular-nums">
-                  <Countdown targetMs={queuingSoon.times.estimatedQueueTime} />
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
+        <QueueTile
+          title="Queuing soon"
+          match={queuingSoon}
+          colors="border-emerald-300 bg-emerald-50 text-emerald-700"
+          ours={teamInMatch(queuingSoon, teamNumber)}
+          until={{ label: "Queue in", at: queuingSoon.times.estimatedQueueTime }}
+        />
       )}
     </div>
   );
@@ -829,16 +804,16 @@ export function PitMonitorPage() {
   return (
     <main className="flex-1 bg-page text-secondary-900">
       <OfflineOverlay connection={connection} />
-      <div className="px-6 py-5 space-y-5">
+      <div className="px-4 py-5 space-y-5 sm:px-6">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-secondary-200 pb-4">
-          <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-secondary-200 pb-4">
+          <div className="flex flex-wrap items-center gap-3">
             <h1 className="text-2xl font-black tracking-tight">{names.appTitle("Pit")} Monitor</h1>
             {monitor?.snapshot && (
               <Badge colors={tones.warning}>Snapshot: {monitor.snapshot.name}</Badge>
             )}
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
             <ConnectionIndicator connection={connection} />
             {lastUpdated && (
               <p className="text-xs text-secondary-600">
@@ -858,11 +833,18 @@ export function PitMonitorPage() {
           className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:grid-rows-[minmax(0,1fr)]"
           style={fitHeight ? { height: fitHeight } : undefined}
         >
-          {/* Left: Nexus status (only with real Nexus data) + ranking + the team's matches. In the
-              column, so the right one starts at the top instead of under it. */}
+          {/* Left: our next match, with the event's queue under it (only with real Nexus data), who's
+              in the pit, the ranking and the team's matches. In the column, so the right one starts
+              at the top instead of under it. */}
           <div className="flex min-h-0 flex-col gap-5">
+            <div className="space-y-2">
+              <OurNextMatchPanel
+                ourMatches={monitor?.ourMatches ?? null}
+                fromNexus={!!nexus?.isRealNexus}
+              />
+              {nexus?.isRealNexus && <NexusSection nexus={nexus} teamNumber={teamNumber} />}
+            </div>
             {inThePit && <InThePitSection people={inThePit} />}
-            {nexus?.isRealNexus && <NexusSection nexus={nexus} teamNumber={teamNumber} />}
             {monitor?.ranking && (
               <RankingSection
                 ranking={monitor.ranking}
