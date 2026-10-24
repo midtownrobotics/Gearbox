@@ -6,12 +6,15 @@ import {
   ErrorBanner,
   Loading,
   Page,
+  TextField,
   redirectToSignIn,
+  tones,
 } from "@g3/ui";
 import { GraduationCap, Shield, ShieldOff } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { g3id as api } from "../../lib/api";
+import { type Reporter, reporterIds } from "../../lib/platform";
 import { PROVIDERS, ProviderIcon, STATUS_STYLES, type User, relativeTime } from "./members-shared";
 
 // One member of the team, opened from the Users list: their details, the accounts they sign in
@@ -33,9 +36,90 @@ const longDate = (ts: number) =>
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex justify-between gap-4 py-2 text-sm">
-      <dt className="text-secondary-500">{label}</dt>
-      <dd className="text-right text-secondary-900">{children}</dd>
+      <dt className="shrink-0 text-secondary-500">{label}</dt>
+      <dd className="min-w-0 text-right text-secondary-900">{children}</dd>
     </div>
+  );
+}
+
+/**
+ * Their name, which an admin can correct (Enter or Save saves, Escape or Cancel doesn't). Their
+ * username is their chat account's and isn't edited here.
+ */
+function NameRow({ user, onSaved }: { user: Details; onSaved: (name: string) => void }) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function save(e: React.SyntheticEvent) {
+    e.preventDefault();
+    if (draft === null) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await api.admin.users[":id"].name.$put({
+        param: { id: user.id },
+        json: { name: draft },
+      });
+      const body = (await res.json().catch(() => ({}))) as { displayName?: string; error?: string };
+      if (!res.ok || !body.displayName)
+        throw new Error(body.error ?? "That didn't work. Try again.");
+      onSaved(body.displayName);
+      setDraft(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "That didn't work. Try again.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (draft === null) {
+    return (
+      <Row label="Name">
+        <span className="flex items-center justify-end gap-3">
+          <span className="min-w-0">{user.displayName}</span>
+          <button
+            type="button"
+            className="shrink-0 text-sm text-primary-600 hover:underline"
+            onClick={() => setDraft(user.displayName)}
+          >
+            Edit
+          </button>
+        </span>
+      </Row>
+    );
+  }
+  return (
+    <form onSubmit={save} className="space-y-2 py-2">
+      <label className="block space-y-1">
+        <span className="text-sm text-secondary-500">Name</span>
+        <TextField
+          kind="person"
+          autoFocus
+          maxLength={80}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => e.key === "Escape" && setDraft(null)}
+          disabled={saving}
+          required
+        />
+      </label>
+      {error && <ErrorBanner message={error} />}
+      <div className="flex gap-2">
+        <Button type="submit" size="sm" disabled={saving || !draft.trim()}>
+          {saving ? "Saving…" : "Save"}
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          disabled={saving}
+          onClick={() => setDraft(null)}
+        >
+          Cancel
+        </Button>
+      </div>
+    </form>
   );
 }
 
@@ -51,6 +135,8 @@ export function MemberPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  /** Their reporter ID, or null for someone who has never opened Report a problem. */
+  const [reporter, setReporter] = useState<Reporter | null>(null);
 
   useEffect(() => {
     api.auth.me.$get().then(async (res) => {
@@ -71,6 +157,7 @@ export function MemberPage() {
         setUser((await res.json()) as Details);
       })
       .catch((err) => setError(err instanceof Error ? err.message : "Couldn't load this person."));
+    reporterIds().then((ids) => setReporter(ids.get(id) ?? null));
   }, [me, id]);
 
   /** Runs an action on them; on success, applies `patch` (or leaves the page, for a delete). */
@@ -116,6 +203,9 @@ export function MemberPage() {
             </div>
             <div className="min-w-0">
               <p className="truncate text-sm text-secondary-600">{user.email}</p>
+              {user.status === "pending" && user.needsName === 1 && (
+                <p className="text-sm text-secondary-500">Hasn't entered their name yet.</p>
+              )}
               <div className="mt-1 flex flex-wrap items-center gap-2">
                 {STATUS_STYLES[user.status] && (
                   <Badge colors={STATUS_STYLES[user.status]}>
@@ -138,6 +228,13 @@ export function MemberPage() {
 
           <Card className="!py-3">
             <dl className="divide-y divide-secondary-200">
+              <NameRow
+                user={user}
+                onSaved={(displayName) =>
+                  setUser((u) => (u ? { ...u, displayName, needsName: 0 } : u))
+                }
+              />
+              <Row label="Username">{user.username ?? "None"}</Row>
               <Row label="Joined">{longDate(user.createdAt)}</Row>
               <Row label="Last signed in">
                 {user.lastLoginAt
@@ -147,7 +244,24 @@ export function MemberPage() {
               <Row label="Kiosk PIN">
                 {user.kioskPinSince ? `Since ${longDate(user.kioskPinSince)}` : "None"}
               </Row>
+              <Row label="Reporter ID">
+                {reporter ? (
+                  <span className="inline-flex items-center gap-2">
+                    <span className="font-mono">{reporter.id}</span>
+                    {reporter.blocked && <Badge colors={tones.danger}>Blocked</Badge>}
+                  </span>
+                ) : (
+                  "None"
+                )}
+              </Row>
             </dl>
+            {reporter?.blocked && (
+              <p className="pt-2 text-sm text-secondary-600">
+                Gearbox blocked them from Report a problem
+                {reporter.blockedAt ? ` on ${longDate(reporter.blockedAt)}` : ""}
+                {reporter.blockReason ? `: “${reporter.blockReason}”` : "."}
+              </p>
+            )}
           </Card>
 
           <Card title="Signs in with">

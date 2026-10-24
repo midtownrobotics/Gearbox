@@ -684,12 +684,12 @@ function HoursChart({ report }: { report: Report }) {
       </div>
       <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-secondary-600">
         {named.map((row) => (
-          <li key={row.member.id} className="flex items-center gap-1.5">
+          <li key={row.member.id} className="flex min-w-0 items-center gap-1.5">
             <span
-              className="inline-block h-0.5 w-4 rounded-full"
+              className="inline-block h-0.5 w-4 shrink-0 rounded-full"
               style={{ background: colorOf(row) ?? undefined }}
             />
-            <span className="text-secondary-900">{row.member.displayName}</span>
+            <span className="min-w-0 text-secondary-900">{row.member.displayName}</span>
             <span className="tabular-nums">{formatHours(row.totalHours)}</span>
           </li>
         ))}

@@ -29,13 +29,22 @@ export function PairingCard({
   const [teamNumber, setTeamNumber] = useState("");
   const [code, setCode] = useState("");
   const [name, setName] = useState(gearbox.defaultName);
+  // Another Pit than the team's usual one (staging, a Pit of its own): typed here, or left empty.
+  const [otherPit, setOtherPit] = useState(false);
+  const [pitUrl, setPitUrl] = useState("");
+  const usualPitUrl = gearbox.usualPitUrl.replace("<team>", teamNumber || "1648");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     setBusy(true);
-    const problem = await send("POST", "/api/gearbox/pair", { teamNumber, code, name });
+    const problem = await send("POST", "/api/gearbox/pair", {
+      teamNumber,
+      code,
+      name,
+      pitUrl: otherPit ? pitUrl : "",
+    });
     setBusy(false);
     if (problem) setError(problem);
     else onPaired();
@@ -51,7 +60,7 @@ export function PairingCard({
           On your team's Pit, a mentor or admin opens Logs and chooses Get a pairing code. Enter it
           here within 10 minutes.
         </p>
-        {gearbox.pitUrl && (
+        {gearbox.pitUrl && !otherPit && (
           <p className="text-sm text-secondary-600">
             Pairs with the Pit at <span className="font-mono">{gearbox.pitUrl}</span>.
           </p>
@@ -88,6 +97,29 @@ export function PairingCard({
             maxLength={60}
           />
         </Field>
+        {otherPit ? (
+          <Field
+            label="Pit address"
+            hint="Only for a Pit that isn't at your team's usual address. Copy it from the browser."
+          >
+            <TextField
+              kind="url"
+              type="url"
+              value={pitUrl}
+              onChange={(e) => setPitUrl(e.target.value)}
+              placeholder={usualPitUrl}
+              required
+            />
+          </Field>
+        ) : (
+          <button
+            type="button"
+            className="block text-sm text-primary-600 underline"
+            onClick={() => setOtherPit(true)}
+          >
+            Use another Pit address
+          </button>
+        )}
         <Button type="submit" disabled={busy || !teamNumber || code.length !== 6}>
           {busy ? "Pairing…" : "Pair"}
         </Button>
@@ -126,6 +158,9 @@ export function GearboxCard({
             </a>{" "}
             as <span className="font-semibold">{paired.name}</span>.
           </p>
+          {!paired.usual && (
+            <p className="mt-1 font-mono text-xs text-secondary-500">{paired.pitUrl}</p>
+          )}
           {gearbox.connection === "unreachable" && (
             <p className="mt-1 text-amber-700">
               Can't reach Gearbox right now. It tries again every minute.

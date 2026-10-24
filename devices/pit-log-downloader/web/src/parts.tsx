@@ -274,6 +274,34 @@ function DeleteLog({ log, onError }: { log: LogStatus; onError: (message: string
   );
 }
 
+/** For a log deleted in Pit: uploads it again from this computer. */
+function UploadAgain({ log, onError }: { log: LogStatus; onError: (message: string) => void }) {
+  const [busy, setBusy] = useState(false);
+  async function upload() {
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/logs/${encodeURIComponent(log.id)}/upload`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as { error?: string } | null;
+        onError(body?.error ?? "Couldn't upload it again.");
+      }
+    } catch {
+      onError("Can't reach the downloader. Check that it's still running.");
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <Button variant="secondary" size="sm" disabled={busy} onClick={() => void upload()}>
+      Upload again
+    </Button>
+  );
+}
+
 function LogRow({ log }: { log: LogStatus }) {
   const here = log.downloaded && log.sizeBytes !== null;
   const [trimming, setTrimming] = useState(false);
@@ -287,6 +315,9 @@ function LogRow({ log }: { log: LogStatus }) {
       </div>
       <LogBadges log={log} />
       <div className="ml-auto flex flex-wrap gap-2">
+        {here && log.uploaded && log.inGearbox === false && !log.uploading && (
+          <UploadAgain log={log} onError={setError} />
+        )}
         {here && (
           <a className={buttonClass("secondary", "sm")} href={download}>
             Download

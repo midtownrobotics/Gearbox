@@ -48,6 +48,25 @@ export type OperatorAccess = {
   createdAt: number;
 };
 
+/** A member's reporter ID: what stands for them on their problem reports' public issues. */
+export type Reporter = {
+  id: string;
+  userId: string;
+  blocked: boolean;
+  blockedAt: number | null;
+  blockReason: string | null;
+};
+
+/** The team's reporter IDs by member (admins only); empty when they can't be loaded. */
+export async function reporterIds(): Promise<Map<string, Reporter>> {
+  try {
+    const list = await platform<Reporter[]>("/team/reports/reporters");
+    return new Map(list.map((r) => [r.userId, r]));
+  } catch {
+    return new Map();
+  }
+}
+
 /** Downloads an app's data for the team as a JSON file (the platform's export, logged there). */
 export async function downloadAppData(slug: string) {
   const res = await fetch(

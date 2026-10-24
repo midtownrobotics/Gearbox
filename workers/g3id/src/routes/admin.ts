@@ -2,6 +2,7 @@ import { leaveGuild } from "@g3/discord";
 import { SlackApiError } from "@g3/slack";
 import { and, desc, eq, gt, inArray, isNull, or } from "drizzle-orm";
 import { Hono } from "hono";
+import { validator } from "hono/validator";
 import { createDb } from "../db";
 import {
   coreSessions,
@@ -19,6 +20,7 @@ import { CHAT_LABELS, chatForTeam, listChatChannels } from "../lib/chat";
 import { discordForTeam, removeDiscordInstallation } from "../lib/discord-install";
 import { dmMember } from "../lib/member-dm";
 import { methodOff } from "../lib/sign-in-methods";
+import { NAME_MAX, cleanName } from "../lib/signup-name";
 import { removeInstallation, slackForTeam } from "../lib/slack-install";
 import { teamOfUser, teamUrl } from "../lib/team";
 import { appearanceChanges, logToTeam } from "../lib/team-log";
@@ -158,6 +160,8 @@ export const adminRouter = new Hono<AppEnv>()
         id: coreUsers.id,
         email: coreUsers.email,
         displayName: coreUsers.displayName,
+        username: coreUsers.username,
+        needsName: coreUsers.needsName,
         status: coreUsers.status,
         isAdmin: coreUsers.isAdmin,
         isMentor: coreUsers.isMentor,
@@ -187,6 +191,26 @@ export const adminRouter = new Hono<AppEnv>()
     ]);
     return c.json({ ...user, identities, kioskPinSince: pin?.createdAt ?? null });
   })
+  // A member's name, which an admin can correct. Their username (their chat account's name)
+  // stays as it is. Someone still to enter their own name keeps the admin's instead.
+  .put(
+    "/users/:id/name",
+    validator("json", (value, c) => {
+      const name = cleanName((value as { name?: unknown } | null)?.name);
+      if (!name) return c.json({ error: `Enter a name of up to ${NAME_MAX} characters.` }, 400);
+      return { name };
+    }),
+    async (c) => {
+      const { name } = c.req.valid("json");
+      const updated = await createDb(c.env.DB)
+        .update(coreUsers)
+        .set({ displayName: name, needsName: 0, updatedAt: Math.floor(Date.now() / 1000) })
+        .where(memberOf(c.get("adminTeamId") as string, c.req.param("id")))
+        .returning({ id: coreUsers.id });
+      if (updated.length === 0) return c.json({ error: "User not found." }, 404);
+      return c.json({ displayName: name });
+    },
+  )
   .post("/users/:id/approve", async (c) => {
     const id = c.req.param("id");
     const db = createDb(c.env.DB);

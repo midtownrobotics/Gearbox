@@ -13,7 +13,12 @@ export type Identity = {
 export type User = {
   id: string;
   email: string;
+  /** Their full name, which an admin can change. */
   displayName: string;
+  /** The name on the chat account they signed up with; nobody edits it. */
+  username: string | null;
+  /** 1 until someone who just signed up has entered their name. */
+  needsName: number;
   status: string;
   isAdmin: number;
   isMentor: number;
@@ -102,14 +107,25 @@ const fold = (text: string) =>
     .toLowerCase();
 
 /**
- * Whether a user matches a search: every word is somewhere in their name, email, or the name of
- * an account they sign in with (a Slack, Discord or GitHub username, a Google email).
+ * Whether a user matches a search: every word is somewhere in their name, username, email, or the
+ * name of an account they sign in with (a Slack, Discord or GitHub username, a Google email), or
+ * their reporter ID (on their problem reports' GitHub issues).
  */
-export function matchesSearch(user: User, query: string): boolean {
+export function matchesSearch(user: User, query: string, reporterId?: string): boolean {
   const words = fold(query).split(/\s+/).filter(Boolean);
   if (words.length === 0) return true;
   const text = fold(
-    [user.displayName, user.email, ...user.identities.map((i) => i.providerEmail ?? "")].join(" "),
+    [
+      user.displayName,
+      user.username ?? "",
+      user.email,
+      ...user.identities.map((i) => i.providerEmail ?? ""),
+      reporterId ?? "",
+    ].join(" "),
   );
   return words.every((word) => text.includes(word));
 }
+
+/** Their username when it says something their name doesn't. */
+export const otherUsername = (user: Pick<User, "displayName" | "username">) =>
+  user.username && user.username !== user.displayName ? user.username : null;

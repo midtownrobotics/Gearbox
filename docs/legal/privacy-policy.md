@@ -30,20 +30,21 @@ We collect only what the apps need to work.
 
 | Kind | What it includes | Where it comes from |
 | --- | --- | --- |
-| Account | Name, email address, when you last signed in | You, or the sign-in service you use |
+| Account | Name (you enter it when you join, and your team's admins can correct it), the username of the Slack or Discord account you joined with, email address, when you last signed in | You, your team's admins, or the sign-in service you use |
 | Sign-in links | Your identifier at each service you link, such as Google, GitHub, Slack, Discord or Steam, and the email or username it gives us. A password is stored only as a one-way hash. For Google and GitHub, the access token they issue when you sign in | You, when you link a service |
 | Team membership | Your team, your role, your status, and a kiosk PIN if your team uses kiosks | Your team's admins |
 | Sessions and devices | A session identifier in a cookie, and for shared shop devices a kiosk token | Created when you sign in |
 | Attendance | When you signed in and out, and hours added by an admin | You and your team's admins |
 | Orders | Part requests, reasons, approvals, costs, budgets and vendors | Members and mentors |
 | Inventory | What the team owns, how many and where, and a history of who counted, moved, checked out or received each part | Members and mentors |
-| Shop | Parts, production steps, who did them, who made a part obsolete, drawings and files; for each Onshape release, its name and notes, who made and approved it (their Onshape names) and its comments | Members, mentors and Onshape, if connected |
+| Shop | Parts, production steps, who did them, who made a part obsolete, who your team's shop managers are, quality reports (who made each, its notes, and who did the steps it questions), drawings and files; for each Onshape release, its name and notes, who made and approved it (their Onshape names) and its comments | Members, mentors and Onshape, if connected |
 | Pit | Checklists, issues and battery records, and archives of the checklists with who archived each one and when; the computers paired as log downloaders, with each one's name, who paired it, when, when it was last heard from and what it last said it was doing (connected to the robot, copying, uploading); and the robot's match logs those computers upload (the robot's own data from each match; at most 20 per team), kept until the team deletes them; AdvantageScope's preferences and layout for the team, with who last changed each; and the field, robot and joystick models mentors upload to it, with who uploaded each and when | Members |
 | Skill Tree | Each member's progress on skills and who signed it off | Members and mentors |
 | Schedule | Each event's days and periods, which members are attending, each one's role for every 15 minutes, who may edit schedules, and which chat reminders (Slack or Discord) were sent; each member's own list of friends, which only that member can see | Mentors and the students they trust; each member, for their friends |
 | Scouting | Match and pit observations, notes on other teams, robot photos, schedules; when engagement is enabled, point balances and awards, match picks and their results | Members and optional scouting activities |
 | Uploaded files | Whatever your team uploads | Members |
 | Technical logs | Internet address, browser type, the page requested and the time | Recorded automatically by our hosting provider |
+| Problem reports | What you write when you report a problem or an idea from an app's menu, the page's address (without anything after `?`), the app and Gearbox versions, your browser, your team, that you sent it and your reporter ID (a random ID given to you with your first report) | You, when you send one |
 | Visits to our public page | How many visits frcgearbox.com's home page had each day, and how many of them were by someone signed in. Only these daily totals: nothing that identifies a visitor | Counted when the page opens |
 | Team record | Team name, FRC team number, country, branding, which apps are on, and acceptance of our terms | The team owner |
 
@@ -80,6 +81,8 @@ We count teams and the apps they use so we can plan capacity. Those counts do no
 
 Some things are public by design: your team's name, number and branding on its sign-in page, and the apps your team has submitted to the library.
 
+Problem reports are public too. Each one is posted as an issue on Gearbox's public GitHub repository, with the page's address, the app and Gearbox versions, your browser, your team's number and your reporter ID. Your name isn't posted, but anything you write in the report is. Your reporter ID is the same on each of your reports, so they can be seen to come from one person, but it doesn't say who you are. The report form shows you your reporter ID. Your team's admins can see each member's reporter ID. Our operators can block a reporter ID used for spam or misuse without learning whose it is; a blocked reporter can't send reports, and your team's admins are told it's you and the operator's reason. Gearbox keeps who sent each report, to message you when it's fixed or closed.
+
 Scouting forms, reports, schedules, uploaded files and points are private to the owning team. Team deletion or the app's scheduled deletion removes its database records and uploaded files.
 
 Scouting engagement is off by default. An admin can enable points and match predictions and can separately enable team points standings. Standings show members' names, balances, points earned and points used to signed-in teammates. A member's prediction history is shown only to that member through the activity page. Disabling activities pauses new awards and prediction result processing and keeps existing balances and history under the same retention rules as other team data.
@@ -90,6 +93,7 @@ Scouting engagement is off by default. An admin can enable points and match pred
 | --- | --- | --- |
 | Cloudflare | Hosting, storage and network delivery | Always. All Gearbox data is held on Cloudflare |
 | Google, GitHub, Steam | Sign-in | Only if you choose to sign in with or link that service |
+| GitHub | Holds problem reports as public issues | When you send a report: its text, the page's address, the versions, your browser, your team's number and your reporter ID |
 | Slack | Sign-in and team notifications | Only if your team connects its Slack workspace |
 | Discord | Sign-in and team notifications. When someone new signs in with Discord, we check with Discord that they're in your team's server; the answer isn't stored | Only if your team connects its Discord server |
 | Onshape | Part and drawing data for Shop | Only if your team connects Onshape |
@@ -116,6 +120,7 @@ Where the law of your team's country requires a legal basis for that transfer, t
 | Data of an app your team switches off | 90 days, in case your team switches it back on, then deleted |
 | Records that name a removed member, such as past orders | Kept by the team, with the member's name replaced by a placeholder |
 | Operator access log | 12 months |
+| Who sent a problem report, and your reporter ID | Kept as team data, and deleted with the team. The public GitHub issue stays: ask us to remove one |
 | Daily visit totals for our public page | Kept; they are totals and identify no one |
 | Technical logs | [Period set with our hosting provider] |
 | Backups | [Period], after which deleted information is gone from backups too |
@@ -151,7 +156,7 @@ No system is perfectly secure. If we learn that your team's information has been
 
 ## 12. Cookies and device storage
 
-Gearbox uses one cookie, which keeps you signed in. On shared shop devices it also stores a kiosk token in the browser. We use no advertising or analytics cookies and no third-party trackers. Our public home page notes in your browser's session storage that it has counted your visit, so reloading it isn't counted again; the note is gone when you close the tab. While you fill in a scouting form for a match, your answers and drawings are kept in your browser's storage until the report is sent or you discard it, so they aren't lost if the page closes or the form moves to the next match; drafts more than 12 hours old are removed.
+Gearbox uses one cookie, which keeps you signed in. On shared shop devices it also stores a kiosk token in the browser. We use no advertising or analytics cookies and no third-party trackers. Our public home page notes in your browser's session storage that it has counted your visit, so reloading it isn't counted again; the note is gone when you close the tab. While you fill in a scouting form for a match, your answers and drawings are kept in your browser's storage until the report is sent or you discard it, so they aren't lost if the page closes or the form moves to the next match; drafts more than 12 hours old are removed. When you use AdvantageScope in Pit, AdvantageScope itself, your team's AdvantageScope settings, the field and robot models and the match logs you open or save to the device are kept in your browser's storage, so they aren't downloaded again; a log is removed from it once your team no longer has it in Pit, and you can clear it all by clearing the site's data in your browser.
 
 ## 13. Apps built by teams
 

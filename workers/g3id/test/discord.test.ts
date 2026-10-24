@@ -192,21 +192,79 @@ describe("signing in with Discord", () => {
     expect(((await me.json()) as { id: string }).id).toBe(userId);
   });
 
-  it("signs up someone new from the team's server, waiting for an admin who hears of it", async () => {
+  it("signs up someone new from the team's server, who enters their name before admins hear of it", async () => {
     const { team } = await teamWithDiscord();
     const admin = await memberWithDiscord(team, { isAdmin: true });
     const newcomer = snowflake("5");
     const res = await signIn(team, newcomer);
-    expect(res.headers.get("Location")).toMatch(/\/signup\/pending$/);
+    const location = new URL(res.headers.get("Location") ?? "");
+    expect(location.pathname).toBe("/signup/name");
     expect(cookieFrom(res)).toBeNull();
     const user = await createDb(testEnv.DB)
-      .select({ status: coreUsers.status, email: coreUsers.email })
+      .select({
+        id: coreUsers.id,
+        status: coreUsers.status,
+        displayName: coreUsers.displayName,
+        username: coreUsers.username,
+      })
       .from(coreUsers)
       .where(eq(coreUsers.email, `${newcomer}@discord.test`))
       .get();
-    expect(user?.status).toBe("pending");
+    const discordName = `Member ${newcomer.slice(-4)}`;
+    expect(user).toMatchObject({
+      status: "pending",
+      displayName: discordName,
+      username: discordName,
+    });
+    const before = (await sentTo(`dm-${admin.discordId}`)).length;
+
+    // Their page starts from their Discord name, and saving it tells the admins.
+    const token = location.searchParams.get("token") ?? "";
+    const headers = { "X-Team-Id": team };
+    const step = await g3id(`/auth/signup/name?token=${token}`, { headers });
+    expect(await step.json()).toEqual({ username: discordName });
+    expect((await sentTo(`dm-${admin.discordId}`)).length).toBe(before);
+    const saved = await g3id("/auth/signup/name", {
+      method: "POST",
+      headers,
+      body: { token, name: "  Ada   Lovelace " },
+    });
+    expect(saved.status).toBe(200);
+    const named = await createDb(testEnv.DB)
+      .select({ displayName: coreUsers.displayName, username: coreUsers.username })
+      .from(coreUsers)
+      .where(eq(coreUsers.id, user?.id ?? ""))
+      .get();
+    expect(named).toEqual({ displayName: "Ada Lovelace", username: discordName });
     const dms = await sentTo(`dm-${admin.discordId}`);
+    expect(dms.length).toBe(before + 1);
+    expect(dms.at(-1)?.content).toContain("Ada Lovelace");
+    expect(dms.at(-1)?.content).toContain(`${discordName} on Discord`);
     expect(dms.at(-1)?.content).toContain("is waiting for approval");
+
+    // The token is spent, and signing in again says they're waiting.
+    const again = await g3id("/auth/signup/name", {
+      method: "POST",
+      headers,
+      body: { token, name: "Someone Else" },
+    });
+    expect(again.status).toBe(404);
+    expect((await signIn(team, newcomer)).headers.get("Location")).toMatch(/\/signup\/pending$/);
+  });
+
+  it("asks for the name again of someone who left before entering it", async () => {
+    const { team } = await teamWithDiscord();
+    await memberWithDiscord(team, { isAdmin: true });
+    const newcomer = snowflake("5");
+    await signIn(team, newcomer);
+    const again = new URL((await signIn(team, newcomer)).headers.get("Location") ?? "");
+    expect(again.pathname).toBe("/signup/name");
+    // Only on the team's own address.
+    const token = again.searchParams.get("token") ?? "";
+    const elsewhere = await g3id(`/auth/signup/name?token=${token}`, {
+      headers: { "X-Team-Id": await createTeam() },
+    });
+    expect(elsewhere.status).toBe(404);
   });
 
   it("makes a team's first member its admin", async () => {

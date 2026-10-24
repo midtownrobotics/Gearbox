@@ -4,12 +4,13 @@ export type Subsystem = {
   createdAt: number;
 };
 
-export type ProcessType = "regular" | "file_producer" | "file_consumer";
+export type ProcessType = "regular" | "file_producer" | "file_consumer" | "quality_control";
 
 export const PROCESS_TYPE_LABELS: Record<ProcessType, string> = {
   regular: "Regular",
   file_producer: "File Producer",
   file_consumer: "File Consumer",
+  quality_control: "Quality Control",
 };
 
 export type Process = {
@@ -194,3 +195,53 @@ export type OnshapeRelease = {
     links: { part: string | null; drawing: string | null };
   }[];
 };
+
+/** A step a failed quality report names as the likely cause, as it was when reported. */
+/** One line of the checklist a report went through, and whether the part met it. */
+export type QualityAnswer = { label: string; ok: boolean };
+
+export type QualitySuspect = {
+  processId: number;
+  name: string;
+  /** When it was last finished, and by whom (a user id); null when that wasn't recorded. */
+  completedAt: number | null;
+  completedBy: string | null;
+};
+
+export type QualityOutcome = "passed" | "sent_back" | "not_sent_back" | "fixed" | "replaced";
+
+/** A quality report on a part at a Quality Control step; the part and step as they were then. */
+export type QualityReport = {
+  id: number;
+  partInstanceId: number;
+  partDefinitionId: number;
+  partName: string;
+  partNumber: string;
+  revision: string | null;
+  instanceNumber: number;
+  processId: number;
+  processName: string;
+  reportedBy: string;
+  createdAt: number;
+  /** The checklist as it read when the report was written, in the team's order. */
+  checks: QualityAnswer[];
+  passed: number;
+  unsure: number;
+  suspects: QualitySuspect[];
+  notes: string | null;
+  outcome: QualityOutcome;
+  sentBackProcessId: number | null;
+  sentBackProcessName: string | null;
+  sentBackStatus: "todo" | "doing" | null;
+  /** What has to be done to fix the part, as written onto the part's notes. */
+  fixNote: string | null;
+  /** The part made to replace this one; its instance may later be deleted. */
+  replacementInstanceId: number | null;
+  replacementInstanceNumber: number | null;
+  outcomeBy: string | null;
+  outcomeAt: number | null;
+};
+
+/** How many lines a team's quality checklist can have, and how long each can be. */
+export const MAX_CHECKLIST_ITEMS = 20;
+export const MAX_CHECK_LABEL = 120;

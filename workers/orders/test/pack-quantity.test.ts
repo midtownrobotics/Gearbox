@@ -113,6 +113,13 @@ describe("on requests and the catalog", () => {
       body: { packQuantity: 2 },
     });
     expect(fixed.packQuantity).toBe(2);
+    for (const bad of [0, 1.5, -2, 10_001, "4"]) {
+      const res = await callAs(student, `/requests/${single.id}`, {
+        method: "PATCH",
+        body: { packQuantity: bad },
+      });
+      expect(res.status, String(bad)).toBe(400);
+    }
     expect(
       (
         await callAs(otherStudent, `/requests/${single.id}`, {

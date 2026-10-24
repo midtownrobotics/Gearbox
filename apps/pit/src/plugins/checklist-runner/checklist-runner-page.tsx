@@ -335,7 +335,7 @@ export function ChecklistRunnerPage() {
                           title="Mark resolved"
                           aria-label={`Mark resolved: ${issue.text}`}
                         />
-                        <p className="flex-1 text-sm leading-snug text-secondary-900">
+                        <p className="min-w-0 flex-1 text-sm leading-snug text-secondary-900">
                           {issue.text}
                         </p>
                       </div>

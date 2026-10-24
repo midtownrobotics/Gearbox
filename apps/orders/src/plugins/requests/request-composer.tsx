@@ -16,6 +16,7 @@ import { useLoad } from "../../shared/use-load";
 import {
   type Draft,
   DraftCard,
+  badQuantities,
   blank,
   catalogDraft,
   draftFields,
@@ -273,10 +274,10 @@ export function useRequestComposer({
                   ? "Nothing is requested yet: anyone can promote it to a request later."
                   : `You'll get a ${chat} DM when a mentor approves each one.`}
               </p>
-              <div className="flex items-center gap-2">
+              <div className="flex min-w-0 max-w-full items-center gap-2">
                 {!wishlist && (lists.data?.length ?? 0) > 0 && (
                   <select
-                    className="rounded-lg border border-secondary-300 bg-surface px-3 py-2 text-sm text-secondary-700 focus:outline-none focus:border-primary-500"
+                    className="min-w-0 max-w-full rounded-lg border border-secondary-300 bg-surface px-3 py-2 text-sm text-secondary-700 focus:outline-none focus:border-primary-500"
                     value={listId}
                     onChange={(e) => setListId(e.target.value)}
                     aria-label="List"
@@ -289,7 +290,14 @@ export function useRequestComposer({
                     ))}
                   </select>
                 )}
-                <Button onClick={submitAll} disabled={busy || readyCount === 0}>
+                <Button
+                  onClick={submitAll}
+                  disabled={
+                    busy ||
+                    readyCount === 0 ||
+                    drafts.some((d) => d.state === "ready" && badQuantities(d))
+                  }
+                >
                   {busy
                     ? "Saving…"
                     : wishlist

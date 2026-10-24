@@ -13,6 +13,7 @@ import { newId } from "../../lib/id";
 import { type OAuthState, decodeState, encodeState } from "../../lib/oauth-state";
 import { sanitizeRedirect } from "../../lib/redirect";
 import { methodOff } from "../../lib/sign-in-methods";
+import { nameToken } from "../../lib/signup-name";
 import {
   providerRedirectUri,
   requestTeamId,
@@ -175,7 +176,12 @@ export const discordAuthRouter = new Hono<AppEnv>()
     // --- Sign-in (or sign-up) ---
     const signIn = await signInWithDiscord(c.env, st.team, done.user);
     if (signIn.result === "failed") return err(signIn.message);
-    if (signIn.result === "pending") return c.redirect(`${frontend}/signup/pending`);
+    if (signIn.result === "pending") {
+      const token = signIn.nameUserId && (await nameToken(c.env, signIn.nameUserId));
+      return c.redirect(
+        token ? `${frontend}/signup/name?token=${token}` : `${frontend}/signup/pending`,
+      );
+    }
     setCookie(c, "g3_session", signIn.sessionId, sessionCookieOptions(c.req.url));
     const redirect = st.redirect?.startsWith("/") ? `${frontend}${st.redirect}` : st.redirect;
     return c.redirect(redirect ?? `${teamUrl(c.env, st.team, "portal")}/`);

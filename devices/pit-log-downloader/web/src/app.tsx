@@ -103,7 +103,8 @@ export function App() {
   const styled = Boolean(teamNumber) && appearanceLoaded;
   const appIcon = useTeamIcon(styled ? "/favicon.svg" : undefined) ?? "/favicon.svg";
   // A logo is on the internet: offline, the app's icon in the team's color.
-  const icon = styled && teamUi.logoUrl && status?.connection.internet ? teamUi.logoUrl : appIcon;
+  const showLogo = Boolean(styled && teamUi.logoUrl && status?.connection.internet);
+  const icon = showLogo ? teamUi.logoUrl : appIcon;
   const shortName = styled ? teamUi.shortName : teamNumber;
 
   return (
@@ -112,6 +113,7 @@ export function App() {
       <AppNavBar
         title={shortName ? `${shortName} PIT LOGS`.toUpperCase() : "PIT LOGS"}
         icon={icon}
+        iconIsLogo={showLogo}
         items={[]}
         team={false}
         allApps={false}

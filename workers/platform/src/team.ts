@@ -3,7 +3,7 @@ import { type AppName, teamAppUrlVia } from "@g3/site-config";
 import { and, desc, eq, inArray, isNull, lte } from "drizzle-orm";
 import { Hono } from "hono";
 import { type TEAM_ACTIONS, operatorActions, teamApps, teamAuditLog, teams } from "./db/schema";
-import { accounts, db, g3id, now } from "./lib";
+import { accounts, db, now, tellAdmins } from "./lib";
 import {
   changedParts,
   dmCandidates,
@@ -91,25 +91,6 @@ const longDay = (seconds: number) =>
     year: "numeric",
     timeZone: "UTC",
   });
-
-/**
- * Tells every admin of the team, on its chat (Slack or Discord), that an app was switched on or
- * off (G3ID sends it from the team's own bot to each active admin who has linked it). Never fails
- * the change: a team without a chat just isn't told.
- */
-async function tellAdmins(env: AppEnv["Bindings"], teamId: string, text: string) {
-  try {
-    const res = await g3id(env, `/teams/${encodeURIComponent(teamId)}/chat/dm-admins`, {
-      method: "POST",
-      body: { text },
-    });
-    if (!res.ok && res.status !== 404) {
-      console.error("[apps] telling admins", res.status, await res.text().catch(() => ""));
-    }
-  } catch (err) {
-    console.error("[apps] telling admins", err);
-  }
-}
 
 /** The library as the team's admins see it: every app the team may have, and its state. */
 async function library(env: AppEnv["Bindings"], teamId: string) {

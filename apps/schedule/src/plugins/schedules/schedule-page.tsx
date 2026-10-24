@@ -279,9 +279,9 @@ function Legend({ roles }: { roles: Role[] }) {
   return (
     <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-secondary-600">
       {shown.map((role) => (
-        <li key={role.id} className="inline-flex items-center gap-1.5">
+        <li key={role.id} className="inline-flex min-w-0 items-center gap-1.5">
           <Swatch color={role.color} />
-          {role.name}
+          <span className="min-w-0">{role.name}</span>
         </li>
       ))}
     </ul>
@@ -334,7 +334,7 @@ function MyDay({
                   style={look.style}
                 >
                   <div className="flex flex-wrap items-baseline justify-between gap-x-3">
-                    <span className="font-semibold">{role?.name ?? "Role"}</span>
+                    <span className="min-w-0 font-semibold">{role?.name ?? "Role"}</span>
                     <span className="text-sm">{spanLabel(range.start, range.end)}</span>
                   </div>
                   {with_.length > 0 && (
@@ -353,7 +353,7 @@ function MyDay({
           <ol className="space-y-1.5 text-sm">
             {periods.map((period) => (
               <li key={period.id} className="flex justify-between gap-3">
-                <span className="font-medium text-secondary-900">{period.label}</span>
+                <span className="min-w-0 font-medium text-secondary-900">{period.label}</span>
                 <span className="text-secondary-500 whitespace-nowrap">
                   {spanLabel(period.start, period.end)}
                 </span>

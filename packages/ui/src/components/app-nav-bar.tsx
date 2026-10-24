@@ -11,11 +11,13 @@ import { type ComponentType, type ReactNode, useEffect, useState } from "react";
 import { useSignedInUser, useTeamApps } from "../session";
 import { useTeamIcon, useTeamUiSettings } from "../team-ui";
 import { useTheme } from "../theme";
+import { ReportDialog } from "./report-dialog";
 
 // The top bar every G3 app shares (from Scouting's): the menu button, the app's wordmark, its
 // pages, who's signed in and the light/dark switch. The menu (a drawer) lists the team's apps
-// under "All Apps"; below 768px the pages move into it too, above them. It has its own CSS
-// (nav-bar.css), so it looks the same in apps that don't use Tailwind.
+// under "All Apps"; below 768px the pages move into it too, above them. Its foot has "Report a
+// problem" for anyone signed in (ReportDialog). It has its own CSS (nav-bar.css), so it looks the
+// same in apps that don't use Tailwind.
 
 export type AppNavItem = {
   /** Unique within the bar (usually the path). */
@@ -86,11 +88,17 @@ export function AppNavBar({
   signedIn,
   version,
   team = true,
+  iconIsLogo = false,
 }: {
   /** The app's wordmark, e.g. wordmark("Shop") from @g3/site-config. */
   title: string;
   /** The app's icon (its tab icon, e.g. "/favicon.svg"), shown before the wordmark. */
   icon?: string;
+  /**
+   * `icon` is a team's logo (any shape) rather than a square app icon, so it keeps its
+   * proportions. The bar knows this itself for the team's logo from Team Appearance.
+   */
+  iconIsLogo?: boolean;
   homeHref?: string;
   items: AppNavItem[];
   link?: AppNavLink;
@@ -114,6 +122,7 @@ export function AppNavBar({
   team?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const [reporting, setReporting] = useState(false);
   const teamUi = useTeamUiSettings(team);
   const brandedTitle = team
     ? title.replace(new RegExp(`^${site.team.shortName}\\b`, "i"), teamUi.shortName)
@@ -123,6 +132,13 @@ export function AppNavBar({
   // The app's icon, with its accent in the team's color.
   const teamIcon = useTeamIcon(team ? icon : undefined);
   const shownIcon = team ? teamUi.logoUrl || teamIcon : icon;
+  const shownLogo = team ? !!teamUi.logoUrl : iconIsLogo;
+  // Which logo has loaded wider than it is tall: only a wide one narrows when the bar is short of
+  // room (a square or tall one is no wider than the icon already).
+  const [wideLogo, setWideLogo] = useState<string | null>(null);
+  const iconClass = shownLogo
+    ? `g3-nav-icon is-logo${wideLogo === shownIcon ? " is-wide" : ""}`
+    : "g3-nav-icon";
 
   // The team's home, then its apps that are on, in the order of the home's grid.
   const here = typeof window === "undefined" ? "" : window.location.host;
@@ -142,6 +158,8 @@ export function AppNavBar({
             : []),
         ]
       : [];
+  // Reports go to Gearbox's public GitHub: never from the demo, whose text stays on the page.
+  const canReport = team && !!user && !isDemoPage;
   // Whether the bar has an app list to offer (or may, while it's being asked).
   const hasApps = allApps && user !== null;
   // With no pages and no apps there's nothing for a menu; the bar keeps its controls on phones too.
@@ -215,8 +233,18 @@ export function AppNavBar({
         onClick: () => setOpen(false),
         children: (
           <>
-            {shownIcon && <img className="g3-nav-icon" src={shownIcon} alt="" />}
-            {brandedTitle}
+            {shownIcon && (
+              <img
+                className={iconClass}
+                src={shownIcon}
+                alt=""
+                onLoad={(e) => {
+                  const { naturalWidth, naturalHeight } = e.currentTarget;
+                  if (naturalWidth > naturalHeight) setWideLogo(shownIcon);
+                }}
+              />
+            )}
+            <span className="g3-nav-title">{brandedTitle}</span>
           </>
         ),
       })}
@@ -315,10 +343,23 @@ export function AppNavBar({
           <div className="g3-nav-drawer-foot">
             {actions && <div className="g3-nav-actions">{actions}</div>}
             <ThemeToggle labeled />
+            {canReport && (
+              <button
+                type="button"
+                className="g3-nav-text-link g3-nav-report"
+                onClick={() => {
+                  setOpen(false);
+                  setReporting(true);
+                }}
+              >
+                Report a problem
+              </button>
+            )}
             {version && <span className="g3-nav-version">{version}</span>}
           </div>
         </div>
       )}
+      {reporting && <ReportDialog version={version} onClose={() => setReporting(false)} />}
     </>
   );
 }

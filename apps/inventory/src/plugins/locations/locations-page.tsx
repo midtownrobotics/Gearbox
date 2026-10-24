@@ -305,9 +305,9 @@ function Panel({
                     {held.item.name}
                   </Link>
                   {held.stock.status === "in_use" && (
-                    <span className="flex items-center gap-2 text-xs text-secondary-500">
+                    <span className="flex min-w-0 items-center gap-2 text-xs text-secondary-500">
                       <StatusBadge status="in_use" />
-                      {useLabel(held.stock, places)}
+                      <span className="min-w-0">{useLabel(held.stock, places)}</span>
                     </span>
                   )}
                   <button type="button" className={smallButton} onClick={() => onMoveEntry(held)}>

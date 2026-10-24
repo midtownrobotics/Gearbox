@@ -1,0 +1,54 @@
+name: dev-env-guard
+
+# dev-env only takes merges: nothing on it may reach staging or public. A pull request into either fails when it's
+# from dev-env, or when its branch holds any of dev-env's own commits (those on dev-env's first-parent
+# line that aren't on staging or public: the commits made on it and the merges into it). Branches merged
+# into dev-env stay mergeable elsewhere: their commits aren't on dev-env's first-parent line.
+# Required on staging and public by their rulesets (docs/deploy.md, "dev-env").
+
+on:
+  pull_request:
+
+jobs:
+  dev-env-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Nothing from dev-env
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          HEAD_REF: ${{ github.head_ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          SAME_REPO: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+        run: |
+          if [ "$BASE_REF" != "staging" ] && [ "$BASE_REF" != "public" ]; then
+            echo "Only pull requests into staging or public are checked."
+            exit 0
+          fi
+          if [ "$HEAD_REF" = "dev-env" ] && [ "$SAME_REPO" = "true" ]; then
+            echo "::error::dev-env can't be merged into another branch. Open the pull request from the branch that has the change."
+            exit 1
+          fi
+          if ! git rev-parse --verify --quiet origin/dev-env >/dev/null; then
+            echo "No dev-env branch."
+            exit 0
+          fi
+
+          main_branches=()
+          for b in staging public; do
+            git rev-parse --verify --quiet "origin/$b" >/dev/null && main_branches+=("^origin/$b")
+          done
+          git rev-list --first-parent origin/dev-env "${main_branches[@]}" | sort > dev-env-only.txt
+          git rev-list "$HEAD_SHA" "^origin/$BASE_REF" | sort > pr-commits.txt
+          found=$(comm -12 dev-env-only.txt pr-commits.txt)
+
+          if [ -n "$found" ]; then
+            echo "::error::This branch has dev-env in it (dev-env was merged into it, or it started from dev-env). Make the branch again from staging with only your own commits."
+            echo "dev-env commits in this pull request:"
+            for c in $found; do git log -1 --format='  %h %s' "$c"; done
+            exit 1
+          fi
+          echo "No dev-env commits."

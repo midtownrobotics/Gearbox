@@ -4,6 +4,7 @@ import { api, getErrorMessage } from "../../shared/api";
 import { AnswerDialog } from "../../shared/ask";
 import { useAuthUser } from "../../shared/auth";
 import { formatCents, parseDollars } from "../../shared/format";
+import { QuantityInput, QuantityMessage, parseQuantity } from "../../shared/quantity";
 import { ReceiveDialog, asksInventory, useIntake } from "../../shared/receive-dialog";
 import type { OrderRequest } from "../../shared/types";
 
@@ -86,8 +87,8 @@ export function RequestActions({
     const reason = answer?.reason ?? note;
     const edits: { quantity?: number; unitPriceCents?: number | null } = {};
     if (action === "approve") {
-      const q = Number(quantity);
-      if (!Number.isInteger(q) || q < 1) return setError("Quantity must be a whole number.");
+      const q = parseQuantity(quantity);
+      if (q === null) return setError("Quantity must be a whole number from 1 to 10000.");
       const p = parseDollars(price);
       if (Number.isNaN(p)) return setError("Price must be a dollar amount like 12.50.");
       if (q !== request.quantity) edits.quantity = q;
@@ -105,9 +106,9 @@ export function RequestActions({
     onChanged();
   }
 
-  const q = Number(quantity);
+  const q = parseQuantity(quantity);
   const p = parseDollars(price);
-  const total = Number.isInteger(q) && q > 0 && p !== null && !Number.isNaN(p) ? q * p : null;
+  const total = q !== null && p !== null && !Number.isNaN(p) ? q * p : null;
 
   return (
     <div className="space-y-2">
@@ -115,13 +116,10 @@ export function RequestActions({
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <label className="flex items-center gap-1.5 text-secondary-600">
             Qty
-            <input
-              type="number"
-              min={1}
-              max={10000}
+            <QuantityInput
               className={`${inputClass} !w-20 !py-1.5`}
               value={quantity}
-              onChange={(e) => setQuantity(e.target.value)}
+              onChange={setQuantity}
             />
           </label>
           <label className="flex items-center gap-1.5 text-secondary-600">
@@ -138,6 +136,11 @@ export function RequestActions({
           <span className="text-secondary-500 tabular-nums">
             = {formatCents(total, request.currency)}
           </span>
+          {q === null && (
+            <span className="basis-full">
+              <QuantityMessage value={quantity} />
+            </span>
+          )}
         </div>
       )}
       {!compact && (canApprove || actions.includes("cancel")) && (
@@ -174,7 +177,7 @@ export function RequestActions({
                     ? "danger"
                     : "secondary"
               }
-              disabled={busy !== null}
+              disabled={busy !== null || (a === "approve" && q === null)}
               onClick={() => run(a)}
             >
               {busy === a ? "…" : LABELS[a]}
