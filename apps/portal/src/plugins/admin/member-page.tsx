@@ -34,8 +34,8 @@ const longDate = (ts: number) =>
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex justify-between gap-4 py-2 text-sm">
-      <dt className="text-secondary-500">{label}</dt>
-      <dd className="text-right text-secondary-900">{children}</dd>
+      <dt className="shrink-0 text-secondary-500">{label}</dt>
+      <dd className="min-w-0 text-right text-secondary-900">{children}</dd>
     </div>
   );
 }
@@ -74,11 +74,11 @@ function NameRow({ user, onSaved }: { user: Details; onSaved: (name: string) => 
   if (draft === null) {
     return (
       <Row label="Name">
-        <span className="inline-flex items-center gap-3">
-          {user.displayName}
+        <span className="flex items-center justify-end gap-3">
+          <span className="min-w-0">{user.displayName}</span>
           <button
             type="button"
-            className="text-sm text-primary-600 hover:underline"
+            className="shrink-0 text-sm text-primary-600 hover:underline"
             onClick={() => setDraft(user.displayName)}
           >
             Edit

@@ -80,7 +80,10 @@ function Requires({
       <legend className="text-sm font-medium text-secondary-700">{label}</legend>
       <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
         {options.map((option) => (
-          <label key={option.id} className="flex items-center gap-1.5 text-sm text-secondary-700">
+          <label
+            key={option.id}
+            className="flex min-w-0 items-center gap-1.5 text-sm text-secondary-700"
+          >
             <input
               type="checkbox"
               checked={value.includes(option.id)}
@@ -90,7 +93,7 @@ function Requires({
                 )
               }
             />
-            {option.name}
+            <span className="min-w-0">{option.name}</span>
           </label>
         ))}
       </div>

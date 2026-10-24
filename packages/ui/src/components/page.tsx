@@ -52,7 +52,7 @@ export function Page({
     <Container className={`flex-1 bg-page ${className}`}>
       <div className={`${WIDTHS[width]} px-4 sm:px-6 py-6 space-y-5 ${contentClassName}`}>
         <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
+          <div className="min-w-0 [overflow-wrap:anywhere]">
             <h1 className="text-4xl text-secondary-900">{title}</h1>
             {description && <p className="mt-1 text-sm text-secondary-500">{description}</p>}
           </div>

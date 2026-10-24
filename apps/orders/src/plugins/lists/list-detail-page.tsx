@@ -91,7 +91,9 @@ export function ListDetailPage() {
         </p>
       )}
       <Card className="space-y-4">
-        {list.description && <p className="text-secondary-700">{list.description}</p>}
+        {list.description && (
+          <p className="text-secondary-700 [overflow-wrap:anywhere]">{list.description}</p>
+        )}
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
           <Stat
             label="Parts"
