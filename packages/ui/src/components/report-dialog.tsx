@@ -34,6 +34,7 @@ function useReporter() {
 
 export function ReportDialog({ version, onClose }: { version?: string; onClose: () => void }) {
   const [kind, setKind] = useState<Kind>("problem");
+  const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -50,7 +51,7 @@ export function ReportDialog({ version, onClose }: { version?: string; onClose: 
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ kind, message, page: window.location.href, version }),
+        body: JSON.stringify({ kind, title, message, page: window.location.href, version }),
       });
       const body = (await res.json().catch(() => ({}))) as {
         error?: string;
@@ -103,6 +104,17 @@ export function ReportDialog({ version, onClose }: { version?: string; onClose: 
             An idea
           </Chip>
         </div>
+        <Field label="Title (optional)">
+          <TextField
+            kind="issue"
+            maxLength={80}
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder={
+              kind === "problem" ? "Approve button does nothing" : "Sort parts by vendor"
+            }
+          />
+        </Field>
         <Field
           label={kind === "problem" ? "What happened?" : "What would help?"}
           hint="Reports are public on Gearbox's GitHub, with this page's address, your browser and your reporter ID, but not your name. Leave out names and anything private."

@@ -129,9 +129,10 @@ export type Operator = {
   isYou: boolean;
 };
 
-/** A reporter an operator blocked: only their reporter ID, never who they are. */
+/** A reporter an operator blocked: their reporter ID and team number, never who they are. */
 export type BlockedReporter = {
   id: string;
+  teamNumber: number;
   blockedAt: number;
   blockReason: string | null;
   blockedByName: string | null;

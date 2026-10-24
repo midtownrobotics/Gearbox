@@ -498,11 +498,13 @@ export const consoleRouter = new Hono<AppEnv>()
     });
     return c.json({ ok: true });
   })
-  // Blocked reporters, newest first. Only their reporter IDs: never who they are or their team.
+  // Blocked reporters, newest first: their reporter IDs and team numbers (both on their public
+  // issues), never who they are.
   .get("/reporters", async (c) => {
     const list = await db(c.env)
       .select({
         id: reporters.id,
+        teamId: reporters.teamId,
         blockedAt: reporters.blockedAt,
         blockedBy: reporters.blockedBy,
         blockReason: reporters.blockReason,
@@ -517,8 +519,9 @@ export const consoleRouter = new Hono<AppEnv>()
       list.map((r) => r.blockedBy).filter((id): id is string => !!id),
     );
     return c.json(
-      list.map(({ blockedBy, ...r }) => ({
+      list.map(({ blockedBy, teamId, ...r }) => ({
         ...r,
+        teamNumber: Number(teamId.replace(/^frc/, "")),
         blockedByName: (blockedBy && names.get(blockedBy)?.displayName) ?? blockedBy,
       })),
     );

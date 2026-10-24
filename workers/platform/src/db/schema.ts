@@ -178,6 +178,8 @@ export const problemReports = sqliteTable("problem_reports", {
   /** Who sent it on the public issue: a `reporters` id (migration 0013). */
   reporterId: text("reporter_id"),
   kind: text("kind", { enum: REPORT_KINDS }).notNull(),
+  /** The member's title (migration 0014), or null to use the message's first line. */
+  title: text("title"),
   message: text("message").notNull(),
   /** The page it was sent from, without its query string. */
   page: text("page").notNull(),

@@ -40,6 +40,14 @@ const github = (path: string, method = "GET") =>
   }>;
 const issueOf = (report: Shown) => Number(report.issueUrl?.split("/").pop());
 
+/** Moves every report of the team `seconds` in time (negative: earlier). */
+const moveTeamReports = (teamId: string, seconds: number) =>
+  testEnv.PLATFORM_DB.prepare(
+    "UPDATE problem_reports SET created_at = created_at + ? WHERE team_id = ?",
+  )
+    .bind(seconds, teamId)
+    .run();
+
 /** The reporter ID on a report's issue. */
 const reporterOf = async (report: Shown) =>
   (await github(`/test/issues/${issueOf(report)}`)).body.match(/\| Reporter \| (\w+) \|/)?.[1];
@@ -85,12 +93,26 @@ describe("reporting a problem", () => {
     const issue = await github(`/test/issues/${issueOf(report)}`);
     expect(issue.title).toBe("Orders: Ping @​someone: the Approve button is broken");
     expect(issue.labels).toEqual(["from-gearbox", "bug", "orders"]);
-    expect(issue.body).toContain("> Ping @​someone");
+    expect(issue.body).toMatch(/^Ping @​someone: the Approve button is broken\n/);
+    expect(issue.body).not.toContain("> Ping");
     expect(issue.body).toContain("`https://1648-orders.frcgearbox.com/approvals`");
     expect(issue.body).not.toContain("Jordan");
     expect(issue.body).toContain("Orders 1.4.0");
     expect(issue.body).toContain(`| Team | ${team.student.teamId.replace("frc", "")} |`);
     expect(issue.body).not.toContain(team.student.id);
+  });
+
+  it("uses the member's title for the issue when they give one", async () => {
+    const team = newTeam();
+    const titled = (await (
+      await send(team.student, { title: "  Approve\nbutton   broken ", kind: "idea" })
+    ).json()) as Shown;
+    expect(titled.title).toBe("Orders idea: Approve button broken");
+    expect((await github(`/test/issues/${issueOf(titled)}`)).title).toBe(
+      "Orders idea: Approve button broken",
+    );
+    const untitled = (await (await send(team.student, { title: "   " })).json()) as Shown;
+    expect(untitled.title).toBe("Orders: The Approve button does nothing on my phone.");
   });
 
   it("lists each member's own reports only", async () => {
@@ -113,9 +135,34 @@ describe("reporting a problem", () => {
     expect(res.status).toBe(401);
   });
 
+  it("lets a team send 5 a day, then one every 10 minutes", async () => {
+    const team = newTeam();
+    for (let i = 0; i < 5; i++) expect((await send(team.admin)).status).toBe(201);
+    const slowed = await send(team.student);
+    expect(slowed.status).toBe(429);
+    expect(((await slowed.json()) as { error: string }).error).toContain("Try again in 10 minutes");
+
+    // 11 minutes later, one more, then another wait.
+    await moveTeamReports(team.admin.teamId, -11 * 60);
+    expect((await send(team.student)).status).toBe(201);
+    expect((await send(team.mentor)).status).toBe(429);
+  });
+
+  it("starts each team's day afresh at midnight UTC", async () => {
+    const team = newTeam();
+    for (let i = 0; i < 5; i++) expect((await send(team.student)).status).toBe(201);
+    expect((await send(team.mentor)).status).toBe(429);
+    // Yesterday's: the time since midnight, and a minute more.
+    const sinceMidnight = Math.floor(Date.now() / 1000) % 86400;
+    await moveTeamReports(team.student.teamId, -(sinceMidnight + 60));
+    for (let i = 0; i < 5; i++) expect((await send(team.mentor)).status).toBe(201);
+  });
+
   it("limits how many one member sends in an hour", async () => {
     const team = newTeam();
     for (let i = 0; i < 5; i++) expect((await send(team.admin)).status).toBe(201);
+    // Past the team's wait, but not the hour.
+    await moveTeamReports(team.admin.teamId, -11 * 60);
     expect((await send(team.admin)).status).toBe(429);
     expect((await send(team.student)).status).toBe(201);
   });
@@ -152,7 +199,8 @@ describe("reporter IDs", () => {
     const list = await (await consoleCall("/reporters")).text();
     expect(list).toContain(id);
     expect(list).not.toContain(team.student.id);
-    expect(list).not.toContain(team.student.teamId);
+    // Their team's number, which their issues show too.
+    expect(list).toContain(`"teamNumber":${team.student.teamId.replace("frc", "")}`);
 
     expect((await send(team.student)).status).toBe(403);
     expect((await send(team.mentor)).status).toBe(201);
