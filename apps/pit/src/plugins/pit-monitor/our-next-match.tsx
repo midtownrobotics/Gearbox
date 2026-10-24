@@ -79,7 +79,7 @@ function TeamSlot({
 }: { team: string; ours: boolean; color: string; rank?: number; pit?: string }) {
   return (
     <span
-      className={`inline-flex min-w-0 items-baseline gap-1.5 rounded-lg px-1.5 py-0.5 sm:px-2 ${
+      className={`inline-flex min-w-0 items-center gap-1.5 rounded-lg px-1.5 py-0.5 sm:px-2 ${
         ours ? "bg-surface shadow-md ring-[3px] ring-white" : ""
       }`}
     >
