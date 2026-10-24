@@ -4,7 +4,8 @@
   "private": true,
   "exports": {
     ".": "./src/index.ts",
-    "./manifest": "./src/manifest.ts"
+    "./manifest": "./src/manifest.ts",
+    "./service-issues": "./src/service-issues.ts"
   },
   "scripts": {
     "dev": "wrangler dev --port 8792 --inspector-port 9234",

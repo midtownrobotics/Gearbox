@@ -13,14 +13,17 @@ import {
   inputClass,
   useTeamChat,
 } from "@g3/ui";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api } from "../../shared/api";
 import { getErrorMessage } from "../../shared/api-error";
+import { InfoTip } from "../../shared/info-tip";
 import { enableKioskMode } from "../../shared/kiosk";
 import { PROCESS_TYPE_LABELS, type Process, type ProcessType } from "../../shared/types";
-import { useAuthUser } from "../../shared/use-auth";
+import { useAuthUser, useRefreshAuthUser } from "../../shared/use-auth";
 import { useShopData } from "../../shared/use-shop-data";
 import { ActionsLog } from "./actions-log";
+import { sectionHeading } from "./admin-styles";
+import { QualityReports } from "./quality-reports";
 
 export function AdminPage() {
   const { data, loading, error, refresh } = useShopData();
@@ -166,7 +169,14 @@ export function AdminPage() {
           </div>
         </Section>
 
-        {/* Section 3: Data Management */}
+        {/* Section 3: Quality Control */}
+        {isAdmin && (
+          <Section title="Quality Control" defaultOpen={false}>
+            <QualityControlSettings />
+          </Section>
+        )}
+
+        {/* Section 4: Data Management */}
         {isAdmin && (
           <Section title="Data Management" defaultOpen={false}>
             <div className="flex flex-wrap items-center gap-2">
@@ -184,19 +194,19 @@ export function AdminPage() {
           </Section>
         )}
 
-        {/* Section 4: Kiosk Mode */}
+        {/* Section 5: Kiosk Mode */}
         <Section title="Kiosk Mode" defaultOpen={false}>
           <KioskModeSettings />
         </Section>
 
-        {/* Section 5: Onshape */}
+        {/* Section 6: Onshape */}
         {isAdmin && (
           <Section title="Onshape Configuration" defaultOpen={false}>
             {data ? <OnShapeConfig /> : <Loading />}
           </Section>
         )}
 
-        {/* Section 6: the team's chat (Slack or Discord) */}
+        {/* Section 7: the team's chat (Slack or Discord) */}
         {isAdmin && (
           <Section title={`${chat} Configuration`} defaultOpen={false}>
             <ChannelSettings />
@@ -204,6 +214,300 @@ export function AdminPage() {
         )}
       </>
     </Page>
+  );
+}
+
+type QualityState = {
+  requireQualityCheck: boolean;
+  qualityProcessId: number | null;
+  qualityProcesses: { id: number; name: string }[];
+  people: {
+    id: string;
+    displayName: string;
+    isAdmin: boolean;
+    isMentor: boolean;
+    isManager: boolean;
+  }[];
+  peopleLoaded: boolean;
+};
+
+/** Picks someone who isn't a shop manager yet, by typing a name or opening the list. */
+function PersonPicker({
+  people,
+  disabled,
+  onPick,
+}: {
+  people: { id: string; displayName: string; isAdmin: boolean; isMentor: boolean }[];
+  disabled: boolean;
+  onPick: (id: string) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const listId = "shop-manager-options";
+  const term = query.trim().toLowerCase();
+  const matches = term ? people.filter((p) => p.displayName.toLowerCase().includes(term)) : people;
+
+  function pick(id: string) {
+    onPick(id);
+    setQuery("");
+    setOpen(false);
+  }
+
+  return (
+    <div className="relative max-w-sm">
+      <TextField
+        typeable
+        role="combobox"
+        aria-expanded={open}
+        aria-controls={listId}
+        aria-label="Add a shop manager"
+        autoComplete="off"
+        disabled={disabled}
+        value={query}
+        placeholder={people.length === 0 ? "Everyone is a shop manager" : "Add a shop manager…"}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setOpen(false)}
+        onChange={(e) => {
+          setQuery(e.target.value);
+          setOpen(true);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") setOpen(false);
+          if (e.key === "Enter" && matches.length > 0) pick(matches[0].id);
+        }}
+      />
+      {open && people.length > 0 && (
+        <div
+          id={listId}
+          role="listbox"
+          // The box keeps the focus; the list is only reached through it.
+          tabIndex={-1}
+          aria-label="People who aren't shop managers"
+          className="absolute z-10 mt-1 w-full max-h-56 overflow-y-auto bg-surface border border-secondary-300 rounded-lg shadow-lg"
+        >
+          {matches.length === 0 ? (
+            <p className="px-3 py-2 text-sm text-secondary-500">Nobody by that name.</p>
+          ) : (
+            matches.map((person) => (
+              <button
+                key={person.id}
+                type="button"
+                // Keeps the box focused so the click lands before the list closes.
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => pick(person.id)}
+                role="option"
+                aria-selected={false}
+                className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm text-secondary-900 hover:bg-secondary-50 transition-colors"
+              >
+                <span className="flex-1 truncate">{person.displayName}</span>
+                {person.isAdmin ? (
+                  <span className="text-xs text-secondary-500 shrink-0">Admin</span>
+                ) : person.isMentor ? (
+                  <span className="text-xs text-secondary-500 shrink-0">Mentor</span>
+                ) : null}
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Who may check off a Quality Control process, and whether every part ends with one.
+ * Admins can always check one off; anyone else has to be a shop manager here.
+ */
+function QualityControlSettings() {
+  const [state, setState] = useState<QualityState | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [banner, setBanner] = useState<string | null>(null);
+  const [pickingProcess, setPickingProcess] = useState(false);
+  const refreshAuth = useRefreshAuthUser();
+
+  const load = useCallback(async () => {
+    const res = await api.admin.quality.$get();
+    if (!res.ok) {
+      setBanner(await getErrorMessage(res as unknown as Response));
+      return;
+    }
+    setState((await res.json()) as QualityState);
+  }, []);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: load once
+  useEffect(() => {
+    void load();
+  }, []);
+
+  async function setManager(userId: string, manager: boolean) {
+    setBusy(true);
+    // Show the change at once; the reload behind it confirms.
+    setState((prev) =>
+      prev
+        ? {
+            ...prev,
+            people: prev.people.map((p) => (p.id === userId ? { ...p, isManager: manager } : p)),
+          }
+        : prev,
+    );
+    const res = await api.admin.quality.managers[":userId"].$put({
+      param: { userId },
+      json: { manager },
+    });
+    setBanner(res.ok ? null : await getErrorMessage(res as unknown as Response));
+    await load();
+    // Whoever changed is told by /me whether they may sign a step off.
+    refreshAuth();
+    setBusy(false);
+  }
+
+  async function saveCheck(next: {
+    requireQualityCheck?: boolean;
+    qualityProcessId?: number | null;
+  }) {
+    setBusy(true);
+    const res = await api.admin.quality.settings.$put({ json: next });
+    setBanner(res.ok ? null : await getErrorMessage(res as unknown as Response));
+    await load();
+    // The shop floor reads the check from /me, so it has to hear about the change.
+    refreshAuth();
+    setBusy(false);
+  }
+
+  if (!state) return <p className="text-sm text-secondary-500">Loading…</p>;
+
+  const steps = state.qualityProcesses;
+  const checkOn = state.requireQualityCheck || pickingProcess;
+
+  // The worker only saves "required" with a process, so turning it on without one just shows
+  // the picker; picking a process saves both.
+  async function toggleCheck(on: boolean) {
+    if (on) {
+      if (state?.qualityProcessId == null) {
+        setPickingProcess(true);
+        return;
+      }
+      await saveCheck({ requireQualityCheck: true });
+      return;
+    }
+    setPickingProcess(false);
+    if (state?.requireQualityCheck) await saveCheck({ requireQualityCheck: false });
+  }
+
+  async function pickProcess(id: number | null) {
+    if (id === null) {
+      await saveCheck({ requireQualityCheck: false, qualityProcessId: null });
+      return;
+    }
+    await saveCheck({ qualityProcessId: id, requireQualityCheck: true });
+    setPickingProcess(false);
+  }
+  const managers = state.people.filter((p) => p.isManager);
+
+  return (
+    <div className="space-y-6">
+      {banner && <ErrorBanner message={banner} />}
+
+      <div className="space-y-3">
+        <h3 className={sectionHeading}>
+          Shop Managers <span className="text-secondary-500 font-normal">({managers.length})</span>
+        </h3>
+        <p className="text-xs text-secondary-500">
+          Shop managers and admins are the only people who can mark a Quality Control process
+          complete. A kiosk PIN sign-in doesn't carry anyone's admin role, so add your admins here
+          too if they check parts off at a kiosk.
+        </p>
+        {!state.peopleLoaded && (
+          <p className="text-xs text-amber-700">
+            The team's member list didn't load, so only the current shop managers are shown.
+          </p>
+        )}
+        {managers.length > 0 && (
+          <div className="space-y-1.5 max-w-sm">
+            {managers.map((person) => (
+              <div
+                key={person.id}
+                className="flex items-center gap-2 bg-inset border border-secondary-200 rounded-lg px-3.5 py-2 text-sm text-secondary-900"
+              >
+                <span className="flex-1 truncate">{person.displayName}</span>
+                {person.isAdmin ? (
+                  <span className="text-xs text-secondary-500 shrink-0">Admin</span>
+                ) : person.isMentor ? (
+                  <span className="text-xs text-secondary-500 shrink-0">Mentor</span>
+                ) : null}
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => setManager(person.id, false)}
+                  aria-label={`Remove ${person.displayName}`}
+                  title="No longer a shop manager"
+                  className="text-secondary-500 hover:text-red-600 px-1 transition-colors disabled:opacity-50"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        {state.peopleLoaded && (
+          <PersonPicker
+            people={state.people.filter((p) => !p.isManager)}
+            disabled={busy}
+            onPick={(id) => setManager(id, true)}
+          />
+        )}
+      </div>
+
+      <div className="space-y-3">
+        <h3 className={sectionHeading}>Require Quality Control</h3>
+        {steps.length === 0 ? (
+          <p className="text-xs text-secondary-500">
+            Add a process with the type Quality Control under Shop Settings first.
+          </p>
+        ) : (
+          <>
+            <div className="flex items-center gap-2 text-sm text-secondary-900">
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={checkOn}
+                  disabled={busy}
+                  onChange={(e) => toggleCheck(e.target.checked)}
+                  className="accent-primary-500 w-4 h-4"
+                />
+                Require quality control
+              </label>
+              <InfoTip label="What requiring quality control does">
+                The process you pick goes at the end of every part's processes from now on, so
+                nothing finishes without a shop manager signing it off. Parts already being made
+                keep the steps they have.
+              </InfoTip>
+            </div>
+            {checkOn && (
+              <select
+                aria-label="Process to require"
+                value={state.qualityProcessId ?? ""}
+                disabled={busy}
+                onChange={(e) => pickProcess(Number(e.target.value) || null)}
+                className={`${inputClass} max-w-sm`}
+              >
+                <option value="">— Pick a process to require —</option>
+                {steps.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            )}
+          </>
+        )}
+      </div>
+
+      <div className="space-y-3">
+        <h3 className={sectionHeading}>Quality Reports</h3>
+        <QualityReports />
+      </div>
+    </div>
   );
 }
 

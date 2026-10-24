@@ -51,6 +51,11 @@ import {
 import { requireAuth } from "./middleware/auth";
 import { predictionsRoutes, settleConfiguredGame } from "./predictions";
 import { getG3IdUsers, isServiceHelper, isStrategyAdmin } from "./roles";
+import {
+  type ServiceIssueType,
+  describeServiceIssue,
+  parseServiceIssueTypes,
+} from "./service-issues";
 import { teamSettingsRouter } from "./team-settings";
 import type { AppEnv, TbaMatch, TbaTeam } from "./types";
 import { finiteNumber, id, parseJson, stringArray, teamNumber, text } from "./utils";
@@ -1977,7 +1982,10 @@ app.get("/operations", requireAuth, async (c) => {
     admin ? getG3IdUsers(c) : Promise.resolve([]),
   ]);
   return c.json({
-    tickets: rows.results,
+    tickets: rows.results.map(({ issue_types, ...ticket }) => ({
+      ...ticket,
+      issueTypes: parseJson<ServiceIssueType[]>(issue_types, []),
+    })),
     helpers: helpers.results,
     users: users ?? [],
     isAdmin: admin,
@@ -1987,9 +1995,10 @@ app.get("/operations", requireAuth, async (c) => {
 app.post("/service-tickets", requireAuth, async (c) => {
   const body = await c.req.json<Record<string, unknown>>();
   const teamName = teamNumber(body.teamName);
-  const issueType = text(body.issueType, 20);
-  if (!teamName || !["mechanical", "electrical", "programming", "other"].includes(issueType))
-    return c.json({ error: "A valid team number and issue type are required." }, 400);
+  if (!teamName) return c.json({ error: "A valid team number is required." }, 400);
+  const issue = parseServiceIssueTypes(body.issueTypes);
+  if ("error" in issue) return c.json({ error: issue.error }, 400);
+  const description = text(body.description, 2000);
   const ticketId = id("ticket");
   const now = Date.now();
   const eventLink = await resolveEventLink(c);
@@ -1999,8 +2008,8 @@ app.post("/service-tickets", requireAuth, async (c) => {
       withTeam(c.get("teamId"), {
         id: ticketId,
         team_name: teamName,
-        issue_type: issueType,
-        description: text(body.description, 2000),
+        issue_types: issue.types,
+        description,
         status: "open",
         created_by: c.get("userId"),
         created_by_name: c.get("userDisplayName"),
@@ -2025,7 +2034,9 @@ app.post("/service-tickets", requireAuth, async (c) => {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             userIds: helpers.slice(offset, offset + 100).map((helper) => helper.userId),
-            text: `New ${issueType} service ticket for team ${teamName}: ${text(body.description, 500)}\nOpen Service Tickets to claim it.`,
+            text: `New service ticket: team ${teamName} has ${describeServiceIssue(issue.types)}.${
+              description ? `\n${text(description, 500)}` : ""
+            }\nOpen Service Tickets to claim it.`,
           }),
         },
       ),

@@ -5,20 +5,20 @@ import { coreUserIdentities, coreUsers } from "../db/schema";
 import type { AppEnv } from "../types";
 import { discordForTeam } from "./discord-install";
 import { newId } from "./id";
-import { dmAdmins } from "./member-dm";
 import { createSession } from "./session";
-import { teamUrl } from "./team";
 
 // Signing in with Discord (OAuth, routes/auth/discord.ts), the Discord counterpart of the Slack
 // code flow in slack-code.ts: an existing member is signed in; someone new who is in the team's
 // Discord server signs up, as its first admin if the team has no members yet (the founder) or
-// waiting for an admin's approval otherwise.
+// waiting for an admin's approval otherwise. Someone waiting enters their full name first
+// (lib/signup-name.ts), and only then are the team's admins told.
 
 type Env = AppEnv["Bindings"];
 
 export type DiscordSignIn =
   | { result: "signed_in"; userId: string; sessionId: string; firstAdmin: boolean }
-  | { result: "pending" }
+  /** `nameUserId`: they still have to enter their name (lib/signup-name.ts). */
+  | { result: "pending"; nameUserId: string | null }
   | { result: "failed"; message: string };
 
 export async function signInWithDiscord(
@@ -37,7 +37,12 @@ export async function signInWithDiscord(
 
   if (identity) {
     const user = await db
-      .select({ id: coreUsers.id, teamId: coreUsers.teamId, status: coreUsers.status })
+      .select({
+        id: coreUsers.id,
+        teamId: coreUsers.teamId,
+        status: coreUsers.status,
+        needsName: coreUsers.needsName,
+      })
       .from(coreUsers)
       .where(eq(coreUsers.id, identity.userId))
       .get();
@@ -47,7 +52,9 @@ export async function signInWithDiscord(
         message: "This account belongs to another team. Sign in on your own team's page.",
       };
     }
-    if (user?.status === "pending") return { result: "pending" };
+    if (user?.status === "pending") {
+      return { result: "pending", nameUserId: user.needsName === 1 ? user.id : null };
+    }
     if (!user || user.status !== "active") {
       return { result: "failed", message: "Your account is not active." };
     }
@@ -115,6 +122,9 @@ export async function signInWithDiscord(
       teamId,
       email,
       displayName: person.displayName,
+      username: person.displayName,
+      // The founder starts with their Discord name; an admin can change it on Members.
+      needsName: firstMember ? 0 : 1,
       status: firstMember ? "active" : "pending",
       isAdmin: firstMember ? 1 : 0,
       createdAt: now,
@@ -139,15 +149,5 @@ export async function signInWithDiscord(
       firstAdmin: true,
     };
   }
-  // Every admin hears there's someone to approve. Never fails the sign-up.
-  try {
-    await dmAdmins(
-      env,
-      teamId,
-      `👋 ${person.displayName} (${email}) signed up and is waiting for approval: ${teamUrl(env, teamId, "portal")}/admin/members/${userId}`,
-    );
-  } catch (err) {
-    console.error("[discord] telling admins about a sign-up failed", err);
-  }
-  return { result: "pending" };
+  return { result: "pending", nameUserId: userId };
 }

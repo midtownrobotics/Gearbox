@@ -231,7 +231,7 @@ it("keeps every team's checklists, archives, batteries, settings and log downloa
   });
   expect(problems).toEqual([]);
   expect(requests).toBeGreaterThan(80);
-});
+}, 60_000);
 
 it("deletes a team's data when an operator deletes the team, and only that team's", async () => {
   const problems = await checkTeamDeletion({

@@ -5,6 +5,7 @@ import { createDb } from "../../db";
 import { coreSlackLinkCodes } from "../../db/schema";
 import { sessionCookieOptions } from "../../lib/cookie";
 import { sanitizeRedirect } from "../../lib/redirect";
+import { nameToken } from "../../lib/signup-name";
 import { createLinkCode, createSigninCode } from "../../lib/slack-code";
 import { requestTeamId, teamFrontend, teamOfUser, teamUrl } from "../../lib/team";
 import { requireAuth } from "../../middleware/auth";
@@ -51,8 +52,10 @@ export const slackAuthRouter = new Hono<AppEnv>()
       return c.json({ status: "success", action: "linked" });
     }
 
+    // Someone new enters their name next (lib/signup-name.ts).
     if (record.status === "signup_pending") {
-      return c.json({ status: "signup_pending" });
+      const nameTokenFor = record.userId ? await nameToken(c.env, record.userId) : null;
+      return c.json({ status: "signup_pending", nameToken: nameTokenFor });
     }
 
     // Status is 'success' with a session ID — set cookie and report success

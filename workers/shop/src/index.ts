@@ -7,6 +7,8 @@ import { cors } from "hono/cors";
 import packageJson from "../package.json";
 import { createShopDb } from "./db";
 import { type BOMQueueMessage, processBOMQueue } from "./lib/bom-queue-consumer";
+import { isShopManager, qualityCheck, qualityReportsOn } from "./lib/quality";
+import { checklistFor } from "./lib/quality-checklist";
 import { actionsRouter } from "./routes/actions";
 import { adminPartsRouter } from "./routes/admin-parts";
 import { drawingsRouter } from "./routes/drawings";
@@ -22,6 +24,8 @@ import { partInstancesRouter } from "./routes/part-instances";
 import { partViewerRouter } from "./routes/part-viewer";
 import { printRouter } from "./routes/print";
 import { processesRouter } from "./routes/processes";
+import { qualityRouter } from "./routes/quality";
+import { qualityReportsRouter } from "./routes/quality-reports";
 import { stagingBatchesRouter } from "./routes/staging-batches";
 import { subsystemsRouter } from "./routes/subsystems";
 import { teamSettingsRouter } from "./routes/team-settings";
@@ -46,8 +50,19 @@ base.use(
 
 const app = base
   .get("/health", (c) => c.json({ status: "ok", service: "shop", version: packageJson.version }))
-  .get("/me", requireAuth, (c) =>
-    c.json({
+  // Also what the pages need about quality checks: whether this person may check a Quality
+  // Control step off, and the step every part ends with when the team requires one.
+  .get("/me", requireAuth, async (c) => {
+    const db = createShopDb(c.env.SHOP_DB);
+    const teamId = c.get("teamId");
+    const [check, manager, reports] = await Promise.all([
+      qualityCheck(db, teamId),
+      isShopManager(db, teamId, c.get("userId")),
+      qualityReportsOn(db, teamId),
+    ]);
+    // Only a team using reports needs the checklist, and only then is one worth making for it.
+    const checklist = reports ? await checklistFor(db, teamId) : [];
+    return c.json({
       userId: c.get("userId"),
       isAdmin: c.get("userIsAdmin"),
       email: c.get("userEmail"),
@@ -55,8 +70,12 @@ const app = base
       sessionType: c.get("sessionType"),
       kioskDeviceId: c.get("kioskDeviceId"),
       kioskDeviceName: c.get("kioskDeviceName"),
-    }),
-  )
+      isShopManager: manager,
+      qualityCheck: check,
+      qualityReports: reports,
+      qualityChecklist: checklist,
+    });
+  })
   .route("/drawings", drawingsRouter)
   .route("/print", printRouter)
   .route("/onshape", onshapeExportRouter)
@@ -102,6 +121,8 @@ const app = base
   .route("/actions", actionsRouter)
   .route("/kiosk-presence", kioskPresenceRouter)
   .route("/admin", adminPartsRouter)
+  .route("/admin/quality", qualityRouter)
+  .route("/quality-reports", qualityReportsRouter)
   .route("/team-settings", teamSettingsRouter)
   .route("/internal", internalRouter);
 

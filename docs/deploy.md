@@ -44,6 +44,12 @@ Staging deploys from `staging` unless the repository variable `STAGING_BRANCH` n
 - **One branch at a time.** Whatever deployed last is what staging runs, so say when you take it over.
 - **With `PRODUCTION_BRANCH` set to `staging`,** a push to `staging` while the staging environment follows another branch still deploys production, without staging first.
 
+### dev-env
+
+`dev-env` only takes merges: branches go into it, and nothing on it goes anywhere else. Its ruleset ("dev environment protection") takes changes only as pull requests merged with a merge commit, and blocks pushing to it, force pushes and deleting it: open a pull request into `dev-env` to try a branch there. `.github/workflows/dev-env-guard.yml` fails a pull request into `staging` or `public` from `dev-env`, or from any branch holding `dev-env`'s own commits (dev-env merged into it, or the branch started from it), and the `staging` and `public` rulesets require its `dev-env-guard` check. A branch you merged into `dev-env` can still go to `staging` as it is. If the check fails, make the branch again from `staging` and cherry-pick only your own commits. Git can't stop a merge on someone's computer, so the check is what keeps it out of `staging` and `public`.
+
+**Resetting it:** Actions → reset-dev-env → Run workflow puts `dev-env` back to `staging`, dropping everything merged into it since, and, while `STAGING_BRANCH` is `dev-env`, deploys staging from it. Migrations from branches that were in `dev-env` stay applied to staging's databases (see "Trying a branch on staging"). After a reset the check no longer knows `dev-env`'s old commits, so a branch made from the old `dev-env` isn't caught: make branches from `staging`. The reset pushes with the release deploy key (`RELEASE_DEPLOY_KEY`), which is the one thing on the `dev-env` ruleset's bypass list; its push starts the staging deploy.
+
 ### Setting staging up (once)
 
 1. **Resources:** `pnpm staging:create` (with a Wrangler login; `-- --dry-run` first to see what it would make). It makes each staging D1 database, the KV namespaces (Sessions and Rate limit), Shop's and Scouting's R2 buckets and Shop's queue, writes their ids into `infra/staging/resources.json` and the `wrangler.toml` files, and deploys an empty placeholder for each staging Worker so the first deploy can bind them to each other. Commit the changed files.
