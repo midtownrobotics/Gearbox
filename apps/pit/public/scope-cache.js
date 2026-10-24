@@ -249,7 +249,6 @@ function answer(event, read) {
 
 self.addEventListener("fetch", (event) => {
   const { request } = event;
-  console.debug("[scope-cache] seen", request.destination || "fetch", request.method, request.url);
   if (request.method !== "GET" || request.headers.has("Range")) return;
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
