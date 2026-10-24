@@ -201,8 +201,8 @@ function AllianceBoard({
         `relative z-10 -mt-[3px] rounded-b-xl border-[3px] border-t-0 pt-[calc(0.5rem+3px)] pb-2 ${style.border} ${style.tint}`
       : `relative -mt-[12px] border-[3px] border-t-0 pt-[calc(0.5rem+12px)] pb-2 ${tuck[side]} ${corner[side]} ${ALLIANCE[side].border} ${ALLIANCE[side].tint}`;
   return (
-    // The bar keeps its own height; the alliances take any the status box adds.
-    <div className="grid min-w-0 grid-cols-2 grid-rows-[auto_1fr]">
+    // Any height the status box adds is shared between the bar and the alliances.
+    <div className="grid min-w-0 grid-cols-2">
       <div
         className={`relative z-[5] col-span-2 flex flex-wrap items-center justify-between gap-x-10 gap-y-2 rounded-t-xl border-[3px] px-5 py-3 sm:px-8 ${theirs === "red" ? "rounded-br-xl" : "rounded-bl-xl"} ${style.border} ${style.tint}`}
       >
