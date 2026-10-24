@@ -46,6 +46,9 @@ const APP_LABELS: Partial<Record<AppName, string>> = {
   portal: "portal",
   orders: "orders",
   skillTree: "skill tree",
+  inventory: "inventory",
+  schedule: "schedule",
+  scouting: "scouting",
 };
 
 const KIND_LABELS: Record<ReportKind, string> = { problem: "bug", idea: "idea" };
@@ -66,11 +69,14 @@ export function appOfPage(page: URL): AppName | null {
 /** Text that can't @mention anyone on GitHub: a zero-width space after every @. */
 const noMentions = (text: string) => text.replace(/@/g, "@​");
 
+/** An app's name in an issue: its manifest's, except Portal, which members call "Home". */
+const appName = (app: AppName) => (app === "portal" ? "Portal" : MANIFESTS[app].name);
+
 /** The issue's title: the app's name and the report's first line, cut short. */
 export function issueTitle(kind: ReportKind, app: AppName | null, message: string): string {
   const first = message.trim().split("\n")[0].replace(/\s+/g, " ");
   const short = first.length > 70 ? `${first.slice(0, 69).trimEnd()}…` : first;
-  const where = app ? MANIFESTS[app].name : "Gearbox";
+  const where = app ? appName(app) : "Gearbox";
   return noMentions(`${where}${kind === "idea" ? " idea" : ""}: ${short}`);
 }
 
@@ -84,7 +90,7 @@ export function issueBody(report: Report, teamNumber: string): string {
   const cell = (text: string) => noMentions(text).replace(/\|/g, "\\|").replace(/\n/g, " ");
   const rows = [
     ["Kind", report.kind === "idea" ? "Idea" : "Problem"],
-    ["App", report.app && isAppName(report.app) ? MANIFESTS[report.app].name : "Unknown"],
+    ["App", report.app && isAppName(report.app) ? appName(report.app) : "Unknown"],
     ["Page", `\`${report.page}\``],
     ["Version", report.version ?? "Unknown"],
     ["Browser", report.browser ?? "Unknown"],
