@@ -6,6 +6,7 @@ import {
   ErrorBanner,
   Loading,
   Page,
+  TextField,
   redirectToSignIn,
 } from "@g3/ui";
 import { GraduationCap, Shield, ShieldOff } from "lucide-react";
@@ -36,6 +37,87 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
       <dt className="text-secondary-500">{label}</dt>
       <dd className="text-right text-secondary-900">{children}</dd>
     </div>
+  );
+}
+
+/**
+ * Their name, which an admin can correct (Enter or Save saves, Escape or Cancel doesn't). Their
+ * username is their chat account's and isn't edited here.
+ */
+function NameRow({ user, onSaved }: { user: Details; onSaved: (name: string) => void }) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function save(e: React.SyntheticEvent) {
+    e.preventDefault();
+    if (draft === null) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await api.admin.users[":id"].name.$put({
+        param: { id: user.id },
+        json: { name: draft },
+      });
+      const body = (await res.json().catch(() => ({}))) as { displayName?: string; error?: string };
+      if (!res.ok || !body.displayName)
+        throw new Error(body.error ?? "That didn't work. Try again.");
+      onSaved(body.displayName);
+      setDraft(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "That didn't work. Try again.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (draft === null) {
+    return (
+      <Row label="Name">
+        <span className="inline-flex items-center gap-3">
+          {user.displayName}
+          <button
+            type="button"
+            className="text-sm text-primary-600 hover:underline"
+            onClick={() => setDraft(user.displayName)}
+          >
+            Edit
+          </button>
+        </span>
+      </Row>
+    );
+  }
+  return (
+    <form onSubmit={save} className="space-y-2 py-2">
+      <label className="block space-y-1">
+        <span className="text-sm text-secondary-500">Name</span>
+        <TextField
+          kind="person"
+          autoFocus
+          maxLength={80}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => e.key === "Escape" && setDraft(null)}
+          disabled={saving}
+          required
+        />
+      </label>
+      {error && <ErrorBanner message={error} />}
+      <div className="flex gap-2">
+        <Button type="submit" size="sm" disabled={saving || !draft.trim()}>
+          {saving ? "Saving…" : "Save"}
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          disabled={saving}
+          onClick={() => setDraft(null)}
+        >
+          Cancel
+        </Button>
+      </div>
+    </form>
   );
 }
 
@@ -116,6 +198,9 @@ export function MemberPage() {
             </div>
             <div className="min-w-0">
               <p className="truncate text-sm text-secondary-600">{user.email}</p>
+              {user.status === "pending" && user.needsName === 1 && (
+                <p className="text-sm text-secondary-500">Hasn't entered their name yet.</p>
+              )}
               <div className="mt-1 flex flex-wrap items-center gap-2">
                 {STATUS_STYLES[user.status] && (
                   <Badge colors={STATUS_STYLES[user.status]}>
@@ -138,6 +223,13 @@ export function MemberPage() {
 
           <Card className="!py-3">
             <dl className="divide-y divide-secondary-200">
+              <NameRow
+                user={user}
+                onSaved={(displayName) =>
+                  setUser((u) => (u ? { ...u, displayName, needsName: 0 } : u))
+                }
+              />
+              <Row label="Username">{user.username ?? "None"}</Row>
               <Row label="Joined">{longDate(user.createdAt)}</Row>
               <Row label="Last signed in">
                 {user.lastLoginAt

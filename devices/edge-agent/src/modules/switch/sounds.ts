@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { mkdir, readdir, stat, unlink, writeFile } from "node:fs/promises";
+import { link, mkdir, readdir, stat, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
   MAX_SWITCH_SOUND_BYTES,
@@ -59,6 +59,26 @@ export class SoundLibrary {
       if ((error as NodeJS.ErrnoException).code === "EEXIST") {
         throw new Error("A sound with that name already exists.");
       }
+      throw error;
+    }
+  }
+
+  async rename(name: string, newName: string) {
+    const source = this.soundPath(name);
+    const destination = this.path(newName);
+    if (name === newName) return;
+    try {
+      // Creating the destination exclusively prevents overwriting another clip.
+      await link(source, destination);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "EEXIST")
+        throw new Error("A sound with that name already exists.");
+      throw error;
+    }
+    try {
+      await unlink(source);
+    } catch (error) {
+      await unlink(destination);
       throw error;
     }
   }

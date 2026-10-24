@@ -5,7 +5,19 @@ export interface SwitchSound {
   size: number;
 }
 
-export interface SwitchState {
+export interface SwitchClipSettings {
+  delaySeconds: number;
+  volumePercent: number;
+}
+
+export interface SwitchPlaybackSettings {
+  soundSettings: Record<string, SwitchClipSettings>;
+  volumePercent: number;
+  delaySeconds: number;
+  selectedSounds: string[];
+}
+
+export interface SwitchState extends SwitchPlaybackSettings {
   input: "gpio" | "placeholder";
   gpio: string | null;
   audioDevice: string;
@@ -29,4 +41,15 @@ export function isWaveFile(data: Uint8Array) {
   return (
     text.decode(data.subarray(0, 4)) === "RIFF" && text.decode(data.subarray(8, 12)) === "WAVE"
   );
+}
+
+export interface SwitchSubmission {
+  id: string;
+  name: string;
+  userId: string;
+  submittedBy: string;
+  size: number;
+  submittedAt: number;
+  status: "pending" | "approved" | "rejected";
+  reviewedBy: string | null;
 }

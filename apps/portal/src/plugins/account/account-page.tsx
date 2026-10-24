@@ -29,6 +29,8 @@ type Me = {
   id: string;
   email: string;
   displayName: string;
+  /** The name on the chat account they joined with (Slack or Discord). */
+  username?: string | null;
   status: string;
   isAdmin: boolean;
   createdAt: number;
@@ -51,6 +53,50 @@ const PROVIDER_LABELS: Record<string, string> = {
   github: "GitHub",
   steam: "Steam",
 };
+
+/** The services a member can link more than one account of, in the order their buttons show. */
+const MULTI_ACCOUNT = [
+  { provider: "google", Icon: FaGoogle },
+  { provider: "github", Icon: FaGithub },
+  { provider: "steam", Icon: FaSteam },
+];
+
+const isChat = (provider: string) => provider === "slack" || provider === "discord";
+
+/**
+ * Their sign-ins in the order the page lists them: the team's chat first (the account they joined
+ * with ahead of any linked later), then the rest, oldest first.
+ */
+function inOrder(identities: Identity[]): Identity[] {
+  return [...identities].sort(
+    (a, b) => Number(isChat(b.provider)) - Number(isChat(a.provider)) || a.createdAt - b.createdAt,
+  );
+}
+
+/**
+ * The account name a sign-in was linked with, so two of the same service can be told apart, and
+ * a link to its profile where the service has one. The chat account they joined with shows their
+ * username.
+ */
+function accountName(
+  identity: Identity,
+  me: Me,
+  joinedWith: string | undefined,
+): { text: string; url?: string } | null {
+  if (identity.id === joinedWith && me.username) return { text: me.username };
+  if (identity.provider === "local") return { text: me.email };
+  if (identity.provider === "steam") {
+    const id = identity.providerEmail || identity.providerId;
+    return id ? { text: id, url: `https://steamcommunity.com/profiles/${id}` } : null;
+  }
+  const name = identity.providerEmail;
+  if (!name) return null;
+  // A GitHub account's is its email; only a username has a profile to link to.
+  if (identity.provider === "github" && !name.includes("@")) {
+    return { text: name, url: `https://github.com/${name}` };
+  }
+  return { text: name };
+}
 
 /** A member's status as a badge's colors: only one that needs noticing (active shows none). */
 const STATUS_TONES: Partial<Record<string, string>> = {
@@ -109,21 +155,7 @@ export function AccountPage() {
         if (slackPollRef.current) clearInterval(slackPollRef.current);
         if (status.status === "success" && status.action === "linked") {
           setSlackCode(null);
-          setMe((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  identities: [
-                    ...prev.identities,
-                    {
-                      id: `slack-${Date.now()}`,
-                      provider: "slack",
-                      createdAt: Math.floor(Date.now() / 1000),
-                    },
-                  ],
-                }
-              : prev,
-          );
+          void loadMe();
         } else {
           setSlackError(
             status.status === "expired"
@@ -214,23 +246,26 @@ export function AccountPage() {
     }
   }
 
+  async function loadMe() {
+    const res = await api.auth.me.$get();
+    if (res.status === 401) {
+      redirectToSignIn();
+      return;
+    }
+    if (res.status === 404) {
+      window.location.assign(`${appUrl("id")}/signup`);
+      return;
+    }
+    if (!res.ok) {
+      setError("Failed to load your account.");
+      return;
+    }
+    setMe((await res.json()) as Me);
+  }
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: loads once
   useEffect(() => {
-    api.auth.me.$get().then(async (res) => {
-      if (res.status === 401) {
-        redirectToSignIn();
-        return;
-      }
-      if (res.status === 404) {
-        window.location.assign(`${appUrl("id")}/signup`);
-        return;
-      }
-      if (!res.ok) {
-        setError("Failed to load your account.");
-        return;
-      }
-      const data = (await res.json()) as Me;
-      setMe(data);
-    });
+    void loadMe();
   }, []);
 
   if (error) {
@@ -248,6 +283,9 @@ export function AccountPage() {
       </Page>
     );
   }
+
+  const identities = inOrder(me.identities);
+  const joinedWith = identities.find((i) => isChat(i.provider))?.id;
 
   return (
     <Page title="Account" width="narrow">
@@ -273,27 +311,8 @@ export function AccountPage() {
           </div>
         )}
         <div className="space-y-2">
-          {me.identities.map((identity) => {
-            let displayText: string | null = null;
-            let profileUrl: string | null = null;
-
-            if (identity.provider === "github" && identity.providerEmail) {
-              displayText = identity.providerEmail;
-              profileUrl = `https://github.com/${identity.providerEmail}`;
-            } else if (
-              identity.provider === "steam" &&
-              (identity.providerEmail || identity.providerId)
-            ) {
-              displayText = (identity.providerEmail || identity.providerId) ?? null;
-              if (displayText) {
-                profileUrl = `https://steamcommunity.com/profiles/${displayText}`;
-              }
-            } else if (
-              (identity.provider === "google" || identity.provider === "discord") &&
-              identity.providerEmail
-            ) {
-              displayText = identity.providerEmail;
-            }
+          {identities.map((identity) => {
+            const name = accountName(identity, me, joinedWith);
             const label = PROVIDER_LABELS[identity.provider] ?? identity.provider;
 
             return (
@@ -302,37 +321,26 @@ export function AccountPage() {
                 className="flex flex-wrap items-center justify-between gap-2 text-sm"
               >
                 <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="text-secondary-900">{label}</p>
-                    {displayText &&
-                      (profileUrl ? (
+                  <div className="flex min-w-0 items-center gap-2">
+                    <p className="text-secondary-900 shrink-0">{label}</p>
+                    {name &&
+                      (name.url ? (
                         <a
-                          href={profileUrl}
+                          href={name.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-primary-500 hover:text-primary-600 text-xs truncate"
+                          className="text-primary-500 hover:text-primary-600 truncate"
                         >
-                          {displayText}
+                          {name.text}
                         </a>
                       ) : (
-                        <span className="text-secondary-400 text-xs truncate">{displayText}</span>
+                        <span className="text-secondary-600 truncate">{name.text}</span>
                       ))}
                   </div>
                   <p className="text-secondary-500 text-xs">
                     Added {new Date(identity.createdAt * 1000).toLocaleDateString()}
                   </p>
                 </div>
-                {(identity.provider === "steam" ||
-                  identity.provider === "google" ||
-                  identity.provider === "github") &&
-                  linkable(identity.provider) && (
-                    <a
-                      href={linkUrl(identity.provider)}
-                      className={`${buttonClass("secondary", "sm")} ml-auto`}
-                    >
-                      Add another
-                    </a>
-                  )}
                 {/* The team's chat stays linked: members join through it. */}
                 {identity.provider !== "slack" &&
                   identity.provider !== "discord" &&
@@ -351,25 +359,23 @@ export function AccountPage() {
           })}
         </div>
 
+        {/* One button per service: Connect it, or add another account of it once one is linked. */}
         <div className="mt-3 space-y-2">
-          {linkable("google") && !me.identities.some((i) => i.provider === "google") && (
-            <a href={linkUrl("google")} className={`${buttonClass()} w-full`}>
-              <FaGoogle size={16} />
-              Connect Google
-            </a>
-          )}
-          {linkable("github") && !me.identities.some((i) => i.provider === "github") && (
-            <a href={linkUrl("github")} className={`${buttonClass()} w-full`}>
-              <FaGithub size={16} />
-              Connect GitHub
-            </a>
-          )}
-          {linkable("steam") && !me.identities.some((i) => i.provider === "steam") && (
-            <a href={linkUrl("steam")} className={`${buttonClass()} w-full`}>
-              <FaSteam size={16} />
-              Connect Steam
-            </a>
-          )}
+          {MULTI_ACCOUNT.filter(({ provider }) => linkable(provider)).map(({ provider, Icon }) => {
+            const linked = me.identities.some((i) => i.provider === provider);
+            return (
+              <a
+                key={provider}
+                href={linkUrl(provider)}
+                className={`${buttonClass(linked ? "secondary" : "primary")} w-full`}
+              >
+                <Icon size={16} />
+                {linked
+                  ? `Add another ${PROVIDER_LABELS[provider]} account`
+                  : `Connect ${PROVIDER_LABELS[provider]}`}
+              </a>
+            );
+          })}
         </div>
         {methods.discord === true && !me.identities.some((i) => i.provider === "discord") && (
           <a href={linkUrl("discord")} className={`${buttonClass()} mt-3 w-full`}>

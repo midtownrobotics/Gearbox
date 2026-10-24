@@ -1,11 +1,13 @@
-import { requireAdmin } from "@g3/auth";
+import { requireAdmin, requireAuth, requireMentor, requireOAuthSession } from "@g3/auth";
 import { type Context, Hono } from "hono";
+import { bodyLimit } from "hono/body-limit";
 import { AgentError, agentFetch } from "../../lib/agent";
 import type { AppEnv } from "../../types";
 import {
   MAX_SWITCH_SOUND_BYTES,
   type SwitchSound,
   type SwitchState,
+  type SwitchSubmission,
   isWaveFile,
   validSwitchSoundName,
 } from "./types";
@@ -34,13 +36,74 @@ function soundName(c: Ctx) {
   return validSwitchSoundName(name) ? name : null;
 }
 
+const soundLimit = bodyLimit({
+  maxSize: MAX_SWITCH_SOUND_BYTES,
+  onError: (c) => c.json({ error: "WAV files must be between 1 byte and 10 MB." }, 400),
+});
+
 export const switchRouter = new Hono<AppEnv>()
-  .get("/state", requireAdmin, async (c) => {
+  .get("/submissions", requireAuth, requireOAuthSession, async (c) => {
+    const query = c.get("userIsAdmin") ? "" : `?userId=${encodeURIComponent(c.get("userId"))}`;
+    const result = await relay<{ submissions: SwitchSubmission[] }>(c, `/submissions${query}`);
+    if ("error" in result) return c.json({ error: result.error }, result.status);
+    return c.json(result.data);
+  })
+  .post("/submissions", requireAuth, requireOAuthSession, soundLimit, async (c) => {
+    const name = soundName(c);
+    if (!name)
+      return c.json(
+        {
+          error:
+            "Use a WAV filename with letters, numbers, spaces, dots, dashes or underscores (5-100 characters).",
+        },
+        400,
+      );
+    const audio = new Uint8Array(await c.req.arrayBuffer());
+    if (!audio.length || audio.length > MAX_SWITCH_SOUND_BYTES || !isWaveFile(audio))
+      return c.json({ error: "Upload a valid WAV file up to 10 MB." }, 400);
+    const params = new URLSearchParams({
+      name,
+      userId: c.get("userId"),
+      submittedBy: c.get("userDisplayName"),
+    });
+    const result = await relay<{ submission: SwitchSubmission }>(
+      c,
+      `/submissions?${params.toString()}`,
+      { method: "POST", headers: { "Content-Type": "audio/wav" }, body: audio, timeoutMs: 60_000 },
+    );
+    if ("error" in result) return c.json({ error: result.error }, result.status);
+    return c.json(result.data, 201);
+  })
+  .post("/submissions/:id/:action", requireAdmin, async (c) => {
+    const id = c.req.param("id");
+    const action = c.req.param("action");
+    if (!/^[0-9a-f-]{36}$/.test(id) || !["approve", "reject", "test"].includes(action))
+      return c.json({ error: "Invalid review action." }, 400);
+    const result = await relay<{ ok?: true; submission?: SwitchSubmission }>(
+      c,
+      `/submissions/${id}/${action}?reviewedBy=${encodeURIComponent(c.get("userId"))}`,
+      { method: "POST" },
+    );
+    if ("error" in result) return c.json({ error: result.error }, result.status);
+    return c.json(result.data);
+  })
+  .get("/state", requireMentor, async (c) => {
     const result = await relay<SwitchState>(c, "/state");
     if ("error" in result) return c.json({ error: result.error }, result.status);
     return c.json(result.data);
   })
-  .get("/sounds", requireAdmin, async (c) => {
+  .put("/settings", requireMentor, async (c) => {
+    const body = await c.req.json().catch(() => null);
+    if (!body) return c.json({ error: "Expected playback settings." }, 400);
+    const result = await relay<{ ok: true }>(c, "/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if ("error" in result) return c.json({ error: result.error }, result.status);
+    return c.json(result.data);
+  })
+  .get("/sounds", requireMentor, async (c) => {
     const result = await relay<{ sounds: SwitchSound[] }>(c, "/sounds");
     if ("error" in result) return c.json({ error: result.error }, result.status);
     return c.json(result.data);
@@ -75,6 +138,29 @@ export const switchRouter = new Hono<AppEnv>()
         headers: { "Content-Type": "audio/wav" },
         body: data,
         timeoutMs: 60_000,
+      },
+    );
+    if ("error" in result) return c.json({ error: result.error }, result.status);
+    return c.json(result.data);
+  })
+  .patch("/sounds/:name", requireMentor, async (c) => {
+    const name = soundName(c);
+    const body = await c.req.json().catch(() => null);
+    if (!name || typeof body?.name !== "string" || !validSwitchSoundName(body.name))
+      return c.json(
+        {
+          error:
+            "Use a WAV filename with letters, numbers, spaces, dots, dashes or underscores (5-100 characters).",
+        },
+        400,
+      );
+    const result = await relay<{ ok: true; sounds: SwitchSound[] }>(
+      c,
+      `/sounds/${encodeURIComponent(name)}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: body.name }),
       },
     );
     if ("error" in result) return c.json({ error: result.error }, result.status);

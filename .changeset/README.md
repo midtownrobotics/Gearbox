@@ -14,4 +14,4 @@ Pick the app (its page or its worker; they share one version), then the bump:
 
 Write the summary for the people who use the app. It becomes that app's CHANGELOG.md entry.
 
-Changes to shared packages (`packages/*`) are recorded against the apps they affect. A release happens when `main` is merged into `public` (see RELEASES.md).
+Changes to shared packages (`packages/*`) are recorded against the apps they affect. A release happens when `staging` is merged into `public` (see RELEASES.md).

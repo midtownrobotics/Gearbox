@@ -17,6 +17,7 @@ import {
   teamComments,
   tierLists,
 } from "./db/schema";
+import type { ServiceIssueType } from "./service-issues";
 
 // The public demo's Scouting (roadmap 5.3), loaded after its nightly reset: an event in progress
 // with a schedule entered by hand (so nothing depends on The Blue Alliance), match and pit
@@ -339,18 +340,32 @@ export async function loadDemo(db: Db, teamId: string) {
 
   const reporter = DEMO_STUDENTS[2] as DemoPerson;
   await db.insert(serviceTickets).values(
-    withTeam(teamId, {
-      id: "demo-ticket",
-      team_name: ranked[5] as string,
-      issue_type: "electrical",
-      description: SAFE_TEXT.issue[1] as string,
-      status: "open",
-      created_by: reporter.id,
-      created_by_name: reporter.name,
-      created_at: now - 0.5 * HOUR,
-      updated_at: now - 0.5 * HOUR,
-      event_key: eventKey,
-    }),
+    withTeam(teamId, [
+      {
+        id: "demo-ticket",
+        team_name: ranked[5] as string,
+        issue_types: ["electrical"] satisfies ServiceIssueType[],
+        description: SAFE_TEXT.issue[1] as string,
+        status: "open",
+        created_by: reporter.id,
+        created_by_name: reporter.name,
+        created_at: now - 0.5 * HOUR,
+        updated_at: now - 0.5 * HOUR,
+        event_key: eventKey,
+      },
+      {
+        id: "demo-ticket-encoder",
+        team_name: ranked[8] as string,
+        issue_types: ["electrical", "programming"] satisfies ServiceIssueType[],
+        description: SAFE_TEXT.issue[3] as string,
+        status: "open",
+        created_by: reporter.id,
+        created_by_name: reporter.name,
+        created_at: now - 0.25 * HOUR,
+        updated_at: now - 0.25 * HOUR,
+        event_key: eventKey,
+      },
+    ]),
   );
   return { matches: MATCHES, reports };
 }

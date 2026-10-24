@@ -4,7 +4,6 @@ import { createDb } from "../db";
 import { coreSlackLinkCodes, coreUserIdentities, coreUsers } from "../db/schema";
 import type { AppEnv } from "../types";
 import { newId } from "./id";
-import { dmAdmins } from "./member-dm";
 import { createSession } from "./session";
 import { methodOff } from "./sign-in-methods";
 import { slackForTeam, teamForWorkspace } from "./slack-install";
@@ -86,6 +85,10 @@ export function createLinkCode(
 ): Promise<{ code: string; token: string }> {
   return insertCode(db, { teamId, userId, type: "link" });
 }
+
+/** What the bot says to someone new: their sign-in page asks for their name next. */
+const NAME_NEXT =
+  "✅ Account created! Go back to the sign-in page to enter your name. Then an admin can approve your account.";
 
 type HandleResult = {
   success: boolean;
@@ -212,12 +215,18 @@ export async function handleSlackCode(opts: {
       return { success: false, message: `❌ ${msg}` };
     }
 
+    // Their Slack name, so their account page can tell this Slack account from another.
+    const teamSlack = await slackForTeam(env, workspaceTeam);
+    const slackName = teamSlack
+      ? (await getUserInfo(slackUserId, teamSlack.slack).catch(() => null))?.displayName
+      : null;
     const ts = Math.floor(Date.now() / 1000);
     await db.insert(coreUserIdentities).values({
       id: newId(),
       userId,
       provider: "slack",
       providerId: slackUserId,
+      providerEmail: slackName && slackName !== "Unknown" ? slackName : null,
       createdAt: ts,
       updatedAt: ts,
     });
@@ -237,7 +246,12 @@ export async function handleSlackCode(opts: {
 
   if (identity) {
     const user = await db
-      .select({ id: coreUsers.id, teamId: coreUsers.teamId, status: coreUsers.status })
+      .select({
+        id: coreUsers.id,
+        teamId: coreUsers.teamId,
+        status: coreUsers.status,
+        needsName: coreUsers.needsName,
+      })
       .from(coreUsers)
       .where(eq(coreUsers.id, identity.userId))
       .get();
@@ -246,6 +260,16 @@ export async function handleSlackCode(opts: {
       const msg = "This account belongs to another team. Sign in on your own team's page.";
       await updateStatus("failed", msg);
       return { success: false, message: `❌ ${msg}` };
+    }
+
+    // Someone who signed up but left before entering their name gets that step again.
+    if (user?.status === "pending" && user.needsName === 1) {
+      await db
+        .update(coreSlackLinkCodes)
+        .set({ userId: user.id })
+        .where(eq(coreSlackLinkCodes.id, record.id));
+      await updateStatus("signup_pending");
+      return { success: true, message: NAME_NEXT };
     }
 
     if (!user || user.status !== "active") {
@@ -311,6 +335,9 @@ export async function handleSlackCode(opts: {
       teamId: record.teamId,
       email,
       displayName: slackUser.displayName,
+      username: slackUser.displayName,
+      // The founder starts with their Slack name; an admin can change it on Members.
+      needsName: firstMember ? 0 : 1,
       status: firstMember ? "active" : "pending",
       isAdmin: firstMember ? 1 : 0,
       createdAt: ts,
@@ -321,6 +348,7 @@ export async function handleSlackCode(opts: {
       userId,
       provider: "slack",
       providerId: slackUserId,
+      providerEmail: slackUser.displayName,
       createdAt: ts,
       updatedAt: ts,
     }),
@@ -338,16 +366,9 @@ export async function handleSlackCode(opts: {
     };
   }
 
+  // Their page asks for their full name next, and only then are the team's admins told
+  // (lib/signup-name.ts).
+  await db.update(coreSlackLinkCodes).set({ userId }).where(eq(coreSlackLinkCodes.id, record.id));
   await updateStatus("signup_pending");
-  // Every admin hears there's someone to approve, with a link to them. Never fails the sign-up.
-  try {
-    await dmAdmins(
-      env,
-      record.teamId,
-      `👋 ${slackUser.displayName} (${email}) signed up and is waiting for approval: ${teamUrl(env, record.teamId, "portal")}/admin/members/${userId}`,
-    );
-  } catch (err) {
-    console.error("[slack] telling admins about a sign-up failed", err);
-  }
-  return { success: true, message: "✅ Account created! Your account is pending admin approval." };
+  return { success: true, message: NAME_NEXT };
 }

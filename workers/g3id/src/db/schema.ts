@@ -52,7 +52,15 @@ export const coreUsers = sqliteTable(
       .notNull()
       .references((): AnySQLiteColumn => teams.id),
     email: text("email").notNull().unique(),
+    /** Their full name: entered when they sign up, changed by an admin (migration 0020). */
     displayName: text("display_name").notNull(),
+    /**
+     * The name on the chat account they signed up with (Slack or Discord), never edited. For
+     * accounts from before 0020, the name they had then.
+     */
+    username: text("username"),
+    /** 1 until someone new enters their name; their team's admins hear of them after that. */
+    needsName: integer("needs_name").notNull().default(0),
     status: text("status").notNull(),
     isAdmin: integer("is_admin").notNull().default(0),
     isMentor: integer("is_mentor").notNull().default(0),

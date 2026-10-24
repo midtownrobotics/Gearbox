@@ -31,6 +31,7 @@ export const DEMO_BLOCKED: readonly Blocked[] = [
     path: /^\/admin\/users\/[^/]+\/(merge|promote|demote|grant-mentor|revoke-mentor|reject)$/,
   },
   { app: "id", method: "DELETE", path: /^\/admin\/users\// },
+  { app: "id", method: "PUT", path: /^\/admin\/users\/[^/]+\/name$/ },
   { app: "id", method: "*", path: /^\/admin\/kiosk\// },
   { app: "id", method: "POST", path: /^\/kiosk\/activate/ },
   { app: "id", method: "POST", path: /^\/auth\/(password|pin\/regenerate|login\/email)/ },
