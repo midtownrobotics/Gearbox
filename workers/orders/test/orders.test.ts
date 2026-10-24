@@ -142,6 +142,60 @@ describe("requests", () => {
     expect((await edit(mentor, { quantity: 6 })).status).toBe(409);
   });
 
+  it("changes the link, and the history keeps what the item was", async () => {
+    const { id: categoryId } = await newCategory(`Relink ${crypto.randomUUID()}`);
+    const request = await newRequest(categoryId, "Wrong Bearing");
+    const url = `https://www.revrobotics.com/${crypto.randomUUID()}/`;
+    const edit = (user: typeof student, body: Record<string, unknown>) =>
+      callAs(user, `/requests/${request.id}`, { method: "PATCH", body });
+
+    // Someone else's request isn't theirs to relink.
+    expect((await edit(otherStudent, { url, catalogCategory: "Bearings & Bushings" })).status).toBe(
+      403,
+    );
+    // A link new to the catalog needs a catalog category for its part.
+    expect((await edit(student, { url })).status).toBe(400);
+
+    const res = await edit(student, {
+      url,
+      title: "REV Flanged Bearing",
+      unitPriceCents: 399,
+      catalogCategory: "Bearings & Bushings",
+    });
+    expect(res.status).toBe(200);
+    const row = (await res.json()) as {
+      url: string;
+      vendor: string;
+      title: string;
+      catalogItemId: number;
+    };
+    expect(row).toMatchObject({ url, vendor: "REV Robotics", title: "REV Flanged Bearing" });
+
+    const detail = await jsonAs<{
+      catalogItemId: number;
+      events: { action: string; note: string | null }[];
+    }>(student, `/requests/${request.id}`);
+    expect(detail.events.map((e) => e.action)).toEqual(["created", "replaced"]);
+    expect(detail.events[1].note).toContain(
+      "Was 2× Wrong Bearing from West Coast Products: https://wcproducts.com",
+    );
+
+    // Once approved, a mentor's new link is approved again with what it was.
+    await jsonAs(mentor, `/requests/${request.id}/approve`, { method: "POST", body: {} });
+    const again = `https://www.revrobotics.com/${crypto.randomUUID()}/`;
+    expect(
+      (await edit(mentor, { url: again, catalogCategory: "Bearings & Bushings" })).status,
+    ).toBe(200);
+    const after = await jsonAs<{ events: { action: string; note: string | null }[] }>(
+      student,
+      `/requests/${request.id}`,
+    );
+    expect(after.events.at(-1)).toMatchObject({ action: "reapproved" });
+    expect(after.events.at(-1)?.note).toContain(
+      `Was 2× REV Flanged Bearing from REV Robotics: ${url}`,
+    );
+  });
+
   it("lets only the requester or a mentor cancel", async () => {
     const { id: categoryId } = await newCategory("Electrical");
     const request = await newRequest(categoryId);
@@ -167,6 +221,88 @@ describe("requests", () => {
   it("rejects incomplete requests", async () => {
     const res = await callAs(student, "/requests", { method: "POST", body: { title: "No link" } });
     expect(res.status).toBe(400);
+  });
+});
+
+describe("quantities", () => {
+  // Quantities are whole numbers from 1 to 10000 wherever one is set.
+  const bad = [1.5, 0.5, 0, -1, 10_001, "2"];
+
+  it("are whole numbers when a request is made or edited", async () => {
+    const { id: categoryId } = await newCategory(`Whole ${crypto.randomUUID()}`);
+    const body = (quantity: unknown) => ({
+      url: `https://wcproducts.com/products/${crypto.randomUUID()}`,
+      title: "WCP Shaft Collar",
+      quantity,
+      unitPriceCents: 300,
+      categoryId,
+      catalogCategory: "Bearings & Bushings",
+    });
+    for (const quantity of bad) {
+      const res = await callAs(student, "/requests", { method: "POST", body: body(quantity) });
+      expect(res.status, String(quantity)).toBe(400);
+    }
+    const made = await jsonAs<Request & { quantity: number }>(
+      student,
+      "/requests",
+      { method: "POST", body: body(3) },
+      201,
+    );
+    expect(made.quantity).toBe(3);
+
+    for (const quantity of bad) {
+      const res = await callAs(student, `/requests/${made.id}`, {
+        method: "PATCH",
+        body: { quantity },
+      });
+      expect(res.status, String(quantity)).toBe(400);
+    }
+    const edited = await jsonAs<{ quantity: number }>(student, `/requests/${made.id}`, {
+      method: "PATCH",
+      body: { quantity: 4 },
+    });
+    expect(edited.quantity).toBe(4);
+  });
+
+  it("are whole numbers when a mentor approves with a new quantity", async () => {
+    const { id: categoryId } = await newCategory(`Approve whole ${crypto.randomUUID()}`);
+    const request = await newRequest(categoryId);
+    for (const quantity of bad) {
+      const res = await callAs(mentor, `/requests/${request.id}/approve`, {
+        method: "POST",
+        body: { quantity },
+      });
+      expect(res.status, String(quantity)).toBe(400);
+    }
+    const approved = await jsonAs<{ status: string; quantity: number }>(
+      mentor,
+      `/requests/${request.id}/approve`,
+      { method: "POST", body: { quantity: 5 } },
+    );
+    expect(approved).toMatchObject({ status: "approved", quantity: 5 });
+  });
+
+  it("are whole numbers on a placed order", async () => {
+    const { id: categoryId } = await newCategory(`Order whole ${crypto.randomUUID()}`);
+    const request = await newRequest(categoryId);
+    await jsonAs(mentor, `/requests/${request.id}/approve`, { method: "POST", body: {} });
+    const order = (quantity: unknown) =>
+      callAs(mentor, "/orders", {
+        method: "POST",
+        body: {
+          vendor: "WCP",
+          lines: [{ requestId: request.id, quantity, unitPriceCents: 450 }],
+        },
+      });
+    for (const quantity of bad) {
+      expect((await order(quantity)).status, String(quantity)).toBe(400);
+    }
+    expect((await order(2)).status).toBe(200);
+    const placed = await jsonAs<{ status: string; quantity: number }>(
+      student,
+      `/requests/${request.id}`,
+    );
+    expect(placed).toMatchObject({ status: "ordered", quantity: 2 });
   });
 });
 

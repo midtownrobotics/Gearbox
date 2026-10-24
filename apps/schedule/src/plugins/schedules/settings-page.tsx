@@ -519,7 +519,7 @@ function PeriodRow({
   if (!editing) {
     return (
       <li className="flex flex-wrap items-center justify-between gap-2">
-        <span>
+        <span className="min-w-0">
           <span className="font-medium text-secondary-900">{period.label}</span>{" "}
           <span className="text-sm text-secondary-500">{spanLabel(period.start, period.end)}</span>
         </span>
@@ -647,7 +647,7 @@ function AttendeesCard({ detail, reload }: CardProps) {
                 key={member.id}
                 className="flex flex-wrap items-center justify-between gap-2 py-2"
               >
-                <span className="text-sm text-secondary-900">
+                <span className="min-w-0 text-sm text-secondary-900">
                   {member.displayName}
                   {member.isMentor && <span className="text-secondary-500"> · Mentor</span>}
                 </span>
@@ -680,7 +680,7 @@ function AttendeesCard({ detail, reload }: CardProps) {
               key={attendee.userId}
               className="flex flex-wrap items-center justify-between gap-2 py-2"
             >
-              <span className="text-sm text-secondary-500">
+              <span className="min-w-0 text-sm text-secondary-500">
                 {attendee.displayName ?? "Former member"} · no longer on the team
               </span>
               <ConfirmButton

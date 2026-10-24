@@ -130,9 +130,9 @@ export function RolesPage() {
                     key={role.id}
                     className="flex flex-wrap items-center justify-between gap-2 py-2"
                   >
-                    <span className="inline-flex items-center gap-2 text-sm text-secondary-700">
+                    <span className="inline-flex min-w-0 items-center gap-2 text-sm text-secondary-700">
                       <Swatch color={role.color} />
-                      {role.name}
+                      <span className="min-w-0">{role.name}</span>
                     </span>
                     <Button
                       size="sm"
@@ -322,9 +322,9 @@ function RoleRow({
   }
   return (
     <li className="flex flex-wrap items-center justify-between gap-2 py-2">
-      <span className="inline-flex items-center gap-2">
+      <span className="inline-flex min-w-0 items-center gap-2">
         <span
-          className={`rounded-md border px-2 py-0.5 text-sm font-medium ${roleBlock(role.color).className}`}
+          className={`min-w-0 rounded-md border px-2 py-0.5 text-sm font-medium ${roleBlock(role.color).className}`}
           style={roleBlock(role.color).style}
         >
           {role.name}

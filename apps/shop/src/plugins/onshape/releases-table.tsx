@@ -30,7 +30,7 @@ type Props = {
 
 export function ReleasesTable(props: Props) {
   return (
-    <div className="overflow-x-auto rounded-xl border border-secondary-200 bg-surface text-sm">
+    <div className="relative overflow-x-auto rounded-xl border border-secondary-200 bg-surface text-sm">
       <WideTable {...props} />
       <NarrowList {...props} />
     </div>
