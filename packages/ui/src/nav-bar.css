@@ -58,11 +58,33 @@ html[data-theme="dark"] .g3-nav-drawer {
   white-space: nowrap;
 }
 
+/* The wordmark's words, cut short ("1648 SKILL TR…") when a long team name and app name don't
+   fit beside the bar's buttons. The buttons keep their size. */
+.g3-nav-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .g3-nav-icon {
   display: block;
   width: 30px;
   height: 30px;
   flex-shrink: 0;
+}
+
+/* A team's logo keeps its shape: as tall as the icon, up to 2.5 times as wide (a tall one is
+   narrower). Short of room on a phone, a wide logo narrows, down to a square, before the words
+   are cut short. */
+.g3-nav-icon.is-logo {
+  width: auto;
+  max-width: 75px;
+  object-fit: contain;
+}
+
+.g3-nav-icon.is-logo.is-wide {
+  min-width: 30px;
+  flex-shrink: 100000;
 }
 
 .g3-nav-links {
@@ -248,6 +270,7 @@ html[data-theme="dark"] .g3-nav-drawer {
   background: transparent;
   color: var(--g3-nav-strong);
   cursor: pointer;
+  flex-shrink: 0;
 }
 
 /* The menu button, at the left of every bar that has a menu. */
@@ -287,6 +310,16 @@ html[data-theme="dark"] .g3-nav-drawer {
 
 .g3-nav-drawer .g3-nav-drawer-head .g3-nav-menu {
   display: flex;
+}
+
+/* The wordmark gives way to the close button. */
+.g3-nav-drawer-head .g3-nav-brand,
+.g3-nav-drawer-head .g3-nav-wordmark {
+  min-width: 0;
+}
+
+.g3-nav-drawer-head .g3-nav-brand {
+  flex-shrink: 1;
 }
 
 .g3-nav-drawer-links {
@@ -376,11 +409,23 @@ html[data-theme="dark"] .g3-nav-drawer {
   .g3-nav-links {
     display: none;
   }
-  /* On a phone the bar's other controls are in the menu. The greeting stays, in the room the
-     wordmark leaves. */
-  .g3-nav:not(.is-flat) .g3-nav-end {
-    flex-shrink: 1;
+  /* A long wordmark is cut short rather than pushing the bar's other parts off it. */
+  .g3-nav .g3-nav-brand,
+  .g3-nav .g3-nav-wordmark {
     min-width: 0;
+  }
+  .g3-nav .g3-nav-brand {
+    flex-shrink: 1;
+  }
+  /* On a phone the bar's other controls are in the menu. The greeting stays, in the room the
+     wordmark leaves: it gives way first (its far larger flex-shrink), down to "Hello, A…", and
+     only then the wordmark. */
+  .g3-nav:not(.is-flat) .g3-nav-end {
+    flex-shrink: 100000;
+    min-width: 0;
+  }
+  .g3-nav:not(.is-flat) .g3-nav-end:has(.g3-nav-hello) {
+    min-width: 3.5rem;
   }
   .g3-nav:not(.is-flat) .g3-nav-end > :not(.g3-nav-hello) {
     display: none;
