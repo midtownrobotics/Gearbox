@@ -113,6 +113,39 @@ function teamInMatch(m: NexusMatch, team: string): boolean {
 }
 
 /**
+ * How tall Open Issues must stay to show its first three cards (all of them when there are
+ * fewer): from its top to the bottom of the third card, measured as laid out, since a card's
+ * height depends on how its text wraps.
+ */
+function useIssuesMinHeight(ref: RefObject<HTMLElement | null>, count: number): number | undefined {
+  const [height, setHeight] = useState<number>();
+  // biome-ignore lint/correctness/useExhaustiveDependencies: measures again, and watches the new cards, when the issues change
+  useLayoutEffect(() => {
+    const section = ref.current;
+    const list = section?.querySelector<HTMLElement>("[data-issues]");
+    if (!section || !list) {
+      setHeight(undefined);
+      return;
+    }
+    const measure = () => {
+      const cards = list.children;
+      const last = cards[Math.min(3, cards.length) - 1] as HTMLElement | undefined;
+      if (!last) return setHeight(undefined);
+      // Where the third card ends below the section's top, as if the list hadn't scrolled.
+      const bottom =
+        last.getBoundingClientRect().bottom - section.getBoundingClientRect().top + list.scrollTop;
+      setHeight(Math.ceil(bottom));
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(list);
+    for (const card of Array.from(list.children)) observer.observe(card);
+    return () => observer.disconnect();
+  }, [ref, count]);
+  return height;
+}
+
+/**
  * How tall an element can be to end at the bottom of the window, on a wide screen; null on a
  * narrow one, or when too little of the window is left.
  */
@@ -594,11 +627,11 @@ function BatteriesSection({ batteries }: { batteries: Battery[] }) {
 /** Who has a Pit role on the team's Schedule now, and until when. */
 function InThePitSection({ people }: { people: PersonInThePit[] }) {
   return (
-    <div className="space-y-2">
-      <h2 className="text-xs font-bold uppercase tracking-widest text-secondary-600">
+    <div className="flex min-h-0 flex-col gap-2">
+      <h2 className="shrink-0 text-xs font-bold uppercase tracking-widest text-secondary-600">
         In the pit now
       </h2>
-      <div className="bg-surface border border-secondary-200 rounded-xl p-5">
+      <div className="min-h-0 overflow-y-auto bg-surface border border-secondary-200 rounded-xl p-5">
         {people.length === 0 ? (
           <p className="text-secondary-500">No one has a Pit role on the schedule right now.</p>
         ) : (
@@ -667,11 +700,15 @@ function ChecklistSection({
   const totalChecked = lists.reduce((s, l) => s + l.checkedCount, 0);
   const globalPct = totalItems > 0 ? Math.round((totalChecked / totalItems) * 100) : 0;
   const allDone = totalItems > 0 && totalChecked === totalItems;
+  const issuesRef = useRef<HTMLDivElement>(null);
+  const issuesMin = useIssuesMinHeight(issuesRef, issues.length);
 
   return (
     <div className={`${SCROLL_SECTION} gap-5`}>
-      {/* Each part keeps its heading and scrolls inside when the column runs short. */}
-      <div className="flex min-h-0 shrink flex-col gap-2">
+      {/* Each part keeps its heading and scrolls inside when the column runs short. Open Issues
+          gives way first, but never below its first three cards (all of them when there are
+          fewer); the checklists take the rest, and any room they don't need goes to the issues. */}
+      <div className="flex min-h-24 shrink flex-col gap-2">
         <h2 className="shrink-0 text-xs font-bold uppercase tracking-widest text-secondary-600">
           Checklist Progress
         </h2>
@@ -714,7 +751,11 @@ function ChecklistSection({
         </div>
       </div>
 
-      <div className="flex min-h-0 shrink flex-col gap-2">
+      <div
+        ref={issuesRef}
+        className="relative flex shrink-[1000] flex-col gap-2"
+        style={{ minHeight: issuesMin }}
+      >
         <h2 className="shrink-0 text-xs font-bold uppercase tracking-widest text-secondary-600">
           Open Issues{" "}
           {issues.length > 0 && (
@@ -724,7 +765,7 @@ function ChecklistSection({
         {issues.length === 0 ? (
           <p className="text-emerald-600 text-sm font-semibold">No open issues ✓</p>
         ) : (
-          <div className="min-h-0 space-y-2 overflow-y-auto">
+          <div data-issues className="min-h-0 space-y-2 overflow-y-auto">
             {issues.map((issue) => (
               <div
                 key={issue.id}
@@ -934,14 +975,14 @@ export function PitMonitorPage() {
                   </div>
                 )}
               </div>
-              <div className="contents xl:col-start-2 xl:flex xl:min-h-0 xl:flex-col xl:gap-5 xl:overflow-y-auto">
+              <div className="contents xl:col-start-2 xl:flex xl:min-h-0 xl:flex-col xl:gap-5">
                 {nexus?.isRealNexus && (
                   <div className="order-2 xl:order-none">
                     <NexusSection nexus={nexus} teamNumber={teamNumber} />
                   </div>
                 )}
                 {inThePit && (
-                  <div className="order-3 xl:order-none">
+                  <div className="order-3 flex min-h-24 shrink flex-col xl:order-none">
                     <InThePitSection people={inThePit} />
                   </div>
                 )}
