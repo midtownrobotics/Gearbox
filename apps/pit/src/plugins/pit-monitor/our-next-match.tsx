@@ -260,6 +260,24 @@ const LABEL = "text-lg font-bold uppercase tracking-widest text-secondary-600";
  * Where our match is, filling its box: the matches until we're called on three lines, or once we
  * have been, Nexus's status on two.
  */
+/** A count on three lines: the tallest thing the status box shows. */
+function CountLines({
+  above,
+  count,
+  below,
+  accent,
+}: { above: string; count: number; below: string; accent: string }) {
+  return (
+    <>
+      <p className={LABEL}>{above}</p>
+      <p className={`text-8xl font-black leading-[0.8] tabular-nums sm:text-9xl ${accent}`}>
+        {count}
+      </p>
+      <p className={LABEL}>{below}</p>
+    </>
+  );
+}
+
 function Headline({ next, accent }: { next: OurNextMatch; accent: string }) {
   if (next.matchesUntilQueuing !== null || next.status === null) {
     // Before the call (or no calls at all, on The Blue Alliance's schedule): the count is what
@@ -267,13 +285,12 @@ function Headline({ next, accent }: { next: OurNextMatch; accent: string }) {
     const queuing = next.matchesUntilQueuing !== null;
     const count = next.matchesUntilQueuing ?? next.matchesUntilField;
     return (
-      <>
-        <p className={LABEL}>{queuing ? "Queuing in" : "Matches before"}</p>
-        <p className={`text-8xl font-black leading-[0.8] tabular-nums sm:text-9xl ${accent}`}>
-          {count}
-        </p>
-        <p className={LABEL}>{queuing ? (count === 1 ? "match" : "matches") : "ours"}</p>
-      </>
+      <CountLines
+        above={queuing ? "Queuing in" : "Matches before"}
+        count={count}
+        below={queuing ? (count === 1 ? "match" : "matches") : "ours"}
+        accent={accent}
+      />
     );
   }
   return (
@@ -316,9 +333,16 @@ function NextMatch({
     <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_17rem]">
       <AllianceBoard next={next} teamNumber={teamNumber} times={times} note={note} />
       <div
-        className={`flex min-w-0 flex-col items-center justify-center gap-3 rounded-xl border-[3px] p-4 text-center ${style.card}`}
+        className={`grid min-w-0 place-items-center rounded-xl border-[3px] p-4 text-center ${style.card}`}
       >
-        <Headline next={next} accent={style.accent} />
+        {/* An unseen count in the same cell, so the box keeps that height in every state and
+            nothing on the page moves when we're called. */}
+        <div aria-hidden className="invisible col-start-1 row-start-1 flex flex-col gap-3">
+          <CountLines above="Queuing in" count={0} below="matches" accent="" />
+        </div>
+        <div className="col-start-1 row-start-1 flex flex-col items-center justify-center gap-3">
+          <Headline next={next} accent={style.accent} />
+        </div>
       </div>
     </div>
   );
