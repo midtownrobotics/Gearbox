@@ -120,7 +120,7 @@ export function issueBody(report: Report, teamNumber: string): string {
     "",
     "---",
     "",
-    "| | |",
+    "| Detail | Value |",
     "| --- | --- |",
     ...rows.map(([name, value]) => `| ${name} | ${cell(value)} |`),
     "",

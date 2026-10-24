@@ -95,6 +95,8 @@ describe("reporting a problem", () => {
     expect(issue.labels).toEqual(["from-gearbox", "bug", "orders"]);
     expect(issue.body).toMatch(/^Ping @​someone: the Approve button is broken\n/);
     expect(issue.body).not.toContain("> Ping");
+    // A real header, not an empty row.
+    expect(issue.body).toContain("| Detail | Value |\n| --- | --- |\n| Kind | Problem |");
     expect(issue.body).toContain("`https://1648-orders.frcgearbox.com/approvals`");
     expect(issue.body).not.toContain("Jordan");
     expect(issue.body).toContain("Orders 1.4.0");
