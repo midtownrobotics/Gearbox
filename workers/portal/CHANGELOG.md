@@ -1,5 +1,21 @@
 # @g3/worker-portal
 
+## 2.2.0
+
+### Minor Changes
+
+- 542d82b: Portal's Account page shows the account name behind each linked sign-in: your username on the Slack or Discord account you joined with (listed first), and the username or email of each other account, so two accounts from the same service can be told apart. Slack accounts linked from now on keep their Slack name, and ones linked before take the member's username. Deployers: apply G3ID's migration `0021_slack_identity_names.sql` before deploying G3ID.
+- 542d82b: Someone new who joins with Slack or Discord now enters their full name (filled in from their Slack or Discord name) before the team's admins are asked to approve them. Admins can correct any member's name on Portal's Members page, and each member's username, the name on the chat account they joined with, is shown beside it and can't be edited. Everyone's current name stays as it is and becomes their username too. Deployers: apply G3ID's migration `0020_member_names.sql` before deploying G3ID.
+- 9006f60: Report a problem or suggest an idea from any app: the menu has "Report a problem", which posts it as a public issue on Gearbox's GitHub with the page and app versions (never your name), and you get a Slack or Discord message when it's fixed or closed. No GitHub account needed. Not in the public demo. Deployers: apply the platform's migration `0012_problem_reports.sql` before deploying it, and set its `GITHUB_TOKEN` secret (`docs/deploy.md`, "Problem reports on GitHub"); without it, reports are kept, and those under a week old are sent once it's set.
+- 9006f60: Each problem report's GitHub issue shows the sender's reporter ID, a random ID that doesn't say who they are, and the report form shows members their own. Operators can block a reporter ID that sends spam or misuses reports, from the console's Reporters page; the team's admins get a Slack or Discord message saying who it is and why, and see each member's reporter ID on their page in Members (the search finds it too). Deployers: apply the platform's migration `0013_reporters.sql` first.
+
+### Patch Changes
+
+- 542d82b: On the Account page, each service you can link more than once has one button below your sign-ins: Connect it, or add another account of it once one is linked.
+- 05068af: Your team's logo keeps its shape in the top bar: a wide logo shows wider and a tall one narrower, instead of being squeezed into a square.
+- 05068af: On a phone, a long team and app name in the top bar and the menu is cut short ("ROBOWARRIORS SKILL TR…") instead of pushing the menu's close button and your greeting off the screen.
+- 73d2f28: Long links, part names and other long text wrap or are cut short on phones instead of making the page scroll sideways.
+
 ## 2.1.0
 
 ### Minor Changes
