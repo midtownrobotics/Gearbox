@@ -163,11 +163,12 @@ function DetailsCard({ item, onChanged }: { item: ItemView; onChanged: () => Pro
           No fields yet. An admin adds them on the Admin page.
         </p>
       ) : (
-        <dl className="grid grid-cols-[minmax(7rem,auto)_1fr] gap-x-6 gap-y-2 text-sm">
+        <dl className="grid grid-cols-[fit-content(40%)_minmax(0,1fr)] gap-x-6 gap-y-2 text-sm">
+          {/* A field's name takes at most 40% of the row, so a long one can't squeeze its value. */}
           {fields.map((field) => (
             <div key={field.id} className="contents">
-              <dt className="text-secondary-500">{field.name}</dt>
-              <dd className="text-secondary-900">
+              <dt className="min-w-28 text-secondary-500 [overflow-wrap:anywhere]">{field.name}</dt>
+              <dd className="min-w-0 text-secondary-900">
                 <ValueView field={field} value={item.values[field.id]} />
               </dd>
             </div>
@@ -205,7 +206,7 @@ function StockCard({ item, onChanged }: { item: ItemView; onChanged: () => Promi
             <span className="font-semibold text-secondary-900">{total}</span> in all
             {inUse > 0 && `: ${total - inUse} in storage, ${inUse} in use`}
           </p>
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead>
                 <tr className="border-b border-secondary-200 text-xs font-bold uppercase tracking-wider text-secondary-400">

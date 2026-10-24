@@ -9,25 +9,32 @@ export function Field({
   label,
   hint,
   warn = false,
+  error,
   children,
 }: {
   label: string;
   hint?: string;
   /** Show the hint as something to check (a guessed value), not just help text. */
   warn?: boolean;
+  /** What's wrong with the value, shown in red in place of the hint. */
+  error?: string | null;
   children: ReactNode;
 }) {
   return (
     // biome-ignore lint/a11y/noLabelWithoutControl: the control is passed as children
-    <label className="block space-y-1">
+    <label className="block min-w-0 space-y-1">
       <span className="text-sm font-medium text-secondary-700">{label}</span>
       {children}
-      {hint && (
-        <span
-          className={`block text-xs ${warn ? "text-amber-700 font-medium" : "text-secondary-500"}`}
-        >
-          {hint}
-        </span>
+      {error ? (
+        <span className="block text-xs font-medium text-red-700">{error}</span>
+      ) : (
+        hint && (
+          <span
+            className={`block text-xs ${warn ? "text-amber-700 font-medium" : "text-secondary-500"}`}
+          >
+            {hint}
+          </span>
+        )
       )}
     </label>
   );

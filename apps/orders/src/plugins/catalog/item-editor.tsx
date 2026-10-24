@@ -1,6 +1,7 @@
 import { Button, Card, ConfirmButton, ErrorBanner, Field, TextField, inputClass } from "@g3/ui";
 import { useState } from "react";
 import { api, getErrorMessage } from "../../shared/api";
+import { QuantityInput, parseQuantity, quantityError } from "../../shared/quantity";
 import type { CatalogItem } from "../../shared/types";
 
 /** "Length: 1/2\"" per line ↔ {"Length": "1/2\""}. */
@@ -48,19 +49,20 @@ export function ItemEditor({
       sku: sku.trim() || null,
       url: url.trim(),
       options: parseOptions(options),
-      packQuantity: Number(packQuantity),
+      packQuantity: parseQuantity(packQuantity),
     };
     if (!json.name || !json.category || !json.vendor || !json.url) {
       return setError("Name, category, vendor and link are all needed.");
     }
-    if (!Number.isInteger(json.packQuantity) || json.packQuantity < 1) {
-      return setError("Pack of must be a whole number, 1 or more.");
+    if (json.packQuantity === null) {
+      return setError("Pack of must be a whole number from 1 to 10000.");
     }
     setBusy(true);
     setError(null);
+    const body = { ...json, packQuantity: json.packQuantity };
     const res = item
-      ? await api.catalog.items[":id"].$patch({ param: { id: String(item.id) }, json })
-      : await api.catalog.items.$post({ json });
+      ? await api.catalog.items[":id"].$patch({ param: { id: String(item.id) }, json: body })
+      : await api.catalog.items.$post({ json: body });
     setBusy(false);
     if (!res.ok) return setError(await getErrorMessage(res));
     onDone(true);
@@ -105,15 +107,8 @@ export function ItemEditor({
         <Field label="Part number">
           <TextField kind="sku" value={sku} onChange={(e) => setSku(e.target.value)} />
         </Field>
-        <Field label="Pack of" hint="Parts in one of these">
-          <input
-            type="number"
-            min={1}
-            max={10000}
-            className={inputClass}
-            value={packQuantity}
-            onChange={(e) => setPackQuantity(e.target.value)}
-          />
+        <Field label="Pack of" hint="Parts in one of these" error={quantityError(packQuantity)}>
+          <QuantityInput value={packQuantity} onChange={setPackQuantity} />
         </Field>
         <div className="col-span-2">
           <Field label="Category" hint="Missing one? Use “New category” first">
@@ -147,7 +142,7 @@ export function ItemEditor({
       </div>
       {error && <ErrorBanner message={error} />}
       <div className="mt-3 flex flex-wrap gap-2">
-        <Button onClick={save} disabled={busy}>
+        <Button onClick={save} disabled={busy || parseQuantity(packQuantity) === null}>
           {busy ? "Saving…" : item ? "Save" : "Add to catalog"}
         </Button>
         <Button variant="secondary" onClick={() => onDone(false)} disabled={busy}>

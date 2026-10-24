@@ -239,7 +239,7 @@ function CategoryRow({
   return (
     <div className="py-4 first:pt-0 last:pb-0 space-y-2">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h3 className="font-semibold text-secondary-900">
+        <h3 className="min-w-0 font-semibold text-secondary-900">
           {c.name}
           {c.code && <span className="ml-2 font-mono text-xs text-secondary-500">{c.code}</span>}
         </h3>

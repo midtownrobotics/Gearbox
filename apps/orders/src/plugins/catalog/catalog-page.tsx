@@ -251,7 +251,7 @@ export function CatalogPage() {
           {link && <p className="text-sm text-secondary-500">Opening a request for that link…</p>}
           <div className={`flex flex-wrap items-center gap-2 ${link ? "hidden" : ""}`}>
             <select
-              className={`${inputClass} !w-auto !py-1.5 text-sm`}
+              className={`${inputClass} !w-auto max-w-full !py-1.5 text-sm`}
               value={vendor}
               onChange={(e) => setVendor(e.target.value)}
               aria-label="Vendor"
