@@ -1,5 +1,17 @@
 # @g3/scouting
 
+## 3.0.0
+
+### Patch Changes
+
+- Updated dependencies [05068af]
+- Updated dependencies [05068af]
+- Updated dependencies [73d2f28]
+- Updated dependencies [9006f60]
+- Updated dependencies [24cbdaf]
+- Updated dependencies [24cbdaf]
+  - @g3/worker-scouting@3.0.0
+
 ## 2.1.0
 
 ### Patch Changes

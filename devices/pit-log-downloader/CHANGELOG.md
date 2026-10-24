@@ -1,5 +1,17 @@
 # @g3/pit-log-downloader
 
+## 2.2.0
+
+### Minor Changes
+
+- 1e15859: The pairing page can pair with a Pit at another address (Use another Pit address), such as staging, without changing config.env.
+- 1e15859: A log deleted from Gearbox has an Upload again button on the status page.
+
+### Patch Changes
+
+- 05068af: Your team's logo keeps its shape in the top bar: a wide logo shows wider and a tall one narrower, instead of being squeezed into a square.
+- 73d2f28: Long links, part names and other long text wrap or are cut short on phones instead of making the page scroll sideways.
+
 ## 2.1.0
 
 ### Minor Changes
