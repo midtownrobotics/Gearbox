@@ -108,9 +108,59 @@ const g3id = async (request: Request) => {
   return Response.json({ error: "Not stubbed" }, { status: 500 });
 };
 
+// GitHub's issues on the repository "test/gearbox", for members' reports (src/reports.ts). Tests
+// read an issue back with GET /test/issues/:n, close one with POST /test/issues/:n/close?reason=,
+// and take GitHub down or up with POST /test/down?on=1|0.
+type FakeIssue = {
+  number: number;
+  title: string;
+  body: string;
+  labels: string[];
+  state: string;
+  state_reason: string | null;
+};
+const issues = new Map<number, FakeIssue>();
+let githubDown = false;
+const github = async (request: Request) => {
+  const path = new URL(request.url).pathname;
+  const url = new URL(request.url);
+  if (path === "/test/down") {
+    githubDown = url.searchParams.get("on") === "1";
+    return Response.json({ ok: true });
+  }
+  const test = path.match(/^\/test\/issues\/(\d+)(\/close)?$/);
+  if (test) {
+    const issue = issues.get(Number(test[1]));
+    if (!issue) return Response.json({ message: "Not Found" }, { status: 404 });
+    if (test[2]) {
+      issue.state = "closed";
+      issue.state_reason = url.searchParams.get("reason");
+    }
+    return Response.json(issue);
+  }
+  if (githubDown) return Response.json({ message: "Down" }, { status: 503 });
+  if (request.headers.get("Authorization") !== "Bearer test-github-token") {
+    return Response.json({ message: "Bad credentials" }, { status: 401 });
+  }
+  if (path === "/repos/test/gearbox/issues" && request.method === "POST") {
+    const body = (await request.json()) as { title: string; body: string; labels: string[] };
+    const number = issues.size + 1;
+    issues.set(number, { number, ...body, state: "open", state_reason: null });
+    return Response.json(
+      { number, html_url: `https://github.com/test/gearbox/issues/${number}` },
+      { status: 201 },
+    );
+  }
+  const one = path.match(/^\/repos\/test\/gearbox\/issues\/(\d+)$/);
+  const issue = one && issues.get(Number(one[1]));
+  if (issue) return Response.json(issue);
+  return Response.json({ message: "Not Found" }, { status: 404 });
+};
+
 // Slack's install: answers for the workspace named in the code ("ws:T123").
 const slack = async (request: Request) => {
   const url = new URL(request.url);
+  if (url.hostname === "api.github.com") return github(request);
   // Discord: @g3/testing's fake (packages/testing/src/discord.ts).
   if (url.hostname === "discord.com") return fakeDiscord(request);
   if (url.hostname === "slack.com" && url.pathname === "/api/oauth.v2.access") {
@@ -186,6 +236,8 @@ export default workerTestConfig({
     DISCORD_CLIENT_ID: "test-discord-client",
     DISCORD_CLIENT_SECRET: "test-discord-secret",
     LOCAL_GATEWAY_URL: "",
+    GITHUB_REPO: "test/gearbox",
+    GITHUB_TOKEN: "test-github-token",
   },
   services: {
     G3ID: g3id,

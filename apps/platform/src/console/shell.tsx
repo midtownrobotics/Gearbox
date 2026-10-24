@@ -26,6 +26,7 @@ type Me = { user: { id: string; displayName: string; email: string }; isOperator
 const PAGES = [
   { to: "/console", label: "Teams" },
   { to: "/console/reports", label: "Reports" },
+  { to: "/console/reporters", label: "Reporters" },
   { to: "/console/visitors", label: "Visitors" },
   { to: "/console/notifications", label: "Notifications" },
   { to: "/console/operators", label: "Operators" },

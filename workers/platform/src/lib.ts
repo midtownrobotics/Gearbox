@@ -31,3 +31,22 @@ export async function accounts(env: AppEnv["Bindings"], ids: (string | null)[]) 
   const list = (await res.json()) as Account[];
   return new Map(list.map((a) => [a.id, a]));
 }
+
+/**
+ * Tells every admin of the team on its chat (Slack or Discord): G3ID sends it from the team's own
+ * bot to each active admin who has linked it. Never fails the change: a team without a chat just
+ * isn't told.
+ */
+export async function tellAdmins(env: AppEnv["Bindings"], teamId: string, text: string) {
+  try {
+    const res = await g3id(env, `/teams/${encodeURIComponent(teamId)}/chat/dm-admins`, {
+      method: "POST",
+      body: { text },
+    });
+    if (!res.ok && res.status !== 404) {
+      console.error("[platform] telling admins", res.status, await res.text().catch(() => ""));
+    }
+  } catch (err) {
+    console.error("[platform] telling admins", err);
+  }
+}
