@@ -67,9 +67,9 @@ const ALLIANCE = {
  * The page's lightest body text: a team's rank and pit address beside its number, shown only when
  * its alliance's half is wide enough for them (a container query on the half).
  */
-const QUIET = "hidden text-sm font-normal text-secondary-500 @xs:inline";
+const QUIET = "hidden text-sm font-normal text-secondary-500 @md:inline";
 
-/** One team: its rank, its number (ours on a card of its own, ringed in white) and its pit. */
+/** One team: its rank, its number and its pit; ours together on a card ringed in white. */
 function TeamSlot({
   team,
   ours,
@@ -78,12 +78,14 @@ function TeamSlot({
   pit,
 }: { team: string; ours: boolean; color: string; rank?: number; pit?: string }) {
   return (
-    <span className="inline-flex min-w-0 items-baseline gap-1.5">
+    <span
+      className={`inline-flex min-w-0 items-baseline gap-1.5 rounded-lg px-1.5 py-0.5 sm:px-2 ${
+        ours ? "bg-surface shadow-md ring-[3px] ring-white" : ""
+      }`}
+    >
       {rank !== undefined && <span className={`tabular-nums ${QUIET}`}>#{rank}</span>}
       <span
-        className={`rounded-md px-1 py-0.5 text-sm tabular-nums sm:px-2 sm:text-xl ${color} ${
-          ours ? "bg-surface font-black shadow-md ring-[3px] ring-white" : "font-semibold"
-        }`}
+        className={`text-base tabular-nums sm:text-2xl ${color} ${ours ? "font-black" : "font-semibold"}`}
       >
         {team || "—"}
       </span>
@@ -133,11 +135,14 @@ function AllianceTeams({
 /** How round the board's corners are: Tailwind's rounded-xl, and the borders' width. */
 const RADIUS = 12;
 const EDGE = 3;
+/** How far the other alliance's half reaches in under ours, to show in our tab's rounded corners. */
+const TUCK = RADIUS + EDGE;
 
 /**
  * The rounded inside corner where our tab meets the bar, drawn over the other alliance's top
- * corner beside it: our tint, with a quarter circle of theirs whose border carries ours round
- * from the bar's edge down our tab's side. Like the open tab in a browser, upside down.
+ * corner beside it (which reaches `TUCK` in under our tab): our tint, with a quarter circle of
+ * theirs whose border carries ours round from the bar's edge down our tab's side. Like the open
+ * tab in a browser, upside down.
  */
 function TabCorner({
   ours,
@@ -149,7 +154,12 @@ function TabCorner({
     <span
       aria-hidden
       className={`pointer-events-none absolute z-20 overflow-hidden ${ALLIANCE[ours].tint}`}
-      style={{ top: -EDGE, [oursOnLeft ? "left" : "right"]: -EDGE, width: size, height: size }}
+      style={{
+        top: -EDGE,
+        [oursOnLeft ? "left" : "right"]: TUCK - EDGE,
+        width: size,
+        height: size,
+      }}
     >
       <span
         className={`absolute top-0 rounded-full border-[3px] ${ALLIANCE[ours].border} ${ALLIANCE[theirs].tint}`}
@@ -182,22 +192,29 @@ function AllianceBoard({
   const style = ALLIANCE[ours];
   // Which outside corner each half rounds.
   const corner = { blue: "rounded-bl-xl", red: "rounded-br-xl" };
+  // The other half reaches TUCK in under our tab (padded back, so its teams stay put), so its tint
+  // and bottom border show in our tab's rounded bottom corner in the middle.
+  const tuck = {
+    red: "-ml-[15px] pl-[19px] sm:pl-[23px] border-l-0",
+    blue: "-mr-[15px] pr-[19px] sm:pr-[23px] border-r-0",
+  };
   const tab = (side: "red" | "blue") =>
     side === ours
-      ? // Up over the bar's 3px edge, padded back down so both halves' teams line up.
-        `relative z-10 -mt-[3px] border-[3px] border-t-0 pt-[calc(0.5rem+3px)] pb-2 ${corner[side]} ${style.border} ${style.tint}`
-      : `relative border-[3px] border-t-0 py-2 ${side === "red" ? "border-l-0" : "border-r-0"} ${corner[side]} ${ALLIANCE[side].border} ${ALLIANCE[side].tint}`;
+      ? // Up over the bar's 3px edge, padded back down so both halves' teams line up; both bottom
+        // corners rounded, like a tab.
+        `relative z-10 -mt-[3px] rounded-b-xl border-[3px] border-t-0 pt-[calc(0.5rem+3px)] pb-2 ${style.border} ${style.tint}`
+      : `relative border-[3px] border-t-0 py-2 ${tuck[side]} ${corner[side]} ${ALLIANCE[side].border} ${ALLIANCE[side].tint}`;
   return (
     <div className="grid min-w-0 grid-cols-2">
       <div
-        className={`col-span-2 flex flex-wrap items-center justify-between gap-x-8 gap-y-2 rounded-t-xl border-[3px] px-4 py-3 ${style.border} ${style.tint}`}
+        className={`col-span-2 flex flex-wrap items-center justify-between gap-x-10 gap-y-2 rounded-t-xl border-[3px] px-5 py-3 sm:px-8 ${style.border} ${style.tint}`}
       >
         <div className="min-w-0">
           <p className="text-3xl font-black text-secondary-900 sm:text-4xl">{next.label}</p>
           {note && <p className="text-xs text-secondary-600">{note}</p>}
         </div>
         {times.length > 0 && (
-          <div className="flex gap-8">
+          <div className="flex gap-10">
             {times.map((time) => (
               <Time key={time.label} label={time.label} at={time.at} color={style.timer} />
             ))}
@@ -299,7 +316,7 @@ function NextMatch({
     <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_17rem]">
       <AllianceBoard next={next} teamNumber={teamNumber} times={times} note={note} />
       <div
-        className={`flex min-w-0 flex-col items-center justify-center gap-3 rounded-xl border p-4 text-center ${style.card}`}
+        className={`flex min-w-0 flex-col items-center justify-center gap-3 rounded-xl border-[3px] p-4 text-center ${style.card}`}
       >
         <Headline next={next} accent={style.accent} />
       </div>
