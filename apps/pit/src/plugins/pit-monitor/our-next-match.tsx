@@ -139,24 +139,22 @@ const EDGE = 3;
 const TUCK = RADIUS + EDGE;
 
 /**
- * A rounded top corner of the other alliance's half, where it meets the bar: our tint, with a
- * quarter circle of theirs whose border carries the bar's edge round and down the side. Drawn at
- * both its top corners, the one by our tab (`inset` `TUCK - EDGE`, as that half reaches in under
- * ours) and the outside one (`inset` `-EDGE`, out over its own border: positions count from inside
- * the border), so it sits behind the bar like a tab in a browser, upside down.
+ * The rounded inside corner where our tab meets the bar, drawn over the other alliance's top
+ * corner beside it (which reaches `TUCK` in under our tab, and `RADIUS` up behind the bar): our
+ * tint, with a quarter circle of theirs whose border carries the bar's edge round and down our
+ * tab's side. Like the open tab in a browser, upside down.
  */
 function TabCorner({
   ours,
   theirs,
   side,
-  inset,
-}: { ours: "red" | "blue"; theirs: "red" | "blue"; side: "left" | "right"; inset: number }) {
+}: { ours: "red" | "blue"; theirs: "red" | "blue"; side: "left" | "right" }) {
   const size = RADIUS + EDGE;
   return (
     <span
       aria-hidden
       className={`pointer-events-none absolute z-20 overflow-hidden ${ALLIANCE[ours].tint}`}
-      style={{ top: -EDGE, [side]: inset, width: size, height: size }}
+      style={{ top: RADIUS - EDGE, [side]: TUCK - EDGE, width: size, height: size }}
     >
       <span
         className={`absolute top-0 rounded-full border-[3px] ${ALLIANCE[ours].border} ${ALLIANCE[theirs].tint}`}
@@ -189,8 +187,9 @@ function AllianceBoard({
   const style = ALLIANCE[ours];
   // Which outside corner each half rounds.
   const corner = { blue: "rounded-bl-xl", red: "rounded-br-xl" };
-  // The other half reaches TUCK in under our tab (padded back, so its teams stay put), so its tint
-  // and bottom border show in our tab's rounded bottom corner in the middle.
+  // The other half reaches TUCK in under our tab and RADIUS up behind the bar (padded back, so its
+  // teams stay put), so its tint and border show in our tab's rounded bottom corner in the middle
+  // and in the bar's rounded bottom corner at the outside edge.
   const tuck = {
     red: "-ml-[15px] pl-[19px] sm:pl-[23px] border-l-0",
     blue: "-mr-[15px] pr-[19px] sm:pr-[23px] border-r-0",
@@ -200,12 +199,12 @@ function AllianceBoard({
       ? // Up over the bar's 3px edge, padded back down so both halves' teams line up; both bottom
         // corners rounded, like a tab.
         `relative z-10 -mt-[3px] rounded-b-xl border-[3px] border-t-0 pt-[calc(0.5rem+3px)] pb-2 ${style.border} ${style.tint}`
-      : `relative border-[3px] border-t-0 py-2 ${tuck[side]} ${corner[side]} ${ALLIANCE[side].border} ${ALLIANCE[side].tint}`;
+      : `relative -mt-[12px] border-[3px] border-t-0 pt-[calc(0.5rem+12px)] pb-2 ${tuck[side]} ${corner[side]} ${ALLIANCE[side].border} ${ALLIANCE[side].tint}`;
   return (
     // The bar keeps its own height; the alliances take any the status box adds.
     <div className="grid min-w-0 grid-cols-2 grid-rows-[auto_1fr]">
       <div
-        className={`col-span-2 flex flex-wrap items-center justify-between gap-x-10 gap-y-2 rounded-t-xl border-[3px] px-5 py-3 sm:px-8 ${style.border} ${style.tint}`}
+        className={`relative z-[5] col-span-2 flex flex-wrap items-center justify-between gap-x-10 gap-y-2 rounded-t-xl border-[3px] px-5 py-3 sm:px-8 ${theirs === "red" ? "rounded-br-xl" : "rounded-bl-xl"} ${style.border} ${style.tint}`}
       >
         <div className="min-w-0">
           <p className="text-3xl font-black text-secondary-900 sm:text-4xl">{next.label}</p>
@@ -235,19 +234,7 @@ function AllianceBoard({
         >
           {side === theirs && (
             <>
-              {/* By our tab, then the outside edge. */}
-              <TabCorner
-                ours={ours}
-                theirs={theirs}
-                side={ours === "blue" ? "left" : "right"}
-                inset={TUCK - EDGE}
-              />
-              <TabCorner
-                ours={ours}
-                theirs={theirs}
-                side={ours === "blue" ? "right" : "left"}
-                inset={-EDGE}
-              />
+              <TabCorner ours={ours} theirs={theirs} side={ours === "blue" ? "left" : "right"} />
             </>
           )}
         </AllianceTeams>
