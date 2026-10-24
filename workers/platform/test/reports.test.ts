@@ -1,7 +1,8 @@
 import { env } from "cloudflare:test";
 import { exports } from "cloudflare:workers";
-import { type TestUser, asUser, teamUsers } from "@g3/testing/users";
-import { describe, expect, it } from "vitest";
+import { site } from "@g3/site-config";
+import { type TestUser, admin, asUser, teamUsers } from "@g3/testing/users";
+import { beforeAll, describe, expect, it } from "vitest";
 import { appOfPage, syncReports } from "../src/reports";
 import type { AppEnv } from "../src/types";
 
@@ -38,6 +39,32 @@ const github = (path: string, method = "GET") =>
     labels: string[];
   }>;
 const issueOf = (report: Shown) => Number(report.issueUrl?.split("/").pop());
+
+/** The reporter ID on a report's issue. */
+const reporterOf = async (report: Shown) =>
+  (await github(`/test/issues/${issueOf(report)}`)).body.match(/\| Reporter \| (\w+) \|/)?.[1];
+
+/** `admin` is an operator; the console's changes come from its own address. */
+const operator = admin;
+const consoleCall = (path: string, body?: unknown) =>
+  exports.default.fetch(
+    new Request(
+      `http://platform/api/console${path}`,
+      asUser(operator, {
+        method: body === undefined ? "GET" : "POST",
+        body,
+        headers: { Origin: `https://admin.${site.platformDomain}` },
+      }),
+    ),
+  );
+
+beforeAll(async () => {
+  await testEnv.PLATFORM_DB.prepare(
+    "INSERT OR IGNORE INTO operators (user_id, created_at) VALUES (?, 1)",
+  )
+    .bind(operator.id)
+    .run();
+});
 
 const dmsTo = async (teamId: string) =>
   (await (
@@ -99,6 +126,104 @@ describe("reporting a problem", () => {
   });
 });
 
+describe("reporter IDs", () => {
+  it("stand for the same member on each of their issues, and never are their account id", async () => {
+    const team = newTeam();
+    const first = await reporterOf((await (await send(team.student)).json()) as Shown);
+    const again = await reporterOf((await (await send(team.student)).json()) as Shown);
+    const other = await reporterOf((await (await send(team.mentor)).json()) as Shown);
+    expect(first).toMatch(/^[0-9a-f]{10}$/);
+    expect(again).toBe(first);
+    expect(other).not.toBe(first);
+    expect(first).not.toContain(team.student.id);
+  });
+
+  it("let an operator block a reporter without learning who it is", async () => {
+    const team = newTeam();
+    const id = await reporterOf((await (await send(team.student)).json()) as Shown);
+
+    expect((await consoleCall(`/reporters/${id}`, { blocked: true })).status).toBe(400);
+    expect(
+      (await consoleCall("/reporters/0000000000", { blocked: true, reason: "x" })).status,
+    ).toBe(404);
+    const res = await consoleCall(`/reporters/${id}`, { blocked: true, reason: "Spam" });
+    expect(res.status).toBe(200);
+
+    const list = await (await consoleCall("/reporters")).text();
+    expect(list).toContain(id);
+    expect(list).not.toContain(team.student.id);
+    expect(list).not.toContain(team.student.teamId);
+
+    expect((await send(team.student)).status).toBe(403);
+    expect((await send(team.mentor)).status).toBe(201);
+
+    expect((await consoleCall(`/reporters/${id}`, { blocked: false })).status).toBe(200);
+    expect((await send(team.student)).status).toBe(201);
+  });
+
+  it("tell the team's admins who was blocked and why, with a link to their page", async () => {
+    const team = newTeam();
+    const id = await reporterOf((await (await send(team.student)).json()) as Shown);
+    await consoleCall(`/reporters/${id}`, {
+      blocked: true,
+      reason: "Posted the same spam 40 times",
+    });
+    await consoleCall(`/reporters/${id}`, { blocked: false });
+
+    const dms = (await (
+      await testEnv.G3ID.fetch(
+        `http://g3id/api/internal/teams/${team.student.teamId}/chat/dm-admins`,
+      )
+    ).json()) as { text: string }[];
+    const [blocked, unblocked] = dms.map((d) => d.text);
+    expect(blocked).toContain(`blocked reporter ID \`${id}\``);
+    expect(blocked).toContain(`**Name of ${team.student.id}**`);
+    expect(blocked).toContain(`/admin/members/${team.student.id}`);
+    expect(blocked).toContain("> Posted the same spam 40 times");
+    expect(unblocked).toContain(`unblocked reporter ID \`${id}\``);
+  });
+
+  it("are shown to their member, and to the team's admins with whose each is", async () => {
+    const team = newTeam();
+    const id = await reporterOf((await (await send(team.student)).json()) as Shown);
+    const mine = (await (await call(team.student, "/team/reports/reporter")).json()) as {
+      id: string;
+      blocked: boolean;
+    };
+    expect(mine).toMatchObject({ id, blocked: false });
+    expect(JSON.stringify(mine)).not.toContain(team.student.id);
+
+    // A member who never reported gets one when the form asks.
+    const fresh = (await (await call(team.mentor, "/team/reports/reporter")).json()) as {
+      id: string;
+    };
+    expect(fresh.id).toMatch(/^[0-9a-f]{10}$/);
+
+    expect((await call(team.student, "/team/reports/reporters")).status).toBe(403);
+    const all = (await (await call(team.admin, "/team/reports/reporters")).json()) as {
+      id: string;
+      userId: string;
+    }[];
+    expect(all).toContainEqual(expect.objectContaining({ id, userId: team.student.id }));
+    expect(all).toContainEqual(expect.objectContaining({ id: fresh.id, userId: team.mentor.id }));
+
+    // Another team's admin sees none of them.
+    const other = newTeam();
+    const theirs = await (await call(other.admin, "/team/reports/reporters")).text();
+    expect(theirs).not.toContain(id);
+  });
+
+  it("only operators block, from the console", async () => {
+    const team = newTeam();
+    const id = await reporterOf((await (await send(team.student)).json()) as Shown);
+    const res = await call(team.admin, `/console/reporters/${id}`, {
+      method: "POST",
+      body: { blocked: true, reason: "Spam" },
+    });
+    expect(res.status).toBe(403);
+  });
+});
+
 describe("the hourly check", () => {
   it("makes the issues GitHub didn't take the first time", async () => {
     const team = newTeam();
@@ -110,6 +235,19 @@ describe("the hourly check", () => {
     await syncReports(testEnv);
     const [now] = (await (await call(team.student, "/team/reports")).json()) as Shown[];
     expect(now.issueUrl).toMatch(/issues\/\d+$/);
+  });
+
+  it("never sends a blocked reporter's unsent reports", async () => {
+    const team = newTeam();
+    const id = await reporterOf((await (await send(team.student)).json()) as Shown);
+    await fetch("https://api.github.com/test/down?on=1", { method: "POST" });
+    await send(team.student);
+    await fetch("https://api.github.com/test/down?on=0", { method: "POST" });
+    await consoleCall(`/reporters/${id}`, { blocked: true, reason: "Spam" });
+
+    await syncReports(testEnv);
+    const [unsent] = (await (await call(team.student, "/team/reports")).json()) as Shown[];
+    expect(unsent.issueUrl).toBeNull();
   });
 
   it("tells the reporter once when their issue is fixed or closed", async () => {

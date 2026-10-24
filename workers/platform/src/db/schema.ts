@@ -1,4 +1,4 @@
-import { integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { integer, primaryKey, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 /** The platform's team registry (migration 0001). */
 export const teams = sqliteTable("teams", {
@@ -61,6 +61,9 @@ export const OPERATOR_ACTIONS = [
   // Migration 0007.
   "create_notification",
   "delete_notification",
+  // Migration 0013.
+  "block_reporter",
+  "unblock_reporter",
 ] as const;
 
 /** The operator access log: every action, and each look at a team's members (migration 0003). */
@@ -172,6 +175,8 @@ export const problemReports = sqliteTable("problem_reports", {
   id: text("id").primaryKey(),
   teamId: text("team_id").notNull(),
   userId: text("user_id").notNull(),
+  /** Who sent it on the public issue: a `reporters` id (migration 0013). */
+  reporterId: text("reporter_id"),
   kind: text("kind", { enum: REPORT_KINDS }).notNull(),
   message: text("message").notNull(),
   /** The page it was sent from, without its query string. */
@@ -191,3 +196,22 @@ export const problemReports = sqliteTable("problem_reports", {
   checkedAt: integer("checked_at"),
   createdAt: integer("created_at").notNull(),
 });
+
+/**
+ * Reporter IDs (migration 0013, src/reports.ts): the random ID that stands for a member on their
+ * reports' public issues, so operators can block one without learning who it is.
+ */
+export const reporters = sqliteTable(
+  "reporters",
+  {
+    id: text("id").primaryKey(),
+    teamId: text("team_id").notNull(),
+    userId: text("user_id").notNull(),
+    blockedAt: integer("blocked_at"),
+    /** The operator who blocked them. */
+    blockedBy: text("blocked_by"),
+    blockReason: text("block_reason"),
+    createdAt: integer("created_at").notNull(),
+  },
+  (t) => [uniqueIndex("reporters_user").on(t.teamId, t.userId)],
+);

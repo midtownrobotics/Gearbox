@@ -108,9 +108,10 @@ const fold = (text: string) =>
 
 /**
  * Whether a user matches a search: every word is somewhere in their name, username, email, or the
- * name of an account they sign in with (a Slack, Discord or GitHub username, a Google email).
+ * name of an account they sign in with (a Slack, Discord or GitHub username, a Google email), or
+ * their reporter ID (on their problem reports' GitHub issues).
  */
-export function matchesSearch(user: User, query: string): boolean {
+export function matchesSearch(user: User, query: string, reporterId?: string): boolean {
   const words = fold(query).split(/\s+/).filter(Boolean);
   if (words.length === 0) return true;
   const text = fold(
@@ -119,6 +120,7 @@ export function matchesSearch(user: User, query: string): boolean {
       user.username ?? "",
       user.email,
       ...user.identities.map((i) => i.providerEmail ?? ""),
+      reporterId ?? "",
     ].join(" "),
   );
   return words.every((word) => text.includes(word));

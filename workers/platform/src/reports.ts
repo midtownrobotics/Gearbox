@@ -1,15 +1,16 @@
-import { requireAuth, sendMemberDM } from "@g3/auth";
+import { requireAdmin, requireAuth, sendMemberDM } from "@g3/auth";
 import {
   type AppName,
   DEV_DOMAIN,
   TEAM_HOST_APPS,
   isDemoTeam,
   platformLabel,
+  teamAppUrlVia,
 } from "@g3/site-config";
-import { and, asc, count, desc, eq, gt, isNotNull, isNull } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, isNotNull, isNull, notInArray, or } from "drizzle-orm";
 import { Hono } from "hono";
-import { REPORT_KINDS, type ReportKind, problemReports } from "./db/schema";
-import { db, now } from "./lib";
+import { REPORT_KINDS, type ReportKind, problemReports, reporters } from "./db/schema";
+import { accounts, db, now, tellAdmins } from "./lib";
 import { MANIFESTS, isAppName } from "./registry";
 import type { AppEnv } from "./types";
 
@@ -20,8 +21,16 @@ import type { AppEnv } from "./types";
 // about open ones: when one is closed, the reporter gets a DM on the team's chat.
 //
 // The issue is public. It carries the report's text, the app, the page (no query string, which
-// can hold searches), the versions, the browser and the team's number, never who sent it. The
-// text is quoted and its @mentions broken, so a report can't ping anyone on GitHub.
+// can hold searches), the versions, the browser, the team's number and the sender's reporter ID,
+// never who sent it. The text is quoted and its @mentions broken, so a report can't ping anyone on
+// GitHub.
+//
+// A reporter ID (`reporters`) is a random ID each member gets with their first report. It isn't
+// their account id: an operator who sees abuse on GitHub blocks it on the console's Reporters page
+// (src/console.ts) without learning who it is. A blocked reporter's reports are refused, and any
+// GitHub didn't take yet are never sent. The team's admins are told on their chat who it is and
+// why (`tellBlocked`), and see each member's reporter ID on their page in Portal's Members list
+// (GET /team/reports/reporters). The report form shows the member their own ID and says so.
 
 type Bindings = AppEnv["Bindings"];
 
@@ -95,6 +104,7 @@ export function issueBody(report: Report, teamNumber: string): string {
     ["Version", report.version ?? "Unknown"],
     ["Browser", report.browser ?? "Unknown"],
     ["Team", teamNumber],
+    ["Reporter", report.reporterId ?? "Unknown"],
   ];
   return [
     quoted,
@@ -153,6 +163,63 @@ async function fileIssue(env: Bindings, report: Report): Promise<boolean> {
   }
 }
 
+/** A new reporter ID: 10 random hex digits. */
+export const newReporterId = () =>
+  [...crypto.getRandomValues(new Uint8Array(5))]
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+
+/** The member's reporter ID, made the first time they send a report. */
+async function reporterOf(env: Bindings, teamId: string, userId: string) {
+  const database = db(env);
+  await database
+    .insert(reporters)
+    .values({ id: newReporterId(), teamId, userId, createdAt: now() })
+    .onConflictDoNothing();
+  const reporter = await database
+    .select()
+    .from(reporters)
+    .where(and(eq(reporters.teamId, teamId), eq(reporters.userId, userId)))
+    .get();
+  if (!reporter) throw new Error("No reporter ID");
+  return reporter;
+}
+
+/**
+ * Tells the team's admins on their chat that an operator blocked (or unblocked) one of their
+ * members' reporter IDs, who it is and why.
+ */
+export async function tellBlocked(
+  env: Bindings,
+  reporter: { id: string; teamId: string; userId: string },
+  blocked: boolean,
+  reason: string | null,
+) {
+  const name = (await accounts(env, [reporter.userId]).catch(() => null))?.get(
+    reporter.userId,
+  )?.displayName;
+  const who = name ? `**${name}**` : "a member who is no longer on the team";
+  const page = `${teamAppUrlVia(env.LOCAL_GATEWAY_URL, reporter.teamId, "portal")}/admin/members/${encodeURIComponent(reporter.userId)}`;
+  const text = blocked
+    ? [
+        `A Gearbox operator blocked reporter ID \`${reporter.id}\` from Report a problem. This reporter is ${who} ([their page](${page})). They can't send reports until it's unblocked.`,
+        reason ? `Why:\n> ${reason.replace(/\n/g, "\n> ")}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n")
+    : `A Gearbox operator unblocked reporter ID \`${reporter.id}\` (${who}, [their page](${page})). They can send reports again.`;
+  await tellAdmins(env, reporter.teamId, text);
+}
+
+/** A member's reporter ID as the pages show it. */
+const shownReporter = (r: typeof reporters.$inferSelect) => ({
+  id: r.id,
+  userId: r.userId,
+  blocked: r.blockedAt !== null,
+  blockedAt: r.blockedAt,
+  blockReason: r.blockReason,
+});
+
 /** A report as its sender sees it. */
 const shown = (r: Report) => ({
   id: r.id,
@@ -206,6 +273,23 @@ export const reportsRouter = new Hono<AppEnv>()
       .all();
     return c.json(rows.map(shown));
   })
+  // The signed-in member's reporter ID, shown on the report form (made now if they have none).
+  .get("/reporter", async (c) => {
+    if (isDemoTeam(c.get("teamId"))) return c.json({ error: "Not in the demo." }, 403);
+    const { userId, ...reporter } = shownReporter(
+      await reporterOf(c.env, c.get("teamId"), c.get("userId")),
+    );
+    return c.json(reporter);
+  })
+  // Admins: every reporter ID on the team, with whose it is and whether it's blocked.
+  .get("/reporters", requireAdmin, async (c) => {
+    const rows = await db(c.env)
+      .select()
+      .from(reporters)
+      .where(eq(reporters.teamId, c.get("teamId")))
+      .all();
+    return c.json(rows.map(shownReporter));
+  })
   .post("/", async (c) => {
     const teamId = c.get("teamId");
     const userId = c.get("userId");
@@ -213,6 +297,16 @@ export const reportsRouter = new Hono<AppEnv>()
     if (isDemoTeam(teamId)) return c.json({ error: "That isn't available in the demo." }, 403);
     const parsed = parseReport(await c.req.json().catch(() => null));
     if (typeof parsed === "string") return c.json({ error: parsed }, 400);
+
+    const reporter = await reporterOf(c.env, teamId, userId);
+    if (reporter.blockedAt !== null) {
+      return c.json(
+        {
+          error: `Your reporter ID (${reporter.id}) was blocked from sending reports for misuse. Your team's admins were told why.`,
+        },
+        403,
+      );
+    }
 
     const database = db(c.env);
     const since = (s: number) => gt(problemReports.createdAt, now() - s);
@@ -238,6 +332,7 @@ export const reportsRouter = new Hono<AppEnv>()
       id: crypto.randomUUID(),
       teamId,
       userId,
+      reporterId: reporter.id,
       ...parsed,
       browser: c.req.header("User-Agent")?.slice(0, 300) ?? null,
       issueNumber: null,
@@ -278,7 +373,21 @@ export async function syncReports(env: Bindings) {
     .from(problemReports)
     // tenancy: all teams (the cron works through every team's unsent reports)
     .where(
-      and(isNull(problemReports.issueNumber), gt(problemReports.createdAt, now() - RETRY_FOR_S)),
+      and(
+        isNull(problemReports.issueNumber),
+        gt(problemReports.createdAt, now() - RETRY_FOR_S),
+        // Never a blocked reporter's.
+        or(
+          isNull(problemReports.reporterId),
+          notInArray(
+            problemReports.reporterId,
+            database
+              .select({ id: reporters.id })
+              .from(reporters)
+              .where(isNotNull(reporters.blockedAt)),
+          ),
+        ),
+      ),
     )
     .orderBy(asc(problemReports.createdAt))
     .limit(RETRIES_PER_RUN)

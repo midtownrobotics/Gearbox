@@ -129,6 +129,14 @@ export type Operator = {
   isYou: boolean;
 };
 
+/** A reporter an operator blocked: only their reporter ID, never who they are. */
+export type BlockedReporter = {
+  id: string;
+  blockedAt: number;
+  blockReason: string | null;
+  blockedByName: string | null;
+};
+
 export const formatTime = (seconds: number | null | undefined) =>
   seconds ? new Date(seconds * 1000).toLocaleString() : "—";
 
