@@ -44,6 +44,7 @@ We collect only what the apps need to work.
 | Scouting | Match and pit observations, notes on other teams, robot photos, schedules; when engagement is enabled, point balances and awards, match picks and their results | Members and optional scouting activities |
 | Uploaded files | Whatever your team uploads | Members |
 | Technical logs | Internet address, browser type, the page requested and the time | Recorded automatically by our hosting provider |
+| Problem reports | What you write when you report a problem or an idea from an app's menu, the page's address (without anything after `?`), the app and Gearbox versions, your browser, your team, that you sent it and your reporter ID (a random ID given to you with your first report) | You, when you send one |
 | Visits to our public page | How many visits frcgearbox.com's home page had each day, and how many of them were by someone signed in. Only these daily totals: nothing that identifies a visitor | Counted when the page opens |
 | Team record | Team name, FRC team number, country, branding, which apps are on, and acceptance of our terms | The team owner |
 
@@ -80,6 +81,8 @@ We count teams and the apps they use so we can plan capacity. Those counts do no
 
 Some things are public by design: your team's name, number and branding on its sign-in page, and the apps your team has submitted to the library.
 
+Problem reports are public too. Each one is posted as an issue on Gearbox's public GitHub repository, with the page's address, the app and Gearbox versions, your browser, your team's number and your reporter ID. Your name isn't posted, but anything you write in the report is. Your reporter ID is the same on each of your reports, so they can be seen to come from one person, but it doesn't say who you are. The report form shows you your reporter ID. Your team's admins can see each member's reporter ID. Our operators can block a reporter ID used for spam or misuse without learning whose it is; a blocked reporter can't send reports, and your team's admins are told it's you and the operator's reason. Gearbox keeps who sent each report, to message you when it's fixed or closed.
+
 Scouting forms, reports, schedules, uploaded files and points are private to the owning team. Team deletion or the app's scheduled deletion removes its database records and uploaded files.
 
 Scouting engagement is off by default. An admin can enable points and match predictions and can separately enable team points standings. Standings show members' names, balances, points earned and points used to signed-in teammates. A member's prediction history is shown only to that member through the activity page. Disabling activities pauses new awards and prediction result processing and keeps existing balances and history under the same retention rules as other team data.
@@ -90,6 +93,7 @@ Scouting engagement is off by default. An admin can enable points and match pred
 | --- | --- | --- |
 | Cloudflare | Hosting, storage and network delivery | Always. All Gearbox data is held on Cloudflare |
 | Google, GitHub, Steam | Sign-in | Only if you choose to sign in with or link that service |
+| GitHub | Holds problem reports as public issues | When you send a report: its text, the page's address, the versions, your browser, your team's number and your reporter ID |
 | Slack | Sign-in and team notifications | Only if your team connects its Slack workspace |
 | Discord | Sign-in and team notifications. When someone new signs in with Discord, we check with Discord that they're in your team's server; the answer isn't stored | Only if your team connects its Discord server |
 | Onshape | Part and drawing data for Shop | Only if your team connects Onshape |
@@ -116,6 +120,7 @@ Where the law of your team's country requires a legal basis for that transfer, t
 | Data of an app your team switches off | 90 days, in case your team switches it back on, then deleted |
 | Records that name a removed member, such as past orders | Kept by the team, with the member's name replaced by a placeholder |
 | Operator access log | 12 months |
+| Who sent a problem report, and your reporter ID | Kept as team data, and deleted with the team. The public GitHub issue stays: ask us to remove one |
 | Daily visit totals for our public page | Kept; they are totals and identify no one |
 | Technical logs | [Period set with our hosting provider] |
 | Backups | [Period], after which deleted information is gone from backups too |

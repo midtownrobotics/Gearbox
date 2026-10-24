@@ -385,6 +385,18 @@ html[data-theme="dark"] .g3-nav-drawer {
   border-top: 1px solid var(--g3-nav-line);
 }
 
+/* "Report a problem": a text link that's a button. */
+.g3-nav-drawer .g3-nav-report {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
 .g3-nav-version {
   color: var(--g3-nav-muted);
   font-size: 12px;

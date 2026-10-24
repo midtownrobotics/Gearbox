@@ -11,11 +11,13 @@ import { type ComponentType, type ReactNode, useEffect, useState } from "react";
 import { useSignedInUser, useTeamApps } from "../session";
 import { useTeamIcon, useTeamUiSettings } from "../team-ui";
 import { useTheme } from "../theme";
+import { ReportDialog } from "./report-dialog";
 
 // The top bar every G3 app shares (from Scouting's): the menu button, the app's wordmark, its
 // pages, who's signed in and the light/dark switch. The menu (a drawer) lists the team's apps
-// under "All Apps"; below 768px the pages move into it too, above them. It has its own CSS
-// (nav-bar.css), so it looks the same in apps that don't use Tailwind.
+// under "All Apps"; below 768px the pages move into it too, above them. Its foot has "Report a
+// problem" for anyone signed in (ReportDialog). It has its own CSS (nav-bar.css), so it looks the
+// same in apps that don't use Tailwind.
 
 export type AppNavItem = {
   /** Unique within the bar (usually the path). */
@@ -120,6 +122,7 @@ export function AppNavBar({
   team?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const [reporting, setReporting] = useState(false);
   const teamUi = useTeamUiSettings(team);
   const brandedTitle = team
     ? title.replace(new RegExp(`^${site.team.shortName}\\b`, "i"), teamUi.shortName)
@@ -155,6 +158,8 @@ export function AppNavBar({
             : []),
         ]
       : [];
+  // Reports go to Gearbox's public GitHub: never from the demo, whose text stays on the page.
+  const canReport = team && !!user && !isDemoPage;
   // Whether the bar has an app list to offer (or may, while it's being asked).
   const hasApps = allApps && user !== null;
   // With no pages and no apps there's nothing for a menu; the bar keeps its controls on phones too.
@@ -338,10 +343,23 @@ export function AppNavBar({
           <div className="g3-nav-drawer-foot">
             {actions && <div className="g3-nav-actions">{actions}</div>}
             <ThemeToggle labeled />
+            {canReport && (
+              <button
+                type="button"
+                className="g3-nav-text-link g3-nav-report"
+                onClick={() => {
+                  setOpen(false);
+                  setReporting(true);
+                }}
+              >
+                Report a problem
+              </button>
+            )}
             {version && <span className="g3-nav-version">{version}</span>}
           </div>
         </div>
       )}
+      {reporting && <ReportDialog version={version} onClose={() => setReporting(false)} />}
     </>
   );
 }

@@ -23,7 +23,7 @@ export function Field({
   return (
     // biome-ignore lint/a11y/noLabelWithoutControl: the control is passed as children
     <label className="block min-w-0 space-y-1">
-      <span className="text-sm font-medium text-secondary-700">{label}</span>
+      <span className="block text-sm font-medium text-secondary-700">{label}</span>
       {children}
       {error ? (
         <span className="block text-xs font-medium text-red-700">{error}</span>

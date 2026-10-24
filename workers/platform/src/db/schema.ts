@@ -1,4 +1,4 @@
-import { integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { integer, primaryKey, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 /** The platform's team registry (migration 0001). */
 export const teams = sqliteTable("teams", {
@@ -61,6 +61,9 @@ export const OPERATOR_ACTIONS = [
   // Migration 0007.
   "create_notification",
   "delete_notification",
+  // Migration 0013.
+  "block_reporter",
+  "unblock_reporter",
 ] as const;
 
 /** The operator access log: every action, and each look at a team's members (migration 0003). */
@@ -160,3 +163,57 @@ export const landingVisits = sqliteTable("landing_visits", {
   visits: integer("visits").notNull().default(0),
   signedIn: integer("signed_in").notNull().default(0),
 });
+
+export const REPORT_KINDS = ["problem", "idea"] as const;
+export type ReportKind = (typeof REPORT_KINDS)[number];
+
+/**
+ * Problems and ideas members report from any app's bar (migration 0012, src/reports.ts). Each
+ * becomes a public GitHub issue; the row keeps who sent it, to tell them when it's closed.
+ */
+export const problemReports = sqliteTable("problem_reports", {
+  id: text("id").primaryKey(),
+  teamId: text("team_id").notNull(),
+  userId: text("user_id").notNull(),
+  /** Who sent it on the public issue: a `reporters` id (migration 0013). */
+  reporterId: text("reporter_id"),
+  kind: text("kind", { enum: REPORT_KINDS }).notNull(),
+  /** The member's title (migration 0014), or null to use the message's first line. */
+  title: text("title"),
+  message: text("message").notNull(),
+  /** The page it was sent from, without its query string. */
+  page: text("page").notNull(),
+  /** The app's slug, from the page's address. */
+  app: text("app"),
+  version: text("version"),
+  browser: text("browser"),
+  /** The GitHub issue, once it's made. */
+  issueNumber: integer("issue_number"),
+  issueUrl: text("issue_url"),
+  status: text("status", { enum: ["open", "fixed", "closed"] })
+    .notNull()
+    .default("open"),
+  closedAt: integer("closed_at"),
+  /** When the cron last asked GitHub about the issue. */
+  checkedAt: integer("checked_at"),
+  createdAt: integer("created_at").notNull(),
+});
+
+/**
+ * Reporter IDs (migration 0013, src/reports.ts): the random ID that stands for a member on their
+ * reports' public issues, so operators can block one without learning who it is.
+ */
+export const reporters = sqliteTable(
+  "reporters",
+  {
+    id: text("id").primaryKey(),
+    teamId: text("team_id").notNull(),
+    userId: text("user_id").notNull(),
+    blockedAt: integer("blocked_at"),
+    /** The operator who blocked them. */
+    blockedBy: text("blocked_by"),
+    blockReason: text("block_reason"),
+    createdAt: integer("created_at").notNull(),
+  },
+  (t) => [uniqueIndex("reporters_user").on(t.teamId, t.userId)],
+);
