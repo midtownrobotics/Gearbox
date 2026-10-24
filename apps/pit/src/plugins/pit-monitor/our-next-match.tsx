@@ -232,11 +232,7 @@ function AllianceBoard({
           teamNumber={teamNumber}
           className={tab(side)}
         >
-          {side === theirs && (
-            <>
-              <TabCorner ours={ours} theirs={theirs} side={ours === "blue" ? "left" : "right"} />
-            </>
-          )}
+          {side === theirs && }
         </AllianceTeams>
       ))}
     </div>
