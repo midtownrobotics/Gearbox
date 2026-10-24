@@ -40,7 +40,7 @@
         "noLabelWithoutControl": {
           "level": "error",
           "options": {
-            "inputComponents": ["TextField"]
+            "inputComponents": ["TextField", "QuantityInput"]
           }
         }
       }

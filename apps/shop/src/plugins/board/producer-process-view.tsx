@@ -259,7 +259,7 @@ export function ProducerSections({
                       <BatchLink batch={batch} />
                     </span>
                     <BatchStatusBadge batch={batch} processName={processName} />
-                    <span className="text-xs text-secondary-400">
+                    <span className="min-w-0 text-xs text-secondary-400">
                       {batch.label !== `Batch ${batch.number}` && `Batch ${batch.number} · `}
                       {batch.createdBy === "migration"
                         ? "carried over"

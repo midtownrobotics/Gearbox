@@ -94,7 +94,7 @@ function VendorCard({
   return (
     <Card className="!p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="font-semibold text-secondary-900">{v.name}</h2>
+        <h2 className="min-w-0 font-semibold text-secondary-900">{v.name}</h2>
         <p className="text-xs text-secondary-500">
           {v.openItems} waiting to order · {v.ordersThisYear} order
           {v.ordersThisYear === 1 ? "" : "s"} this year

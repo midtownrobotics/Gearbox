@@ -230,6 +230,8 @@ describe("where received parts go", () => {
       { status: "in_use", locationId: 2 },
       { status: "in_use", locationId: 2, robotId: 1 },
       { ...storage, quantities: { [id]: 0 } },
+      { ...storage, quantities: { [id]: 1.5 } },
+      { ...storage, quantities: { [id]: -2 } },
       "storage",
     ]) {
       expect((await receive(student, { ids: [id], inventory })).status).toBe(400);

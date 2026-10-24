@@ -300,7 +300,7 @@ export function TablePage() {
               : count(items.length, "entry", "entries")}
           </p>
 
-          <div className="overflow-x-auto rounded-xl border border-secondary-200 bg-surface">
+          <div className="relative overflow-x-auto rounded-xl border border-secondary-200 bg-surface">
             {narrow ? (
               <NarrowRows rows={rows.slice(0, shown)} places={places} onAction={setAction} />
             ) : (

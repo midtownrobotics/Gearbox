@@ -13,6 +13,7 @@ import {
   parseDollars,
 } from "../../shared/format";
 import { PRIORITY, PRIORITY_ORDER } from "../../shared/priority";
+import { QuantityInput, parseQuantity, quantityError } from "../../shared/quantity";
 import { STATUS } from "../../shared/status-badge";
 import type { CatalogItem, Priority } from "../../shared/types";
 
@@ -304,15 +305,18 @@ export function variantPatch(
   };
 }
 
+/** A draft's quantity or pack isn't a whole number it can be sent with. */
+export const badQuantities = (d: Draft) =>
+  parseQuantity(d.quantity) === null || parseQuantity(d.packQuantity) === null;
+
 /** What's missing before a draft can be sent, or null when it's complete. */
 export function draftProblem(d: Draft): string | null {
   return (
     (!d.url && "Add the product link.") ||
     (!d.name.trim() && "Give it a name.") ||
     (Number.isNaN(parseDollars(d.price)) && "Price must be a dollar amount like 12.50.") ||
-    (!(Number(d.quantity) >= 1) && "Quantity must be at least 1.") ||
-    (!(Number.isInteger(Number(d.packQuantity)) && Number(d.packQuantity) >= 1) &&
-      "Pack of must be a whole number, 1 or more.") ||
+    (parseQuantity(d.quantity) === null && "Quantity must be a whole number from 1 to 10000.") ||
+    (parseQuantity(d.packQuantity) === null && "Pack of must be a whole number from 1 to 10000.") ||
     (!d.categoryId && "Pick a budget category.") ||
     (!d.catalogItemId &&
       !d.catalogCategory.trim() &&
@@ -383,14 +387,11 @@ export function DraftCard({
     );
   }
   const unit = parseDollars(d.price);
-  const total =
-    unit !== null && !Number.isNaN(unit) && Number(d.quantity) > 0
-      ? unit * Number(d.quantity)
-      : null;
+  const quantity = parseQuantity(d.quantity);
+  const total = unit !== null && !Number.isNaN(unit) && quantity !== null ? unit * quantity : null;
   // How many parts arrive, when what's ordered is a pack.
-  const pack = Number(d.packQuantity);
-  const parts =
-    Number.isInteger(pack) && pack > 1 && Number(d.quantity) > 0 ? pack * Number(d.quantity) : null;
+  const pack = parseQuantity(d.packQuantity);
+  const parts = pack !== null && pack > 1 && quantity !== null ? pack * quantity : null;
 
   return (
     <Card className="!p-4">
@@ -490,14 +491,9 @@ export function DraftCard({
             <Field
               label="Qty"
               hint={total !== null ? `= ${formatCents(total, d.currency)}` : undefined}
+              error={quantityError(d.quantity)}
             >
-              <input
-                type="number"
-                min={1}
-                className={inputClass}
-                value={d.quantity}
-                onChange={(e) => onChange({ quantity: e.target.value })}
-              />
+              <QuantityInput value={d.quantity} onChange={(quantity) => onChange({ quantity })} />
             </Field>
             <Field
               label="Pack of"
@@ -509,13 +505,11 @@ export function DraftCard({
                     : "Parts in one of these"
               }
               warn={d.packGuessed}
+              error={quantityError(d.packQuantity)}
             >
-              <input
-                type="number"
-                min={1}
-                className={inputClass}
+              <QuantityInput
                 value={d.packQuantity}
-                onChange={(e) => onChange({ packQuantity: e.target.value, packGuessed: false })}
+                onChange={(packQuantity) => onChange({ packQuantity, packGuessed: false })}
               />
             </Field>
             <div className="col-span-2">
