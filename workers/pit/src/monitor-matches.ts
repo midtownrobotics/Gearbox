@@ -210,7 +210,14 @@ export interface OurNextMatch {
   startTime: number | null;
   /** Whose times they are. */
   timesFrom: "nexus" | "tba";
+  /** The match's teams' current ranks at the event, for the ones ranked. */
+  ranks: Record<string, number>;
+  /** The match's teams' pit addresses from Nexus ("A12"), for the ones it has. */
+  pits: Record<string, string>;
 }
+
+/** What the event knows about its teams, to show beside the ones in our match. */
+export type TeamInfo = { ranks?: Record<string, number>; pits?: Record<string, string> };
 
 /** The team's next match (null when it has none to come), and how many matches it has in all. */
 export type OurSchedule = { next: OurNextMatch | null; total: number };
@@ -238,6 +245,7 @@ export function ourSchedule(
   matches: unknown[],
   teamNumber: string,
   fromNexus: boolean,
+  info: TeamInfo = {},
 ): OurSchedule {
   const list = matches.map((raw) => (raw ?? {}) as NexusMatch);
   const statusOf = (match: NexusMatch) =>
@@ -285,8 +293,22 @@ export function ourSchedule(
       onFieldTime: msOrNull(times.actualOnFieldTime) ?? msOrNull(times.estimatedOnFieldTime),
       startTime: msOrNull(times.estimatedStartTime),
       timesFrom: fromNexus && !match.timesFromTba ? "nexus" : "tba",
+      ...teamInfo([...stations(match.redTeams), ...stations(match.blueTeams)], info),
     },
   };
+}
+
+/** The ranks and pit addresses of just these teams. */
+function teamInfo(teams: string[], info: TeamInfo) {
+  const ranks: Record<string, number> = {};
+  const pits: Record<string, string> = {};
+  for (const team of teams) {
+    const rank = info.ranks?.[team];
+    const pit = info.pits?.[team];
+    if (typeof rank === "number" && rank > 0) ranks[team] = rank;
+    if (typeof pit === "string" && pit.trim()) pits[team] = pit.trim();
+  }
+  return { ranks, pits };
 }
 
 export type RankingInfo = { rank: number; team: string };

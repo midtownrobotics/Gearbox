@@ -75,6 +75,8 @@ describe("event snapshot", () => {
       matchesUntilQueuing: 2,
       matchesUntilField: 4,
       timesFrom: "nexus",
+      ranks: { "1648": 16 },
+      pits: {},
     });
     expect(data.ranking).toMatchObject({ rank: 16, wins: 2, losses: 2 });
     expect(data.contextRankings?.top3).toHaveLength(3);

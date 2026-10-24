@@ -177,7 +177,10 @@ export async function snapshotMonitorData(env: Bindings, db: Db, team: string) {
   return {
     teamNumber: snapshot.teamNumber,
     nexus: { isRealNexus: true, matches },
-    ourMatches: ourSchedule(matches, snapshot.teamNumber, true),
+    // GRITS's ranks; the snapshot has no pit addresses.
+    ourMatches: ourSchedule(matches, snapshot.teamNumber, true, {
+      ranks: Object.fromEntries(snapshot.rankings.map((r) => [r.team, r.rank])),
+    }),
     // Schedule isn't part of the snapshot: sample people, so "In the pit now" is at its fullest.
     inThePit: sampleInThePit(Date.now()),
     ranking: ours

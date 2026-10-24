@@ -150,6 +150,8 @@ describe("our next match", () => {
         onFieldTime: null,
         startTime: 2009,
         timesFrom: "nexus",
+        ranks: {},
+        pits: {},
       },
     });
 
@@ -161,6 +163,16 @@ describe("our next match", () => {
       queueTime: 999,
       queued: true,
     });
+  });
+
+  it("gives the match's teams' ranks and pit addresses, and only theirs", () => {
+    const matches = event(3, [1]);
+    const next = ourSchedule(matches, "1648", true, {
+      ranks: { "1648": 7, "4": 12, "99": 1 },
+      pits: { "1648": " A12 ", "1": "B3", "99": "C1" },
+    }).next;
+    expect(next?.ranks).toEqual({ "1648": 7, "4": 12 });
+    expect(next?.pits).toEqual({ "1648": "A12", "1": "B3" });
   });
 
   it("passes over a match of ours that's over, even before its score is in", () => {

@@ -868,7 +868,7 @@ const app = base
     const nexusKey = c.env.NEXUS_API_KEY;
     const year = new Date().getFullYear();
 
-    const [nexusResult, tbaResult, tbaRankingsResult, sbResult, tbaScheduleResult] =
+    const [nexusResult, tbaResult, tbaRankingsResult, sbResult, tbaScheduleResult, pitsResult] =
       await Promise.allSettled([
         nexusEventKey && nexusKey
           ? fetch(`https://frc.nexus/api/v1/event/${nexusEventKey}`, {
@@ -898,6 +898,12 @@ const app = base
               headers: { "X-TBA-Auth-Key": tbaKey },
             }).then((r) => (r.ok ? r.json() : null))
           : Promise.resolve(null),
+        // Each team's pit address, for our next match's teams.
+        nexusEventKey && nexusKey
+          ? fetch(`https://frc.nexus/api/v1/event/${nexusEventKey}/pits`, {
+              headers: { "Nexus-Api-Key": nexusKey },
+            }).then((r) => (r.ok ? r.json() : null))
+          : Promise.resolve(null),
       ]);
 
     const nexus = nexusResult.status === "fulfilled" ? nexusResult.value : null;
@@ -905,6 +911,7 @@ const app = base
     const tbaRankings = tbaRankingsResult.status === "fulfilled" ? tbaRankingsResult.value : null;
     const sb = sbResult.status === "fulfilled" ? sbResult.value : null;
     const tbaSchedule = tbaScheduleResult.status === "fulfilled" ? tbaScheduleResult.value : null;
+    const pits = pitsResult.status === "fulfilled" ? pitsResult.value : null;
 
     // biome-ignore lint/suspicious/noExplicitAny: external API shapes
     const tbaAny = tba as any;
@@ -955,7 +962,17 @@ const app = base
 
     // The team's next match and how far off it is, for the Monitor's "Our next match".
     const ourMatches = finalNexus?.matches
-      ? ourSchedule(finalNexus.matches, team, finalNexus.isRealNexus === true)
+      ? ourSchedule(finalNexus.matches, team, finalNexus.isRealNexus === true, {
+          ranks: Array.isArray(tbaRankingsAny?.rankings)
+            ? Object.fromEntries(
+                (tbaRankingsAny.rankings as { rank: number; team_key: string }[]).map((r) => [
+                  r.team_key.replace("frc", ""),
+                  r.rank,
+                ]),
+              )
+            : undefined,
+          pits: pits && typeof pits === "object" ? (pits as Record<string, string>) : undefined,
+        })
       : null;
 
     return c.json({ teamNumber: team, nexus: finalNexus, ourMatches, ranking, contextRankings });
