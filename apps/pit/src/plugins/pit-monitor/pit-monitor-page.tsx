@@ -669,76 +669,75 @@ function ChecklistSection({
   const allDone = totalItems > 0 && totalChecked === totalItems;
 
   return (
-    <div className={`${SCROLL_SECTION} gap-3`}>
-      {/* Overall progress stays at the top; the lists and issues scroll under it. */}
-      <div className="shrink-0 space-y-3">
-        <h2 className="text-xs font-bold uppercase tracking-widest text-secondary-600">
+    <div className={`${SCROLL_SECTION} gap-5`}>
+      {/* Each part keeps its heading and scrolls inside when the column runs short. */}
+      <div className="flex min-h-0 shrink flex-col gap-2">
+        <h2 className="shrink-0 text-xs font-bold uppercase tracking-widest text-secondary-600">
           Checklist Progress
         </h2>
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between">
-            <span
-              className={`text-sm font-semibold ${allDone ? "text-emerald-600" : "text-secondary-700"}`}
-            >
-              {allDone ? "All done!" : `${totalChecked} / ${totalItems} complete`}
-            </span>
-            <span
-              className={`text-lg font-black tabular-nums ${allDone ? "text-emerald-600" : "text-secondary-900"}`}
-            >
-              {globalPct}%
-            </span>
+        <div className="min-h-0 space-y-4 overflow-y-auto rounded-xl border border-secondary-200 bg-surface p-4">
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span
+                className={`text-sm font-semibold ${allDone ? "text-emerald-600" : "text-secondary-700"}`}
+              >
+                {allDone ? "All done!" : `${totalChecked} / ${totalItems} complete`}
+              </span>
+              <span
+                className={`text-lg font-black tabular-nums ${allDone ? "text-emerald-600" : "text-secondary-900"}`}
+              >
+                {globalPct}%
+              </span>
+            </div>
+            <ProgressBar percent={globalPct} done={allDone} className="!h-3" />
           </div>
-          <ProgressBar percent={globalPct} done={allDone} className="!h-3" />
+          {/* One grid for every list, so the names take only the longest one's width (at most
+              60%), the bars the rest, all the same length, and the counts line up at the right. */}
+          <div className="grid grid-cols-[fit-content(60%)_minmax(4rem,1fr)_auto] items-center gap-x-3 gap-y-2">
+            {lists.map((list) => {
+              const pct =
+                list.itemCount > 0 ? Math.round((list.checkedCount / list.itemCount) * 100) : 0;
+              const done = list.itemCount > 0 && list.checkedCount === list.itemCount;
+              return (
+                <div key={list.id} className="contents">
+                  <span className="min-w-0 truncate text-sm text-secondary-600">{list.name}</span>
+                  <ProgressBar percent={pct} done={done} />
+                  <span
+                    className={`text-right text-sm font-semibold tabular-nums ${done ? "text-emerald-600" : "text-secondary-700"}`}
+                  >
+                    {list.checkedCount}/{list.itemCount}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
-      <div className="min-h-0 space-y-4 overflow-y-auto">
-        {/* One grid for every list, so the names take only the longest one's width (at most 60%),
-            the bars the rest, all the same length, and the counts line up at the right. */}
-        <div className="grid grid-cols-[fit-content(60%)_minmax(4rem,1fr)_auto] items-center gap-x-3 gap-y-2">
-          {lists.map((list) => {
-            const pct =
-              list.itemCount > 0 ? Math.round((list.checkedCount / list.itemCount) * 100) : 0;
-            const done = list.itemCount > 0 && list.checkedCount === list.itemCount;
-            return (
-              <div key={list.id} className="contents">
-                <span className="min-w-0 truncate text-sm text-secondary-600">{list.name}</span>
-                <ProgressBar percent={pct} done={done} />
-                <span
-                  className={`text-right text-sm font-semibold tabular-nums ${done ? "text-emerald-600" : "text-secondary-700"}`}
-                >
-                  {list.checkedCount}/{list.itemCount}
-                </span>
-              </div>
-            );
-          })}
-        </div>
 
-        {/* Issues */}
-        <div className="space-y-2 pt-2 border-t border-secondary-200">
-          <h2 className="text-xs font-bold uppercase tracking-widest text-secondary-600">
-            Open Issues{" "}
-            {issues.length > 0 && (
-              <span className="text-secondary-900 normal-case">{issues.length}</span>
-            )}
-          </h2>
-          {issues.length === 0 ? (
-            <p className="text-emerald-600 text-sm font-semibold">No open issues ✓</p>
-          ) : (
-            <div className="space-y-2">
-              {issues.map((issue) => (
-                <div
-                  key={issue.id}
-                  className="bg-amber-100 border border-amber-300 rounded-xl px-4 py-3"
-                >
-                  <p className="text-sm text-secondary-900 leading-snug">{issue.text}</p>
-                  <p className="text-xs text-secondary-600 mt-0.5">
-                    {issue.listName} · {issue.itemName}
-                  </p>
-                </div>
-              ))}
-            </div>
+      <div className="flex min-h-0 shrink flex-col gap-2">
+        <h2 className="shrink-0 text-xs font-bold uppercase tracking-widest text-secondary-600">
+          Open Issues{" "}
+          {issues.length > 0 && (
+            <span className="text-secondary-900 normal-case">{issues.length}</span>
           )}
-        </div>
+        </h2>
+        {issues.length === 0 ? (
+          <p className="text-emerald-600 text-sm font-semibold">No open issues ✓</p>
+        ) : (
+          <div className="min-h-0 space-y-2 overflow-y-auto">
+            {issues.map((issue) => (
+              <div
+                key={issue.id}
+                className="bg-amber-100 border border-amber-300 rounded-xl px-4 py-3"
+              >
+                <p className="text-sm text-secondary-900 leading-snug">{issue.text}</p>
+                <p className="text-xs text-secondary-600 mt-0.5">
+                  {issue.listName} · {issue.itemName}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -139,31 +139,28 @@ const EDGE = 3;
 const TUCK = RADIUS + EDGE;
 
 /**
- * The rounded inside corner where our tab meets the bar, drawn over the other alliance's top
- * corner beside it (which reaches `TUCK` in under our tab): our tint, with a quarter circle of
- * theirs whose border carries ours round from the bar's edge down our tab's side. Like the open
- * tab in a browser, upside down.
+ * A rounded top corner of the other alliance's half, where it meets the bar: our tint, with a
+ * quarter circle of theirs whose border carries the bar's edge round and down the side. Drawn at
+ * both its top corners, the one by our tab (`inset` `TUCK - EDGE`, as that half reaches in under
+ * ours) and the outside one (`inset` `-EDGE`, out over its own border: positions count from inside
+ * the border), so it sits behind the bar like a tab in a browser, upside down.
  */
 function TabCorner({
   ours,
   theirs,
-  oursOnLeft,
-}: { ours: "red" | "blue"; theirs: "red" | "blue"; oursOnLeft: boolean }) {
+  side,
+  inset,
+}: { ours: "red" | "blue"; theirs: "red" | "blue"; side: "left" | "right"; inset: number }) {
   const size = RADIUS + EDGE;
   return (
     <span
       aria-hidden
       className={`pointer-events-none absolute z-20 overflow-hidden ${ALLIANCE[ours].tint}`}
-      style={{
-        top: -EDGE,
-        [oursOnLeft ? "left" : "right"]: TUCK - EDGE,
-        width: size,
-        height: size,
-      }}
+      style={{ top: -EDGE, [side]: inset, width: size, height: size }}
     >
       <span
         className={`absolute top-0 rounded-full border-[3px] ${ALLIANCE[ours].border} ${ALLIANCE[theirs].tint}`}
-        style={{ [oursOnLeft ? "left" : "right"]: 0, width: size * 2, height: size * 2 }}
+        style={{ [side]: 0, width: size * 2, height: size * 2 }}
       />
     </span>
   );
@@ -205,7 +202,8 @@ function AllianceBoard({
         `relative z-10 -mt-[3px] rounded-b-xl border-[3px] border-t-0 pt-[calc(0.5rem+3px)] pb-2 ${style.border} ${style.tint}`
       : `relative border-[3px] border-t-0 py-2 ${tuck[side]} ${corner[side]} ${ALLIANCE[side].border} ${ALLIANCE[side].tint}`;
   return (
-    <div className="grid min-w-0 grid-cols-2">
+    // The bar keeps its own height; the alliances take any the status box adds.
+    <div className="grid min-w-0 grid-cols-2 grid-rows-[auto_1fr]">
       <div
         className={`col-span-2 flex flex-wrap items-center justify-between gap-x-10 gap-y-2 rounded-t-xl border-[3px] px-5 py-3 sm:px-8 ${style.border} ${style.tint}`}
       >
@@ -213,11 +211,17 @@ function AllianceBoard({
           <p className="text-3xl font-black text-secondary-900 sm:text-4xl">{next.label}</p>
           {note && <p className="text-xs text-secondary-600">{note}</p>}
         </div>
-        {times.length > 0 && (
+        {times.length > 0 ? (
           <div className="flex gap-10">
             {times.map((time) => (
               <Time key={time.label} label={time.label} at={time.at} color={style.timer} />
             ))}
+          </div>
+        ) : (
+          // No countdown (we're on the field): an unseen one keeps the bar its height.
+          <div aria-hidden className="invisible text-center">
+            <p className={TIME_LABEL}>Queue</p>
+            <p className={TIME_COUNT}>0m 00s</p>
           </div>
         )}
       </div>
@@ -230,7 +234,21 @@ function AllianceBoard({
           className={tab(side)}
         >
           {side === theirs && (
-            <TabCorner ours={ours} theirs={theirs} oursOnLeft={ours === "blue"} />
+            <>
+              {/* By our tab, then the outside edge. */}
+              <TabCorner
+                ours={ours}
+                theirs={theirs}
+                side={ours === "blue" ? "left" : "right"}
+                inset={TUCK - EDGE}
+              />
+              <TabCorner
+                ours={ours}
+                theirs={theirs}
+                side={ours === "blue" ? "right" : "left"}
+                inset={-EDGE}
+              />
+            </>
           )}
         </AllianceTeams>
       ))}
@@ -238,15 +256,19 @@ function AllianceBoard({
   );
 }
 
+const TIME_LABEL =
+  "flex flex-wrap items-baseline justify-center gap-x-2 text-xs font-semibold uppercase tracking-wide text-secondary-600";
+const TIME_COUNT = "text-3xl font-black tabular-nums sm:text-5xl";
+
 /** A countdown under its label and clock time, in our alliance's color. */
 function Time({ label, at, color }: { label: string; at: number; color: string }) {
   return (
     <div className="min-w-0 text-center">
-      <p className="flex flex-wrap items-baseline justify-center gap-x-2 text-xs font-semibold uppercase tracking-wide text-secondary-600">
+      <p className={TIME_LABEL}>
         <span>{label}</span>
         <span className="tabular-nums normal-case font-normal">{formatTime(at)}</span>
       </p>
-      <p className={`text-3xl font-black tabular-nums sm:text-5xl ${color}`}>
+      <p className={`${TIME_COUNT} ${color}`}>
         <Countdown targetMs={at} />
       </p>
     </div>
