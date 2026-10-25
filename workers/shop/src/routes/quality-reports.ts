@@ -17,6 +17,7 @@ import {
 } from "../db/schema";
 import { canQualityCheck, qualityReportsOn } from "../lib/quality";
 import { MAX_CHECKLIST_ITEMS, checklistFor } from "../lib/quality-checklist";
+import { removedError } from "../lib/removal";
 import { finished, promoteNextSteps } from "../lib/steps";
 import type { AppEnv } from "../types";
 import { recordAction } from "./actions";
@@ -376,7 +377,12 @@ export const qualityReportsRouter = new Hono<AppEnv>()
     const { report, steps, check } = open;
 
     const chosen = await db
-      .select({ id: processes.id, name: processes.name, type: processes.type })
+      .select({
+        id: processes.id,
+        name: processes.name,
+        type: processes.type,
+        archivedAt: processes.archivedAt,
+      })
       .from(processes)
       .where(inTeam(processes, teamId, eq(processes.id, processId)))
       .get();
@@ -398,6 +404,8 @@ export const qualityReportsRouter = new Hono<AppEnv>()
           400,
         );
       }
+      const removed = chosen.archivedAt !== null && removedError("process", [chosen]);
+      if (removed) return c.json({ error: removed }, 400);
     }
 
     // The note goes on the part definition, which is what the shop view shows as Notes.

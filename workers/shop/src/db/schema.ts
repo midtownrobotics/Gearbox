@@ -13,6 +13,8 @@ export const subsystems = sqliteTable("subsystems", {
   teamId: teamId(),
   name: text("name").notNull(),
   createdAt: integer("created_at").notNull(),
+  /** When an admin removed it while parts still used it (lib/removal.ts); null while in use. */
+  archivedAt: integer("archived_at"),
 });
 
 export const partDefinitions = sqliteTable("part_definitions", {
@@ -69,6 +71,8 @@ export const processes = sqliteTable("processes", {
   // Parts using this process must record material + thickness at ingest.
   requiresPartInfo: integer("requires_part_info").notNull().default(0),
   createdAt: integer("created_at").notNull(),
+  /** When an admin removed it while something still used it (lib/removal.ts); else null. */
+  archivedAt: integer("archived_at"),
 });
 
 /**

@@ -24,6 +24,12 @@ A process is a step a part can go through: "Router", "Mill", "Lathe", "Deburr", 
 
 A part that uses files needs both kinds, with the producer first. Batches and files, later in this section, covers them.
 
+## Removing a subsystem or process
+
+Choose **Remove** beside one you no longer use, such as a typo or an old machine. If nothing uses it, it's deleted. If parts do, it's hidden from new parts (Ingest, Add Part, a part's processes), and parts that already have it keep it. The Shop Floor still shows a removed process while parts are at it.
+
+Switch on **Show removed** to see removed ones and **Restore** them. The required quality check can't be removed while it's required. Removing and restoring are in the team's log.
+
 ## Connect Onshape
 
 Under **Onshape Configuration**:

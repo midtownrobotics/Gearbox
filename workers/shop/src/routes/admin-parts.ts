@@ -77,10 +77,11 @@ export const adminPartsRouter = new Hono<AppEnv>()
     }
     const pendingParts = Array.from(partsByNumber.values());
 
+    // Only what a new part may be filed under: not ones removed on the Admin page.
     const subsystems = await db
       .select()
       .from(schema.subsystems)
-      .where(inTeam(schema.subsystems, teamId))
+      .where(inTeam(schema.subsystems, teamId, isNull(schema.subsystems.archivedAt)))
       .all();
 
     // The releases the pending parts came from, so the page can group them by release.

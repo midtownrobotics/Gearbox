@@ -2,6 +2,8 @@ export type Subsystem = {
   id: number;
   name: string;
   createdAt: number;
+  /** When an admin removed it while parts used it: kept for them, left out of new parts. */
+  archivedAt: number | null;
 };
 
 export type ProcessType = "regular" | "file_producer" | "file_consumer" | "quality_control";
@@ -20,6 +22,8 @@ export type Process = {
   /** 1 when parts using this process must record material + thickness at ingest. */
   requiresPartInfo: number;
   createdAt: number;
+  /** When an admin removed it while something used it: kept for that, left out of new parts. */
+  archivedAt: number | null;
 };
 
 export type PartDefinition = {
@@ -245,3 +249,17 @@ export type QualityReport = {
 /** How many lines a team's quality checklist can have, and how long each can be. */
 export const MAX_CHECKLIST_ITEMS = 20;
 export const MAX_CHECK_LABEL = 120;
+
+/** How many parts use a subsystem or process, and whether anything at all does. */
+export type Usage = { parts: number; inUse: boolean };
+
+/** What removing one did: deleted (nothing used it) or archived (hidden from new parts). */
+export type Removal = { outcome: "deleted" | "archived"; name: string; parts: number };
+
+/** Leaves out subsystems or processes removed on Admin, except the ones already chosen. */
+export function activeOr<T extends { id: number; archivedAt: number | null }>(
+  items: T[],
+  chosen: number[] = [],
+): T[] {
+  return items.filter((item) => item.archivedAt === null || chosen.includes(item.id));
+}
