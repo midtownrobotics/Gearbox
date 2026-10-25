@@ -179,4 +179,28 @@ assert.throws(() =>
 console.log(
   "Issue types migration wraps each ticket's type in a list, keeps its key and indexes, and refuses unknown or repeated types.",
 );
+db.exec(fs.readFileSync(`${md}/0038_multiple_active_forms.sql`, "utf8"));
+const insertForm = db.prepare(
+  "INSERT INTO scouting_forms (team_id, id, name, fields_json, created_by, created_at, updated_at, form_kind) VALUES (?, ?, 'Test', '[]', 'test', 1, 1, 'scouting')",
+);
+for (const [teamId, formId] of [
+  ["migration-owner-a", "first"],
+  ["migration-owner-a", "second"],
+  ["migration-owner-b", "first"],
+])
+  insertForm.run(teamId, formId);
+const insertReport = db.prepare(
+  "INSERT INTO scouting_form_submissions (team_id, id, form_id, answers_json, submitted_by, submitted_by_name, created_at, event_key, match_number) VALUES (?, ?, ?, '{}', 'scout', 'Scout', 1, 'event', 1)",
+);
+insertReport.run("migration-owner-a", "report-1", "first");
+insertReport.run("migration-owner-a", "report-2", "second");
+insertReport.run("migration-owner-b", "report-1", "first");
+assert.throws(
+  () => insertReport.run("migration-owner-a", "duplicate", "first"),
+  /one scouting submission per match/,
+);
+assert.deepEqual(db.prepare("PRAGMA foreign_key_check").all(), []);
+console.log(
+  "Form/category migration preserves tickets and enforces one submission per form, scout, event and match within each team.",
+);
 db.close();

@@ -12,6 +12,8 @@ export type MatchDraft = {
   answers: Record<string, unknown>;
   /** Field map drawings by field id, as data URLs of the whole canvas. */
   drawings: Record<string, string>;
+  /** Storage ran out: these paths must be kept open or redrawn, never reported as fully saved. */
+  missingDrawingFields?: string[];
   savedAt: number;
 };
 
@@ -54,8 +56,11 @@ function readAll(userId: string) {
 }
 
 /** Whether a draft holds anything the scout wrote. */
-export function hasContent(draft: Pick<MatchDraft, "answers" | "drawings">) {
+export function hasContent(
+  draft: Pick<MatchDraft, "answers" | "drawings" | "missingDrawingFields">,
+) {
   return (
+    Boolean(draft.missingDrawingFields?.length) ||
     Object.keys(draft.drawings).length > 0 ||
     Object.values(draft.answers).some(
       (value) =>
@@ -85,26 +90,38 @@ function prune(userId: string) {
 }
 
 /** Saves a draft, or removes it once it's empty. Keeps the answers if drawings don't fit. */
-export function saveDraft(userId: string, draft: MatchDraft) {
+export type DraftSaveResult = "saved" | "partial" | "failed" | "empty";
+
+export function saveDraft(userId: string, draft: MatchDraft): DraftSaveResult {
   const store = storage();
-  if (!store) return;
+  if (!store) return "failed";
   const key = keyOf(userId, draft.formId, draft.matchKey);
-  try {
-    if (!hasContent(draft)) {
+  if (!hasContent(draft)) {
+    try {
       store.removeItem(key);
-      return;
+      return "empty";
+    } catch {
+      return "failed";
     }
+  }
+  try {
     store.setItem(key, JSON.stringify(draft));
+    return draft.missingDrawingFields?.length ? "partial" : "saved";
   } catch {
     // Full: make room and try again, then without the drawings, which are most of the size.
     prune(userId);
     try {
       store.setItem(key, JSON.stringify(draft));
+      return draft.missingDrawingFields?.length ? "partial" : "saved";
     } catch {
       try {
-        store.setItem(key, JSON.stringify({ ...draft, drawings: {} }));
+        const missingDrawingFields = [
+          ...new Set([...(draft.missingDrawingFields ?? []), ...Object.keys(draft.drawings)]),
+        ];
+        store.setItem(key, JSON.stringify({ ...draft, drawings: {}, missingDrawingFields }));
+        return missingDrawingFields.length ? "partial" : "saved";
       } catch {
-        // Storage won't take it: the form itself still works.
+        return "failed";
       }
     }
   }

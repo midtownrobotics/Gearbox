@@ -1,25 +1,13 @@
-import { pageTeamNumber } from "@g3/site-config";
 import { Button, Chip, Page as SharedPage, inputClass, useQuestions } from "@g3/ui";
-import { BarChart3, Map as MapIcon, Scale, Search, Star, Trash2, Users, X } from "lucide-react";
+import { BarChart3, Scale, Search, Users, X } from "lucide-react";
 import { type SyntheticEvent, useEffect, useState } from "react";
+import { AnalysisAutoPaths } from "./AnalysisAutoPaths";
 import { AnalysisTeamTable, type TeamComment } from "./AnalysisTeamTable";
+import { MatchAnalysis, type TeamMatch } from "./MatchAnalysis";
 import { TeamLookupInput } from "./TeamLookupInput";
+import { matchLabel } from "./analysis-table";
 import type { Report } from "./analysis-table";
 import { API_URL, api } from "./api";
-
-type TeamMatch = {
-  key: string;
-  label: string;
-  scheduledAt: number | null;
-  alliance: "red" | "blue";
-  redTeams: string[];
-  blueTeams: string[];
-  redScore: number;
-  blueScore: number;
-  /** Whether this team played with or against our team. */
-  relationToTeam: "with" | "against" | "none";
-  played: boolean;
-};
 
 const AUTO_PATH_COLORS = [
   [255, 51, 79],
@@ -80,6 +68,7 @@ export function Analysis({
   const [searchedB, setSearchedB] = useState("");
   const [reportsB, setReportsB] = useState<Report[]>([]);
   const [teamMatches, setTeamMatches] = useState<TeamMatch[]>([]);
+  const [teamMatchesError, setTeamMatchesError] = useState("");
   const [teamComments, setTeamComments] = useState<TeamComment[]>([]);
   const [competition, setCompetition] = useState("all");
   const [reportKind, setReportKind] = useState<"all" | "scouting" | "pit">("scouting");
@@ -96,18 +85,19 @@ export function Analysis({
     label: string;
   } | null>(null);
 
-  async function loadData(teamFilter = team, teamBFilter = teamB) {
+  async function loadData(teamFilter = team, teamBFilter = teamB, eventFilter = competition) {
     setLoading(true);
     setLoadError("");
     try {
       const result = await api<{
         reports: Report[];
         teamMatches: TeamMatch[];
+        teamMatchesError?: string;
         teamComments: TeamComment[];
         eventNames: Record<string, string>;
         currentEventKey?: string | null;
       }>(
-        `/analysis?team=${encodeURIComponent(teamFilter)}${tab === "compare" ? `&teamB=${encodeURIComponent(teamBFilter)}` : ""}`,
+        `/analysis?event=${encodeURIComponent(eventFilter)}&team=${encodeURIComponent(teamFilter)}${tab === "compare" ? `&teamB=${encodeURIComponent(teamBFilter)}` : ""}`,
       );
       setReports(
         teamFilter
@@ -121,6 +111,7 @@ export function Analysis({
       setSearchedB(tab === "compare" ? teamBFilter : "");
       setTeamComments(result.teamComments);
       setTeamMatches(result.teamMatches);
+      setTeamMatchesError(result.teamMatchesError ?? "");
       setEventNames(result.eventNames ?? {});
       setCurrentEventKey(result.currentEventKey || null);
       // The page opens on the event being scouted now, or on a report someone linked to.
@@ -181,22 +172,6 @@ export function Analysis({
     setReportsB((items) => items.filter((item) => item.id !== report.id));
   }
 
-  async function toggleStar(report: Report, fieldId: string) {
-    const result = await api<{ starredFieldIds: string[] }>(
-      `/analysis/reports/${report.id}/stars`,
-      {
-        method: "PUT",
-        body: JSON.stringify({ fieldId, starred: !report.starredFieldIds.includes(fieldId) }),
-      },
-    );
-    const update = (items: Report[]) =>
-      items.map((item) =>
-        item.id === report.id ? { ...item, starredFieldIds: result.starredFieldIds } : item,
-      );
-    setReports(update);
-    setReportsB(update);
-  }
-
   function numericSummary(items: Report[]) {
     const values = new Map<string, number[]>();
     for (const report of items) {
@@ -229,7 +204,8 @@ export function Analysis({
   );
   const summaryA = numericSummary(activeReports);
   const summaryB = numericSummary(activeReportsB);
-  const comparisonLabels = [...new Set([...summaryA.keys(), ...summaryB.keys()])];
+  const comparisonLabels =
+    searched && searchedB ? [...new Set([...summaryA.keys(), ...summaryB.keys()])] : [];
   const competitions = [
     ...new Set([
       ...(currentEventKey ? [currentEventKey] : []),
@@ -247,14 +223,14 @@ export function Analysis({
   ).size;
   const teamCount = new Set(activeReports.map((report) => report.teamName)).size;
   const scoutCount = new Set(activeReports.map((report) => report.submittedByName)).size;
-  const highlightedReports = activeReports.filter(
-    (report) => report.starredFieldIds.length > 0,
-  ).length;
-
   const autoFields = activeReports.flatMap((report) =>
     report.fields
-      .filter((field) => field.type === "fieldMap" && report.drawings[field.id])
-      .map((field) => ({ report, field, url: report.drawings[field.id] })),
+      .filter(
+        (field) =>
+          field.type === "fieldMap" &&
+          (report.drawings[field.id] || report.answers[field.id] === "no-minimal-movement"),
+      )
+      .map((field) => ({ report, field, url: report.drawings[field.id] ?? "" })),
   );
   const visibleAutoFields = autoFields.filter(
     ({ report, field }) => !blankPathIds.has(`${report.id}-${field.id}`),
@@ -286,7 +262,11 @@ export function Analysis({
       className="scouting-page-frame"
       contentClassName="page analysis-page"
       description=<span>
-        {searched ? `Team ${searched}` : `${reports.length} scouting reports`}
+        {tab === "compare" && searched && searchedB
+          ? `Team ${searched} and Team ${searchedB}`
+          : searched
+            ? `Team ${searched}`
+            : `${reports.length} scouting reports`}
       </span>
     >
       <form className="analysis-search" onSubmit={search}>
@@ -295,7 +275,7 @@ export function Analysis({
           required={tab === "compare"}
           value={team}
           onChange={setTeam}
-          placeholder={tab === "compare" ? "Team A number or name" : "Team number or name"}
+          placeholder="Team number or name"
         />
         {tab === "compare" && (
           <>
@@ -304,7 +284,7 @@ export function Analysis({
               required
               value={teamB}
               onChange={setTeamB}
-              placeholder="Team B number or name"
+              placeholder="Another team number or name"
             />
           </>
         )}
@@ -338,7 +318,10 @@ export function Analysis({
         <button
           type="button"
           className={tab === "matches" ? "active" : ""}
-          onClick={() => setTab("matches")}
+          onClick={() => {
+            setTab("matches");
+            void loadData(searched, "", competition);
+          }}
         >
           Matches
         </button>
@@ -364,9 +347,9 @@ export function Analysis({
           Compare
         </button>
       </div>
-      {tab !== "matches" && (
+      {
         <div className="analysis-controls">
-          {tab === "stats" ? (
+          {tab === "matches" ? null : tab === "stats" ? (
             <fieldset className="flex flex-wrap gap-2">
               <legend className="sr-only">Report type</legend>
               <Chip selected={shownKind === "scouting"} onClick={() => setReportKind("scouting")}>
@@ -398,9 +381,14 @@ export function Analysis({
                 className={inputClass}
                 value={competition}
                 aria-label="Competition"
-                onChange={(event) => setCompetition(event.target.value)}
+                onChange={(event) => {
+                  setCompetition(event.target.value);
+                  if (tab === "matches") void loadData(searched, "", event.target.value);
+                }}
               >
-                <option value="all">All competitions</option>
+                <option value="all">
+                  {tab === "matches" ? "Current event" : "All competitions"}
+                </option>
                 {competitions.map((eventKey) => (
                   <option value={eventKey} key={eventKey}>
                     {eventLabel(eventKey)}
@@ -411,7 +399,7 @@ export function Analysis({
             </label>
           )}
         </div>
-      )}
+      }
       {tab === "stats" ? (
         <div className="analysis-results-stack">
           {loaded && activeReports.length > 0 && (
@@ -438,11 +426,6 @@ export function Analysis({
                 <strong>{scoutCount}</strong>
                 <span>Scouts</span>
               </div>
-              <div>
-                <Star size={18} />
-                <strong>{highlightedReports}</strong>
-                <span>Highlights</span>
-              </div>
             </section>
           )}
           {loaded && !activeReports.length && (
@@ -461,7 +444,6 @@ export function Analysis({
               eventLabel={eventLabel}
               focusReportId={initialReportId}
               canManageReports={canManageReports}
-              onToggleStar={(report) => toggleStar(report, "__report")}
               onDelete={permanentlyDeleteReport}
               onViewDrawing={({ url, teamName, label }) =>
                 setSelectedPath({ url: `${API_URL}${url}`, teamName, label })
@@ -489,114 +471,65 @@ export function Analysis({
         </div>
       ) : tab === "matches" ? (
         <div className="match-history">
-          {teamMatches.map((match) => (
-            <article
-              key={match.key}
-              className={match.relationToTeam !== "none" ? "team-match" : ""}
-            >
-              <header>
-                <strong>{match.label}</strong>
-                {match.relationToTeam !== "none" && (
-                  <span>
-                    Played {match.relationToTeam} Team {pageTeamNumber}
-                  </span>
-                )}
-              </header>
-              <div className="match-score">
-                <span className={match.alliance === "red" ? "searched-alliance" : ""}>
-                  Red: {match.redTeams.join(", ")}
-                  <b>{match.played ? match.redScore : "—"}</b>
-                </span>
-                <span className={match.alliance === "blue" ? "searched-alliance" : ""}>
-                  Blue: {match.blueTeams.join(", ")}
-                  <b>{match.played ? match.blueScore : "—"}</b>
-                </span>
-              </div>
-              {match.scheduledAt && <time>{new Date(match.scheduledAt).toLocaleString()}</time>}
-            </article>
-          ))}
-          {searched && !teamMatches.length && (
-            <div className="forms-empty">No TBA matches found.</div>
+          {teamMatchesError && (
+            <p role="alert" className="text-sm text-red-700">
+              Could not load matches: {teamMatchesError}
+            </p>
           )}
-          {loaded && !searched && (
-            <div className="forms-empty">Enter a team number to load its TBA matches.</div>
+          {teamMatches.map((match) => (
+            <MatchAnalysis
+              key={match.key}
+              match={match}
+              eventLabel={eventLabel}
+              canManageReports={canManageReports}
+              onDelete={permanentlyDeleteReport}
+              onView={({ report, field, url }) =>
+                setSelectedPath({
+                  url: API_URL + url,
+                  teamName: report.teamName,
+                  label: field.label,
+                })
+              }
+            />
+          ))}
+          {loaded && !teamMatches.length && (
+            <div className="forms-empty">
+              No matches found for this event{searched ? " and team" : ""}.
+            </div>
           )}
         </div>
       ) : tab === "auto" ? (
-        <div className="analysis-results-stack">
-          <div className="auto-path-grid">
-            {visibleAutoFields.map(({ report, field, url }) => {
-              const pathId = `${report.id}-${field.id}`;
-              return (
-                <article key={pathId}>
-                  <button
-                    type="button"
-                    className="auto-path-image-link"
-                    aria-label={`Open full-size path for team ${report.teamName}`}
-                    title="Open full-size drawing"
-                    onClick={() =>
-                      setSelectedPath({
-                        url: `${API_URL}${url}`,
-                        teamName: report.teamName,
-                        label: field.label,
-                      })
-                    }
-                  >
-                    <img
-                      src={`${API_URL}${url}`}
-                      alt={`${report.teamName} ${field.label}`}
-                      crossOrigin="use-credentials"
-                      onLoad={(event) => {
-                        if (imageHasAutoPath(event.currentTarget)) return;
-                        setBlankPathIds((current) => new Set(current).add(pathId));
-                      }}
-                    />
-                  </button>
-                  <div>
-                    <MapIcon size={16} />
-                    <strong>
-                      Team {report.teamName} · {field.label}
-                    </strong>
-                    <span>
-                      {eventLabel(report.eventKey)} · {report.formName} ·{" "}
-                      {new Date(report.createdAt).toLocaleDateString()}
-                    </span>
-                  </div>
-                  {canManageReports && (
-                    <Button
-                      variant="danger"
-                      type="button"
-                      className="delete-report-button"
-                      onClick={() => permanentlyDeleteReport(report)}
-                      aria-label={`Permanently delete report for ${report.teamName}`}
-                      title="Remove bad data"
-                    >
-                      <Trash2 size={17} />
-                    </Button>
-                  )}
-                </article>
-              );
-            })}
-            {loaded && !visibleAutoFields.length && (
-              <div className="forms-empty">
-                No autonomous paths reported{searched ? ` for ${searched}` : ""}.
-              </div>
-            )}
-          </div>
-        </div>
+        <AnalysisAutoPaths
+          paths={visibleAutoFields}
+          loaded={loaded}
+          searched={searched}
+          eventLabel={eventLabel}
+          imageUrl={(url) => API_URL + url}
+          canManageReports={canManageReports}
+          onDelete={permanentlyDeleteReport}
+          onView={({ report, field, url }) =>
+            setSelectedPath({
+              url: API_URL + url,
+              teamName: report.teamName,
+              label: `${matchLabel(report)} - ${field.label}`,
+            })
+          }
+          onImageLoad={({ report, field }, image) => {
+            if (imageHasAutoPath(image)) return;
+            setBlankPathIds((current) => new Set(current).add(`${report.id}-${field.id}`));
+          }}
+        />
       ) : (
         <div className="team-comparison">
           {searched && searchedB && (
             <div className="comparison-scoreboard">
               <div>
-                <span>Team A</span>
-                <strong>{searched}</strong>
+                <strong>Team {searched}</strong>
                 <small>{activeReports.length} reports</small>
               </div>
               <Scale size={28} />
               <div>
-                <span>Team B</span>
-                <strong>{searchedB}</strong>
+                <strong>Team {searchedB}</strong>
                 <small>{activeReportsB.length} reports</small>
               </div>
             </div>
@@ -613,16 +546,21 @@ export function Analysis({
             return (
               <div className="comparison-row" key={label}>
                 <strong className={winner === "left" ? "winner" : ""}>
+                  <small className="comparison-team-name">Team {searched}</small>
                   {left?.toFixed(1) ?? "—"}
                 </strong>
                 <span>{label}</span>
                 <strong className={winner === "right" ? "winner" : ""}>
+                  <small className="comparison-team-name">Team {searchedB}</small>
                   {right?.toFixed(1) ?? "—"}
                 </strong>
               </div>
             );
           })}
-          {searched && !comparisonLabels.length && (
+          {(!searched || !searchedB) && (
+            <div className="forms-empty">Choose two teams and select Compare.</div>
+          )}
+          {searched && searchedB && !comparisonLabels.length && (
             <div className="forms-empty">No comparable slider or counter data was found.</div>
           )}
         </div>

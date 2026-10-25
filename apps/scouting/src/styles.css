@@ -2165,9 +2165,18 @@
     text-align: center;
   }
   .comparison-row > strong {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
     padding: 9px;
     border-radius: 8px;
     font-size: 20px;
+  }
+  .comparison-row .comparison-team-name {
+    color: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    overflow-wrap: anywhere;
   }
   .comparison-row > strong.winner {
     color: var(--g3-on-brand);
