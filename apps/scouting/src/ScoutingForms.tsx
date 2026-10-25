@@ -54,12 +54,15 @@ import {
   emptyIssueChoice,
   issueTypesToSend,
 } from "./IssueTypePicker";
+import { MatchCoverage } from "./MatchCoverage";
 import { Operations } from "./Operations";
 import { PitCoverage } from "./PitCoverage";
 import { TeamLookupInput } from "./TeamLookupInput";
 import { api } from "./api";
+import { draftStatusText } from "./draft-status";
 import { clearInputError, showTeamNumberError } from "./input-validation";
 import {
+  type DraftSaveResult,
   type MatchDraft,
   dataUrlToBlob,
   deleteDraft,
@@ -712,11 +715,16 @@ function EntryDraft({
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState<"success" | "error">("success");
   const [saving, setSaving] = useState(false);
+  const [localSave, setLocalSave] = useState<DraftSaveResult | "saving">(
+    restored?.missingDrawingFields?.length ? "partial" : restored ? "saved" : "empty",
+  );
+  const [submissionState, setSubmissionState] = useState<"idle" | "failed" | "submitted">("idle");
   const [canvasKey, setCanvasKey] = useState(0);
   const canvases = useRef<Record<string, HTMLCanvasElement | null>>({});
   const canvasAdapters = useRef<Record<string, RefObject<HTMLCanvasElement | null>>>({});
   const drawnFields = useRef(new Set<string>());
   const drawings = useRef<Record<string, string>>({ ...(restored?.drawings ?? {}) });
+  const missingDrawingFields = useRef(new Set(restored?.missingDrawingFields ?? []));
   // Field maps with a saved drawing on its way back: their first "no drawing" is the blank field
   // loading, not the scout clearing it.
   const restoring = useRef(new Set(Object.keys(restored?.drawings ?? {})));
@@ -729,15 +737,17 @@ function EntryDraft({
   const persist = useCallback(() => {
     pendingSave.current = false;
     if (isMatch && !target) return;
-    saveDraft(userId, {
+    const result = saveDraft(userId, {
       formId: form.id,
       matchKey: target?.match.key ?? `__pit__:${teamName}`,
       matchLabel: target?.match.label ?? "Pit scouting",
       teamName: target?.team ?? teamName,
       answers: answersRef.current,
       drawings: { ...drawings.current },
+      missingDrawingFields: [...missingDrawingFields.current],
       savedAt: Date.now(),
     });
+    if (mounted.current) setLocalSave(result);
   }, [isMatch, target, userId, form.id, teamName]);
   const persistRef = useRef(persist);
   useEffect(() => {
@@ -773,6 +783,7 @@ function EntryDraft({
 
   function drawingChanged(fieldId: string, hasDrawing: boolean) {
     if (hasDrawing) {
+      setSubmissionState("idle");
       restoring.current.delete(fieldId);
       drawnFields.current.add(fieldId);
       return;
@@ -780,6 +791,7 @@ function EntryDraft({
     if (restoring.current.has(fieldId)) return;
     drawnFields.current.delete(fieldId);
     if (!(fieldId in drawings.current)) return;
+    setSubmissionState("idle");
     delete drawings.current[fieldId];
     setHasDrawings(Object.keys(drawings.current).length > 0);
     persist();
@@ -789,8 +801,11 @@ function EntryDraft({
     try {
       drawings.current[fieldId] = canvas.toDataURL("image/jpeg", 0.85);
     } catch {
+      missingDrawingFields.current.add(fieldId);
+      setLocalSave("failed");
       return;
     }
+    missingDrawingFields.current.delete(fieldId);
     setHasDrawings(true);
     persist();
   }
@@ -798,6 +813,8 @@ function EntryDraft({
   async function submit(event: SyntheticEvent) {
     event.preventDefault();
     if (saving || blocked || (isMatch && scheduleUnavailable)) return;
+    persist();
+    setSubmissionState("idle");
     setSaving(true);
     setMessage("");
     try {
@@ -819,9 +836,11 @@ function EntryDraft({
         method: "POST",
         body: payload,
       });
-      if (!mounted.current) return;
       deleteDraft(userId, form.id, target?.match.key ?? `__pit__:${teamName}`);
+      if (!mounted.current) return;
+      setSubmissionState("submitted");
       drawings.current = {};
+      missingDrawingFields.current.clear();
       answersRef.current = {};
       drawnFields.current.clear();
       setHasDrawings(false);
@@ -843,6 +862,7 @@ function EntryDraft({
       await refreshContext().catch(() => {});
     } catch (error) {
       if (!mounted.current) return;
+      setSubmissionState("failed");
       setMessageType("error");
       setMessage(error instanceof Error ? error.message : "Could not submit report.");
       if (isMatch) void refreshContext().catch(() => {});
@@ -887,6 +907,13 @@ function EntryDraft({
           )}
         </div>
       </div>
+      <p
+        role="status"
+        aria-live="polite"
+        className={`text-sm ${submissionState === "submitted" ? "text-green-700" : localSave === "failed" || localSave === "partial" || submissionState === "failed" ? "text-amber-700" : "text-secondary-500"}`}
+      >
+        {draftStatusText(localSave, submissionState, saving)}
+      </p>
       {isMatch && banner && (
         <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">
           {banner}
@@ -903,7 +930,11 @@ function EntryDraft({
           </span>
           <TeamLookupInput
             value={teamName}
-            onChange={setTeamName}
+            onChange={(value) => {
+              setSubmissionState("idle");
+              setLocalSave("saving");
+              setTeamName(value);
+            }}
             size="lg"
             inputMode="numeric"
             readOnly={isMatch}
@@ -936,7 +967,11 @@ function EntryDraft({
                       });
                       setHasDrawings(Object.keys(drawings.current).length > 0);
                     }
-                    setAnswers((current) => ({ ...current, [field.id]: value }));
+                    answersRef.current = { ...answersRef.current, [field.id]: value };
+                    pendingSave.current = true;
+                    setSubmissionState("idle");
+                    setLocalSave("saving");
+                    setAnswers(answersRef.current);
                   }}
                   canvasRef={mapRef}
                   canvasKey={canvasKey}
@@ -2214,6 +2249,7 @@ function EventStatus({
             <h2>Competition overview</h2>
           </header>
           <LiveUsers />
+          <MatchCoverage />
           <section className="match-submission-status">
             <h3>
               {context?.currentMatch

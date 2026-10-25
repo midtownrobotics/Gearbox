@@ -51,6 +51,7 @@ import {
 import { requireAuth } from "./middleware/auth";
 import { predictionsRoutes, settleConfiguredGame } from "./predictions";
 import { getG3IdUsers, isServiceHelper, isStrategyAdmin } from "./roles";
+import { assignmentCandidates } from "./scout-assignments";
 import {
   type ServiceIssueType,
   describeServiceIssue,
@@ -205,6 +206,27 @@ async function persistAutomaticMatch(
   return saved?.current_match_number ?? null;
 }
 
+/** Completed work still covers a robot; abandoned claims alone must not reserve it forever. */
+function activeAssignment(c: Context<AppEnv>) {
+  const recent = Date.now() - 75_000;
+  return sql`(
+    ${scoutingMatchAssignments.assigned_at} >= ${recent}
+    OR ${scoutingMatchAssignments.user_id} IN (
+      SELECT user_id FROM ${strategyPresence} WHERE ${inTeam(strategyPresence, c.get("teamId"))}
+      AND current_page = 'forms' AND last_seen_at >= ${recent}
+    )
+    OR EXISTS (
+      SELECT 1 FROM (SELECT * FROM ${scoutingFormSubmissions} WHERE ${inTeam(scoutingFormSubmissions, c.get("teamId"))}) s
+      JOIN (SELECT * FROM ${scoutingForms} WHERE ${inTeam(scoutingForms, c.get("teamId"))}) f ON f.id = s.form_id
+      WHERE f.form_kind = 'scouting' AND f.is_active = 1 AND s.archived_at IS NULL
+      AND s.submitted_by = ${scoutingMatchAssignments.user_id}
+      AND s.team_name = ${scoutingMatchAssignments.team_number}
+      AND s.event_key = ${scoutingMatchAssignments.event_key}
+      AND s.match_number = ${scoutingMatchAssignments.match_number}
+    )
+  )`;
+}
+
 async function getOrCreateScoutAssignment(
   c: Context<AppEnv>,
   eventKey: string,
@@ -231,15 +253,23 @@ async function getOrCreateScoutAssignment(
   if (!teams.length) return null;
   // Counting coverage and claiming a team happen in one SQLite statement, so
   // concurrent scouts see earlier claims. Only an invalid lineup assignment is replaced.
-  const candidates = JSON.stringify(teams);
+  const candidates = JSON.stringify(assignmentCandidates(teams, matchNumber));
   await dbOf(c).run(sql`
     INSERT INTO ${scoutingMatchAssignments} (team_id, event_key, match_number, user_id, team_number, assigned_at)
     SELECT ${c.get("teamId")}, ${eventKey}, ${matchNumber}, ${c.get("userId")}, candidate.value, ${Date.now()}
     FROM json_each(${candidates}) AS candidate WHERE 1 = 1
     ORDER BY (
-      SELECT COUNT(*) FROM ${scoutingMatchAssignments}
+      SELECT COUNT(*) FROM (
+      SELECT user_id FROM ${scoutingMatchAssignments}
       WHERE ${inTeam(scoutingMatchAssignments, c.get("teamId"))}
         AND event_key = ${eventKey} AND match_number = ${matchNumber} AND team_number = candidate.value
+        AND ${activeAssignment(c)}
+      UNION
+      SELECT s.submitted_by FROM (SELECT * FROM ${scoutingFormSubmissions} WHERE ${inTeam(scoutingFormSubmissions, c.get("teamId"))}) s
+      JOIN (SELECT * FROM ${scoutingForms} WHERE ${inTeam(scoutingForms, c.get("teamId"))}) f ON f.id = s.form_id
+      WHERE f.form_kind = 'scouting' AND f.is_active = 1 AND s.archived_at IS NULL
+        AND s.event_key = ${eventKey} AND s.match_number = ${matchNumber} AND s.team_name = candidate.value
+      )
     ), candidate.key LIMIT 1
     ON CONFLICT (team_id, event_key, match_number, user_id) DO UPDATE
       SET team_number = excluded.team_number, assigned_at = excluded.assigned_at
@@ -589,6 +619,103 @@ async function reportMatch(
     return { error: `It's too late to send a report for ${matchLabel(match)}.` };
   return { match, late: true };
 }
+
+app.get("/match-coverage", requireAuth, async (c) => {
+  if (!(await isStrategyAdmin(c))) return c.json({ error: "Strategy lead access required." }, 403);
+  const config = await first<{
+    event_key: string;
+    schedule_mode: string;
+    current_match_number: number | null;
+    submission_window_seconds: number | null;
+  }>(
+    dbOf(c),
+    sql`SELECT event_key, schedule_mode, current_match_number, submission_window_seconds FROM ${strategyEventConfig} WHERE ${inTeam(strategyEventConfig, c.get("teamId"))} AND id = 1`,
+  );
+  if (!config?.event_key)
+    return c.json({ error: "Choose an event before checking match coverage." }, 409);
+  let schedule: TbaMatch[];
+  try {
+    schedule = (await getEventMatches(c, config.event_key, config.schedule_mode)).sort(
+      (a, b) => matchOrder(a) - matchOrder(b),
+    );
+  } catch {
+    return c.json(
+      { error: "Could not load the event schedule. Retry to check missing reports." },
+      503,
+    );
+  }
+  const [formRows, reports, assignments] = await Promise.all([
+    all<{ id: string; name: string; fields_json: string }>(
+      dbOf(c),
+      sql`SELECT id, name, fields_json FROM ${scoutingForms} WHERE ${inTeam(scoutingForms, c.get("teamId"))} AND form_kind = 'scouting' AND is_active = 1 ORDER BY name, id`,
+    ),
+    all<{
+      team_name: string;
+      form_id: string;
+      match_key: string | null;
+      match_number: number | null;
+    }>(
+      dbOf(c),
+      sql`SELECT team_name, form_id, match_key, match_number FROM ${scoutingFormSubmissions} WHERE ${inTeam(scoutingFormSubmissions, c.get("teamId"))} AND event_key = ${config.event_key} AND archived_at IS NULL`,
+    ),
+    all<{ team_number: string; match_number: number; count: number }>(
+      dbOf(c),
+      sql`SELECT team_number, match_number, COUNT(*) AS count FROM ${scoutingMatchAssignments} WHERE ${inTeam(scoutingMatchAssignments, c.get("teamId"))} AND event_key = ${config.event_key} AND ${activeAssignment(c)} GROUP BY match_number, team_number`,
+    ),
+  ]);
+  const forms = formRows.results
+    .filter((row) => parseJson<unknown[]>(row.fields_json, []).length > 0)
+    .map(({ id, name }) => ({ id, name }));
+  const counts = new Map<string, number>();
+  for (const report of reports.results) {
+    const key = JSON.stringify([
+      report.match_key || `${config.event_key}_qm${report.match_number}`,
+      report.team_name,
+      report.form_id,
+    ]);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  const assigned = new Map(
+    assignments.results.map((row) => [`${row.match_number}:${row.team_number}`, Number(row.count)]),
+  );
+  const current =
+    config.schedule_mode === "manual"
+      ? (schedule.find(
+          (match) =>
+            match.match_number === config.current_match_number && match.comp_level === "qm",
+        ) ?? (config.current_match_number ? undefined : schedule[0]))
+      : automaticTbaMatch(
+          schedule,
+          config.submission_window_seconds ?? DEFAULT_SUBMISSION_WINDOW,
+          undefined,
+          config.current_match_number,
+        );
+  return c.json({
+    eventKey: config.event_key,
+    currentMatchKey: current?.key ?? null,
+    forms,
+    matches: schedule.map((match) => ({
+      key: match.key,
+      label: matchLabel(match),
+      played: match.alliances.red.score >= 0 && match.alliances.blue.score >= 0,
+      teams: (["red", "blue"] as const).flatMap((alliance) =>
+        match.alliances[alliance].team_keys.map((key) => {
+          const team = key.replace(/^frc/, "");
+          return {
+            team,
+            alliance,
+            assignedScouts:
+              match.comp_level === "qm" ? (assigned.get(`${match.match_number}:${team}`) ?? 0) : 0,
+            forms: forms.map((form) => ({
+              ...form,
+              reports: counts.get(JSON.stringify([match.key, team, form.id])) ?? 0,
+            })),
+          };
+        }),
+      ),
+    })),
+  });
+});
 
 app.get("/event-context", requireAuth, async (c) => {
   const admin = await isStrategyAdmin(c);
