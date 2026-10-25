@@ -2,7 +2,7 @@
 
 Goal: anyone using Gearbox can report a problem or ask for something, without a GitHub account or knowing how GitHub works, and hear back when it's dealt with.
 
-Status: **steps 1 to 3 built** (branch `issue-reports`): every app's menu has "Report a problem", each report becomes a public issue on midtownrobotics/Gearbox (decided 23 October 2026: public, like any GitHub issue), and the reporter gets a DM on the team's chat when it's closed. The daily Claude task's instructions are in [ai-task-prompt.md](ai-task-prompt.md), with the issue template `.github/ISSUE_TEMPLATE/ai-ready.yml`; the routine itself and the labels are set up by hand (`docs/deploy.md`, "Problem reports on GitHub"). Step 4 (votes) waits for demand.
+Status: **steps 1 to 3 built** (branch `issue-reports`): every app's menu has "Report a problem", each report becomes a public issue on midtownrobotics/Gearbox (decided 23 October 2026: public, like any GitHub issue), and the reporter gets a DM on the team's chat when it's closed. The daily Claude task's instructions are in [ai-task-prompt.md](ai-task-prompt.md), with the issue template `.github/ISSUE_TEMPLATE/ai-ready.yml`. Issues made on GitHub use `problem.yml` and `idea.yml`, which ask for the details a report adds (app, page, version, browser, team) and carry its labels; the routine itself and the labels are set up by hand (`docs/deploy.md`, "Problem reports on GitHub"). Step 4 (votes) waits for demand.
 
 ## What was built
 

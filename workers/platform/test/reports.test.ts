@@ -50,7 +50,7 @@ const moveTeamReports = (teamId: string, seconds: number) =>
 
 /** The reporter ID on a report's issue. */
 const reporterOf = async (report: Shown) =>
-  (await github(`/test/issues/${issueOf(report)}`)).body.match(/\| Reporter \| (\w+) \|/)?.[1];
+  (await github(`/test/issues/${issueOf(report)}`)).body.match(/### Reporter\n\n(\w+)\n/)?.[1];
 
 /** `admin` is an operator; the console's changes come from its own address. */
 const operator = admin;
@@ -93,14 +93,17 @@ describe("reporting a problem", () => {
     const issue = await github(`/test/issues/${issueOf(report)}`);
     expect(issue.title).toBe("Orders: Ping @​someone: the Approve button is broken");
     expect(issue.labels).toEqual(["from-gearbox", "bug", "orders"]);
-    expect(issue.body).toMatch(/^Ping @​someone: the Approve button is broken\n/);
+    expect(issue.body).toMatch(
+      /^### What happened\n\nPing @​someone: the Approve button is broken\n/,
+    );
     expect(issue.body).not.toContain("> Ping");
-    // A real header, not an empty row.
-    expect(issue.body).toContain("| Detail | Value |\n| --- | --- |\n| Kind | Problem |");
-    expect(issue.body).toContain("`https://1648-orders.frcgearbox.com/approvals`");
+    // Laid out like an issue made with the repository's Problem form.
+    expect(issue.body).toContain(
+      "### App\n\nOrders\n\n### Page\n\nhttps://1648-orders.frcgearbox.com/approvals\n",
+    );
     expect(issue.body).not.toContain("Jordan");
     expect(issue.body).toContain("Orders 1.4.0");
-    expect(issue.body).toContain(`| Team | ${team.student.teamId.replace("frc", "")} |`);
+    expect(issue.body).toContain(`### Team\n\n${team.student.teamId.replace("frc", "")}\n`);
     expect(issue.body).not.toContain(team.student.id);
   });
 
@@ -111,14 +114,14 @@ describe("reporting a problem", () => {
     };
     expect(named.withName).toBe(true);
     expect((await github(`/test/issues/${issueOf(named)}`)).body).toContain(
-      `| Name | ${team.student.displayName} |`,
+      `### Name\n\n${team.student.displayName}\n`,
     );
     const unnamed = (await (await send(team.student, { withName: "yes" })).json()) as Shown & {
       withName: boolean;
     };
     expect(unnamed.withName).toBe(false);
     const body = (await github(`/test/issues/${issueOf(unnamed)}`)).body;
-    expect(body).not.toContain("| Name |");
+    expect(body).not.toContain("### Name");
     expect(body).not.toContain(team.student.displayName);
   });
 
