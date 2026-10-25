@@ -9,7 +9,7 @@ import {
 } from "@g3/site-config";
 import { type ComponentType, type ReactNode, useEffect, useState } from "react";
 import { useSignedInUser, useTeamApps } from "../session";
-import { useTeamIcon, useTeamUiSettings } from "../team-ui";
+import { usePageTeamAvatar, useTeamIcon, useTeamUiSettings } from "../team-ui";
 import { useTheme } from "../theme";
 
 // The top bar every G3 app shares (from Scouting's): the menu button, the app's wordmark, its
@@ -128,8 +128,10 @@ export function AppNavBar({
   const enabled = useTeamApps(allApps && !!user);
   // The app's icon, with its accent in the team's color.
   const teamIcon = useTeamIcon(team ? icon : undefined);
-  const shownIcon = team ? teamUi.logoUrl || teamIcon : icon;
-  const shownLogo = team ? !!teamUi.logoUrl : iconIsLogo;
+  // The team's avatar in its place, when the team shows it (Team Appearance) and has one.
+  const avatar = usePageTeamAvatar(team);
+  const shownIcon = team ? avatar || teamIcon : icon;
+  const shownLogo = team ? !!avatar : iconIsLogo;
   // Which logo has loaded wider than it is tall: only a wide one narrows when the bar is short of
   // room (a square or tall one is no wider than the icon already).
   const [wideLogo, setWideLogo] = useState<string | null>(null);

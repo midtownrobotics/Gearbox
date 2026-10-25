@@ -9,6 +9,7 @@ import {
   fillColor,
   hexToHsv,
   hsvToHex,
+  teamAvatarUrl,
   teamKey,
   teamLinks,
   teamUiDefaults,
@@ -269,6 +270,23 @@ describe("team UI settings", () => {
     expect(older.appOrder.slice(0, 2)).toEqual(["edge", "shop"]);
     expect(older.appOrder).toHaveLength(defaultAppOrder.length);
     expect((await put(defaultAppOrder)).status).toBe(200);
+  });
+
+  it("reads a logo address saved before avatars as showing the team's avatar", () => {
+    const { useAvatar: _avatar, ...appearance } = defaultTeamUiSettings;
+    const read = (legacy: object) => readTeamUiSettings(JSON.stringify(legacy));
+    expect(read({ ...appearance, logoUrl: "https://example.com/logo.png" })).toEqual({
+      ...defaultTeamUiSettings,
+      useAvatar: true,
+    });
+    expect(read({ ...appearance, logoUrl: "" })).toEqual(defaultTeamUiSettings);
+  });
+
+  it("builds the avatar's address for the current year", () => {
+    expect(teamAvatarUrl(1648, 2026)).toBe(
+      "https://www.thebluealliance.com/avatar/2026/frc1648.png",
+    );
+    expect(teamAvatarUrl(254)).toContain(`/avatar/${new Date().getFullYear()}/frc254.png`);
   });
 
   describe("settings saved when the brand color was its own setting", () => {
