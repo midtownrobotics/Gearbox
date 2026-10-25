@@ -1,4 +1,4 @@
-import { Button, Card, ErrorBanner, Field, Loading, TextField, appOn, inputClass } from "@g3/ui";
+import { Button, Card, ErrorBanner, Field, Loading, TextField, inputClass } from "@g3/ui";
 import { applyTemplate } from "@g3/worker-orders/naming";
 import type { InferResponseType } from "hono/client";
 import { useState } from "react";
@@ -29,6 +29,8 @@ export type Draft = {
   state: "loading" | "ready";
   /** Why the lookup failed, if it did (the row can still be filled in by hand). */
   lookupError: string | null;
+  /** The lookup needs an Edge box the team doesn't have: a note, not an error. */
+  lookupNeedsEdge: boolean;
   submitError: string | null;
   url: string;
   vendor: string;
@@ -74,6 +76,7 @@ export const blank = (url = ""): Draft => ({
   key: nextKey++,
   state: "ready",
   lookupError: null,
+  lookupNeedsEdge: false,
   submitError: null,
   url,
   vendor: "",
@@ -115,19 +118,24 @@ const HINTS = {
 /**
  * Looks up a product link and fills a draft from it: the lookup's details, the name from the team
  * template, a budget category guess and the product's purchase history. A failed lookup comes
- * back as `lookupError` with everything else blank, to fill in by hand. Lookups go through the
- * team's edge box, so a team with Edge off gets the blank row (and the guesses) without one.
+ * back as `lookupError` with everything else blank, to fill in by hand. Shopify stores and REV
+ * are read from the vendor; other sites need the team's edge box.
  */
 export async function lookUpDraft(url: string): Promise<Partial<Draft>> {
   let lookup: Lookup | null = null;
   let lookupError: string | null = null;
-  const canLookUp = await appOn("edge");
+  let lookupNeedsEdge = false;
   try {
-    if (canLookUp) {
-      const res = await api.lookup.$get({ query: { url } });
-      if (!res.ok) throw new Error(await getErrorMessage(res));
-      lookup = await res.json();
+    const res = await api.lookup.$get({ query: { url } });
+    if (!res.ok) {
+      const body = (await res
+        .clone()
+        .json()
+        .catch(() => null)) as { code?: string } | null;
+      lookupNeedsEdge = body?.code === "no_edge";
+      throw new Error(await getErrorMessage(res));
     }
+    lookup = await res.json();
   } catch (err) {
     lookupError = err instanceof Error ? err.message : String(err);
   }
@@ -146,6 +154,7 @@ export async function lookUpDraft(url: string): Promise<Partial<Draft>> {
   return {
     state: "ready",
     lookupError,
+    lookupNeedsEdge,
     url: base.url,
     vendor: suggestion?.vendor ?? base.vendor,
     name: lookup ? (suggestion?.name ?? lookup.title) : "",
@@ -160,7 +169,6 @@ export async function lookUpDraft(url: string): Promise<Partial<Draft>> {
     ...suggestionFields(suggestion),
     storePlatform: lookup?.source ?? null,
     storeVariantId: variantId,
-    ...(canLookUp ? {} : { linkNote: "Fill in the part's details from its page." }),
   };
 }
 
@@ -227,11 +235,13 @@ export async function catalogDraft(item: CatalogItem): Promise<Partial<Draft>> {
           ? "This link is only the vendor's homepage. Paste the product page if you find it."
           : null,
   };
-  if (item.linkKind === "product" && !priceIsFresh(item) && (await appOn("edge"))) {
+  if (item.linkKind === "product" && !priceIsFresh(item)) {
     const found = await lookUpDraft(item.url);
     // The catalog's store option (REV links can't carry it the way Shopify's ?variant= does).
     const option = !found.variant
-      ? found.variants?.find((v) => v.id === item.storeVariantId)
+      ? found.variants?.find(
+          (v) => v.id === item.storeVariantId || (!!item.sku && v.sku === item.sku),
+        )
       : undefined;
     return {
       ...found,
@@ -305,14 +315,15 @@ export function variantPatch(
   };
 }
 
-/** A draft's quantity or pack isn't a whole number it can be sent with. */
-export const badQuantities = (d: Draft) =>
-  parseQuantity(d.quantity) === null || parseQuantity(d.packQuantity) === null;
+/** The product has options and none is picked yet. */
+export const needsOption = (d: Draft) =>
+  d.variants.length > 1 && !d.variants.some((v) => v.title === d.variant);
 
 /** What's missing before a draft can be sent, or null when it's complete. */
 export function draftProblem(d: Draft): string | null {
   return (
     (!d.url && "Add the product link.") ||
+    (needsOption(d) && "Pick an option.") ||
     (!d.name.trim() && "Give it a name.") ||
     (Number.isNaN(parseDollars(d.price)) && "Price must be a dollar amount like 12.50.") ||
     (parseQuantity(d.quantity) === null && "Quantity must be a whole number from 1 to 10000.") ||
@@ -425,7 +436,9 @@ export function DraftCard({
             </button>
           </div>
           {d.lookupError && (
-            <p className="text-xs text-red-700">{d.lookupError} Fill in the details by hand.</p>
+            <p className={`text-xs ${d.lookupNeedsEdge ? "text-blue-700" : "text-red-700"}`}>
+              {d.lookupError} Fill in the details by hand.
+            </p>
           )}
           {d.linkNote && <p className="text-xs text-secondary-600">{d.linkNote}</p>}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -457,7 +470,10 @@ export function DraftCard({
             </Field>
             {d.variants.length > 1 && (
               <div className="col-span-2">
-                <Field label="Option">
+                <Field
+                  label="Option"
+                  hint={needsOption(d) ? "Pick one to send the request" : undefined}
+                >
                   <select
                     className={inputClass}
                     value={d.variants.find((v) => v.title === d.variant)?.id ?? ""}

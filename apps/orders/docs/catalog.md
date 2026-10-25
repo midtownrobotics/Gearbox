@@ -11,6 +11,8 @@ The catalog is the **New Request** page: [open it](team:orders/catalog). It star
 
 Type in the search box: sizes, fractions and part numbers all work, and small typos are fine. Parts are grouped by category.
 
+Paste a product link into the same box to request that part straight away (see the next page, New Request).
+
 ## A part's page
 
 Open a part to see its vendor, part number, sizes or types, pack size, link, and what the team last paid. From there:
@@ -18,6 +20,8 @@ Open a part to see its vendor, part number, sizes or types, pack size, link, and
 - **Request** starts a request for it.
 - **Add to wishlist** saves it for one day.
 - **Edit** changes it, if you can edit the catalog.
+
+A part from a vendor that [VendorDiff](https://public-vendordiff.vercel.app) follows (REV, WCP, AndyMark, CTRE, The Thrifty Bot, Swerve Drive Specialties and others) also has a **VendorDiff** link, on its page and in its row, to see how its price and stock have changed.
 
 ## Prices
 

@@ -42,4 +42,4 @@ With Inventory on, people marking parts received can say where they're going. Tu
 
 ## Part lookup
 
-When someone pastes a link, Orders can fill in the part's name, price and number from the vendor's page. That runs on your team's Edge box (Edge, the last app in these docs), so it only works if your team has one connected. Without it, requesters type the details in.
+When someone pastes a link, Orders fills in the part's name, price and number from the vendor. It does this on its own for REV and for stores on Shopify: WCP, AndyMark, The Thrifty Bot, CTRE, Swerve Drive Specialties, Swyft, Last Anvil, Limelight, Armabot and most other robot part stores. Other sites, such as Amazon, McMaster-Carr and DigiKey, need your team's Edge box (Edge, the last app in these docs). Without one, requesters type those parts' details in.
