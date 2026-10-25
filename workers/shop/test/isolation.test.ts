@@ -85,14 +85,14 @@ async function seed(team: TeamUsers): Promise<Seeded> {
   );
 
   const subsystem = await jsonAs<Id>(
-    student,
+    admin,
     "/subsystems",
     { method: "POST", body: { name: `Sub ${tag}` } },
     201,
   );
   const makeProcess = (name: string, type: string) =>
     jsonAs<Id>(
-      student,
+      admin,
       "/processes",
       { method: "POST", body: { name: `${name} ${tag}`, type } },
       201,
@@ -240,6 +240,7 @@ async function seed(team: TeamUsers): Promise<Seeded> {
     "part-instances": instances[2].id,
     "part-files": file.id,
     "staging-batches": batch.id,
+    subsystems: subsystem.id,
     processes: process.id,
     "quality-reports": report.id,
   };

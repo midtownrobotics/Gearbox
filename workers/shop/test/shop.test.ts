@@ -3,8 +3,8 @@ import { call, callAs, jsonAs } from "@g3/testing/worker";
 import { describe, expect, it } from "vitest";
 import { STARTER_CHECKLIST } from "../src/lib/quality-checklist";
 
-// G3 Shop: parts and processes for anyone signed in, kiosk presence for kiosk PIN sessions, and
-// settings for admins (never from a kiosk).
+// G3 Shop: parts for anyone signed in, kiosk presence for kiosk PIN sessions, and settings,
+// subsystems and processes for admins (never from a kiosk).
 
 describe("sign-in and roles", () => {
   it("needs a G3ID session", async () => {
@@ -45,16 +45,16 @@ describe("sign-in and roles", () => {
 describe("subsystems and processes", () => {
   it("creates and lists them", async () => {
     const subsystem = await jsonAs<{ id: number; name: string }>(
-      student,
+      admin,
       "/subsystems",
       { method: "POST", body: { name: "Intake" } },
       201,
     );
-    expect((await jsonAs<{ name: string }[]>(student, "/subsystems")).map((s) => s.name)).toContain(
+    expect((await jsonAs<{ name: string }[]>(admin, "/subsystems")).map((s) => s.name)).toContain(
       subsystem.name,
     );
     const process = await jsonAs<{ name: string; type: string }>(
-      student,
+      admin,
       "/processes",
       { method: "POST", body: { name: "Laser cut" } },
       201,
@@ -63,12 +63,12 @@ describe("subsystems and processes", () => {
   });
 
   it("validates them", async () => {
-    expect(
-      (await callAs(student, "/processes", { method: "POST", body: { name: "" } })).status,
-    ).toBe(400);
+    expect((await callAs(admin, "/processes", { method: "POST", body: { name: "" } })).status).toBe(
+      400,
+    );
     expect(
       (
-        await callAs(student, "/processes", {
+        await callAs(admin, "/processes", {
           method: "POST",
           body: { name: "X", type: "teleport" },
         })
@@ -128,8 +128,8 @@ describe("obsolete parts", () => {
   /** A part of its own with `quantity` instances. */
   async function seed(quantity: number) {
     const tag = crypto.randomUUID().slice(0, 8);
-    const subsystem = await jsonAs<Id>(student, "/subsystems", post({ name: `Arm ${tag}` }), 201);
-    const process = await jsonAs<Id>(student, "/processes", post({ name: `Mill ${tag}` }), 201);
+    const subsystem = await jsonAs<Id>(admin, "/subsystems", post({ name: `Arm ${tag}` }), 201);
+    const process = await jsonAs<Id>(admin, "/processes", post({ name: `Mill ${tag}` }), 201);
     const part = await jsonAs<Id>(
       student,
       "/part-definitions",
@@ -190,8 +190,8 @@ describe("quality control", () => {
   /** A Quality Control step, a plain step, and a part with both (the check last). */
   async function seed({ required = false }: { required?: boolean } = {}) {
     const tag = crypto.randomUUID().slice(0, 8);
-    const subsystem = await jsonAs<Id>(student, "/subsystems", post({ name: `Drive ${tag}` }), 201);
-    const mill = await jsonAs<Id>(student, "/processes", post({ name: `Mill ${tag}` }), 201);
+    const subsystem = await jsonAs<Id>(admin, "/subsystems", post({ name: `Drive ${tag}` }), 201);
+    const mill = await jsonAs<Id>(admin, "/processes", post({ name: `Mill ${tag}` }), 201);
     const check = await jsonAs<Id>(
       admin,
       "/processes",
@@ -444,9 +444,9 @@ describe("quality reports", () => {
   async function seed() {
     const team = teamUsers(newTeamId());
     const { admin, student } = team;
-    const subsystem = await jsonAs<Id>(student, "/subsystems", post({ name: "Arm" }), 201);
-    const mill = await jsonAs<Id>(student, "/processes", post({ name: "Mill" }), 201);
-    const deburr = await jsonAs<Id>(student, "/processes", post({ name: "Deburr" }), 201);
+    const subsystem = await jsonAs<Id>(admin, "/subsystems", post({ name: "Arm" }), 201);
+    const mill = await jsonAs<Id>(admin, "/processes", post({ name: "Mill" }), 201);
+    const deburr = await jsonAs<Id>(admin, "/processes", post({ name: "Deburr" }), 201);
     const check = await jsonAs<Id>(
       admin,
       "/processes",
@@ -557,7 +557,7 @@ describe("quality reports", () => {
       ).status,
     ).toBe(403);
     // Only a step this part actually has.
-    const spare = await jsonAs<Id>(team.student, "/processes", post({ name: "Lathe" }), 201);
+    const spare = await jsonAs<Id>(team.admin, "/processes", post({ name: "Lathe" }), 201);
     expect(
       (
         await callAs(
@@ -660,7 +660,7 @@ describe("quality reports", () => {
 
   it("adds a step this part never had when a fix sends it there", async () => {
     const { team, check, instance, steps } = await seed();
-    const sanding = await jsonAs<Id>(team.student, "/processes", post({ name: "Sanding" }), 201);
+    const sanding = await jsonAs<Id>(team.admin, "/processes", post({ name: "Sanding" }), 201);
     const { report } = await jsonAs<{ report: Report }>(
       team.admin,
       "/quality-reports",
@@ -680,7 +680,7 @@ describe("quality reports", () => {
     ).toBe(400);
     // Nor can a file step join one part: those have to be paired across the whole list.
     const nest = await jsonAs<Id>(
-      team.student,
+      team.admin,
       "/processes",
       post({ name: "Nest", type: "file_producer" }),
       201,

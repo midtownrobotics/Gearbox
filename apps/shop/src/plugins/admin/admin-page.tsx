@@ -1,12 +1,15 @@
 import {
+  Badge,
   Button,
   ChannelPicker,
   ConfirmButton,
+  ConfirmQuestion,
   ErrorBanner,
   Field,
   Loading,
   Page,
   SuccessBanner,
+  Switch,
   TextField,
   chatName,
   focusRing,
@@ -18,7 +21,13 @@ import { api } from "../../shared/api";
 import { getErrorMessage } from "../../shared/api-error";
 import { InfoTip } from "../../shared/info-tip";
 import { enableKioskMode } from "../../shared/kiosk";
-import { PROCESS_TYPE_LABELS, type Process, type ProcessType } from "../../shared/types";
+import {
+  PROCESS_TYPE_LABELS,
+  type Process,
+  type ProcessType,
+  type Removal,
+  type Usage,
+} from "../../shared/types";
 import { useAuthUser, useRefreshAuthUser } from "../../shared/use-auth";
 import { useShopData } from "../../shared/use-shop-data";
 import { ActionsLog } from "./actions-log";
@@ -28,8 +37,12 @@ import { StatusLevelsSettings } from "./status-levels";
 
 export function AdminPage() {
   const { data, loading, error, refresh } = useShopData();
-  // The Onshape, chat and data sections and the summary buttons only work for an admin.
-  const isAdmin = useAuthUser()?.isAdmin ?? false;
+  const user = useAuthUser();
+  // The Onshape, chat and data sections, the summary buttons, and adding and removing subsystems
+  // and processes only work for an admin.
+  const isAdmin = user?.isAdmin ?? false;
+  // A required quality check is at the end of every part, so it can't be removed while it is.
+  const requiredCheck = user?.qualityCheck.required ? user.qualityCheck.processId : null;
   const chat = chatName(useTeamChat());
   const [banner, setBanner] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
@@ -39,6 +52,65 @@ export function AdminPage() {
   const [newProcess, setNewProcess] = useState("");
   const [newProcessType, setNewProcessType] = useState<ProcessType>("regular");
   const [newProcessNeedsInfo, setNewProcessNeedsInfo] = useState(false);
+
+  // How many parts use each subsystem and process, so Remove can say what it will do.
+  const [usage, setUsage] = useState<{
+    subsystems: Record<string, Usage>;
+    processes: Record<string, Usage>;
+  } | null>(null);
+  const loadUsage = useCallback(async () => {
+    if (!isAdmin) return;
+    const [subsystems, processes] = await Promise.all([
+      api.subsystems.usage.$get(),
+      api.processes.usage.$get(),
+    ]);
+    if (!subsystems.ok || !processes.ok) return;
+    setUsage({
+      subsystems: (await subsystems.json()) as Record<string, Usage>,
+      processes: (await processes.json()) as Record<string, Usage>,
+    });
+  }, [isAdmin]);
+  useEffect(() => {
+    void loadUsage();
+  }, [loadUsage]);
+
+  async function removeItem(kind: "subsystem" | "process", id: number) {
+    const param = { id: String(id) };
+    const res =
+      kind === "subsystem"
+        ? await api.subsystems[":id"].$delete({ param })
+        : await api.processes[":id"].$delete({ param });
+    if (!res.ok) {
+      setDone(null);
+      setBanner(await getErrorMessage(res as unknown as Response));
+      return;
+    }
+    const removed = (await res.json()) as Removal;
+    setBanner(null);
+    setDone(
+      removed.outcome === "deleted"
+        ? `Deleted ${removed.name}.`
+        : `Removed ${removed.name}: it's hidden from new parts.`,
+    );
+    await Promise.all([refresh(), loadUsage()]);
+  }
+
+  async function restoreItem(kind: "subsystem" | "process", id: number) {
+    const param = { id: String(id) };
+    const res =
+      kind === "subsystem"
+        ? await api.subsystems[":id"].restore.$post({ param })
+        : await api.processes[":id"].restore.$post({ param });
+    if (!res.ok) {
+      setDone(null);
+      setBanner(await getErrorMessage(res as unknown as Response));
+      return;
+    }
+    const restored = (await res.json()) as { name: string };
+    setBanner(null);
+    setDone(`Restored ${restored.name}.`);
+    await refresh();
+  }
 
   async function addSubsystem() {
     if (!newSubsystem.trim()) return;
@@ -140,11 +212,15 @@ export function AdminPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <NameList
               title="Subsystems"
-              items={(data?.subsystems ?? []).map((s) => ({ id: s.id, name: s.name }))}
+              items={data?.subsystems ?? []}
               draft={newSubsystem}
               setDraft={setNewSubsystem}
               onAdd={addSubsystem}
               placeholder="New subsystem"
+              isAdmin={isAdmin}
+              usage={usage?.subsystems}
+              onRemove={(id) => removeItem("subsystem", id)}
+              onRestore={(id) => restoreItem("subsystem", id)}
             />
             <ProcessList
               processes={(data?.processes ?? []).map((p) => {
@@ -166,6 +242,11 @@ export function AdminPage() {
               setDraftNeedsInfo={setNewProcessNeedsInfo}
               onAdd={addProcess}
               onUpdate={updateProcess}
+              isAdmin={isAdmin}
+              usage={usage?.processes}
+              requiredCheck={requiredCheck}
+              onRemove={(id) => removeItem("process", id)}
+              onRestore={(id) => restoreItem("process", id)}
             />
           </div>
         </Section>
@@ -584,6 +665,122 @@ function Section({
   );
 }
 
+/** What removing one will do, from how many parts use it (unknown until the counts load). */
+function removeQuestion(name: string, use: Usage | undefined, loaded: boolean) {
+  if (!loaded) {
+    return `Remove ${name}? If parts use it, it will be hidden from new parts and existing parts keep it; if not, it will be deleted.`;
+  }
+  if (!use?.inUse) return `Nothing uses ${name}, so it will be deleted.`;
+  if (use.parts === 0) {
+    return `${name} is in the shop's records: it will be hidden from new parts, and what already uses it keeps it.`;
+  }
+  return `Used by ${use.parts} ${use.parts === 1 ? "part" : "parts"}: it will be hidden from new parts, and existing parts keep it.`;
+}
+
+/** A list's heading, its count, and the admins' switch for the removed ones. */
+function ListHeading({
+  title,
+  count,
+  removed,
+  showRemoved,
+  setShowRemoved,
+}: {
+  title: string;
+  count: number;
+  /** How many were removed; the switch shows only when there are some. */
+  removed: number;
+  showRemoved: boolean;
+  setShowRemoved: (show: boolean) => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+      <h3 className="font-sans text-sm font-bold uppercase tracking-wider text-secondary-500">
+        {title} <span className="text-secondary-400 font-normal">({count})</span>
+      </h3>
+      {removed > 0 && (
+        <span className="flex items-center gap-2 text-xs text-secondary-500">
+          <Switch
+            checked={showRemoved}
+            onChange={setShowRemoved}
+            label={`Show removed ${title.toLowerCase()}`}
+          />
+          Show removed ({removed})
+        </span>
+      )}
+    </div>
+  );
+}
+
+/**
+ * One subsystem or process. Admins remove it, after a question in the row saying what will
+ * happen, or restore it once removed. `blocked` says why it can't be removed now.
+ */
+function ItemRow({
+  name,
+  archived,
+  isAdmin,
+  question,
+  blocked,
+  onRemove,
+  onRestore,
+  children,
+}: {
+  name: string;
+  archived: boolean;
+  isAdmin: boolean;
+  question: string;
+  blocked?: string | null;
+  onRemove: () => void;
+  onRestore: () => void;
+  /** Its own controls, shown while it isn't removed. */
+  children?: React.ReactNode;
+}) {
+  const [asking, setAsking] = useState(false);
+  return (
+    <div className="flex flex-wrap items-center gap-2 bg-page border border-secondary-200 rounded-lg px-3.5 py-2 text-sm text-secondary-900">
+      <span
+        className={`flex-1 min-w-0 truncate ${archived ? "text-secondary-500" : ""}`}
+        title={name}
+      >
+        {name}
+      </span>
+      {archived ? <Badge>Removed</Badge> : children}
+      {isAdmin &&
+        (archived ? (
+          <Button variant="secondary" size="sm" onClick={onRestore}>
+            Restore
+          </Button>
+        ) : (
+          !asking && (
+            <Button variant="secondary" size="sm" onClick={() => setAsking(true)}>
+              Remove
+            </Button>
+          )
+        ))}
+      {asking &&
+        (blocked ? (
+          <div className="basis-full space-y-2 rounded-lg border border-secondary-200 bg-inset p-3">
+            <p className="text-sm text-secondary-700">{blocked}</p>
+            <Button variant="secondary" size="sm" onClick={() => setAsking(false)}>
+              OK
+            </Button>
+          </div>
+        ) : (
+          <ConfirmQuestion
+            question={question}
+            confirmLabel="Remove"
+            size="sm"
+            onConfirm={() => {
+              setAsking(false);
+              onRemove();
+            }}
+            onKeep={() => setAsking(false)}
+          />
+        ))}
+    </div>
+  );
+}
+
 function NameList({
   title,
   items,
@@ -591,50 +788,62 @@ function NameList({
   setDraft,
   onAdd,
   placeholder,
+  isAdmin,
+  usage,
+  onRemove,
+  onRestore,
 }: {
   title: string;
-  items: { id: number; name: string }[];
+  items: { id: number; name: string; archivedAt: number | null }[];
   draft: string;
   setDraft: (v: string) => void;
   onAdd: () => void;
   placeholder: string;
+  isAdmin: boolean;
+  usage: Record<string, Usage> | undefined;
+  onRemove: (id: number) => void;
+  onRestore: (id: number) => void;
 }) {
+  const [showRemoved, setShowRemoved] = useState(false);
+  const active = items.filter((item) => item.archivedAt === null);
+  const removed = items.length - active.length;
+  const shown = showRemoved && isAdmin ? items : active;
   return (
     <div className="space-y-3">
-      <h3 className="font-sans text-sm font-bold uppercase tracking-wider text-secondary-500">
-        {title} <span className="text-secondary-400 font-normal">({items.length})</span>
-      </h3>
-      <div className="flex gap-2">
-        <TextField
-          kind="label"
-          placeholder={placeholder}
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") onAdd();
-          }}
-          className="flex-1"
-        />
-        <Button onClick={onAdd}>Add</Button>
-      </div>
+      <ListHeading
+        title={title}
+        count={active.length}
+        removed={isAdmin ? removed : 0}
+        showRemoved={showRemoved}
+        setShowRemoved={setShowRemoved}
+      />
+      {isAdmin && (
+        <div className="flex gap-2">
+          <TextField
+            kind="label"
+            placeholder={placeholder}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") onAdd();
+            }}
+            className="flex-1 min-w-0"
+          />
+          <Button onClick={onAdd}>Add</Button>
+        </div>
+      )}
       <div className="space-y-1.5">
-        {items.length === 0 && <p className="text-secondary-400 text-sm">None yet.</p>}
-        {items.map((item) => (
-          <div
+        {shown.length === 0 && <p className="text-secondary-400 text-sm">None yet.</p>}
+        {shown.map((item) => (
+          <ItemRow
             key={item.id}
-            className="flex items-center gap-2 bg-page border border-secondary-200 rounded-lg px-3.5 py-2 text-sm text-secondary-900"
-          >
-            <span className="flex-1 truncate">{item.name}</span>
-            <button
-              type="button"
-              disabled
-              title="Removal isn't available yet"
-              className="text-secondary-300 cursor-not-allowed px-1"
-              aria-label={`Remove ${item.name}`}
-            >
-              ✕
-            </button>
-          </div>
+            name={item.name}
+            archived={item.archivedAt !== null}
+            isAdmin={isAdmin}
+            question={removeQuestion(item.name, usage?.[item.id], usage !== undefined)}
+            onRemove={() => onRemove(item.id)}
+            onRestore={() => onRestore(item.id)}
+          />
         ))}
       </div>
     </div>
@@ -701,6 +910,11 @@ function ProcessList({
   setDraftNeedsInfo,
   onAdd,
   onUpdate,
+  isAdmin,
+  usage,
+  requiredCheck,
+  onRemove,
+  onRestore,
 }: {
   processes: Process[];
   draft: string;
@@ -711,35 +925,62 @@ function ProcessList({
   setDraftNeedsInfo: (v: boolean) => void;
   onAdd: () => void;
   onUpdate: (id: number, edit: { type?: ProcessType; requiresPartInfo?: boolean }) => void;
+  isAdmin: boolean;
+  usage: Record<string, Usage> | undefined;
+  /** The team's required quality check, which can't be removed while it's required. */
+  requiredCheck: number | null;
+  onRemove: (id: number) => void;
+  onRestore: (id: number) => void;
 }) {
+  const [showRemoved, setShowRemoved] = useState(false);
+  const active = processes.filter((p) => p.archivedAt === null);
+  const removed = processes.length - active.length;
+  const shown = showRemoved && isAdmin ? processes : active;
   return (
     <div className="space-y-3">
-      <h3 className="font-sans text-sm font-bold uppercase tracking-wider text-secondary-500">
-        Processes <span className="text-secondary-400 font-normal">({processes.length})</span>
-      </h3>
-      <div className="flex gap-2">
-        <TextField
-          kind="process"
-          placeholder="New process (e.g. Welding)"
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") onAdd();
-          }}
-          className="flex-1 min-w-0"
-        />
-        <ProcessTypeSelect value={draftType} onChange={setDraftType} label="New process type" />
-        <PartInfoToggle checked={draftNeedsInfo} onChange={setDraftNeedsInfo} />
-        <Button onClick={onAdd}>Add</Button>
-      </div>
+      <ListHeading
+        title="Processes"
+        count={active.length}
+        removed={isAdmin ? removed : 0}
+        showRemoved={showRemoved}
+        setShowRemoved={setShowRemoved}
+      />
+      {isAdmin && (
+        <div className="flex flex-wrap gap-2">
+          <TextField
+            kind="process"
+            placeholder="New process (e.g. Welding)"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") onAdd();
+            }}
+            className="flex-1 min-w-40"
+          />
+          <div className="flex items-center gap-2">
+            <ProcessTypeSelect value={draftType} onChange={setDraftType} label="New process type" />
+            <PartInfoToggle checked={draftNeedsInfo} onChange={setDraftNeedsInfo} />
+            <Button onClick={onAdd}>Add</Button>
+          </div>
+        </div>
+      )}
       <div className="space-y-1.5">
-        {processes.length === 0 && <p className="text-secondary-400 text-sm">None yet.</p>}
-        {processes.map((p) => (
-          <div
+        {shown.length === 0 && <p className="text-secondary-400 text-sm">None yet.</p>}
+        {shown.map((p) => (
+          <ItemRow
             key={p.id}
-            className="flex items-center gap-2 bg-page border border-secondary-200 rounded-lg px-3.5 py-2 text-sm text-secondary-900"
+            name={p.name}
+            archived={p.archivedAt !== null}
+            isAdmin={isAdmin}
+            question={removeQuestion(p.name, usage?.[p.id], usage !== undefined)}
+            blocked={
+              p.id === requiredCheck
+                ? `${p.name} is the team's required quality check. Turn off "Require quality control" in Quality Control first.`
+                : null
+            }
+            onRemove={() => onRemove(p.id)}
+            onRestore={() => onRestore(p.id)}
           >
-            <span className="flex-1 truncate">{p.name}</span>
             <PartInfoToggle
               checked={!!p.requiresPartInfo}
               onChange={(requiresPartInfo) => onUpdate(p.id, { requiresPartInfo })}
@@ -749,7 +990,7 @@ function ProcessList({
               onChange={(type) => onUpdate(p.id, { type })}
               label={`Type for ${p.name}`}
             />
-          </div>
+          </ItemRow>
         ))}
       </div>
     </div>

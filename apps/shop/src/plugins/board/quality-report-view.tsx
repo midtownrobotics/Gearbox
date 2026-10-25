@@ -55,7 +55,9 @@ export function QualityReportView({
   // A fix can also send it to a plain process the part has never had (sanding a failed part),
   // which joins this one part's steps just before the check.
   const extraSteps = data.processes
-    .filter((p) => p.type === "regular" && !allSteps.some((s) => s.id === p.id))
+    .filter(
+      (p) => p.type === "regular" && p.archivedAt === null && !allSteps.some((s) => s.id === p.id),
+    )
     .map((p) => ({ id: p.id, name: p.name }));
   // The team's checklist, as the Admin page has it.
   const checklist = useAuthUser()?.qualityChecklist ?? [];

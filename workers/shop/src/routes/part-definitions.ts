@@ -11,6 +11,7 @@ import {
 } from "../db/schema";
 import { fileStepError } from "../lib/process-rules";
 import { withQualityStep } from "../lib/quality";
+import { removedError } from "../lib/removal";
 import type { AppEnv } from "../types";
 
 const updatePartValidator = validator(
@@ -90,36 +91,52 @@ const reorderBlueprintValidator = validator("json", (value, c): { processIds: nu
 type ShopDb = ReturnType<typeof createShopDb>;
 
 /**
- * What's wrong with a part's process list, or null: a process that isn't the team's, or File
- * Producer steps without File Consumer ones (or the other way round).
+ * What's wrong with a part's process list, or null: a process that isn't the team's, one removed
+ * on the Admin page (unless the part already has it: `kept`), or File Producer steps without File
+ * Consumer ones (or the other way round).
  */
 async function processListError(
   db: ShopDb,
   teamId: string,
   processIds: number[],
+  kept: number[] = [],
 ): Promise<string | null> {
   if (processIds.length === 0) return null;
   const steps = await db
-    .select({ id: processes.id, name: processes.name, type: processes.type })
+    .select({
+      id: processes.id,
+      name: processes.name,
+      type: processes.type,
+      archivedAt: processes.archivedAt,
+    })
     .from(processes)
     .where(inTeam(processes, teamId, inArray(processes.id, processIds)))
     .all();
   if (new Set(steps.map((s) => s.id)).size !== new Set(processIds).size) {
     return "Some of those processes don't exist.";
   }
+  const removed = removedError(
+    "process",
+    steps.filter((s) => s.archivedAt !== null && !kept.includes(s.id)),
+  );
+  if (removed) return removed;
   // In the order the part goes through them, which is what the rule is about.
   const byId = new Map(steps.map((s) => [s.id, s]));
   return fileStepError(processIds.flatMap((id) => byId.get(id) ?? []));
 }
 
-async function isTeamSubsystem(db: ShopDb, teamId: string, id: number) {
-  return Boolean(
-    await db
-      .select({ id: subsystems.id })
-      .from(subsystems)
-      .where(inTeam(subsystems, teamId, eq(subsystems.id, id)))
-      .get(),
-  );
+/**
+ * Why a part can't be filed under this subsystem, or null: it isn't the team's, or it was removed
+ * on the Admin page and isn't the one the part already has (`current`).
+ */
+async function subsystemError(db: ShopDb, teamId: string, id: number, current?: number) {
+  const row = await db
+    .select({ name: subsystems.name, archivedAt: subsystems.archivedAt })
+    .from(subsystems)
+    .where(inTeam(subsystems, teamId, eq(subsystems.id, id)))
+    .get();
+  if (!row) return "That subsystem doesn't exist.";
+  return row.archivedAt !== null && id !== current ? removedError("subsystem", [row]) : null;
 }
 
 /** The team's part definition, if it is one. */
@@ -241,9 +258,8 @@ export const partDefinitionsRouter = new Hono<AppEnv>()
     const teamId = c.get("teamId");
     const now = Date.now();
 
-    if (!(await isTeamSubsystem(db, teamId, subsystemId))) {
-      return c.json({ error: "That subsystem doesn't exist." }, 400);
-    }
+    const subsystemProblem = await subsystemError(db, teamId, subsystemId);
+    if (subsystemProblem) return c.json({ error: subsystemProblem }, 400);
 
     // With a quality check required, it's the last step of every part.
     const pipeline = await withQualityStep(db, teamId, processIds ?? []);
@@ -382,11 +398,20 @@ export const partDefinitionsRouter = new Hono<AppEnv>()
 
     const db = createShopDb(c.env.SHOP_DB);
     const teamId = c.get("teamId");
-    if (
-      updates.subsystemId !== undefined &&
-      !(await isTeamSubsystem(db, teamId, updates.subsystemId))
-    ) {
-      return c.json({ error: "That subsystem doesn't exist." }, 400);
+    if (updates.subsystemId !== undefined) {
+      const current = await db
+        .select({ subsystemId: partDefinitions.subsystemId })
+        .from(partDefinitions)
+        .where(inTeam(partDefinitions, teamId, eq(partDefinitions.id, id)))
+        .get();
+      if (!current) return c.json({ error: "Part definition not found." }, 404);
+      const subsystemProblem = await subsystemError(
+        db,
+        teamId,
+        updates.subsystemId,
+        current.subsystemId,
+      );
+      if (subsystemProblem) return c.json({ error: subsystemProblem }, 400);
     }
     const row = await db
       .update(partDefinitions)
@@ -416,7 +441,9 @@ export const partDefinitionsRouter = new Hono<AppEnv>()
     }
 
     const pipeline = await withQualityStep(db, teamId, processIds);
-    const fileError = await processListError(db, teamId, pipeline);
+    // A process removed on the Admin page stays on a part that already has it.
+    const kept = (await blueprintOf(db, teamId, partDefinitionId)).map((b) => b.processId);
+    const fileError = await processListError(db, teamId, pipeline, kept);
     if (fileError) return c.json({ error: fileError }, 400);
 
     await replaceBlueprint(db, teamId, partDefinitionId, pipeline);
@@ -445,7 +472,7 @@ export const partDefinitionsRouter = new Hono<AppEnv>()
         400,
       );
     }
-    const orderError = await processListError(db, teamId, processIds);
+    const orderError = await processListError(db, teamId, processIds, existingIds);
     if (orderError) return c.json({ error: orderError }, 400);
 
     await replaceBlueprint(

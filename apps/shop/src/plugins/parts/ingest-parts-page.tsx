@@ -616,8 +616,11 @@ export function IngestPartsPage() {
         (p) => p.id === user.qualityCheck.processId && p.type === "quality_control",
       ) ?? null)
     : null;
-  // The quality check isn't picked by hand while it's required: it's on every part already.
-  const pickable = (data?.processes ?? []).filter((p) => p.id !== qualityStep?.id);
+  // The quality check isn't picked by hand while it's required: it's on every part already. Nor
+  // is a process removed on the Admin page.
+  const pickable = (data?.processes ?? []).filter(
+    (p) => p.id !== qualityStep?.id && p.archivedAt === null,
+  );
   const qualityNote = qualityStep ? (
     <p className="text-sm text-secondary-500">
       The team requires quality control: {qualityStep.name} is added to the end of every part.
