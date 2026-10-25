@@ -1,7 +1,7 @@
 name: Problem
 description: Something in Gearbox isn't working.
 title: "<App>: "
-labels: ["from-gearbox", "bug"]
+labels: ["bug"]
 body:
   - type: markdown
     attributes:

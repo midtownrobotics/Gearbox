@@ -1,7 +1,7 @@
 name: Idea
 description: Something you'd like Gearbox to do.
 title: "<App> idea: "
-labels: ["from-gearbox", "idea"]
+labels: ["idea"]
 body:
   - type: markdown
     attributes:
