@@ -2,7 +2,7 @@ import { env } from "cloudflare:test";
 import { exports } from "cloudflare:workers";
 import { site } from "@g3/site-config";
 import { type TestUser, admin, asUser, teamUsers } from "@g3/testing/users";
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { appOfPage, syncReports } from "../src/reports";
 import type { AppEnv } from "../src/types";
 
@@ -155,36 +155,50 @@ describe("reporting a problem", () => {
     expect(res.status).toBe(401);
   });
 
-  it("lets a team send 5 a day, then one every 10 minutes", async () => {
-    const team = newTeam();
-    for (let i = 0; i < 5; i++) expect((await send(team.admin)).status).toBe(201);
-    const slowed = await send(team.student);
-    expect(slowed.status).toBe(429);
-    expect(((await slowed.json()) as { error: string }).error).toContain("Try again in 10 minutes");
+  describe("limits", () => {
+    // Midday UTC, so moving reports minutes earlier never crosses midnight, when a team's day
+    // starts over. Only Date is faked: D1 and the fake GitHub still run on real timers.
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date(`${new Date().toISOString().slice(0, 10)}T12:00:00Z`));
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
 
-    // 11 minutes later, one more, then another wait.
-    await moveTeamReports(team.admin.teamId, -11 * 60);
-    expect((await send(team.student)).status).toBe(201);
-    expect((await send(team.mentor)).status).toBe(429);
-  });
+    it("lets a team send 5 a day, then one every 10 minutes", async () => {
+      const team = newTeam();
+      for (let i = 0; i < 5; i++) expect((await send(team.admin)).status).toBe(201);
+      const slowed = await send(team.student);
+      expect(slowed.status).toBe(429);
+      expect(((await slowed.json()) as { error: string }).error).toContain(
+        "Try again in 10 minutes",
+      );
 
-  it("starts each team's day afresh at midnight UTC", async () => {
-    const team = newTeam();
-    for (let i = 0; i < 5; i++) expect((await send(team.student)).status).toBe(201);
-    expect((await send(team.mentor)).status).toBe(429);
-    // Yesterday's: the time since midnight, and a minute more.
-    const sinceMidnight = Math.floor(Date.now() / 1000) % 86400;
-    await moveTeamReports(team.student.teamId, -(sinceMidnight + 60));
-    for (let i = 0; i < 5; i++) expect((await send(team.mentor)).status).toBe(201);
-  });
+      // 11 minutes later, one more, then another wait.
+      await moveTeamReports(team.admin.teamId, -11 * 60);
+      expect((await send(team.student)).status).toBe(201);
+      expect((await send(team.mentor)).status).toBe(429);
+    });
 
-  it("limits how many one member sends in an hour", async () => {
-    const team = newTeam();
-    for (let i = 0; i < 5; i++) expect((await send(team.admin)).status).toBe(201);
-    // Past the team's wait, but not the hour.
-    await moveTeamReports(team.admin.teamId, -11 * 60);
-    expect((await send(team.admin)).status).toBe(429);
-    expect((await send(team.student)).status).toBe(201);
+    it("starts each team's day afresh at midnight UTC", async () => {
+      const team = newTeam();
+      for (let i = 0; i < 5; i++) expect((await send(team.student)).status).toBe(201);
+      expect((await send(team.mentor)).status).toBe(429);
+      // Yesterday's: the time since midnight, and a minute more.
+      const sinceMidnight = Math.floor(Date.now() / 1000) % 86400;
+      await moveTeamReports(team.student.teamId, -(sinceMidnight + 60));
+      for (let i = 0; i < 5; i++) expect((await send(team.mentor)).status).toBe(201);
+    });
+
+    it("limits how many one member sends in an hour", async () => {
+      const team = newTeam();
+      for (let i = 0; i < 5; i++) expect((await send(team.admin)).status).toBe(201);
+      // Past the team's wait, but not the hour.
+      await moveTeamReports(team.admin.teamId, -11 * 60);
+      expect((await send(team.admin)).status).toBe(429);
+      expect((await send(team.student)).status).toBe(201);
+    });
   });
 
   it("isn't open to the public demo", async () => {
