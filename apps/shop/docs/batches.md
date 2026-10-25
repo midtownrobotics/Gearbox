@@ -20,4 +20,6 @@ Once the batch has moved on, parts don't join or leave it that way: send the who
 
 The [Files](team:shop/files) page lists every file by its batches' progress: not started, in progress, complete, unused and obsolete. A file is **obsolete** once a part it was made for has changed in a newer release; it can't go on a new batch.
 
+To clear out old files and drawings, tick the box by each one and choose **Delete selected**, or, in **Complete**, **Unused** and **Obsolete**, the box by the group's name to choose all of it. **Complete** and **Obsolete** also have **Delete all**. Deleting can't be undone, and a batch that had a deleted file has none. Shop computers in kiosk mode can't delete.
+
 **Duplicate** a batch to make the same parts again from the same file.

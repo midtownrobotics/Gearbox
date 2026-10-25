@@ -264,6 +264,7 @@ async function seed(team: TeamUsers): Promise<Seeded> {
       file: file.id,
       check: check.id,
       checkedInstance: checkedInstance.id,
+      partNumber,
     },
   };
 }
@@ -341,6 +342,11 @@ it("keeps every team's shop to itself", async () => {
           fixNote: "",
         },
         "PUT /admin/quality/checklist": { checklist: STARTER_CHECKLIST.slice() },
+        "POST /part-files/delete": { ids: [d.file] },
+        "POST /drawings/delete": {
+          drawings: [{ partNumber: (b.data as { partNumber: string }).partNumber, revision: "A" }],
+        },
+        "PUT /admin/shop-status": { levels: [{ label: "Mine", below: null }] },
       };
     },
   });

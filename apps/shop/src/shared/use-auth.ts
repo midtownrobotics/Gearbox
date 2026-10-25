@@ -17,7 +17,11 @@ export type AuthUser = {
   qualityReports: boolean;
   /** The team's quality checklist, in order; empty while quality reports are off. */
   qualityChecklist: string[];
+  /** The Overview's shop status words, lowest first: each while the queue is under `below`. */
+  statusLevels: StatusLevel[];
 };
+
+export type StatusLevel = { label: string; below: number | null };
 
 type AuthState =
   | { status: "loading" }

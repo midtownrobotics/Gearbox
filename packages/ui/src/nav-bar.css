@@ -87,6 +87,15 @@ html[data-theme="dark"] .g3-nav-drawer {
   flex-shrink: 100000;
 }
 
+/* The pages, and the arrows over their ends when there are more to scroll to. */
+.g3-nav-pages {
+  position: relative;
+  display: flex;
+  flex: 1;
+  align-self: stretch;
+  min-width: 0;
+}
+
 .g3-nav-links {
   display: flex;
   flex: 1;
@@ -96,6 +105,84 @@ html[data-theme="dark"] .g3-nav-drawer {
   gap: 28px;
   overflow-x: auto;
   scrollbar-width: none;
+}
+
+.g3-nav-links::-webkit-scrollbar {
+  display: none;
+}
+
+/* Pages past an edge: that edge fades out, so it's clear the bar scrolls. */
+.g3-nav-links.more-left {
+  mask-image: linear-gradient(to right, transparent, #000 40px);
+}
+
+.g3-nav-links.more-right {
+  mask-image: linear-gradient(to left, transparent, #000 40px);
+}
+
+.g3-nav-links.more-left.more-right {
+  mask-image: linear-gradient(to right, transparent, #000 40px, #000 calc(100% - 40px), transparent);
+}
+
+/* With the pointer on a bar whose pages don't fit, a full-height line each side of them sets them apart from the wordmark and the controls. */
+.g3-nav.is-overflowing .g3-nav-brand,
+.g3-nav.is-overflowing .g3-nav-end {
+  position: relative;
+  align-self: stretch;
+  align-items: center;
+}
+
+.g3-nav.is-overflowing:hover .g3-nav-brand::after,
+.g3-nav.is-overflowing:hover .g3-nav-end::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--g3-nav-line);
+}
+
+.g3-nav.is-overflowing:hover .g3-nav-brand::after {
+  right: -14px;
+}
+
+.g3-nav.is-overflowing:hover .g3-nav-end::before {
+  left: -14px;
+}
+
+/* An arrow at each end with more pages past it, shown with the lines; a click scrolls that way. */
+.g3-nav .g3-nav-scroll {
+  position: absolute;
+  top: 50%;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--g3-nav-text);
+  cursor: pointer;
+  transform: translateY(-50%);
+}
+
+.g3-nav .g3-nav-scroll:hover {
+  color: var(--g3-nav-strong);
+}
+
+.g3-nav .g3-nav-scroll.is-left {
+  left: 0;
+}
+
+.g3-nav .g3-nav-scroll.is-right {
+  right: 0;
+}
+
+.g3-nav.is-overflowing:hover .g3-nav-scroll {
+  display: flex;
 }
 
 .g3-nav-group {
@@ -418,7 +505,7 @@ html[data-theme="dark"] .g3-nav-drawer {
     gap: 8px;
     padding: 0 12px;
   }
-  .g3-nav-links {
+  .g3-nav-pages {
     display: none;
   }
   /* A long wordmark is cut short rather than pushing the bar's other parts off it. */

@@ -10,7 +10,7 @@ import {
   portalAppLabels,
   site,
 } from "@g3/site-config";
-import { type ComponentType, type ReactNode, useEffect, useState } from "react";
+import { type ComponentType, type ReactNode, useEffect, useRef, useState } from "react";
 import { useSignedInUser, useTeamApps } from "../session";
 import { usePageTeamAvatar, useTeamIcon, useTeamUiSettings } from "../team-ui";
 import { useTheme } from "../theme";
@@ -90,6 +90,65 @@ const plainLink: AppNavLink = ({ href, children, ...props }) => (
   </a>
 );
 
+/**
+ * The bar's pages scroll sideways when they don't fit, at any width: a mouse wheel anywhere on the
+ * bar scrolls them (never the page under it), the side with more fades out, and the current page
+ * is brought into view.
+ */
+function usePagesScroll(pageKeys: string, activeKey: string | undefined) {
+  const ref = useRef<HTMLElement>(null);
+  const barRef = useRef<HTMLElement>(null);
+  const [more, setMore] = useState({ left: false, right: false });
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: watched again when the pages change
+  useEffect(() => {
+    const el = ref.current;
+    const bar = barRef.current;
+    if (!el || !bar) return;
+    const update = () => {
+      const left = el.scrollLeft > 1;
+      const right = el.scrollLeft + el.clientWidth < el.scrollWidth - 1;
+      setMore((m) => (m.left === left && m.right === right ? m : { left, right }));
+    };
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      // Firefox can count in lines rather than pixels.
+      const lines = e.deltaMode === 1 ? 16 : 1;
+      const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+      el.scrollLeft += delta * lines;
+    };
+    update();
+    el.addEventListener("scroll", update, { passive: true });
+    bar.addEventListener("wheel", onWheel, { passive: false });
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    for (const child of el.children) observer.observe(child);
+    return () => {
+      el.removeEventListener("scroll", update);
+      bar.removeEventListener("wheel", onWheel);
+      observer.disconnect();
+    };
+  }, [pageKeys]);
+
+  // Bring the current page into view, moving only the bar (never the page).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: again each time the page changes
+  useEffect(() => {
+    const el = ref.current;
+    const current = el?.querySelector<HTMLElement>('[aria-current="page"]');
+    if (!el || !current) return;
+    const box = el.getBoundingClientRect();
+    const link = current.getBoundingClientRect();
+    if (link.left < box.left) el.scrollLeft += link.left - box.left - 24;
+    else if (link.right > box.right) el.scrollLeft += link.right - box.right + 24;
+  }, [activeKey]);
+
+  const className = `g3-nav-links${more.left ? " more-left" : ""}${more.right ? " more-right" : ""}`;
+  /** Scroll the pages most of the way across, toward the start (-1) or the end (1). */
+  const scroll = (direction: -1 | 1) =>
+    ref.current?.scrollBy({ left: direction * ref.current.clientWidth * 0.7, behavior: "smooth" });
+  return { ref, barRef, className, more, scroll, overflows: more.left || more.right };
+}
+
 export function AppNavBar({
   title,
   icon,
@@ -137,6 +196,10 @@ export function AppNavBar({
 }) {
   const [open, setOpen] = useState(false);
   const [reporting, setReporting] = useState(false);
+  const pages = usePagesScroll(
+    items.map((item) => item.key).join(" "),
+    items.find((item) => item.active)?.key,
+  );
   const teamUi = useTeamUiSettings(team);
   const brandedTitle = team
     ? title.replace(new RegExp(`^${site.team.shortName}\\b`, "i"), teamUi.shortName)
@@ -304,7 +367,10 @@ export function AppNavBar({
           </span>
         </div>
       )}
-      <header className={`g3-nav${flat ? " is-flat" : ""}${hasApps ? " has-apps" : ""}`}>
+      <header
+        ref={pages.barRef}
+        className={`g3-nav${flat ? " is-flat" : ""}${hasApps ? " has-apps" : ""}${pages.overflows ? " is-overflowing" : ""}`}
+      >
         {!flat && (
           <button
             type="button"
@@ -317,14 +383,38 @@ export function AppNavBar({
           </button>
         )}
         {brand}
-        <nav className="g3-nav-links" aria-label="Pages">
-          {groups.map(([name, groupItems], i) => (
-            <div key={name || i} className="g3-nav-group">
-              {name && <span className="g3-nav-group-name">{name}</span>}
-              {groupItems.map((item) => renderItem(item, false))}
-            </div>
-          ))}
-        </nav>
+        <div className="g3-nav-pages">
+          <nav ref={pages.ref} className={pages.className} aria-label="Pages">
+            {groups.map(([name, groupItems], i) => (
+              <div key={name || i} className="g3-nav-group">
+                {name && <span className="g3-nav-group-name">{name}</span>}
+                {groupItems.map((item) => renderItem(item, false))}
+              </div>
+            ))}
+          </nav>
+          {pages.more.left && (
+            <button
+              type="button"
+              className="g3-nav-scroll is-left"
+              aria-label="Scroll pages left"
+              tabIndex={-1}
+              onClick={() => pages.scroll(-1)}
+            >
+              <ChevronIcon direction="left" />
+            </button>
+          )}
+          {pages.more.right && (
+            <button
+              type="button"
+              className="g3-nav-scroll is-right"
+              aria-label="Scroll pages right"
+              tabIndex={-1}
+              onClick={() => pages.scroll(1)}
+            >
+              <ChevronIcon direction="right" />
+            </button>
+          )}
+        </div>
         <div className="g3-nav-end">
           {actions && <div className="g3-nav-actions">{actions}</div>}
           {hello}
@@ -471,6 +561,14 @@ function SunIcon() {
     <svg {...iconProps} aria-hidden="true">
       <circle cx="12" cy="12" r="4" />
       <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
+    </svg>
+  );
+}
+
+function ChevronIcon({ direction }: { direction: "left" | "right" }) {
+  return (
+    <svg {...iconProps} width={16} height={16} aria-hidden="true">
+      <path d={direction === "left" ? "m15 18-6-6 6-6" : "m9 18 6-6-6-6"} />
     </svg>
   );
 }

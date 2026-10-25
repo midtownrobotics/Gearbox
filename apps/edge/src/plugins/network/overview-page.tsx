@@ -16,6 +16,7 @@ import { useLoad } from "../../shared/use-load";
 import { BarChart, ChartLegend } from "./bar-chart";
 import { InsightStats, WhenCharts } from "./insights";
 import { RangePicker, rangeLabel, useRange } from "./range";
+import { isPseudoSite, sitePath } from "./sites-page";
 
 async function loadOverview(query: { from: string | undefined; to: string | undefined }) {
   const res = await api.network.overview.$get({ query });
@@ -25,6 +26,7 @@ async function loadOverview(query: { from: string | undefined; to: string | unde
 
 export function OverviewPage() {
   const names = useTeamNames();
+  const user = useAuthUser();
   const { query, zoom, withRange } = useRange();
   const { data, error, reload } = useLoad(() => loadOverview(query), [query.from, query.to]);
   if (error)
@@ -157,7 +159,57 @@ export function OverviewPage() {
           </ul>
         )}
       </Card>
+
+      {/* Site data is browsing data: admins only, like the Sites page. */}
+      {user.isAdmin && <TopSites label={label} />}
     </Page>
+  );
+}
+
+/** The range's ten busiest sites, with a link to all of them on the Sites page. */
+function TopSites({ label }: { label: string }) {
+  const { query, withRange } = useRange();
+  const { data, error } = useLoad(async () => {
+    const res = await api.network.sites.$get({ query });
+    if (!res.ok) throw new Error(await getErrorMessage(res));
+    return res.json();
+  }, [query.from, query.to]);
+  const sites = data?.sites ?? [];
+  const total = sites.reduce((sum, s) => sum + s.dl + s.ul, 0);
+  return (
+    <Card title={`Top sites · ${label}`}>
+      {error ? (
+        <ErrorBanner message={error} />
+      ) : !data ? (
+        <Loading />
+      ) : sites.length === 0 ? (
+        <p className="text-sm text-secondary-400">No site data for these dates.</p>
+      ) : (
+        <ul className="divide-y divide-secondary-100">
+          {sites.slice(0, 10).map((s) => (
+            <li key={s.site} className="py-2 flex items-center gap-3">
+              <Link
+                to={withRange(sitePath(s.site))}
+                className={`font-medium truncate min-w-0 hover:text-primary-500 ${isPseudoSite(s.site) ? "italic text-secondary-500" : "text-secondary-900"}`}
+                title={s.site}
+              >
+                {s.site}
+              </Link>
+              <ShareBar share={(s.dl + s.ul) / Math.max(1, total)} />
+              <span className="text-sm text-secondary-600 tabular-nums w-20 text-right">
+                {formatBytes(s.dl + s.ul)}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <Link
+        to={withRange("/network/sites")}
+        className="mt-3 inline-block text-sm font-medium text-primary-500 hover:text-primary-700"
+      >
+        All sites
+      </Link>
+    </Card>
   );
 }
 

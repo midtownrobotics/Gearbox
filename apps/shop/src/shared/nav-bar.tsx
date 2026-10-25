@@ -49,7 +49,7 @@ export function NavBar({ items }: { items: PluginNavItem[] }) {
       actions={
         kiosk.active && (
           <>
-            <KioskBadge machineName={kiosk.machineName} />
+            <KioskBadge machineName={kiosk.machineName} version={versionLabel("Shop")} />
             {user?.displayName && (
               <p className="text-sm font-semibold text-secondary-500">{user.displayName}</p>
             )}
@@ -93,7 +93,7 @@ function ExitKioskDialog({ onClose }: { onClose: () => void }) {
   );
 }
 
-function KioskBadge({ machineName }: { machineName: string | null }) {
+function KioskBadge({ machineName, version }: { machineName: string | null; version: string }) {
   const [open, setOpen] = useState(false);
   const [exiting, setExiting] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -127,6 +127,7 @@ function KioskBadge({ machineName }: { machineName: string | null }) {
               {machineName ?? "Kiosk"}
             </p>
             <p className="text-xs text-secondary-400 mt-1">This device is in kiosk mode</p>
+            <p className="text-xs text-secondary-400 mt-1">{version}</p>
           </div>
           <Button
             variant="danger"

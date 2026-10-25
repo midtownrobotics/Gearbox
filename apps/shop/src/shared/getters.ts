@@ -184,6 +184,12 @@ export async function deletePartFile(id: number): Promise<void> {
   if (!res.ok) throw new Error(await getErrorMessage(res as unknown as Response));
 }
 
+/** Deletes several files at once; batches that had them have no file. */
+export async function deletePartFiles(ids: number[]): Promise<void> {
+  const res = await api["part-files"].delete.$post({ json: { ids } });
+  if (!res.ok) throw new Error(await getErrorMessage(res as unknown as Response));
+}
+
 export function partFileDownloadUrl(id: number): string {
   return `${import.meta.env.VITE_API_BASE_URL ?? ""}/part-files/${id}/download`;
 }
@@ -315,6 +321,14 @@ export async function deleteDrawing(partNumber: string, revision: string): Promi
   const res = await api.drawings[":partNumber"][":revision"].$delete({
     param: { partNumber, revision },
   });
+  if (!res.ok) throw new Error(await getErrorMessage(res as unknown as Response));
+}
+
+/** Deletes several released drawings at once. */
+export async function deleteDrawings(
+  drawings: { partNumber: string; revision: string }[],
+): Promise<void> {
+  const res = await api.drawings.delete.$post({ json: { drawings } });
   if (!res.ok) throw new Error(await getErrorMessage(res as unknown as Response));
 }
 

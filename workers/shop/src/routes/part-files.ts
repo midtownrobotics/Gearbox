@@ -1,5 +1,5 @@
 import { inTeam, requireAuth, withTeam } from "@g3/auth";
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, inArray } from "drizzle-orm";
 import { Hono } from "hono";
 import { createMiddleware } from "hono/factory";
 import { createShopDb } from "../db";
@@ -9,6 +9,17 @@ import { partFileKey } from "../lib/storage";
 import type { AppEnv } from "../types";
 
 // The team's file library. A file reaches instances only through a batch (lib/batches.ts).
+
+/** The most files one request deletes. */
+const MAX_DELETE = 500;
+
+/** The ids in `{ ids: [...] }`, or null when it isn't a list of 1 to MAX_DELETE ids. */
+export function deleteIds(body: unknown): number[] | null {
+  const ids = (body as { ids?: unknown } | null)?.ids;
+  if (!Array.isArray(ids) || ids.length === 0 || ids.length > MAX_DELETE) return null;
+  if (!ids.every((id) => Number.isInteger(id) && id > 0)) return null;
+  return [...new Set(ids as number[])];
+}
 
 // Cloudflare rejects request bodies over 100 MB before they reach the worker anyway.
 const MAX_FILE_BYTES = 100 * 1024 * 1024;
@@ -93,6 +104,29 @@ export const partFilesRouter = new Hono<AppEnv>()
         "Cache-Control": "private, max-age=3600",
       },
     });
+  })
+  // Deletes several files at once (`{ ids }`), as one would each; ids not the team's are skipped.
+  .post("/delete", requireAuth, denyKiosk, async (c) => {
+    const ids = deleteIds(await c.req.json().catch(() => null));
+    if (!ids) return c.json({ error: `Choose 1 to ${MAX_DELETE} files to delete.` }, 400);
+    const db = createShopDb(c.env.SHOP_DB);
+    const teamId = c.get("teamId");
+    const rows = await db
+      .select({ id: files.id, r2Key: files.r2Key })
+      .from(files)
+      .where(inTeam(files, teamId, inArray(files.id, ids)))
+      .all();
+    if (rows.length === 0) return c.json({ deleted: 0 });
+    const found = rows.map((row) => row.id);
+    await c.env.DRAWINGS.delete(rows.map((row) => row.r2Key));
+    await db.batch([
+      db
+        .update(stagingBatches)
+        .set({ fileId: null })
+        .where(inTeam(stagingBatches, teamId, inArray(stagingBatches.fileId, found))),
+      db.delete(files).where(inTeam(files, teamId, inArray(files.id, found))),
+    ]);
+    return c.json({ deleted: rows.length });
   })
   // Deletes the file from storage; a batch that had it has no file.
   .delete("/:id", requireAuth, denyKiosk, async (c) => {
