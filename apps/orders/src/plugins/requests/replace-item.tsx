@@ -14,6 +14,7 @@ import {
   draftFields,
   draftProblem,
   lookUpDraft,
+  needsOption,
   variantPatch,
 } from "./draft";
 
@@ -226,7 +227,13 @@ function ReplaceDialog({
           </Button>
           <Button
             onClick={save}
-            disabled={busy || !draft || draft.state !== "ready" || badQuantities(draft)}
+            disabled={
+              busy ||
+              !draft ||
+              draft.state !== "ready" ||
+              badQuantities(draft) ||
+              needsOption(draft)
+            }
           >
             {busy ? "Saving…" : "Replace item"}
           </Button>

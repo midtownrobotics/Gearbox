@@ -23,6 +23,7 @@ import {
   draftFields,
   draftProblem,
   lookUpDraft,
+  needsOption,
   variantPatch,
 } from "./draft";
 
@@ -296,7 +297,7 @@ export function useRequestComposer({
                   disabled={
                     busy ||
                     readyCount === 0 ||
-                    drafts.some((d) => d.state === "ready" && badQuantities(d))
+                    drafts.some((d) => d.state === "ready" && (badQuantities(d) || needsOption(d)))
                   }
                 >
                   {busy

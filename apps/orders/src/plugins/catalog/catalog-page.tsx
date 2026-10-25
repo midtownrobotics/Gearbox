@@ -10,6 +10,7 @@ import {
   inputClass,
   nextSafe,
 } from "@g3/ui";
+import { vendorDiffUrl } from "@g3/worker-orders/vendor-sites";
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { api, getErrorMessage } from "../../shared/api";
@@ -515,6 +516,7 @@ function ItemRow({
   const [editing, setEditing] = useState(false);
   const { canEditCatalog } = useAuthUser();
   const composer = useContext(Composer);
+  const vendorDiff = vendorDiffUrl(item.url, item.sku);
   if (editing) {
     return (
       <li className="py-2">
@@ -569,6 +571,17 @@ function ItemRow({
       >
         {LINK_LABEL[item.linkKind]}
       </a>
+      {vendorDiff && (
+        <a
+          href={vendorDiff}
+          target="_blank"
+          rel="noreferrer"
+          title="Price and stock history"
+          className="text-xs text-secondary-500 hover:text-primary-600 whitespace-nowrap"
+        >
+          VendorDiff ↗
+        </a>
+      )}
       {canEditCatalog && (
         <button
           type="button"

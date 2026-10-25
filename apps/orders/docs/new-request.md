@@ -8,10 +8,11 @@ pages: /request
 ## Start a request
 
 - **From the catalog:** open a part and choose **Request**. The request opens filled in from the catalog.
-- **From a link:** paste a product link into the search box on [New Request](team:orders/catalog). If the catalog has that part, its request opens filled in; otherwise Orders looks it up (when your team has an Edge box), or you type the name and price. You can paste several links at once.
+- **From a link:** paste a product link into the search box on [New Request](team:orders/catalog). If the catalog has that part, its request opens filled in; otherwise Orders looks it up, or you type the name and price when it can't. You can paste several links at once.
 
 ## Fill it in
 
+- **Option**: a product that comes in sizes or types (a link to a page with a dropdown) asks which one. Pick one before sending; a link that already names one starts with it picked.
 - **Quantity** is how many you're buying. **Pack of** is how many parts come in one (a pack of 4), so Inventory counts parts, not packs.
 - **Budget category** may be guessed. Anything guessed is marked "check it's right" until you change it.
 - **Catalog category** is asked for a part new to the catalog, so it lands in the right place.

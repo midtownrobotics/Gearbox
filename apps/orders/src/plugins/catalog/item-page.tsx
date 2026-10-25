@@ -1,4 +1,5 @@
 import { Button, Card, ErrorBanner, Loading, Page, SuccessBanner } from "@g3/ui";
+import { vendorDiffUrl } from "@g3/worker-orders/vendor-sites";
 import { useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuthUser } from "../../shared/auth";
@@ -61,6 +62,7 @@ export function CatalogItemPage() {
   }
   const family = item.familyId !== null ? data.families.get(item.familyId) : undefined;
   const options = Object.entries(item.options);
+  const vendorDiff = vendorDiffUrl(item.url, item.sku);
 
   return (
     <Page title="Catalog part" actions={back}>
@@ -125,6 +127,16 @@ export function CatalogItemPage() {
               >
                 {LINK_LABEL[item.linkKind]}
               </a>
+              {vendorDiff && (
+                <a
+                  href={vendorDiff}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="ml-4 inline-block text-sm text-secondary-600 hover:text-primary-600"
+                >
+                  Price and stock history on VendorDiff ↗
+                </a>
+              )}
             </div>
           </div>
           <div className="mt-5 flex flex-wrap gap-2">

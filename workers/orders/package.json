@@ -8,7 +8,8 @@
     "./fiscal": "./src/lib/fiscal.ts",
     "./naming": "./src/lib/naming.ts",
     "./product-key": "./src/lib/product-key.ts",
-    "./manifest": "./src/manifest.ts"
+    "./manifest": "./src/manifest.ts",
+    "./vendor-sites": "./src/lib/vendor-sites.ts"
   },
   "scripts": {
     "dev": "wrangler dev --port 8794 --inspector-port 9236",
