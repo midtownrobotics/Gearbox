@@ -248,7 +248,12 @@ export function PartFilesSection({ data, rows }: { data: ShopData | null; rows: 
               title={title}
               count={list.length}
               empty={empty}
-              select={canDelete ? selection.group(ids) : undefined}
+              select={
+                // Only groups that are done with can all be chosen at once.
+                canDelete && (state === "complete" || state === "unused" || state === "obsolete")
+                  ? selection.group(ids)
+                  : undefined
+              }
               deleteAll={
                 canDelete && (state === "complete" || state === "obsolete")
                   ? {

@@ -289,7 +289,12 @@ export function FilesPage() {
                   title={title}
                   count={list.length}
                   empty={empty}
-                  select={canDelete ? selection.group(list.map((d) => d.r2Key)) : undefined}
+                  select={
+                    // Only groups that are done with can all be chosen at once.
+                    canDelete && (state === "complete" || state === "obsolete")
+                      ? selection.group(list.map((d) => d.r2Key))
+                      : undefined
+                  }
                   deleteAll={
                     canDelete && (state === "complete" || state === "obsolete")
                       ? {
