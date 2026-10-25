@@ -115,8 +115,7 @@ html[data-theme="dark"] .g3-nav-drawer {
   mask-image: linear-gradient(to right, transparent, #000 40px, #000 calc(100% - 40px), transparent);
 }
 
-/* With the pointer on a bar whose pages don't fit, a line each side of them (like the dividers
-   between groups) sets them apart from the wordmark and the controls. */
+/* With the pointer on a bar whose pages don't fit, a full-height line each side of them sets them apart from the wordmark and the controls. */
 .g3-nav.is-overflowing .g3-nav-brand,
 .g3-nav.is-overflowing .g3-nav-end {
   position: relative;
@@ -128,8 +127,8 @@ html[data-theme="dark"] .g3-nav-drawer {
 .g3-nav.is-overflowing:hover .g3-nav-end::before {
   content: "";
   position: absolute;
-  top: 18px;
-  bottom: 18px;
+  top: 0;
+  bottom: 0;
   width: 1px;
   background: var(--g3-nav-line);
 }
