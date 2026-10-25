@@ -177,6 +177,8 @@ export const problemReports = sqliteTable("problem_reports", {
   userId: text("user_id").notNull(),
   /** Who sent it on the public issue: a `reporters` id (migration 0013). */
   reporterId: text("reporter_id"),
+  /** The sender's name on the public issue, when they chose to add it (migration 0015). */
+  reporterName: text("reporter_name"),
   kind: text("kind", { enum: REPORT_KINDS }).notNull(),
   /** The member's title (migration 0014), or null to use the message's first line. */
   title: text("title"),

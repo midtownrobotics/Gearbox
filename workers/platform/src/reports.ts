@@ -22,7 +22,8 @@ import type { AppEnv } from "./types";
 //
 // The issue is public. It carries the report's title (or its first line) and text, the app, the page (no query string, which
 // can hold searches), the versions, the browser, the team's number and the sender's reporter ID,
-// never who sent it. Its @mentions are broken, so a report can't ping anyone on GitHub.
+// and the sender's name only when they chose to add it (`withName`, kept as `reporter_name`).
+// Its @mentions are broken, so a report can't ping anyone on GitHub.
 //
 // A reporter ID (`reporters`) is a random ID each member gets with their first report. It isn't
 // their account id: an operator who sees abuse on GitHub blocks it on the console's Reporters page
@@ -114,6 +115,7 @@ export function issueBody(report: Report, teamNumber: string): string {
     ["Browser", report.browser ?? "Unknown"],
     ["Team", teamNumber],
     ["Reporter", report.reporterId ?? "Unknown"],
+    ...(report.reporterName ? [["Name", report.reporterName]] : []),
   ];
   return [
     noMentions(report.message.trim()),
@@ -237,6 +239,7 @@ const shown = (r: Report) => ({
   kind: r.kind,
   title: issueTitle(r.kind, r.app && isAppName(r.app) ? r.app : null, r.message, r.title),
   message: r.message,
+  withName: r.reporterName !== null,
   status: r.status,
   issueUrl: r.issueUrl,
   createdAt: r.createdAt,
@@ -268,6 +271,7 @@ function parseReport(body: unknown) {
     page: `${page.origin}${page.pathname}`.slice(0, 500),
     app: appOfPage(page),
     version: text(b.version, 120),
+    withName: b.withName === true,
   };
 }
 
@@ -310,6 +314,9 @@ export const reportsRouter = new Hono<AppEnv>()
     if (isDemoTeam(teamId)) return c.json({ error: "That isn't available in the demo." }, 403);
     const parsed = parseReport(await c.req.json().catch(() => null));
     if (typeof parsed === "string") return c.json({ error: parsed }, 400);
+    const { withName, ...fields } = parsed;
+    // The name as it is now, kept with the report: the cron may make the issue later.
+    const name = withName ? c.get("userDisplayName")?.trim().slice(0, 100) || null : null;
 
     const reporter = await reporterOf(c.env, teamId, userId);
     if (reporter.blockedAt !== null) {
@@ -358,7 +365,8 @@ export const reportsRouter = new Hono<AppEnv>()
       teamId,
       userId,
       reporterId: reporter.id,
-      ...parsed,
+      reporterName: name,
+      ...fields,
       browser: c.req.header("User-Agent")?.slice(0, 300) ?? null,
       issueNumber: null,
       issueUrl: null,
