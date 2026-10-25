@@ -46,6 +46,10 @@ function describe(action: Action): string {
       return `Created a ${str(d.type)} notification: ${str(d.summary)}`;
     case "delete_notification":
       return `Deleted a ${str(d.type)} notification: ${str(d.summary)}`;
+    case "block_reporter":
+      return `Blocked reporter ${str(d.reporterId)}`;
+    case "unblock_reporter":
+      return `Unblocked reporter ${str(d.reporterId)}`;
     default:
       return action.action;
   }

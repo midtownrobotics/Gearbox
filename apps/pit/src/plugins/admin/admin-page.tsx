@@ -8,6 +8,7 @@ import {
   type SafeTextKind,
   SuccessBanner,
   TextField,
+  Toggle,
 } from "@g3/ui";
 import { useEffect, useState } from "react";
 import { api } from "../../shared/api";
@@ -25,6 +26,13 @@ export function AdminPage() {
   const [saving, setSaving] = useState(false);
   const [banner, setBanner] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  // The past event the Monitor can show instead, offered only in dev and staging.
+  const [snapshot, setSnapshot] = useState<{
+    available: boolean;
+    on: boolean;
+    name: string | null;
+  } | null>(null);
+  const [switching, setSwitching] = useState(false);
 
   const isAdmin = user?.isAdmin === true;
 
@@ -46,7 +54,24 @@ export function AdminPage() {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
+    api.admin["event-snapshot"]
+      .$get()
+      .then((res) => (res.ok ? res.json() : null))
+      .then(setSnapshot)
+      .catch(() => {});
   }, [isAdmin]);
+
+  async function handleSnapshot(on: boolean) {
+    setSwitching(true);
+    const res = await api.admin["event-snapshot"].$put({ json: { on } });
+    setSwitching(false);
+    if (!res.ok) {
+      setBanner(await getErrorMessage(res as unknown as Response));
+      return;
+    }
+    setBanner(null);
+    setSnapshot((prev) => (prev ? { ...prev, on } : prev));
+  }
 
   async function handleSave() {
     setSaving(true);
@@ -124,6 +149,15 @@ export function AdminPage() {
         >
           {setting(iframeUrl, setIframeUrl, "e.g. https://example.com/monitor", "url")}
         </Field>
+        {snapshot?.available && (
+          <Toggle
+            label="Use event snapshot"
+            description={`The Monitor shows ${snapshot.name}, halfway through qualifications, instead of your event. Switching it on starts its countdowns again. Not offered on the public site.`}
+            checked={snapshot.on}
+            disabled={switching}
+            onChange={handleSnapshot}
+          />
+        )}
       </Card>
 
       {banner && <ErrorBanner message={banner} />}

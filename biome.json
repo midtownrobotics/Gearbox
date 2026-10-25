@@ -12,6 +12,7 @@
       ".wrangler",
       "node_modules",
       "G3-Web-Apps",
+      "vendor",
       "*.tsbuildinfo",
       ".claude",
       "devices/pit-log-downloader/data",
@@ -39,7 +40,7 @@
         "noLabelWithoutControl": {
           "level": "error",
           "options": {
-            "inputComponents": ["TextField"]
+            "inputComponents": ["TextField", "QuantityInput"]
           }
         }
       }

@@ -1,0 +1,986 @@
+{
+  "event": "2026gagr",
+  "name": "GRITS 2026",
+  "teamNumber": "1648",
+  "source": "The Blue Alliance's 2026gagr results (with each match's bonus RPs) and schedule as Qualification 31 went on the field; rankings worked out from the first 30 matches (3 RP a win, 1 a tie, 1 each bonus), ties broken by average score",
+  "matches": [
+    {
+      "label": "Qualification 1",
+      "redTeams": ["832", "1648", "8100"],
+      "blueTeams": ["3635", "2974", "3318"],
+      "startOffsetMs": -21960000,
+      "result": {
+        "red": 141,
+        "blue": 226,
+        "winner": "blue",
+        "bonus": {
+          "red": [true, false, false],
+          "blue": [true, false, false]
+        }
+      }
+    },
+    {
+      "label": "Qualification 2",
+      "redTeams": ["6705", "7451", "8865"],
+      "blueTeams": ["7538", "2415", "6340"],
+      "startOffsetMs": -21360000,
+      "result": {
+        "red": 36,
+        "blue": 43,
+        "winner": "blue",
+        "bonus": {
+          "red": [false, false, false],
+          "blue": [false, false, false]
+        }
+      }
+    },
+    {
+      "label": "Qualification 3",
+      "redTeams": ["6925", "9522", "3344"],
+      "blueTeams": ["8080", "1002", "5293"],
+      "startOffsetMs": -20760000,
+      "result": {
+        "red": 32,
+        "blue": 138,
+        "winner": "blue",
+        "bonus": {
+          "red": [false, false, false],
+          "blue": [true, false, false]
+        }
+      }
+    },
+    {
+      "label": "Qualification 4",
+      "redTeams": ["5608", "10376", "1414"],
+      "blueTeams": ["4189", "6829", "9480"],
+      "startOffsetMs": -20160000,
+      "result": {
+        "red": 115,
+        "blue": 247,
+        "winner": "blue",
+        "bonus": {
+          "red": [true, false, false],
+          "blue": [true, false, false]
+        }
+      }
+    },
+    {
+      "label": "Qualification 5",
+      "redTeams": ["8866", "10482", "6910"],
+      "blueTeams": ["9477", "5074", "1833"],
+      "startOffsetMs": -19560000,
+      "result": {
+        "red": 206,
+        "blue": 49,
+        "winner": "red",
+        "bonus": {
+          "red": [true, false, false],
+          "blue": [false, false, false]
+        }
+      }
+    },
+    {
+      "label": "Qualification 6",
+      "redTeams": ["4026", "1683", "11174"],
+      "blueTeams": ["11214", "6905", "4188"],
+      "startOffsetMs": -18960000,
+      "result": {
+        "red": 192,
+        "blue": 180,
+        "winner": "red",
+        "bonus": {
+          "red": [true, false, false],
+          "blue": [true, false, false]
+        }
+      }
+    },
+    {
+      "label": "Qualification 7",
+      "redTeams": ["5900", "1261", "5109"],
+      "blueTeams": ["1746", "4112", "1771"],
+      "startOffsetMs": -18360000,
+      "result": {
+        "red": 308,
+        "blue": 202,
+        "winner": "red",
+        "bonus": {
+          "red": [true, false, false],
+          "blue": [true, false, false]
+        }
+      }
+    },
+    {
+      "label": "Qualification 8",
+      "redTeams": ["4509", "6705", "6340"],
+      "blueTeams": ["3635", "3344", "6772"],
+      "startOffsetMs": -17760000,
+      "result": {
+        "red": 67,
+        "blue": 127,
+        "winner": "blue",
+        "bonus": {
+          "red": [false, false, false],
+          "blue": [true, false, false]
+        }
+      }
+    },
+    {
+      "label": "Qualification 9",
+      "redTeams": ["2415", "8865", "9522"],
+      "blueTeams": ["6925", "832", "6829"],
+      "startOffsetMs": -17160000,
+      "result": {
+        "red": 45,
+        "blue": 263,
+        "winner": "blue",
+        "bonus": {
+          "red": [false, false, false],
+          "blue": [true, false, false]
+        }
+      }
+    },
+    {
+      "label": "Qualification 10",
+      "redTeams": ["9480", "1648", "1414"],
+      "blueTeams": ["9477", "8100", "10482"],
+      "startOffsetMs": -16620000,
+      "result": {
+        "red": 267,
+        "blue": 46,
+        "winner": "red",
+        "bonus": {
+          "red": [true, false, false],
+          "blue": [false, false, false]
+        }
+      }
+    },
+    {
+      "label": "Qualification 11",
+      "redTeams": ["11214", "6910", "2974"],
+      "blueTeams": ["4189", "8080", "7538"],
+      "startOffsetMs": -16080000,
+      "result": {
+        "red": 156,
+        "blue": 56,
+        "winner": "red",
+        "bonus": {
+          "red": [true, false, false],
+          "blue": [false, false, false]
+        }
+      }
+    },
+    {
+      "label": "Qualification 12",
+      "redTeams": ["1833", "1002", "1683"],
+      "blueTeams": ["1771", "5109", "10376"],
+      "startOffsetMs": -11160000,
+      "result": {
+        "red": 278,
+        "blue": 301,
+        "winner": "blue",
+        "bonus": {
+          "red": [true, false, false],
+          "blue": [true, false, false]
+        }
+      }
+    },
+    {
+      "label": "Qualification 13",
+      "redTeams": ["11174", "5900", "6905"],
+      "blueTeams": ["5293", "5074", "1261"],
+      "startOffsetMs": -10620000,
+      "result": {
+        "red": 39,
+        "blue": 236,
+        "winner": "blue",
+        "bonus": {
+          "red": [false, false, false],
+          "blue": [true, false, false]
+        }
+      }
+    },
+    {
+      "label": "Qualification 14",
+      "redTeams": ["8866", "3318", "4026"],
+      "blueTeams": ["4509", "4112", "5608"],
+      "startOffsetMs": -10080000,
+      "result": {
+        "red": 244,
+        "blue": 104,
+        "winner": "red",
+        "bonus": {
+          "red": [true, false, false],
+          "blue": [true, false, false]
+        }
+      }
+    },
+    {
+      "label": "Qualification 15",
+      "redTeams": ["6772", "7451", "832"],
+      "blueTeams": ["4188", "1746", "9477"],
+      "startOffsetMs": -9540000,
+      "result": {
+        "red": 59,
+        "blue": 328,
+        "winner": "blue",
+        "bonus": {
+          "red": [false, false, false],
+          "blue": [true, false, false]
+        }
+      }
+    },
+    {
+      "label": "Qualification 16",
+      "redTeams": ["3344", "2974", "10482"],
+      "blueTeams": ["1414", "11214", "8865"],
+      "startOffsetMs": -9000000,
+      "result": {
+        "red": 286,
+        "blue": 62,
+        "winner": "red",
+        "bonus": {
+          "red": [true, false, false],
+          "blue": [false, false, false]
+        }
+      }
+    },
+    {
+      "label": "Qualification 17",
+      "redTeams": ["4189", "5109", "3635"],
+      "blueTeams": ["9480", "6925", "2415"],
+      "startOffsetMs": -8460000,
+      "result": {
+        "red": 294,
+        "blue": 101,
+        "winner": "red",
+        "bonus": {
+          "red": [true, false, false],
+          "blue": [true, false, false]
+        }
+      }
+    },
+    {
+      "label": "Qualification 18",
+      "redTeams": ["6340", "5293", "6910"],
+      "blueTeams": ["1683", "1771", "1648"],
+      "startOffsetMs": -7920000,
+      "result": {
+        "red": 93,
+        "blue": 257,
+        "winner": "blue",
+        "bonus": {
+          "red": [false, false, false],
+          "blue": [true, false, false]
+        }
+      }
+    },
+    {
+      "label": "Qualification 19",
+      "redTeams": ["1002", "3318", "4112"],
+      "blueTeams": ["11174", "8080", "6705"],
+      "startOffsetMs": -7380000,
+      "result": {
+        "red": 80,
+        "blue": 52,
+        "winner": "red",
+        "bonus": {
+          "red": [false, false, false],
+          "blue": [false, false, false]
+        }
+      }
+    },
+    {
+      "label": "Qualification 20",
+      "redTeams": ["6772", "9522", "4188"],
+      "blueTeams": ["5074", "5900", "8866"],
+      "startOffsetMs": -6840000,
+      "result": {
+        "red": 211,
+        "blue": 109,
+        "winner": "red",
+        "bonus": {
+          "red": [true, false, false],
+          "blue": [true, false, false]
+        }
+      }
+    },
+    {
+      "label": "Qualification 21",
+      "redTeams": ["7538", "5608", "7451"],
+      "blueTeams": ["6905", "1261", "10376"],
+      "startOffsetMs": -6300000,
+      "result": {
+        "red": 99,
+        "blue": 265,
+        "winner": "blue",
+        "bonus": {
+          "red": [false, false, false],
+          "blue": [true, false, false]
+        }
+      }
+    },
+    {
+      "label": "Qualification 22",
+      "redTeams": ["1833", "1746", "6829"],
+      "blueTeams": ["8100", "4509", "4026"],
+      "startOffsetMs": -5760000,
+      "result": {
+        "red": 213,
+        "blue": 110,
+        "winner": "red",
+        "bonus": {
+          "red": [true, false, false],
+          "blue": [false, false, false]
+        }
+      }
+    },
+    {
+      "label": "Qualification 23",
+      "redTeams": ["9477", "2974", "2415"],
+      "blueTeams": ["1771", "5293", "3344"],
+      "startOffsetMs": -5220000,
+      "result": {
+        "red": 233,
+        "blue": 162,
+        "winner": "red",
+        "bonus": {
+          "red": [true, false, false],
+          "blue": [true, false, false]
+        }
+      }
+    },
+    {
+      "label": "Qualification 24",
+      "redTeams": ["6910", "4112", "8080"],
+      "blueTeams": ["9480", "6340", "8865"],
+      "startOffsetMs": -4680000,
+      "result": {
+        "red": 105,
+        "blue": 76,
+        "winner": "red",
+        "bonus": {
+          "red": [true, false, false],
+          "blue": [false, false, false]
+        }
+      }
+    },
+    {
+      "label": "Qualification 25",
+      "redTeams": ["6925", "8866", "11174"],
+      "blueTeams": ["1414", "5900", "6705"],
+      "startOffsetMs": -4140000,
+      "result": {
+        "red": 183,
+        "blue": 42,
+        "winner": "red",
+        "bonus": {
+          "red": [true, false, false],
+          "blue": [false, false, false]
+        }
+      }
+    },
+    {
+      "label": "Qualification 26",
+      "redTeams": ["832", "6905", "1002"],
+      "blueTeams": ["10482", "6772", "11214"],
+      "startOffsetMs": -3600000,
+      "result": {
+        "red": 156,
+        "blue": 40,
+        "winner": "red",
+        "bonus": {
+          "red": [true, false, false],
+          "blue": [false, false, false]
+        }
+      }
+    },
+    {
+      "label": "Qualification 27",
+      "redTeams": ["8100", "3318", "1746"],
+      "blueTeams": ["9522", "7538", "10376"],
+      "startOffsetMs": -2160000,
+      "result": {
+        "red": 99,
+        "blue": 13,
+        "winner": "red",
+        "bonus": {
+          "red": [false, false, false],
+          "blue": [false, false, false]
+        }
+      }
+    },
+    {
+      "label": "Qualification 28",
+      "redTeams": ["3635", "4509", "1833"],
+      "blueTeams": ["5608", "1683", "4188"],
+      "startOffsetMs": -1620000,
+      "result": {
+        "red": 139,
+        "blue": 117,
+        "winner": "red",
+        "bonus": {
+          "red": [true, false, false],
+          "blue": [false, false, false]
+        }
+      }
+    },
+    {
+      "label": "Qualification 29",
+      "redTeams": ["1648", "4189", "5074"],
+      "blueTeams": ["1261", "4026", "7451"],
+      "startOffsetMs": -1080000,
+      "result": {
+        "red": 90,
+        "blue": 220,
+        "winner": "blue",
+        "bonus": {
+          "red": [false, false, false],
+          "blue": [true, false, false]
+        }
+      }
+    },
+    {
+      "label": "Qualification 30",
+      "redTeams": ["5109", "6705", "6925"],
+      "blueTeams": ["6829", "6910", "9477"],
+      "startOffsetMs": -540000,
+      "result": {
+        "red": 90,
+        "blue": 166,
+        "winner": "blue",
+        "bonus": {
+          "red": [false, false, false],
+          "blue": [true, false, false]
+        }
+      }
+    },
+    {
+      "label": "Qualification 31",
+      "redTeams": ["2974", "6340", "8866"],
+      "blueTeams": ["1002", "11174", "10482"],
+      "startOffsetMs": 0
+    },
+    {
+      "label": "Qualification 32",
+      "redTeams": ["1414", "6772", "4112"],
+      "blueTeams": ["5293", "832", "7538"],
+      "startOffsetMs": 540000
+    },
+    {
+      "label": "Qualification 33",
+      "redTeams": ["1833", "5608", "8100"],
+      "blueTeams": ["2415", "8080", "5900"],
+      "startOffsetMs": 1080000
+    },
+    {
+      "label": "Qualification 34",
+      "redTeams": ["1261", "11214", "4509"],
+      "blueTeams": ["7451", "9480", "9522"],
+      "startOffsetMs": 1620000
+    },
+    {
+      "label": "Qualification 35",
+      "redTeams": ["1746", "3344", "5109"],
+      "blueTeams": ["1648", "4026", "6905"],
+      "startOffsetMs": 2160000
+    },
+    {
+      "label": "Qualification 36",
+      "redTeams": ["4188", "8865", "1771"],
+      "blueTeams": ["3318", "10376", "4189"],
+      "startOffsetMs": 2700000
+    },
+    {
+      "label": "Qualification 37",
+      "redTeams": ["1683", "6829", "7538"],
+      "blueTeams": ["1002", "3635", "5074"],
+      "startOffsetMs": 3240000
+    },
+    {
+      "label": "Qualification 38",
+      "redTeams": ["2974", "8100", "4112"],
+      "blueTeams": ["5608", "6925", "6772"],
+      "startOffsetMs": 3780000
+    },
+    {
+      "label": "Qualification 39",
+      "redTeams": ["2415", "11174", "832"],
+      "blueTeams": ["6910", "4509", "5900"],
+      "startOffsetMs": 4320000
+    },
+    {
+      "label": "Qualification 40",
+      "redTeams": ["4026", "1746", "5293"],
+      "blueTeams": ["6705", "10482", "9480"],
+      "startOffsetMs": 4860000
+    },
+    {
+      "label": "Qualification 41",
+      "redTeams": ["3318", "4188", "1261"],
+      "blueTeams": ["6340", "5109", "11214"],
+      "startOffsetMs": 5400000
+    },
+    {
+      "label": "Qualification 42",
+      "redTeams": ["8080", "1833", "1771"],
+      "blueTeams": ["6905", "1414", "7451"],
+      "startOffsetMs": 57240000
+    },
+    {
+      "label": "Qualification 43",
+      "redTeams": ["8865", "4189", "9477"],
+      "blueTeams": ["9522", "3635", "1683"],
+      "startOffsetMs": 57840000
+    },
+    {
+      "label": "Qualification 44",
+      "redTeams": ["10376", "6829", "5074"],
+      "blueTeams": ["8866", "3344", "1648"],
+      "startOffsetMs": 58440000
+    },
+    {
+      "label": "Qualification 45",
+      "redTeams": ["5900", "9480", "4026"],
+      "blueTeams": ["2974", "7538", "1002"],
+      "startOffsetMs": 58980000
+    },
+    {
+      "label": "Qualification 46",
+      "redTeams": ["5293", "11214", "6925"],
+      "blueTeams": ["6340", "5608", "1746"],
+      "startOffsetMs": 59520000
+    },
+    {
+      "label": "Qualification 47",
+      "redTeams": ["10482", "1414", "8080"],
+      "blueTeams": ["5109", "4188", "4509"],
+      "startOffsetMs": 60060000
+    },
+    {
+      "label": "Qualification 48",
+      "redTeams": ["6910", "6772", "1683"],
+      "blueTeams": ["7451", "2415", "3318"],
+      "startOffsetMs": 60600000
+    },
+    {
+      "label": "Qualification 49",
+      "redTeams": ["6905", "1771", "3635"],
+      "blueTeams": ["4112", "8866", "6829"],
+      "startOffsetMs": 61140000
+    },
+    {
+      "label": "Qualification 50",
+      "redTeams": ["1261", "4189", "832"],
+      "blueTeams": ["8100", "6705", "3344"],
+      "startOffsetMs": 61680000
+    },
+    {
+      "label": "Qualification 51",
+      "redTeams": ["1648", "9477", "9522"],
+      "blueTeams": ["8865", "1833", "11174"],
+      "startOffsetMs": 62220000
+    },
+    {
+      "label": "Qualification 52",
+      "redTeams": ["10376", "6340", "6925"],
+      "blueTeams": ["5074", "4026", "2974"],
+      "startOffsetMs": 62760000
+    },
+    {
+      "label": "Qualification 53",
+      "redTeams": ["1414", "4188", "1002"],
+      "blueTeams": ["1746", "2415", "6910"],
+      "startOffsetMs": 63300000
+    },
+    {
+      "label": "Qualification 54",
+      "redTeams": ["6829", "7451", "3635"],
+      "blueTeams": ["3318", "10482", "5293"],
+      "startOffsetMs": 63840000
+    },
+    {
+      "label": "Qualification 55",
+      "redTeams": ["8080", "9480", "1261"],
+      "blueTeams": ["832", "1683", "8866"],
+      "startOffsetMs": 64380000
+    },
+    {
+      "label": "Qualification 56",
+      "redTeams": ["11174", "7538", "6772"],
+      "blueTeams": ["3344", "1833", "4189"],
+      "startOffsetMs": 64920000
+    },
+    {
+      "label": "Qualification 57",
+      "redTeams": ["1771", "5074", "5608"],
+      "blueTeams": ["8865", "8100", "5109"],
+      "startOffsetMs": 65460000
+    },
+    {
+      "label": "Qualification 58",
+      "redTeams": ["11214", "10376", "1648"],
+      "blueTeams": ["4112", "9477", "5900"],
+      "startOffsetMs": 66000000
+    },
+    {
+      "label": "Qualification 59",
+      "redTeams": ["6705", "6905", "2974"],
+      "blueTeams": ["4509", "9522", "1414"],
+      "startOffsetMs": 66540000
+    }
+  ],
+  "rankings": [
+    {
+      "rank": 1,
+      "team": "1261",
+      "rp": 16,
+      "wins": 4,
+      "losses": 0,
+      "ties": 0
+    },
+    {
+      "rank": 2,
+      "team": "2974",
+      "rp": 16,
+      "wins": 4,
+      "losses": 0,
+      "ties": 0
+    },
+    {
+      "rank": 3,
+      "team": "6829",
+      "rp": 16,
+      "wins": 4,
+      "losses": 0,
+      "ties": 0
+    },
+    {
+      "rank": 4,
+      "team": "3635",
+      "rp": 16,
+      "wins": 4,
+      "losses": 0,
+      "ties": 0
+    },
+    {
+      "rank": 5,
+      "team": "3318",
+      "rp": 14,
+      "wins": 4,
+      "losses": 0,
+      "ties": 0
+    },
+    {
+      "rank": 6,
+      "team": "8866",
+      "rp": 13,
+      "wins": 3,
+      "losses": 1,
+      "ties": 0
+    },
+    {
+      "rank": 7,
+      "team": "6910",
+      "rp": 16,
+      "wins": 4,
+      "losses": 1,
+      "ties": 0
+    },
+    {
+      "rank": 8,
+      "team": "5109",
+      "rp": 12,
+      "wins": 3,
+      "losses": 1,
+      "ties": 0
+    },
+    {
+      "rank": 9,
+      "team": "1746",
+      "rp": 12,
+      "wins": 3,
+      "losses": 1,
+      "ties": 0
+    },
+    {
+      "rank": 10,
+      "team": "4026",
+      "rp": 12,
+      "wins": 3,
+      "losses": 1,
+      "ties": 0
+    },
+    {
+      "rank": 11,
+      "team": "1002",
+      "rp": 12,
+      "wins": 3,
+      "losses": 1,
+      "ties": 0
+    },
+    {
+      "rank": 12,
+      "team": "1771",
+      "rp": 10,
+      "wins": 2,
+      "losses": 2,
+      "ties": 0
+    },
+    {
+      "rank": 13,
+      "team": "9477",
+      "rp": 12,
+      "wins": 3,
+      "losses": 2,
+      "ties": 0
+    },
+    {
+      "rank": 14,
+      "team": "1683",
+      "rp": 9,
+      "wins": 2,
+      "losses": 2,
+      "ties": 0
+    },
+    {
+      "rank": 15,
+      "team": "4188",
+      "rp": 9,
+      "wins": 2,
+      "losses": 2,
+      "ties": 0
+    },
+    {
+      "rank": 16,
+      "team": "1648",
+      "rp": 9,
+      "wins": 2,
+      "losses": 2,
+      "ties": 0
+    },
+    {
+      "rank": 17,
+      "team": "10376",
+      "rp": 9,
+      "wins": 2,
+      "losses": 2,
+      "ties": 0
+    },
+    {
+      "rank": 18,
+      "team": "9480",
+      "rp": 9,
+      "wins": 2,
+      "losses": 2,
+      "ties": 0
+    },
+    {
+      "rank": 19,
+      "team": "1833",
+      "rp": 9,
+      "wins": 2,
+      "losses": 2,
+      "ties": 0
+    },
+    {
+      "rank": 20,
+      "team": "6905",
+      "rp": 9,
+      "wins": 2,
+      "losses": 2,
+      "ties": 0
+    },
+    {
+      "rank": 21,
+      "team": "5293",
+      "rp": 9,
+      "wins": 2,
+      "losses": 2,
+      "ties": 0
+    },
+    {
+      "rank": 22,
+      "team": "832",
+      "rp": 9,
+      "wins": 2,
+      "losses": 2,
+      "ties": 0
+    },
+    {
+      "rank": 23,
+      "team": "3344",
+      "rp": 9,
+      "wins": 2,
+      "losses": 2,
+      "ties": 0
+    },
+    {
+      "rank": 24,
+      "team": "4112",
+      "rp": 9,
+      "wins": 2,
+      "losses": 2,
+      "ties": 0
+    },
+    {
+      "rank": 25,
+      "team": "4189",
+      "rp": 8,
+      "wins": 2,
+      "losses": 2,
+      "ties": 0
+    },
+    {
+      "rank": 26,
+      "team": "10482",
+      "rp": 8,
+      "wins": 2,
+      "losses": 2,
+      "ties": 0
+    },
+    {
+      "rank": 27,
+      "team": "11174",
+      "rp": 8,
+      "wins": 2,
+      "losses": 2,
+      "ties": 0
+    },
+    {
+      "rank": 28,
+      "team": "6772",
+      "rp": 8,
+      "wins": 2,
+      "losses": 2,
+      "ties": 0
+    },
+    {
+      "rank": 29,
+      "team": "2415",
+      "rp": 8,
+      "wins": 2,
+      "losses": 2,
+      "ties": 0
+    },
+    {
+      "rank": 30,
+      "team": "8080",
+      "rp": 8,
+      "wins": 2,
+      "losses": 2,
+      "ties": 0
+    },
+    {
+      "rank": 31,
+      "team": "6925",
+      "rp": 9,
+      "wins": 2,
+      "losses": 3,
+      "ties": 0
+    },
+    {
+      "rank": 32,
+      "team": "5900",
+      "rp": 5,
+      "wins": 1,
+      "losses": 3,
+      "ties": 0
+    },
+    {
+      "rank": 33,
+      "team": "1414",
+      "rp": 5,
+      "wins": 1,
+      "losses": 3,
+      "ties": 0
+    },
+    {
+      "rank": 34,
+      "team": "5074",
+      "rp": 5,
+      "wins": 1,
+      "losses": 3,
+      "ties": 0
+    },
+    {
+      "rank": 35,
+      "team": "11214",
+      "rp": 5,
+      "wins": 1,
+      "losses": 3,
+      "ties": 0
+    },
+    {
+      "rank": 36,
+      "team": "4509",
+      "rp": 5,
+      "wins": 1,
+      "losses": 3,
+      "ties": 0
+    },
+    {
+      "rank": 37,
+      "team": "7451",
+      "rp": 4,
+      "wins": 1,
+      "losses": 3,
+      "ties": 0
+    },
+    {
+      "rank": 38,
+      "team": "8100",
+      "rp": 4,
+      "wins": 1,
+      "losses": 3,
+      "ties": 0
+    },
+    {
+      "rank": 39,
+      "team": "9522",
+      "rp": 4,
+      "wins": 1,
+      "losses": 3,
+      "ties": 0
+    },
+    {
+      "rank": 40,
+      "team": "6340",
+      "rp": 3,
+      "wins": 1,
+      "losses": 3,
+      "ties": 0
+    },
+    {
+      "rank": 41,
+      "team": "7538",
+      "rp": 3,
+      "wins": 1,
+      "losses": 3,
+      "ties": 0
+    },
+    {
+      "rank": 42,
+      "team": "5608",
+      "rp": 2,
+      "wins": 0,
+      "losses": 4,
+      "ties": 0
+    },
+    {
+      "rank": 43,
+      "team": "6705",
+      "rp": 0,
+      "wins": 0,
+      "losses": 5,
+      "ties": 0
+    },
+    {
+      "rank": 44,
+      "team": "8865",
+      "rp": 0,
+      "wins": 0,
+      "losses": 4,
+      "ties": 0
+    }
+  ]
+}

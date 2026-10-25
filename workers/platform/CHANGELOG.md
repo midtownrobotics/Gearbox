@@ -1,5 +1,103 @@
 # @g3/worker-platform
 
+## 4.0.0
+
+### Major Changes
+
+- 9006f60: Report a problem or suggest an idea from any app: the menu has "Report a problem", which posts it as a public issue on Gearbox's GitHub with the page and app versions (never your name), and you get a Slack or Discord message when it's fixed or closed. No GitHub account needed. Not in the public demo. Deployers: apply the platform's migration `0012_problem_reports.sql` before deploying it, and set its `GITHUB_TOKEN` secret (`docs/deploy.md`, "Problem reports on GitHub"); without it, reports are kept, and those under a week old are sent once it's set.
+
+### Minor Changes
+
+- 9006f60: Reports can have a title of their own, which becomes the GitHub issue's title, and the issue shows the report's text as written instead of as a quote. Deployers: apply the platform's migration `0014_report_titles.sql` first.
+- 9006f60: Each problem report's GitHub issue shows the sender's reporter ID, a random ID that doesn't say who they are, and the report form shows members their own. Operators can block a reporter ID that sends spam or misuses reports, from the console's Reporters page; the team's admins get a Slack or Discord message saying who it is and why, and see each member's reporter ID on their page in Members (the search finds it too). Deployers: apply the platform's migration `0013_reporters.sql` first.
+
+### Patch Changes
+
+- 05068af: On a phone, a long team and app name in the top bar and the menu is cut short ("ROBOWARRIORS SKILL TR…") instead of pushing the menu's close button and your greeting off the screen.
+- 73d2f28: Long links, part names and other long text wrap or are cut short on phones instead of making the page scroll sideways.
+- 9006f60: A team can send 5 problem reports a day, then one every 10 minutes until midnight UTC.
+- Updated dependencies [542d82b]
+- Updated dependencies [542d82b]
+- Updated dependencies [542d82b]
+- Updated dependencies [05068af]
+- Updated dependencies [05068af]
+- Updated dependencies [73d2f28]
+- Updated dependencies [73d2f28]
+- Updated dependencies [73d2f28]
+- Updated dependencies [b8d939a]
+- Updated dependencies [1e15859]
+- Updated dependencies [b8d939a]
+- Updated dependencies [9c00961]
+- Updated dependencies [9006f60]
+- Updated dependencies [9006f60]
+- Updated dependencies [24cbdaf]
+- Updated dependencies [24cbdaf]
+- Updated dependencies [9c00961]
+- Updated dependencies [9c00961]
+  - @g3/worker-portal@2.2.0
+  - @g3/worker-g3id@4.0.0
+  - @g3/worker-attendance@2.1.0
+  - @g3/worker-edge@2.3.0
+  - @g3/worker-inventory@1.1.0
+  - @g3/worker-orders@2.2.0
+  - @g3/worker-pit@3.1.0
+  - @g3/worker-schedule@0.3.0
+  - @g3/worker-scouting@3.0.0
+  - @g3/worker-shop@3.0.0
+  - @g3/worker-skill-tree@2.1.0
+
+## 3.0.2
+
+### Patch Changes
+
+- Updated dependencies [1273a89]
+  - @g3/worker-edge@2.2.0
+  - @g3/worker-orders@2.1.0
+
+## 3.0.1
+
+### Patch Changes
+
+- Updated dependencies [74955c0]
+  - @g3/worker-edge@2.1.0
+  - @g3/worker-orders@2.1.0
+
+## 3.0.0
+
+### Major Changes
+
+- db2c78c: Teams can use Discord instead of Slack: connect your server on Integrations (or when signing your team up), sign in with Discord, and get everything Gearbox sends (approvals, releases, daily summaries, reminders, service alerts and notifications) on Discord. Deployers run G3ID's and the platform's migrations first, and set up the Discord app (docs/deploy.md, "Discord") to switch it on.
+
+### Patch Changes
+
+- Updated dependencies [db2c78c]
+- Updated dependencies [3c67e43]
+- Updated dependencies [3c67e43]
+- Updated dependencies [fe63d3f]
+- Updated dependencies [c429a6e]
+- Updated dependencies [2aa06eb]
+- Updated dependencies [c6d1e89]
+- Updated dependencies [c6d1e89]
+- Updated dependencies [f29e1e4]
+- Updated dependencies [7f8f724]
+- Updated dependencies [c6d1e89]
+- Updated dependencies [c6d1e89]
+- Updated dependencies [f9bd8ec]
+- Updated dependencies [1585566]
+- Updated dependencies [1585566]
+- Updated dependencies [f29e1e4]
+- Updated dependencies [c6d1e89]
+- Updated dependencies [f9bd8ec]
+- Updated dependencies [c6d1e89]
+- Updated dependencies [da8964e]
+  - @g3/worker-g3id@3.0.0
+  - @g3/worker-portal@2.1.0
+  - @g3/worker-shop@2.1.0
+  - @g3/worker-orders@2.1.0
+  - @g3/worker-schedule@0.2.0
+  - @g3/worker-scouting@2.1.0
+  - @g3/worker-pit@3.0.0
+
 ## 2.0.0
 
 ### Major Changes

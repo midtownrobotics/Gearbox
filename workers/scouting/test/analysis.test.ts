@@ -1,7 +1,7 @@
 import { env } from "cloudflare:workers";
 import { inTeam, withTeam } from "@g3/auth";
 import { newTeamId, teamUsers } from "@g3/testing/users";
-import { jsonAs } from "@g3/testing/worker";
+import { callAs, jsonAs } from "@g3/testing/worker";
 import { describe, expect, it } from "vitest";
 import { createDb } from "../src/db";
 import { manualEvents, scoutingFormSubmissions, strategyEventConfig } from "../src/db/schema";
@@ -11,6 +11,7 @@ const db = createDb((env as unknown as AppEnv["Bindings"]).SCOUTING_DB);
 type Analysis = {
   reports: { id: string; formKind: string; eventKey: string }[];
   eventNames: Record<string, string>;
+  currentEventKey: string | null;
 };
 
 async function reportsFor(eventKeys: string[], authKey = "test-key") {
@@ -48,6 +49,43 @@ async function reportsFor(eventKeys: string[], authKey = "test-key") {
 }
 
 describe("analysis report types and event names", () => {
+  it("lets members read their team's reports and drawings while preserving management permissions", async () => {
+    const team = await reportsFor(["2099qaoffline"]);
+    const other = await reportsFor(["2099qaoffline"]);
+    const result = await jsonAs<Analysis>(team.student, "/scouting/analysis");
+    expect(result.reports).toHaveLength(1);
+    const id = result.reports[0].id;
+    const key = `teams/${team.teamId}/scouting-submissions/${id}/path.png`;
+    await (env as unknown as AppEnv["Bindings"]).FIELD_MAPS.put(key, "test drawing");
+    await db
+      .update(scoutingFormSubmissions)
+      .set({
+        drawing_fields_json: JSON.stringify({ path: { key, contentType: "image/png" } }),
+      })
+      .where(inTeam(scoutingFormSubmissions, team.teamId))
+      .run();
+    const drawingPath = `/scouting/scouting-submissions/${id}/drawings/path`;
+    const drawing = await callAs(team.student, drawingPath);
+    expect(drawing.status).toBe(200);
+    expect(new Uint8Array(await drawing.arrayBuffer())).toEqual(
+      new TextEncoder().encode("test drawing"),
+    );
+    expect((await callAs(other.student, drawingPath)).status).toBe(404);
+    const otherReports = await jsonAs<Analysis>(other.student, "/scouting/analysis");
+    expect(otherReports.reports.map((report) => report.id)).not.toContain(id);
+    for (const [method, suffix] of [
+      ["PUT", "/stars"],
+      ["DELETE", ""],
+      ["PUT", "/restore"],
+      ["DELETE", "/permanent"],
+    ]) {
+      expect(
+        (await callAs(team.student, `/scouting/analysis/reports/${id}${suffix}`, { method }))
+          .status,
+      ).toBe(403);
+    }
+  });
+
   it("returns match/pit kinds with short event names, falling back to the full name", async () => {
     const team = await reportsFor(["2099qashort", "2099qafull"]);
     const result = await jsonAs<Analysis>(team.admin, "/scouting/analysis");
@@ -94,6 +132,18 @@ describe("analysis report types and event names", () => {
     expect(first.eventNames).toEqual({ "manual-shared": "Private A" });
     expect(second.eventNames).toEqual({ "manual-shared": "Private B" });
     expect(second.reports.map((report) => report.id)).not.toContain(first.reports[0].id);
+  });
+
+  it("says which event the team is scouting now", async () => {
+    const team = await reportsFor(["2099qaoffline"], "");
+    expect((await jsonAs<Analysis>(team.student, "/scouting/analysis")).currentEventKey).toBeNull();
+    await db
+      .update(strategyEventConfig)
+      .set({ event_key: "manual-current" })
+      .where(inTeam(strategyEventConfig, team.teamId))
+      .run();
+    const result = await jsonAs<Analysis>(team.student, "/scouting/analysis");
+    expect(result.currentEventKey).toBe("manual-current");
   });
 
   it("does not lose reports when TBA is unavailable or unconfigured", async () => {

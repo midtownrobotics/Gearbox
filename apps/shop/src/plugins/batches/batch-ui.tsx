@@ -64,7 +64,12 @@ export function BatchStatusBadge({
     : batchStage(batch).status === "doing"
       ? tones.warning
       : tones.neutral;
-  return <Badge colors={colors}>{batchStatusText(batch, processName)}</Badge>;
+  const text = batchStatusText(batch, processName);
+  return (
+    <Badge colors={colors} title={text}>
+      {text}
+    </Badge>
+  );
 }
 
 /** A file's name, which downloads it. */

@@ -36,6 +36,8 @@ export function g3id(
 type NewUser = {
   email?: string;
   displayName?: string;
+  /** The name on their chat account. */
+  username?: string;
   /** Sets up email/password sign-in. */
   password?: string;
   status?: "active" | "pending" | "rejected";
@@ -54,6 +56,7 @@ export async function createUser(user: NewUser = {}): Promise<string> {
     teamId: user.teamId ?? siteTeamId,
     email: user.email ?? `${id}@test.g3`,
     displayName: user.displayName ?? "Test User",
+    username: user.username ?? null,
     status: user.status ?? "active",
     isAdmin: user.isAdmin ? 1 : 0,
     isMentor: user.isMentor ? 1 : 0,

@@ -16,7 +16,7 @@ import {
 import { fetchKioskPresence } from "../../shared/getters";
 import { processPath } from "../../shared/nav";
 import type { Batch, KioskPresence, ProcessType } from "../../shared/types";
-import { useKiosk } from "../../shared/use-auth";
+import { useAuthUser, useCanQualityCheck, useKiosk } from "../../shared/use-auth";
 import { type ShopData, useShopData } from "../../shared/use-shop-data";
 import { useTouchDevice } from "../../shared/use-touch";
 import { useUserNames } from "../../shared/use-user-names";
@@ -26,6 +26,7 @@ import { ConsumerBatchCard, batchesHere } from "./consumer-process-view";
 import { PartDetailsView } from "./part-details-view";
 import { PartWorkView } from "./part-work-view";
 import { ProducerSections } from "./producer-process-view";
+import { QualityReportView } from "./quality-report-view";
 import { ScanDialog } from "./scan-dialog";
 
 const MOOD_TONES: Record<ShopMood["tone"], string> = {
@@ -47,6 +48,10 @@ export function BoardPage() {
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const kiosk = useKiosk();
+  // A Quality Control process is only checked off by a shop manager or an admin.
+  const canQualityCheck = useCanQualityCheck();
+  // With quality reports on, a part at a Quality Control step gets a report instead.
+  const reportsOn = !!useAuthUser()?.qualityReports;
   // Kiosks are tablets — always use the finger-friendly layout there.
   const touch = useTouchDevice() || kiosk.active;
 
@@ -67,6 +72,7 @@ export function BoardPage() {
   const [viewingPartInstanceId, setViewingPartInstanceId] = useState<number | null>(null);
   const [presence, setPresence] = useState<KioskPresence[]>([]);
   const [scanOpen, setScanOpen] = useState(false);
+  const [reportingInstanceId, setReportingInstanceId] = useState<number | null>(null);
 
   const rows = useMemo(() => (data ? buildInstanceRows(data) : []), [data]);
   const batchById = useMemo(() => batchesById(data?.batches ?? []), [data]);
@@ -150,6 +156,17 @@ export function BoardPage() {
       </Page>
     );
 
+  /** Whether this part is at a Quality Control step that's finished with a report. */
+  const atReport = (row: InstanceRow) =>
+    reportsOn &&
+    data?.processes.find((p) => p.id === row.current?.processId)?.type === "quality_control";
+  /** Closes whichever shop view is open and starts this part's quality report. */
+  const startReport = (row: InstanceRow) => {
+    setWorkingPartInstanceId(null);
+    setViewingPartInstanceId(null);
+    setReportingInstanceId(row.instance.id);
+  };
+
   const processName = (pid: number) =>
     data?.processes.find((p) => p.id === pid)?.name ?? `Process #${pid}`;
 
@@ -162,7 +179,7 @@ export function BoardPage() {
     <Page
       title={kioskMachine?.name ?? (view === "overview" ? "Shop Floor" : processName(view))}
       actions={
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex min-w-0 max-w-full flex-wrap items-center gap-3">
           {view !== "overview" && !kioskMachine && (
             <Link
               to="/board"
@@ -180,7 +197,7 @@ export function BoardPage() {
                   e.target.value === "overview" ? "/board" : processPath(Number(e.target.value)),
                 )
               }
-              className={`${inputClass} !w-auto`}
+              className={`${inputClass} !w-auto min-w-0 max-w-full`}
             >
               <option value="overview">Every machine</option>
               {data?.processes.map((p) => (
@@ -224,6 +241,9 @@ export function BoardPage() {
             onOpenWorkView={setWorkingPartInstanceId}
             onViewPart={setViewingPartInstanceId}
             processType={data.processes.find((p) => p.id === view)?.type ?? "regular"}
+            canQualityCheck={canQualityCheck}
+            reports={reportsOn}
+            onStartReport={startReport}
             requiresPartInfo={!!data.processes.find((p) => p.id === view)?.requiresPartInfo}
             onChanged={refresh}
           />
@@ -264,6 +284,7 @@ export function BoardPage() {
                     setWorkingPartInstanceId(null);
                   }
                 }}
+                onStartReport={atReport(workingRow) ? () => startReport(workingRow) : undefined}
                 onChanged={refresh}
               />
             ) : null;
@@ -283,6 +304,21 @@ export function BoardPage() {
                     await advance(viewingRow, "doing");
                   }
                 }}
+                onStartReport={atReport(viewingRow) ? () => startReport(viewingRow) : undefined}
+              />
+            ) : null;
+          })()}
+
+        {reportingInstanceId &&
+          data &&
+          (() => {
+            const reportingRow = rows.find((r) => r.instance.id === reportingInstanceId);
+            return reportingRow ? (
+              <QualityReportView
+                row={reportingRow}
+                data={data}
+                onClose={() => setReportingInstanceId(null)}
+                onChanged={refresh}
               />
             ) : null;
           })()}
@@ -454,7 +490,8 @@ function BoardList({
                 <Link
                   to={processPath(row.current.processId)}
                   onClick={(e) => e.stopPropagation()}
-                  className="text-xs font-medium text-secondary-500 bg-inset border border-secondary-200 hover:border-secondary-400 hover:text-primary-600 rounded-full px-2.5 py-0.5 shrink-0 transition-colors"
+                  title={processName(row.current.processId)}
+                  className="text-xs font-medium text-secondary-500 bg-inset border border-secondary-200 hover:border-secondary-400 hover:text-primary-600 rounded-full px-2.5 py-0.5 max-w-[45%] truncate transition-colors"
                 >
                   {processName(row.current.processId)}
                 </Link>
@@ -480,6 +517,9 @@ function ProcessView({
   onOpenWorkView,
   onViewPart,
   processType,
+  canQualityCheck,
+  reports,
+  onStartReport,
   requiresPartInfo,
   onChanged,
 }: {
@@ -493,6 +533,9 @@ function ProcessView({
   onOpenWorkView: (instanceId: number) => void;
   onViewPart: (instanceId: number) => void;
   processType: ProcessType;
+  canQualityCheck: boolean;
+  reports: boolean;
+  onStartReport: (row: InstanceRow) => void;
   requiresPartInfo: boolean;
   onChanged: () => Promise<void>;
 }) {
@@ -521,6 +564,37 @@ function ProcessView({
   );
 
   const btnSize = touch ? "px-4 py-2.5" : "px-3 py-1.5";
+  // At a quality check, only a shop manager or an admin signs a part off.
+  const blocked = processType === "quality_control" && !canQualityCheck;
+  const completeHint = blocked
+    ? "Only a shop manager can mark a quality check complete."
+    : processType === "quality_control"
+      ? "Check the part before marking it complete!"
+      : "Do a quality check before marking this complete!";
+  // With quality reports on, a quality check is one report: no Start part or Mark as complete.
+  const reporting = processType === "quality_control" && reports;
+  const reportButton = (row: InstanceRow) => (
+    <Button
+      size={touch ? "md" : "sm"}
+      className="whitespace-nowrap disabled:cursor-not-allowed"
+      disabled={blocked}
+      title={blocked ? "Only a shop manager can do a quality report." : undefined}
+      onClick={(e) => {
+        e.stopPropagation();
+        onStartReport(row);
+      }}
+    >
+      Start quality report
+    </Button>
+  );
+  const completeButton = (row: InstanceRow) => (
+    <CompleteButton
+      blocked={blocked}
+      hint={completeHint}
+      size={btnSize}
+      onClick={() => onAdvance(row, "done")}
+    />
+  );
   const batchCards = (list: typeof batches) =>
     list.map((item) => (
       <ConsumerBatchCard key={item.batch.id} item={item} touch={touch} onChanged={onChanged} />
@@ -565,21 +639,7 @@ function ProcessView({
                     onOpenPart={() => onOpenWorkView(row.instance.id)}
                     stack
                   >
-                    <span className="relative group">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onAdvance(row, "done");
-                        }}
-                        className={`w-full whitespace-nowrap text-xs bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold transition-colors ${btnSize}`}
-                      >
-                        Mark as complete
-                      </button>
-                      <span className="pointer-events-none absolute bottom-full right-0 mb-1.5 hidden group-hover:block whitespace-nowrap bg-secondary-900 text-surface text-xs rounded-md px-2.5 py-1.5 shadow-lg">
-                        Do a quality check before marking this complete!
-                      </span>
-                    </span>
+                    {reporting ? reportButton(row) : completeButton(row)}
                   </PartLine>
                 ))}
               </div>
@@ -603,31 +663,23 @@ function ProcessView({
                     onOpenPart={() => onViewPart(row.instance.id)}
                     stack
                   >
-                    <Button
-                      size={touch ? "md" : "sm"}
-                      className="whitespace-nowrap"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onAdvance(row, "doing");
-                      }}
-                    >
-                      Start part
-                    </Button>
-                    <span className="relative group">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onAdvance(row, "done");
-                        }}
-                        className={`w-full whitespace-nowrap text-xs bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold transition-colors ${btnSize}`}
-                      >
-                        Mark as complete
-                      </button>
-                      <span className="pointer-events-none absolute bottom-full right-0 mb-1.5 hidden group-hover:block whitespace-nowrap bg-secondary-900 text-surface text-xs rounded-md px-2.5 py-1.5 shadow-lg">
-                        Do a quality check before marking this complete!
-                      </span>
-                    </span>
+                    {reporting ? (
+                      reportButton(row)
+                    ) : (
+                      <>
+                        <Button
+                          size={touch ? "md" : "sm"}
+                          className="whitespace-nowrap"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onAdvance(row, "doing");
+                          }}
+                        >
+                          Start part
+                        </Button>
+                        {completeButton(row)}
+                      </>
+                    )}
                   </PartLine>
                 ))}
               </div>
@@ -654,7 +706,10 @@ function ProcessView({
                 detailsLink
               >
                 {row.current && (
-                  <span className="text-xs text-secondary-400 shrink-0">
+                  <span
+                    title={`Stuck at ${processName(row.current.processId)}`}
+                    className="text-xs text-secondary-400 min-w-0 max-w-[45%] truncate"
+                  >
                     Stuck at{" "}
                     <Link
                       to={processPath(row.current.processId)}
@@ -675,6 +730,38 @@ function ProcessView({
 }
 
 // ── Shared bits ───────────────────────────────────────────────────────────────
+
+/** Finishes a part's step here. Disabled at a quality check for anyone who can't sign one off. */
+function CompleteButton({
+  blocked,
+  hint,
+  size,
+  onClick,
+}: {
+  blocked: boolean;
+  hint: string;
+  size: string;
+  onClick: () => void;
+}) {
+  return (
+    <span className="relative group">
+      <button
+        type="button"
+        disabled={blocked}
+        onClick={(e) => {
+          e.stopPropagation();
+          onClick();
+        }}
+        className={`w-full whitespace-nowrap text-xs bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${size}`}
+      >
+        Mark as complete
+      </button>
+      <span className="pointer-events-none absolute bottom-full right-0 mb-1.5 hidden group-hover:block whitespace-nowrap bg-secondary-900 text-surface text-xs rounded-md px-2.5 py-1.5 shadow-lg">
+        {hint}
+      </span>
+    </span>
+  );
+}
 
 /**
  * One part in a list. With `onOpenPart` its name is the link that opens its shop view; with

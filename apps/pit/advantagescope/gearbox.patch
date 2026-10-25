@@ -1,0 +1,417 @@
+diff --git a/src/hub/Sidebar.ts b/src/hub/Sidebar.ts
+index 9a7924f..4a224c6 100644
+--- a/src/hub/Sidebar.ts
++++ b/src/hub/Sidebar.ts
+@@ -703,8 +703,13 @@ export default class Sidebar {
+       // Search expand callback
+       let highlightForSearch = () => {
+         if (this.searchKey !== null && field.fullKey === this.searchKey) {
+-          // @ts-expect-error
+-          fieldElement.scrollIntoViewIfNeeded(); // Available in Chromium but not standard
++          // Gearbox: Firefox and Safari don't have it; there, the standard call scrolls only as needed.
++          if ("scrollIntoViewIfNeeded" in fieldElement) {
++            // @ts-expect-error
++            fieldElement.scrollIntoViewIfNeeded(); // Available in Chromium but not standard
++          } else {
++            (fieldElement as HTMLElement).scrollIntoView({ block: "nearest" });
++          }
+           fieldElementContainer.classList.add("highlight");
+           setTimeout(() => fieldElementContainer.classList.remove("highlight"), 3000);
+         }
+diff --git a/src/main/lite/assetLoader.ts b/src/main/lite/assetLoader.ts
+index cb79b2d..e0a7b4d 100644
+--- a/src/main/lite/assetLoader.ts
++++ b/src/main/lite/assetLoader.ts
+@@ -18,10 +18,34 @@ export async function loadAssets(): Promise<AdvantageScopeAssets> {
+     loadFailures: []
+   };
+ 
+-  // Request asset index
+-  let response = await fetch("assets");
+-  let assetIndex = await response.json();
++  // Gearbox: the assets built in, as static files, then the team's own uploads, kept by Pit. One
++  // the team uploaded replaces the built-in one with the same name.
+   let currentPath = window.location.pathname;
++  let assetIndex: { [path: string]: any } = {};
++  let assetBase: { [name: string]: string } = {};
++  for (let [indexUrl, base] of [
++    ["bundledAssets/index.json", currentPath + "bundledAssets/"],
++    ["/api/scope/assets", "/api/scope/assets/"]
++  ]) {
++    let index: { [path: string]: any };
++    try {
++      let response = await fetch(indexUrl);
++      if (!response.ok) continue;
++      index = await response.json();
++    } catch (e) {
++      continue;
++    }
++    for (let path of Object.keys(index)) {
++      let name = path.split("/")[0];
++      if (assetBase[name] !== base) {
++        for (let old of Object.keys(assetIndex)) {
++          if (old.split("/")[0] === name) delete assetIndex[old];
++        }
++        assetBase[name] = base;
++      }
++      assetIndex[path] = index[path];
++    }
++  }
+ 
+   // Filter and sort index
+   let configPaths = Object.keys(assetIndex)
+@@ -45,7 +69,7 @@ export async function loadAssets(): Promise<AdvantageScopeAssets> {
+       } else if (config === "invalid") {
+         return;
+       }
+-      config.path = currentPath + `assets/${encodeURIComponent(name)}/image.png`;
++      config.path = assetBase[name] + `${encodeURIComponent(name)}/image.png`;
+       if (`${name}/image.png` in assetIndex) {
+         assets.field2ds.push(config);
+         assets.loadFailures.splice(assets.loadFailures.indexOf(name), 1);
+@@ -59,7 +83,7 @@ export async function loadAssets(): Promise<AdvantageScopeAssets> {
+       } else if (config === "invalid") {
+         return;
+       }
+-      config.path = currentPath + `assets/${encodeURIComponent(name)}/model.glb`;
++      config.path = assetBase[name] + `${encodeURIComponent(name)}/model.glb`;
+       if (
+         `${name}/model.glb` in assetIndex &&
+         config.gamePieces.every((_, index) => `${name}/model_${index}.glb` in assetIndex)
+@@ -71,7 +95,7 @@ export async function loadAssets(): Promise<AdvantageScopeAssets> {
+       // ***** 3D ROBOT *****
+       let config = parseRobot(configRaw);
+       if (config === "invalid") return;
+-      config.path = currentPath + `assets/${encodeURIComponent(name)}/model.glb`;
++      config.path = assetBase[name] + `${encodeURIComponent(name)}/model.glb`;
+       if (
+         `${name}/model.glb` in assetIndex &&
+         config.components.every((_, index) => `${name}/model_${index}.glb` in assetIndex)
+@@ -83,7 +107,7 @@ export async function loadAssets(): Promise<AdvantageScopeAssets> {
+       // ***** JOYSTICK *****
+       let config = parseJoystick(configRaw);
+       if (config === "invalid") return;
+-      config.path = currentPath + `assets/${encodeURIComponent(name)}/image.png`;
++      config.path = assetBase[name] + `${encodeURIComponent(name)}/image.png`;
+       if (`${name}/image.png` in assetIndex) {
+         assets.joysticks.push(config);
+         assets.loadFailures.splice(assets.loadFailures.indexOf(name), 1);
+diff --git a/src/main/lite/main.ts b/src/main/lite/main.ts
+index f8e6a0d..0ef2333 100644
+--- a/src/main/lite/main.ts
++++ b/src/main/lite/main.ts
+@@ -32,6 +32,7 @@ import { GITHUB_REPOSITORY } from "../github";
+ import { loadAssets } from "./assetLoader";
+ import { isAlpha, isBeta, isBetaExpired, isBetaWelcomeComplete, saveBetaWelcomeComplete } from "./betaUtil";
+ import { LocalStorageKeys } from "./localStorageKeys";
++import { localStorage, storageReady } from "./teamStorage";
+ 
+ let HUB_FRAME: HTMLIFrameElement;
+ let POPUP_FRAME: HTMLIFrameElement;
+@@ -191,7 +192,7 @@ function openDownload() {
+         let updateList = async () => {
+           let response: Response;
+           try {
+-            response = await fetch(`logs?folder=${encodeURIComponent(path)}`);
++            response = await fetch(`/api/scope/logs?folder=${encodeURIComponent(path)}`);
+           } catch (e) {
+             sendMessage(port, "show-error", "Fetch failed");
+             return;
+@@ -238,6 +239,10 @@ async function openUploadAsset() {
+ }
+ 
+ async function initHub() {
++  // Gearbox: the team's settings and the assets before the hub is connected, which then saves its
++  // state every 250 ms: connected first, its empty state would replace the team's before it's read.
++  await Promise.all([storageReady, assetsPromise]);
++
+   // Create message ports
+   const channel = new MessageChannel();
+   HUB_FRAME.contentWindow?.postMessage("port", "*", [channel.port1]);
+@@ -265,6 +270,13 @@ async function initHub() {
+   if (state !== null) sendMessage(hubPort, "restore-state", JSON.parse(state));
+   sendMessage(hubPort, "show-when-ready");
+ 
++  // Gearbox: Pit's Logs page opens a match log here with ?log=<file name>.
++  let log = new URLSearchParams(location.search).get("log");
++  if (log !== null) {
++    history.replaceState(null, "", location.pathname);
++    sendMessage(hubPort, "open-files", { files: [log], merge: false });
++  }
++
+   // Add cursor event handlers
+   HUB_FRAME.contentWindow?.addEventListener("contextmenu", (event) => {
+     event.preventDefault();
+@@ -333,7 +345,7 @@ async function handleHubMessage(message: NamedMessage) {
+         let prefsRaw = localStorage.getItem(LocalStorageKeys.PREFS);
+         if (prefsRaw !== null) mergePreferences(prefs, JSON.parse(prefsRaw));
+ 
+-        let response = await fetch(`logs/${encodeURIComponent(path)}?folder=${encodeURIComponent(prefs.remotePath)}`);
++        let response = await fetch(`/api/scope/logs/${encodeURIComponent(path)}?folder=${encodeURIComponent(prefs.remotePath)}`);
+         let buffer = await response.arrayBuffer();
+         let array = new Uint8Array(buffer);
+ 
+diff --git a/src/main/lite/teamStorage.ts b/src/main/lite/teamStorage.ts
+new file mode 100644
+index 0000000..4b91ca1
+--- /dev/null
++++ b/src/main/lite/teamStorage.ts
+@@ -0,0 +1,64 @@
++// Gearbox: AdvantageScope Lite's preferences and layout belong to the team, not to one browser.
++// Pit keeps them (GET/PUT /api/scope/settings), and main.ts reads and writes them through this
++// `localStorage` in place of the browser's.
++
++const ENDPOINT = "/api/scope/settings";
++const SAVE_DELAY_MS = 1000;
++
++const values = new Map<string, string>();
++const unsaved = new Map<string, string>();
++let loaded = false;
++let saveTimer: number | null = null;
++
++/** Resolves once the team's settings are in (or couldn't be read: then nothing is saved). */
++export const storageReady: Promise<void> = (async () => {
++  try {
++    const response = await fetch(ENDPOINT, { credentials: "same-origin" });
++    if (response.status === 401) {
++      // Signed out: to the team's sign-in page, coming back here.
++      location.replace("/api/scope/sign-in?return=" + encodeURIComponent(location.href));
++      await new Promise(() => {});
++    }
++    if (!response.ok) return;
++    const body = (await response.json()) as { settings: { [key: string]: string } };
++    for (const [key, value] of Object.entries(body.settings)) values.set(key, value);
++    loaded = true;
++  } catch {
++    // Offline: the defaults, without overwriting what the team has saved.
++  }
++})();
++
++function save(keepalive = false) {
++  if (saveTimer !== null) {
++    window.clearTimeout(saveTimer);
++    saveTimer = null;
++  }
++  if (unsaved.size === 0) return;
++  const body = JSON.stringify({ settings: Object.fromEntries(unsaved) });
++  unsaved.clear();
++  fetch(ENDPOINT, {
++    method: "PUT",
++    credentials: "same-origin",
++    headers: { "Content-Type": "application/json" },
++    body: body,
++    keepalive: keepalive && body.length < 60000
++  }).catch(() => {});
++}
++
++window.addEventListener("pagehide", () => save(true));
++document.addEventListener("visibilitychange", () => {
++  if (document.visibilityState === "hidden") save(true);
++});
++
++export const localStorage = {
++  getItem(key: string): string | null {
++    return values.get(key) ?? null;
++  },
++  setItem(key: string, value: string) {
++    if (values.get(key) === value) return;
++    values.set(key, value);
++    if (!loaded) return;
++    unsaved.set(key, value);
++    if (saveTimer === null) saveTimer = window.setTimeout(() => save(), SAVE_DELAY_MS);
++  }
++};
+diff --git a/src/shared/renderers/Field3dRendererImpl.ts b/src/shared/renderers/Field3dRendererImpl.ts
+index bf13268..71d8f93 100644
+--- a/src/shared/renderers/Field3dRendererImpl.ts
++++ b/src/shared/renderers/Field3dRendererImpl.ts
+@@ -28,6 +28,7 @@ import GamePieceManager from "./field3d/objectManagers/GamePieceManager";
+ import HeatmapManager from "./field3d/objectManagers/HeatmapManager";
+ import RobotManager from "./field3d/objectManagers/RobotManager";
+ import TrajectoryManager from "./field3d/objectManagers/TrajectoryManager";
++import { fetchFiles, modelPaths } from "./field3d/workers/gearboxFiles";
+ 
+ export default class Field3dRendererImpl implements TabRenderer {
+   private LOWER_POWER_MAX_FPS = 30;
+@@ -734,12 +735,18 @@ export default class Field3dRendererImpl implements TabRenderer {
+         newFieldReady();
+       } else {
+         this.isFieldLoading = true;
+-        WorkerManager.request("../bundles/shared$loadField.js", {
+-          fieldConfig: fieldConfig,
+-          mode: this.mode,
+-          materialSpecular: this.MATERIAL_SPECULAR.toArray(),
+-          materialShininess: this.MATERIAL_SHININESS
+-        }).then((result) => {
++        // Gearbox: the models fetched here, not in the worker (gearboxFiles.ts).
++        fetchFiles(modelPaths(fieldConfig.path, fieldConfig.gamePieces.length))
++          .then((files) =>
++            WorkerManager.request("../bundles/shared$loadField.js", {
++              fieldConfig: fieldConfig,
++              files: files,
++              mode: this.mode,
++              materialSpecular: this.MATERIAL_SPECULAR.toArray(),
++              materialShininess: this.MATERIAL_SHININESS
++            })
++          )
++          .then((result) => {
+           const loader = new THREE.ObjectLoader();
+           this.field = loader.parse(result.field);
+           this.fieldStagedPieces = loader.parse(result.fieldStagedPieces);
+diff --git a/src/shared/renderers/field3d/objectManagers/RobotManager.ts b/src/shared/renderers/field3d/objectManagers/RobotManager.ts
+index 08431a9..e0aded4 100644
+--- a/src/shared/renderers/field3d/objectManagers/RobotManager.ts
++++ b/src/shared/renderers/field3d/objectManagers/RobotManager.ts
+@@ -21,6 +21,7 @@ import { quaternionToRotation3d, rotation3dToQuaternion } from "../../Field3dRen
+ import ObjectManager from "../ObjectManager";
+ import { FTC_MULTIPLIER, XR_MAX_RADIUS } from "../OptimizeGeometries";
+ import ResizableInstancedMesh from "../ResizableInstancedMesh";
++import { fetchFiles, modelPaths } from "../workers/gearboxFiles";
+ 
+ type MechanismLineData = {
+   mesh: ResizableInstancedMesh;
+@@ -267,13 +268,19 @@ export default class RobotManager extends ObjectManager<
+           });
+         } else {
+           // Desktop, load models with worker and mesh merging
+-          WorkerManager.request("../bundles/shared$loadRobot.js", {
+-            robotConfig: robotConfig!,
+-            isFTC: robotConfig.isFTC,
+-            mode: this.mode,
+-            materialSpecular: this.materialSpecular.toArray(),
+-            materialShininess: this.materialShininess
+-          }).then((result: THREE.MeshJSON[][]) => {
++          // Gearbox: the models fetched here, not in the worker (gearboxFiles.ts).
++          fetchFiles(modelPaths(robotConfig.path, robotConfig.components.length))
++            .then((files) =>
++              WorkerManager.request("../bundles/shared$loadRobot.js", {
++                robotConfig: robotConfig!,
++                files: files,
++                isFTC: robotConfig.isFTC,
++                mode: this.mode,
++                materialSpecular: this.materialSpecular.toArray(),
++                materialShininess: this.materialShininess
++              })
++            )
++            .then((result: THREE.MeshJSON[][]) => {
+             if (loadingCounter !== this.loadingCounter) {
+               // Model was switched, throw away the data :(
+               return;
+diff --git a/src/shared/renderers/field3d/workers/gearboxFiles.ts b/src/shared/renderers/field3d/workers/gearboxFiles.ts
+new file mode 100644
+index 0000000..5a31f75
+--- /dev/null
++++ b/src/shared/renderers/field3d/workers/gearboxFiles.ts
+@@ -0,0 +1,33 @@
++// Gearbox: the page fetches a 3D worker's models and hands them over, rather than the worker
++// fetching them. Firefox sends a worker's own requests past Pit's service worker, which keeps
++// the models on the device, so without a connection they failed.
++
++import { GLTF, GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
++
++/** A model and the ones beside it (model.glb, model_0.glb, ...), as their paths. */
++export function modelPaths(path: string, count: number): string[] {
++  return [path, ...Array.from({ length: count }, (_, index) => path.slice(0, -4) + "_" + index.toString() + ".glb")];
++}
++
++/** On the page: each file's bytes, by path (one that can't be fetched is left for the worker). */
++export async function fetchFiles(paths: string[]): Promise<{ [path: string]: ArrayBuffer }> {
++  const files: { [path: string]: ArrayBuffer } = {};
++  await Promise.all(
++    paths.map(async (path) => {
++      try {
++        const response = await fetch(path);
++        if (response.ok) files[path] = await response.arrayBuffer();
++      } catch (e) {}
++    })
++  );
++  return files;
++}
++
++/** In the worker: the model from the bytes the page sent, else fetched as before. */
++export function loadModel(loader: GLTFLoader, files: { [path: string]: ArrayBuffer } | undefined, path: string) {
++  return new Promise<GLTF>((resolve) => {
++    const file = files?.[path];
++    if (file) loader.parse(file, "", resolve, (error) => console.error(error));
++    else loader.load(path, resolve);
++  });
++}
+diff --git a/src/shared/renderers/field3d/workers/loadField.ts b/src/shared/renderers/field3d/workers/loadField.ts
+index e61b49d..cec778a 100644
+--- a/src/shared/renderers/field3d/workers/loadField.ts
++++ b/src/shared/renderers/field3d/workers/loadField.ts
+@@ -7,6 +7,7 @@
+ 
+ import * as THREE from "three";
+ import { GLTF, GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
++import { loadModel, modelPaths } from "./gearboxFiles";
+ import { Config3dField } from "../../../AdvantageScopeAssets";
+ import { rotationSequenceToQuaternion } from "../../../geometry";
+ import optimizeGeometries from "../OptimizeGeometries";
+@@ -33,17 +34,9 @@ self.onmessage = (event) => {
+   let fieldPieces: { [key: string]: THREE.Mesh } = {};
+ 
+   const gltfLoader = new GLTFLoader();
+-  Promise.all([
+-    new Promise((resolve) => {
+-      gltfLoader.load(fieldConfig.path, resolve);
+-    }),
+-    ...fieldConfig.gamePieces.map(
+-      (_, index) =>
+-        new Promise((resolve) => {
+-          gltfLoader.load(fieldConfig.path.slice(0, -4) + "_" + index.toString() + ".glb", resolve);
+-        })
+-    )
+-  ]).then(async (gltfs) => {
++  Promise.all(
++    modelPaths(fieldConfig.path, fieldConfig.gamePieces.length).map((path) => loadModel(gltfLoader, payload.files, path))
++  ).then(async (gltfs) => {
+     let gltfScenes = (gltfs as GLTF[]).map((gltf) => gltf.scene);
+     if (fieldConfig === undefined) return;
+     let loadCount = 0;
+diff --git a/src/shared/renderers/field3d/workers/loadRobot.ts b/src/shared/renderers/field3d/workers/loadRobot.ts
+index b1cc095..83eaa74 100644
+--- a/src/shared/renderers/field3d/workers/loadRobot.ts
++++ b/src/shared/renderers/field3d/workers/loadRobot.ts
+@@ -7,6 +7,7 @@
+ 
+ import * as THREE from "three";
+ import { GLTF, GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
++import { loadModel, modelPaths } from "./gearboxFiles";
+ import { Config3dRobot } from "../../../AdvantageScopeAssets";
+ import { rotationSequenceToQuaternion } from "../../../geometry";
+ import optimizeGeometries from "../OptimizeGeometries";
+@@ -32,17 +33,9 @@ self.onmessage = (event) => {
+   let meshes: THREE.MeshJSON[][] = [];
+ 
+   const gltfLoader = new GLTFLoader();
+-  Promise.all([
+-    new Promise((resolve) => {
+-      gltfLoader.load(robotConfig.path, resolve);
+-    }),
+-    ...robotConfig.components.map(
+-      (_, index) =>
+-        new Promise((resolve) => {
+-          gltfLoader.load(robotConfig.path.slice(0, -4) + "_" + index.toString() + ".glb", resolve);
+-        })
+-    )
+-  ]).then(async (gltfs) => {
++  Promise.all(
++    modelPaths(robotConfig.path, robotConfig.components.length).map((path) => loadModel(gltfLoader, payload.files, path))
++  ).then(async (gltfs) => {
+     let gltfScenes = (gltfs as GLTF[]).map((gltf) => gltf.scene);
+     for (let index = 0; index < gltfScenes.length; index++) {
+       let scene = gltfScenes[index];
+diff --git a/src/uploadAsset.ts b/src/uploadAsset.ts
+index 207bf5a..931e2a9 100644
+--- a/src/uploadAsset.ts
++++ b/src/uploadAsset.ts
+@@ -29,7 +29,7 @@ window.addEventListener("message", (event) => {
+   function confirm() {
+     if (ASSET_INPUT.files !== null && ASSET_INPUT.files.length > 0) {
+       PROGRESS_TEXT.innerText = "Uploading file...";
+-      const API_ENDPOINT = "../uploadAsset";
++      const API_ENDPOINT = "/api/scope/assets";
+       const request = new XMLHttpRequest();
+       const formData = new FormData();
+ 

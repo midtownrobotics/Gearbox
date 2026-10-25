@@ -10,6 +10,7 @@ import { emailAuthRouter } from "./routes/auth/email";
 import { githubAuthRouter } from "./routes/auth/github";
 import { googleAuthRouter } from "./routes/auth/google";
 import { pinAuthRouter } from "./routes/auth/pin";
+import { signupNameRouter } from "./routes/auth/signup-name";
 import { slackAuthRouter } from "./routes/auth/slack";
 import { steamAuthRouter } from "./routes/auth/steam";
 import { demoAuthRouter, demoInternalRouter } from "./routes/demo";
@@ -50,6 +51,7 @@ const app = base
   .route("/auth", discordAuthRouter)
   .route("/auth", steamAuthRouter)
   .route("/auth", demoAuthRouter)
+  .route("/auth", signupNameRouter)
   .route("/admin/team/sign-in", adminSignInRouter)
   .route("/admin", adminRouter)
   .route("/team/sign-in", teamSignInRouter)

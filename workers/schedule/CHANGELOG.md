@@ -1,5 +1,24 @@
 # @g3/worker-schedule
 
+## 0.3.0
+
+### Minor Changes
+
+- 9006f60: Report a problem or suggest an idea from any app: the menu has "Report a problem", which posts it as a public issue on Gearbox's GitHub with the page and app versions (never your name), and you get a Slack or Discord message when it's fixed or closed. No GitHub account needed. Not in the public demo. Deployers: apply the platform's migration `0012_problem_reports.sql` before deploying it, and set its `GITHUB_TOKEN` secret (`docs/deploy.md`, "Problem reports on GitHub"); without it, reports are kept, and those under a week old are sent once it's set.
+
+### Patch Changes
+
+- 05068af: Your team's logo keeps its shape in the top bar: a wide logo shows wider and a tall one narrower, instead of being squeezed into a square.
+- 05068af: On a phone, a long team and app name in the top bar and the menu is cut short ("ROBOWARRIORS SKILL TR…") instead of pushing the menu's close button and your greeting off the screen.
+- 73d2f28: Long links, part names and other long text wrap or are cut short on phones instead of making the page scroll sideways.
+
+## 0.2.0
+
+### Minor Changes
+
+- db2c78c: Teams can use Discord instead of Slack: connect your server on Integrations (or when signing your team up), sign in with Discord, and get everything Gearbox sends (approvals, releases, daily summaries, reminders, service alerts and notifications) on Discord. Deployers run G3ID's and the platform's migrations first, and set up the Discord app (docs/deploy.md, "Discord") to switch it on.
+- 2aa06eb: Pit's Monitor keeps the team's played matches in its match list, with the blue and red scores and a green W or red L in place of the time; the list opens at the next match. On a wide screen the Monitor fits the window: the match list and the checklists scroll on their own, with the column names and the overall progress bar kept at the top. The Batteries page has Pause All and Unpause All, which stop and restart every battery's timer without changing any battery's state. On the days of a published Schedule event, the timers go back to zero and pause when the first day opens, pause when each day closes, and carry on when the next day opens. In dev and staging only, Pit's Admin page has Use event snapshot, which shows GRITS 2026 halfway through qualifications on the Monitor instead of the team's event. Deployers: apply Pit's migration 0018 first, and deploy Schedule with Pit (Pit's new `SCHEDULE` service binding).
+
 ## 0.1.0
 
 ### Minor Changes

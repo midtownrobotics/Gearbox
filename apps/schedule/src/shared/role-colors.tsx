@@ -74,14 +74,14 @@ export function Swatch({ color, className = "h-3 w-3" }: { color: string; classN
     return (
       <span
         aria-hidden
-        className={`inline-block rounded-sm ${className} ${PRESETS[color].swatch}`}
+        className={`inline-block shrink-0 rounded-sm ${className} ${PRESETS[color].swatch}`}
       />
     );
   }
   return (
     <span
       aria-hidden
-      className={`inline-block rounded-sm border border-black/15 ${className}`}
+      className={`inline-block shrink-0 rounded-sm border border-black/15 ${className}`}
       style={{ backgroundColor: isHexColor(color) ? color : undefined }}
     />
   );

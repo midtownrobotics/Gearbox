@@ -6,8 +6,11 @@ import {
   ConfirmQuestion,
   ErrorBanner,
   buttonClass,
+  tones,
 } from "@g3/ui";
 import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { advantageScopePage } from "../../shared/getters/advantagescope";
 import {
   type MatchLog,
   type MatchLogs as MatchLogsData,
@@ -19,16 +22,18 @@ import {
   matchLogsZipUrl,
   setWhenFull,
 } from "../../shared/getters/downloaders";
+import { canSaveLogs, saveAdvantageScope, saveLog, useSavedLogs } from "../../shared/saved-logs";
 
 // The match logs the team's downloaders uploaded, by event (the one uploaded to last first), each
 // event's matches latest first. Anyone signed in downloads them, one or all in a zip; mentors and
 // admins choose what happens once Pit has its limit, and admins delete them (one, or all after an
-// export).
+// export). Logs can be saved on the device ahead, so AdvantageScope opens them without
+// downloading (at an event, on cellular).
 
 const whenFormat = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
 const TYPE_ORDER = { e: 0, q: 1, p: 2 } as const;
 
-const size = (bytes: number) =>
+export const size = (bytes: number) =>
   bytes < 1024 * 1024
     ? `${(bytes / 1024).toFixed(0)} KB`
     : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
@@ -150,9 +155,74 @@ function Storage({
   );
 }
 
+/**
+ * How many logs are on this device, and saving AdvantageScope (its own files and the team's fields
+ * and robots) and the rest of the logs, so they open without a connection.
+ */
+function OnThisDevice({
+  logs,
+  saved,
+  onError,
+}: { logs: MatchLog[]; saved: Set<number>; onError: (message: string) => void }) {
+  const [saving, setSaving] = useState<string | null>(null);
+  const missing = logs.filter((log) => !saved.has(log.id));
+  const bytes = missing.reduce((sum, log) => sum + log.size, 0);
+
+  const saveAll = async () => {
+    try {
+      await saveAdvantageScope((done, of) =>
+        setSaving(`Saving AdvantageScope (${Math.round((done / of) * 100)}%)…`),
+      );
+    } catch {
+      setSaving(null);
+      onError("Couldn't save AdvantageScope. Check your connection and try again.");
+      return;
+    }
+    let failed = false;
+    for (const [done, log] of missing.entries()) {
+      setSaving(`Saving log ${done + 1} of ${missing.length}…`);
+      try {
+        await saveLog(log);
+      } catch {
+        failed = true;
+      }
+    }
+    setSaving(null);
+    if (failed) onError("Couldn't save every log. Check your connection and try again.");
+  };
+
+  return (
+    <Card>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="text-sm">
+          <p className="font-semibold text-secondary-900">
+            {saved.size} of {logs.length} logs on this device
+          </p>
+          <p className="text-secondary-500">
+            Save AdvantageScope, your team's fields and robots, and the logs to open them without a
+            connection.
+          </p>
+        </div>
+        <Button
+          variant="secondary"
+          size="sm"
+          disabled={Boolean(saving)}
+          onClick={() => void saveAll()}
+        >
+          {saving ??
+            (missing.length > 0
+              ? `Save all to this device (logs: ${size(bytes)})`
+              : "Save AdvantageScope to this device")}
+        </Button>
+      </div>
+    </Card>
+  );
+}
+
 export function MatchLogs() {
   const [data, setData] = useState<MatchLogsData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const saved = useSavedLogs(data?.logs ?? null);
 
   const load = useCallback(
     () =>
@@ -176,6 +246,7 @@ export function MatchLogs() {
     <div className="space-y-5">
       {error && <ErrorBanner message={error} />}
       <Storage data={data} onChange={() => void load()} onError={setError} />
+      {canSaveLogs() && <OnThisDevice logs={data.logs} saved={saved} onError={setError} />}
       {data.logs.length === 0 ? (
         <Card>
           <p className="text-sm text-secondary-500">
@@ -193,12 +264,16 @@ export function MatchLogs() {
                     <p className="flex items-center gap-2 font-semibold text-secondary-900">
                       {log.name}
                       {log.trimmed && <Badge>Trimmed</Badge>}
+                      {saved.has(log.id) && <Badge colors={tones.success}>On this device</Badge>}
                     </p>
                     <p className="text-xs text-secondary-500">
                       {size(log.rawSize ?? log.size)} · from {log.downloaderName}
                       {log.uploadedAt ? ` · ${whenFormat.format(log.uploadedAt)}` : ""}
                     </p>
                   </div>
+                  <Link className={buttonClass("secondary", "sm")} to={advantageScopePage(log)}>
+                    Open in AdvantageScope
+                  </Link>
                   <a className={buttonClass("secondary", "sm")} href={matchLogFileUrl(log.id)}>
                     Download
                   </a>

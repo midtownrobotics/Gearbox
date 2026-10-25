@@ -5,9 +5,10 @@
 // user) and sent as `Authorization: Bearer <key>` to Pit's /api/downloader/* routes.
 
 import * as fs from "node:fs";
+import * as net from "node:net";
 import * as os from "node:os";
 import * as path from "node:path";
-import { type TeamUiSettings, teamUiDefaults } from "@g3/site-config";
+import { type TeamUiSettings, teamAppUrlVia, teamUiDefaults } from "@g3/site-config";
 import { config, pitUrlFor } from "./config.ts";
 import type { GearboxStatus } from "./status.ts";
 
@@ -15,6 +16,8 @@ export type Pairing = {
   teamNumber: number;
   /** The Pit it paired with. */
   pitUrl: string;
+  /** Its address was typed on the pairing form: kept whatever PIT_URL and --dev say. */
+  chosenUrl?: boolean;
   id: number;
   name: string;
   key: string;
@@ -27,17 +30,23 @@ const kAppearanceFile = path.join(config.dataDir, "appearance.json");
 const kAppearanceMaxAgeMs = 60_000;
 const kTimeoutMs = 10_000;
 
+// Node tries each of a host's addresses for only 250 ms before the next one. On a pit or school
+// network with no IPv6 and a slow first connect, every address fails and Gearbox looks offline
+// while a browser reaches it fine. Give each address 2 seconds instead.
+net.setDefaultAutoSelectFamilyAttemptTimeout(2_000);
+
 let pairing: Pairing | null = load();
+/** The logs Pit has ("<event>/<name>"), from the last time it was asked; null until then. */
+let inPit: Set<string> | null = null;
 let connection: GearboxStatus["connection"] = null;
 let checkedAt: number | null = null;
 
 function load(): Pairing | null {
   try {
     const saved = JSON.parse(fs.readFileSync(kPairingFile, "utf8")) as Pairing;
+    if (!saved.key || !saved.teamNumber || !saved.pitUrl) return null;
     // Paired with another Pit than the one it's now set to use (PIT_URL, --dev): pair again.
-    if (!saved.key || !saved.teamNumber || saved.pitUrl !== pitUrlFor(saved.teamNumber)) {
-      return null;
-    }
+    if (!saved.chosenUrl && saved.pitUrl !== pitUrlFor(saved.teamNumber)) return null;
     return saved;
   } catch {
     return null;
@@ -51,14 +60,18 @@ function save(next: Pairing | null) {
     fs.writeFileSync(kPairingFile, JSON.stringify(next, null, 2), { mode: 0o600 });
   } else {
     fs.rmSync(kPairingFile, { force: true });
+    inPit = null;
   }
 }
 
 /** The pairing, while there is one: the downloader does nothing without it. */
 export const currentPairing = () => pairing;
 
-/** A request to a team's Pit API, with this downloader's key when it has one. */
-function pit(teamNumber: number, apiPath: string, init: RequestInit = {}) {
+/**
+ * A request to Pit's API, with this downloader's key when it has one: the Pit it's paired with,
+ * else `pitUrl`.
+ */
+function pit(pitUrl: string, apiPath: string, init: RequestInit = {}) {
   const headers = new Headers(init.headers);
   if (pairing) headers.set("Authorization", `Bearer ${pairing.key}`);
   if (init.body && !headers.has("Content-Type")) {
@@ -67,7 +80,7 @@ function pit(teamNumber: number, apiPath: string, init: RequestInit = {}) {
       typeof init.body === "string" ? "application/json" : "application/octet-stream",
     );
   }
-  return fetch(`${pitUrlFor(teamNumber)}/api${apiPath}`, {
+  return fetch(`${pairing?.pitUrl ?? pitUrl}/api${apiPath}`, {
     ...init,
     headers,
     signal: AbortSignal.timeout(init.body && typeof init.body !== "string" ? 120_000 : kTimeoutMs),
@@ -83,10 +96,13 @@ export function gearboxStatus(): GearboxStatus {
       ? {
           teamNumber: pairing.teamNumber,
           pitUrl: pairing.pitUrl,
+          usual: pairing.pitUrl === teamAppUrlVia(undefined, `frc${pairing.teamNumber}`, "pit"),
           name: pairing.name,
           pairedAt: pairing.pairedAt,
         }
       : null,
+    // The pairing form's hint for another address.
+    usualPitUrl: pitUrlFor("<team>"),
     // Shown on the pairing screen when it isn't the team's usual Pit on Gearbox.
     pitUrl: config.pitUrl ?? (config.devGateway ? pitUrlFor("<team>") : null),
     connection,
@@ -99,7 +115,7 @@ export function gearboxStatus(): GearboxStatus {
 export async function checkGearbox(): Promise<void> {
   if (!pairing) return;
   try {
-    const res = await pit(pairing.teamNumber, "/downloader/me");
+    const res = await pit(pairing.pitUrl, "/downloader/me");
     checkedAt = Date.now();
     if (res.status === 401) {
       save(null);
@@ -115,15 +131,22 @@ export async function checkGearbox(): Promise<void> {
 
 export class PairingError extends Error {}
 
-export async function pairWithGearbox(teamNumber: number, code: string, name: string) {
-  const pitUrl = pitUrlFor(teamNumber);
+/** Pairs with the team's Pit: at `chosenUrl` when one was typed, else its usual address. */
+export async function pairWithGearbox(
+  teamNumber: number,
+  code: string,
+  name: string,
+  chosenUrl: string | null,
+) {
+  const pitUrl = chosenUrl ?? pitUrlFor(teamNumber);
   let res: Response;
   try {
-    res = await pit(teamNumber, "/downloaders/pair", {
+    res = await pit(pitUrl, "/downloaders/pair", {
       method: "POST",
       body: JSON.stringify({ code, name: name.trim() || defaultName() }),
     });
-  } catch {
+  } catch (error) {
+    console.warn(`[gearbox] couldn't reach ${pitUrl}:`, (error as Error).cause ?? error);
     throw new PairingError(`Couldn't reach Gearbox at ${pitUrl}. Check the internet connection.`);
   }
   const body = (await res.json().catch(() => null)) as {
@@ -133,7 +156,11 @@ export async function pairWithGearbox(teamNumber: number, code: string, name: st
     error?: string;
   } | null;
   if (res.status === 404) {
-    throw new PairingError(`Gearbox has no Pit for team ${teamNumber}. Check the team number.`);
+    throw new PairingError(
+      chosenUrl
+        ? `There's no Pit at ${pitUrl}. Check the address.`
+        : `Gearbox has no Pit for team ${teamNumber}. Check the team number.`,
+    );
   }
   if (!res.ok || !body?.key || typeof body.id !== "number") {
     throw new PairingError(body?.error ?? `Gearbox answered ${res.status}.`);
@@ -141,6 +168,7 @@ export async function pairWithGearbox(teamNumber: number, code: string, name: st
   save({
     teamNumber,
     pitUrl,
+    ...(chosenUrl ? { chosenUrl: true } : {}),
     id: body.id,
     name: body.name ?? name,
     key: body.key,
@@ -167,7 +195,7 @@ export async function teamAppearance(): Promise<TeamUiSettings | null> {
     return appearance.settings;
   }
   try {
-    const res = await pit(teamNumber, "/downloader/team-ui");
+    const res = await pit(pairing.pitUrl, "/downloader/team-ui");
     if (res.ok) {
       appearance = {
         teamNumber,
@@ -218,7 +246,7 @@ export class UploadRefused extends Error {
  */
 export async function uploadLog(log: LogUpload): Promise<"uploaded" | "already there"> {
   if (!pairing) throw new Error("Not paired with Gearbox.");
-  const { teamNumber } = pairing;
+  const { pitUrl } = pairing;
   const expectOk = async (res: Response) => {
     if (res.status === 401) {
       save(null);
@@ -237,7 +265,7 @@ export async function uploadLog(log: LogUpload): Promise<"uploaded" | "already t
 
   const { gzipped, ...meta } = log;
   const started = (await expectOk(
-    await pit(teamNumber, "/downloader/logs", {
+    await pit(pitUrl, "/downloader/logs", {
       method: "POST",
       body: JSON.stringify({ ...meta, size: gzipped.length }),
     }),
@@ -249,7 +277,7 @@ export async function uploadLog(log: LogUpload): Promise<"uploaded" | "already t
   for (let offset = 0, part = 1; offset < gzipped.length; offset += partSize, part++) {
     parts.push(
       (await expectOk(
-        await pit(teamNumber, `/downloader/logs/${started.id}/parts/${part}`, {
+        await pit(pitUrl, `/downloader/logs/${started.id}/parts/${part}`, {
           method: "PUT",
           body: gzipped.subarray(offset, offset + partSize),
         }),
@@ -257,7 +285,7 @@ export async function uploadLog(log: LogUpload): Promise<"uploaded" | "already t
     );
   }
   await expectOk(
-    await pit(teamNumber, `/downloader/logs/${started.id}/complete`, {
+    await pit(pitUrl, `/downloader/logs/${started.id}/complete`, {
       method: "POST",
       body: JSON.stringify({ parts }),
     }),
@@ -271,7 +299,7 @@ export async function deleteFromGearbox(event: string, name: string): Promise<vo
   let res: Response;
   try {
     res = await pit(
-      pairing.teamNumber,
+      pairing.pitUrl,
       `/downloader/logs/${encodeURIComponent(event)}/${encodeURIComponent(name)}`,
       { method: "DELETE" },
     );
@@ -290,11 +318,58 @@ export async function deleteFromGearbox(event: string, name: string): Promise<vo
 
 /** Forgets the pairing, and tells Pit to remove this downloader when it can. */
 export async function unpairFromGearbox(): Promise<void> {
-  if (pairing)
-    await pit(pairing.teamNumber, "/downloader/me", { method: "DELETE" }).catch(() => null);
+  if (pairing) await pit(pairing.pitUrl, "/downloader/me", { method: "DELETE" }).catch(() => null);
   save(null);
   connection = null;
   checkedAt = null;
   appearance = null;
   fs.rmSync(kAppearanceFile, { force: true });
+}
+
+/** What this downloader is doing, as it tells Pit (Pit's Logs page and Monitor show it). */
+export type ReportedStatus = {
+  robot: boolean;
+  rioReachable: boolean | null;
+  copying: number;
+  uploading: string | null;
+  pendingUpload: number;
+  version: string;
+};
+
+/** Tells Pit what it's doing. Nothing happens when Pit can't be reached; it's sent again soon. */
+export async function reportStatus(status: ReportedStatus): Promise<void> {
+  if (!pairing) return;
+  await pit(pairing.pitUrl, "/downloader/status", {
+    method: "POST",
+    body: JSON.stringify(status),
+  }).catch(() => null);
+}
+
+const pitKey = (event: string, name: string) => `${event}/${name}`;
+
+/** Whether Pit has this log, as of the last time it was asked; null when that isn't known. */
+export const inGearbox = (event: string, name: string) =>
+  inPit ? inPit.has(pitKey(event, name)) : null;
+
+/** Notes a log Pit now has, or no longer has, without asking it again. */
+export function noteInGearbox(event: string, name: string, has: boolean) {
+  if (!inPit) return;
+  if (has) inPit.add(pitKey(event, name));
+  else inPit.delete(pitKey(event, name));
+}
+
+/** Asks Pit which logs it has, so the page's "In Gearbox" stays true when one is deleted there. */
+export async function refreshGearboxLogs(): Promise<void> {
+  if (!pairing) {
+    inPit = null;
+    return;
+  }
+  try {
+    const res = await pit(pairing.pitUrl, "/downloader/logs");
+    if (!res.ok) return;
+    const body = (await res.json()) as { logs: { event: string; name: string }[] };
+    inPit = new Set(body.logs.map((log) => pitKey(log.event, log.name)));
+  } catch {
+    // Offline: what it last knew stands.
+  }
 }

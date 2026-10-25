@@ -18,7 +18,9 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { validator } from "hono/validator";
 import packageJson from "../package.json";
+import { bundledAsset, deleteTeamScopeFiles, scopeRoutes } from "./advantagescope";
 import { archiveRoutes } from "./archives";
+import { catchUp, freshTimer, timerRoutes } from "./battery-timers";
 import { createDb } from "./db";
 import {
   batteries,
@@ -29,12 +31,22 @@ import {
   logDownloaderCodes,
   logDownloaders,
   matchLogs,
+  scopeAssets,
+  scopeSettings,
   settings,
 } from "./db/schema";
 import { demoWords, loadDemo } from "./demo";
 import { downloaderRoutes, downloaderSelfRoutes } from "./downloaders";
+import { eventSnapshotRoutes, snapshotMonitorData } from "./event-snapshot";
 import { manifest } from "./manifest";
 import { deleteTeamLogFiles, logUploadRoutes, matchLogRoutes } from "./match-logs";
+import {
+  type TbaMatch,
+  contextRankingsFor,
+  ourSchedule,
+  scheduleFromTba,
+  withResults,
+} from "./monitor-matches";
 import { SETTING_KEYS, type SettingKey, getSetting, getWhenFull, teamNumberOf } from "./settings";
 import type { AppEnv } from "./types";
 
@@ -136,28 +148,6 @@ interface NexusMonitorData {
   [key: string]: unknown;
 }
 
-interface TbaScheduleMatch {
-  comp_level?: string;
-  match_number?: number;
-  predicted_time?: number | null;
-  time?: number | null;
-  alliances?: {
-    blue?: { team_keys?: string[] };
-    red?: { team_keys?: string[] };
-  };
-}
-
-interface MonitorScheduleMatch {
-  label: string;
-  status: "Queuing soon";
-  blueTeams: string[] | null;
-  redTeams: string[] | null;
-  times: {
-    estimatedStartTime: number | null;
-    estimatedQueueTime: number | null;
-  };
-}
-
 const settingsValidator = validator("json", (value, c): Partial<Record<SettingKey, string>> => {
   const v = (value ?? {}) as Record<string, unknown>;
   const out: Partial<Record<SettingKey, string>> = {};
@@ -221,6 +211,8 @@ const app = base
         checklistArchives,
         logDownloaders,
         matchLogs,
+        scopeSettings,
+        scopeAssets,
       ],
       { log_downloaders: ["keyHash"], match_logs: ["uploadId"] },
     );
@@ -228,12 +220,16 @@ const app = base
       teamExport(manifest, teamId, tables, [
         "Log downloaders' keys and pairing codes aren't included: pair a downloader again on the Logs page.",
         "The match log files aren't included: download them on the Logs page.",
+        "AdvantageScope's asset files aren't included, only their names and configs: upload them again in AdvantageScope.",
       ]),
     );
   })
   .delete("/internal/teams/:teamId", async (c) => {
     await deleteTeamLogFiles(c.env.LOGS, c.req.param("teamId"));
+    await deleteTeamScopeFiles(c.env.LOGS, c.req.param("teamId"));
     await deleteTeamRows(createDb(c.env.PIT_DB), c.req.param("teamId"), [
+      scopeAssets,
+      scopeSettings,
       matchLogs,
       checklistArchives,
       checklistIssues,
@@ -710,6 +706,7 @@ const app = base
   .get("/batteries", requireAuth, async (c) => {
     const db = createDb(c.env.PIT_DB);
     const team = c.get("teamId");
+    await catchUp(c.env, db, team);
     const rows = await db
       .select()
       .from(batteries)
@@ -717,15 +714,24 @@ const app = base
       .orderBy(batteries.createdAt);
     return c.json(rows);
   })
+  // Pause All and Unpause All, and the timers' automatic changes on event days.
+  .route("/batteries/timers", timerRoutes)
 
   .post("/batteries", requireAuth, listNameValidator, async (c) => {
     const { name } = c.req.valid("json");
     const db = createDb(c.env.PIT_DB);
     const team = c.get("teamId");
     const now = Math.floor(Date.now() / 1000);
-    const result = await db
-      .insert(batteries)
-      .values(withTeam(team, { name, state: "Idle", stateSince: Date.now(), createdAt: now }));
+    const { paused } = await catchUp(c.env, db, team);
+    const result = await db.insert(batteries).values(
+      withTeam(team, {
+        name,
+        state: "Idle",
+        stateSince: Date.now(),
+        createdAt: now,
+        ...freshTimer(paused),
+      }),
+    );
     const [created] = await db
       .select()
       .from(batteries)
@@ -763,6 +769,8 @@ const app = base
     const enteringRobot = state === "In Robot" && existing.state !== "In Robot";
     const baseUseCount = typeof existing.useCount === "number" ? existing.useCount : 0;
     const newUseCount = enteringRobot ? baseUseCount + 1 : baseUseCount;
+    // Its timer starts again from zero, paused while the team's timers are.
+    const { paused } = await catchUp(c.env, db, team);
     await db
       .update(batteries)
       .set({
@@ -770,6 +778,7 @@ const app = base
         stateSince: Date.now(),
         voltage: tracksVoltage ? (existing.voltage ?? null) : null,
         useCount: newUseCount,
+        ...freshTimer(paused),
       })
       .where(inTeam(batteries, team, eq(batteries.id, id)));
     const [updated] = await db
@@ -833,6 +842,9 @@ const app = base
   // Match logs the downloaders uploaded (./match-logs.ts).
   .route("/logs", matchLogRoutes)
 
+  // AdvantageScope Lite at /scope/: its logs, assets and the team's settings (./advantagescope.ts).
+  .route("/scope", scopeRoutes)
+
   // Global reset — unchecks all items across all lists, preserves issues, archives nothing
   .post("/reset", requireAuth, async (c) => {
     const db = createDb(c.env.PIT_DB);
@@ -844,6 +856,9 @@ const app = base
   // Pit monitor — proxies external APIs so the frontend avoids CORS
   .get("/monitor/data", requireAuth, async (c) => {
     const db = createDb(c.env.PIT_DB);
+    // In dev and staging, an admin can show a past event instead (./event-snapshot.ts).
+    const snapshot = await snapshotMonitorData(c.env, db, c.get("teamId"));
+    if (snapshot) return c.json(snapshot);
     const team = teamNumberOf(c.get("teamId"));
     const [eventKey, nexusEventKey] = await Promise.all([
       getSetting(db, c.get("teamId"), "eventKey"),
@@ -853,7 +868,7 @@ const app = base
     const nexusKey = c.env.NEXUS_API_KEY;
     const year = new Date().getFullYear();
 
-    const [nexusResult, tbaResult, tbaRankingsResult, sbResult, tbaScheduleResult] =
+    const [nexusResult, tbaResult, tbaRankingsResult, sbResult, tbaScheduleResult, pitsResult] =
       await Promise.allSettled([
         nexusEventKey && nexusKey
           ? fetch(`https://frc.nexus/api/v1/event/${nexusEventKey}`, {
@@ -883,6 +898,12 @@ const app = base
               headers: { "X-TBA-Auth-Key": tbaKey },
             }).then((r) => (r.ok ? r.json() : null))
           : Promise.resolve(null),
+        // Each team's pit address, for our next match's teams.
+        nexusEventKey && nexusKey
+          ? fetch(`https://frc.nexus/api/v1/event/${nexusEventKey}/pits`, {
+              headers: { "Nexus-Api-Key": nexusKey },
+            }).then((r) => (r.ok ? r.json() : null))
+          : Promise.resolve(null),
       ]);
 
     const nexus = nexusResult.status === "fulfilled" ? nexusResult.value : null;
@@ -890,6 +911,7 @@ const app = base
     const tbaRankings = tbaRankingsResult.status === "fulfilled" ? tbaRankingsResult.value : null;
     const sb = sbResult.status === "fulfilled" ? sbResult.value : null;
     const tbaSchedule = tbaScheduleResult.status === "fulfilled" ? tbaScheduleResult.value : null;
+    const pits = pitsResult.status === "fulfilled" ? pitsResult.value : null;
 
     // biome-ignore lint/suspicious/noExplicitAny: external API shapes
     const tbaAny = tba as any;
@@ -912,92 +934,48 @@ const app = base
           }
         : null;
 
-    // Build context rankings: top 3 and teams around us
-    interface RankingInfo {
-      rank: number;
-      team: string;
-    }
-    type ContextRankings = { top3: RankingInfo[]; context: RankingInfo[] } | null;
-    let contextRankings: ContextRankings = null;
-    if (tbaRankingsAny?.rankings && Array.isArray(tbaRankingsAny.rankings) && ourRank) {
-      interface TbaRanking {
-        rank: number;
-        team_key: string;
-      }
-      const top3 = tbaRankingsAny.rankings.slice(0, 3).map((r: TbaRanking) => ({
-        rank: r.rank as number,
-        team: (r.team_key as string).replace("frc", ""),
-      }));
+    // The top 3 and the teams around us.
+    const contextRankings =
+      Array.isArray(tbaRankingsAny?.rankings) && ourRank
+        ? contextRankingsFor(
+            (tbaRankingsAny.rankings as { rank: number; team_key: string }[]).map((r) => ({
+              rank: r.rank,
+              team: r.team_key.replace("frc", ""),
+            })),
+            ourRank,
+          )
+        : null;
 
-      // Logic for "around us" based on rank position
-      let contextRanks: number[] = [];
-      if (ourRank <= 3) {
-        // Top 3: show #4, #5, #6
-        contextRanks = [4, 5, 6];
-      } else if (ourRank === 4) {
-        // #4: show 3 below us (#5, #6, #7) to avoid intersecting with top 3
-        contextRanks = [5, 6, 7];
-      } else if (ourRank === 5) {
-        // #5: show 1 above and 2 below
-        contextRanks = [4, 6, 7];
-      } else if (ourRank === 6) {
-        // #6: show 2 above and 1 below
-        contextRanks = [4, 5, 7];
-      } else {
-        // #7+: show 3 above us
-        contextRanks = [ourRank - 3, ourRank - 2, ourRank - 1];
-      }
-
-      const context = contextRanks
-        .map((r) => tbaRankingsAny.rankings.find((rank: TbaRanking) => rank.rank === r))
-        .filter(Boolean)
-        .map((r: TbaRanking) => ({
-          rank: r.rank as number,
-          team: (r.team_key as string).replace("frc", ""),
-        }));
-
-      contextRankings = { top3, context };
-    }
-
-    // Fallback to Blue Alliance schedule if Nexus is unavailable
+    // Nexus's schedule with The Blue Alliance's scores, else The Blue Alliance's own.
+    const tbaMatches = Array.isArray(tbaSchedule) ? (tbaSchedule as TbaMatch[]) : [];
     let finalNexus = nexus as NexusMonitorData | null;
     const isRealNexus = Boolean(finalNexus?.matches?.length);
-    if (!isRealNexus && tbaSchedule && Array.isArray(tbaSchedule)) {
-      // Build a Nexus-like schedule from Blue Alliance data
-      const tbaMatches = tbaSchedule as TbaScheduleMatch[];
-      finalNexus = {
-        matches: tbaMatches
-          .filter((match) => match.comp_level && match.match_number)
-          .map<MonitorScheduleMatch>((match) => ({
-            label: `${match.comp_level?.toUpperCase()}${match.match_number}`,
-            status: "Queuing soon" as const, // Blue Alliance doesn't provide status, default to queuing soon
-            blueTeams:
-              match.alliances?.blue?.team_keys?.map((teamKey) => teamKey.replace("frc", "")) ??
-              null,
-            redTeams:
-              match.alliances?.red?.team_keys?.map((teamKey) => teamKey.replace("frc", "")) ?? null,
-            times: {
-              estimatedStartTime: match.predicted_time
-                ? match.predicted_time * 1000
-                : match.time
-                  ? match.time * 1000
-                  : null,
-              estimatedQueueTime: match.predicted_time ? (match.predicted_time - 300) * 1000 : null, // Estimate queue 5min before
-            },
-          }))
-          .sort((a, b) => {
-            const timeA = a.times.estimatedStartTime ?? 0;
-            const timeB = b.times.estimatedStartTime ?? 0;
-            return timeA - timeB;
-          }),
-        isRealNexus: false,
-      };
-    }
     if (finalNexus && isRealNexus) {
-      finalNexus.isRealNexus = true;
+      finalNexus = {
+        ...finalNexus,
+        matches: withResults(finalNexus.matches ?? [], tbaMatches),
+        isRealNexus: true,
+      };
+    } else if (tbaMatches.length > 0) {
+      finalNexus = { matches: scheduleFromTba(tbaMatches), isRealNexus: false };
     }
 
-    return c.json({ teamNumber: team, nexus: finalNexus, ranking, contextRankings });
+    // The team's next match and how far off it is, for the Monitor's "Our next match".
+    const ourMatches = finalNexus?.matches
+      ? ourSchedule(finalNexus.matches, team, finalNexus.isRealNexus === true, {
+          ranks: Array.isArray(tbaRankingsAny?.rankings)
+            ? Object.fromEntries(
+                (tbaRankingsAny.rankings as { rank: number; team_key: string }[]).map((r) => [
+                  r.team_key.replace("frc", ""),
+                  r.rank,
+                ]),
+              )
+            : undefined,
+          pits: pits && typeof pits === "object" ? (pits as Record<string, string>) : undefined,
+        })
+      : null;
+
+    return c.json({ teamNumber: team, nexus: finalNexus, ourMatches, ranking, contextRankings });
   })
 
   // Pit monitor settings — read-only, public (display-only settings like iframe URL)
@@ -1020,6 +998,9 @@ const app = base
     ]);
     return c.json({ eventKey, nexusEventKey, iframeUrl, teamNumber: teamNumberOf(team) });
   })
+
+  // Use event snapshot (dev and staging only).
+  .route("/admin/event-snapshot", eventSnapshotRoutes)
 
   .patch("/admin/settings", requireAdmin, settingsValidator, async (c) => {
     const updates = c.req.valid("json");
@@ -1085,4 +1066,10 @@ const app = base
 export type PitApp = typeof app;
 /** The Hono app itself, for the isolation test (test/teams.test.ts). */
 export { app };
-export default { fetch: withApiPrefix(app.fetch) };
+export default {
+  fetch: withApiPrefix((request: Request, env: AppEnv["Bindings"], ctx: ExecutionContext) =>
+    env.ASSETS && new URL(request.url).pathname.startsWith("/scope/bundledAssets/")
+      ? bundledAsset(request, env.ASSETS)
+      : app.fetch(request, env, ctx),
+  ),
+};

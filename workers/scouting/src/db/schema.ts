@@ -7,6 +7,7 @@ import {
   text,
   unique,
 } from "drizzle-orm/sqlite-core";
+import type { ServiceIssueType } from "../service-issues";
 
 export const autoRoutines = sqliteTable(
   "auto_routines",
@@ -310,6 +311,7 @@ export const scoutingFormSubmissions = sqliteTable(
     archived_by: text("archived_by"),
     archive_reason: text("archive_reason"),
     fields_json: text("fields_json"),
+    submitted_late: integer("submitted_late").notNull().default(0),
   },
   (t) => [
     primaryKey({ columns: [t.teamId, t.id] }),
@@ -373,7 +375,8 @@ export const serviceTickets = sqliteTable(
     teamId: text("team_id").notNull(),
     id: text("id").notNull(),
     team_name: text("team_name").notNull(),
-    issue_type: text("issue_type").notNull(),
+    /** Distinct `SERVICE_ISSUE_TYPES` values; empty when the reporter wasn't sure. */
+    issue_types: text("issue_types", { mode: "json" }).$type<ServiceIssueType[]>().notNull(),
     description: text("description").notNull().default(""),
     status: text("status").notNull().default("open"),
     claimed_by: text("claimed_by"),
@@ -431,6 +434,7 @@ export const strategyEventConfig = sqliteTable(
     nexus_api_key: text("nexus_api_key"),
     schedule_mode: text("schedule_mode").notNull().default("tba"),
     submission_window_seconds: integer("submission_window_seconds").notNull().default(120),
+    late_window_seconds: integer("late_window_seconds").notNull().default(600),
   },
   (t) => [primaryKey({ columns: [t.teamId, t.id] })],
 );

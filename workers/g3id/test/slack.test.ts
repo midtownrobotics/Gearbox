@@ -220,6 +220,34 @@ describe("sign-in and link codes", () => {
     });
   });
 
+  it("keeps a linked Slack account's name, and the member's username, for their account page", async () => {
+    const team = await createTeam();
+    const ws = workspace();
+    await install(team, ws);
+    const userId = await createUser({ teamId: team, username: "gracie" });
+    const { code } = await createLinkCode(db(), team, userId);
+    const slackUserId = `U${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
+    const res = await handleSlackCode({
+      code,
+      slackUserId,
+      workspaceId: ws,
+      type: "link",
+      env: testEnv,
+    });
+    expect(res.success).toBe(true);
+
+    const me = (await (
+      await g3id("/auth/me", {
+        cookie: await sessionCookie(userId),
+        headers: { "X-Team-Id": team },
+      })
+    ).json()) as { username: string; identities: { provider: string; providerEmail: string }[] };
+    expect(me.username).toBe("gracie");
+    expect(me.identities).toEqual([
+      expect.objectContaining({ provider: "slack", providerEmail: `Member ${slackUserId}` }),
+    ]);
+  });
+
   it("clears out codes that expired more than a day ago", async () => {
     const team = await createTeam();
     const old = Math.floor(Date.now() / 1000) - 2 * 86400;
@@ -348,24 +376,55 @@ describe("signing a team up", () => {
       type: "signin",
       env: testEnv,
     });
-    expect(joined.message).toContain("pending admin approval");
-
-    // Every admin (the founder) hears there's someone to approve, with a link to them.
+    expect(joined.message).toContain("enter your name");
     const pending = await testEnv.DB.prepare(
-      "SELECT id FROM core_users WHERE team_id = ? AND status = 'pending'",
+      "SELECT id, display_name, username FROM core_users WHERE team_id = ? AND status = 'pending'",
     )
       .bind(team)
-      .first<{ id: string }>();
-    const dms = (await (await fetch("https://slack.com/__sent")).json()) as {
-      channel: string;
-      text: string;
-    }[];
-    const told = dms.find(
-      (m) => m.channel === `D-${founder}` && m.text.includes(pending?.id ?? "?"),
-    );
+      .first<{ id: string; display_name: string; username: string }>();
+    expect(pending).toMatchObject({
+      display_name: `Member ${joiner}`,
+      username: `Member ${joiner}`,
+    });
+    const sent = async () =>
+      (await (await fetch("https://slack.com/__sent")).json()) as {
+        channel: string;
+        text: string;
+      }[];
+    const toldAbout = async () =>
+      (await sent()).find(
+        (m) => m.channel === `D-${founder}` && m.text.includes(pending?.id ?? "?"),
+      );
+    expect(await toldAbout()).toBeUndefined();
+
+    // Their page asks for their full name, starting from their Slack name.
+    const headers = { "X-Team-Id": team };
+    const polled = (await (
+      await g3id(`/auth/slack/status?token=${next.token}`, { headers })
+    ).json()) as { status: string; nameToken: string };
+    expect(polled.status).toBe("signup_pending");
+    const step = await g3id(`/auth/signup/name?token=${polled.nameToken}`, { headers });
+    expect(await step.json()).toEqual({ username: `Member ${joiner}` });
+    const blank = await g3id("/auth/signup/name", {
+      method: "POST",
+      headers,
+      body: { token: polled.nameToken, name: "   " },
+    });
+    expect(blank.status).toBe(400);
+    const named = await g3id("/auth/signup/name", {
+      method: "POST",
+      headers,
+      body: { token: polled.nameToken, name: "Grace Hopper" },
+    });
+    expect(named.status).toBe(200);
+
+    // Then every admin (the founder) hears there's someone to approve, with a link to them.
+    const told = await toldAbout();
+    expect(told?.text).toContain("Grace Hopper");
+    expect(told?.text).toContain(`Member ${joiner} on Slack`);
     expect(told?.text).toContain("waiting for approval");
     expect(told?.text).toContain(`${joiner.toLowerCase()}@slack.test`);
-    expect(dms.some((m) => m.channel === `D-${joiner}`)).toBe(false);
+    expect((await sent()).some((m) => m.channel === `D-${joiner}`)).toBe(false);
   });
 
   it("won't connect a workspace that's already another team's", async () => {

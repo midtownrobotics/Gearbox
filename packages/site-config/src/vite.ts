@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Plugin } from "vite";
@@ -18,6 +19,33 @@ const DEV_WORKERS: Partial<Record<AppName | "platform", string>> = {
   schedule: "schedule",
 };
 
+/** A git command's output in `dir`, or "" when git isn't there or fails. */
+function git(dir: string, ...args: string[]): string {
+  try {
+    return execFileSync("git", args, { cwd: dir, encoding: "utf8", stdio: "pipe" }).trim();
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * The pull request a staging build was made from, read off the commit it's built from: GitHub's
+ * merge commit ("Merge pull request #284 from …") or squash commit ("Title (#284)"). Its repository
+ * is GitHub Actions' GITHUB_REPOSITORY, else the origin remote's. Null when it can't tell.
+ */
+function lastPullRequest(root: string): { number: string; url: string } | null {
+  const subject = git(root, "log", "-1", "--format=%s");
+  const number =
+    subject.match(/^Merge pull request #(\d+)\b/)?.[1] ?? subject.match(/\(#(\d+)\)$/)?.[1];
+  const repo =
+    process.env.GITHUB_REPOSITORY ??
+    git(root, "remote", "get-url", "origin").match(
+      /github\.com[:/]([\w.-]+\/[\w.-]+?)(\.git)?$/,
+    )?.[1];
+  if (!number || !repo || !/^[\w.-]+\/[\w.-]+$/.test(repo)) return null;
+  return { number, url: `https://github.com/${repo}/pull/${number}` };
+}
+
 /**
  * Brings site.ts into an app's build. Nothing team-specific is built in (roadmap 2.10): a page
  * learns its team from its address and its names from the team's appearance settings at runtime,
@@ -32,7 +60,8 @@ const DEV_WORKERS: Partial<Record<AppName | "platform", string>> = {
  * - in dev, points site-config's addresses (`appUrl`, `teamAppUrl`, `allAppsUrl`, ...) at the
  *   local dev gateway (`localGateway`), so links stay on your machine;
  * - with GEARBOX_STAGING=1 (each worker's [env.staging.build]), makes a staging build: its
- *   addresses are staging's (`isStaging`), and every page has a "Staging" banner.
+ *   addresses are staging's (`isStaging`), and every page has a "Staging" banner, with a link to
+ *   the pull request last merged into the branch it was built from (`lastPullRequest`).
  */
 export function siteConfig(
   options: { app?: AppName; productionEnv?: Record<string, string> } = {},
@@ -43,6 +72,13 @@ export function siteConfig(
       workers: Record<string, { port: number; url: string }>;
     };
   const staging = () => process.env.GEARBOX_STAGING === "1";
+  /** The banner's text: the pull request is the only part that takes clicks. */
+  const banner = () => {
+    const pr = lastPullRequest(root);
+    return pr
+      ? `Staging: not the real apps · <a href="${pr.url}" target="_blank" rel="noreferrer" style="color:inherit;text-decoration:underline;pointer-events:auto">#${pr.number}</a>`
+      : "Staging: not the real apps";
+  };
   return {
     name: "g3-site-config",
     // Staging: a banner on every page, so nobody mistakes it for the real apps. Amber for a
@@ -59,7 +95,7 @@ export function siteConfig(
                   style:
                     "position:fixed;bottom:12px;left:50%;transform:translateX(-50%);z-index:2147483647;padding:4px 12px;border-radius:999px;background:#f59e0b;color:#1f1300;font:600 12px/1.4 system-ui,sans-serif;box-shadow:0 2px 8px rgb(0 0 0 / .25);pointer-events:none",
                 },
-                children: "Staging: not the real apps",
+                children: banner(),
                 injectTo: "body",
               },
             ]

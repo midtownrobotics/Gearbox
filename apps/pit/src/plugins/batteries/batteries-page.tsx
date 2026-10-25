@@ -16,10 +16,14 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { api } from "../../shared/api";
 import { getErrorMessage } from "../../shared/api-error";
-import { ElapsedTime, STATE_TONES, voltageColor } from "../../shared/battery-display";
+import { ElapsedTime, STATE_TONES, timerMs, voltageColor } from "../../shared/battery-display";
 import { generateBatteryAndStatesPDF } from "../../shared/generate-state-labels";
-import { fetchBatteries } from "../../shared/getters/batteries";
-import type { Battery, BatteryState } from "../../shared/getters/types";
+import {
+  fetchBatteries,
+  fetchBatteryTimers,
+  setBatteryTimersPaused,
+} from "../../shared/getters/batteries";
+import type { Battery, BatteryState, BatteryTimers } from "../../shared/getters/types";
 
 const POLL_INTERVAL_MS = 10_000;
 
@@ -43,12 +47,47 @@ const STATE_LABELS = [
 
 const textButton = `rounded text-xs font-semibold text-secondary-500 underline hover:text-secondary-900 ${focusRing}`;
 
+/** By state, then the longest in it first. */
 function sortBatteries(batteries: Battery[]): Battery[] {
+  const now = Date.now();
   return [...batteries].sort((a, b) => {
     const orderDiff = STATE_ORDER[a.state] - STATE_ORDER[b.state];
     if (orderDiff !== 0) return orderDiff;
-    return a.stateSince - b.stateSince;
+    return timerMs(b, now) - timerMs(a, now) || a.stateSince - b.stateSince;
   });
+}
+
+/** Within a day, "6:00 PM"; further off, "Sat 6:00 PM". */
+function whenLabel(at: number): string {
+  const sameDay = new Date(at).toDateString() === new Date().toDateString();
+  return new Intl.DateTimeFormat(undefined, {
+    ...(sameDay ? {} : { weekday: "short" }),
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(at);
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** What the timers do next: paused, and what the team's event will change in the next day. */
+function timersNote({ paused, next }: BatteryTimers): string | null {
+  const soon = next && next.at - Date.now() < DAY_MS ? next : null;
+  if (paused) {
+    if (soon?.kind === "resume") {
+      return `Timers are paused until the event opens at ${whenLabel(soon.at)}.`;
+    }
+    return `Timers are paused. Unpause them once the chargers have power.${
+      soon?.kind === "reset"
+        ? ` When the event opens at ${whenLabel(soon.at)}, they go back to zero.`
+        : ""
+    }`;
+  }
+  if (soon?.kind === "pause")
+    return `Timers pause at ${whenLabel(soon.at)}, when the event closes.`;
+  if (soon?.kind === "reset") {
+    return `When the event opens at ${whenLabel(soon.at)}, timers go back to zero and pause.`;
+  }
+  return null;
 }
 
 /** One battery at the top of the page: the one in the robot, the next one, the longest charging. */
@@ -62,7 +101,7 @@ function SummaryTile({
       <p className="mb-1 text-xs font-bold uppercase tracking-widest">{label}</p>
       <p className="text-base font-bold text-secondary-900">{battery.name}</p>
       <p className="text-xs text-secondary-600">
-        <ElapsedTime sinceMs={battery.stateSince} />
+        <ElapsedTime battery={battery} />
       </p>
       {voltage && battery.voltage != null && (
         <p className={`mt-0.5 font-mono text-xs ${voltageColor(battery.voltage)}`}>
@@ -75,6 +114,9 @@ function SummaryTile({
 
 export function BatteriesPage() {
   const [batteries, setBatteries] = useState<Battery[]>([]);
+  // Whether every timer is paused (Pause All), and what the team's event does to them next.
+  const [timers, setTimers] = useState<BatteryTimers | null>(null);
+  const [pausing, setPausing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [banner, setBanner] = useState<string | null>(null);
   // Something to check that isn't an error: a voltage outside the range for a match.
@@ -96,11 +138,32 @@ export function BatteriesPage() {
   const voltageInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
+    fetchBatteryTimers()
+      .then(setTimers)
+      .catch(() => {});
     fetchBatteries()
       .then(setBatteries)
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
+
+  // When the event opens or closes, show what it changed right away.
+  const nextChange = timers?.next?.at;
+  useEffect(() => {
+    if (!nextChange || nextChange - Date.now() > DAY_MS) return;
+    const timeout = setTimeout(
+      () => {
+        fetchBatteryTimers()
+          .then(setTimers)
+          .catch(() => {});
+        fetchBatteries()
+          .then(setBatteries)
+          .catch(() => {});
+      },
+      Math.max(0, nextChange - Date.now()) + 1000,
+    );
+    return () => clearTimeout(timeout);
+  }, [nextChange]);
 
   useEffect(() => {
     if (loading) return;
@@ -109,7 +172,9 @@ export function BatteriesPage() {
       if (document.visibilityState !== "visible" || requestInFlight) return;
       requestInFlight = true;
       try {
-        setBatteries(await fetchBatteries());
+        const [b, t] = await Promise.all([fetchBatteries(), fetchBatteryTimers()]);
+        setBatteries(b);
+        setTimers(t);
       } catch {
         // Keep the last successful data visible while a refresh fails.
       } finally {
@@ -127,6 +192,31 @@ export function BatteriesPage() {
   useEffect(() => {
     if (editingVoltageId !== null) voltageInputRef.current?.focus();
   }, [editingVoltageId]);
+
+  async function handleTogglePause() {
+    const paused = !timers?.paused;
+    const now = Date.now();
+    setPausing(true);
+    setTimers((prev) => ({ next: prev?.next ?? null, paused }));
+    setBatteries((prev) =>
+      prev.map((b) =>
+        paused
+          ? { ...b, countedMs: timerMs(b, now), countingSince: null }
+          : { ...b, countingSince: b.countingSince ?? now },
+      ),
+    );
+    try {
+      setTimers(await setBatteryTimersPaused(paused));
+      setBanner(null);
+    } catch (err) {
+      setBanner(err instanceof Error ? err.message : "Couldn't change the timers.");
+    } finally {
+      setPausing(false);
+    }
+    fetchBatteries()
+      .then(setBatteries)
+      .catch(() => {});
+  }
 
   async function handleAddBattery() {
     if (!newName.trim()) {
@@ -176,6 +266,8 @@ export function BatteriesPage() {
               ...b,
               state,
               stateSince: Date.now(),
+              countedMs: 0,
+              countingSince: timers?.paused ? null : Date.now(),
               ...(!tracksVoltage ? { voltage: null } : {}),
               ...(enteringRobot ? { useCount: b.useCount + 1 } : {}),
             }
@@ -291,9 +383,8 @@ export function BatteriesPage() {
   const sorted = sortBatteries(batteries);
   const inRobot = batteries.find((b) => b.state === "In Robot");
   const nextUp = batteries.find((b) => b.state === "Next Up");
-  const longestCharging = batteries
-    .filter((b) => b.state === "Charging")
-    .sort((a, b) => a.stateSince - b.stateSince)[0];
+  const longestCharging = sorted.find((b) => b.state === "Charging");
+  const note = timers && timersNote(timers);
 
   return (
     <Page
@@ -301,7 +392,16 @@ export function BatteriesPage() {
       width="narrow"
       actions={
         !adding && (
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            {timers && (
+              <Button
+                variant={timers.paused ? "primary" : "secondary"}
+                onClick={handleTogglePause}
+                disabled={pausing}
+              >
+                {timers.paused ? "Unpause All" : "Pause All"}
+              </Button>
+            )}
             <Button variant="secondary" onClick={() => setShowLabelsModal(true)}>
               Print labels
             </Button>
@@ -318,6 +418,7 @@ export function BatteriesPage() {
       }
     >
       {banner && <ErrorBanner message={banner} />}
+      {note && <p className="text-sm text-secondary-600">{note}</p>}
       {warning && (
         <p className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
           {warning}
@@ -385,7 +486,7 @@ export function BatteriesPage() {
                   <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-secondary-500">
                     <Badge colors={STATE_TONES[battery.state]}>{battery.state}</Badge>
                     <span>
-                      for <ElapsedTime sinceMs={battery.stateSince} />
+                      for <ElapsedTime battery={battery} />
                     </span>
                   </p>
                   <p className="mt-1 flex items-center gap-2 text-xs text-secondary-500">

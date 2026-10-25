@@ -11,7 +11,10 @@ import {
 // Every table is one team's data and carries the team (migration 0011): every query goes through
 // inTeam/withTeam from @g3/auth (roadmap Phase 3).
 
-/** A team's Pit settings by name: eventKey, nexusEventKey, iframeUrl. */
+/**
+ * A team's Pit settings by name: eventKey, nexusEventKey, iframeUrl, matchLogsWhenFull, and the
+ * battery timers' state (../battery-timers.ts).
+ */
 export const settings = sqliteTable(
   "settings",
   {
@@ -61,6 +64,10 @@ export const batteries = sqliteTable("batteries", {
   voltage: real("voltage"),
   useCount: integer("use_count").notNull().default(0), // times put in the robot
   createdAt: integer("created_at").notNull(),
+  // Its timer (migration 0018, ../battery-timers.ts): ms counted in its state up to
+  // `countingSince`, which is null while the team's timers are paused.
+  countedMs: integer("counted_ms").notNull().default(0),
+  countingSince: integer("counting_since"),
 });
 
 export const checklistIssues = sqliteTable(
@@ -121,6 +128,9 @@ export const logDownloaders = sqliteTable(
     pairedByName: text("paired_by_name").notNull(),
     pairedAt: integer("paired_at").notNull(),
     lastSeenAt: integer("last_seen_at"),
+    /** JSON, what it last said it was doing (`DownloaderStatus`, migration 0017). */
+    status: text("status"),
+    statusAt: integer("status_at"),
   },
   (t) => [uniqueIndex("log_downloaders_key_idx").on(t.teamId, t.keyHash)],
 );
@@ -173,4 +183,40 @@ export const matchLogs = sqliteTable(
     uploadedAt: integer("uploaded_at"),
   },
   (t) => [uniqueIndex("match_logs_name_idx").on(t.teamId, t.event, t.name)],
+);
+
+/**
+ * AdvantageScope Lite's preferences and layout for the team (migration 0016,
+ * ../advantagescope.ts): each value it would keep in localStorage, by its key.
+ */
+export const scopeSettings = sqliteTable(
+  "scope_settings",
+  {
+    teamId: text("team_id").notNull(),
+    key: text("key").notNull(),
+    value: text("value").notNull(),
+    updatedBy: text("updated_by").notNull(),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.teamId, t.key] })],
+);
+
+/** A field, robot or joystick asset the team uploaded to AdvantageScope, its files in LOGS. */
+export const scopeAssets = sqliteTable(
+  "scope_assets",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    teamId: text("team_id").notNull(),
+    /** The asset's folder name ("Robot_Comet"), which says its kind. */
+    name: text("name").notNull(),
+    /** JSON: [{ name, size }], the files under the asset's R2 prefix. */
+    files: text("files").notNull(),
+    /** JSON: its config.json. */
+    config: text("config").notNull(),
+    /** Bytes, all its files. */
+    size: integer("size").notNull(),
+    uploadedBy: text("uploaded_by").notNull(),
+    uploadedAt: integer("uploaded_at").notNull(),
+  },
+  (t) => [uniqueIndex("scope_assets_name_idx").on(t.teamId, t.name)],
 );

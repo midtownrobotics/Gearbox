@@ -1,6 +1,6 @@
 import { tones } from "@g3/ui";
 import { useEffect, useState } from "react";
-import type { BatteryState } from "./getters/types";
+import type { Battery, BatteryState } from "./getters/types";
 
 // How a battery is shown wherever one is: its state's color, its voltage's, and how long it has
 // been in its state.
@@ -24,8 +24,19 @@ export function voltageColor(volts: number): string {
   return "text-red-700";
 }
 
-export function formatElapsed(sinceMs: number): string {
-  const ms = Date.now() - sinceMs;
+/**
+ * How long a battery's timer has counted at `now`, in ms: the time in its state while the team's
+ * timers ran. A battery from before timers could pause (an offline copy) counts from its state.
+ */
+export function timerMs(
+  battery: Pick<Battery, "stateSince" | "countedMs" | "countingSince">,
+  now = Date.now(),
+): number {
+  const since = battery.countingSince === undefined ? battery.stateSince : battery.countingSince;
+  return (battery.countedMs ?? 0) + (since === null ? 0 : Math.max(0, now - since));
+}
+
+export function formatDuration(ms: number): string {
   const totalSeconds = Math.floor(ms / 1000);
   const totalMinutes = Math.floor(totalSeconds / 60);
   const hours = Math.floor(totalMinutes / 60);
@@ -36,12 +47,22 @@ export function formatElapsed(sinceMs: number): string {
   return `${seconds}s`;
 }
 
-/** How long ago `sinceMs` was, counting up. */
-export function ElapsedTime({ sinceMs }: { sinceMs: number }) {
-  const [text, setText] = useState(() => formatElapsed(sinceMs));
+/** How long a battery has been in its state, counting up while its timer runs. */
+export function ElapsedTime({ battery }: { battery: Battery }) {
+  const { stateSince, countedMs, countingSince } = battery;
+  const read = () => formatDuration(timerMs({ stateSince, countedMs, countingSince }));
+  const [text, setText] = useState(read);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: read uses only these
   useEffect(() => {
-    const interval = setInterval(() => setText(formatElapsed(sinceMs)), 250);
+    setText(read());
+    if (countingSince === null) return;
+    const interval = setInterval(() => setText(read()), 250);
     return () => clearInterval(interval);
-  }, [sinceMs]);
-  return <>{text}</>;
+  }, [stateSince, countedMs, countingSince]);
+  return (
+    <>
+      {text}
+      {countingSince === null && " (paused)"}
+    </>
+  );
 }

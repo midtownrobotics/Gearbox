@@ -136,8 +136,12 @@ async function seed(team: TeamUsers): Promise<Seeded> {
         result_json: JSON.stringify({ private: marker }),
         expires_at: Date.now() + 60000,
       });
-    if (name === "service_tickets")
-      Object.assign(row, { team_name: "123", issue_type: "mechanical" });
+    if (name === "service_tickets") {
+      // The fixture has the column from before migration 0037: a ticket's types are a list now.
+      // biome-ignore lint/performance/noDelete: the insert takes the row's own columns
+      delete row.issue_type;
+      Object.assign(row, { team_name: "123", issue_types: '["mechanical","electrical"]' });
+    }
     const columns = Object.keys(row);
     await db
       .prepare(

@@ -1,10 +1,11 @@
 {
   "name": "@g3/worker-pit",
-  "version": "2.0.0",
+  "version": "3.1.0",
   "private": true,
   "exports": {
     ".": "./src/index.ts",
-    "./manifest": "./src/manifest.ts"
+    "./manifest": "./src/manifest.ts",
+    "./monitor-matches": "./src/monitor-matches.ts"
   },
   "scripts": {
     "dev": "wrangler dev --port 8789 --inspector-port 9231",

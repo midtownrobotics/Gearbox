@@ -264,7 +264,7 @@ function PeopleList({
         id={id}
         value=""
         onChange={(e) => e.target.value && onChange([...chosen, e.target.value])}
-        className="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm text-secondary-900 focus:border-primary-500 focus:outline-none"
+        className="max-w-full rounded-lg border border-line bg-surface px-3 py-1.5 text-sm text-secondary-900 focus:border-primary-500 focus:outline-none"
       >
         <option value="">Add a person…</option>
         {available.map((m) => (

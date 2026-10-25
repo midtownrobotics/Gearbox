@@ -59,12 +59,14 @@ export function ConnectionTiles({ status }: { status: Status }) {
     <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
       <Tile
         label="Robot"
-        light={c.robot ? "ok" : "off"}
+        light={!c.robot ? "off" : c.rioReachable === false ? "busy" : "ok"}
         value={c.robot ? "Connected" : "Not connected"}
         hint={
-          c.robot
-            ? `roboRIO at ${settings.rioIp}`
-            : `Join the robot's network (${settings.robotNetwork}.x) to copy its logs`
+          !c.robot
+            ? `Join the robot's network (${settings.robotNetwork}.x) to copy its logs`
+            : c.rioReachable === false
+              ? `The roboRIO at ${settings.rioIp} isn't answering. Trying again`
+              : `roboRIO at ${settings.rioIp}`
         }
       />
       <Tile
@@ -176,10 +178,13 @@ function LogBadges({ log }: { log: LogStatus }) {
       <Badge key="gearbox" colors={tones.warning}>
         Uploading…
       </Badge>
-    ) : log.uploaded ? (
+    ) : (log.inGearbox ?? log.uploaded) ? (
       <Badge key="gearbox" colors={tones.success}>
         In Gearbox
       </Badge>
+    ) : log.uploaded ? (
+      // Uploaded, then deleted in Pit: it isn't uploaded again.
+      <Badge key="gearbox">Deleted from Gearbox</Badge>
     ) : log.needsTrim ? (
       <Badge key="gearbox" colors={tones.warning}>
         Too big to upload: trim it
@@ -249,23 +254,51 @@ function DeleteLog({ log, onError }: { log: LogStatus; onError: (message: string
   return (
     <ConfirmQuestion
       question={
-        log.uploaded
+        (log.inGearbox ?? log.uploaded)
           ? `Delete ${log.name}? It can't be undone, and it won't be copied off the robot again.`
           : `Delete ${log.name} from this computer? It can't be undone, it won't be copied off the robot again, and it hasn't been uploaded to Pit.`
       }
-      confirmLabel={log.uploaded ? "Delete from this computer" : "Delete"}
+      confirmLabel={(log.inGearbox ?? log.uploaded) ? "Delete from this computer" : "Delete"}
       keepLabel="Keep it"
       size="sm"
       disabled={busy}
       onConfirm={() => void remove(false)}
       onKeep={() => setAsking(false)}
     >
-      {log.uploaded && (
+      {(log.inGearbox ?? log.uploaded) && (
         <Button variant="danger" size="sm" disabled={busy} onClick={() => void remove(true)}>
           Delete here and from Gearbox
         </Button>
       )}
     </ConfirmQuestion>
+  );
+}
+
+/** For a log deleted in Pit: uploads it again from this computer. */
+function UploadAgain({ log, onError }: { log: LogStatus; onError: (message: string) => void }) {
+  const [busy, setBusy] = useState(false);
+  async function upload() {
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/logs/${encodeURIComponent(log.id)}/upload`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as { error?: string } | null;
+        onError(body?.error ?? "Couldn't upload it again.");
+      }
+    } catch {
+      onError("Can't reach the downloader. Check that it's still running.");
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <Button variant="secondary" size="sm" disabled={busy} onClick={() => void upload()}>
+      Upload again
+    </Button>
   );
 }
 
@@ -282,6 +315,9 @@ function LogRow({ log }: { log: LogStatus }) {
       </div>
       <LogBadges log={log} />
       <div className="ml-auto flex flex-wrap gap-2">
+        {here && log.uploaded && log.inGearbox === false && !log.uploading && (
+          <UploadAgain log={log} onError={setError} />
+        )}
         {here && (
           <a className={buttonClass("secondary", "sm")} href={download}>
             Download

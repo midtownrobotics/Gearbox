@@ -1,5 +1,31 @@
 # @g3/worker-edge
 
+## 2.3.0
+
+### Minor Changes
+
+- 9006f60: Report a problem or suggest an idea from any app: the menu has "Report a problem", which posts it as a public issue on Gearbox's GitHub with the page and app versions (never your name), and you get a Slack or Discord message when it's fixed or closed. No GitHub account needed. Not in the public demo. Deployers: apply the platform's migration `0012_problem_reports.sql` before deploying it, and set its `GITHUB_TOKEN` secret (`docs/deploy.md`, "Problem reports on GitHub"); without it, reports are kept, and those under a week old are sent once it's set.
+
+### Patch Changes
+
+- 05068af: Your team's logo keeps its shape in the top bar: a wide logo shows wider and a tall one narrower, instead of being squeezed into a square.
+- 05068af: On a phone, a long team and app name in the top bar and the menu is cut short ("ROBOWARRIORS SKILL TR…") instead of pushing the menu's close button and your greeting off the screen.
+- 73d2f28: Long links, part names and other long text wrap or are cut short on phones instead of making the page scroll sideways.
+
+## 2.2.0
+
+### Minor Changes
+
+- 1273a89: Admins and mentors can manage Door Sounds. Only admins can test, approve, reject, or delete sounds. Signed-in students can submit WAV files for review and see their own submission status. Pending audio stays outside the playable library until an admin approves it; the Edge box keeps the review queue across restarts. Install the updated agent before enabling submissions in the UI.
+
+## 2.1.0
+
+### Minor Changes
+
+- 74955c0: Door Sounds now has an ordered multi-selection with touch and keyboard drag handles, clearly separated clip cards, and compact sliders beneath each clip for pause and volume. Each clip has a single Pause before this clip slider that also applies on repeats. Each opening starts at the first selection and its volume; closing cancels any delay or cuts off playback immediately. Preferences persist on the Edge box. Volume control supports uncompressed PCM and floating-point WAVs.
+  
+  Rename clips inline while keeping their volume, pause, and playlist position.
+
 ## 2.0.0
 
 ### Major Changes

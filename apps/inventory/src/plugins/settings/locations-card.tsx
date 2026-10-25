@@ -242,17 +242,17 @@ function Node({ row, tree, alone }: { row: LocationRow; tree: Tree; alone: boole
             type="button"
             onClick={() => toggle(row.id)}
             aria-expanded={isOpen}
-            className="flex items-center gap-1.5 text-sm text-secondary-900 hover:text-primary-600"
+            className="flex min-w-0 items-center gap-1.5 text-left text-sm text-secondary-900 hover:text-primary-600"
           >
             <span className="inline-block w-3 text-secondary-400" aria-hidden>
               {isOpen ? "▾" : "▸"}
             </span>
-            <span className="font-semibold">{row.name}</span>
-            {row.title && <span className="text-secondary-500">- {row.title}</span>}
-            <span className="text-xs text-secondary-400">{children.length}</span>
+            <span className="min-w-0 font-semibold">{row.name}</span>
+            {row.title && <span className="min-w-0 text-secondary-500">- {row.title}</span>}
+            <span className="shrink-0 text-xs text-secondary-400">{children.length}</span>
           </button>
         ) : (
-          <span className="pl-[1.125rem] text-sm text-secondary-900">
+          <span className="min-w-0 pl-[1.125rem] text-sm text-secondary-900">
             {row.name}
             {row.title && <span className="text-secondary-500"> - {row.title}</span>}
           </span>

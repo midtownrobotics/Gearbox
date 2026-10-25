@@ -58,11 +58,11 @@ export function ListsPage() {
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
           {shown.map((l) => (
-            <Link key={l.id} to={`/lists/${l.id}`} className="block group">
+            <Link key={l.id} to={`/lists/${l.id}`} className="block min-w-0 group">
               <Card className="h-full space-y-3 group-hover:border-secondary-400 transition-colors">
                 <div>
                   <div className="flex items-start justify-between gap-2">
-                    <h2 className="font-semibold text-secondary-900 group-hover:text-primary-500">
+                    <h2 className="min-w-0 font-semibold text-secondary-900 group-hover:text-primary-500 [overflow-wrap:anywhere]">
                       {l.name}
                     </h2>
                     {l.isArchived && (
@@ -72,7 +72,9 @@ export function ListsPage() {
                     )}
                   </div>
                   {l.description && (
-                    <p className="text-sm text-secondary-600 line-clamp-2">{l.description}</p>
+                    <p className="text-sm text-secondary-600 line-clamp-2 [overflow-wrap:anywhere]">
+                      {l.description}
+                    </p>
                   )}
                 </div>
                 <ProgressBar progress={l.progress} />

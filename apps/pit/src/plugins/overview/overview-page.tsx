@@ -176,7 +176,7 @@ function BatteriesTile({ batteries, unknown }: { batteries: Battery[] | null; un
               {inRobot?.name ?? "None"}
             </dd>
             <dd className="text-xs tabular-nums text-secondary-500">
-              {inRobot && <ElapsedTime sinceMs={inRobot.stateSince} />}
+              {inRobot && <ElapsedTime battery={inRobot} />}
             </dd>
           </dl>
         </>

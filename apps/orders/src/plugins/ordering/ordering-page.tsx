@@ -11,6 +11,7 @@ import { Deadline, isLate } from "../../shared/deadline";
 import { ExportCsvButton } from "../../shared/export-csv";
 import { formatCents, formatDay, parseDollars, startOfToday } from "../../shared/format";
 import { PRIORITY_ORDER, PriorityBadge } from "../../shared/priority";
+import { QuantityInput, QuantityMessage, parseQuantity } from "../../shared/quantity";
 import type { OrderRequest, Vendor } from "../../shared/types";
 import { useLoad } from "../../shared/use-load";
 import { useVendors } from "../../shared/vendors";
@@ -228,13 +229,13 @@ function VendorOrder({
   const inOrder = selected.size > 0 ? group.items.filter((r) => selected.has(r.id)) : group.items;
   const parsed = inOrder.map((r) => {
     const e = edits[r.id] ?? { quantity: String(r.quantity), price: dollars(r.unitPriceCents) };
-    const quantity = Number(e.quantity);
+    const quantity = parseQuantity(e.quantity);
     const price = parseDollars(e.price);
     return {
       r,
       quantity,
       price,
-      ok: Number.isInteger(quantity) && quantity >= 1 && price !== null && !Number.isNaN(price),
+      ok: quantity !== null && price !== null && !Number.isNaN(price),
     };
   });
   // One-click cart for the lines in this order, at the quantities entered here.
@@ -244,11 +245,14 @@ function VendorOrder({
       sku: l.r.sku,
       storePlatform: l.r.storePlatform,
       storeVariantId: l.r.storeVariantId,
-      quantity: Number.isInteger(l.quantity) && l.quantity > 0 ? l.quantity : l.r.quantity,
+      quantity: l.quantity ?? l.r.quantity,
     })),
   );
   const shippingCents = parseDollars(shipping) ?? 0;
-  const itemsTotal = parsed.reduce((n, l) => n + (l.ok ? l.quantity * (l.price as number) : 0), 0);
+  const itemsTotal = parsed.reduce(
+    (n, l) => n + (l.ok ? (l.quantity as number) * (l.price as number) : 0),
+    0,
+  );
   // Tax starts at the team's rate on the items (nothing at tax-exempt vendors) and follows the
   // items total until someone types their own amount.
   const defaultTaxCents = isTaxExempt(group.profile)
@@ -262,7 +266,7 @@ function VendorOrder({
     ? chargesByCategory(
         parsed.map((l) => ({
           categoryId: l.r.categoryId,
-          quantity: l.quantity,
+          quantity: l.quantity as number,
           unitPriceCents: l.price,
         })),
         shippingCents,
@@ -322,7 +326,7 @@ function VendorOrder({
         vendor: group.vendor,
         lines: parsed.map((l) => ({
           requestId: l.r.id,
-          quantity: l.quantity,
+          quantity: l.quantity as number,
           unitPriceCents: l.price as number,
         })),
         shippingCents,
@@ -351,7 +355,7 @@ function VendorOrder({
         vendor: group.vendor,
         lines: parsed.map((l) => ({
           requestId: l.r.id,
-          quantity: Number.isInteger(l.quantity) && l.quantity > 0 ? l.quantity : l.r.quantity,
+          quantity: l.quantity ?? l.r.quantity,
         })),
       },
     });
@@ -528,10 +532,9 @@ function VendorOrder({
           <tbody>
             {group.items.map((r) => {
               const e = edits[r.id];
-              const q = Number(e?.quantity);
+              const q = parseQuantity(e?.quantity ?? "");
               const p = parseDollars(e?.price ?? "");
-              const line =
-                Number.isInteger(q) && q > 0 && p !== null && !Number.isNaN(p) ? q * p : null;
+              const line = q !== null && p !== null && !Number.isNaN(p) ? q * p : null;
               const dimmed = selected.size > 0 && !selected.has(r.id);
               return (
                 <tr
@@ -547,14 +550,13 @@ function VendorOrder({
                     />
                   </td>
                   <td className="py-1.5 pr-3">
-                    <input
-                      type="number"
-                      min={1}
+                    <QuantityInput
                       className={small}
                       value={e?.quantity ?? ""}
-                      onChange={(ev) => setEdit(r.id, { quantity: ev.target.value })}
+                      onChange={(quantity) => setEdit(r.id, { quantity })}
                       aria-label={`${r.title} quantity`}
                     />
+                    <QuantityMessage value={e?.quantity ?? ""} />
                   </td>
                   <td className="py-1.5 pr-3">
                     {r.url ? (

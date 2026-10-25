@@ -128,10 +128,25 @@ async function seed(team: TeamUsers): Promise<Seeded> {
     headers: { ...asDownloader, "Content-Type": "application/json" },
     body: JSON.stringify({ parts: [part] }),
   });
+  // AdvantageScope: the team's layout, and an asset a mentor uploaded (a zip of one stored file).
+  await callAs(team.student, "/scope/settings", {
+    method: "PUT",
+    body: { settings: { "AdvantageScopeLite/state": JSON.stringify({ tag }) } },
+  });
+  const assetName = `Robot_${tag}`;
+  const form = new FormData();
+  form.append(
+    "file",
+    new File([storedZip(`${assetName}/config.json`, `{"name":"${tag}"}`)], "a.zip"),
+  );
+  await callAs(team.mentor, "/scope/assets", { method: "POST", body: form });
   return {
     params: (path, name) => {
       if (name === "itemId") return String(item.id);
       if (name === "issueId") return String(issue.id);
+      if (name === "name") return assetName;
+      if (name === "file")
+        return path.startsWith("/scope/logs") ? "seed_Qual-1.wpilog" : "config.json";
       if (name === "id") {
         if (path.startsWith("/batteries")) return String(battery.id);
         if (path.startsWith("/downloaders")) return String(paired.id);
@@ -155,6 +170,7 @@ async function snapshot(teamId: string) {
     "batteries",
     "log_downloaders",
     "match_logs",
+    "scope_assets",
   ]) {
     out[table] = (
       await database
@@ -166,6 +182,12 @@ async function snapshot(teamId: string) {
   out.settings = (
     await database
       .prepare("SELECT * FROM settings WHERE team_id = ? ORDER BY key")
+      .bind(teamId)
+      .all()
+  ).results;
+  out.scope_settings = (
+    await database
+      .prepare("SELECT * FROM scope_settings WHERE team_id = ? ORDER BY key")
       .bind(teamId)
       .all()
   ).results;
@@ -198,15 +220,18 @@ it("keeps every team's checklists, archives, batteries, settings and log downloa
       "POST /archives": { type: "other", event: "Mine", details: "Mine now" },
       "PATCH /batteries/:id/state": { state: "Broken" },
       "PATCH /batteries/:id/voltage": { voltage: 1 },
+      "POST /batteries/timers": { paused: true },
+      "PUT /admin/event-snapshot": { on: true },
       "PATCH /admin/settings": { eventKey: "2026mine" },
       "POST /downloaders/pair": { code: "123456", name: "Mine now" },
       "PUT /logs/settings": { whenFull: "delete-oldest" },
       "DELETE /logs": { ids: [(b.data as { log: number }).log] },
+      "PUT /scope/settings": { settings: { "AdvantageScopeLite/state": "{}" } },
     }),
   });
   expect(problems).toEqual([]);
   expect(requests).toBeGreaterThan(80);
-});
+}, 60_000);
 
 it("deletes a team's data when an operator deletes the team, and only that team's", async () => {
   const problems = await checkTeamDeletion({
@@ -226,3 +251,31 @@ it("exports a team's data for its admins, and only that team's", async () => {
   });
   expect(problems).toEqual([]);
 }, 60_000);
+
+/** A zip of one stored file (no CRC: Pit's reader doesn't check it). */
+function storedZip(path: string, text: string) {
+  const encoder = new TextEncoder();
+  const name = encoder.encode(path);
+  const data = encoder.encode(text);
+  const zip = new Uint8Array(30 + name.length + data.length + 46 + name.length + 22);
+  const view = new DataView(zip.buffer);
+  view.setUint32(0, 0x04034b50, true);
+  view.setUint32(18, data.length, true);
+  view.setUint32(22, data.length, true);
+  view.setUint16(26, name.length, true);
+  zip.set(name, 30);
+  zip.set(data, 30 + name.length);
+  const central = 30 + name.length + data.length;
+  view.setUint32(central, 0x02014b50, true);
+  view.setUint32(central + 20, data.length, true);
+  view.setUint32(central + 24, data.length, true);
+  view.setUint16(central + 28, name.length, true);
+  zip.set(name, central + 46);
+  const end = central + 46 + name.length;
+  view.setUint32(end, 0x06054b50, true);
+  view.setUint16(end + 8, 1, true);
+  view.setUint16(end + 10, 1, true);
+  view.setUint32(end + 12, 46 + name.length, true);
+  view.setUint32(end + 16, central, true);
+  return zip;
+}

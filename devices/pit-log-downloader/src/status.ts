@@ -11,8 +11,13 @@ export type LogStatus = {
   matchType: MatchTypeName;
   matchNumber: number;
   downloaded: boolean;
-  /** In the team's Pit on Gearbox. */
+  /**
+   * Uploaded to the team's Pit (it isn't uploaded again on its own if it's deleted there; Upload
+   * again on the status page does).
+   */
   uploaded: boolean;
+  /** In the team's Pit now, as of Pit's list (asked once a minute); null when that isn't known. */
+  inGearbox: boolean | null;
   /** Kept to part of the match when uploaded. */
   trimmed: boolean;
   /** What it comes to gzipped for Pit, once worked out. */
@@ -38,8 +43,19 @@ export type GearboxStatus = {
    * gateway's "http://<team>-pit.gearbox.localhost:8796" with --dev); null for the usual one.
    */
   pitUrl: string | null;
-  /** Null until it's paired: then the downloader does nothing but ask to be. */
-  paired: { teamNumber: number; pitUrl: string; name: string; pairedAt: number } | null;
+  /** The Pit it pairs with unless an address is typed, with "<team>" for the team number. */
+  usualPitUrl: string;
+  /**
+   * Null until it's paired: then the downloader does nothing but ask to be. `usual` when it's the
+   * team's usual Pit on Gearbox.
+   */
+  paired: {
+    teamNumber: number;
+    pitUrl: string;
+    usual: boolean;
+    name: string;
+    pairedAt: number;
+  } | null;
   /**
    * The last check of its key: "ok", "unreachable" (no internet, or Gearbox didn't answer),
    * "removed" (Pit no longer knows it, so it unpaired), or null before any check.
@@ -59,7 +75,10 @@ export type Status = {
   restartCommand: string;
   gearbox: GearboxStatus;
   connection: {
+    /** On the robot's network. */
     robot: boolean;
+    /** Whether the roboRIO answered the last time it was tried; null before (or off its network). */
+    rioReachable: boolean | null;
     internet: boolean;
     /** Uploading to Gearbox right now. */
     uploadingRunning: boolean;

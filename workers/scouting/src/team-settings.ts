@@ -4,7 +4,13 @@ import { type WriteQuery, batch, dbOf } from "./db";
 import { scoutingEngagementSettings, strategyEventConfig } from "./db/schema";
 import { getEngagementSettings } from "./engagement";
 import { manifest } from "./manifest";
-import { DEFAULT_SUBMISSION_WINDOW, submissionWindow } from "./match-advance";
+import {
+  DEFAULT_LATE_WINDOW,
+  DEFAULT_SUBMISSION_WINDOW,
+  MAX_LATE_WINDOW,
+  lateWindow,
+  submissionWindow,
+} from "./match-advance";
 import type { AppEnv } from "./types";
 
 export const teamSettingsRouter = teamSettingsRoutes<AppEnv>(manifest, "Scouting settings", {
@@ -14,6 +20,7 @@ export const teamSettingsRouter = teamSettingsRoutes<AppEnv>(manifest, "Scouting
       .select({
         tbaKey: strategyEventConfig.tba_auth_key,
         submissionWindowSeconds: strategyEventConfig.submission_window_seconds,
+        lateWindowSeconds: strategyEventConfig.late_window_seconds,
       })
       .from(strategyEventConfig)
       .where(inTeam(strategyEventConfig, c.get("teamId")))
@@ -22,6 +29,7 @@ export const teamSettingsRouter = teamSettingsRoutes<AppEnv>(manifest, "Scouting
       values: {
         pointsLabel: settings.pointsLabel,
         submissionWindowSeconds: config?.submissionWindowSeconds ?? DEFAULT_SUBMISSION_WINDOW,
+        lateWindowSeconds: config?.lateWindowSeconds ?? DEFAULT_LATE_WINDOW,
       },
       integrations: {
         "the blue alliance": {
@@ -39,7 +47,12 @@ export const teamSettingsRouter = teamSettingsRoutes<AppEnv>(manifest, "Scouting
       changes.submissionWindowSeconds === undefined
         ? undefined
         : submissionWindow(changes.submissionWindowSeconds);
-    if (delay === null) return "Scouting window must be a whole number from 0 to 1800 seconds.";
+    if (delay === null)
+      return "Move on after a match must be a whole number from 0 to 1800 seconds.";
+    const late =
+      changes.lateWindowSeconds === undefined ? undefined : lateWindow(changes.lateWindowSeconds);
+    if (late === null)
+      return `Late reports must be accepted for a whole number from 0 to ${MAX_LATE_WINDOW} seconds.`;
     const values = {
       enabled: Number(settings.enabled),
       predictions_enabled: Number(settings.predictionsEnabled),
@@ -55,9 +68,10 @@ export const teamSettingsRouter = teamSettingsRoutes<AppEnv>(manifest, "Scouting
         .values(withTeam(c.get("teamId"), values))
         .onConflictDoUpdate({ target: scoutingEngagementSettings.teamId, set: values }),
     ];
-    if (delay !== undefined) {
+    if (delay !== undefined || late !== undefined) {
       const delayValues = {
-        submission_window_seconds: delay,
+        ...(delay === undefined ? {} : { submission_window_seconds: delay }),
+        ...(late === undefined ? {} : { late_window_seconds: late }),
         updated_by: c.get("userId"),
         updated_at: Date.now(),
       };

@@ -1,5 +1,47 @@
 # @g3/worker-scouting
 
+## 3.0.0
+
+### Major Changes
+
+- 24cbdaf: A service ticket can have more than one issue type, or "Not sure" when the reporter can't tell: both ticket forms pick them with chips, and each ticket shows a badge per type. Apply migration `0037_service_ticket_issue_types.sql` before deploying; the API takes and returns `issueTypes` (a list) in place of `issueType`.
+
+### Minor Changes
+
+- 9006f60: Report a problem or suggest an idea from any app: the menu has "Report a problem", which posts it as a public issue on Gearbox's GitHub with the page and app versions (never your name), and you get a Slack or Discord message when it's fixed or closed. No GitHub account needed. Not in the public demo. Deployers: apply the platform's migration `0012_problem_reports.sql` before deploying it, and set its `GITHUB_TOKEN` secret (`docs/deploy.md`, "Problem reports on GitHub"); without it, reports are kept, and those under a week old are sent once it's set.
+- 24cbdaf: Multiple choice questions with up to six short choices, like Yes/No, are answered with one tap on large bubbles instead of a dropdown; tap the chosen answer again to clear it. Longer lists keep the dropdown.
+
+### Patch Changes
+
+- 05068af: Your team's logo keeps its shape in the top bar: a wide logo shows wider and a tall one narrower, instead of being squeezed into a square.
+- 05068af: On a phone, a long team and app name in the top bar and the menu is cut short ("ROBOWARRIORS SKILL TR…") instead of pushing the menu's close button and your greeting off the screen.
+- 73d2f28: Long links, part names and other long text wrap or are cut short on phones instead of making the page scroll sideways.
+
+## 2.1.0
+
+### Minor Changes
+
+- db2c78c: Teams can use Discord instead of Slack: connect your server on Integrations (or when signing your team up), sign in with Discord, and get everything Gearbox sends (approvals, releases, daily summaries, reminders, service alerts and notifications) on Discord. Deployers run G3ID's and the platform's migrations first, and set up the Discord app (docs/deploy.md, "Discord") to switch it on.
+- c6d1e89: Scouting's Admin page opens with the announcement box, then a Competition overview: who's in the app, this match's submissions, the Strategy leads online, the match everyone is scouting, and the next team match. The manual schedule section is now called Match schedule and explains itself. Strategy leads also set how long scouts have to send a form in after a match ends (two minutes to start, with whole-second precision). Apply migrations through 0035 before deploying; saved minute-based delays are preserved.
+- 7f8f724: Analysis now lists teams instead of single reports: match scouting shows each team's average for every number and its most common answer to every choice at the current event, and pit scouting shows each team's answers. Sort by any column, and click a team's number to see each of its reports, labeled with the match and scout.
+- c6d1e89: Default automatic match advancing to two minutes after a match finishes and let teams customize the delay in Scouting Admin.
+- 1585566: Match forms never lose a scout's work: answers and drawings are kept on the device, a bar counts down before the form moves on (with +30 s to finish), a report that missed the move can still be sent and goes to its own match marked late, and a done screen shows what was sent and the next match. Admins set how long late reports are accepted.
+- f9bd8ec: Separate match and pit scouting forms, filter and sort reports by type, and show competition names instead of event codes. Apply report type and competition filters to statistics, auto paths and team comparisons.
+
+### Patch Changes
+
+- c6d1e89: Analysis sorts reports by form, so a team's match forms and its pit form no longer sit mixed together.
+- f29e1e4: Allow signed-in team members to open Analysis and view their team's reports and drawings. Keep report management restricted to Strategy leads and admins.
+- c6d1e89: Keep Scouting API credentials private to each team. Restrict legacy deployment-key fallbacks to the original team, and report missing credentials correctly for other teams.
+- f9bd8ec: Show the match submission deadline and countdown, clear answers and drawings at expiry or assignment changes, and reject stale match or team submissions before saving reports or awarding points.
+- 1585566: A scout who has sent a match report in moves to the match on the field at once, instead of waiting out the window after the finished match, and the confirmation names the match the report went to and the match they are on now.
+- f29e1e4: Open a scout's next match immediately after saving a report, without a start-time submission gate. Limit automatic progression to one match ahead of the shared current match, preserve drafts during schedule failures, and prevent stale polls from restoring completed forms. Keep expired and wrong-team report protection.
+  
+  Claim scout assignments atomically, repair changed lineups, and validate team membership before and after drawing uploads. Keep automatic match advancement forward-only, preserve omitted event settings, and reopen empty forms after a confirmed deadline extension. Anchor countdowns to server time so device clock changes do not erase drafts.
+- c6d1e89: Load scouting points and history before external predictions, limit Statbotics requests to three seconds, and reuse recent public match data. Name the active event in prediction errors and distinguish missing events from server failures and timeouts. Keep points and standings usable during outages, allow retrying failed loads, and validate submitted picks against fresh data.
+- c6d1e89: Every answer on a scouting form takes 0. A rating of 0, a choice named "0", a selection including it and a note reading "0" were all refused as if the field were blank; a robot that did nothing is now recorded as doing nothing. Each field still needs an answer, and says so instead of blaming 0.
+- da8964e: Save tier list edits automatically, serialize pending changes, and retry failed saves. Use stable list IDs so retrying a new list does not create duplicates.
+
 ## 2.0.0
 
 ### Major Changes

@@ -5,16 +5,287 @@ Each release of the whole platform, newest first, with the version of every app 
 - **Platform version** (root `package.json`): CalVer, `YEAR.MONTH.N`, where N counts releases within the month. It says how current an install is.
 - **App versions**: SemVer, one per app, shared by its page and its worker (Changesets "fixed" groups in `.changeset/config.json`). Shown in each app's navbar and its worker's `/health`.
 
-**Branches:** work lands on `main`. `public` is what's released, and it's what gets deployed.
+**Branches:** work lands on `staging`. `public` is what's released, and it's what gets deployed.
 
 **Making a release:**
 
-1. Every PR into `main` that changes an app adds a changeset (`pnpm changeset`, see `.changeset/README.md`).
-2. A release PR from `main` into `public` stays open (`.github/workflows/release-pr.yml`). After every push to `main` it's retitled with what merging it would release, e.g. "Release 2026.10.4: Orders 1.2.0, Pit 1.0.1", and its description lists the versions and notes (`pnpm release:preview` shows the same locally). Nothing is applied yet.
-3. When you're ready, merge that PR with **Create a merge commit** (not squash or rebase, which would break the merge back into `main`).
-4. The release workflow (`.github/workflows/release.yml`) then runs on `public`. It applies the changesets (`pnpm release:version`: versions, changelogs, the next platform version, this file), commits that to `public` as "Release <platform>", tags `v<platform>` plus each app's new version (`pnpm release:tag`), and merges `public` back into `main` so `main` has the new versions too. It pushes with a deploy key (`RELEASE_DEPLOY_KEY`) that's on the bypass list of both branch rulesets.
+1. Every PR into `staging` that changes an app adds a changeset (`pnpm changeset`, see `.changeset/README.md`).
+2. A release PR from `staging` into `public` stays open (`.github/workflows/release-pr.yml`). After every push to `staging` it's retitled with what merging it would release, e.g. "Release 2026.10.4: Orders 1.2.0, Pit 1.0.1", and its description lists the versions and notes (`pnpm release:preview` shows the same locally). Nothing is applied yet.
+3. When you're ready, merge that PR with **Create a merge commit** (not squash or rebase, which would break the merge back into `staging`).
+4. The release workflow (`.github/workflows/release.yml`) then runs on `public`. It applies the changesets (`pnpm release:version`: versions, changelogs, the next platform version, this file), commits that to `public` as "Release <platform>", tags `v<platform>` plus each app's new version (`pnpm release:tag`), and merges `public` back into `staging` so `staging` has the new versions too. It pushes with a deploy key (`RELEASE_DEPLOY_KEY`) that's on the bypass list of both branch rulesets.
 
 <!-- releases -->
+
+## 2026.10.5 (2026-10-24)
+
+| App | Version |
+| --- | --- |
+| **G3ID** | **4.0.0** (was 3.0.0) |
+| **Portal** | **2.2.0** (was 2.1.0) |
+| **Platform** | **4.0.0** (was 3.0.2) |
+| **Shop** | **3.0.0** (was 2.1.0) |
+| **Pit** | **3.1.0** (was 3.0.0) |
+| **Orders** | **2.2.0** (was 2.1.0) |
+| **Edge** | **2.3.0** (was 2.2.0) |
+| Edge agent | 0.7.0 |
+| **Pit log downloader** | **2.2.0** (was 2.1.0) |
+| **Scouting** | **3.0.0** (was 2.1.0) |
+| **Skill Tree** | **2.1.0** (was 2.0.0) |
+| **Attendance** | **2.1.0** (was 2.0.0) |
+| **Inventory** | **1.1.0** (was 1.0.0) |
+| **Schedule** | **0.3.0** (was 0.2.0) |
+
+### G3ID 4.0.0
+
+- Portal's Account page shows the account name behind each linked sign-in: your username on the Slack or Discord account you joined with (listed first), and the username or email of each other account, so two accounts from the same service can be told apart. Slack accounts linked from now on keep their Slack name, and ones linked before take the member's username. Deployers: apply G3ID's migration `0021_slack_identity_names.sql` before deploying G3ID.
+- Someone new who joins with Slack or Discord now enters their full name (filled in from their Slack or Discord name) before the team's admins are asked to approve them. Admins can correct any member's name on Portal's Members page, and each member's username, the name on the chat account they joined with, is shown beside it and can't be edited. Everyone's current name stays as it is and becomes their username too. Deployers: apply G3ID's migration `0020_member_names.sql` before deploying G3ID.
+- Your team's logo keeps its shape in the top bar: a wide logo shows wider and a tall one narrower, instead of being squeezed into a square.
+- On a phone, a long team and app name in the top bar and the menu is cut short ("ROBOWARRIORS SKILL TR…") instead of pushing the menu's close button and your greeting off the screen.
+- Long links, part names and other long text wrap or are cut short on phones instead of making the page scroll sideways.
+- Report a problem or suggest an idea from any app: the menu has "Report a problem", which posts it as a public issue on Gearbox's GitHub with the page and app versions (never your name), and you get a Slack or Discord message when it's fixed or closed. No GitHub account needed. Not in the public demo. Deployers: apply the platform's migration `0012_problem_reports.sql` before deploying it, and set its `GITHUB_TOKEN` secret (`docs/deploy.md`, "Problem reports on GitHub"); without it, reports are kept, and those under a week old are sent once it's set.
+
+### Portal 2.2.0
+
+- On the Account page, each service you can link more than once has one button below your sign-ins: Connect it, or add another account of it once one is linked.
+- Portal's Account page shows the account name behind each linked sign-in: your username on the Slack or Discord account you joined with (listed first), and the username or email of each other account, so two accounts from the same service can be told apart. Slack accounts linked from now on keep their Slack name, and ones linked before take the member's username. Deployers: apply G3ID's migration `0021_slack_identity_names.sql` before deploying G3ID.
+- Someone new who joins with Slack or Discord now enters their full name (filled in from their Slack or Discord name) before the team's admins are asked to approve them. Admins can correct any member's name on Portal's Members page, and each member's username, the name on the chat account they joined with, is shown beside it and can't be edited. Everyone's current name stays as it is and becomes their username too. Deployers: apply G3ID's migration `0020_member_names.sql` before deploying G3ID.
+- Your team's logo keeps its shape in the top bar: a wide logo shows wider and a tall one narrower, instead of being squeezed into a square.
+- On a phone, a long team and app name in the top bar and the menu is cut short ("ROBOWARRIORS SKILL TR…") instead of pushing the menu's close button and your greeting off the screen.
+- Long links, part names and other long text wrap or are cut short on phones instead of making the page scroll sideways.
+- Report a problem or suggest an idea from any app: the menu has "Report a problem", which posts it as a public issue on Gearbox's GitHub with the page and app versions (never your name), and you get a Slack or Discord message when it's fixed or closed. No GitHub account needed. Not in the public demo. Deployers: apply the platform's migration `0012_problem_reports.sql` before deploying it, and set its `GITHUB_TOKEN` secret (`docs/deploy.md`, "Problem reports on GitHub"); without it, reports are kept, and those under a week old are sent once it's set.
+- Each problem report's GitHub issue shows the sender's reporter ID, a random ID that doesn't say who they are, and the report form shows members their own. Operators can block a reporter ID that sends spam or misuses reports, from the console's Reporters page; the team's admins get a Slack or Discord message saying who it is and why, and see each member's reporter ID on their page in Members (the search finds it too). Deployers: apply the platform's migration `0013_reporters.sql` first.
+
+### Platform 4.0.0
+
+- On a phone, a long team and app name in the top bar and the menu is cut short ("ROBOWARRIORS SKILL TR…") instead of pushing the menu's close button and your greeting off the screen.
+- Long links, part names and other long text wrap or are cut short on phones instead of making the page scroll sideways.
+- Report a problem or suggest an idea from any app: the menu has "Report a problem", which posts it as a public issue on Gearbox's GitHub with the page and app versions (never your name), and you get a Slack or Discord message when it's fixed or closed. No GitHub account needed. Not in the public demo. Deployers: apply the platform's migration `0012_problem_reports.sql` before deploying it, and set its `GITHUB_TOKEN` secret (`docs/deploy.md`, "Problem reports on GitHub"); without it, reports are kept, and those under a week old are sent once it's set.
+- A team can send 5 problem reports a day, then one every 10 minutes until midnight UTC.
+- Reports can have a title of their own, which becomes the GitHub issue's title, and the issue shows the report's text as written instead of as a quote. Deployers: apply the platform's migration `0014_report_titles.sql` first.
+- Each problem report's GitHub issue shows the sender's reporter ID, a random ID that doesn't say who they are, and the report form shows members their own. Operators can block a reporter ID that sends spam or misuses reports, from the console's Reporters page; the team's admins get a Slack or Discord message saying who it is and why, and see each member's reporter ID on their page in Members (the search finds it too). Deployers: apply the platform's migration `0013_reporters.sql` first.
+
+### Shop 3.0.0
+
+- Your team's logo keeps its shape in the top bar: a wide logo shows wider and a tall one narrower, instead of being squeezed into a square.
+- On a phone, a long team and app name in the top bar and the menu is cut short ("ROBOWARRIORS SKILL TR…") instead of pushing the menu's close button and your greeting off the screen.
+- Long links, part names and other long text wrap or are cut short on phones instead of making the page scroll sideways.
+- Quality control is one section on the Admin page: quality reports and their table moved into it, the process picker only shows once "Require quality control" is on, and the checklist a report goes through is now the team's own, edited under the reports table. A part that fails its check can go to any of its steps, not only one before the check. Two new choices sit beside Send back: Fix it, which sends the part to a step and writes what has to be done onto the part's notes, and Start over, which makes the part obsolete and adds a new one at its first step. A fix can send the part to a step it doesn't have yet — sanding a part that failed — and that step joins this one part, just before its quality check. Turning quality reports or a required quality check on now takes effect on the shop floor without reloading the page, so a Quality Control step no longer offers Mark Complete when it needs a quality report. Run the Shop worker's D1 migrations `0020`–`0023` before deploying: they add Quality Control processes, shop managers and quality reports, widen what a report's outcome can be and move a report's four fixed questions into the team's editable checklist.
+- Report a problem or suggest an idea from any app: the menu has "Report a problem", which posts it as a public issue on Gearbox's GitHub with the page and app versions (never your name), and you get a Slack or Discord message when it's fixed or closed. No GitHub account needed. Not in the public demo. Deployers: apply the platform's migration `0012_problem_reports.sql` before deploying it, and set its `GITHUB_TOKEN` secret (`docs/deploy.md`, "Problem reports on GitHub"); without it, reports are kept, and those under a week old are sent once it's set.
+- Quality Control processes: a process type only shop managers and admins can check off. The Admin page's new Quality Control section picks the team's shop managers, and can require a quality check, which puts a chosen Quality Control process at the end of every part.
+- Quality reports: with them on (the Admin page's new Quality Reports section), a part at a Quality Control process gets one Start Quality Report button. A shop manager checks the part against its drawing; if something's wrong, they pick the step it likely came from, see who did it and when, and send the part back. Every report is listed on the Admin page. "Require a quality check" is now "Require quality control".
+
+### Pit 3.1.0
+
+- Your team's logo keeps its shape in the top bar: a wide logo shows wider and a tall one narrower, instead of being squeezed into a square.
+- On a phone, a long team and app name in the top bar and the menu is cut short ("ROBOWARRIORS SKILL TR…") instead of pushing the menu's close button and your greeting off the screen.
+- Long links, part names and other long text wrap or are cut short on phones instead of making the page scroll sideways.
+- The Pit Monitor is three columns on a wide screen and leads with "Our next match": its name on our alliance's color, all six teams by driver station with ours ringed and each team's rank and pit address beside it, how many matches until we're called to queue (then Now queuing, On deck, On field), and countdowns to queuing and going on the field. Its color grows more urgent as it gets closer. The event's On deck, Now queuing and Queuing soon are at the top right, and each played qualification match's score shows its bonus RPs as dots, as The Blue Alliance does. When Nexus has no times the panel uses The Blue Alliance's schedule, and it says so plainly when there's no schedule or we have no more matches. The Monitor's battery tiles are two lines each, and the Monitor no longer scrolls sideways on a phone.
+- AdvantageScope's field and robot models download about a third the size and stay on the device after the first time, and so does each match log you open. The log picker says which logs are on this device and how much the others download, and the Logs page saves AdvantageScope, your team's fields and robots and all the logs to the device ahead, so AdvantageScope opens with no connection.
+- On staging, with the event snapshot on, admins can move its clock on or back from the Monitor (a match, five minutes or a minute at a time, or back to the start), and each match's status and score follow it, so every state of "Our next match" can be seen without waiting.
+- Report a problem or suggest an idea from any app: the menu has "Report a problem", which posts it as a public issue on Gearbox's GitHub with the page and app versions (never your name), and you get a Slack or Discord message when it's fixed or closed. No GitHub account needed. Not in the public demo. Deployers: apply the platform's migration `0012_problem_reports.sql` before deploying it, and set its `GITHUB_TOKEN` secret (`docs/deploy.md`, "Problem reports on GitHub"); without it, reports are kept, and those under a week old are sent once it's set.
+
+### Orders 2.2.0
+
+- Your team's logo keeps its shape in the top bar: a wide logo shows wider and a tall one narrower, instead of being squeezed into a square.
+- On a phone, a long team and app name in the top bar and the menu is cut short ("ROBOWARRIORS SKILL TR…") instead of pushing the menu's close button and your greeting off the screen.
+- Long links, part names and other long text wrap or are cut short on phones instead of making the page scroll sideways.
+- Edit request can change the link: the new link is looked up like on New Request, and you choose whether to use its name and price. Long titles, reasons, vendors and list names now wrap or are cut short on phones instead of pushing the page off the screen.
+- Quantity and Pack of boxes take whole numbers only, show the number pad on phones, and say "Enter a whole number" under the box (with submit turned off) instead of failing when you send.
+- Report a problem or suggest an idea from any app: the menu has "Report a problem", which posts it as a public issue on Gearbox's GitHub with the page and app versions (never your name), and you get a Slack or Discord message when it's fixed or closed. No GitHub account needed. Not in the public demo. Deployers: apply the platform's migration `0012_problem_reports.sql` before deploying it, and set its `GITHUB_TOKEN` secret (`docs/deploy.md`, "Problem reports on GitHub"); without it, reports are kept, and those under a week old are sent once it's set.
+
+### Edge 2.3.0
+
+- Your team's logo keeps its shape in the top bar: a wide logo shows wider and a tall one narrower, instead of being squeezed into a square.
+- On a phone, a long team and app name in the top bar and the menu is cut short ("ROBOWARRIORS SKILL TR…") instead of pushing the menu's close button and your greeting off the screen.
+- Long links, part names and other long text wrap or are cut short on phones instead of making the page scroll sideways.
+- Report a problem or suggest an idea from any app: the menu has "Report a problem", which posts it as a public issue on Gearbox's GitHub with the page and app versions (never your name), and you get a Slack or Discord message when it's fixed or closed. No GitHub account needed. Not in the public demo. Deployers: apply the platform's migration `0012_problem_reports.sql` before deploying it, and set its `GITHUB_TOKEN` secret (`docs/deploy.md`, "Problem reports on GitHub"); without it, reports are kept, and those under a week old are sent once it's set.
+
+### Pit log downloader 2.2.0
+
+- Your team's logo keeps its shape in the top bar: a wide logo shows wider and a tall one narrower, instead of being squeezed into a square.
+- Long links, part names and other long text wrap or are cut short on phones instead of making the page scroll sideways.
+- The pairing page can pair with a Pit at another address (Use another Pit address), such as staging, without changing config.env.
+- A log deleted from Gearbox has an Upload again button on the status page.
+
+### Scouting 3.0.0
+
+- Your team's logo keeps its shape in the top bar: a wide logo shows wider and a tall one narrower, instead of being squeezed into a square.
+- On a phone, a long team and app name in the top bar and the menu is cut short ("ROBOWARRIORS SKILL TR…") instead of pushing the menu's close button and your greeting off the screen.
+- Long links, part names and other long text wrap or are cut short on phones instead of making the page scroll sideways.
+- Report a problem or suggest an idea from any app: the menu has "Report a problem", which posts it as a public issue on Gearbox's GitHub with the page and app versions (never your name), and you get a Slack or Discord message when it's fixed or closed. No GitHub account needed. Not in the public demo. Deployers: apply the platform's migration `0012_problem_reports.sql` before deploying it, and set its `GITHUB_TOKEN` secret (`docs/deploy.md`, "Problem reports on GitHub"); without it, reports are kept, and those under a week old are sent once it's set.
+- Multiple choice questions with up to six short choices, like Yes/No, are answered with one tap on large bubbles instead of a dropdown; tap the chosen answer again to clear it. Longer lists keep the dropdown.
+- A service ticket can have more than one issue type, or "Not sure" when the reporter can't tell: both ticket forms pick them with chips, and each ticket shows a badge per type. Apply migration `0037_service_ticket_issue_types.sql` before deploying; the API takes and returns `issueTypes` (a list) in place of `issueType`.
+
+### Skill Tree 2.1.0
+
+- Your team's logo keeps its shape in the top bar: a wide logo shows wider and a tall one narrower, instead of being squeezed into a square.
+- On a phone, a long team and app name in the top bar and the menu is cut short ("ROBOWARRIORS SKILL TR…") instead of pushing the menu's close button and your greeting off the screen.
+- Long links, part names and other long text wrap or are cut short on phones instead of making the page scroll sideways.
+- Report a problem or suggest an idea from any app: the menu has "Report a problem", which posts it as a public issue on Gearbox's GitHub with the page and app versions (never your name), and you get a Slack or Discord message when it's fixed or closed. No GitHub account needed. Not in the public demo. Deployers: apply the platform's migration `0012_problem_reports.sql` before deploying it, and set its `GITHUB_TOKEN` secret (`docs/deploy.md`, "Problem reports on GitHub"); without it, reports are kept, and those under a week old are sent once it's set.
+
+### Attendance 2.1.0
+
+- Your team's logo keeps its shape in the top bar: a wide logo shows wider and a tall one narrower, instead of being squeezed into a square.
+- On a phone, a long team and app name in the top bar and the menu is cut short ("ROBOWARRIORS SKILL TR…") instead of pushing the menu's close button and your greeting off the screen.
+- Long links, part names and other long text wrap or are cut short on phones instead of making the page scroll sideways.
+- Report a problem or suggest an idea from any app: the menu has "Report a problem", which posts it as a public issue on Gearbox's GitHub with the page and app versions (never your name), and you get a Slack or Discord message when it's fixed or closed. No GitHub account needed. Not in the public demo. Deployers: apply the platform's migration `0012_problem_reports.sql` before deploying it, and set its `GITHUB_TOKEN` secret (`docs/deploy.md`, "Problem reports on GitHub"); without it, reports are kept, and those under a week old are sent once it's set.
+
+### Inventory 1.1.0
+
+- Your team's logo keeps its shape in the top bar: a wide logo shows wider and a tall one narrower, instead of being squeezed into a square.
+- On a phone, a long team and app name in the top bar and the menu is cut short ("ROBOWARRIORS SKILL TR…") instead of pushing the menu's close button and your greeting off the screen.
+- Long links, part names and other long text wrap or are cut short on phones instead of making the page scroll sideways.
+- Report a problem or suggest an idea from any app: the menu has "Report a problem", which posts it as a public issue on Gearbox's GitHub with the page and app versions (never your name), and you get a Slack or Discord message when it's fixed or closed. No GitHub account needed. Not in the public demo. Deployers: apply the platform's migration `0012_problem_reports.sql` before deploying it, and set its `GITHUB_TOKEN` secret (`docs/deploy.md`, "Problem reports on GitHub"); without it, reports are kept, and those under a week old are sent once it's set.
+
+### Schedule 0.3.0
+
+- Your team's logo keeps its shape in the top bar: a wide logo shows wider and a tall one narrower, instead of being squeezed into a square.
+- On a phone, a long team and app name in the top bar and the menu is cut short ("ROBOWARRIORS SKILL TR…") instead of pushing the menu's close button and your greeting off the screen.
+- Long links, part names and other long text wrap or are cut short on phones instead of making the page scroll sideways.
+- Report a problem or suggest an idea from any app: the menu has "Report a problem", which posts it as a public issue on Gearbox's GitHub with the page and app versions (never your name), and you get a Slack or Discord message when it's fixed or closed. No GitHub account needed. Not in the public demo. Deployers: apply the platform's migration `0012_problem_reports.sql` before deploying it, and set its `GITHUB_TOKEN` secret (`docs/deploy.md`, "Problem reports on GitHub"); without it, reports are kept, and those under a week old are sent once it's set.
+
+## 2026.10.4 (2026-10-19)
+
+| App | Version |
+| --- | --- |
+| G3ID | 3.0.0 |
+| Portal | 2.1.0 |
+| **Platform** | **3.0.2** (was 3.0.1) |
+| Shop | 2.1.0 |
+| Pit | 3.0.0 |
+| Orders | 2.1.0 |
+| **Edge** | **2.2.0** (was 2.1.0) |
+| **Edge agent** | **0.7.0** (was 0.6.0) |
+| Pit log downloader | 2.1.0 |
+| Scouting | 2.1.0 |
+| Skill Tree | 2.0.0 |
+| Attendance | 2.0.0 |
+| Inventory | 1.0.0 |
+| Schedule | 0.2.0 |
+
+### Platform 3.0.2
+
+- Updated (no notes).
+
+### Edge 2.2.0
+
+- Admins and mentors can manage Door Sounds. Only admins can test, approve, reject, or delete sounds. Signed-in students can submit WAV files for review and see their own submission status. Pending audio stays outside the playable library until an admin approves it; the Edge box keeps the review queue across restarts. Install the updated agent before enabling submissions in the UI.
+- Door Sounds is available to admins and mentors. Students can suggest sounds on a separate page and track approval status. Admins can test pending clips, stop playback, approve or decline submissions, upload directly, and delete approved clips. The general warning and introductory playback description have been removed.
+
+### Edge agent 0.7.0
+
+- Admins and mentors can manage Door Sounds. Only admins can test, approve, reject, or delete sounds. Signed-in students can submit WAV files for review and see their own submission status. Pending audio stays outside the playable library until an admin approves it; the Edge box keeps the review queue across restarts. Install the updated agent before enabling submissions in the UI.
+
+## 2026.10.3 (2026-10-19)
+
+| App | Version |
+| --- | --- |
+| G3ID | 3.0.0 |
+| Portal | 2.1.0 |
+| **Platform** | **3.0.1** (was 3.0.0) |
+| Shop | 2.1.0 |
+| Pit | 3.0.0 |
+| Orders | 2.1.0 |
+| **Edge** | **2.1.0** (was 2.0.0) |
+| **Edge agent** | **0.6.0** (was 0.5.0) |
+| Pit log downloader | 2.1.0 |
+| Scouting | 2.1.0 |
+| Skill Tree | 2.0.0 |
+| Attendance | 2.0.0 |
+| Inventory | 1.0.0 |
+| Schedule | 0.2.0 |
+
+### Platform 3.0.1
+
+- Updated (no notes).
+
+### Edge 2.1.0
+
+- Door Sounds now has an ordered multi-selection with touch and keyboard drag handles, clearly separated clip cards, and compact sliders beneath each clip for pause and volume. Each clip has a single Pause before this clip slider that also applies on repeats. Each opening starts at the first selection and its volume; closing cancels any delay or cuts off playback immediately. Preferences persist on the Edge box. Volume control supports uncompressed PCM and floating-point WAVs. Rename clips inline while keeping their volume, pause, and playlist position.
+
+### Edge agent 0.6.0
+
+- Door Sounds now has an ordered multi-selection with touch and keyboard drag handles, clearly separated clip cards, and compact sliders beneath each clip for pause and volume. Each clip has a single Pause before this clip slider that also applies on repeats. Each opening starts at the first selection and its volume; closing cancels any delay or cuts off playback immediately. Preferences persist on the Edge box. Volume control supports uncompressed PCM and floating-point WAVs. Rename clips inline while keeping their volume, pause, and playlist position.
+
+## 2026.10.2 (2026-10-18)
+
+| App | Version |
+| --- | --- |
+| **G3ID** | **3.0.0** (was 2.0.0) |
+| **Portal** | **2.1.0** (was 2.0.0) |
+| **Platform** | **3.0.0** (was 2.0.0) |
+| **Shop** | **2.1.0** (was 2.0.0) |
+| **Pit** | **3.0.0** (was 2.0.0) |
+| **Orders** | **2.1.0** (was 2.0.0) |
+| Edge | 2.0.0 |
+| Edge agent | 0.5.0 |
+| **Pit log downloader** | **2.1.0** (was 2.0.0) |
+| **Scouting** | **2.1.0** (was 2.0.0) |
+| Skill Tree | 2.0.0 |
+| Attendance | 2.0.0 |
+| Inventory | 1.0.0 |
+| **Schedule** | **0.2.0** (was 0.1.0) |
+
+### G3ID 3.0.0
+
+- Teams can use Discord instead of Slack: connect your server on Integrations (or when signing your team up), sign in with Discord, and get everything Gearbox sends (approvals, releases, daily summaries, reminders, service alerts and notifications) on Discord. Deployers run G3ID's and the platform's migrations first, and set up the Discord app (docs/deploy.md, "Discord") to switch it on.
+
+### Portal 2.1.0
+
+- Teams can use Discord instead of Slack: connect your server on Integrations (or when signing your team up), sign in with Discord, and get everything Gearbox sends (approvals, releases, daily summaries, reminders, service alerts and notifications) on Discord. Deployers run G3ID's and the platform's migrations first, and set up the Discord app (docs/deploy.md, "Discord") to switch it on.
+
+### Platform 3.0.0
+
+- Teams can use Discord instead of Slack: connect your server on Integrations (or when signing your team up), sign in with Discord, and get everything Gearbox sends (approvals, releases, daily summaries, reminders, service alerts and notifications) on Discord. Deployers run G3ID's and the platform's migrations first, and set up the Discord app (docs/deploy.md, "Discord") to switch it on.
+
+### Shop 2.1.0
+
+- Teams can use Discord instead of Slack: connect your server on Integrations (or when signing your team up), sign in with Discord, and get everything Gearbox sends (approvals, releases, daily summaries, reminders, service alerts and notifications) on Discord. Deployers run G3ID's and the platform's migrations first, and set up the Discord app (docs/deploy.md, "Discord") to switch it on.
+
+### Pit 3.0.0
+
+- AdvantageScope is in Pit: open it from the Logs page, and open any match log in it with one click. Its preferences and layout are shared by the whole team, and mentors can add your robot or another field for everyone. Deployers: apply Pit's migration 0016 first.
+- Pit's Logs page and Monitor show what the log downloader is doing: online, connected to the robot, copying and uploading. The Monitor's Recent Logs is now Logs, and In the pit now is at the top of its left column. On the downloader, the robot shows as connected as soon as the computer joins its network, the page no longer stalls while logs copy, it checks the robot again for new logs while connected, and "In Gearbox" follows what Pit has. Deployers: apply Pit's migration 0017 first.
+- The Monitor shows whether it's online, checked every second, and covers the screen with a big Offline notice when Pit can't be reached. A failed refresh keeps what it last showed.
+- Pit deploys again when AdvantageScope comes from the build cache.
+- Pit's Monitor keeps the team's played matches in its match list, with the blue and red scores and a green W or red L in place of the time; the list opens at the next match. On a wide screen the Monitor fits the window: the match list and the checklists scroll on their own, with the column names and the overall progress bar kept at the top. The Batteries page has Pause All and Unpause All, which stop and restart every battery's timer without changing any battery's state. On the days of a published Schedule event, the timers go back to zero and pause when the first day opens, pause when each day closes, and carry on when the next day opens. In dev and staging only, Pit's Admin page has Use event snapshot, which shows GRITS 2026 halfway through qualifications on the Monitor instead of the team's event. Deployers: apply Pit's migration 0018 first, and deploy Schedule with Pit (Pit's new `SCHEDULE` service binding).
+
+### Orders 2.1.0
+
+- Teams can use Discord instead of Slack: connect your server on Integrations (or when signing your team up), sign in with Discord, and get everything Gearbox sends (approvals, releases, daily summaries, reminders, service alerts and notifications) on Discord. Deployers run G3ID's and the platform's migrations first, and set up the Discord app (docs/deploy.md, "Discord") to switch it on.
+
+### Pit log downloader 2.1.0
+
+- Pit's Logs page and Monitor show what the log downloader is doing: online, connected to the robot, copying and uploading. The Monitor's Recent Logs is now Logs, and In the pit now is at the top of its left column. On the downloader, the robot shows as connected as soon as the computer joins its network, the page no longer stalls while logs copy, it checks the robot again for new logs while connected, and "In Gearbox" follows what Pit has. Deployers: apply Pit's migration 0017 first.
+- Pairing and uploads no longer fail with "Couldn't reach Gearbox" on networks without IPv6 or with a slow first connection.
+- A log copy cut off by the robot leaving (or one that stops moving) now ends and is tried again the next time the robot is connected, instead of staying stuck on Copying.
+
+### Scouting 2.1.0
+
+- Teams can use Discord instead of Slack: connect your server on Integrations (or when signing your team up), sign in with Discord, and get everything Gearbox sends (approvals, releases, daily summaries, reminders, service alerts and notifications) on Discord. Deployers run G3ID's and the platform's migrations first, and set up the Discord app (docs/deploy.md, "Discord") to switch it on.
+- Scouting's Admin page opens with the announcement box, then a Competition overview: who's in the app, this match's submissions, the Strategy leads online, the match everyone is scouting, and the next team match. The manual schedule section is now called Match schedule and explains itself. Strategy leads also set how long scouts have to send a form in after a match ends (two minutes to start, with whole-second precision). Apply migrations through 0035 before deploying; saved minute-based delays are preserved.
+- Analysis sorts reports by form, so a team's match forms and its pit form no longer sit mixed together.
+- Allow signed-in team members to open Analysis and view their team's reports and drawings. Keep report management restricted to Strategy leads and admins.
+- Analysis now lists teams instead of single reports: match scouting shows each team's average for every number and its most common answer to every choice at the current event, and pit scouting shows each team's answers. Sort by any column, and click a team's number to see each of its reports, labeled with the match and scout.
+- Restore Android touch scrolling across Scouting pages by clipping horizontal overflow without creating nested vertical scroll containers.
+- Keep Scouting API credentials private to each team. Restrict legacy deployment-key fallbacks to the original team, and report missing credentials correctly for other teams.
+- Default automatic match advancing to two minutes after a match finishes and let teams customize the delay in Scouting Admin.
+- Show the match submission deadline and countdown, clear answers and drawings at expiry or assignment changes, and reject stale match or team submissions before saving reports or awarding points.
+- Match forms never lose a scout's work: answers and drawings are kept on the device, a bar counts down before the form moves on (with +30 s to finish), a report that missed the move can still be sent and goes to its own match marked late, and a done screen shows what was sent and the next match. Admins set how long late reports are accepted.
+- A scout who has sent a match report in moves to the match on the field at once, instead of waiting out the window after the finished match, and the confirmation names the match the report went to and the match they are on now.
+- Open a scout's next match immediately after saving a report, without a start-time submission gate. Limit automatic progression to one match ahead of the shared current match, preserve drafts during schedule failures, and prevent stale polls from restoring completed forms. Keep expired and wrong-team report protection. Claim scout assignments atomically, repair changed lineups, and validate team membership before and after drawing uploads. Keep automatic match advancement forward-only, preserve omitted event settings, and reopen empty forms after a confirmed deadline extension. Anchor countdowns to server time so device clock changes do not erase drafts.
+- Load scouting points and history before external predictions, limit Statbotics requests to three seconds, and reuse recent public match data. Name the active event in prediction errors and distinguish missing events from server failures and timeouts. Keep points and standings usable during outages, allow retrying failed loads, and validate submitted picks against fresh data.
+- Separate match and pit scouting forms, filter and sort reports by type, and show competition names instead of event codes. Apply report type and competition filters to statistics, auto paths and team comparisons.
+- Every answer on a scouting form takes 0. A rating of 0, a choice named "0", a selection including it and a note reading "0" were all refused as if the field were blank; a robot that did nothing is now recorded as doing nothing. Each field still needs an answer, and says so instead of blaming 0.
+- Save tier list edits automatically, serialize pending changes, and retry failed saves. Use stable list IDs so retrying a new list does not create duplicates.
+- Allow tier list entries to be dragged left or right within a tier and inserted before or after entries in other tiers.
+- Reorder whole tiers by dragging their handles with the repository's dnd-kit sorting library, or using Space and arrow keys. Preserve tier contents and autosave the new order.
+- Add touch-friendly tier entry movement buttons and a tier selector alongside drag-and-drop.
+
+### Schedule 0.2.0
+
+- Teams can use Discord instead of Slack: connect your server on Integrations (or when signing your team up), sign in with Discord, and get everything Gearbox sends (approvals, releases, daily summaries, reminders, service alerts and notifications) on Discord. Deployers run G3ID's and the platform's migrations first, and set up the Discord app (docs/deploy.md, "Discord") to switch it on.
+- Pit's Monitor keeps the team's played matches in its match list, with the blue and red scores and a green W or red L in place of the time; the list opens at the next match. On a wide screen the Monitor fits the window: the match list and the checklists scroll on their own, with the column names and the overall progress bar kept at the top. The Batteries page has Pause All and Unpause All, which stop and restart every battery's timer without changing any battery's state. On the days of a published Schedule event, the timers go back to zero and pause when the first day opens, pause when each day closes, and carry on when the next day opens. In dev and staging only, Pit's Admin page has Use event snapshot, which shows GRITS 2026 halfway through qualifications on the Monitor instead of the team's event. Deployers: apply Pit's migration 0018 first, and deploy Schedule with Pit (Pit's new `SCHEDULE` service binding).
 
 ## 2026.10.1 (2026-10-16)
 

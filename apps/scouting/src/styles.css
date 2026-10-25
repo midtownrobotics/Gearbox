@@ -1349,7 +1349,7 @@
   }
   .form-choice {
     display: grid;
-    grid-template-columns: 1fr auto;
+    grid-template-columns: minmax(0, 1fr) auto;
     overflow: hidden;
     border: 1px solid var(--border, var(--g3-light-line));
     border-radius: 12px;
@@ -1361,11 +1361,15 @@
   }
   .form-choice > button:first-child {
     display: grid;
+    min-width: 0;
     gap: 4px;
     padding: 18px;
     border: 0;
     text-align: left;
     background: transparent;
+  }
+  .form-choice > button:first-child > * {
+    min-width: 0;
   }
   .form-choice > button:first-child strong {
     font-size: 18px;
@@ -1544,6 +1548,54 @@
   .multi-select input {
     width: auto;
   }
+  /* Yes/No splits the row in two; more choices wrap two to a row on a phone. */
+  .choice-bubbles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
+    gap: 8px;
+    min-width: 0;
+  }
+  .choice-bubbles label {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-width: 0;
+    min-height: 52px;
+    padding: 8px 14px;
+    overflow-wrap: anywhere;
+    border: 1px solid var(--border, var(--g3-light-line));
+    border-radius: 999px;
+    color: inherit;
+    background: var(--surface, var(--g3-light-surface));
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1.2;
+    text-align: center;
+    cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  /* The real radio covers its bubble, so a tap, the keyboard and the browser's "required" all use it. */
+  .choice-bubbles input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+  .choice-bubbles label.selected {
+    border-color: var(--g3-brand);
+    color: var(--g3-on-brand);
+    background: var(--g3-brand);
+  }
+  .choice-bubbles label:has(input:focus-visible) {
+    outline: 3px solid color-mix(in srgb, var(--g3-brand) 55%, transparent);
+    outline-offset: 2px;
+  }
   .form-designer-toolbar > div {
     display: grid;
     gap: 3px;
@@ -1644,7 +1696,8 @@
   }
   .strategy-admin-list > span {
     display: grid;
-    grid-template-columns: 1fr auto;
+    min-width: 0;
+    grid-template-columns: minmax(0, 1fr) auto;
     column-gap: 10px;
     padding: 8px 10px;
     border: 1px solid var(--border, var(--g3-light-line));
@@ -2547,6 +2600,10 @@
     display: grid;
     gap: 22px;
   }
+  /* A long form name or question wraps instead of widening the form past a phone's screen. */
+  .scouting-entry > * {
+    min-width: 0;
+  }
   .scouting-form-title {
     display: flex;
     align-items: flex-start;
@@ -2560,6 +2617,7 @@
     gap: 14px;
   }
   .scouting-form-title h2 {
+    min-width: 0;
     margin: 0;
     font-size: clamp(36px, 4vw, 48px);
     line-height: 1;
@@ -3470,7 +3528,7 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 16px;
   }
-  .scouting-questions label:not(.checkbox-question) {
+  .scouting-questions label:not(.checkbox-question):where(:not(.choice-bubbles label)) {
     display: grid;
     align-content: start;
     gap: 7px;
@@ -3857,6 +3915,41 @@
     min-height: 84px;
     place-items: center;
     padding: 9px;
+  }
+  .tier-label-heading {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-width: 0;
+  }
+  .tier-label-heading input {
+    min-width: 0;
+  }
+  .tier-drag-handle {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    cursor: grab;
+    touch-action: none;
+  }
+  .tier-drag-handle:focus-visible {
+    outline: 2px solid var(--g3-brand);
+    outline-offset: 2px;
+  }
+  .tier-row-dragging {
+    position: relative;
+    z-index: 1;
+    box-shadow: 0 6px 18px rgb(0 0 0 / 20%);
+  }
+  .tier-row-dragging .tier-drag-handle {
+    cursor: grabbing;
   }
 
   .tier-label input[type="text"],
@@ -6833,7 +6926,9 @@
     body,
     #root {
       max-width: 100%;
-      overflow-x: hidden;
+      /* hidden also computes overflow-y to auto. That makes body a scroll container
+         with no vertical range; its overscroll lock then traps Android touch swipes. */
+      overflow-x: clip;
     }
 
     .mobile-header {
@@ -7341,6 +7436,18 @@
   html[data-theme="dark"] .counter-intervals button {
     border-color: var(--border);
     background: var(--surface-raised);
+  }
+
+  html[data-theme="dark"] .choice-bubbles label {
+    border-color: var(--border);
+    color: var(--text);
+    background: var(--surface-raised);
+  }
+
+  html[data-theme="dark"] .choice-bubbles label.selected {
+    border-color: var(--g3-brand);
+    color: var(--g3-on-brand);
+    background: var(--g3-brand);
   }
 
   html[data-theme="dark"] .counter-intervals button.active {
@@ -8595,6 +8702,29 @@
     white-space: normal;
     overflow-wrap: anywhere;
   }
+  .tier-move-controls {
+    display: flex;
+    align-items: center;
+    gap: .25rem;
+  }
+  .tier-move-controls button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .tier-move-controls select {
+    width: auto;
+    max-width: 7rem;
+    min-height: 44px;
+  }
+  @media (any-pointer: coarse) {
+    .scouting-content .tier-chip {
+      flex-wrap: wrap;
+    }
+    .tier-move-controls {
+      flex-basis: 100%;
+      order: 1;
+    }
+  }
   .scouting-content .tier-chip > button {
     flex-shrink: 0;
     min-width: 32px;
@@ -9096,6 +9226,27 @@
   @media (min-width: 600px) and (max-width: 1024px) and (max-height: 500px) {
     .scouting-content .map-editor .map-toolbar {
       grid-template-columns: repeat(6, minmax(0, 1fr));
+    }
+  }
+}
+
+/* The move-on bar is fixed to the bottom: keep toasts and the form's last button clear of it. */
+@layer components {
+  body.scouting-move-bar-open .status-toast {
+    bottom: calc(max(20px, env(safe-area-inset-bottom)) + 150px);
+  }
+
+  body.scouting-move-bar-open .scouting-forms-page {
+    padding-bottom: 170px;
+  }
+
+  @media (min-width: 640px) {
+    body.scouting-move-bar-open .status-toast {
+      bottom: calc(max(20px, env(safe-area-inset-bottom)) + 96px);
+    }
+
+    body.scouting-move-bar-open .scouting-forms-page {
+      padding-bottom: 116px;
     }
   }
 }

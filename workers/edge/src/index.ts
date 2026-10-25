@@ -42,6 +42,7 @@ const app = base
       userId: c.get("userId"),
       displayName: c.get("userDisplayName"),
       isAdmin: c.get("userIsAdmin"),
+      isMentor: c.get("userIsMentor"),
       /** The team's box's time zone (UTC until it has said): pages show its days and times. */
       timeZone: await teamTimeZone(createEdgeDb(c.env.EDGE_DB), c.get("teamId")),
     }),

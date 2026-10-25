@@ -31,6 +31,7 @@ export const DEMO_BLOCKED: readonly Blocked[] = [
     path: /^\/admin\/users\/[^/]+\/(merge|promote|demote|grant-mentor|revoke-mentor|reject)$/,
   },
   { app: "id", method: "DELETE", path: /^\/admin\/users\// },
+  { app: "id", method: "PUT", path: /^\/admin\/users\/[^/]+\/name$/ },
   { app: "id", method: "*", path: /^\/admin\/kiosk\// },
   { app: "id", method: "POST", path: /^\/kiosk\/activate/ },
   { app: "id", method: "POST", path: /^\/auth\/(password|pin\/regenerate|login\/email)/ },
@@ -38,6 +39,8 @@ export const DEMO_BLOCKED: readonly Blocked[] = [
   // The team's apps stay on, and nothing is sent to Slack or Discord.
   { app: "platform", method: "PUT", path: /^\/team\/library\// },
   { app: "platform", method: "PUT", path: /^\/team\/notification-settings/ },
+  // Reports become public GitHub issues.
+  { app: "platform", method: "POST", path: /^\/team\/reports/ },
   // Integrations: keys, webhooks and boxes stay unconnected.
   { app: "edge", method: "POST", path: /^\/box\/key/ },
   { app: "pit", method: "POST", path: /^\/downloaders\/(codes|pair)/ },
@@ -47,6 +50,11 @@ export const DEMO_BLOCKED: readonly Blocked[] = [
   { app: "shop", method: "*", path: /^\/print\// },
   { app: "orders", method: "*", path: /^\/share-a-cart\/(connect|callback|disconnect)/ },
   { app: "orders", method: "POST", path: /^\/orders\/import/ },
+  // AdvantageScope: its layout is the team's (each visitor's stays in their tab), and assets are
+  // uploads.
+  { app: "pit", method: "PUT", path: /^\/scope\/settings/ },
+  { app: "pit", method: "POST", path: /^\/scope\/assets/ },
+  { app: "pit", method: "DELETE", path: /^\/scope\/assets/ },
   // Scouting: reading a photographed schedule runs Workers AI.
   { app: "scouting", method: "POST", path: /^\/scouting\/manual-schedule\/extract/ },
   // Integration keys and every app's settings form (no page saves through it yet).
