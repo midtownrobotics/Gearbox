@@ -316,7 +316,8 @@ export function HomePage() {
                   ) : (
                     <div className="relative w-16 h-16 rounded-[14px] bg-black flex items-center justify-center shadow-lg transition-transform duration-150 group-hover:scale-110">
                       {app.logoSrc ? (
-                        <img src={app.logoSrc} alt="" className="w-11 h-11 object-contain" />
+                        // As big as the other tiles' icons, clear of the corner's ↗.
+                        <img src={app.logoSrc} alt="" className="w-7.5 h-7.5 object-contain" />
                       ) : app.icon ? (
                         <span className="text-white text-[34px]">
                           <app.icon />
