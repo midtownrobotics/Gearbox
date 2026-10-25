@@ -102,7 +102,7 @@ describe("reporting a problem", () => {
       "### App\n\nOrders\n\n### Page\n\nhttps://1648-orders.frcgearbox.com/approvals\n",
     );
     expect(issue.body).not.toContain("Jordan");
-    expect(issue.body).toContain("Orders 1.4.0");
+    expect(issue.body).toContain("### App version\n\n1.4.0\n\n### Platform version\n\n2026.10.4\n");
     expect(issue.body).toContain(`### Team\n\n${team.student.teamId.replace("frc", "")}\n`);
     expect(issue.body).not.toContain(team.student.id);
   });

@@ -106,16 +106,28 @@ export function issueTitle(
 type Report = typeof problemReports.$inferSelect;
 
 /**
+ * The app's and the platform's versions from the bar's label ("Orders 1.4.0 · platform
+ * 2026.10.0", `versionLabel`), or the whole label as the app's when it isn't one.
+ */
+export function splitVersion(label: string | null): { app: string; platform: string } {
+  const match = label?.match(/^.+ (\S+) · platform (\S+)$/);
+  if (match) return { app: match[1], platform: match[2] };
+  return { app: label || "Unknown", platform: "Unknown" };
+}
+
+/**
  * The issue's text, laid out as GitHub lays out an issue made with the repository's Problem and
  * Idea forms (`.github/ISSUE_TEMPLATE`): a `###` heading per field, in the same order and words,
  * so issues read alike however they were made. Change both together.
  */
 export function issueBody(report: Report, teamNumber: string): string {
   const line = (text: string) => noMentions(text).replace(/\s+/g, " ").trim();
+  const versions = splitVersion(report.version);
   const fields = [
     ["App", report.app && isAppName(report.app) ? appName(report.app) : "Unknown"],
     ["Page", report.page],
-    ["Version", report.version ?? "Unknown"],
+    ["App version", versions.app],
+    ["Platform version", versions.platform],
     ["Browser", report.browser ?? "Unknown"],
     ["Team", teamNumber],
     ["Reporter", report.reporterId ?? "Unknown"],
