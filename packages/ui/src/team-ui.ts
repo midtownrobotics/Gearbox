@@ -204,14 +204,18 @@ export function useTeamUiSettings(team = true): TeamUiSettings {
         void refreshTeamUiSettings();
       } else applySettings();
     };
+    // Its own function, not applySettings itself: the browser keeps one copy of a listener added
+    // twice, so another user of this hook going away would take this one's with it, and the
+    // theme's colors would stop following the theme.
+    const themeChanged = () => applySettings();
     refresh();
     window.addEventListener("focus", refresh);
     document.addEventListener("visibilitychange", refresh);
-    window.addEventListener("g3-theme-changed", applySettings);
+    window.addEventListener("g3-theme-changed", themeChanged);
     return () => {
       window.removeEventListener("focus", refresh);
       document.removeEventListener("visibilitychange", refresh);
-      window.removeEventListener("g3-theme-changed", applySettings);
+      window.removeEventListener("g3-theme-changed", themeChanged);
     };
   }, [team]);
   return settings;
