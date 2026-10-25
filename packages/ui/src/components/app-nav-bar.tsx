@@ -143,7 +143,10 @@ function usePagesScroll(pageKeys: string, activeKey: string | undefined) {
   }, [activeKey]);
 
   const className = `g3-nav-links${more.left ? " more-left" : ""}${more.right ? " more-right" : ""}`;
-  return { ref, barRef, className, overflows: more.left || more.right };
+  /** Scroll the pages most of the way across, toward the start (-1) or the end (1). */
+  const scroll = (direction: -1 | 1) =>
+    ref.current?.scrollBy({ left: direction * ref.current.clientWidth * 0.7, behavior: "smooth" });
+  return { ref, barRef, className, more, scroll, overflows: more.left || more.right };
 }
 
 export function AppNavBar({
@@ -380,14 +383,38 @@ export function AppNavBar({
           </button>
         )}
         {brand}
-        <nav ref={pages.ref} className={pages.className} aria-label="Pages">
-          {groups.map(([name, groupItems], i) => (
-            <div key={name || i} className="g3-nav-group">
-              {name && <span className="g3-nav-group-name">{name}</span>}
-              {groupItems.map((item) => renderItem(item, false))}
-            </div>
-          ))}
-        </nav>
+        <div className="g3-nav-pages">
+          <nav ref={pages.ref} className={pages.className} aria-label="Pages">
+            {groups.map(([name, groupItems], i) => (
+              <div key={name || i} className="g3-nav-group">
+                {name && <span className="g3-nav-group-name">{name}</span>}
+                {groupItems.map((item) => renderItem(item, false))}
+              </div>
+            ))}
+          </nav>
+          {pages.more.left && (
+            <button
+              type="button"
+              className="g3-nav-scroll is-left"
+              aria-label="Scroll pages left"
+              tabIndex={-1}
+              onClick={() => pages.scroll(-1)}
+            >
+              <ChevronIcon direction="left" />
+            </button>
+          )}
+          {pages.more.right && (
+            <button
+              type="button"
+              className="g3-nav-scroll is-right"
+              aria-label="Scroll pages right"
+              tabIndex={-1}
+              onClick={() => pages.scroll(1)}
+            >
+              <ChevronIcon direction="right" />
+            </button>
+          )}
+        </div>
         <div className="g3-nav-end">
           {actions && <div className="g3-nav-actions">{actions}</div>}
           {hello}
@@ -534,6 +561,14 @@ function SunIcon() {
     <svg {...iconProps} aria-hidden="true">
       <circle cx="12" cy="12" r="4" />
       <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
+    </svg>
+  );
+}
+
+function ChevronIcon({ direction }: { direction: "left" | "right" }) {
+  return (
+    <svg {...iconProps} width={16} height={16} aria-hidden="true">
+      <path d={direction === "left" ? "m15 18-6-6 6-6" : "m9 18 6-6-6-6"} />
     </svg>
   );
 }
