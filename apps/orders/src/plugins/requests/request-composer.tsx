@@ -6,6 +6,7 @@ import {
   SuccessBanner,
   TextField,
   chatName,
+  scrollPageToTop,
   useTeamChat,
 } from "@g3/ui";
 import { useEffect, useRef, useState } from "react";
@@ -204,7 +205,7 @@ export function useRequestComposer({
             }.${left}`,
       );
       if (failed.length === 0) setSharedReason("");
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      scrollPageToTop("smooth");
     }
   }
 

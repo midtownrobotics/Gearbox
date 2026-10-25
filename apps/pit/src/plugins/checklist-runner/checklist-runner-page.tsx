@@ -8,6 +8,7 @@ import {
   TextField,
   buttonClass,
   focusRing,
+  scrollPageToTop,
 } from "@g3/ui";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
@@ -70,7 +71,7 @@ export function ChecklistRunnerPage() {
     setBanner(null);
     setAddingIssueForItemId(null);
     setConfirmDeleteIssueId(null);
-    window.scrollTo(0, 0);
+    scrollPageToTop();
     // Every list, in the Checklists page's order, for the links to the ones before and after.
     fetchLists()
       .then(setLists)

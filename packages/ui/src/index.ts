@@ -37,6 +37,17 @@ export { ProgressBar } from "./components/progress-bar";
 export { Switch, Toggle } from "./components/toggle";
 export { forceTheme, readTheme, setTheme, type Theme, useTheme } from "./theme";
 export {
+  type TutorialAppsMessage,
+  type TutorialDocMessage,
+  type TutorialRole,
+  isTutorialAppsMessage,
+  lockPageScroll,
+  pageScroller,
+  scrollPageToTop,
+  setTutorial,
+  useTutorial,
+} from "./tutorial";
+export {
   refreshTeamUiSettings,
   teamHasAvatar,
   usePageTeamAvatar,

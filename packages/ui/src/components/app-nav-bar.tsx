@@ -1,7 +1,10 @@
 import {
+  type AppName,
   allAppsUrl,
   appUrl,
   completeAppOrder,
+  helpDocFor,
+  helpUrl,
   isDemoPage,
   platformUrl,
   portalAppLabels,
@@ -11,12 +14,23 @@ import { type ComponentType, type ReactNode, useEffect, useState } from "react";
 import { useSignedInUser, useTeamApps } from "../session";
 import { usePageTeamAvatar, useTeamIcon, useTeamUiSettings } from "../team-ui";
 import { useTheme } from "../theme";
+import {
+  type TutorialDocMessage,
+  handOffDoc,
+  lockPageScroll,
+  navigateInApp,
+  setTutorial,
+  useTutorial,
+  useTutorialFits,
+} from "../tutorial";
 import { ReportDialog } from "./report-dialog";
+import { TutorialPanel } from "./tutorial-panel";
 
 // The top bar every G3 app shares (from Scouting's): the menu button, the app's wordmark, its
 // pages, who's signed in and the light/dark switch. The menu (a drawer) lists the team's apps
 // under "All Apps"; below 768px the pages move into it too, above them. Its foot has "Report a
-// problem" for anyone signed in (ReportDialog). It has its own CSS (nav-bar.css), so it looks the
+// problem" for anyone signed in (ReportDialog), "Need help?" and, on a computer, Tutorial mode
+// (TutorialPanel: the docs beside the app). It has its own CSS (nav-bar.css), so it looks the
 // same in apps that don't use Tailwind.
 
 export type AppNavItem = {
@@ -160,6 +174,30 @@ export function AppNavBar({
             : []),
         ]
       : [];
+  // "Need help?": the doc about this page, else the app's front page in the docs
+  // (`helpUrl`, from each doc's `pages:`). Worked out as the bar draws, so it follows the page.
+  const thisApp = appLinks.find((app) => new URL(app.href, window.location.href).host === here);
+  const help = team ? helpUrl(window.location.pathname, thisApp?.key as AppName | undefined) : null;
+  // Tutorial mode: the same docs page beside the app, on a wide enough window, never on a
+  // screen that keeps people in one app (a kiosk).
+  const tutorialOn = useTutorial();
+  const tutorialFits = useTutorialFits();
+  const canTutorial = !!help && allApps && tutorialFits;
+  // A page the reader opens in the panel: go to the app page it's about, unless this page is one
+  // it's about already. Another app's page opens that app (where tutorial mode stays on); an app
+  // the team has off, or a doc about no app page (Getting started), leaves the app as it is.
+  const followDoc = (doc: TutorialDocMessage) => {
+    if (!doc.app || !doc.path) return;
+    const here = helpDocFor(window.location.pathname);
+    if (here?.section === doc.section) {
+      if (here.slug !== doc.slug) navigateInApp(doc.path);
+      return;
+    }
+    const target = appLinks.find((app) => app.key === doc.app);
+    if (!target) return;
+    handOffDoc(doc.pathname);
+    window.location.assign(new URL(doc.path, target.href).href);
+  };
   // Reports go to Gearbox's public GitHub: never from the demo, whose text stays on the page.
   const canReport = team && !!user && !isDemoPage;
   // Whether the bar has an app list to offer (or may, while it's being asked).
@@ -177,11 +215,10 @@ export function AppNavBar({
     if (!open) return;
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
     window.addEventListener("keydown", onKey);
-    const overflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    const unlock = lockPageScroll();
     return () => {
       window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = overflow;
+      unlock();
     };
   }, [open]);
 
@@ -345,6 +382,23 @@ export function AppNavBar({
           <div className="g3-nav-drawer-foot">
             {actions && <div className="g3-nav-actions">{actions}</div>}
             <ThemeToggle labeled />
+            {help && (
+              <a className="g3-nav-text-link" href={help} target="_blank" rel="noreferrer">
+                Need help?
+              </a>
+            )}
+            {canTutorial && (
+              <button
+                type="button"
+                className="g3-nav-text-link g3-nav-report"
+                onClick={() => {
+                  setOpen(false);
+                  setTutorial(!tutorialOn);
+                }}
+              >
+                {tutorialOn ? "Close tutorial" : "Tutorial mode"}
+              </button>
+            )}
             {canReport && (
               <button
                 type="button"
@@ -362,6 +416,14 @@ export function AppNavBar({
         </div>
       )}
       {reporting && <ReportDialog version={version} onClose={() => setReporting(false)} />}
+      {canTutorial && tutorialOn && help && (
+        <TutorialPanel
+          src={help}
+          apps={enabled instanceof Set ? ["portal", ...enabled] : null}
+          role={user ? (user.isAdmin ? "admin" : user.isMentor ? "mentor" : "member") : null}
+          onDocPage={followDoc}
+        />
+      )}
     </>
   );
 }

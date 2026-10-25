@@ -1,4 +1,4 @@
-import { ErrorBanner } from "@g3/ui";
+import { ErrorBanner, lockPageScroll } from "@g3/ui";
 import { useEffect, useState } from "react";
 import { api, getErrorMessage } from "../../shared/api";
 import { useAuthUser } from "../../shared/auth";
@@ -66,11 +66,10 @@ export function CategoryDrawer({
       else onClose();
     };
     window.addEventListener("keydown", onKey);
-    const overflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    const unlock = lockPageScroll();
     return () => {
       window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = overflow;
+      unlock();
     };
   }, [skill, onSelectSkill, onClose]);
 

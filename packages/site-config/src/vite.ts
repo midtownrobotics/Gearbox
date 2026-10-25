@@ -1,7 +1,8 @@
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { basename, join } from "node:path";
 import type { Plugin } from "vite";
+import { type HelpPages, docsFrontMatter, pagePaths } from "./help.ts";
 import { type AppName, apiPath } from "./index.ts";
 
 /** Each app's worker in .dev-ports.json (Portal has none), and the platform's. */
@@ -18,6 +19,23 @@ const DEV_WORKERS: Partial<Record<AppName | "platform", string>> = {
   inventory: "inventory",
   schedule: "schedule",
 };
+
+/**
+ * "Need help?" for the app in `appDir`: each route path its docs name (`pages:` in each
+ * `docs/*.md`), with the doc's slug (./help.ts). Null when it has no docs folder. The docs build
+ * checks the paths; this only reads them.
+ */
+function readHelpPages(appDir: string): HelpPages | null {
+  const dir = join(appDir, "docs");
+  if (!existsSync(join(dir, "index.md"))) return null;
+  const folder = basename(appDir);
+  const pages: HelpPages["pages"] = [];
+  for (const name of readdirSync(dir).filter((n) => n.endsWith(".md") && n !== "index.md")) {
+    const { fields } = docsFrontMatter(readFileSync(join(dir, name), "utf8"), name);
+    for (const path of pagePaths(fields.pages)) pages.push([path, name.slice(0, -3)]);
+  }
+  return { section: folder === "platform" ? "start" : folder, pages };
+}
 
 /** A git command's output in `dir`, or "" when git isn't there or fails. */
 function git(dir: string, ...args: string[]): string {
@@ -55,6 +73,7 @@ function lastPullRequest(root: string): { number: string; url: string } | null {
  *   dev, and a real environment variable still wins;
  * - defines the app's version (its package.json) and the platform version (the repo root's) for
  *   `@g3/site-config/versions`;
+ * - defines the pages its docs are about (`readHelpPages`), for the bar's "Need help?" (`helpUrl`);
  * - in dev, proxies `apiPath(app)` (/api/~<app>) to each app's local worker, as the gateway does in
  *   production;
  * - in dev, points site-config's addresses (`appUrl`, `teamAppUrl`, `allAppsUrl`, ...) at the
@@ -101,6 +120,19 @@ export function siteConfig(
             ]
           : html,
     },
+    // "Need help?" is read from the app's docs when Vite starts: a change to them restarts it, so
+    // a new or changed `pages:` line works without restarting `pnpm dev` by hand.
+    configureServer(server) {
+      const docs = join(server.config.root, "docs");
+      if (!existsSync(docs)) return;
+      server.watcher.add(docs);
+      const restart = (file: string) => {
+        if (file.startsWith(docs) && file.endsWith(".md")) void server.restart();
+      };
+      server.watcher.on("change", restart);
+      server.watcher.on("add", restart);
+      server.watcher.on("unlink", restart);
+    },
     config(config, { mode }) {
       const appDir = config.root ?? process.cwd();
       const readVersion = (dir: string) =>
@@ -109,6 +141,7 @@ export function siteConfig(
       const define = {
         __G3_APP_VERSION__: JSON.stringify(readVersion(appDir)),
         __G3_PLATFORM_VERSION__: JSON.stringify(readVersion(join(import.meta.dirname, "../../.."))),
+        __G3_HELP__: JSON.stringify(readHelpPages(appDir)),
       };
       if (mode !== "production") {
         const ports = devPorts();

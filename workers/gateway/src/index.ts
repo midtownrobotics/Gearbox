@@ -3,6 +3,7 @@ import {
   CONSOLE_HOSTS,
   DEMO_HOST_LABEL,
   DEV_DOMAIN,
+  DOCS_HOSTS,
   TEAM_HOST_APPS,
   demoTeamId,
   isAllowedOrigin,
@@ -26,6 +27,7 @@ import { teamIcon } from "./icons";
 // G3's included; <domain> its `domain`, G3's own (its public website).
 //   <platform>/, www.<platform>/   → the platform worker: public site and team sign-up
 //   admin.<platform>/              → the platform worker: the operators' console
+//   docs.<platform>/               → the platform worker: the docs (setting up and using each app)
 //   <number>.<platform>/...        → that team's home (Portal)
 //   <number>-<app>.<platform>/...  → the app, for team <number>
 //   <any of those>/api/~<app>/...  → another app's /api/..., for the same team: how one app's page
@@ -109,6 +111,7 @@ const PLATFORM_ROUTES = new Map<string, Route>([
   [platformHost(""), { app: "platform", team: null }],
   [platformHost("www"), { app: "platform", team: null }],
   ...CONSOLE_HOSTS.map((host): [string, Route] => [host, { app: "platform", team: null }]),
+  ...DOCS_HOSTS.map((host): [string, Route] => [host, { app: "platform", team: null }]),
   [platformHost("id"), { app: "id", team: null }],
 ]);
 
