@@ -14,25 +14,11 @@ body:
       description: What you did, what you expected and what happened instead.
     validations:
       required: true
-  - type: dropdown
+  - type: input
     id: app
     attributes:
       label: App
-      options:
-        - Attendance
-        - Edge
-        - ID
-        - Inventory
-        - Orders
-        - Pit
-        - Portal
-        - Schedule
-        - Scouting
-        - Shop
-        - Skill Tree
-        - Unknown
-    validations:
-      required: true
+      description: Attendance, Edge, ID, Inventory, Orders, Pit, Portal, Schedule, Scouting, Shop or Skill Tree.
   - type: input
     id: page
     attributes:
@@ -40,11 +26,17 @@ body:
       description: The page's address, without anything after a ?.
       placeholder: https://1648-orders.frcgearbox.com/requests
   - type: input
-    id: version
+    id: app-version
     attributes:
-      label: Version
-      description: The app's version, from the menu (beside Report a problem).
-      placeholder: Orders 1.4.0
+      label: App version
+      description: In the app's menu, beside Report a problem.
+      placeholder: 1.4.0
+  - type: input
+    id: platform-version
+    attributes:
+      label: Platform version
+      description: In the app's menu, after "platform".
+      placeholder: 2026.10.0
   - type: input
     id: browser
     attributes:

@@ -6,6 +6,7 @@ import {
   helpDocFor,
   helpUrl,
   isDemoPage,
+  pageTeamNumber,
   platformUrl,
   portalAppLabels,
   site,
@@ -23,13 +24,14 @@ import {
   useTutorial,
   useTutorialFits,
 } from "../tutorial";
-import { ReportDialog } from "./report-dialog";
+import { GitHubReportDialog, ReportDialog, appOfWordmark } from "./report-dialog";
 import { TutorialPanel } from "./tutorial-panel";
 
 // The top bar every G3 app shares (from Scouting's): the menu button, the app's wordmark, its
 // pages, who's signed in and the light/dark switch. The menu (a drawer) lists the team's apps
 // under "All Apps"; below 768px the pages move into it too, above them. Its foot has "Report a
-// problem" for anyone signed in (ReportDialog), "Need help?" and, on a computer, Tutorial mode
+// problem" (ReportDialog for a team's signed-in member, else GitHubReportDialog; in the bar itself
+// when there's no app list, since a computer's bar then has no menu button), "Need help?" and, on a computer, Tutorial mode
 // (TutorialPanel: the docs beside the app). It has its own CSS (nav-bar.css), so it looks the
 // same in apps that don't use Tailwind.
 
@@ -261,8 +263,11 @@ export function AppNavBar({
     handOffDoc(doc.pathname);
     window.location.assign(new URL(doc.path, target.href).href);
   };
-  // Reports go to Gearbox's public GitHub: never from the demo, whose text stays on the page.
-  const canReport = team && !!user && !isDemoPage;
+  // Reports go to Gearbox's public GitHub. A team's signed-in member sends one through the
+  // platform; anyone else (signed out, the demo, a page that's no team's) opens GitHub's own form,
+  // so nothing they write goes through Gearbox. Not while it isn't known who's signed in.
+  const canReport = user !== undefined;
+  const reportOnGitHub = !team || !user || isDemoPage;
   // Whether the bar has an app list to offer (or may, while it's being asked).
   const hasApps = allApps && user !== null;
   // With no pages and no apps there's nothing for a menu; the bar keeps its controls on phones too.
@@ -418,6 +423,18 @@ export function AppNavBar({
         <div className="g3-nav-end">
           {actions && <div className="g3-nav-actions">{actions}</div>}
           {hello}
+          {/* With no app list a computer's bar has no menu button, so Report a problem is in the
+              bar (on a phone it's in the menu, like the bar's other controls, unless there's
+              no menu either). */}
+          {!hasApps && canReport && (
+            <button
+              type="button"
+              className="g3-nav-text-link g3-nav-report"
+              onClick={() => setReporting(true)}
+            >
+              Report a problem
+            </button>
+          )}
           <ThemeToggle />
         </div>
       </header>
@@ -505,7 +522,17 @@ export function AppNavBar({
           </div>
         </div>
       )}
-      {reporting && <ReportDialog version={version} onClose={() => setReporting(false)} />}
+      {reporting &&
+        (reportOnGitHub ? (
+          <GitHubReportDialog
+            app={appOfWordmark(title)}
+            version={version}
+            team={team ? pageTeamNumber : undefined}
+            onClose={() => setReporting(false)}
+          />
+        ) : (
+          <ReportDialog version={version} onClose={() => setReporting(false)} />
+        ))}
       {canTutorial && tutorialOn && help && (
         <TutorialPanel
           src={help}

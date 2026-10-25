@@ -473,6 +473,7 @@ html[data-theme="dark"] .g3-nav-drawer {
 }
 
 /* "Report a problem": a text link that's a button. */
+.g3-nav .g3-nav-report,
 .g3-nav-drawer .g3-nav-report {
   margin: 0;
   padding: 0;

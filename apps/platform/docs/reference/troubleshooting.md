@@ -28,4 +28,4 @@ An admin has to switch the app on, on [Apps](/portal/apps). The page someone see
 
 ## Still stuck
 
-Choose **Report a problem** in any app's menu: describe what happened, and you'll get a message on your team's chat when it's dealt with. Or ask on [GitHub](https://github.com/midtownrobotics/Gearbox/issues).
+Choose **Report a problem** in any app's menu: describe what happened, and you'll get a message on your team's chat when it's dealt with. Signed out, it opens the report on GitHub instead. Or ask on [GitHub](https://github.com/midtownrobotics/Gearbox/issues).
