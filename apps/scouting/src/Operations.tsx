@@ -12,15 +12,29 @@ import {
   useQuestions,
   useTeamChat,
 } from "@g3/ui";
+import {
+  SERVICE_ISSUE_TYPES,
+  type ServiceIssueType,
+  describeServiceIssue,
+} from "@g3/worker-scouting/service-issues";
 import { CheckCircle, Hand, MessageSquarePlus, Plus, Trash2 } from "lucide-react";
 import { type SyntheticEvent, useCallback, useEffect, useState } from "react";
+import {
+  type IssueChoice,
+  IssueTypePicker,
+  emptyIssueChoice,
+  issueTypesToSend,
+} from "./IssueTypePicker";
 import { TeamLookupInput } from "./TeamLookupInput";
 import { api } from "./api";
+
+const issueLabel = (type: ServiceIssueType) =>
+  SERVICE_ISSUE_TYPES.find((item) => item.value === type)?.label ?? type;
 
 type Ticket = {
   id: string;
   team_name: string;
-  issue_type: string;
+  issueTypes: ServiceIssueType[];
   description: string;
   status: string;
   claimed_by_name?: string;
@@ -52,7 +66,9 @@ export function Operations({ embedded = false }: { embedded?: boolean }) {
     isAdmin: false,
   });
   const [ticketView, setTicketView] = useState<"active" | "closed">("active");
-  const [ticket, setTicket] = useState({ teamName: "", issueType: "mechanical", description: "" });
+  const [ticket, setTicket] = useState({ teamName: "", description: "" });
+  const [issue, setIssue] = useState<IssueChoice>(emptyIssueChoice);
+  const [issueMissing, setIssueMissing] = useState(false);
   const [helperId, setHelperId] = useState("");
   const [skills, setSkills] = useState("");
   const load = useCallback(
@@ -67,14 +83,23 @@ export function Operations({ embedded = false }: { embedded?: boolean }) {
   }, [load, ticketView]);
   async function createTicket(event: SyntheticEvent) {
     event.preventDefault();
+    const issueTypes = issueTypesToSend(issue);
+    if (!issueTypes) {
+      setIssueMissing(true);
+      return;
+    }
     if (
       !(await questions.confirm(
-        `Open a ${ticket.issueType} service ticket for team ${ticket.teamName}? Helpers will be notified in ${chat}.`,
+        `Open a service ticket for ${describeServiceIssue(issueTypes)} on team ${ticket.teamName}? Helpers will be notified in ${chat}.`,
       ))
     )
       return;
-    await api("/service-tickets", { method: "POST", body: JSON.stringify(ticket) });
-    setTicket({ teamName: "", issueType: "mechanical", description: "" });
+    await api("/service-tickets", {
+      method: "POST",
+      body: JSON.stringify({ ...ticket, issueTypes }),
+    });
+    setTicket({ teamName: "", description: "" });
+    setIssue(emptyIssueChoice);
     setTicketView("active");
     await load("active");
   }
@@ -103,19 +128,14 @@ export function Operations({ embedded = false }: { embedded?: boolean }) {
                 onChange={(teamName) => setTicket({ ...ticket, teamName })}
               />
             </Field>
-            <Field label="Issue type">
-              <select
-                aria-label="Issue type"
-                className={inputClass}
-                value={ticket.issueType}
-                onChange={(e) => setTicket({ ...ticket, issueType: e.target.value })}
-              >
-                <option value="mechanical">Mechanical</option>
-                <option value="electrical">Electrical</option>
-                <option value="programming">Programming</option>
-                <option value="other">Other</option>
-              </select>
-            </Field>
+            <IssueTypePicker
+              choice={issue}
+              missing={issueMissing}
+              onChange={(update) => {
+                setIssue(update);
+                setIssueMissing(false);
+              }}
+            />
             <div className="sm:col-span-2">
               <Field label="Description">
                 <TextField
@@ -142,9 +162,13 @@ export function Operations({ embedded = false }: { embedded?: boolean }) {
           <Card key={item.id} className="service-ticket flex min-w-0 flex-col gap-3">
             <header className="flex flex-wrap items-start justify-between gap-2">
               <strong className="text-base text-secondary-900">Team {item.team_name}</strong>
-              <Badge>
-                <span className="capitalize">{item.issue_type}</span>
-              </Badge>
+              <div className="flex flex-wrap gap-1.5">
+                {item.issueTypes.length ? (
+                  item.issueTypes.map((type) => <Badge key={type}>{issueLabel(type)}</Badge>)
+                ) : (
+                  <Badge>Type not sure</Badge>
+                )}
+              </div>
             </header>
             {item.description && (
               <p className="whitespace-pre-wrap text-sm text-secondary-700 [overflow-wrap:anywhere]">

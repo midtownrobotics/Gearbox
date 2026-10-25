@@ -7,6 +7,7 @@ import {
   text,
   unique,
 } from "drizzle-orm/sqlite-core";
+import type { ServiceIssueType } from "../service-issues";
 
 export const autoRoutines = sqliteTable(
   "auto_routines",
@@ -374,8 +375,8 @@ export const serviceTickets = sqliteTable(
     teamId: text("team_id").notNull(),
     id: text("id").notNull(),
     team_name: text("team_name").notNull(),
-    issue_type: text("issue_type").notNull(),
-    issue_types_json: text("issue_types_json").notNull().default("[]"),
+    /** Distinct `SERVICE_ISSUE_TYPES` values; empty when the reporter wasn't sure. */
+    issue_types: text("issue_types", { mode: "json" }).$type<ServiceIssueType[]>().notNull(),
     description: text("description").notNull().default(""),
     status: text("status").notNull().default("open"),
     claimed_by: text("claimed_by"),

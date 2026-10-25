@@ -37,7 +37,9 @@ knows its team: on first start, the status page only asks to pair.
 
 1. On Pit's **Logs** page, a mentor or admin chooses **Get a pairing code**.
 2. On the status page, enter your team number and the code within 10 minutes. The computer's
-   name is what Pit lists it as.
+   name is what Pit lists it as. For a Pit that isn't at your team's usual address (staging),
+   choose **Use another Pit address** and paste its address; the pairing keeps it, whatever
+   `PIT_URL` or `--dev` say.
 
 Then the status page takes your team's colors, names and logo from Gearbox, and it copies logs
 (and uploads them to Pit once online) whenever the computer joins the robot's network (`10.TE.AM.x`, from the team

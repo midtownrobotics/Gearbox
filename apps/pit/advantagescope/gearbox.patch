@@ -221,6 +221,187 @@ index 0000000..4b91ca1
 +    if (saveTimer === null) saveTimer = window.setTimeout(() => save(), SAVE_DELAY_MS);
 +  }
 +};
+diff --git a/src/shared/renderers/Field3dRendererImpl.ts b/src/shared/renderers/Field3dRendererImpl.ts
+index bf13268..71d8f93 100644
+--- a/src/shared/renderers/Field3dRendererImpl.ts
++++ b/src/shared/renderers/Field3dRendererImpl.ts
+@@ -28,6 +28,7 @@ import GamePieceManager from "./field3d/objectManagers/GamePieceManager";
+ import HeatmapManager from "./field3d/objectManagers/HeatmapManager";
+ import RobotManager from "./field3d/objectManagers/RobotManager";
+ import TrajectoryManager from "./field3d/objectManagers/TrajectoryManager";
++import { fetchFiles, modelPaths } from "./field3d/workers/gearboxFiles";
+ 
+ export default class Field3dRendererImpl implements TabRenderer {
+   private LOWER_POWER_MAX_FPS = 30;
+@@ -734,12 +735,18 @@ export default class Field3dRendererImpl implements TabRenderer {
+         newFieldReady();
+       } else {
+         this.isFieldLoading = true;
+-        WorkerManager.request("../bundles/shared$loadField.js", {
+-          fieldConfig: fieldConfig,
+-          mode: this.mode,
+-          materialSpecular: this.MATERIAL_SPECULAR.toArray(),
+-          materialShininess: this.MATERIAL_SHININESS
+-        }).then((result) => {
++        // Gearbox: the models fetched here, not in the worker (gearboxFiles.ts).
++        fetchFiles(modelPaths(fieldConfig.path, fieldConfig.gamePieces.length))
++          .then((files) =>
++            WorkerManager.request("../bundles/shared$loadField.js", {
++              fieldConfig: fieldConfig,
++              files: files,
++              mode: this.mode,
++              materialSpecular: this.MATERIAL_SPECULAR.toArray(),
++              materialShininess: this.MATERIAL_SHININESS
++            })
++          )
++          .then((result) => {
+           const loader = new THREE.ObjectLoader();
+           this.field = loader.parse(result.field);
+           this.fieldStagedPieces = loader.parse(result.fieldStagedPieces);
+diff --git a/src/shared/renderers/field3d/objectManagers/RobotManager.ts b/src/shared/renderers/field3d/objectManagers/RobotManager.ts
+index 08431a9..e0aded4 100644
+--- a/src/shared/renderers/field3d/objectManagers/RobotManager.ts
++++ b/src/shared/renderers/field3d/objectManagers/RobotManager.ts
+@@ -21,6 +21,7 @@ import { quaternionToRotation3d, rotation3dToQuaternion } from "../../Field3dRen
+ import ObjectManager from "../ObjectManager";
+ import { FTC_MULTIPLIER, XR_MAX_RADIUS } from "../OptimizeGeometries";
+ import ResizableInstancedMesh from "../ResizableInstancedMesh";
++import { fetchFiles, modelPaths } from "../workers/gearboxFiles";
+ 
+ type MechanismLineData = {
+   mesh: ResizableInstancedMesh;
+@@ -267,13 +268,19 @@ export default class RobotManager extends ObjectManager<
+           });
+         } else {
+           // Desktop, load models with worker and mesh merging
+-          WorkerManager.request("../bundles/shared$loadRobot.js", {
+-            robotConfig: robotConfig!,
+-            isFTC: robotConfig.isFTC,
+-            mode: this.mode,
+-            materialSpecular: this.materialSpecular.toArray(),
+-            materialShininess: this.materialShininess
+-          }).then((result: THREE.MeshJSON[][]) => {
++          // Gearbox: the models fetched here, not in the worker (gearboxFiles.ts).
++          fetchFiles(modelPaths(robotConfig.path, robotConfig.components.length))
++            .then((files) =>
++              WorkerManager.request("../bundles/shared$loadRobot.js", {
++                robotConfig: robotConfig!,
++                files: files,
++                isFTC: robotConfig.isFTC,
++                mode: this.mode,
++                materialSpecular: this.materialSpecular.toArray(),
++                materialShininess: this.materialShininess
++              })
++            )
++            .then((result: THREE.MeshJSON[][]) => {
+             if (loadingCounter !== this.loadingCounter) {
+               // Model was switched, throw away the data :(
+               return;
+diff --git a/src/shared/renderers/field3d/workers/gearboxFiles.ts b/src/shared/renderers/field3d/workers/gearboxFiles.ts
+new file mode 100644
+index 0000000..5a31f75
+--- /dev/null
++++ b/src/shared/renderers/field3d/workers/gearboxFiles.ts
+@@ -0,0 +1,33 @@
++// Gearbox: the page fetches a 3D worker's models and hands them over, rather than the worker
++// fetching them. Firefox sends a worker's own requests past Pit's service worker, which keeps
++// the models on the device, so without a connection they failed.
++
++import { GLTF, GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
++
++/** A model and the ones beside it (model.glb, model_0.glb, ...), as their paths. */
++export function modelPaths(path: string, count: number): string[] {
++  return [path, ...Array.from({ length: count }, (_, index) => path.slice(0, -4) + "_" + index.toString() + ".glb")];
++}
++
++/** On the page: each file's bytes, by path (one that can't be fetched is left for the worker). */
++export async function fetchFiles(paths: string[]): Promise<{ [path: string]: ArrayBuffer }> {
++  const files: { [path: string]: ArrayBuffer } = {};
++  await Promise.all(
++    paths.map(async (path) => {
++      try {
++        const response = await fetch(path);
++        if (response.ok) files[path] = await response.arrayBuffer();
++      } catch (e) {}
++    })
++  );
++  return files;
++}
++
++/** In the worker: the model from the bytes the page sent, else fetched as before. */
++export function loadModel(loader: GLTFLoader, files: { [path: string]: ArrayBuffer } | undefined, path: string) {
++  return new Promise<GLTF>((resolve) => {
++    const file = files?.[path];
++    if (file) loader.parse(file, "", resolve, (error) => console.error(error));
++    else loader.load(path, resolve);
++  });
++}
+diff --git a/src/shared/renderers/field3d/workers/loadField.ts b/src/shared/renderers/field3d/workers/loadField.ts
+index e61b49d..cec778a 100644
+--- a/src/shared/renderers/field3d/workers/loadField.ts
++++ b/src/shared/renderers/field3d/workers/loadField.ts
+@@ -7,6 +7,7 @@
+ 
+ import * as THREE from "three";
+ import { GLTF, GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
++import { loadModel, modelPaths } from "./gearboxFiles";
+ import { Config3dField } from "../../../AdvantageScopeAssets";
+ import { rotationSequenceToQuaternion } from "../../../geometry";
+ import optimizeGeometries from "../OptimizeGeometries";
+@@ -33,17 +34,9 @@ self.onmessage = (event) => {
+   let fieldPieces: { [key: string]: THREE.Mesh } = {};
+ 
+   const gltfLoader = new GLTFLoader();
+-  Promise.all([
+-    new Promise((resolve) => {
+-      gltfLoader.load(fieldConfig.path, resolve);
+-    }),
+-    ...fieldConfig.gamePieces.map(
+-      (_, index) =>
+-        new Promise((resolve) => {
+-          gltfLoader.load(fieldConfig.path.slice(0, -4) + "_" + index.toString() + ".glb", resolve);
+-        })
+-    )
+-  ]).then(async (gltfs) => {
++  Promise.all(
++    modelPaths(fieldConfig.path, fieldConfig.gamePieces.length).map((path) => loadModel(gltfLoader, payload.files, path))
++  ).then(async (gltfs) => {
+     let gltfScenes = (gltfs as GLTF[]).map((gltf) => gltf.scene);
+     if (fieldConfig === undefined) return;
+     let loadCount = 0;
+diff --git a/src/shared/renderers/field3d/workers/loadRobot.ts b/src/shared/renderers/field3d/workers/loadRobot.ts
+index b1cc095..83eaa74 100644
+--- a/src/shared/renderers/field3d/workers/loadRobot.ts
++++ b/src/shared/renderers/field3d/workers/loadRobot.ts
+@@ -7,6 +7,7 @@
+ 
+ import * as THREE from "three";
+ import { GLTF, GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
++import { loadModel, modelPaths } from "./gearboxFiles";
+ import { Config3dRobot } from "../../../AdvantageScopeAssets";
+ import { rotationSequenceToQuaternion } from "../../../geometry";
+ import optimizeGeometries from "../OptimizeGeometries";
+@@ -32,17 +33,9 @@ self.onmessage = (event) => {
+   let meshes: THREE.MeshJSON[][] = [];
+ 
+   const gltfLoader = new GLTFLoader();
+-  Promise.all([
+-    new Promise((resolve) => {
+-      gltfLoader.load(robotConfig.path, resolve);
+-    }),
+-    ...robotConfig.components.map(
+-      (_, index) =>
+-        new Promise((resolve) => {
+-          gltfLoader.load(robotConfig.path.slice(0, -4) + "_" + index.toString() + ".glb", resolve);
+-        })
+-    )
+-  ]).then(async (gltfs) => {
++  Promise.all(
++    modelPaths(robotConfig.path, robotConfig.components.length).map((path) => loadModel(gltfLoader, payload.files, path))
++  ).then(async (gltfs) => {
+     let gltfScenes = (gltfs as GLTF[]).map((gltf) => gltf.scene);
+     for (let index = 0; index < gltfScenes.length; index++) {
+       let scene = gltfScenes[index];
 diff --git a/src/uploadAsset.ts b/src/uploadAsset.ts
 index 207bf5a..931e2a9 100644
 --- a/src/uploadAsset.ts

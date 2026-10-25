@@ -1,5 +1,20 @@
 # @g3/worker-pit
 
+## 3.1.0
+
+### Minor Changes
+
+- b8d939a: The Pit Monitor is three columns on a wide screen and leads with "Our next match": its name on our alliance's color, all six teams by driver station with ours ringed and each team's rank and pit address beside it, how many matches until we're called to queue (then Now queuing, On deck, On field), and countdowns to queuing and going on the field. Its color grows more urgent as it gets closer. The event's On deck, Now queuing and Queuing soon are at the top right, and each played qualification match's score shows its bonus RPs as dots, as The Blue Alliance does. When Nexus has no times the panel uses The Blue Alliance's schedule, and it says so plainly when there's no schedule or we have no more matches. The Monitor's battery tiles are two lines each, and the Monitor no longer scrolls sideways on a phone.
+- 1e15859: AdvantageScope's field and robot models download about a third the size and stay on the device after the first time, and so does each match log you open. The log picker says which logs are on this device and how much the others download, and the Logs page saves AdvantageScope, your team's fields and robots and all the logs to the device ahead, so AdvantageScope opens with no connection.
+- 9006f60: Report a problem or suggest an idea from any app: the menu has "Report a problem", which posts it as a public issue on Gearbox's GitHub with the page and app versions (never your name), and you get a Slack or Discord message when it's fixed or closed. No GitHub account needed. Not in the public demo. Deployers: apply the platform's migration `0012_problem_reports.sql` before deploying it, and set its `GITHUB_TOKEN` secret (`docs/deploy.md`, "Problem reports on GitHub"); without it, reports are kept, and those under a week old are sent once it's set.
+
+### Patch Changes
+
+- 05068af: Your team's logo keeps its shape in the top bar: a wide logo shows wider and a tall one narrower, instead of being squeezed into a square.
+- 05068af: On a phone, a long team and app name in the top bar and the menu is cut short ("ROBOWARRIORS SKILL TR…") instead of pushing the menu's close button and your greeting off the screen.
+- 73d2f28: Long links, part names and other long text wrap or are cut short on phones instead of making the page scroll sideways.
+- b8d939a: On staging, with the event snapshot on, admins can move its clock on or back from the Monitor (a match, five minutes or a minute at a time, or back to the start), and each match's status and score follow it, so every state of "Our next match" can be seen without waiting.
+
 ## 3.0.0
 
 ### Major Changes

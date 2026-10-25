@@ -1,7 +1,3 @@
--- Preserve the scalar column for older clients; new clients use every selected category.
-ALTER TABLE service_tickets ADD COLUMN issue_types_json TEXT NOT NULL DEFAULT '[]';
-UPDATE service_tickets SET issue_types_json = json_array(issue_type);
-
 -- Scouts may submit each form once for the same match, with the rule enforced atomically.
 DROP TRIGGER scouting_submission_one_per_match;
 CREATE TRIGGER scouting_submission_one_per_match

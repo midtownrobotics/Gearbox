@@ -30,7 +30,7 @@ A worker with a service binding to another worker can't be deployed until that w
 
 ## Staging
 
-Staging is a second copy of everything, deployed from `staging` (or the branch in `STAGING_BRANCH`, below) on every push by `.github/workflows/staging.yml` through the same `deploy.yml` as production (migrations, then each app's worker, then the gateway). Its addresses are production's with `-dev` on the first part, on g3robotics.com: `1648-orders-dev.g3robotics.com`, a team's home at `1648-dev.g3robotics.com`, sign-in callbacks at `id-dev.g3robotics.com`, the console at `admin-dev.g3robotics.com` and the platform at `dev.g3robotics.com` (`site.staging` in `site.ts`). A different domain from production's, so the two never share a cookie; every page has a "Staging" banner.
+Staging is a second copy of everything, deployed from `staging` (or the branch in `STAGING_BRANCH`, below) on every push by `.github/workflows/staging.yml` through the same `deploy.yml` as production (migrations, then each app's worker, then the gateway). Its addresses are production's with `-dev` on the first part, on g3robotics.com: `1648-orders-dev.g3robotics.com`, a team's home at `1648-dev.g3robotics.com`, sign-in callbacks at `id-dev.g3robotics.com`, the console at `admin-dev.g3robotics.com` and the platform at `dev.g3robotics.com` (`site.staging` in `site.ts`). A different domain from production's, so the two never share a cookie; every page has a "Staging" banner, which links the pull request last merged into the branch it was deployed from (read from the deployed commit's message), so you can tell whether a merge has reached it yet.
 
 Each worker's `[env.staging]` is written by `pnpm configure` from its `[env.production]` (below the "Staging" line at the end of each `wrangler.toml`): `-staging` worker names, databases and buckets, staging's addresses, and the ids in `infra/staging/resources.json`. Change `[env.production]` and run `pnpm configure`; never edit the staging part. Production's gateway answers only G3's retired addresses on g3robotics.com, by exact name, and staging's gateway only `*-dev.g3robotics.com` and `dev.g3robotics.com`.
 
@@ -232,6 +232,25 @@ Portal no longer has G3's logo built in. After the release, a G3ID admin sets G3
 - The platform now has a daily cron (cleaning up apps switched off more than 90 days ago); `wrangler deploy` sets it up, nothing to do by hand.
 - The gateway asks the platform which apps a team has on. If it's deployed before the platform's new code, it sees no app list and leaves every app open, so the order doesn't break anything.
 - Slack's install now returns admins to the team's home (`<number>.frcgearbox.com/admin/slack`), still through G3ID's `id.<platform>` callback: nothing changes in the Slack app's settings.
+
+## Problem reports on GitHub (once)
+
+Members' reports ("Report a problem" in every app's menu) become issues on midtownrobotics/Gearbox (`GITHUB_REPO` in the platform's `wrangler.toml`), made by the platform's worker (`workers/platform/src/reports.ts`). Until its token is set, reports are kept in the platform's database, and the hourly cron sends those under a week old once it is.
+
+1. Make a fine-grained personal access token (or a GitHub App's) for **only** midtownrobotics/Gearbox, with **Issues: Read and write** and nothing else. Prefer an account that belongs to the team, not a person, since the issues are opened in its name.
+2. `pnpm --filter @g3/worker-platform exec wrangler secret put GITHUB_TOKEN --env production`, and paste it.
+3. Make the labels the reports and the daily Claude task use (once):
+   ```bash
+   gh label create from-gearbox --description "Sent from Gearbox's Report a problem" --color 0e8a16
+   gh label create bug --description "Something isn't working" --color d73a4a
+   gh label create idea --description "A member's idea" --color a2eeef
+   gh label create ai-ready --description "Checked by a maintainer: the daily Claude task may take it" --color 5319e7
+   gh label create ai-working --description "The daily Claude task is on it" --color c5def5
+   gh label create ai-needs-info --description "The daily Claude task asked a question" --color fbca04
+   gh label create ai --description "Opened by the daily Claude task" --color bfdadc
+   ```
+
+Leave `GITHUB_TOKEN` unset on staging, so trying reports there doesn't open real issues; they stay in staging's database. The daily task is in `docs/roadmap/ai-task-prompt.md`; it runs as a Claude Code routine (`/schedule`), not on Cloudflare.
 
 ## Other outside services
 

@@ -15,6 +15,8 @@ export type AppEnv = {
     G3ID: Fetcher;
     /** Schedule, for when the team's events open and close (battery-timers.ts). Optional. */
     SCHEDULE?: Fetcher;
+    /** The page's static files (production): AdvantageScope's built-in models go through bundledAsset. */
+    ASSETS?: Fetcher;
   };
   Variables: G3AuthVariables & {
     /** The paired log downloader a request came from (`requireDownloader`). */

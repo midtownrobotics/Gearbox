@@ -1,6 +1,6 @@
 import { requireAuth } from "@g3/auth";
 import { CONSOLE_HOSTS, DEV_DOMAIN, teamKey } from "@g3/site-config";
-import { and, count, desc, eq, inArray, like, lt } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNotNull, like, lt } from "drizzle-orm";
 import { type Context, Hono } from "hono";
 import { createMiddleware } from "hono/factory";
 import {
@@ -11,11 +11,14 @@ import {
   numberReports,
   operatorActions,
   operators,
+  problemReports,
+  reporters,
   teams,
 } from "./db/schema";
 import { accounts, db, g3id, now } from "./lib";
 import { deliverToChat } from "./notifications";
 import { DELETABLE, callHook } from "./registry";
+import { tellBlocked } from "./reports";
 import type { AppEnv } from "./types";
 import { recentVisits } from "./visits";
 
@@ -27,6 +30,8 @@ import { recentVisits } from "./visits";
 // - suspend a team (the gateway stops answering its addresses) and reactivate it;
 // - follow up reports that a number was falsely registered (POST /reports);
 // - add and remove other operators;
+// - block a reporter by the reporter ID on a problem report's GitHub issue (src/reports.ts),
+//   never learning who it is (the team's admins are told who and why), and unblock them;
 // - write notifications for every team (info, warning, critical), each until it expires; each
 //   team's settings say where they go (src/notifications.ts).
 // Every action is logged in `operator_actions` with the operator's reason, and so is each look at a
@@ -337,6 +342,9 @@ export const consoleRouter = new Hono<AppEnv>()
     const { deletedUserIds } = (await res.json()) as { deletedUserIds: string[] };
 
     await db(c.env).delete(teams).where(eq(teams.id, team.id));
+    // Its members' reports (their GitHub issues are public, and stay).
+    await db(c.env).delete(problemReports).where(eq(problemReports.teamId, team.id));
+    await db(c.env).delete(reporters).where(eq(reporters.teamId, team.id));
     // An operator whose account went with the team isn't one any more.
     if (deletedUserIds.length) {
       await db(c.env).delete(operators).where(inArray(operators.userId, deletedUserIds));
@@ -488,6 +496,73 @@ export const consoleRouter = new Hono<AppEnv>()
       teamId: team?.id ?? null,
       details: { reportId: report.id, teamNumber: report.teamNumber },
     });
+    return c.json({ ok: true });
+  })
+  // Blocked reporters, newest first: their reporter IDs and team numbers (both on their public
+  // issues), never who they are.
+  .get("/reporters", async (c) => {
+    const list = await db(c.env)
+      .select({
+        id: reporters.id,
+        teamId: reporters.teamId,
+        blockedAt: reporters.blockedAt,
+        blockedBy: reporters.blockedBy,
+        blockReason: reporters.blockReason,
+      })
+      .from(reporters)
+      .where(isNotNull(reporters.blockedAt))
+      .orderBy(desc(reporters.blockedAt))
+      .limit(500)
+      .all();
+    const names = await accounts(
+      c.env,
+      list.map((r) => r.blockedBy).filter((id): id is string => !!id),
+    );
+    return c.json(
+      list.map(({ blockedBy, teamId, ...r }) => ({
+        ...r,
+        teamNumber: Number(teamId.replace(/^frc/, "")),
+        blockedByName: (blockedBy && names.get(blockedBy)?.displayName) ?? blockedBy,
+      })),
+    );
+  })
+  // Blocking a reporter (by the ID on their issues: { blocked: true, reason }) or unblocking them.
+  .post("/reporters/:id", async (c) => {
+    const body = await c.req.json<{ reason?: unknown; blocked?: unknown }>();
+    if (typeof body.blocked !== "boolean") return c.json({ error: "Say block or unblock." }, 400);
+    // Blocking needs a reason; unblocking may have one.
+    const reason = reasonOf(body);
+    if (body.blocked && !reason) return c.json({ error: NO_REASON }, 400);
+    const id = c.req.param("id").trim().toLowerCase();
+    const reporter = await db(c.env)
+      .select({
+        id: reporters.id,
+        teamId: reporters.teamId,
+        userId: reporters.userId,
+        blockedAt: reporters.blockedAt,
+      })
+      .from(reporters)
+      .where(eq(reporters.id, id))
+      .get();
+    if (!reporter) return c.json({ error: "No reporter has that ID." }, 404);
+    if ((reporter.blockedAt !== null) === body.blocked) {
+      return c.json({ error: body.blocked ? "Already blocked." : "Not blocked." }, 409);
+    }
+    await db(c.env)
+      .update(reporters)
+      .set(
+        body.blocked
+          ? { blockedAt: now(), blockedBy: c.get("userId"), blockReason: reason }
+          : { blockedAt: null, blockedBy: null, blockReason: null },
+      )
+      .where(eq(reporters.id, reporter.id));
+    // No team: the log says only the reporter ID. The team's admins are told on their chat instead,
+    // with who it is and why; the operator never is.
+    await log(c.env, c.get("userId"), body.blocked ? "block_reporter" : "unblock_reporter", {
+      reason,
+      details: { reporterId: reporter.id },
+    });
+    await tellBlocked(c.env, reporter, body.blocked, reason);
     return c.json({ ok: true });
   })
   .get("/operators", async (c) => {

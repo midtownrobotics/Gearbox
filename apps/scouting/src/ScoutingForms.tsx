@@ -15,6 +15,7 @@ import {
   useTeamChat,
   useTeamNames,
 } from "@g3/ui";
+import { describeServiceIssue } from "@g3/worker-scouting/service-issues";
 import {
   AlertCircle,
   ArrowDown,
@@ -47,6 +48,12 @@ import {
   useState,
 } from "react";
 import { FormFieldMap } from "./FormFieldMap";
+import {
+  type IssueChoice,
+  IssueTypePicker,
+  emptyIssueChoice,
+  issueTypesToSend,
+} from "./IssueTypePicker";
 import { Operations } from "./Operations";
 import { TeamLookupInput } from "./TeamLookupInput";
 import { api } from "./api";
@@ -102,6 +109,17 @@ const TYPES: { type: FieldType; label: string }[] = [
 ];
 
 const COUNTER_INTERVALS = [1, 5, 10, 20] as const;
+
+/** A multiple choice question this few, this short choices is answered with bubbles: one tap. */
+const MAX_BUBBLE_CHOICES = 6;
+const MAX_BUBBLE_LENGTH = 20;
+function answeredWithBubbles(field: ScoutingField) {
+  return (
+    field.options.length > 0 &&
+    field.options.length <= MAX_BUBBLE_CHOICES &&
+    field.options.every((option) => option.length <= MAX_BUBBLE_LENGTH)
+  );
+}
 
 function FieldInput({
   field,
@@ -199,6 +217,42 @@ function FieldInput({
         onChange={(event) => setValue(event.target.value)}
       />
     );
+  if (field.type === "mcq" && answeredWithBubbles(field)) {
+    const selected = String(value ?? "");
+    return (
+      <div
+        className="choice-bubbles"
+        role="radiogroup"
+        aria-labelledby={`${inputId}-label`}
+        aria-required={field.required || undefined}
+      >
+        {field.options.map((option) => (
+          <label key={option} className={option === selected ? "selected" : ""}>
+            <input
+              type="radio"
+              name={inputId}
+              value={option}
+              required={field.required}
+              checked={option === selected}
+              onChange={() => setValue(option)}
+              // Tapping the chosen answer again clears it, and so does Space, which browsers
+              // don't turn into a click on a radio that's already checked.
+              onClick={() => {
+                if (option === selected) setValue("");
+              }}
+              onKeyDown={(event) => {
+                if (event.key !== " " || option !== selected) return;
+                event.preventDefault();
+                setValue("");
+              }}
+            />
+            {option === selected && <Check size={17} aria-hidden="true" />}
+            {option}
+          </label>
+        ))}
+      </div>
+    );
+  }
   if (field.type === "mcq")
     return (
       <select
@@ -834,7 +888,7 @@ function EntryDraft({
                 className={`scouting-question ${field.type === "fieldMap" ? "wide" : ""}`}
                 key={field.id}
               >
-                <label htmlFor={`field-${field.id}`}>
+                <label htmlFor={`field-${field.id}`} id={`field-${field.id}-label`}>
                   {field.label}
                   {field.required && <b> *</b>}
                 </label>
@@ -1346,7 +1400,9 @@ function ServiceIssueReport() {
   const questions = useQuestions();
   const chat = chatName(useTeamChat());
   const [open, setOpen] = useState(false);
-  const [report, setReport] = useState({ teamName: "", issueType: "mechanical", description: "" });
+  const [report, setReport] = useState({ teamName: "", description: "" });
+  const [issue, setIssue] = useState<IssueChoice>(emptyIssueChoice);
+  const [issueMissing, setIssueMissing] = useState(false);
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState<"success" | "error">("success");
   if (!open)
@@ -1360,17 +1416,26 @@ function ServiceIssueReport() {
       className="service-issue-form"
       onSubmit={async (event) => {
         event.preventDefault();
+        const issueTypes = issueTypesToSend(issue);
+        if (!issueTypes) {
+          setIssueMissing(true);
+          return;
+        }
         if (
           !(await questions.confirm(
-            `Alert the service crew about a ${report.issueType} issue for team ${report.teamName}?`,
+            `Alert the service crew about ${describeServiceIssue(issueTypes)} for team ${report.teamName}?`,
           ))
         )
           return;
         try {
-          await api("/service-tickets", { method: "POST", body: JSON.stringify(report) });
+          await api("/service-tickets", {
+            method: "POST",
+            body: JSON.stringify({ ...report, issueTypes }),
+          });
           setMessageType("success");
           setMessage(`Service crew alerted through ${chat}.`);
-          setReport({ teamName: "", issueType: "mechanical", description: "" });
+          setReport({ teamName: "", description: "" });
+          setIssue(emptyIssueChoice);
         } catch (error) {
           setMessageType("error");
           setMessage(error instanceof Error ? error.message : "Could not alert the service crew.");
@@ -1393,16 +1458,14 @@ function ServiceIssueReport() {
         onInvalid={showTeamNumberError}
         placeholder="Team number"
       />
-      <select
-        className={inputClass}
-        value={report.issueType}
-        onChange={(event) => setReport({ ...report, issueType: event.target.value })}
-      >
-        <option value="mechanical">Mechanical</option>
-        <option value="electrical">Electrical</option>
-        <option value="programming">Programming</option>
-        <option value="other">Other</option>
-      </select>
+      <IssueTypePicker
+        choice={issue}
+        missing={issueMissing}
+        onChange={(update) => {
+          setIssue(update);
+          setIssueMissing(false);
+        }}
+      />
       <TextField
         kind="note"
         value={report.description}

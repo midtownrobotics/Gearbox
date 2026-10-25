@@ -15,19 +15,26 @@ export const tones = {
 /**
  * A status as a small label. Give it an icon where one helps it read without its color.
  * `colors` is one of `tones`, or fill, text and border classes for a status with a color of its
- * own.
+ * own. Text too long for its row is cut short with "…"; give the full text as `title` when it can
+ * be long (a name in it).
  */
 export function Badge({
   colors = tones.neutral,
   icon,
+  title,
   children,
-}: { colors?: string; icon?: ReactNode; children: ReactNode }) {
+}: { colors?: string; icon?: ReactNode; title?: string; children: ReactNode }) {
   return (
     <span
-      className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-semibold ${colors}`}
+      title={title}
+      className={`inline-flex max-w-full items-center gap-1 whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-semibold ${colors}`}
     >
-      {icon && <span aria-hidden>{icon}</span>}
-      {children}
+      {icon && (
+        <span aria-hidden className="shrink-0">
+          {icon}
+        </span>
+      )}
+      <span className="min-w-0 truncate">{children}</span>
     </span>
   );
 }

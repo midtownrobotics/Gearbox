@@ -86,7 +86,7 @@ describe("planned scouting workflows", () => {
     await jsonAs(team.admin, `/scouting/scouting-forms/${id}`, { method: "PUT", body: change });
     const { forms } = await jsonAs<{
       forms: { id: string; name: string; kind: string; isActive: boolean }[];
-    }>(team.student, "/scouting/scouting-forms");
+    }>(team.admin, "/scouting/scouting-forms");
     expect(forms.find((form) => form.id === id)).toMatchObject({
       name: "Pit interview",
       kind: "pit",
@@ -201,10 +201,10 @@ describe("planned scouting workflows", () => {
     ).toEqual([]);
   });
 
-  it("stores every service category and accepts legacy single-category clients", async () => {
+  it("stores every service category and isolates tickets", async () => {
     const { team } = await fixture();
     const other = teamUsers(newTeamId());
-    for (const issueTypes of [[], ["invalid"], "mechanical", ["electrical", 3]]) {
+    for (const issueTypes of [["invalid"], "mechanical", ["electrical", 3]]) {
       expect(
         (
           await callAs(team.student, "/scouting/service-tickets", {
@@ -216,7 +216,7 @@ describe("planned scouting workflows", () => {
     }
     for (const categories of [
       { issueTypes: ["mechanical", "electrical"] },
-      { issueType: "programming" },
+      { issueTypes: ["programming"] },
     ]) {
       expect(
         (

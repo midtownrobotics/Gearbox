@@ -132,12 +132,54 @@ console.log(
   "Seconds-based window migration preserves saved delays, defaults new teams to 120 seconds and removes the duplicate setting.",
 );
 db.exec(fs.readFileSync(`${md}/0036_late_reports.sql`, "utf8"));
-const ticketsBefore = db.prepare("SELECT * FROM service_tickets").all();
-db.exec(fs.readFileSync(`${md}/0037_forms_and_service_categories.sql`, "utf8"));
-for (const { issue_types_json, ...row } of db.prepare("SELECT * FROM service_tickets").all()) {
-  assert.deepEqual(JSON.parse(issue_types_json), [row.issue_type]);
-  assert.deepEqual(row, { ...ticketsBefore.find((ticket) => ticket.id === row.id) });
-}
+const ticketIndexes = () =>
+  db
+    .prepare(
+      "SELECT name, sql FROM sqlite_master WHERE type = 'index' AND tbl_name = 'service_tickets' AND sql IS NOT NULL ORDER BY name",
+    )
+    .all()
+    .map((row) => ({ ...row }));
+const beforeTickets = db
+  .prepare("SELECT * FROM service_tickets")
+  .all()
+  .map((row) => ({ ...row }));
+const beforeIndexes = ticketIndexes();
+db.exec("BEGIN");
+db.exec(fs.readFileSync(`${md}/0037_service_ticket_issue_types.sql`, "utf8"));
+db.exec("COMMIT");
+assert.deepEqual(
+  db
+    .prepare("SELECT * FROM service_tickets")
+    .all()
+    .map(({ issue_types, ...row }) => {
+      assert.equal(issue_types, '["mechanical"]');
+      return { ...row, issue_type: "mechanical" };
+    }),
+  beforeTickets,
+);
+assert.deepEqual(ticketIndexes(), beforeIndexes);
+assert.deepEqual(
+  db
+    .prepare("PRAGMA table_info(service_tickets)")
+    .all()
+    .filter((column) => column.pk)
+    .map((column) => column.name),
+  ["team_id", "id"],
+);
+const insertTicket = db.prepare(
+  "INSERT INTO service_tickets (team_id, id, team_name, issue_types, created_by, created_by_name, created_at, updated_at) VALUES ('migration-test-new', ?, '123', ?, 'test', 'Test', 1, 1)",
+);
+insertTicket.run("several", '["mechanical","electrical"]');
+insertTicket.run("not-sure", "[]");
+for (const value of ["mechanical", '{"a":1}', '["wheels"]', '["other","other"]', "[1]", null])
+  assert.throws(() => insertTicket.run(`bad-${value}`, value), String(value));
+assert.throws(() =>
+  db.prepare("UPDATE service_tickets SET issue_types = '[\"wheels\"]' WHERE id = 'several'").run(),
+);
+console.log(
+  "Issue types migration wraps each ticket's type in a list, keeps its key and indexes, and refuses unknown or repeated types.",
+);
+db.exec(fs.readFileSync(`${md}/0038_multiple_active_forms.sql`, "utf8"));
 const insertForm = db.prepare(
   "INSERT INTO scouting_forms (team_id, id, name, fields_json, created_by, created_at, updated_at, form_kind) VALUES (?, ?, 'Test', '[]', 'test', 1, 1, 'scouting')",
 );
