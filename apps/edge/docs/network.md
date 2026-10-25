@@ -1,7 +1,8 @@
 ---
 title: Network and blocking
 summary: Data used by each device and site, the monthly cap, blocklists and exceptions. For admins.
-order: 2
+order: 1
+pages: /network /network/clients /network/clients/:mac /network/controls /network/sites /network/sites/:site
 ---
 
 ## Usage

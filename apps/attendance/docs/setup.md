@@ -1,7 +1,9 @@
 ---
 title: Set up Attendance
 summary: Set the school year and the auto sign-out limit, and put a sign-in screen up in the shop.
-order: 1
+order: 0
+pages: /admin /qr-codes /kiosk /signin /signout
+access: admin
 ---
 
 ## Checklist

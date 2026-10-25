@@ -2,6 +2,7 @@
 title: From release to the shop
 summary: How parts arrive from Onshape and get their processes on Ingest.
 order: 2
+pages: /ingest /onshape /onshape/releases/:id /parts/new
 ---
 
 1. **Release it in Onshape.** Designers release parts and drawings as usual.

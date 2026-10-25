@@ -1,4 +1,5 @@
-import { CONSOLE_HOSTS, DOCS_HOSTS } from "@g3/site-config";
+import { isConsoleHost, isDocsHost } from "@g3/site-config";
+import { Loading } from "@g3/ui";
 import { StrictMode, Suspense, lazy } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
@@ -17,16 +18,22 @@ import { ReportPage } from "./report-page";
 import { SignupPage } from "./signup-page";
 import { MyTeamPage, NotFoundPage, TeamNotFoundPage } from "./team-pages";
 
-/** admin.<domain> is only the operators' console (also at /console on the platform's own host). */
-const onConsoleHost = (CONSOLE_HOSTS as readonly string[]).includes(window.location.hostname);
+/** admin.<domain> is only the operators' console (also at /console on the platform's own host and in dev). */
+const onConsoleHost = isConsoleHost(window.location.hostname);
 
 /** docs.<domain> is only the docs (also at /docs on the platform's own host). */
-const onDocsHost = (DOCS_HOSTS as readonly string[]).includes(window.location.hostname);
+const onDocsHost = isDocsHost(window.location.hostname);
 
 // The docs are their own chunk: the landing page doesn't load them.
 const DocsApp = lazy(() => import("./docs/docs-app"));
 const docs = (base: string) => (
-  <Suspense fallback={<div className="min-h-screen bg-page" />}>
+  <Suspense
+    fallback={
+      <div className="min-h-screen bg-page px-5 py-6">
+        <Loading />
+      </div>
+    }
+  >
     <DocsApp base={base} />
   </Suspense>
 );

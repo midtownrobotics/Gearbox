@@ -12,4 +12,4 @@
 "@g3/worker-schedule": minor
 ---
 
-The menu has a Help link to the app's part of the Gearbox docs.
+The menu has a "Need help?" link to the Gearbox docs page about the page you're on, and on a computer, Tutorial mode: that docs page beside the app, following you from page to page.

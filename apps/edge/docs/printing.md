@@ -1,7 +1,8 @@
 ---
 title: Printing, drive and door sounds
 summary: The shop's printer, its shared drive and the door's sounds.
-order: 3
+order: 2
+pages: /print /print/printers /drive /door-sounds /sound-requests
 ---
 
 ## Printing

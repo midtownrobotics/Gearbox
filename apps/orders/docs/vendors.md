@@ -1,7 +1,9 @@
 ---
 title: Vendors
 summary: Shipping, minimums, lead times, payment and store credit for each vendor. For mentors.
-order: 7
+order: 2
+pages: /vendors
+access: mentor
 ---
 
 [Vendors](team:orders/vendors) keeps what you know about each store, and Carts uses it to nudge you:

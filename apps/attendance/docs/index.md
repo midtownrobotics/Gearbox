@@ -1,7 +1,7 @@
 ---
 title: Attendance
 summary: Members sign in and out by scanning a QR code in the shop, and everyone sees the hours.
-order: 16
+order: 10
 ---
 
 A screen in the shop shows a QR code. Members scan it with their phone to sign in when they arrive and out when they leave. Hours add up over the school year, and the Leaderboard shows who's been there.

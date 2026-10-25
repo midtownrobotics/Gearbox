@@ -1,7 +1,8 @@
 ---
 title: Match logs
 summary: Copy the robot's AdvantageKit logs off the roboRIO after each match, and keep them in Pit.
-order: 5
+order: 4
+pages: /logs /logs/advantagescope
 ---
 
 The **pit log downloader** is a small program for a laptop in the pit (Windows, macOS or Linux). When the laptop joins the robot's network, it copies the robot's AdvantageKit match logs off the roboRIO, names them by match, and uploads them to Pit whenever it's online.

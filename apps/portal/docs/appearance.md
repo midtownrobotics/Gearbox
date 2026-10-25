@@ -1,7 +1,9 @@
 ---
 title: Team appearance
 summary: Your team's colors, logo, names and links, used on every page of every app.
-order: 3
+order: 4
+pages: /admin/appearance
+access: admin
 ---
 
 On [Appearance](team:portal/admin/appearance), admins set how Gearbox looks for your team. **Save** applies it everywhere; **Reset** puts back the defaults in the form, for you to save or not.

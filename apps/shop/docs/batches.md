@@ -1,7 +1,8 @@
 ---
 title: Batches and files
 summary: Group parts that share one CAM or slicer file, and move them through together.
-order: 4
+order: 3
+pages: /files
 ---
 
 A **batch** is a set of parts made from one file: a sheet of plates cut together on the router, a plate of 3D prints. It goes through two processes as one:

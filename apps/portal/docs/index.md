@@ -10,15 +10,15 @@ Admins also get the team's admin pages, under **Admin** in the bar. Only what's 
 
 | Page | What it's for |
 | --- | --- |
-| [Manage Apps](apps) | Switch apps on and off, download an app's data, see the team's log |
-| [Members](members) | Approve new members, give roles, remove people |
-| [Appearance](appearance) | Colors, logo, names, links and the order of the tiles |
-| [Sign-in](sign-in) | Which sign-in methods your team allows |
-| [Kiosk Devices](kiosks) | Shared shop computers where people sign in with a PIN |
-| [Integrations](integrations) | Connect Slack or Discord, and see what else is connected |
-| [Notifications](notifications) | Who sees Gearbox's announcements, and where they're sent |
-| [Operator Access](operator-access) | When Gearbox's operators looked at your team, and why |
+| Manage Apps | Switch apps on and off, download an app's data, see the team's log |
+| Members | Approve new members, give roles, remove people |
+| Appearance | Colors, logo, names, links and the order of the tiles |
+| Sign-in | Which sign-in methods your team allows |
+| Kiosk Devices | Shared shop computers where people sign in to Shop with a PIN (Shop only, for now) |
+| Integrations | Connect Slack or Discord, and see what else is connected |
+| Notifications | Who sees Gearbox's announcements, and where they're sent |
+| Operator Access | When Gearbox's operators looked at your team, and why |
 
-Every member also has an [Account page](account): open it from "Hello, name" in the bar.
+Every member also has an Account page: open it from "Hello, name" in the bar. It's the next page here, since it's the one everyone uses; the admin pages follow, one page each, in the order a new team needs them.
 
 Open your team's admin pages: [Manage Apps](team:portal/admin).

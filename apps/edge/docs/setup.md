@@ -1,7 +1,8 @@
 ---
 title: Set up Edge
 summary: Connect your team's box with its key. Building a box is still a hands-on job.
-order: 1
+order: 0
+pages: /box
 ---
 
 > A setup kit any team can follow isn't ready yet. Today, building a box means following the hand-applied setup in [infra/edge](https://github.com/midtownrobotics/Gearbox/tree/main/infra/edge) and the [design notes](https://github.com/midtownrobotics/Gearbox/blob/main/docs/edge.md). If you'd like to try, ask on [GitHub](https://github.com/midtownrobotics/Gearbox/issues).

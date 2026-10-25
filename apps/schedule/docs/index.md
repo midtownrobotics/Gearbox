@@ -1,7 +1,7 @@
 ---
 title: Schedule
 summary: Who does what at each event, 15 minutes at a time, with chat reminders before each change.
-order: 17
+order: 12
 ---
 
 Schedule plans an event's roles: who's on drive team, scouting, in the pit or on break, in 15-minute blocks. Editors paint roles onto a grid; everyone sees their own day, and gets a message in your team's chat just before their role changes.

@@ -1,7 +1,8 @@
 ---
 title: Set up Shop
 summary: Add your processes, connect Onshape, choose chat channels and set up shop screens. For admins.
-order: 1
+order: 0
+pages: /admin
 ---
 
 ## Checklist
@@ -11,7 +12,7 @@ order: 1
 - [ ] [Connect Onshape](#connect-onshape), so releases come in by themselves
 - [ ] Choose the [chat channels](#chat-channels) for releases and the daily summary
 - [ ] Turn on [kiosk mode](#shop-screens) on the shop's computers
-- [ ] If your team has an [Edge box](/edge) with a printer, try printing a drawing
+- [ ] If your team has an Edge box with a printer (Edge, the last app in these docs), try printing a drawing
 
 ## Processes
 
@@ -21,7 +22,7 @@ A process is a step a part can go through: "Router", "Mill", "Lathe", "Deburr", 
 - **File producer:** makes a file, such as CAM or slicing.
 - **File consumer:** uses one, such as a CNC router or a 3D printer.
 
-A part that uses files needs both kinds, with the producer first. See [batches and files](batches).
+A part that uses files needs both kinds, with the producer first. Batches and files, later in this section, covers them.
 
 ## Connect Onshape
 

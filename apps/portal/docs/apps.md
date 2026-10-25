@@ -1,14 +1,16 @@
 ---
 title: Switch apps on and off
 summary: Choose the apps your team uses, and what happens to an app's data when you switch it off.
-order: 1
+order: 2
+pages: /admin
+access: admin
 ---
 
 On [Manage Apps](team:portal/admin), each app has a switch. A new team starts with none on; sign-in and the home page are always on.
 
 ## Switching an app on
 
-The app appears on everyone's home page and in the menu at once. Some apps start with something to work from: Skill Tree with a default set of trees, Orders with a starter parts catalog. Then follow the app's setup page in these docs.
+The app appears on everyone's home page and in the menu at once. Some apps start with something to work from: Skill Tree with a default set of trees, Orders with a starter parts catalog. Each app's section, later in these docs, ends with how to set it up.
 
 Every admin who has linked the team's chat gets a message when an app is switched on or off.
 

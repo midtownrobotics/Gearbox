@@ -1,10 +1,10 @@
 ---
 title: Who can do what
-summary: Admins, mentors, students and kiosk sessions, and the extra roles some apps add.
+summary: Admins, mentors and students, and the extra roles some apps add.
 order: 3
 ---
 
-Every member of a team has one account. Roles are set on [Portal's Members page](/portal/members) and apply in every app.
+Every member of a team has one account. Roles are set on Portal's Members page (in Portal's section, after this one) and apply in every app.
 
 ## Team roles
 
@@ -15,10 +15,6 @@ Every member of a team has one account. Roles are set on [Portal's Members page]
 | Admin | A few people who look after Gearbox | The team's admin pages, and each app's **Admin** page |
 
 A person can be both a mentor and an admin. An admin who isn't a mentor is treated as a student in apps that count students, like Skill Tree.
-
-## Kiosk sessions
-
-A kiosk is a shared computer in the shop where people sign in with a 3-digit PIN instead of their own account (see [kiosk devices](/portal/kiosks)). A kiosk session can do what a student can, but never what needs a mentor or an admin, even when a mentor signs in on it. That keeps a forgotten sign-in on a shop computer from being a problem.
 
 ## Roles inside an app
 

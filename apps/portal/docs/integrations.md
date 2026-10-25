@@ -2,6 +2,8 @@
 title: Integrations
 summary: Connect your team's Slack or Discord, and see the status of everything else that's connected.
 order: 6
+pages: /admin/integrations
+access: admin
 ---
 
 ## Slack or Discord
@@ -24,7 +26,7 @@ The same page lists each app's integrations, whether they're connected and where
 
 | Integration | App | Where it's set up |
 | --- | --- | --- |
-| Edge box | Edge (and Orders' part lookup, Shop's printing) | [Edge's Edge Box page](/edge/setup) |
-| Onshape | Shop | [Shop's Admin page](/shop/setup#connect-onshape) |
-| Share-A-Cart | Orders | [Orders' Admin page](/orders/setup#share-a-cart) |
-| The Blue Alliance and Nexus | Pit, Scouting | Pit needs only your event key. Scouting needs your own keys: [Scouting's Admin page](/scouting/setup) |
+| Edge box | Edge (and Orders' part lookup, Shop's printing) | Edge's Edge Box page (Set up Edge, in Edge's section) |
+| Onshape | Shop | Shop's Admin page (Set up Shop) |
+| Share-A-Cart | Orders | Orders' Admin page (Set up Orders) |
+| The Blue Alliance and Nexus | Pit, Scouting | Pit needs only your event key. Scouting needs your own keys: Scouting's Admin page (Set up Scouting) |

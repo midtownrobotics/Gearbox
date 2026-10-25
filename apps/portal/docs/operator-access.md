@@ -2,6 +2,8 @@
 title: Operator access
 summary: When Gearbox's operators opened your team's member list or changed its ownership, and why.
 order: 9
+pages: /admin/operator-access
+access: admin
 ---
 
 Gearbox is run by volunteers. Rarely, an operator has to look at a team, for example to hand it to a new owner when its only admin has left.

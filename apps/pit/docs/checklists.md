@@ -1,7 +1,8 @@
 ---
 title: Checklists and issues
 summary: Run checklists between matches, report problems, and archive and reset for the next match.
-order: 2
+order: 1
+pages: /checklists /checklists/:id /archives /editor /editor/:id
 ---
 
 ## Run a checklist

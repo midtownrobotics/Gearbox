@@ -1,7 +1,9 @@
 ---
 title: Set up Skill Tree
 summary: Start from the default trees, then make them your team's, in the editor or with a file.
-order: 1
+order: 0
+pages: /edit /edit/:treeId
+access: mentor
 ---
 
 Switching Skill Tree on gives your team a default set of trees to start from. Make them your own on [Edit Trees](team:skill-tree/edit).

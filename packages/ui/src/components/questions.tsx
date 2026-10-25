@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { lockPageScroll } from "../tutorial";
 import { Button } from "./button";
 import { Dialog } from "./dialog";
 import { Field, inputClass } from "./field";
@@ -29,8 +30,7 @@ export function QuestionProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!question) return;
     const active = document.activeElement;
-    const overflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    const unlock = lockPageScroll();
     const frame = requestAnimationFrame(() => {
       (
         document.querySelector<HTMLElement>('[role="dialog"] input') ??
@@ -39,7 +39,7 @@ export function QuestionProvider({ children }: { children: ReactNode }) {
     });
     return () => {
       cancelAnimationFrame(frame);
-      document.body.style.overflow = overflow;
+      unlock();
       if (active instanceof HTMLElement && active.isConnected) active.focus();
     };
   }, [question]);

@@ -1,7 +1,9 @@
 ---
 title: Set up Orders
 summary: Money settings, budget categories, vendors and who can edit the catalog.
-order: 1
+order: 0
+pages: /admin
+access: mentor
 ---
 
 Do these as a mentor, before members start requesting.
@@ -40,4 +42,4 @@ With Inventory on, people marking parts received can say where they're going. Tu
 
 ## Part lookup
 
-When someone pastes a link, Orders can fill in the part's name, price and number from the vendor's page. That runs on your team's [Edge box](/edge), so it only works if your team has one connected. Without it, requesters type the details in.
+When someone pastes a link, Orders can fill in the part's name, price and number from the vendor's page. That runs on your team's Edge box (Edge, the last app in these docs), so it only works if your team has one connected. Without it, requesters type the details in.

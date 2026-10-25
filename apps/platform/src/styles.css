@@ -43,13 +43,20 @@
   color: var(--color-secondary-900);
   scroll-margin-top: 1.5rem;
 }
+/* Links in the theme's accent, lightened in dark mode so they read on the dark page. */
 .docs-prose a {
-  color: var(--color-primary-700);
+  color: var(--g3-accent);
   text-decoration: underline;
   text-underline-offset: 2px;
 }
 .docs-prose a:hover {
-  color: var(--color-primary-900);
+  color: var(--color-primary-700);
+}
+html[data-theme="dark"] .docs-prose a {
+  color: color-mix(in srgb, var(--g3-dark-accent) 55%, white);
+}
+html[data-theme="dark"] .docs-prose a:hover {
+  color: color-mix(in srgb, var(--g3-dark-accent) 35%, white);
 }
 .docs-prose strong {
   font-weight: 650;

@@ -12,6 +12,7 @@ import {
   type SafeTextKind,
   TextField,
   inputClass,
+  scrollPageToTop,
   tones,
 } from "@g3/ui";
 import { Fragment, useEffect, useState } from "react";
@@ -973,7 +974,7 @@ export function IngestPartsPage() {
           type="button"
           onClick={() => {
             setCurrentIndex(null);
-            window.scrollTo(0, 0);
+            scrollPageToTop();
           }}
           className="text-sm text-secondary-500 hover:text-primary-600"
         >
@@ -1298,7 +1299,7 @@ function PartIngestCard({
       setBanner(null);
       setDrawingError(null);
       setDrawingSuccess(false);
-      window.scrollTo(0, 0);
+      scrollPageToTop();
     } catch (err) {
       setBanner(err instanceof Error ? err.message : "An error occurred");
     } finally {
@@ -1630,7 +1631,7 @@ function PartIngestCard({
             setBanner(null);
             setDrawingError(null);
             setDrawingSuccess(false);
-            window.scrollTo(0, 0);
+            scrollPageToTop();
             onNext();
           }}
           disabled={submitting}
@@ -1643,7 +1644,7 @@ function PartIngestCard({
           className="ml-auto"
           onClick={() => {
             onBack();
-            window.scrollTo(0, 0);
+            scrollPageToTop();
           }}
         >
           ← All parts

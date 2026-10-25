@@ -19,4 +19,4 @@ Pit is for competitions. Before each match the crew runs its checklists; problem
 | Monitor | A full-screen display for the pit |
 | Admin | The event, and the Monitor's feed |
 
-Anyone signed in uses Pit, kiosks too. Admins change its settings.
+Anyone signed in uses Pit. Admins change its settings.

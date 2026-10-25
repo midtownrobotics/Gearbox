@@ -4,26 +4,32 @@ summary: Match and pit scouting forms, analysis, tier lists, autos, field maps a
 order: 14
 ---
 
-Scouting runs your team's scouting and strategy at competitions. Scouts are assigned a team for each match and fill in its form before the deadline. Strategy leads read the results in Analysis, rank teams in tier lists and plan with field maps and the auto library. The service crew gets tickets when something on your robot breaks.
+Scouting runs your team's scouting and strategy at competitions. Scouts are each given a team for every match and fill in its form as it's played. Everyone can read the results in Analysis. Strategy leads rank teams in tier lists, plan on field maps and keep the event moving. The service crew helps robots that break, yours or other teams'.
 
 ## Who does what
 
-| Role | What they see |
-| --- | --- |
-| Scouts (every member) | Scouting Forms, and Scouting Points or Match Predictions if your team turned them on |
-| Service crew | Also Service Tickets |
-| Strategy leads and admins | Everything: Analysis, Auto Library, Tier Lists, Field Maps and Admin |
+| | Scouts (every member) | Service crew | Strategy leads and admins |
+| --- | --- | --- | --- |
+| Scouting Forms: match and pit scouting | Yes | Yes | Yes |
+| Report a robot breakdown | Yes | Yes | Yes |
+| Analysis | Yes | Yes | Yes |
+| Scouting Points or Match Predictions, if your team has them on | Yes | Yes | Yes |
+| Service Tickets: claim and close them | | Yes | Yes |
+| Tier Lists, Auto Library, Field Maps | | | Yes |
+| Admin: the event, the schedule, edit forms | | | Yes |
 
-Strategy leads and the service crew are chosen in Scouting. Kiosk sessions never get the lead's pages.
+Strategy leads and the service crew are chosen in Scouting. Points and predictions are switched on and off by your team's admins only.
 
 ## Pages
 
 | Page | What it's for |
 | --- | --- |
-| Scouting Forms | Fill in match and pit scouting; leads edit the forms |
-| Analysis | Every report, by team and match, with statistics and comparisons |
-| Service Tickets | Problems with your robot, for the service crew |
+| Scouting Forms | Fill in match and pit scouting |
+| Analysis | Every report, by team and match, with averages and comparisons |
+| Service Tickets | Robots that need help, for the service crew |
 | Auto Library | Other teams' autonomous routines |
-| Tier Lists | Drag teams into tiers for alliance selection |
+| Tier Lists | Rank teams for alliance selection |
 | Field Maps | Draw plans on the field |
-| Admin | The event, announcements, points, a manual schedule and strategy leads |
+| Admin | The event, its schedule, announcements, strategy leads and points |
+
+The pages in this section follow the same path: set it up, scout a match, help with breakdowns, read the results, lead the strategy, and last, the optional points.

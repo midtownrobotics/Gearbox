@@ -1,7 +1,7 @@
 ---
 title: Sign up your team
 summary: Register your team, connect its Slack or Discord, and become its first admin.
-order: 1
+order: 2
 ---
 
 Signing up takes about five minutes. The person who signs up becomes the team's first admin, and can make others admins afterward.
@@ -16,7 +16,7 @@ Signing up takes about five minutes. The person who signs up becomes the team's 
 
 ## Sign up with Slack
 
-1. Go to [frcgearbox.com](https://frcgearbox.com) and choose **Sign up your team**.
+1. Go to [frcgearbox.com/signup](https://frcgearbox.com/signup).
 2. Enter your team's number, name and country, and accept the terms.
 3. Choose **Add to Slack** and approve the app for your team's workspace.
 4. Gearbox shows you a code. Send it as a direct message to the Gearbox bot in Slack.
@@ -24,11 +24,11 @@ Signing up takes about five minutes. The person who signs up becomes the team's 
 
 ## Sign up with Discord
 
-1. Go to [frcgearbox.com](https://frcgearbox.com) and choose **Sign up your team**.
+1. Go to [frcgearbox.com/signup](https://frcgearbox.com/signup).
 2. Enter your team's number, name and country, and accept the terms.
 3. Choose **Add to Discord**, pick your team's server and approve the bot.
 4. That one step also signs you in: you're your team's first admin.
 
 ## Next
 
-Work through [the setup checklist](checklist). Members join through your team's chat, so there's nothing to send them yet beyond your team's address.
+Read on: the next page is who can do what, so you know which roles to give people. Members join through your team's chat, so there's nothing to send them yet beyond your team's address. The setup checklist in Reference, at the end of these docs, lists everything to set up, in order.

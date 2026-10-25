@@ -1,6 +1,13 @@
 import { type AppName, platformUrl, site, teamAppUrl } from "@g3/site-config";
-import { TextField, ThemeToggle, buttonClass, rememberedTeam } from "@g3/ui";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import {
+  TextField,
+  ThemeToggle,
+  type TutorialDocMessage,
+  buttonClass,
+  isTutorialAppsMessage,
+  rememberedTeam,
+} from "@g3/ui";
+import { type ReactNode, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   Link,
   Navigate,
@@ -19,6 +26,7 @@ import scheduleIcon from "../assets/app-icons/schedule.svg";
 import scoutingIcon from "../assets/app-icons/scouting.svg";
 import shopIcon from "../assets/app-icons/shop.svg";
 import skillsIcon from "../assets/app-icons/skills.svg";
+import startIcon from "../assets/app-icons/start.svg";
 import {
   type DocsPage,
   type DocsSection,
@@ -35,6 +43,7 @@ import {
 // It belongs to no team, so it keeps the built-in colors, like the rest of the platform's pages.
 
 const ICONS: Partial<Record<string, string>> = {
+  start: startIcon,
   portal: "/favicon.svg",
   shop: shopIcon,
   pit: pitIcon,
@@ -46,6 +55,65 @@ const ICONS: Partial<Record<string, string>> = {
   inventory: inventoryIcon,
   schedule: scheduleIcon,
 };
+
+/** A section's icon: its app's, or Getting started's flag ("start", which has no app). */
+const iconOf = (section: DocsSection) => ICONS[section.app ?? section.id];
+
+/**
+ * Opened in an app's tutorial panel (`?embed`, TutorialPanel in @g3/ui): only the page, with a
+ * search box, and no header, sidebar or footer. Read once, as the page loads, so following links
+ * inside the panel keeps it. Links to a team's app open in the app beside it, others in a new tab.
+ */
+const embedded =
+  typeof window !== "undefined" && new URLSearchParams(window.location.search).has("embed");
+
+/**
+ * In a tutorial panel only, who's reading, as the app beside it says: the apps their team has on
+ * and their role (each null until it says, or when it can't tell). The previous and next links
+ * skip the sections of apps that are off and the pages they can't open. The docs site on its own
+ * always shows every page.
+ */
+type Reader = {
+  apps: ReadonlySet<string> | null;
+  role: "admin" | "mentor" | "member" | null;
+  /** Parts of apps the team has off (a doc's `feature`). */
+  featuresOff: ReadonlySet<string>;
+};
+let reader: Reader = { apps: null, role: null, featuresOff: new Set() };
+const readerListeners = new Set<() => void>();
+if (embedded) {
+  window.addEventListener("message", (e) => {
+    if (e.source !== window.parent || !isTutorialAppsMessage(e.data)) return;
+    const role = e.data.role;
+    reader = {
+      apps: e.data.apps ? new Set(e.data.apps) : null,
+      role: role === "admin" || role === "mentor" || role === "member" ? role : null,
+      featuresOff: new Set(
+        Array.isArray(e.data.featuresOff)
+          ? e.data.featuresOff.filter((f): f is string => typeof f === "string")
+          : [],
+      ),
+    };
+    for (const listener of readerListeners) listener();
+  });
+}
+
+/** Whether the reader can open the app page a doc is about (anyone, while it isn't known). */
+function canOpen(page: DocsPage, role: Reader["role"]) {
+  if (!role || page.access === "everyone") return true;
+  if (page.access === "mentor") return role === "mentor" || role === "admin";
+  return role === "admin";
+}
+
+function useReader() {
+  return useSyncExternalStore(
+    (listener) => {
+      readerListeners.add(listener);
+      return () => readerListeners.delete(listener);
+    },
+    () => reader,
+  );
+}
 
 /** The reader's team (the one this browser last opened), or null. */
 function useTeam(): number | null {
@@ -104,6 +172,17 @@ function Shell({
       className="w-full"
     />
   );
+
+  if (embedded) {
+    return (
+      <div className="min-h-screen bg-page px-5 py-5">
+        <div className="mb-5">{search}</div>
+        <main className="min-w-0">
+          {query.trim() ? <SearchResults base={base} query={query} /> : children}
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen flex-col bg-page">
@@ -184,9 +263,7 @@ function Contents({ base, current }: { base: string; current?: DocsPage }) {
                 open ? "text-secondary-900" : "text-secondary-600 hover:text-secondary-900"
               } ${open && current?.slug === "" ? "bg-inset" : ""}`}
             >
-              {section.app && ICONS[section.app] && (
-                <img src={ICONS[section.app]} alt="" className="h-5 w-5 rounded" />
-              )}
+              {iconOf(section) && <img src={iconOf(section)} alt="" className="h-5 w-5 rounded" />}
               {section.title}
             </Link>
             {open && (
@@ -279,7 +356,7 @@ function SectionCard({
   section: DocsSection;
   wide?: boolean;
 }) {
-  const icon = section.app ? ICONS[section.app] : undefined;
+  const icon = iconOf(section);
   return (
     <Link
       to={`${base}/${section.id}`}
@@ -303,11 +380,27 @@ function Article({ base }: { base: string }) {
   const team = useTeam();
   const body = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
-  const { hash } = useLocation();
+  const { hash, pathname } = useLocation();
+  const { apps: teamApps, role, featuresOff } = useReader();
 
   useEffect(() => {
     if (page) document.title = `${page.title} · Gearbox Docs`;
   }, [page]);
+
+  // In a tutorial panel, the app beside it follows: tell it which page this is and the app page
+  // it's about. Nothing private: it's this public page's own address.
+  useEffect(() => {
+    if (!embedded || !page || !section || window.parent === window) return;
+    const message: TutorialDocMessage = {
+      type: "gearbox-docs-page",
+      pathname,
+      section: section.id,
+      slug: page.slug,
+      app: section.app,
+      path: page.appPath,
+    };
+    window.parent.postMessage(message, "*");
+  }, [page, section, pathname]);
 
   // Links, team links and checklists in the page's HTML.
   useEffect(() => {
@@ -320,6 +413,13 @@ function Article({ base }: { base: string }) {
     }
     for (const a of root.querySelectorAll<HTMLAnchorElement>("a[data-team-app]")) {
       a.href = teamHref(team, a.dataset.teamApp ?? "portal", a.dataset.teamPath);
+      // In a tutorial panel, the app beside it goes to that page.
+      if (embedded) a.target = "_top";
+    }
+    if (embedded) {
+      for (const a of root.querySelectorAll<HTMLAnchorElement>('a[href^="http"]')) {
+        if (!a.dataset.teamApp) a.target = "_blank";
+      }
     }
     // A setup page's checklist: ticks are kept in this browser, page by page.
     const key = `gearbox-docs:${pagePath(page)}`;
@@ -359,9 +459,20 @@ function Article({ base }: { base: string }) {
 
   if (!page || !section) return <Navigate to={base || "/"} replace />;
 
-  const at = readingOrder.indexOf(page);
-  const previous = readingOrder[at - 1];
-  const next = readingOrder[at + 1];
+  // Previous and next skip the apps the team has off and the pages the reader can't open (known
+  // in a tutorial panel only).
+  const order = readingOrder.filter((p) => {
+    if (p === page) return true;
+    const app = findSection(p.section)?.app;
+    return (
+      (!app || !teamApps || teamApps.has(app)) &&
+      canOpen(p, role) &&
+      !(p.feature && featuresOff.has(p.feature))
+    );
+  });
+  const at = order.indexOf(page);
+  const previous = order[at - 1];
+  const next = order[at + 1];
   const children = page.slug === "" ? pagesOf(section.id).filter((p) => p.slug !== "") : [];
 
   return (
@@ -378,7 +489,7 @@ function Article({ base }: { base: string }) {
           )}
           <h1 className="mt-1 text-3xl font-bold text-secondary-900">{page.title}</h1>
           {page.summary && <p className="mt-2 text-lg text-secondary-600">{page.summary}</p>}
-          {section.app && page.slug === "" && (
+          {section.app && page.slug === "" && !embedded && (
             <a
               href={teamHref(team, section.app)}
               className={`${buttonClass("secondary", "sm")} mt-4 inline-flex`}
@@ -429,12 +540,14 @@ function Article({ base }: { base: string }) {
           </div>
           <a
             href={`${site.sourceUrl}/blob/main/${page.source}`}
+            target={embedded ? "_blank" : undefined}
+            rel={embedded ? "noreferrer" : undefined}
             className="mt-6 inline-block text-sm text-secondary-500 hover:text-secondary-900"
           >
             Suggest a change to this page
           </a>
         </article>
-        {page.headings.length > 1 && (
+        {page.headings.length > 1 && !embedded && (
           <nav
             aria-label="On this page"
             className="sticky top-6 hidden max-h-[calc(100vh-3rem)] w-52 shrink-0 self-start overflow-y-auto text-sm xl:block"

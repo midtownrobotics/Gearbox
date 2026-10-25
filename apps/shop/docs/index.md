@@ -1,7 +1,7 @@
 ---
 title: Shop
 summary: Every part the team is making, from Onshape release to finished, process by process.
-order: 12
+order: 17
 ---
 
 Shop tracks manufacturing. A part comes in when it's released in Onshape, gets its manufacturing processes (cut on the router, then deburr, then tap), and moves through them on the Shop Floor until it's done. Each copy of a part (an instance) moves on its own, so you can see that 3 of 4 side plates are done.

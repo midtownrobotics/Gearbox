@@ -502,3 +502,110 @@ html[data-theme="dark"] .g3-demo-banner {
   background: #422006;
   color: #fde68a;
 }
+
+/* Tutorial mode (components/tutorial-panel.tsx, tutorial.ts): the app in the left part of the
+   window, the docs in the right third. The body is narrowed and transformed, which makes it the
+   box `position: fixed` is placed in, so the app's dialogs, drawer and full-screen views fill
+   its own part; #root scrolls instead of the window, so the body never moves. The panel is
+   fixed too, just past the body's right edge. */
+html[data-tutorial] {
+  --g3-tutorial-width: clamp(360px, 33.333vw, 640px);
+  height: 100%;
+  overflow: hidden;
+}
+
+html[data-tutorial] body {
+  width: calc(100vw - var(--g3-tutorial-width));
+  height: 100%;
+  margin: 0;
+  overflow: visible;
+  transform: translateX(0);
+}
+
+html[data-tutorial] #root {
+  height: 100%;
+  overflow-y: auto;
+}
+
+.g3-tutorial {
+  position: fixed;
+  top: 0;
+  left: 100%;
+  z-index: 80;
+  display: flex;
+  flex-direction: column;
+  width: var(--g3-tutorial-width);
+  height: 100%;
+  border-left: 1px solid var(--g3-line);
+  background: var(--g3-page);
+  font-family: "Ubuntu", sans-serif;
+}
+
+.g3-tutorial-head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  height: 56px;
+  flex-shrink: 0;
+  padding: 0 12px 0 20px;
+  border-bottom: 1px solid var(--g3-line);
+  background: var(--g3-surface);
+}
+
+.g3-tutorial-title {
+  flex: 1;
+  color: var(--g3-text);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.g3-tutorial-link {
+  color: var(--g3-muted);
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.g3-tutorial-link:hover {
+  color: var(--g3-text);
+}
+
+.g3-tutorial-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--g3-text);
+  cursor: pointer;
+}
+
+.g3-tutorial-close:hover {
+  background: var(--g3-inset);
+}
+
+.g3-tutorial-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+.g3-tutorial-frame {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: var(--g3-page);
+}
+
+.g3-tutorial-loading {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  padding: 24px 20px;
+  background: var(--g3-page);
+  color: var(--g3-muted);
+  font-size: 14px;
+}

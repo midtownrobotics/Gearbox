@@ -1,7 +1,8 @@
 ---
 title: Budgets
 summary: Budget categories, fiscal years, and importing or exporting your order sheet. For mentors.
-order: 5
+order: 1
+pages: /budget
 ---
 
 [Budget](team:orders/budget) shows each category's budget, what's been spent and what's committed, for one fiscal year at a time.

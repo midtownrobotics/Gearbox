@@ -15,11 +15,15 @@ These docs are for the people who look after a team's apps: usually a mentor or 
 - **Sign-in** is through your team's chat, Slack or Discord, plus any other ways your admins allow (Google, GitHub, Steam). One sign-in covers every app.
 - **Your team's chat** is also where Gearbox sends messages: an order approved, a release posted, a schedule reminder.
 
-## Start here
+## How these docs are laid out
 
-- [ ] [Sign up your team](sign-up) (once, by the person who'll be its first admin)
-- [ ] Work through [the setup checklist](checklist): members, apps, colors and notifications
-- [ ] Read [who can do what](roles), so you know which roles to give people
-- [ ] Set up each app you switch on: every app's section starts with its own setup page
+The docs read in order, from the basics to the more advanced, and each page builds only on the ones before it. Choose **Next** at the bottom of a page to carry on.
 
-Not sure yet? [Try the demo](demo): a sample team you can use without an account.
+1. **Getting started** (this section): try the demo, sign up your team, learn who can do what, and put Gearbox on your phone.
+2. **Portal**: your own account first, then the team's admin pages.
+3. **The apps**, simplest first: Attendance, Skill Tree, Schedule, Pit, Scouting, Inventory, Orders, Shop, and last Edge, which needs a box in your shop. Each app starts with what it does and how to set it up, then how members use it and what mentors do.
+4. **Reference**: the whole setup as one checklist, and troubleshooting.
+
+You only need the apps your team uses: skip the rest.
+
+On a computer, you can also read these docs beside the app: open any app's menu and choose **Tutorial mode**. The page about where you are shows on the right, and changes as you move around. **Close tutorial** in the same menu, or the × above the docs, turns it off.

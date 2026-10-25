@@ -1,7 +1,7 @@
 ---
 title: Troubleshooting
 summary: The usual reasons someone can't sign in or can't see something, and what to do.
-order: 5
+order: 2
 ---
 
 ## Someone can't sign in
@@ -17,8 +17,7 @@ An admin has to switch the app on, on [Apps](/portal/apps). The page someone see
 
 ## A button or page is missing
 
-- Most "missing" things need a role: see [who can do what](roles).
-- On a [kiosk](/portal/kiosks), nothing that needs a mentor or admin is shown, whoever signed in.
+- Most "missing" things need a role: see [who can do what](/start/roles).
 - Some features need another app: Orders' part lookup needs Edge, Inventory's Request buttons need Orders. They're hidden while that app is off.
 
 ## Messages aren't arriving in Slack or Discord
@@ -29,4 +28,4 @@ An admin has to switch the app on, on [Apps](/portal/apps). The page someone see
 
 ## Still stuck
 
-Report a problem or ask a question on [GitHub](https://github.com/midtownrobotics/Gearbox/issues).
+Choose **Report a problem** in any app's menu: describe what happened, and you'll get a message on your team's chat when it's dealt with. Or ask on [GitHub](https://github.com/midtownrobotics/Gearbox/issues).

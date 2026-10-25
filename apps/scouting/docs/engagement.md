@@ -1,7 +1,9 @@
 ---
 title: Points and predictions
 summary: Optional points for scouting reports, and match predictions to spend them on.
-order: 4
+order: 5
+pages: /predictions
+feature: scouting-points
 ---
 
 To keep scouts going at a long event, your team can turn on points. They're off unless an admin turns them on, on Scouting's Admin page under **Optional engagement**.

@@ -1,7 +1,8 @@
 ---
 title: Make a schedule
 summary: Days, periods and attendees, painting roles onto the grid, and publishing. For editors.
-order: 2
+order: 1
+pages: /schedules /schedules/all /schedules/:id /schedules/:id/settings
 ---
 
 ## Create it

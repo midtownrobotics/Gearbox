@@ -1,7 +1,9 @@
 ---
 title: Set up Schedule
 summary: Make your team's roles and choose who can edit schedules.
-order: 1
+order: 0
+pages: /roles /admin
+access: mentor
 ---
 
 ## Checklist
@@ -9,7 +11,7 @@ order: 1
 - [ ] On [Roles](team:schedule/roles), add your roles: Drive Team, Scouting, Pit, Break, Lunch
 - [ ] Give each a color, and a type: **Scouting**, **Pit** or **Other**
 - [ ] On [Admin](team:schedule/admin), choose any students who'll help edit schedules
-- [ ] [Make your first schedule](schedules)
+- [ ] Make your first schedule (the next page)
 
 ## Roles
 

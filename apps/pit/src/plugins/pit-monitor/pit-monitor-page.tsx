@@ -1,4 +1,4 @@
-import { Badge, Button, ProgressBar, tones, useTeamNames } from "@g3/ui";
+import { Badge, Button, ProgressBar, pageScroller, tones, useTeamNames } from "@g3/ui";
 import type { OurSchedule } from "@g3/worker-pit/monitor-matches";
 import { type RefObject, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { api } from "../../shared/api";
@@ -156,7 +156,7 @@ function useFitToWindow(ref: RefObject<HTMLElement | null>, ready: boolean): num
     if (!ready || !element) return;
     const wide = window.matchMedia(WIDE);
     const measure = () => {
-      const top = element.getBoundingClientRect().top + window.scrollY;
+      const top = element.getBoundingClientRect().top + pageScroller().scrollTop;
       const fits = window.innerHeight - top - BOTTOM_GAP;
       setHeight(wide.matches && fits >= MIN_FIT_HEIGHT ? fits : null);
     };

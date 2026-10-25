@@ -1,7 +1,9 @@
 ---
 title: Set up Pit
 summary: Set the event, write your checklists, add batteries and put up a pit display.
-order: 1
+order: 0
+pages: /admin
+access: admin
 ---
 
 ## Checklist
@@ -10,7 +12,7 @@ order: 1
 - [ ] On [Edit Checklists](team:pit/editor), write your checklists: "Pre-match", "Battery swap", "Post-match"
 - [ ] On [Batteries](team:pit/batteries), add each battery with a name, and print labels for them
 - [ ] Put the [Monitor](team:pit/monitor) up on a screen in the pit
-- [ ] If you want match logs, [pair a log downloader](logs)
+- [ ] If you want match logs, pair a log downloader (Match logs, later in this section)
 
 ## The event
 

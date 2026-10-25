@@ -1,7 +1,7 @@
 ---
 title: Setup checklist
 summary: Everything a new team sets up, in order. Tick items off as you go; your ticks stay in this browser.
-order: 2
+order: 1
 ---
 
 ## Your team
@@ -15,8 +15,7 @@ order: 2
 
 - [ ] Ask members to sign up from your team's home page, with your team's Slack or Discord
 - [ ] [Approve them](/portal/members) as they ask to join. Admins get a chat message for each one
-- [ ] Give mentors the **Mentor** role, and a few trusted people **Admin** (see [who can do what](roles))
-- [ ] Set up [kiosk devices](/portal/kiosks) if your shop has shared computers or tablets
+- [ ] Give mentors the **Mentor** role, and a few trusted people **Admin** (see [who can do what](/start/roles))
 
 ## Each app you switched on
 

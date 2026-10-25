@@ -1,7 +1,9 @@
 ---
 title: Notifications
 summary: Choose who sees Gearbox's announcements, on the home page and in your team's chat.
-order: 7
+order: 5
+pages: /admin/notifications
+access: admin
 ---
 
 Gearbox's operators sometimes post announcements for every team: planned downtime, a new version, or something an admin needs to act on.

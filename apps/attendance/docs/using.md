@@ -1,7 +1,8 @@
 ---
 title: Hours and corrections
 summary: Read the Leaderboard, and fix hours when someone forgot to sign in or out.
-order: 2
+order: 1
+pages: /leaderboard /me
 ---
 
 ## Signing in and out
