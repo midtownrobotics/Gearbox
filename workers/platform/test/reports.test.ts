@@ -104,6 +104,24 @@ describe("reporting a problem", () => {
     expect(issue.body).not.toContain(team.student.id);
   });
 
+  it("puts the member's name on the issue only when they choose to", async () => {
+    const team = newTeam();
+    const named = (await (await send(team.student, { withName: true })).json()) as Shown & {
+      withName: boolean;
+    };
+    expect(named.withName).toBe(true);
+    expect((await github(`/test/issues/${issueOf(named)}`)).body).toContain(
+      `| Name | ${team.student.displayName} |`,
+    );
+    const unnamed = (await (await send(team.student, { withName: "yes" })).json()) as Shown & {
+      withName: boolean;
+    };
+    expect(unnamed.withName).toBe(false);
+    const body = (await github(`/test/issues/${issueOf(unnamed)}`)).body;
+    expect(body).not.toContain("| Name |");
+    expect(body).not.toContain(team.student.displayName);
+  });
+
   it("uses the member's title for the issue when they give one", async () => {
     const team = newTeam();
     const titled = (await (

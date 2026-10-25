@@ -7,10 +7,12 @@ import { Dialog } from "./dialog";
 import { Field } from "./field";
 import { ErrorBanner, SuccessBanner } from "./messages";
 import { TextField } from "./text-field";
+import { Toggle } from "./toggle";
 
 // "Report a problem", from every app's bar (AppNavBar): a problem or an idea, sent to the
 // platform's /team/reports, which posts it as a public issue on Gearbox's GitHub. It shows the
-// member their reporter ID, which stands for them on the issue, and that it can be blocked.
+// member their reporter ID, which stands for them on the issue, and that it can be blocked. A
+// member can choose to put their name on it too (`withName`), off by default.
 
 type Kind = "problem" | "idea";
 
@@ -36,6 +38,7 @@ export function ReportDialog({ version, onClose }: { version?: string; onClose: 
   const [kind, setKind] = useState<Kind>("problem");
   const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
+  const [withName, setWithName] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState<{ issueUrl: string | null } | null>(null);
@@ -51,7 +54,14 @@ export function ReportDialog({ version, onClose }: { version?: string; onClose: 
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ kind, title, message, page: window.location.href, version }),
+        body: JSON.stringify({
+          kind,
+          title,
+          message,
+          withName,
+          page: window.location.href,
+          version,
+        }),
       });
       const body = (await res.json().catch(() => ({}))) as {
         error?: string;
@@ -117,7 +127,7 @@ export function ReportDialog({ version, onClose }: { version?: string; onClose: 
         </Field>
         <Field
           label={kind === "problem" ? "What happened?" : "What would help?"}
-          hint="Reports are public on Gearbox's GitHub, with this page's address, your browser and your reporter ID, but not your name. Leave out names and anything private."
+          hint="Reports are public on Gearbox's GitHub, with this page's address, your browser and your reporter ID. Leave out other people's names and anything private."
         >
           <TextField
             multiline
@@ -134,6 +144,16 @@ export function ReportDialog({ version, onClose }: { version?: string; onClose: 
             required
           />
         </Field>
+        <Toggle
+          label="Put my name on it"
+          description={
+            withName
+              ? "Your name will be public on the report, beside your reporter ID."
+              : "Your name stays off the report: only your reporter ID is shown."
+          }
+          checked={withName}
+          onChange={setWithName}
+        />
         {reporter && (
           <p className="text-sm text-secondary-600">
             Your reporter ID is <span className="font-mono text-secondary-900">{reporter.id}</span>.
