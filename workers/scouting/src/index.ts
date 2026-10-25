@@ -1159,9 +1159,10 @@ app.route("/", manualRoutes);
 
 app.get("/scouting-forms", requireAuth, async (c) => {
   await seedTeam(dbOf(c), c.get("teamId"));
+  const canManage = await isStrategyAdmin(c);
   const rows = await all<Record<string, unknown>>(
     dbOf(c),
-    sql`SELECT * FROM (SELECT * FROM ${scoutingForms} WHERE ${inTeam(scoutingForms, c.get("teamId"))}) AS scoped_scouting_forms WHERE form_kind IN ('scouting', 'pit') ORDER BY form_kind DESC`,
+    sql`SELECT * FROM (SELECT * FROM ${scoutingForms} WHERE ${inTeam(scoutingForms, c.get("teamId"))}) AS scoped_scouting_forms WHERE form_kind IN ('scouting', 'pit') ${canManage ? sql`` : sql`AND is_active = 1`} ORDER BY form_kind DESC`,
   );
   return c.json({
     forms: rows.results.map((row) => ({
@@ -1205,6 +1206,24 @@ app.post("/scouting-forms", requireAuth, async (c) => {
     )
     .run();
   return c.json({ id: formId }, 201);
+});
+
+app.put("/scouting-forms/:id/visibility", requireAuth, async (c) => {
+  if (!(await isStrategyAdmin(c))) return c.json({ error: "Strategy lead access required." }, 403);
+  const body = await c.req.json<{ isActive?: unknown }>();
+  if (typeof body.isActive !== "boolean")
+    return c.json({ error: "Visibility must be true or false." }, 400);
+  const form = await first<{ id: string }>(
+    dbOf(c),
+    sql`SELECT id FROM ${scoutingForms} WHERE ${inTeam(scoutingForms, c.get("teamId"))} AND id = ${c.req.param("id")}`,
+  );
+  if (!form) return c.json({ error: "Scouting form not found." }, 404);
+  await dbOf(c)
+    .update(scoutingForms)
+    .set({ is_active: body.isActive ? 1 : 0, updated_at: Date.now() })
+    .where(inTeam(scoutingForms, c.get("teamId"), sql`id = ${form.id}`))
+    .run();
+  return c.json({ isActive: body.isActive });
 });
 
 app.put("/scouting-forms/:id", requireAuth, async (c) => {

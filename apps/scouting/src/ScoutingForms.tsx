@@ -23,6 +23,8 @@ import {
   CalendarClock,
   Check,
   CheckCircle2,
+  Eye,
+  EyeOff,
   GripVertical,
   Info,
   Maximize2,
@@ -1108,7 +1110,7 @@ function Editor({
               setDraft((current) => ({ ...current, isActive: event.target.checked }))
             }
           />
-          Active for scouts
+          Visible to scouts
         </label>
       </div>
       <div className="designer-field-list">
@@ -2515,8 +2517,35 @@ export function ScoutingForms({
   const [loadError, setLoadError] = useState("");
   const [loading, setLoading] = useState(true);
   const [forms, setForms] = useState<ScoutingForm[]>([]);
+  const [changingVisibility, setChangingVisibility] = useState<string | null>(null);
+  const [visibilityError, setVisibilityError] = useState("");
   const [selected, setSelected] = useState<ScoutingForm | null>(null);
   const [editing, setEditing] = useState(false);
+  async function toggleVisibility(form: ScoutingForm) {
+    if (changingVisibility) return;
+    setChangingVisibility(form.id);
+    setVisibilityError("");
+    try {
+      const result = await api<{ isActive: boolean }>(`/scouting-forms/${form.id}/visibility`, {
+        method: "PUT",
+        body: JSON.stringify({ isActive: !form.isActive }),
+      });
+      setForms((current) =>
+        current.map((item) =>
+          item.id === form.id ? { ...item, isActive: result.isActive } : item,
+        ),
+      );
+      setSelected((current) =>
+        current?.id === form.id ? { ...current, isActive: result.isActive } : current,
+      );
+    } catch (cause) {
+      setVisibilityError(
+        cause instanceof Error ? cause.message : "Could not change form visibility.",
+      );
+    } finally {
+      setChangingVisibility(null);
+    }
+  }
   const [pitTeam, setPitTeam] = useState<string | undefined>();
   const [pitSelection, setPitSelection] = useState(0);
   const [category, setCategory] = useState<"scouting" | "pit">("scouting");
@@ -2543,6 +2572,20 @@ export function ScoutingForms({
       )
       .finally(() => setLoading(false));
   }, [load]);
+  useEffect(() => {
+    if (isAdmin) return;
+    const refresh = () => {
+      if (document.visibilityState === "visible") void load().catch(() => undefined);
+    };
+    const timer = window.setInterval(refresh, 10_000);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, [isAdmin, load]);
   const contextRequest = useRef(0);
   const [contextError, setContextError] = useState("");
   const refreshContext = useCallback(async () => {
@@ -2612,6 +2655,11 @@ export function ScoutingForms({
       </Button>
     >
       {loading && <Loading />}
+      {visibilityError && (
+        <div role="alert">
+          <ErrorBanner message={visibilityError} />
+        </div>
+      )}
       {loadError && (
         <div role="alert">
           <ErrorBanner message={loadError} />
@@ -2723,24 +2771,49 @@ export function ScoutingForms({
                   className={`text-xs ${form.isActive ? "text-secondary-500" : "text-amber-700"}`}
                 >
                   {!form.isActive
-                    ? "Inactive"
+                    ? "Hidden from scouts"
                     : form.kind === "scouting" && context?.submittedFormIds?.includes(form.id)
                       ? "Submitted for this match"
-                      : "Active"}
+                      : "Visible to scouts"}
                 </span>
               </button>
               {isAdmin && (
-                <button
-                  type="button"
-                  className="edit-form-button"
-                  onClick={() => {
-                    setPitTeam(undefined);
-                    setSelected(form);
-                    setEditing(true);
-                  }}
-                >
-                  <Pencil size={15} /> Edit
-                </button>
+                <div className="flex min-w-0 flex-wrap items-center justify-end gap-1 border-l border-line p-1.5 max-sm:border-l-0 max-sm:border-t">
+                  <button
+                    type="button"
+                    className="edit-form-button"
+                    onClick={() => {
+                      setPitTeam(undefined);
+                      setSelected(form);
+                      setEditing(true);
+                    }}
+                  >
+                    <Pencil size={15} /> Edit
+                  </button>
+                  <button
+                    type="button"
+                    className="inline-flex min-h-11 items-center gap-1.5 rounded px-2 text-xs font-semibold text-secondary-600 hover:bg-inset disabled:opacity-50"
+                    disabled={changingVisibility !== null || (editing && selected?.id === form.id)}
+                    onClick={() => void toggleVisibility(form)}
+                    aria-label={`${form.isActive ? "Hide" : "Show"} ${form.name} ${form.isActive ? "from" : "to"} scouts`}
+                    title={
+                      editing && selected?.id === form.id
+                        ? "Save or close the editor before changing visibility"
+                        : undefined
+                    }
+                  >
+                    {form.isActive ? (
+                      <EyeOff size={16} className="shrink-0" />
+                    ) : (
+                      <Eye size={16} className="shrink-0" />
+                    )}
+                    {changingVisibility === form.id
+                      ? "Updating…"
+                      : form.isActive
+                        ? "Hide from scouts"
+                        : "Show to scouts"}
+                  </button>
+                </div>
               )}
             </div>
           ))}
@@ -2766,7 +2839,7 @@ export function ScoutingForms({
           />
         ) : !selected.isActive ? (
           <p className="text-sm text-secondary-500">
-            This form is inactive. Edit it to make it available to scouts.
+            This form is hidden from scouts. Use Show to scouts above to make it available.
           </p>
         ) : (
           <>
