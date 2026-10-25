@@ -7,7 +7,7 @@ pages: /network /network/clients /network/clients/:mac /network/controls /networ
 
 ## Usage
 
-**Overview** shows the shop's data use for the billing cycle, against the cap, with where it's heading. Pick any range of days; click a day on a chart to see its hours. **Clients** is each device, with who's online now. **Sites** is each site, across all devices or one.
+**Overview** shows the shop's data use for the billing cycle, against the cap, with where it's heading. Pick any range of days; click a day on a chart to see its hours. **Clients** is each device, with who's online now. **Sites** is each site, across all devices or one; admins also see the top sites for the dates picked on **Overview**, so click a day to see that day's.
 
 Usage is kept by hour for two weeks and by day after that. Site data is kept by hour for 30 days, then by day for a year.
 

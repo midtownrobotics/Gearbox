@@ -98,6 +98,23 @@ html[data-theme="dark"] .g3-nav-drawer {
   scrollbar-width: none;
 }
 
+.g3-nav-links::-webkit-scrollbar {
+  display: none;
+}
+
+/* Pages past an edge: that edge fades out, so it's clear the bar scrolls. */
+.g3-nav-links.more-left {
+  mask-image: linear-gradient(to right, transparent, #000 40px);
+}
+
+.g3-nav-links.more-right {
+  mask-image: linear-gradient(to left, transparent, #000 40px);
+}
+
+.g3-nav-links.more-left.more-right {
+  mask-image: linear-gradient(to right, transparent, #000 40px, #000 calc(100% - 40px), transparent);
+}
+
 .g3-nav-group {
   display: flex;
   align-items: stretch;

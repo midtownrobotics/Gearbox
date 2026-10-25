@@ -10,7 +10,7 @@ import {
   portalAppLabels,
   site,
 } from "@g3/site-config";
-import { type ComponentType, type ReactNode, useEffect, useState } from "react";
+import { type ComponentType, type ReactNode, useEffect, useRef, useState } from "react";
 import { useSignedInUser, useTeamApps } from "../session";
 import { usePageTeamAvatar, useTeamIcon, useTeamUiSettings } from "../team-ui";
 import { useTheme } from "../theme";
@@ -90,6 +90,60 @@ const plainLink: AppNavLink = ({ href, children, ...props }) => (
   </a>
 );
 
+/**
+ * The bar's pages scroll sideways when they don't fit, at any width: a mouse wheel scrolls them
+ * too, the side with more fades out, and the current page is brought into view.
+ */
+function usePagesScroll(pageKeys: string, activeKey: string | undefined) {
+  const ref = useRef<HTMLElement>(null);
+  const [more, setMore] = useState({ left: false, right: false });
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: watched again when the pages change
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const update = () => {
+      const left = el.scrollLeft > 1;
+      const right = el.scrollLeft + el.clientWidth < el.scrollWidth - 1;
+      setMore((m) => (m.left === left && m.right === right ? m : { left, right }));
+    };
+    const onWheel = (e: WheelEvent) => {
+      if (el.scrollWidth <= el.clientWidth || Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
+      const before = el.scrollLeft;
+      // Firefox can count in lines rather than pixels.
+      el.scrollLeft += e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
+      // At an end the wheel goes back to scrolling the page.
+      if (el.scrollLeft !== before) e.preventDefault();
+    };
+    update();
+    el.addEventListener("scroll", update, { passive: true });
+    el.addEventListener("wheel", onWheel, { passive: false });
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    for (const child of el.children) observer.observe(child);
+    return () => {
+      el.removeEventListener("scroll", update);
+      el.removeEventListener("wheel", onWheel);
+      observer.disconnect();
+    };
+  }, [pageKeys]);
+
+  // Bring the current page into view, moving only the bar (never the page).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: again each time the page changes
+  useEffect(() => {
+    const el = ref.current;
+    const current = el?.querySelector<HTMLElement>('[aria-current="page"]');
+    if (!el || !current) return;
+    const box = el.getBoundingClientRect();
+    const link = current.getBoundingClientRect();
+    if (link.left < box.left) el.scrollLeft += link.left - box.left - 24;
+    else if (link.right > box.right) el.scrollLeft += link.right - box.right + 24;
+  }, [activeKey]);
+
+  const className = `g3-nav-links${more.left ? " more-left" : ""}${more.right ? " more-right" : ""}`;
+  return { ref, className };
+}
+
 export function AppNavBar({
   title,
   icon,
@@ -137,6 +191,10 @@ export function AppNavBar({
 }) {
   const [open, setOpen] = useState(false);
   const [reporting, setReporting] = useState(false);
+  const pages = usePagesScroll(
+    items.map((item) => item.key).join(" "),
+    items.find((item) => item.active)?.key,
+  );
   const teamUi = useTeamUiSettings(team);
   const brandedTitle = team
     ? title.replace(new RegExp(`^${site.team.shortName}\\b`, "i"), teamUi.shortName)
@@ -317,7 +375,7 @@ export function AppNavBar({
           </button>
         )}
         {brand}
-        <nav className="g3-nav-links" aria-label="Pages">
+        <nav ref={pages.ref} className={pages.className} aria-label="Pages">
           {groups.map(([name, groupItems], i) => (
             <div key={name || i} className="g3-nav-group">
               {name && <span className="g3-nav-group-name">{name}</span>}
