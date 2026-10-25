@@ -34,6 +34,14 @@ describe("the demo's sample data", () => {
     expect(await drawings.get(drawingKey(demoTeamId, "DEMO-1001", "A"))).not.toBeNull();
   });
 
+  it("gives no Onshape links for its sample releases, which were never in Onshape", async () => {
+    const { admin, student } = teamUsers(demoTeamId);
+    const pending = await jsonAs<Pending>(admin, "/admin/parts/pending");
+    expect(pending.parts.length).toBeGreaterThan(0);
+    const { links } = await jsonAs<{ links: unknown[] }>(student, "/onshape/links");
+    expect(links).toEqual([]);
+  });
+
   it("adds a sample release from Ingest, only in the demo", async () => {
     const { admin } = teamUsers(demoTeamId);
     const before = await jsonAs<Pending>(admin, "/admin/parts/pending");

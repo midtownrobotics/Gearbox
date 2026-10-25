@@ -14,11 +14,11 @@ import {
   bulkMoveInstances,
   createBatch,
   deleteBatch,
-  fetchOnshapeLinks,
   stageIntoBatch,
   unstageFromBatch,
 } from "../../shared/getters";
-import type { Batch, OnshapePartLink, PartDefinition } from "../../shared/types";
+import { type OnshapeLinks, onshapeLinkFor, useOnshapeLinks } from "../../shared/onshape-links";
+import type { Batch } from "../../shared/types";
 import { useAuthUser } from "../../shared/use-auth";
 import type { ShopData } from "../../shared/use-shop-data";
 import { useUserNames } from "../../shared/use-user-names";
@@ -38,7 +38,7 @@ import { NoticeText } from "../files/file-ui";
  * What a part header shows besides its name: material and thickness on a process that requires
  * part info, and the team's Onshape links by part number, newest release first.
  */
-type PartHeaderContext = { showInfo: boolean; links: Map<string, OnshapePartLink[]> };
+type PartHeaderContext = { showInfo: boolean; links: OnshapeLinks };
 const PartHeader = createContext<PartHeaderContext>({ showInfo: false, links: new Map() });
 const NEW_BATCH = "new";
 
@@ -64,19 +64,6 @@ function groupByPart(rows: InstanceRow[]): PartGroup[] {
     .sort((a, b) =>
       (a.rows[0].definition.name ?? "").localeCompare(b.rows[0].definition.name ?? ""),
     );
-}
-
-/**
- * Where a part is in Onshape: the release that gave it the revision being made, else its newest
- * one, since a part's number is what Onshape releases and a hand-typed revision may match none.
- */
-function onshapeLinkFor(
-  links: Map<string, OnshapePartLink[]>,
-  definition: PartDefinition,
-): OnshapePartLink | null {
-  const released = links.get(definition.onshapePartNumber);
-  if (!released) return null;
-  return released.find((l) => l.revision === definition.revision) ?? released[0] ?? null;
 }
 
 const sectionHeading = "font-sans text-xs font-bold uppercase tracking-widest text-secondary-400";
@@ -110,7 +97,7 @@ export function ProducerSections({
 }) {
   const user = useAuthUser();
   const processName = processNamer(data);
-  const [onshapeLinks, setOnshapeLinks] = useState<OnshapePartLink[]>([]);
+  const onshapeLinks = useOnshapeLinks();
   const [target, setTarget] = useState<string>("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -123,13 +110,6 @@ export function ProducerSections({
   );
   const resolveName = useUserNames(batches.map((b) => b.createdBy));
 
-  // Onshape only decides whether part names are links, so losing it doesn't fail the view.
-  useEffect(() => {
-    fetchOnshapeLinks()
-      .then(setOnshapeLinks)
-      .catch(() => {});
-  }, []);
-
   // Default the stage target to your newest batch, else the newest batch, else a new one.
   // Only when nothing valid is chosen: "a new batch" is a deliberate pick and must stick.
   // Skipped mid-action: a just-created batch is selected before the list reloads to include it.
@@ -141,15 +121,10 @@ export function ProducerSections({
     setTarget(pick ? String(pick.id) : NEW_BATCH);
   }, [batches, busy, target, user?.userId]);
 
-  const header = useMemo<PartHeaderContext>(() => {
-    const links = new Map<string, OnshapePartLink[]>();
-    for (const link of onshapeLinks) {
-      const list = links.get(link.partNumber);
-      if (list) list.push(link);
-      else links.set(link.partNumber, [link]);
-    }
-    return { showInfo: showPartInfo, links };
-  }, [onshapeLinks, showPartInfo]);
+  const header = useMemo<PartHeaderContext>(
+    () => ({ showInfo: showPartInfo, links: onshapeLinks }),
+    [onshapeLinks, showPartInfo],
+  );
 
   const rowById = useMemo(() => new Map(rows.map((r) => [r.instance.id, r])), [rows]);
 
@@ -604,7 +579,11 @@ function PartGroup({
 }) {
   const { showInfo, links } = useContext(PartHeader);
   const first = rows[0];
-  const onshape = onshapeLinkFor(links, first.definition);
+  const onshape = onshapeLinkFor(
+    links,
+    first.definition.onshapePartNumber,
+    first.definition.revision,
+  );
   const name = (
     <>
       {first.definition.name}

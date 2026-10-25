@@ -7,7 +7,7 @@ pages: /ingest /onshape /onshape/releases/:id /parts/new
 
 1. **Release it in Onshape.** Designers release parts and drawings as usual.
 2. **Get the release approved** in Onshape.
-3. **Give it its processes on [Ingest](team:shop/ingest).** Each new part waits here. Choose the processes it goes through.
+3. **Give it its processes on [Ingest](team:shop/ingest).** Each new part waits here, under the release it came from. Choose the processes it goes through. To check a part's shape first, click its name to open it in Onshape; **Open in Onshape** beside a release opens the whole release.
 4. **Make it.** The part shows up on the Shop Floor at its first process.
 
 The release's channel in your team's chat gets a message for each release.
