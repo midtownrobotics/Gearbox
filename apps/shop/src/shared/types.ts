@@ -96,6 +96,8 @@ export type OnshapePartLink = {
   revision: string | null;
   /** The part in the released version, or null when the release left no part element. */
   part: string | null;
+  /** Onshape's id for the release package the part came from. */
+  releaseId: string;
   /** The release package the part came from. */
   release: string;
 };
