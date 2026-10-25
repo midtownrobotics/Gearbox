@@ -13,4 +13,4 @@
 "@g3/worker-skill-tree": patch
 ---
 
-When the top bar's pages don't fit, a mouse wheel scrolls them sideways and the edge with more fades out.
+When the top bar's pages don't fit, a mouse wheel over the bar scrolls them sideways (never the page) and the edge with more fades out.

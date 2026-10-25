@@ -91,39 +91,41 @@ const plainLink: AppNavLink = ({ href, children, ...props }) => (
 );
 
 /**
- * The bar's pages scroll sideways when they don't fit, at any width: a mouse wheel scrolls them
- * too, the side with more fades out, and the current page is brought into view.
+ * The bar's pages scroll sideways when they don't fit, at any width: a mouse wheel anywhere on the
+ * bar scrolls them (never the page under it), the side with more fades out, and the current page
+ * is brought into view.
  */
 function usePagesScroll(pageKeys: string, activeKey: string | undefined) {
   const ref = useRef<HTMLElement>(null);
+  const barRef = useRef<HTMLElement>(null);
   const [more, setMore] = useState({ left: false, right: false });
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: watched again when the pages change
   useEffect(() => {
     const el = ref.current;
-    if (!el) return;
+    const bar = barRef.current;
+    if (!el || !bar) return;
     const update = () => {
       const left = el.scrollLeft > 1;
       const right = el.scrollLeft + el.clientWidth < el.scrollWidth - 1;
       setMore((m) => (m.left === left && m.right === right ? m : { left, right }));
     };
     const onWheel = (e: WheelEvent) => {
-      if (el.scrollWidth <= el.clientWidth || Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
-      const before = el.scrollLeft;
+      e.preventDefault();
       // Firefox can count in lines rather than pixels.
-      el.scrollLeft += e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
-      // At an end the wheel goes back to scrolling the page.
-      if (el.scrollLeft !== before) e.preventDefault();
+      const lines = e.deltaMode === 1 ? 16 : 1;
+      const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+      el.scrollLeft += delta * lines;
     };
     update();
     el.addEventListener("scroll", update, { passive: true });
-    el.addEventListener("wheel", onWheel, { passive: false });
+    bar.addEventListener("wheel", onWheel, { passive: false });
     const observer = new ResizeObserver(update);
     observer.observe(el);
     for (const child of el.children) observer.observe(child);
     return () => {
       el.removeEventListener("scroll", update);
-      el.removeEventListener("wheel", onWheel);
+      bar.removeEventListener("wheel", onWheel);
       observer.disconnect();
     };
   }, [pageKeys]);
@@ -141,7 +143,7 @@ function usePagesScroll(pageKeys: string, activeKey: string | undefined) {
   }, [activeKey]);
 
   const className = `g3-nav-links${more.left ? " more-left" : ""}${more.right ? " more-right" : ""}`;
-  return { ref, className };
+  return { ref, barRef, className };
 }
 
 export function AppNavBar({
@@ -362,7 +364,10 @@ export function AppNavBar({
           </span>
         </div>
       )}
-      <header className={`g3-nav${flat ? " is-flat" : ""}${hasApps ? " has-apps" : ""}`}>
+      <header
+        ref={pages.barRef}
+        className={`g3-nav${flat ? " is-flat" : ""}${hasApps ? " has-apps" : ""}`}
+      >
         {!flat && (
           <button
             type="button"
