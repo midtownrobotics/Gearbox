@@ -143,7 +143,7 @@ function usePagesScroll(pageKeys: string, activeKey: string | undefined) {
   }, [activeKey]);
 
   const className = `g3-nav-links${more.left ? " more-left" : ""}${more.right ? " more-right" : ""}`;
-  return { ref, barRef, className };
+  return { ref, barRef, className, overflows: more.left || more.right };
 }
 
 export function AppNavBar({
@@ -366,7 +366,7 @@ export function AppNavBar({
       )}
       <header
         ref={pages.barRef}
-        className={`g3-nav${flat ? " is-flat" : ""}${hasApps ? " has-apps" : ""}`}
+        className={`g3-nav${flat ? " is-flat" : ""}${hasApps ? " has-apps" : ""}${pages.overflows ? " is-overflowing" : ""}`}
       >
         {!flat && (
           <button

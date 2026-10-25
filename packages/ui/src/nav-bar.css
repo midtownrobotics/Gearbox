@@ -115,6 +115,33 @@ html[data-theme="dark"] .g3-nav-drawer {
   mask-image: linear-gradient(to right, transparent, #000 40px, #000 calc(100% - 40px), transparent);
 }
 
+/* With the pointer on a bar whose pages don't fit, a line each side of them (like the dividers
+   between groups) sets them apart from the wordmark and the controls. */
+.g3-nav.is-overflowing .g3-nav-brand,
+.g3-nav.is-overflowing .g3-nav-end {
+  position: relative;
+  align-self: stretch;
+  align-items: center;
+}
+
+.g3-nav.is-overflowing:hover .g3-nav-brand::after,
+.g3-nav.is-overflowing:hover .g3-nav-end::before {
+  content: "";
+  position: absolute;
+  top: 18px;
+  bottom: 18px;
+  width: 1px;
+  background: var(--g3-nav-line);
+}
+
+.g3-nav.is-overflowing:hover .g3-nav-brand::after {
+  right: -14px;
+}
+
+.g3-nav.is-overflowing:hover .g3-nav-end::before {
+  left: -14px;
+}
+
 .g3-nav-group {
   display: flex;
   align-items: stretch;
