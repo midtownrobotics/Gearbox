@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { workerTestConfig } from "@g3/testing/config";
 
 // Each app's worker is a stub that says which app got the request, at what path, and with which
@@ -34,7 +35,21 @@ const g3id = (request: Request) => {
     const me = sessions[session];
     return me ? Response.json(me) : Response.json({ error: "Unauthorized." }, { status: 401 });
   }
+  // Team 4242 has its own brand color; the others answer without one.
+  if (url.pathname === "/api/team/ui" && request.headers.get("X-Team-Id") === "frc4242") {
+    return Response.json({ light: { accent: "#1f6feb" } });
+  }
   return echo("G3ID")(request);
+};
+
+// Orders serves its real manifest and icon files, like its worker's assets.
+const ordersPublic = new URL("../../apps/orders/public/", import.meta.url);
+const orders = (request: Request) => {
+  const path = new URL(request.url).pathname;
+  if (path === "/manifest.webmanifest" || path === "/icon-192.png") {
+    return new Response(readFileSync(new URL(`.${path}`, ordersPublic)));
+  }
+  return echo("ORDERS")(request);
 };
 
 // The platform knows which teams exist, and which apps they have on: 4242 has only sign-in, its
@@ -66,7 +81,6 @@ export default workerTestConfig({
         "PORTAL",
         "SHOP",
         "PIT",
-        "ORDERS",
         "EDGE",
         "SCOUTING",
         "SKILL_TREE",
@@ -75,6 +89,7 @@ export default workerTestConfig({
         "SCHEDULE",
       ].map((binding) => [binding, echo(binding)]),
     ),
+    ORDERS: orders,
     G3ID: g3id,
     PLATFORM: platform,
   },
