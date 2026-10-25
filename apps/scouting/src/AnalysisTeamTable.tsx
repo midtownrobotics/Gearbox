@@ -1,5 +1,5 @@
 import { Badge, focusRing, tones } from "@g3/ui";
-import { ChevronRight, Star, Trash2 } from "lucide-react";
+import { ChevronRight, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import {
   type Column,
@@ -37,7 +37,6 @@ type Props = {
   /** A report to open its team's row at and mark. */
   focusReportId?: string | null;
   canManageReports: boolean;
-  onToggleStar: (report: Report) => void;
   onDelete: (report: Report) => void;
   onViewDrawing: (drawing: { url: string; teamName: string; label: string }) => void;
 };
@@ -50,12 +49,12 @@ const sticky = "sticky left-0 z-10";
 /**
  * Every team with reports, one row each: on match scouting the average of each number and the
  * answer given most to each choice, on pit scouting the answers of the team's newest pit report.
- * A team's number opens its reports below its row, oldest first.
+ * A team's number opens its reports below its row, newest first.
  */
 export function AnalysisTeamTable(props: Props) {
   const { kind, reports, focusReportId } = props;
   const columns = columnsOf(reports);
-  const [sort, setSort] = useState<Sort>({ key: "team", dir: "asc" });
+  const [sort, setSort] = useState<Sort>({ key: "recent", dir: "desc" });
   const focusTeam = reports.find((report) => report.id === focusReportId)?.teamName;
   const [opened, setOpened] = useState<Set<string>>(() => new Set(focusTeam ? [focusTeam] : []));
   const rows = sortRows(teamRows(reports, columns, kind), sort);
@@ -102,11 +101,14 @@ export function AnalysisTeamTable(props: Props) {
 
   return (
     <div className="overflow-x-auto rounded-xl border border-line bg-surface text-sm">
+      <div className="flex justify-end border-b border-line px-3 py-2">
+        <SortButton k="recent" label="Latest match" sort={sort} onSort={onSort} />
+      </div>
       <table className="w-full border-collapse">
         <thead className="bg-page">
           <tr>
             {header("team", "Team", `${sticky} bg-page min-w-[8.5rem] md:min-w-[11rem]`)}
-            {header("reports", "Reports", "text-right")}
+            {header("reports", "Reports / form", "text-right")}
             {columns.map((column) =>
               header(
                 `field:${column.id}`,
@@ -151,7 +153,6 @@ function TeamRows({
   eventLabel,
   focusReportId,
   canManageReports,
-  onToggleStar,
   onDelete,
   onViewDrawing,
 }: Props & {
@@ -162,7 +163,7 @@ function TeamRows({
   onToggle: () => void;
 }) {
   const comments = commentsByTeam.get(row.team) ?? [];
-  const newest = row.reports[row.reports.length - 1];
+  const newest = row.reports[0];
   const manyEvents = new Set(row.reports.map((report) => report.eventKey ?? "")).size > 1;
   return (
     <tbody className="border-t border-line">
@@ -182,17 +183,15 @@ function TeamRows({
             />
             {row.team}
           </button>
+          <span className="block pl-5 text-xs font-normal text-secondary-500">
+            {kind === "pit" ? new Date(newest.createdAt).toLocaleDateString() : matchLabel(newest)}
+          </span>
         </th>
         <td className={`${td} text-right tabular-nums text-secondary-600`}>{row.reports.length}</td>
         {columns.map((column) => (
           <td key={column.id} className={`${td} ${isNumeric(column) ? "text-right" : ""}`}>
             {kind === "pit" ? (
-              <AnswerCell
-                report={newest}
-                column={column}
-                onViewDrawing={onViewDrawing}
-                highlight={false}
-              />
+              <AnswerCell report={newest} column={column} onViewDrawing={onViewDrawing} />
             ) : (
               <SummaryCell summary={row.summaries.get(column.id) ?? { kind: "none" }} />
             )}
@@ -202,7 +201,6 @@ function TeamRows({
       {open &&
         row.reports.map((report) => {
           const focused = report.id === focusReportId;
-          const starred = report.starredFieldIds.includes("__report");
           return (
             <tr key={report.id} className={focused ? "bg-primary-50" : "bg-inset"}>
               <th
@@ -223,19 +221,6 @@ function TeamRows({
                     </div>
                     {report.late && <Badge colors={tones.warning}>Sent late</Badge>}
                   </div>
-                  {(canManageReports || starred) && (
-                    <button
-                      type="button"
-                      disabled={!canManageReports}
-                      onClick={() => onToggleStar(report)}
-                      aria-pressed={starred}
-                      aria-label={starred ? "Unstar report" : "Star report"}
-                      title={starred ? "Unstar report" : "Star report"}
-                      className={`rounded p-1 ${focusRing} ${starred ? "text-amber-500" : "text-secondary-400 hover:text-secondary-700"}`}
-                    >
-                      <Star size={15} fill={starred ? "currentColor" : "none"} />
-                    </button>
-                  )}
                   {canManageReports && (
                     <button
                       type="button"
@@ -249,15 +234,10 @@ function TeamRows({
                   )}
                 </div>
               </th>
-              <td className={td} />
+              <td className={`${td} text-xs text-secondary-500`}>{report.formName}</td>
               {columns.map((column) => (
                 <td key={column.id} className={`${td} ${isNumeric(column) ? "text-right" : ""}`}>
-                  <AnswerCell
-                    report={report}
-                    column={column}
-                    onViewDrawing={onViewDrawing}
-                    highlight={report.starredFieldIds.includes(column.id)}
-                  />
+                  <AnswerCell report={report} column={column} onViewDrawing={onViewDrawing} />
                 </td>
               ))}
             </tr>
@@ -307,24 +287,24 @@ function SummaryCell({ summary }: { summary: Summary }) {
       </span>
     );
   }
-  return null;
+  return <span className="text-secondary-400">—</span>;
 }
 
 /** One report's answer to one question; a drawing as a button that opens it. */
 function AnswerCell({
   report,
   column,
-  highlight,
   onViewDrawing,
 }: {
   report: Report;
   column: Column;
-  highlight: boolean;
   onViewDrawing: Props["onViewDrawing"];
 }) {
   if (column.type === "fieldMap") {
     const url = report.drawings[column.id];
-    if (!url) return null;
+    if (report.answers[column.id] === "no-minimal-movement")
+      return <span>No/minimal movement</span>;
+    if (!url) return <span className="text-secondary-400">—</span>;
     return (
       <button
         type="button"
@@ -338,12 +318,9 @@ function AnswerCell({
   const text = answerText(report.answers[column.id]);
   return (
     <span
-      title={highlight ? "Highlighted" : undefined}
-      className={`whitespace-pre-wrap [overflow-wrap:anywhere] ${isNumeric(column) ? "tabular-nums" : ""} ${
-        highlight ? "rounded bg-amber-50 px-1 ring-1 ring-amber-300" : ""
-      }`}
+      className={`whitespace-pre-wrap [overflow-wrap:anywhere] ${isNumeric(column) ? "tabular-nums" : ""}`}
     >
-      {text}
+      {text || "—"}
     </span>
   );
 }

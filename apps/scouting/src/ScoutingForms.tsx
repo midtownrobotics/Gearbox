@@ -56,6 +56,7 @@ import {
 } from "./IssueTypePicker";
 import { MatchCoverage } from "./MatchCoverage";
 import { Operations } from "./Operations";
+import { PitCoverage } from "./PitCoverage";
 import { TeamLookupInput } from "./TeamLookupInput";
 import { api } from "./api";
 import { draftStatusText } from "./draft-status";
@@ -147,13 +148,25 @@ function FieldInput({
   const [counterInterval, setCounterInterval] = useState<(typeof COUNTER_INTERVALS)[number]>(1);
   if (field.type === "fieldMap" && canvasRef)
     return (
-      <FormFieldMap
-        key={canvasKey}
-        canvasRef={canvasRef}
-        onDrawingChange={onDrawingChange}
-        onCommit={onCommit}
-        initialImage={initialImage}
-      />
+      <div className="space-y-3">
+        {value !== "no-minimal-movement" && (
+          <FormFieldMap
+            key={canvasKey}
+            canvasRef={canvasRef}
+            onDrawingChange={onDrawingChange}
+            onCommit={onCommit}
+            initialImage={initialImage}
+          />
+        )}
+        <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border border-line px-3 py-2 text-sm">
+          <input
+            type="checkbox"
+            checked={value === "no-minimal-movement"}
+            onChange={(event) => setValue(event.target.checked ? "no-minimal-movement" : "")}
+          />
+          No/minimal movement
+        </label>
+      </div>
     );
   if (field.type === "counter") {
     const current = Number(value ?? 0);
@@ -324,12 +337,14 @@ function EntryForm({
   refreshContext,
   scheduleUnavailable,
   userId,
+  pitTeam,
 }: {
   form: ScoutingForm;
   context: EventContext | null;
   refreshContext: () => Promise<void>;
   scheduleUnavailable: boolean;
   userId: string;
+  pitTeam?: string;
 }) {
   if (form.kind !== "scouting")
     return (
@@ -337,6 +352,7 @@ function EntryForm({
         form={form}
         userId={userId}
         target={null}
+        initialTeam={pitTeam}
         refreshContext={refreshContext}
         scheduleUnavailable={scheduleUnavailable}
       />
@@ -469,7 +485,7 @@ function MatchEntry({
     sent !== null &&
     live !== null &&
     live.match.key !== sent.matchKey &&
-    !context?.hasSubmittedCurrentMatch;
+    !(context?.submittedFormIds?.includes(form.id) ?? context?.hasSubmittedCurrentMatch);
   useEffect(() => {
     setReadyAt((at) => (nextReady ? (at ?? serverNow()) : null));
   }, [nextReady, serverNow]);
@@ -522,7 +538,9 @@ function MatchEntry({
     }
   }
 
-  const showDone = sent !== null || Boolean(context?.hasSubmittedCurrentMatch);
+  const showDone =
+    sent !== null ||
+    Boolean(context?.submittedFormIds?.includes(form.id) ?? context?.hasSubmittedCurrentMatch);
   const doneLabel = sent?.label ?? liveMatch?.label ?? "Match";
   const upcoming = context?.upcomingMatch ?? null;
   let banner: ReactNode = null;
@@ -584,9 +602,11 @@ function MatchEntry({
               : null
           }
           waiting={
-            upcoming
-              ? `${upcoming.label} opens once ${doneLabel} is scored.`
-              : "No more matches on the schedule for now."
+            context?.submittedFormIds?.includes(form.id) && !context.hasSubmittedCurrentMatch
+              ? "This form is submitted. Choose another active match form above to finish this match."
+              : upcoming
+                ? `${upcoming.label} opens once ${doneLabel} is scored.`
+                : "No more matches on the schedule for now."
           }
           now={now}
           opensAt={opensAt}
@@ -647,6 +667,7 @@ function MatchEntry({
 
 function EntryDraft({
   form,
+  initialTeam,
   userId,
   target,
   banner,
@@ -658,6 +679,7 @@ function EntryDraft({
   onSavingChange,
 }: {
   form: ScoutingForm;
+  initialTeam?: string;
   userId: string;
   /** A match form's match and team; null for a pit form, or a match form with no match yet. */
   target: DraftTarget | null;
@@ -675,13 +697,15 @@ function EntryDraft({
   const [restored] = useState(() => {
     const draft = isMatch
       ? loadDraft(userId, form.id, target?.match.key ?? "")
-      : listDrafts(userId, form.id).find((item) => item.matchKey.startsWith("__pit__:"));
+      : initialTeam
+        ? loadDraft(userId, form.id, `__pit__:${initialTeam}`)
+        : listDrafts(userId, form.id).find((item) => item.matchKey.startsWith("__pit__"));
     return draft && (!isMatch || draft.teamName === target?.team) && hasContent(draft)
       ? draft
       : null;
   });
   const [teamName, setTeamName] = useState(
-    isMatch ? (target?.team ?? "") : (restored?.teamName ?? ""),
+    isMatch ? (target?.team ?? "") : (initialTeam ?? restored?.teamName ?? ""),
   );
   const [answers, setAnswers] = useState<Record<string, unknown>>(restored?.answers ?? {});
   const [initialDrawings, setInitialDrawings] = useState(restored?.drawings ?? {});
@@ -861,7 +885,7 @@ function EntryDraft({
     return adapter;
   }
   return (
-    <form className="scouting-entry" onSubmit={submit} ref={formRef}>
+    <form id={`entry-${form.id}`} className="scouting-entry" onSubmit={submit} ref={formRef}>
       <div className="scouting-form-title">
         <div className="scouting-form-heading-row">
           <h2>{form.name}</h2>
@@ -932,6 +956,17 @@ function EntryDraft({
                   field={field}
                   value={answers[field.id]}
                   setValue={(value) => {
+                    if (field.type === "fieldMap") {
+                      delete drawings.current[field.id];
+                      drawnFields.current.delete(field.id);
+                      restoring.current.delete(field.id);
+                      setInitialDrawings((current) => {
+                        const next = { ...current };
+                        delete next[field.id];
+                        return next;
+                      });
+                      setHasDrawings(Object.keys(drawings.current).length > 0);
+                    }
                     answersRef.current = { ...answersRef.current, [field.id]: value };
                     pendingSave.current = true;
                     setSubmissionState("idle");
@@ -1055,6 +1090,27 @@ function Editor({
           <AlertCircle size={18} /> {saveError}
         </div>
       )}
+      <div className="grid gap-4 rounded-lg border border-line p-4 sm:grid-cols-[minmax(0,1fr)_auto]">
+        <label className="grid gap-1 text-sm font-semibold">
+          Form name
+          <TextField
+            kind="title"
+            value={draft.name}
+            maxLength={120}
+            onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))}
+          />
+        </label>
+        <label className="flex min-h-11 cursor-pointer items-center gap-2 self-end text-sm">
+          <input
+            type="checkbox"
+            checked={draft.isActive}
+            onChange={(event) =>
+              setDraft((current) => ({ ...current, isActive: event.target.checked }))
+            }
+          />
+          Active for scouts
+        </label>
+      </div>
       <div className="designer-field-list">
         {draft.fields.map((field, index) => (
           <div
@@ -1554,6 +1610,7 @@ type EventContext = {
   tbaCurrentMatch: EventMatch | null;
   assignedTeam: string | null;
   hasSubmittedCurrentMatch: boolean;
+  submittedFormIds?: string[];
   onlineScoutCount: number;
   matchSubmissions: {
     id: string;
@@ -2460,16 +2517,25 @@ export function ScoutingForms({
   const [forms, setForms] = useState<ScoutingForm[]>([]);
   const [selected, setSelected] = useState<ScoutingForm | null>(null);
   const [editing, setEditing] = useState(false);
+  const [pitTeam, setPitTeam] = useState<string | undefined>();
+  const [pitSelection, setPitSelection] = useState(0);
+  const [category, setCategory] = useState<"scouting" | "pit">("scouting");
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [context, setContext] = useState<EventContext | null>(null);
   const load = useCallback(async () => {
     const result = await api<{ forms: ScoutingForm[] }>("/scouting-forms");
     setLoadError("");
-    setForms(result.forms);
-    setSelected(
-      (current) => result.forms.find((form) => form.id === current?.id) ?? result.forms[0] ?? null,
+    const visible = result.forms.filter(
+      (form) => isAdmin || (form.isActive && form.fields.length > 0),
     );
-  }, []);
+    setForms(visible);
+    setSelected(
+      (current) =>
+        visible.find((form) => form.id === current?.id) ??
+        visible.find((form) => form.isActive && form.kind === category) ??
+        null,
+    );
+  }, [isAdmin, category]);
   useEffect(() => {
     load()
       .catch((cause) =>
@@ -2554,17 +2620,22 @@ export function ScoutingForms({
       {!loading && !loadError && !forms.length && (
         <p className="text-sm text-secondary-500">No scouting forms are available.</p>
       )}
-      {forms.length > 0 && (
+      {
         <div className="flex flex-wrap gap-2" role="group" aria-label="Scouting form type">
           {(["scouting", "pit"] as const).map((kind) => (
             <Chip
               key={kind}
-              selected={selected?.kind === kind}
+              selected={category === kind}
               className="min-h-11"
-              disabled={!forms.some((form) => form.kind === kind)}
               onClick={() => {
-                if (selected?.kind === kind) return;
-                setSelected(forms.find((form) => form.kind === kind) ?? null);
+                if (category === kind) return;
+                setPitTeam(undefined);
+                setCategory(kind);
+                setSelected(
+                  forms.find((form) => form.kind === kind && form.isActive) ??
+                    (isAdmin ? forms.find((form) => form.kind === kind) : null) ??
+                    null,
+                );
                 setEditing(false);
               }}
             >
@@ -2572,10 +2643,68 @@ export function ScoutingForms({
             </Chip>
           ))}
         </div>
+      }
+      {isAdmin && (
+        <Button
+          variant="secondary"
+          type="button"
+          onClick={() => {
+            setSelected({
+              id: "new",
+              name: "",
+              kind: category,
+              description: "",
+              isActive: true,
+              fields: [
+                {
+                  id: crypto.randomUUID(),
+                  label: "Notes",
+                  type: "longText",
+                  required: false,
+                  options: [],
+                  min: 0,
+                  max: 10,
+                  step: 1,
+                },
+              ],
+            });
+            setPitTeam(undefined);
+            setEditing(true);
+          }}
+        >
+          <Plus size={16} />
+          New {category === "pit" ? "pit" : "match"} form
+        </Button>
+      )}
+      {category === "scouting" &&
+        forms.filter((form) => form.kind === "scouting" && form.isActive && form.fields.length > 0)
+          .length > 1 && (
+          <p className="text-sm text-secondary-500">
+            Complete each active match form for your assigned team. Your answers are saved when you
+            switch forms.
+          </p>
+        )}
+      {category === "pit" && (
+        <PitCoverage
+          refreshKey={context?.serverNow}
+          onStart={
+            selected?.kind === "pit" && selected.isActive && selected.fields.length > 0 && !editing
+              ? (team) => {
+                  setPitTeam(team);
+                  setPitSelection((current) => current + 1);
+                  window.requestAnimationFrame(() =>
+                    document
+                      .getElementById(`entry-${selected.id}`)
+                      ?.scrollIntoView({ behavior: "smooth", block: "start" }),
+                  );
+                }
+              : undefined
+          }
+        />
       )}
       <div className="form-choice-grid">
         {forms
-          .filter((form) => form.kind === selected?.kind)
+          .filter((form) => form.kind === category)
           .map((form) => (
             <div
               className={selected?.id === form.id ? "form-choice active" : "form-choice"}
@@ -2584,17 +2713,28 @@ export function ScoutingForms({
               <button
                 type="button"
                 onClick={() => {
+                  setPitTeam(undefined);
                   setSelected(form);
                   setEditing(false);
                 }}
               >
                 <strong>{form.name}</strong>
+                <span
+                  className={`text-xs ${form.isActive ? "text-secondary-500" : "text-amber-700"}`}
+                >
+                  {!form.isActive
+                    ? "Inactive"
+                    : form.kind === "scouting" && context?.submittedFormIds?.includes(form.id)
+                      ? "Submitted for this match"
+                      : "Active"}
+                </span>
               </button>
               {isAdmin && (
                 <button
                   type="button"
                   className="edit-form-button"
                   onClick={() => {
+                    setPitTeam(undefined);
                     setSelected(form);
                     setEditing(true);
                   }}
@@ -2612,20 +2752,29 @@ export function ScoutingForms({
             form={selected}
             close={() => setEditing(false)}
             save={async (form) => {
-              await api(`/scouting-forms/${form.id}`, {
-                method: "PUT",
-                body: JSON.stringify(form),
-              });
+              const saved = await api<{ id?: string }>(
+                form.id === "new" ? "/scouting-forms" : `/scouting-forms/${form.id}`,
+                {
+                  method: form.id === "new" ? "POST" : "PUT",
+                  body: JSON.stringify(form),
+                },
+              );
               await load();
+              setSelected({ ...form, id: saved.id ?? form.id });
               setEditing(false);
             }}
           />
+        ) : !selected.isActive ? (
+          <p className="text-sm text-secondary-500">
+            This form is inactive. Edit it to make it available to scouts.
+          </p>
         ) : (
           <>
             {contextError && selected.kind === "scouting" && <ErrorBanner message={contextError} />}
             <EntryForm
-              key={selected.id}
+              key={`${selected.id}:${pitTeam ?? ""}:${pitSelection}`}
               form={selected}
+              pitTeam={pitTeam}
               context={context}
               refreshContext={refreshContext}
               scheduleUnavailable={!!contextError}

@@ -66,6 +66,7 @@ export function Operations({ embedded = false }: { embedded?: boolean }) {
     isAdmin: false,
   });
   const [ticketView, setTicketView] = useState<"active" | "closed">("active");
+  const [categoryFilter, setCategoryFilter] = useState("all");
   const [ticket, setTicket] = useState({ teamName: "", description: "" });
   const [issue, setIssue] = useState<IssueChoice>(emptyIssueChoice);
   const [issueMissing, setIssueMissing] = useState(false);
@@ -103,6 +104,13 @@ export function Operations({ embedded = false }: { embedded?: boolean }) {
     setTicketView("active");
     await load("active");
   }
+  const filteredTickets = data.tickets.filter(
+    (item) =>
+      categoryFilter === "all" ||
+      (categoryFilter === "not-sure"
+        ? !item.issueTypes.length
+        : item.issueTypes.some((type) => type === categoryFilter)),
+  );
   return (
     <SharedPage
       as={embedded ? "section" : "main"}
@@ -118,6 +126,20 @@ export function Operations({ embedded = false }: { embedded?: boolean }) {
         <Chip selected={ticketView === "closed"} onClick={() => setTicketView("closed")}>
           Closed tickets
         </Chip>
+        <select
+          className={inputClass}
+          aria-label="Filter issue category"
+          value={categoryFilter}
+          onChange={(event) => setCategoryFilter(event.target.value)}
+        >
+          <option value="all">All issue categories</option>
+          {SERVICE_ISSUE_TYPES.map(({ value, label }) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+          <option value="not-sure">Type not sure</option>
+        </select>
       </div>
       {ticketView === "active" && (
         <Card title="New service ticket">
@@ -158,7 +180,7 @@ export function Operations({ embedded = false }: { embedded?: boolean }) {
         </Card>
       )}
       <div className="grid min-w-0 items-start gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {data.tickets.map((item) => (
+        {filteredTickets.map((item) => (
           <Card key={item.id} className="service-ticket flex min-w-0 flex-col gap-3">
             <header className="flex flex-wrap items-start justify-between gap-2">
               <strong className="text-base text-secondary-900">Team {item.team_name}</strong>
@@ -271,9 +293,13 @@ export function Operations({ embedded = false }: { embedded?: boolean }) {
             )}
           </Card>
         ))}
-        {!data.tickets.length && (
+        {!filteredTickets.length && (
           <Card className="col-span-full text-sm text-secondary-500">
-            {ticketView === "closed" ? "No closed tickets." : "No active tickets."}
+            {categoryFilter !== "all"
+              ? "No tickets in this category."
+              : ticketView === "closed"
+                ? "No closed tickets."
+                : "No active tickets."}
           </Card>
         )}
       </div>

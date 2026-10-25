@@ -375,6 +375,57 @@ async function getTbaTeams(c: Context<AppEnv>, eventKey: string) {
   return teams;
 }
 
+app.get("/pit-coverage", requireAuth, async (c) => {
+  const config = await first<{ event_key: string; schedule_mode: string }>(
+    dbOf(c),
+    sql`SELECT event_key, schedule_mode FROM ${strategyEventConfig} WHERE ${inTeam(strategyEventConfig, c.get("teamId"))} AND id = 1`,
+  );
+  if (!config?.event_key)
+    return c.json({ error: "Choose an event before checking pit scouting coverage." }, 409);
+  try {
+    const roster =
+      config.schedule_mode === "manual"
+        ? (
+            await all<{ team_number: string; team_name: string }>(
+              dbOf(c),
+              sql`SELECT team_number, team_name FROM ${manualTeams} WHERE ${inTeam(manualTeams, c.get("teamId"))} AND event_key = ${config.event_key}`,
+            )
+          ).results.map((team) => ({ number: team.team_number, name: team.team_name }))
+        : (await getTbaTeams(c, config.event_key)).map((team) => ({
+            number: String(team.team_number),
+            name: team.nickname || team.name,
+          }));
+    if (!roster.length)
+      return c.json(
+        { error: "The event roster is empty. Add or load event teams before checking coverage." },
+        409,
+      );
+    const completed = await all<{ team_name: string }>(
+      dbOf(c),
+      sql`SELECT DISTINCT s.team_name
+      FROM (SELECT * FROM ${scoutingFormSubmissions} WHERE ${inTeam(scoutingFormSubmissions, c.get("teamId"))}) s
+      JOIN (SELECT * FROM ${scoutingForms} WHERE ${inTeam(scoutingForms, c.get("teamId"))}) f ON f.id = s.form_id
+      WHERE f.form_kind = 'pit' AND s.event_key = ${config.event_key} AND s.archived_at IS NULL`,
+    );
+    const done = new Set(completed.results.map((row) => row.team_name));
+    const teams = [...new Map(roster.map((team) => [team.number, team])).values()].sort(
+      (a, b) => Number(a.number) - Number(b.number),
+    );
+    const remaining = teams.filter((team) => !done.has(team.number));
+    return c.json({
+      eventKey: config.event_key,
+      total: teams.length,
+      completed: teams.length - remaining.length,
+      remaining,
+    });
+  } catch (cause) {
+    return c.json(
+      { error: cause instanceof Error ? cause.message : "Could not load the event roster." },
+      503,
+    );
+  }
+});
+
 app.get("/teams/search", requireAuth, async (c) => {
   const query = text(c.req.query("q"), 80).toLowerCase();
   if (!query) return c.json({ teams: [], message: null });
@@ -432,6 +483,9 @@ async function submittedScoutMatches(c: Context<AppEnv>, eventKey: string) {
     JOIN (SELECT * FROM ${scoutingForms} WHERE ${inTeam(scoutingForms, c.get("teamId"))}) AS f ON f.id = s.form_id
     WHERE f.form_kind = 'scouting' AND s.submitted_by = ${c.get("userId")}
       AND s.event_key = ${eventKey} AND s.match_number IS NOT NULL
+      AND f.is_active = 1 AND f.fields_json <> '[]'
+    GROUP BY s.match_number
+    HAVING COUNT(DISTINCT s.form_id) = (SELECT COUNT(*) FROM ${scoutingForms} WHERE ${inTeam(scoutingForms, c.get("teamId"))} AND form_kind = 'scouting' AND is_active = 1 AND fields_json <> '[]')
   `,
   );
   return new Set(rows.results.map((row) => Number(row.match_number)));
@@ -742,7 +796,7 @@ app.get("/event-context", requireAuth, async (c) => {
     ? await all<Record<string, unknown>>(
         dbOf(c),
         sql`SELECT s.id, s.submitted_by, s.submitted_by_name, s.team_name, s.created_at,
-                  s.match_number, s.match_key, s.submitted_late
+                  s.match_number, s.match_key, s.submitted_late, s.form_id
            FROM (SELECT * FROM ${scoutingFormSubmissions} WHERE ${inTeam(scoutingFormSubmissions, c.get("teamId"))}) AS s
            JOIN (SELECT * FROM ${scoutingForms} WHERE ${inTeam(scoutingForms, c.get("teamId"))}) AS f ON f.id = s.form_id
            WHERE f.form_kind = 'scouting' AND s.event_key = ${eventKey}
@@ -798,6 +852,9 @@ app.get("/event-context", requireAuth, async (c) => {
     tbaCurrentMatch: tbaCurrent ? publicMatch(tbaCurrent) : null,
     assignedTeam,
     hasSubmittedCurrentMatch: completedMatches.has(currentMatchNumber ?? 0),
+    submittedFormIds: currentMatchSubmissions
+      .filter((row) => row.submitted_by === c.get("userId"))
+      .map((row) => String(row.form_id)),
     onlineScoutCount: activeScoutIds.length,
     matchSubmissions: admin ? (eventMatchSubmissions?.results ?? []) : [],
     nextTeamMatch: nextTeamMatch ? publicMatch(nextTeamMatch) : null,
@@ -1127,6 +1184,8 @@ app.post("/scouting-forms", requireAuth, async (c) => {
   const fields = parseScoutingFields(body.fields);
   if (!name || !fields?.length)
     return c.json({ error: "A name and at least one valid field are required." }, 400);
+  if (body.kind !== undefined && body.kind !== "scouting" && body.kind !== "pit")
+    return c.json({ error: "Choose Match scouting or Pit scouting." }, 400);
   const formId = id("form");
   const now = Date.now();
   await dbOf(c)
@@ -1137,7 +1196,8 @@ app.post("/scouting-forms", requireAuth, async (c) => {
         name: name,
         description: text(body.description, 1000),
         fields_json: JSON.stringify(fields),
-        is_active: 1,
+        is_active: body.isActive === false ? 0 : 1,
+        form_kind: body.kind === "pit" ? "pit" : "scouting",
         created_by: c.get("userId"),
         created_at: now,
         updated_at: now,
@@ -1160,7 +1220,7 @@ app.put("/scouting-forms/:id", requireAuth, async (c) => {
       name: name,
       description: text(body.description, 1000),
       fields_json: JSON.stringify(fields),
-      is_active: 1,
+      ...(typeof body.isActive === "boolean" ? { is_active: body.isActive ? 1 : 0 } : {}),
       updated_at: Date.now(),
     })
     .where(inTeam(scoutingForms, c.get("teamId"), sql`id = ${c.req.param("id")}`))
@@ -1218,12 +1278,11 @@ app.post("/scouting-forms/:id/submissions", requireAuth, async (c) => {
       sql`SELECT s.id
        FROM (SELECT * FROM ${scoutingFormSubmissions} WHERE ${inTeam(scoutingFormSubmissions, c.get("teamId"))}) AS s
        JOIN (SELECT * FROM ${scoutingForms} WHERE ${inTeam(scoutingForms, c.get("teamId"))}) AS f ON f.id = s.form_id
-       WHERE f.form_kind = 'scouting' AND s.submitted_by = ${c.get("userId")}
+       WHERE f.form_kind = 'scouting' AND s.form_id = ${c.req.param("id")} AND s.submitted_by = ${c.get("userId")}
          AND s.event_key = ${reportEvent.eventKey} AND s.match_number = ${reportEvent.matchNumber}
        LIMIT 1`,
     );
-    if (existing)
-      return c.json({ error: "You already submitted a scouting form for this match." }, 409);
+    if (existing) return c.json({ error: "You already submitted this form for this match." }, 409);
     const assignment = await first<{ team_number: string }>(
       dbOf(c),
       sql`SELECT team_number FROM (SELECT * FROM ${scoutingMatchAssignments} WHERE ${inTeam(scoutingMatchAssignments, c.get("teamId"))}) AS scoped_scouting_match_assignments WHERE event_key = ${reportEvent.eventKey} AND match_number = ${reportEvent.matchNumber} AND user_id = ${c.get("userId")}`,
@@ -1241,6 +1300,17 @@ app.post("/scouting-forms/:id/submissions", requireAuth, async (c) => {
   const cleanAnswers: Record<string, string | number | boolean | string[]> = {};
   for (const field of fields) {
     const value = answers[field.id];
+    if (field.type === "fieldMap") {
+      if (value === "no-minimal-movement") {
+        const upload = form.get(`drawing:${field.id}`);
+        if (upload instanceof File && upload.size > 0)
+          return c.json({ error: `${field.label}: choose a drawing or no/minimal movement.` }, 400);
+        cleanAnswers[field.id] = value;
+      } else if (value !== undefined && value !== "") {
+        return c.json({ error: `${field.label}: invalid movement choice.` }, 400);
+      }
+      continue;
+    }
     if (field.type === "counter") {
       const count = scoutingCount(value);
       if (count === null)
@@ -1254,16 +1324,11 @@ app.post("/scouting-forms/:id/submissions", requireAuth, async (c) => {
       cleanAnswers[field.id] = rating;
       continue;
     }
-    if (
-      formDefinition.form_kind === "scouting" &&
-      field.type !== "fieldMap" &&
-      !answeredScoutingEntry(field, value)
-    ) {
+    if (formDefinition.form_kind === "scouting" && !answeredScoutingEntry(field, value)) {
       return c.json({ error: needsAnswer(field.label) }, 400);
     }
     if (
       field.required &&
-      field.type !== "fieldMap" &&
       (value === undefined || value === null || value === "" || value === false)
     ) {
       return c.json({ error: `${field.label} is required.` }, 400);
@@ -1273,7 +1338,7 @@ app.post("/scouting-forms/:id/submissions", requireAuth, async (c) => {
     if (field.type === "multiSelect") cleanAnswers[field.id] = stringArray(value, 30);
     else if (field.type === "slider" && value !== "" && value !== undefined)
       cleanAnswers[field.id] = Number(value);
-    else if (field.type !== "fieldMap") cleanAnswers[field.id] = text(value, 3000);
+    else cleanAnswers[field.id] = text(value, 3000);
   }
   const submissionId = id("submission");
   const drawing = form.get("drawing");
@@ -1290,6 +1355,7 @@ app.post("/scouting-forms/:id/submissions", requireAuth, async (c) => {
     });
   }
   for (const field of fields.filter((candidate) => candidate.type === "fieldMap")) {
+    if (cleanAnswers[field.id] === "no-minimal-movement") continue;
     const fieldDrawing = form.get(`drawing:${field.id}`);
     if (!(fieldDrawing instanceof File) || fieldDrawing.size === 0) {
       if (field.required || formDefinition.form_kind === "scouting")
@@ -1428,8 +1494,12 @@ app.post("/scouting-forms/:id/submissions", requireAuth, async (c) => {
       ...Object.values(drawingFields).map((item) => item.key),
     ].filter((key): key is string => Boolean(key));
     if (uploadedKeys.length) await c.env.FIELD_MAPS.delete(uploadedKeys);
-    if (String(error).includes("one scouting submission per match"))
-      return c.json({ error: "You already submitted a scouting form for this match." }, 409);
+    if (
+      `${String(error)} ${error instanceof Error ? String(error.cause) : ""}`.includes(
+        "one scouting submission per match",
+      )
+    )
+      return c.json({ error: "You already submitted this form for this match." }, 409);
     throw error;
   }
   return c.json({ id: submissionId, boyleBucksAwarded, late: reportEvent.late }, 201);
@@ -1667,6 +1737,7 @@ app.get("/analysis", requireAuth, async (c) => {
   const team = teamNumber(c.req.query("team"));
   const teamB = teamNumber(c.req.query("teamB"));
   const includeArchived = c.req.query("archived") === "true";
+  const requestedMatchKey = text(c.req.query("matchKey"), 200);
   const reportFilter = team
     ? teamB
       ? sql`s.team_name IN (${team}, ${teamB})`
@@ -1684,8 +1755,8 @@ app.get("/analysis", requireAuth, async (c) => {
       COALESCE(s.fields_json, f.fields_json) AS fields_json
       FROM (SELECT * FROM ${scoutingFormSubmissions} WHERE ${inTeam(scoutingFormSubmissions, c.get("teamId"))}) s
       JOIN (SELECT * FROM ${scoutingForms} WHERE ${inTeam(scoutingForms, c.get("teamId"))}) f ON f.id = s.form_id
-      WHERE ${reportFilter} ${includeArchived ? sql`` : sql`AND s.archived_at IS NULL`}
-      ORDER BY CASE WHEN s.starred_fields_json = '[]' THEN 1 ELSE 0 END, s.created_at DESC`,
+      WHERE ${reportFilter} ${requestedMatchKey ? sql`AND s.match_key = ${requestedMatchKey} AND f.form_kind = 'scouting'` : sql``} ${includeArchived ? sql`` : sql`AND s.archived_at IS NULL`}
+      ORDER BY s.created_at DESC`,
     ),
     all<Record<string, unknown>>(
       dbOf(c),
@@ -1699,19 +1770,35 @@ app.get("/analysis", requireAuth, async (c) => {
     ),
   ]);
   let teamMatches: Record<string, unknown>[] = [];
+  let teamMatchesError = "";
   const eventNames = await analysisEventNames(c, [
     ...rows.results.map((row) => String(row.event_key || "")),
     ...teamComments.results.map((row) => String(row.event_key || "")),
   ]);
-  if (team && eventConfig?.event_key) {
+  const requestedEvent = text(c.req.query("event"), 100);
+  const matchEvent =
+    requestedEvent && requestedEvent !== "all" && requestedEvent !== "Unassigned"
+      ? requestedEvent
+      : eventConfig?.event_key;
+  if (matchEvent && !requestedMatchKey) {
     try {
-      const matches = (await getEventMatches(c, eventConfig.event_key)).sort(
-        (a, b) => matchOrder(a) - matchOrder(b),
-      );
-      const teamKey = `frc${team}`;
+      const matches = (
+        await getEventMatches(
+          c,
+          matchEvent,
+          matchEvent === eventConfig?.event_key
+            ? undefined
+            : matchEvent.startsWith("manual-")
+              ? "manual"
+              : "tba",
+        )
+      ).sort((a, b) => matchOrder(a) - matchOrder(b));
+      const teamKey = team ? `frc${team}` : "";
       teamMatches = matches
-        .filter((match) =>
-          [...match.alliances.red.team_keys, ...match.alliances.blue.team_keys].includes(teamKey),
+        .filter(
+          (match) =>
+            !teamKey ||
+            [...match.alliances.red.team_keys, ...match.alliances.blue.team_keys].includes(teamKey),
         )
         .map((match) => {
           const alliance = match.alliances.red.team_keys.includes(teamKey) ? "red" : "blue";
@@ -1730,8 +1817,10 @@ app.get("/analysis", requireAuth, async (c) => {
             played: match.alliances.red.score >= 0 && match.alliances.blue.score >= 0,
           };
         });
-    } catch {
+    } catch (cause) {
       // Scouting data remains available when TBA is unavailable.
+      teamMatchesError =
+        cause instanceof Error ? cause.message : "Could not load the match schedule.";
     }
   }
   return c.json({
@@ -1759,6 +1848,7 @@ app.get("/analysis", requireAuth, async (c) => {
     })),
     teamComments: teamComments.results,
     teamMatches,
+    teamMatchesError,
     eventNames,
     currentEventKey: eventConfig?.event_key || null,
   });
