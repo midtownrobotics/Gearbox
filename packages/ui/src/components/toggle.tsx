@@ -1,4 +1,4 @@
-import { useId } from "react";
+import { type ReactNode, useId } from "react";
 import { focusRing } from "./focus";
 
 /**
@@ -48,7 +48,7 @@ export function Toggle({
   onChange,
 }: {
   label: string;
-  description: string;
+  description: ReactNode;
   checked: boolean;
   disabled?: boolean;
   onChange: (checked: boolean) => void;

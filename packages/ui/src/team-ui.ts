@@ -7,6 +7,7 @@ import {
   defaultTeamUiSettings,
   pageTeamId,
   pageTeamNumber,
+  teamAvatarUrl,
   teamUiDefaults,
 } from "@g3/site-config";
 import { useEffect, useState, useSyncExternalStore } from "react";
@@ -243,6 +244,61 @@ export function useTeamIcon(src: string | undefined): string | undefined {
     };
   }, [wanted, src, key, color]);
   return wanted && recolored?.key === key ? recolored.src : src;
+}
+
+// Whether each team's avatar loads, asked once per page.
+const avatarChecks = new Map<string, Promise<boolean>>();
+
+/**
+ * Whether a team has an avatar this season on The Blue Alliance (`teamAvatarUrl`): false when it
+ * has none, or when it can't be reached.
+ */
+export function teamHasAvatar(teamNumber: number): Promise<boolean> {
+  const src = teamAvatarUrl(teamNumber);
+  let check = avatarChecks.get(src);
+  if (!check) {
+    check = new Promise((resolve) => {
+      const image = new Image();
+      image.onload = () => resolve(image.naturalWidth > 0);
+      image.onerror = () => resolve(false);
+      image.src = src;
+    });
+    avatarChecks.set(src, check);
+  }
+  return check;
+}
+
+/**
+ * A team's avatar's address once it has loaded, for a logo: undefined for no team (undefined), a
+ * team without one, and until it has loaded, so a page shows its app icon instead.
+ */
+export function useTeamAvatar(teamNumber: number | undefined): string | undefined {
+  const src = teamNumber ? teamAvatarUrl(teamNumber) : undefined;
+  const [loaded, setLoaded] = useState<string | null>(null);
+  useEffect(() => {
+    if (!teamNumber || !src) return;
+    let canceled = false;
+    void teamHasAvatar(teamNumber).then((ok) => {
+      if (!canceled) setLoaded(ok ? src : null);
+    });
+    return () => {
+      canceled = true;
+    };
+  }, [teamNumber, src]);
+  return src && loaded === src ? src : undefined;
+}
+
+/**
+ * The page's team's avatar, while its Team Appearance says to show it. `team` false: for a page
+ * with no team. Beside `useTeamUiSettings`, which keeps the settings up to date.
+ */
+export function usePageTeamAvatar(team = true): string | undefined {
+  const show = useSyncExternalStore(
+    subscribe,
+    () => current.useAvatar,
+    () => initial.useAvatar,
+  );
+  return useTeamAvatar(team && show ? pageTeamNumber : undefined);
 }
 
 /**
