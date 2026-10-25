@@ -10,7 +10,12 @@ import {
   stageableRows,
 } from "../../shared/batches";
 import { type InstanceRow, isObsoleteRevision } from "../../shared/derive";
-import { deletePartFile, fetchPartFiles, uploadPartFile } from "../../shared/getters";
+import {
+  deletePartFile,
+  deletePartFiles,
+  fetchPartFiles,
+  uploadPartFile,
+} from "../../shared/getters";
 import type { Batch, PartDefinition, PartFile, PartInstance } from "../../shared/types";
 import { useKiosk } from "../../shared/use-auth";
 import { type ShopData, refreshShopData } from "../../shared/use-shop-data";
@@ -54,6 +59,7 @@ export function PartFilesSection({ data, rows }: { data: ShopData | null; rows: 
   const resolveName = useUserNames(files.map((f) => f.uploadedBy));
   const processName = processNamer(data);
   const batches = data?.batches ?? [];
+  const selection = useSelection(files.map((f) => f.id));
 
   const load = useCallback(async () => {
     try {
@@ -156,6 +162,28 @@ export function PartFilesSection({ data, rows }: { data: ShopData | null; rows: 
 
   const totalSize = files.reduce((sum, f) => sum + f.fileSize, 0);
   const searching = search.trim() !== "";
+  // Kiosks can't delete files, so they get no boxes.
+  const canDelete = !kiosk.active;
+
+  /** Deletes these files, asking first with the question from `deleteQuestion`. */
+  const deleteFiles = (ids: number[]) =>
+    run(async () => {
+      await deletePartFiles(ids);
+      selection.set(ids, false);
+      return undefined;
+    });
+  /** The question before deleting several files: which batches still in production use them. */
+  const deleteQuestion = (ids: number[]) => {
+    const live = ids.flatMap((id) => (batchesOf.get(id) ?? []).filter((b) => !batchComplete(b)));
+    const used = ids.some((id) => (batchesOf.get(id) ?? []).length > 0);
+    return `${
+      live.length > 0
+        ? `${live.map((b) => b.label).join(", ")} ${live.length === 1 ? "is" : "are"} still in production with them. `
+        : ""
+    }Delete ${ids.length} file${ids.length === 1 ? "" : "s"}? ${
+      used ? "Their batches will have no file. " : ""
+    }This can't be undone.`;
+  };
 
   return (
     <section className="space-y-3">
@@ -193,6 +221,15 @@ export function PartFilesSection({ data, rows }: { data: ShopData | null; rows: 
         placeholder="Search by file, batch, part number or part name…"
       />
 
+      <SelectionBar
+        count={selection.selected.length}
+        noun={["file", "files"]}
+        question={deleteQuestion(selection.selected)}
+        busy={busy}
+        onDelete={() => deleteFiles(selection.selected)}
+        onClear={selection.clear}
+      />
+
       {files.length === 0 ? (
         <p className="text-secondary-500 text-sm">
           No files yet. Upload one here, or on a batch at a File Producer process on the Shop Floor.
@@ -204,87 +241,116 @@ export function PartFilesSection({ data, rows }: { data: ShopData | null; rows: 
           const list = visible.filter((f) => fileState(f, batches) === state);
           // A search shows only the subsections that have a match.
           if (searching && list.length === 0) return null;
+          const ids = list.map((f) => f.id);
           return (
-            <Subsection key={state} title={title} count={list.length} empty={empty}>
+            <Subsection
+              key={state}
+              title={title}
+              count={list.length}
+              empty={empty}
+              select={canDelete ? selection.group(ids) : undefined}
+              deleteAll={
+                canDelete && (state === "complete" || state === "obsolete")
+                  ? {
+                      question: deleteQuestion(ids),
+                      busy,
+                      onConfirm: () => deleteFiles(ids),
+                    }
+                  : undefined
+              }
+            >
               {list.map((file) => {
                 const used = batchesOf.get(file.id) ?? [];
                 const live = used.filter((b) => !batchComplete(b));
                 return (
-                  <li key={file.id} className="px-4 py-3 space-y-2">
-                    <FileHeading
-                      name={<FileLink file={file} />}
-                      title={file.filename}
-                      details={<FileMeta file={file} uploader={resolveName(file.uploadedBy)} />}
-                    >
-                      <DownloadLink file={file} />
-                      {!kiosk.active && !file.obsolete && startingFor !== file.id && (
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          disabled={busy}
-                          onClick={() => setStartingFor(file.id)}
-                        >
-                          Start a batch
-                        </Button>
+                  <li key={file.id} className="flex gap-3 px-4 py-3">
+                    {canDelete && (
+                      <span className="pt-0.5">
+                        <SelectBox
+                          label={`Choose ${file.filename}`}
+                          checked={selection.isChosen(file.id)}
+                          onChange={(on) => selection.set([file.id], on)}
+                        />
+                      </span>
+                    )}
+                    <div className="min-w-0 flex-1 space-y-2">
+                      <FileHeading
+                        name={<FileLink file={file} />}
+                        title={file.filename}
+                        details={<FileMeta file={file} uploader={resolveName(file.uploadedBy)} />}
+                      >
+                        <DownloadLink file={file} />
+                        {!kiosk.active && !file.obsolete && startingFor !== file.id && (
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            disabled={busy}
+                            onClick={() => setStartingFor(file.id)}
+                          >
+                            Start a batch
+                          </Button>
+                        )}
+                        {!kiosk.active && (
+                          <ConfirmButton
+                            size="sm"
+                            label="Delete"
+                            question={`${
+                              live.length > 0
+                                ? `${live.map((b) => b.label).join(", ")} ${live.length === 1 ? "is" : "are"} still in production with it. `
+                                : ""
+                            }Delete ${file.filename}? ${
+                              used.length > 0 ? "Its batches will have no file. " : ""
+                            }This can't be undone.`}
+                            disabled={busy}
+                            onConfirm={() =>
+                              run(() => deletePartFile(file.id).then(() => undefined))
+                            }
+                          />
+                        )}
+                      </FileHeading>
+
+                      {used.length === 0 ? (
+                        <p className="text-xs text-secondary-400">
+                          {state === "obsolete"
+                            ? "Made for a part that's now obsolete."
+                            : "Not on a batch with instances in it."}
+                        </p>
+                      ) : (
+                        used.map((batch) => (
+                          <FileBatch
+                            key={batch.id}
+                            batch={batch}
+                            definitionById={definitionById}
+                            instances={data?.instances ?? []}
+                            processName={processName}
+                          />
+                        ))
                       )}
-                      {!kiosk.active && (
-                        <ConfirmButton
-                          size="sm"
-                          label="Delete"
-                          question={`${
-                            live.length > 0
-                              ? `${live.map((b) => b.label).join(", ")} ${live.length === 1 ? "is" : "are"} still in production with it. `
-                              : ""
-                          }Delete ${file.filename}? ${
-                            used.length > 0 ? "Its batches will have no file. " : ""
-                          }This can't be undone.`}
-                          disabled={busy}
-                          onConfirm={() => run(() => deletePartFile(file.id).then(() => undefined))}
+
+                      {startingFor === file.id && data && (
+                        <StartBatch
+                          busy={busy}
+                          definitions={data.definitions}
+                          instances={data.instances}
+                          waiting={waiting}
+                          onError={setError}
+                          onCancel={() => setStartingFor(null)}
+                          onStart={(definition, count) => {
+                            setStartingFor(null);
+                            run(async () => {
+                              const { notice } = await linkFileToPart(
+                                rows,
+                                data,
+                                definition,
+                                count,
+                                file.id,
+                              );
+                              return notice ? [notice] : [];
+                            });
+                          }}
                         />
                       )}
-                    </FileHeading>
-
-                    {used.length === 0 ? (
-                      <p className="text-xs text-secondary-400">
-                        {state === "obsolete"
-                          ? "Made for a part that's now obsolete."
-                          : "Not on a batch with instances in it."}
-                      </p>
-                    ) : (
-                      used.map((batch) => (
-                        <FileBatch
-                          key={batch.id}
-                          batch={batch}
-                          definitionById={definitionById}
-                          instances={data?.instances ?? []}
-                          processName={processName}
-                        />
-                      ))
-                    )}
-
-                    {startingFor === file.id && data && (
-                      <StartBatch
-                        busy={busy}
-                        definitions={data.definitions}
-                        instances={data.instances}
-                        waiting={waiting}
-                        onError={setError}
-                        onCancel={() => setStartingFor(null)}
-                        onStart={(definition, count) => {
-                          setStartingFor(null);
-                          run(async () => {
-                            const { notice } = await linkFileToPart(
-                              rows,
-                              data,
-                              definition,
-                              count,
-                              file.id,
-                            );
-                            return notice ? [notice] : [];
-                          });
-                        }}
-                      />
-                    )}
+                    </div>
                   </li>
                 );
               })}
@@ -301,18 +367,44 @@ export function Subsection({
   title,
   count,
   empty,
+  select,
+  deleteAll,
   children,
 }: {
   title: string;
   count: number;
   empty: string;
+  /** A box choosing every row in the group, for Delete selected. */
+  select?: { checked: boolean; some: boolean; onChange: (on: boolean) => void };
+  /** Delete every row in the group, after asking `question`. */
+  deleteAll?: { question: string; busy: boolean; onConfirm: () => void };
   children: React.ReactNode;
 }) {
   return (
     <div className="space-y-1.5">
-      <h3 className="font-sans text-xs font-bold uppercase tracking-widest text-secondary-400">
-        {title} <span className="text-primary-600">{count}</span>
-      </h3>
+      <div className="flex min-h-8 items-center gap-3">
+        {select && count > 0 && (
+          <SelectBox
+            label={`Choose every ${title.toLowerCase()} row`}
+            checked={select.checked}
+            indeterminate={select.some && !select.checked}
+            onChange={select.onChange}
+          />
+        )}
+        <h3 className="flex-1 font-sans text-xs font-bold uppercase tracking-widest text-secondary-400">
+          {title} <span className="text-primary-600">{count}</span>
+        </h3>
+        {deleteAll && count > 0 && (
+          <ConfirmButton
+            size="sm"
+            label={deleteAll.busy ? "Deleting…" : "Delete all"}
+            confirmLabel="Delete all"
+            question={deleteAll.question}
+            disabled={deleteAll.busy}
+            onConfirm={deleteAll.onConfirm}
+          />
+        )}
+      </div>
       {count === 0 ? (
         <p className="text-secondary-400 text-sm">{empty}</p>
       ) : (
@@ -322,6 +414,96 @@ export function Subsection({
       )}
     </div>
   );
+}
+
+/** A row's box for Delete selected (or a group's, choosing all of its rows). */
+export function SelectBox({
+  label,
+  checked,
+  indeterminate = false,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  indeterminate?: boolean;
+  onChange: (on: boolean) => void;
+}) {
+  return (
+    <input
+      type="checkbox"
+      aria-label={label}
+      checked={checked}
+      ref={(el) => {
+        if (el) el.indeterminate = indeterminate;
+      }}
+      onChange={(e) => onChange(e.target.checked)}
+      className="accent-primary-500 w-4 h-4 shrink-0 cursor-pointer"
+    />
+  );
+}
+
+/** Shown while rows are chosen: how many, Delete selected (which asks first) and Clear. */
+export function SelectionBar({
+  count,
+  noun,
+  question,
+  busy,
+  onDelete,
+  onClear,
+}: {
+  count: number;
+  noun: [string, string];
+  question: string;
+  busy: boolean;
+  onDelete: () => void;
+  onClear: () => void;
+}) {
+  if (count === 0) return null;
+  return (
+    <div className="sticky top-16 z-10 flex flex-wrap items-center gap-3 rounded-lg border border-secondary-200 bg-inset px-4 py-2.5">
+      <span className="text-sm font-medium text-secondary-900">
+        {count} {count === 1 ? noun[0] : noun[1]} chosen
+      </span>
+      <ConfirmButton
+        size="sm"
+        label={busy ? "Deleting…" : "Delete selected"}
+        confirmLabel="Delete"
+        question={question}
+        disabled={busy}
+        onConfirm={onDelete}
+      />
+      <Button variant="secondary" size="sm" disabled={busy} onClick={onClear}>
+        Clear
+      </Button>
+    </div>
+  );
+}
+
+/**
+ * Which rows are chosen, by key. Keys no longer among `present` (deleted, or gone in a reload)
+ * drop out on their own.
+ */
+export function useSelection<K>(present: K[]) {
+  const [chosen, setChosen] = useState<Set<K>>(new Set());
+  const here = new Set(present);
+  const selected = [...chosen].filter((k) => here.has(k));
+  const isChosen = (k: K) => chosen.has(k) && here.has(k);
+  const set = (keys: K[], on: boolean) =>
+    setChosen((prev) => {
+      const next = new Set(prev);
+      for (const k of keys) {
+        if (on) next.add(k);
+        else next.delete(k);
+      }
+      return next;
+    });
+  /** The group box for these rows. */
+  const group = (keys: K[]) => ({
+    checked: keys.length > 0 && keys.every(isChosen),
+    some: keys.some(isChosen),
+    onChange: (on: boolean) => set(keys, on),
+  });
+  return { selected, isChosen, set, group, clear: () => setChosen(new Set()) };
 }
 
 /** One batch that has the file: its name and status, and the parts in it. */

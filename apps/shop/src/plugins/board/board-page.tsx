@@ -16,7 +16,7 @@ import {
 import { fetchKioskPresence } from "../../shared/getters";
 import { processPath } from "../../shared/nav";
 import type { Batch, KioskPresence, ProcessType } from "../../shared/types";
-import { useAuthUser, useCanQualityCheck, useKiosk } from "../../shared/use-auth";
+import { type StatusLevel, useAuthUser, useCanQualityCheck, useKiosk } from "../../shared/use-auth";
 import { type ShopData, useShopData } from "../../shared/use-shop-data";
 import { useTouchDevice } from "../../shared/use-touch";
 import { useUserNames } from "../../shared/use-user-names";
@@ -338,13 +338,10 @@ export function BoardPage() {
 
 // ── Overview ──────────────────────────────────────────────────────────────────
 
-function getCookedness(totalQueue: number): string {
-  if (totalQueue < 5) return "Mooing Cow 🐮";
-  if (totalQueue < 10) return "Chopping Block 🔪";
-  if (totalQueue < 20) return "Raw 🥩";
-  if (totalQueue < 25) return "Rare 🍖";
-  if (totalQueue < 35) return "Cooked 🍳";
-  return "Ash 🔥";
+/** The team's word for a queue this long (its statuses, set on the Admin page). */
+function getCookedness(totalQueue: number, levels: StatusLevel[]): string {
+  const level = levels.find((l) => l.below === null || totalQueue < l.below);
+  return level?.label ?? levels[levels.length - 1]?.label ?? "";
 }
 
 function OverviewView({
@@ -368,7 +365,7 @@ function OverviewView({
   const inProgress = rows.filter((r) => r.state === "doing");
   const notStarted = sortPriorityFirst(rows.filter((r) => r.state === "todo"));
   const totalQueue = rows.length;
-  const cookedness = getCookedness(totalQueue);
+  const cookedness = getCookedness(totalQueue, useAuthUser()?.statusLevels ?? []);
 
   const resolveName = useUserNames(presence.map((p) => p.userId));
   // Kiosks are matched to machines by name, same rule as the kiosk auto-open.

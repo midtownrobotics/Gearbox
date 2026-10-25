@@ -187,6 +187,8 @@ export const SAFE_TEXT = {
   template: ["{vendor} {sku} – {title}", "{title} ({vendor})", "{vendor} – {title}"],
   keyword: ["bolt", "bearing", "motor", "wire", "drill"],
   process: ["CAM", "Router", "Lathe", "Mill", "Welding", "Deburr", "Assembly"],
+  /** Shop's status words for how full its queue is. */
+  shopStatus: ["Mooing Cow 🐮", "Chopping Block 🔪", "Raw 🥩", "Rare 🍖", "Cooked 🍳", "Ash 🔥"],
   icon: ["🔧", "⚙️", "🤖", "🛠️", "🔩", "💡"],
   /** A skill tree's name. */
   tree: ["Safety", "Manufacturing", "Programming", "Electrical", "Design"],

@@ -1,5 +1,5 @@
 import { inTeam, requireAuth, withTeam } from "@g3/auth";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { Hono } from "hono";
 import { createShopDb } from "../db";
 import * as schema from "../db/schema";
@@ -16,6 +16,23 @@ async function listAll(bucket: R2Bucket, prefix: string) {
     cursor = page.truncated ? page.cursor : undefined;
   } while (cursor);
   return objects;
+}
+
+/** The most drawings one request deletes. */
+const MAX_DELETE = 500;
+
+/** `{ drawings: [{ partNumber, revision }] }`, or null when it isn't 1 to MAX_DELETE of them. */
+function drawingsToDelete(body: unknown): { partNumber: string; revision: string }[] | null {
+  const list = (body as { drawings?: unknown } | null)?.drawings;
+  if (!Array.isArray(list) || list.length === 0 || list.length > MAX_DELETE) return null;
+  const out: { partNumber: string; revision: string }[] = [];
+  for (const item of list) {
+    const { partNumber, revision } = (item ?? {}) as { partNumber?: unknown; revision?: unknown };
+    if (typeof partNumber !== "string" || typeof revision !== "string") return null;
+    if (!partNumber || !revision || partNumber.includes("/") || revision.includes("/")) return null;
+    out.push({ partNumber, revision });
+  }
+  return out;
 }
 
 /** The team's drawings, signed in only. */
@@ -40,6 +57,28 @@ export const drawingsRouter = new Hono<AppEnv>()
       .delete(schema.drawings)
       .where(inTeam(schema.drawings, teamId, eq(schema.drawings.r2Key, r2Key)));
     return c.json({ ok: true });
+  })
+  // Deletes several drawings at once (`{ drawings: [{ partNumber, revision }] }`); ones the team
+  // doesn't have are skipped.
+  .post("/delete", async (c) => {
+    if (c.get("sessionType") === "pin") {
+      return c.json({ error: "Kiosks can't delete drawings." }, 403);
+    }
+    const list = drawingsToDelete(await c.req.json().catch(() => null));
+    if (!list) return c.json({ error: `Choose 1 to ${MAX_DELETE} drawings to delete.` }, 400);
+    const teamId = c.get("teamId");
+    const keys = [...new Set(list.map((d) => drawingKey(teamId, d.partNumber, d.revision)))];
+    const found = (await Promise.all(keys.map((key) => c.env.DRAWINGS.head(key)))).filter(
+      (object): object is R2Object => object !== null,
+    );
+    if (found.length === 0) return c.json({ deleted: 0 });
+    const foundKeys = found.map((object) => object.key);
+    await c.env.DRAWINGS.delete(foundKeys);
+    const db = createShopDb(c.env.SHOP_DB);
+    await db
+      .delete(schema.drawings)
+      .where(inTeam(schema.drawings, teamId, inArray(schema.drawings.r2Key, foundKeys)));
+    return c.json({ deleted: found.length });
   })
   .get("/", async (c) => {
     try {

@@ -9,6 +9,7 @@ import { createShopDb } from "./db";
 import { type BOMQueueMessage, processBOMQueue } from "./lib/bom-queue-consumer";
 import { isShopManager, qualityCheck, qualityReportsOn } from "./lib/quality";
 import { checklistFor } from "./lib/quality-checklist";
+import { statusLevelsFor } from "./lib/shop-status";
 import { actionsRouter } from "./routes/actions";
 import { adminPartsRouter } from "./routes/admin-parts";
 import { drawingsRouter } from "./routes/drawings";
@@ -26,6 +27,7 @@ import { printRouter } from "./routes/print";
 import { processesRouter } from "./routes/processes";
 import { qualityRouter } from "./routes/quality";
 import { qualityReportsRouter } from "./routes/quality-reports";
+import { shopStatusRouter } from "./routes/shop-status";
 import { stagingBatchesRouter } from "./routes/staging-batches";
 import { subsystemsRouter } from "./routes/subsystems";
 import { teamSettingsRouter } from "./routes/team-settings";
@@ -55,10 +57,11 @@ const app = base
   .get("/me", requireAuth, async (c) => {
     const db = createShopDb(c.env.SHOP_DB);
     const teamId = c.get("teamId");
-    const [check, manager, reports] = await Promise.all([
+    const [check, manager, reports, statusLevels] = await Promise.all([
       qualityCheck(db, teamId),
       isShopManager(db, teamId, c.get("userId")),
       qualityReportsOn(db, teamId),
+      statusLevelsFor(db, teamId),
     ]);
     // Only a team using reports needs the checklist, and only then is one worth making for it.
     const checklist = reports ? await checklistFor(db, teamId) : [];
@@ -74,6 +77,8 @@ const app = base
       qualityCheck: check,
       qualityReports: reports,
       qualityChecklist: checklist,
+      // The Overview's shop status words, lowest first (lib/shop-status.ts).
+      statusLevels,
     });
   })
   .route("/drawings", drawingsRouter)
@@ -122,6 +127,7 @@ const app = base
   .route("/kiosk-presence", kioskPresenceRouter)
   .route("/admin", adminPartsRouter)
   .route("/admin/quality", qualityRouter)
+  .route("/admin/shop-status", shopStatusRouter)
   .route("/quality-reports", qualityReportsRouter)
   .route("/team-settings", teamSettingsRouter)
   .route("/internal", internalRouter);

@@ -24,6 +24,7 @@ import { useShopData } from "../../shared/use-shop-data";
 import { ActionsLog } from "./actions-log";
 import { sectionHeading } from "./admin-styles";
 import { QualityReports } from "./quality-reports";
+import { StatusLevelsSettings } from "./status-levels";
 
 export function AdminPage() {
   const { data, loading, error, refresh } = useShopData();
@@ -173,6 +174,12 @@ export function AdminPage() {
         {isAdmin && (
           <Section title="Quality Control" defaultOpen={false}>
             <QualityControlSettings />
+          </Section>
+        )}
+
+        {isAdmin && (
+          <Section title="Shop Status" defaultOpen={false}>
+            <StatusLevelsSettings />
           </Section>
         )}
 
