@@ -179,7 +179,7 @@ export function BoardPage() {
     <Page
       title={kioskMachine?.name ?? (view === "overview" ? "Shop Floor" : processName(view))}
       actions={
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex min-w-0 max-w-full flex-wrap items-center gap-3">
           {view !== "overview" && !kioskMachine && (
             <Link
               to="/board"
@@ -197,7 +197,7 @@ export function BoardPage() {
                   e.target.value === "overview" ? "/board" : processPath(Number(e.target.value)),
                 )
               }
-              className={`${inputClass} !w-auto`}
+              className={`${inputClass} !w-auto min-w-0 max-w-full`}
             >
               <option value="overview">Every machine</option>
               {data?.processes.map((p) => (
@@ -490,7 +490,8 @@ function BoardList({
                 <Link
                   to={processPath(row.current.processId)}
                   onClick={(e) => e.stopPropagation()}
-                  className="text-xs font-medium text-secondary-500 bg-inset border border-secondary-200 hover:border-secondary-400 hover:text-primary-600 rounded-full px-2.5 py-0.5 shrink-0 transition-colors"
+                  title={processName(row.current.processId)}
+                  className="text-xs font-medium text-secondary-500 bg-inset border border-secondary-200 hover:border-secondary-400 hover:text-primary-600 rounded-full px-2.5 py-0.5 max-w-[45%] truncate transition-colors"
                 >
                   {processName(row.current.processId)}
                 </Link>
@@ -705,7 +706,10 @@ function ProcessView({
                 detailsLink
               >
                 {row.current && (
-                  <span className="text-xs text-secondary-400 shrink-0">
+                  <span
+                    title={`Stuck at ${processName(row.current.processId)}`}
+                    className="text-xs text-secondary-400 min-w-0 max-w-[45%] truncate"
+                  >
                     Stuck at{" "}
                     <Link
                       to={processPath(row.current.processId)}

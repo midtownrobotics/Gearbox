@@ -8,6 +8,7 @@ import { CatalogSearch } from "../catalog/catalog-search";
 import {
   type Draft,
   DraftCard,
+  badQuantities,
   blank,
   catalogDraft,
   draftFields,
@@ -223,7 +224,10 @@ function ReplaceDialog({
           <Button variant="secondary" onClick={onClose}>
             Cancel
           </Button>
-          <Button onClick={save} disabled={busy || !draft || draft.state !== "ready"}>
+          <Button
+            onClick={save}
+            disabled={busy || !draft || draft.state !== "ready" || badQuantities(draft)}
+          >
             {busy ? "Saving…" : "Replace item"}
           </Button>
         </div>

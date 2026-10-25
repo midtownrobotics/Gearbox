@@ -1,7 +1,7 @@
 {
   "name": "gearbox",
   "private": true,
-  "version": "2026.10.4",
+  "version": "2026.10.5",
   "license": "MIT",
   "type": "module",
   "scripts": {

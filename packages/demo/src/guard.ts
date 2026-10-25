@@ -39,6 +39,8 @@ export const DEMO_BLOCKED: readonly Blocked[] = [
   // The team's apps stay on, and nothing is sent to Slack or Discord.
   { app: "platform", method: "PUT", path: /^\/team\/library\// },
   { app: "platform", method: "PUT", path: /^\/team\/notification-settings/ },
+  // Reports become public GitHub issues.
+  { app: "platform", method: "POST", path: /^\/team\/reports/ },
   // Integrations: keys, webhooks and boxes stay unconnected.
   { app: "edge", method: "POST", path: /^\/box\/key/ },
   { app: "pit", method: "POST", path: /^\/downloaders\/(codes|pair)/ },

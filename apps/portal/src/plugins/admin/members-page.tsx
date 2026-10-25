@@ -14,6 +14,7 @@ import { GraduationCap, Search, Shield, ShieldOff } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { g3id as api } from "../../lib/api";
+import { type Reporter, reporterIds } from "../../lib/platform";
 import {
   PROVIDERS,
   ProviderIcon,
@@ -109,6 +110,8 @@ export function MembersPage() {
   const [mergingUserId, setMergingUserId] = useState<string | null>(null);
   const [mergeTargetId, setMergeTargetId] = useState("");
   const [mergeLoading, setMergeLoading] = useState(false);
+  /** Reporter IDs by member, so a search finds whose an ID on a GitHub issue is. */
+  const [reporters, setReporters] = useState<Map<string, Reporter>>(new Map());
 
   useEffect(() => {
     api.auth.me.$get().then(async (res) => {
@@ -135,6 +138,7 @@ export function MembersPage() {
       })
       .catch((err) => setError(err instanceof Error ? err.message : "Something went wrong."))
       .finally(() => setLoading(false));
+    reporterIds().then(setReporters);
   }, [currentUserId]);
 
   function updateUser(userId: string, patch: Partial<User>) {
@@ -277,9 +281,9 @@ export function MembersPage() {
         (u) =>
           (role === "" || ROLES[role].has(u)) &&
           (provider === "" || u.identities.some((identity) => identity.provider === provider)) &&
-          matchesSearch(u, query),
+          matchesSearch(u, query, reporters.get(u.id)?.id),
       ),
-    [users, role, provider, query],
+    [users, role, provider, query, reporters],
   );
   const filtered = useMemo(
     () =>
@@ -366,7 +370,7 @@ export function MembersPage() {
             type="search"
             value={query}
             onChange={(e) => setParam("q", e.target.value)}
-            placeholder="Search by name, email or sign-in account"
+            placeholder="Search by name, email, sign-in account or reporter ID"
             aria-label="Search users"
             className="pl-9"
           />

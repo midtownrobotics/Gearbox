@@ -71,6 +71,17 @@
   h6 {
     font-family: var(--font-display);
   }
+
+  /* A word too long for its line (a link, a part number, a file name) breaks instead of pushing
+     the page wider than a phone's screen. Words that fit are never broken. */
+  body {
+    overflow-wrap: break-word;
+  }
+
+  /* A fieldset is as wide as its content by default; like a div, it fits its column instead. */
+  fieldset {
+    min-width: 0;
+  }
 }
 
 /* No overscroll stretch or bounce at a page's edges in any app (Android's stretch, iOS's rubber

@@ -560,6 +560,9 @@ importers:
       '@g3/ui':
         specifier: workspace:*
         version: link:../../packages/ui
+      '@g3/worker-scouting':
+        specifier: workspace:*
+        version: link:../../workers/scouting
       lucide-react:
         specifier: ^0.468.0
         version: 0.468.0(react@19.2.6)

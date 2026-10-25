@@ -128,7 +128,7 @@ describe("team-scoped workflows", () => {
       (
         await callAs(a.student, "/scouting/service-tickets", {
           method: "POST",
-          body: { teamName: "123", issueType: "mechanical", description: "Repair wheel" },
+          body: { teamName: "123", issueTypes: ["mechanical"], description: "Repair wheel" },
         })
       ).status,
     ).toBe(201);

@@ -2,9 +2,9 @@
 
 Updated 21 October 2026. Source: the user's Changes.docx and follow-up answers. The changes below are implemented locally and awaiting PR review against `staging`; they are not deployed. The feature descriptions remain the acceptance plan.
 
-Implementation is split between the Scouting interface (extending PR #261) and a separate compatible Worker PR. Review and merge the Worker, including migration `0037`, before the interface. The Worker accepts existing single-category ticket clients and form creation without a kind (defaulting to match scouting).
+Implementation is split between the Scouting interface (extending PR #261) and a separate compatible Worker PR. Review and merge Worker PR #262, including migration `0038_multiple_active_forms.sql`, before interface PR #261, then #294 and #295. The existing `0037_service_ticket_issue_types.sql` migration and its issueTypes array contract are preserved. Form creation without a kind still defaults to match scouting.
 
-Verification: Scouting app build and both TypeScript checks pass; all 102 Worker tests pass, including five new workflow cases; populated migration checks verify ticket preservation and per-form duplicate protection. App regression checks cover newest-match ordering and draft separation. Repository Biome, text-field and tenancy lint pass. Browser visual verification is still needed: no browser was connected in this session.
+Verification covers Scouting app builds, both TypeScript checks, Worker workflow tests, populated migrations, newest-match ordering, draft separation, and repository lint. The PR checks record results for each updated branch.
 
 ## Confirmed decisions
 
@@ -76,7 +76,7 @@ Acceptance: two match forms and two pit forms can be active together; each has a
 - Require an explicit choice instead of preselecting Mechanical. One ticket can carry multiple categories.
 - Show every selected category on ticket lists and details. Update filters and any skill-based routing or notifications to consider all categories.
 
-Implementation: add array storage with a migration from each existing scalar issue type to a one-item array. Validate allowed values, reject duplicates and preserve existing tickets and status history. Update API types and both clients together; provide compatibility during rollout if old clients can still submit scalar values.
+Implementation: add array storage with a migration from each existing scalar issue type to a one-item array. Validate allowed values, reject duplicates and preserve existing tickets and status history. Update API types and both clients together; retain the existing issueTypes array contract from the released service-ticket implementation.
 
 Acceptance: a Mechanical + Electrical ticket appears once, shows both categories and matches either category filter. Existing single-category tickets remain readable. Unknown categories and cross-team access are rejected.
 

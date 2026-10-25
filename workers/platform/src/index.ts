@@ -15,6 +15,7 @@ import { consoleRouter, tellOperators } from "./console";
 import { numberReports, teams } from "./db/schema";
 import { maybeResetDemo, resetDemo } from "./demo";
 import { db, g3id, now } from "./lib";
+import { reportsRouter, syncReports } from "./reports";
 import { clearSwitchedOff, enabledApps, logTeam, teamRouter } from "./team";
 import { countVisit } from "./visits";
 
@@ -471,15 +472,19 @@ const routes = app
     return c.body(null, 204);
   })
   .route("/console", consoleRouter)
+  .route("/team/reports", reportsRouter)
   .route("/team", teamRouter);
 
 export type PlatformApp = typeof routes;
 export default {
   fetch: withApiPrefix(app.fetch),
   // Daily (07:15 UTC): apps switched off for longer than the grace period have the team's data
-  // deleted. Hourly: the public demo is reset at midnight in its time zone.
+  // deleted. Hourly: the public demo is reset at midnight in its time zone, and members' reports
+  // are checked on GitHub.
   async scheduled(controller: ScheduledController, env: AppEnv["Bindings"]) {
-    if (controller.cron === HOURLY) await maybeResetDemo(env, new Date(controller.scheduledTime));
-    else await clearSwitchedOff(env);
+    if (controller.cron === HOURLY) {
+      await maybeResetDemo(env, new Date(controller.scheduledTime));
+      await syncReports(env);
+    } else await clearSwitchedOff(env);
   },
 } satisfies ExportedHandler<AppEnv["Bindings"]>;

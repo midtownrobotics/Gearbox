@@ -88,7 +88,7 @@ export function CatalogItemPage() {
             )}
             <div className="min-w-0 flex-1 space-y-3">
               <h2 className="text-xl font-semibold text-secondary-900">{item.name}</h2>
-              <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1.5 text-sm">
+              <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-6 gap-y-1.5 text-sm">
                 {family && family.name !== item.name && <Row label="Family">{family.name}</Row>}
                 <Row label="Category">{item.category}</Row>
                 <Row label="Vendor">{item.vendor}</Row>
@@ -158,7 +158,7 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   return (
     <>
       <dt className="text-secondary-500">{label}</dt>
-      <dd className="text-secondary-900">{children}</dd>
+      <dd className="min-w-0 text-secondary-900">{children}</dd>
     </>
   );
 }

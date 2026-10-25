@@ -411,7 +411,7 @@ export function RequestList({
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <Link
                     to={`/requests/${r.id}`}
-                    className="font-semibold text-secondary-900 hover:text-primary-500 line-clamp-2"
+                    className="min-w-0 font-semibold text-secondary-900 hover:text-primary-500 line-clamp-2 [overflow-wrap:anywhere]"
                   >
                     {r.quantity}× {r.title}
                   </Link>
@@ -420,7 +420,7 @@ export function RequestList({
                     <StatusBadge status={r.status} />
                   </span>
                 </div>
-                <p className="text-sm text-secondary-600">
+                <p className="text-sm text-secondary-600 [overflow-wrap:anywhere]">
                   {r.vendor}
                   {r.variant && ` · ${r.variant}`} · {r.categoryName} ·{" "}
                   <span className="tabular-nums">
@@ -429,7 +429,7 @@ export function RequestList({
                       : `${formatCents(estimate, r.currency)}${r.orderId === null ? " est." : ""}`}
                   </span>
                 </p>
-                <p className="text-xs text-secondary-500">
+                <p className="text-xs text-secondary-500 [overflow-wrap:anywhere]">
                   {r.requesterName} · {formatDate(r.createdAt)}
                   {r.needBy !== null && (
                     <>
@@ -442,7 +442,9 @@ export function RequestList({
                 {showActions && (
                   <>
                     {r.reason && (
-                      <p className="text-sm text-secondary-700 line-clamp-3">“{r.reason}”</p>
+                      <p className="text-sm text-secondary-700 line-clamp-3 [overflow-wrap:anywhere]">
+                        “{r.reason}”
+                      </p>
                     )}
                     <div className="pt-1 space-y-2">
                       <div className="flex flex-wrap gap-2">

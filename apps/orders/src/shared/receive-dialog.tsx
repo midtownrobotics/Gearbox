@@ -2,6 +2,7 @@ import { Button, Dialog, ErrorBanner, Field, inputClass, useTeamNames } from "@g
 import type { InferResponseType } from "hono/client";
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { api, getErrorMessage } from "./api";
+import { QuantityInput, parseQuantity, quantityError } from "./quantity";
 
 // Marking parts received, with where they go in the Inventory app: into storage at a location, or
 // straight into use on a robot. Each part has its own location, which starts as where Inventory
@@ -55,6 +56,9 @@ export type ReceiveLine = {
 
 /** How many parts a line is, as Inventory counts them: 1 pack of 4 is 4. */
 const partsOf = (line: ReceiveLine) => line.quantity * line.packQuantity;
+
+/** The most parts one request can put into Inventory. */
+const MAX_PARTS = 1_000_000;
 
 /** A location as Inventory shows it: its name, with its title when it has one ("A1 - Misc. Electronics"). */
 const labelOf = (row: Location) => (row.title ? `${row.name} - ${row.title}` : row.name);
@@ -180,6 +184,13 @@ export function ReceiveDialog({
       : `${inventoryName} can't be reached right now.`
     : null;
   const canUse = !!options && options.robots.length > 0 && options.subsystems.length > 0;
+  const quantityText = (line: ReceiveLine) => quantities[line.id] ?? String(partsOf(line));
+  /** What's wrong with a line's number of parts, or null when it's fine (or left as it was). */
+  const quantityProblem = (line: ReceiveLine) => {
+    const text = quantityText(line);
+    return text === String(partsOf(line)) ? null : quantityError(text, MAX_PARTS);
+  };
+  const quantitiesBad = send && usable && lines.some((line) => quantityProblem(line) !== null);
 
   function pickPlace(id: number, locationId: number | null) {
     touched.current.add(id);
@@ -200,13 +211,11 @@ export function ReceiveDialog({
         const own = places[line.id] ?? null;
         if (own !== null) locations[line.id] = own;
         else if (restId === null) return setError(`Pick where “${line.title}” goes.`);
-        const text = quantities[line.id];
-        if (text === undefined || text.trim() === "") continue;
-        const n = Number(text);
-        if (!Number.isInteger(n) || n < 1) {
+        if (quantityProblem(line)) {
           return setError("Quantities going into Inventory must be whole numbers, 1 or more.");
         }
-        if (n !== partsOf(line)) changed[line.id] = n;
+        const n = parseQuantity(quantityText(line), MAX_PARTS);
+        if (n !== null && n !== partsOf(line)) changed[line.id] = n;
       }
       inventory = {
         status: inUse ? ("in_use" as const) : ("storage" as const),
@@ -331,17 +340,12 @@ export function ReceiveDialog({
                   return (
                     <li key={line.id} className="space-y-1.5 px-3 py-2">
                       <div className="flex items-center gap-3 text-sm">
-                        <input
-                          type="number"
-                          inputMode="numeric"
-                          min={1}
-                          step={1}
+                        <QuantityInput
+                          max={MAX_PARTS}
                           aria-label={`Parts of ${line.title}`}
                           className={`${inputClass} !w-20 !py-1`}
-                          value={quantities[line.id] ?? String(partsOf(line))}
-                          onChange={(e) =>
-                            setQuantities({ ...quantities, [line.id]: e.target.value })
-                          }
+                          value={quantityText(line)}
+                          onChange={(text) => setQuantities({ ...quantities, [line.id]: text })}
                         />
                         <span
                           className="min-w-0 flex-1 truncate text-secondary-900"
@@ -356,6 +360,11 @@ export function ReceiveDialog({
                           )}
                         </span>
                       </div>
+                      {quantityProblem(line) && (
+                        <span className="block text-xs font-medium text-red-700">
+                          {quantityProblem(line)}
+                        </span>
+                      )}
                       <LocationPicker
                         locations={options.locations}
                         value={places[line.id] ?? null}
@@ -391,7 +400,10 @@ export function ReceiveDialog({
           <Button variant="secondary" disabled={busy} onClick={onClose}>
             Cancel
           </Button>
-          <Button type="submit" disabled={busy || (send && intake.required && !!blocked)}>
+          <Button
+            type="submit"
+            disabled={busy || quantitiesBad || (send && intake.required && !!blocked)}
+          >
             {busy ? "Saving…" : "Received"}
           </Button>
         </div>

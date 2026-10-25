@@ -16,6 +16,134 @@ Each release of the whole platform, newest first, with the version of every app 
 
 <!-- releases -->
 
+## 2026.10.5 (2026-10-24)
+
+| App | Version |
+| --- | --- |
+| **G3ID** | **4.0.0** (was 3.0.0) |
+| **Portal** | **2.2.0** (was 2.1.0) |
+| **Platform** | **4.0.0** (was 3.0.2) |
+| **Shop** | **3.0.0** (was 2.1.0) |
+| **Pit** | **3.1.0** (was 3.0.0) |
+| **Orders** | **2.2.0** (was 2.1.0) |
+| **Edge** | **2.3.0** (was 2.2.0) |
+| Edge agent | 0.7.0 |
+| **Pit log downloader** | **2.2.0** (was 2.1.0) |
+| **Scouting** | **3.0.0** (was 2.1.0) |
+| **Skill Tree** | **2.1.0** (was 2.0.0) |
+| **Attendance** | **2.1.0** (was 2.0.0) |
+| **Inventory** | **1.1.0** (was 1.0.0) |
+| **Schedule** | **0.3.0** (was 0.2.0) |
+
+### G3ID 4.0.0
+
+- Portal's Account page shows the account name behind each linked sign-in: your username on the Slack or Discord account you joined with (listed first), and the username or email of each other account, so two accounts from the same service can be told apart. Slack accounts linked from now on keep their Slack name, and ones linked before take the member's username. Deployers: apply G3ID's migration `0021_slack_identity_names.sql` before deploying G3ID.
+- Someone new who joins with Slack or Discord now enters their full name (filled in from their Slack or Discord name) before the team's admins are asked to approve them. Admins can correct any member's name on Portal's Members page, and each member's username, the name on the chat account they joined with, is shown beside it and can't be edited. Everyone's current name stays as it is and becomes their username too. Deployers: apply G3ID's migration `0020_member_names.sql` before deploying G3ID.
+- Your team's logo keeps its shape in the top bar: a wide logo shows wider and a tall one narrower, instead of being squeezed into a square.
+- On a phone, a long team and app name in the top bar and the menu is cut short ("ROBOWARRIORS SKILL TR…") instead of pushing the menu's close button and your greeting off the screen.
+- Long links, part names and other long text wrap or are cut short on phones instead of making the page scroll sideways.
+- Report a problem or suggest an idea from any app: the menu has "Report a problem", which posts it as a public issue on Gearbox's GitHub with the page and app versions (never your name), and you get a Slack or Discord message when it's fixed or closed. No GitHub account needed. Not in the public demo. Deployers: apply the platform's migration `0012_problem_reports.sql` before deploying it, and set its `GITHUB_TOKEN` secret (`docs/deploy.md`, "Problem reports on GitHub"); without it, reports are kept, and those under a week old are sent once it's set.
+
+### Portal 2.2.0
+
+- On the Account page, each service you can link more than once has one button below your sign-ins: Connect it, or add another account of it once one is linked.
+- Portal's Account page shows the account name behind each linked sign-in: your username on the Slack or Discord account you joined with (listed first), and the username or email of each other account, so two accounts from the same service can be told apart. Slack accounts linked from now on keep their Slack name, and ones linked before take the member's username. Deployers: apply G3ID's migration `0021_slack_identity_names.sql` before deploying G3ID.
+- Someone new who joins with Slack or Discord now enters their full name (filled in from their Slack or Discord name) before the team's admins are asked to approve them. Admins can correct any member's name on Portal's Members page, and each member's username, the name on the chat account they joined with, is shown beside it and can't be edited. Everyone's current name stays as it is and becomes their username too. Deployers: apply G3ID's migration `0020_member_names.sql` before deploying G3ID.
+- Your team's logo keeps its shape in the top bar: a wide logo shows wider and a tall one narrower, instead of being squeezed into a square.
+- On a phone, a long team and app name in the top bar and the menu is cut short ("ROBOWARRIORS SKILL TR…") instead of pushing the menu's close button and your greeting off the screen.
+- Long links, part names and other long text wrap or are cut short on phones instead of making the page scroll sideways.
+- Report a problem or suggest an idea from any app: the menu has "Report a problem", which posts it as a public issue on Gearbox's GitHub with the page and app versions (never your name), and you get a Slack or Discord message when it's fixed or closed. No GitHub account needed. Not in the public demo. Deployers: apply the platform's migration `0012_problem_reports.sql` before deploying it, and set its `GITHUB_TOKEN` secret (`docs/deploy.md`, "Problem reports on GitHub"); without it, reports are kept, and those under a week old are sent once it's set.
+- Each problem report's GitHub issue shows the sender's reporter ID, a random ID that doesn't say who they are, and the report form shows members their own. Operators can block a reporter ID that sends spam or misuses reports, from the console's Reporters page; the team's admins get a Slack or Discord message saying who it is and why, and see each member's reporter ID on their page in Members (the search finds it too). Deployers: apply the platform's migration `0013_reporters.sql` first.
+
+### Platform 4.0.0
+
+- On a phone, a long team and app name in the top bar and the menu is cut short ("ROBOWARRIORS SKILL TR…") instead of pushing the menu's close button and your greeting off the screen.
+- Long links, part names and other long text wrap or are cut short on phones instead of making the page scroll sideways.
+- Report a problem or suggest an idea from any app: the menu has "Report a problem", which posts it as a public issue on Gearbox's GitHub with the page and app versions (never your name), and you get a Slack or Discord message when it's fixed or closed. No GitHub account needed. Not in the public demo. Deployers: apply the platform's migration `0012_problem_reports.sql` before deploying it, and set its `GITHUB_TOKEN` secret (`docs/deploy.md`, "Problem reports on GitHub"); without it, reports are kept, and those under a week old are sent once it's set.
+- A team can send 5 problem reports a day, then one every 10 minutes until midnight UTC.
+- Reports can have a title of their own, which becomes the GitHub issue's title, and the issue shows the report's text as written instead of as a quote. Deployers: apply the platform's migration `0014_report_titles.sql` first.
+- Each problem report's GitHub issue shows the sender's reporter ID, a random ID that doesn't say who they are, and the report form shows members their own. Operators can block a reporter ID that sends spam or misuses reports, from the console's Reporters page; the team's admins get a Slack or Discord message saying who it is and why, and see each member's reporter ID on their page in Members (the search finds it too). Deployers: apply the platform's migration `0013_reporters.sql` first.
+
+### Shop 3.0.0
+
+- Your team's logo keeps its shape in the top bar: a wide logo shows wider and a tall one narrower, instead of being squeezed into a square.
+- On a phone, a long team and app name in the top bar and the menu is cut short ("ROBOWARRIORS SKILL TR…") instead of pushing the menu's close button and your greeting off the screen.
+- Long links, part names and other long text wrap or are cut short on phones instead of making the page scroll sideways.
+- Quality control is one section on the Admin page: quality reports and their table moved into it, the process picker only shows once "Require quality control" is on, and the checklist a report goes through is now the team's own, edited under the reports table. A part that fails its check can go to any of its steps, not only one before the check. Two new choices sit beside Send back: Fix it, which sends the part to a step and writes what has to be done onto the part's notes, and Start over, which makes the part obsolete and adds a new one at its first step. A fix can send the part to a step it doesn't have yet — sanding a part that failed — and that step joins this one part, just before its quality check. Turning quality reports or a required quality check on now takes effect on the shop floor without reloading the page, so a Quality Control step no longer offers Mark Complete when it needs a quality report. Run the Shop worker's D1 migrations `0020`–`0023` before deploying: they add Quality Control processes, shop managers and quality reports, widen what a report's outcome can be and move a report's four fixed questions into the team's editable checklist.
+- Report a problem or suggest an idea from any app: the menu has "Report a problem", which posts it as a public issue on Gearbox's GitHub with the page and app versions (never your name), and you get a Slack or Discord message when it's fixed or closed. No GitHub account needed. Not in the public demo. Deployers: apply the platform's migration `0012_problem_reports.sql` before deploying it, and set its `GITHUB_TOKEN` secret (`docs/deploy.md`, "Problem reports on GitHub"); without it, reports are kept, and those under a week old are sent once it's set.
+- Quality Control processes: a process type only shop managers and admins can check off. The Admin page's new Quality Control section picks the team's shop managers, and can require a quality check, which puts a chosen Quality Control process at the end of every part.
+- Quality reports: with them on (the Admin page's new Quality Reports section), a part at a Quality Control process gets one Start Quality Report button. A shop manager checks the part against its drawing; if something's wrong, they pick the step it likely came from, see who did it and when, and send the part back. Every report is listed on the Admin page. "Require a quality check" is now "Require quality control".
+
+### Pit 3.1.0
+
+- Your team's logo keeps its shape in the top bar: a wide logo shows wider and a tall one narrower, instead of being squeezed into a square.
+- On a phone, a long team and app name in the top bar and the menu is cut short ("ROBOWARRIORS SKILL TR…") instead of pushing the menu's close button and your greeting off the screen.
+- Long links, part names and other long text wrap or are cut short on phones instead of making the page scroll sideways.
+- The Pit Monitor is three columns on a wide screen and leads with "Our next match": its name on our alliance's color, all six teams by driver station with ours ringed and each team's rank and pit address beside it, how many matches until we're called to queue (then Now queuing, On deck, On field), and countdowns to queuing and going on the field. Its color grows more urgent as it gets closer. The event's On deck, Now queuing and Queuing soon are at the top right, and each played qualification match's score shows its bonus RPs as dots, as The Blue Alliance does. When Nexus has no times the panel uses The Blue Alliance's schedule, and it says so plainly when there's no schedule or we have no more matches. The Monitor's battery tiles are two lines each, and the Monitor no longer scrolls sideways on a phone.
+- AdvantageScope's field and robot models download about a third the size and stay on the device after the first time, and so does each match log you open. The log picker says which logs are on this device and how much the others download, and the Logs page saves AdvantageScope, your team's fields and robots and all the logs to the device ahead, so AdvantageScope opens with no connection.
+- On staging, with the event snapshot on, admins can move its clock on or back from the Monitor (a match, five minutes or a minute at a time, or back to the start), and each match's status and score follow it, so every state of "Our next match" can be seen without waiting.
+- Report a problem or suggest an idea from any app: the menu has "Report a problem", which posts it as a public issue on Gearbox's GitHub with the page and app versions (never your name), and you get a Slack or Discord message when it's fixed or closed. No GitHub account needed. Not in the public demo. Deployers: apply the platform's migration `0012_problem_reports.sql` before deploying it, and set its `GITHUB_TOKEN` secret (`docs/deploy.md`, "Problem reports on GitHub"); without it, reports are kept, and those under a week old are sent once it's set.
+
+### Orders 2.2.0
+
+- Your team's logo keeps its shape in the top bar: a wide logo shows wider and a tall one narrower, instead of being squeezed into a square.
+- On a phone, a long team and app name in the top bar and the menu is cut short ("ROBOWARRIORS SKILL TR…") instead of pushing the menu's close button and your greeting off the screen.
+- Long links, part names and other long text wrap or are cut short on phones instead of making the page scroll sideways.
+- Edit request can change the link: the new link is looked up like on New Request, and you choose whether to use its name and price. Long titles, reasons, vendors and list names now wrap or are cut short on phones instead of pushing the page off the screen.
+- Quantity and Pack of boxes take whole numbers only, show the number pad on phones, and say "Enter a whole number" under the box (with submit turned off) instead of failing when you send.
+- Report a problem or suggest an idea from any app: the menu has "Report a problem", which posts it as a public issue on Gearbox's GitHub with the page and app versions (never your name), and you get a Slack or Discord message when it's fixed or closed. No GitHub account needed. Not in the public demo. Deployers: apply the platform's migration `0012_problem_reports.sql` before deploying it, and set its `GITHUB_TOKEN` secret (`docs/deploy.md`, "Problem reports on GitHub"); without it, reports are kept, and those under a week old are sent once it's set.
+
+### Edge 2.3.0
+
+- Your team's logo keeps its shape in the top bar: a wide logo shows wider and a tall one narrower, instead of being squeezed into a square.
+- On a phone, a long team and app name in the top bar and the menu is cut short ("ROBOWARRIORS SKILL TR…") instead of pushing the menu's close button and your greeting off the screen.
+- Long links, part names and other long text wrap or are cut short on phones instead of making the page scroll sideways.
+- Report a problem or suggest an idea from any app: the menu has "Report a problem", which posts it as a public issue on Gearbox's GitHub with the page and app versions (never your name), and you get a Slack or Discord message when it's fixed or closed. No GitHub account needed. Not in the public demo. Deployers: apply the platform's migration `0012_problem_reports.sql` before deploying it, and set its `GITHUB_TOKEN` secret (`docs/deploy.md`, "Problem reports on GitHub"); without it, reports are kept, and those under a week old are sent once it's set.
+
+### Pit log downloader 2.2.0
+
+- Your team's logo keeps its shape in the top bar: a wide logo shows wider and a tall one narrower, instead of being squeezed into a square.
+- Long links, part names and other long text wrap or are cut short on phones instead of making the page scroll sideways.
+- The pairing page can pair with a Pit at another address (Use another Pit address), such as staging, without changing config.env.
+- A log deleted from Gearbox has an Upload again button on the status page.
+
+### Scouting 3.0.0
+
+- Your team's logo keeps its shape in the top bar: a wide logo shows wider and a tall one narrower, instead of being squeezed into a square.
+- On a phone, a long team and app name in the top bar and the menu is cut short ("ROBOWARRIORS SKILL TR…") instead of pushing the menu's close button and your greeting off the screen.
+- Long links, part names and other long text wrap or are cut short on phones instead of making the page scroll sideways.
+- Report a problem or suggest an idea from any app: the menu has "Report a problem", which posts it as a public issue on Gearbox's GitHub with the page and app versions (never your name), and you get a Slack or Discord message when it's fixed or closed. No GitHub account needed. Not in the public demo. Deployers: apply the platform's migration `0012_problem_reports.sql` before deploying it, and set its `GITHUB_TOKEN` secret (`docs/deploy.md`, "Problem reports on GitHub"); without it, reports are kept, and those under a week old are sent once it's set.
+- Multiple choice questions with up to six short choices, like Yes/No, are answered with one tap on large bubbles instead of a dropdown; tap the chosen answer again to clear it. Longer lists keep the dropdown.
+- A service ticket can have more than one issue type, or "Not sure" when the reporter can't tell: both ticket forms pick them with chips, and each ticket shows a badge per type. Apply migration `0037_service_ticket_issue_types.sql` before deploying; the API takes and returns `issueTypes` (a list) in place of `issueType`.
+
+### Skill Tree 2.1.0
+
+- Your team's logo keeps its shape in the top bar: a wide logo shows wider and a tall one narrower, instead of being squeezed into a square.
+- On a phone, a long team and app name in the top bar and the menu is cut short ("ROBOWARRIORS SKILL TR…") instead of pushing the menu's close button and your greeting off the screen.
+- Long links, part names and other long text wrap or are cut short on phones instead of making the page scroll sideways.
+- Report a problem or suggest an idea from any app: the menu has "Report a problem", which posts it as a public issue on Gearbox's GitHub with the page and app versions (never your name), and you get a Slack or Discord message when it's fixed or closed. No GitHub account needed. Not in the public demo. Deployers: apply the platform's migration `0012_problem_reports.sql` before deploying it, and set its `GITHUB_TOKEN` secret (`docs/deploy.md`, "Problem reports on GitHub"); without it, reports are kept, and those under a week old are sent once it's set.
+
+### Attendance 2.1.0
+
+- Your team's logo keeps its shape in the top bar: a wide logo shows wider and a tall one narrower, instead of being squeezed into a square.
+- On a phone, a long team and app name in the top bar and the menu is cut short ("ROBOWARRIORS SKILL TR…") instead of pushing the menu's close button and your greeting off the screen.
+- Long links, part names and other long text wrap or are cut short on phones instead of making the page scroll sideways.
+- Report a problem or suggest an idea from any app: the menu has "Report a problem", which posts it as a public issue on Gearbox's GitHub with the page and app versions (never your name), and you get a Slack or Discord message when it's fixed or closed. No GitHub account needed. Not in the public demo. Deployers: apply the platform's migration `0012_problem_reports.sql` before deploying it, and set its `GITHUB_TOKEN` secret (`docs/deploy.md`, "Problem reports on GitHub"); without it, reports are kept, and those under a week old are sent once it's set.
+
+### Inventory 1.1.0
+
+- Your team's logo keeps its shape in the top bar: a wide logo shows wider and a tall one narrower, instead of being squeezed into a square.
+- On a phone, a long team and app name in the top bar and the menu is cut short ("ROBOWARRIORS SKILL TR…") instead of pushing the menu's close button and your greeting off the screen.
+- Long links, part names and other long text wrap or are cut short on phones instead of making the page scroll sideways.
+- Report a problem or suggest an idea from any app: the menu has "Report a problem", which posts it as a public issue on Gearbox's GitHub with the page and app versions (never your name), and you get a Slack or Discord message when it's fixed or closed. No GitHub account needed. Not in the public demo. Deployers: apply the platform's migration `0012_problem_reports.sql` before deploying it, and set its `GITHUB_TOKEN` secret (`docs/deploy.md`, "Problem reports on GitHub"); without it, reports are kept, and those under a week old are sent once it's set.
+
+### Schedule 0.3.0
+
+- Your team's logo keeps its shape in the top bar: a wide logo shows wider and a tall one narrower, instead of being squeezed into a square.
+- On a phone, a long team and app name in the top bar and the menu is cut short ("ROBOWARRIORS SKILL TR…") instead of pushing the menu's close button and your greeting off the screen.
+- Long links, part names and other long text wrap or are cut short on phones instead of making the page scroll sideways.
+- Report a problem or suggest an idea from any app: the menu has "Report a problem", which posts it as a public issue on Gearbox's GitHub with the page and app versions (never your name), and you get a Slack or Discord message when it's fixed or closed. No GitHub account needed. Not in the public demo. Deployers: apply the platform's migration `0012_problem_reports.sql` before deploying it, and set its `GITHUB_TOKEN` secret (`docs/deploy.md`, "Problem reports on GitHub"); without it, reports are kept, and those under a week old are sent once it's set.
+
 ## 2026.10.4 (2026-10-19)
 
 | App | Version |

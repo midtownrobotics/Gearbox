@@ -8,11 +8,13 @@ import {
   Page,
   TextField,
   redirectToSignIn,
+  tones,
 } from "@g3/ui";
 import { GraduationCap, Shield, ShieldOff } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { g3id as api } from "../../lib/api";
+import { type Reporter, reporterIds } from "../../lib/platform";
 import { PROVIDERS, ProviderIcon, STATUS_STYLES, type User, relativeTime } from "./members-shared";
 
 // One member of the team, opened from the Users list: their details, the accounts they sign in
@@ -34,8 +36,8 @@ const longDate = (ts: number) =>
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex justify-between gap-4 py-2 text-sm">
-      <dt className="text-secondary-500">{label}</dt>
-      <dd className="text-right text-secondary-900">{children}</dd>
+      <dt className="shrink-0 text-secondary-500">{label}</dt>
+      <dd className="min-w-0 text-right text-secondary-900">{children}</dd>
     </div>
   );
 }
@@ -74,11 +76,11 @@ function NameRow({ user, onSaved }: { user: Details; onSaved: (name: string) => 
   if (draft === null) {
     return (
       <Row label="Name">
-        <span className="inline-flex items-center gap-3">
-          {user.displayName}
+        <span className="flex items-center justify-end gap-3">
+          <span className="min-w-0">{user.displayName}</span>
           <button
             type="button"
-            className="text-sm text-primary-600 hover:underline"
+            className="shrink-0 text-sm text-primary-600 hover:underline"
             onClick={() => setDraft(user.displayName)}
           >
             Edit
@@ -133,6 +135,8 @@ export function MemberPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  /** Their reporter ID, or null for someone who has never opened Report a problem. */
+  const [reporter, setReporter] = useState<Reporter | null>(null);
 
   useEffect(() => {
     api.auth.me.$get().then(async (res) => {
@@ -153,6 +157,7 @@ export function MemberPage() {
         setUser((await res.json()) as Details);
       })
       .catch((err) => setError(err instanceof Error ? err.message : "Couldn't load this person."));
+    reporterIds().then((ids) => setReporter(ids.get(id) ?? null));
   }, [me, id]);
 
   /** Runs an action on them; on success, applies `patch` (or leaves the page, for a delete). */
@@ -239,7 +244,24 @@ export function MemberPage() {
               <Row label="Kiosk PIN">
                 {user.kioskPinSince ? `Since ${longDate(user.kioskPinSince)}` : "None"}
               </Row>
+              <Row label="Reporter ID">
+                {reporter ? (
+                  <span className="inline-flex items-center gap-2">
+                    <span className="font-mono">{reporter.id}</span>
+                    {reporter.blocked && <Badge colors={tones.danger}>Blocked</Badge>}
+                  </span>
+                ) : (
+                  "None"
+                )}
+              </Row>
             </dl>
+            {reporter?.blocked && (
+              <p className="pt-2 text-sm text-secondary-600">
+                Gearbox blocked them from Report a problem
+                {reporter.blockedAt ? ` on ${longDate(reporter.blockedAt)}` : ""}
+                {reporter.blockReason ? `: “${reporter.blockReason}”` : "."}
+              </p>
+            )}
           </Card>
 
           <Card title="Signs in with">

@@ -1,5 +1,29 @@
 # @g3/worker-shop
 
+## 3.0.0
+
+### Major Changes
+
+- 9c00961: Quality control is one section on the Admin page: quality reports and their table moved into it, the process picker only shows once "Require quality control" is on, and the checklist a report goes through is now the team's own, edited under the reports table.
+  
+  A part that fails its check can go to any of its steps, not only one before the check. Two new choices sit beside Send back: Fix it, which sends the part to a step and writes what has to be done onto the part's notes, and Start over, which makes the part obsolete and adds a new one at its first step. A fix can send the part to a step it doesn't have yet — sanding a part that failed — and that step joins this one part, just before its quality check.
+  
+  Turning quality reports or a required quality check on now takes effect on the shop floor without reloading the page, so a Quality Control step no longer offers Mark Complete when it needs a quality report.
+  
+  Run the Shop worker's D1 migrations `0020`–`0023` before deploying: they add Quality Control processes, shop managers and quality reports, widen what a report's outcome can be and move a report's four fixed questions into the team's editable checklist.
+- 9c00961: Quality Control processes: a process type only shop managers and admins can check off. The Admin page's new Quality Control section picks the team's shop managers, and can require a quality check, which puts a chosen Quality Control process at the end of every part.
+- 9c00961: Quality reports: with them on (the Admin page's new Quality Reports section), a part at a Quality Control process gets one Start Quality Report button. A shop manager checks the part against its drawing; if something's wrong, they pick the step it likely came from, see who did it and when, and send the part back. Every report is listed on the Admin page. "Require a quality check" is now "Require quality control".
+
+### Minor Changes
+
+- 9006f60: Report a problem or suggest an idea from any app: the menu has "Report a problem", which posts it as a public issue on Gearbox's GitHub with the page and app versions (never your name), and you get a Slack or Discord message when it's fixed or closed. No GitHub account needed. Not in the public demo. Deployers: apply the platform's migration `0012_problem_reports.sql` before deploying it, and set its `GITHUB_TOKEN` secret (`docs/deploy.md`, "Problem reports on GitHub"); without it, reports are kept, and those under a week old are sent once it's set.
+
+### Patch Changes
+
+- 05068af: Your team's logo keeps its shape in the top bar: a wide logo shows wider and a tall one narrower, instead of being squeezed into a square.
+- 05068af: On a phone, a long team and app name in the top bar and the menu is cut short ("ROBOWARRIORS SKILL TR…") instead of pushing the menu's close button and your greeting off the screen.
+- 73d2f28: Long links, part names and other long text wrap or are cut short on phones instead of making the page scroll sideways.
+
 ## 2.1.0
 
 ### Minor Changes
