@@ -120,7 +120,8 @@ export function DoneScreen({
       aria-live="polite"
     >
       <CheckCircle2 size={48} aria-hidden className="text-green-700" />
-      <h2 className="m-0 text-2xl font-bold">{sentLabel} report sent</h2>
+      <h2 className="m-0 text-2xl font-bold">{sentLabel} report submitted</h2>
+      <p className="m-0 text-sm text-green-700">Saved on the server</p>
       {detail && <p className="m-0 text-secondary-600">{detail}</p>}
       {next ? (
         <div className="mt-3 grid w-full max-w-sm gap-2 rounded-lg bg-inset px-4 py-4">
@@ -181,6 +182,12 @@ function ParkedDraft({
         <span className="block">
           Saved {timeOf(draft.savedAt)}. It still goes to {draft.matchLabel}, marked late.
         </span>
+        {Boolean(draft.missingDrawingFields?.length) && (
+          <span className="block font-semibold">
+            Some drawings could not be saved on this device. Check the original open form before
+            submitting.
+          </span>
+        )}
         {error && (
           <span className="mt-1 block font-semibold text-red-700" role="alert">
             {error}
