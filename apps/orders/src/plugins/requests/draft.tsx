@@ -29,6 +29,8 @@ export type Draft = {
   state: "loading" | "ready";
   /** Why the lookup failed, if it did (the row can still be filled in by hand). */
   lookupError: string | null;
+  /** The lookup needs an Edge box the team doesn't have: a note, not an error. */
+  lookupNeedsEdge: boolean;
   submitError: string | null;
   url: string;
   vendor: string;
@@ -74,6 +76,7 @@ export const blank = (url = ""): Draft => ({
   key: nextKey++,
   state: "ready",
   lookupError: null,
+  lookupNeedsEdge: false,
   submitError: null,
   url,
   vendor: "",
@@ -121,9 +124,17 @@ const HINTS = {
 export async function lookUpDraft(url: string): Promise<Partial<Draft>> {
   let lookup: Lookup | null = null;
   let lookupError: string | null = null;
+  let lookupNeedsEdge = false;
   try {
     const res = await api.lookup.$get({ query: { url } });
-    if (!res.ok) throw new Error(await getErrorMessage(res));
+    if (!res.ok) {
+      const body = (await res
+        .clone()
+        .json()
+        .catch(() => null)) as { code?: string } | null;
+      lookupNeedsEdge = body?.code === "no_edge";
+      throw new Error(await getErrorMessage(res));
+    }
     lookup = await res.json();
   } catch (err) {
     lookupError = err instanceof Error ? err.message : String(err);
@@ -143,6 +154,7 @@ export async function lookUpDraft(url: string): Promise<Partial<Draft>> {
   return {
     state: "ready",
     lookupError,
+    lookupNeedsEdge,
     url: base.url,
     vendor: suggestion?.vendor ?? base.vendor,
     name: lookup ? (suggestion?.name ?? lookup.title) : "",
@@ -303,10 +315,6 @@ export function variantPatch(
   };
 }
 
-/** A draft's quantity or pack isn't a whole number it can be sent with. */
-export const badQuantities = (d: Draft) =>
-  parseQuantity(d.quantity) === null || parseQuantity(d.packQuantity) === null;
-
 /** The product has options and none is picked yet. */
 export const needsOption = (d: Draft) =>
   d.variants.length > 1 && !d.variants.some((v) => v.title === d.variant);
@@ -428,7 +436,9 @@ export function DraftCard({
             </button>
           </div>
           {d.lookupError && (
-            <p className="text-xs text-red-700">{d.lookupError} Fill in the details by hand.</p>
+            <p className={`text-xs ${d.lookupNeedsEdge ? "text-blue-700" : "text-red-700"}`}>
+              {d.lookupError} Fill in the details by hand.
+            </p>
           )}
           {d.linkNote && <p className="text-xs text-secondary-600">{d.linkNote}</p>}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

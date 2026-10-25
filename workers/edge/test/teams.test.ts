@@ -184,3 +184,18 @@ describe("the nightly rollup", () => {
     expect(await day(b.team.teamId)).toBe(Math.floor((old + 12 * 3600) / DAY) * DAY - 12 * 3600);
   });
 });
+
+describe("part lookup", () => {
+  it("says a team has no box, apart from a box that's offline", async () => {
+    const lookup = { method: "POST", body: { url: "https://example.com/product" } };
+    const none = teamUsers(newTeamId());
+    const res = await callAs(none.student, "/lookup", lookup);
+    expect(res.status).toBe(503);
+    expect(await res.json()).toMatchObject({ code: "no_box" });
+
+    const { team } = await teamWithBox();
+    const offline = await callAs(team.student, "/lookup", lookup);
+    expect(offline.status).toBe(503);
+    expect(await offline.json()).not.toMatchObject({ code: "no_box" });
+  });
+});

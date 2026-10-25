@@ -26,22 +26,26 @@ export const buttonClass = (variant: ButtonVariant = "primary", size: ButtonSize
 /**
  * A button: `primary` for the page's main action (the team's color), `secondary` for the others,
  * `danger` for one that deletes or can't be undone (red, whatever the team's color). `sm` is for
- * a button inside a row or beside a small field, `lg` for a touch screen.
+ * a button inside a row or beside a small field, `lg` for a touch screen. `blocked` looks like
+ * `disabled` but still takes the click, so the page can say what's missing.
  */
 export function Button({
   variant = "primary",
   size = "md",
+  blocked = false,
   className = "",
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: ButtonVariant;
   size?: ButtonSize;
+  blocked?: boolean;
 }) {
   return (
     <button
       type="button"
+      aria-disabled={blocked || undefined}
       {...props}
-      className={`${SHAPE} disabled:opacity-50 ${focusRing} ${SIZES[size]} ${VARIANTS[variant]} ${className}`}
+      className={`${SHAPE} disabled:opacity-50 ${blocked ? "opacity-50 cursor-not-allowed" : ""} ${focusRing} ${SIZES[size]} ${VARIANTS[variant]} ${className}`}
     />
   );
 }

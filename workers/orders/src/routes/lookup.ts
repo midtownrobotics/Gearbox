@@ -12,6 +12,12 @@ import { lookupCache } from "../db/schema";
 import { lookUpAtVendor } from "../lib/vendor-lookup";
 import type { AppEnv } from "../types";
 
+/** The team has no edge box (Edge off, or never set up): a site only the box can read. */
+const NO_EDGE = {
+  error: "This vendor isn't supported without an Edge box set up.",
+  code: "no_edge",
+} as const;
+
 const CACHE_MS = 7 * 24 * 60 * 60 * 1000;
 /** Query params that only track where a click came from; dropped so they don't split the cache. */
 const TRACKING_PARAMS = /^(utm_\w+|ref|ref_|fbclid|gclid|mc_cid|mc_eid|_pos|_sid|_ss|_psq|_v)$/;
@@ -56,9 +62,7 @@ export const lookupRouter = new Hono<AppEnv>().get("/", requireAuth, urlValidato
   const direct = await lookUpAtVendor(new URL(url));
   if (direct) return c.json({ ...(await remember(direct)), fetchedAt: now });
 
-  if ((await teamHasApp(c.env, c.get("teamId"), "edge")) === false) {
-    return c.json({ error: "This site isn't supported for automatic lookup." }, 422);
-  }
+  if ((await teamHasApp(c.env, c.get("teamId"), "edge")) === false) return c.json(NO_EDGE, 422);
   const client: ClientHeaders = {};
   for (const [key, header] of Object.entries(CLIENT_HEADER_NAMES)) {
     const value = c.req.header(header);
@@ -72,8 +76,12 @@ export const lookupRouter = new Hono<AppEnv>().get("/", requireAuth, urlValidato
       body: JSON.stringify({ url, client }),
     }),
   );
-  const body = (await res.json().catch(() => ({}))) as PartLookup & { error?: string };
+  const body = (await res.json().catch(() => ({}))) as PartLookup & {
+    error?: string;
+    code?: string;
+  };
   if (!res.ok) {
+    if (body.code === "no_box") return c.json(NO_EDGE, 422);
     if (res.status === 422) {
       // The box reached out fine; the vendor's site blocked it or isn't one we can read.
       return c.json(

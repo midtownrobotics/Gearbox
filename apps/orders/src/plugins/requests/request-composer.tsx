@@ -17,13 +17,11 @@ import { useLoad } from "../../shared/use-load";
 import {
   type Draft,
   DraftCard,
-  badQuantities,
   blank,
   catalogDraft,
   draftFields,
   draftProblem,
   lookUpDraft,
-  needsOption,
   variantPatch,
 } from "./draft";
 
@@ -88,6 +86,8 @@ export function useRequestComposer({
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [sharedReason, setSharedReason] = useState("");
   const [error, setError] = useState<string | null>(null);
+  /** The Submit button was clicked while something was missing: say what. */
+  const [showWhy, setShowWhy] = useState(false);
   const [submitted, setSubmitted] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const started = useRef(false);
@@ -166,6 +166,8 @@ export function useRequestComposer({
   }
 
   async function submitAll() {
+    if (whyBlocked.length > 0) return setShowWhy(true);
+    setShowWhy(false);
     const ready = drafts.filter((d) => d.state === "ready");
     if (ready.length === 0) return;
     setBusy(true);
@@ -211,6 +213,15 @@ export function useRequestComposer({
   }
 
   const readyCount = drafts.filter((d) => d.state === "ready").length;
+  /** What has to be fixed before sending, each part named when there are several. */
+  const whyBlocked =
+    readyCount === 0
+      ? ["Wait for the lookup to finish."]
+      : drafts.flatMap((d, i) => {
+          const problem = d.state === "ready" ? draftProblem(d) : null;
+          if (!problem) return [];
+          return [drafts.length > 1 ? `${d.name.trim() || `Part ${i + 1}`}: ${problem}` : problem];
+        });
 
   /** Back to where the page was opened for: the wishlist, or a list. */
   const back = wishlist ? (
@@ -270,6 +281,13 @@ export function useRequestComposer({
                 />
               </Field>
             )}
+            {showWhy && whyBlocked.length > 0 && (
+              <ul role="alert" className="space-y-1 text-sm text-red-700">
+                {whyBlocked.map((why) => (
+                  <li key={why}>{why}</li>
+                ))}
+              </ul>
+            )}
             <div className="flex flex-wrap items-center justify-between gap-3">
               <p className="text-xs text-secondary-500">
                 {wishlist
@@ -292,14 +310,7 @@ export function useRequestComposer({
                     ))}
                   </select>
                 )}
-                <Button
-                  onClick={submitAll}
-                  disabled={
-                    busy ||
-                    readyCount === 0 ||
-                    drafts.some((d) => d.state === "ready" && (badQuantities(d) || needsOption(d)))
-                  }
-                >
+                <Button onClick={submitAll} disabled={busy} blocked={whyBlocked.length > 0}>
                   {busy
                     ? "Saving…"
                     : wishlist
