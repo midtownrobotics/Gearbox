@@ -36,7 +36,7 @@ export async function logToTeam(
 const APPEARANCE_PARTS: Record<keyof TeamUiSettings, string> = {
   name: "Name",
   shortName: "Short name",
-  logoUrl: "Logo",
+  useAvatar: "Team avatar",
   displayFont: "Display font",
   defaultTheme: "Default theme",
   linkAccents: "Linked accents",

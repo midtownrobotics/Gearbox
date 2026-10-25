@@ -73,7 +73,8 @@ export function completeAppOrder(order: readonly unknown[]): PortalTileKey[] {
 export type TeamUiSettings = {
   name: string;
   shortName: string;
-  logoUrl: string;
+  /** Show the team's avatar from The Blue Alliance (`teamAvatarUrl`) as its logo, in place of the app icons. */
+  useAvatar: boolean;
   displayFont: "Agency FB" | "Ubuntu" | "system-ui";
   defaultTheme: "system" | "light" | "dark";
   /**
@@ -163,7 +164,7 @@ export function buttonTextColor(
 export const defaultTeamUiSettings: TeamUiSettings = {
   name: site.team.name,
   shortName: site.team.shortName,
-  logoUrl: "",
+  useAvatar: false,
   displayFont: "Agency FB",
   defaultTheme: "system",
   linkAccents: true,
@@ -198,6 +199,14 @@ export const defaultTeamUiSettings: TeamUiSettings = {
   hiddenLinks: [],
   appOrder: defaultAppOrder,
 };
+
+/**
+ * A team's avatar: the 40 × 40 px image FIRST teams make each season to be shown at events, from The
+ * Blue Alliance, for the current calendar year. A team without one gets an error, not an image.
+ */
+export function teamAvatarUrl(teamNumber: number, year = new Date().getFullYear()): string {
+  return `https://www.thebluealliance.com/avatar/${year}/frc${teamNumber}.png`;
+}
 
 /**
  * A team's appearance before its admins change anything: the site team's from site.ts (above), and

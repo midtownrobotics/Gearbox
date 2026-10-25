@@ -47,7 +47,15 @@ export {
   setTutorial,
   useTutorial,
 } from "./tutorial";
-export { refreshTeamUiSettings, useTeamIcon, useTeamNames, useTeamUiSettings } from "./team-ui";
+export {
+  refreshTeamUiSettings,
+  teamHasAvatar,
+  usePageTeamAvatar,
+  useTeamAvatar,
+  useTeamIcon,
+  useTeamNames,
+  useTeamUiSettings,
+} from "./team-ui";
 export { forgetTeam, rememberedTeam, rememberTeam } from "./my-team";
 export {
   type SignedInUser,

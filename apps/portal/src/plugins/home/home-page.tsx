@@ -14,6 +14,7 @@ import {
   buttonClass,
   rememberTeam,
   signInUrl,
+  usePageTeamAvatar,
   useTeamApps,
   useTeamNames,
   useTeamUiSettings,
@@ -199,9 +200,9 @@ const APPS: App[] = [
   },
 ];
 
-/** The public site's tile: the team's logo (Team Appearance), or a globe until it sets one. */
-function publicSiteMark(logoUrl: string): { logoSrc?: string; icon?: IconType } {
-  return logoUrl ? { logoSrc: logoUrl } : { logoSrc: undefined, icon: FaGlobe };
+/** The public site's tile: the team's avatar (Team Appearance), or a globe without one. */
+function publicSiteMark(avatar: string | undefined): { logoSrc?: string; icon?: IconType } {
+  return avatar ? { logoSrc: avatar } : { logoSrc: undefined, icon: FaGlobe };
 }
 
 const isApp = (key: PortalTileKey) => key in portalAppLabels;
@@ -237,6 +238,7 @@ function FrontDoor() {
 
 export function HomePage() {
   const teamUi = useTeamUiSettings();
+  const avatar = usePageTeamAvatar();
   const me = useMe();
   const teamApps = useTeamApps(!!me);
   const authState = me === undefined ? "checking" : me ? "authenticated" : "unauthenticated";
@@ -255,7 +257,7 @@ export function HomePage() {
         ...app,
         // The team's own links (Team Appearance); a link it hasn't set is left out.
         href: teamUi.links[app.linkKey] ?? "",
-        ...(app.linkKey === "publicSite" ? publicSiteMark(teamUi.logoUrl) : {}),
+        ...(app.linkKey === "publicSite" ? publicSiteMark(avatar) : {}),
       };
     });
 
@@ -314,7 +316,8 @@ export function HomePage() {
                   ) : (
                     <div className="relative w-16 h-16 rounded-[14px] bg-black flex items-center justify-center shadow-lg transition-transform duration-150 group-hover:scale-110">
                       {app.logoSrc ? (
-                        <img src={app.logoSrc} alt="" className="w-11 h-11 object-contain" />
+                        // As big as the other tiles' icons, clear of the corner's ↗.
+                        <img src={app.logoSrc} alt="" className="w-7.5 h-7.5 object-contain" />
                       ) : app.icon ? (
                         <span className="text-white text-[34px]">
                           <app.icon />

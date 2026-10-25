@@ -24,6 +24,7 @@ export {
   fillColor,
   isPortalTileKey,
   portalAppLabels,
+  teamAvatarUrl,
   teamUiDefaults,
   teamUiLinkLabels,
   type ButtonText,

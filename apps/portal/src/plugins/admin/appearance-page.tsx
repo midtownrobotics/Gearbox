@@ -11,6 +11,8 @@ import {
   isDemoPage,
   isHexColor,
   pageTeamId,
+  pageTeamNumber,
+  teamAvatarUrl,
   teamUiDefaults,
   teamUiLinkLabels,
 } from "@g3/site-config";
@@ -22,8 +24,10 @@ import {
   Page,
   SuccessBanner,
   TextField,
+  Toggle,
   inputClass,
   refreshTeamUiSettings,
+  teamHasAvatar,
 } from "@g3/ui";
 import type { SafeTextKind } from "@g3/ui";
 import { type CSSProperties, useEffect, useRef, useState } from "react";
@@ -182,14 +186,6 @@ export function AppearancePage() {
               required
               maxLength={24}
             />
-            <LabeledText
-              kind="url"
-              label="Logo URL (HTTPS)"
-              value={settings.logoUrl}
-              onChange={(v) => update("logoUrl", v)}
-              type="url"
-              placeholder="https://…"
-            />
             <label className="block text-sm font-medium">
               Display font
               <select
@@ -219,13 +215,7 @@ export function AppearancePage() {
               </select>
             </label>
           </div>
-          {settings.logoUrl && (
-            <img
-              src={settings.logoUrl}
-              alt="Team logo preview"
-              className="mt-4 h-16 max-w-40 object-contain"
-            />
-          )}
+          <TeamAvatar checked={settings.useAvatar} onChange={(on) => update("useAvatar", on)} />
         </Card>
 
         <Card title="Colors">
@@ -817,6 +807,62 @@ function AccentColors({
           </span>
         </span>
       </label>
+    </div>
+  );
+}
+
+/**
+ * The team's avatar from The Blue Alliance in place of the app icons, with it shown beside the
+ * switch. A team without one this season can't switch it on, and is told why.
+ */
+function TeamAvatar({
+  checked,
+  onChange,
+}: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  // null while it's being checked.
+  const [hasAvatar, setHasAvatar] = useState<boolean | null>(null);
+  useEffect(() => {
+    void teamHasAvatar(pageTeamNumber).then(setHasAvatar);
+  }, []);
+  const description =
+    hasAvatar === false ? (
+      <>
+        Team {pageTeamNumber} has not submitted an avatar to the{" "}
+        <a
+          href="https://frc-events.firstinspires.org/services/avatar"
+          target="_blank"
+          rel="noreferrer"
+          className="text-primary-600 underline"
+        >
+          Team Avatar Submission Portal
+        </a>
+        . Once you have, you can turn this on.
+      </>
+    ) : (
+      "Show the avatar your team submitted to FIRST in place of the app icons."
+    );
+  return (
+    <div className="mt-5 flex items-start justify-between gap-4 border-t border-line pt-4">
+      <Toggle
+        label="Use Team Avatar"
+        description={description}
+        checked={checked && hasAvatar !== false}
+        disabled={hasAvatar !== true}
+        onChange={onChange}
+      />
+      {hasAvatar && (
+        <img
+          src={teamAvatarUrl(pageTeamNumber)}
+          alt={`Team ${pageTeamNumber}'s avatar`}
+          width={40}
+          height={40}
+          className="shrink-0 rounded-sm"
+          style={{ imageRendering: "pixelated" }}
+        />
+      )}
     </div>
   );
 }

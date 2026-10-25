@@ -18,6 +18,7 @@ import {
 } from "@g3/site-config";
 import devPorts from "../../../.dev-ports.json";
 import { type DemoEnv, checkDemoRequest } from "./demo";
+import { teamIcon } from "./icons";
 
 // The one worker on the platform's domain (and *.<domain>, the site team's own, for its retired
 // addresses): works out the team and app from the hostname and sends the request to that app's
@@ -414,6 +415,16 @@ export default {
     if (!appEnabled(apps, target.app)) return notEnabled(request, target.app, homeOf(url, local));
 
     const isApi = url.pathname === "/api" || url.pathname.startsWith("/api/");
+    // An installed app's icons, in the team's color (./icons.ts).
+    if (team !== null && !isApi) {
+      const original = (path: string) => {
+        const file = new URL(path, url);
+        const plain = new Request(file.toString(), { headers: { [IDENTITY_HEADERS.team]: team } });
+        return local ? devPage(plain, file, target.app) : env[BINDINGS[target.app]].fetch(plain);
+      };
+      const icon = await teamIcon(request, url, team, env.G3ID, original);
+      if (icon) return icon;
+    }
     const headers = new Headers(request.headers);
     for (const name of Object.values(IDENTITY_HEADERS)) headers.delete(name);
     if (team !== null) headers.set(IDENTITY_HEADERS.team, team);

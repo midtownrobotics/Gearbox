@@ -30,7 +30,7 @@ export type Summary =
   | { kind: "choice"; answer: string; times: number; count: number; rank: number }
   | { kind: "none" };
 
-export type SortKey = "team" | "reports" | `field:${string}`;
+export type SortKey = "team" | "recent" | "reports" | `field:${string}`;
 export type Sort = { key: SortKey; dir: "asc" | "desc" };
 
 export const isNumeric = (column: Column) => column.type === "counter" || column.type === "slider";
@@ -148,10 +148,20 @@ export function chronological(reports: Report[]) {
   );
 }
 
+/** Newest matches first; a late upload never moves an older match ahead of a newer one. */
+export function newestFirst(reports: Report[]) {
+  const ordered = chronological(reports).reverse();
+  return [
+    ...ordered.filter((report) => matchParts(report)),
+    ...ordered.filter((report) => !matchParts(report)),
+  ];
+}
+
 export type TeamRow = {
   team: string;
-  /** Oldest first. */
+  /** Newest match first. */
   reports: Report[];
+  recency: number;
   /** By column id: the averages and most-given answers (match scouting) or the newest report's
    * answers (pit scouting). */
   summaries: Map<string, Summary>;
@@ -160,15 +170,18 @@ export type TeamRow = {
 /** One row per team, each with its reports and what they say to every column. */
 export function teamRows(reports: Report[], columns: Column[], kind: "scouting" | "pit") {
   const byTeam = new Map<string, Report[]>();
-  for (const report of reports) {
+  const orderedReports =
+    kind === "pit" ? [...reports].sort((a, b) => b.createdAt - a.createdAt) : newestFirst(reports);
+  for (const report of orderedReports) {
     byTeam.set(report.teamName, [...(byTeam.get(report.teamName) ?? []), report]);
   }
   return [...byTeam].map(([team, teamReports]): TeamRow => {
-    const ordered = chronological(teamReports);
+    const ordered = teamReports;
     // A team's pit row is its newest pit report: one answer each, not a summary.
-    const summarized = kind === "pit" ? ordered.slice(-1) : ordered;
+    const summarized = kind === "pit" ? ordered.slice(0, 1) : ordered;
     return {
       team,
+      recency: orderedReports.indexOf(ordered[0]),
       reports: ordered,
       summaries: new Map(columns.map((column) => [column.id, summarize(column, summarized)])),
     };
@@ -191,6 +204,8 @@ function compareSummaries(left: Summary, right: Summary) {
 export function sortRows(rows: TeamRow[], sort: Sort) {
   const flip = sort.dir === "asc" ? 1 : -1;
   return [...rows].sort((left, right) => {
+    if (sort.key === "recent")
+      return -flip * (left.recency - right.recency) || compareTeams(left.team, right.team);
     if (sort.key === "team") return flip * compareTeams(left.team, right.team);
     if (sort.key === "reports") {
       return (
@@ -217,7 +232,7 @@ export const sortable = (column: Column, kind: "scouting" | "pit") =>
 /** The order a column starts in: the highest number first, a choice's options in their order. */
 export const firstDir = (key: SortKey, columns: Column[]): Sort["dir"] => {
   if (key === "team") return "asc";
-  if (key === "reports") return "desc";
+  if (key === "reports" || key === "recent") return "desc";
   const column = columns.find((item) => `field:${item.id}` === key);
   return column && isNumeric(column) ? "desc" : "asc";
 };
