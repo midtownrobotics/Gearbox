@@ -11,10 +11,12 @@ import { type Places, labelOf, locationLabel, useLabel } from "../../shared/plac
 import { type Row, rowsOf } from "../../shared/rows";
 import { StatusBadge } from "../../shared/status-badge";
 import { type StockAction, StockActionDialog } from "../../shared/stock-cells";
+import { NewEntryForm } from "../table/new-entry-page";
 
 // The inventory the other way round: every location, as nested panels that open, with what's
 // kept in each. For rearranging: an entry, or everything in a location, moves somewhere else
-// whole. A location's description (what belongs there) is added from its bar.
+// whole. A location's description (what belongs there) is added from its bar. For filling a shelf:
+// Add here adds a new entry kept there, without picking the location each time.
 
 /** A top-level location starts open if it has this many places inside it, or fewer. */
 const OPEN_UP_TO = 20;
@@ -217,6 +219,7 @@ function Panel({
   shown,
   onMoveEntry,
   onMoveAll,
+  onAdd,
 }: {
   row: LocationRow;
   depth: number;
@@ -228,6 +231,7 @@ function Panel({
   shown: Set<number> | null;
   onMoveEntry: (held: Held) => void;
   onMoveAll: (row: LocationRow) => void;
+  onAdd: (row: LocationRow) => void;
 }) {
   const children = (places.childrenOf.get(row.id) ?? []).filter(
     (child) => !shown || shown.has(child.id),
@@ -317,13 +321,24 @@ function Panel({
               ))}
             </ul>
           )}
-          {own.length > 0 && (
-            <div className="flex justify-end">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {own.length === 0 && children.length === 0 && (
+              <p className="mr-auto text-sm text-secondary-500">Nothing is kept here.</p>
+            )}
+            <button
+              type="button"
+              className={smallButton}
+              aria-label={`Add here, in ${row.name}`}
+              onClick={() => onAdd(row)}
+            >
+              Add here…
+            </button>
+            {own.length > 0 && (
               <button type="button" className={smallButton} onClick={() => onMoveAll(row)}>
                 Move all…
               </button>
-            </div>
-          )}
+            )}
+          </div>
           {children.map((child) => (
             <Panel
               key={child.id}
@@ -336,11 +351,9 @@ function Panel({
               shown={shown}
               onMoveEntry={onMoveEntry}
               onMoveAll={onMoveAll}
+              onAdd={onAdd}
             />
           ))}
-          {own.length === 0 && children.length === 0 && (
-            <p className="text-sm text-secondary-500">Nothing is kept here.</p>
-          )}
         </div>
       )}
     </section>
@@ -357,6 +370,7 @@ export function LocationsPage() {
   const [query, setQuery] = useState("");
   const [action, setAction] = useState<StockAction | null>(null);
   const [movingAll, setMovingAll] = useState<LocationRow | null>(null);
+  const [addingTo, setAddingTo] = useState<LocationRow | null>(null);
 
   // A search shows the locations it finds (by name, description, or an entry kept there), opened, with
   // what they're inside.
@@ -419,8 +433,8 @@ export function LocationsPage() {
       ) : (
         <>
           <p className="text-sm text-secondary-500">
-            What's kept where. Move an entry or everything in a location, and describe what each
-            place is for.
+            What's kept where. Add entries to a location, move an entry or everything in one, and
+            describe what each place is for.
           </p>
           <TextField
             type="search"
@@ -448,6 +462,7 @@ export function LocationsPage() {
                   setAction({ kind: "move", item: held.item, stock: held.stock })
                 }
                 onMoveAll={setMovingAll}
+                onAdd={setAddingTo}
               />
             ))}
           </div>
@@ -460,6 +475,20 @@ export function LocationsPage() {
           held={contents.own.get(movingAll.id) ?? []}
           onClose={() => setMovingAll(null)}
         />
+      )}
+      {addingTo && (
+        <Dialog
+          title={`Add an entry to ${labelOf(addingTo)}`}
+          size="2xl"
+          onClose={() => setAddingTo(null)}
+        >
+          <NewEntryForm
+            framed={false}
+            locationId={addingTo.id}
+            onAdded={() => setAddingTo(null)}
+            onCancel={() => setAddingTo(null)}
+          />
+        </Dialog>
       )}
     </Page>
   );
