@@ -105,7 +105,7 @@ Stack: Hono, Drizzle (`drizzle-orm`, Hono and `@cloudflare/workers-types` are in
 
 ## Public demo (team 9999)
 
-Every app has sample data behind its manifest's `demo` hook (`src/demo.ts`, plus `GET /internal/demo/words`, tested with `checkDemoHook`); keep it plain and neutral. **A new route that reaches outside the platform (a message, a key, a webhook) goes in `DEMO_BLOCKED`.** Text boxes need a `kind` (see `TextField` above). Details: `packages/demo/AGENTS.md`.
+Every app has sample data behind its manifest's `demo` hook (`src/demo.ts`, plus `GET /internal/demo/words`, tested with `checkDemoHook`); keep it plain and neutral. **A new route that reaches outside the platform (a message, a key, a webhook) goes in `DEMO_BLOCKED`.** A read that makes an app fetch from outside goes in `DEMO_OUTSIDE_READS`. Text boxes need a `kind` (see `TextField` above). Details: `packages/demo/AGENTS.md`.
 
 ## Site config (team, domain)
 

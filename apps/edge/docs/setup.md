@@ -25,4 +25,4 @@ Making a new key replaces the old one and disconnects the box until it has the n
 
 - [ ] Set the monthly data cap on **Overview**, if your internet is metered
 - [ ] Add the shop's printer on **Printers**
-- [ ] Try a part lookup by pasting a link into Orders' New Request
+- [ ] Try a part lookup by pasting an Amazon, McMaster-Carr or DigiKey link into Orders' New Request

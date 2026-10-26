@@ -1,6 +1,6 @@
 ---
 title: Team appearance
-summary: Your team's colors, logo, names and links, used on every page of every app.
+summary: Your team's colors, avatar, names and links, used on every page of every app.
 order: 4
 pages: /admin/appearance
 access: admin
@@ -8,11 +8,11 @@ access: admin
 
 On [Appearance](team:portal/admin/appearance), admins set how Gearbox looks for your team. **Save** applies it everywhere; **Reset** puts back the defaults in the form, for you to save or not.
 
-## Names and logo
+## Names and avatar
 
 - **Team name** is the name everywhere, including the sign-in page. Changing it renames the team.
 - **Short name** goes in front of each app's name ("G3 Orders"). By default it's your team's number.
-- **Logo** replaces the app icons in the bar.
+- **Use Team Avatar** shows the avatar your team submitted to FIRST (the small image teams make each season) in place of the app icons in the bar. It can only be turned on once your team has submitted one through FIRST's Team Avatar Submission Portal; the page links there.
 
 ## Colors
 

@@ -12,6 +12,11 @@ access: mentor
 - parts marked Blocking, or needed so soon they must be ordered today (**Place today**)
 - tips from the vendor's details, like a cutoff time or store credit to use
 - a one-click cart where the vendor supports one: Shopify stores, and Amazon through [Share-A-Cart](setup#share-a-cart). Other stores are ordered by hand.
+- **Copy list**, which copies the cart's parts, with quantities, prices and links, to paste wherever you're ordering.
+
+## McMaster-Carr
+
+On a McMaster-Carr cart, **Copy list** works differently: it copies one line per part in `part-number,quantity` form. On McMaster-Carr's order page, paste it straight into **Paste part numbers and quantities** to fill the order. A part without a McMaster part number is left out, and the page names it so you can add it by hand.
 
 ## Mark it ordered
 

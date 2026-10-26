@@ -10,6 +10,7 @@ Things to know:
 
 - **Anyone can see what you change**, and everything resets at midnight US Eastern.
 - **You can't type** in the demo. Text boxes offer sample text to pick from instead, so nothing you write is shared.
-- Things that reach outside Gearbox are off: connecting Slack or Discord, printing, part lookups, Onshape, and uploads.
+- Things that reach outside Gearbox are off: connecting Slack or Discord, printing, Onshape, and uploads. In Orders, only the sample links fill in a part.
+- **Report a problem** opens a report on GitHub instead of sending it through Gearbox.
 
 It's a good way to show your team what an app does before switching it on.

@@ -8,7 +8,7 @@ order: 1
 
 - [ ] Choose [where notifications go](/portal/notifications): Gearbox announcements, such as planned downtime, for your admins or everyone
 - [ ] Switch on [the apps you want](/portal/apps). A new team starts with none
-- [ ] Set your [team's colors, logo and links](/portal/appearance)
+- [ ] Set your [team's colors, avatar and links](/portal/appearance)
 - [ ] Decide [which sign-in methods](/portal/sign-in) your team allows besides its chat
 
 ## Your members

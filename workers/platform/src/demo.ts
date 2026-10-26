@@ -1,14 +1,14 @@
-import { demoHour, demoTeamId } from "@g3/demo";
+import { DEMO_PEOPLE, type DemoPerson, SAFE_TEXT, demoHour, demoTeamId } from "@g3/demo";
 import { site } from "@g3/site-config";
 import { eq } from "drizzle-orm";
-import { teamApps, teams } from "./db/schema";
+import { notifications, teamApps, teams } from "./db/schema";
 import { db, now } from "./lib";
 import { DELETABLE, MANIFESTS, callHook, inLibrary } from "./registry";
 import type { AppEnv } from "./types";
 
 // The public demo's reset (roadmap 5.4): every night at midnight in the demo's time zone the demo
 // team's data is deleted in every app and loaded again with sample data, so nothing a visitor did
-// lasts. The hourly cron runs it at that hour, or at once when the demo team doesn't exist yet
+// lasts. The platform's own sample is one notification from the team's admin on its home page. The hourly cron runs it at that hour, or at once when the demo team doesn't exist yet
 // (a new deploy). It goes on past an app that fails, and that app's data waits for the next night.
 
 type Env = AppEnv["Bindings"];
@@ -58,6 +58,26 @@ async function ensureDemoTeam(env: Env) {
   if (!res.ok) throw new Error(`G3ID couldn't make the demo team: ${res.status}`);
 }
 
+/** The demo team's own notifications: only the one its admin "sent" this week. */
+async function resetNotifications(env: Env) {
+  const at = now();
+  const admin = DEMO_PEOPLE.find((p) => p.visitor === "admin") as DemoPerson;
+  const database = db(env);
+  await database.batch([
+    database.delete(notifications).where(eq(notifications.teamId, demoTeamId)),
+    database.insert(notifications).values({
+      id: crypto.randomUUID(),
+      type: "info",
+      teamId: demoTeamId,
+      summary: SAFE_TEXT.announcement[0],
+      body: SAFE_TEXT.announcement[4],
+      expiresAt: at + 7 * 24 * 60 * 60,
+      createdBy: admin.id,
+      createdAt: at - 2 * 60 * 60,
+    }),
+  ]);
+}
+
 /** Wipes the demo team and loads its sample data again. Returns the apps that failed. */
 export async function resetDemo(env: Env): Promise<string[]> {
   const failed: string[] = [];
@@ -69,6 +89,7 @@ export async function resetDemo(env: Env): Promise<string[]> {
     new Request(`http://g3id/api/internal/teams/${demoTeamId}/demo/reset`, { method: "POST" }),
   );
   if (!people.ok) failed.push("id reset");
+  await resetNotifications(env);
   for (const app of Object.values(MANIFESTS)) {
     if (app.hooks.demo && !(await callHook(env, app.slug, "demo", demoTeamId))) {
       failed.push(`${app.slug} demo`);

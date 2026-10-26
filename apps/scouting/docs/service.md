@@ -5,17 +5,17 @@ order: 2
 pages: /service
 ---
 
-A service ticket says a team's robot needs help: what looks broken, and whether it's mechanical, electrical, programming or something else. Your team's service crew gets a message in your team's chat for each new one.
+A service ticket says a team's robot needs help: what looks broken, and what kind of problem it is: mechanical, electrical, programming or something else, or several of them. Your team's service crew gets a message in your team's chat for each new one.
 
 ## Report a breakdown
 
-Anyone can report one: on [Scouting Forms](team:scouting/), choose **Pit scouting**, then **Report a robot breakdown**. Enter the team's number, the kind of problem (**Not sure** if you can't tell) and what looks broken, then **Alert helpers**.
+Anyone can report one: on [Scouting Forms](team:scouting/), choose **Pit scouting**, then **Report a robot breakdown**. Enter the team's number, the kind of problem (choose every one that fits, or **Not sure** if you can't tell) and what looks broken, then **Alert helpers**.
 
 ## For the service crew
 
 The crew sees **Service Tickets** in Scouting's bar.
 
-- **Active tickets** are open or claimed. Open a new one yourself with **New service ticket**.
+- **Active tickets** are open or claimed. Open a new one yourself with **New service ticket**. Show one kind of problem at a time with the issue category filter beside them.
 - **Claim** a ticket so others know you're on it. It then says who claimed it.
 - **Close** it when you're done, with a short comment on what you did. Closed tickets are under **Closed tickets**.
 - On a closed ticket, **Add team comment** saves a lasting note about that team ("Their radio mount keeps coming loose"). It shows with the team's reports in Analysis.

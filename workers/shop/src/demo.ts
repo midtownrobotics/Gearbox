@@ -11,15 +11,21 @@ import {
   partInstanceProcesses,
   partInstances,
   processes,
+  qualityReports,
+  shopManagers,
   stagingBatches,
   subsystems,
 } from "./db/schema";
 import { storeDrawingInR2 } from "./lib/onshape-export";
+import { STARTER_CHECKLIST, saveChecklist } from "./lib/quality-checklist";
+import { SETTING, setSetting } from "./lib/settings";
 import type { AppEnv } from "./types";
 
 // The public demo's Shop (roadmap 5.3), loaded after its nightly reset: parts partway through
 // production, each step in every state, two batches (one being programmed in CAM, one programmed
-// and waiting for the router), and a release from Onshape waiting on Ingest. The demo has no
+// and waiting for the router), a required quality check with reports (one part passed, one failed
+// and waiting for a shop manager to decide what to do with it), and a release from Onshape waiting
+// on Ingest. The demo has no
 // Onshape, so a release is made here (`addDemoRelease`, also the Ingest page's "Add a sample
 // release"), and every drawing is a one-page PDF saying a drawing would be there. No part files:
 // uploads are off in the demo.
@@ -35,10 +41,17 @@ const PROCESSES = [
   { name: "Lathe", type: "regular" },
   { name: "Deburr", type: "regular" },
   { name: "Assembly", type: "regular" },
+  { name: "Quality check", type: "quality_control" },
 ] as const;
 
-/** Each part: its subsystem and processes (by place in the lists above) and each instance's progress. */
-const PARTS: {
+/** The required quality check: the last process, at the end of every part. */
+const CHECK = PROCESSES.length - 1;
+
+/**
+ * Each part: its subsystem and processes (by place in the lists above, before the quality check
+ * every part ends with) and each instance's progress.
+ */
+const PART_PLANS: {
   number: string;
   name: string;
   subsystem: number;
@@ -49,6 +62,8 @@ const PARTS: {
   instances: [done: number, doing: boolean][];
   /** Its instances' CAM steps carry this batch (1 or 2). */
   batch?: number;
+  /** Quality reports on its instances, by instance (from 0): passed, or failed and waiting. */
+  reports?: Record<number, "passed" | "failed">;
 }[] = [
   {
     number: "DEMO-1001",
@@ -124,7 +139,25 @@ const PARTS: {
     steps: [0, 1, 4],
     instances: [[0, false]],
   },
+  {
+    number: "DEMO-1007",
+    name: "Intake roller",
+    subsystem: 1,
+    material: "Polycarbonate",
+    steps: [2, 3],
+    // Checked and passed; failed and waiting at the check; waiting for its check.
+    instances: [
+      [3, false],
+      [2, false],
+      [2, false],
+    ],
+    reports: { 0: "passed", 1: "failed" },
+  },
 ];
+
+const PARTS = PART_PLANS.map((part) => ({ ...part, steps: [...part.steps, CHECK] }));
+
+const processName = (step: number) => (PROCESSES[step] as (typeof PROCESSES)[number]).name;
 
 /** The parts each sample release brings, in turn: name, material and quantity. */
 const RELEASE_PARTS = [
@@ -234,6 +267,8 @@ export async function loadDemo(env: Env, teamId: string) {
   const HOUR = 60 * 60 * 1000;
   const designer = DEMO_PEOPLE[5] as DemoPerson;
   const machinist = DEMO_PEOPLE[0] as DemoPerson;
+  const mentor = DEMO_PEOPLE[1] as DemoPerson;
+  const checker = DEMO_PEOPLE[3] as DemoPerson;
 
   const subsystemIds: number[] = [];
   for (const name of SUBSYSTEMS) {
@@ -251,6 +286,22 @@ export async function loadDemo(env: Env, teamId: string) {
       .returning({ id: processes.id });
     processIds.push(row.id);
   }
+
+  // Quality control: required at the end of every part, finished with a report against the
+  // starter checklist, by the shop managers (the mentor visitors sign in as, and a student).
+  for (const manager of [mentor, checker]) {
+    await db.insert(shopManagers).values(
+      withTeam(teamId, {
+        userId: manager.id,
+        addedBy: mentor.id,
+        addedAt: Math.floor((now - 20 * 24 * HOUR) / 1000),
+      }),
+    );
+  }
+  await setSetting(db, teamId, SETTING.qualityCheckProcess, String(processIds[CHECK]));
+  await setSetting(db, teamId, SETTING.qualityCheckRequired, "1");
+  await setSetting(db, teamId, SETTING.qualityReports, "1");
+  await saveChecklist(db, teamId, [...STARTER_CHECKLIST]);
 
   const batchIds = new Map<number, number>();
   for (const number of [1, 2]) {
@@ -314,6 +365,7 @@ export async function loadDemo(env: Env, teamId: string) {
         )
         .returning({ id: partInstances.id });
       instances++;
+      const finished: { processId: number; name: string; completedAt: number | null }[] = [];
       for (const [index, step] of part.steps.entries()) {
         const status: Status =
           index < done ? "done" : index === done ? (doing ? "doing" : "todo") : "waiting";
@@ -333,7 +385,7 @@ export async function loadDemo(env: Env, teamId: string) {
         if (status === "done" || status === "doing") {
           await db.insert(actions).values(
             withTeam(teamId, {
-              userId: machinist.id,
+              userId: step === CHECK ? checker.id : machinist.id,
               partInstanceId: instance.id,
               processId,
               action: status === "done" ? "completed" : "started",
@@ -341,6 +393,37 @@ export async function loadDemo(env: Env, teamId: string) {
             }),
           );
         }
+        if (status === "done" && step !== CHECK) {
+          finished.push({ processId, name: processName(step), completedAt });
+        }
+      }
+      const result = part.reports?.[n];
+      if (result) {
+        const passed = result === "passed";
+        const reportedAt = passed ? now - HOUR / 2 : now - HOUR / 4;
+        const suspect = finished[finished.length - 1];
+        await db.insert(qualityReports).values(
+          withTeam(teamId, {
+            partInstanceId: instance.id,
+            partDefinitionId: definition.id,
+            partName: part.name,
+            partNumber: part.number,
+            revision: "A",
+            instanceNumber: n + 1,
+            processId: processIds[CHECK] as number,
+            processName: processName(CHECK),
+            reportedBy: checker.id,
+            createdAt: reportedAt,
+            // A failed part is the wrong thickness, most likely from its last step.
+            checks: STARTER_CHECKLIST.map((label, i) => ({ label, ok: passed || i !== 1 })),
+            passed: passed ? 1 : 0,
+            suspects: passed || !suspect ? [] : [{ ...suspect, completedBy: machinist.id }],
+            notes: passed ? SAFE_TEXT.note[0] : SAFE_TEXT.note[1],
+            outcome: passed ? "passed" : "not_sent_back",
+            outcomeBy: passed ? checker.id : null,
+            outcomeAt: passed ? reportedAt : null,
+          }),
+        );
       }
     }
   }
@@ -351,4 +434,4 @@ export async function loadDemo(env: Env, teamId: string) {
 
 /** The words in the demo's Shop data, for the gateway. */
 export const demoWords = (): string[] =>
-  vocabularyOf(SUBSYSTEMS, PROCESSES, PARTS, RELEASE_PARTS, "Release");
+  vocabularyOf(SUBSYSTEMS, PROCESSES, PARTS, RELEASE_PARTS, STARTER_CHECKLIST, "Release");

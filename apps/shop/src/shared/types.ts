@@ -188,7 +188,8 @@ export type OnshapeRelease = {
   releasedAt: string;
   approvers: { name: string; approvedAt: string | null; rejectedAt: string | null }[];
   comments: { by: string | null; message: string; at: string | null }[];
-  links: { release: string; document: string | null };
+  /** The release's package in Onshape: null for the demo's sample releases. */
+  links: { release: string | null; document: string | null };
   parts: {
     id: number;
     partNumber: string;

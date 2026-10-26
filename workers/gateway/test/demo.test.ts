@@ -1,4 +1,5 @@
 import { exports } from "cloudflare:workers";
+import { SAFE_TEXT } from "@g3/demo";
 import { site } from "@g3/site-config";
 import { describe, expect, it } from "vitest";
 
@@ -75,6 +76,17 @@ describe("the public demo", () => {
     expect((await send(`${demo("edge")}/api/box/key`, "POST", {})).status).toBe(403);
     const scan = `${demo("scouting")}/api/scouting/manual-schedule/extract`;
     expect((await send(scan, "POST", {})).status).toBe(403);
+  });
+
+  it("looks up only the sample links, since a lookup fetches the vendor's page", async () => {
+    const lookup = (url: string, base = demo("orders"), path = "/api/lookup") =>
+      gateway(`${base}${path}?url=${encodeURIComponent(url)}`);
+    expect((await lookup(SAFE_TEXT.url[0])).status).toBe(200);
+    expect((await lookup("https://example.com/products/anything")).status).toBe(403);
+    expect(
+      (await lookup("https://example.com/x", demo("inventory"), "/api/~orders/lookup")).status,
+    ).toBe(403);
+    expect((await gateway(`${demo("orders")}/api/lookup`)).status).toBe(403);
   });
 
   it("lets reading through untouched", async () => {
