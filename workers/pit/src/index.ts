@@ -50,6 +50,9 @@ import {
 import { SETTING_KEYS, type SettingKey, getSetting, getWhenFull, teamNumberOf } from "./settings";
 import type { AppEnv } from "./types";
 
+// The Monitor's outside services (The Blue Alliance, Nexus, Statbotics) get this long to answer.
+const OUTSIDE_TIMEOUT_MS = 5000;
+
 const base = new Hono<AppEnv>();
 
 base.onError((err, c) => {
@@ -873,6 +876,7 @@ const app = base
         nexusEventKey && nexusKey
           ? fetch(`https://frc.nexus/api/v1/event/${nexusEventKey}`, {
               headers: { "Nexus-Api-Key": nexusKey },
+              signal: AbortSignal.timeout(OUTSIDE_TIMEOUT_MS),
             }).then((r) => (r.ok ? r.json() : null))
           : Promise.resolve(null),
         eventKey && tbaKey
@@ -880,28 +884,32 @@ const app = base
               `https://www.thebluealliance.com/api/v3/team/frc${team}/event/${eventKey}/status`,
               {
                 headers: { "X-TBA-Auth-Key": tbaKey },
+                signal: AbortSignal.timeout(OUTSIDE_TIMEOUT_MS),
               },
             ).then((r) => (r.ok ? r.json() : null))
           : Promise.resolve(null),
         eventKey && tbaKey
           ? fetch(`https://www.thebluealliance.com/api/v3/event/${eventKey}/rankings`, {
               headers: { "X-TBA-Auth-Key": tbaKey },
+              signal: AbortSignal.timeout(OUTSIDE_TIMEOUT_MS),
             }).then((r) => (r.ok ? r.json() : null))
           : Promise.resolve(null),
         team
-          ? fetch(`https://api.statbotics.io/v3/team_year/${team}/${year}`).then((r) =>
-              r.ok ? r.json() : null,
-            )
+          ? fetch(`https://api.statbotics.io/v3/team_year/${team}/${year}`, {
+              signal: AbortSignal.timeout(OUTSIDE_TIMEOUT_MS),
+            }).then((r) => (r.ok ? r.json() : null))
           : Promise.resolve(null),
         eventKey && tbaKey
           ? fetch(`https://www.thebluealliance.com/api/v3/event/${eventKey}/matches`, {
               headers: { "X-TBA-Auth-Key": tbaKey },
+              signal: AbortSignal.timeout(OUTSIDE_TIMEOUT_MS),
             }).then((r) => (r.ok ? r.json() : null))
           : Promise.resolve(null),
         // Each team's pit address, for our next match's teams.
         nexusEventKey && nexusKey
           ? fetch(`https://frc.nexus/api/v1/event/${nexusEventKey}/pits`, {
               headers: { "Nexus-Api-Key": nexusKey },
+              signal: AbortSignal.timeout(OUTSIDE_TIMEOUT_MS),
             }).then((r) => (r.ok ? r.json() : null))
           : Promise.resolve(null),
       ]);

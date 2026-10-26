@@ -85,6 +85,7 @@ async function teamEvents(
     try {
       const res = await env.SCHEDULE.fetch(
         `http://schedule/api/internal/teams/${encodeURIComponent(team)}/event-days`,
+        { signal: AbortSignal.timeout(3000) },
       );
       if (res.ok) events = ((await res.json()) as { events: EventDays[] }).events;
     } catch {}
