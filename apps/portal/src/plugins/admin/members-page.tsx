@@ -20,6 +20,8 @@ import {
   ProviderIcon,
   STATUS_STYLES,
   type User,
+  isOnline,
+  lastOnline,
   matchesSearch,
   otherUsername,
   relativeTime,
@@ -34,8 +36,8 @@ const SORTS = {
   "joined-old": { label: "Joined: oldest first", by: "joined", descending: false },
   "name-az": { label: "Name: A to Z", by: "name", descending: false },
   "name-za": { label: "Name: Z to A", by: "name", descending: true },
-  "login-new": { label: "Last sign-in: most recent first", by: "login", descending: true },
-  "login-old": { label: "Last sign-in: longest ago first", by: "login", descending: false },
+  "login-new": { label: "Last online: most recent first", by: "online", descending: true },
+  "login-old": { label: "Last online: longest ago first", by: "online", descending: false },
 } as const;
 type Sort = keyof typeof SORTS;
 
@@ -56,10 +58,11 @@ function sortUsers(users: User[], sort: Sort): User[] {
       );
     }
     if (by === "joined") return direction * (a.createdAt - b.createdAt);
-    if (a.lastLoginAt === null || b.lastLoginAt === null) {
-      return Number(a.lastLoginAt === null) - Number(b.lastLoginAt === null);
+    const [aOnline, bOnline] = [lastOnline(a), lastOnline(b)];
+    if (aOnline === null || bOnline === null) {
+      return Number(aOnline === null) - Number(bOnline === null);
     }
-    return direction * (a.lastLoginAt - b.lastLoginAt);
+    return direction * (aOnline - bOnline);
   });
 }
 
@@ -311,6 +314,7 @@ export function MembersPage() {
       "Email",
       "Joined Date",
       "Last Sign-in",
+      "Last Online",
       "Admin",
       "Mentor",
       ...authMethods,
@@ -331,6 +335,7 @@ export function MembersPage() {
         u.email,
         new Date(u.createdAt * 1000).toLocaleDateString(),
         u.lastLoginAt ? new Date(u.lastLoginAt * 1000).toLocaleString() : "Never",
+        u.lastSeenAt ? new Date(u.lastSeenAt * 1000).toLocaleString() : "",
         u.isAdmin ? "TRUE" : "FALSE",
         u.isMentor ? "TRUE" : "FALSE",
         authValues.slack ? "TRUE" : "FALSE",
@@ -494,9 +499,7 @@ export function MembersPage() {
                         <ProviderIcon key={identity.provider} provider={identity.provider} />
                       ))}
                       <span className="text-xs text-secondary-500">·</span>
-                      <span className="text-xs text-secondary-500" title="Last sign-in">
-                        {user.lastLoginAt ? relativeTime(user.lastLoginAt) : "never signed in"}
-                      </span>
+                      <LastOnline user={user} />
                       <span className="text-xs text-secondary-500">·</span>
                       <span className="text-xs text-secondary-500" title="Joined">
                         joined {relativeTime(user.createdAt)}
@@ -633,5 +636,16 @@ export function MembersPage() {
         </div>
       )}
     </Page>
+  );
+}
+
+/** "online now", when they were last online, or that they never signed in. */
+function LastOnline({ user }: { user: User }) {
+  if (isOnline(user)) return <span className="text-xs font-medium text-green-700">online now</span>;
+  const at = lastOnline(user);
+  return (
+    <span className="text-xs text-secondary-500" title="Last online">
+      {at ? `online ${relativeTime(at)}` : "never signed in"}
+    </span>
   );
 }

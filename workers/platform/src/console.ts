@@ -1,6 +1,6 @@
 import { requireAuth } from "@g3/auth";
-import { CONSOLE_HOSTS, DEV_DOMAIN, teamKey } from "@g3/site-config";
-import { and, count, desc, eq, inArray, isNotNull, like, lt } from "drizzle-orm";
+import { CONSOLE_HOSTS, DEV_DOMAIN, demoTeamId, teamKey } from "@g3/site-config";
+import { and, count, desc, eq, inArray, isNotNull, like, lt, ne, sql } from "drizzle-orm";
 import { type Context, Hono } from "hono";
 import { createMiddleware } from "hono/factory";
 import {
@@ -13,11 +13,12 @@ import {
   operators,
   problemReports,
   reporters,
+  teamApps,
   teams,
 } from "./db/schema";
 import { accounts, db, g3id, now } from "./lib";
 import { deliverToChat } from "./notifications";
-import { DELETABLE, callHook } from "./registry";
+import { DELETABLE, MANIFESTS, callHook } from "./registry";
 import { tellBlocked } from "./reports";
 import type { AppEnv } from "./types";
 import { recentVisits } from "./visits";
@@ -33,7 +34,9 @@ import { recentVisits } from "./visits";
 // - block a reporter by the reporter ID on a problem report's GitHub issue (src/reports.ts),
 //   never learning who it is (the team's admins are told who and why), and unblock them;
 // - write notifications for every team (info, warning, critical), each until it expires; each
-//   team's settings say where they go (src/notifications.ts).
+//   team's settings say where they go (src/notifications.ts);
+// - see how Gearbox is used: teams, members and how many teams have each app on (counts only,
+//   leaving out the public demo).
 // Every action is logged in `operator_actions` with the operator's reason, and so is each look at a
 // team's members (the privacy policy's operator access log, kept 12 months). The site's own team
 // (site.ts) can't be deleted or suspended. A team's number is its id ("frc<number>") everywhere,
@@ -434,6 +437,56 @@ export const consoleRouter = new Hono<AppEnv>()
       { teamId: team.id, reason },
     );
     return c.json({ ok: true });
+  })
+  // How Gearbox is used, as counts only: teams by status, members (from G3ID) and how many active
+  // teams have each app on. The public demo's team is left out.
+  .get("/stats", async (c) => {
+    const monthAgo = now() - 30 * 86_400;
+    const [teamRows, appRows, membersRes] = await Promise.all([
+      db(c.env)
+        .select({
+          status: teams.status,
+          teams: count(),
+          newThisMonth: sql<number>`coalesce(sum(${teams.createdAt} >= ${monthAgo}), 0)`,
+        })
+        .from(teams)
+        .where(ne(teams.id, demoTeamId))
+        .groupBy(teams.status)
+        .all(),
+      db(c.env)
+        .select({ app: teamApps.app, teams: count() })
+        .from(teamApps)
+        .innerJoin(teams, eq(teams.id, teamApps.teamId))
+        .where(
+          and(eq(teamApps.enabled, true), eq(teams.status, "active"), ne(teams.id, demoTeamId)),
+        )
+        .groupBy(teamApps.app)
+        .all(),
+      g3id(c.env, "/stats"),
+    ]);
+    if (!membersRes.ok) return c.json({ error: "Couldn't count members." }, 502);
+    const byStatus = (status: string) => teamRows.find((r) => r.status === status)?.teams ?? 0;
+    const on = new Map(appRows.map((r) => [r.app, r.teams]));
+    return c.json({
+      teams: {
+        active: byStatus("active"),
+        pending: byStatus("pending"),
+        suspended: byStatus("suspended"),
+        newThisMonth: teamRows.reduce((sum, r) => sum + r.newThisMonth, 0),
+      },
+      members: (await membersRes.json()) as {
+        active: number;
+        pending: number;
+        mentors: number;
+        online: number;
+        activeWeek: number;
+        activeMonth: number;
+        joinedMonth: number;
+      },
+      apps: Object.values(MANIFESTS)
+        .filter((app) => !app.alwaysOn)
+        .map((app) => ({ slug: app.slug, name: app.name, teams: on.get(app.slug) ?? 0 })),
+    });
   })
   // Visits to the landing page per day, the last `days` (30 by default, at most 366).
   .get("/visits", async (c) => {

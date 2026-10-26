@@ -167,6 +167,7 @@ export const adminRouter = new Hono<AppEnv>()
         isMentor: coreUsers.isMentor,
         createdAt: coreUsers.createdAt,
         lastLoginAt: coreUsers.lastLoginAt,
+        lastSeenAt: coreUsers.lastSeenAt,
       })
       .from(coreUsers)
       .where(memberOf(c.get("adminTeamId") as string, c.req.param("id")))

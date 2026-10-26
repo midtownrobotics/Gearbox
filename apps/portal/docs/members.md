@@ -23,7 +23,7 @@ Only admins manage members: being a mentor doesn't open these pages. Anyone else
 ## What a member's page shows
 
 - Their **name**, which an admin can correct with **Edit**, and their **username**: their Slack or Discord name, which can't be changed.
-- When they **joined** and **last signed in**.
+- When they **joined**, were **last online** (using any of the team's apps; "Online now" in the last 5 minutes) and **last signed in**.
 - Their **reporter ID**, which stands for them on problems they report, and whether Gearbox has blocked it.
 - The accounts they **sign in with**, with the email or name on each.
 
@@ -42,7 +42,7 @@ On a member's page, choose **Make mentor** or **Make admin** (**Remove mentor** 
 
 ## Find someone
 
-The list opens on Active members. Search by name, email or the account names they sign in with, and filter by role or sign-in method. Sort by join date, name or last sign-in.
+The list opens on Active members. Search by name, email or the account names they sign in with, and filter by role or sign-in method. Sort by join date, name or when they were last online.
 
 ## Remove someone
 
