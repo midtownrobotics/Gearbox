@@ -1,13 +1,27 @@
 import { inTeam, withTeam } from "@g3/auth";
-import { desc, gte, lt, max, notInArray, sql } from "drizzle-orm";
+import {
+  type SQL,
+  and,
+  countDistinct,
+  desc,
+  eq,
+  gte,
+  lt,
+  max,
+  min,
+  ne,
+  notInArray,
+  sql,
+} from "drizzle-orm";
 import type { createShopDb } from "../db";
 import * as schema from "../db/schema";
 import { type OnshapeCredentials, basicAuth } from "./onshape-config";
 
 // Every call Shop makes to Onshape's API goes through `onshapeFetch`, which counts it for the
-// team (onshape_api_usage: per day and kind) and keeps the failed ones (onshape_api_errors, the
-// last 50). The Admin page shows the counts (`usageReport`); the pages show a banner under the bar
-// while Onshape refuses the team's calls (`onshapeProblem`).
+// team (onshape_api_usage: per API key, day and kind) and keeps the failed ones
+// (onshape_api_errors, the last 50). The Admin page shows the counts (`usageReport`), for the
+// team's current keys or all it has used; the pages show a banner under the bar while Onshape
+// refuses the current keys' calls (`onshapeProblem`).
 
 type ShopDb = ReturnType<typeof createShopDb>;
 
@@ -36,6 +50,15 @@ const KEEP_ERRORS = 50;
 
 const day = (at: Date) => at.toISOString().slice(0, 10);
 
+/**
+ * Which API key a call was made with, without keeping the key: the start of its access key's
+ * SHA-256. Saving new keys starts a new count; the old keys' calls are still there under "All".
+ */
+export async function keyId(credentials: OnshapeCredentials) {
+  const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(credentials.apiKey));
+  return [...new Uint8Array(hash).slice(0, 8)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 /** Onshape's own words for a failed call (its JSON `message`), else the start of the body. */
 async function errorMessage(response: Response) {
   const body = await response.text().catch(() => "");
@@ -52,6 +75,7 @@ async function record(
   failure: { status: number; message: string | null } | null,
 ) {
   const { db, teamId } = api;
+  const key = await keyId(api.credentials);
   const now = new Date();
   // Milliseconds, so a success and a failure a moment apart are still in order.
   const at = now.getTime();
@@ -61,6 +85,7 @@ async function record(
       .insert(t)
       .values(
         withTeam(teamId, {
+          keyId: key,
           day: day(now),
           kind,
           calls: 1,
@@ -70,14 +95,14 @@ async function record(
         }),
       )
       .onConflictDoUpdate({
-        target: [t.teamId, t.day, t.kind],
+        target: [t.teamId, t.keyId, t.day, t.kind],
         set: failure
           ? { calls: sql`${t.calls} + 1`, errors: sql`${t.errors} + 1`, lastErrorAt: at }
           : { calls: sql`${t.calls} + 1`, lastOkAt: at },
       });
     if (!failure) return;
     const e = schema.onshapeApiErrors;
-    await db.insert(e).values(withTeam(teamId, { at, kind, ...failure }));
+    await db.insert(e).values(withTeam(teamId, { keyId: key, at, kind, ...failure }));
     const kept = db
       .select({ id: e.id })
       .from(e)
@@ -139,18 +164,29 @@ export type OnshapeProblem = {
 };
 
 /**
- * Why Onshape isn't working for the team right now: its latest call failed in a way that stops
- * every call (keys refused, the limit reached, Onshape down), and nothing has worked since.
+ * Why Onshape isn't working for the team right now: the current keys' latest call failed in a way
+ * that stops every call (keys refused, the limit reached, Onshape down), and nothing has worked
+ * since. Saving new keys clears it until they fail too.
  */
-export async function onshapeProblem(db: ShopDb, teamId: string): Promise<OnshapeProblem | null> {
+export async function onshapeProblem(
+  db: ShopDb,
+  teamId: string,
+  credentials: OnshapeCredentials,
+): Promise<OnshapeProblem | null> {
   const e = schema.onshapeApiErrors;
   const t = schema.onshapeApiUsage;
+  const key = await keyId(credentials);
   const [latest, ok] = await Promise.all([
-    db.select().from(e).where(inTeam(e, teamId)).orderBy(desc(e.at), desc(e.id)).get(),
+    db
+      .select()
+      .from(e)
+      .where(inTeam(e, teamId, eq(e.keyId, key)))
+      .orderBy(desc(e.at), desc(e.id))
+      .get(),
     db
       .select({ at: max(t.lastOkAt) })
       .from(t)
-      .where(inTeam(t, teamId))
+      .where(inTeam(t, teamId, eq(t.keyId, key)))
       .get(),
   ]);
   if (!latest || !isServiceWide(latest.status)) return null;
@@ -165,19 +201,35 @@ export async function onshapeProblem(db: ShopDb, teamId: string): Promise<Onshap
 
 /**
  * The Admin page's numbers: calls and errors per day and kind over the last year (UTC days), the
- * totals before that per kind, and the latest failed calls.
+ * totals before that per kind, and the latest failed calls. With `onlyCurrent`, only the calls
+ * made with the `current` keys; without, every key the team has used. `keys` says whether there are other keys' calls to
+ * show, and the first day the current keys were used.
  */
-export async function usageReport(db: ShopDb, teamId: string) {
+export async function usageReport(
+  db: ShopDb,
+  teamId: string,
+  current: OnshapeCredentials | null,
+  onlyCurrent: boolean,
+) {
   const t = schema.onshapeApiUsage;
   const e = schema.onshapeApiErrors;
+  const key = current ? await keyId(current) : null;
+  const usageOf = (...conditions: (SQL | undefined)[]) =>
+    inTeam(t, teamId, and(onlyCurrent ? eq(t.keyId, key ?? "") : undefined, ...conditions));
   const since = new Date();
   since.setUTCDate(since.getUTCDate() - 365);
   const from = day(since);
-  const [days, older, errors] = await Promise.all([
+  const [days, older, errors, mine, others] = await Promise.all([
     db
-      .select({ day: t.day, kind: t.kind, calls: t.calls, errors: t.errors })
+      .select({
+        day: t.day,
+        kind: t.kind,
+        calls: sql<number>`sum(${t.calls})`,
+        errors: sql<number>`sum(${t.errors})`,
+      })
       .from(t)
-      .where(inTeam(t, teamId, gte(t.day, from)))
+      .where(usageOf(gte(t.day, from)))
+      .groupBy(t.day, t.kind)
       .orderBy(t.day),
     db
       .select({
@@ -186,18 +238,35 @@ export async function usageReport(db: ShopDb, teamId: string) {
         errors: sql<number>`sum(${t.errors})`,
       })
       .from(t)
-      .where(inTeam(t, teamId, lt(t.day, from)))
+      .where(usageOf(lt(t.day, from)))
       .groupBy(t.kind),
     db
       .select({ at: e.at, kind: e.kind, status: e.status, message: e.message })
       .from(e)
-      .where(inTeam(e, teamId))
+      .where(inTeam(e, teamId, onlyCurrent ? eq(e.keyId, key ?? "") : undefined))
       .orderBy(desc(e.at), desc(e.id)),
+    db
+      .select({ since: min(t.day) })
+      .from(t)
+      .where(inTeam(t, teamId, eq(t.keyId, key ?? "")))
+      .get(),
+    db
+      .select({ n: countDistinct(t.keyId) })
+      .from(t)
+      .where(inTeam(t, teamId, ne(t.keyId, key ?? "")))
+      .get(),
   ]);
   return {
     kinds: ONSHAPE_CALLS,
     today: day(new Date()),
-    days,
+    keys: {
+      onlyCurrent,
+      /** The first day (UTC) the current keys made a call; null before they've made one. */
+      currentSince: mine?.since ?? null,
+      /** Keys the team used before these. */
+      others: others?.n ?? 0,
+    },
+    days: days.map((d) => ({ ...d, calls: Number(d.calls), errors: Number(d.errors) })),
     older: older.map((o) => ({ ...o, calls: Number(o.calls), errors: Number(o.errors) })),
     errors,
   };

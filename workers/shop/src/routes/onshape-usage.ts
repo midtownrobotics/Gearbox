@@ -12,17 +12,22 @@ export const onshapeUsageRouter = new Hono<AppEnv>()
   .get("/onshape/status", requireAuth, async (c) => {
     const db = createShopDb(c.env.SHOP_DB);
     const teamId = c.get("teamId");
-    const [config, problem] = await Promise.all([
-      onshapeConfig(c.env, db, teamId).catch(() => null),
-      onshapeProblem(db, teamId),
-    ]);
+    const config = await onshapeConfig(c.env, db, teamId).catch(() => null);
+    const problem = config?.credentials
+      ? await onshapeProblem(db, teamId, config.credentials)
+      : null;
     return c.json({
       hasApiKey: Boolean(config?.credentials),
       problem: problem && { ...problem, label: ONSHAPE_CALLS[problem.kind] ?? problem.kind },
     });
   })
+  // `?keys=all` counts every key the team has used; otherwise only the current keys.
   .get("/admin/onshape/usage", requireAdmin, async (c) => {
-    return c.json(await usageReport(createShopDb(c.env.SHOP_DB), c.get("teamId")));
+    const db = createShopDb(c.env.SHOP_DB);
+    const teamId = c.get("teamId");
+    const { credentials } = await onshapeConfig(c.env, db, teamId);
+    const onlyCurrent = c.req.query("keys") !== "all";
+    return c.json(await usageReport(db, teamId, credentials, onlyCurrent));
   })
   // One light call with the team's keys (who they belong to), counted like any other.
   .post("/admin/onshape/check", requireAdmin, async (c) => {

@@ -308,12 +308,14 @@ export type QualityOutcome = (typeof QUALITY_OUTCOMES)[number];
 export type QualityAnswer = { label: string; ok: boolean };
 
 /** The team's quality checklist: what every report is answered against, in order. */
-/** Calls to Onshape's API per team, day (UTC, YYYY-MM-DD) and kind (lib/onshape-api.ts). */
+/** Calls to Onshape's API per team, key, day (UTC, YYYY-MM-DD) and kind (lib/onshape-api.ts). */
 export const onshapeApiUsage = sqliteTable(
   "onshape_api_usage",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
     teamId: teamId(),
+    /** Which API key made the calls (`keyId`: a hash, never the key). */
+    keyId: text("key_id").notNull(),
     day: text("day").notNull(),
     kind: text("kind").notNull(),
     calls: integer("calls").notNull().default(0),
@@ -322,13 +324,14 @@ export const onshapeApiUsage = sqliteTable(
     lastOkAt: integer("last_ok_at"),
     lastErrorAt: integer("last_error_at"),
   },
-  (t) => [unique().on(t.teamId, t.day, t.kind)],
+  (t) => [unique().on(t.teamId, t.keyId, t.day, t.kind)],
 );
 
 /** The team's last failed calls to Onshape (the last 50 are kept). */
 export const onshapeApiErrors = sqliteTable("onshape_api_errors", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   teamId: teamId(),
+  keyId: text("key_id").notNull(),
   /** Unix milliseconds. */
   at: integer("at").notNull(),
   kind: text("kind").notNull(),

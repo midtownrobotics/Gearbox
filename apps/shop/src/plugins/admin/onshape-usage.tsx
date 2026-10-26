@@ -9,6 +9,7 @@ type UsageDay = { day: string; kind: string; calls: number; errors: number };
 type Usage = {
   kinds: Record<string, string>;
   today: string;
+  keys: { onlyCurrent: boolean; currentSince: string | null; others: number };
   days: UsageDay[];
   older: { kind: string; calls: number; errors: number }[];
   errors: { at: number; kind: string; status: number; message: string | null }[];
@@ -48,12 +49,14 @@ export function OnshapeUsage() {
   const [usage, setUsage] = useState<Usage | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [range, setRange] = useState<RangeKey>("30");
+  // Only the current API keys' calls, or every key's the team has used.
+  const [allKeys, setAllKeys] = useState(false);
   const [checking, setChecking] = useState(false);
   const [checked, setChecked] = useState<{ ok: boolean; text: string } | null>(null);
 
-  async function load() {
+  async function load(all = allKeys) {
     try {
-      const res = await api.admin.onshape.usage.$get();
+      const res = await api.admin.onshape.usage.$get({ query: all ? { keys: "all" } : {} });
       if (!res.ok) {
         setError(await getErrorMessage(res as unknown as Response));
         return;
@@ -92,6 +95,11 @@ export function OnshapeUsage() {
     }
   }
 
+  function showAllKeys(all: boolean) {
+    setAllKeys(all);
+    void load(all);
+  }
+
   const view = useMemo(() => (usage ? summarize(usage, range) : null), [usage, range]);
 
   if (error) return <ErrorBanner message={error} />;
@@ -103,6 +111,33 @@ export function OnshapeUsage() {
         Every call Shop makes to Onshape with the team's API keys counts toward the team's Onshape
         API allowance. Days are in UTC.
       </p>
+
+      {(usage.keys.others > 0 || allKeys) && (
+        <div className="space-y-1">
+          <div className="flex flex-wrap gap-2">
+            <Chip selected={!allKeys} onClick={() => showAllKeys(false)}>
+              Current API keys
+            </Chip>
+            <Chip selected={allKeys} onClick={() => showAllKeys(true)}>
+              All API keys
+            </Chip>
+          </div>
+          <p className="text-xs text-secondary-500">
+            {allKeys
+              ? "Calls made with every API key the team has saved."
+              : usage.keys.currentSince
+                ? `Calls made with the current keys, first used ${new Date(
+                    `${usage.keys.currentSince}T00:00:00Z`,
+                  ).toLocaleDateString(undefined, {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                    timeZone: "UTC",
+                  })}.`
+                : "The current keys haven't made a call yet."}
+          </p>
+        </div>
+      )}
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap gap-2">

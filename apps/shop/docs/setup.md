@@ -55,6 +55,8 @@ From then on, each approved release in that document shows up on Ingest. Saved k
 
 Every call Shop makes to Onshape with your keys counts toward your Onshape plan's API allowance. **Onshape API Usage** on Admin shows how many calls Shop has made over the last 7 days, 30 days, 12 months or all time, which kinds of calls they were (reading a release, downloading a drawing, and so on), and the latest calls that failed with what Onshape said. **Check connection** tries your keys once.
 
+The numbers are for the API keys saved now: saving new keys starts their count from zero. Once you've switched keys, choose **All API keys** to see the old keys' calls too.
+
 While Shop has no Onshape API keys, or Onshape is refusing its calls (keys not accepted, the API limit reached, Onshape down), every Shop page shows a red banner under the top bar. It goes away by itself once a call to Onshape works again.
 
 ## Chat channels

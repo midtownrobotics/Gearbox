@@ -11,6 +11,7 @@ type Status = {
 };
 type Usage = {
   today: string;
+  keys: { onlyCurrent: boolean; currentSince: string | null; others: number };
   days: { day: string; kind: string; calls: number; errors: number }[];
   errors: { kind: string; status: number; message: string | null }[];
 };
@@ -27,11 +28,13 @@ function onshapeAnswers(answer: (url: string, method: string) => [number, unknow
   );
 }
 
-const saveKeys = (team: ReturnType<typeof teamUsers>) =>
+const saveKeys = (team: ReturnType<typeof teamUsers>, apiKey = "key") =>
   callAs(team.admin, "/admin/onshape/config", {
     method: "POST",
-    body: { documentId: "doc1", companyId: "co1", apiKey: "key", apiSecret: "secret" },
+    body: { documentId: "doc1", companyId: "co1", apiKey, apiSecret: "secret" },
   });
+
+const callCount = (usage: Usage) => usage.days.reduce((n, d) => n + d.calls, 0);
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -106,5 +109,26 @@ describe("Onshape API usage", () => {
     expect((await jsonAs<Usage>(b.admin, "/admin/onshape/usage")).days).toEqual([]);
     expect((await callAs(a.mentor, "/admin/onshape/usage")).status).toBe(403);
     expect((await callAs(a.student, "/admin/onshape/check", { method: "POST" })).status).toBe(403);
+  });
+
+  it("counts new keys on their own, with the old keys' calls still under all keys", async () => {
+    const team = teamUsers(newTeamId());
+    onshapeAnswers(() => [429, { message: "API limit reached" }]);
+    await saveKeys(team, "old-key");
+    expect((await jsonAs<Status>(team.student, "/onshape/status")).problem?.status).toBe(429);
+    const old = await jsonAs<Usage>(team.admin, "/admin/onshape/usage");
+
+    // New keys start with no calls of their own, and the old keys' failure isn't theirs.
+    onshapeAnswers(() => [200, { items: [] }]);
+    await saveKeys(team, "new-key");
+    expect((await jsonAs<Status>(team.student, "/onshape/status")).problem).toBeNull();
+    const mine = await jsonAs<Usage>(team.admin, "/admin/onshape/usage");
+    expect(mine.keys).toEqual({ onlyCurrent: true, currentSince: mine.today, others: 1 });
+    expect(mine.errors).toEqual([]);
+
+    const all = await jsonAs<Usage>(team.admin, "/admin/onshape/usage?keys=all");
+    expect(all.keys.onlyCurrent).toBe(false);
+    expect(callCount(all)).toBe(callCount(old) + callCount(mine));
+    expect(all.errors.length).toBe(old.errors.length);
   });
 });
