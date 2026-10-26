@@ -45,6 +45,8 @@ const TABLES = [
   "shop_managers",
   "quality_reports",
   "quality_check_items",
+  "onshape_api_usage",
+  "onshape_api_errors",
 ];
 
 type Id = { id: number };

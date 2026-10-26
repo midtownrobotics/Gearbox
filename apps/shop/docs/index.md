@@ -17,6 +17,6 @@ Shop tracks manufacturing. A part comes in when it's released in Onshape, gets i
 | Onshape | Every release and the parts in it |
 | Files | CAM files, slicer files and drawings, and the batches that use them |
 | Leaderboard | Who's finished the most work |
-| Admin | Processes, subsystems, quality control, Onshape, the chat channels and kiosk mode |
+| Admin | Processes, subsystems, quality control, Onshape and its API usage, the chat channels and kiosk mode |
 
 Anyone signed in moves parts along, except at a Quality Control step, which shop managers and admins sign off. Admins set Shop up and add parts by hand.

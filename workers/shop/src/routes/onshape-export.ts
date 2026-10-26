@@ -44,7 +44,7 @@ const handleDrawingRequest = async (c: Context<AppEnv>) => {
         params.documentId,
         params.versionId,
         params.drawingEntityId,
-        params.credentials,
+        params.api,
       );
       // Store in R2 for future requests
       await storeDrawingInR2(c.env, teamId, partNumber, revision, pdfBuffer);
