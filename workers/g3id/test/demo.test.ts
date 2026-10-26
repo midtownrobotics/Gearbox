@@ -30,6 +30,23 @@ describe("the demo team", () => {
     expect(((await members.json()) as unknown[]).length).toBe(DEMO_PEOPLE.length);
   });
 
+  it("has members who were last online at different times, one never", async () => {
+    await reset();
+    const pick = await g3id("/auth/demo", {
+      method: "POST",
+      headers: onDemo,
+      body: { role: "admin" },
+    });
+    const res = await g3id("/admin/users", { cookie: cookieOf(pick), headers: onDemo });
+    expect(res.status).toBe(200);
+    const users = (await res.json()) as { lastSeenAt: number | null }[];
+    const now = Math.floor(Date.now() / 1000);
+    expect(
+      users.filter((u) => u.lastSeenAt !== null && now - u.lastSeenAt < 5 * 60).length,
+    ).toBeGreaterThan(1);
+    expect(users.filter((u) => u.lastSeenAt === null)).toHaveLength(1);
+  });
+
   it("signs a visitor in as the role they pick, for a few hours", async () => {
     await reset();
     for (const role of ["student", "mentor", "admin"] as const) {

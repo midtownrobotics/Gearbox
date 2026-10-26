@@ -80,14 +80,16 @@ export function ReleasePage() {
       actions={
         <div className="flex flex-wrap items-center gap-3">
           {back}
-          <a
-            href={release.links.release}
-            target="_blank"
-            rel="noreferrer"
-            className={buttonClass("secondary", "sm")}
-          >
-            Open in Onshape
-          </a>
+          {release.links.release && (
+            <a
+              href={release.links.release}
+              target="_blank"
+              rel="noreferrer"
+              className={buttonClass("secondary", "sm")}
+            >
+              Open in Onshape
+            </a>
+          )}
           {release.links.document && (
             <a
               href={release.links.document}

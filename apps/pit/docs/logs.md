@@ -23,4 +23,11 @@ Logs lists every log by event, for anyone signed in to download. Admins delete t
 - A log over 40 MB (compressed) waits on the laptop until it's trimmed. The downloader's page can trim a log to the part you need, and suggests from just before the robot was first enabled to just after it was last disabled. The file on the laptop is never cut.
 - **Export and delete all** downloads everything as one zip, then offers to delete them.
 
+## AdvantageScope
+
+**Open AdvantageScope** on Logs, or **Open in AdvantageScope** beside a log, opens Mechanical Advantage's AdvantageScope in Pit, with your team's match logs to choose from at the top. Its layout is saved for the whole team. It can't connect to the robot live: use the Driver Station's AdvantageScope for that.
+
+- **Save all to this device** keeps AdvantageScope and every log on this computer or tablet, so they open without a connection at an event. Logs you've opened are kept too, marked **On this device**.
+- **AdvantageScope assets** lists the fields and robot models your team uploaded in AdvantageScope (**File** › **Upload Asset**). Mentors and admins upload and remove them, up to 100 MB in all.
+
 This is in beta.

@@ -26,4 +26,6 @@ The docs read in order, from the basics to the more advanced, and each page buil
 
 You only need the apps your team uses: skip the rest.
 
+Any app's menu has **Need help?**, which opens the page of these docs about the page you're on.
+
 On a computer, you can also read these docs beside the app: open any app's menu and choose **Tutorial mode**. The page about where you are shows on the right, and changes as you move around. **Close tutorial** in the same menu, or the × above the docs, turns it off.

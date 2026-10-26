@@ -1,13 +1,30 @@
 import { inTeam, withTeam } from "@g3/auth";
 import { DEMO_PEOPLE, type DemoPerson, SAFE_TEXT, vocabularyOf } from "@g3/demo";
-import { asc } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import type { Db } from "./db";
-import { fields, itemEvents, itemListings, items, robots, stock, subsystems } from "./db/schema";
+import {
+  fields,
+  itemEvents,
+  itemListings,
+  items,
+  locations,
+  robots,
+  stock,
+  subsystems,
+} from "./db/schema";
 import { loadLocations } from "./lib/locations";
 import { loadSetup, starterSetup } from "./lib/setup";
 
 // The public demo's Inventory (roadmap 5.3), loaded after its nightly reset: the starter setup
-// (fields, locations, robots, subsystems) and a shop's worth of entries, some on a robot.
+// (fields, locations, robots, subsystems), a description on a few locations, and a shop's worth of
+// entries, some on a robot.
+
+/** Descriptions of what's kept in some of the starter locations, by name. */
+const TITLES: Record<string, string> = {
+  Shelves: SAFE_TEXT.contents[0],
+  Cabinets: SAFE_TEXT.contents[1],
+  Workbench: SAFE_TEXT.contents[5],
+};
 
 type Entry = {
   name: string;
@@ -83,6 +100,12 @@ const ENTRIES: Entry[] = [
 
 export async function loadDemo(db: Db, teamId: string) {
   await loadSetup(db, teamId, starterSetup(), true);
+  for (const [name, title] of Object.entries(TITLES)) {
+    await db
+      .update(locations)
+      .set({ title })
+      .where(inTeam(locations, teamId, eq(locations.name, name)));
+  }
   const [places, fieldRows, robotRows, subsystemRows] = await Promise.all([
     loadLocations(db, teamId),
     db.select().from(fields).where(inTeam(fields, teamId)).orderBy(asc(fields.sortOrder)).all(),

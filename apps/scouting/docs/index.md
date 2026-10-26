@@ -24,7 +24,7 @@ Strategy leads and the service crew are chosen in Scouting. Points and predictio
 
 | Page | What it's for |
 | --- | --- |
-| Scouting Forms | Fill in match and pit scouting |
+| Scouting Forms | Fill in match and pit scouting, on each of your team's forms |
 | Analysis | Every report, by team and match, with averages and comparisons |
 | Service Tickets | Robots that need help, for the service crew |
 | Auto Library | Other teams' autonomous routines |

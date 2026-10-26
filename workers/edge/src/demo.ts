@@ -1,11 +1,11 @@
 import { withTeam } from "@g3/auth";
 import { vocabularyOf } from "@g3/demo";
 import type { EdgeDb } from "./db";
-import { netClients, netSettings, netUsageHourly } from "./db/schema";
+import { netClients, netSettings, netSiteUsage, netUsageHourly } from "./db/schema";
 
 // The public demo's Edge (roadmap 5.3), loaded after its nightly reset. The demo has no box, so
 // its pages say it isn't connected; what it shows is a month of the shop network's use: the
-// devices on it and their hourly traffic, busiest at meetings.
+// devices on it and their hourly traffic, busiest at meetings, and the sites each one used.
 
 const GB = 1024 ** 3;
 const MB = 1024 ** 2;
@@ -32,6 +32,28 @@ const CLIENTS = [
   },
 ] as const;
 
+/** The sites each device uses, by its place in CLIENTS, with each one's share of its traffic. */
+const SITES: Record<number, [site: string, share: number][]> = {
+  0: [
+    ["docs.wpilib.org", 0.6],
+    ["github.com", 0.4],
+  ],
+  1: [
+    ["thebluealliance.com", 0.5],
+    ["chiefdelphi.com", 0.5],
+  ],
+  2: [
+    ["cad.onshape.com", 0.8],
+    ["youtube.com", 0.2],
+  ],
+  3: [
+    ["github.com", 0.5],
+    ["docs.wpilib.org", 0.3],
+    ["chiefdelphi.com", 0.2],
+  ],
+  4: [["thebluealliance.com", 1]],
+};
+
 /** Meeting days (Monday, Wednesday, Saturday) and their hours, in UTC. */
 const MEETING_DAYS = new Set([1, 3, 6]);
 const meetingHours = (weekday: number) => (weekday === 6 ? [17, 18, 19, 20, 21] : [22, 23, 0, 1]);
@@ -57,6 +79,7 @@ export async function loadDemo(db: EdgeDb, teamId: string) {
   }
 
   const rows: Omit<typeof netUsageHourly.$inferInsert, "teamId">[] = [];
+  const siteRows: Omit<typeof netSiteUsage.$inferInsert, "teamId">[] = [];
   for (let daysAgo = 30; daysAgo >= 1; daysAgo--) {
     const day = today - daysAgo * 24 * HOUR;
     const weekday = new Date(day * 1000).getUTCDay();
@@ -67,12 +90,18 @@ export async function loadDemo(db: EdgeDb, teamId: string) {
       for (const [i, client] of CLIENTS.entries()) {
         if (client.weight === 0) continue;
         const swing = 1 + ((daysAgo * 7 + hour * 3 + i * 5) % 10) / 10;
-        rows.push({
-          mac: client.mac,
-          ts,
-          dlBytes: Math.round(client.weight * 60 * MB * swing),
-          ulBytes: Math.round(client.weight * 8 * MB * swing),
-        });
+        const dlBytes = Math.round(client.weight * 60 * MB * swing);
+        const ulBytes = Math.round(client.weight * 8 * MB * swing);
+        rows.push({ mac: client.mac, ts, dlBytes, ulBytes });
+        for (const [site, share] of SITES[i] ?? []) {
+          siteRows.push({
+            mac: client.mac,
+            ts,
+            site,
+            dlBytes: Math.round(dlBytes * share),
+            ulBytes: Math.round(ulBytes * share),
+          });
+        }
       }
     }
   }
@@ -82,8 +111,13 @@ export async function loadDemo(db: EdgeDb, teamId: string) {
       .insert(netUsageHourly)
       .values(rows.slice(i, i + 15).map((row) => withTeam(teamId, row)));
   }
-  return { clients: CLIENTS.length, usage: rows.length };
+  for (let i = 0; i < siteRows.length; i += 15) {
+    await db
+      .insert(netSiteUsage)
+      .values(siteRows.slice(i, i + 15).map((row) => withTeam(teamId, row)));
+  }
+  return { clients: CLIENTS.length, usage: rows.length, sites: siteRows.length };
 }
 
 /** The words in the demo's Edge data, for the gateway. */
-export const demoWords = (): string[] => vocabularyOf(CLIENTS);
+export const demoWords = (): string[] => vocabularyOf(CLIENTS, Object.values(SITES));

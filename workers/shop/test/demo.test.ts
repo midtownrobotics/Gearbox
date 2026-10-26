@@ -6,8 +6,8 @@ import { call, callAs, jsonAs } from "@g3/testing/worker";
 import { describe, expect, it } from "vitest";
 import { drawingKey } from "../src/lib/storage";
 
-// The public demo's Shop (roadmap 5.3): parts partway through production, two batches, and a
-// release waiting on Ingest, each part with a stand-in drawing.
+// The public demo's Shop (roadmap 5.3): parts partway through production, two batches, a required
+// quality check with reports, and a release waiting on Ingest, each part with a stand-in drawing.
 
 const drawings = (env as unknown as { DRAWINGS: R2Bucket }).DRAWINGS;
 type Pending = { parts: { partNumber: string; revision: string }[] };
@@ -40,6 +40,28 @@ describe("the demo's sample data", () => {
     expect(pending.parts.length).toBeGreaterThan(0);
     const { links } = await jsonAs<{ links: unknown[] }>(student, "/onshape/links");
     expect(links).toEqual([]);
+  });
+
+  it("has a required quality check with a passed and a failed report", async () => {
+    const { admin } = teamUsers(demoTeamId);
+    const reports = await jsonAs<{ outcome: string; passed: number }[]>(admin, "/quality-reports");
+    expect(reports.map((r) => r.outcome).sort()).toEqual(["not_sent_back", "passed"]);
+    const { qualityCheck, qualityReports } = await jsonAs<{
+      qualityCheck: { required: boolean } | null;
+      qualityReports: boolean;
+    }>(admin, "/me");
+    expect(qualityCheck?.required).toBe(true);
+    expect(qualityReports).toBe(true);
+  });
+
+  it("doesn't link its sample releases to Onshape", async () => {
+    const { student } = teamUsers(demoTeamId);
+    const { releases } = await jsonAs<{ releases: { links: { release: string | null } }[] }>(
+      student,
+      "/onshape/releases",
+    );
+    expect(releases.length).toBeGreaterThan(0);
+    for (const release of releases) expect(release.links.release).toBeNull();
   });
 
   it("adds a sample release from Ingest, only in the demo", async () => {

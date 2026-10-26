@@ -2,8 +2,11 @@ import { env } from "cloudflare:test";
 import { exports } from "cloudflare:workers";
 import { demoTeamId } from "@g3/demo";
 import { site } from "@g3/site-config";
+import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
-import { maybeResetDemo } from "../src/demo";
+import { notifications } from "../src/db/schema";
+import { maybeResetDemo, resetDemo } from "../src/demo";
+import { db } from "../src/lib";
 import type { AppEnv } from "../src/types";
 
 // The public demo's reset (roadmap 5.4): the hourly cron wipes the demo team in every app and
@@ -82,5 +85,16 @@ describe("the public demo", () => {
   it("can be reset by hand (local dev), the gateway never answers it", async () => {
     const res = await call("/internal/demo/reset", { method: "POST" });
     expect(await res.json()).toEqual({ failed: [] });
+  });
+
+  it("has one notification from its admin, however many visitors wrote", async () => {
+    await resetDemo(testEnv);
+    await resetDemo(testEnv);
+    const rows = await db(testEnv)
+      .select()
+      .from(notifications)
+      .where(eq(notifications.teamId, demoTeamId));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.type).toBe("info");
   });
 });

@@ -18,7 +18,7 @@ An admin has to switch the app on, on [Apps](/portal/apps). The page someone see
 ## A button or page is missing
 
 - Most "missing" things need a role: see [who can do what](/start/roles).
-- Some features need another app: Orders' part lookup needs Edge, Inventory's Request buttons need Orders. They're hidden while that app is off.
+- Some features need another app: Inventory's Request buttons need Orders, Shop's Print buttons need Edge. They're hidden while that app is off. Orders fills in parts from Amazon, McMaster-Carr and DigiKey links only with an Edge box.
 
 ## Messages aren't arriving in Slack or Discord
 

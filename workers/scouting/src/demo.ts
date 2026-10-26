@@ -20,8 +20,9 @@ import {
 import type { ServiceIssueType } from "./service-issues";
 
 // The public demo's Scouting (roadmap 5.3), loaded after its nightly reset: an event in progress
-// with a schedule entered by hand (so nothing depends on The Blue Alliance), match and pit
-// forms with reports from the first matches, a pick list, comments, an auto routine, scouting
+// with a schedule entered by hand (so nothing depends on The Blue Alliance), two visible match
+// forms (the second only filled in for some matches, so coverage has gaps), a hidden one, and a
+// pit form, with reports from the first matches, a pick list, comments, an auto routine, scouting
 // assignments for the next matches, an announcement and a breakdown ticket. The other teams at
 // the event have made-up five-digit numbers, so none is a real team.
 
@@ -82,6 +83,35 @@ const MATCH_FIELDS = [
 const PIT_FIELDS = [
   { id: "drivetrain", label: "Drivetrain", type: "mcq", options: ["Swerve", "Tank", "Mecanum"] },
   { id: "climb", label: "Can they climb?", type: "mcq", options: ["Yes", "No"] },
+  { id: "notes", label: "Notes", type: "longText" },
+].map((field) => ({
+  required: false,
+  options: [] as string[],
+  min: 0,
+  max: 10,
+  step: 1,
+  ...field,
+}));
+
+/** A second match form, filled in by the same scouts for the first matches only. */
+const DRIVER_FIELDS = [
+  { id: "driver_skill", label: "Driver skill", type: "slider", min: 1, max: 5, step: 1 },
+  { id: "played_defense", label: "Did they play defense?", type: "mcq", options: ["Yes", "No"] },
+  { id: "notes", label: "Notes", type: "longText" },
+].map((field) => ({
+  required: false,
+  options: [] as string[],
+  min: 0,
+  max: 10,
+  step: 1,
+  ...field,
+}));
+/** The driver ratings are in for matches up to this one. */
+const DRIVER_RATED = 6;
+
+/** A form the team used at practice and has hidden from scouts. */
+const PRACTICE_FIELDS = [
+  { id: "drove", label: "Did the robot drive?", type: "mcq", options: ["Yes", "No"] },
   { id: "notes", label: "Notes", type: "longText" },
 ].map((field) => ({
   required: false,
@@ -202,6 +232,14 @@ export async function loadDemo(db: Db, teamId: string) {
 
   const forms = [
     { id: "form_scouting", name: "Scouting", kind: "scouting", fields: MATCH_FIELDS },
+    { id: "form_driver_ratings", name: "Driver ratings", kind: "scouting", fields: DRIVER_FIELDS },
+    {
+      id: "form_practice_day",
+      name: "Practice day",
+      kind: "scouting",
+      fields: PRACTICE_FIELDS,
+      hidden: true,
+    },
     { id: "form_pit_scouting", name: "Pit Scouting", kind: "pit", fields: PIT_FIELDS },
   ];
   for (const form of forms) {
@@ -212,7 +250,7 @@ export async function loadDemo(db: Db, teamId: string) {
         description: "",
         fields_json: JSON.stringify(form.fields),
         form_kind: form.kind,
-        is_active: 1,
+        is_active: "hidden" in form ? 0 : 1,
         created_by: mentor.id,
         created_at: now - 7 * 24 * HOUR,
         updated_at: now - 7 * 24 * HOUR,
@@ -238,6 +276,28 @@ export async function loadDemo(db: Db, teamId: string) {
           match_key: `${eventKey}_qm${match}`,
           match_number: match,
           fields_json: JSON.stringify(MATCH_FIELDS),
+        }),
+      );
+      reports++;
+      if (match > DRIVER_RATED) continue;
+      const team = Number(number);
+      await db.insert(scoutingFormSubmissions).values(
+        withTeam(teamId, {
+          id: `demo-driver-${match}-${slot}`,
+          form_id: "form_driver_ratings",
+          answers_json: JSON.stringify({
+            driver_skill: (team % 5) + 1,
+            played_defense: (team + match) % 4 === 0 ? "Yes" : "No",
+            notes: SAFE_TEXT.observation[(team + match + 1) % SAFE_TEXT.observation.length],
+          }),
+          submitted_by: scout.id,
+          submitted_by_name: scout.name,
+          created_at: firstMatch + match * 0.2 * HOUR + 60_000,
+          team_name: number,
+          event_key: eventKey,
+          match_key: `${eventKey}_qm${match}`,
+          match_number: match,
+          fields_json: JSON.stringify(DRIVER_FIELDS),
         }),
       );
       reports++;
@@ -372,7 +432,20 @@ export async function loadDemo(db: Db, teamId: string) {
 
 /** The words in the demo's Scouting data, for the gateway. */
 export const demoWords = (): string[] =>
-  vocabularyOf(TEAMS, EVENT_NAME, MATCH_FIELDS, PIT_FIELDS, TIERS, AUTO, "Pick list", [
-    "Scouts for the next four matches are posted. Check your assignments.",
-    "Scouting Pit",
-  ]);
+  vocabularyOf(
+    TEAMS,
+    EVENT_NAME,
+    MATCH_FIELDS,
+    DRIVER_FIELDS,
+    PRACTICE_FIELDS,
+    PIT_FIELDS,
+    TIERS,
+    AUTO,
+    "Pick list",
+    [
+      "Scouts for the next four matches are posted. Check your assignments.",
+      "Scouting Pit",
+      "Driver ratings",
+      "Practice day",
+    ],
+  );

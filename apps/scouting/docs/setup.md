@@ -13,7 +13,7 @@ access: admin
 - [ ] If the event uses Nexus, its **Nexus Event Key** and your **Nexus API Key**
 - [ ] Choose your **strategy leads** on Admin
 - [ ] Choose the **service crew** (Service tickets, later in this section, explains them)
-- [ ] Look over the match and pit forms on [Scouting Forms](team:scouting/), and edit their questions for this year's game
+- [ ] Look over the match and pit forms on [Scouting Forms](team:scouting/), edit their questions for this year's game, and hide any you won't use
 - [ ] Decide whether to turn on points and predictions (Points and predictions, at the end of this section)
 
 ## Event Configuration
@@ -33,13 +33,15 @@ The crew gets a chat message for every robot breakdown someone reports. Admins c
 
 ## Forms
 
-Your team has a match form and a pit form. Choose **Edit** on one to change it: add questions, drag them into order, and delete the ones you don't need. A question can be:
+Scouting Forms has **Match scouting** and **Pit scouting**, and each can have several forms, each with its own name: a main match form and a "Driver ratings" form, say. Choose **New match form** or **New pit form** to add one, and **Edit** on one to change it: its **Form name**, and its questions. Add questions, drag them into order, and delete the ones you don't need. A question can be:
 
 - **Counter**, with a minimum, maximum and how much each tap adds (1, 5, 10 or 20)
 - **Slider**
 - **Multiple choice** or **Multiple select**, with the choices separated by commas. A short list shows as buttons, one tap each.
 - **Text entry**, short or long
 - **Field map drawing**, for an auto path
+
+**Hide from scouts** takes a form off scouts' list without deleting it; **Show to scouts** puts it back. Hidden forms, and the reports already sent with them, stay for strategy leads and admins. Scouts fill in every visible match form for their team before moving on to the next match.
 
 Change forms before an event: reports already in keep the answers they were given.
 

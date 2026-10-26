@@ -150,7 +150,7 @@ function SendForm({
         </fieldset>
         <Field label="Short description">
           <TextField
-            kind="note"
+            kind="announcement"
             required
             maxLength={140}
             value={summary}
@@ -160,7 +160,7 @@ function SendForm({
         <Field label="Full text">
           <TextField
             multiline
-            kind="note"
+            kind="announcement"
             required
             maxLength={10_000}
             rows={4}
