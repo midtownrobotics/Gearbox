@@ -1,4 +1,4 @@
-import { teamKey } from "@g3/site-config";
+import { demoTeamId, teamKey } from "@g3/site-config";
 import { describe, expect, it } from "vitest";
 import { createTeam, createUser, createUserWithPin, g3id, sessionCookie, testEnv } from "./helpers";
 
@@ -83,6 +83,41 @@ describe("operator tools in G3ID", () => {
     });
     expect(await one("SELECT is_admin FROM core_users WHERE id = ?", founder)).toEqual({
       is_admin: 0,
+    });
+  });
+});
+
+describe("stats for the operators' console", () => {
+  type Stats = {
+    active: number;
+    pending: number;
+    mentors: number;
+    signedInWeek: number;
+    signedInMonth: number;
+    joinedMonth: number;
+  };
+  const stats = async () => (await (await internal("/stats")).json()) as Stats;
+
+  it("counts accounts on every team but the demo's, never who", async () => {
+    const before = await stats();
+    const team = await createTeam();
+    const mentor = await createUser({ teamId: team, isMentor: true });
+    await createUser({ teamId: team, status: "pending" });
+    await sessionCookie(mentor);
+    await testEnv.DB.prepare(
+      "INSERT OR IGNORE INTO teams (id, team_number, name, created_at, updated_at) VALUES (?, 9999, 'Demo', 1, 1)",
+    )
+      .bind(demoTeamId)
+      .run();
+    await createUser({ teamId: demoTeamId });
+    const after = await stats();
+    expect(after).toEqual({
+      active: before.active + 1,
+      pending: before.pending + 1,
+      mentors: before.mentors + 1,
+      signedInWeek: before.signedInWeek + 1,
+      signedInMonth: before.signedInMonth + 1,
+      joinedMonth: before.joinedMonth + 1,
     });
   });
 });

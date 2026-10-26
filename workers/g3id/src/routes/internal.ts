@@ -1,5 +1,6 @@
 import type { DiscordGuild, DiscordUser } from "@g3/discord";
-import { and, eq, inArray, isNull, ne } from "drizzle-orm";
+import { demoTeamId } from "@g3/site-config";
+import { and, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { createDb } from "../db";
 import {
@@ -155,6 +156,29 @@ export const internalRouter = new Hono<AppEnv>()
         hasChat: withChat.has(m.id),
       })),
     );
+  })
+  // How many accounts there are on every team but the public demo's, for the operators' console's
+  // Stats page: counts only, never who. "Signed in" is a sign-in in the last 7 or 30 days (a
+  // session lasts 7, so anyone using Gearbox signs in at least weekly).
+  .get("/stats", async (c) => {
+    const now = Math.floor(Date.now() / 1000);
+    const since = (days: number) => now - days * 86_400;
+    const active = sql`${coreUsers.status} = 'active'`;
+    const total = (condition: ReturnType<typeof sql>) =>
+      sql<number>`coalesce(sum(${condition}), 0)`;
+    const [stats] = await createDb(c.env.DB)
+      .select({
+        active: total(active),
+        pending: total(sql`${coreUsers.status} = 'pending'`),
+        mentors: total(sql`${active} and ${coreUsers.isMentor} = 1`),
+        signedInWeek: total(sql`${active} and ${coreUsers.lastLoginAt} >= ${since(7)}`),
+        signedInMonth: total(sql`${active} and ${coreUsers.lastLoginAt} >= ${since(30)}`),
+        joinedMonth: total(sql`${active} and ${coreUsers.createdAt} >= ${since(30)}`),
+      })
+      .from(coreUsers)
+      .where(and(ne(coreUsers.teamId, demoTeamId), isNull(coreUsers.deletedAt)))
+      .all();
+    return c.json(stats);
   })
   // Accounts by id, with their team: the platform's operators (who may be on any team).
   .get("/users", async (c) => {

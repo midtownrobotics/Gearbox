@@ -7,7 +7,8 @@ import { fakeDiscord } from "@g3/testing/discord";
 // For the operators' console: every team has two members, its founder ("u-founder", who has
 // linked the team's chat) and "u-member"; chat posts and DMs to a team are recorded (GET the
 // same path);
-// any account exists except "u-nobody"; and deleting and handing over a team work.
+// any account exists except "u-nobody"; deleting and handing over a team work; and /stats gives
+// fixed member counts.
 // /auth/me is the usual test stub (@g3/testing).
 const checks = new Map<string, number>();
 /** Messages to every admin of a team (the app library's), by team: read back with a GET. */
@@ -37,6 +38,16 @@ const g3id = async (request: Request) => {
   if (!url.pathname.startsWith("/api/internal/")) return g3idStub(request);
   const path = url.pathname.replace(/^\/api\/internal/, "");
   if (path === "/teams") return Response.json({ ok: true });
+  if (path === "/stats") {
+    return Response.json({
+      active: 12,
+      pending: 2,
+      mentors: 3,
+      signedInWeek: 8,
+      signedInMonth: 10,
+      joinedMonth: 4,
+    });
+  }
   if (path === "/users") {
     const ids = (url.searchParams.get("ids") ?? "").split(",").filter((id) => id !== "u-nobody");
     return Response.json(

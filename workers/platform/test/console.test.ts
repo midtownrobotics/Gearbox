@@ -386,3 +386,51 @@ describe("telling operators", () => {
     expect(sent.find((m) => m.text === text)?.userIds).toContain(operator.id);
   });
 });
+
+describe("stats", () => {
+  type Stats = {
+    teams: { active: number; pending: number; suspended: number; newThisMonth: number };
+    members: { active: number; signedInWeek: number };
+    apps: { slug: string; teams: number }[];
+  };
+  const stats = async () => (await (await call(operator, "/stats")).json()) as Stats;
+  const appOn = (teamId: string, app: string, enabled = true) =>
+    testEnv.PLATFORM_DB.prepare(
+      "INSERT OR REPLACE INTO team_apps (team_id, app, enabled, changed_at) VALUES (?, ?, ?, 1)",
+    )
+      .bind(teamId, app, enabled ? 1 : 0)
+      .run();
+
+  it("is for operators only", async () => {
+    expect((await call(student, "/stats")).status).toBe(403);
+  });
+
+  it("counts teams, members and the apps active teams have on, leaving out the demo", async () => {
+    const before = await stats();
+    const active = await createTeam();
+    const pending = await createTeam("pending");
+    await appOn(active.id, "orders");
+    await appOn(active.id, "pit", false);
+    await appOn(pending.id, "orders");
+    // The public demo has every app on, and isn't counted.
+    const demo = `frc${site.demo.teamNumber}`;
+    await testEnv.PLATFORM_DB.prepare(
+      `INSERT OR IGNORE INTO teams (id, team_number, name, country, status, created_at, updated_at)
+       VALUES (?1, ?2, 'Demo', 'US', 'active', 1, 1)`,
+    )
+      .bind(demo, site.demo.teamNumber)
+      .run();
+    await appOn(demo, "orders");
+    await appOn(demo, "pit");
+
+    const after = await stats();
+    expect(after.teams.active).toBe(before.teams.active + 1);
+    expect(after.teams.pending).toBe(before.teams.pending + 1);
+    const teamsWith = (s: Stats, app: string) => s.apps.find((a) => a.slug === app)?.teams;
+    expect(teamsWith(after, "orders")).toBe((teamsWith(before, "orders") ?? 0) + 1);
+    expect(teamsWith(after, "pit")).toBe(teamsWith(before, "pit"));
+    // ID and Portal are always on.
+    expect(after.apps.map((a) => a.slug)).not.toContain("id");
+    expect(after.members).toMatchObject({ active: 12, signedInWeek: 8 });
+  });
+});
