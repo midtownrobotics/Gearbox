@@ -29,6 +29,25 @@ import { OurNextMatchPanel } from "./our-next-match";
 import { SnapshotClock } from "./snapshot-clock";
 
 const REFRESH_MS = 15_000;
+// A part that hasn't answered by then is kept as it was, so one stuck request never holds the page.
+const PART_TIMEOUT_MS = 10_000;
+
+/** The part's answer, or undefined when it failed or took longer than PART_TIMEOUT_MS. */
+function part<T>(promise: Promise<T>): Promise<T | undefined> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(undefined), PART_TIMEOUT_MS);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      () => {
+        clearTimeout(timer);
+        resolve(undefined);
+      },
+    );
+  });
+}
 
 /**
  * The match list and the checklists, the tallest parts: on a wide screen each shrinks to what's
@@ -831,23 +850,24 @@ export function PitMonitorPage() {
   async function loadAll() {
     // Each part is kept as it was when it couldn't be asked (undefined), never blanked.
     const [b, l, i, m, logs] = await Promise.all([
-      fetchBatteries().catch(() => undefined),
-      fetchLists().catch(() => undefined),
-      fetchAllIssues().catch(() => undefined),
-      api.monitor.data
-        .$get()
-        .then((r) => (r.ok ? (r.json() as Promise<MonitorData>) : undefined))
-        .catch(() => undefined),
-      fetchDownloaders()
-        .then(async ({ downloaders }) =>
+      part(fetchBatteries()),
+      part(fetchLists()),
+      part(fetchAllIssues()),
+      part(
+        api.monitor.data
+          .$get()
+          .then((r) => (r.ok ? (r.json() as Promise<MonitorData>) : undefined)),
+      ),
+      part(
+        fetchDownloaders().then(async ({ downloaders }) =>
           downloaders.length
             ? {
                 downloader: currentDownloader(downloaders),
                 logs: (await fetchMatchLogs()).logs.slice(0, 3),
               }
             : null,
-        )
-        .catch(() => undefined),
+        ),
+      ),
     ]);
     if (b !== undefined) {
       setBatteries(b);
