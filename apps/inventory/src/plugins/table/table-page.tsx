@@ -17,6 +17,7 @@ import {
   type StockAction,
   StockActionDialog,
 } from "../../shared/stock-cells";
+import type { NewEntryFrom } from "./new-entry-page";
 
 /** How many rows are drawn at first, and how many more each "Show more" adds. */
 const PAGE_ROWS = 200;
@@ -229,8 +230,10 @@ export function TablePage() {
       title="Inventory"
       width="wide"
       actions={
+        // Filtered to a location, the new entry starts there.
         <Link
-          to="/new"
+          to={filters.locationId === null ? "/new" : `/new?location=${filters.locationId}`}
+          state={{ from: `/inventory?${params}` } satisfies NewEntryFrom}
           className="rounded-lg bg-primary-500 px-3.5 py-2 text-sm font-semibold text-on-primary hover:bg-primary-600"
         >
           Add an entry
