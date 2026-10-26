@@ -1,0 +1,1 @@
+@../../workers/schedule/AGENTS.md

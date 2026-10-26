@@ -42,7 +42,7 @@ pnpm typecheck
 pnpm test               # each worker's tests, in the Workers runtime
 ```
 
-How it fits together: each app is a React page plus a Hono worker serving it and its API at `/api`, and a gateway worker sends every hostname to the right app for the right team. [`CLAUDE.md`](CLAUDE.md) is the architecture reference.
+How it fits together: each app is a React page plus a Hono worker serving it and its API at `/api`, and a gateway worker sends every hostname to the right app for the right team. [`AGENTS.md`](AGENTS.md) and each app's own `AGENTS.md` are the architecture reference.
 
 ## Contributing
 

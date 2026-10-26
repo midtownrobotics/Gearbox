@@ -102,7 +102,7 @@ What a page follows. The first group restates the decisions above as rules. The 
 - **Delete or Remove.** Delete when it is gone for good. Remove when it only leaves a list and still exists.
 - **Dates.** A named month ("Oct 7, 2026"), in the viewer's own language. Orders, Inventory and Edge each have their own helper for it; one shared helper should replace them.
 
-The repo's standing rules still apply to every page: the color rules, short page text and US English in `CLAUDE.md`.
+The repo's standing rules still apply to every page: the color rules, short page text and US English in `AGENTS.md`.
 
 ## The shared parts
 
@@ -283,7 +283,7 @@ From reading the code on 11 October. None was confirmed in a running app, and on
 - Branch off `staging`; never change files on `staging`. A merge to `staging` goes live.
 - One step, or one app of a step, per pull request, with a changeset naming each app whose pages change: **patch** for a restyle or a rename, **minor** for a new page such as Pit's Overview, **major** only if an address stops working without a redirect.
 - Don't change what an app does while restyling it. If a page needs a behavior change to fit the rules (an address for a filter, a question before a delete), say so in the pull request.
-- The rules in `CLAUDE.md` apply: no fixed colors except for meaning, `text-on-primary` on a fill in the team's color, short page text, US English, sign-in only through `@g3/auth`.
+- The rules in `AGENTS.md` apply: no fixed colors except for meaning, `text-on-primary` on a fill in the team's color, short page text, US English, sign-in only through `@g3/auth`.
 - Update the Progress table and "What landed" here in the same pull request. If a step turns out wrong, fix this file and say so in the pull request.
 
 ## Out of scope

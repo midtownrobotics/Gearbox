@@ -58,14 +58,14 @@ Once reports are GitHub issues, a scheduled Claude Code task (a routine, made wi
 
 1. Lists open `ai-ready` issues, oldest first, skipping any that already have an open pull request (`gh pr list --search "<number> in:body"`) or the `ai-working` label.
 2. Takes at most *N* a day (start with 2), so there's never more to review than we can review.
-3. For each: adds `ai-working`, reads the issue, `CLAUDE.md`, and the roadmap and UI alignment pages it touches, and works on a branch `ai/<issue number>-<short name>` from `staging` (never `staging` or `public`; the rulesets block those anyway).
+3. For each: adds `ai-working`, reads the issue, `AGENTS.md`, and the roadmap and UI alignment pages it touches, and works on a branch `ai/<issue number>-<short name>` from `staging` (never `staging` or `public`; the rulesets block those anyway).
 4. Follows the repository's rules like any change: a changeset, the roadmap's Progress table when a step moves, `pnpm biome check --write`, typecheck, and the affected worker's tests.
 5. Opens a **draft** pull request into `staging` that says "Closes #123", what changed, which bump it chose and why, and what it couldn't check. Removes `ai-working`.
 6. If the issue is unclear or too big, it changes nothing, comments with its questions, and swaps `ai-ready` for `ai-needs-info`.
 
 A person reviews the draft and merges it like any other, or comments what to change and leaves `ai-ready` on for the next run to pick up. Nothing reaches production without a merge into `staging` and a release.
 
-The task's prompt is short, since `CLAUDE.md` carries the rules. Keep it in the repository (`docs/roadmap/ai-task-prompt.md`) so changes to it are reviewed, and have the routine read it.
+The task's prompt is short, since `AGENTS.md` carries the rules. Keep it in the repository (`docs/roadmap/ai-task-prompt.md`) so changes to it are reviewed, and have the routine read it.
 
 ### What makes an issue `ai-ready`
 
@@ -73,7 +73,7 @@ A person checks these before adding the label:
 
 - One app or one shared part, and roughly one pull request's worth of work.
 - What's wrong (or wanted) and what "done" looks like, in the issue's own words.
-- No schema change that needs a migration applied to production first, no new Cloudflare product, vendor or domain, and no change to what data is collected or who sees it. Those need the owners first (CLAUDE.md, "Platform Roadmap").
+- No schema change that needs a migration applied to production first, no new Cloudflare product, vendor or domain, and no change to what data is collected or who sees it. Those need the owners first (AGENTS.md, "Platform Roadmap").
 - The issue's text is the maintainer's, not just a user's report pasted in (below).
 
 An issue template (`.github/ISSUE_TEMPLATE/ai-ready.yml`) with these fields makes the check quick.
