@@ -4,6 +4,7 @@ import {
   allowedText,
   baseVocabulary,
   demoBlocked,
+  demoOutsideReadRefused,
   disallowedText,
   nextSafe,
   visitorFor,
@@ -72,6 +73,18 @@ describe("demoBlocked", () => {
   it("lets ordinary work through", () => {
     expect(demoBlocked("orders", "POST", "/requests")).toBe(false);
     expect(demoBlocked("id", "POST", "/admin/users/demo-9999-04/approve")).toBe(false);
+  });
+});
+
+describe("demoOutsideReadRefused", () => {
+  it("looks up only the demo's sample links", () => {
+    const lookup = (url: string) => new URLSearchParams({ url });
+    expect(demoOutsideReadRefused("orders", "/lookup", lookup(SAFE_TEXT.url[1]))).toBe(false);
+    expect(demoOutsideReadRefused("orders", "/lookup", lookup("https://example.com/"))).toBe(true);
+    expect(demoOutsideReadRefused("orders", "/lookup", new URLSearchParams())).toBe(true);
+    expect(demoOutsideReadRefused("orders", "/requests", lookup("https://example.com/"))).toBe(
+      false,
+    );
   });
 });
 

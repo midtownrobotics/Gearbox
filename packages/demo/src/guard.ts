@@ -1,4 +1,5 @@
 import type { AppName } from "@g3/site-config";
+import { SAFE_TEXT } from "./safe-text.ts";
 
 // What the gateway lets a demo visitor do (roadmap 5.5 and 5.7). The demo's pages only send text
 // picked from the safe lists (safe-text.ts) or the demo's own sample data, so this only stops
@@ -6,6 +7,8 @@ import type { AppName } from "@g3/site-config";
 // - Routes that reach outside the platform or lock visitors out (connecting Slack or Discord,
 //   kiosks, keys,
 //   switching apps off, deleting the shared accounts) are refused for every role.
+// - Reads that fetch from outside the platform (Orders' part lookup goes to the vendor's site) are
+//   allowed only for the demo's own sample text (`DEMO_OUTSIDE_READS`).
 // - Uploads are refused: any file, and any body that isn't JSON or a form of text.
 // - Every string in a JSON body must be made of words the demo already has (`vocabulary`), or be
 //   a machine value: a number, an id, a date, a color, a lowercase code like "in-progress".
@@ -64,6 +67,31 @@ export const DEMO_BLOCKED: readonly Blocked[] = [
   { app: "pit", method: "PUT", path: /^\/team-settings/ },
   { app: "attendance", method: "PUT", path: /^\/team-settings/ },
 ];
+
+type OutsideRead = { app: DemoWorker; path: RegExp; param: string; allowed: readonly string[] };
+
+/**
+ * Reads that make an app fetch from outside the platform, and the only values of their query
+ * parameter the demo sends on: Orders' part lookup reads the vendor's page, so only the sample
+ * links a visitor can pick (SAFE_TEXT.url) are looked up.
+ */
+export const DEMO_OUTSIDE_READS: readonly OutsideRead[] = [
+  { app: "orders", path: /^\/lookup\/?$/, param: "url", allowed: SAFE_TEXT.url },
+];
+
+/** Whether a read reaches outside the platform with something other than the demo's own text. */
+export function demoOutsideReadRefused(
+  app: DemoWorker,
+  path: string,
+  search: URLSearchParams,
+): boolean {
+  return DEMO_OUTSIDE_READS.some(
+    (read) =>
+      read.app === app &&
+      read.path.test(path) &&
+      !read.allowed.includes(search.get(read.param)?.trim() ?? ""),
+  );
+}
 
 /** Whether a request is one the demo refuses whatever its body. */
 export function demoBlocked(app: DemoWorker, method: string, path: string): boolean {

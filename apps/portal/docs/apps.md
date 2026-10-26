@@ -21,7 +21,7 @@ Every admin who has linked the team's chat gets a message when an app is switche
 - After 90 days its data is deleted, and that can't be undone.
 - Before you switch an app off, the page offers its data as a download (a JSON file). Download it if you might want it later.
 
-Features that need another app hide while that app is off. For example, Orders' part lookup needs Edge, and Inventory's links to the parts catalog need Orders.
+Features that need another app hide while that app is off. For example, Inventory's links to the parts catalog need Orders, and Shop's Print buttons need Edge.
 
 ## The team's log
 

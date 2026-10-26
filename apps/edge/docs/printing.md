@@ -18,3 +18,5 @@ A shared drive on the shop network at `http://drive.local`, for files too big to
 ## Door sounds
 
 If the box has a door switch, it plays a sound when the shop door opens. On **Door Sounds**, admins upload WAV files, test them on the box and delete them, and see when the door was last opened.
+
+Members can **Suggest a sound**: a WAV of up to 10 MB, which plays only once an admin approves it on Door Sounds.

@@ -4,6 +4,7 @@ import { site } from "@g3/site-config";
 import type { Db } from "./db";
 import {
   assignments,
+  friends,
   roles,
   scheduleAttendees,
   scheduleDays,
@@ -12,7 +13,8 @@ import {
 } from "./db/schema";
 
 // The public demo's Schedule (roadmap 5.3), loaded after its nightly reset: the team's roles and
-// a published two-day event later this week, with periods and everyone's roles painted in.
+// a published two-day event later this week, with periods and everyone's roles painted in, and
+// a few friends for each of the accounts visitors sign in as.
 
 const ROLES = [
   { name: "Drive Team", color: "green", type: "other" },
@@ -115,6 +117,20 @@ export async function loadDemo(db: Db, teamId: string) {
   // Fifteen rows a statement: D1 takes at most 100 values in one.
   for (let i = 0; i < rows.length; i += 15) {
     await db.insert(assignments).values(rows.slice(i, i + 15).map((row) => withTeam(teamId, row)));
+  }
+
+  // Each visitor account's friends (by place in DEMO_PEOPLE), so the Friends view has people.
+  const FRIENDS: Record<number, number[]> = { 0: [3, 4, 5], 1: [2, 12], 2: [1, 6] };
+  for (const [person, list] of Object.entries(FRIENDS)) {
+    for (const friend of list) {
+      await db.insert(friends).values(
+        withTeam(teamId, {
+          userId: (DEMO_PEOPLE[Number(person)] as DemoPerson).id,
+          friendId: (DEMO_PEOPLE[friend] as DemoPerson).id,
+          addedAt: seconds,
+        }),
+      );
+    }
   }
   return { assignments: rows.length };
 }

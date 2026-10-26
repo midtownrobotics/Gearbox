@@ -3,6 +3,7 @@ import {
   type DemoWorker,
   baseVocabulary,
   demoBlocked,
+  demoOutsideReadRefused,
   disallowedText,
   isWrite,
 } from "@g3/demo";
@@ -78,7 +79,9 @@ export async function checkDemoRequest(
 ): Promise<Response | null> {
   const { method } = request;
   if (demoBlocked(app, method, path)) return refuse(403, DEMO_REFUSALS.blocked);
-  if (!isWrite(method)) return null;
+  if (!isWrite(method)) {
+    return demoOutsideReadRefused(app, path, search) ? refuse(403, DEMO_REFUSALS.blocked) : null;
+  }
 
   const visitor = request.headers.get("CF-Connecting-IP") ?? "local";
   if (env.DEMO_LIMITER) {

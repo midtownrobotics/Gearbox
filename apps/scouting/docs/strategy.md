@@ -27,4 +27,5 @@ On Scouting's [Admin](team:scouting/admin) page, during an event:
 
 - **Announcement:** a message every scout sees at the top of Scouting for anywhere from 30 seconds to 10 minutes: "Lunch at 12, no scouting". Choose **Announce**.
 - **Competition overview:** who's online, and the reports in for the current match, each with its scout and team (marked Late if it was). Open one to read it in Analysis.
+- **Missing match reports**, in the Competition overview: each robot in the **Current match** (or **All event matches**), with how many scouts it was given and how many reports each visible match form has. **Only teams missing forms** leaves out the ones that are done.
 - **Change Match #** sets the match everyone is scouting: use the arrows or type it, then **Update match**. With The Blue Alliance, **Set to current TBA match** catches up, and Scouting normally moves on by itself. With a schedule entered by hand, this is how scouts move on.

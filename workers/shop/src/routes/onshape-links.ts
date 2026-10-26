@@ -86,7 +86,8 @@ export const onshapeLinksRouter = new Hono<AppEnv>()
           approvers: release.approvers ?? [],
           comments: release.comments ?? [],
           links: {
-            release: releasePackageUrl(release.releaseId),
+            // The demo's sample releases were never in Onshape: a link would open it on nothing.
+            release: isDemoTeam(teamId) ? null : releasePackageUrl(release.releaseId),
             document: documentId && versionId ? `${ONSHAPE}/${documentId}/v/${versionId}` : null,
           },
           parts: own.map((part) => ({

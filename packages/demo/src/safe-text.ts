@@ -194,6 +194,15 @@ export const SAFE_TEXT = {
   tree: ["Safety", "Manufacturing", "Programming", "Electrical", "Design"],
   role: ["Drive Team", "Scouting", "Pit", "Break", "Lunch", "Media"],
   period: ["Load in", "Practice matches", "Lunch", "Qualification matches", "Awards"],
+  /** A notification a team's admins send its members. */
+  announcement: [
+    "Build session moved to Saturday",
+    "The shop is closed on Friday",
+    "Bring safety glasses to every meeting",
+    "Sign up for the district event by Monday",
+    "This Saturday's build session starts at 9 AM instead of 10. Bring safety glasses, and sign in at the door as usual.",
+    "The shop is closed on Friday for a school event. The next build session is Saturday as usual.",
+  ],
   /** A Slack channel's id (the demo can't connect Slack, so these only fill the field). */
   channel: ["C0DEMO0001", "C0DEMO0002"],
 } as const satisfies Record<string, readonly string[]>;

@@ -26,6 +26,6 @@ Other browsers have it too: in Samsung Internet it's in the **≡** menu as **Ad
 
 - **Sign in again if it asks.** An installed app can keep its own sign-in, apart from your browser's, especially on an iPhone or iPad.
 - **It opens on the app's first page**, not the page you installed it from.
-- **The icon is Gearbox's built-in color**, even when your team has its own. Pages inside the app still show your team's colors.
+- **The icon is in your team's color.** If your team changes its color later, the icon follows the next time the phone updates the app.
 
 To remove it, press and hold its icon and choose **Remove** (Android: **Uninstall** or drag it to **Remove**). Your team's data stays: it lives in Gearbox, not on the phone.

@@ -12,7 +12,7 @@ Admins also get the team's admin pages, under **Admin** in the bar. Only what's 
 | --- | --- |
 | Manage Apps | Switch apps on and off, download an app's data, see the team's log |
 | Members | Approve new members, give roles, remove people |
-| Appearance | Colors, logo, names, links and the order of the tiles |
+| Appearance | Colors, avatar, names, links and the order of the tiles |
 | Sign-in | Which sign-in methods your team allows |
 | Kiosk Devices | Shared shop computers where people sign in to Shop with a PIN (Shop only, for now) |
 | Integrations | Connect Slack or Discord, and see what else is connected |
