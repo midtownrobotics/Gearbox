@@ -200,11 +200,19 @@ export function BoardPage() {
               className={`${inputClass} !w-auto min-w-0 max-w-full`}
             >
               <option value="overview">Every machine</option>
-              {data?.processes.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
+              {data?.processes
+                // A removed process only while parts are still at it.
+                .filter(
+                  (p) =>
+                    p.archivedAt === null ||
+                    p.id === view ||
+                    rows.some((r) => r.current?.processId === p.id),
+                )
+                .map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
             </select>
           )}
           {kiosk.active && (

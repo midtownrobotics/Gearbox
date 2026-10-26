@@ -342,7 +342,81 @@ describe("lists", () => {
 });
 
 describe("part lookup", () => {
-  it("reports the shop's edge box being offline", async () => {
+  type Found = {
+    title: string;
+    vendor: string;
+    sku?: string;
+    price?: number;
+    available?: boolean;
+    source: string;
+    variants: { id: string; title: string; sku?: string; price?: number; available?: boolean }[];
+    selectedVariantId?: string;
+  };
+  const lookUp = (link: string) =>
+    jsonAs<Found>(student, `/lookup?url=${encodeURIComponent(link)}`, {}, 200);
+
+  it("reads a Shopify store's product without the edge box", async () => {
+    const found = await lookUp(`https://wcproducts.com/products/wcp-2073?v=${crypto.randomUUID()}`);
+    expect(found).toMatchObject({
+      source: "shopify",
+      vendor: "wcproducts.com",
+      title: '0.625" OD Cam Follower (#10-32) (2-Pack)',
+      sku: "WCP-2073",
+      price: 7.99,
+      available: true,
+    });
+    expect(found.variants).toEqual([
+      {
+        id: "47177230319828",
+        title: "Default Title",
+        sku: "WCP-2073",
+        price: 7.99,
+        available: true,
+      },
+    ]);
+  });
+
+  it("follows a store's short link, and takes the option a ?variant= picks", async () => {
+    const found = await lookUp(`https://andymark.com/am-0028?variant=12&v=${crypto.randomUUID()}`);
+    expect(found).toMatchObject({
+      title: "3/8 in. Round ID Flanged Shielded Bearing",
+      selectedVariantId: "12",
+      sku: "am-0028-10",
+      price: 20,
+      available: false,
+    });
+    expect(found.variants.map((v) => v.title)).toEqual(["Single", "Pack of 10"]);
+  });
+
+  it("reads REV's feed, a page's options as its variants", async () => {
+    const one = await lookUp("https://www.revrobotics.com/rev-11-1107/");
+    expect(one).toMatchObject({
+      title: "Analog Pressure Sensor",
+      sku: "REV-11-1107",
+      price: 39.42,
+    });
+    const cables = await lookUp("https://www.revrobotics.com/jst-ph-4-pin-sensor-cables");
+    expect(cables.title).toBe("JST PH 4-pin Sensor Cables");
+    expect(cables.sku).toBeUndefined();
+    expect(cables.variants).toEqual([
+      {
+        id: "REV-31-1407-PK4",
+        title: "JST PH 4-pin Sensor Cable - 30cm - 4 Pack",
+        sku: "REV-31-1407-PK4",
+        price: 7,
+        available: true,
+      },
+      {
+        id: "REV-31-1408-PK4",
+        title: "JST PH 4-pin Sensor Cable - 50cm - 4 Pack",
+        sku: "REV-31-1408-PK4",
+        price: 8,
+        available: false,
+      },
+    ]);
+  });
+
+  it("asks the edge box for a product the store doesn't have, and reports it offline", async () => {
     const res = await callAs(
       student,
       `/lookup?url=${encodeURIComponent("https://wcproducts.com/products/x")}`,

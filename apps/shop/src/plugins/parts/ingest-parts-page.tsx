@@ -20,6 +20,7 @@ import { Link } from "react-router-dom";
 import { api } from "../../shared/api";
 import { getErrorMessage } from "../../shared/api-error";
 import { partInfoRequiredBy, pipelineFileError } from "../../shared/derive";
+import { onshapeLinkFor, onshapeReleaseLink, useOnshapeLinks } from "../../shared/onshape-links";
 import type { Process, Subsystem } from "../../shared/types";
 import { useAuthUser } from "../../shared/use-auth";
 import { useShopData } from "../../shared/use-shop-data";
@@ -93,12 +94,24 @@ type LocalPartData = {
 
 const INGEST_COLUMNS = 9;
 
-/** The row above a release's parts: its name and when it was released, linking to its page. */
-function ReleaseHeader({ release, count }: { release?: PendingRelease; count: number }) {
+/**
+ * The row above a release's parts: its name and when it was released, linking to its page, and
+ * the release package in Onshape when the team's links hold it.
+ */
+function ReleaseHeader({
+  release,
+  count,
+  onshape,
+}: {
+  release?: PendingRelease;
+  count: number;
+  onshape: string | null;
+}) {
   return (
     <tr className="bg-secondary-50">
       <td colSpan={INGEST_COLUMNS} className="px-4 py-2">
-        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+        {/* Kept in view and wrapped when the table is wider than a phone's screen. */}
+        <div className="sticky left-4 flex max-w-[calc(100vw-4rem)] flex-wrap items-baseline gap-x-3 gap-y-0.5">
           {release ? (
             <Link
               to={`/onshape/releases/${release.id}`}
@@ -119,9 +132,45 @@ function ReleaseHeader({ release, count }: { release?: PendingRelease; count: nu
           <span className="text-xs text-secondary-400">
             {count} {count === 1 ? "part" : "parts"}
           </span>
+          {onshape && (
+            <a
+              href={onshape}
+              target="_blank"
+              rel="noreferrer"
+              title="Open this release in Onshape"
+              className="text-xs text-primary-600 underline hover:text-primary-700 transition-colors"
+            >
+              Open in Onshape
+            </a>
+          )}
         </div>
       </td>
     </tr>
+  );
+}
+
+/**
+ * A pending part's name, linking to the part in Onshape at the revision being ingested, like the
+ * shop floor's File Producer view. Plain text without it.
+ */
+function IngestPartName({ name, part }: { name: string | null; part: string | null }) {
+  if (!part) {
+    return (
+      <p className="truncate text-secondary-900" title={name ?? undefined}>
+        {name || "—"}
+      </p>
+    );
+  }
+  return (
+    <a
+      href={part}
+      target="_blank"
+      rel="noreferrer"
+      title={name ? `${name}\nOpen this part in Onshape` : "Open this part in Onshape"}
+      className="block truncate font-medium text-primary-600 underline hover:text-primary-700 transition-colors"
+    >
+      {name || "Open in Onshape"}
+    </a>
   );
 }
 
@@ -377,6 +426,7 @@ function ProcessPanel({
 
 export function IngestPartsPage() {
   const { data, loading } = useShopData();
+  const onshapeLinks = useOnshapeLinks();
   const user = useAuthUser();
   const touch = useTouchDevice();
   const [pendingData, setPendingData] = useState<PendingPartsData | null>(null);
@@ -566,8 +616,11 @@ export function IngestPartsPage() {
         (p) => p.id === user.qualityCheck.processId && p.type === "quality_control",
       ) ?? null)
     : null;
-  // The quality check isn't picked by hand while it's required: it's on every part already.
-  const pickable = (data?.processes ?? []).filter((p) => p.id !== qualityStep?.id);
+  // The quality check isn't picked by hand while it's required: it's on every part already. Nor
+  // is a process removed on the Admin page.
+  const pickable = (data?.processes ?? []).filter(
+    (p) => p.id !== qualityStep?.id && p.archivedAt === null,
+  );
   const qualityNote = qualityStep ? (
     <p className="text-sm text-secondary-500">
       The team requires quality control: {qualityStep.name} is added to the end of every part.
@@ -622,6 +675,7 @@ export function IngestPartsPage() {
                           count={
                             pendingData.parts.filter((p) => p.releaseId === part.releaseId).length
                           }
+                          onshape={onshapeReleaseLink(onshapeLinks, part.onshapeReleaseId)}
                         />
                       )}
                       <tr className="hover:bg-secondary-50 transition-colors">
@@ -631,8 +685,14 @@ export function IngestPartsPage() {
                         <td className="px-4 py-3 text-secondary-400 text-xs">
                           {(localPartData[part.partNumber]?.revision ?? part.revision) || "—"}
                         </td>
-                        <td className="px-4 py-3 text-secondary-900 text-xs truncate max-w-xs">
-                          {(localPartData[part.partNumber]?.name ?? part.name) || "—"}
+                        <td className="px-4 py-3 text-xs max-w-xs">
+                          <IngestPartName
+                            name={(localPartData[part.partNumber]?.name ?? part.name) || null}
+                            part={
+                              onshapeLinkFor(onshapeLinks, part.partNumber, part.revision)?.part ??
+                              null
+                            }
+                          />
                         </td>
                         <td className="px-4 py-3 text-secondary-400 text-xs">
                           <TextField

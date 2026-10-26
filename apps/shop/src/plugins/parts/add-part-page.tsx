@@ -15,7 +15,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { api } from "../../shared/api";
 import { getErrorMessage } from "../../shared/api-error";
 import { partInfoRequiredBy, pipelineFileError } from "../../shared/derive";
-import type { PartDefinition, PartInstance } from "../../shared/types";
+import { type PartDefinition, type PartInstance, activeOr } from "../../shared/types";
 import { useAuthUser } from "../../shared/use-auth";
 import { useShopData } from "../../shared/use-shop-data";
 import { useTouchDevice } from "../../shared/use-touch";
@@ -93,7 +93,10 @@ export function AddPartPage() {
         (p) => p.id === user.qualityCheck.processId && p.type === "quality_control",
       ) ?? null)
     : null;
-  const pickable = (data?.processes ?? []).filter((p) => p.id !== qualityStep?.id);
+  // Not one removed on the Admin page, unless the part being edited already has it.
+  const pickable = activeOr(data?.processes ?? [], processIds).filter(
+    (p) => p.id !== qualityStep?.id,
+  );
 
   async function handleSubmit() {
     if (
@@ -225,8 +228,8 @@ export function AddPartPage() {
     }
   }
 
-  const subsystems = data?.subsystems ?? [];
-  const processes = data?.processes ?? [];
+  const subsystems = activeOr(data?.subsystems ?? [], [form.subsystemId]);
+  const processes = activeOr(data?.processes ?? []);
 
   return (
     <Page
@@ -281,7 +284,7 @@ export function AddPartPage() {
                     <option value={0}>Select…</option>
                     {subsystems.map((s) => (
                       <option key={s.id} value={s.id}>
-                        {s.name}
+                        {s.archivedAt === null ? s.name : `${s.name} (removed)`}
                       </option>
                     ))}
                   </select>
@@ -377,7 +380,7 @@ export function AddPartPage() {
                           <option value={0}>Remove</option>
                           {pickable.map((p) => (
                             <option key={p.id} value={p.id}>
-                              {p.name}
+                              {p.archivedAt === null ? p.name : `${p.name} (removed)`}
                             </option>
                           ))}
                         </select>
@@ -396,7 +399,7 @@ export function AddPartPage() {
                         className={`${inputClass} flex-1 border-dashed !text-secondary-500`}
                       >
                         <option value={0}>Add a process…</option>
-                        {pickable.map((p) => (
+                        {activeOr(pickable).map((p) => (
                           <option key={p.id} value={p.id}>
                             {p.name}
                           </option>

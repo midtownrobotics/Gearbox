@@ -10,6 +10,7 @@ import {
   inputClass,
   nextSafe,
 } from "@g3/ui";
+import { vendorDiffUrl } from "@g3/worker-orders/vendor-sites";
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { api, getErrorMessage } from "../../shared/api";
@@ -243,11 +244,6 @@ export function CatalogPage() {
             aria-label="Search the catalog, or paste a product link"
             autoFocus
           />
-          <p className="text-xs text-amber-900 bg-amber-50 border border-amber-300 rounded-lg px-3 py-2">
-            We are aware of the issue with not being able to find the Edge box. We are working on
-            solutions that do not require physical hardware. We will keep everybody updated. Thank
-            you for your patience!
-          </p>
           {link && <p className="text-sm text-secondary-500">Opening a request for that link…</p>}
           <div className={`flex flex-wrap items-center gap-2 ${link ? "hidden" : ""}`}>
             <select
@@ -515,6 +511,7 @@ function ItemRow({
   const [editing, setEditing] = useState(false);
   const { canEditCatalog } = useAuthUser();
   const composer = useContext(Composer);
+  const vendorDiff = vendorDiffUrl(item.url, item.sku);
   if (editing) {
     return (
       <li className="py-2">
@@ -569,6 +566,17 @@ function ItemRow({
       >
         {LINK_LABEL[item.linkKind]}
       </a>
+      {vendorDiff && (
+        <a
+          href={vendorDiff}
+          target="_blank"
+          rel="noreferrer"
+          title="Price and stock history"
+          className="text-xs text-secondary-500 hover:text-primary-600 whitespace-nowrap"
+        >
+          VendorDiff ↗
+        </a>
+      )}
       {canEditCatalog && (
         <button
           type="button"

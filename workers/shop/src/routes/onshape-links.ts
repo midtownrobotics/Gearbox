@@ -1,4 +1,5 @@
 import { inTeam, requireAuth } from "@g3/auth";
+import { isDemoTeam } from "@g3/site-config";
 import { desc } from "drizzle-orm";
 import { Hono } from "hono";
 import { createShopDb } from "../db";
@@ -108,6 +109,8 @@ export const onshapeLinksRouter = new Hono<AppEnv>()
   .get("/links", requireAuth, async (c) => {
     const db = createShopDb(c.env.SHOP_DB);
     const teamId = c.get("teamId");
+    // The demo's sample releases were never in Onshape, so their ids lead nowhere.
+    if (isDemoTeam(teamId)) return c.json({ links: [] });
     const documentId = await getSetting(db, teamId, SETTING.onshapeDocument);
 
     const rows = await db
@@ -139,6 +142,7 @@ export const onshapeLinksRouter = new Hono<AppEnv>()
           documentId && row.versionId && row.entityId
             ? `https://cad.onshape.com/documents/${documentId}/v/${row.versionId}/e/${row.entityId}`
             : null,
+        releaseId: row.releaseId,
         release: releasePackageUrl(row.releaseId),
       });
     }

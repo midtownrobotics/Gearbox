@@ -8,7 +8,6 @@ import { CatalogSearch } from "../catalog/catalog-search";
 import {
   type Draft,
   DraftCard,
-  badQuantities,
   blank,
   catalogDraft,
   draftFields,
@@ -78,6 +77,8 @@ function ReplaceDialog({
   const [draft, setDraft] = useState<Draft | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** Replace item was clicked while something was missing: say what. */
+  const [showWhy, setShowWhy] = useState(false);
 
   const change = (patch: Partial<Draft>) => setDraft((d) => (d ? { ...d, ...patch } : d));
 
@@ -109,10 +110,16 @@ function ReplaceDialog({
     void fill({ ...blank(item.url), name: item.name }, () => catalogDraft(item));
   }
 
+  /** What has to be fixed before the item can be replaced. */
+  const whyBlocked = !draft
+    ? "Paste a link or pick a part from the catalog first."
+    : draft.state !== "ready"
+      ? "Wait for the lookup to finish."
+      : draftProblem(draft);
+
   async function save() {
-    if (!draft) return;
-    const problem = draftProblem(draft);
-    if (problem) return change({ submitError: problem });
+    if (whyBlocked || !draft) return setShowWhy(true);
+    setShowWhy(false);
     setBusy(true);
     change({ submitError: null });
     const res = await api.requests[":id"].$patch({
@@ -220,14 +227,16 @@ function ReplaceDialog({
           )}
         </section>
 
+        {showWhy && whyBlocked && (
+          <p role="alert" className="text-right text-sm text-red-700">
+            {whyBlocked}
+          </p>
+        )}
         <div className="flex flex-wrap justify-end gap-2 border-t border-secondary-200 pt-4">
           <Button variant="secondary" onClick={onClose}>
             Cancel
           </Button>
-          <Button
-            onClick={save}
-            disabled={busy || !draft || draft.state !== "ready" || badQuantities(draft)}
-          >
+          <Button onClick={save} disabled={busy} blocked={!!whyBlocked}>
             {busy ? "Saving…" : "Replace item"}
           </Button>
         </div>

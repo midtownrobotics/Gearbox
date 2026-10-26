@@ -1,0 +1,50 @@
+name: Idea
+description: Something you'd like Gearbox to do.
+title: "<App> idea: "
+labels: ["idea"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The same details Gearbox's Report a problem adds to its issues, so issues read alike however they're made. Start the title with the app's name, as Gearbox does ("Orders idea: …").
+  - type: textarea
+    id: message
+    attributes:
+      label: Your idea
+      description: What you'd like, and what it would help you do.
+    validations:
+      required: true
+  - type: input
+    id: app
+    attributes:
+      label: App
+      description: Attendance, Edge, ID, Inventory, Orders, Pit, Portal, Schedule, Scouting, Shop or Skill Tree.
+  - type: input
+    id: page
+    attributes:
+      label: Page
+      description: The page's address, without anything after a ?.
+      placeholder: https://1648-orders.frcgearbox.com/requests
+  - type: input
+    id: app-version
+    attributes:
+      label: App version
+      description: In the app's menu, beside Report a problem.
+      placeholder: 1.4.0
+  - type: input
+    id: platform-version
+    attributes:
+      label: Platform version
+      description: In the app's menu, after "platform".
+      placeholder: 2026.10.0
+  - type: input
+    id: browser
+    attributes:
+      label: Browser
+      placeholder: Chrome 141 on Windows
+  - type: input
+    id: team
+    attributes:
+      label: Team
+      description: The team's number.
+      placeholder: "1648"

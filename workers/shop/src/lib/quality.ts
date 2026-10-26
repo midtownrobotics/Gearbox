@@ -1,5 +1,5 @@
 import { inTeam } from "@g3/auth";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import type { createShopDb } from "../db";
 import { processes, shopManagers } from "../db/schema";
 import { SETTING, getSettings, setSetting } from "./settings";
@@ -56,12 +56,19 @@ export async function isShopManager(db: ShopDb, teamId: string, userId: string):
   return Boolean(row);
 }
 
-/** The team's Quality Control processes, oldest first. */
+/** The team's Quality Control processes, oldest first, leaving out ones removed on Admin. */
 export function qualityProcesses(db: ShopDb, teamId: string) {
   return db
     .select({ id: processes.id, name: processes.name })
     .from(processes)
-    .where(inTeam(processes, teamId, eq(processes.type, "quality_control")))
+    .where(
+      inTeam(
+        processes,
+        teamId,
+        eq(processes.type, "quality_control"),
+        isNull(processes.archivedAt),
+      ),
+    )
     .all();
 }
 
@@ -154,11 +161,15 @@ export async function saveQualityCheck(
         inTeam(
           processes,
           teamId,
-          and(eq(processes.id, next.processId), eq(processes.type, "quality_control")),
+          and(
+            eq(processes.id, next.processId),
+            eq(processes.type, "quality_control"),
+            isNull(processes.archivedAt),
+          ),
         ),
       )
       .get();
-    if (!step) return "Pick a process whose type is Quality Control.";
+    if (!step) return "Pick a Quality Control process that hasn't been removed.";
   }
   if (next.required && next.processId === null) {
     return "Pick the Quality Control process the check uses.";
