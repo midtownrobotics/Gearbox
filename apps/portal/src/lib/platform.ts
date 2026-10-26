@@ -115,10 +115,10 @@ export async function appIntegrations(slug: string): Promise<Record<string, Inte
   return data.integrations ?? {};
 }
 
-export type NotificationType = "info" | "warning" | "critical";
+export type NotificationType = "info" | "critical";
 export type PortalAudience = "everyone" | "admins" | "nobody";
 
-/** A platform notification, as the home page shows it. */
+/** A notification, as the home page shows it: Gearbox's, or one of the team's admins wrote. */
 export type TeamNotification = {
   id: string;
   type: NotificationType;
@@ -126,29 +126,48 @@ export type TeamNotification = {
   body: string;
   createdAt: number;
   expiresAt: number;
+  fromTeam: boolean;
+  /** Who wrote a team one; null for Gearbox's. */
+  createdByName: string | null;
 };
+
+/** A notification the team's admins wrote, as their admin page lists it. */
+export type WrittenNotification = {
+  id: string;
+  type: NotificationType;
+  summary: string;
+  body: string;
+  createdBy: string;
+  createdByName: string | null;
+  createdAt: number;
+  expiresAt: number;
+};
+
+/** Whose notifications: Gearbox's operators', or the team's own admins'. */
+export type NotificationSource = "gearbox" | "team";
 
 export type NotificationTypeSettings = {
   portal: PortalAudience;
   /** A channel's id on the team's chat (Slack or Discord), or null. */
   channel: string | null;
-  /** G3ID user ids, DMed on the team's chat. */
+  /** G3ID user ids, DMed on the team's chat: only Gearbox's Critical ones. */
   users: string[];
 };
 
-export type NotificationSettings = Record<NotificationType, NotificationTypeSettings>;
+export type NotificationSettings = Record<
+  NotificationSource,
+  Record<NotificationType, NotificationTypeSettings>
+>;
 
 export type DmCandidate = { id: string; displayName: string; isAdmin: boolean; hasChat: boolean };
 
 export const NOTIFICATION_TYPES: { type: NotificationType; label: string }[] = [
   { type: "critical", label: "Critical" },
-  { type: "warning", label: "Warning" },
   { type: "info", label: "Informational" },
 ];
 
-/** Colors that mean the type: amber for a warning, red for critical. */
+/** Colors that mean the type: red for critical. */
 export const NOTIFICATION_STYLES: Record<NotificationType, { badge: string; stripe: string }> = {
   info: { badge: "bg-secondary-100 text-secondary-700", stripe: "border-l-secondary-300" },
-  warning: { badge: "bg-amber-100 text-amber-800", stripe: "border-l-amber-500" },
   critical: { badge: "bg-red-100 text-red-800", stripe: "border-l-red-600" },
 };

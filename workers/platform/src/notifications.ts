@@ -1,7 +1,9 @@
 import { teamMembers } from "@g3/auth";
-import { and, eq, gt } from "drizzle-orm";
+import { and, desc, eq, gt, isNull, or } from "drizzle-orm";
 import {
+  NOTIFICATION_SOURCES,
   NOTIFICATION_TYPES,
+  type NotificationSource,
   type NotificationType,
   PORTAL_AUDIENCES,
   type PortalAudience,
@@ -9,14 +11,15 @@ import {
   teamNotificationSettings,
   teams,
 } from "./db/schema";
-import { db, g3id, now } from "./lib";
+import { accounts, db, g3id, now } from "./lib";
 import type { AppEnv } from "./types";
 
-// Delivering the notifications operators write in the console (console.ts). Each team's admins
-// choose, per type, who sees them on the team's home page (everyone, admins or nobody), a channel
-// on the team's chat (Slack or Discord) and the members they're sent to. Chat messages are sent
-// once, when the notification is written, to every active team; the home page shows them until
-// they expire.
+// Delivering notifications: Gearbox's, which operators write in the console (console.ts) for every
+// team, and the team's own, which its admins write (team.ts). Each team's admins choose, for each
+// source and type, who sees them on the team's home page (everyone, admins or nobody) and a
+// channel on the team's chat (Slack or Discord); Gearbox's Critical ones can also be DMed to
+// members. Chat messages are sent once, when the notification is written; the home page shows
+// them until they expire.
 
 type Bindings = AppEnv["Bindings"];
 
@@ -24,22 +27,79 @@ export type TypeSettings = {
   portal: PortalAudience;
   /** A Slack or Discord channel's id (whichever the team uses), or null. */
   channel: string | null;
-  /** G3ID user ids, DMed on the team's chat. */
+  /** G3ID user ids, DMed on the team's chat: only for Gearbox's Critical ones, else empty. */
   users: string[];
 };
 
-export type NotificationSettings = Record<NotificationType, TypeSettings>;
+export type NotificationSettings = Record<
+  NotificationSource,
+  Record<NotificationType, TypeSettings>
+>;
 
-/** A type the team hasn't set: admins see it on the home page, and nothing goes to its chat. */
-const DEFAULT: TypeSettings = { portal: "admins", channel: null, users: [] };
+/**
+ * What a team hasn't set: Gearbox's show to admins on the home page, the team's own to everyone,
+ * and nothing goes to its chat.
+ */
+const DEFAULTS: Record<NotificationSource, TypeSettings> = {
+  gearbox: { portal: "admins", channel: null, users: [] },
+  team: { portal: "everyone", channel: null, users: [] },
+};
+
+/** Only Gearbox's Critical notifications are DMed. */
+export const takesDms = (source: NotificationSource, type: NotificationType) =>
+  source === "gearbox" && type === "critical";
+
+/** Every source and type, in the order the settings are listed. */
+const SLOTS = NOTIFICATION_SOURCES.flatMap((source) =>
+  NOTIFICATION_TYPES.map((type) => ({ source, type })),
+);
+
+const SOURCE_LABELS: Record<NotificationSource, string> = { gearbox: "Gearbox", team: "Team" };
 
 export const MAX_USERS = 50;
 
 const LABELS: Record<NotificationType, string> = {
   info: "Informational",
-  warning: "Warning",
   critical: "Critical",
 };
+
+/** How long a notification's short description and full text may be. */
+const SUMMARY_MAX = 140;
+const BODY_MAX = 10_000;
+/** How far ahead a notification's expiry may be. */
+const EXPIRY_MAX_S = 365 * 24 * 60 * 60;
+
+export type NewNotification = {
+  type: NotificationType;
+  summary: string;
+  body: string;
+  expiresAt: number;
+};
+
+/** Checks a notification being written (console or team), or says what's wrong in words. */
+export function parseNotification(input: unknown): NewNotification | string {
+  const value = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
+  const type = value.type as NotificationType;
+  if (!NOTIFICATION_TYPES.includes(type)) return "Choose Informational or Critical.";
+  const summary = typeof value.summary === "string" ? value.summary.trim() : "";
+  if (!summary || summary.length > SUMMARY_MAX) {
+    return `Write a short description (up to ${SUMMARY_MAX} characters).`;
+  }
+  const body = typeof value.body === "string" ? value.body.trim() : "";
+  if (!body || body.length > BODY_MAX) {
+    return `Write the full text (up to ${BODY_MAX} characters).`;
+  }
+  const expiresAt = value.expiresAt;
+  if (
+    typeof expiresAt !== "number" ||
+    !Number.isInteger(expiresAt) ||
+    expiresAt <= now() ||
+    expiresAt > now() + EXPIRY_MAX_S
+  ) {
+    return "Choose when it expires: after now, within a year.";
+  }
+  return { type, summary, body, expiresAt };
+}
 
 const parseList = (json: string): string[] => {
   try {
@@ -50,7 +110,7 @@ const parseList = (json: string): string[] => {
   }
 };
 
-/** The team's settings for every type, defaults filled in. */
+/** The team's settings for every source and type, defaults filled in. */
 export async function notificationSettings(
   env: Bindings,
   teamId: string,
@@ -60,60 +120,63 @@ export async function notificationSettings(
     .from(teamNotificationSettings)
     .where(eq(teamNotificationSettings.teamId, teamId))
     .all();
-  return Object.fromEntries(
-    NOTIFICATION_TYPES.map((type) => {
-      const row = rows.find((r) => r.type === type);
-      return [
-        type,
-        row
-          ? {
-              portal: row.portal,
-              channel: row.slackChannel,
-              users: parseList(row.slackUsers),
-            }
-          : DEFAULT,
-      ];
-    }),
-  ) as NotificationSettings;
+  const out = { gearbox: {}, team: {} } as NotificationSettings;
+  for (const { source, type } of SLOTS) {
+    const row = rows.find((r) => r.source === source && r.type === type);
+    out[source][type] = row
+      ? {
+          portal: row.portal,
+          channel: row.channel,
+          users: takesDms(source, type) ? parseList(row.dmUsers) : [],
+        }
+      : DEFAULTS[source];
+  }
+  return out;
 }
 
 /**
  * Checks settings sent by the team's page. `memberIds` are the team's members: anyone else can't
- * be sent a DM. Gives back the settings, or what's wrong in words.
+ * be sent a DM. People given for anything but Gearbox's Critical are left out. Gives back the
+ * settings, or what's wrong in words.
  */
 export function parseSettings(
   input: unknown,
   memberIds: Set<string>,
 ): NotificationSettings | string {
-  if (!input || typeof input !== "object") return "Send the settings for every type.";
-  const out: Partial<NotificationSettings> = {};
-  for (const type of NOTIFICATION_TYPES) {
-    const value = (input as Record<string, unknown>)[type] as Record<string, unknown> | undefined;
-    if (!value || typeof value !== "object") return "Send the settings for every type.";
+  const all = "Send the settings for every kind.";
+  if (!input || typeof input !== "object") return all;
+  const out = { gearbox: {}, team: {} } as NotificationSettings;
+  for (const { source, type } of SLOTS) {
+    const group = (input as Record<string, unknown>)[source] as
+      | Record<string, Record<string, unknown> | undefined>
+      | undefined;
+    const value = group && typeof group === "object" ? group[type] : undefined;
+    if (!value || typeof value !== "object") return all;
     const portal = value.portal as PortalAudience;
     if (!PORTAL_AUDIENCES.includes(portal)) {
-      return "Choose who sees each type on the home page.";
+      return "Choose who sees each kind on the home page.";
     }
-    const given = value.channel;
-    const list = Array.isArray(value.users) ? value.users : null;
-    if ((given !== null && typeof given !== "string") || !list) {
-      return "Send the channel and people for every type.";
-    }
+    const given = value.channel ?? null;
+    if (given !== null && typeof given !== "string") return all;
     // A channel ID as Slack gives it (C or G, then 8 or more capitals and digits) or as Discord
     // does (17 to 20 digits).
     const channel = given?.trim() || null;
     if (channel && !/^[CG][A-Z0-9]{8,}$/.test(channel) && !/^\d{17,20}$/.test(channel)) {
       return "That isn't a channel ID. Choose the channel by name.";
     }
-    const users = [...new Set(list.filter((u): u is string => typeof u === "string"))];
-    if (users.some((u) => !memberIds.has(u))) return "Only your team's members can be sent DMs.";
-    if (users.length > MAX_USERS) return `Up to ${MAX_USERS} people for each type.`;
-    out[type] = { portal, channel, users };
+    let users: string[] = [];
+    if (takesDms(source, type)) {
+      const list = Array.isArray(value.users) ? value.users : [];
+      users = [...new Set(list.filter((u): u is string => typeof u === "string"))];
+      if (users.some((u) => !memberIds.has(u))) return "Only your team's members can be sent DMs.";
+      if (users.length > MAX_USERS) return `Up to ${MAX_USERS} people.`;
+    }
+    out[source][type] = { portal, channel, users };
   }
-  return out as NotificationSettings;
+  return out;
 }
 
-/** Saves the team's settings for every type, in one batch. */
+/** Saves the team's settings for every source and type, in one batch. */
 export async function saveSettings(
   env: Bindings,
   teamId: string,
@@ -121,55 +184,112 @@ export async function saveSettings(
   settings: NotificationSettings,
 ) {
   const database = db(env);
-  const [first, ...rest] = NOTIFICATION_TYPES.map((type) => {
+  const [first, ...rest] = SLOTS.map(({ source, type }) => {
     const values = {
-      portal: settings[type].portal,
-      slackChannel: settings[type].channel,
-      slackUsers: JSON.stringify(settings[type].users),
+      portal: settings[source][type].portal,
+      channel: settings[source][type].channel,
+      dmUsers: JSON.stringify(settings[source][type].users),
       updatedAt: now(),
       updatedBy: userId,
     };
     return database
       .insert(teamNotificationSettings)
-      .values({ teamId, type, ...values })
+      .values({ teamId, source, type, ...values })
       .onConflictDoUpdate({
-        target: [teamNotificationSettings.teamId, teamNotificationSettings.type],
+        target: [
+          teamNotificationSettings.teamId,
+          teamNotificationSettings.source,
+          teamNotificationSettings.type,
+        ],
         set: values,
       });
   });
   await database.batch([first, ...rest]);
 }
 
-/** Which parts changed, for the team's log ("Critical: home page, channel"). */
+/** Which parts changed, for the team's log ("Gearbox Critical: home page, DMs"). */
 export function changedParts(before: NotificationSettings, after: NotificationSettings) {
-  return NOTIFICATION_TYPES.flatMap((type) => {
+  return SLOTS.flatMap(({ source, type }) => {
+    const [b, a] = [before[source][type], after[source][type]];
     const parts = [
-      before[type].portal !== after[type].portal && "home page",
-      before[type].channel !== after[type].channel && "channel",
-      JSON.stringify(before[type].users) !== JSON.stringify(after[type].users) && "DMs",
+      b.portal !== a.portal && "home page",
+      b.channel !== a.channel && "channel",
+      JSON.stringify(b.users) !== JSON.stringify(a.users) && "DMs",
     ].filter(Boolean);
-    return parts.length ? [`${LABELS[type]}: ${parts.join(", ")}`] : [];
+    return parts.length ? [`${SOURCE_LABELS[source]} ${LABELS[type]}: ${parts.join(", ")}`] : [];
   });
 }
 
-/** The notifications a member sees on the team's home page now, newest first. */
+/** Names of the members who wrote these, by id; empty when G3ID can't say. */
+async function writers(env: Bindings, ids: string[]) {
+  try {
+    return await accounts(env, ids);
+  } catch (err) {
+    console.error("[notifications] writers' names", err);
+    return new Map<string, { displayName: string }>();
+  }
+}
+
+/**
+ * The notifications a member sees on the team's home page now, newest first: Gearbox's and the
+ * team's own, with the name of the member who wrote a team one.
+ */
 export async function visibleNotifications(env: Bindings, teamId: string, isAdmin: boolean) {
   const settings = await notificationSettings(env, teamId);
-  const shown = (type: NotificationType) =>
-    settings[type].portal === "everyone" || (isAdmin && settings[type].portal === "admins");
+  const shown = (source: NotificationSource, type: NotificationType) =>
+    settings[source][type].portal === "everyone" ||
+    (isAdmin && settings[source][type].portal === "admins");
   const active = await db(env)
     .select({
       id: notifications.id,
       type: notifications.type,
+      teamId: notifications.teamId,
       summary: notifications.summary,
       body: notifications.body,
+      createdBy: notifications.createdBy,
       createdAt: notifications.createdAt,
       expiresAt: notifications.expiresAt,
     })
     .from(notifications)
-    .where(gt(notifications.expiresAt, now()))
+    .where(
+      and(
+        gt(notifications.expiresAt, now()),
+        or(isNull(notifications.teamId), eq(notifications.teamId, teamId)),
+      ),
+    )
     .all();
-  return active.filter((n) => shown(n.type)).sort((a, b) => b.createdAt - a.createdAt);
+  const list = active
+    .filter((n) => shown(n.teamId ? "team" : "gearbox", n.type))
+    .sort((a, b) => b.createdAt - a.createdAt);
+  const names = await writers(
+    env,
+    list.filter((n) => n.teamId).map((n) => n.createdBy),
+  );
+  return list.map(({ teamId: team, createdBy, ...n }) => ({
+    ...n,
+    fromTeam: team !== null,
+    // Only a team member's name: operators stay unnamed.
+    createdByName: team ? (names.get(createdBy)?.displayName ?? null) : null,
+  }));
+}
+
+/** The notifications the team's admins wrote, newest first, expired ones too. */
+export async function teamWritten(env: Bindings, teamId: string) {
+  const list = await db(env)
+    .select()
+    .from(notifications)
+    .where(eq(notifications.teamId, teamId))
+    .orderBy(desc(notifications.createdAt))
+    .limit(200)
+    .all();
+  const names = await writers(
+    env,
+    list.map((n) => n.createdBy),
+  );
+  return list.map(({ teamId: _, ...n }) => ({
+    ...n,
+    createdByName: names.get(n.createdBy)?.displayName ?? null,
+  }));
 }
 
 /**
@@ -190,14 +310,20 @@ export async function dmCandidates(env: Bindings, teamId: string) {
 }
 
 /**
- * The chat text (Gearbox's chat format), sent by the team's own bot, so it says plainly that it's
- * Gearbox's: "Gearbox Critical Notification" with the type's mark, then the short description and
- * the full text as a quote. Kept under 4,000 characters (the text is cut); Discord gets it in
- * pieces.
+ * The chat text (Gearbox's chat format), sent by the team's own bot, so it says plainly whose it
+ * is: "Gearbox Critical Notification", or "Critical Notification from <name>" for one the team's
+ * admin wrote, with the type's mark, then the short description and the full text as a quote.
+ * Kept under 4,000 characters (the text is cut); Discord gets it in pieces.
  */
-export function chatText(n: { type: NotificationType; summary: string; body: string }) {
-  const mark = { info: "ℹ️", warning: "⚠️", critical: "🚨" };
-  const head = `${mark[n.type]}  **Gearbox ${LABELS[n.type]} Notification**\n`;
+export function chatText(
+  n: { type: NotificationType; summary: string; body: string },
+  from?: string,
+) {
+  const mark = { info: "ℹ️", critical: "🚨" };
+  const title = from
+    ? `${LABELS[n.type]} Notification from ${from}`
+    : `Gearbox ${LABELS[n.type]} Notification`;
+  const head = `${mark[n.type]}  **${title}**\n`;
   // A quote bar down the side of every line of the notification itself, then cut to fit.
   let quoted = `**${n.summary.trim()}**\n${n.body.trim()}`
     .split("\n")
@@ -209,33 +335,42 @@ export function chatText(n: { type: NotificationType; summary: string; body: str
 }
 
 /**
- * Sends a new notification to every active team's chosen channel and members on its chat (Slack
- * or Discord), from each team's own bot (through G3ID). Never throws: a team without a chat, or a
- * channel the bot can't post in, is logged and skipped. Gives back how many teams it was sent to.
+ * Sends a new Gearbox notification to every active team's chosen channel (and, for a Critical
+ * one, members) on its chat (Slack or Discord), from each team's own bot (through G3ID); or, with
+ * `team`, the team's own to its chosen channel, under the name of the admin who wrote it. Never throws: a team without a chat, or a channel the bot
+ * can't post in, is logged and skipped. Gives back how many teams it was sent to.
  */
 export async function deliverToChat(
   env: Bindings,
   n: { type: NotificationType; summary: string; body: string },
+  team?: { id: string; from: string },
 ): Promise<number> {
   const rows = await db(env)
     .select({
       teamId: teamNotificationSettings.teamId,
-      slackChannel: teamNotificationSettings.slackChannel,
-      slackUsers: teamNotificationSettings.slackUsers,
+      channel: teamNotificationSettings.channel,
+      dmUsers: teamNotificationSettings.dmUsers,
     })
     .from(teamNotificationSettings)
     .innerJoin(teams, eq(teams.id, teamNotificationSettings.teamId))
-    .where(and(eq(teamNotificationSettings.type, n.type), eq(teams.status, "active")))
+    .where(
+      and(
+        eq(teamNotificationSettings.source, team ? "team" : "gearbox"),
+        eq(teamNotificationSettings.type, n.type),
+        eq(teams.status, "active"),
+        team ? eq(teamNotificationSettings.teamId, team.id) : undefined,
+      ),
+    )
     .all();
-  const text = chatText(n);
+  const text = chatText(n, team?.from);
   let sentTo = 0;
   // A few teams at a time, so one slow team doesn't hold up the rest.
   for (let i = 0; i < rows.length; i += 10) {
     const results = await Promise.all(
       rows.slice(i, i + 10).map(async (row) => {
         const teamId = encodeURIComponent(row.teamId);
-        const channel = row.slackChannel;
-        const users = parseList(row.slackUsers);
+        const channel = row.channel;
+        const users = takesDms(team ? "team" : "gearbox", n.type) ? parseList(row.dmUsers) : [];
         if (!channel && users.length === 0) return false;
         const sends = [
           ...(channel

@@ -336,7 +336,7 @@ describe("notifications", () => {
 
   it("are written and deleted by operators only, and logged", async () => {
     const input = {
-      type: "warning",
+      type: "info",
       summary: "Down Saturday",
       body: "From 8 to 10 am.",
       expiresAt: inADay(),
@@ -372,6 +372,20 @@ describe("notifications", () => {
     expect((await create(operator, { ...ok, expiresAt: nowS - 60 })).status).toBe(400);
     expect((await create(operator, { ...ok, expiresAt: nowS + 400 * 86400 })).status).toBe(400);
     expect((await create(operator, { ...ok, type: "info" })).status).toBe(201);
+  });
+
+  it("leave out a team's own", async () => {
+    const id = crypto.randomUUID();
+    const team = await createTeam();
+    await testEnv.PLATFORM_DB.prepare(
+      `INSERT INTO notifications (id, type, team_id, summary, body, expires_at, created_by, created_at)
+       VALUES (?1, 'info', ?2, 'Team only', 'Body', ?3, 'u-founder', 1)`,
+    )
+      .bind(id, team.id, inADay())
+      .run();
+    const list = (await (await call(operator, "/notifications")).json()) as { id: string }[];
+    expect(list.map((n) => n.id)).not.toContain(id);
+    expect((await call(operator, `/notifications/${id}`, { method: "DELETE" })).status).toBe(404);
   });
 });
 

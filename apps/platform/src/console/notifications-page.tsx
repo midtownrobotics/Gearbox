@@ -23,19 +23,17 @@ import {
   useLoad,
 } from "./data";
 
-// Notifications for every team, written by operators, each shown until it expires. Each team's
-// admins choose where they go: its home page and its chat, Slack or Discord
+// Notifications for every team, written by operators, each shown until it expires: Informational
+// or Critical. Each team's admins choose where they go: its home page and its chat, Slack or Discord
 // (workers/platform/src/notifications.ts).
 
 const TYPES: { type: NotificationType; label: string }[] = [
   { type: "info", label: "Informational" },
-  { type: "warning", label: "Warning" },
   { type: "critical", label: "Critical" },
 ];
 
 const TYPE_STYLES: Record<NotificationType, { badge: string; stripe: string }> = {
   info: { badge: tones.info, stripe: "border-l-sky-400" },
-  warning: { badge: tones.warning, stripe: "border-l-amber-500" },
   critical: { badge: tones.danger, stripe: "border-l-red-600" },
 };
 

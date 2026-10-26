@@ -1,4 +1,15 @@
-import { ChannelPicker, chatName, useTeamChat } from "@g3/ui";
+import {
+  Button,
+  Card,
+  ChannelPicker,
+  ErrorBanner,
+  Page,
+  PageLoading,
+  SuccessBanner,
+  chatName,
+  inputClass,
+  useTeamChat,
+} from "@g3/ui";
 import { useEffect, useState } from "react";
 import { FaTimes } from "react-icons/fa";
 import { Link, useSearchParams } from "react-router-dom";
@@ -7,27 +18,33 @@ import {
   NOTIFICATION_STYLES,
   NOTIFICATION_TYPES,
   type NotificationSettings,
+  type NotificationSource,
   type NotificationType,
   type NotificationTypeSettings,
   type PortalAudience,
   platform,
 } from "../../lib/platform";
+import { TeamNotifications } from "./team-notifications";
 
-// Where the platform's notifications go for this team (workers/platform/src/notifications.ts):
-// for each type, who sees it on the home page, and the channel and members it's sent to on the
-// team's chat (Slack or Discord).
+// The team's notifications (workers/platform/src/notifications.ts): sending one to the team
+// (team-notifications.tsx), and where each kind goes, set apart for Gearbox's and the team's own:
+// who sees it on the home page and a channel on the team's chat (Slack or Discord). Only
+// Gearbox's Critical ones are also DMed.
 
 const AUDIENCES: { value: PortalAudience; label: string }[] = [
   { value: "everyone", label: "Everyone" },
-  { value: "admins", label: "Admins" },
+  { value: "admins", label: "Admins only" },
   { value: "nobody", label: "Nobody" },
 ];
 
-const TYPE_HINTS: Record<NotificationType, string> = {
-  critical: "Needs an admin's attention right away.",
-  warning: "Planned downtime and version changes.",
-  info: "Updates, surveys and other news.",
-};
+const SOURCES: { source: NotificationSource; title: string; hint: string }[] = [
+  {
+    source: "gearbox",
+    title: "From Gearbox",
+    hint: "From the people who run Gearbox itself, for every team.",
+  },
+  { source: "team", title: "From your team", hint: "What your admins send above." },
+];
 
 type Loaded = { settings: NotificationSettings; members: DmCandidate[] };
 
@@ -53,10 +70,41 @@ export function NotificationsPage() {
 
   const dirty = !!loaded && JSON.stringify(loaded.settings) !== JSON.stringify(draft);
 
-  function update(type: NotificationType, change: Partial<NotificationTypeSettings>) {
+  function update(
+    source: NotificationSource,
+    type: NotificationType,
+    change: Partial<NotificationTypeSettings>,
+  ) {
     setSaved(false);
-    setDraft((d) => (d ? { ...d, [type]: { ...d[type], ...change } } : d));
+    setDraft((d) =>
+      d ? { ...d, [source]: { ...d[source], [type]: { ...d[source][type], ...change } } } : d,
+    );
   }
+
+  /** Every kind's channel, Gearbox's and the team's, at once. */
+  function setAllChannels(channel: string | null) {
+    setSaved(false);
+    setDraft((d) =>
+      d
+        ? (Object.fromEntries(
+            SOURCES.map(({ source }) => [
+              source,
+              Object.fromEntries(
+                NOTIFICATION_TYPES.map(({ type }) => [type, { ...d[source][type], channel }]),
+              ),
+            ]),
+          ) as NotificationSettings)
+        : d,
+    );
+  }
+
+  /** The channel every kind has, when they all have the same one. */
+  const channels = draft
+    ? SOURCES.flatMap(({ source }) =>
+        NOTIFICATION_TYPES.map(({ type }) => draft[source][type]),
+      ).map((s) => s.channel)
+    : [];
+  const sharedChannel = channels.every((c) => c === channels[0]) ? (channels[0] ?? null) : null;
 
   async function save() {
     if (!draft || !loaded) return;
@@ -78,9 +126,12 @@ export function NotificationsPage() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-2xl px-6 py-8">
+    <Page
+      title="Notifications"
+      description={`Send your team news, and choose where it and Gearbox's updates go: the home page and ${chat}.`}
+    >
       {welcome && (
-        <p className="mb-6 rounded-lg border border-line bg-surface p-4 text-secondary-700">
+        <p className="rounded-lg border border-line bg-surface p-4 text-secondary-700">
           <strong className="text-secondary-900">Welcome to Gearbox!</strong> Start by choosing
           where notifications go below, then{" "}
           <Link to="/admin" className="font-semibold text-primary-600 hover:underline">
@@ -89,149 +140,131 @@ export function NotificationsPage() {
           .
         </p>
       )}
-      <h1 className="mb-2 text-3xl font-bold text-secondary-900">Notifications</h1>
-      <p className="mb-6 text-secondary-600">
-        Updates, downtime and anything that needs your attention. Gearbox is an early beta, so we
-        recommend turning on every kind, on the home page and in {chat}.
-      </p>
-      {error && (
-        <p role="alert" className="mb-4 rounded-md border border-red-500 p-3 text-red-700">
-          {error}
-        </p>
-      )}
-      {!draft && !error && <p className="text-secondary-600">Loading…</p>}
+      {error && <ErrorBanner message={error} />}
+      {!draft && !error && <PageLoading />}
+      {loaded && <TeamNotifications settings={loaded.settings} />}
       {draft && loaded && (
-        <form
-          className="space-y-4"
-          onSubmit={(e) => {
-            e.preventDefault();
-            save();
-          }}
-        >
-          {NOTIFICATION_TYPES.map(({ type, label }) => (
-            <TypeCard
-              key={type}
-              type={type}
-              label={label}
-              value={draft[type]}
-              members={loaded.members}
-              onChange={(change) => update(type, change)}
-            />
-          ))}
-          <div className="flex items-center gap-3">
-            <button
-              type="submit"
-              disabled={!dirty || busy}
-              className="rounded-lg bg-primary-600 px-4 py-2 font-semibold text-white hover:bg-primary-700 disabled:opacity-50"
-            >
-              {busy ? "Saving…" : "Save"}
-            </button>
-            {dirty && (
-              <button
-                type="button"
-                onClick={() => setDraft(loaded.settings)}
-                className="px-3 py-2 text-secondary-600 hover:text-secondary-900"
-              >
-                Undo changes
-              </button>
-            )}
-            {saved && !dirty && <span className="text-sm text-green-700">Saved.</span>}
-          </div>
-        </form>
+        <Card title="Where notifications go">
+          <form
+            className="space-y-6"
+            onSubmit={(e) => {
+              e.preventDefault();
+              save();
+            }}
+          >
+            <div className="min-w-0 rounded-lg bg-inset p-3">
+              <label htmlFor="all-channels" className="mb-1 block text-sm text-secondary-700">
+                Set every channel to
+              </label>
+              <ChannelPicker id="all-channels" value={sharedChannel} onChange={setAllChannels} />
+            </div>
+            {SOURCES.map(({ source, title, hint }) => (
+              <fieldset key={source} className="space-y-3">
+                <legend className="font-semibold text-secondary-900">{title}</legend>
+                <p className="text-sm text-secondary-600">{hint}</p>
+                {NOTIFICATION_TYPES.map(({ type, label }) => (
+                  <TypeRow
+                    key={type}
+                    id={`${source}-${type}`}
+                    label={label}
+                    type={type}
+                    value={draft[source][type]}
+                    members={source === "gearbox" && type === "critical" ? loaded.members : null}
+                    onChange={(change) => update(source, type, change)}
+                  />
+                ))}
+              </fieldset>
+            ))}
+            <div className="flex flex-wrap items-center gap-3">
+              <Button type="submit" disabled={!dirty || busy}>
+                {busy ? "Saving…" : "Save"}
+              </Button>
+              {dirty && (
+                <Button variant="secondary" onClick={() => setDraft(loaded.settings)}>
+                  Undo changes
+                </Button>
+              )}
+            </div>
+            {saved && !dirty && <SuccessBanner message="Saved." />}
+          </form>
+        </Card>
       )}
-    </main>
+    </Page>
   );
 }
 
-function TypeCard({
-  type,
+/**
+ * One kind's settings on a line: who sees it on the home page and its channel, with the people
+ * DMed under them when `members` is given (Gearbox's Critical only).
+ */
+function TypeRow({
+  id,
   label,
+  type,
   value,
   members,
   onChange,
 }: {
-  type: NotificationType;
+  id: string;
   label: string;
+  type: NotificationType;
   value: NotificationTypeSettings;
-  members: DmCandidate[];
+  members: DmCandidate[] | null;
   onChange: (change: Partial<NotificationTypeSettings>) => void;
 }) {
   const style = NOTIFICATION_STYLES[type];
   const chat = chatName(useTeamChat());
   return (
-    <section
-      className={`space-y-5 rounded-lg border border-l-4 border-line bg-surface p-4 ${style.stripe}`}
-    >
-      <div>
-        <h2 className="flex items-center gap-2 font-semibold text-secondary-900">
-          <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${style.badge}`}>
-            {label}
-          </span>
-        </h2>
-        <p className="mt-1 text-sm text-secondary-600">{TYPE_HINTS[type]}</p>
-      </div>
-
-      <fieldset>
-        <legend className="mb-2 text-sm font-medium text-secondary-800">
-          Show on the home page to
-        </legend>
-        <div className="inline-flex overflow-hidden rounded-lg border border-line">
-          {AUDIENCES.map((a, i) => (
-            <label
-              key={a.value}
-              className={`cursor-pointer px-3 py-1.5 text-sm has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-primary-300 ${
-                i > 0 ? "border-l border-line" : ""
-              } ${
-                value.portal === a.value
-                  ? "bg-primary-600 font-semibold text-white"
-                  : "bg-surface text-secondary-700 hover:bg-inset"
-              }`}
-            >
-              <input
-                type="radio"
-                name={`portal-${type}`}
-                value={a.value}
-                checked={value.portal === a.value}
-                onChange={() => onChange({ portal: a.value })}
-                className="sr-only"
-              />
-              {a.label}
-            </label>
-          ))}
+    <div className={`space-y-3 rounded-lg border border-l-4 border-line p-3 ${style.stripe}`}>
+      <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${style.badge}`}>{label}</span>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="min-w-0">
+          <label htmlFor={`${id}-portal`} className="mb-1 block text-sm text-secondary-700">
+            Home page
+          </label>
+          <select
+            id={`${id}-portal`}
+            value={value.portal}
+            onChange={(e) => onChange({ portal: e.target.value as PortalAudience })}
+            className={inputClass}
+          >
+            {AUDIENCES.map((a) => (
+              <option key={a.value} value={a.value}>
+                {a.label}
+              </option>
+            ))}
+          </select>
         </div>
-      </fieldset>
-
-      <div>
-        <label
-          htmlFor={`channel-${type}`}
-          className="mb-1 block text-sm font-medium text-secondary-800"
-        >
-          {chat} channel
-        </label>
-        <ChannelPicker
-          id={`channel-${type}`}
-          value={value.channel}
-          onChange={(channel) => onChange({ channel })}
-        />
+        <div className="min-w-0">
+          <label htmlFor={`${id}-channel`} className="mb-1 block text-sm text-secondary-700">
+            {chat} channel
+          </label>
+          <ChannelPicker
+            id={`${id}-channel`}
+            value={value.channel}
+            onChange={(channel) => onChange({ channel })}
+          />
+        </div>
       </div>
-
-      <PeopleList
-        type={type}
-        chosen={value.users}
-        members={members}
-        onChange={(users) => onChange({ users })}
-      />
-    </section>
+      {members && (
+        <PeopleList
+          id={`${id}-people`}
+          chosen={value.users}
+          members={members}
+          onChange={(users) => onChange({ users })}
+        />
+      )}
+    </div>
   );
 }
 
 function PeopleList({
-  type,
+  id,
   chosen,
   members,
   onChange,
 }: {
-  type: NotificationType;
+  id: string;
   chosen: string[];
   members: DmCandidate[];
   onChange: (userIds: string[]) => void;
@@ -239,18 +272,17 @@ function PeopleList({
   const chat = chatName(useTeamChat());
   const byId = new Map(members.map((m) => [m.id, m]));
   const available = members.filter((m) => !chosen.includes(m.id));
-  const id = `people-${type}`;
   return (
     <div>
-      <label htmlFor={id} className="mb-1 block text-sm font-medium text-secondary-800">
-        Direct messages on {chat}
+      <label htmlFor={id} className="mb-1 block text-sm text-secondary-700">
+        Also message directly on {chat}
       </label>
       {chosen.length > 0 && (
         <ul className="mb-2 flex flex-wrap gap-2">
           {chosen.map((userId) => {
             const m = byId.get(userId);
             return (
-              <Chip
+              <Person
                 key={userId}
                 label={m?.displayName ?? "Former member"}
                 warning={m && !m.hasChat ? `hasn't linked ${chat}` : undefined}
@@ -264,7 +296,7 @@ function PeopleList({
         id={id}
         value=""
         onChange={(e) => e.target.value && onChange([...chosen, e.target.value])}
-        className="max-w-full rounded-lg border border-line bg-surface px-3 py-1.5 text-sm text-secondary-900 focus:border-primary-500 focus:outline-none"
+        className={`${inputClass} max-w-full sm:w-auto`}
       >
         <option value="">Add a person…</option>
         {available.map((m) => (
@@ -279,7 +311,7 @@ function PeopleList({
   );
 }
 
-function Chip({
+function Person({
   label,
   warning,
   onRemove,
@@ -289,8 +321,10 @@ function Chip({
   onRemove: () => void;
 }) {
   return (
-    <li className="flex items-center gap-1 rounded-full border border-line bg-inset py-0.5 pr-1 pl-3 text-sm text-secondary-900">
-      {label}
+    <li className="flex min-w-0 items-center gap-1 rounded-full border border-line bg-inset py-0.5 pr-1 pl-3 text-sm text-secondary-900">
+      <span className="min-w-0 truncate" title={label}>
+        {label}
+      </span>
       {warning && <span className="text-xs text-amber-700">({warning})</span>}
       <button
         type="button"
