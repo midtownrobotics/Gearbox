@@ -7,10 +7,11 @@ import {
   platform,
 } from "../../lib/platform";
 
-// The platform's notifications under the home's apps: the ones the team's admins chose to show
-// this member (Notifications, in the admin pages), until they expire. Critical ones first.
+// Notifications under the home's apps, Gearbox's and the team's own: the ones the team's admins
+// chose to show this member (Notifications, in the admin pages), until they expire. Critical ones
+// first.
 
-const ORDER = { critical: 0, warning: 1, info: 2 } as const;
+const ORDER = { critical: 0, info: 1 } as const;
 
 export function HomeNotifications() {
   const [list, setList] = useState<TeamNotification[]>([]);
@@ -70,6 +71,7 @@ function Row({ notification: n }: { notification: TeamNotification }) {
         >
           <p className="whitespace-pre-wrap break-words">{n.body}</p>
           <p className="mt-2 text-xs text-secondary-500">
+            {n.fromTeam ? `From ${n.createdByName ?? "your team"}` : "From Gearbox"},{" "}
             {new Date(n.createdAt * 1000).toLocaleDateString()}
           </p>
         </div>

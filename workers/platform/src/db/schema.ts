@@ -116,13 +116,19 @@ export const teamAuditLog = sqliteTable("team_audit_log", {
   createdAt: integer("created_at").notNull(),
 });
 
-export const NOTIFICATION_TYPES = ["info", "warning", "critical"] as const;
+/** Informational and Critical (migration 0016 made warnings Informational). */
+export const NOTIFICATION_TYPES = ["info", "critical"] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 
-/** Notifications operators write for every team (migration 0007); not delivered yet. */
+/**
+ * Notifications (migration 0007): operators write them for every team, and a team's admins for
+ * their own team (`teamId`, migration 0016).
+ */
 export const notifications = sqliteTable("notifications", {
   id: text("id").primaryKey(),
   type: text("type", { enum: NOTIFICATION_TYPES }).notNull(),
+  /** The team that wrote it, for its own members; null for an operator's, for every team. */
+  teamId: text("team_id"),
   /** A short description. */
   summary: text("summary").notNull(),
   body: text("body").notNull(),
@@ -135,22 +141,29 @@ export const notifications = sqliteTable("notifications", {
 export const PORTAL_AUDIENCES = ["everyone", "admins", "nobody"] as const;
 export type PortalAudience = (typeof PORTAL_AUDIENCES)[number];
 
-/** Where a team wants each type of notification (migration 0008). */
+export const NOTIFICATION_SOURCES = ["gearbox", "team"] as const;
+export type NotificationSource = (typeof NOTIFICATION_SOURCES)[number];
+
+/**
+ * Where a team wants each source and type of notification (migrations 0008 and 0016): Gearbox's
+ * and its own admins' are set apart.
+ */
 export const teamNotificationSettings = sqliteTable(
   "team_notification_settings",
   {
     teamId: text("team_id").notNull(),
+    source: text("source", { enum: NOTIFICATION_SOURCES }).notNull(),
     type: text("type", { enum: NOTIFICATION_TYPES }).notNull(),
     /** Who sees it on the team's home page. */
     portal: text("portal", { enum: PORTAL_AUDIENCES }).notNull(),
-    /** The Slack channel's id, if any. */
-    slackChannel: text("slack_channel"),
-    /** JSON: G3ID user ids to DM. */
-    slackUsers: text("slack_users").notNull().default("[]"),
+    /** A channel's id on the team's chat, if any. */
+    channel: text("channel"),
+    /** JSON: G3ID user ids to DM (only Gearbox's Critical ones are DMed). */
+    dmUsers: text("dm_users").notNull().default("[]"),
     updatedAt: integer("updated_at").notNull(),
     updatedBy: text("updated_by"),
   },
-  (t) => [primaryKey({ columns: [t.teamId, t.type] })],
+  (t) => [primaryKey({ columns: [t.teamId, t.source, t.type] })],
 );
 
 /**
