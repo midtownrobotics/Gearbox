@@ -127,6 +127,8 @@ const APPS: App[] = [
       shopManagers: "shop_managers",
       qualityReports: "quality_reports",
       qualityCheckItems: "quality_check_items",
+      projects: "projects",
+      onshapeDocuments: "onshape_documents",
     },
   },
   {

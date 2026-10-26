@@ -15,6 +15,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { api } from "../../shared/api";
 import { getErrorMessage } from "../../shared/api-error";
 import { partInfoRequiredBy, pipelineFileError } from "../../shared/derive";
+import { useProjectFilter } from "../../shared/projects";
 import { type PartDefinition, type PartInstance, activeOr } from "../../shared/types";
 import { useAuthUser } from "../../shared/use-auth";
 import { useShopData } from "../../shared/use-shop-data";
@@ -69,6 +70,10 @@ export function AddPartPage() {
   const [formError, setFormError] = useState("");
   const [banner, setBanner] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // The project the part is for: picked here, else its subsystem's, else the one the pages are
+  // filtered to, else the team's only one. Its subsystems are the ones to pick from.
+  const projectFilter = useProjectFilter();
+  const [pickedProject, setPickedProject] = useState<number | null>(null);
 
   if (loading || !user)
     return (
@@ -228,7 +233,20 @@ export function AddPartPage() {
     }
   }
 
-  const subsystems = activeOr(data?.subsystems ?? [], [form.subsystemId]);
+  const projects = activeOr(data?.projects ?? []);
+  const currentProject = data?.subsystems.find((s) => s.id === form.subsystemId)?.projectId;
+  const projectId =
+    pickedProject ??
+    currentProject ??
+    projectFilter.projectId ??
+    (projects.length === 1 ? projects[0].id : null);
+  const removedProjects = new Set(
+    (data?.projects ?? []).filter((p) => p.archivedAt !== null).map((p) => p.id),
+  );
+  const subsystems = activeOr(data?.subsystems ?? [], [form.subsystemId]).filter(
+    (s) =>
+      s.id === form.subsystemId || (s.projectId === projectId && !removedProjects.has(s.projectId)),
+  );
   const processes = activeOr(data?.processes ?? []);
 
   return (
@@ -248,9 +266,30 @@ export function AddPartPage() {
         {banner && <ErrorBanner message={banner} />}
 
         <Card className="space-y-4">
-          {subsystems.length === 0 ? (
+          {projects.length > 1 && (
+            <Field label="Project *">
+              <select
+                value={projectId ?? 0}
+                onChange={(e) => {
+                  setPickedProject(Number(e.target.value) || null);
+                  setForm({ ...form, subsystemId: 0 });
+                }}
+                className={inputClass}
+              >
+                <option value={0}>Select…</option>
+                {projects.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          )}
+          {projects.length > 1 && projectId === null ? null : subsystems.length === 0 ? (
             <p className="text-sm text-amber-800 bg-amber-50 border border-amber-300 rounded-lg px-4 py-2.5">
-              A part needs a subsystem.{" "}
+              {projects.length === 0
+                ? "A part needs a project and a subsystem."
+                : "A part needs a subsystem."}{" "}
               <Link to="/admin" className="underline font-medium">
                 Add one on Admin
               </Link>{" "}

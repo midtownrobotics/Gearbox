@@ -5,6 +5,7 @@ import {
   fetchBatches,
   fetchPartDefinitions,
   fetchProcesses,
+  fetchProjects,
   fetchSubsystems,
 } from "./getters";
 import type {
@@ -13,10 +14,12 @@ import type {
   PartInstance,
   PartInstanceProcess,
   Process,
+  Project,
   Subsystem,
 } from "./types";
 
 export type ShopData = {
+  projects: Project[];
   subsystems: Subsystem[];
   processes: Process[];
   definitions: PartDefinition[];
@@ -41,7 +44,8 @@ function set(next: State) {
 
 async function load() {
   try {
-    const [subsystems, processes, definitions, instances, batches] = await Promise.all([
+    const [projects, subsystems, processes, definitions, instances, batches] = await Promise.all([
+      fetchProjects(),
       fetchSubsystems(),
       fetchProcesses(),
       fetchPartDefinitions(),
@@ -50,7 +54,7 @@ async function load() {
     ]);
     const instanceProcesses = await fetchAllInstanceProcesses(processes);
     set({
-      data: { subsystems, processes, definitions, instances, instanceProcesses, batches },
+      data: { projects, subsystems, processes, definitions, instances, instanceProcesses, batches },
       loading: false,
       error: null,
     });

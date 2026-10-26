@@ -8,9 +8,47 @@ import type { ReleaseApprover, ReleaseComment } from "../lib/onshape-release";
 /** The team a row belongs to ("frc<number>"). */
 const teamId = () => text("team_id").notNull();
 
+/**
+ * What the team's parts are made for (a robot, a practice bot). Each Onshape document and each
+ * subsystem belongs to one, so a part's project is its subsystem's (migration 0025).
+ */
+export const projects = sqliteTable(
+  "projects",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    teamId: teamId(),
+    name: text("name").notNull(),
+    createdAt: integer("created_at").notNull(),
+    /** When an admin removed it while something still used it (lib/removal.ts); else null. */
+    archivedAt: integer("archived_at"),
+  },
+  (t) => [unique().on(t.teamId, t.name)],
+);
+
+/** An Onshape document the team follows: Shop's webhook is on it, its releases go to its project. */
+export const onshapeDocuments = sqliteTable(
+  "onshape_documents",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    teamId: teamId(),
+    projectId: integer("project_id")
+      .notNull()
+      .references(() => projects.id),
+    documentId: text("document_id").notNull(),
+    /** The assembly whose BOM gives a release's quantities; null for none. */
+    mainAssemblyId: text("main_assembly_id"),
+    createdAt: integer("created_at").notNull(),
+  },
+  (t) => [unique().on(t.teamId, t.documentId)],
+);
+
 export const subsystems = sqliteTable("subsystems", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   teamId: teamId(),
+  /** Always set, though the column can't say so (migration 0025). */
+  projectId: integer("project_id")
+    .notNull()
+    .references(() => projects.id),
   name: text("name").notNull(),
   createdAt: integer("created_at").notNull(),
   /** When an admin removed it while parts still used it (lib/removal.ts); null while in use. */
@@ -175,6 +213,8 @@ export const onshapeReleases = sqliteTable(
     state: text("state"),
     documentId: text("document_id"),
     versionId: text("version_id"),
+    /** The project of the document it came from, kept when the document is taken off the list. */
+    projectId: integer("project_id").references(() => projects.id),
     madeBy: text("made_by"),
     madeAt: text("made_at"),
     approvers: text("approvers", { mode: "json" }).$type<ReleaseApprover[]>(),
@@ -340,6 +380,9 @@ export const qualityReports = sqliteTable("quality_reports", {
   instanceNumber: integer("instance_number").notNull(),
   processId: integer("process_id").notNull(),
   processName: text("process_name").notNull(),
+  /** The part's project as it was. */
+  projectId: integer("project_id"),
+  projectName: text("project_name"),
   reportedBy: text("reported_by").notNull(),
   createdAt: integer("created_at").notNull(),
   /** The checklist as it read when the report was written, in the team's order. */

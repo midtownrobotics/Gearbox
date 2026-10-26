@@ -3,11 +3,14 @@ import { and, count, eq, isNull } from "drizzle-orm";
 import type { createShopDb } from "../db";
 import {
   actions,
+  onshapeDocuments,
+  onshapeReleases,
   partDefinitionProcessBlueprints,
   partDefinitions,
   partInstanceProcesses,
   partInstances,
   processes,
+  projects,
   stagingBatches,
   subsystems,
 } from "../db/schema";
@@ -131,6 +134,63 @@ export async function removeSubsystem(db: ShopDb, teamId: string, id: number): P
   return { outcome, name: row.name, parts: usage?.parts ?? 0 };
 }
 
+/**
+ * Every project's usage that has any: the parts filed under its subsystems, and whether a
+ * subsystem, an Onshape document or a release names it.
+ */
+export async function projectUsage(db: ShopDb, teamId: string): Promise<Map<number, Usage>> {
+  const [parts, subs, documents, releases] = await Promise.all([
+    db
+      .select({ id: subsystems.projectId, parts: count() })
+      .from(partDefinitions)
+      .innerJoin(subsystems, eq(subsystems.id, partDefinitions.subsystemId))
+      .where(and(inTeam(partDefinitions, teamId), inTeam(subsystems, teamId)))
+      .groupBy(subsystems.projectId)
+      .all(),
+    db
+      .selectDistinct({ id: subsystems.projectId })
+      .from(subsystems)
+      .where(inTeam(subsystems, teamId))
+      .all(),
+    db
+      .selectDistinct({ id: onshapeDocuments.projectId })
+      .from(onshapeDocuments)
+      .where(inTeam(onshapeDocuments, teamId))
+      .all(),
+    db
+      .selectDistinct({ id: onshapeReleases.projectId })
+      .from(onshapeReleases)
+      .where(inTeam(onshapeReleases, teamId))
+      .all(),
+  ]);
+  const counts = new Map(parts.map((p) => [p.id, p.parts]));
+  const used = new Set(
+    [...subs, ...documents, ...releases].flatMap((r) => (r.id === null ? [] : [r.id])),
+  );
+  return new Map([...used].map((id) => [id, { parts: counts.get(id) ?? 0, inUse: true }]));
+}
+
+export async function removeProject(db: ShopDb, teamId: string, id: number): Promise<Removal> {
+  const row = await db
+    .select({ name: projects.name })
+    .from(projects)
+    .where(inTeam(projects, teamId, eq(projects.id, id)))
+    .get();
+  if (!row) return { error: "Project not found.", status: 404 };
+
+  const usage = (await projectUsage(db, teamId)).get(id);
+  const outcome = await deleteOrArchive(
+    usage?.inUse ?? false,
+    () => db.delete(projects).where(inTeam(projects, teamId, eq(projects.id, id))),
+    () =>
+      db
+        .update(projects)
+        .set({ archivedAt: Date.now() })
+        .where(inTeam(projects, teamId, eq(projects.id, id), isNull(projects.archivedAt))),
+  );
+  return { outcome, name: row.name, parts: usage?.parts ?? 0 };
+}
+
 export async function removeProcess(db: ShopDb, teamId: string, id: number): Promise<Removal> {
   const row = await db
     .select({ name: processes.name })
@@ -165,7 +225,7 @@ export async function removeProcess(db: ShopDb, teamId: string, id: number): Pro
 
 /** Says why these can't be given to a new part, or null: some were removed on the Admin page. */
 export function removedError(
-  kind: "subsystem" | "process",
+  kind: "subsystem" | "process" | "project",
   removed: { name: string }[],
 ): string | null {
   if (removed.length === 0) return null;

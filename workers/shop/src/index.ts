@@ -25,6 +25,7 @@ import { partInstancesRouter } from "./routes/part-instances";
 import { partViewerRouter } from "./routes/part-viewer";
 import { printRouter } from "./routes/print";
 import { processesRouter } from "./routes/processes";
+import { projectsRouter } from "./routes/projects";
 import { qualityRouter } from "./routes/quality";
 import { qualityReportsRouter } from "./routes/quality-reports";
 import { shopStatusRouter } from "./routes/shop-status";
@@ -116,6 +117,7 @@ const app = base
     return c.json((await res.json()) as { id: string; displayName: string }[]);
   })
   .route("/onshape", onshapeWebhooksRouter)
+  .route("/projects", projectsRouter)
   .route("/subsystems", subsystemsRouter)
   .route("/processes", processesRouter)
   .route("/part-definitions", partDefinitionsRouter)

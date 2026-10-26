@@ -17,6 +17,10 @@ Shop tracks manufacturing. A part comes in when it's released in Onshape, gets i
 | Onshape | Every release and the parts in it |
 | Files | CAM files, slicer files and drawings, and the batches that use them |
 | Leaderboard | Who's finished the most work |
-| Admin | Processes, Onshape, the chat channels, kiosk mode and subsystems |
+| Admin | Projects, subsystems, processes, Onshape, the chat channels and kiosk mode |
 
 Anyone signed in moves parts along. Admins set Shop up and add parts by hand.
+
+## Projects
+
+A project is what your parts are made for, such as this season's robot or a practice bot. Each part belongs to one, through its subsystem. Once your team has more than one, most pages have a project filter at the top. The filter is remembered on each computer, so a shop screen can stay on one robot.

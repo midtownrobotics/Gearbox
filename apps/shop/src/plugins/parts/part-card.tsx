@@ -16,6 +16,7 @@ import { batchAt, batchesById, currentBatch } from "../../shared/batches";
 import { type InstanceRow, STATUS_LABELS } from "../../shared/derive";
 import { processPath, shopViewPath } from "../../shared/nav";
 import { PrintDrawingButton } from "../../shared/print-drawing-button";
+import { projectName } from "../../shared/projects";
 import type { ShopData } from "../../shared/use-shop-data";
 import { useUserNames } from "../../shared/use-user-names";
 import { BatchLink, linkClass } from "../batches/batch-ui";
@@ -78,8 +79,8 @@ export function PartCard({
 
   const processName = (pid: number) =>
     data.processes.find((p) => p.id === pid)?.name ?? `Process #${pid}`;
-  const subsystemName =
-    data.subsystems.find((s) => s.id === row.definition.subsystemId)?.name ?? "—";
+  const subsystem = data.subsystems.find((s) => s.id === row.definition.subsystemId);
+  const subsystemName = subsystem?.name ?? "—";
   // For display, re-index active instances so numbering starts at 1 for each edit cycle
   const activeInstances = data.instances
     .filter((i) => i.partDefinitionId === row.definition.id && i.isStale === 0)
@@ -253,6 +254,9 @@ export function PartCard({
               <Meta label="Part Number" value={row.definition.onshapePartNumber} mono />
               <Meta label="Revision" value={row.definition.revision} mono />
               <Meta label="Instance" value={`#${activePosition} of ${totalInstances}`} mono />
+              {data.projects.length > 1 && (
+                <Meta label="Project" value={projectName(data.projects, subsystem?.projectId)} />
+              )}
               <Meta label="Subsystem" value={subsystemName} />
               <Meta label="Notes" value={row.definition.notes || "—"} />
               <Meta

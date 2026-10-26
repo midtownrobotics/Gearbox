@@ -19,6 +19,7 @@ import {
   buildInstanceRows,
 } from "../../shared/derive";
 import { processPath } from "../../shared/nav";
+import { ProjectFilter, projectName, useInProject, useProjectFilter } from "../../shared/projects";
 import { useAuthUser } from "../../shared/use-auth";
 import type { ShopData } from "../../shared/use-shop-data";
 import { useShopData } from "../../shared/use-shop-data";
@@ -116,6 +117,11 @@ export function PartsPage() {
     return map;
   }, [data]);
 
+  // Only the chosen project's parts.
+  const projectFilter = useProjectFilter();
+  const inProject = useInProject(data?.subsystems ?? [], projectFilter.projectId);
+  const inFilter = (rows: InstanceRow[]) => rows.filter((r) => inProject(r.definition));
+
   if (loading)
     return (
       <Page title="Parts">
@@ -132,9 +138,12 @@ export function PartsPage() {
     <Page
       title="Parts"
       actions={
-        <Button size={touch ? "lg" : "md"} onClick={handleAddPartClick}>
-          Add a part
-        </Button>
+        <>
+          <ProjectFilter filter={projectFilter} className={touch ? "!py-3" : ""} />
+          <Button size={touch ? "lg" : "md"} onClick={handleAddPartClick}>
+            Add a part
+          </Button>
+        </>
       }
     >
       <>
@@ -171,8 +180,9 @@ export function PartsPage() {
           <>
             <PartsTable
               title="In Production"
-              rows={activeRows}
+              rows={inFilter(activeRows)}
               data={data}
+              projectId={projectFilter.projectId}
               totalByDef={totalByDef}
               touch={touch}
               onOpen={setSelectedInstanceId}
@@ -180,8 +190,9 @@ export function PartsPage() {
             />
             <PartsTable
               title="Complete"
-              rows={completeRows}
+              rows={inFilter(completeRows)}
               data={data}
+              projectId={projectFilter.projectId}
               totalByDef={totalByDef}
               touch={touch}
               onOpen={setSelectedInstanceId}
@@ -189,8 +200,9 @@ export function PartsPage() {
             />
             <PartsTable
               title="Obsolete"
-              rows={obsoleteRows}
+              rows={inFilter(obsoleteRows)}
               data={data}
+              projectId={projectFilter.projectId}
               totalByDef={totalByDef}
               touch={touch}
               onOpen={setSelectedInstanceId}
@@ -234,6 +246,7 @@ function PartsTable({
   title,
   rows,
   data,
+  projectId,
   totalByDef,
   touch,
   onOpen,
@@ -242,6 +255,8 @@ function PartsTable({
   title: string;
   rows: InstanceRow[];
   data: ShopData;
+  /** The project the page shows, or null for all: the subsystem filter offers its subsystems. */
+  projectId: number | null;
   totalByDef: Map<number, number>;
   touch: boolean;
   onOpen: (instanceId: number) => void;
@@ -477,7 +492,14 @@ function PartsTable({
               onChange={(v) => setFilters({ ...filters, subsystemId: Number(v) })}
               options={[
                 ["0", "All"],
-                ...data.subsystems.map((s): [string, string] => [String(s.id), s.name]),
+                ...data.subsystems
+                  .filter((s) => projectId === null || s.projectId === projectId)
+                  .map((s): [string, string] => [
+                    String(s.id),
+                    projectId === null && data.projects.length > 1
+                      ? `${s.name} (${projectName(data.projects, s.projectId)})`
+                      : s.name,
+                  ]),
               ]}
             />
             <FilterSelect

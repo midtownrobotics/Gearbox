@@ -4,6 +4,7 @@ import { createShopDb } from "../db";
 import * as schema from "../db/schema";
 import type { AppEnv } from "../types";
 import { onshapeConfig } from "./onshape-config";
+import { followedDocument } from "./onshape-documents";
 import { exportDrawingAsPDF, storeDrawingInR2 } from "./onshape-export";
 import {
   ELEMENT_DRAWING,
@@ -105,9 +106,9 @@ async function processSingleBOMJob(
 
   const database = createShopDb(env.SHOP_DB);
 
-  // The team's document and keys.
+  // The team's keys.
   const config = await onshapeConfig(env, database, teamId);
-  const { mainAssemblyId, credentials } = config;
+  const { credentials } = config;
   if (!credentials) {
     console.log("[BOM Queue Job] No Onshape keys for this team, skipping");
     return;
@@ -131,7 +132,29 @@ async function processSingleBOMJob(
     return;
   }
 
-  const documentId = release?.details.documentId ?? config.documentId;
+  // The document it came from (the package's, else the webhook's), and that document's project
+  // and main assembly while the team follows it.
+  const row = await database
+    .select({ documentId: schema.onshapeReleases.documentId })
+    .from(schema.onshapeReleases)
+    .where(inTeam(schema.onshapeReleases, teamId, eq(schema.onshapeReleases.id, releaseRowId)))
+    .get();
+  const documentId = release?.details.documentId ?? row?.documentId ?? null;
+  const document = documentId ? await followedDocument(database, teamId, documentId) : undefined;
+  if (document) {
+    await database
+      .update(schema.onshapeReleases)
+      .set({ documentId, projectId: document.projectId })
+      .where(inTeam(schema.onshapeReleases, teamId, eq(schema.onshapeReleases.id, releaseRowId)));
+  }
+  const mainAssemblyId = document?.mainAssemblyId ?? null;
+  const project = document
+    ? await database
+        .select({ name: schema.projects.name })
+        .from(schema.projects)
+        .where(inTeam(schema.projects, teamId, eq(schema.projects.id, document.projectId)))
+        .get()
+    : undefined;
   const versionId = release?.details.versionId ?? parts[0]?.versionId ?? null;
   const docId = documentId || "unknown";
 
@@ -173,6 +196,7 @@ async function processSingleBOMJob(
   const message = [
     "🎉 **New release candidate approved!**",
     `Release: ${releaseLink}`,
+    ...(project ? [`Project: ${project.name}`] : []),
     ...(details?.madeBy ? [`Made by: ${details.madeBy}`] : []),
     ...(approvedBy.length > 0 ? [`Approved by: ${approvedBy.join(", ")}`] : []),
     ...(details?.notes && details.notes !== details.name ? [`Notes: ${details.notes}`] : []),

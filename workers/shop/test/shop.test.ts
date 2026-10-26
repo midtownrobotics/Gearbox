@@ -2,6 +2,7 @@ import { admin, kioskAdmin, mentor, newTeamId, student, teamUsers } from "@g3/te
 import { call, callAs, jsonAs } from "@g3/testing/worker";
 import { describe, expect, it } from "vitest";
 import { STARTER_CHECKLIST } from "../src/lib/quality-checklist";
+import { newSubsystem } from "./projects";
 
 // G3 Shop: parts for anyone signed in, kiosk presence for kiosk PIN sessions, and settings,
 // subsystems and processes for admins (never from a kiosk).
@@ -44,12 +45,7 @@ describe("sign-in and roles", () => {
 
 describe("subsystems and processes", () => {
   it("creates and lists them", async () => {
-    const subsystem = await jsonAs<{ id: number; name: string }>(
-      admin,
-      "/subsystems",
-      { method: "POST", body: { name: "Intake" } },
-      201,
-    );
+    const subsystem = await newSubsystem(admin, "Intake");
     expect((await jsonAs<{ name: string }[]>(admin, "/subsystems")).map((s) => s.name)).toContain(
       subsystem.name,
     );
@@ -128,7 +124,7 @@ describe("obsolete parts", () => {
   /** A part of its own with `quantity` instances. */
   async function seed(quantity: number) {
     const tag = crypto.randomUUID().slice(0, 8);
-    const subsystem = await jsonAs<Id>(admin, "/subsystems", post({ name: `Arm ${tag}` }), 201);
+    const subsystem = await newSubsystem(admin, `Arm ${tag}`);
     const process = await jsonAs<Id>(admin, "/processes", post({ name: `Mill ${tag}` }), 201);
     const part = await jsonAs<Id>(
       student,
@@ -190,7 +186,7 @@ describe("quality control", () => {
   /** A Quality Control step, a plain step, and a part with both (the check last). */
   async function seed({ required = false }: { required?: boolean } = {}) {
     const tag = crypto.randomUUID().slice(0, 8);
-    const subsystem = await jsonAs<Id>(admin, "/subsystems", post({ name: `Drive ${tag}` }), 201);
+    const subsystem = await newSubsystem(admin, `Drive ${tag}`);
     const mill = await jsonAs<Id>(admin, "/processes", post({ name: `Mill ${tag}` }), 201);
     const check = await jsonAs<Id>(
       admin,
@@ -444,7 +440,7 @@ describe("quality reports", () => {
   async function seed() {
     const team = teamUsers(newTeamId());
     const { admin, student } = team;
-    const subsystem = await jsonAs<Id>(admin, "/subsystems", post({ name: "Arm" }), 201);
+    const subsystem = await newSubsystem(admin, "Arm");
     const mill = await jsonAs<Id>(admin, "/processes", post({ name: "Mill" }), 201);
     const deburr = await jsonAs<Id>(admin, "/processes", post({ name: "Deburr" }), 201);
     const check = await jsonAs<Id>(

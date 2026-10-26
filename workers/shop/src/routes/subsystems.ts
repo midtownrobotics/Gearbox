@@ -2,12 +2,13 @@ import { inTeam, logTeamChange, requireAdmin, requireAuth, withTeam } from "@g3/
 import { eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { createShopDb } from "../db";
-import { subsystems } from "../db/schema";
-import { removeSubsystem, subsystemUsage } from "../lib/removal";
+import { projects, subsystems } from "../db/schema";
+import { removeSubsystem, removedError, subsystemUsage } from "../lib/removal";
 import type { AppEnv } from "../types";
 
 // Every subsystem, removed ones too (`archivedAt`): what already uses one still shows its name,
-// and pickers for new parts leave them out. Only admins add, remove and restore them.
+// and pickers for new parts leave them out. Each is in one project (`projectId`), which is its
+// parts' project. Only admins add, remove and restore them.
 export const subsystemsRouter = new Hono<AppEnv>()
   .get("/", requireAuth, async (c) => {
     const db = createShopDb(c.env.SHOP_DB);
@@ -24,15 +25,32 @@ export const subsystemsRouter = new Hono<AppEnv>()
     const usage = await subsystemUsage(db, c.get("teamId"));
     return c.json(Object.fromEntries(usage));
   })
+  /** A new subsystem, in one of the team's projects that hasn't been removed. */
   .post("/", requireAdmin, async (c) => {
-    const body = await c.req.json<{ name?: unknown }>().catch(() => ({ name: undefined }));
+    const body = await c.req
+      .json<{ name?: unknown; projectId?: unknown }>()
+      .catch(() => ({ name: undefined, projectId: undefined }));
     const name = typeof body.name === "string" ? body.name.trim() : "";
     if (!name) return c.json({ error: "name is required." }, 400);
+    const projectId = Number(body.projectId);
+    if (!Number.isInteger(projectId) || projectId < 1) {
+      return c.json({ error: "Choose the project it's for." }, 400);
+    }
 
     const db = createShopDb(c.env.SHOP_DB);
+    const teamId = c.get("teamId");
+    const project = await db
+      .select({ name: projects.name, archivedAt: projects.archivedAt })
+      .from(projects)
+      .where(inTeam(projects, teamId, eq(projects.id, projectId)))
+      .get();
+    if (!project) return c.json({ error: "That project doesn't exist." }, 400);
+    if (project.archivedAt !== null) {
+      return c.json({ error: removedError("project", [project]) }, 400);
+    }
     const row = await db
       .insert(subsystems)
-      .values(withTeam(c.get("teamId"), { name, createdAt: Date.now() }))
+      .values(withTeam(teamId, { name, projectId, createdAt: Date.now() }))
       .returning()
       .get();
 

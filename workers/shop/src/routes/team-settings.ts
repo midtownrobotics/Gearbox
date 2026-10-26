@@ -1,6 +1,7 @@
 import { teamSettingsRoutes } from "@g3/auth";
 import { createShopDb } from "../db";
 import { onshapeConfig } from "../lib/onshape-config";
+import { teamDocuments } from "../lib/onshape-documents";
 import { qualityCheck, qualityReportsOn, saveQualityCheck } from "../lib/quality";
 import { SETTING, getSetting, isChannelId, setSetting } from "../lib/settings";
 import { manifest } from "../manifest";
@@ -18,14 +19,15 @@ export const teamSettingsRouter = teamSettingsRoutes<AppEnv>(manifest, "Shop set
   async read(c) {
     const db = createShopDb(c.env.SHOP_DB);
     const teamId = c.get("teamId");
-    const [release, summary, onshape, quality, reports] = await Promise.all([
+    const [release, summary, onshape, quality, reports, documents] = await Promise.all([
       getSetting(db, teamId, CHANNELS.releaseChannelId),
       getSetting(db, teamId, CHANNELS.summaryChannelId),
       onshapeConfig(c.env, db, teamId).catch(() => null),
       qualityCheck(db, teamId),
       qualityReportsOn(db, teamId),
+      teamDocuments(db, teamId),
     ]);
-    const connected = Boolean(onshape?.credentials && onshape.companyId && onshape.documentId);
+    const connected = Boolean(onshape?.credentials && onshape.companyId && documents.length > 0);
     return {
       values: {
         releaseChannelId: release,
@@ -47,7 +49,13 @@ export const teamSettingsRouter = teamSettingsRoutes<AppEnv>(manifest, "Shop set
               ? "Uses keys set up on the server. Save your own in Shop to replace them."
               : undefined,
           facts: [
-            { label: "Document", value: onshape?.documentId ?? "Not set" },
+            {
+              label: "Documents",
+              value:
+                documents.length === 0
+                  ? "None"
+                  : `${documents.length} document${documents.length === 1 ? "" : "s"}`,
+            },
             { label: "Company", value: onshape?.companyId ?? "Not set" },
             { label: "API keys", value: onshape?.credentials ? "Set" : "Not set" },
             {

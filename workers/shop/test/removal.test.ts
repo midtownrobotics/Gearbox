@@ -1,6 +1,7 @@
 import { newTeamId, teamUsers } from "@g3/testing/users";
 import { callAs, jsonAs } from "@g3/testing/worker";
 import { describe, expect, it } from "vitest";
+import { newSubsystem } from "./projects";
 
 // Admins remove subsystems and processes the team no longer uses: deleted when nothing points at
 // them, archived while parts do, so nothing in use breaks. Archived ones stay out of new parts and
@@ -18,7 +19,7 @@ const remove = { method: "DELETE" };
 async function seed() {
   const team = teamUsers(newTeamId());
   const { admin } = team;
-  const subsystem = await jsonAs<Id>(admin, "/subsystems", post({ name: "Arm" }), 201);
+  const subsystem = await newSubsystem(admin, "Arm");
   const mill = await jsonAs<Id>(admin, "/processes", post({ name: "Mill" }), 201);
   const deburr = await jsonAs<Id>(admin, "/processes", post({ name: "Deburr" }), 201);
   const part = await jsonAs<Id>(
@@ -48,7 +49,7 @@ const newPart = (subsystemId: number, processIds: number[]) =>
 describe("removing subsystems and processes", () => {
   it("deletes one nothing uses", async () => {
     const { admin } = teamUsers(newTeamId());
-    const typo = await jsonAs<Id>(admin, "/subsystems", post({ name: "Intkae" }), 201);
+    const typo = await newSubsystem(admin, "Intkae");
     const old = await jsonAs<Id>(admin, "/processes", post({ name: "Old saw" }), 201);
 
     expect(await jsonAs<Removal>(admin, `/subsystems/${typo.id}`, remove)).toEqual({
@@ -95,7 +96,7 @@ describe("removing subsystems and processes", () => {
   it("keeps archived ones out of new parts", async () => {
     const { team, subsystem, mill, deburr, part } = await seed();
     const { admin } = team;
-    const other = await jsonAs<Id>(admin, "/subsystems", post({ name: "Drive" }), 201);
+    const other = await newSubsystem(admin, "Drive");
     const lathe = await jsonAs<Id>(admin, "/processes", post({ name: "Lathe" }), 201);
     await jsonAs(admin, `/subsystems/${subsystem.id}`, remove);
     await jsonAs(admin, `/processes/${mill.id}`, remove);

@@ -4,6 +4,7 @@ import { callAs, jsonAs } from "@g3/testing/worker";
 import { describe, expect, it } from "vitest";
 import { drawingKey } from "../src/lib/storage";
 import { eventually, onshapeEvent } from "./onshape";
+import { newProject, newSubsystem } from "./projects";
 
 // What each team has of its own in Shop (roadmap Phase 3): its lists (including the ones that are
 // only numbers, which the isolation test's markers can't see), its files under its own R2 prefix,
@@ -19,12 +20,7 @@ type Id = { id: number };
 async function shopWithWork() {
   const team = teamUsers(newTeamId());
   const { admin, student } = team;
-  const subsystem = await jsonAs<Id>(
-    admin,
-    "/subsystems",
-    { method: "POST", body: { name: "Drive" } },
-    201,
-  );
+  const subsystem = await newSubsystem(admin, "Drive");
   const process = await jsonAs<Id>(
     admin,
     "/processes",
@@ -125,11 +121,18 @@ describe("Onshape", () => {
     const b = teamUsers(newTeamId());
     await jsonAs(a.admin, "/admin/onshape/config", {
       method: "POST",
-      body: { documentId: "docA", webhookKeyPrimary: "a-secret-key", apiKey: "a-api-key" },
+      body: { webhookKeyPrimary: "a-secret-key", apiKey: "a-api-key" },
     });
+    const project = await newProject(a.admin);
+    await jsonAs(
+      a.admin,
+      "/admin/onshape/documents",
+      { method: "POST", body: { documentId: "docA", projectId: project.id } },
+      201,
+    );
     const mine = await jsonAs<Record<string, unknown>>(a.admin, "/admin/onshape/config");
     expect(mine).toMatchObject({
-      documentId: "docA",
+      documents: [{ documentId: "docA", projectId: project.id, mainAssemblyId: "" }],
       hasWebhookKeys: true,
       fromWorkerSecrets: false,
     });
@@ -138,7 +141,7 @@ describe("Onshape", () => {
       `https://${a.teamId.replace("frc", "")}-shop.frcgearbox.com/api/onshape/events`,
     );
     expect(await jsonAs(b.admin, "/admin/onshape/config")).toMatchObject({
-      documentId: "",
+      documents: [],
       hasApiKey: false,
       hasWebhookKeys: false,
     });
@@ -162,7 +165,7 @@ describe("Onshape", () => {
     ] as const) {
       await jsonAs(team.admin, "/admin/onshape/config", {
         method: "POST",
-        body: { documentId: "doc", webhookKeyPrimary: key },
+        body: { webhookKeyPrimary: key },
       });
     }
     const event = (partNumber: string) => ({

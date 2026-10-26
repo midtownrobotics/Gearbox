@@ -13,15 +13,6 @@ export const manifest = defineManifest({
   hooks: { seed: false, delete: true, export: true, demo: true },
   settings: [
     {
-      key: "documentId",
-      label: "Onshape document",
-      type: "text",
-      default: null,
-      editedBy: "admin",
-      page: "/admin",
-      integration: "onshape",
-    },
-    {
       key: "companyId",
       label: "Onshape company",
       type: "text",

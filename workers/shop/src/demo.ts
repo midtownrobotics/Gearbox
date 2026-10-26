@@ -11,6 +11,7 @@ import {
   partInstanceProcesses,
   partInstances,
   processes,
+  projects,
   stagingBatches,
   subsystems,
 } from "./db/schema";
@@ -27,7 +28,15 @@ import type { AppEnv } from "./types";
 type Status = "waiting" | "todo" | "doing" | "done";
 type Env = AppEnv["Bindings"];
 
-const SUBSYSTEMS = ["Drivetrain", "Intake", "Climber", "Electrical"];
+const PROJECTS = ["Competition robot", "Practice robot"];
+
+/** Each subsystem and its project (by place in the list above). */
+const SUBSYSTEMS = [
+  { name: "Drivetrain", project: 0 },
+  { name: "Intake", project: 0 },
+  { name: "Climber", project: 0 },
+  { name: "Electrical", project: 1 },
+];
 
 const PROCESSES = [
   { name: "CAM", type: "file_producer" },
@@ -180,6 +189,13 @@ export async function addDemoRelease(env: Env, teamId: string) {
     .all();
   const n = done.length + 1;
   const now = Math.floor(Date.now() / 1000);
+  // From the competition robot's document: the first project.
+  const project = await db
+    .select({ id: projects.id })
+    .from(projects)
+    .where(inTeam(projects, teamId))
+    .orderBy(projects.id)
+    .get();
   const madeBy = DEMO_PEOPLE[5] as DemoPerson;
   const approver = DEMO_PEOPLE[1] as DemoPerson;
   const releaseId = `demo-release-${n}`;
@@ -191,6 +207,7 @@ export async function addDemoRelease(env: Env, teamId: string) {
         releaseId,
         timestamp: at,
         createdAt: now,
+        projectId: project?.id ?? null,
         name: `Release ${n}`,
         notes: SAFE_TEXT.note[n % SAFE_TEXT.note.length],
         state: "RELEASED",
@@ -235,11 +252,25 @@ export async function loadDemo(env: Env, teamId: string) {
   const designer = DEMO_PEOPLE[5] as DemoPerson;
   const machinist = DEMO_PEOPLE[0] as DemoPerson;
 
+  const projectIds: number[] = [];
+  for (const name of PROJECTS) {
+    const [row] = await db
+      .insert(projects)
+      .values(withTeam(teamId, { name, createdAt: now - 30 * 24 * HOUR }))
+      .returning({ id: projects.id });
+    projectIds.push(row.id);
+  }
   const subsystemIds: number[] = [];
-  for (const name of SUBSYSTEMS) {
+  for (const { name, project } of SUBSYSTEMS) {
     const [row] = await db
       .insert(subsystems)
-      .values(withTeam(teamId, { name, createdAt: now - 30 * 24 * HOUR }))
+      .values(
+        withTeam(teamId, {
+          name,
+          projectId: projectIds[project] as number,
+          createdAt: now - 30 * 24 * HOUR,
+        }),
+      )
       .returning({ id: subsystems.id });
     subsystemIds.push(row.id);
   }
@@ -351,4 +382,4 @@ export async function loadDemo(env: Env, teamId: string) {
 
 /** The words in the demo's Shop data, for the gateway. */
 export const demoWords = (): string[] =>
-  vocabularyOf(SUBSYSTEMS, PROCESSES, PARTS, RELEASE_PARTS, "Release");
+  vocabularyOf(PROJECTS, SUBSYSTEMS, PROCESSES, PARTS, RELEASE_PARTS, "Release");

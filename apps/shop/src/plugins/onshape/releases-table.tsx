@@ -1,5 +1,6 @@
 import { Badge, focusRing } from "@g3/ui";
 import { Link, useLocation } from "react-router-dom";
+import { projectName, useProjects } from "../../shared/projects";
 import type { OnshapeRelease } from "../../shared/types";
 import { PartNameLink, linkClass } from "../batches/batch-ui";
 import {
@@ -226,19 +227,27 @@ function SortButton({
 /** When a release was released: "Oct 5, 2026, 9:05 AM". */
 const released = (release: OnshapeRelease) => when(release.releasedAt) ?? release.releasedAt;
 
-/** A release's name, which opens its page. */
+/** A release's name, which opens its page, and its project while the team has more than one. */
 function ReleaseLink({ release, className = "" }: { release: OnshapeRelease; className?: string }) {
   // The release's back link returns to the table as it is now.
   const { search } = useLocation();
+  const projects = useProjects();
   return (
-    <Link
-      to={`/onshape/releases/${release.id}`}
-      state={{ list: search }}
-      title="Open this release"
-      className={`${linkClass} break-words ${className}`}
-    >
-      {releaseName(release)}
-    </Link>
+    <>
+      <Link
+        to={`/onshape/releases/${release.id}`}
+        state={{ list: search }}
+        title="Open this release"
+        className={`${linkClass} break-words ${className}`}
+      >
+        {releaseName(release)}
+      </Link>
+      {projects.length > 1 && (
+        <span className="block text-xs text-secondary-500">
+          {projectName(projects, release.projectId)}
+        </span>
+      )}
+    </>
   );
 }
 

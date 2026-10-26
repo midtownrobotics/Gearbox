@@ -4,6 +4,7 @@ import { api } from "../../shared/api";
 import { getErrorMessage } from "../../shared/api-error";
 import { fetchQualityReports, saveQualityChecklist } from "../../shared/getters";
 import { InfoTip } from "../../shared/info-tip";
+import { ProjectFilter, useProjectFilter } from "../../shared/projects";
 import { MAX_CHECKLIST_ITEMS, MAX_CHECK_LABEL, type QualityReport } from "../../shared/types";
 import { useRefreshAuthUser } from "../../shared/use-auth";
 import { useUserNames } from "../../shared/use-user-names";
@@ -54,6 +55,8 @@ export function QualityReports() {
   const refreshAuth = useRefreshAuthUser();
 
   const [search, setSearch] = useState("");
+  const projectFilter = useProjectFilter();
+  const { projectId } = projectFilter;
   const [reporterFilter, setReporterFilter] = useState("all");
   const [partFilter, setPartFilter] = useState("all");
   const [resultFilter, setResultFilter] = useState<"all" | "passed" | "problem">("all");
@@ -118,6 +121,7 @@ export function QualityReports() {
     const from = fromDate ? new Date(`${fromDate}T00:00:00`).getTime() : null;
     const to = toDate ? new Date(`${toDate}T23:59:59.999`).getTime() : null;
     const result = rows.filter(({ report: r, ...row }) => {
+      if (projectId !== null && r.projectId !== projectId) return false;
       if (reporterFilter !== "all" && r.reportedBy !== reporterFilter) return false;
       if (partFilter !== "all" && String(r.partDefinitionId) !== partFilter) return false;
       if (resultFilter === "passed" && !r.passed) return false;
@@ -163,6 +167,7 @@ export function QualityReports() {
   }, [
     rows,
     search,
+    projectId,
     reporterFilter,
     partFilter,
     resultFilter,
@@ -238,6 +243,7 @@ export function QualityReports() {
               onChange={(e) => setSearch(e.target.value)}
               className="flex-1 min-w-40"
             />
+            <ProjectFilter filter={projectFilter} />
             <select
               aria-label="Reported by"
               value={reporterFilter}
@@ -345,6 +351,9 @@ export function QualityReports() {
                         {r.partNumber}
                         {r.revision ? ` · Rev ${r.revision}` : ""} · {r.processName}
                       </span>
+                      {projectFilter.show && r.projectName && (
+                        <span className="block text-xs text-secondary-500">{r.projectName}</span>
+                      )}
                     </td>
                     <td className="px-3 py-2 min-w-44">
                       <span

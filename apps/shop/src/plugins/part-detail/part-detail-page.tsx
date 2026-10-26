@@ -4,6 +4,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../../shared/api";
 import { getErrorMessage } from "../../shared/api-error";
 import { PrintDrawingButton } from "../../shared/print-drawing-button";
+import { projectName, useProjects } from "../../shared/projects";
 
 interface PartDefinition {
   id: number;
@@ -28,6 +29,7 @@ interface PartInstance {
 
 interface Subsystem {
   id: number;
+  projectId: number;
   name: string;
   createdAt: number;
 }
@@ -55,6 +57,7 @@ export function PartDetailPage() {
   const [definitions, setDefinitions] = useState<PartDefinition[]>([]);
   const [instances, setInstances] = useState<PartInstance[]>([]);
   const [subsystems, setSubsystems] = useState<Subsystem[]>([]);
+  const projects = useProjects();
   const [processes, setProcesses] = useState<Process[]>([]);
   const [instanceProcesses, setInstanceProcesses] = useState<InstanceProcess[]>([]);
   const [loading, setLoading] = useState(true);
@@ -354,6 +357,15 @@ export function PartDetailPage() {
         <Card title="Summary">
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             <Stat label="Revision" value={activeDef.revision || "—"} />
+            {projects.length > 1 && (
+              <Stat
+                label="Project"
+                value={projectName(
+                  projects,
+                  subsystems.find((s) => s.id === activeDef.subsystemId)?.projectId,
+                )}
+              />
+            )}
             <Stat label="Subsystem" value={getSubsystemName(activeDef.subsystemId)} />
             <Stat label="Instances" value={activeInstances.length} />
           </div>

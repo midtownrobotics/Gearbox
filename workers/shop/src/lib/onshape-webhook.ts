@@ -4,6 +4,7 @@ import type { createShopDb } from "../db";
 import * as schema from "../db/schema";
 import type { BOMQueueMessage } from "./bom-queue-consumer";
 import { type OnshapeCredentials, basicAuth } from "./onshape-config";
+import { followedDocument } from "./onshape-documents";
 
 type ShopDb = ReturnType<typeof createShopDb>;
 
@@ -302,19 +303,23 @@ export async function processReleaseEvent(
   releaseId: string,
   timestamp: string,
   queue: Queue,
+  /** The document the event came from, when Onshape says: the release goes to its project. */
+  documentId?: string,
 ): Promise<void> {
   const startTime = Date.now();
   console.log(`[OnShape Webhook] Starting processReleaseEvent for ${releaseId}`);
 
   const now = Math.floor(Date.now() / 1000);
+  const document = documentId ? await followedDocument(database, teamId, documentId) : undefined;
+  const origin = document ? { documentId: document.documentId, projectId: document.projectId } : {};
 
   console.log(`[OnShape Webhook] [${Date.now() - startTime}ms] Inserting release`);
   const release = await database
     .insert(schema.onshapeReleases)
-    .values(withTeam(teamId, { releaseId, timestamp, createdAt: now }))
+    .values(withTeam(teamId, { releaseId, timestamp, createdAt: now, ...origin }))
     .onConflictDoUpdate({
       target: [schema.onshapeReleases.teamId, schema.onshapeReleases.releaseId],
-      set: { timestamp },
+      set: { timestamp, ...origin },
     })
     .returning({ id: schema.onshapeReleases.id });
 
