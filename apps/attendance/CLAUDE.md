@@ -1,0 +1,1 @@
+@../../workers/attendance/AGENTS.md

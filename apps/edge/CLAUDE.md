@@ -1,0 +1,1 @@
+@../../workers/edge/AGENTS.md

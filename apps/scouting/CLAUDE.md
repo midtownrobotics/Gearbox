@@ -1,0 +1,1 @@
+@../../workers/scouting/AGENTS.md

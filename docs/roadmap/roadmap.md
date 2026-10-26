@@ -692,5 +692,5 @@ The risk that matters most is one team seeing another team's data. Most of the s
 | Edge | An optional app any team can run with its own box (changed 6 October 2026, once the box no longer needed a tunnel). Its plan is the Edge section, not a phase |
 | Single-team apps | A public category: listed for every team, run only by the author team. Teams discuss them off the platform |
 | Contact address | contact@frcgearbox.com, as written in both drafts |
-| Internal names | @g3 packages, the G3ID binding, and cookie and database names stay as they are, with no renames in this roadmap. Decided in the repo and recorded in CLAUDE.md |
+| Internal names | @g3 packages, the G3ID binding, and cookie and database names stay as they are, with no renames in this roadmap. Decided in the repo and recorded in AGENTS.md |
 | Teams per account | One. `team_id` on the user row, with no memberships table; roles stay as `is_admin` and `is_mentor` |

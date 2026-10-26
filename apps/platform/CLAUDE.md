@@ -1,0 +1,1 @@
+@../../workers/platform/AGENTS.md
