@@ -24,8 +24,17 @@ export type User = {
   isMentor: number;
   createdAt: number;
   lastLoginAt: number | null;
+  /** When they last used any app, at most a minute out; null before Gearbox kept it. */
+  lastSeenAt: number | null;
   identities: Identity[];
 };
+
+/** When they were last online: last using an app, else their last sign-in. */
+export const lastOnline = (u: User): number | null => u.lastSeenAt ?? u.lastLoginAt;
+
+/** Used an app in the last 5 minutes. */
+export const isOnline = (u: User): boolean =>
+  u.lastSeenAt !== null && Date.now() / 1000 - u.lastSeenAt < 5 * 60;
 
 export function relativeTime(ts: number): string {
   const diff = Math.floor(Date.now() / 1000) - ts;

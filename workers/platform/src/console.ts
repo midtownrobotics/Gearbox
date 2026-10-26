@@ -478,8 +478,9 @@ export const consoleRouter = new Hono<AppEnv>()
         active: number;
         pending: number;
         mentors: number;
-        signedInWeek: number;
-        signedInMonth: number;
+        online: number;
+        activeWeek: number;
+        activeMonth: number;
         joinedMonth: number;
       },
       apps: Object.values(MANIFESTS)

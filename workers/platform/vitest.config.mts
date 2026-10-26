@@ -43,8 +43,9 @@ const g3id = async (request: Request) => {
       active: 12,
       pending: 2,
       mentors: 3,
-      signedInWeek: 8,
-      signedInMonth: 10,
+      online: 1,
+      activeWeek: 8,
+      activeMonth: 10,
       joinedMonth: 4,
     });
   }

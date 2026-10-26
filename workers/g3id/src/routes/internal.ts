@@ -158,12 +158,12 @@ export const internalRouter = new Hono<AppEnv>()
     );
   })
   // How many accounts there are on every team but the public demo's, for the operators' console's
-  // Stats page: counts only, never who. "Signed in" is a sign-in in the last 7 or 30 days (a
-  // session lasts 7, so anyone using Gearbox signs in at least weekly).
+  // Stats page: counts only, never who. Online is having used any app in the last 5 minutes;
+  // active, in the last 7 or 30 days (when they last signed in, for anyone not seen since 0022).
   .get("/stats", async (c) => {
     const now = Math.floor(Date.now() / 1000);
-    const since = (days: number) => now - days * 86_400;
     const active = sql`${coreUsers.status} = 'active'`;
+    const seen = sql`coalesce(${coreUsers.lastSeenAt}, ${coreUsers.lastLoginAt})`;
     const total = (condition: ReturnType<typeof sql>) =>
       sql<number>`coalesce(sum(${condition}), 0)`;
     const [stats] = await createDb(c.env.DB)
@@ -171,9 +171,10 @@ export const internalRouter = new Hono<AppEnv>()
         active: total(active),
         pending: total(sql`${coreUsers.status} = 'pending'`),
         mentors: total(sql`${active} and ${coreUsers.isMentor} = 1`),
-        signedInWeek: total(sql`${active} and ${coreUsers.lastLoginAt} >= ${since(7)}`),
-        signedInMonth: total(sql`${active} and ${coreUsers.lastLoginAt} >= ${since(30)}`),
-        joinedMonth: total(sql`${active} and ${coreUsers.createdAt} >= ${since(30)}`),
+        online: total(sql`${active} and ${coreUsers.lastSeenAt} >= ${now - 5 * 60}`),
+        activeWeek: total(sql`${active} and ${seen} >= ${now - 7 * 86_400}`),
+        activeMonth: total(sql`${active} and ${seen} >= ${now - 30 * 86_400}`),
+        joinedMonth: total(sql`${active} and ${coreUsers.createdAt} >= ${now - 30 * 86_400}`),
       })
       .from(coreUsers)
       .where(and(ne(coreUsers.teamId, demoTeamId), isNull(coreUsers.deletedAt)))

@@ -390,7 +390,7 @@ describe("telling operators", () => {
 describe("stats", () => {
   type Stats = {
     teams: { active: number; pending: number; suspended: number; newThisMonth: number };
-    members: { active: number; signedInWeek: number };
+    members: { active: number; online: number; activeWeek: number };
     apps: { slug: string; teams: number }[];
   };
   const stats = async () => (await (await call(operator, "/stats")).json()) as Stats;
@@ -431,6 +431,6 @@ describe("stats", () => {
     expect(teamsWith(after, "pit")).toBe(teamsWith(before, "pit"));
     // ID and Portal are always on.
     expect(after.apps.map((a) => a.slug)).not.toContain("id");
-    expect(after.members).toMatchObject({ active: 12, signedInWeek: 8 });
+    expect(after.members).toMatchObject({ active: 12, online: 1, activeWeek: 8 });
   });
 });

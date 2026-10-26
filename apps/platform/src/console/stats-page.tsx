@@ -10,8 +10,9 @@ type Stats = {
     active: number;
     pending: number;
     mentors: number;
-    signedInWeek: number;
-    signedInMonth: number;
+    online: number;
+    activeWeek: number;
+    activeMonth: number;
     joinedMonth: number;
   };
   apps: { slug: string; name: string; teams: number }[];
@@ -46,8 +47,9 @@ export function StatsPage() {
                 value={data.members.active}
                 hint={`${data.members.mentors} mentors`}
               />
-              <Stat label="Signed in, 7 days" value={data.members.signedInWeek} />
-              <Stat label="Signed in, 30 days" value={data.members.signedInMonth} />
+              <Stat label="Online now" value={data.members.online} hint="In the last 5 minutes" />
+              <Stat label="Active, 7 days" value={data.members.activeWeek} />
+              <Stat label="Active, 30 days" value={data.members.activeMonth} />
               <Stat label="Joined in 30 days" value={data.members.joinedMonth} />
               <Stat label="Awaiting approval" value={data.members.pending} />
             </div>
