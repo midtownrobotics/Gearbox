@@ -1,2 +1,4 @@
 * text=auto eol=lf
 
+# The pit log downloader's status page, built by each release (release.yml).
+devices/pit-log-downloader/page/** linguist-generated=true -diff

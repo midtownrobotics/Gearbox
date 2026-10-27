@@ -15,6 +15,8 @@ The **pit log downloader** is a small program for a laptop in the pit (Windows, 
 
 The laptop now shows up on Logs. To stop it, remove it there.
 
+To update the downloader, stop it (Ctrl+C), run `git pull` in its Gearbox folder, and start it again.
+
 ## The logs
 
 Logs lists every log by event, for anyone signed in to download. Admins delete them.

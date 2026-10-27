@@ -63,6 +63,9 @@ jobs:
           if git diff --quiet; then
             echo "No changesets to release."
           else
+            # The pit log downloader's status page goes in each release, built, so pit computers
+            # only install what it runs with (devices/pit-log-downloader/AGENTS.md).
+            pnpm --filter @g3/pit-log-downloader build:release
             git add -A
             git commit -m "Release $(node -p 'require("./package.json").version')"
             git push origin public
