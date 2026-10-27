@@ -112,11 +112,12 @@ async function processSingleBOMJob(
     console.log("[BOM Queue Job] No Onshape keys for this team, skipping");
     return;
   }
+  const api = { db: database, teamId, credentials };
 
   // The release package: its name, who made and approved it, and its parts and drawings. If it
   // can't be read, the parts the revision events recorded are used, with the BOM's details.
   console.log(`[BOM Queue Job] [${Date.now() - jobStartTime}ms] Fetching release package`);
-  const release = await fetchReleasePackage(releaseId, credentials);
+  const release = await fetchReleasePackage(releaseId, api);
   if (release) await saveRelease(database, teamId, releaseId, releaseRowId, release);
 
   const parts = await database
@@ -139,7 +140,7 @@ async function processSingleBOMJob(
   // package, so do the names, descriptions and revisions.
   if (documentId && mainAssemblyId && versionId) {
     console.log(`[BOM Queue Job] [${Date.now() - jobStartTime}ms] Fetching BOM data`);
-    const bomMetadata = await fetchAndParseBOM(documentId, versionId, mainAssemblyId, credentials);
+    const bomMetadata = await fetchAndParseBOM(documentId, versionId, mainAssemblyId, api);
     for (const part of parts) {
       const metadata = bomMetadata.get(part.partNumber);
       if (!metadata) continue;
@@ -223,7 +224,7 @@ async function processSingleBOMJob(
               documentId,
               part.versionId as string,
               part.partDrawingEntityId as string,
-              credentials,
+              api,
             );
 
             await storeDrawingInR2(

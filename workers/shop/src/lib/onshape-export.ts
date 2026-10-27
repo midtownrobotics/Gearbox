@@ -4,7 +4,8 @@ import type { createShopDb } from "../db";
 import * as schema from "../db/schema";
 import type { AppEnv } from "../types";
 import { drawingBarcodeValue, stampBarcode } from "./barcode";
-import { type OnshapeCredentials, basicAuth, onshapeConfig } from "./onshape-config";
+import { type OnshapeApi, onshapeFetch } from "./onshape-api";
+import { onshapeConfig } from "./onshape-config";
 import { drawingKey } from "./storage";
 
 type ShopDb = ReturnType<typeof createShopDb>;
@@ -82,7 +83,7 @@ export async function getDrawingExportParams(
   documentId: string;
   versionId: string;
   drawingEntityId: string;
-  credentials: OnshapeCredentials;
+  api: OnshapeApi;
 }> {
   const config = await onshapeConfig(env, db, teamId);
   const documentId = config.documentId;
@@ -117,7 +118,7 @@ export async function getDrawingExportParams(
     documentId,
     versionId: part.versionId,
     drawingEntityId: part.partDrawingEntityId,
-    credentials: config.credentials,
+    api: { db, teamId, credentials: config.credentials },
   };
 }
 
@@ -125,21 +126,18 @@ export async function exportDrawingAsPDF(
   documentId: string,
   versionId: string,
   drawingEntityId: string,
-  onshape: OnshapeCredentials,
+  api: OnshapeApi,
 ): Promise<ArrayBuffer> {
-  const credentials = basicAuth(onshape);
-
   // Step 1: Request PDF export
   console.log("[OnShape Export] Requesting PDF export", { documentId, versionId, drawingEntityId });
 
-  const exportResponse = await fetch(
-    `https://cad.onshape.com/api/v16/drawings/d/${documentId}/v/${versionId}/e/${drawingEntityId}/translations`,
+  const exportResponse = await onshapeFetch(
+    api,
+    "drawing_export",
+    `/v16/drawings/d/${documentId}/v/${versionId}/e/${drawingEntityId}/translations`,
     {
       method: "POST",
-      headers: {
-        Authorization: credentials,
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         formatName: "PDF",
         storeInDocument: false,
@@ -183,13 +181,10 @@ export async function exportDrawingAsPDF(
 
     console.log("[OnShape Export] Polling status", { translationId, attempt: retries + 1 });
 
-    const statusResponse = await fetch(
-      `https://cad.onshape.com/api/v16/translations/${translationId}`,
-      {
-        headers: {
-          Authorization: credentials,
-        },
-      },
+    const statusResponse = await onshapeFetch(
+      api,
+      "export_status",
+      `/v16/translations/${translationId}`,
     );
 
     if (!statusResponse.ok) {
@@ -226,13 +221,10 @@ export async function exportDrawingAsPDF(
   console.log("[OnShape Export] Export complete, downloading PDF", { externalDataId });
 
   // Step 3: Download the PDF
-  const downloadResponse = await fetch(
-    `https://cad.onshape.com/api/v16/documents/d/${documentId}/externaldata/${externalDataId}`,
-    {
-      headers: {
-        Authorization: credentials,
-      },
-    },
+  const downloadResponse = await onshapeFetch(
+    api,
+    "export_download",
+    `/v16/documents/d/${documentId}/externaldata/${externalDataId}`,
   );
 
   if (!downloadResponse.ok) {
