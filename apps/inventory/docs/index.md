@@ -15,7 +15,7 @@ Every change to an entry is in its History, with who made it.
 | Add and edit entries, count, move, check out and in | Yes | Yes | Yes |
 | Describe locations and move everything in one | Yes | Yes | Yes |
 | Delete, merge and split entries | | Yes | Yes |
-| The Admin page: fields, locations, robots, subsystems | | | Yes |
+| The Admin page: fields, locations, robots, subsystems, units | | | Yes |
 
 ## Pages
 
@@ -24,6 +24,6 @@ Every change to an entry is in its History, with who made it.
 | Inventory | The table: every entry in every place. Search, count, move, check out and in |
 | Locations | The same, location by location, to see what's in a drawer or move it all |
 | Add an entry | A new kind of part |
-| Admin | Your team's fields, locations, robots and subsystems |
+| Admin | Your team's fields, locations, robots, subsystems and units |
 
 After setting it up, the pages in this section follow the bar, then an entry's own page.

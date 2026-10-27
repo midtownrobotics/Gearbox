@@ -63,11 +63,26 @@ export const subsystems = sqliteTable("subsystems", {
   createdAt: integer("created_at").notNull(),
 });
 
+/** The team's own units, offered when an entry's unit is typed (migration 0004). */
+export const units = sqliteTable(
+  "units",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    teamId: text("team_id").notNull(),
+    name: text("name").notNull(),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: integer("created_at").notNull(),
+  },
+  (t) => [index("units_team_idx").on(t.teamId)],
+);
+
 /** An inventory entry: one kind of part, whichever vendors it comes from. */
 export const items = sqliteTable("items", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   teamId: text("team_id").notNull(),
   name: text("name").notNull(),
+  /** What one of its quantity is ("ft", "kg", "sheet"); "" for one of each (lib/units.ts). */
+  unit: text("unit").notNull().default(""),
   /** JSON object of the team's fields: field id -> value. */
   fieldValues: text("field_values").notNull().default("{}"),
   createdById: text("created_by_id").notNull(),

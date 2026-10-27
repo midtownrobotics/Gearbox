@@ -9,7 +9,7 @@ Open an entry from the table to see everything about it.
 
 ## Details
 
-Its name and your team's fields. **Edit** them; anyone can.
+Its name, its unit and your team's fields. **Edit** them; anyone can. The unit is what one of its quantity is ("ft", "sheet"), or "each" for parts counted one by one. Changing it doesn't change the numbers, so fix the counts if they were in another unit.
 
 ## Where it is
 
@@ -27,6 +27,6 @@ Every change, newest first, with who made it: created, edited, added, counted, m
 
 ## For mentors
 
-- **Merge another entry into this one** when they're the same part, often from different vendors. Its parts, listings and history move over, adding quantities kept in the same place, and the other entry is deleted.
+- **Merge another entry into this one** when they're the same part, often from different vendors. Its parts, listings and history move over, adding quantities kept in the same place, and the other entry is deleted. This entry keeps its unit: when the two are counted in different units, the pop-up says so before you merge, and the other entry's numbers are added as they are.
 - **Split off a listing** when two parts were wrongly kept as one: the listing becomes its own entry, with the name you give it and the parts you say are its.
 - **Delete** an entry the team no longer has or wants. It asks first.

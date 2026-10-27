@@ -5,6 +5,7 @@ import { api, getErrorMessage } from "./api";
 import { useInventory } from "./inventory-data";
 import { LocationPicker } from "./location-picker";
 import { type Places, locationLabel, useLabel } from "./places";
+import { UnitSuffix, formatQuantity } from "./units";
 
 // The pop-ups for moving parts around: check out (storage → in use on a robot), check in (back to
 // storage), move (somewhere else, as they are) and add (parts that weren't counted before).
@@ -71,32 +72,46 @@ function StockForm({
   );
 }
 
-function QuantityField({
+/** A whole number of an entry's parts, with its unit after the box ("ft"; nothing for each). */
+export function QuantityField({
   label,
   value,
   onChange,
+  unit,
   max,
   min = 1,
+  hint,
+  required = true,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
+  unit: string;
   max?: number;
   min?: number;
+  /** Said under the box; "N there now" when there's a `max`. */
+  hint?: string;
+  required?: boolean;
 }) {
   return (
-    <Field label={label} hint={max === undefined ? undefined : `${max} there now`}>
-      <input
-        className={inputClass}
-        type="number"
-        inputMode="numeric"
-        min={min}
-        max={max}
-        step={1}
-        required
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-      />
+    <Field
+      label={label}
+      hint={hint ?? (max === undefined ? undefined : `${formatQuantity(max, unit)} there now`)}
+    >
+      <div className="flex items-center gap-2">
+        <input
+          className={`${inputClass} min-w-0`}
+          type="number"
+          inputMode="numeric"
+          min={min}
+          max={max}
+          step={1}
+          required={required}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+        />
+        <UnitSuffix n={Number(value) || 0} unit={unit} className="max-w-24 shrink-0 text-sm" />
+      </div>
     </Field>
   );
 }
@@ -165,7 +180,8 @@ function Summary({ item, stock }: { item: ItemView; stock: StockView }) {
     <p className="text-sm text-secondary-600">
       <span className="font-semibold text-secondary-900">{item.name}</span>
       <br />
-      {stock.quantity} in {locationLabel(stock.locationId, places) || "an unknown location"}
+      {formatQuantity(stock.quantity, item.unit)} in{" "}
+      {locationLabel(stock.locationId, places) || "an unknown location"}
       {use && `, in use on ${use}`}
     </p>
   );
@@ -224,6 +240,7 @@ export function CheckOutDialog({ item, stock, onClose, onDone }: RowProps) {
         label="How many to put in use"
         value={quantity}
         onChange={setQuantity}
+        unit={item.unit}
         max={stock.quantity}
       />
       <UseFields
@@ -276,6 +293,7 @@ export function CheckInDialog({ item, stock, onClose, onDone }: RowProps) {
         label="How many to put back in storage"
         value={quantity}
         onChange={setQuantity}
+        unit={item.unit}
         max={stock.quantity}
       />
       <Field
@@ -283,7 +301,7 @@ export function CheckInDialog({ item, stock, onClose, onDone }: RowProps) {
         hint={
           home && locationId === home.locationId
             ? home.quantity > 0
-              ? `Back with the ${home.quantity} already in storage there.`
+              ? `Back with the ${formatQuantity(home.quantity, item.unit)} already in storage there.`
               : "Back where this entry is kept."
             : undefined
         }
@@ -370,7 +388,13 @@ export function AddStockDialog({
         <br />
         For parts that were found, donated or made. To fix a count, edit the quantity in the table.
       </p>
-      <QuantityField label="How many" value={quantity} onChange={setQuantity} min={0} />
+      <QuantityField
+        label="How many"
+        value={quantity}
+        onChange={setQuantity}
+        unit={item.unit}
+        min={0}
+      />
       <div className="flex gap-4 text-sm text-secondary-700">
         <label className="flex items-center gap-2">
           <input type="radio" checked={!inUse} onChange={() => setInUse(false)} />

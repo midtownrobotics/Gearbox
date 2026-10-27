@@ -1,5 +1,6 @@
 import { Button, Card, ErrorBanner, Page, SuccessBanner, TextField } from "@g3/ui";
 import type { Setup, SetupSummary } from "@g3/worker-inventory";
+import { MAX_UNIT } from "@g3/worker-inventory/units";
 import { type ChangeEvent, type FormEvent, useRef, useState } from "react";
 import { api, getErrorMessage } from "../../shared/api";
 import { useAuthUser } from "../../shared/auth";
@@ -11,20 +12,23 @@ import { LocationsCard } from "./locations-card";
 
 const smallButton = "text-xs text-secondary-500 hover:text-primary-600 disabled:opacity-50";
 
-/** A plain list of names: the robots, or the subsystems, parts can be in use on. */
+/** A plain list of names: the robots or subsystems parts can be in use on, or the team's units. */
 function NamesCard({
   title,
   about,
   what,
   rows,
   client,
+  maxLength = 80,
 }: {
   title: string;
   about: string;
-  /** "robot", "subsystem" */
+  /** "robot", "subsystem", "unit" */
   what: string;
   rows: Named[];
-  client: typeof api.robots | typeof api.subsystems;
+  client: typeof api.robots | typeof api.subsystems | typeof api.units;
+  /** The longest a name can be. */
+  maxLength?: number;
 }) {
   const { reload } = useInventory();
   const [name, setName] = useState("");
@@ -81,7 +85,7 @@ function NamesCard({
                   <TextField
                     kind="label"
                     aria-label={`New name for ${row.name}`}
-                    maxLength={80}
+                    maxLength={maxLength}
                     value={editing.name}
                     onChange={(e) => setEditing({ id: row.id, name: e.target.value })}
                   />
@@ -150,7 +154,7 @@ function NamesCard({
           kind="label"
           placeholder={`New ${what}`}
           aria-label={`New ${what}`}
-          maxLength={80}
+          maxLength={maxLength}
           value={name}
           onChange={(e) => setName(e.target.value)}
         />
@@ -178,6 +182,7 @@ function addsLine(summary: SetupSummary): string {
     summary.locations > 0 && count(summary.locations, "location"),
     summary.robots > 0 && count(summary.robots, "robot"),
     summary.subsystems > 0 && count(summary.subsystems, "subsystem"),
+    summary.units > 0 && count(summary.units, "unit"),
   ]
     .filter(Boolean)
     .join(", ");
@@ -307,8 +312,8 @@ function SetupCard() {
         />
       </div>
       <p className="mt-3 text-sm text-secondary-500">
-        Your fields, locations, robots and subsystems as one file, without your parts. Loading a
-        file only adds what's missing.
+        Your fields, locations, robots, subsystems and units as one file, without your parts.
+        Loading a file only adds what's missing.
       </p>
 
       {pending && (
@@ -352,7 +357,7 @@ function SetupCard() {
 /** How the team has Inventory arranged. Admins only. */
 export function SettingsPage() {
   const { isAdmin } = useAuthUser();
-  const { places } = useInventory();
+  const { places, units } = useInventory();
   if (!isAdmin) {
     return (
       <Page title="Admin">
@@ -379,6 +384,14 @@ export function SettingsPage() {
           what="subsystem"
           rows={places.subsystems}
           client={api.subsystems}
+        />
+        <NamesCard
+          title="Units"
+          about="Offered when someone sets what an entry counts in, along with ft, in, kg and the other common ones. Anyone can still type their own."
+          what="unit"
+          rows={units}
+          client={api.units}
+          maxLength={MAX_UNIT}
         />
       </div>
     </Page>

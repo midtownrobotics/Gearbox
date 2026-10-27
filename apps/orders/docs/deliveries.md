@@ -12,6 +12,6 @@ pages: /receiving
 
 ## Putting parts into Inventory
 
-If your team uses [Inventory](/inventory), marking parts received asks where they're going. It suggests the place each part is already kept, or where it went last time. Each part goes in as quantity × pack size, so a pack of 4 bought twice adds 8.
+If your team uses [Inventory](/inventory), marking parts received asks where they're going. It suggests the place each part is already kept, or where it went last time. Each part goes in as quantity × pack size, so a pack of 4 bought twice adds 8, and two 100 ft spools add 200 ft. A part new to Inventory becomes an entry counted in the pack's unit. If the entry Inventory already has counts in a different unit, the pop-up says so: the number is added as it is, so change it first if it should be in the entry's unit.
 
 If Inventory can't take them, nothing is marked received, so nothing gets lost.

@@ -10,10 +10,10 @@ import {
   useState,
 } from "react";
 import { api, getErrorMessage } from "./api";
-import { type Places, indexPlaces } from "./places";
+import { type Named, type Places, indexPlaces } from "./places";
 
 // Everything the pages show, loaded once and shared: the entries with their stock, and the team's
-// fields and places. Fetched again when the tab is looked at and every minute while it stays open,
+// fields, places and units. Fetched again when the tab is looked at and every minute while it stays open,
 // so a count or a check-out made on another device shows up.
 
 const REFRESH_MS = 60_000;
@@ -22,6 +22,8 @@ type InventoryData = {
   fields: FieldView[];
   items: ItemView[];
   places: Places;
+  /** The team's own units, offered when an entry's unit is typed. */
+  units: Named[];
   reload: () => Promise<void>;
 };
 
@@ -69,6 +71,7 @@ export function InventoryDataProvider({ children }: { children: ReactNode }) {
             fields: loaded.fields,
             items: loaded.items,
             places: indexPlaces(loaded.locations, loaded.robots, loaded.subsystems),
+            units: loaded.units,
             reload,
           }
         : null,

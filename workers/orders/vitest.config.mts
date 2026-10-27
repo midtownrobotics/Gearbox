@@ -16,7 +16,7 @@ const sent: Line[] = [];
 /**
  * The Inventory worker as Orders uses it: /options lists where parts can go, /intake takes what
  * was received, and /intake/places says where a part is already kept (catalog part 901 is, in
- * location 2). Location 404 is one that's gone (Inventory refuses it); 500 is Inventory failing.
+ * location 2, counted each; 904 is too, counted in ft). Location 404 is one that's gone (Inventory refuses it); 500 is Inventory failing.
  * /options also gives back what /intake has been sent (`sent`), which Orders passes through to
  * GET /inventory, so a test can check what Orders told Inventory.
  */
@@ -69,8 +69,28 @@ const inventory = async (request: Request) => {
     return json({
       places: body.lines.map((line) =>
         line.listing?.catalogItemId === 901
-          ? { sourceKey: line.sourceKey, itemId: 7, itemName: "Known bearing", locationId: 2 }
-          : { sourceKey: line.sourceKey, itemId: null, itemName: null, locationId: null },
+          ? {
+              sourceKey: line.sourceKey,
+              itemId: 7,
+              itemName: "Known bearing",
+              unit: "",
+              locationId: 2,
+            }
+          : line.listing?.catalogItemId === 904
+            ? {
+                sourceKey: line.sourceKey,
+                itemId: 8,
+                itemName: "Red wire",
+                unit: "ft",
+                locationId: 2,
+              }
+            : {
+                sourceKey: line.sourceKey,
+                itemId: null,
+                itemName: null,
+                unit: null,
+                locationId: null,
+              },
       ),
     });
   }

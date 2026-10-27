@@ -10,8 +10,8 @@ An entry is one kind of part ("1/2 in. hex bearing"). Before adding one, search 
 On [Add an entry](team:inventory/new):
 
 1. **What it is:** its name, and your team's fields.
-2. **How many, and where:** the quantity, and its storage location. Leave the quantity empty if it hasn't been counted.
-3. **Part in the Orders catalog** (optional, when your team uses Orders): pick the catalog part. The entry then shows its product page and price, and received orders of that part are added to it.
+2. **How many, and where:** its **Unit**, the quantity, and its storage location. Leave the unit empty for parts counted one by one; set it for ones counted by length, weight or sheet ("ft", "g", "sheet"), choosing from your team's units or typing your own. Quantities are whole numbers, so for part of a foot, count in inches. Leave the quantity empty if it hasn't been counted.
+3. **Part in the Orders catalog** (optional, when your team uses Orders): pick the catalog part. The entry then shows its product page and price, and received orders of that part are added to it. A part sold by length or weight in Orders ("Pack of 100 ft") fills in the unit.
 
 Filtered the table to a location first? The new entry starts in that location. To add several entries to one place, use **Add here** on the Locations page.
 

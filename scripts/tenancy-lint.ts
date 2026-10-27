@@ -153,6 +153,7 @@ const APPS: App[] = [
       locations: "locations",
       robots: "robots",
       subsystems: "subsystems",
+      units: "units",
       items: "items",
       itemListings: "item_listings",
       stock: "stock",

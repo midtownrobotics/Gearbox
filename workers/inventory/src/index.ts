@@ -16,6 +16,7 @@ import {
   robots,
   stock,
   subsystems,
+  units,
 } from "./db/schema";
 import { demoWords, loadDemo } from "./demo";
 import { manifest } from "./manifest";
@@ -29,6 +30,7 @@ import {
   robotsRouter,
   setupRouter,
   subsystemsRouter,
+  unitsRouter,
 } from "./routes/settings";
 import { stockRouter } from "./routes/stock";
 import type { AppEnv } from "./types";
@@ -74,6 +76,7 @@ const app = base
       locations,
       robots,
       subsystems,
+      units,
       items,
       itemListings,
       stock,
@@ -92,6 +95,7 @@ const app = base
       locations,
       robots,
       subsystems,
+      units,
       fields,
     ]);
     return c.json({ ok: true });
@@ -114,6 +118,7 @@ const app = base
   .route("/locations", locationContentsRouter)
   .route("/robots", robotsRouter)
   .route("/subsystems", subsystemsRouter)
+  .route("/units", unitsRouter)
   .route("/setup", setupRouter)
   .route("/intake", intakeRouter);
 

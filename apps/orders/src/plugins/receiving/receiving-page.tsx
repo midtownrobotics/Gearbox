@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 import { api, getErrorMessage } from "../../shared/api";
 import { useAuthUser } from "../../shared/auth";
 import { formatDate } from "../../shared/format";
+import { amountOf, packLabel } from "../../shared/pack";
 import {
   type Intake,
   ReceiveDialog,
@@ -206,8 +207,8 @@ function OrderCard({
               </Link>
               <p className="truncate text-xs text-secondary-500">
                 {[
-                  l.packQuantity > 1 &&
-                    `pack of ${l.packQuantity} (${l.quantity * l.packQuantity} parts)`,
+                  packLabel(l.packQuantity, l.packUnit) &&
+                    `${packLabel(l.packQuantity, l.packUnit)} (${amountOf(l.quantity * l.packQuantity, l.packUnit)})`,
                   l.variant,
                   l.sku,
                   `for ${l.requesterName}`,

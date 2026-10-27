@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 // The public demo's Orders (roadmap 5.3): requests for real catalog parts in every status.
 
-type Request = { status: string; title: string };
+type Request = { status: string; title: string; packQuantity: number; packUnit: string };
 
 describe("the demo's sample data", () => {
   it("loads, reloads after a reset, and is only for the demo team", async () => {
@@ -14,6 +14,10 @@ describe("the demo's sample data", () => {
       for (const status of ["requested", "approved", "ordered", "received"]) {
         expect(statuses).toContain(status);
       }
+      // Stock material on order, counted by the inch.
+      expect(requests).toContainEqual(
+        expect.objectContaining({ status: "ordered", packUnit: "in" }),
+      );
       return requests.length;
     });
   });

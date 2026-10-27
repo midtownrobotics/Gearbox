@@ -22,6 +22,7 @@ import { type StockStatus, itemEvents, items, robots, stock, subsystems } from "
 import type { AppEnv } from "../types";
 import { insertWhere } from "./guarded";
 import { type LocationIndex, indexLocations, loadLocations, pathLabel } from "./locations";
+import { formatQuantity } from "./units";
 
 // Stock: how many of an entry are in each place. A place is a location in storage, or a location
 // plus the robot and subsystem the parts are in use on. An entry has at most one row per place.
@@ -322,9 +323,10 @@ export function describePlace(place: Place, names: Names): string {
 
 /**
  * The history line for parts going between storage and use. When they stay at one location, it's
- * said once: "6 in Dungeon › A1, onto Comp Bot (Intake)."
+ * said once: "6 in Dungeon › A1, onto Comp Bot (Intake)." `quantity` is said with the entry's
+ * unit ("6 ft").
  */
-export function transferNote(quantity: number, from: Place, to: Place, names: Names): string {
+export function transferNote(quantity: string, from: Place, to: Place, names: Names): string {
   if (from.locationId !== to.locationId || from.status === to.status) {
     return `${quantity} from ${describePlace(from, names)} to ${describePlace(to, names)}.`;
   }
@@ -371,8 +373,10 @@ export async function moveLocationContents(
       robotId: stock.robotId,
       subsystemId: stock.subsystemId,
       quantity: stock.quantity,
+      unit: items.unit,
     })
     .from(stock)
+    .innerJoin(items, inTeam(items, team, eq(items.id, stock.itemId)))
     .where(inTeam(stock, team, eq(stock.locationId, from)))
     .orderBy(asc(stock.id))
     .all();
@@ -467,7 +471,8 @@ export async function moveLocationContents(
         ),
       ),
     ...rows.map((row) => {
-      const place = { ...row, locationId: from };
+      const { unit, ...rest } = row;
+      const place = { ...rest, locationId: from };
       const there = describePlace({ ...place, locationId: to }, names);
       return logEvent(
         db,
@@ -475,7 +480,7 @@ export async function moveLocationContents(
         row.itemId,
         "moved",
         row.quantity > 0
-          ? `${row.quantity} from ${describePlace(place, names)} to ${there}.`
+          ? `${formatQuantity(row.quantity, unit)} from ${describePlace(place, names)} to ${there}.`
           : `Now kept in ${there}.`,
         by,
         now,

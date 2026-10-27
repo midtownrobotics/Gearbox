@@ -55,6 +55,7 @@ export const inventoryRouter = new Hono<AppEnv>()
           url: orderRequests.url,
           quantity: orderRequests.quantity,
           packQuantity: orderRequests.packQuantity,
+          packUnit: orderRequests.packUnit,
           unitPriceCents: orderRequests.unitPriceCents,
           lineTotalCents: orderRequests.lineTotalCents,
           catalogItemId: orderRequests.catalogItemId,

@@ -21,6 +21,7 @@ const TABLES = [
   "locations",
   "robots",
   "subsystems",
+  "units",
   "items",
   "item_listings",
   "stock",
@@ -34,6 +35,7 @@ type Inventory = {
   locations: Named[];
   robots: Named[];
   subsystems: Named[];
+  units: Named[];
   items: { id: number; name: string; stock: { id: number; status: string }[]; listings: Named[] }[];
 };
 
@@ -46,6 +48,7 @@ async function seed(team: TeamUsers): Promise<Seeded> {
     locations: [{ name: `Room ${tag}`, children: [`Bin ${tag}`] }],
     robots: [`Robot ${tag}`],
     subsystems: [`Sub ${tag}`],
+    units: [`u${tag}`],
   };
   expect((await callAs(team.admin, "/setup/import", { method: "POST", body: setup })).status).toBe(
     200,
@@ -60,7 +63,12 @@ async function seed(team: TeamUsers): Promise<Seeded> {
     "/items",
     {
       method: "POST",
-      body: { name: `Part ${tag}`, stock: { quantity: 9, locationId: bin.id }, listing },
+      body: {
+        name: `Part ${tag}`,
+        unit: `x${tag}`,
+        stock: { quantity: 9, locationId: bin.id },
+        listing,
+      },
     },
     201,
   );
@@ -79,7 +87,9 @@ async function seed(team: TeamUsers): Promise<Seeded> {
     method: "POST",
     body: {
       destination: { status: "storage", locationId: bin.id },
-      lines: [{ sourceKey: `orders:request:${tag}`, quantity: 1, name: "", listing }],
+      lines: [
+        { sourceKey: `orders:request:${tag}`, quantity: 1, unit: `y${tag}`, name: "", listing },
+      ],
     },
   });
   const after = await jsonAs<Inventory>(team.student, "/inventory");
@@ -91,6 +101,7 @@ async function seed(team: TeamUsers): Promise<Seeded> {
     locations: bin.id,
     robots: robot.id,
     subsystems: subsystem.id,
+    units: after.units[0].id,
   };
   return {
     params: (path, name) => {
@@ -107,6 +118,7 @@ async function seed(team: TeamUsers): Promise<Seeded> {
       bin: bin.id,
       robot: robot.id,
       subsystem: subsystem.id,
+      unit: after.units[0].id,
       field: after.fields[0].id,
       listingInput: listing,
       tag,
@@ -135,7 +147,7 @@ it("keeps every team's inventory to itself", async () => {
     bodies: (b) => {
       const d = b.data as Record<string, number> & { listingInput: unknown; tag: string };
       return {
-        "PATCH /items/:id": { name: "Renamed" },
+        "PATCH /items/:id": { name: "Renamed", unit: "kg" },
         "POST /items/:id/stock": { quantity: 1, locationId: d.bin },
         "POST /items/:id/listings": { vendor: "Someone" },
         "POST /items/:id/merge": { fromId: d.item },
@@ -162,6 +174,8 @@ it("keeps every team's inventory to itself", async () => {
         "PUT /robots/order": { ids: [d.robot] },
         "PATCH /subsystems/:id": { name: "Renamed" },
         "PUT /subsystems/order": { ids: [d.subsystem] },
+        "PATCH /units/:id": { name: "Renamed" },
+        "PUT /units/order": { ids: [d.unit] },
         // Team B's part number: A's Inventory must neither find B's entry nor say where it's kept.
         "POST /intake/places": { lines: [{ sourceKey: "k", listing: d.listingInput }] },
         "POST /intake": {

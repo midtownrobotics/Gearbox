@@ -34,6 +34,8 @@ export type ListingView = {
 export type ItemView = {
   id: number;
   name: string;
+  /** What one of its quantity is ("ft", "sheet"); "" for one of each. */
+  unit: string;
   /** The team's fields: field id -> value. */
   values: FieldValues;
   createdByName: string;
@@ -78,6 +80,7 @@ export async function loadItems(db: Db, team: string, onlyId?: number): Promise<
     views.set(row.id, {
       id: row.id,
       name: row.name,
+      unit: row.unit,
       values: parseValues(row.fieldValues),
       createdByName: row.createdByName,
       createdAt: row.createdAt,

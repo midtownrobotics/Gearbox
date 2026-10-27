@@ -1,7 +1,8 @@
 import { Button, Card, ConfirmButton, ErrorBanner, Field, TextField, inputClass } from "@g3/ui";
 import { useState } from "react";
 import { api, getErrorMessage } from "../../shared/api";
-import { QuantityInput, parseQuantity, quantityError } from "../../shared/quantity";
+import { PackInput } from "../../shared/pack";
+import { parseQuantity, quantityError } from "../../shared/quantity";
 import type { CatalogItem } from "../../shared/types";
 
 /** "Length: 1/2\"" per line ↔ {"Length": "1/2\""}. */
@@ -37,6 +38,7 @@ export function ItemEditor({
   const [sku, setSku] = useState(item?.sku ?? "");
   const [url, setUrl] = useState(item?.url ?? "");
   const [packQuantity, setPackQuantity] = useState(String(item?.packQuantity ?? 1));
+  const [packUnit, setPackUnit] = useState(item?.packUnit ?? "");
   const [options, setOptions] = useState(optionsText(item?.options ?? {}));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -50,6 +52,7 @@ export function ItemEditor({
       url: url.trim(),
       options: parseOptions(options),
       packQuantity: parseQuantity(packQuantity),
+      packUnit: packUnit.trim(),
     };
     if (!json.name || !json.category || !json.vendor || !json.url) {
       return setError("Name, category, vendor and link are all needed.");
@@ -107,8 +110,17 @@ export function ItemEditor({
         <Field label="Part number">
           <TextField kind="sku" value={sku} onChange={(e) => setSku(e.target.value)} />
         </Field>
-        <Field label="Pack of" hint="Parts in one of these" error={quantityError(packQuantity)}>
-          <QuantityInput value={packQuantity} onChange={setPackQuantity} />
+        <Field
+          label="Pack of"
+          hint="Parts in one of these, or an amount: 100 ft"
+          error={quantityError(packQuantity)}
+        >
+          <PackInput
+            quantity={packQuantity}
+            unit={packUnit}
+            onQuantity={setPackQuantity}
+            onUnit={setPackUnit}
+          />
         </Field>
         <div className="col-span-2">
           <Field label="Category" hint="Missing one? Use “New category” first">

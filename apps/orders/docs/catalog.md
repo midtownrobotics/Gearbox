@@ -15,7 +15,7 @@ Paste a product link into the same box to request that part straight away (see t
 
 ## A part's page
 
-Open a part to see its vendor, part number, sizes or types, pack size, link, and what the team last paid. From there:
+Open a part to see its vendor, part number, sizes or types, pack size (with its unit, such as "pack of 100 ft"), link, and what the team last paid. From there:
 
 - **Request** starts a request for it.
 - **Add to wishlist** saves it for one day.
@@ -32,7 +32,7 @@ A part's price is what the team last paid for it, from placed orders. After a we
 Mentors, and the **trusted students** chosen on Orders' Admin page, can edit the catalog. Everyone else browses and requests.
 
 - **Add a part** by hand, in an existing category.
-- **Edit a part** from its page: name, vendor, part number, link, sizes or types, pack size.
+- **Edit a part** from its page: name, vendor, part number, link, sizes or types, pack size and its unit. New requests for the part start with them.
 - **Add, rename and remove categories.** Removing one moves its parts to another category first.
 
 Requests add to the catalog too: a link that isn't in it yet becomes a new part.

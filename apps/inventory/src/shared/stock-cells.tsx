@@ -3,19 +3,22 @@ import { useEffect, useState } from "react";
 import { api, getErrorMessage } from "./api";
 import { useInventory } from "./inventory-data";
 import { AddStockDialog, CheckInDialog, CheckOutDialog, MoveDialog } from "./stock-dialogs";
+import { UnitSuffix } from "./units";
 
 // The parts of a stock row that can be changed where it's shown (the main table and an entry's
 // page): its quantity, its location, and checking it out or in.
 
 /**
  * A row's quantity, changed in place: type the number that's there and press Enter (or click
- * away). That's recorded as a count, with who counted. `compact`: a narrower box, for a phone.
+ * away). That's recorded as a count, with who counted. `unit` is the entry's, shown after the box.
+ * `compact`: a narrower box, for a phone.
  */
 export function QuantityCell({
   stock,
+  unit,
   onSaved,
   compact = false,
-}: { stock: StockView; onSaved?: () => void; compact?: boolean }) {
+}: { stock: StockView; unit: string; onSaved?: () => void; compact?: boolean }) {
   const { reload } = useInventory();
   const [text, setText] = useState(String(stock.quantity));
   const [busy, setBusy] = useState(false);
@@ -52,28 +55,31 @@ export function QuantityCell({
 
   return (
     <span className="inline-flex flex-col items-start">
-      <input
-        type="number"
-        inputMode="numeric"
-        min={0}
-        step={1}
-        aria-label="Quantity"
-        title="Type what's there and press Enter to record a count"
-        className={`${compact ? "w-16" : "w-20"} rounded-md border bg-surface px-2 py-1 text-sm tabular-nums text-secondary-900 focus:outline-none focus:border-primary-500 ${
-          error ? "border-primary-400" : "border-secondary-200 hover:border-secondary-400"
-        }`}
-        disabled={busy}
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        onBlur={() => void save()}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") e.currentTarget.blur();
-          if (e.key === "Escape") {
-            setText(String(stock.quantity));
-            setError(null);
-          }
-        }}
-      />
+      <span className="inline-flex max-w-full items-center gap-1.5">
+        <input
+          type="number"
+          inputMode="numeric"
+          min={0}
+          step={1}
+          aria-label="Quantity"
+          title="Type what's there and press Enter to record a count"
+          className={`${compact ? "w-16" : "w-20"} rounded-md border bg-surface px-2 py-1 text-sm tabular-nums text-secondary-900 focus:outline-none focus:border-primary-500 ${
+            error ? "border-primary-400" : "border-secondary-200 hover:border-secondary-400"
+          }`}
+          disabled={busy}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onBlur={() => void save()}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") e.currentTarget.blur();
+            if (e.key === "Escape") {
+              setText(String(stock.quantity));
+              setError(null);
+            }
+          }}
+        />
+        <UnitSuffix n={stock.quantity} unit={unit} className={compact ? "max-w-10" : "max-w-16"} />
+      </span>
       {error && (
         <span className={`mt-0.5 text-xs text-red-700 ${compact ? "max-w-16" : "max-w-40"}`}>
           {error}
