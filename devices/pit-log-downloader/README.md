@@ -21,11 +21,15 @@ you need [Git](https://git-scm.com/) and [Node.js 24](https://nodejs.org/) or ne
 
 ```sh
 npm install -g pnpm
-git clone https://github.com/midtownrobotics/Gearbox.git
+git clone --depth 1 --filter=blob:none --sparse --branch public https://github.com/midtownrobotics/Gearbox.git
 cd Gearbox
+git sparse-checkout set devices/pit-log-downloader packages/site-config packages/ui packages/demo
 pnpm install --filter "@g3/pit-log-downloader..."
 pnpm --filter @g3/pit-log-downloader start
 ```
+
+The clone is only the released code (`public`) and the folders the downloader needs, about 2 MB
+instead of the whole repository. `git pull` updates it.
 
 `start` builds the status page, which takes a few seconds, then runs the downloader. Open
 <http://localhost:3000> and leave it running. Stop it with Ctrl+C.

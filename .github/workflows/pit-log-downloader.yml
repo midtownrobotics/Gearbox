@@ -34,7 +34,15 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
+      # Only the folders a pit computer checks out (DOWNLOADER_FOLDERS in Pit's
+      # apps/pit/src/plugins/logs/setup-steps.tsx), so a new one it needs fails here first.
       - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            devices/pit-log-downloader
+            packages/site-config
+            packages/ui
+            packages/demo
 
       - uses: pnpm/action-setup@v4
         with:

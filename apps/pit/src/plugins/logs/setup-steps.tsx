@@ -21,6 +21,18 @@ function guessSystem(): System {
   return "linux";
 }
 
+/**
+ * The only folders a pit computer checks out (with the root files): the downloader and the
+ * workspace packages it builds with. The clone is of `public`, the released code, at its latest
+ * commit only.
+ */
+const DOWNLOADER_FOLDERS = [
+  "devices/pit-log-downloader",
+  "packages/site-config",
+  "packages/ui",
+  "packages/demo",
+];
+
 /** nvm's installer: Node.js on macOS and Linux without admin rights. */
 const NVM_INSTALL =
   "curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash";
@@ -114,8 +126,9 @@ export function SetupSteps() {
           <Command>
             {[
               "npm install -g pnpm",
-              `git clone ${site.sourceUrl}.git`,
+              `git clone --depth 1 --filter=blob:none --sparse --branch public ${site.sourceUrl}.git`,
               "cd Gearbox",
+              `git sparse-checkout set ${DOWNLOADER_FOLDERS.join(" ")}`,
               'pnpm install --filter "@g3/pit-log-downloader..."',
             ].join("\n")}
           </Command>
