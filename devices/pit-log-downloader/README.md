@@ -23,15 +23,16 @@ you need [Git](https://git-scm.com/) and [Node.js 24](https://nodejs.org/) or ne
 npm install -g pnpm
 git clone --depth 1 --filter=blob:none --sparse --branch public https://github.com/midtownrobotics/Gearbox.git
 cd Gearbox
-git sparse-checkout set devices/pit-log-downloader packages/site-config packages/ui packages/demo
-pnpm install --filter "@g3/pit-log-downloader..."
+git sparse-checkout set devices/pit-log-downloader packages/site-config
+pnpm install --prod --filter "@g3/pit-log-downloader..."
 pnpm --filter @g3/pit-log-downloader start
 ```
 
 The clone is only the released code (`public`) and the folders the downloader needs, about 2 MB
-instead of the whole repository. `git pull` updates it.
+instead of the whole repository, and its status page comes built, so the install is about 6 MB.
+`git pull` updates it.
 
-`start` builds the status page, which takes a few seconds, then runs the downloader. Open
+`start` runs the downloader. Open
 <http://localhost:3000> and leave it running. Stop it with Ctrl+C.
 
 ## Pairing with Gearbox
@@ -79,8 +80,8 @@ None are needed. To change one, copy `config.env.example` to `config.env` in
 ## Working on it
 
 ```sh
-pnpm --filter @g3/pit-log-downloader start -- --dev   # pairs with the Pit under `pnpm dev`
-pnpm --filter @g3/pit-log-downloader watch -- --dev   # the same, reloading as you edit
+pnpm --filter @g3/pit-log-downloader start:build -- --dev   # pairs with the Pit under `pnpm dev`
+pnpm --filter @g3/pit-log-downloader watch -- --dev         # the same, reloading as you edit
 ```
 
 `--dev` pairs with the team's Pit under `pnpm dev`, through the dev gateway
@@ -95,7 +96,9 @@ downloader when `src/` changes and reloads the status page as you edit it.
 - `web/`: the status page, in React with Vite and Tailwind, built from the shared Gearbox parts
   (`@g3/ui`). It has the Gearbox top bar with no sign-in, light and dark mode, and once paired
   the team's Team Appearance from Gearbox (kept in `data/appearance.json` for when it's
-  offline). `start` builds it into `dist/web`; `watch` serves it through Vite instead.
+  offline). Each release builds it into `page/`, which `start` serves; `build` and `start:build`
+  build your own into `dist/web` (served instead while it's newer than `page/`); `watch` serves
+  it through Vite.
 
 ## Moving from the old Pit-Log-Downloader repository
 

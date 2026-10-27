@@ -16,6 +16,7 @@
       "*.tsbuildinfo",
       ".claude",
       "devices/pit-log-downloader/data",
+      "devices/pit-log-downloader/page",
       "workers/attendance/src/firestore.ts",
       "workers/attendance/src/auth.ts"
     ]
