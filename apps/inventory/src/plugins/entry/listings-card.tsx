@@ -18,6 +18,7 @@ import { CatalogPick } from "../../shared/catalog-pick";
 import { ago, formatCents } from "../../shared/format";
 import { useInventory } from "../../shared/inventory-data";
 import { locationLabel, useLabel } from "../../shared/places";
+import { formatQuantity } from "../../shared/units";
 import { useTakenParts } from "../table/new-entry-page";
 
 // The ways to buy an entry: one panel per vendor's listing. Equivalent parts from different
@@ -43,8 +44,10 @@ function ListingPanel({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // What Orders knows now wins over the copy saved with the listing. Both are for one part.
+  // What Orders knows now wins over the copy saved with the listing. Both are for one part, or
+  // one of the unit the part is sold in (a foot of a 100 ft spool).
   const pack = part ? packOf(part) : 1;
+  const priceUnit = part ? (part.packUnit ?? "") : item.unit;
   const priceCents = (part && partPriceCents(part)) ?? listing.priceCents;
   const priceAt = part?.priceCents != null ? part.priceAt : listing.priceAt;
   const url = part?.url ?? listing.url;
@@ -80,8 +83,11 @@ function ListingPanel({
               <span className="text-secondary-400">No price yet</span>
             ) : (
               <>
-                <span className="font-semibold">{formatCents(priceCents)}</span> each
-                {part && pack > 1 && ` (${formatCents(part.priceCents)} for a pack of ${pack})`}
+                <span className="font-semibold">{formatCents(priceCents)}</span>{" "}
+                {priceUnit ? `per ${priceUnit}` : "each"}
+                {part &&
+                  (pack > 1 || priceUnit) &&
+                  ` (${formatCents(part.priceCents)} for a pack of ${formatQuantity(pack, priceUnit)})`}
                 {priceAt !== null && `, paid ${ago(priceAt)}`}
               </>
             )}
@@ -303,7 +309,7 @@ function SplitDialog({
             label={`From ${locationLabel(row.locationId, places)}${
               row.status === "in_use" ? ` (in use on ${useLabel(row, places)})` : ""
             }`}
-            hint={`${row.quantity} there now`}
+            hint={`${formatQuantity(row.quantity, item.unit)} there now`}
           >
             <input
               className={inputClass}

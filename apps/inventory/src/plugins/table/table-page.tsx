@@ -175,7 +175,7 @@ function NarrowRows({
                   />
                 </NarrowCell>
                 <NarrowCell line2>
-                  <QuantityCell stock={stock} compact />
+                  <QuantityCell stock={stock} unit={item.unit} compact />
                 </NarrowCell>
                 <NarrowCell line2 className="flex-col !items-start justify-center">
                   <StatusBadge status={stock.status} />
@@ -345,7 +345,7 @@ export function TablePage() {
                       {stock ? (
                         <>
                           <td className="px-3 py-1.5">
-                            <QuantityCell stock={stock} />
+                            <QuantityCell stock={stock} unit={item.unit} />
                           </td>
                           <td className="px-3 py-2.5">
                             <LocationButton

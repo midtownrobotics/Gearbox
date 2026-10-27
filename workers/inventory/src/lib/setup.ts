@@ -1,15 +1,25 @@
 import { inTeam, withTeam } from "@g3/auth";
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, ne } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import starter from "../../content/starter-setup.json";
 import type { Db } from "../db";
-import { FIELD_TYPES, type FieldType, fields, locations, robots, subsystems } from "../db/schema";
+import {
+  FIELD_TYPES,
+  type FieldType,
+  fields,
+  items,
+  locations,
+  robots,
+  subsystems,
+  units,
+} from "../db/schema";
 import { loadFields } from "./fields";
 import { chunks, sameName } from "./input";
 import { MAX_DEPTH, MAX_TITLE, indexLocations, loadLocations } from "./locations";
+import { MAX_UNIT, cleanUnit } from "./units";
 
 // A setup file: how a team has Inventory arranged (its fields, its tree of locations, its robots
-// and subsystems), without any of its parts. The app itself holds none of this. A team builds its
+// and subsystems, the units it counts in), without any of its parts. The app itself holds none of this. A team builds its
 // setup on the Admin page, can save it to a file, and can load a file: its own, another team's,
 // or the starter that comes with the app (content/starter-setup.json).
 //
@@ -42,6 +52,8 @@ export type Setup = {
   locations: SetupLocation[];
   robots: string[];
   subsystems: string[];
+  /** Units the team counts in ("ft", "sheet"), offered when an entry's unit is typed. */
+  units: string[];
 };
 
 /** What loading a file adds (or would add). */
@@ -52,6 +64,7 @@ export type SetupSummary = {
   locations: number;
   robots: number;
   subsystems: number;
+  units: number;
   /** Things in the file the team already has. */
   already: number;
 };
@@ -62,6 +75,7 @@ export const MAX_CHOICES = 200;
 export const MAX_LOCATIONS = 5000;
 export const MAX_ROBOTS = 100;
 export const MAX_SUBSYSTEMS = 200;
+export const MAX_UNITS = 100;
 const MAX_PROBLEMS = 25;
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
@@ -197,6 +211,16 @@ export function parseSetup(input: unknown): { setup: Setup } | { problems: strin
 
   const setupRobots = names(input.robots, MAX_ROBOTS, "File", "robots");
   const setupSubsystems = names(input.subsystems, MAX_SUBSYSTEMS, "File", "subsystems");
+  // Units, left out of older files. "each" needs no row: every entry can count in it.
+  const setupUnits = list(input.units, MAX_UNITS, "File", "units").flatMap((raw, i) => {
+    const unit = cleanUnit(raw);
+    if (unit === null) {
+      fail(`File, units ${i + 1}`, `must be text up to ${MAX_UNIT} characters.`);
+      return [];
+    }
+    return unit ? [unit] : [];
+  });
+  unique(setupUnits, "File, units");
 
   if (problems.length > 0) {
     const shown = problems.slice(0, MAX_PROBLEMS);
@@ -213,6 +237,7 @@ export function parseSetup(input: unknown): { setup: Setup } | { problems: strin
       locations: setupLocations,
       robots: setupRobots,
       subsystems: setupSubsystems,
+      units: setupUnits,
     },
   };
 }
@@ -226,22 +251,40 @@ export function starterSetup(): Setup {
 
 /** The team's setup as a file. */
 export async function exportSetup(db: Db, team: string): Promise<Setup> {
-  const [fieldRows, locationRows, robotRows, subsystemRows] = await Promise.all([
-    loadFields(db, team),
-    loadLocations(db, team),
-    db
-      .select()
-      .from(robots)
-      .where(inTeam(robots, team))
-      .orderBy(asc(robots.sortOrder), asc(robots.id))
-      .all(),
-    db
-      .select()
-      .from(subsystems)
-      .where(inTeam(subsystems, team))
-      .orderBy(asc(subsystems.sortOrder), asc(subsystems.id))
-      .all(),
-  ]);
+  const [fieldRows, locationRows, robotRows, subsystemRows, unitRows, usedUnits] =
+    await Promise.all([
+      loadFields(db, team),
+      loadLocations(db, team),
+      db
+        .select()
+        .from(robots)
+        .where(inTeam(robots, team))
+        .orderBy(asc(robots.sortOrder), asc(robots.id))
+        .all(),
+      db
+        .select()
+        .from(subsystems)
+        .where(inTeam(subsystems, team))
+        .orderBy(asc(subsystems.sortOrder), asc(subsystems.id))
+        .all(),
+      db
+        .select()
+        .from(units)
+        .where(inTeam(units, team))
+        .orderBy(asc(units.sortOrder), asc(units.id))
+        .all(),
+      // Units entries count in, which the team's list may not have.
+      db
+        .selectDistinct({ unit: items.unit })
+        .from(items)
+        .where(inTeam(items, team, ne(items.unit, "")))
+        .orderBy(asc(items.unit))
+        .all(),
+    ]);
+  const unitNames: string[] = [];
+  for (const unit of [...unitRows.map((row) => row.name), ...usedUnits.map((row) => row.unit)]) {
+    if (!unitNames.some((have) => sameName(have, unit))) unitNames.push(unit);
+  }
   const { childrenOf } = indexLocations(locationRows);
   const tree = (parentId: number | null, depth: number): SetupLocation[] =>
     depth > MAX_DEPTH
@@ -263,6 +306,7 @@ export async function exportSetup(db: Db, team: string): Promise<Setup> {
     locations: tree(null, 1),
     robots: robotRows.map((row) => row.name),
     subsystems: subsystemRows.map((row) => row.name),
+    units: unitNames.slice(0, MAX_UNITS),
   };
 }
 
@@ -285,6 +329,7 @@ export async function loadSetup(
     locations: 0,
     robots: 0,
     subsystems: 0,
+    units: 0,
     already: 0,
   };
   const now = Date.now();
@@ -336,10 +381,11 @@ export async function loadSetup(
     );
   }
 
-  // Robots and subsystems: plain lists of names.
+  // Robots, subsystems and units: plain lists of names.
   for (const [table, wanted, key] of [
     [robots, setup.robots, "robots"],
     [subsystems, setup.subsystems, "subsystems"],
+    [units, setup.units, "units"],
   ] as const) {
     const have = await db.select().from(table).where(inTeam(table, team)).all();
     let next = have.reduce((max, row) => Math.max(max, row.sortOrder), -1) + 1;

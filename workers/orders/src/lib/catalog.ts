@@ -66,30 +66,36 @@ type RequestItem = {
   storeVariantId: string | null;
   /** How many parts one unit is, if the request says. */
   packQuantity?: number;
+  /** What the pack quantity counts ("ft"; "" for each), if the request says. */
+  packUnit?: string;
 };
 
-/** A catalog part's pack quantity (1 if it's gone). */
-export async function catalogPackQuantity(
+type Pack = { packQuantity: number; packUnit: string };
+
+/** A catalog part's pack quantity and unit (1 each if it's gone). */
+export async function catalogPack(
   db: OrdersDb,
   teamId: string,
   catalogItemId: number,
-): Promise<number> {
+): Promise<Pack> {
   const row = await db
-    .select({ packQuantity: catalogItems.packQuantity })
+    .select({ packQuantity: catalogItems.packQuantity, packUnit: catalogItems.packUnit })
     .from(catalogItems)
     .where(inTeam(catalogItems, teamId, eq(catalogItems.id, catalogItemId)))
     .get();
-  return row?.packQuantity ?? 1;
+  return row ?? { packQuantity: 1, packUnit: "" };
 }
 
 /**
- * A catalog part that doesn't know its pack quantity yet (still 1) learns it from a request that
- * says more. One that has it keeps it: catalog editors change it from there.
+ * A catalog part that doesn't know its pack yet (still 1 each) learns it from a request that says
+ * more: a pack of 4, or 100 ft. One that has it keeps it: catalog editors change it from there.
  */
-const learnsPack = (known: number, item: RequestItem) =>
-  known === 1 && item.packQuantity !== undefined && item.packQuantity > 1
-    ? { packQuantity: item.packQuantity }
-    : {};
+const learnsPack = (known: Pack, item: RequestItem) => {
+  if (known.packQuantity !== 1 || known.packUnit !== "") return {};
+  const packQuantity = item.packQuantity ?? 1;
+  const packUnit = item.packUnit ?? "";
+  return packQuantity > 1 || packUnit ? { packQuantity, packUnit } : {};
+};
 
 /**
  * The team's catalog item a submitted request is: the one picked from the catalog, or the one with
@@ -133,7 +139,7 @@ export async function catalogItemFor(
               }
             : {}),
           ...(picked.image ? {} : { image: item.image }),
-          ...learnsPack(picked.packQuantity, item),
+          ...learnsPack(picked, item),
         })
         .where(inTeam(catalogItems, teamId, eq(catalogItems.id, picked.id)));
       return picked.id;
@@ -146,6 +152,7 @@ export async function catalogItemFor(
         id: catalogItems.id,
         image: catalogItems.image,
         packQuantity: catalogItems.packQuantity,
+        packUnit: catalogItems.packUnit,
       })
       .from(catalogItems)
       .where(inTeam(catalogItems, teamId, eq(catalogItems.productKey, key)))
@@ -157,7 +164,7 @@ export async function catalogItemFor(
           requestCount: sql`${catalogItems.requestCount} + 1`,
           lastRequestedAt: now,
           ...(same.image ? {} : { image: item.image }),
-          ...learnsPack(same.packQuantity, item),
+          ...learnsPack(same, item),
         })
         .where(inTeam(catalogItems, teamId, eq(catalogItems.id, same.id)));
       return same.id;
@@ -189,6 +196,7 @@ export async function catalogItemFor(
         productKey: kind === "product" ? key : null,
         image: item.image,
         packQuantity: item.packQuantity ?? 1,
+        packUnit: item.packUnit ?? "",
         storePlatform: item.storePlatform,
         storeVariantId: item.storeVariantId,
         source: "request",

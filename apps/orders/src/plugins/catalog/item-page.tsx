@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuthUser } from "../../shared/auth";
 import { formatCents, formatDate } from "../../shared/format";
+import { formatQuantity } from "../../shared/pack";
 import { useLoad } from "../../shared/use-load";
 import { priceIsFresh } from "../requests/draft";
 import type { RequestDone, RequestFrom } from "../requests/request-page";
@@ -104,7 +105,9 @@ export function CatalogItemPage() {
                     {value}
                   </Row>
                 ))}
-                {item.packQuantity > 1 && <Row label="Pack of">{item.packQuantity}</Row>}
+                {(item.packQuantity > 1 || item.packUnit) && (
+                  <Row label="Pack of">{formatQuantity(item.packQuantity, item.packUnit)}</Row>
+                )}
                 <Row label="Last paid">
                   {item.priceCents === null || item.priceAt === null ? (
                     "No price yet"

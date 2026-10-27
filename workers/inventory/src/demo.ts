@@ -14,6 +14,7 @@ import {
 } from "./db/schema";
 import { loadLocations } from "./lib/locations";
 import { loadSetup, starterSetup } from "./lib/setup";
+import { formatQuantity } from "./lib/units";
 
 // The public demo's Inventory (roadmap 5.3), loaded after its nightly reset: the starter setup
 // (fields, locations, robots, subsystems), a description on a few locations, and a shop's worth of
@@ -30,6 +31,8 @@ type Entry = {
   name: string;
   type: string;
   size?: string;
+  /** What its quantities count, when it isn't one of each. */
+  unit?: string;
   /** Where it's kept: a location's name, and how many. */
   kept: [string, number];
   /** On a robot: the robot's and subsystem's place in the setup's lists, and how many. */
@@ -96,6 +99,16 @@ const ENTRIES: Entry[] = [
   { name: "Calipers", type: "Tools", kept: ["Workbench", 2] },
   { name: "Drill bit set", type: "Tools", kept: ["Workbench", 1] },
   { name: "Zip ties", type: "Other", kept: ["Pit cart", 500] },
+  {
+    name: "Signal wire",
+    type: "Electronics",
+    size: "22 AWG",
+    unit: "ft",
+    kept: ["Pit cart", 150],
+    inUse: [0, 5, 12],
+  },
+  { name: "Polycarbonate", type: "Raw stock", size: "1/8 in", unit: "sheet", kept: ["Storage", 3] },
+  { name: "Hex shaft", type: "Raw stock", size: "1/2 in hex", unit: "in", kept: ["Storage", 108] },
 ];
 
 export async function loadDemo(db: Db, teamId: string) {
@@ -133,6 +146,7 @@ export async function loadDemo(db: Db, teamId: string) {
       .values(
         withTeam(teamId, {
           name: entry.name,
+          unit: entry.unit ?? "",
           fieldValues: JSON.stringify(values),
           createdById: who.id,
           createdByName: who.name,
@@ -187,7 +201,7 @@ export async function loadDemo(db: Db, teamId: string) {
       withTeam(teamId, {
         itemId: item.id,
         action: "created",
-        note: `${entry.kept[1]} in ${entry.kept[0]}`,
+        note: `${formatQuantity(entry.kept[1], entry.unit ?? "")} in ${entry.kept[0]}`,
         userId: who.id,
         userName: who.name,
         createdAt,

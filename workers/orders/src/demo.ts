@@ -1,6 +1,6 @@
 import { inTeam, withTeam } from "@g3/auth";
 import { DEMO_PEOPLE, DEMO_STUDENTS, type DemoPerson, SAFE_TEXT, vocabularyOf } from "@g3/demo";
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, like } from "drizzle-orm";
 import type { OrdersDb } from "./db";
 import {
   budgetCategories,
@@ -100,6 +100,26 @@ export async function loadDemo(db: OrdersDb, teamId: string) {
   const step = Math.max(1, Math.floor(parts.length / REQUESTS.length));
   const picked = REQUESTS.map((_, i) => parts[(i * step) % Math.max(parts.length, 1)]);
 
+  // Stock material, counted by the inch in Inventory: hex stock sold 36" long is a pack of 36 in.
+  // It is one of the parts on order, so receiving it shows the unit.
+  const stockLengths = await db
+    .select()
+    .from(catalogItems)
+    .where(inTeam(catalogItems, teamId, like(catalogItems.name, '%Hex%" L)%')))
+    .orderBy(asc(catalogItems.id))
+    .all();
+  for (const part of stockLengths) {
+    const inches = Number(part.name.match(/\((\d+)" L\)/)?.[1]);
+    if (!Number.isInteger(inches) || inches < 1) continue;
+    const pack = { packQuantity: inches, packUnit: "in" };
+    await db
+      .update(catalogItems)
+      .set(pack)
+      .where(inTeam(catalogItems, teamId, eq(catalogItems.id, part.id)));
+    picked[8] = { ...part, ...pack };
+    break;
+  }
+
   for (const name of new Set(picked.map((part) => part?.vendor).filter(Boolean))) {
     await db.insert(vendors).values(
       withTeam(teamId, {
@@ -156,6 +176,7 @@ export async function loadDemo(db: OrdersDb, teamId: string) {
           unitPriceCents: 899 + ((i * 731) % 6_000),
           quantity: 1 + (i % 4),
           packQuantity: part.packQuantity,
+          packUnit: part.packUnit,
           categoryId: categoryIds[i % categoryIds.length] as number,
           reason: SAFE_TEXT.reason[i % SAFE_TEXT.reason.length] as string,
           status: plan.status as (typeof orderRequests.$inferInsert)["status"],

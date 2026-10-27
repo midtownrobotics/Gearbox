@@ -1,14 +1,19 @@
 import { mentor, otherStudent, student } from "@g3/testing/users";
 import { callAs, jsonAs } from "@g3/testing/worker";
 import { describe, expect, it } from "vitest";
-import { guessPackQuantity, pricePerPart } from "../src/lib/pack-quantity";
+import { guessPack, guessPackQuantity, pricePerPart } from "../src/lib/pack-quantity";
 
 // Pack quantity: how many parts one unit of a product is. A request carries it, the catalog part
 // remembers it, and a product's name can suggest it.
 
-type Request = { id: number; packQuantity: number; catalogItemId: number };
-type CatalogItem = { id: number; packQuantity: number };
-type Suggestion = { packQuantity: number | null; packQuantityGuess: number | null };
+type Request = { id: number; packQuantity: number; packUnit: string; catalogItemId: number };
+type CatalogItem = { id: number; packQuantity: number; packUnit: string };
+type Suggestion = {
+  packQuantity: number | null;
+  packUnit: string | null;
+  packQuantityGuess: number | null;
+  packUnitGuess: string | null;
+};
 
 const body = (url: string, extra: Record<string, unknown> = {}) => ({
   url,
@@ -49,6 +54,30 @@ describe("reading it from a product's name", () => {
       "1/4-20 x 2 Bolt",
     ]) {
       expect(guessPackQuantity(name), name).toBeNull();
+    }
+  });
+
+  it("reads an amount in a unit, and a count before it", () => {
+    for (const [name, pack] of [
+      ["Silicone Wire 22 AWG, Red, 25 ft", { quantity: 25, unit: "ft" }],
+      ["Paracord 550, 100' spool", { quantity: 100, unit: "ft" }],
+      ["PLA Filament 1.75mm, 1kg spool", { quantity: 1, unit: "kg" }],
+      ["LED Strip 5m", { quantity: 5, unit: "m" }],
+      ["Lead Shot, 5 lb bag", { quantity: 5, unit: "lb" }],
+      ["Ethernet Cable 6 ft (10 Pack)", { quantity: 10, unit: "" }],
+      ["Zip Ties 8in, 100-pack", { quantity: 100, unit: "" }],
+    ] as const) {
+      expect(guessPack(name), name).toEqual(pack);
+    }
+    for (const name of [
+      '1/2" Hex Shaft (36" L)',
+      "3M VHB Tape",
+      "Torque Wrench 20-150 ft-lb",
+      "Mini CIM Motor, 2.5 lb",
+      "M3 x 10mm Socket Head Screw",
+      "Kraken X60 Motor",
+    ]) {
+      expect(guessPack(name), name).toBeNull();
     }
   });
 
@@ -130,6 +159,52 @@ describe("on requests and the catalog", () => {
     ).toBe(403);
   });
 
+  it("can be an amount in a unit, which requests and the catalog keep too", async () => {
+    const { id: categoryId } = await jsonAs<{ id: number }>(
+      mentor,
+      "/categories",
+      { method: "POST", body: { name: `Spools ${crypto.randomUUID()}` } },
+      201,
+    );
+    await callAs(mentor, "/catalog/categories", { method: "POST", body: { name: "Wheels" } });
+    const post = (b: Record<string, unknown>, status = 201) =>
+      jsonAs<Request>(student, "/requests", { method: "POST", body: { ...b, categoryId } }, status);
+    const url = `https://www.revrobotics.com/${crypto.randomUUID()}/`;
+
+    const spool = await post(body(url, { packQuantity: 100, packUnit: " ft " }));
+    expect(spool).toMatchObject({ packQuantity: 100, packUnit: "ft" });
+    expect(await catalogItem(spool.catalogItemId)).toMatchObject({
+      packQuantity: 100,
+      packUnit: "ft",
+    });
+    // The next one starts as 100 ft; "each" is saved as one of each.
+    expect(await post(body(url))).toMatchObject({ packQuantity: 100, packUnit: "ft" });
+    expect(await post(body(url, { packQuantity: 1, packUnit: "each" }))).toMatchObject({
+      packQuantity: 1,
+      packUnit: "",
+    });
+    const bad = await callAs(student, "/requests", {
+      method: "POST",
+      body: { ...body(url, { packUnit: "x".repeat(21) }), categoryId },
+    });
+    expect(bad.status).toBe(400);
+
+    // Changing it while it waits is in the request's history once it's approved.
+    const waiting = await post(body(url));
+    await jsonAs(mentor, `/requests/${waiting.id}/approve`, { method: "POST" });
+    await jsonAs(mentor, `/requests/${waiting.id}`, {
+      method: "PATCH",
+      body: { packQuantity: 1200, packUnit: "in" },
+    });
+    const { events } = await jsonAs<{ events: { action: string; note: string | null }[] }>(
+      student,
+      `/requests/${waiting.id}`,
+    );
+    expect(events.find((e) => e.action === "reapproved")?.note).toContain(
+      "pack of 100 ft → 1200 in",
+    );
+  });
+
   it("is set on a catalog part by catalog editors", async () => {
     await callAs(mentor, "/catalog/categories", { method: "POST", body: { name: "Wheels" } });
     const made = await jsonAs<CatalogItem>(
@@ -149,7 +224,24 @@ describe("on requests and the catalog", () => {
       },
       201,
     );
-    expect(made.packQuantity).toBe(4);
+    expect(made).toMatchObject({ packQuantity: 4, packUnit: "" });
+    const spool = await callAs(mentor, `/catalog/items/${made.id}`, {
+      method: "PATCH",
+      body: { packQuantity: 50, packUnit: "ft" },
+    });
+    expect(await spool.json()).toMatchObject({ packQuantity: 50, packUnit: "ft" });
+    expect(
+      (
+        await callAs(mentor, `/catalog/items/${made.id}`, {
+          method: "PATCH",
+          body: { packUnit: "x".repeat(21) },
+        })
+      ).status,
+    ).toBe(400);
+    await callAs(mentor, `/catalog/items/${made.id}`, {
+      method: "PATCH",
+      body: { packQuantity: 4, packUnit: "" },
+    });
     const edit = (user: typeof mentor, packQuantity: unknown) =>
       callAs(user, `/catalog/items/${made.id}`, { method: "PATCH", body: { packQuantity } });
     expect((await edit(student, 2)).status).toBe(403);
@@ -177,6 +269,13 @@ describe("on requests and the catalog", () => {
     expect(await suggest(fresh, "Kraken X60 Motor")).toMatchObject({
       packQuantity: null,
       packQuantityGuess: null,
+      packUnitGuess: null,
+    });
+    expect(await suggest(fresh, "Silicone Wire 22 AWG, Red, 25 ft")).toMatchObject({
+      packQuantity: null,
+      packUnit: null,
+      packQuantityGuess: 25,
+      packUnitGuess: "ft",
     });
   });
 });

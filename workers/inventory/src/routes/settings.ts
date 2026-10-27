@@ -12,6 +12,7 @@ import {
   robots,
   stock,
   subsystems,
+  units,
 } from "../db/schema";
 import { parseOptions } from "../lib/fields";
 import { chunks, parseId, sameName, textField } from "../lib/input";
@@ -23,11 +24,13 @@ import {
   MAX_NAME,
   MAX_ROBOTS,
   MAX_SUBSYSTEMS,
+  MAX_UNITS,
   exportSetup,
   loadSetup,
   parseSetup,
   starterSetup,
 } from "../lib/setup";
+import { MAX_UNIT, cleanUnit } from "../lib/units";
 import type { AppEnv } from "../types";
 
 // The Admin page: how a team has Inventory arranged. Its fields, its tree of locations, its
@@ -46,7 +49,7 @@ const orderValidator = validator("json", (value, c): { ids: number[] } => {
   return { ids: [...new Set(ids as number[])] };
 });
 
-type Ordered = typeof fields | typeof locations | typeof robots | typeof subsystems;
+type Ordered = typeof fields | typeof locations | typeof robots | typeof subsystems | typeof units;
 
 /** Puts the team's rows of a list in the order of `ids` (others' ids change nothing). */
 async function reorder(db: Db, team: string, table: Ordered, ids: number[]) {
@@ -361,15 +364,30 @@ export const locationsRouter = new Hono<AppEnv>()
     return c.json({ ok: true });
   });
 
-// ---- Robots and subsystems: what parts in use are in use on ----
+// ---- Robots and subsystems: what parts in use are in use on. Units: what entries count in ----
 
-function namedRouter(table: typeof robots | typeof subsystems, what: string, max: number) {
-  // The stock column that points at this list.
-  const usedBy = table === robots ? stock.robotId : stock.subsystemId;
+/** A unit for the team's list: "each" is every entry's already. */
+function unitName(name: string): string | { error: string } {
+  const unit = cleanUnit(name);
+  if (unit === null) return { error: `A unit is up to ${MAX_UNIT} characters.` };
+  if (!unit) return { error: "Each is always a choice." };
+  return unit;
+}
+
+function namedRouter(
+  table: typeof robots | typeof subsystems | typeof units,
+  what: string,
+  max: number,
+) {
+  // The stock column that points at this list (units are only text on entries).
+  const usedBy = table === robots ? stock.robotId : table === subsystems ? stock.subsystemId : null;
+  /** The name as it's kept, or what's wrong with it. */
+  const clean = (name: string) => (table === units ? unitName(name) : name);
   return (
     new Hono<AppEnv>()
       .post("/", requireAdmin, nameValidator, async (c) => {
-        const { name } = c.req.valid("json");
+        const name = clean(c.req.valid("json").name);
+        if (typeof name !== "string") return c.json(name, 400);
         const db = createDb(c.env.INVENTORY_DB);
         const team = c.get("teamId");
         const results = await db
@@ -402,7 +420,8 @@ function namedRouter(table: typeof robots | typeof subsystems, what: string, max
       })
       .patch("/:id", requireAdmin, nameValidator, async (c) => {
         const id = parseId(c.req.param("id"));
-        const { name } = c.req.valid("json");
+        const name = clean(c.req.valid("json").name);
+        if (typeof name !== "string") return c.json(name, 400);
         const db = createDb(c.env.INVENTORY_DB);
         const team = c.get("teamId");
         const results = await db
@@ -422,17 +441,19 @@ function namedRouter(table: typeof robots | typeof subsystems, what: string, max
           .where(inTeam(table, team, eq(table.id, id)));
         return c.json({ ok: true });
       })
-      /** Removes one, unless parts are in use on it. */
+      /** Removes one, unless parts are in use on it. A unit entries count in stays on them. */
       .delete("/:id", requireAdmin, async (c) => {
         const id = parseId(c.req.param("id"));
         if (id === null) return c.json({ ok: true });
         const db = createDb(c.env.INVENTORY_DB);
         const team = c.get("teamId");
-        const used = await db
-          .selectDistinct({ itemId: stock.itemId })
-          .from(stock)
-          .where(inTeam(stock, team, eq(usedBy, id)))
-          .all();
+        const used = !usedBy
+          ? []
+          : await db
+              .selectDistinct({ itemId: stock.itemId })
+              .from(stock)
+              .where(inTeam(stock, team, eq(usedBy, id)))
+              .all();
         if (used.length > 0) {
           return c.json(
             {
@@ -449,6 +470,7 @@ function namedRouter(table: typeof robots | typeof subsystems, what: string, max
 
 export const robotsRouter = namedRouter(robots, "robot", MAX_ROBOTS);
 export const subsystemsRouter = namedRouter(subsystems, "subsystem", MAX_SUBSYSTEMS);
+export const unitsRouter = namedRouter(units, "unit", MAX_UNITS);
 
 // ---- Setup files ----
 
@@ -461,7 +483,7 @@ const setupValidator = validator("json", (value, c) => {
 });
 
 export const setupRouter = new Hono<AppEnv>()
-  /** The team's setup as a file: its fields, locations, robots and subsystems, and no parts. */
+  /** The team's setup as a file: its fields, locations, robots, subsystems and units, no parts. */
   .get("/export", requireAdmin, async (c) =>
     c.json(await exportSetup(createDb(c.env.INVENTORY_DB), c.get("teamId"))),
   )

@@ -2,6 +2,7 @@ import { Button, Dialog, ErrorBanner, Field, inputClass, useTeamNames } from "@g
 import type { InferResponseType } from "hono/client";
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { api, getErrorMessage } from "./api";
+import { amountOf, packLabel, sameUnit } from "./pack";
 import { QuantityInput, parseQuantity, quantityError } from "./quantity";
 
 // Marking parts received, with where they go in the Inventory app: into storage at a location, or
@@ -51,10 +52,12 @@ export type ReceiveLine = {
   quantity: number;
   /** How many parts one of the quantity is: Inventory counts parts. */
   packQuantity: number;
+  /** What the pack quantity counts ("ft"); "" for one of each. Inventory counts in it too. */
+  packUnit: string;
   title: string;
 };
 
-/** How many parts a line is, as Inventory counts them: 1 pack of 4 is 4. */
+/** How many parts a line is, as Inventory counts them: 1 pack of 4 is 4, 2 spools of 100 ft 200. */
 const partsOf = (line: ReceiveLine) => line.quantity * line.packQuantity;
 
 /** The most parts one request can put into Inventory. */
@@ -273,6 +276,20 @@ export function ReceiveDialog({
       : "Where it went last time.";
   }
 
+  /**
+   * When the entry Inventory has for the part counts in another unit than the pack: the number
+   * is added as it is, so the person receiving can change it first.
+   */
+  function unitNote(line: ReceiveLine): string | null {
+    const start = defaults[line.id];
+    if (start?.from !== "entry" || start.entryUnit === null) return null;
+    if (sameUnit(start.entryUnit, line.packUnit)) return null;
+    const entry = start.entryName ? `“${start.entryName}”` : "Its entry";
+    const counted = start.entryUnit ? `in ${start.entryUnit}` : "one by one";
+    const as = start.entryUnit ? start.entryUnit : "parts";
+    return `The units differ: ${entry} is counted ${counted} in ${inventoryName}, and this is ${amountOf(partsOf(line), line.packUnit)}. The number is added as it is, as ${as}: change it first if that's wrong.`;
+  }
+
   return (
     <Dialog
       title={many ? `Mark ${lines.length} items received` : "Mark received"}
@@ -337,6 +354,7 @@ export function ReceiveDialog({
               <ul className="mt-2 max-h-80 divide-y divide-secondary-100 overflow-y-auto rounded-lg border border-secondary-200">
                 {lines.map((line) => {
                   const why = reason(line);
+                  const units = unitNote(line);
                   return (
                     <li key={line.id} className="space-y-1.5 px-3 py-2">
                       <div className="flex items-center gap-3 text-sm">
@@ -347,15 +365,23 @@ export function ReceiveDialog({
                           value={quantityText(line)}
                           onChange={(text) => setQuantities({ ...quantities, [line.id]: text })}
                         />
+                        {line.packUnit && (
+                          <span
+                            className="max-w-12 shrink-0 truncate text-xs text-secondary-500"
+                            title={line.packUnit}
+                          >
+                            {line.packUnit}
+                          </span>
+                        )}
                         <span
                           className="min-w-0 flex-1 truncate text-secondary-900"
                           title={line.title}
                         >
                           {line.title}
-                          {line.packQuantity > 1 && (
+                          {packLabel(line.packQuantity, line.packUnit) && (
                             <span className="text-secondary-500">
                               {" "}
-                              ({line.quantity} × pack of {line.packQuantity})
+                              ({line.quantity} × {packLabel(line.packQuantity, line.packUnit)})
                             </span>
                           )}
                         </span>
@@ -373,6 +399,7 @@ export function ReceiveDialog({
                         emptyLabel={many ? "Same as the rest (below)" : "Pick a location…"}
                       />
                       {why && <p className="text-xs text-secondary-500">{why}</p>}
+                      {units && <p className="text-xs font-medium text-amber-700">{units}</p>}
                     </li>
                   );
                 })}

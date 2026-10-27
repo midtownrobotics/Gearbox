@@ -2,7 +2,7 @@ import { inTeam, requireAuth } from "@g3/auth";
 import { asc } from "drizzle-orm";
 import { Hono } from "hono";
 import { type Db, createDb } from "../db";
-import { robots, subsystems } from "../db/schema";
+import { robots, subsystems, units } from "../db/schema";
 import { loadFields } from "../lib/fields";
 import type { InventoryOptions } from "../lib/intake-types";
 import { loadItems } from "../lib/items";
@@ -29,16 +29,25 @@ async function loadOptions(db: Db, team: string): Promise<InventoryOptions> {
 }
 
 export const inventoryRouter = new Hono<AppEnv>()
-  /** The main table: every entry with its stock and listings, and what they're described by. */
+  /**
+   * The main table: every entry with its stock and listings, and what they're described by. `units`
+   * is the team's own list of units, offered when an entry's unit is typed.
+   */
   .get("/inventory", requireAuth, async (c) => {
     const db = createDb(c.env.INVENTORY_DB);
     const team = c.get("teamId");
-    const [fields, options, items] = await Promise.all([
+    const [fields, options, items, unitRows] = await Promise.all([
       loadFields(db, team),
       loadOptions(db, team),
       loadItems(db, team),
+      db
+        .select({ id: units.id, name: units.name })
+        .from(units)
+        .where(inTeam(units, team))
+        .orderBy(asc(units.sortOrder), asc(units.id))
+        .all(),
     ]);
-    return c.json({ fields, ...options, items });
+    return c.json({ fields, ...options, units: unitRows, items });
   })
   /** Just the places, for picking where something goes (Orders asks when a part is received). */
   .get("/options", requireAuth, async (c) => {

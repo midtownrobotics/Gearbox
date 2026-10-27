@@ -19,7 +19,7 @@ pages: /request
 ## Fill it in
 
 - **Option**: a product that comes in sizes or types (a link to a page with a dropdown) asks which one. Pick one before sending; a link that already names one starts with it picked.
-- **Quantity** is how many you're buying. **Pack of** is how many parts come in one (a pack of 4), so Inventory counts parts, not packs.
+- **Quantity** is how many you're buying. **Pack of** is how many parts come in one (a pack of 4), so Inventory counts parts, not packs. For something sold by length or weight, give the amount and its unit in the box beside it: a 100 ft spool of wire is a pack of 100 "ft". The hint says what arrives ("= 200 ft when it arrives"). Both are whole numbers, so use a smaller unit for part of one (in, not ft). The pack may be guessed from the product's name ("PK4", "25 ft").
 - **Budget category** may be guessed. Anything guessed is marked "check it's right" until you change it.
 - **Catalog category** is asked for a part new to the catalog, so it lands in the right place.
 - **Priority** (Blocking, High, Normal, Nice to have) and **Need by** help mentors decide what to order first.

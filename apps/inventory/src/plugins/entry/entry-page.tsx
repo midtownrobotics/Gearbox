@@ -18,6 +18,7 @@ import {
   type StockAction,
   StockActionDialog,
 } from "../../shared/stock-cells";
+import { UnitField, formatQuantity, sameUnit, unitName } from "../../shared/units";
 import { useLoad } from "../../shared/use-load";
 import { ListingsCard } from "./listings-card";
 
@@ -102,12 +103,14 @@ function DetailsCard({ item, onChanged }: { item: ItemView; onChanged: () => Pro
   const { fields } = useInventory();
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(item.name);
+  const [unit, setUnit] = useState(item.unit);
   const [draft, setDraft] = useState<Draft>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   function start() {
     setName(item.name);
+    setUnit(item.unit);
     setDraft(draftOf(fields, item.values));
     setError(null);
     setEditing(true);
@@ -121,7 +124,7 @@ function DetailsCard({ item, onChanged }: { item: ItemView; onChanged: () => Pro
     setError(null);
     const res = await api.items[":id"].$patch({
       param: { id: String(item.id) },
-      json: { name: name.trim(), values: parsed.values },
+      json: { name: name.trim(), unit: unit.trim(), values: parsed.values },
     });
     setBusy(false);
     if (!res.ok) return setError(await getErrorMessage(res));
@@ -142,6 +145,12 @@ function DetailsCard({ item, onChanged }: { item: ItemView; onChanged: () => Pro
               onChange={(e) => setName(e.target.value)}
             />
           </Field>
+          <Field
+            label="Unit"
+            hint="What one of its quantity is: ft, sheet, kg. Leave empty to count them one by one. The numbers stay as they are."
+          >
+            <UnitField value={unit} onChange={setUnit} />
+          </Field>
           <FieldInputs fields={fields} draft={draft} onChange={setDraft} />
           {error && <ErrorBanner message={error} />}
           <div className="flex gap-2">
@@ -158,22 +167,23 @@ function DetailsCard({ item, onChanged }: { item: ItemView; onChanged: () => Pro
   }
   return (
     <Card title="Details">
-      {fields.length === 0 ? (
-        <p className="text-sm text-secondary-500">
+      <dl className="grid grid-cols-[fit-content(40%)_minmax(0,1fr)] gap-x-6 gap-y-2 text-sm">
+        {/* A field's name takes at most 40% of the row, so a long one can't squeeze its value. */}
+        <dt className="min-w-28 text-secondary-500">Unit</dt>
+        <dd className="min-w-0 text-secondary-900">{unitName(item.unit)}</dd>
+        {fields.map((field) => (
+          <div key={field.id} className="contents">
+            <dt className="min-w-28 text-secondary-500 [overflow-wrap:anywhere]">{field.name}</dt>
+            <dd className="min-w-0 text-secondary-900">
+              <ValueView field={field} value={item.values[field.id]} />
+            </dd>
+          </div>
+        ))}
+      </dl>
+      {fields.length === 0 && (
+        <p className="mt-3 text-sm text-secondary-500">
           No fields yet. An admin adds them on the Admin page.
         </p>
-      ) : (
-        <dl className="grid grid-cols-[fit-content(40%)_minmax(0,1fr)] gap-x-6 gap-y-2 text-sm">
-          {/* A field's name takes at most 40% of the row, so a long one can't squeeze its value. */}
-          {fields.map((field) => (
-            <div key={field.id} className="contents">
-              <dt className="min-w-28 text-secondary-500 [overflow-wrap:anywhere]">{field.name}</dt>
-              <dd className="min-w-0 text-secondary-900">
-                <ValueView field={field} value={item.values[field.id]} />
-              </dd>
-            </div>
-          ))}
-        </dl>
       )}
       <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
         <Button variant="secondary" onClick={start}>
@@ -203,8 +213,12 @@ function StockCard({ item, onChanged }: { item: ItemView; onChanged: () => Promi
       ) : (
         <>
           <p className="mb-3 text-sm text-secondary-700">
-            <span className="font-semibold text-secondary-900">{total}</span> in all
-            {inUse > 0 && `: ${total - inUse} in storage, ${inUse} in use`}
+            <span className="font-semibold text-secondary-900">
+              {formatQuantity(total, item.unit)}
+            </span>{" "}
+            in all
+            {inUse > 0 &&
+              `: ${formatQuantity(total - inUse, item.unit)} in storage, ${formatQuantity(inUse, item.unit)} in use`}
           </p>
           <div className="relative overflow-x-auto">
             <table className="w-full text-left text-sm">
@@ -223,7 +237,11 @@ function StockCard({ item, onChanged }: { item: ItemView; onChanged: () => Promi
                 {item.stock.map((stock) => (
                   <tr key={stock.id} className="align-top">
                     <td className="py-1.5 pr-3">
-                      <QuantityCell stock={stock} onSaved={() => void onChanged()} />
+                      <QuantityCell
+                        stock={stock}
+                        unit={item.unit}
+                        onSaved={() => void onChanged()}
+                      />
                     </td>
                     <td className="px-3 py-2.5">
                       <LocationButton
@@ -270,6 +288,15 @@ function StockCard({ item, onChanged }: { item: ItemView; onChanged: () => Promi
     </Card>
   );
 }
+
+/** "in ft", or "one by one" for an entry counted each. */
+const countedIn = (unit: string) => (unit ? `in ${unit}` : "one by one");
+
+/** "12 parts", "40 ft": everything an entry has, in its unit. */
+const amountOf = (item: ItemView) => {
+  const n = item.stock.reduce((sum, row) => sum + row.quantity, 0);
+  return item.unit ? formatQuantity(n, item.unit) : count(n, "part");
+};
 
 /** Combines another entry into this one. */
 function MergeDialog({
@@ -320,13 +347,16 @@ function MergeDialog({
       {from ? (
         <>
           <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-            “{from.name}” merges into “{item.name}” with its{" "}
-            {count(
-              from.stock.reduce((sum, row) => sum + row.quantity, 0),
-              "part",
-            )}
-            , {count(from.listings.length, "listing")} and history.
+            “{from.name}” merges into “{item.name}” with its {amountOf(from)},{" "}
+            {count(from.listings.length, "listing")} and history.
           </p>
+          {!sameUnit(from.unit, item.unit) && (
+            <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              The units differ: “{from.name}” is counted {countedIn(from.unit)} and “{item.name}”{" "}
+              {countedIn(item.unit)}. Its numbers are added as they are, as {item.unit || "parts"}.
+              Fix the counts after merging if they need it.
+            </p>
+          )}
           {error && <ErrorBanner message={error} />}
           <div className="flex justify-end gap-2">
             <Button variant="secondary" disabled={busy} onClick={() => setFrom(null)}>
@@ -360,10 +390,7 @@ function MergeDialog({
                   >
                     {other.name}
                     <span className="block text-xs text-secondary-500">
-                      {count(
-                        other.stock.reduce((sum, row) => sum + row.quantity, 0),
-                        "part",
-                      )}
+                      {amountOf(other)}
                       {other.listings.length > 0 &&
                         ` · ${other.listings
                           .map((l) => l.vendor)

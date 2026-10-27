@@ -17,11 +17,11 @@ import {
   vendorOrders,
 } from "../db/schema";
 import { expandAmazonLink } from "../lib/amazon-link";
-import { type CatalogChoice, catalogItemFor, catalogPackQuantity } from "../lib/catalog";
+import { type CatalogChoice, catalogItemFor, catalogPack } from "../lib/catalog";
 import { type ReceiveDestination, parseDestination, sendToInventory } from "../lib/inventory";
 import { addToList } from "../lib/lists";
 import { formatCents } from "../lib/money";
-import { packQuantityField } from "../lib/pack-quantity";
+import { MAX_UNIT, formatQuantity, packQuantityField, packUnitField } from "../lib/pack-quantity";
 import { teamSettings } from "../lib/settings";
 import { catalogReady } from "../lib/starter";
 import { ordersUrl } from "../lib/urls";
@@ -40,6 +40,8 @@ type RequestFields = {
   quantity: number;
   /** How many parts one of `quantity` is. Left out, it's the catalog part's. */
   packQuantity?: number;
+  /** What the pack quantity counts ("ft"; "" for each). Left out, it's the catalog part's. */
+  packUnit?: string;
   categoryId: number;
   reason: string;
   priority: Priority;
@@ -139,6 +141,11 @@ const requestValidator = (partial: boolean) =>
         const pack = packQuantityField(v.packQuantity);
         if (pack === null) return fail("packQuantity must be a whole number from 1 to 10000.");
         out.packQuantity = pack;
+      }
+      if (v.packUnit !== undefined && v.packUnit !== null) {
+        const unit = packUnitField(v.packUnit);
+        if (unit === null) return fail(`packUnit must be up to ${MAX_UNIT} characters.`);
+        out.packUnit = unit;
       }
       if (has("categoryId")) {
         if (!Number.isInteger(v.categoryId)) return fail("Pick a budget category.");
@@ -280,8 +287,14 @@ async function describeEdit(
   const parts: string[] = [];
   const amounts = describeChanges(before, after);
   if (amounts) parts.push(amounts);
-  if (after.packQuantity !== undefined && after.packQuantity !== before.packQuantity) {
-    parts.push(`pack of ${before.packQuantity} → ${after.packQuantity}`);
+  const pack = {
+    quantity: after.packQuantity ?? before.packQuantity,
+    unit: after.packUnit ?? before.packUnit,
+  };
+  if (pack.quantity !== before.packQuantity || pack.unit !== before.packUnit) {
+    parts.push(
+      `pack of ${formatQuantity(before.packQuantity, before.packUnit)} → ${formatQuantity(pack.quantity, pack.unit)}`,
+    );
   }
   if (after.categoryId !== undefined && after.categoryId !== before.categoryId) {
     const was = await db
@@ -436,8 +449,13 @@ export const requestsRouter = new Hono<AppEnv>()
     // Every submitted link is in the catalog: the picked item, the one with this link, or new.
     const catalogItemId = await catalogItemFor(db, teamId, catalog, body, c.get("userDisplayName"));
     if (catalogItemId === null) return c.json({ error: NEEDS_CATALOG_CATEGORY }, 400);
-    const packQuantity =
-      body.packQuantity ?? (await catalogPackQuantity(db, teamId, catalogItemId));
+    // The pack starts as the catalog part's, for what the request leaves out.
+    const known =
+      body.packQuantity === undefined || body.packUnit === undefined
+        ? await catalogPack(db, teamId, catalogItemId)
+        : null;
+    const packQuantity = body.packQuantity ?? known?.packQuantity ?? 1;
+    const packUnit = body.packUnit ?? known?.packUnit ?? "";
     const now = Date.now();
     const row = await db
       .insert(orderRequests)
@@ -445,6 +463,7 @@ export const requestsRouter = new Hono<AppEnv>()
         withTeam(teamId, {
           ...body,
           packQuantity,
+          packUnit,
           catalogItemId,
           currency: body.currency ?? (await teamSettings(db, teamId)).currency,
           requesterId: c.get("userId"),

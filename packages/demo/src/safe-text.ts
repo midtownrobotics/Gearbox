@@ -105,6 +105,7 @@ export const SAFE_TEXT = {
   material: ["Aluminum 6061", "Steel", "Polycarbonate", "Delrin", "Carbon fiber"],
   /** A size or thickness. */
   size: ["1/8 in", "1/4 in", "1/16 in", "1/2 in hex", "2 in", "10-32"],
+  unit: ["ft", "in", "sheet", "kg", "roll"],
   revision: ["A", "B", "C"],
   location: ["Shelf A", "Bin 12", "Workbench", "Pit cart", "Tool wall", "Drawer 3", "Back room"],
   /** A short code: a budget category's, a battery's, a process's. */

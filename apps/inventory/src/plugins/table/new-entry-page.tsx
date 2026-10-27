@@ -1,4 +1,4 @@
-import { Button, Card, ErrorBanner, Field, Page, TextField, inputClass } from "@g3/ui";
+import { Button, Card, ErrorBanner, Field, Page, TextField } from "@g3/ui";
 import { type FormEvent, type ReactNode, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { api, getErrorMessage } from "../../shared/api";
@@ -7,6 +7,8 @@ import { CatalogPick, partLine } from "../../shared/catalog-pick";
 import { type Draft, FieldInputs, draftOf, valuesOf } from "../../shared/field-inputs";
 import { useInventory } from "../../shared/inventory-data";
 import { LocationPicker } from "../../shared/location-picker";
+import { QuantityField } from "../../shared/stock-dialogs";
+import { UnitField } from "../../shared/units";
 
 /** Catalog parts already on an entry (a part is on one entry at most), by the entry's name. */
 export function useTakenParts(): Map<number, string> {
@@ -86,6 +88,7 @@ export function NewEntryForm({
   const [name, setName] = useState("");
   const [draft, setDraft] = useState<Draft>(() => draftOf(fields, {}));
   const [quantity, setQuantity] = useState("");
+  const [unit, setUnit] = useState("");
   const [locationId, setLocationId] = useState<number | null>(() =>
     startAt !== null && places.byId.has(startAt) ? startAt : null,
   );
@@ -110,6 +113,7 @@ export function NewEntryForm({
       const res = await api.items.$post({
         json: {
           name: name.trim(),
+          unit: unit.trim(),
           values: parsed.values,
           stock: locationId === null ? null : { quantity: n ?? 0, locationId },
           listing: part && {
@@ -162,17 +166,21 @@ export function NewEntryForm({
 
       <Section framed={framed} title="How many, and where">
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Quantity" hint="Leave empty if it hasn't been counted.">
-            <input
-              className={inputClass}
-              type="number"
-              inputMode="numeric"
-              min={0}
-              step={1}
-              value={quantity}
-              onChange={(e) => setQuantity(e.target.value)}
-            />
+          <Field
+            label="Unit"
+            hint="What one of its quantity is: ft, sheet, kg. Leave empty to count them one by one."
+          >
+            <UnitField value={unit} onChange={setUnit} />
           </Field>
+          <QuantityField
+            label="Quantity"
+            required={false}
+            hint="Leave empty if it hasn't been counted. Whole numbers only: count in a smaller unit for part of one."
+            value={quantity}
+            onChange={setQuantity}
+            unit={unit.trim()}
+            min={0}
+          />
           <Field label="Storage location">
             <LocationPicker places={places} value={locationId} onChange={setLocationId} />
           </Field>
@@ -202,6 +210,8 @@ export function NewEntryForm({
                 onPick={(picked) => {
                   setPart(picked);
                   if (!name.trim()) setName(picked.name);
+                  // A part sold by the foot is counted in feet.
+                  if (!unit.trim() && picked.packUnit) setUnit(picked.packUnit);
                 }}
               />
             </>

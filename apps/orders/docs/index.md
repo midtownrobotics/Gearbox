@@ -32,7 +32,7 @@ The filters and search stay in the page's address, so you can share or bookmark 
 
 Open a request to see its details (vendor, SKU, quantity, price, budget category, priority, need-by date and who asked) and its **History**: every change and who made it.
 
-- **Edit request** changes it while it's pending: the link, quantity, pack size, price, category, priority, need-by date or reason. A new link is looked up again, and you choose to **Use its name and price** or **Keep the current name and price**.
+- **Edit request** changes it while it's pending: the link, quantity, pack size and its unit, price, category, priority, need-by date or reason. A new link is looked up again, and you choose to **Use its name and price** or **Keep the current name and price**.
 - **Cancel request** withdraws it, any time before it's ordered.
 - **Mark received** when the box is opened. Anyone can.
 

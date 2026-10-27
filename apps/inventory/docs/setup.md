@@ -1,6 +1,6 @@
 ---
 title: Set up Inventory
-summary: Make your locations, robots, subsystems and fields, by hand or from a setup file. For admins.
+summary: Make your locations, robots, subsystems, units and fields, by hand or from a setup file. For admins.
 order: 0
 pages: /admin
 access: admin
@@ -30,13 +30,19 @@ Members give locations a short description on the Locations page, such as "Misc.
 
 The robots and subsystems parts can be checked out onto. Add them, **Rename** them, or **Delete** one you no longer need.
 
+## Units
+
+Most entries are counted one by one. Others are counted in a unit: wire in ft, filament in g, polycarbonate by the sheet, hex shaft in inches. **Units** lists the ones your team uses, offered whenever someone sets an entry's unit, along with the common ones (ft, in, mm, m, g, kg, lb, oz, sheet, roll, set). Anyone can still type their own. Deleting a unit here doesn't change the entries counted in it.
+
+Quantities are always whole numbers, so pick a unit small enough: count wire in ft or in, and filament in g rather than kg.
+
 ## Fields
 
 Fields are what your team records about each entry besides its name, quantity and location. **Add a field** and choose its kind: text, paragraph, number, choice (with its choices, one on each line), checkbox, link or date. Turn on **Show as a column in the main table** for the ones you want to see at a glance. Deleting a field removes it from every entry.
 
 ## Setup files
 
-A setup file holds your fields, locations, robots and subsystems, without your parts, so you can copy your arrangement between seasons or teams. Under **Setup file**:
+A setup file holds your fields, locations, robots, subsystems and units, without your parts, so you can copy your arrangement between seasons or teams. Under **Setup file**:
 
 - **Save to a file** downloads your current setup.
 - **Load the starter setup** brings in the one that comes with Inventory.

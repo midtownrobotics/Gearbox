@@ -16,6 +16,7 @@ import { Link, useLocation, useNavigate, useSearchParams } from "react-router-do
 import { api, getErrorMessage } from "../../shared/api";
 import { useAuthUser } from "../../shared/auth";
 import { formatCents } from "../../shared/format";
+import { packLabel } from "../../shared/pack";
 import type { CatalogFamily, CatalogItem } from "../../shared/types";
 import { useLoad } from "../../shared/use-load";
 import { priceIsFresh } from "../requests/draft";
@@ -538,7 +539,8 @@ function ItemRow({
         <p className="text-xs text-secondary-500">
           {item.vendor}
           {item.sku && ` · ${item.sku}`}
-          {item.packQuantity > 1 && ` · pack of ${item.packQuantity}`}
+          {packLabel(item.packQuantity, item.packUnit) &&
+            ` · ${packLabel(item.packQuantity, item.packUnit)}`}
           {" · "}
           {item.priceCents === null ? (
             "no price yet"

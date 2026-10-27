@@ -33,6 +33,7 @@ type Listing = {
 type Item = {
   id: number;
   name: string;
+  unit: string;
   values: Record<string, string | number | boolean>;
   stock: Stock[];
   listings: Listing[];
@@ -42,6 +43,7 @@ type Inventory = {
   locations: Location[];
   robots: Named[];
   subsystems: Named[];
+  units: Named[];
   items: Item[];
 };
 type Event = { action: string; note: string | null; ref: string | null; userName: string };
@@ -51,6 +53,7 @@ type Summary = {
   locations: number;
   robots: number;
   subsystems: number;
+  units: number;
   already: number;
 };
 
@@ -94,6 +97,7 @@ const SETUP = {
   ],
   robots: ["Comp bot"],
   subsystems: ["Drivetrain", "Intake"],
+  units: ["ft", "sheet"],
 };
 
 describe("signing in", () => {
@@ -116,6 +120,7 @@ describe("signing in", () => {
       locations: [],
       robots: [],
       subsystems: [],
+      units: [],
       items: [],
     });
   });
@@ -162,7 +167,15 @@ describe("settings", () => {
   });
 
   it("previews a setup file without loading it, then loads it", async () => {
-    const wanted = { fields: 2, choices: 0, locations: 7, robots: 1, subsystems: 2, already: 0 };
+    const wanted = {
+      fields: 2,
+      choices: 0,
+      locations: 7,
+      robots: 1,
+      subsystems: 2,
+      units: 2,
+      already: 0,
+    };
     expect(await jsonAs<Summary>(admin, "/setup/preview", post(SETUP))).toEqual(wanted);
     expect((await inventory()).locations).toEqual([]);
 
@@ -174,6 +187,7 @@ describe("settings", () => {
     expect(await locationId("Shop", "Shelves", "Bin 2")).toBeGreaterThan(0);
     expect(loaded.robots.map((r) => r.name)).toEqual(["Comp bot"]);
     expect(loaded.subsystems.map((s) => s.name)).toEqual(["Drivetrain", "Intake"]);
+    expect(loaded.units.map((u) => u.name)).toEqual(["ft", "sheet"]);
   });
 
   it("loading again only adds what's missing", async () => {
@@ -186,6 +200,8 @@ describe("settings", () => {
       ],
       robots: ["comp bot", "Practice bot"],
       subsystems: [],
+      // "each" needs no row: every entry can count in it.
+      units: ["FT", "roll", "each"],
     };
     expect(await jsonAs<Summary>(admin, "/setup/import", post(more))).toEqual({
       fields: 0,
@@ -193,8 +209,9 @@ describe("settings", () => {
       locations: 2,
       robots: 1,
       subsystems: 0,
-      // The Type field, Shop, Shelves and Comp bot.
-      already: 4,
+      units: 1,
+      // The Type field, Shop, Shelves, Comp bot and ft.
+      already: 5,
     });
     const loaded = await inventory();
     expect(loaded.fields[0].options).toEqual(["Hardware", "Motors", "Electronics"]);
@@ -207,11 +224,18 @@ describe("settings", () => {
     expect(file.format).toBe("gearbox-inventory-setup");
     expect(file.locations.map((l) => l.name)).toEqual(["Shop", "Pit", "Trailer"]);
     expect(file.robots).toEqual(["Comp bot", "Practice bot"]);
+    expect(file.units).toEqual(["ft", "sheet", "roll"]);
     expect(await jsonAs<Summary>(admin, "/setup/preview", post(file))).toMatchObject({
       fields: 0,
       locations: 0,
       robots: 0,
       subsystems: 0,
+      units: 0,
+    });
+    // A file from before units loads, with none.
+    const { units: _, ...older } = SETUP;
+    expect(await jsonAs<Summary>(admin, "/setup/preview", post(older))).toMatchObject({
+      units: 0,
     });
     // The starter that comes with the app is a valid file too.
     const starter = await jsonAs(admin, "/setup/starter");
@@ -1040,5 +1064,135 @@ describe("the Locations page", () => {
     ]);
     expect((await call("/intake/places", { method: "POST" })).status).toBe(401);
     expect((await callAs(student, "/intake/places", post({ lines: [] }))).status).toBe(400);
+  });
+});
+
+describe("units", () => {
+  const bin = () => locationId("Shop", "Shelves", "Bin 1");
+
+  it("an entry says what its quantity counts, and blank is one of each", async () => {
+    const wire = await newItem({
+      name: "Red wire",
+      unit: " ft ",
+      stock: { quantity: 50, locationId: await bin() },
+    });
+    const made = await detail(wire);
+    expect(made.item.unit).toBe("ft");
+    expect(made.events[0].note).toBe("50 ft in Shop › Shelves › Bin 1.");
+    // "each" (and nothing) is saved as blank.
+    expect((await itemOf(await newItem({ name: "Washer", unit: "each" }))).unit).toBe("");
+    expect((await itemOf(await newItem({ name: "Spacer" }))).unit).toBe("");
+    const tooLong = await callAs(student, "/items", post({ name: "X", unit: "x".repeat(21) }));
+    expect(tooLong.status).toBe(400);
+    expect((await callAs(student, "/items", post({ name: "X", unit: 3 }))).status).toBe(400);
+
+    // Anyone signed in changes it; the quantities stay as they are.
+    await jsonAs(student, `/items/${wire}`, patch({ unit: "in" }));
+    const changed = await detail(wire);
+    expect(changed.item).toMatchObject({ unit: "in", stock: [{ quantity: 50 }] });
+    expect(changed.events[0]).toMatchObject({ action: "edited", note: "Unit ft → in." });
+    await jsonAs(student, `/items/${wire}`, patch({ unit: "ft" }));
+
+    // History lines say the unit.
+    const [row] = (await itemOf(wire)).stock;
+    await jsonAs(student, `/stock/${row.id}`, patch({ quantity: 40 }));
+    expect((await detail(wire)).events[0].note).toBe("50 → 40 ft in Shop › Shelves › Bin 1.");
+    await jsonAs(
+      student,
+      `/stock/${row.id}/check-out`,
+      post({
+        quantity: 12,
+        locationId: await bin(),
+        robotId: await robotId("Comp bot"),
+        subsystemId: await subsystemId("Intake"),
+      }),
+    );
+    expect((await detail(wire)).events[0].note).toBe(
+      "12 ft in Shop › Shelves › Bin 1, onto Comp bot (Intake).",
+    );
+  });
+
+  it("the team's own units are kept on the Admin page", async () => {
+    expect((await callAs(student, "/units", post({ name: "spool" }))).status).toBe(403);
+    expect((await callAs(kioskAdmin, "/units", post({ name: "spool" }))).status).toBe(403);
+    expect((await callAs(admin, "/units", post({ name: "each" }))).status).toBe(400);
+    expect((await callAs(admin, "/units", post({ name: "x".repeat(21) }))).status).toBe(400);
+    expect((await callAs(admin, "/units", post({ name: "Sheet" }))).status).toBe(409);
+    const { id } = await jsonAs<{ id: number }>(admin, "/units", post({ name: "spool" }), 201);
+    expect((await inventory()).units.map((u) => u.name)).toEqual(["ft", "sheet", "roll", "spool"]);
+    // Taking one off the list leaves the entries that count in it alone.
+    await jsonAs(admin, `/units/${id}`, { method: "DELETE" });
+    const ft = (await inventory()).units.find((u) => u.name === "ft") as Named;
+    await jsonAs(admin, `/units/${ft.id}`, { method: "DELETE" });
+    expect((await inventory()).items.find((i) => i.name === "Red wire")?.unit).toBe("ft");
+    // A unit entries count in is still in the setup file.
+    const file = await jsonAs<{ units: string[] }>(admin, "/setup/export");
+    expect(file.units).toEqual(["sheet", "roll", "ft"]);
+  });
+
+  it("a delivery's unit goes on a new entry, and an entry Inventory has keeps its own", async () => {
+    const binTwo = await locationId("Shop", "Shelves", "Bin 2");
+    const body = (sourceKey: string, quantity: number, unit?: string) =>
+      post({
+        destination: { status: "storage", locationId: binTwo },
+        lines: [
+          {
+            sourceKey,
+            quantity,
+            unit,
+            name: "Black wire",
+            listing: { vendor: "WCP", sku: "WCP-WIRE-BLK", priceCents: 12 },
+            note: "WCP order",
+          },
+        ],
+      });
+    type Result = { added: { itemId: number; created: boolean }[] };
+    const first = await jsonAs<Result>(
+      student,
+      "/intake",
+      body("orders:request:unit-1", 100, "ft"),
+    );
+    expect(first.added).toMatchObject([{ created: true }]);
+    const id = first.added[0].itemId;
+    const made = await detail(id);
+    expect(made.item).toMatchObject({ unit: "ft", stock: [{ quantity: 100 }] });
+    expect(made.events[0].note).toBe("100 ft into Shop › Shelves › Bin 2 (WCP order).");
+
+    // Inventory says what the entry counts in before the next one arrives.
+    const places = await jsonAs<{ places: { unit: string | null }[] }>(
+      student,
+      "/intake/places",
+      post({ lines: [{ sourceKey: "a", listing: { vendor: "WCP", sku: "WCP-WIRE-BLK" } }] }),
+    );
+    expect(places.places).toMatchObject([{ unit: "ft" }]);
+
+    // One sent without a unit (each) is added as sent, and the entry stays in ft.
+    await jsonAs<Result>(student, "/intake", body("orders:request:unit-2", 2));
+    const after = await detail(id);
+    expect(after.item).toMatchObject({ unit: "ft", stock: [{ quantity: 102 }] });
+    expect(after.events[0].note).toBe(
+      "2 into Shop › Shelves › Bin 2 (WCP order), counted ft here.",
+    );
+    const bad = await callAs(student, "/intake", body("orders:request:unit-3", 1, "x".repeat(21)));
+    expect(bad.status).toBe(400);
+  });
+
+  it("merging keeps this entry's unit, and says when the other counted in another", async () => {
+    const into = await newItem({
+      name: "Wire A",
+      unit: "ft",
+      stock: { quantity: 10, locationId: await bin() },
+    });
+    const from = await newItem({
+      name: "Wire B",
+      unit: "in",
+      stock: { quantity: 24, locationId: await bin() },
+    });
+    await jsonAs(mentor, `/items/${into}/merge`, post({ fromId: from }));
+    const merged = await detail(into);
+    expect(merged.item).toMatchObject({ unit: "ft", stock: [{ quantity: 34 }] });
+    expect(merged.events[0].note).toBe(
+      '"Wire B" merged in: 24 in, 0 listings, counted in there and ft here.',
+    );
   });
 });

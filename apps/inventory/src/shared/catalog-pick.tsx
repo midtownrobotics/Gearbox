@@ -2,15 +2,21 @@ import { TextField } from "@g3/ui";
 import { useMemo, useState } from "react";
 import { type CatalogPart, packOf, searchCatalog, useCatalog } from "./catalog";
 import { ago, formatCents } from "./format";
+import { formatQuantity } from "./units";
 
 /** A catalog part's vendor, part number and what was last paid, on one line. */
 export function partLine(
-  part: Pick<CatalogPart, "vendor" | "sku" | "priceCents" | "priceAt" | "packQuantity">,
+  part: Pick<
+    CatalogPart,
+    "vendor" | "sku" | "priceCents" | "priceAt" | "packQuantity" | "packUnit"
+  >,
 ) {
   return [
     part.vendor,
     part.sku,
-    packOf(part) > 1 ? `pack of ${packOf(part)}` : null,
+    packOf(part) > 1 || part.packUnit
+      ? `pack of ${formatQuantity(packOf(part), part.packUnit ?? "")}`
+      : null,
     part.priceCents === null
       ? null
       : `${formatCents(part.priceCents)} paid ${part.priceAt === null ? "" : ago(part.priceAt)}`.trim(),

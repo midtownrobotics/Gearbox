@@ -22,7 +22,7 @@ import {
 import { productKey } from "../lib/catalog";
 import { guessCatalogCategory, matchesKeyword } from "../lib/category-guess";
 import { DEFAULT_TEMPLATE, applyTemplate } from "../lib/naming";
-import { guessPackQuantity } from "../lib/pack-quantity";
+import { guessPack } from "../lib/pack-quantity";
 import { type TeamSettings, saveTeamSettings, teamSettings } from "../lib/settings";
 import { catalogReady } from "../lib/starter";
 import { vendorKey, vendorName } from "../lib/vendors";
@@ -272,7 +272,11 @@ export const suggestRouter = new Hono<AppEnv>().post(
     const optionPrefix = `${key}?variant=`;
     const inCatalog = key
       ? await db
-          .select({ category: catalogItems.category, packQuantity: catalogItems.packQuantity })
+          .select({
+            category: catalogItems.category,
+            packQuantity: catalogItems.packQuantity,
+            packUnit: catalogItems.packUnit,
+          })
           .from(catalogItems)
           .where(
             inTeam(
@@ -351,17 +355,20 @@ export const suggestRouter = new Hono<AppEnv>().post(
       }
     }
 
-    // How many parts one unit is: the catalog's, for a product it knows as a pack; else what the
-    // product's name says ("PK4", "10 pack"), which the requester checks.
-    const packQuantity = inCatalog && inCatalog.packQuantity > 1 ? inCatalog.packQuantity : null;
-    const packQuantityGuess =
-      packQuantity === null ? guessPackQuantity(`${input.title} ${input.variant ?? ""}`) : null;
+    // How many parts one unit is: the catalog's, for a product it knows as a pack (or an amount
+    // in a unit); else what the product's name says ("PK4", "10 pack", "25 ft"), which the
+    // requester checks.
+    const known =
+      inCatalog && (inCatalog.packQuantity > 1 || inCatalog.packUnit) ? inCatalog : null;
+    const guess = known ? null : guessPack(`${input.title} ${input.variant ?? ""}`);
 
     return c.json({
       catalogCategory: inCatalog?.category ?? null,
       catalogCategoryGuess,
-      packQuantity,
-      packQuantityGuess,
+      packQuantity: known?.packQuantity ?? null,
+      packUnit: known?.packUnit ?? null,
+      packQuantityGuess: guess?.quantity ?? null,
+      packUnitGuess: guess?.unit ?? null,
       name: applyTemplate(settings.namingTemplate, input),
       vendor: input.vendor,
       category,

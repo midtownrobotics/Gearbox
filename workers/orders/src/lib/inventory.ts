@@ -134,6 +134,8 @@ export type ReceivedLine = {
   quantity: number;
   /** How many parts one of `quantity` is. */
   packQuantity: number;
+  /** What the pack quantity counts ("ft"); "" for one of each. */
+  packUnit: string;
   unitPriceCents: number | null;
   lineTotalCents: number | null;
   catalogItemId: number | null;
@@ -148,8 +150,8 @@ const listingOf = (line: ReceivedLine) => ({
   vendor: line.vendor,
   sku: line.sku,
   url: line.url,
-  // What one part cost: the final price of a unit (or an imported line's total split evenly),
-  // over the parts in a unit.
+  // What one part (or one of the pack's unit: a foot) cost: the final price of a unit (or an
+  // imported line's total split evenly), over the pack quantity.
   priceCents: pricePerPart(
     line.unitPriceCents ??
       (line.lineTotalCents === null
@@ -173,6 +175,8 @@ export type InventoryDefault = {
   from: "entry" | "history";
   /** The Inventory entry's name, when there is one. */
   entryName: string | null;
+  /** What that entry counts in ("ft"; "" for each), when there is one. */
+  entryUnit: string | null;
 };
 
 /** The default place for each request that has one, by request id. Never fails: no answer, no default. */
@@ -204,6 +208,8 @@ export async function inventoryDefaults(
             locationId: place.locationId,
             from: "entry",
             entryName: place.itemName,
+            // An older Inventory doesn't say.
+            entryUnit: place.unit ?? null,
           };
         }
       }
@@ -249,7 +255,7 @@ export async function inventoryDefaults(
     for (const line of lines) {
       const locationId = line.catalogItemId === null ? undefined : latest.get(line.catalogItemId);
       if (!out[line.id] && locationId !== undefined) {
-        out[line.id] = { locationId, from: "history", entryName: null };
+        out[line.id] = { locationId, from: "history", entryName: null, entryUnit: null };
       }
     }
   }
@@ -294,8 +300,10 @@ export async function sendToInventory(
       destination: { status, robotId, subsystemId },
       lines: lines.slice(i, i + INVENTORY_BATCH).map((line) => ({
         sourceKey: sourceKey(line),
-        // Inventory counts parts: a pack of 4 ordered once is 4.
+        // Inventory counts parts: a pack of 4 ordered once is 4, a 100 ft spool is 100 ft. An entry
+        // Inventory has keeps its own unit.
         quantity: quantities[line.id] ?? line.quantity * line.packQuantity,
+        unit: line.packUnit,
         name: line.title,
         listing: listingOf(line),
         note: line.orderId === null ? line.vendor : `${line.vendor} order #${line.orderId}`,
