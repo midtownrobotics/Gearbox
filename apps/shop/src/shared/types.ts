@@ -1,5 +1,15 @@
+/** What the team's parts are made for (a robot, a practice bot). A part's is its subsystem's. */
+export type Project = {
+  id: number;
+  name: string;
+  createdAt: number;
+  /** When an admin removed it while something used it: kept for that, left out of new parts. */
+  archivedAt: number | null;
+};
+
 export type Subsystem = {
   id: number;
+  projectId: number;
   name: string;
   createdAt: number;
   /** When an admin removed it while parts used it: kept for them, left out of new parts. */
@@ -178,6 +188,8 @@ export type DuplicatePlan = {
 export type OnshapeRelease = {
   id: number;
   releaseId: string;
+  /** The project of the document it came from; null when that wasn't known. */
+  projectId: number | null;
   /** From the release package; null for releases from before it was kept. */
   name: string | null;
   notes: string | null;
@@ -225,6 +237,9 @@ export type QualityReport = {
   partName: string;
   partNumber: string;
   revision: string | null;
+  /** The part's project when the report was written; null for reports from before projects. */
+  projectId: number | null;
+  projectName: string | null;
   instanceNumber: number;
   processId: number;
   processName: string;

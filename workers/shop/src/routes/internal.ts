@@ -10,6 +10,7 @@ import {
   kioskPresence,
   onshapeApiErrors,
   onshapeApiUsage,
+  onshapeDocuments,
   onshapeParts,
   onshapeReleases,
   partDefinitionProcessBlueprints,
@@ -17,6 +18,7 @@ import {
   partInstanceProcesses,
   partInstances,
   processes,
+  projects,
   qualityCheckItems,
   qualityReports,
   shopManagers,
@@ -26,6 +28,7 @@ import {
 } from "../db/schema";
 import { demoWords, loadDemo } from "../demo";
 import { onshapeConfig } from "../lib/onshape-config";
+import { teamDocuments } from "../lib/onshape-documents";
 import { unregisterOnShapeWebhooks } from "../lib/onshape-webhook";
 import { SETTING } from "../lib/settings";
 import { teamPrefix } from "../lib/storage";
@@ -64,6 +67,8 @@ export const internalRouter = new Hono<AppEnv>()
     const db = createShopDb(c.env.SHOP_DB);
     const tables = await exportTeamRows(db, teamId, [
       adminSettings,
+      projects,
+      onshapeDocuments,
       subsystems,
       processes,
       partDefinitions,
@@ -108,12 +113,14 @@ export const internalRouter = new Hono<AppEnv>()
 
     // Best effort: an Onshape webhook left behind only calls an address that no longer answers.
     const onshape = await onshapeConfig(c.env, db, teamId).catch(() => null);
-    if (onshape?.documentId && onshape.credentials) {
-      await unregisterOnShapeWebhooks(
-        onshape.documentId,
-        { db, teamId, credentials: onshape.credentials },
-        `${shopUrl(c.env, teamId)}/api/onshape/events`,
-      );
+    if (onshape?.credentials) {
+      for (const document of await teamDocuments(db, teamId)) {
+        await unregisterOnShapeWebhooks(
+          document.documentId,
+          { db, teamId, credentials: onshape.credentials },
+          `${shopUrl(c.env, teamId)}/api/onshape/events`,
+        );
+      }
     }
 
     // R2 deletes up to 1,000 keys at a time; list and delete until nothing's left.
@@ -139,6 +146,8 @@ export const internalRouter = new Hono<AppEnv>()
       kioskPresence,
       onshapeParts,
       onshapeReleases,
+      onshapeDocuments,
+      projects,
       drawings,
       adminSettings,
       shopManagers,

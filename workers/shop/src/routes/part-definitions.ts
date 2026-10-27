@@ -1,5 +1,5 @@
 import { inTeam, requireAuth, withTeam } from "@g3/auth";
-import { asc, eq, inArray, ne, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, ne, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
 import { createShopDb } from "../db";
@@ -7,6 +7,7 @@ import {
   partDefinitionProcessBlueprints,
   partDefinitions,
   processes,
+  projects,
   subsystems,
 } from "../db/schema";
 import { fileStepError } from "../lib/process-rules";
@@ -126,18 +127,45 @@ async function processListError(
 }
 
 /**
- * Why a part can't be filed under this subsystem, or null: it isn't the team's, or it was removed
- * on the Admin page and isn't the one the part already has (`current`).
+ * Why a part can't be filed under this subsystem, or null: it isn't the team's, or it (or its
+ * project) was removed on the Admin page and isn't the one the part already has (`current`).
  */
 async function subsystemError(db: ShopDb, teamId: string, id: number, current?: number) {
   const row = await db
-    .select({ name: subsystems.name, archivedAt: subsystems.archivedAt })
+    .select({
+      name: subsystems.name,
+      archivedAt: subsystems.archivedAt,
+      project: projects.name,
+      projectArchivedAt: projects.archivedAt,
+    })
     .from(subsystems)
-    .where(inTeam(subsystems, teamId, eq(subsystems.id, id)))
+    .innerJoin(projects, eq(projects.id, subsystems.projectId))
+    .where(and(inTeam(subsystems, teamId, eq(subsystems.id, id)), inTeam(projects, teamId)))
     .get();
   if (!row) return "That subsystem doesn't exist.";
-  return row.archivedAt !== null && id !== current ? removedError("subsystem", [row]) : null;
+  if (id === current) return null;
+  if (row.projectArchivedAt !== null) return removedError("project", [{ name: row.project }]);
+  return row.archivedAt !== null ? removedError("subsystem", [row]) : null;
 }
+
+/** The ids of the subsystems in this subsystem's project: the parts that share its part numbers. */
+const projectSubsystems = (db: ShopDb, teamId: string, subsystemId: number) =>
+  db
+    .select({ id: subsystems.id })
+    .from(subsystems)
+    .where(
+      inTeam(
+        subsystems,
+        teamId,
+        eq(
+          subsystems.projectId,
+          db
+            .select({ projectId: subsystems.projectId })
+            .from(subsystems)
+            .where(inTeam(subsystems, teamId, eq(subsystems.id, subsystemId))),
+        ),
+      ),
+    );
 
 /** The team's part definition, if it is one. */
 async function teamPart(db: ShopDb, teamId: string, id: number) {
@@ -290,8 +318,8 @@ export const partDefinitionsRouter = new Hono<AppEnv>()
     const fileError = await processListError(db, teamId, pipeline);
     if (fileError) return c.json({ error: fileError }, 400);
 
-    // If obsoleteExisting is true, mark all existing parts with same number as obsolete
-    // BUT exclude the new revision we're about to create
+    // If obsoleteExisting is true, mark all existing parts with same number in the same project
+    // as obsolete, BUT exclude the new revision we're about to create
     if (obsoleteExisting) {
       try {
         await db
@@ -302,6 +330,7 @@ export const partDefinitionsRouter = new Hono<AppEnv>()
               partDefinitions,
               teamId,
               eq(partDefinitions.onshapePartNumber, onshapePartNumber),
+              inArray(partDefinitions.subsystemId, projectSubsystems(db, teamId, subsystemId)),
               revision ? ne(partDefinitions.revision, revision) : sql`1=1`,
             ),
           );

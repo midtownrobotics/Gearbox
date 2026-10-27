@@ -15,6 +15,12 @@ import { getErrorMessage } from "../../shared/api-error";
 import { type DrawingState, drawingKey, drawingStates } from "../../shared/batches";
 import { buildInstanceRows } from "../../shared/derive";
 import { deleteDrawing, deleteDrawings, drawingUrl } from "../../shared/getters";
+import {
+  ProjectFilter,
+  subsystemProjects,
+  useDataInProject,
+  useProjectFilter,
+} from "../../shared/projects";
 import { useAuthUser } from "../../shared/use-auth";
 import { useKiosk } from "../../shared/use-auth";
 import { useShopData } from "../../shared/use-shop-data";
@@ -57,7 +63,23 @@ export function FilesPage() {
   const selection = useSelection(drawings.map((d) => d.r2Key));
   const kiosk = useKiosk();
   const { data } = useShopData();
+  const projectFilter = useProjectFilter();
+  const projectId = projectFilter.projectId;
   const rows = useMemo(() => (data ? buildInstanceRows(data) : []), [data]);
+  // The parts a batch can be started for: the chosen project's.
+  const projectData = useDataInProject(data, projectId);
+  const projectRows = useMemo(
+    () => (projectData ? buildInstanceRows(projectData) : []),
+    [projectData],
+  );
+  /** Whether a drawing is in the chosen project: its part's is, or no part is made from it. */
+  const drawingInProject = useMemo(() => {
+    const projectOf = subsystemProjects(data?.subsystems ?? []);
+    return (d: Drawing) => {
+      const part = data?.definitions.find((p) => p.onshapePartNumber === d.partNumber);
+      return projectId === null || !part || projectOf.get(part.subsystemId) === projectId;
+    };
+  }, [data, projectId]);
   /** The part a drawing is of, when the shop has that revision. */
   const partOf = (d: Drawing) =>
     data?.definitions.find(
@@ -209,14 +231,16 @@ export function FilesPage() {
 
   const visibleDrawings = useMemo(() => {
     const q = search.trim().toLowerCase();
-    const sorted = [...drawings].sort(
-      (a, b) => a.partNumber.localeCompare(b.partNumber) || a.revision.localeCompare(b.revision),
-    );
+    const sorted = drawings
+      .filter(drawingInProject)
+      .sort(
+        (a, b) => a.partNumber.localeCompare(b.partNumber) || a.revision.localeCompare(b.revision),
+      );
     if (!q) return sorted;
     return sorted.filter(
       (d) => d.filename.toLowerCase().includes(q) || d.partNumber.toLowerCase().includes(q),
     );
-  }, [drawings, search]);
+  }, [drawings, search, drawingInProject]);
 
   if (loading)
     return (
@@ -235,18 +259,20 @@ export function FilesPage() {
       title="Files"
       width="wide"
       actions={
-        user?.isAdmin &&
-        canPrint && (
-          <Button variant="secondary" onClick={handleTestPrint} disabled={testPrinting}>
-            {testPrinting ? "Testing…" : "Test print"}
-          </Button>
-        )
+        <>
+          <ProjectFilter filter={projectFilter} />
+          {user?.isAdmin && canPrint && (
+            <Button variant="secondary" onClick={handleTestPrint} disabled={testPrinting}>
+              {testPrinting ? "Testing…" : "Test print"}
+            </Button>
+          )}
+        </>
       }
     >
       <>
         {error && <ErrorBanner message={error} />}
 
-        <PartFilesSection data={data} rows={rows} />
+        <PartFilesSection data={data} rows={projectRows} projectId={projectId} />
 
         <section className="space-y-3 pt-4">
           <div>

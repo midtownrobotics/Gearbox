@@ -2,6 +2,7 @@ import { ErrorBanner, Loading, Page, Switch, TextField } from "@g3/ui";
 import { useEffect, useId, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { fetchOnshapeReleases } from "../../shared/getters";
+import { ProjectFilter, useProjectFilter } from "../../shared/projects";
 import type { OnshapeRelease } from "../../shared/types";
 import {
   PART_SORTS,
@@ -66,9 +67,16 @@ export function OnshapePage() {
     });
   };
 
+  // Only the chosen project's releases.
+  const projectFilter = useProjectFilter();
+  const { projectId } = projectFilter;
+  const inProject = useMemo(
+    () => (releases ?? []).filter((r) => projectId === null || r.projectId === projectId),
+    [releases, projectId],
+  );
   const groups = useMemo(
-    () => (releases ?? []).flatMap((r) => shownGroup(r, query, showObsolete) ?? []),
-    [releases, query, showObsolete],
+    () => inProject.flatMap((r) => shownGroup(r, query, showObsolete) ?? []),
+    [inProject, query, showObsolete],
   );
   const flat = PART_SORTS.includes(key);
   const grouped = useMemo(
@@ -90,7 +98,7 @@ export function OnshapePage() {
   const partCount = groups.reduce((n, g) => n + g.parts.length, 0);
   const hidden = showObsolete
     ? 0
-    : releases.reduce((n, r) => n + r.parts.filter((p) => p.obsolete).length, 0);
+    : inProject.reduce((n, r) => n + r.parts.filter((p) => p.obsolete).length, 0);
   const empty = flat ? lines.length === 0 : groups.length === 0;
 
   return (
@@ -98,10 +106,11 @@ export function OnshapePage() {
       title="Onshape"
       description="Every approved release and its parts. Open a release for its notes, comments and links."
       width="wide"
+      actions={<ProjectFilter filter={projectFilter} />}
     >
-      {releases.length === 0 ? (
+      {inProject.length === 0 ? (
         <p className="text-secondary-500 text-sm">
-          No releases yet. Approved releases in your team's Onshape document show up here.
+          No releases yet. Approved releases in your team's Onshape documents show up here.
         </p>
       ) : (
         <>

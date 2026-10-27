@@ -16,6 +16,7 @@ import {
   fetchPartFiles,
   uploadPartFile,
 } from "../../shared/getters";
+import { subsystemProjects } from "../../shared/projects";
 import type { Batch, PartDefinition, PartFile, PartInstance } from "../../shared/types";
 import { useKiosk } from "../../shared/use-auth";
 import { type ShopData, refreshShopData } from "../../shared/use-shop-data";
@@ -47,7 +48,16 @@ const FILE_STATES: { state: FileState; title: string; empty: string }[] = [
  * The file library, by where each file's batches are. A file is used by putting it on a batch;
  * "Start a batch" makes one from a part number here, and the Shop Floor makes them too.
  */
-export function PartFilesSection({ data, rows }: { data: ShopData | null; rows: InstanceRow[] }) {
+export function PartFilesSection({
+  data,
+  rows,
+  projectId = null,
+}: {
+  data: ShopData | null;
+  rows: InstanceRow[];
+  /** Only the files of this project's batches (and files in no batch yet); null for all. */
+  projectId?: number | null;
+}) {
   const kiosk = useKiosk();
   const [files, setFiles] = useState<PartFile[]>([]);
   const [search, setSearch] = useState("");
@@ -90,8 +100,23 @@ export function PartFilesSection({ data, rows }: { data: ShopData | null; rows: 
 
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return files;
-    return files.filter(
+    const projectOf = subsystemProjects(data?.subsystems ?? []);
+    const inProject = (f: PartFile) => {
+      const of = batchesOf.get(f.id) ?? [];
+      return (
+        projectId === null ||
+        of.length === 0 ||
+        of.some((b) =>
+          b.instances.some((i) => {
+            const d = definitionById.get(i.partDefinitionId);
+            return !!d && projectOf.get(d.subsystemId) === projectId;
+          }),
+        )
+      );
+    };
+    const shown = files.filter(inProject);
+    if (!q) return shown;
+    return shown.filter(
       (f) =>
         f.filename.toLowerCase().includes(q) ||
         (batchesOf.get(f.id) ?? []).some(
@@ -106,7 +131,7 @@ export function PartFilesSection({ data, rows }: { data: ShopData | null; rows: 
             }),
         ),
     );
-  }, [files, search, batchesOf, definitionById]);
+  }, [files, search, batchesOf, definitionById, data, projectId]);
 
   async function run(action: () => Promise<string[] | undefined>) {
     setBusy(true);

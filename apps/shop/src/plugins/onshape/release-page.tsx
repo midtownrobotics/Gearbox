@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { drawingUrl, fetchOnshapeReleases } from "../../shared/getters";
 import { partPath } from "../../shared/nav";
+import { projectName, useProjects } from "../../shared/projects";
 import type { OnshapeRelease } from "../../shared/types";
 import { linkClass } from "../batches/batch-ui";
 import { ExternalLink, NarrowPart, td, th, when } from "./release-ui";
@@ -29,6 +30,7 @@ export function ReleasePage() {
   );
   const [release, setRelease] = useState<OnshapeRelease | null | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
+  const projects = useProjects();
 
   useEffect(() => {
     fetchOnshapeReleases()
@@ -52,6 +54,9 @@ export function ReleasePage() {
   const waiting = release.approvers.filter((a) => !a.approvedAt && !a.rejectedAt);
   const facts: [string, string][] = [
     ["Released", when(release.releasedAt) ?? release.releasedAt],
+    ...(projects.length > 1
+      ? [["Project", projectName(projects, release.projectId)] as [string, string]]
+      : []),
     ...(release.state ? [["State", release.state] as [string, string]] : []),
     ...(release.madeBy
       ? [

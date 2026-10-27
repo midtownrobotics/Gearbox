@@ -1,6 +1,7 @@
 import { newTeamId, teamUsers } from "@g3/testing/users";
 import { callAs, jsonAs } from "@g3/testing/worker";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { newProject } from "./projects";
 
 // Every call to Onshape is counted for the team (lib/onshape-api.ts): the Admin page's usage, and
 // the banner under the bar while Onshape refuses the team's calls.
@@ -28,11 +29,25 @@ function onshapeAnswers(answer: (url: string, method: string) => [number, unknow
   );
 }
 
-const saveKeys = (team: ReturnType<typeof teamUsers>, apiKey = "key") =>
-  callAs(team.admin, "/admin/onshape/config", {
+const following = new Set<string>();
+
+/** Saves the team's keys, following one document first (no calls to Onshape without keys). */
+async function saveKeys(team: ReturnType<typeof teamUsers>, apiKey = "key") {
+  if (!following.has(team.teamId)) {
+    following.add(team.teamId);
+    const project = await newProject(team.admin);
+    await jsonAs(
+      team.admin,
+      "/admin/onshape/documents",
+      { method: "POST", body: { documentId: "doc1", projectId: project.id } },
+      201,
+    );
+  }
+  return callAs(team.admin, "/admin/onshape/config", {
     method: "POST",
-    body: { documentId: "doc1", companyId: "co1", apiKey, apiSecret: "secret" },
+    body: { companyId: "co1", apiKey, apiSecret: "secret" },
   });
+}
 
 const callCount = (usage: Usage) => usage.days.reduce((n, d) => n + d.calls, 0);
 

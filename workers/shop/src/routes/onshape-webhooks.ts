@@ -71,6 +71,7 @@ router.post("/events", async (c) => {
     partNumber?: string;
     releaseId?: string;
     versionId?: string;
+    documentId?: string;
     objectType?: string;
     objectId?: string;
     timestamp?: string;
@@ -110,10 +111,10 @@ router.post("/events", async (c) => {
     webhookData.objectType === "RELEASE" &&
     webhookData.transitionName === "RELEASE"
   ) {
-    const { objectId: releaseId, timestamp } = webhookData;
+    const { objectId: releaseId, timestamp, documentId } = webhookData;
     if (releaseId && timestamp) {
       c.executionCtx.waitUntil(
-        processReleaseEvent(db, teamId, releaseId, timestamp, c.env.BOM_QUEUE),
+        processReleaseEvent(db, teamId, releaseId, timestamp, c.env.BOM_QUEUE, documentId),
       );
     }
     return c.json({ ok: true });

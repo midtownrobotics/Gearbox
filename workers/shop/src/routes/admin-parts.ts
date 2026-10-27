@@ -1,8 +1,16 @@
-import { inTeam, logTeamChange, requireAdmin, requireAuth, sendTeamMessage } from "@g3/auth";
+import {
+  inTeam,
+  logTeamChange,
+  requireAdmin,
+  requireAuth,
+  sendTeamMessage,
+  withTeam,
+} from "@g3/auth";
 import { isDemoTeam } from "@g3/demo";
 import { eq, inArray, isNull } from "drizzle-orm";
 import { Hono } from "hono";
-import { createShopDb } from "../db";
+import { validator } from "hono/validator";
+import { type ShopDb, createShopDb } from "../db";
 import * as schema from "../db/schema";
 import { addDemoRelease } from "../demo";
 import { obsoleteFileIds } from "../lib/batches";
@@ -12,9 +20,16 @@ import {
   getOverviewStats,
   getReflectionStats,
 } from "../lib/daily-summary";
-import { onshapeConfig, saveOnshapeConfig } from "../lib/onshape-config";
+import { type OnshapeConfig, onshapeConfig, saveOnshapeConfig } from "../lib/onshape-config";
+import {
+  type OnshapeDocument,
+  followedDocument,
+  latestReleasedPart,
+  teamDocuments,
+} from "../lib/onshape-documents";
 import { exportDrawingAsPDF, storeDrawingInR2 } from "../lib/onshape-export";
 import { registerOnShapeWebhook, unregisterOnShapeWebhooks } from "../lib/onshape-webhook";
+import { removedError } from "../lib/removal";
 import { SETTING, getSetting, isChannelId, setSetting } from "../lib/settings";
 import { shopUrl } from "../lib/urls";
 import type { AppEnv } from "../types";
@@ -26,34 +41,120 @@ const SUMMARY_CHANNEL_KEY = SETTING.summaryChannel;
 const eventsUrl = (env: AppEnv["Bindings"], teamId: string) =>
   `${shopUrl(env, teamId)}/api/onshape/events`;
 
+const documentJson = (d: OnshapeDocument) => ({
+  id: d.id,
+  documentId: d.documentId,
+  mainAssemblyId: d.mainAssemblyId ?? "",
+  projectId: d.projectId,
+});
+
+/** A document's fields as sent (each checked by its route): addresses or ids, and the project. */
+const documentValidator = validator(
+  "json",
+  (value): { documentId?: unknown; mainAssemblyId?: unknown; projectId?: unknown } =>
+    typeof value === "object" && value !== null ? value : {},
+);
+
+/**
+ * An Onshape id as typed or pasted: the id itself, or an address with it after `/<part>/`
+ * (`/documents/<id>/w/…` for a document, `/e/<id>` for an element). Null for nothing.
+ */
+function onshapeId(value: unknown, part: "documents" | "e"): string | null {
+  if (typeof value !== "string" || !value.trim()) return null;
+  const found = value.match(new RegExp(`/${part}/([0-9a-f]{24})(?:[/?#]|$)`, "i"));
+  return (found?.[1] ?? value.trim()).slice(0, 64);
+}
+
+/** The team's project by id, if it's one a new document may go to (not removed). */
+async function liveProject(db: ShopDb, teamId: string, value: unknown) {
+  const id = Number(value);
+  if (!Number.isInteger(id) || id < 1) return { error: "Choose the project it's for." };
+  const row = await db
+    .select()
+    .from(schema.projects)
+    .where(inTeam(schema.projects, teamId, eq(schema.projects.id, id)))
+    .get();
+  if (!row) return { error: "That project doesn't exist." };
+  if (row.archivedAt !== null) {
+    return { error: removedError("project", [row]) ?? "That project was removed." };
+  }
+  return row;
+}
+
+type WebhookOutcome = "registered" | "failed" | "needs keys";
+
+/**
+ * Puts Shop's webhook on a document again: takes off any it has (so saving never adds a second),
+ * then registers one at the team's current address.
+ */
+async function replaceWebhook(
+  env: AppEnv["Bindings"],
+  db: ShopDb,
+  teamId: string,
+  config: OnshapeConfig,
+  document: OnshapeDocument,
+): Promise<WebhookOutcome> {
+  if (!config.credentials || !config.companyId) return "needs keys";
+  const url = eventsUrl(env, teamId);
+  const api = { db, teamId, credentials: config.credentials };
+  await unregisterOnShapeWebhooks(document.documentId, api, url);
+  try {
+    await registerOnShapeWebhook(document.documentId, api, config.companyId, url);
+    return "registered";
+  } catch (err) {
+    console.error("[OnShape Config] Webhook registration failed", err);
+    return "failed";
+  }
+}
+
 export const adminPartsRouter = new Hono<AppEnv>()
   .get("/parts/pending", requireAuth, async (c) => {
     const db = createShopDb(c.env.SHOP_DB);
     const teamId = c.get("teamId");
 
     // Get all parts from onshapeParts and partDefinitions
-    const onshapeParts = await db
-      .select()
-      .from(schema.onshapeParts)
-      .where(inTeam(schema.onshapeParts, teamId))
-      .all();
-    const definitions = await db
-      .select()
-      .from(schema.partDefinitions)
-      .where(inTeam(schema.partDefinitions, teamId))
-      .all();
+    const [onshapeParts, definitions, allSubsystems, allReleases, projects] = await Promise.all([
+      db.select().from(schema.onshapeParts).where(inTeam(schema.onshapeParts, teamId)).all(),
+      db.select().from(schema.partDefinitions).where(inTeam(schema.partDefinitions, teamId)).all(),
+      db.select().from(schema.subsystems).where(inTeam(schema.subsystems, teamId)).all(),
+      db
+        .select({
+          id: schema.onshapeReleases.id,
+          releaseId: schema.onshapeReleases.releaseId,
+          name: schema.onshapeReleases.name,
+          timestamp: schema.onshapeReleases.timestamp,
+          projectId: schema.onshapeReleases.projectId,
+          documentId: schema.onshapeReleases.documentId,
+        })
+        .from(schema.onshapeReleases)
+        .where(inTeam(schema.onshapeReleases, teamId))
+        .all(),
+      db.select().from(schema.projects).where(inTeam(schema.projects, teamId)).all(),
+    ]);
+
+    // Part numbers are matched within a project: a part's is its subsystem's, a released part's
+    // its release's. A release whose project isn't known matches the part number in any project.
+    const subsystemProject = new Map(allSubsystems.map((s) => [s.id, s.projectId]));
+    const releaseProject = new Map(allReleases.map((r) => [r.id, r.projectId]));
+    const keyOf = (project: number | null | undefined, partNumber: string) =>
+      `${project ?? ""}\u0000${partNumber}`;
+    const projectOfPart = (p: (typeof onshapeParts)[number]) =>
+      p.releaseId === null ? null : (releaseProject.get(p.releaseId) ?? null);
 
     // Normalize timestamps to seconds for consistent comparison
     const toSeconds = (ts: number) => (ts > 10000000000 ? Math.floor(ts / 1000) : ts);
 
-    // Create a map of part number to their definition's createdAt (in seconds)
+    // The most recent definition's createdAt (in seconds) for each part number, in its project
+    // and in no particular project.
     const definitionsByNumber = new Map<string, number>();
     for (const def of definitions) {
       const defSeconds = toSeconds(def.createdAt);
-      const existing = definitionsByNumber.get(def.onshapePartNumber);
-      // Keep the most recent definition's createdAt for each part number
-      if (!existing || defSeconds > existing) {
-        definitionsByNumber.set(def.onshapePartNumber, defSeconds);
+      for (const key of [
+        keyOf(subsystemProject.get(def.subsystemId), def.onshapePartNumber),
+        keyOf(null, def.onshapePartNumber),
+      ]) {
+        const existing = definitionsByNumber.get(key);
+        if (!existing || defSeconds > existing) definitionsByNumber.set(key, defSeconds);
       }
     }
 
@@ -62,47 +163,39 @@ export const adminPartsRouter = new Hono<AppEnv>()
     // 2. Are newer than their definition (createdAt > definition's createdAt)
     const unfilteredPending = onshapeParts.filter((p) => {
       const partSeconds = toSeconds(p.createdAt);
-      const defSeconds = definitionsByNumber.get(p.partNumber);
+      const defSeconds = definitionsByNumber.get(keyOf(projectOfPart(p), p.partNumber));
       // Keep if no definition exists, or if this part is newer than the definition
       return !defSeconds || partSeconds > defSeconds;
     });
 
-    // Keep only the most recent version of each part (by createdAt)
+    // Keep only the most recent version of each part (by createdAt), per project
     const partsByNumber = new Map<string, (typeof unfilteredPending)[0]>();
     for (const part of unfilteredPending) {
-      const existing = partsByNumber.get(part.partNumber);
+      const key = keyOf(projectOfPart(part), part.partNumber);
+      const existing = partsByNumber.get(key);
       if (!existing || part.createdAt > existing.createdAt) {
-        partsByNumber.set(part.partNumber, part);
+        partsByNumber.set(key, part);
       }
     }
     const pendingParts = Array.from(partsByNumber.values());
 
-    // Only what a new part may be filed under: not ones removed on the Admin page.
-    const subsystems = await db
-      .select()
-      .from(schema.subsystems)
-      .where(inTeam(schema.subsystems, teamId, isNull(schema.subsystems.archivedAt)))
-      .all();
+    // Only what a new part may be filed under: not ones removed on the Admin page, or in a
+    // project that was.
+    const removedProjects = new Set(projects.filter((p) => p.archivedAt !== null).map((p) => p.id));
+    const subsystems = allSubsystems.filter(
+      (s) => s.archivedAt === null && !removedProjects.has(s.projectId),
+    );
 
-    // The releases the pending parts came from, so the page can group them by release.
+    // The releases the pending parts came from, so the page can group them by release, each
+    // with its project.
     const releaseIds = new Set(pendingParts.map((p) => p.releaseId));
-    const releases = (
-      await db
-        .select({
-          id: schema.onshapeReleases.id,
-          releaseId: schema.onshapeReleases.releaseId,
-          name: schema.onshapeReleases.name,
-          timestamp: schema.onshapeReleases.timestamp,
-        })
-        .from(schema.onshapeReleases)
-        .where(inTeam(schema.onshapeReleases, teamId))
-        .all()
-    ).filter((r) => releaseIds.has(r.id));
+    const releases = allReleases.filter((r) => releaseIds.has(r.id));
 
     return c.json({
       parts: pendingParts,
       releases,
       subsystems,
+      projects: projects.filter((p) => p.archivedAt === null),
     });
   })
   // The public demo has no Onshape: a sample release stands in for one its webhook would bring.
@@ -123,12 +216,8 @@ export const adminPartsRouter = new Hono<AppEnv>()
       const db = createShopDb(c.env.SHOP_DB);
       const teamId = c.get("teamId");
 
-      // Get the OnShape part info
-      const part = await db
-        .select()
-        .from(schema.onshapeParts)
-        .where(inTeam(schema.onshapeParts, teamId, eq(schema.onshapeParts.partNumber, partNumber)))
-        .get();
+      // The part's newest release, and the document it came from.
+      const part = await latestReleasedPart(db, teamId, partNumber);
 
       if (!part) {
         return c.json(
@@ -160,10 +249,11 @@ export const adminPartsRouter = new Hono<AppEnv>()
         );
       }
 
-      const { documentId, credentials } = await onshapeConfig(c.env, db, teamId);
+      const { credentials } = await onshapeConfig(c.env, db, teamId);
+      const { documentId } = part;
 
       if (!documentId) {
-        return c.json({ error: "Document ID not configured" }, 400);
+        return c.json({ error: "The part's Onshape document isn't known" }, 400);
       }
       if (!credentials) {
         return c.json({ error: "Onshape API keys not configured" }, 400);
@@ -233,33 +323,34 @@ export const adminPartsRouter = new Hono<AppEnv>()
     }
   })
   /**
-   * The team's Onshape connection. The key, secret and webhook signing keys are never sent back:
-   * only whether they're set (and whether they're still the site team's worker secrets).
+   * The team's Onshape connection and the documents it follows. The key, secret and webhook
+   * signing keys are never sent back: only whether they're set (and whether they're still the site
+   * team's worker secrets).
    */
   .get("/onshape/config", requireAdmin, async (c) => {
-    const config = await onshapeConfig(c.env, createShopDb(c.env.SHOP_DB), c.get("teamId"));
+    const db = createShopDb(c.env.SHOP_DB);
+    const teamId = c.get("teamId");
+    const [config, documents] = await Promise.all([
+      onshapeConfig(c.env, db, teamId),
+      teamDocuments(db, teamId),
+    ]);
     return c.json({
-      documentId: config.documentId ?? "",
-      mainAssemblyId: config.mainAssemblyId ?? "",
+      documents: documents.map(documentJson),
       companyId: config.companyId ?? "",
       hasApiKey: config.credentials !== null,
       hasWebhookKeys: config.webhookKeys !== null,
       fromWorkerSecrets: config.fromWorkerSecrets,
-      webhookUrl: eventsUrl(c.env, c.get("teamId")),
+      webhookUrl: eventsUrl(c.env, teamId),
     });
   })
   /**
    * Saves the team's Onshape connection (secrets left empty stay as they are), then registers
-   * Shop's webhook on the document again, so it calls back on the team's own address.
+   * Shop's webhook on every document again, so each calls back on the team's own address.
    */
   .post("/onshape/config", requireAdmin, async (c) => {
     const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
     const text = (key: string) =>
       typeof body[key] === "string" ? (body[key] as string).trim() : undefined;
-    const documentId = text("documentId");
-    if (!documentId) {
-      return c.json({ error: "documentId is required" }, 400);
-    }
 
     const db = createShopDb(c.env.SHOP_DB);
     const teamId = c.get("teamId");
@@ -267,8 +358,6 @@ export const adminPartsRouter = new Hono<AppEnv>()
     try {
       const before = await onshapeConfig(c.env, db, teamId);
       await saveOnshapeConfig(c.env, db, teamId, {
-        documentId,
-        mainAssemblyId: text("mainAssemblyId"),
         companyId: text("companyId"),
         apiKey: text("apiKey"),
         apiSecret: text("apiSecret"),
@@ -276,14 +365,9 @@ export const adminPartsRouter = new Hono<AppEnv>()
         webhookKeySecondary: text("webhookKeySecondary"),
       });
       const config = await onshapeConfig(c.env, db, teamId);
-      // Which parts changed: the document and company by value, the keys whenever new ones were
-      // entered (their values never go in the log).
+      // Which parts changed: the company by value, the keys whenever new ones were entered (their
+      // values never go in the log).
       const changed = [
-        ...(before.documentId !== documentId ? ["Onshape document"] : []),
-        ...(text("mainAssemblyId") !== undefined &&
-        (before.mainAssemblyId ?? undefined) !== text("mainAssemblyId")
-          ? ["Main assembly"]
-          : []),
         ...(text("companyId") !== undefined && (before.companyId ?? undefined) !== text("companyId")
           ? ["Onshape company"]
           : []),
@@ -301,42 +385,127 @@ export const adminPartsRouter = new Hono<AppEnv>()
         });
       }
 
-      // Replace our webhook: drop it from the old document (if it changed) and from this one, so
-      // saving re-registers it at the current address instead of adding a second one.
-      let webhook: "registered" | "failed" | "needs keys" = "needs keys";
-      if (config.credentials && config.companyId) {
-        const url = eventsUrl(c.env, teamId);
-        if (before.documentId && before.documentId !== documentId && before.credentials) {
-          console.log("[OnShape Config] Document ID changed, updating webhook registration");
-          await unregisterOnShapeWebhooks(
-            before.documentId,
-            { db, teamId, credentials: before.credentials },
-            url,
-          );
-        }
-        const api = { db, teamId, credentials: config.credentials };
-        await unregisterOnShapeWebhooks(documentId, api, url);
-        try {
-          await registerOnShapeWebhook(documentId, api, config.companyId, url);
-          webhook = "registered";
-        } catch (err) {
-          console.error("[OnShape Config] Webhook registration failed", err);
-          // Don't fail the config update if webhook registration fails
-          webhook = "failed";
-        }
+      const webhooks: Record<string, WebhookOutcome> = {};
+      for (const document of await teamDocuments(db, teamId)) {
+        webhooks[document.documentId] = await replaceWebhook(c.env, db, teamId, config, document);
       }
-
-      return c.json({
-        success: true,
-        webhook,
-        config: {
-          documentId,
-          mainAssemblyId: config.mainAssemblyId ?? undefined,
-        },
-      });
+      return c.json({ success: true, webhooks });
     } catch (err) {
       return c.json({ error: err instanceof Error ? err.message : "Failed to update config" }, 500);
     }
+  })
+  /**
+   * Follows another Onshape document: its releases go to `projectId`. Takes the document's id or
+   * any address in it (and the same for the main assembly), and registers Shop's webhook on it.
+   */
+  .post("/onshape/documents", requireAdmin, documentValidator, async (c) => {
+    const body = c.req.valid("json");
+    const documentId = onshapeId(body.documentId, "documents");
+    if (!documentId) return c.json({ error: "Enter the Onshape document's address or id." }, 400);
+    const mainAssemblyId = onshapeId(body.mainAssemblyId, "e");
+
+    const db = createShopDb(c.env.SHOP_DB);
+    const teamId = c.get("teamId");
+    const project = await liveProject(db, teamId, body.projectId);
+    if ("error" in project) return c.json({ error: project.error }, 400);
+    if (await followedDocument(db, teamId, documentId)) {
+      return c.json({ error: "Shop already follows that document." }, 409);
+    }
+
+    const document = await db
+      .insert(schema.onshapeDocuments)
+      .values(
+        withTeam(teamId, {
+          documentId,
+          mainAssemblyId,
+          projectId: project.id,
+          createdAt: Date.now(),
+        }),
+      )
+      .returning()
+      .get();
+    await logTeamChange(c.env, teamId, {
+      userId: c.get("userId"),
+      app: "shop",
+      what: `Added an Onshape document to ${project.name}`,
+    });
+    const config = await onshapeConfig(c.env, db, teamId);
+    const webhook = await replaceWebhook(c.env, db, teamId, config, document);
+    return c.json({ document: documentJson(document), webhook }, 201);
+  })
+  /** Changes a document's project or main assembly. Releases already in keep their project. */
+  .patch("/onshape/documents/:id", requireAdmin, documentValidator, async (c) => {
+    const body = c.req.valid("json");
+    const db = createShopDb(c.env.SHOP_DB);
+    const teamId = c.get("teamId");
+    const id = Number(c.req.param("id"));
+    const before = await db
+      .select()
+      .from(schema.onshapeDocuments)
+      .where(inTeam(schema.onshapeDocuments, teamId, eq(schema.onshapeDocuments.id, id)))
+      .get();
+    if (!before) return c.json({ error: "Shop doesn't follow that document." }, 404);
+
+    const set: { projectId?: number; mainAssemblyId?: string | null } = {};
+    const changed: string[] = [];
+    if (body.projectId !== undefined) {
+      const project = await liveProject(db, teamId, body.projectId);
+      if ("error" in project) return c.json({ error: project.error }, 400);
+      set.projectId = project.id;
+      if (project.id !== before.projectId) changed.push("Project");
+    }
+    if (body.mainAssemblyId !== undefined) {
+      set.mainAssemblyId = onshapeId(body.mainAssemblyId, "e");
+      if (set.mainAssemblyId !== before.mainAssemblyId) changed.push("Main assembly");
+    }
+    if (Object.keys(set).length === 0) return c.json({ error: "Nothing to change." }, 400);
+
+    const row = await db
+      .update(schema.onshapeDocuments)
+      .set(set)
+      .where(inTeam(schema.onshapeDocuments, teamId, eq(schema.onshapeDocuments.id, id)))
+      .returning()
+      .get();
+    if (changed.length > 0) {
+      await logTeamChange(c.env, teamId, {
+        userId: c.get("userId"),
+        app: "shop",
+        what: "An Onshape document",
+        changed,
+      });
+    }
+    return c.json(documentJson(row));
+  })
+  /** Stops following a document and takes Shop's webhook off it. Its releases stay. */
+  .delete("/onshape/documents/:id", requireAdmin, async (c) => {
+    const db = createShopDb(c.env.SHOP_DB);
+    const teamId = c.get("teamId");
+    const row = await db
+      .delete(schema.onshapeDocuments)
+      .where(
+        inTeam(
+          schema.onshapeDocuments,
+          teamId,
+          eq(schema.onshapeDocuments.id, Number(c.req.param("id"))),
+        ),
+      )
+      .returning()
+      .get();
+    if (!row) return c.json({ error: "Shop doesn't follow that document." }, 404);
+    const config = await onshapeConfig(c.env, db, teamId);
+    if (config.credentials) {
+      await unregisterOnShapeWebhooks(
+        row.documentId,
+        { db, teamId, credentials: config.credentials },
+        eventsUrl(c.env, teamId),
+      );
+    }
+    await logTeamChange(c.env, teamId, {
+      userId: c.get("userId"),
+      app: "shop",
+      what: "Removed an Onshape document",
+    });
+    return c.json({ ok: true });
   })
   .get("/chat/config", requireAdmin, async (c) => {
     const db = createShopDb(c.env.SHOP_DB);

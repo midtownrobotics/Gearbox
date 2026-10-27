@@ -3,6 +3,7 @@ import { newTeamId, teamUsers } from "@g3/testing/users";
 import { jsonAs } from "@g3/testing/worker";
 import { expect, it } from "vitest";
 import { eventually, onshapeEvent } from "./onshape";
+import { newProject } from "./projects";
 
 // Where the File Producer view sends someone who clicks a part name: the part in the team's own
 // Onshape document, and the release it came from. Nothing is stored, so both are built from the
@@ -29,8 +30,15 @@ async function teamWithRelease(elementType: number) {
   const key = `key-${tag}`;
   await jsonAs(team.admin, "/admin/onshape/config", {
     method: "POST",
-    body: { documentId: "doc-abc", webhookKeyPrimary: key },
+    body: { webhookKeyPrimary: key },
   });
+  const project = await newProject(team.admin);
+  await jsonAs(
+    team.admin,
+    "/admin/onshape/documents",
+    { method: "POST", body: { documentId: "doc-abc", projectId: project.id } },
+    201,
+  );
   const event = await onshapeEvent(team.teamId, key, {
     event: "onshape.revision.created",
     elementType,
@@ -77,12 +85,13 @@ async function storeRelease(
   releaseId: string,
   timestamp: string,
   parts: [string, string | null][],
+  projectId: number | null = null,
 ) {
   const release = await database
     .prepare(
-      "INSERT INTO onshape_releases (team_id, release_id, timestamp, created_at) VALUES (?, ?, ?, ?) RETURNING id",
+      "INSERT INTO onshape_releases (team_id, release_id, timestamp, created_at, project_id) VALUES (?, ?, ?, ?, ?) RETURNING id",
     )
-    .bind(teamId, releaseId, timestamp, Date.now())
+    .bind(teamId, releaseId, timestamp, Date.now(), projectId)
     .first<{ id: number }>();
   for (const [partNumber, revision] of parts) {
     await database
@@ -113,6 +122,29 @@ it("marks a part obsolete once a later release holds it at another revision", as
   expect(obsolete(releases[0])).toEqual({ PLATE: false, SHAFT: false });
   // The shaft was released again at the revision it already had, so that one still stands.
   expect(obsolete(releases[1])).toEqual({ PLATE: true, SHAFT: false, GUSSET: false });
+});
+
+it("only counts later releases of the same project", async () => {
+  const team = teamUsers(newTeamId());
+  const robot = await newProject(team.admin);
+  const practice = await newProject(team.admin);
+  await storeRelease(team.teamId, "robot", "2026-01-01T12:00:00.000Z", [["PLATE", "A"]], robot.id);
+  await storeRelease(
+    team.teamId,
+    "practice",
+    "2026-02-01T12:00:00.000Z",
+    [["PLATE", "B"]],
+    practice.id,
+  );
+
+  const { releases } = await jsonAs<{ releases: (Release & { projectId: number })[] }>(
+    team.student,
+    "/onshape/releases",
+  );
+  expect(releases.map((r) => [r.releaseId, r.projectId, r.parts[0].obsolete])).toEqual([
+    ["practice", practice.id, false],
+    ["robot", robot.id, false],
+  ]);
 });
 
 it("serves kiosk sessions, which are what the shop floor runs on", async () => {

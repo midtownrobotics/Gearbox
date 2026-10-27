@@ -1,11 +1,9 @@
-import { inTeam } from "@g3/auth";
-import { desc, eq } from "drizzle-orm";
 import type { createShopDb } from "../db";
-import * as schema from "../db/schema";
 import type { AppEnv } from "../types";
 import { drawingBarcodeValue, stampBarcode } from "./barcode";
 import { type OnshapeApi, onshapeFetch } from "./onshape-api";
 import { onshapeConfig } from "./onshape-config";
+import { latestReleasedPart } from "./onshape-documents";
 import { drawingKey } from "./storage";
 
 type ShopDb = ReturnType<typeof createShopDb>;
@@ -86,24 +84,19 @@ export async function getDrawingExportParams(
   api: OnshapeApi;
 }> {
   const config = await onshapeConfig(env, db, teamId);
-  const documentId = config.documentId;
-  if (!documentId) {
-    throw new Error("Document ID not configured in database");
-  }
   if (!config.credentials) {
     throw new Error("OnShape API credentials not configured");
   }
 
-  // Get part info from database (most recent)
-  const part = await db
-    .select()
-    .from(schema.onshapeParts)
-    .where(inTeam(schema.onshapeParts, teamId, eq(schema.onshapeParts.partNumber, partNumber)))
-    .orderBy(desc(schema.onshapeParts.createdAt))
-    .get();
+  // The most recent release of the part, in the document it came from.
+  const part = await latestReleasedPart(db, teamId, partNumber);
 
   if (!part) {
     throw new Error(`Part not found: ${partNumber}`);
+  }
+  const { documentId } = part;
+  if (!documentId) {
+    throw new Error(`The Onshape document of ${partNumber} isn't known`);
   }
 
   if (!part.partDrawingEntityId) {

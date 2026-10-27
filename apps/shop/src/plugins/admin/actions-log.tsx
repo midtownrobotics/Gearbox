@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { fetchActions } from "../../shared/getters";
 import { processPath } from "../../shared/nav";
+import { ProjectFilter, subsystemProjects, useProjectFilter } from "../../shared/projects";
 import type { Action } from "../../shared/types";
 import type { ShopData } from "../../shared/use-shop-data";
 import { useUserNames } from "../../shared/use-user-names";
@@ -46,6 +47,9 @@ export function ActionsLog({ data }: { data: ShopData }) {
     () => new Map(data.processes.map((p) => [p.id, p])),
     [data.processes],
   );
+  const projectOf = useMemo(() => subsystemProjects(data.subsystems), [data.subsystems]);
+  const projectFilter = useProjectFilter();
+  const { projectId } = projectFilter;
 
   const rows = useMemo(() => {
     return (actions ?? []).map((a) => {
@@ -62,10 +66,11 @@ export function ActionsLog({ data }: { data: ShopData }) {
         // Its details view, unless the part has since been deleted or made obsolete.
         opens: !!instance && !instance.isStale && !!definition && !definition.isObsolete,
         definitionId: definition?.id ?? null,
+        projectId: definition ? (projectOf.get(definition.subsystemId) ?? null) : null,
         processName: processById.get(a.processId)?.name ?? `Process #${a.processId}`,
       };
     });
-  }, [actions, instById, defById, processById, resolveName]);
+  }, [actions, instById, defById, processById, resolveName, projectOf]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -73,6 +78,7 @@ export function ActionsLog({ data }: { data: ShopData }) {
     const to = toDate ? new Date(`${toDate}T23:59:59.999`).getTime() : null;
 
     const result = rows.filter((r) => {
+      if (projectId !== null && r.projectId !== projectId) return false;
       if (userFilter !== "all" && r.action.userId !== userFilter) return false;
       if (partFilter !== "all" && String(r.definitionId) !== partFilter) return false;
       if (processFilter !== "all" && String(r.action.processId) !== processFilter) return false;
@@ -102,7 +108,18 @@ export function ActionsLog({ data }: { data: ShopData }) {
       }
     });
     return result;
-  }, [rows, search, userFilter, partFilter, processFilter, fromDate, toDate, sortKey, sortDir]);
+  }, [
+    rows,
+    search,
+    projectId,
+    userFilter,
+    partFilter,
+    processFilter,
+    fromDate,
+    toDate,
+    sortKey,
+    sortDir,
+  ]);
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) {
@@ -142,6 +159,7 @@ export function ActionsLog({ data }: { data: ShopData }) {
           onChange={(e) => setSearch(e.target.value)}
           className="flex-1 min-w-40"
         />
+        <ProjectFilter filter={projectFilter} />
         <select
           value={userFilter}
           onChange={(e) => setUserFilter(e.target.value)}
@@ -160,11 +178,13 @@ export function ActionsLog({ data }: { data: ShopData }) {
           className={selectClass}
         >
           <option value="all">All parts</option>
-          {data.definitions.map((d) => (
-            <option key={d.id} value={String(d.id)}>
-              {d.name}
-            </option>
-          ))}
+          {data.definitions
+            .filter((d) => projectId === null || projectOf.get(d.subsystemId) === projectId)
+            .map((d) => (
+              <option key={d.id} value={String(d.id)}>
+                {d.name}
+              </option>
+            ))}
         </select>
         <select
           value={processFilter}

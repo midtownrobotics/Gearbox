@@ -21,7 +21,8 @@ import { api } from "../../shared/api";
 import { getErrorMessage } from "../../shared/api-error";
 import { partInfoRequiredBy, pipelineFileError } from "../../shared/derive";
 import { onshapeLinkFor, onshapeReleaseLink, useOnshapeLinks } from "../../shared/onshape-links";
-import type { Process, Subsystem } from "../../shared/types";
+import { ProjectFilter, projectName, useProjectFilter } from "../../shared/projects";
+import type { Process, Project, Subsystem } from "../../shared/types";
 import { useAuthUser } from "../../shared/use-auth";
 import { useShopData } from "../../shared/use-shop-data";
 import { useTouchDevice } from "../../shared/use-touch";
@@ -41,13 +42,63 @@ type PendingPart = {
   description: string | null;
 };
 
-type PendingRelease = { id: number; releaseId: string; name: string | null; timestamp: string };
+type PendingRelease = {
+  id: number;
+  releaseId: string;
+  name: string | null;
+  timestamp: string;
+  /** The project of the document it came from; null when that isn't known. */
+  projectId: number | null;
+};
 
 type PendingPartsData = {
   parts: PendingPart[];
   releases: PendingRelease[];
   subsystems: Subsystem[];
+  projects: Project[];
 };
+
+/** Where a pending part's choices are kept: two projects may both have a part number waiting. */
+const pendingKey = (part: PendingPart) => `${part.releaseId ?? ""}:${part.partNumber}`;
+
+/** The project a pending part goes to: its release's, or null for any. */
+const pendingProject = (data: PendingPartsData, part: PendingPart) =>
+  data.releases.find((r) => r.id === part.releaseId)?.projectId ?? null;
+
+/** The subsystems a pending part may go under: its project's, or every one, grouped by project. */
+function SubsystemOptions({ data, part }: { data: PendingPartsData; part: PendingPart }) {
+  const project = pendingProject(data, part);
+  if (project !== null) {
+    return (
+      <>
+        {data.subsystems
+          .filter((s) => s.projectId === project)
+          .map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+            </option>
+          ))}
+      </>
+    );
+  }
+  return (
+    <>
+      {data.projects.map((p) => {
+        const subsystems = data.subsystems.filter((s) => s.projectId === p.id);
+        if (subsystems.length === 0) return null;
+        return (
+          <optgroup key={p.id} label={p.name}>
+            {subsystems.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </optgroup>
+        );
+      })}
+    </>
+  );
+}
 
 /**
  * Parts grouped by the release they came from: newest release first, parts by number within it,
@@ -100,10 +151,13 @@ const INGEST_COLUMNS = 9;
  */
 function ReleaseHeader({
   release,
+  project,
   count,
   onshape,
 }: {
   release?: PendingRelease;
+  /** Its project's name, while the team has more than one. */
+  project: string | null;
   count: number;
   onshape: string | null;
 }) {
@@ -123,6 +177,7 @@ function ReleaseHeader({
           ) : (
             <span className="font-semibold text-secondary-500">Not from a release</span>
           )}
+          {project && <Badge>{project}</Badge>}
           {release && (
             <span className="text-xs text-secondary-400">
               Released{" "}
@@ -183,7 +238,7 @@ function DrawingStatusCell({
 }) {
   const [drawingExists, setDrawingExists] = useState(false);
   const [checking, setChecking] = useState(true);
-  const revision = localPartData[part.partNumber]?.revision ?? part.revision;
+  const revision = localPartData[pendingKey(part)]?.revision ?? part.revision;
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: dependencies captured via closure
   useEffect(() => {
@@ -435,15 +490,16 @@ export function IngestPartsPage() {
   const [currentIndex, setCurrentIndex] = useState<number | null>(null);
   const [deletingPartNumber, setDeletingPartNumber] = useState<string | null>(null);
   const [localPartData, setLocalPartData] = useState<Record<string, LocalPartData>>({});
+  const projectFilter = useProjectFilter();
 
   /** Merges edits into one part's local ingest data. */
-  function updateLocal(partNumber: string, patch: Partial<LocalPartData>) {
+  function updateLocal(key: string, patch: Partial<LocalPartData>) {
     setLocalPartData((prev) => ({
       ...prev,
-      [partNumber]: {
-        ...prev[partNumber],
-        subsystemId: prev[partNumber]?.subsystemId ?? 0,
-        processIds: prev[partNumber]?.processIds ?? [],
+      [key]: {
+        ...prev[key],
+        subsystemId: prev[key]?.subsystemId ?? 0,
+        processIds: prev[key]?.processIds ?? [],
         ...patch,
       },
     }));
@@ -627,6 +683,17 @@ export function IngestPartsPage() {
     </p>
   ) : null;
 
+  // The parts in the chosen project, each with its place in the whole list (which the detail view
+  // goes through). A part whose project isn't known shows under every project.
+  const shownParts = pendingData.parts.flatMap((part, idx) => {
+    const project = pendingProject(pendingData, part);
+    return projectFilter.projectId === null ||
+      project === null ||
+      project === projectFilter.projectId
+      ? [{ part, idx }]
+      : [];
+  });
+
   // If currentIndex is null, show list view; otherwise show detail view
   if (currentIndex === null) {
     return (
@@ -634,7 +701,12 @@ export function IngestPartsPage() {
         title="Ingest"
         description="Give each released part its subsystem and processes, then ingest them."
         width="full"
-        actions={sampleRelease || undefined}
+        actions={
+          <>
+            <ProjectFilter filter={projectFilter} />
+            {sampleRelease}
+          </>
+        }
       >
         <>
           {qualityNote}
@@ -667,11 +739,23 @@ export function IngestPartsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-secondary-200">
-                  {pendingData.parts.map((part, idx) => (
+                  {shownParts.length === 0 && (
+                    <tr>
+                      <td colSpan={INGEST_COLUMNS} className="px-4 py-6 text-secondary-500">
+                        No parts are waiting in this project.
+                      </td>
+                    </tr>
+                  )}
+                  {shownParts.map(({ part, idx }, at) => (
                     <Fragment key={`${part.onshapeReleaseId}-${part.partNumber}`}>
-                      {(idx === 0 || pendingData.parts[idx - 1]?.releaseId !== part.releaseId) && (
+                      {(at === 0 || shownParts[at - 1]?.part.releaseId !== part.releaseId) && (
                         <ReleaseHeader
                           release={pendingData.releases.find((r) => r.id === part.releaseId)}
+                          project={
+                            projectFilter.show
+                              ? projectName(pendingData.projects, pendingProject(pendingData, part))
+                              : null
+                          }
                           count={
                             pendingData.parts.filter((p) => p.releaseId === part.releaseId).length
                           }
@@ -683,11 +767,11 @@ export function IngestPartsPage() {
                           {part.partNumber}
                         </td>
                         <td className="px-4 py-3 text-secondary-400 text-xs">
-                          {(localPartData[part.partNumber]?.revision ?? part.revision) || "—"}
+                          {(localPartData[pendingKey(part)]?.revision ?? part.revision) || "—"}
                         </td>
                         <td className="px-4 py-3 text-xs max-w-xs">
                           <IngestPartName
-                            name={(localPartData[part.partNumber]?.name ?? part.name) || null}
+                            name={(localPartData[pendingKey(part)]?.name ?? part.name) || null}
                             part={
                               onshapeLinkFor(onshapeLinks, part.partNumber, part.revision)?.part ??
                               null
@@ -700,21 +784,21 @@ export function IngestPartsPage() {
                             typeable
                             inputMode="numeric"
                             value={
-                              localPartData[part.partNumber]?.quantity === null
+                              localPartData[pendingKey(part)]?.quantity === null
                                 ? ""
-                                : (localPartData[part.partNumber]?.quantity ?? part.quantity ?? "")
+                                : (localPartData[pendingKey(part)]?.quantity ?? part.quantity ?? "")
                             }
                             onChange={(e) => {
                               const val = e.target.value;
                               if (val === "" || /^\d+$/.test(val)) {
                                 setLocalPartData({
                                   ...localPartData,
-                                  [part.partNumber]: {
-                                    ...localPartData[part.partNumber],
-                                    subsystemId: localPartData[part.partNumber]?.subsystemId || 0,
-                                    processIds: localPartData[part.partNumber]?.processIds || [],
-                                    revision: localPartData[part.partNumber]?.revision,
-                                    name: localPartData[part.partNumber]?.name,
+                                  [pendingKey(part)]: {
+                                    ...localPartData[pendingKey(part)],
+                                    subsystemId: localPartData[pendingKey(part)]?.subsystemId || 0,
+                                    processIds: localPartData[pendingKey(part)]?.processIds || [],
+                                    revision: localPartData[pendingKey(part)]?.revision,
+                                    name: localPartData[pendingKey(part)]?.name,
                                     quantity: val === "" ? null : Number(val),
                                   },
                                 });
@@ -724,12 +808,12 @@ export function IngestPartsPage() {
                               if (e.target.value === "") {
                                 setLocalPartData({
                                   ...localPartData,
-                                  [part.partNumber]: {
-                                    ...localPartData[part.partNumber],
-                                    subsystemId: localPartData[part.partNumber]?.subsystemId || 0,
-                                    processIds: localPartData[part.partNumber]?.processIds || [],
-                                    revision: localPartData[part.partNumber]?.revision,
-                                    name: localPartData[part.partNumber]?.name,
+                                  [pendingKey(part)]: {
+                                    ...localPartData[pendingKey(part)],
+                                    subsystemId: localPartData[pendingKey(part)]?.subsystemId || 0,
+                                    processIds: localPartData[pendingKey(part)]?.processIds || [],
+                                    revision: localPartData[pendingKey(part)]?.revision,
+                                    name: localPartData[pendingKey(part)]?.name,
                                     quantity: 1,
                                   },
                                 });
@@ -740,80 +824,76 @@ export function IngestPartsPage() {
                         </td>
                         <td className="px-4 py-3 text-secondary-400 text-xs">
                           <select
-                            value={localPartData[part.partNumber]?.subsystemId || 0}
+                            value={localPartData[pendingKey(part)]?.subsystemId || 0}
                             onChange={(e) =>
                               setLocalPartData({
                                 ...localPartData,
-                                [part.partNumber]: {
-                                  ...localPartData[part.partNumber],
+                                [pendingKey(part)]: {
+                                  ...localPartData[pendingKey(part)],
                                   subsystemId: Number(e.target.value),
-                                  processIds: localPartData[part.partNumber]?.processIds || [],
-                                  revision: localPartData[part.partNumber]?.revision,
-                                  name: localPartData[part.partNumber]?.name,
-                                  quantity: localPartData[part.partNumber]?.quantity,
+                                  processIds: localPartData[pendingKey(part)]?.processIds || [],
+                                  revision: localPartData[pendingKey(part)]?.revision,
+                                  name: localPartData[pendingKey(part)]?.name,
+                                  quantity: localPartData[pendingKey(part)]?.quantity,
                                 },
                               })
                             }
                             className="bg-surface border border-secondary-300 rounded px-2 py-1 text-xs text-secondary-900 focus:outline-none focus:border-primary-500"
                           >
                             <option value={0}>— Select —</option>
-                            {pendingData.subsystems.map((s) => (
-                              <option key={s.id} value={s.id}>
-                                {s.name}
-                              </option>
-                            ))}
+                            <SubsystemOptions data={pendingData} part={part} />
                           </select>
                         </td>
                         <td className="px-4 py-3 text-secondary-400 text-xs">
                           {data && (
                             <ProcessSelector
                               processes={pickable}
-                              selectedProcessIds={localPartData[part.partNumber]?.processIds || []}
+                              selectedProcessIds={localPartData[pendingKey(part)]?.processIds || []}
                               onAddProcess={(procId) => {
                                 setLocalPartData({
                                   ...localPartData,
-                                  [part.partNumber]: {
-                                    ...localPartData[part.partNumber],
-                                    subsystemId: localPartData[part.partNumber]?.subsystemId || 0,
+                                  [pendingKey(part)]: {
+                                    ...localPartData[pendingKey(part)],
+                                    subsystemId: localPartData[pendingKey(part)]?.subsystemId || 0,
                                     processIds: [
-                                      ...(localPartData[part.partNumber]?.processIds || []),
+                                      ...(localPartData[pendingKey(part)]?.processIds || []),
                                       procId,
                                     ],
-                                    revision: localPartData[part.partNumber]?.revision,
-                                    name: localPartData[part.partNumber]?.name,
-                                    quantity: localPartData[part.partNumber]?.quantity,
+                                    revision: localPartData[pendingKey(part)]?.revision,
+                                    name: localPartData[pendingKey(part)]?.name,
+                                    quantity: localPartData[pendingKey(part)]?.quantity,
                                   },
                                 });
                               }}
                               onReplaceProcess={(slotIdx, procId) => {
                                 const newProcessIds = [
-                                  ...(localPartData[part.partNumber]?.processIds || []),
+                                  ...(localPartData[pendingKey(part)]?.processIds || []),
                                 ];
                                 newProcessIds[slotIdx] = procId;
                                 setLocalPartData({
                                   ...localPartData,
-                                  [part.partNumber]: {
-                                    ...localPartData[part.partNumber],
-                                    subsystemId: localPartData[part.partNumber]?.subsystemId || 0,
+                                  [pendingKey(part)]: {
+                                    ...localPartData[pendingKey(part)],
+                                    subsystemId: localPartData[pendingKey(part)]?.subsystemId || 0,
                                     processIds: newProcessIds,
-                                    revision: localPartData[part.partNumber]?.revision,
-                                    name: localPartData[part.partNumber]?.name,
-                                    quantity: localPartData[part.partNumber]?.quantity,
+                                    revision: localPartData[pendingKey(part)]?.revision,
+                                    name: localPartData[pendingKey(part)]?.name,
+                                    quantity: localPartData[pendingKey(part)]?.quantity,
                                   },
                                 });
                               }}
                               onRemoveProcess={(idx) => {
                                 setLocalPartData({
                                   ...localPartData,
-                                  [part.partNumber]: {
-                                    ...localPartData[part.partNumber],
-                                    subsystemId: localPartData[part.partNumber]?.subsystemId || 0,
-                                    processIds: localPartData[part.partNumber].processIds.filter(
+                                  [pendingKey(part)]: {
+                                    ...localPartData[pendingKey(part)],
+                                    subsystemId: localPartData[pendingKey(part)]?.subsystemId || 0,
+                                    processIds: localPartData[pendingKey(part)].processIds.filter(
                                       (_, i) => i !== idx,
                                     ),
-                                    revision: localPartData[part.partNumber]?.revision,
-                                    name: localPartData[part.partNumber]?.name,
-                                    quantity: localPartData[part.partNumber]?.quantity,
+                                    revision: localPartData[pendingKey(part)]?.revision,
+                                    name: localPartData[pendingKey(part)]?.name,
+                                    quantity: localPartData[pendingKey(part)]?.quantity,
                                   },
                                 });
                               }}
@@ -823,7 +903,7 @@ export function IngestPartsPage() {
                           {data &&
                             (() => {
                               const fileError = pipelineFileError(
-                                localPartData[part.partNumber]?.processIds ?? [],
+                                localPartData[pendingKey(part)]?.processIds ?? [],
                                 data.processes,
                               );
                               return fileError ? (
@@ -834,16 +914,16 @@ export function IngestPartsPage() {
                         <td className="px-4 py-3 text-secondary-400 text-xs">
                           {data &&
                           partInfoRequiredBy(
-                            localPartData[part.partNumber]?.processIds ?? [],
+                            localPartData[pendingKey(part)]?.processIds ?? [],
                             data.processes,
                           ).length > 0 ? (
                             <div className="flex gap-1.5">
                               <TextField
                                 variant="plain"
                                 kind="material"
-                                value={localPartData[part.partNumber]?.material ?? ""}
+                                value={localPartData[pendingKey(part)]?.material ?? ""}
                                 onChange={(e) =>
-                                  updateLocal(part.partNumber, { material: e.target.value })
+                                  updateLocal(pendingKey(part), { material: e.target.value })
                                 }
                                 placeholder="Material"
                                 aria-label={`Material for ${part.partNumber}`}
@@ -852,9 +932,9 @@ export function IngestPartsPage() {
                               <TextField
                                 variant="plain"
                                 kind="size"
-                                value={localPartData[part.partNumber]?.thickness ?? ""}
+                                value={localPartData[pendingKey(part)]?.thickness ?? ""}
                                 onChange={(e) =>
-                                  updateLocal(part.partNumber, { thickness: e.target.value })
+                                  updateLocal(pendingKey(part), { thickness: e.target.value })
                                 }
                                 placeholder='0.25"'
                                 aria-label={`Thickness for ${part.partNumber}`}
@@ -898,8 +978,9 @@ export function IngestPartsPage() {
               <Button
                 disabled={
                   ingestingAll ||
-                  !pendingData.parts.every((p) => {
-                    const partData = localPartData[p.partNumber];
+                  shownParts.length === 0 ||
+                  !shownParts.every(({ part: p }) => {
+                    const partData = localPartData[pendingKey(p)];
                     const revision = partData?.revision ?? p.revision;
                     const name = partData?.name ?? p.name;
                     const infoOk =
@@ -914,8 +995,8 @@ export function IngestPartsPage() {
                 onClick={async () => {
                   setIngestingAll(true);
                   try {
-                    for (const part of pendingData.parts) {
-                      const partData = localPartData[part.partNumber];
+                    for (const { part } of shownParts) {
+                      const partData = localPartData[pendingKey(part)];
                       if (!partData?.subsystemId) continue;
 
                       const quantity = partData.quantity ?? part.quantity ?? 1;
@@ -979,11 +1060,11 @@ export function IngestPartsPage() {
                 partNumber={pendingData.parts[editingProcessPartIdx]?.partNumber}
                 processes={pickable}
                 selectedProcessIds={
-                  localPartData[pendingData.parts[editingProcessPartIdx].partNumber]?.processIds ||
+                  localPartData[pendingKey(pendingData.parts[editingProcessPartIdx])]?.processIds ||
                   []
                 }
                 onAddProcess={(procId) => {
-                  const partNum = pendingData.parts[editingProcessPartIdx].partNumber;
+                  const partNum = pendingKey(pendingData.parts[editingProcessPartIdx]);
                   setLocalPartData({
                     ...localPartData,
                     [partNum]: {
@@ -997,7 +1078,7 @@ export function IngestPartsPage() {
                   });
                 }}
                 onRemoveProcess={(idx) => {
-                  const partNum = pendingData.parts[editingProcessPartIdx].partNumber;
+                  const partNum = pendingKey(pendingData.parts[editingProcessPartIdx]);
                   setLocalPartData({
                     ...localPartData,
                     [partNum]: {
@@ -1046,13 +1127,13 @@ export function IngestPartsPage() {
         {data && (
           <PartIngestCard
             part={currentPart}
-            subsystems={pendingData.subsystems}
+            pending={pendingData}
             processes={pickable}
-            localPartData={localPartData[currentPart.partNumber]}
-            onUpdateLocalPartData={(partData) => updateLocal(currentPart.partNumber, partData)}
+            localPartData={localPartData[pendingKey(currentPart)]}
+            onUpdateLocalPartData={(partData) => updateLocal(pendingKey(currentPart), partData)}
             onRemoveFromLocal={() => {
               const newLocalData = { ...localPartData };
-              delete newLocalData[currentPart.partNumber];
+              delete newLocalData[pendingKey(currentPart)];
               setLocalPartData(newLocalData);
             }}
             onNext={() => {
@@ -1075,7 +1156,7 @@ export function IngestPartsPage() {
 
 function PartIngestCard({
   part,
-  subsystems,
+  pending,
   processes,
   localPartData,
   onUpdateLocalPartData,
@@ -1086,7 +1167,8 @@ function PartIngestCard({
   onBack,
 }: {
   part: PendingPart;
-  subsystems: Subsystem[];
+  /** Everything pending: the part's subsystem choices come from its release's project. */
+  pending: PendingPartsData;
   processes: Process[];
   localPartData?: LocalPartData;
   onUpdateLocalPartData: (partData: Partial<LocalPartData>) => void;
@@ -1120,28 +1202,16 @@ function PartIngestCard({
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
   const [banner, setBanner] = useState<string | null>(null);
-  const [documentId, setDocumentId] = useState<string | null>(null);
+  const onshapePart =
+    onshapeLinkFor(useOnshapeLinks(), part.partNumber, part.revision)?.part ?? null;
   const [existingRevisions, setExistingRevisions] = useState<string[]>([]);
   const [showDuplicateConfirm, setShowDuplicateConfirm] = useState(false);
   const [checkingDrawing, setCheckingDrawing] = useState(true);
 
-  // Load document ID and check if drawing exists
+  // Check if drawing exists
   useEffect(() => {
-    loadDocumentId();
     checkIfDrawingExists();
   }, []);
-
-  async function loadDocumentId() {
-    try {
-      const res = await api.admin.onshape.config.$get();
-      if (res.ok) {
-        const config = (await res.json()) as { documentId: string };
-        setDocumentId(config.documentId);
-      }
-    } catch (err) {
-      console.error("Failed to load document ID");
-    }
-  }
 
   async function checkIfDrawingExists() {
     try {
@@ -1372,9 +1442,9 @@ function PartIngestCard({
       <div className="pb-2 border-b border-secondary-200 space-y-2">
         <h3 className="font-sans font-semibold text-secondary-900">{part.partNumber}</h3>
         <p className="text-xs text-secondary-500">From Onshape release {part.onshapeReleaseId}</p>
-        {documentId && part.entityId && part.versionId && (
+        {onshapePart && (
           <a
-            href={`https://cad.onshape.com/documents/${documentId}/v/${part.versionId}/e/${part.entityId}`}
+            href={onshapePart}
             target="_blank"
             rel="noopener noreferrer"
             className="text-xs text-primary-600 hover:text-primary-700 underline"
@@ -1429,11 +1499,7 @@ function PartIngestCard({
             className={inputClass}
           >
             <option value={0}>Select…</option>
-            {subsystems.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
+            <SubsystemOptions data={pending} part={part} />
           </select>
         </Field>
         <LabeledText

@@ -13,11 +13,18 @@ import type {
   PartInstance,
   PartInstanceProcess,
   Process,
+  Project,
   QualityAnswer,
   QualityReport,
   QualitySuspect,
   Subsystem,
 } from "./types";
+
+export async function fetchProjects(): Promise<Project[]> {
+  const res = await api.projects.$get();
+  if (!res.ok) throw new Error(`Failed to fetch projects (${res.status})`);
+  return res.json() as Promise<Project[]>;
+}
 
 export async function fetchSubsystems(): Promise<Subsystem[]> {
   const res = await api.subsystems.$get();

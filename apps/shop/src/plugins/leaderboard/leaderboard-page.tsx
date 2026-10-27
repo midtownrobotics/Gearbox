@@ -1,7 +1,9 @@
 import { ErrorBanner, Loading, Page } from "@g3/ui";
 import { useEffect, useMemo, useState } from "react";
 import { fetchActions } from "../../shared/getters";
+import { ProjectFilter, useDataInProject, useProjectFilter } from "../../shared/projects";
 import type { Action } from "../../shared/types";
+import { useShopData } from "../../shared/use-shop-data";
 import { useUserNames } from "../../shared/use-user-names";
 
 const MEDALS: Record<number, { emoji: string; ring: string }> = {
@@ -13,6 +15,10 @@ const MEDALS: Record<number, { emoji: string; ring: string }> = {
 export function LeaderboardPage() {
   const [actions, setActions] = useState<Action[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // With a project chosen, only the parts made for it count.
+  const projectFilter = useProjectFilter();
+  const { data } = useShopData();
+  const projectData = useDataInProject(data, projectFilter.projectId);
 
   useEffect(() => {
     fetchActions()
@@ -21,15 +27,20 @@ export function LeaderboardPage() {
   }, []);
 
   const standings = useMemo(() => {
+    const inProject =
+      projectFilter.projectId === null || !projectData
+        ? null
+        : new Set(projectData.instances.map((i) => i.id));
     const counts = new Map<string, number>();
     for (const a of actions ?? []) {
       if (a.action !== "completed") continue;
+      if (inProject && !inProject.has(a.partInstanceId)) continue;
       counts.set(a.userId, (counts.get(a.userId) ?? 0) + 1);
     }
     return [...counts.entries()]
       .map(([userId, completed]) => ({ userId, completed }))
       .sort((a, b) => b.completed - a.completed);
-  }, [actions]);
+  }, [actions, projectData, projectFilter.projectId]);
 
   const resolveName = useUserNames(standings.map((s) => s.userId));
 
@@ -41,7 +52,12 @@ export function LeaderboardPage() {
     );
 
   return (
-    <Page title="Leaderboard" description="Ranked by parts marked complete." width="narrow">
+    <Page
+      title="Leaderboard"
+      description="Ranked by parts marked complete."
+      width="narrow"
+      actions={<ProjectFilter filter={projectFilter} />}
+    >
       {standings.length === 0 ? (
         <p className="text-secondary-500 text-sm">
           No parts completed yet. Finish a part on the shop floor to get on the board.

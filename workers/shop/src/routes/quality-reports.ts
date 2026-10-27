@@ -13,7 +13,9 @@ import {
   partInstanceProcesses,
   partInstances,
   processes,
+  projects,
   qualityReports,
+  subsystems,
 } from "../db/schema";
 import { canQualityCheck, qualityReportsOn } from "../lib/quality";
 import { MAX_CHECKLIST_ITEMS, checklistFor } from "../lib/quality-checklist";
@@ -259,12 +261,18 @@ export const qualityReportsRouter = new Hono<AppEnv>()
     if (process.type !== "quality_control") {
       return c.json({ error: `${process.name} isn't a Quality Control process.` }, 400);
     }
-    const definition = await db
-      .select()
+    const found = await db
+      .select({ definition: partDefinitions, projectId: projects.id, projectName: projects.name })
       .from(partDefinitions)
+      .leftJoin(
+        subsystems,
+        inTeam(subsystems, teamId, eq(subsystems.id, partDefinitions.subsystemId)),
+      )
+      .leftJoin(projects, inTeam(projects, teamId, eq(projects.id, subsystems.projectId)))
       .where(inTeam(partDefinitions, teamId, eq(partDefinitions.id, instance.partDefinitionId)))
       .get();
-    if (!definition) return c.json({ error: "Part not found." }, 404);
+    if (!found) return c.json({ error: "Part not found." }, 404);
+    const { definition } = found;
 
     const steps = await stepsOf(db, teamId, instance.id);
     const step = steps.find(
@@ -335,6 +343,8 @@ export const qualityReportsRouter = new Hono<AppEnv>()
           instanceNumber: instance.instanceNumber,
           processId: process.id,
           processName: process.name,
+          projectId: found.projectId,
+          projectName: found.projectName,
           reportedBy: c.get("userId"),
           createdAt: now,
           checks: body.checks,

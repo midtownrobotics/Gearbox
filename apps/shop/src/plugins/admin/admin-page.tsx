@@ -23,10 +23,12 @@ import { getErrorMessage } from "../../shared/api-error";
 import { InfoTip } from "../../shared/info-tip";
 import { enableKioskMode } from "../../shared/kiosk";
 import { refreshOnshapeStatus } from "../../shared/onshape-banner";
+import { refreshProjects, subsystemProjects } from "../../shared/projects";
 import {
   PROCESS_TYPE_LABELS,
   type Process,
   type ProcessType,
+  type Project,
   type Removal,
   type Usage,
 } from "../../shared/types";
@@ -51,24 +53,37 @@ export function AdminPage() {
   const [done, setDone] = useState<string | null>(null);
   const [deletingObsolete, setDeletingObsolete] = useState(false);
 
+  const [newProject, setNewProject] = useState("");
   const [newSubsystem, setNewSubsystem] = useState("");
+  const [newSubsystemProject, setNewSubsystemProject] = useState(0);
   const [newProcess, setNewProcess] = useState("");
   const [newProcessType, setNewProcessType] = useState<ProcessType>("regular");
   const [newProcessNeedsInfo, setNewProcessNeedsInfo] = useState(false);
 
-  // How many parts use each subsystem and process, so Remove can say what it will do.
+  const projects = data?.projects ?? [];
+  const liveProjects = projects.filter((p) => p.archivedAt === null);
+  const projectOfSubsystem = subsystemProjects(data?.subsystems ?? []);
+  // A new subsystem goes in the project chosen, or the only one there is.
+  const subsystemProject =
+    liveProjects.find((p) => p.id === newSubsystemProject)?.id ??
+    (liveProjects.length === 1 ? liveProjects[0].id : 0);
+
+  // How many parts use each project, subsystem and process, so Remove can say what it will do.
   const [usage, setUsage] = useState<{
+    projects: Record<string, Usage>;
     subsystems: Record<string, Usage>;
     processes: Record<string, Usage>;
   } | null>(null);
   const loadUsage = useCallback(async () => {
     if (!isAdmin) return;
-    const [subsystems, processes] = await Promise.all([
+    const [projects, subsystems, processes] = await Promise.all([
+      api.projects.usage.$get(),
       api.subsystems.usage.$get(),
       api.processes.usage.$get(),
     ]);
-    if (!subsystems.ok || !processes.ok) return;
+    if (!projects.ok || !subsystems.ok || !processes.ok) return;
     setUsage({
+      projects: (await projects.json()) as Record<string, Usage>,
       subsystems: (await subsystems.json()) as Record<string, Usage>,
       processes: (await processes.json()) as Record<string, Usage>,
     });
@@ -77,12 +92,17 @@ export function AdminPage() {
     void loadUsage();
   }, [loadUsage]);
 
-  async function removeItem(kind: "subsystem" | "process", id: number) {
+  /** Loads everything a project change shows up in: the shop's data and every project filter. */
+  const refreshAll = () => Promise.all([refresh(), refreshProjects()]);
+
+  async function removeItem(kind: "project" | "subsystem" | "process", id: number) {
     const param = { id: String(id) };
     const res =
-      kind === "subsystem"
-        ? await api.subsystems[":id"].$delete({ param })
-        : await api.processes[":id"].$delete({ param });
+      kind === "project"
+        ? await api.projects[":id"].$delete({ param })
+        : kind === "subsystem"
+          ? await api.subsystems[":id"].$delete({ param })
+          : await api.processes[":id"].$delete({ param });
     if (!res.ok) {
       setDone(null);
       setBanner(await getErrorMessage(res as unknown as Response));
@@ -95,15 +115,17 @@ export function AdminPage() {
         ? `Deleted ${removed.name}.`
         : `Removed ${removed.name}: it's hidden from new parts.`,
     );
-    await Promise.all([refresh(), loadUsage()]);
+    await Promise.all([refreshAll(), loadUsage()]);
   }
 
-  async function restoreItem(kind: "subsystem" | "process", id: number) {
+  async function restoreItem(kind: "project" | "subsystem" | "process", id: number) {
     const param = { id: String(id) };
     const res =
-      kind === "subsystem"
-        ? await api.subsystems[":id"].restore.$post({ param })
-        : await api.processes[":id"].restore.$post({ param });
+      kind === "project"
+        ? await api.projects[":id"].restore.$post({ param })
+        : kind === "subsystem"
+          ? await api.subsystems[":id"].restore.$post({ param })
+          : await api.processes[":id"].restore.$post({ param });
     if (!res.ok) {
       setDone(null);
       setBanner(await getErrorMessage(res as unknown as Response));
@@ -112,19 +134,49 @@ export function AdminPage() {
     const restored = (await res.json()) as { name: string };
     setBanner(null);
     setDone(`Restored ${restored.name}.`);
-    await refresh();
+    await refreshAll();
+  }
+
+  async function addProject() {
+    if (!newProject.trim()) return;
+    const res = await api.projects.$post({ json: { name: newProject.trim() } });
+    if (!res.ok) {
+      setBanner(await getErrorMessage(res as unknown as Response));
+      return;
+    }
+    setNewProject("");
+    setBanner(null);
+    await Promise.all([refreshAll(), loadUsage()]);
+  }
+
+  async function renameProject(id: number, name: string) {
+    const res = await api.projects[":id"].$patch({ param: { id: String(id) }, json: { name } });
+    if (!res.ok) {
+      setDone(null);
+      setBanner(await getErrorMessage(res as unknown as Response));
+      return false;
+    }
+    setBanner(null);
+    await refreshAll();
+    return true;
   }
 
   async function addSubsystem() {
     if (!newSubsystem.trim()) return;
-    const res = await api.subsystems.$post({ json: { name: newSubsystem.trim() } });
+    if (!subsystemProject) {
+      setBanner("Choose the project the subsystem is for.");
+      return;
+    }
+    const res = await api.subsystems.$post({
+      json: { name: newSubsystem.trim(), projectId: subsystemProject },
+    });
     if (!res.ok) {
       setBanner(await getErrorMessage(res as unknown as Response));
       return;
     }
     setNewSubsystem("");
     setBanner(null);
-    await refresh();
+    await Promise.all([refresh(), loadUsage()]);
   }
 
   async function addProcess() {
@@ -214,6 +266,20 @@ export function AdminPage() {
         <Section title="Shop Settings" defaultOpen={false}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <NameList
+              title="Projects"
+              hint="What your parts are made for, such as a robot. Each Onshape document and each subsystem belongs to one."
+              items={projects}
+              draft={newProject}
+              setDraft={setNewProject}
+              onAdd={addProject}
+              placeholder="New project"
+              isAdmin={isAdmin}
+              usage={usage?.projects}
+              onRemove={(id) => removeItem("project", id)}
+              onRestore={(id) => restoreItem("project", id)}
+              onRename={renameProject}
+            />
+            <NameList
               title="Subsystems"
               items={data?.subsystems ?? []}
               draft={newSubsystem}
@@ -224,6 +290,26 @@ export function AdminPage() {
               usage={usage?.subsystems}
               onRemove={(id) => removeItem("subsystem", id)}
               onRestore={(id) => restoreItem("subsystem", id)}
+              groups={projects.length > 1 ? projects : undefined}
+              groupOf={(item) => projectOfSubsystem.get(item.id) ?? 0}
+              addControl={
+                liveProjects.length > 1 && (
+                  <select
+                    aria-label="Project"
+                    value={subsystemProject}
+                    onChange={(e) => setNewSubsystemProject(Number(e.target.value))}
+                    className={`${inputClass} !w-auto max-w-[45%]`}
+                  >
+                    <option value={0}>Project…</option>
+                    {liveProjects.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                )
+              }
+              emptyHint={isAdmin && liveProjects.length === 0 ? "Add a project first." : undefined}
             />
             <ProcessList
               processes={(data?.processes ?? []).map((p) => {
@@ -293,7 +379,7 @@ export function AdminPage() {
         {/* Section 6: Onshape */}
         {isAdmin && (
           <Section title="Onshape Configuration" defaultOpen={false}>
-            {data ? <OnShapeConfig /> : <Loading />}
+            {data ? <OnShapeConfig projects={projects} /> : <Loading />}
           </Section>
         )}
 
@@ -744,6 +830,7 @@ function ItemRow({
   blocked,
   onRemove,
   onRestore,
+  onRename,
   children,
 }: {
   name: string;
@@ -753,10 +840,46 @@ function ItemRow({
   blocked?: string | null;
   onRemove: () => void;
   onRestore: () => void;
+  /** Renames it; resolves to whether it was saved. Without it there's no Rename. */
+  onRename?: (name: string) => Promise<boolean>;
   /** Its own controls, shown while it isn't removed. */
   children?: React.ReactNode;
 }) {
   const [asking, setAsking] = useState(false);
+  const [renaming, setRenaming] = useState<string | null>(null);
+
+  async function saveName() {
+    if (renaming === null) return;
+    const next = renaming.trim();
+    if (!next || next === name || (onRename && (await onRename(next)))) setRenaming(null);
+  }
+
+  if (renaming !== null) {
+    return (
+      <div className="flex flex-wrap items-center gap-2 bg-page border border-secondary-200 rounded-lg px-3.5 py-2 text-sm">
+        <TextField
+          kind="label"
+          variant="compact"
+          aria-label={`New name for ${name}`}
+          value={renaming}
+          autoFocus
+          onChange={(e) => setRenaming(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") void saveName();
+            if (e.key === "Escape") setRenaming(null);
+          }}
+          className="flex-1 min-w-0"
+        />
+        <Button size="sm" onClick={() => void saveName()}>
+          Save
+        </Button>
+        <Button variant="secondary" size="sm" onClick={() => setRenaming(null)}>
+          Cancel
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-wrap items-center gap-2 bg-page border border-secondary-200 rounded-lg px-3.5 py-2 text-sm text-secondary-900">
       <span
@@ -766,6 +889,11 @@ function ItemRow({
         {name}
       </span>
       {archived ? <Badge>Removed</Badge> : children}
+      {isAdmin && onRename && !archived && !asking && (
+        <Button variant="secondary" size="sm" onClick={() => setRenaming(name)}>
+          Rename
+        </Button>
+      )}
       {isAdmin &&
         (archived ? (
           <Button variant="secondary" size="sm" onClick={onRestore}>
@@ -802,8 +930,11 @@ function ItemRow({
   );
 }
 
+type Named = { id: number; name: string; archivedAt: number | null };
+
 function NameList({
   title,
+  hint,
   items,
   draft,
   setDraft,
@@ -813,9 +944,15 @@ function NameList({
   usage,
   onRemove,
   onRestore,
+  onRename,
+  groups,
+  groupOf,
+  addControl,
+  emptyHint,
 }: {
   title: string;
-  items: { id: number; name: string; archivedAt: number | null }[];
+  hint?: string;
+  items: Named[];
   draft: string;
   setDraft: (v: string) => void;
   onAdd: () => void;
@@ -824,11 +961,38 @@ function NameList({
   usage: Record<string, Usage> | undefined;
   onRemove: (id: number) => void;
   onRestore: (id: number) => void;
+  /** Renames one; resolves to whether it was saved. */
+  onRename?: (id: number, name: string) => Promise<boolean>;
+  /** The list under a heading per group (a subsystem's project), in this order. */
+  groups?: Named[];
+  groupOf?: (item: Named) => number;
+  /** Beside the new item's name (the project a new subsystem goes in). */
+  addControl?: React.ReactNode;
+  /** In place of the add box, while nothing can be added yet. */
+  emptyHint?: string;
 }) {
   const [showRemoved, setShowRemoved] = useState(false);
   const active = items.filter((item) => item.archivedAt === null);
   const removed = items.length - active.length;
   const shown = showRemoved && isAdmin ? items : active;
+  const row = (item: Named) => (
+    <ItemRow
+      key={item.id}
+      name={item.name}
+      archived={item.archivedAt !== null}
+      isAdmin={isAdmin}
+      question={removeQuestion(item.name, usage?.[item.id], usage !== undefined)}
+      onRemove={() => onRemove(item.id)}
+      onRestore={() => onRestore(item.id)}
+      onRename={onRename && ((name) => onRename(item.id, name))}
+    />
+  );
+  const grouped =
+    groups && groupOf
+      ? groups
+          .map((group) => ({ group, rows: shown.filter((item) => groupOf(item) === group.id) }))
+          .filter((g) => g.rows.length > 0)
+      : null;
   return (
     <div className="space-y-3">
       <ListHeading
@@ -838,34 +1002,36 @@ function NameList({
         showRemoved={showRemoved}
         setShowRemoved={setShowRemoved}
       />
-      {isAdmin && (
-        <div className="flex gap-2">
-          <TextField
-            kind="label"
-            placeholder={placeholder}
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") onAdd();
-            }}
-            className="flex-1 min-w-0"
-          />
-          <Button onClick={onAdd}>Add</Button>
-        </div>
-      )}
+      {hint && <p className="text-xs text-secondary-500">{hint}</p>}
+      {isAdmin &&
+        (emptyHint ? (
+          <p className="text-sm text-secondary-500">{emptyHint}</p>
+        ) : (
+          <div className="flex gap-2">
+            <TextField
+              kind="label"
+              placeholder={placeholder}
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") onAdd();
+              }}
+              className="flex-1 min-w-0"
+            />
+            {addControl}
+            <Button onClick={onAdd}>Add</Button>
+          </div>
+        ))}
       <div className="space-y-1.5">
         {shown.length === 0 && <p className="text-secondary-400 text-sm">None yet.</p>}
-        {shown.map((item) => (
-          <ItemRow
-            key={item.id}
-            name={item.name}
-            archived={item.archivedAt !== null}
-            isAdmin={isAdmin}
-            question={removeQuestion(item.name, usage?.[item.id], usage !== undefined)}
-            onRemove={() => onRemove(item.id)}
-            onRestore={() => onRestore(item.id)}
-          />
-        ))}
+        {grouped
+          ? grouped.map(({ group, rows }) => (
+              <div key={group.id} className="space-y-1.5">
+                <p className="pt-1 text-xs font-semibold text-secondary-500">{group.name}</p>
+                {rows.map(row)}
+              </div>
+            ))
+          : shown.map(row)}
       </div>
     </div>
   );
@@ -1018,9 +1184,15 @@ function ProcessList({
   );
 }
 
-type OnShapeStatus = {
+type OnShapeDocument = {
+  id: number;
   documentId: string;
   mainAssemblyId: string;
+  projectId: number;
+};
+
+type OnShapeStatus = {
+  documents: OnShapeDocument[];
   companyId: string;
   hasApiKey: boolean;
   hasWebhookKeys: boolean;
@@ -1028,41 +1200,71 @@ type OnShapeStatus = {
   webhookUrl: string;
 };
 
+type WebhookOutcome = "registered" | "failed" | "needs keys";
+
+const webhookMessage = (outcome: WebhookOutcome | undefined, what: string) =>
+  outcome === "registered"
+    ? { ok: true, text: `${what} Onshape will send its releases to Shop.` }
+    : outcome === "failed"
+      ? { ok: false, text: `${what} Onshape refused the webhook: check the keys and company.` }
+      : { ok: true, text: `${what} Add the API keys and company ID to receive releases.` };
+
+/** A project picker for a document: the team's projects that weren't removed. */
+function ProjectSelect({
+  projects,
+  value,
+  onChange,
+  label = "Project",
+}: {
+  projects: Project[];
+  value: number;
+  onChange: (id: number) => void;
+  label?: string;
+}) {
+  return (
+    <select
+      aria-label={label}
+      value={value}
+      onChange={(e) => onChange(Number(e.target.value))}
+      className={`${inputClass} max-w-full`}
+    >
+      <option value={0}>Choose a project…</option>
+      {projects
+        .filter((p) => p.archivedAt === null || p.id === value)
+        .map((p) => (
+          <option key={p.id} value={p.id}>
+            {p.name}
+          </option>
+        ))}
+    </select>
+  );
+}
+
 /**
- * The team's Onshape connection: the document Shop follows, and the team's own API keys and
- * webhook signing keys from Onshape's Developer Portal. Keys are never shown again once saved;
- * leave them blank to keep them.
+ * The team's Onshape connection: the documents Shop follows, each with its project, and the team's
+ * own API keys and webhook signing keys from Onshape's Developer Portal. Keys are never shown again
+ * once saved; leave them blank to keep them.
  */
-function OnShapeConfig() {
-  const [documentId, setDocumentId] = useState("");
-  const [mainAssemblyId, setMainAssemblyId] = useState("");
+function OnShapeConfig({ projects }: { projects: Project[] }) {
   const [companyId, setCompanyId] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [apiSecret, setApiSecret] = useState("");
   const [webhookKeyPrimary, setWebhookKeyPrimary] = useState("");
   const [webhookKeySecondary, setWebhookKeySecondary] = useState("");
   const [status, setStatus] = useState<OnShapeStatus | null>(null);
-  const [urlInput, setUrlInput] = useState("");
   const [saving, setSaving] = useState(false);
   const [banner, setBanner] = useState<{ ok: boolean; text: string } | null>(null);
 
-  function parseUrl() {
-    // Format: https://cad.onshape.com/documents/[DOCID]/[not used]/[not used]/e/[MAINASSEMBLYID]
-    const match = urlInput.match(/\/documents\/([^/]+)\/[^/]*\/[^/]*\/e\/([^/?]+)/);
-    if (!match) {
-      setBanner({
-        ok: false,
-        text: "Invalid URL format. Expected: https://cad.onshape.com/documents/[DOCID]/[...]/e/[MAINASSEMBLYID]",
-      });
-      return;
-    }
-
-    const [, docId, assemblyId] = match;
-    setDocumentId(docId);
-    setMainAssemblyId(assemblyId);
-    setUrlInput("");
-    setBanner(null);
-  }
+  // A document to add: its address, its main assembly's, and its project.
+  const live = projects.filter((p) => p.archivedAt === null);
+  const [newAddress, setNewAddress] = useState("");
+  const [newAssembly, setNewAssembly] = useState("");
+  const [newProject, setNewProject] = useState(0);
+  const project = live.some((p) => p.id === newProject)
+    ? newProject
+    : live.length === 1
+      ? live[0].id
+      : 0;
 
   async function loadConfig() {
     try {
@@ -1073,8 +1275,6 @@ function OnShapeConfig() {
       }
       const config = (await res.json()) as OnShapeStatus;
       setStatus(config);
-      setDocumentId(config.documentId || "");
-      setMainAssemblyId(config.mainAssemblyId || "");
       setCompanyId(config.companyId || "");
     } catch (err) {
       setBanner({
@@ -1090,17 +1290,10 @@ function OnShapeConfig() {
   }, []);
 
   async function handleSave() {
-    if (!documentId.trim()) {
-      setBanner({ ok: false, text: "Document ID is required" });
-      return;
-    }
-
     setSaving(true);
     try {
       const res = await api.admin.onshape.config.$post({
         json: {
-          documentId: documentId.trim(),
-          mainAssemblyId: mainAssemblyId.trim() || undefined,
           companyId: companyId.trim() || undefined,
           apiKey: apiKey.trim() || undefined,
           apiSecret: apiSecret.trim() || undefined,
@@ -1113,20 +1306,23 @@ function OnShapeConfig() {
         setBanner({ ok: false, text: await getErrorMessage(res as unknown as Response) });
         return;
       }
-      const result = (await res.json()) as { webhook?: string };
+      const result = (await res.json()) as { webhooks?: Record<string, WebhookOutcome> };
       setApiKey("");
       setApiSecret("");
       setWebhookKeyPrimary("");
       setWebhookKeySecondary("");
+      const outcomes = Object.values(result.webhooks ?? {});
       setBanner(
-        result.webhook === "registered"
-          ? { ok: true, text: "Saved. Onshape will send releases to Shop." }
-          : result.webhook === "failed"
-            ? {
-                ok: false,
-                text: "Saved, but Onshape refused the webhook. Check the keys and company.",
-              }
-            : { ok: true, text: "Saved. Add the API keys and company ID to receive releases." },
+        outcomes.length === 0
+          ? { ok: true, text: "Saved. Add a document to receive its releases." }
+          : webhookMessage(
+              outcomes.includes("failed")
+                ? "failed"
+                : outcomes.includes("needs keys")
+                  ? "needs keys"
+                  : "registered",
+              "Saved.",
+            ),
       );
       await loadConfig();
       refreshOnshapeStatus();
@@ -1137,11 +1333,64 @@ function OnShapeConfig() {
     }
   }
 
+  async function addDocument() {
+    if (!newAddress.trim()) {
+      setBanner({ ok: false, text: "Paste the document's address." });
+      return;
+    }
+    if (!project) {
+      setBanner({ ok: false, text: "Choose the project the document is for." });
+      return;
+    }
+    const res = await api.admin.onshape.documents.$post({
+      json: {
+        documentId: newAddress.trim(),
+        mainAssemblyId: newAssembly.trim() || undefined,
+        projectId: project,
+      },
+    });
+    if (!res.ok) {
+      setBanner({ ok: false, text: await getErrorMessage(res as unknown as Response) });
+      return;
+    }
+    const result = (await res.json()) as { webhook: WebhookOutcome };
+    setNewAddress("");
+    setNewAssembly("");
+    setBanner(webhookMessage(result.webhook, "Added."));
+    await loadConfig();
+  }
+
+  async function changeDocument(
+    id: number,
+    change: { projectId?: number; mainAssemblyId?: string },
+  ) {
+    const res = await api.admin.onshape.documents[":id"].$patch({
+      param: { id: String(id) },
+      json: change,
+    });
+    if (!res.ok) {
+      setBanner({ ok: false, text: await getErrorMessage(res as unknown as Response) });
+      return;
+    }
+    setBanner({ ok: true, text: "Saved." });
+    await loadConfig();
+  }
+
+  async function removeDocument(id: number) {
+    const res = await api.admin.onshape.documents[":id"].$delete({ param: { id: String(id) } });
+    if (!res.ok) {
+      setBanner({ ok: false, text: await getErrorMessage(res as unknown as Response) });
+      return;
+    }
+    setBanner({ ok: true, text: "Removed. Its releases stay in Shop." });
+    await loadConfig();
+  }
+
   const keptHint = (saved: boolean | undefined) =>
     saved ? "Saved; leave blank to keep it" : "From Onshape's Developer Portal";
 
   return (
-    <div className="space-y-4 max-w-xl">
+    <div className="space-y-6 max-w-2xl">
       {banner &&
         (banner.ok ? (
           <SuccessBanner message={banner.text} />
@@ -1149,114 +1398,189 @@ function OnShapeConfig() {
           <ErrorBanner message={banner.text} />
         ))}
 
-      {status?.fromWorkerSecrets && (
-        <p className="text-xs text-secondary-500">
-          Using the built-in keys. Save your team's own to replace them.
-        </p>
-      )}
-
-      <div className="p-3 bg-page rounded-lg border border-secondary-200 space-y-2">
-        <p className="text-sm font-medium text-secondary-700">
-          Fill in from the document's address
-        </p>
-        <div className="flex gap-2">
-          <TextField
-            kind="url"
-            value={urlInput}
-            onChange={(e) => setUrlInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") parseUrl();
-            }}
-            placeholder="https://cad.onshape.com/documents/[...]/e/[...]"
-            className="flex-1"
+      <div className="space-y-3">
+        <h3 className={sectionHeading}>Documents</h3>
+        <p className="text-xs text-secondary-500">Releases from each document go to its project.</p>
+        {status?.documents.length === 0 && (
+          <p className="text-sm text-secondary-400">No documents yet.</p>
+        )}
+        {status?.documents.map((d) => (
+          <DocumentRow
+            key={d.id}
+            document={d}
+            projects={projects}
+            onChange={(change) => changeDocument(d.id, change)}
+            onRemove={() => removeDocument(d.id)}
           />
-          <Button variant="secondary" onClick={parseUrl}>
-            Fill in
-          </Button>
+        ))}
+
+        <div className="p-3 bg-page rounded-lg border border-secondary-200 space-y-3">
+          <p className="text-sm font-medium text-secondary-700">Add a document</p>
+          {live.length === 0 ? (
+            <p className="text-sm text-secondary-500">Add a project under Shop Settings first.</p>
+          ) : (
+            <>
+              <Field
+                label="Document address"
+                hint="Copy it from the browser with the document open"
+              >
+                <TextField
+                  kind="url"
+                  value={newAddress}
+                  onChange={(e) => setNewAddress(e.target.value)}
+                  placeholder="https://cad.onshape.com/documents/…"
+                />
+              </Field>
+              <Field
+                label="Main assembly address"
+                hint="Optional: open the main assembly's tab and copy the address, to fill in how many of each part a release needs"
+              >
+                <TextField
+                  kind="url"
+                  value={newAssembly}
+                  onChange={(e) => setNewAssembly(e.target.value)}
+                  placeholder="https://cad.onshape.com/documents/…/e/…"
+                />
+              </Field>
+              <div className="flex flex-wrap items-end gap-2">
+                <Field label="Project">
+                  <ProjectSelect projects={projects} value={project} onChange={setNewProject} />
+                </Field>
+                <Button onClick={() => void addDocument()}>Add document</Button>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
-      <Field
-        label="Document ID"
-        hint="From the document's address: cad.onshape.com/documents/[DOCUMENT_ID]/..."
-      >
-        <TextField
-          typeable
-          value={documentId}
-          onChange={(e) => setDocumentId(e.target.value)}
-          placeholder="e.g. abc123def456"
-        />
-      </Field>
+      <div className="space-y-4">
+        <h3 className={sectionHeading}>Keys</h3>
+        {status?.fromWorkerSecrets && (
+          <p className="text-xs text-secondary-500">
+            Using the built-in keys. Save your team's own to replace them.
+          </p>
+        )}
 
-      <Field
-        label="Main Assembly ID"
-        hint="Optional: fills in how many of each part a release needs"
-      >
-        <TextField
-          typeable
-          value={mainAssemblyId}
-          onChange={(e) => setMainAssemblyId(e.target.value)}
-          placeholder="e.g. xyz789"
-        />
-      </Field>
+        <Field label="Company ID">
+          <TextField
+            typeable
+            value={companyId}
+            onChange={(e) => setCompanyId(e.target.value)}
+            placeholder="The Onshape company (or classroom) that owns the documents"
+          />
+        </Field>
 
-      <Field label="Company ID">
-        <TextField
-          typeable
-          value={companyId}
-          onChange={(e) => setCompanyId(e.target.value)}
-          placeholder="The Onshape company (or classroom) that owns the document"
-        />
-      </Field>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="API access key" hint={keptHint(status?.hasApiKey)}>
+            <input
+              type="password"
+              autoComplete="off"
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              className={inputClass}
+            />
+          </Field>
+          <Field label="API secret key" hint={keptHint(status?.hasApiKey)}>
+            <input
+              type="password"
+              autoComplete="off"
+              value={apiSecret}
+              onChange={(e) => setApiSecret(e.target.value)}
+              className={inputClass}
+            />
+          </Field>
+          <Field label="Webhook signing key (primary)" hint={keptHint(status?.hasWebhookKeys)}>
+            <input
+              type="password"
+              autoComplete="off"
+              value={webhookKeyPrimary}
+              onChange={(e) => setWebhookKeyPrimary(e.target.value)}
+              className={inputClass}
+            />
+          </Field>
+          <Field label="Webhook signing key (secondary)" hint={keptHint(status?.hasWebhookKeys)}>
+            <input
+              type="password"
+              autoComplete="off"
+              value={webhookKeySecondary}
+              onChange={(e) => setWebhookKeySecondary(e.target.value)}
+              className={inputClass}
+            />
+          </Field>
+        </div>
+        {status && (
+          <p className="text-xs text-secondary-400 break-all">
+            Saving registers Shop's webhook on every document, calling back on {status.webhookUrl}
+          </p>
+        )}
 
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="API access key" hint={keptHint(status?.hasApiKey)}>
-          <input
-            type="password"
-            autoComplete="off"
-            value={apiKey}
-            onChange={(e) => setApiKey(e.target.value)}
-            className={inputClass}
-          />
-        </Field>
-        <Field label="API secret key" hint={keptHint(status?.hasApiKey)}>
-          <input
-            type="password"
-            autoComplete="off"
-            value={apiSecret}
-            onChange={(e) => setApiSecret(e.target.value)}
-            className={inputClass}
-          />
-        </Field>
-        <Field label="Webhook signing key (primary)" hint={keptHint(status?.hasWebhookKeys)}>
-          <input
-            type="password"
-            autoComplete="off"
-            value={webhookKeyPrimary}
-            onChange={(e) => setWebhookKeyPrimary(e.target.value)}
-            className={inputClass}
-          />
-        </Field>
-        <Field label="Webhook signing key (secondary)" hint={keptHint(status?.hasWebhookKeys)}>
-          <input
-            type="password"
-            autoComplete="off"
-            value={webhookKeySecondary}
-            onChange={(e) => setWebhookKeySecondary(e.target.value)}
-            className={inputClass}
-          />
-        </Field>
+        <div className="flex gap-2 pt-2">
+          <Button onClick={handleSave} disabled={saving}>
+            {saving ? "Saving…" : "Save"}
+          </Button>
+        </div>
       </div>
-      {status && (
-        <p className="text-xs text-secondary-400 break-all">
-          Saving registers Shop's webhook on the document, calling back on {status.webhookUrl}
-        </p>
-      )}
+    </div>
+  );
+}
 
-      <div className="flex gap-2 pt-2">
-        <Button onClick={handleSave} disabled={saving}>
-          {saving ? "Saving…" : "Save"}
-        </Button>
+/** One document Shop follows: its project, its main assembly, and Remove (asked in the row). */
+function DocumentRow({
+  document,
+  projects,
+  onChange,
+  onRemove,
+}: {
+  document: OnShapeDocument;
+  projects: Project[];
+  onChange: (change: { projectId?: number; mainAssemblyId?: string }) => Promise<void>;
+  onRemove: () => Promise<void>;
+}) {
+  const [assembly, setAssembly] = useState(document.mainAssemblyId);
+  useEffect(() => setAssembly(document.mainAssemblyId), [document.mainAssemblyId]);
+  return (
+    <div className="space-y-2 bg-page border border-secondary-200 rounded-lg px-3.5 py-3 text-sm">
+      <div className="flex flex-wrap items-center gap-2">
+        <a
+          href={`https://cad.onshape.com/documents/${document.documentId}`}
+          target="_blank"
+          rel="noreferrer"
+          className="flex-1 min-w-0 truncate font-mono text-xs text-primary-700 hover:underline"
+          title={document.documentId}
+        >
+          {document.documentId}
+        </a>
+        <ProjectSelect
+          projects={projects}
+          value={document.projectId}
+          label={`Project for document ${document.documentId}`}
+          onChange={(projectId) => {
+            if (projectId) void onChange({ projectId });
+          }}
+        />
+        <ConfirmButton
+          label="Remove"
+          size="sm"
+          question="Stop following this document? Releases already in Shop stay."
+          confirmLabel="Remove"
+          onConfirm={() => void onRemove()}
+        />
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <TextField
+          typeable
+          variant="compact"
+          aria-label="Main assembly"
+          value={assembly}
+          onChange={(e) => setAssembly(e.target.value)}
+          placeholder="Main assembly (optional)"
+          className="flex-1 min-w-0"
+        />
+        {assembly !== document.mainAssemblyId && (
+          <Button size="sm" onClick={() => void onChange({ mainAssemblyId: assembly.trim() })}>
+            Save
+          </Button>
+        )}
       </div>
     </div>
   );

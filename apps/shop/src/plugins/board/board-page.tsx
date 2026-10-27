@@ -15,6 +15,7 @@ import {
 } from "../../shared/derive";
 import { fetchKioskPresence } from "../../shared/getters";
 import { processPath } from "../../shared/nav";
+import { ProjectFilter, useDataInProject, useProjectFilter } from "../../shared/projects";
 import type { Batch, KioskPresence, ProcessType } from "../../shared/types";
 import { type StatusLevel, useAuthUser, useCanQualityCheck, useKiosk } from "../../shared/use-auth";
 import { type ShopData, useShopData } from "../../shared/use-shop-data";
@@ -43,7 +44,10 @@ const LOAD_STYLES = {
 };
 
 export function BoardPage() {
-  const { data, loading, error, refresh } = useShopData();
+  const { data: allData, loading, error, refresh } = useShopData();
+  // The lists show the chosen project's parts; a part opened by its link or a scan is found in all.
+  const projectFilter = useProjectFilter();
+  const data = useDataInProject(allData, projectFilter.projectId);
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -75,6 +79,7 @@ export function BoardPage() {
   const [reportingInstanceId, setReportingInstanceId] = useState<number | null>(null);
 
   const rows = useMemo(() => (data ? buildInstanceRows(data) : []), [data]);
+  const allRows = useMemo(() => (allData ? buildInstanceRows(allData) : []), [allData]);
   const batchById = useMemo(() => batchesById(data?.batches ?? []), [data]);
   const loads = useMemo(() => (data ? processLoads(rows, data.processes) : []), [rows, data]);
   // What a scan is matched against: the station's own queue, or everything on the overview.
@@ -102,13 +107,13 @@ export function BoardPage() {
   useEffect(() => {
     const part = searchParams.get("part");
     if (!part || !data) return;
-    const row = rows.find((r) => r.instance.id === Number(part));
+    const row = allRows.find((r) => r.instance.id === Number(part));
     if (row?.state === "doing") setWorkingPartInstanceId(row.instance.id);
     else if (row) setViewingPartInstanceId(row.instance.id);
     const rest = new URLSearchParams(searchParams);
     rest.delete("part");
     setSearchParams(rest, { replace: true });
-  }, [searchParams, setSearchParams, data, rows]);
+  }, [searchParams, setSearchParams, data, allRows]);
 
   // Who is logged in at each kiosk, refreshed alongside the heartbeat cadence.
   useEffect(() => {
@@ -172,7 +177,7 @@ export function BoardPage() {
 
   const selectedRow =
     selectedInstanceId !== null
-      ? (rows.find((r) => r.instance.id === selectedInstanceId) ?? null)
+      ? (allRows.find((r) => r.instance.id === selectedInstanceId) ?? null)
       : null;
 
   return (
@@ -215,6 +220,7 @@ export function BoardPage() {
                 ))}
             </select>
           )}
+          <ProjectFilter filter={projectFilter} className="min-w-0" />
           {kiosk.active && (
             <Button size="lg" className="shrink-0" onClick={() => setScanOpen(true)}>
               Scan
@@ -260,7 +266,7 @@ export function BoardPage() {
         {scanOpen && (
           <ScanDialog
             queue={queueRows}
-            all={rows}
+            all={allRows}
             onFound={(row) => {
               setScanOpen(false);
               // A part its batch moves has no buttons of its own: its batch's view has them.
@@ -278,13 +284,13 @@ export function BoardPage() {
         )}
 
         {workingPartInstanceId &&
-          data &&
+          allData &&
           (() => {
-            const workingRow = rows.find((r) => r.instance.id === workingPartInstanceId);
+            const workingRow = allRows.find((r) => r.instance.id === workingPartInstanceId);
             return workingRow ? (
               <PartWorkView
                 row={workingRow}
-                data={data}
+                data={allData}
                 onClose={() => setWorkingPartInstanceId(null)}
                 onMarkComplete={async () => {
                   if (workingRow.current) {
@@ -299,13 +305,13 @@ export function BoardPage() {
           })()}
 
         {viewingPartInstanceId &&
-          data &&
+          allData &&
           (() => {
-            const viewingRow = rows.find((r) => r.instance.id === viewingPartInstanceId);
+            const viewingRow = allRows.find((r) => r.instance.id === viewingPartInstanceId);
             return viewingRow ? (
               <PartDetailsView
                 row={viewingRow}
-                data={data}
+                data={allData}
                 onClose={() => setViewingPartInstanceId(null)}
                 onStartPart={async () => {
                   if (viewingRow.current) {
@@ -318,23 +324,23 @@ export function BoardPage() {
           })()}
 
         {reportingInstanceId &&
-          data &&
+          allData &&
           (() => {
-            const reportingRow = rows.find((r) => r.instance.id === reportingInstanceId);
+            const reportingRow = allRows.find((r) => r.instance.id === reportingInstanceId);
             return reportingRow ? (
               <QualityReportView
                 row={reportingRow}
-                data={data}
+                data={allData}
                 onClose={() => setReportingInstanceId(null)}
                 onChanged={refresh}
               />
             ) : null;
           })()}
 
-        {selectedRow && data && (
+        {selectedRow && allData && (
           <PartCard
             row={selectedRow}
-            data={data}
+            data={allData}
             onClose={() => setSelectedInstanceId(null)}
             onChanged={refresh}
           />

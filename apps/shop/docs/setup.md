@@ -1,19 +1,26 @@
 ---
 title: Set up Shop
-summary: Add your processes, connect Onshape, choose chat channels and set up shop screens. For admins.
+summary: Add your projects and processes, connect Onshape, choose chat channels and set up shop screens. For admins.
 order: 0
 pages: /admin
 ---
 
 ## Checklist
 
-- [ ] On [Admin](team:shop/admin), add your **processes**: the machines and steps parts go through
-- [ ] Add your **subsystems**
-- [ ] [Connect Onshape](#connect-onshape), so releases come in by themselves
+- [ ] On [Admin](team:shop/admin), add your **[projects](#projects)**: what your parts are made for
+- [ ] Add your **processes**: the machines and steps parts go through
+- [ ] Add each project's **subsystems**
+- [ ] [Connect Onshape](#connect-onshape) and add each project's documents, so releases come in by themselves
 - [ ] Choose the [chat channels](#chat-channels) for releases and the daily summary
 - [ ] Turn on [kiosk mode](#shop-screens) on the shop's computers
 - [ ] If parts should be checked before they're done, set up [quality control](#quality-control)
 - [ ] If your team has an Edge box with a printer (Edge, the last app in these docs), try printing a drawing
+
+## Projects
+
+A project is what your parts are made for: "2027 Robot", "Practice bot". Every subsystem belongs to one, and so every part does. Each Onshape document you add goes to one project, and its releases go there too. Choose **Rename** beside a project to change its name.
+
+When you add a subsystem and your team has more than one project, choose its project beside the name.
 
 ## Processes
 
@@ -26,9 +33,9 @@ A process is a step a part can go through: "Router", "Mill", "Lathe", "Deburr", 
 
 A part that uses files needs both file kinds, with the producer first. Batches and files, later in this section, covers them.
 
-## Removing a subsystem or process
+## Removing a project, subsystem or process
 
-Choose **Remove** beside one you no longer use, such as a typo or an old machine. If nothing uses it, it's deleted. If parts do, it's hidden from new parts (Ingest, Add Part, a part's processes), and parts that already have it keep it. The Shop Floor still shows a removed process while parts are at it.
+Choose **Remove** beside one you no longer use, such as a typo or an old machine. If nothing uses it, it's deleted. If parts do, it's hidden from new parts (Ingest, Add Part, a part's processes), and parts that already have it keep it. A removed project's subsystems are hidden from new parts too, and no document can be added to it. The Shop Floor still shows a removed process while parts are at it.
 
 Switch on **Show removed** to see removed ones and **Restore** them. The required quality check can't be removed while it's required. Removing and restoring are in the team's log.
 
@@ -45,11 +52,11 @@ Under **Quality Control** on Admin:
 
 Under **Onshape Configuration**:
 
-1. In Onshape's Developer Portal, make an API key for your team's Onshape company. Enter its **API access key** and **API secret key**, and the portal's **webhook signing keys** (primary and secondary).
-2. Enter your **Company ID** and the **Document ID** of the robot's document. Add the **Main Assembly ID** if you want quantities from its bill of materials.
-3. Save. Shop registers its webhook on the document and says whether Onshape accepted it. If Onshape refused it, check the keys and the company.
+1. In Onshape's Developer Portal, make an API key for your team's Onshape company. Under **Keys**, enter its **API access key** and **API secret key**, the portal's **webhook signing keys** (primary and secondary), and your **Company ID**. Save.
+2. Under **Documents**, choose **Add a document** for each Onshape document Shop should follow. Paste the document's address from your browser and choose its project. Add the main assembly's address too (open its tab, then copy the address) if you want quantities from its bill of materials.
+3. Shop registers its webhook on the document and says whether Onshape accepted it. If Onshape refused it, check the keys and the company.
 
-From then on, each approved release in that document shows up on Ingest. Saved keys are never shown again; leave a key blank to keep it.
+From then on, each approved release in those documents shows up on Ingest, in the document's project. Change a document's project or main assembly in its row; releases already in Shop keep the project they came in with. **Remove** stops following a document; its releases stay. Saved keys are never shown again; leave a key blank to keep it.
 
 ## Onshape API usage
 

@@ -47,6 +47,8 @@ const TABLES = [
   "quality_check_items",
   "onshape_api_usage",
   "onshape_api_errors",
+  "projects",
+  "onshape_documents",
 ];
 
 type Id = { id: number };
@@ -59,16 +61,31 @@ async function seed(team: TeamUsers): Promise<Seeded> {
   const partNumber = `PN-${crypto.randomUUID().slice(0, 8)}`;
   const webhookKey = `key-${tag}`;
 
-  // Settings: the team's chat channels and Onshape document and webhook key (no API keys, so
-  // nothing calls Onshape).
+  // Settings: the team's chat channels, a project with its Onshape document, and the webhook key
+  // (no API keys, so nothing calls Onshape).
   await jsonAs(admin, "/admin/chat/config", {
     method: "POST",
     body: { releaseChannelId: "CRELEASE", summaryChannelId: "CSUMMARY" },
   });
   await jsonAs(admin, "/admin/onshape/config", {
     method: "POST",
-    body: { documentId: `doc${tag}`, mainAssemblyId: `asm${tag}`, webhookKeyPrimary: webhookKey },
+    body: { webhookKeyPrimary: webhookKey },
   });
+  const project = await jsonAs<Id>(
+    admin,
+    "/projects",
+    { method: "POST", body: { name: `Robot ${tag}` } },
+    201,
+  );
+  const { document } = await jsonAs<{ document: Id }>(
+    admin,
+    "/admin/onshape/documents",
+    {
+      method: "POST",
+      body: { documentId: `doc${tag}`, mainAssemblyId: `asm${tag}`, projectId: project.id },
+    },
+    201,
+  );
   // A released part, from the team's own webhook.
   const event = await onshapeEvent(team.teamId, webhookKey, {
     event: "onshape.revision.created",
@@ -89,7 +106,7 @@ async function seed(team: TeamUsers): Promise<Seeded> {
   const subsystem = await jsonAs<Id>(
     admin,
     "/subsystems",
-    { method: "POST", body: { name: `Sub ${tag}` } },
+    { method: "POST", body: { name: `Sub ${tag}`, projectId: project.id } },
     201,
   );
   const makeProcess = (name: string, type: string) =>
@@ -243,6 +260,7 @@ async function seed(team: TeamUsers): Promise<Seeded> {
     "part-files": file.id,
     "staging-batches": batch.id,
     subsystems: subsystem.id,
+    projects: project.id,
     processes: process.id,
     "quality-reports": report.id,
   };
@@ -255,11 +273,13 @@ async function seed(team: TeamUsers): Promise<Seeded> {
       if (name === "revision") return "A";
       if (name === "drawingId") return String(uploaded.id);
       if (name === "userId") return student.id;
+      if (path.startsWith("/admin/onshape/documents/")) return String(document.id);
       const id = ids[path.split("/")[1]];
       return id === undefined ? undefined : String(id);
     },
     markers: [tag],
     data: {
+      project: project.id,
       subsystem: subsystem.id,
       process: process.id,
       part: part.id,
@@ -295,7 +315,11 @@ it("keeps every team's shop to itself", async () => {
     bodies: (b) => {
       const d = b.data as Record<string, number>;
       return {
-        "POST /subsystems": { name: "Mine" },
+        "POST /subsystems": { name: "Mine", projectId: d.project },
+        "POST /projects": { name: "Mine" },
+        "PATCH /projects/:id": { name: "Renamed" },
+        "POST /admin/onshape/documents": { documentId: "mine", projectId: d.project },
+        "PATCH /admin/onshape/documents/:id": { projectId: d.project, mainAssemblyId: "mine" },
         "POST /processes": { name: "Mine" },
         "PATCH /processes/:id": { type: "file_producer" },
         "POST /part-definitions": {
@@ -329,7 +353,7 @@ it("keeps every team's shop to itself", async () => {
         "POST /staging-batches/:id/status": { at: "producer", to: "done" },
         "POST /staging-batches/:id/send-back": { to: "producer" },
         "POST /admin/chat/config": { releaseChannelId: "CMINE" },
-        "POST /admin/onshape/config": { documentId: "mine" },
+        "POST /admin/onshape/config": { companyId: "mine" },
         "POST /admin/chat/daily-summary": { kind: "overview", since: Date.now() - 1000 },
         "PUT /admin/quality/managers/:userId": { manager: true },
         "PUT /admin/quality/settings": { requireQualityCheck: true, qualityProcessId: d.check },

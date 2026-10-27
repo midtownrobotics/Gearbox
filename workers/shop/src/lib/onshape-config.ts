@@ -4,7 +4,8 @@ import type { AppEnv } from "../types";
 import { SETTING, getSettings, readSecret, setSecret, setSetting } from "./settings";
 
 // Each team's Onshape connection: its own API key and secret (from Onshape's Developer Portal),
-// company, webhook signing keys and the document Shop follows. Admins save them on the Admin page;
+// company and webhook signing keys. The documents Shop follows are a list of their own
+// (lib/onshape-documents.ts). Admins save them on the Admin page;
 // the key, secret and signing keys are stored encrypted. Onshape's webhooks for a team call back on
 // that team's own address, which is how an event finds its team (routes/onshape-webhooks.ts).
 //
@@ -22,8 +23,6 @@ export type OnshapeConfig = {
   companyId: string | null;
   /** Signing keys for verifying the team's webhook events. */
   webhookKeys: { primary: string; secondary: string } | null;
-  documentId: string | null;
-  mainAssemblyId: string | null;
   /** Keys from the site team's worker secrets, not saved ones. */
   fromWorkerSecrets: boolean;
 };
@@ -58,15 +57,11 @@ export async function onshapeConfig(env: Env, db: ShopDb, teamId: string): Promi
     credentials: savedCredentials ?? secretCredentials,
     companyId: s.get(SETTING.onshapeCompany) ?? (site ? (env.ONSHAPE_COMPANY_ID ?? null) : null),
     webhookKeys: savedWebhook ?? secretWebhook,
-    documentId: s.get(SETTING.onshapeDocument) ?? null,
-    mainAssemblyId: s.get(SETTING.onshapeMainAssembly) ?? null,
     fromWorkerSecrets: !savedCredentials && secretCredentials !== null,
   };
 }
 
 export type OnshapeChanges = {
-  documentId?: string;
-  mainAssemblyId?: string;
   companyId?: string;
   apiKey?: string;
   apiSecret?: string;
@@ -81,14 +76,7 @@ export async function saveOnshapeConfig(
   teamId: string,
   changes: OnshapeChanges,
 ) {
-  const plain = [
-    [SETTING.onshapeDocument, changes.documentId],
-    [SETTING.onshapeMainAssembly, changes.mainAssemblyId],
-    [SETTING.onshapeCompany, changes.companyId],
-  ] as const;
-  for (const [key, value] of plain) {
-    if (value) await setSetting(db, teamId, key, value);
-  }
+  if (changes.companyId) await setSetting(db, teamId, SETTING.onshapeCompany, changes.companyId);
   const secret = [
     [SETTING.onshapeApiKey, changes.apiKey],
     [SETTING.onshapeApiSecret, changes.apiSecret],

@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import type { InstanceRow } from "../../shared/derive";
 import { detailsViewPath } from "../../shared/nav";
 import { PrintDrawingButton } from "../../shared/print-drawing-button";
+import { projectName } from "../../shared/projects";
 import type { ShopData } from "../../shared/use-shop-data";
 import { DrawingPreview } from "../parts/drawing-preview";
 
@@ -39,6 +40,9 @@ export function ShopView({
     { label: "Revision", value: row.definition.revision || "—" },
     { label: "Instance", value: `#${row.instance.instanceNumber}` },
     { label: "Subsystem", value: subsystem?.name || "—" },
+    ...(data.projects.length > 1
+      ? [{ label: "Project", value: projectName(data.projects, subsystem?.projectId) }]
+      : []),
   ];
 
   return (
