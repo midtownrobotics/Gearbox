@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../../shared/api";
 import { getErrorMessage } from "../../shared/api-error";
+import { onshapeLinkFor, useOnshapeLinks } from "../../shared/onshape-links";
+import { OnshapePartLinks } from "../../shared/onshape-part-links";
 import { PrintDrawingButton } from "../../shared/print-drawing-button";
 
 interface PartDefinition {
@@ -51,6 +53,7 @@ interface InstanceProcess {
 export function PartDetailPage() {
   const [searchParams] = useSearchParams();
   const partNumber = searchParams.get("p");
+  const onshapeLinks = useOnshapeLinks();
 
   const [definitions, setDefinitions] = useState<PartDefinition[]>([]);
   const [instances, setInstances] = useState<PartInstance[]>([]);
@@ -233,6 +236,7 @@ export function PartDetailPage() {
   }
 
   const activeInstances = instances.filter((i) => i.partDefinitionId === activeDef.id);
+  const onshape = onshapeLinkFor(onshapeLinks, activeDef.onshapePartNumber, activeDef.revision);
 
   return (
     <Page title={title}>
@@ -283,7 +287,7 @@ export function PartDetailPage() {
                   </div>
                 </div>
 
-                {(def.partDrawingUrl || def.revision) && (
+                {(def.partDrawingUrl || def.revision || onshape) && (
                   <div className="pt-3 border-t border-secondary-200 flex flex-wrap items-center gap-4">
                     {def.partDrawingUrl && (
                       <a
@@ -295,6 +299,7 @@ export function PartDetailPage() {
                         View drawing →
                       </a>
                     )}
+                    <OnshapePartLinks link={onshape} className="text-xs font-medium" />
                     {def.revision && (
                       <PrintDrawingButton
                         partNumber={def.onshapePartNumber}
