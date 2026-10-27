@@ -174,7 +174,7 @@ export const adminPartsRouter = new Hono<AppEnv>()
         documentId,
         part.versionId,
         part.partDrawingEntityId,
-        credentials,
+        { db, teamId, credentials },
       );
 
       // Store in R2 with revision in path (stamps the part-number barcode on the way in)
@@ -308,11 +308,16 @@ export const adminPartsRouter = new Hono<AppEnv>()
         const url = eventsUrl(c.env, teamId);
         if (before.documentId && before.documentId !== documentId && before.credentials) {
           console.log("[OnShape Config] Document ID changed, updating webhook registration");
-          await unregisterOnShapeWebhooks(before.documentId, before.credentials, url);
+          await unregisterOnShapeWebhooks(
+            before.documentId,
+            { db, teamId, credentials: before.credentials },
+            url,
+          );
         }
-        await unregisterOnShapeWebhooks(documentId, config.credentials, url);
+        const api = { db, teamId, credentials: config.credentials };
+        await unregisterOnShapeWebhooks(documentId, api, url);
         try {
-          await registerOnShapeWebhook(documentId, config.credentials, config.companyId, url);
+          await registerOnShapeWebhook(documentId, api, config.companyId, url);
           webhook = "registered";
         } catch (err) {
           console.error("[OnShape Config] Webhook registration failed", err);

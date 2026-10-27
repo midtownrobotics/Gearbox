@@ -16,11 +16,13 @@ import {
   inputClass,
   useTeamChat,
 } from "@g3/ui";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { api } from "../../shared/api";
 import { getErrorMessage } from "../../shared/api-error";
 import { InfoTip } from "../../shared/info-tip";
 import { enableKioskMode } from "../../shared/kiosk";
+import { refreshOnshapeStatus } from "../../shared/onshape-banner";
 import {
   PROCESS_TYPE_LABELS,
   type Process,
@@ -32,6 +34,7 @@ import { useAuthUser, useRefreshAuthUser } from "../../shared/use-auth";
 import { useShopData } from "../../shared/use-shop-data";
 import { ActionsLog } from "./actions-log";
 import { sectionHeading } from "./admin-styles";
+import { OnshapeUsage } from "./onshape-usage";
 import { QualityReports } from "./quality-reports";
 import { StatusLevelsSettings } from "./status-levels";
 
@@ -291,6 +294,13 @@ export function AdminPage() {
         {isAdmin && (
           <Section title="Onshape Configuration" defaultOpen={false}>
             {data ? <OnShapeConfig /> : <Loading />}
+          </Section>
+        )}
+
+        {/* Opened by the Onshape banner's link (`#onshape`). */}
+        {isAdmin && (
+          <Section title="Onshape API Usage" id="onshape" defaultOpen={false}>
+            <OnshapeUsage />
           </Section>
         )}
 
@@ -637,16 +647,27 @@ function KioskModeSettings() {
 
 function Section({
   title,
+  id,
   defaultOpen = true,
   children,
 }: {
   title: string;
+  /** Opens the section, and scrolls to it, when the address ends in `#<id>`. */
+  id?: string;
   defaultOpen?: boolean;
   children: React.ReactNode;
 }) {
-  const [open, setOpen] = useState(defaultOpen);
+  const { hash } = useLocation();
+  const linked = id !== undefined && hash === `#${id}`;
+  const [open, setOpen] = useState(defaultOpen || linked);
+  const ref = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (!linked) return;
+    setOpen(true);
+    ref.current?.scrollIntoView({ block: "start" });
+  }, [linked]);
   return (
-    <section className="bg-surface border border-secondary-200 rounded-xl">
+    <section ref={ref} id={id} className="bg-surface border border-secondary-200 rounded-xl">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
@@ -1108,6 +1129,7 @@ function OnShapeConfig() {
             : { ok: true, text: "Saved. Add the API keys and company ID to receive releases." },
       );
       await loadConfig();
+      refreshOnshapeStatus();
     } catch (err) {
       setBanner({ ok: false, text: err instanceof Error ? err.message : "Failed to save config" });
     } finally {

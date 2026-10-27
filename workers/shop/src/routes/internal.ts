@@ -8,6 +8,8 @@ import {
   drawings,
   files,
   kioskPresence,
+  onshapeApiErrors,
+  onshapeApiUsage,
   onshapeParts,
   onshapeReleases,
   partDefinitionProcessBlueprints,
@@ -79,6 +81,8 @@ export const internalRouter = new Hono<AppEnv>()
       shopManagers,
       qualityReports,
       qualityCheckItems,
+      onshapeApiUsage,
+      onshapeApiErrors,
     ]);
     tables.admin_settings = (tables.admin_settings ?? []).filter(
       (row) => !SECRET_SETTINGS.includes(String(row.key)),
@@ -107,7 +111,7 @@ export const internalRouter = new Hono<AppEnv>()
     if (onshape?.documentId && onshape.credentials) {
       await unregisterOnShapeWebhooks(
         onshape.documentId,
-        onshape.credentials,
+        { db, teamId, credentials: onshape.credentials },
         `${shopUrl(c.env, teamId)}/api/onshape/events`,
       );
     }
@@ -140,6 +144,9 @@ export const internalRouter = new Hono<AppEnv>()
       shopManagers,
       qualityReports,
       qualityCheckItems,
+      // After the webhook calls above, which are counted here too.
+      onshapeApiUsage,
+      onshapeApiErrors,
     ]);
     return c.json({ ok: true });
   });
