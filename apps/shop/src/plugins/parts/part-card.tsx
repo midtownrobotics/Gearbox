@@ -15,6 +15,8 @@ import { getErrorMessage } from "../../shared/api-error";
 import { batchAt, batchesById, currentBatch } from "../../shared/batches";
 import { type InstanceRow, STATUS_LABELS } from "../../shared/derive";
 import { processPath, shopViewPath } from "../../shared/nav";
+import { onshapeLinkFor, useOnshapeLinks } from "../../shared/onshape-links";
+import { OnshapePartLinks } from "../../shared/onshape-part-links";
 import { PrintDrawingButton } from "../../shared/print-drawing-button";
 import type { ShopData } from "../../shared/use-shop-data";
 import { useUserNames } from "../../shared/use-user-names";
@@ -59,6 +61,7 @@ export function PartCard({
   onChanged: () => Promise<void>;
 }) {
   const navigate = useNavigate();
+  const onshapeLinks = useOnshapeLinks();
   const [banner, setBanner] = useState<string | null>(null);
   const [addInstanceFeedback, setAddInstanceFeedback] = useState<"success" | "error" | null>(null);
   const [addInstanceError, setAddInstanceError] = useState<string | null>(null);
@@ -190,15 +193,24 @@ export function PartCard({
         {/* Above the page's own layers (the drawing is one), so nothing shows over it. */}
         <div className="sticky top-0 z-10 bg-surface border-b border-secondary-200 flex items-start justify-between gap-3 px-5 py-4">
           <div className="min-w-0">
-            <h2 className="text-3xl text-secondary-900 truncate">
+            <h2 className="text-3xl text-secondary-900 truncate" title={row.definition.name}>
               {row.definition.name}{" "}
               <span className="text-secondary-400 text-2xl">
                 #{activePosition} of {totalInstances}
               </span>
             </h2>
-            <p className="text-sm text-secondary-500 font-mono">
-              {row.definition.onshapePartNumber} · Rev {row.definition.revision}
-            </p>
+            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm">
+              <p className="text-secondary-500 font-mono break-words min-w-0">
+                {row.definition.onshapePartNumber} · Rev {row.definition.revision}
+              </p>
+              <OnshapePartLinks
+                link={onshapeLinkFor(
+                  onshapeLinks,
+                  row.definition.onshapePartNumber,
+                  row.definition.revision,
+                )}
+              />
+            </div>
             {isObsolete && (
               <span className="inline-block mt-1.5 text-[10px] font-semibold uppercase tracking-wider text-secondary-500 bg-inset border border-secondary-300 rounded-full px-2 py-0.5">
                 Obsolete · view only

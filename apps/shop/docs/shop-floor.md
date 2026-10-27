@@ -14,6 +14,8 @@ The [Shop Floor](team:shop/board) shows one process at a time, with what's **rea
 
 Parts marked as priority show first.
 
+**Switch to details view** on a part, or open one from the Parts page, for everything about it. **Open in Onshape** opens the part at that revision, and **Release** the release it came from.
+
 ## Quality control
 
 At a Quality Control process, only a shop manager or an admin can mark a part complete. Others see **Needs a shop manager**.
