@@ -167,6 +167,8 @@ export const orderRequests = sqliteTable(
     quantity: integer("quantity").notNull(),
     /** How many parts one of `quantity` is: 4 for a pack of 4 (lib/pack-quantity.ts). */
     packQuantity: integer("pack_quantity").notNull().default(1),
+    /** What the pack quantity counts ("ft" for a 100 ft spool); "" for one of each. */
+    packUnit: text("pack_unit").notNull().default(""),
     /**
      * Where the parts went in the Inventory app when received (a location's id there), to offer
      * the same place next time (lib/inventory.ts). Null when they weren't put in Inventory.
@@ -297,6 +299,8 @@ export const catalogItems = sqliteTable(
     priceAt: integer("price_at"),
     /** How many parts one of this product is: 4 for a pack of 4. Requests for it start with this. */
     packQuantity: integer("pack_quantity").notNull().default(1),
+    /** What the pack quantity counts ("ft"); "" for one of each. Requests start with this too. */
+    packUnit: text("pack_unit").notNull().default(""),
     storePlatform: text("store_platform"),
     storeVariantId: text("store_variant_id"),
     source: text("source", { enum: ["frcdesign", "request"] }).notNull(),

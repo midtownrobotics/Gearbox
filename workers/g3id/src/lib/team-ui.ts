@@ -75,7 +75,7 @@ export function isTeamUiSettings(value: unknown): value is TeamUiSettings {
     typeof value.shortName === "string" &&
     value.shortName.trim().length > 0 &&
     value.shortName.length <= 24 &&
-    isLink(value.logoUrl) &&
+    typeof value.useAvatar === "boolean" &&
     ["Agency FB", "Ubuntu", "system-ui"].includes(String(value.displayFont)) &&
     ["system", "light", "dark"].includes(String(value.defaultTheme)) &&
     typeof value.linkAccents === "boolean" &&
@@ -141,9 +141,12 @@ export function readTeamUiSettings(
   try {
     const value: unknown = JSON.parse(json);
     if (!isRecord(value) || !isRecord(value.links)) return defaults;
-    const stored = withoutPrimaryColor(value);
+    const { logoUrl, ...stored } = withoutPrimaryColor(value);
     const settings = {
       ...stored,
+      // Saved when a team gave its logo's address: a team that had a logo shows its avatar.
+      useAvatar:
+        "useAvatar" in stored ? stored.useAvatar : typeof logoUrl === "string" && !!logoUrl,
       linkAccents: "linkAccents" in stored ? stored.linkAccents : defaults.linkAccents,
       // Saved before button text was a choice: automatic.
       buttonText: "buttonText" in stored ? stored.buttonText : defaults.buttonText,

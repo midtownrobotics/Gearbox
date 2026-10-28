@@ -22,9 +22,9 @@ const post = (body?: unknown) => ({ method: "POST", body });
 /** Its own CAM (makes files) → Router (uses them) → Deburr, and a part that goes through them. */
 async function shop() {
   const tag = crypto.randomUUID().slice(0, 8);
-  const subsystem = await jsonAs<Id>(student, "/subsystems", post({ name: `Arm ${tag}` }), 201);
+  const subsystem = await jsonAs<Id>(admin, "/subsystems", post({ name: `Arm ${tag}` }), 201);
   const make = (name: string, type: string) =>
-    jsonAs<Id>(student, "/processes", post({ name: `${name} ${tag}`, type }), 201);
+    jsonAs<Id>(admin, "/processes", post({ name: `${name} ${tag}`, type }), 201);
   const cam = await make("CAM", "file_producer");
   const router = await make("Router", "file_consumer");
   const laser = await make("Laser", "file_consumer");
@@ -506,7 +506,7 @@ describe("the order of file processes", () => {
 
   it("is checked when a part is made", async () => {
     const s = await shop();
-    const subsystem = await jsonAs<Id>(student, "/subsystems", post({ name: "Order" }), 201);
+    const subsystem = await jsonAs<Id>(admin, "/subsystems", post({ name: "Order" }), 201);
     const res = await callAs(
       student,
       "/part-definitions",

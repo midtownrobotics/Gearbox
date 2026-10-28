@@ -15,6 +15,7 @@ const now = Date.now();
 type Sent = {
   sourceKey: string;
   quantity: number;
+  unit?: string;
   name: string;
   listing: {
     catalogItemId: number | null;
@@ -38,6 +39,8 @@ async function ordered(part: {
   catalogItemId?: number;
   /** How many parts one of the quantity is. */
   packQuantity?: number;
+  /** What the pack quantity counts ("ft"). */
+  packUnit?: string;
 }) {
   const category = await db
     .prepare(
@@ -54,9 +57,9 @@ async function ordered(part: {
   const row = await db
     .prepare(
       `INSERT INTO order_requests (team_id, requester_id, requester_name, url, vendor, title, sku, quantity,
-         pack_quantity, unit_price_cents, catalog_item_id, category_id, reason, status, order_id,
-         created_at, updated_at)
-       VALUES (?, ?, 'Sam Student', ?, 'WCP', ?, 'WCP-0500', ?, ?, 1299, ?, ?, 'test', 'ordered', ?, ?, ?)
+         pack_quantity, pack_unit, unit_price_cents, catalog_item_id, category_id, reason, status,
+         order_id, created_at, updated_at)
+       VALUES (?, ?, 'Sam Student', ?, 'WCP', ?, 'WCP-0500', ?, ?, ?, 1299, ?, ?, 'test', 'ordered', ?, ?, ?)
        RETURNING id`,
     )
     .bind(
@@ -66,6 +69,7 @@ async function ordered(part: {
       part.title,
       part.quantity ?? 1,
       part.packQuantity ?? 1,
+      part.packUnit ?? "",
       part.catalogItemId ?? null,
       category?.id,
       order?.id,
@@ -206,6 +210,37 @@ describe("where received parts go", () => {
     }>(student, "/orders/receiving");
     const line = page.recent.flatMap((o) => o.lines).find((l) => l.id === wheels.id);
     expect(line).toMatchObject({ quantity: 2, packQuantity: 4 });
+  });
+
+  it("sends a pack's unit with it: a spool of 100 ft is 100 ft", async () => {
+    // Two spools of 100 ft at $12.99 each: 200 ft, about 13¢ a foot.
+    const wire = await ordered({
+      title: "Red wire",
+      quantity: 2,
+      packQuantity: 100,
+      packUnit: "ft",
+    });
+    await jsonAs<Received>(student, "/orders/receive", {
+      method: "POST",
+      body: { ids: [wire.id], inventory: storage },
+    });
+    expect(await sentFor(wire.id)).toMatchObject([
+      { quantity: 200, unit: "ft", listing: { priceCents: 13 } },
+    ]);
+    // One of each says so too.
+    const bolt = await ordered({ title: "Bolt" });
+    await jsonAs<Received>(student, "/orders/receive", {
+      method: "POST",
+      body: { ids: [bolt.id], inventory: storage },
+    });
+    expect(await sentFor(bolt.id)).toMatchObject([{ quantity: 1, unit: "" }]);
+    const page = await jsonAs<{ recent: { lines: { id: number; packUnit: string }[] }[] }>(
+      student,
+      "/orders/receiving",
+    );
+    expect(page.recent.flatMap((o) => o.lines).find((l) => l.id === wire.id)).toMatchObject({
+      packUnit: "ft",
+    });
   });
 
   it("marks nothing received when Inventory refuses or is down", async () => {
@@ -359,8 +394,14 @@ describe("where each part goes", () => {
 
     const { defaults } = await defaultsFor([known.id, again.id, fresh.id, loose.id]);
     expect(defaults).toEqual({
-      [known.id]: { locationId: 2, from: "entry", entryName: "Known bearing" },
-      [again.id]: { locationId: 3, from: "history", entryName: null },
+      [known.id]: { locationId: 2, from: "entry", entryName: "Known bearing", entryUnit: "" },
+      [again.id]: { locationId: 3, from: "history", entryName: null, entryUnit: null },
+    });
+    // What the entry counts in, so the pop-up can say when the pack's unit is another.
+    const wire = await ordered({ title: "Wire by the spool", catalogItemId: 904 });
+    expect((await defaultsFor([wire.id])).defaults[wire.id]).toMatchObject({
+      entryName: "Red wire",
+      entryUnit: "ft",
     });
     // The latest place wins: received somewhere else now, that's where the next one starts.
     await jsonAs(student, "/orders/receive", {

@@ -7,9 +7,11 @@
     "node": ">=24"
   },
   "scripts": {
-    "start": "vite build && node --env-file-if-exists=config.env src/index.ts",
+    "start": "node --env-file-if-exists=config.env src/index.ts",
+    "start:build": "vite build && node --env-file-if-exists=config.env src/index.ts",
     "watch": "node --env-file-if-exists=config.env --watch-path=src src/index.ts --watch-page",
     "build": "vite build",
+    "build:release": "vite build --outDir ../page",
     "smoke": "vite build && node scripts/smoke.ts",
     "typecheck": "tsc --noEmit && tsc --noEmit -p web"
   },

@@ -127,6 +127,8 @@ const APPS: App[] = [
       shopManagers: "shop_managers",
       qualityReports: "quality_reports",
       qualityCheckItems: "quality_check_items",
+      onshapeApiUsage: "onshape_api_usage",
+      onshapeApiErrors: "onshape_api_errors",
     },
   },
   {
@@ -153,6 +155,7 @@ const APPS: App[] = [
       locations: "locations",
       robots: "robots",
       subsystems: "subsystems",
+      units: "units",
       items: "items",
       itemListings: "item_listings",
       stock: "stock",

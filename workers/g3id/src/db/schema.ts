@@ -68,6 +68,8 @@ export const coreUsers = sqliteTable(
     createdAt: integer("created_at").notNull(),
     updatedAt: integer("updated_at").notNull(),
     lastLoginAt: integer("last_login_at"),
+    /** When they last used any app (/auth/me), at most a minute out (migration 0022). */
+    lastSeenAt: integer("last_seen_at"),
     deletedAt: integer("deleted_at"),
   },
   (table) => [

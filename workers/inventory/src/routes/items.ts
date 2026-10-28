@@ -33,6 +33,7 @@ import {
   takeStock,
   tidyStorage,
 } from "../lib/stock";
+import { MAX_UNIT, cleanUnit, formatQuantity, sameUnit, unitName } from "../lib/units";
 import type { AppEnv } from "../types";
 
 // Entries: one kind of part each, with the team's fields, the vendors' listings it can be bought
@@ -43,6 +44,8 @@ import type { AppEnv } from "../types";
 const HISTORY_LIMIT = 500;
 
 const GONE = "That entry no longer exists.";
+
+const UNIT_ERROR = `unit must be up to ${MAX_UNIT} characters.`;
 
 /** Other names for the stock table, for subqueries about other rows of it. */
 const s = alias(stock, "s");
@@ -81,6 +84,8 @@ const itemRow = (db: Db, team: string, id: number | null) =>
 
 type NewItem = {
   name: string;
+  /** "" for one of each. */
+  unit: string;
   values: unknown;
   /** Where the parts are kept and how many there are, if that's known yet. */
   stock: { quantity: number; locationId: number } | null;
@@ -92,6 +97,8 @@ const newItemValidator = validator("json", (value, c): NewItem => {
   const fail = (error: string) => c.json({ error }, 400) as never;
   const name = textField(v.name, 200, true);
   if (name === null) return fail("name must be 1–200 characters.");
+  const unit = cleanUnit(v.unit);
+  if (unit === null) return fail(UNIT_ERROR);
   let stock: NewItem["stock"] = null;
   if (v.stock !== undefined && v.stock !== null) {
     const s = v.stock as Record<string, unknown>;
@@ -107,16 +114,23 @@ const newItemValidator = validator("json", (value, c): NewItem => {
     if ("error" in parsed) return fail(parsed.error);
     listing = parsed;
   }
-  return { name, values: v.values ?? {}, stock, listing };
+  return { name, unit, values: v.values ?? {}, stock, listing };
 });
 
-const editValidator = validator("json", (value, c): { name?: string; values?: unknown } => {
+type Edit = { name?: string; unit?: string; values?: unknown };
+
+const editValidator = validator("json", (value, c): Edit => {
   const v = (value ?? {}) as Record<string, unknown>;
-  const out: { name?: string; values?: unknown } = {};
+  const out: Edit = {};
   if (v.name !== undefined) {
     const name = textField(v.name, 200, true);
     if (name === null) return c.json({ error: "name must be 1–200 characters." }, 400) as never;
     out.name = name;
+  }
+  if (v.unit !== undefined) {
+    const unit = cleanUnit(v.unit);
+    if (unit === null) return c.json({ error: UNIT_ERROR }, 400) as never;
+    out.unit = unit;
   }
   if (v.values !== undefined) out.values = v.values;
   return out;
@@ -212,6 +226,7 @@ export const itemsRouter = new Hono<AppEnv>()
       .values(
         withTeam(team, {
           name: body.name,
+          unit: body.unit,
           fieldValues: JSON.stringify(applied.values),
           createdById: by.id,
           createdByName: by.name,
@@ -222,7 +237,9 @@ export const itemsRouter = new Hono<AppEnv>()
       .returning({ id: items.id })
       .get();
     const note =
-      place && body.stock ? `${body.stock.quantity} in ${describePlace(place, names)}.` : null;
+      place && body.stock
+        ? `${formatQuantity(body.stock.quantity, body.unit)} in ${describePlace(place, names)}.`
+        : null;
     try {
       await db.batch([
         logEvent(db, team, made.id, "created", note, by, now),
@@ -271,6 +288,10 @@ export const itemsRouter = new Hono<AppEnv>()
     const changed: string[] = [];
     const name = body.name ?? row.name;
     if (name !== row.name) changed.push("Name");
+    const unit = body.unit ?? row.unit;
+    // Only the unit changes: the quantities stay as they are.
+    const unitNote = unit !== row.unit ? `Unit ${unitName(row.unit)} → ${unitName(unit)}.` : null;
+    if (unit !== row.unit) changed.push("Unit");
     let fieldValues = row.fieldValues;
     if (body.values !== undefined) {
       const applied = applyValues(
@@ -288,11 +309,13 @@ export const itemsRouter = new Hono<AppEnv>()
     const note =
       name !== row.name && changed.length === 1
         ? `Renamed from "${row.name}".`
-        : `Changed ${changed.join(", ")}.`;
+        : unitNote && changed.length === 1
+          ? unitNote
+          : `Changed ${changed.join(", ")}.`;
     await db.batch([
       db
         .update(items)
-        .set({ name, fieldValues, updatedAt: now })
+        .set({ name, unit, fieldValues, updatedAt: now })
         .where(inTeam(items, team, eq(items.id, row.id))),
       logEvent(db, team, row.id, "edited", note, actorOf(c), now),
     ]);
@@ -328,7 +351,7 @@ export const itemsRouter = new Hono<AppEnv>()
         team,
         row.id,
         "added",
-        quantity > 0 ? `${quantity} in ${where}.` : `Kept in ${where}.`,
+        quantity > 0 ? `${formatQuantity(quantity, row.unit)} in ${where}.` : `Kept in ${where}.`,
         actorOf(c),
         now,
       ),
@@ -408,7 +431,8 @@ export const itemsRouter = new Hono<AppEnv>()
   /**
    * Combines another entry into this one: equivalent parts (the same bolt from two vendors) as one
    * entry. Its stock, listings and history move here, its values fill this entry's blanks, and it
-   * is gone.
+   * is gone. This entry keeps its unit: the other's quantities are added as they are (the page
+   * says so first when the units differ).
    */
   .post("/:id/merge", requireMentor, mergeValidator, async (c) => {
     const id = parseId(c.req.param("id"));
@@ -432,9 +456,15 @@ export const itemsRouter = new Hono<AppEnv>()
     );
     const parts = from.stock.reduce((sum, row) => sum + row.quantity, 0);
     const listings = from.listings.length;
-    const note = `"${from.name}" merged in: ${parts} ${parts === 1 ? "part" : "parts"}, ${listings} ${
+    const amount = from.unit
+      ? formatQuantity(parts, from.unit)
+      : `${parts} ${parts === 1 ? "part" : "parts"}`;
+    const unlike = sameUnit(from.unit, into.unit)
+      ? ""
+      : `, counted ${unitName(from.unit)} there and ${unitName(into.unit)} here`;
+    const note = `"${from.name}" merged in: ${amount}, ${listings} ${
       listings === 1 ? "listing" : "listings"
-    }.`;
+    }${unlike}.`;
     // `same` matches another row with the stock row in the same place.
     const same = (other: StockTable): SQL[] => [
       eq(other.locationId, stock.locationId),
@@ -562,6 +592,7 @@ export const itemsRouter = new Hono<AppEnv>()
       .values(
         withTeam(team, {
           name,
+          unit: item.unit,
           fieldValues: row?.fieldValues ?? "{}",
           createdById: by.id,
           createdByName: by.name,
@@ -619,7 +650,7 @@ export const itemsRouter = new Hono<AppEnv>()
           team,
           item.id,
           "split",
-          `"${name}" split off as its own entry${moved > 0 ? `, with ${moved}` : ""}.`,
+          `"${name}" split off as its own entry${moved > 0 ? `, with ${formatQuantity(moved, item.unit)}` : ""}.`,
           by,
           now,
           null,

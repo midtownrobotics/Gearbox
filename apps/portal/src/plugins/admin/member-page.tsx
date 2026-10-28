@@ -15,7 +15,14 @@ import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { g3id as api } from "../../lib/api";
 import { type Reporter, reporterIds } from "../../lib/platform";
-import { PROVIDERS, ProviderIcon, STATUS_STYLES, type User, relativeTime } from "./members-shared";
+import {
+  PROVIDERS,
+  ProviderIcon,
+  STATUS_STYLES,
+  type User,
+  isOnline,
+  relativeTime,
+} from "./members-shared";
 
 // One member of the team, opened from the Users list: their details, the accounts they sign in
 // with, and what an admin can do for them.
@@ -236,6 +243,13 @@ export function MemberPage() {
               />
               <Row label="Username">{user.username ?? "None"}</Row>
               <Row label="Joined">{longDate(user.createdAt)}</Row>
+              <Row label="Last online">
+                {isOnline(user)
+                  ? "Online now"
+                  : user.lastSeenAt
+                    ? `${longDate(user.lastSeenAt)} (${relativeTime(user.lastSeenAt)})`
+                    : "Not yet seen"}
+              </Row>
               <Row label="Last signed in">
                 {user.lastLoginAt
                   ? `${longDate(user.lastLoginAt)} (${relativeTime(user.lastLoginAt)})`

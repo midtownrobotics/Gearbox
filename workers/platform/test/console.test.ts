@@ -336,7 +336,7 @@ describe("notifications", () => {
 
   it("are written and deleted by operators only, and logged", async () => {
     const input = {
-      type: "warning",
+      type: "info",
       summary: "Down Saturday",
       body: "From 8 to 10 am.",
       expiresAt: inADay(),
@@ -373,6 +373,20 @@ describe("notifications", () => {
     expect((await create(operator, { ...ok, expiresAt: nowS + 400 * 86400 })).status).toBe(400);
     expect((await create(operator, { ...ok, type: "info" })).status).toBe(201);
   });
+
+  it("leave out a team's own", async () => {
+    const id = crypto.randomUUID();
+    const team = await createTeam();
+    await testEnv.PLATFORM_DB.prepare(
+      `INSERT INTO notifications (id, type, team_id, summary, body, expires_at, created_by, created_at)
+       VALUES (?1, 'info', ?2, 'Team only', 'Body', ?3, 'u-founder', 1)`,
+    )
+      .bind(id, team.id, inADay())
+      .run();
+    const list = (await (await call(operator, "/notifications")).json()) as { id: string }[];
+    expect(list.map((n) => n.id)).not.toContain(id);
+    expect((await call(operator, `/notifications/${id}`, { method: "DELETE" })).status).toBe(404);
+  });
 });
 
 describe("telling operators", () => {
@@ -384,5 +398,53 @@ describe("telling operators", () => {
       await testEnv.G3ID.fetch("http://g3id/api/internal/teams/frc1648/chat/dm-members")
     ).json()) as { userIds: string[]; text: string }[];
     expect(sent.find((m) => m.text === text)?.userIds).toContain(operator.id);
+  });
+});
+
+describe("stats", () => {
+  type Stats = {
+    teams: { active: number; pending: number; suspended: number; newThisMonth: number };
+    members: { active: number; online: number; activeWeek: number };
+    apps: { slug: string; teams: number }[];
+  };
+  const stats = async () => (await (await call(operator, "/stats")).json()) as Stats;
+  const appOn = (teamId: string, app: string, enabled = true) =>
+    testEnv.PLATFORM_DB.prepare(
+      "INSERT OR REPLACE INTO team_apps (team_id, app, enabled, changed_at) VALUES (?, ?, ?, 1)",
+    )
+      .bind(teamId, app, enabled ? 1 : 0)
+      .run();
+
+  it("is for operators only", async () => {
+    expect((await call(student, "/stats")).status).toBe(403);
+  });
+
+  it("counts teams, members and the apps active teams have on, leaving out the demo", async () => {
+    const before = await stats();
+    const active = await createTeam();
+    const pending = await createTeam("pending");
+    await appOn(active.id, "orders");
+    await appOn(active.id, "pit", false);
+    await appOn(pending.id, "orders");
+    // The public demo has every app on, and isn't counted.
+    const demo = `frc${site.demo.teamNumber}`;
+    await testEnv.PLATFORM_DB.prepare(
+      `INSERT OR IGNORE INTO teams (id, team_number, name, country, status, created_at, updated_at)
+       VALUES (?1, ?2, 'Demo', 'US', 'active', 1, 1)`,
+    )
+      .bind(demo, site.demo.teamNumber)
+      .run();
+    await appOn(demo, "orders");
+    await appOn(demo, "pit");
+
+    const after = await stats();
+    expect(after.teams.active).toBe(before.teams.active + 1);
+    expect(after.teams.pending).toBe(before.teams.pending + 1);
+    const teamsWith = (s: Stats, app: string) => s.apps.find((a) => a.slug === app)?.teams;
+    expect(teamsWith(after, "orders")).toBe((teamsWith(before, "orders") ?? 0) + 1);
+    expect(teamsWith(after, "pit")).toBe(teamsWith(before, "pit"));
+    // ID and Portal are always on.
+    expect(after.apps.map((a) => a.slug)).not.toContain("id");
+    expect(after.members).toMatchObject({ active: 12, online: 1, activeWeek: 8 });
   });
 });

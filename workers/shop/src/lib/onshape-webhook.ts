@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import type { createShopDb } from "../db";
 import * as schema from "../db/schema";
 import type { BOMQueueMessage } from "./bom-queue-consumer";
-import { type OnshapeCredentials, basicAuth } from "./onshape-config";
+import { type OnshapeApi, onshapeFetch } from "./onshape-api";
 
 type ShopDb = ReturnType<typeof createShopDb>;
 
@@ -77,13 +77,14 @@ type OnshapeWebhook = { id: string; name?: string; url?: string };
  */
 export async function unregisterOnShapeWebhooks(
   documentId: string,
-  credentials: OnshapeCredentials,
+  api: OnshapeApi,
   eventsUrl: string,
 ) {
   try {
-    const listResponse = await fetch(
-      `https://cad.onshape.com/api/v16/webhooks?documentId=${documentId}`,
-      { headers: { Authorization: basicAuth(credentials) } },
+    const listResponse = await onshapeFetch(
+      api,
+      "webhook_list",
+      `/v16/webhooks?documentId=${documentId}`,
     );
     if (!listResponse.ok) {
       console.warn("[OnShape] Failed to list webhooks for cleanup");
@@ -92,10 +93,12 @@ export async function unregisterOnShapeWebhooks(
     const webhooks = (await listResponse.json()) as { items?: OnshapeWebhook[] };
     for (const webhook of webhooks.items ?? []) {
       if (webhook.url !== eventsUrl && webhook.name !== WEBHOOK_NAME) continue;
-      const deleteResponse = await fetch(`https://cad.onshape.com/api/v16/webhooks/${webhook.id}`, {
-        method: "DELETE",
-        headers: { Authorization: basicAuth(credentials) },
-      });
+      const deleteResponse = await onshapeFetch(
+        api,
+        "webhook_delete",
+        `/v16/webhooks/${webhook.id}`,
+        { method: "DELETE" },
+      );
       if (deleteResponse.ok) {
         console.log("[OnShape Webhook Unregistered]", { documentId, webhookId: webhook.id });
       }
@@ -111,16 +114,13 @@ export async function unregisterOnShapeWebhooks(
 /** Registers Shop's webhook on a document, calling back on the team's own events address. */
 export async function registerOnShapeWebhook(
   documentId: string,
-  credentials: OnshapeCredentials,
+  api: OnshapeApi,
   companyId: string,
   eventsUrl: string,
 ) {
-  const response = await fetch("https://cad.onshape.com/api/v16/webhooks", {
+  const response = await onshapeFetch(api, "webhook_create", "/v16/webhooks", {
     method: "POST",
-    headers: {
-      Authorization: basicAuth(credentials),
-      "Content-Type": "application/json",
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       documentId,
       companyId,
@@ -202,18 +202,16 @@ export async function fetchAndParseBOM(
   documentId: string,
   versionId: string,
   mainAssemblyId: string,
-  credentials: OnshapeCredentials,
+  api: OnshapeApi,
 ): Promise<
   Map<string, { quantity?: number; name?: string; description?: string; revision?: string }>
 > {
   const bomStartTime = Date.now();
-  const bomUrl = `https://cad.onshape.com/api/v16/assemblies/d/${documentId}/v/${versionId}/e/${mainAssemblyId}/bom?indented=false`;
+  const bomPath = `/v16/assemblies/d/${documentId}/v/${versionId}/e/${mainAssemblyId}/bom?indented=false`;
 
   try {
     console.log("[BOM Fetch] Starting BOM request");
-    const response = await fetch(bomUrl, {
-      headers: { Authorization: basicAuth(credentials) },
-    });
+    const response = await onshapeFetch(api, "bom", bomPath);
     console.log(
       `[BOM Fetch] Response received after ${Date.now() - bomStartTime}ms, status: ${response.status}`,
     );

@@ -1,0 +1,1 @@
+@../../workers/inventory/AGENTS.md

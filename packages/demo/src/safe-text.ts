@@ -105,6 +105,7 @@ export const SAFE_TEXT = {
   material: ["Aluminum 6061", "Steel", "Polycarbonate", "Delrin", "Carbon fiber"],
   /** A size or thickness. */
   size: ["1/8 in", "1/4 in", "1/16 in", "1/2 in hex", "2 in", "10-32"],
+  unit: ["ft", "in", "sheet", "kg", "roll"],
   revision: ["A", "B", "C"],
   location: ["Shelf A", "Bin 12", "Workbench", "Pit cart", "Tool wall", "Drawer 3", "Back room"],
   /** A short code: a budget category's, a battery's, a process's. */
@@ -187,11 +188,22 @@ export const SAFE_TEXT = {
   template: ["{vendor} {sku} – {title}", "{title} ({vendor})", "{vendor} – {title}"],
   keyword: ["bolt", "bearing", "motor", "wire", "drill"],
   process: ["CAM", "Router", "Lathe", "Mill", "Welding", "Deburr", "Assembly"],
+  /** Shop's status words for how full its queue is. */
+  shopStatus: ["Mooing Cow 🐮", "Chopping Block 🔪", "Raw 🥩", "Rare 🍖", "Cooked 🍳", "Ash 🔥"],
   icon: ["🔧", "⚙️", "🤖", "🛠️", "🔩", "💡"],
   /** A skill tree's name. */
   tree: ["Safety", "Manufacturing", "Programming", "Electrical", "Design"],
   role: ["Drive Team", "Scouting", "Pit", "Break", "Lunch", "Media"],
   period: ["Load in", "Practice matches", "Lunch", "Qualification matches", "Awards"],
+  /** A notification a team's admins send its members. */
+  announcement: [
+    "Build session moved to Saturday",
+    "The shop is closed on Friday",
+    "Bring safety glasses to every meeting",
+    "Sign up for the district event by Monday",
+    "This Saturday's build session starts at 9 AM instead of 10. Bring safety glasses, and sign in at the door as usual.",
+    "The shop is closed on Friday for a school event. The next build session is Saturday as usual.",
+  ],
   /** A Slack channel's id (the demo can't connect Slack, so these only fill the field). */
   channel: ["C0DEMO0001", "C0DEMO0002"],
 } as const satisfies Record<string, readonly string[]>;

@@ -1,4 +1,4 @@
-import { type OnshapeCredentials, basicAuth } from "./onshape-config";
+import { type OnshapeApi, onshapeFetch } from "./onshape-api";
 
 // An approved Onshape release package (GET /api/v10/releasepackages/:id): what it's called, who
 // made and approved it, and the parts and drawings in it with their part numbers and revisions.
@@ -119,11 +119,13 @@ export function parseReleasePackage(pkg: ReleasePackage): {
 }
 
 /** The release package from Onshape, or null when it can't be read. */
-export async function fetchReleasePackage(releaseId: string, credentials: OnshapeCredentials) {
+export async function fetchReleasePackage(releaseId: string, api: OnshapeApi) {
   try {
-    const response = await fetch(
-      `https://cad.onshape.com/api/v10/releasepackages/${encodeURIComponent(releaseId)}`,
-      { headers: { Authorization: basicAuth(credentials), Accept: "application/json" } },
+    const response = await onshapeFetch(
+      api,
+      "release_package",
+      `/v10/releasepackages/${encodeURIComponent(releaseId)}`,
+      { headers: { Accept: "application/json" } },
     );
     if (!response.ok) {
       console.error("[Release Fetch Error]", releaseId, response.status, response.statusText);

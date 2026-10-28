@@ -11,10 +11,13 @@ import { type Places, labelOf, locationLabel, useLabel } from "../../shared/plac
 import { type Row, rowsOf } from "../../shared/rows";
 import { StatusBadge } from "../../shared/status-badge";
 import { type StockAction, StockActionDialog } from "../../shared/stock-cells";
+import { UnitSuffix, formatQuantity } from "../../shared/units";
+import { NewEntryForm } from "../table/new-entry-page";
 
 // The inventory the other way round: every location, as nested panels that open, with what's
 // kept in each. For rearranging: an entry, or everything in a location, moves somewhere else
-// whole. A location's description (what belongs there) is added from its bar.
+// whole. A location's description (what belongs there) is added from its bar. For filling a shelf:
+// Add here adds a new entry kept there, without picking the location each time.
 
 /** A top-level location starts open if it has this many places inside it, or fewer. */
 const OPEN_UP_TO = 20;
@@ -25,9 +28,30 @@ type Held = Row & { stock: NonNullable<Row["stock"]> };
 type Contents = {
   /** What's kept directly in each location. */
   own: Map<number, Held[]>;
-  /** Entries and parts in a location and everything inside it. */
+  /**
+   * Entries and parts in a location and everything inside it. Parts are entries counted one of
+   * each: feet of wire aren't parts.
+   */
   totals: Map<number, { entries: number; parts: number }>;
 };
+
+/** Parts counted one of each, among some rows. */
+const partsIn = (held: Held[]) =>
+  held.reduce((sum, row) => sum + (row.item.unit ? 0 : row.stock.quantity), 0);
+
+/** "3 entries (12 parts, 40 ft)": what some rows are, each unit added up on its own. */
+function contentsLine(held: Held[]): string {
+  const entries = count(new Set(held.map((h) => h.item.id)).size, "entry", "entries");
+  const byUnit = new Map<string, number>();
+  for (const h of held) {
+    const key = [...byUnit.keys()].find((unit) => unit.toLowerCase() === h.item.unit.toLowerCase());
+    byUnit.set(key ?? h.item.unit, (byUnit.get(key ?? h.item.unit) ?? 0) + h.stock.quantity);
+  }
+  const amounts = [...byUnit].map(([unit, n]) =>
+    unit ? formatQuantity(n, unit) : count(n, "part"),
+  );
+  return amounts.length > 0 ? `${entries} (${amounts.join(", ")})` : entries;
+}
 
 function contentsOf(items: ReturnType<typeof useInventory>["items"], places: Places): Contents {
   const own = new Map<number, Held[]>();
@@ -43,7 +67,7 @@ function contentsOf(items: ReturnType<typeof useInventory>["items"], places: Pla
   const total = (id: number): { ids: Set<number>; parts: number } => {
     const mine = own.get(id) ?? [];
     const ids = new Set(mine.map((row) => row.item.id));
-    let parts = mine.reduce((sum, row) => sum + row.stock.quantity, 0);
+    let parts = partsIn(mine);
     for (const child of places.childrenOf.get(id) ?? []) {
       const inside = total(child.id);
       for (const itemId of inside.ids) ids.add(itemId);
@@ -152,8 +176,6 @@ function MoveContentsDialog({
   const [toLocationId, setToLocationId] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const entries = new Set(held.map((h) => h.item.id)).size;
-  const parts = held.reduce((sum, h) => sum + h.stock.quantity, 0);
 
   async function move(e: FormEvent) {
     e.preventDefault();
@@ -180,7 +202,7 @@ function MoveContentsDialog({
     <Dialog title={`Move everything in ${labelOf(row)}`} onClose={onClose}>
       <form onSubmit={move} className="space-y-4">
         <p className="text-sm text-secondary-600">
-          {count(entries, "entry", "entries")} ({count(parts, "part")}) in{" "}
+          {contentsLine(held)} in{" "}
           <span className="font-semibold text-secondary-900">{locationLabel(row.id, places)}</span>{" "}
           move to the place you pick.
         </p>
@@ -217,6 +239,7 @@ function Panel({
   shown,
   onMoveEntry,
   onMoveAll,
+  onAdd,
 }: {
   row: LocationRow;
   depth: number;
@@ -228,6 +251,7 @@ function Panel({
   shown: Set<number> | null;
   onMoveEntry: (held: Held) => void;
   onMoveAll: (row: LocationRow) => void;
+  onAdd: (row: LocationRow) => void;
 }) {
   const children = (places.childrenOf.get(row.id) ?? []).filter(
     (child) => !shown || shown.has(child.id),
@@ -265,7 +289,9 @@ function Panel({
           <span className="shrink-0 whitespace-nowrap text-xs text-secondary-500">
             {total.entries === 0
               ? "Empty"
-              : `${count(total.entries, "entry", "entries")} · ${count(total.parts, "part")}`}
+              : total.parts === 0
+                ? count(total.entries, "entry", "entries")
+                : `${count(total.entries, "entry", "entries")} · ${count(total.parts, "part")}`}
           </span>
         </div>
         {describing ? (
@@ -295,8 +321,15 @@ function Panel({
                   key={held.stock.id}
                   className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-1.5 text-sm"
                 >
-                  <span className="w-12 shrink-0 text-right font-semibold tabular-nums text-secondary-900">
-                    {held.stock.quantity}
+                  <span className="flex w-20 shrink-0 items-baseline justify-end gap-1">
+                    <span className="font-semibold tabular-nums text-secondary-900">
+                      {held.stock.quantity}
+                    </span>
+                    <UnitSuffix
+                      n={held.stock.quantity}
+                      unit={held.item.unit}
+                      className="max-w-10"
+                    />
                   </span>
                   <Link
                     to={`/items/${held.item.id}`}
@@ -317,13 +350,24 @@ function Panel({
               ))}
             </ul>
           )}
-          {own.length > 0 && (
-            <div className="flex justify-end">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {own.length === 0 && children.length === 0 && (
+              <p className="mr-auto text-sm text-secondary-500">Nothing is kept here.</p>
+            )}
+            <button
+              type="button"
+              className={smallButton}
+              aria-label={`Add here, in ${row.name}`}
+              onClick={() => onAdd(row)}
+            >
+              Add here…
+            </button>
+            {own.length > 0 && (
               <button type="button" className={smallButton} onClick={() => onMoveAll(row)}>
                 Move all…
               </button>
-            </div>
-          )}
+            )}
+          </div>
           {children.map((child) => (
             <Panel
               key={child.id}
@@ -336,11 +380,9 @@ function Panel({
               shown={shown}
               onMoveEntry={onMoveEntry}
               onMoveAll={onMoveAll}
+              onAdd={onAdd}
             />
           ))}
-          {own.length === 0 && children.length === 0 && (
-            <p className="text-sm text-secondary-500">Nothing is kept here.</p>
-          )}
         </div>
       )}
     </section>
@@ -357,6 +399,7 @@ export function LocationsPage() {
   const [query, setQuery] = useState("");
   const [action, setAction] = useState<StockAction | null>(null);
   const [movingAll, setMovingAll] = useState<LocationRow | null>(null);
+  const [addingTo, setAddingTo] = useState<LocationRow | null>(null);
 
   // A search shows the locations it finds (by name, description, or an entry kept there), opened, with
   // what they're inside.
@@ -419,8 +462,8 @@ export function LocationsPage() {
       ) : (
         <>
           <p className="text-sm text-secondary-500">
-            What's kept where. Move an entry or everything in a location, and describe what each
-            place is for.
+            What's kept where. Add entries to a location, move an entry or everything in one, and
+            describe what each place is for.
           </p>
           <TextField
             type="search"
@@ -448,6 +491,7 @@ export function LocationsPage() {
                   setAction({ kind: "move", item: held.item, stock: held.stock })
                 }
                 onMoveAll={setMovingAll}
+                onAdd={setAddingTo}
               />
             ))}
           </div>
@@ -460,6 +504,20 @@ export function LocationsPage() {
           held={contents.own.get(movingAll.id) ?? []}
           onClose={() => setMovingAll(null)}
         />
+      )}
+      {addingTo && (
+        <Dialog
+          title={`Add an entry to ${labelOf(addingTo)}`}
+          size="2xl"
+          onClose={() => setAddingTo(null)}
+        >
+          <NewEntryForm
+            framed={false}
+            locationId={addingTo.id}
+            onAdded={() => setAddingTo(null)}
+            onCancel={() => setAddingTo(null)}
+          />
+        </Dialog>
       )}
     </Page>
   );

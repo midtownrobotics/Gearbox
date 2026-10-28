@@ -1,7 +1,9 @@
 import { requireAuth } from "@g3/auth";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
+import { createEdgeDb } from "../../db";
 import { AgentError, agentFetch } from "../../lib/agent";
+import { teamBox } from "../../lib/box-key";
 import type { AppEnv } from "../../types";
 import type { ClientHeaders, LookupRequest, PartLookup } from "./types";
 
@@ -22,13 +24,17 @@ const lookupValidator = validator("json", (value, c): LookupRequest => {
 /**
  * Part lookup from the edge box (called by the orders worker). The box fetches
  * the vendor page, so vendors see the shop's connection, not a Workers IP.
- * Nothing is cached here; the orders worker caches results.
+ * Nothing is cached here; the orders worker caches results. A team that has never set up a box
+ * gets `code: "no_box"`, so Orders can say the site needs one rather than that it's offline.
  */
 export const lookupRouter = new Hono<AppEnv>().post(
   "/",
   requireAuth,
   lookupValidator,
   async (c) => {
+    if (!(await teamBox(createEdgeDb(c.env.EDGE_DB), c.get("teamId")))) {
+      return c.json({ error: "This team has no edge box.", code: "no_box" }, 503);
+    }
     try {
       const res = await agentFetch(c.env, c.get("teamId"), "/lookup", {
         method: "POST",

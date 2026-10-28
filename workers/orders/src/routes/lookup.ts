@@ -1,4 +1,4 @@
-import { forwardIdentity, requireAuth } from "@g3/auth";
+import { forwardIdentity, requireAuth, teamHasApp } from "@g3/auth";
 import {
   CLIENT_HEADER_NAMES,
   type ClientHeaders,
@@ -9,7 +9,14 @@ import { Hono } from "hono";
 import { validator } from "hono/validator";
 import { createOrdersDb } from "../db";
 import { lookupCache } from "../db/schema";
+import { lookUpAtVendor } from "../lib/vendor-lookup";
 import type { AppEnv } from "../types";
+
+/** The team has no edge box (Edge off, or never set up): a site only the box can read. */
+const NO_EDGE = {
+  error: "This vendor isn't supported without an Edge box set up.",
+  code: "no_edge",
+} as const;
 
 const CACHE_MS = 7 * 24 * 60 * 60 * 1000;
 /** Query params that only track where a click came from; dropped so they don't split the cache. */
@@ -36,10 +43,11 @@ const urlValidator = validator("query", (value, c): { url: string } => {
 });
 
 /**
- * GET /lookup?url=<product page>: part details from a vendor link. The edge box
- * fetches the page (vendors block cloud IPs), using the requester's own browser
- * headers where a page needs to see a browser; results are cached for 7 days.
- * Requires a login so this isn't an open fetch proxy.
+ * GET /lookup?url=<product page>: part details from a vendor link. Shopify stores and REV are
+ * read straight from the vendor (`lib/vendor-lookup.ts`); anything else goes to the team's edge
+ * box, when it has Edge, which fetches the page from the shop's connection (vendors like Amazon
+ * block cloud IPs), using the requester's own browser headers where a page needs to see a
+ * browser. Results are cached for 7 days. Requires a login so this isn't an open fetch proxy.
  */
 export const lookupRouter = new Hono<AppEnv>().get("/", requireAuth, urlValidator, async (c) => {
   const { url } = c.req.valid("query");
@@ -51,6 +59,10 @@ export const lookupRouter = new Hono<AppEnv>().get("/", requireAuth, urlValidato
     return c.json({ ...(JSON.parse(cached.result) as PartLookup), fetchedAt: cached.fetchedAt });
   }
 
+  const direct = await lookUpAtVendor(new URL(url));
+  if (direct) return c.json({ ...(await remember(direct)), fetchedAt: now });
+
+  if ((await teamHasApp(c.env, c.get("teamId"), "edge")) === false) return c.json(NO_EDGE, 422);
   const client: ClientHeaders = {};
   for (const [key, header] of Object.entries(CLIENT_HEADER_NAMES)) {
     const value = c.req.header(header);
@@ -64,8 +76,12 @@ export const lookupRouter = new Hono<AppEnv>().get("/", requireAuth, urlValidato
       body: JSON.stringify({ url, client }),
     }),
   );
-  const body = (await res.json().catch(() => ({}))) as PartLookup & { error?: string };
+  const body = (await res.json().catch(() => ({}))) as PartLookup & {
+    error?: string;
+    code?: string;
+  };
   if (!res.ok) {
+    if (body.code === "no_box") return c.json(NO_EDGE, 422);
     if (res.status === 422) {
       // The box reached out fine; the vendor's site blocked it or isn't one we can read.
       return c.json(
@@ -80,18 +96,23 @@ export const lookupRouter = new Hono<AppEnv>().get("/", requireAuth, urlValidato
     return c.json({ error: body.error ?? `Lookup failed (HTTP ${res.status}).` }, status);
   }
 
-  await db
-    .insert(lookupCache)
-    .values({ url, result: JSON.stringify(body), fetchedAt: now })
-    .onConflictDoUpdate({
-      target: lookupCache.url,
-      set: { result: JSON.stringify(body), fetchedAt: now },
-    });
-  c.executionCtx.waitUntil(
-    db
-      .delete(lookupCache)
-      .where(lt(lookupCache.fetchedAt, now - CACHE_MS))
-      .run(),
-  );
-  return c.json({ ...(body as PartLookup), fetchedAt: now });
+  return c.json({ ...(await remember(body as PartLookup)), fetchedAt: now });
+
+  /** Keeps a result for 7 days, clearing out old ones. */
+  async function remember(result: PartLookup) {
+    await db
+      .insert(lookupCache)
+      .values({ url, result: JSON.stringify(result), fetchedAt: now })
+      .onConflictDoUpdate({
+        target: lookupCache.url,
+        set: { result: JSON.stringify(result), fetchedAt: now },
+      });
+    c.executionCtx.waitUntil(
+      db
+        .delete(lookupCache)
+        .where(lt(lookupCache.fetchedAt, now - CACHE_MS))
+        .run(),
+    );
+    return result;
+  }
 });

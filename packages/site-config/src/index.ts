@@ -1,3 +1,4 @@
+import { type HelpPages, helpSlugFor } from "./help.ts";
 import { site } from "./site.ts";
 
 // Everything apps and workers need from site.ts, already put together.
@@ -23,6 +24,7 @@ export {
   fillColor,
   isPortalTileKey,
   portalAppLabels,
+  teamAvatarUrl,
   teamUiDefaults,
   teamUiLinkLabels,
   type ButtonText,
@@ -198,9 +200,58 @@ export const platformUrl = platformUrlVia(localGateway);
  */
 export const CONSOLE_HOSTS = [platformHost("admin")] as const;
 
+/** Whether a page's hostname is the console's: its own, or admin.gearbox.localhost in dev. */
+export const isConsoleHost = (hostname: string) =>
+  (CONSOLE_HOSTS as readonly string[]).includes(hostname) || hostname === `admin.${DEV_DOMAIN}`;
+
 /** The console's address (`teamId`, the operator's team, no longer changes it). */
 export function consoleUrl(_teamId?: string): string {
   return consoleUrlVia(localGateway);
+}
+
+/**
+ * The docs (how to set up and use the platform and each app), served by the platform worker at
+ * docs.<platform domain>, for no team (also at /docs on the platform's own host).
+ */
+export const DOCS_HOSTS = [platformHost("docs")] as const;
+
+/** Whether a page's hostname is the docs': their own, or docs.gearbox.localhost in dev. */
+export const isDocsHost = (hostname: string) =>
+  (DOCS_HOSTS as readonly string[]).includes(hostname) || hostname === `docs.${DEV_DOMAIN}`;
+
+/** The docs' address, or given the dev gateway, its address there. */
+export function docsUrlVia(gateway: string | undefined): string {
+  return gateway ? onGateway(gateway, "docs") : `https://${platformHost("docs")}`;
+}
+
+/** An app's part of the docs (`skillTree` → /skill-tree), or their front page. */
+export function docsUrl(app?: AppName): string {
+  const base = docsUrlVia(localGateway);
+  return app ? `${base}/${app.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}` : base;
+}
+
+declare const __G3_HELP__: HelpPages | null | undefined;
+
+/** This app's docs, from its build (`siteConfig()`); null for an app without a docs folder. */
+const helpPages: HelpPages | null = typeof __G3_HELP__ === "object" ? __G3_HELP__ : null;
+
+/**
+ * "Need help?": the docs page about the page at `pathname` (see ./help.ts), else the app's front
+ * page in the docs, else `app`'s (for a page built without its docs), else the docs' front page.
+ */
+export function helpUrl(pathname: string, app?: AppName): string {
+  if (!helpPages) return docsUrl(app);
+  const slug = helpSlugFor(pathname, helpPages.pages);
+  return `${docsUrlVia(localGateway)}/${helpPages.section}${slug ? `/${slug}` : ""}`;
+}
+
+/**
+ * The docs page about the page at `pathname` in this app: its section and slug ("" for the app's
+ * front page, which covers every page no doc names). Null for an app built without docs.
+ */
+export function helpDocFor(pathname: string): { section: string; slug: string } | null {
+  if (!helpPages) return null;
+  return { section: helpPages.section, slug: helpSlugFor(pathname, helpPages.pages) ?? "" };
 }
 
 /** The demo's short address (demo.<platform domain>), which leads to the demo team's home. */

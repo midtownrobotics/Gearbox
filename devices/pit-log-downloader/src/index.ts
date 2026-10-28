@@ -79,6 +79,18 @@ const kVersion: string = JSON.parse(
   fs.readFileSync(path.join(kPackageDir, "package.json"), "utf8"),
 ).version;
 
+/**
+ * The built status page to serve: page/ (committed by each release, so a pit computer never builds
+ * it), or dist/web when it was built more recently, from this computer's own code.
+ */
+function pageDir() {
+  const released = path.join(kPackageDir, "page");
+  const local = path.join(kPackageDir, "dist", "web");
+  const builtAt = (dir: string) =>
+    fs.statSync(path.join(dir, "index.html"), { throwIfNoEntry: false })?.mtimeMs ?? -1;
+  return builtAt(local) > builtAt(released) ? local : released;
+}
+
 type MatchType = "e" | "q" | "p";
 
 type Log = {
@@ -747,8 +759,9 @@ if (process.argv.includes("--watch-page")) {
   });
   app.use(vite.middlewares);
 } else {
-  // `start` builds the page first.
-  const webDir = path.join(kPackageDir, "dist", "web");
+  // The released page (page/, built by the release workflow), unless this computer built its own
+  // since (`build`, `start:build`: dist/web).
+  const webDir = pageDir();
   app.use(express.static(webDir));
   app.use((_req, res) => {
     const page = path.join(webDir, "index.html");

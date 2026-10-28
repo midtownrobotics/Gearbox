@@ -22,6 +22,7 @@ import {
   msToDateInput,
   parseDollars,
 } from "../../shared/format";
+import { PackInput, amountOf, packHint, packLabel } from "../../shared/pack";
 import { PRIORITY, PRIORITY_ORDER, PriorityBadge } from "../../shared/priority";
 import { QuantityInput, parseQuantity, quantityError } from "../../shared/quantity";
 import { STATUS, StatusBadge } from "../../shared/status-badge";
@@ -156,8 +157,8 @@ export function RequestDetailPage() {
               )}
               <Row label="Quantity">
                 {r.quantity}
-                {r.packQuantity > 1 &&
-                  ` × pack of ${r.packQuantity} (${r.quantity * r.packQuantity} parts)`}
+                {packLabel(r.packQuantity, r.packUnit) &&
+                  ` × ${packLabel(r.packQuantity, r.packUnit)} (${amountOf(r.quantity * r.packQuantity, r.packUnit)})`}
               </Row>
               <Row label="Price each">{formatCents(r.unitPriceCents, r.currency)}</Row>
               <Row label={r.orderId === null ? "Estimated total" : "Ordered total"}>
@@ -291,6 +292,7 @@ function EditForm({ request, onDone }: { request: RequestDetail; onDone: () => v
   }, []);
   const [quantity, setQuantity] = useState(String(request.quantity));
   const [packQuantity, setPackQuantity] = useState(String(request.packQuantity));
+  const [packUnit, setPackUnit] = useState(request.packUnit);
   const currentPrice =
     request.unitPriceCents === null ? "" : (request.unitPriceCents / 100).toFixed(2);
   const [price, setPrice] = useState(currentPrice);
@@ -384,6 +386,7 @@ function EditForm({ request, onDone }: { request: RequestDetail; onDone: () => v
       json: {
         quantity: parseQuantity(quantity) as number,
         packQuantity: parseQuantity(packQuantity) as number,
+        packUnit: packUnit.trim(),
         unitPriceCents,
         categoryId: Number(categoryId),
         reason,
@@ -502,8 +505,21 @@ function EditForm({ request, onDone }: { request: RequestDetail; onDone: () => v
           <Field label="Quantity" error={quantityError(quantity)}>
             <QuantityInput value={quantity} onChange={setQuantity} required />
           </Field>
-          <Field label="Pack of" hint="Parts in one of these" error={quantityError(packQuantity)}>
-            <QuantityInput value={packQuantity} onChange={setPackQuantity} required />
+          <Field
+            label="Pack of"
+            hint={
+              packHint(parseQuantity(quantity), parseQuantity(packQuantity), packUnit.trim()) ??
+              "Parts in one of these, or an amount: 100 ft"
+            }
+            error={quantityError(packQuantity)}
+          >
+            <PackInput
+              quantity={packQuantity}
+              unit={packUnit}
+              onQuantity={setPackQuantity}
+              onUnit={setPackUnit}
+              required
+            />
           </Field>
           <Field label="Price each">
             <TextField

@@ -10,7 +10,13 @@ import { eventually, onshapeEvent } from "./onshape";
 
 const database = (env as unknown as { SHOP_DB: D1Database }).SHOP_DB;
 
-type Link = { partNumber: string; revision: string | null; part: string | null; release: string };
+type Link = {
+  partNumber: string;
+  revision: string | null;
+  part: string | null;
+  releaseId: string;
+  release: string;
+};
 
 /**
  * A team whose Onshape has released one part, with the ids that release left behind.
@@ -48,6 +54,7 @@ it("gives a released part its place in Onshape and its release", async () => {
   const { links } = await jsonAs<{ links: Link[] }>(team.student, "/onshape/links");
   const link = links.find((l) => l.partNumber === partNumber);
   expect(link?.part).toBe(`https://cad.onshape.com/documents/doc-abc/v/ver${tag}/e/el${tag}`);
+  expect(link?.releaseId).toBe(`rel${tag}`);
   expect(link?.release).toBe(`https://cad.onshape.com/documents?releasepackage=rel${tag}`);
 });
 

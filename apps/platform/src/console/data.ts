@@ -144,7 +144,7 @@ export const formatTime = (seconds: number | null | undefined) =>
 export const formatDate = (seconds: number | null | undefined) =>
   seconds ? new Date(seconds * 1000).toLocaleDateString() : "—";
 
-export type NotificationType = "info" | "warning" | "critical";
+export type NotificationType = "info" | "critical";
 
 export type Notification = {
   id: string;

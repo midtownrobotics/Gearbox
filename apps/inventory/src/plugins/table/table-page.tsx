@@ -17,6 +17,7 @@ import {
   type StockAction,
   StockActionDialog,
 } from "../../shared/stock-cells";
+import type { NewEntryFrom } from "./new-entry-page";
 
 /** How many rows are drawn at first, and how many more each "Show more" adds. */
 const PAGE_ROWS = 200;
@@ -174,7 +175,7 @@ function NarrowRows({
                   />
                 </NarrowCell>
                 <NarrowCell line2>
-                  <QuantityCell stock={stock} compact />
+                  <QuantityCell stock={stock} unit={item.unit} compact />
                 </NarrowCell>
                 <NarrowCell line2 className="flex-col !items-start justify-center">
                   <StatusBadge status={stock.status} />
@@ -229,8 +230,10 @@ export function TablePage() {
       title="Inventory"
       width="wide"
       actions={
+        // Filtered to a location, the new entry starts there.
         <Link
-          to="/new"
+          to={filters.locationId === null ? "/new" : `/new?location=${filters.locationId}`}
+          state={{ from: `/inventory?${params}` } satisfies NewEntryFrom}
           className="rounded-lg bg-primary-500 px-3.5 py-2 text-sm font-semibold text-on-primary hover:bg-primary-600"
         >
           Add an entry
@@ -342,7 +345,7 @@ export function TablePage() {
                       {stock ? (
                         <>
                           <td className="px-3 py-1.5">
-                            <QuantityCell stock={stock} />
+                            <QuantityCell stock={stock} unit={item.unit} />
                           </td>
                           <td className="px-3 py-2.5">
                             <LocationButton

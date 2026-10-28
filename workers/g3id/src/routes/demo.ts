@@ -22,6 +22,30 @@ import { deleteTeam } from "./internal";
 
 const ROLES: readonly DemoRole[] = ["student", "mentor", "admin"];
 
+const MINUTE = 60;
+const DAY = 24 * 60 * MINUTE;
+
+/**
+ * When each demo member (by place in DEMO_PEOPLE) was last online, in seconds ago, so the
+ * Members list shows a mix: two online now, the rest over the last weeks, and one never. The
+ * visitor accounts update their own as they're used.
+ */
+const LAST_SEEN = [
+  2 * MINUTE,
+  3 * MINUTE,
+  30 * MINUTE,
+  2 * 60 * MINUTE,
+  DAY,
+  DAY + 4 * 60 * MINUTE,
+  2 * DAY,
+  3 * DAY,
+  5 * DAY,
+  9 * DAY,
+  16 * DAY,
+  null,
+  4 * DAY,
+];
+
 /**
  * Makes the demo team in G3ID as it starts each day: its members (the same ids every time, so
  * each app's sample data can name them), its appearance and no other way to sign in. Everything
@@ -41,8 +65,9 @@ async function resetDemoTeam(env: AppEnv["Bindings"]) {
       updatedAt: now,
     }),
     // One statement each: D1 takes at most 100 values in one.
-    ...DEMO_PEOPLE.map((person) =>
-      db.insert(coreUsers).values({
+    ...DEMO_PEOPLE.map((person, i) => {
+      const seen = LAST_SEEN[i];
+      return db.insert(coreUsers).values({
         id: person.id,
         teamId: demoTeamId,
         email: person.email,
@@ -51,10 +76,12 @@ async function resetDemoTeam(env: AppEnv["Bindings"]) {
         status: "active",
         isAdmin: person.isAdmin ? 1 : 0,
         isMentor: person.isMentor ? 1 : 0,
-        createdAt: now,
+        // Joined over the season so far, a few days apart.
+        createdAt: now - (90 - i * 4) * DAY,
         updatedAt: now,
-      }),
-    ),
+        lastSeenAt: seen === null || seen === undefined ? null : now - seen,
+      });
+    }),
     db.insert(teamUiSettings).values({
       teamId: demoTeamId,
       settingsJson: JSON.stringify(appearance),

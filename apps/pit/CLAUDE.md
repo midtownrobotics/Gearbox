@@ -1,0 +1,1 @@
+@../../workers/pit/AGENTS.md

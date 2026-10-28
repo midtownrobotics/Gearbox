@@ -14,13 +14,19 @@ import { api } from "../../shared/api";
 import { getErrorMessage } from "../../shared/api-error";
 import { type DrawingState, drawingKey, drawingStates } from "../../shared/batches";
 import { buildInstanceRows } from "../../shared/derive";
-import { deleteDrawing, drawingUrl } from "../../shared/getters";
+import { deleteDrawing, deleteDrawings, drawingUrl } from "../../shared/getters";
 import { useAuthUser } from "../../shared/use-auth";
 import { useKiosk } from "../../shared/use-auth";
 import { useShopData } from "../../shared/use-shop-data";
 import { PartNameLink, linkClass } from "../batches/batch-ui";
 import { FileHeading, formatBytes } from "./file-ui";
-import { PartFilesSection, Subsection } from "./part-files-section";
+import {
+  PartFilesSection,
+  SelectBox,
+  SelectionBar,
+  Subsection,
+  useSelection,
+} from "./part-files-section";
 
 /** The drawing subsections, in the order the page shows them, with what each holds. */
 const DRAWING_STATES: { state: DrawingState; title: string; empty: string }[] = [
@@ -47,6 +53,8 @@ export function FilesPage() {
   const [drawings, setDrawings] = useState<Drawing[]>([]);
   const [search, setSearch] = useState("");
   const [deletingKey, setDeletingKey] = useState<string | null>(null);
+  const [deletingMany, setDeletingMany] = useState(false);
+  const selection = useSelection(drawings.map((d) => d.r2Key));
   const kiosk = useKiosk();
   const { data } = useShopData();
   const rows = useMemo(() => (data ? buildInstanceRows(data) : []), [data]);
@@ -79,6 +87,30 @@ export function FilesPage() {
       setDeletingKey(null);
     }
   }
+  /** Deletes these drawings in one go. */
+  async function handleDeleteDrawings(list: Drawing[]) {
+    setDeletingMany(true);
+    setError(null);
+    try {
+      await deleteDrawings(list.map((d) => ({ partNumber: d.partNumber, revision: d.revision })));
+      const gone = new Set(list.map((d) => d.r2Key));
+      setDrawings((prev) => prev.filter((d) => !gone.has(d.r2Key)));
+      selection.set([...gone], false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete drawings");
+    } finally {
+      setDeletingMany(false);
+    }
+  }
+  /** The question before deleting several drawings: how many instances still use them. */
+  const deleteQuestion = (list: Drawing[]) => {
+    const making = list.reduce((n, d) => n + stillMaking(d), 0);
+    return `${
+      making > 0
+        ? `${making} instance${making === 1 ? " that's" : "s that are"} still being made use${making === 1 ? "s" : ""} them. `
+        : ""
+    }Delete ${list.length} drawing${list.length === 1 ? "" : "s"}? This can't be undone.`;
+  };
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [printingId, setPrintingId] = useState<number | null>(null);
@@ -194,6 +226,9 @@ export function FilesPage() {
     );
 
   const totalSize = drawings.reduce((sum, d) => sum + (d.fileSize || 0), 0);
+  const chosen = drawings.filter((d) => selection.isChosen(d.r2Key));
+  // Kiosks can't delete drawings, so they get no boxes.
+  const canDelete = !kiosk.active;
 
   return (
     <Page
@@ -228,6 +263,15 @@ export function FilesPage() {
             placeholder="Search by filename or part number…"
           />
 
+          <SelectionBar
+            count={chosen.length}
+            noun={["drawing", "drawings"]}
+            question={deleteQuestion(chosen)}
+            busy={deletingMany}
+            onDelete={() => handleDeleteDrawings(chosen)}
+            onClear={selection.clear}
+          />
+
           {drawings.length === 0 ? (
             <p className="text-secondary-500 text-sm">
               No drawings yet. A release's drawings are saved when its parts are ingested.
@@ -240,72 +284,103 @@ export function FilesPage() {
               // A search shows only the subsections that have a match.
               if (search.trim() && list.length === 0) return null;
               return (
-                <Subsection key={state} title={title} count={list.length} empty={empty}>
+                <Subsection
+                  key={state}
+                  title={title}
+                  count={list.length}
+                  empty={empty}
+                  select={
+                    // Only groups that are done with can all be chosen at once.
+                    canDelete && (state === "complete" || state === "obsolete")
+                      ? selection.group(list.map((d) => d.r2Key))
+                      : undefined
+                  }
+                  deleteAll={
+                    canDelete && (state === "complete" || state === "obsolete")
+                      ? {
+                          question: deleteQuestion(list),
+                          busy: deletingMany,
+                          onConfirm: () => handleDeleteDrawings(list),
+                        }
+                      : undefined
+                  }
+                >
                   {list.map((drawing) => {
                     const making = stillMaking(drawing);
                     const part = partOf(drawing);
                     return (
-                      <li key={drawing.r2Key} className="px-4 py-3">
-                        <FileHeading
-                          name={
+                      <li key={drawing.r2Key} className="flex gap-3 px-4 py-3">
+                        {canDelete && (
+                          <span className="pt-0.5">
+                            <SelectBox
+                              label={`Choose ${drawing.filename}`}
+                              checked={selection.isChosen(drawing.r2Key)}
+                              onChange={(on) => selection.set([drawing.r2Key], on)}
+                            />
+                          </span>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <FileHeading
+                            name={
+                              <a
+                                href={drawingUrl(drawing.partNumber, drawing.revision)}
+                                target="_blank"
+                                rel="noreferrer"
+                                title="Open this drawing"
+                                className={linkClass}
+                              >
+                                {drawing.filename}
+                              </a>
+                            }
+                            title={drawing.filename}
+                            details={
+                              <p className="text-xs text-secondary-400">
+                                {part?.name && (
+                                  <>
+                                    <PartNameLink definition={part} />{" "}
+                                  </>
+                                )}
+                                <span className="font-mono text-secondary-500">
+                                  {drawing.partNumber} · Rev {drawing.revision}
+                                </span>{" "}
+                                · {formatBytes(drawing.fileSize || 0)} ·{" "}
+                                {new Date(drawing.createdAt * 1000).toLocaleDateString()}
+                              </p>
+                            }
+                          >
+                            {canPrint && (
+                              <Button
+                                size="sm"
+                                className="shrink-0"
+                                onClick={() => handlePrint(drawing)}
+                                disabled={printingId === drawing.id}
+                              >
+                                {printingId === drawing.id ? "Printing…" : "Print"}
+                              </Button>
+                            )}
                             <a
                               href={drawingUrl(drawing.partNumber, drawing.revision)}
-                              target="_blank"
-                              rel="noreferrer"
-                              title="Open this drawing"
-                              className={linkClass}
+                              download={drawing.filename}
+                              className={`${buttonClass("secondary", "sm")} shrink-0`}
                             >
-                              {drawing.filename}
+                              Download
                             </a>
-                          }
-                          title={drawing.filename}
-                          details={
-                            <p className="text-xs text-secondary-400">
-                              {part?.name && (
-                                <>
-                                  <PartNameLink definition={part} />{" "}
-                                </>
-                              )}
-                              <span className="font-mono text-secondary-500">
-                                {drawing.partNumber} · Rev {drawing.revision}
-                              </span>{" "}
-                              · {formatBytes(drawing.fileSize || 0)} ·{" "}
-                              {new Date(drawing.createdAt * 1000).toLocaleDateString()}
-                            </p>
-                          }
-                        >
-                          {canPrint && (
-                            <Button
-                              size="sm"
-                              className="shrink-0"
-                              onClick={() => handlePrint(drawing)}
-                              disabled={printingId === drawing.id}
-                            >
-                              {printingId === drawing.id ? "Printing…" : "Print"}
-                            </Button>
-                          )}
-                          <a
-                            href={drawingUrl(drawing.partNumber, drawing.revision)}
-                            download={drawing.filename}
-                            className={`${buttonClass("secondary", "sm")} shrink-0`}
-                          >
-                            Download
-                          </a>
-                          {!kiosk.active && (
-                            <ConfirmButton
-                              size="sm"
-                              label={deletingKey === drawing.r2Key ? "Deleting…" : "Delete"}
-                              confirmLabel="Delete"
-                              question={`${
-                                making > 0
-                                  ? `${making} instance${making === 1 ? " that's" : "s that are"} still being made use${making === 1 ? "s" : ""} it. `
-                                  : ""
-                              }Delete the drawing for ${drawing.partNumber} Rev ${drawing.revision}? This can't be undone.`}
-                              disabled={deletingKey === drawing.r2Key}
-                              onConfirm={() => handleDeleteDrawing(drawing)}
-                            />
-                          )}
-                        </FileHeading>
+                            {!kiosk.active && (
+                              <ConfirmButton
+                                size="sm"
+                                label={deletingKey === drawing.r2Key ? "Deleting…" : "Delete"}
+                                confirmLabel="Delete"
+                                question={`${
+                                  making > 0
+                                    ? `${making} instance${making === 1 ? " that's" : "s that are"} still being made use${making === 1 ? "s" : ""} it. `
+                                    : ""
+                                }Delete the drawing for ${drawing.partNumber} Rev ${drawing.revision}? This can't be undone.`}
+                                disabled={deletingKey === drawing.r2Key}
+                                onConfirm={() => handleDeleteDrawing(drawing)}
+                              />
+                            )}
+                          </FileHeading>
+                        </div>
                       </li>
                     );
                   })}

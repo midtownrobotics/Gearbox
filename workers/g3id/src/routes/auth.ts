@@ -1,4 +1,4 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull, lt, or } from "drizzle-orm";
 import { Hono } from "hono";
 import { deleteCookie, getCookie } from "hono/cookie";
 import { createDb } from "../db";
@@ -34,6 +34,23 @@ export const authRouter = new Hono<AppEnv>()
       .get();
 
     if (!user) return c.json({ error: "User not found." }, 404);
+
+    // Every app asks this on each call, so it's when the member last used Gearbox. Written at most
+    // once a minute, after answering.
+    const now = Math.floor(Date.now() / 1000);
+    c.executionCtx.waitUntil(
+      db
+        .update(coreUsers)
+        .set({ lastSeenAt: now })
+        .where(
+          and(
+            eq(coreUsers.id, userId),
+            or(isNull(coreUsers.lastSeenAt), lt(coreUsers.lastSeenAt, now - 60)),
+          ),
+        )
+        .run()
+        .catch((err) => console.error("[g3id] last seen", err)),
+    );
 
     const includeIdentities = c.req.query("includeIdentities") !== "false";
     const identities = includeIdentities

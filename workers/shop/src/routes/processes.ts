@@ -1,10 +1,11 @@
-import { inTeam, requireAuth, withTeam } from "@g3/auth";
+import { inTeam, logTeamChange, requireAdmin, requireAuth, withTeam } from "@g3/auth";
 import { eq } from "drizzle-orm";
 import { type Context, Hono } from "hono";
 import { validator } from "hono/validator";
 import { createShopDb } from "../db";
 import { PROCESS_TYPES, type ProcessType, processes } from "../db/schema";
 import { forgetQualityCheck } from "../lib/quality";
+import { processUsage, removeProcess } from "../lib/removal";
 import type { AppEnv } from "../types";
 
 const isProcessType = (v: unknown): v is ProcessType =>
@@ -52,11 +53,13 @@ const updateProcessValidator = validator(
 
 /**
  * A Quality Control step is a permission boundary (only shop managers and admins check one off),
- * so only an admin may make one, or take the type away again.
+ * so only an admin may give a process the type, or take it away again.
  */
 const qualityTypeNeedsAdmin = (c: Context<AppEnv>, ...types: (ProcessType | undefined)[]) =>
   types.includes("quality_control") && !c.get("userIsAdmin");
 
+// Every process, removed ones too (`archivedAt`): parts, batches and the shop floor still show
+// one by name, and pickers for new parts leave them out. Only admins add, remove and restore them.
 export const processesRouter = new Hono<AppEnv>()
   .get("/", requireAuth, async (c) => {
     const db = createShopDb(c.env.SHOP_DB);
@@ -67,12 +70,14 @@ export const processesRouter = new Hono<AppEnv>()
       .all();
     return c.json(rows);
   })
-  .post("/", requireAuth, createProcessValidator, async (c) => {
+  /** How many parts use each process, for the Admin page to say what removing one does. */
+  .get("/usage", requireAdmin, async (c) => {
+    const db = createShopDb(c.env.SHOP_DB);
+    const usage = await processUsage(db, c.get("teamId"));
+    return c.json(Object.fromEntries(usage));
+  })
+  .post("/", requireAdmin, createProcessValidator, async (c) => {
     const { name, type, requiresPartInfo } = c.req.valid("json");
-    if (qualityTypeNeedsAdmin(c, type)) {
-      return c.json({ error: "Only an admin can add a Quality Control process." }, 403);
-    }
-
     const db = createShopDb(c.env.SHOP_DB);
     const row = await db
       .insert(processes)
@@ -120,5 +125,35 @@ export const processesRouter = new Hono<AppEnv>()
     if (type !== undefined && type !== "quality_control") {
       await forgetQualityCheck(db, teamId, id);
     }
+    return c.json(row);
+  })
+  /** Deletes the process, or archives it while anything uses it. */
+  .delete("/:id", requireAdmin, async (c) => {
+    const db = createShopDb(c.env.SHOP_DB);
+    const teamId = c.get("teamId");
+    const removed = await removeProcess(db, teamId, Number(c.req.param("id")));
+    if ("error" in removed) return c.json({ error: removed.error }, removed.status);
+    await logTeamChange(c.env, teamId, {
+      userId: c.get("userId"),
+      app: "shop",
+      what: `Removed process ${removed.name}`,
+    });
+    return c.json(removed);
+  })
+  .post("/:id/restore", requireAdmin, async (c) => {
+    const db = createShopDb(c.env.SHOP_DB);
+    const teamId = c.get("teamId");
+    const row = await db
+      .update(processes)
+      .set({ archivedAt: null })
+      .where(inTeam(processes, teamId, eq(processes.id, Number(c.req.param("id")))))
+      .returning()
+      .get();
+    if (!row) return c.json({ error: "Process not found." }, 404);
+    await logTeamChange(c.env, teamId, {
+      userId: c.get("userId"),
+      app: "shop",
+      what: `Restored process ${row.name}`,
+    });
     return c.json(row);
   });

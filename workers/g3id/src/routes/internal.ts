@@ -1,5 +1,6 @@
 import type { DiscordGuild, DiscordUser } from "@g3/discord";
-import { and, eq, inArray, isNull, ne } from "drizzle-orm";
+import { demoTeamId } from "@g3/site-config";
+import { and, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { createDb } from "../db";
 import {
@@ -155,6 +156,30 @@ export const internalRouter = new Hono<AppEnv>()
         hasChat: withChat.has(m.id),
       })),
     );
+  })
+  // How many accounts there are on every team but the public demo's, for the operators' console's
+  // Stats page: counts only, never who. Online is having used any app in the last 5 minutes;
+  // active, in the last 7 or 30 days (when they last signed in, for anyone not seen since 0022).
+  .get("/stats", async (c) => {
+    const now = Math.floor(Date.now() / 1000);
+    const active = sql`${coreUsers.status} = 'active'`;
+    const seen = sql`coalesce(${coreUsers.lastSeenAt}, ${coreUsers.lastLoginAt})`;
+    const total = (condition: ReturnType<typeof sql>) =>
+      sql<number>`coalesce(sum(${condition}), 0)`;
+    const [stats] = await createDb(c.env.DB)
+      .select({
+        active: total(active),
+        pending: total(sql`${coreUsers.status} = 'pending'`),
+        mentors: total(sql`${active} and ${coreUsers.isMentor} = 1`),
+        online: total(sql`${active} and ${coreUsers.lastSeenAt} >= ${now - 5 * 60}`),
+        activeWeek: total(sql`${active} and ${seen} >= ${now - 7 * 86_400}`),
+        activeMonth: total(sql`${active} and ${seen} >= ${now - 30 * 86_400}`),
+        joinedMonth: total(sql`${active} and ${coreUsers.createdAt} >= ${now - 30 * 86_400}`),
+      })
+      .from(coreUsers)
+      .where(and(ne(coreUsers.teamId, demoTeamId), isNull(coreUsers.deletedAt)))
+      .all();
+    return c.json(stats);
   })
   // Accounts by id, with their team: the platform's operators (who may be on any team).
   .get("/users", async (c) => {

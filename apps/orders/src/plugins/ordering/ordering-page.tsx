@@ -1,4 +1,13 @@
-import { Button, ErrorBanner, Loading, Page, SuccessBanner, TextField, inputClass } from "@g3/ui";
+import {
+  Button,
+  ErrorBanner,
+  Loading,
+  Page,
+  SuccessBanner,
+  TextField,
+  inputClass,
+  scrollPageToTop,
+} from "@g3/ui";
 import { amazonAsin, isAmazonShortLink } from "@g3/worker-orders/product-key";
 import { chargesByCategory } from "@g3/worker-orders/split";
 import { useMemo, useState } from "react";
@@ -177,7 +186,7 @@ export function OrderingPage() {
               onPlaced={(message) => {
                 setDone(message);
                 reload();
-                window.scrollTo({ top: 0, behavior: "smooth" });
+                scrollPageToTop("smooth");
               }}
               onRemoved={(message) => {
                 setDone(message);

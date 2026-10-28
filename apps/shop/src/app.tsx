@@ -3,6 +3,7 @@ import { plugins } from "./plugins.config";
 import { BatchSheet } from "./plugins/batches/batch-sheet";
 import { BoardPage } from "./plugins/board/board-page";
 import { NavBar } from "./shared/nav-bar";
+import { OnshapeBanner } from "./shared/onshape-banner";
 import { ProtectedRoute } from "./shared/protected-route";
 import { useKiosk } from "./shared/use-auth";
 
@@ -26,6 +27,7 @@ function AppContent() {
     return (
       <div className="flex flex-1 flex-col bg-page">
         <NavBar items={navItems} />
+        <OnshapeBanner />
         <BoardPage />
         <BatchSheet />
       </div>
@@ -36,6 +38,7 @@ function AppContent() {
   return (
     <div className="flex flex-1 flex-col bg-page">
       <NavBar items={navItems} />
+      <OnshapeBanner />
       <Routes>
         {allRoutes.map((r) => (
           <Route key={r.path} path={r.path} element={r.element} />

@@ -1,5 +1,5 @@
-import { teamKey } from "@g3/site-config";
-import { describe, expect, it } from "vitest";
+import { demoTeamId, teamKey } from "@g3/site-config";
+import { describe, expect, it, vi } from "vitest";
 import { createTeam, createUser, createUserWithPin, g3id, sessionCookie, testEnv } from "./helpers";
 
 // The platform's operator console (roadmap 2.8) deletes and hands over teams through
@@ -84,5 +84,60 @@ describe("operator tools in G3ID", () => {
     expect(await one("SELECT is_admin FROM core_users WHERE id = ?", founder)).toEqual({
       is_admin: 0,
     });
+  });
+});
+
+describe("stats for the operators' console", () => {
+  type Stats = {
+    active: number;
+    pending: number;
+    mentors: number;
+    online: number;
+    activeWeek: number;
+    activeMonth: number;
+    joinedMonth: number;
+  };
+  const stats = async () => (await (await internal("/stats")).json()) as Stats;
+
+  it("counts accounts on every team but the demo's, never who", async () => {
+    const before = await stats();
+    const team = await createTeam();
+    const mentor = await createUser({ teamId: team, isMentor: true });
+    await createUser({ teamId: team, status: "pending" });
+    // Signing in counts as active; using an app (/auth/me) as online.
+    const cookie = await sessionCookie(mentor);
+    expect((await g3id("/auth/me", { cookie })).status).toBe(200);
+    await testEnv.DB.prepare(
+      "INSERT OR IGNORE INTO teams (id, team_number, name, created_at, updated_at) VALUES (?, 9999, 'Demo', 1, 1)",
+    )
+      .bind(demoTeamId)
+      .run();
+    await createUser({ teamId: demoTeamId });
+    await vi.waitFor(async () => expect((await stats()).online).toBe(before.online + 1));
+    expect(await stats()).toEqual({
+      active: before.active + 1,
+      pending: before.pending + 1,
+      mentors: before.mentors + 1,
+      online: before.online + 1,
+      activeWeek: before.activeWeek + 1,
+      activeMonth: before.activeMonth + 1,
+      joinedMonth: before.joinedMonth + 1,
+    });
+  });
+
+  it("notes when a member last used Gearbox, at most once a minute", async () => {
+    const id = await createUser();
+    const cookie = await sessionCookie(id);
+    const seen = () =>
+      one<{ last_seen_at: number | null }>("SELECT last_seen_at FROM core_users WHERE id = ?", id);
+    await g3id("/auth/me", { cookie });
+    await vi.waitFor(async () => expect((await seen())?.last_seen_at).not.toBeNull());
+    await testEnv.DB.prepare("UPDATE core_users SET last_seen_at = ? WHERE id = ?")
+      .bind(Math.floor(Date.now() / 1000) - 30, id)
+      .run();
+    const recent = (await seen())?.last_seen_at;
+    await g3id("/auth/me", { cookie });
+    await new Promise((r) => setTimeout(r, 50));
+    expect((await seen())?.last_seen_at).toBe(recent);
   });
 });

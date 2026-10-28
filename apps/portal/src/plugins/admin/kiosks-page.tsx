@@ -123,7 +123,11 @@ export function KiosksPage() {
   }
 
   return (
-    <Page title="Kiosk Devices" width="narrow">
+    <Page
+      title="Kiosk Devices"
+      description="Kiosks are only set up for Shop for now: members sign in to a shop computer with their PIN."
+      width="narrow"
+    >
       <Card title="Add a kiosk">
         <form onSubmit={handleGenerateCode} className="space-y-4">
           <Field label="Device name">

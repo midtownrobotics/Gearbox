@@ -9,9 +9,9 @@ import {
   TextField,
   inputClass,
   linkWith,
+  usePageTeamAvatar,
   useQuestions,
   useTeamNames,
-  useTeamUiSettings,
 } from "@g3/ui";
 import {
   ArrowRight,
@@ -151,10 +151,10 @@ function AnnouncementBanner() {
   );
 }
 
-/** The team's logo (Team Appearance); G3's own on the site team's pages, otherwise none. */
+/** The team's avatar (Team Appearance); G3's own on the site team's pages, otherwise none. */
 function TeamLogo({ size = 20, className = "" }: { size?: number; className?: string }) {
-  const { logoUrl } = useTeamUiSettings();
-  const src = logoUrl || (pageTeamId === teamKey ? "/g3.png" : "");
+  const avatar = usePageTeamAvatar();
+  const src = avatar || (pageTeamId === teamKey ? "/g3.png" : "");
   if (!src) return null;
   return (
     <img

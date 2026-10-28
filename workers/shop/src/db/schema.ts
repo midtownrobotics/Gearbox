@@ -13,6 +13,8 @@ export const subsystems = sqliteTable("subsystems", {
   teamId: teamId(),
   name: text("name").notNull(),
   createdAt: integer("created_at").notNull(),
+  /** When an admin removed it while parts still used it (lib/removal.ts); null while in use. */
+  archivedAt: integer("archived_at"),
 });
 
 export const partDefinitions = sqliteTable("part_definitions", {
@@ -69,6 +71,8 @@ export const processes = sqliteTable("processes", {
   // Parts using this process must record material + thickness at ingest.
   requiresPartInfo: integer("requires_part_info").notNull().default(0),
   createdAt: integer("created_at").notNull(),
+  /** When an admin removed it while something still used it (lib/removal.ts); else null. */
+  archivedAt: integer("archived_at"),
 });
 
 /**
@@ -304,6 +308,38 @@ export type QualityOutcome = (typeof QUALITY_OUTCOMES)[number];
 export type QualityAnswer = { label: string; ok: boolean };
 
 /** The team's quality checklist: what every report is answered against, in order. */
+/** Calls to Onshape's API per team, key, day (UTC, YYYY-MM-DD) and kind (lib/onshape-api.ts). */
+export const onshapeApiUsage = sqliteTable(
+  "onshape_api_usage",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    teamId: teamId(),
+    /** Which API key made the calls (`keyId`: a hash, never the key). */
+    keyId: text("key_id").notNull(),
+    day: text("day").notNull(),
+    kind: text("kind").notNull(),
+    calls: integer("calls").notNull().default(0),
+    errors: integer("errors").notNull().default(0),
+    /** Unix milliseconds. */
+    lastOkAt: integer("last_ok_at"),
+    lastErrorAt: integer("last_error_at"),
+  },
+  (t) => [unique().on(t.teamId, t.keyId, t.day, t.kind)],
+);
+
+/** The team's last failed calls to Onshape (the last 50 are kept). */
+export const onshapeApiErrors = sqliteTable("onshape_api_errors", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  teamId: teamId(),
+  keyId: text("key_id").notNull(),
+  /** Unix milliseconds. */
+  at: integer("at").notNull(),
+  kind: text("kind").notNull(),
+  /** The HTTP status; 0 when Onshape couldn't be reached. */
+  status: integer("status").notNull(),
+  message: text("message"),
+});
+
 export const qualityCheckItems = sqliteTable("quality_check_items", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   teamId: teamId(),

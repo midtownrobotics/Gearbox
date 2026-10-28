@@ -45,6 +45,8 @@ const TABLES = [
   "shop_managers",
   "quality_reports",
   "quality_check_items",
+  "onshape_api_usage",
+  "onshape_api_errors",
 ];
 
 type Id = { id: number };
@@ -85,14 +87,14 @@ async function seed(team: TeamUsers): Promise<Seeded> {
   );
 
   const subsystem = await jsonAs<Id>(
-    student,
+    admin,
     "/subsystems",
     { method: "POST", body: { name: `Sub ${tag}` } },
     201,
   );
   const makeProcess = (name: string, type: string) =>
     jsonAs<Id>(
-      student,
+      admin,
       "/processes",
       { method: "POST", body: { name: `${name} ${tag}`, type } },
       201,
@@ -240,6 +242,7 @@ async function seed(team: TeamUsers): Promise<Seeded> {
     "part-instances": instances[2].id,
     "part-files": file.id,
     "staging-batches": batch.id,
+    subsystems: subsystem.id,
     processes: process.id,
     "quality-reports": report.id,
   };
@@ -264,6 +267,7 @@ async function seed(team: TeamUsers): Promise<Seeded> {
       file: file.id,
       check: check.id,
       checkedInstance: checkedInstance.id,
+      partNumber,
     },
   };
 }
@@ -341,6 +345,11 @@ it("keeps every team's shop to itself", async () => {
           fixNote: "",
         },
         "PUT /admin/quality/checklist": { checklist: STARTER_CHECKLIST.slice() },
+        "POST /part-files/delete": { ids: [d.file] },
+        "POST /drawings/delete": {
+          drawings: [{ partNumber: (b.data as { partNumber: string }).partNumber, revision: "A" }],
+        },
+        "PUT /admin/shop-status": { levels: [{ label: "Mine", below: null }] },
       };
     },
   });

@@ -1,11 +1,9 @@
 import { requireAuth } from "@g3/auth";
-import { CONSOLE_HOSTS, DEV_DOMAIN, teamKey } from "@g3/site-config";
-import { and, count, desc, eq, inArray, isNotNull, like, lt } from "drizzle-orm";
+import { CONSOLE_HOSTS, DEV_DOMAIN, demoTeamId, teamKey } from "@g3/site-config";
+import { and, count, desc, eq, inArray, isNotNull, isNull, like, lt, ne, sql } from "drizzle-orm";
 import { type Context, Hono } from "hono";
 import { createMiddleware } from "hono/factory";
 import {
-  NOTIFICATION_TYPES,
-  type NotificationType,
   type OPERATOR_ACTIONS,
   notifications,
   numberReports,
@@ -13,11 +11,12 @@ import {
   operators,
   problemReports,
   reporters,
+  teamApps,
   teams,
 } from "./db/schema";
 import { accounts, db, g3id, now } from "./lib";
-import { deliverToChat } from "./notifications";
-import { DELETABLE, callHook } from "./registry";
+import { deliverToChat, parseNotification } from "./notifications";
+import { DELETABLE, MANIFESTS, callHook } from "./registry";
 import { tellBlocked } from "./reports";
 import type { AppEnv } from "./types";
 import { recentVisits } from "./visits";
@@ -32,8 +31,10 @@ import { recentVisits } from "./visits";
 // - add and remove other operators;
 // - block a reporter by the reporter ID on a problem report's GitHub issue (src/reports.ts),
 //   never learning who it is (the team's admins are told who and why), and unblock them;
-// - write notifications for every team (info, warning, critical), each until it expires; each
-//   team's settings say where they go (src/notifications.ts).
+// - write notifications for every team (informational or critical), each until it expires; each
+//   team's settings say where they go (src/notifications.ts);
+// - see how Gearbox is used: teams, members and how many teams have each app on (counts only,
+//   leaving out the public demo).
 // Every action is logged in `operator_actions` with the operator's reason, and so is each look at a
 // team's members (the privacy policy's operator access log, kept 12 months). The site's own team
 // (site.ts) can't be deleted or suspended. A team's number is its id ("frc<number>") everywhere,
@@ -179,12 +180,6 @@ export async function tellOperators(env: AppEnv["Bindings"], text: string) {
     console.error("[operators] DM failed", err);
   }
 }
-
-/** How long a notification's short description and full text may be. */
-const SUMMARY_MAX = 140;
-const BODY_MAX = 10_000;
-/** How far ahead a notification's expiry may be. */
-const EXPIRY_MAX_S = 365 * 24 * 60 * 60;
 
 /** G3ID's error message, if it sent one. */
 async function errorOf(res: Response, fallback: string): Promise<string> {
@@ -435,6 +430,56 @@ export const consoleRouter = new Hono<AppEnv>()
     );
     return c.json({ ok: true });
   })
+  // How Gearbox is used, as counts only: teams by status, members (from G3ID) and how many active
+  // teams have each app on. The public demo's team is left out.
+  .get("/stats", async (c) => {
+    const monthAgo = now() - 30 * 86_400;
+    const [teamRows, appRows, membersRes] = await Promise.all([
+      db(c.env)
+        .select({
+          status: teams.status,
+          teams: count(),
+          newThisMonth: sql<number>`coalesce(sum(${teams.createdAt} >= ${monthAgo}), 0)`,
+        })
+        .from(teams)
+        .where(ne(teams.id, demoTeamId))
+        .groupBy(teams.status)
+        .all(),
+      db(c.env)
+        .select({ app: teamApps.app, teams: count() })
+        .from(teamApps)
+        .innerJoin(teams, eq(teams.id, teamApps.teamId))
+        .where(
+          and(eq(teamApps.enabled, true), eq(teams.status, "active"), ne(teams.id, demoTeamId)),
+        )
+        .groupBy(teamApps.app)
+        .all(),
+      g3id(c.env, "/stats"),
+    ]);
+    if (!membersRes.ok) return c.json({ error: "Couldn't count members." }, 502);
+    const byStatus = (status: string) => teamRows.find((r) => r.status === status)?.teams ?? 0;
+    const on = new Map(appRows.map((r) => [r.app, r.teams]));
+    return c.json({
+      teams: {
+        active: byStatus("active"),
+        pending: byStatus("pending"),
+        suspended: byStatus("suspended"),
+        newThisMonth: teamRows.reduce((sum, r) => sum + r.newThisMonth, 0),
+      },
+      members: (await membersRes.json()) as {
+        active: number;
+        pending: number;
+        mentors: number;
+        online: number;
+        activeWeek: number;
+        activeMonth: number;
+        joinedMonth: number;
+      },
+      apps: Object.values(MANIFESTS)
+        .filter((app) => !app.alwaysOn)
+        .map((app) => ({ slug: app.slug, name: app.name, teams: on.get(app.slug) ?? 0 })),
+    });
+  })
   // Visits to the landing page per day, the last `days` (30 by default, at most 366).
   .get("/visits", async (c) => {
     const days = Math.min(366, Math.max(1, Number(c.req.query("days")) || 30));
@@ -615,11 +660,12 @@ export const consoleRouter = new Hono<AppEnv>()
     await log(c.env, c.get("userId"), "remove_operator", { details: { userId } });
     return c.json({ ok: true });
   })
-  // Notifications, newest first.
+  // Notifications for every team, newest first (never a team's own, which are its business).
   .get("/notifications", async (c) => {
     const list = await db(c.env)
       .select()
       .from(notifications)
+      .where(isNull(notifications.teamId))
       .orderBy(desc(notifications.createdAt))
       .limit(300)
       .all();
@@ -635,33 +681,9 @@ export const consoleRouter = new Hono<AppEnv>()
     );
   })
   .post("/notifications", async (c) => {
-    const input = await c.req.json<{
-      type?: unknown;
-      summary?: unknown;
-      body?: unknown;
-      expiresAt?: unknown;
-    }>();
-    const type = input.type as NotificationType;
-    if (!NOTIFICATION_TYPES.includes(type)) {
-      return c.json({ error: "Choose Informational, Warning or Critical." }, 400);
-    }
-    const summary = typeof input.summary === "string" ? input.summary.trim() : "";
-    if (!summary || summary.length > SUMMARY_MAX) {
-      return c.json({ error: `Write a short description (up to ${SUMMARY_MAX} characters).` }, 400);
-    }
-    const body = typeof input.body === "string" ? input.body.trim() : "";
-    if (!body || body.length > BODY_MAX) {
-      return c.json({ error: `Write the full text (up to ${BODY_MAX} characters).` }, 400);
-    }
-    const expiresAt = input.expiresAt;
-    if (
-      typeof expiresAt !== "number" ||
-      !Number.isInteger(expiresAt) ||
-      expiresAt <= now() ||
-      expiresAt > now() + EXPIRY_MAX_S
-    ) {
-      return c.json({ error: "Choose when it expires: after now, within a year." }, 400);
-    }
+    const parsed = parseNotification(await c.req.json().catch(() => null));
+    if (typeof parsed === "string") return c.json({ error: parsed }, 400);
+    const { type, summary, body, expiresAt } = parsed;
     const id = crypto.randomUUID();
     await db(c.env)
       .insert(notifications)
@@ -684,7 +706,7 @@ export const consoleRouter = new Hono<AppEnv>()
   .delete("/notifications/:id", async (c) => {
     const removed = await db(c.env)
       .delete(notifications)
-      .where(eq(notifications.id, c.req.param("id")))
+      .where(and(eq(notifications.id, c.req.param("id")), isNull(notifications.teamId)))
       .returning({
         id: notifications.id,
         type: notifications.type,

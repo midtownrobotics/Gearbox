@@ -5,7 +5,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./intake-types": "./src/lib/intake-types.ts",
-    "./manifest": "./src/manifest.ts"
+    "./manifest": "./src/manifest.ts",
+    "./units": "./src/lib/units.ts"
   },
   "scripts": {
     "dev": "wrangler dev --port 8797 --inspector-port 9239",

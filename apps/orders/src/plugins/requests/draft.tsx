@@ -1,4 +1,4 @@
-import { Button, Card, ErrorBanner, Field, Loading, TextField, appOn, inputClass } from "@g3/ui";
+import { Button, Card, ErrorBanner, Field, Loading, TextField, inputClass } from "@g3/ui";
 import { applyTemplate } from "@g3/worker-orders/naming";
 import type { InferResponseType } from "hono/client";
 import { useState } from "react";
@@ -12,6 +12,7 @@ import {
   formatDate,
   parseDollars,
 } from "../../shared/format";
+import { PackInput, packHint } from "../../shared/pack";
 import { PRIORITY, PRIORITY_ORDER } from "../../shared/priority";
 import { QuantityInput, parseQuantity, quantityError } from "../../shared/quantity";
 import { STATUS } from "../../shared/status-badge";
@@ -29,6 +30,8 @@ export type Draft = {
   state: "loading" | "ready";
   /** Why the lookup failed, if it did (the row can still be filled in by hand). */
   lookupError: string | null;
+  /** The lookup needs an Edge box the team doesn't have: a note, not an error. */
+  lookupNeedsEdge: boolean;
   submitError: string | null;
   url: string;
   vendor: string;
@@ -44,9 +47,11 @@ export type Draft = {
   priceUnit: string | null;
   currency: string;
   quantity: string;
-  /** How many parts one of the quantity is: 4 for a pack of 4. */
+  /** How many parts one of the quantity is: 4 for a pack of 4, or 100 of `packUnit`. */
   packQuantity: string;
-  /** packQuantity was read from the product's name and the requester hasn't changed it. */
+  /** What the pack quantity counts ("ft" for a 100 ft spool); "" for one of each. */
+  packUnit: string;
+  /** The pack was read from the product's name and the requester hasn't changed it. */
   packGuessed: boolean;
   categoryId: string;
   categoryHint: string | null;
@@ -74,6 +79,7 @@ export const blank = (url = ""): Draft => ({
   key: nextKey++,
   state: "ready",
   lookupError: null,
+  lookupNeedsEdge: false,
   submitError: null,
   url,
   vendor: "",
@@ -89,6 +95,7 @@ export const blank = (url = ""): Draft => ({
   currency: currentCurrency(),
   quantity: "1",
   packQuantity: "1",
+  packUnit: "",
   packGuessed: false,
   categoryId: "",
   categoryHint: null,
@@ -115,19 +122,24 @@ const HINTS = {
 /**
  * Looks up a product link and fills a draft from it: the lookup's details, the name from the team
  * template, a budget category guess and the product's purchase history. A failed lookup comes
- * back as `lookupError` with everything else blank, to fill in by hand. Lookups go through the
- * team's edge box, so a team with Edge off gets the blank row (and the guesses) without one.
+ * back as `lookupError` with everything else blank, to fill in by hand. Shopify stores and REV
+ * are read from the vendor; other sites need the team's edge box.
  */
 export async function lookUpDraft(url: string): Promise<Partial<Draft>> {
   let lookup: Lookup | null = null;
   let lookupError: string | null = null;
-  const canLookUp = await appOn("edge");
+  let lookupNeedsEdge = false;
   try {
-    if (canLookUp) {
-      const res = await api.lookup.$get({ query: { url } });
-      if (!res.ok) throw new Error(await getErrorMessage(res));
-      lookup = await res.json();
+    const res = await api.lookup.$get({ query: { url } });
+    if (!res.ok) {
+      const body = (await res
+        .clone()
+        .json()
+        .catch(() => null)) as { code?: string } | null;
+      lookupNeedsEdge = body?.code === "no_edge";
+      throw new Error(await getErrorMessage(res));
     }
+    lookup = await res.json();
   } catch (err) {
     lookupError = err instanceof Error ? err.message : String(err);
   }
@@ -146,6 +158,7 @@ export async function lookUpDraft(url: string): Promise<Partial<Draft>> {
   return {
     state: "ready",
     lookupError,
+    lookupNeedsEdge,
     url: base.url,
     vendor: suggestion?.vendor ?? base.vendor,
     name: lookup ? (suggestion?.name ?? lookup.title) : "",
@@ -160,7 +173,6 @@ export async function lookUpDraft(url: string): Promise<Partial<Draft>> {
     ...suggestionFields(suggestion),
     storePlatform: lookup?.source ?? null,
     storeVariantId: variantId,
-    ...(canLookUp ? {} : { linkNote: "Fill in the part's details from its page." }),
   };
 }
 
@@ -191,8 +203,9 @@ function suggestionFields(suggestion: Suggestion | null): Partial<Draft> {
         }`
       : null,
     history: suggestion?.history ?? [],
-    // The catalog's pack quantity for a product it knows, else what the name says.
+    // The catalog's pack for a product it knows, else what the name says ("PK4", "25 ft").
     packQuantity: String(suggestion?.packQuantity ?? suggestion?.packQuantityGuess ?? 1),
+    packUnit: suggestion?.packUnit ?? suggestion?.packUnitGuess ?? "",
     packGuessed: !suggestion?.packQuantity && !!suggestion?.packQuantityGuess,
     catalogCategory: suggestion?.catalogCategory ?? suggestion?.catalogCategoryGuess ?? "",
     catalogKnown: !!suggestion?.catalogCategory,
@@ -216,9 +229,10 @@ export async function catalogDraft(item: CatalogItem): Promise<Partial<Draft>> {
     catalogCategory: item.category,
     catalogKnown: true,
     catalogCategoryGuessed: false,
-    // A part the catalog knows as a pack; otherwise the name's guess (if any) stands.
-    ...(item.packQuantity > 1
-      ? { packQuantity: String(item.packQuantity), packGuessed: false }
+    // A part the catalog knows as a pack (or an amount in a unit); otherwise the name's guess (if
+    // any) stands.
+    ...(item.packQuantity > 1 || item.packUnit
+      ? { packQuantity: String(item.packQuantity), packUnit: item.packUnit, packGuessed: false }
       : {}),
     linkNote:
       item.linkKind === "search"
@@ -227,11 +241,13 @@ export async function catalogDraft(item: CatalogItem): Promise<Partial<Draft>> {
           ? "This link is only the vendor's homepage. Paste the product page if you find it."
           : null,
   };
-  if (item.linkKind === "product" && !priceIsFresh(item) && (await appOn("edge"))) {
+  if (item.linkKind === "product" && !priceIsFresh(item)) {
     const found = await lookUpDraft(item.url);
     // The catalog's store option (REV links can't carry it the way Shopify's ?variant= does).
     const option = !found.variant
-      ? found.variants?.find((v) => v.id === item.storeVariantId)
+      ? found.variants?.find(
+          (v) => v.id === item.storeVariantId || (!!item.sku && v.sku === item.sku),
+        )
       : undefined;
     return {
       ...found,
@@ -305,14 +321,15 @@ export function variantPatch(
   };
 }
 
-/** A draft's quantity or pack isn't a whole number it can be sent with. */
-export const badQuantities = (d: Draft) =>
-  parseQuantity(d.quantity) === null || parseQuantity(d.packQuantity) === null;
+/** The product has options and none is picked yet. */
+export const needsOption = (d: Draft) =>
+  d.variants.length > 1 && !d.variants.some((v) => v.title === d.variant);
 
 /** What's missing before a draft can be sent, or null when it's complete. */
 export function draftProblem(d: Draft): string | null {
   return (
     (!d.url && "Add the product link.") ||
+    (needsOption(d) && "Pick an option.") ||
     (!d.name.trim() && "Give it a name.") ||
     (Number.isNaN(parseDollars(d.price)) && "Price must be a dollar amount like 12.50.") ||
     (parseQuantity(d.quantity) === null && "Quantity must be a whole number from 1 to 10000.") ||
@@ -338,6 +355,7 @@ export function draftFields(d: Draft, fallbackReason = "") {
     currency: d.currency,
     quantity: Number(d.quantity),
     packQuantity: Number(d.packQuantity),
+    packUnit: d.packUnit.trim(),
     categoryId: Number(d.categoryId),
     reason: d.reason.trim() || fallbackReason.trim(),
     priority: d.priority,
@@ -389,9 +407,8 @@ export function DraftCard({
   const unit = parseDollars(d.price);
   const quantity = parseQuantity(d.quantity);
   const total = unit !== null && !Number.isNaN(unit) && quantity !== null ? unit * quantity : null;
-  // How many parts arrive, when what's ordered is a pack.
-  const pack = parseQuantity(d.packQuantity);
-  const parts = pack !== null && pack > 1 && quantity !== null ? pack * quantity : null;
+  // What arrives, when what's ordered is a pack: "= 8 parts", "= 100 ft".
+  const arrives = packHint(quantity, parseQuantity(d.packQuantity), d.packUnit.trim());
 
   return (
     <Card className="!p-4">
@@ -425,7 +442,9 @@ export function DraftCard({
             </button>
           </div>
           {d.lookupError && (
-            <p className="text-xs text-red-700">{d.lookupError} Fill in the details by hand.</p>
+            <p className={`text-xs ${d.lookupNeedsEdge ? "text-blue-700" : "text-red-700"}`}>
+              {d.lookupError} Fill in the details by hand.
+            </p>
           )}
           {d.linkNote && <p className="text-xs text-secondary-600">{d.linkNote}</p>}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -457,7 +476,10 @@ export function DraftCard({
             </Field>
             {d.variants.length > 1 && (
               <div className="col-span-2">
-                <Field label="Option">
+                <Field
+                  label="Option"
+                  hint={needsOption(d) ? "Pick one to send the request" : undefined}
+                >
                   <select
                     className={inputClass}
                     value={d.variants.find((v) => v.title === d.variant)?.id ?? ""}
@@ -500,16 +522,16 @@ export function DraftCard({
               hint={
                 d.packGuessed
                   ? "Guessed from the name. Check it's right and change it if not."
-                  : parts !== null
-                    ? `= ${parts} parts when it arrives`
-                    : "Parts in one of these"
+                  : (arrives ?? "Parts in one of these, or an amount: 100 ft")
               }
               warn={d.packGuessed}
               error={quantityError(d.packQuantity)}
             >
-              <QuantityInput
-                value={d.packQuantity}
-                onChange={(packQuantity) => onChange({ packQuantity, packGuessed: false })}
+              <PackInput
+                quantity={d.packQuantity}
+                unit={d.packUnit}
+                onQuantity={(packQuantity) => onChange({ packQuantity, packGuessed: false })}
+                onUnit={(packUnit) => onChange({ packUnit, packGuessed: false })}
               />
             </Field>
             <div className="col-span-2">

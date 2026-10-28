@@ -321,6 +321,14 @@ describe("the platform", () => {
     ).toMatchObject({ app: "PLATFORM", team: null, user: null, cookie: "g3_session=theirs" });
   });
 
+  it("serves the docs on docs.<platform>, for no team", async () => {
+    expect(await routed(`https://docs.${site.platformDomain}/orders/setup`)).toMatchObject({
+      app: "PLATFORM",
+      path: "/orders/setup",
+      team: null,
+    });
+  });
+
   it("answers id.<platform> for sign-in callbacks too", async () => {
     expect(
       await routed(`https://id.${site.platformDomain}/api/auth/google/callback`),

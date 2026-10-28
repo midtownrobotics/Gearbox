@@ -15,9 +15,11 @@ for [`workers/inventory`](../../workers/inventory).
   the **robot** and **subsystem** the parts are in use on. The main table has a row for each place
   an entry has parts.
 - Locations are a tree, up to four levels (a room, a cabinet, a drawer, a bin).
+- An entry can have a **unit**: what one of its quantity is (ft, sheet, kg). Left empty, its parts
+  are counted one by one. Quantities are whole numbers in every unit.
 
-None of that arrangement is part of the app. A team defines its fields, locations, robots and
-subsystems on Settings, or loads them from a setup file. A new team starts empty and can load the
+None of that arrangement is part of the app. A team defines its fields, locations, robots,
+subsystems and units on Settings, or loads them from a setup file. A new team starts empty and can load the
 starter setup that comes with the app.
 
 ## Who can do what
@@ -27,7 +29,7 @@ starter setup that comes with the app.
   moves everything in a location somewhere else.
 - **Mentors and admins** (the G3ID roles, never a kiosk PIN session) delete entries, merge two
   entries into one, and split a listing off as its own entry.
-- **Admins** arrange Settings: fields, locations, robots, subsystems and setup files. Locations
+- **Admins** arrange Settings: fields, locations, robots, subsystems, units and setup files. Locations
   are put in order by dragging them by their handles, each among the ones in the same place.
 
 Every change to an entry is in its History, with who made it.
@@ -76,13 +78,15 @@ Every change to an entry is in its History, with who made it.
     { "name": "Shop", "children": [{ "name": "Shelves", "children": ["Bin 1", "Bin 2"] }] }
   ],
   "robots": ["Competition robot"],
-  "subsystems": ["Drivetrain", "Intake"]
+  "subsystems": ["Drivetrain", "Intake"],
+  "units": ["ft", "sheet"]
 }
 ```
 
 Field types: `text`, `paragraph`, `number`, `choice` (with `options`), `checkbox`, `link`, `date`.
 A location is a name, or `{ "name", "title", "children" }` (the title is optional), at most four
-levels deep. Loading a file only
+levels deep. `units` (optional) are offered when an entry's unit is typed; "each" is always there
+and isn't listed. Loading a file only
 adds what the team doesn't have yet, matched by name; nothing is changed or removed.
 
 ## Development

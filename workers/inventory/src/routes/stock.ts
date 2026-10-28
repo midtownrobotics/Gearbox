@@ -4,7 +4,7 @@ import type { Context } from "hono";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
 import { createDb } from "../db";
-import { stock } from "../db/schema";
+import { items, stock } from "../db/schema";
 import { parseId, quantityField } from "../lib/input";
 import {
   type Place,
@@ -21,6 +21,7 @@ import {
   tidyStorage,
   transferNote,
 } from "../lib/stock";
+import { formatQuantity } from "../lib/units";
 import type { AppEnv } from "../types";
 
 // What members do to a row of the main table: count it, move it, put some of it in use on a
@@ -82,19 +83,23 @@ async function rowOf(c: Context<AppEnv>) {
   if (id === null) return null;
   const db = createDb(c.env.INVENTORY_DB);
   const team = c.get("teamId");
-  const row = await db
-    .select()
+  const found = await db
+    .select({ row: stock, unit: items.unit })
     .from(stock)
+    .innerJoin(items, inTeam(items, team, eq(items.id, stock.itemId)))
     .where(inTeam(stock, team, eq(stock.id, id)))
     .get();
-  if (!row) return null;
+  if (!found) return null;
+  const { row, unit } = found;
   const place: Place = {
     locationId: row.locationId,
     status: row.status,
     robotId: row.robotId,
     subsystemId: row.subsystemId,
   };
-  return { db, team, row, place };
+  /** A quantity of this entry, as the history says it: "6 ft". */
+  const amount = (n: number) => formatQuantity(n, unit);
+  return { db, team, row, place, amount };
 }
 
 /**
@@ -131,7 +136,7 @@ export const stockRouter = new Hono<AppEnv>()
   .patch("/:id", requireAuth, editValidator, async (c) => {
     const found = await rowOf(c);
     if (!found) return c.json({ error: "That row no longer exists. Reload the page." }, 404);
-    const { db, team, row, place } = found;
+    const { db, team, row, place, amount } = found;
     const body = c.req.valid("json");
     const names = await loadNames(db, team);
     let quantity = row.quantity;
@@ -141,8 +146,8 @@ export const stockRouter = new Hono<AppEnv>()
       const where = describePlace(place, names);
       const note =
         body.quantity === row.quantity
-          ? `Confirmed ${row.quantity} in ${where}.`
-          : `${row.quantity} → ${body.quantity} in ${where}.`;
+          ? `Confirmed ${amount(row.quantity)} in ${where}.`
+          : `${row.quantity} → ${amount(body.quantity)} in ${where}.`;
       const outcome = await runStockChange(db, [
         db
           .update(stock)
@@ -173,7 +178,7 @@ export const stockRouter = new Hono<AppEnv>()
         quantity,
         {
           action: "moved",
-          note: transferNote(quantity, place, to, names),
+          note: transferNote(amount(quantity), place, to, names),
         },
         true,
       );
@@ -184,7 +189,7 @@ export const stockRouter = new Hono<AppEnv>()
   .post("/:id/check-out", requireAuth, checkOutValidator, async (c) => {
     const found = await rowOf(c);
     if (!found) return c.json({ error: "That row no longer exists. Reload the page." }, 404);
-    const { db, team, row, place } = found;
+    const { db, team, row, place, amount } = found;
     if (row.status !== "storage") {
       return c.json({ error: "Those parts are already in use." }, 409);
     }
@@ -200,7 +205,7 @@ export const stockRouter = new Hono<AppEnv>()
       quantity,
       {
         action: "checked_out",
-        note: transferNote(quantity, place, to, names),
+        note: transferNote(amount(quantity), place, to, names),
       },
       false,
     );
@@ -209,7 +214,7 @@ export const stockRouter = new Hono<AppEnv>()
   .post("/:id/check-in", requireAuth, checkInValidator, async (c) => {
     const found = await rowOf(c);
     if (!found) return c.json({ error: "That row no longer exists. Reload the page." }, 404);
-    const { db, team, row, place } = found;
+    const { db, team, row, place, amount } = found;
     if (row.status !== "in_use") {
       return c.json({ error: "Those parts are already in storage." }, 409);
     }
@@ -225,7 +230,7 @@ export const stockRouter = new Hono<AppEnv>()
       quantity,
       {
         action: "checked_in",
-        note: transferNote(quantity, place, to, names),
+        note: transferNote(amount(quantity), place, to, names),
       },
       false,
     );

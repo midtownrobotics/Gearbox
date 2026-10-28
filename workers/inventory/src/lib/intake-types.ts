@@ -15,8 +15,13 @@ export type InventoryDestination = {
 export type IntakeLine = {
   /** Names the delivery where it came from ("orders:request:12"); sent twice, it's added once. */
   sourceKey: string;
-  /** How many parts arrived: 4 for one pack of 4. */
+  /** How many arrived, in `unit`: 4 for one pack of 4, 100 for a 100 ft spool. */
   quantity: number;
+  /**
+   * What the quantity counts ("ft"); "" or left out for one of each. A new entry takes it; an
+   * entry Inventory already has keeps its own.
+   */
+  unit?: string;
   /** What to call a new entry, if the part isn't in Inventory yet. */
   name: string;
   /** The vendor's listing, which is how a later delivery of the same part finds the entry. */
@@ -26,7 +31,7 @@ export type IntakeLine = {
     vendor: string;
     sku: string | null;
     url: string | null;
-    /** What one part cost (a pack's price over the parts in it). */
+    /** What one of the unit cost (a pack's price over the pack quantity). */
     priceCents: number | null;
     priceAt: number | null;
   };
@@ -61,6 +66,8 @@ export type PlacesResult = {
     /** The entry the part would be added to, if Inventory has it. */
     itemId: number | null;
     itemName: string | null;
+    /** What that entry counts in ("ft"; "" for each), so a different unit can be pointed out. */
+    unit: string | null;
     /** Where that entry's parts are kept (its storage, before parts in use). */
     locationId: number | null;
   }[];

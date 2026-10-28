@@ -1,18 +1,38 @@
 import { inTeam, withTeam } from "@g3/auth";
 import { DEMO_PEOPLE, type DemoPerson, SAFE_TEXT, vocabularyOf } from "@g3/demo";
-import { asc } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import type { Db } from "./db";
-import { fields, itemEvents, itemListings, items, robots, stock, subsystems } from "./db/schema";
+import {
+  fields,
+  itemEvents,
+  itemListings,
+  items,
+  locations,
+  robots,
+  stock,
+  subsystems,
+} from "./db/schema";
 import { loadLocations } from "./lib/locations";
 import { loadSetup, starterSetup } from "./lib/setup";
+import { formatQuantity } from "./lib/units";
 
 // The public demo's Inventory (roadmap 5.3), loaded after its nightly reset: the starter setup
-// (fields, locations, robots, subsystems) and a shop's worth of entries, some on a robot.
+// (fields, locations, robots, subsystems), a description on a few locations, and a shop's worth of
+// entries, some on a robot.
+
+/** Descriptions of what's kept in some of the starter locations, by name. */
+const TITLES: Record<string, string> = {
+  Shelves: SAFE_TEXT.contents[0],
+  Cabinets: SAFE_TEXT.contents[1],
+  Workbench: SAFE_TEXT.contents[5],
+};
 
 type Entry = {
   name: string;
   type: string;
   size?: string;
+  /** What its quantities count, when it isn't one of each. */
+  unit?: string;
   /** Where it's kept: a location's name, and how many. */
   kept: [string, number];
   /** On a robot: the robot's and subsystem's place in the setup's lists, and how many. */
@@ -79,10 +99,26 @@ const ENTRIES: Entry[] = [
   { name: "Calipers", type: "Tools", kept: ["Workbench", 2] },
   { name: "Drill bit set", type: "Tools", kept: ["Workbench", 1] },
   { name: "Zip ties", type: "Other", kept: ["Pit cart", 500] },
+  {
+    name: "Signal wire",
+    type: "Electronics",
+    size: "22 AWG",
+    unit: "ft",
+    kept: ["Pit cart", 150],
+    inUse: [0, 5, 12],
+  },
+  { name: "Polycarbonate", type: "Raw stock", size: "1/8 in", unit: "sheet", kept: ["Storage", 3] },
+  { name: "Hex shaft", type: "Raw stock", size: "1/2 in hex", unit: "in", kept: ["Storage", 108] },
 ];
 
 export async function loadDemo(db: Db, teamId: string) {
   await loadSetup(db, teamId, starterSetup(), true);
+  for (const [name, title] of Object.entries(TITLES)) {
+    await db
+      .update(locations)
+      .set({ title })
+      .where(inTeam(locations, teamId, eq(locations.name, name)));
+  }
   const [places, fieldRows, robotRows, subsystemRows] = await Promise.all([
     loadLocations(db, teamId),
     db.select().from(fields).where(inTeam(fields, teamId)).orderBy(asc(fields.sortOrder)).all(),
@@ -110,6 +146,7 @@ export async function loadDemo(db: Db, teamId: string) {
       .values(
         withTeam(teamId, {
           name: entry.name,
+          unit: entry.unit ?? "",
           fieldValues: JSON.stringify(values),
           createdById: who.id,
           createdByName: who.name,
@@ -164,7 +201,7 @@ export async function loadDemo(db: Db, teamId: string) {
       withTeam(teamId, {
         itemId: item.id,
         action: "created",
-        note: `${entry.kept[1]} in ${entry.kept[0]}`,
+        note: `${formatQuantity(entry.kept[1], entry.unit ?? "")} in ${entry.kept[0]}`,
         userId: who.id,
         userName: who.name,
         createdAt,

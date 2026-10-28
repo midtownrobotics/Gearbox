@@ -5,7 +5,7 @@ import { validator } from "hono/validator";
 import { type OrdersDb, createOrdersDb } from "../db";
 import { catalogCategories, catalogFamilies, catalogItems, orderRequests } from "../db/schema";
 import { catalogKey, linkKindOf } from "../lib/catalog";
-import { packQuantityField } from "../lib/pack-quantity";
+import { MAX_UNIT, packQuantityField, packUnitField } from "../lib/pack-quantity";
 import { catalogReady } from "../lib/starter";
 import { vendorName } from "../lib/vendors";
 import { requireCatalogEditor } from "../middleware/auth";
@@ -20,6 +20,8 @@ type ItemFields = {
   options: Record<string, string>;
   /** How many parts one unit is: 4 for a pack of 4. */
   packQuantity: number;
+  /** What the pack quantity counts ("ft"); "" for one of each. */
+  packUnit: string;
 };
 
 /** A catalog item, created or edited by anyone. */
@@ -59,6 +61,11 @@ const itemValidator = (partial: boolean) =>
       if (pack === null) return fail("packQuantity must be a whole number from 1 to 10000.");
       out.packQuantity = pack;
     }
+    if (v.packUnit !== undefined) {
+      const unit = packUnitField(v.packUnit);
+      if (unit === null) return fail(`packUnit must be up to ${MAX_UNIT} characters.`);
+      out.packUnit = unit;
+    }
     if (v.options !== undefined) {
       const o = v.options as Record<string, unknown>;
       if (!o || typeof o !== "object" || Array.isArray(o))
@@ -86,6 +93,7 @@ const itemColumns = {
   priceCents: catalogItems.priceCents,
   priceAt: catalogItems.priceAt,
   packQuantity: catalogItems.packQuantity,
+  packUnit: catalogItems.packUnit,
   storePlatform: catalogItems.storePlatform,
   storeVariantId: catalogItems.storeVariantId,
   source: catalogItems.source,

@@ -18,8 +18,10 @@ export type CatalogPart = {
   /** What one unit cost last time, as Orders buys it: a whole pack, when it's a pack. */
   priceCents: number | null;
   priceAt: number | null;
-  /** How many parts one unit is: 4 for a pack of 4. */
+  /** How many parts one unit is: 4 for a pack of 4, or 100 of `packUnit` (a 100 ft spool). */
   packQuantity?: number;
+  /** What the pack quantity counts ("ft"); "" or left out for one of each. */
+  packUnit?: string;
 };
 
 /** How many parts one unit of a catalog part is. */
@@ -27,8 +29,8 @@ export const packOf = (part: Pick<CatalogPart, "packQuantity">) =>
   Math.max(1, part.packQuantity ?? 1);
 
 /**
- * What one part cost. Inventory counts parts, so its prices are per part: a pack of 4 bought for
- * $17.50 is $4.38 each.
+ * What one part cost. Inventory counts parts (or feet, or sheets), so its prices are per one of
+ * them: a pack of 4 bought for $17.50 is $4.38 each, a 100 ft spool for $12 is $0.12 a foot.
  */
 export const partPriceCents = (part: Pick<CatalogPart, "priceCents" | "packQuantity">) =>
   part.priceCents === null ? null : Math.round(part.priceCents / packOf(part));

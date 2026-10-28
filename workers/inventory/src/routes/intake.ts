@@ -17,6 +17,7 @@ import {
   placeProblem,
   tidyStorage,
 } from "../lib/stock";
+import { cleanUnit, formatQuantity, sameUnit, unitName } from "../lib/units";
 import type { AppEnv } from "../types";
 
 // Parts arriving from another app: Orders sends what was just received, with where the person
@@ -32,6 +33,8 @@ const MAX_LINES = 50;
 type Line = {
   sourceKey: string;
   quantity: number;
+  /** "" for one of each. */
+  unit: string;
   name: string;
   listing: ListingInput;
   note: string | null;
@@ -68,17 +71,19 @@ const intakeValidator = validator("json", (value, c): { use: Use; lines: Line[] 
     const quantity = quantityField(raw?.quantity, 1);
     const name = textField(raw?.name ?? "", 300);
     const note = textField(raw?.note ?? "", 200);
+    const unit = cleanUnit(raw?.unit);
     if (sourceKey === null || lines.some((line) => line.sourceKey === sourceKey)) {
       return fail("Each delivery needs its own sourceKey.");
     }
     if (quantity === null) return fail("quantity must be a whole number, 1 or more.");
     if (name === null || note === null) return fail("A delivery's name or note is too long.");
+    if (unit === null) return fail("A delivery's unit is too long.");
     const own = raw.locationId === undefined || raw.locationId === null ? null : raw.locationId;
     const locationId = own === null ? shared : parseId(own);
     if (locationId === null) return fail("Pick a location.");
     const listing = parseListing(raw.listing);
     if ("error" in listing) return fail(listing.error);
-    lines.push({ sourceKey, quantity, name, listing, note: note || null, locationId });
+    lines.push({ sourceKey, quantity, unit, name, listing, note: note || null, locationId });
   }
   return { use, lines };
 });
@@ -179,12 +184,23 @@ export const intakeRouter = new Hono<AppEnv>()
       const now = Date.now();
       const found = await findListing(db, team, line.listing);
       let itemId = found?.itemId;
+      // An entry Inventory has keeps its unit; the history says when the delivery's was another.
+      const kept = found
+        ? await db
+            .select({ unit: items.unit })
+            .from(items)
+            .where(inTeam(items, team, eq(items.id, found.itemId)))
+            .get()
+        : undefined;
+      const unlike =
+        kept && !sameUnit(kept.unit, line.unit) ? `, counted ${unitName(kept.unit)} here` : "";
       if (itemId === undefined) {
         const made = await db
           .insert(items)
           .values(
             withTeam(team, {
               name: (line.name || line.listing.name || listingLabel(line.listing)).slice(0, 200),
+              unit: line.unit,
               createdById: by.id,
               createdByName: by.name,
               createdAt: now,
@@ -238,7 +254,7 @@ export const intakeRouter = new Hono<AppEnv>()
             team,
             itemId,
             "received",
-            `${line.quantity} into ${where}${line.note ? ` (${line.note})` : ""}.`,
+            `${formatQuantity(line.quantity, line.unit)} into ${where}${line.note ? ` (${line.note})` : ""}${unlike}.`,
             by,
             now,
             null,
@@ -270,13 +286,19 @@ export const intakeRouter = new Hono<AppEnv>()
     for (const line of lines) {
       const found = await findListing(db, team, line.listing);
       if (!found) {
-        places.push({ sourceKey: line.sourceKey, itemId: null, itemName: null, locationId: null });
+        places.push({
+          sourceKey: line.sourceKey,
+          itemId: null,
+          itemName: null,
+          unit: null,
+          locationId: null,
+        });
         continue;
       }
       // Where it's kept: storage before in use, a row with parts before an empty one.
       const [item, kept] = await Promise.all([
         db
-          .select({ name: items.name })
+          .select({ name: items.name, unit: items.unit })
           .from(items)
           .where(inTeam(items, team, eq(items.id, found.itemId)))
           .get(),
@@ -292,6 +314,7 @@ export const intakeRouter = new Hono<AppEnv>()
         sourceKey: line.sourceKey,
         itemId: found.itemId,
         itemName: item?.name ?? null,
+        unit: item?.unit ?? null,
         locationId: kept?.locationId ?? null,
       });
     }

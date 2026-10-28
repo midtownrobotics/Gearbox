@@ -2,14 +2,24 @@ import { requireAdmin, requireAuth } from "@g3/auth";
 import { type AppName, teamAppUrlVia } from "@g3/site-config";
 import { and, desc, eq, inArray, isNull, lte } from "drizzle-orm";
 import { Hono } from "hono";
-import { type TEAM_ACTIONS, operatorActions, teamApps, teamAuditLog, teams } from "./db/schema";
+import {
+  type TEAM_ACTIONS,
+  notifications,
+  operatorActions,
+  teamApps,
+  teamAuditLog,
+  teams,
+} from "./db/schema";
 import { accounts, db, now, tellAdmins } from "./lib";
 import {
   changedParts,
+  deliverToChat,
   dmCandidates,
   notificationSettings,
+  parseNotification,
   parseSettings,
   saveSettings,
+  teamWritten,
   visibleNotifications,
 } from "./notifications";
 import { ALWAYS_ON, MANIFESTS, callHook, fetchExport, inLibrary, isAppName } from "./registry";
@@ -27,7 +37,8 @@ import type { AppEnv } from "./types";
 // download its data (its export hook), and every admin is told on the team's chat when one goes
 // on or off.
 //
-// Members also read the platform's notifications here, and admins choose where each type goes
+// Members also read the platform's notifications here, admins choose where each type goes, and
+// admins write notifications for their own team, which go by the same settings
 // (src/notifications.ts).
 
 /**
@@ -149,6 +160,35 @@ export const teamRouter = new Hono<AppEnv>()
       ),
     ),
   )
+  // Notifications the team's admins wrote, expired ones too.
+  .get("/notifications/written", requireAdmin, async (c) =>
+    c.json(await teamWritten(c.env, c.get("teamId"))),
+  )
+  // A notification for the team's own members, sent where the team's settings send its type.
+  .post("/notifications", requireAdmin, async (c) => {
+    const parsed = parseNotification(await c.req.json().catch(() => null));
+    if (typeof parsed === "string") return c.json({ error: parsed }, 400);
+    const teamId = c.get("teamId");
+    const id = crypto.randomUUID();
+    await db(c.env)
+      .insert(notifications)
+      .values({ id, teamId, ...parsed, createdBy: c.get("userId"), createdAt: now() });
+    c.executionCtx.waitUntil(
+      deliverToChat(c.env, parsed, { id: teamId, from: c.get("userDisplayName") }),
+    );
+    return c.json({ id }, 201);
+  })
+  // Takes one of the team's own off the home page (what was sent on chat stays there).
+  .delete("/notifications/:id", requireAdmin, async (c) => {
+    const removed = await db(c.env)
+      .delete(notifications)
+      .where(
+        and(eq(notifications.id, c.req.param("id")), eq(notifications.teamId, c.get("teamId"))),
+      )
+      .returning({ id: notifications.id });
+    if (removed.length === 0) return c.json({ error: "No such notification." }, 404);
+    return c.json({ ok: true });
+  })
   .use("/notification-settings", requireAdmin)
   // Where the team wants each type: the home page, chat channels, and members to DM (the team's
   // active members to choose from).

@@ -36,7 +36,26 @@ export { QuestionProvider, useQuestions } from "./components/questions";
 export { ProgressBar } from "./components/progress-bar";
 export { Switch, Toggle } from "./components/toggle";
 export { forceTheme, readTheme, setTheme, type Theme, useTheme } from "./theme";
-export { refreshTeamUiSettings, useTeamIcon, useTeamNames, useTeamUiSettings } from "./team-ui";
+export {
+  type TutorialAppsMessage,
+  type TutorialDocMessage,
+  type TutorialRole,
+  isTutorialAppsMessage,
+  lockPageScroll,
+  pageScroller,
+  scrollPageToTop,
+  setTutorial,
+  useTutorial,
+} from "./tutorial";
+export {
+  refreshTeamUiSettings,
+  teamHasAvatar,
+  usePageTeamAvatar,
+  useTeamAvatar,
+  useTeamIcon,
+  useTeamNames,
+  useTeamUiSettings,
+} from "./team-ui";
 export { forgetTeam, rememberedTeam, rememberTeam } from "./my-team";
 export {
   type SignedInUser,

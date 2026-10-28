@@ -6,6 +6,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./vite": "./src/vite.ts",
+    "./help": "./src/help.ts",
     "./versions": "./src/versions.ts",
     "./worker": "./src/worker.ts"
   },

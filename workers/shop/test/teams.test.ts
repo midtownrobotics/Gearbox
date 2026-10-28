@@ -18,15 +18,15 @@ type Id = { id: number };
 /** A team with a part in production: two instances, one started, and a file on one. */
 async function shopWithWork() {
   const team = teamUsers(newTeamId());
-  const { student } = team;
+  const { admin, student } = team;
   const subsystem = await jsonAs<Id>(
-    student,
+    admin,
     "/subsystems",
     { method: "POST", body: { name: "Drive" } },
     201,
   );
   const process = await jsonAs<Id>(
-    student,
+    admin,
     "/processes",
     { method: "POST", body: { name: "Mill" } },
     201,

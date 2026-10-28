@@ -1,7 +1,8 @@
 name: pit-log-downloader
 
 # The pit log downloader runs on team members' own computers, so it's checked on Linux, Windows
-# and macOS: it installs, type checks, builds its status page, starts and answers.
+# and macOS: it installs, type checks, builds its status page as a release does, then installs
+# again as a pit computer does (only its folders, no build tools), starts and answers.
 
 on:
   pull_request:
@@ -33,8 +34,18 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
     steps:
+      # The downloader and the packages its status page is built from.
       - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            devices/pit-log-downloader
+            packages/site-config
+            packages/ui
+            packages/demo
 
       - uses: pnpm/action-setup@v4
         with:
@@ -45,9 +56,20 @@ jobs:
           node-version: 24
           cache: pnpm
 
-      # Only the downloader and what it needs, as on a pit computer.
       - run: pnpm install --frozen-lockfile --filter "@g3/pit-log-downloader..."
 
       - run: pnpm --filter @g3/pit-log-downloader typecheck
 
-      - run: pnpm --filter @g3/pit-log-downloader smoke
+      # As release.yml does.
+      - run: pnpm --filter @g3/pit-log-downloader build:release
+
+      # Then only what a pit computer has: its folders (DOWNLOADER_FOLDERS in Pit's
+      # apps/pit/src/plugins/logs/setup-steps.tsx) and no build tools, so something new it needs to
+      # run fails here first.
+      - name: Install as a pit computer
+        run: |
+          git sparse-checkout set devices/pit-log-downloader packages/site-config
+          find . -name node_modules -type d -prune -exec rm -rf {} +
+          pnpm install --frozen-lockfile --prod --filter "@g3/pit-log-downloader..."
+
+      - run: node devices/pit-log-downloader/scripts/smoke.ts

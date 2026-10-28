@@ -1,4 +1,4 @@
-import { site } from "@g3/site-config";
+import { docsUrl, site } from "@g3/site-config";
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import g3Logo from "./assets/g3.png";
@@ -29,6 +29,9 @@ export function Header() {
         </a>
         <a href="/#open-source" className="g3-nav-text-link hidden md:block">
           Open source
+        </a>
+        <a href={docsUrl()} className="g3-nav-text-link hidden md:block">
+          Docs
         </a>
         <span className="text-sm">
           <MyTeamButton />
@@ -62,6 +65,9 @@ export function Footer() {
           </p>
         </div>
         <div className="flex flex-wrap gap-x-5 gap-y-2">
+          <a href={docsUrl()} className="hover:text-secondary-900">
+            Docs
+          </a>
           <a href={site.legal.terms} className="hover:text-secondary-900">
             Terms
           </a>

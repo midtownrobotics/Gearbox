@@ -3,7 +3,8 @@ import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
-// The status page. `start` builds it into dist/web, which the server serves; `watch` runs Vite
+// The status page. `build` writes it into dist/web and `build:release` into page/ (each release
+// commits it there), which the server serves; `watch` runs Vite
 // inside the server instead (src/index.ts).
 export default defineConfig({
   root: fileURLToPath(new URL("./web", import.meta.url)),

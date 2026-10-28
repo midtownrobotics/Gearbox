@@ -6,6 +6,7 @@ import {
   Page,
   buttonClass,
   refreshTeamUiSettings,
+  useTeamAvatar,
   useTeamIcon,
   useTeamUiSettings,
 } from "@g3/ui";
@@ -102,9 +103,12 @@ export function App() {
   }, [teamNumber]);
   const styled = Boolean(teamNumber) && appearanceLoaded;
   const appIcon = useTeamIcon(styled ? "/favicon.svg" : undefined) ?? "/favicon.svg";
-  // A logo is on the internet: offline, the app's icon in the team's color.
-  const showLogo = Boolean(styled && teamUi.logoUrl && status?.connection.internet);
-  const icon = showLogo ? teamUi.logoUrl : appIcon;
+  // The team's avatar is on the internet: offline (or without one), the app's icon in the team's color.
+  const avatar = useTeamAvatar(
+    styled && teamUi.useAvatar && status?.connection.internet ? teamNumber : undefined,
+  );
+  const showLogo = Boolean(avatar);
+  const icon = avatar ?? appIcon;
   const shortName = styled ? teamUi.shortName : teamNumber;
 
   return (

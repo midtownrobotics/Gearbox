@@ -2,7 +2,7 @@ import { env } from "cloudflare:test";
 import { exports } from "cloudflare:workers";
 import { site } from "@g3/site-config";
 import { type TestUser, admin, asUser, teamUsers } from "@g3/testing/users";
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { appOfPage, syncReports } from "../src/reports";
 import type { AppEnv } from "../src/types";
 
@@ -50,7 +50,7 @@ const moveTeamReports = (teamId: string, seconds: number) =>
 
 /** The reporter ID on a report's issue. */
 const reporterOf = async (report: Shown) =>
-  (await github(`/test/issues/${issueOf(report)}`)).body.match(/\| Reporter \| (\w+) \|/)?.[1];
+  (await github(`/test/issues/${issueOf(report)}`)).body.match(/### Reporter\n\n(\w+)\n/)?.[1];
 
 /** `admin` is an operator; the console's changes come from its own address. */
 const operator = admin;
@@ -93,15 +93,36 @@ describe("reporting a problem", () => {
     const issue = await github(`/test/issues/${issueOf(report)}`);
     expect(issue.title).toBe("Orders: Ping @​someone: the Approve button is broken");
     expect(issue.labels).toEqual(["from-gearbox", "bug", "orders"]);
-    expect(issue.body).toMatch(/^Ping @​someone: the Approve button is broken\n/);
+    expect(issue.body).toMatch(
+      /^### What happened\n\nPing @​someone: the Approve button is broken\n/,
+    );
     expect(issue.body).not.toContain("> Ping");
-    // A real header, not an empty row.
-    expect(issue.body).toContain("| Detail | Value |\n| --- | --- |\n| Kind | Problem |");
-    expect(issue.body).toContain("`https://1648-orders.frcgearbox.com/approvals`");
+    // Laid out like an issue made with the repository's Problem form.
+    expect(issue.body).toContain(
+      "### App\n\nOrders\n\n### Page\n\nhttps://1648-orders.frcgearbox.com/approvals\n",
+    );
     expect(issue.body).not.toContain("Jordan");
-    expect(issue.body).toContain("Orders 1.4.0");
-    expect(issue.body).toContain(`| Team | ${team.student.teamId.replace("frc", "")} |`);
+    expect(issue.body).toContain("### App version\n\n1.4.0\n\n### Platform version\n\n2026.10.4\n");
+    expect(issue.body).toContain(`### Team\n\n${team.student.teamId.replace("frc", "")}\n`);
     expect(issue.body).not.toContain(team.student.id);
+  });
+
+  it("puts the member's name on the issue only when they choose to", async () => {
+    const team = newTeam();
+    const named = (await (await send(team.student, { withName: true })).json()) as Shown & {
+      withName: boolean;
+    };
+    expect(named.withName).toBe(true);
+    expect((await github(`/test/issues/${issueOf(named)}`)).body).toContain(
+      `### Name\n\n${team.student.displayName}\n`,
+    );
+    const unnamed = (await (await send(team.student, { withName: "yes" })).json()) as Shown & {
+      withName: boolean;
+    };
+    expect(unnamed.withName).toBe(false);
+    const body = (await github(`/test/issues/${issueOf(unnamed)}`)).body;
+    expect(body).not.toContain("### Name");
+    expect(body).not.toContain(team.student.displayName);
   });
 
   it("uses the member's title for the issue when they give one", async () => {
@@ -137,36 +158,50 @@ describe("reporting a problem", () => {
     expect(res.status).toBe(401);
   });
 
-  it("lets a team send 5 a day, then one every 10 minutes", async () => {
-    const team = newTeam();
-    for (let i = 0; i < 5; i++) expect((await send(team.admin)).status).toBe(201);
-    const slowed = await send(team.student);
-    expect(slowed.status).toBe(429);
-    expect(((await slowed.json()) as { error: string }).error).toContain("Try again in 10 minutes");
+  describe("limits", () => {
+    // Midday UTC, so moving reports minutes earlier never crosses midnight, when a team's day
+    // starts over. Only Date is faked: D1 and the fake GitHub still run on real timers.
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date(`${new Date().toISOString().slice(0, 10)}T12:00:00Z`));
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
 
-    // 11 minutes later, one more, then another wait.
-    await moveTeamReports(team.admin.teamId, -11 * 60);
-    expect((await send(team.student)).status).toBe(201);
-    expect((await send(team.mentor)).status).toBe(429);
-  });
+    it("lets a team send 5 a day, then one every 10 minutes", async () => {
+      const team = newTeam();
+      for (let i = 0; i < 5; i++) expect((await send(team.admin)).status).toBe(201);
+      const slowed = await send(team.student);
+      expect(slowed.status).toBe(429);
+      expect(((await slowed.json()) as { error: string }).error).toContain(
+        "Try again in 10 minutes",
+      );
 
-  it("starts each team's day afresh at midnight UTC", async () => {
-    const team = newTeam();
-    for (let i = 0; i < 5; i++) expect((await send(team.student)).status).toBe(201);
-    expect((await send(team.mentor)).status).toBe(429);
-    // Yesterday's: the time since midnight, and a minute more.
-    const sinceMidnight = Math.floor(Date.now() / 1000) % 86400;
-    await moveTeamReports(team.student.teamId, -(sinceMidnight + 60));
-    for (let i = 0; i < 5; i++) expect((await send(team.mentor)).status).toBe(201);
-  });
+      // 11 minutes later, one more, then another wait.
+      await moveTeamReports(team.admin.teamId, -11 * 60);
+      expect((await send(team.student)).status).toBe(201);
+      expect((await send(team.mentor)).status).toBe(429);
+    });
 
-  it("limits how many one member sends in an hour", async () => {
-    const team = newTeam();
-    for (let i = 0; i < 5; i++) expect((await send(team.admin)).status).toBe(201);
-    // Past the team's wait, but not the hour.
-    await moveTeamReports(team.admin.teamId, -11 * 60);
-    expect((await send(team.admin)).status).toBe(429);
-    expect((await send(team.student)).status).toBe(201);
+    it("starts each team's day afresh at midnight UTC", async () => {
+      const team = newTeam();
+      for (let i = 0; i < 5; i++) expect((await send(team.student)).status).toBe(201);
+      expect((await send(team.mentor)).status).toBe(429);
+      // Yesterday's: the time since midnight, and a minute more.
+      const sinceMidnight = Math.floor(Date.now() / 1000) % 86400;
+      await moveTeamReports(team.student.teamId, -(sinceMidnight + 60));
+      for (let i = 0; i < 5; i++) expect((await send(team.mentor)).status).toBe(201);
+    });
+
+    it("limits how many one member sends in an hour", async () => {
+      const team = newTeam();
+      for (let i = 0; i < 5; i++) expect((await send(team.admin)).status).toBe(201);
+      // Past the team's wait, but not the hour.
+      await moveTeamReports(team.admin.teamId, -11 * 60);
+      expect((await send(team.admin)).status).toBe(429);
+      expect((await send(team.student)).status).toBe(201);
+    });
   });
 
   it("isn't open to the public demo", async () => {
