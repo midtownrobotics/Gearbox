@@ -1,5 +1,28 @@
 # @g3/worker-shop
 
+## 4.0.0
+
+### Major Changes
+
+- 4b489a5: Admins can remove subsystems and processes on the Admin page: unused ones are deleted, and ones parts use are hidden from new parts and can be restored. Only admins add or remove them now. Apply migration 0024 before deploying.
+
+### Minor Changes
+
+- dcb9da4: The menu has a "Need help?" link to the Gearbox docs page about the page you're on, and on a computer, Tutorial mode: that docs page beside the app, following you from page to page.
+- aa5cd00: Report a problem is there when you're signed out and on the demo too: it lets you write the report and opens it on GitHub, filled in with the page, versions, browser and team.
+- 3252560: A part's details view and its part page link to the part in Onshape and to the release it came from.
+- 13405a2: Ingest: each part's name opens it in Onshape, and each release has an Open in Onshape link.
+- 26e042d: Admin has an Onshape API Usage section: how many calls Shop makes to Onshape, which kinds, and the ones that failed, for the current API keys or all the team has used. Every page shows a banner while Shop has no Onshape API keys or Onshape is refusing its calls, such as when the API limit is reached.
+- 9667d17: Admins can change the shop status words on the Shop Floor's overview ("Raw 🥩", "Cooked 🍳", "Ash 🔥") and the queue size each starts at. The Files page has a box by every file and drawing for Delete selected, and Delete all on the Complete and Obsolete groups.
+
+### Patch Changes
+
+- 754ede0: The demo requires a quality check at the end of every part, with two shop managers, a passed and a failed quality report, and its sample releases no longer link to Onshape, where they never were.
+- 9667d17: When the top bar's pages don't fit, a mouse wheel over the bar scrolls them sideways (never the page) and the edge with more fades out.
+- 9667d17: In kiosk mode, the machine's pop-up in the top bar shows Shop's version.
+- 46b26b4: Your team's logo is now its avatar from The Blue Alliance: turn on Use Team Avatar on the Appearance page in place of giving a logo's address. With it off, the apps show their own icons.
+- a1832e8: Switching between light and dark mode changes the page's background and cards right away, not only its text.
+
 ## 3.0.0
 
 ### Major Changes

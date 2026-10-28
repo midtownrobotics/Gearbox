@@ -1,5 +1,63 @@
 # @g3/worker-platform
 
+## 4.1.0
+
+### Minor Changes
+
+- 82fe5af: Admins see when each member was last online on the Members pages, and the operators' console has a Stats page of teams, members and how many teams have each app on.
+- dcb9da4: Docs for team admins at docs.frcgearbox.com: getting started, the team's admin pages and every app, each with a setup checklist and how-tos. The landing page links to them.
+- aa5cd00: Report a problem is there when you're signed out and on the demo too: it lets you write the report and opens it on GitHub, filled in with the page, versions, browser and team.
+- a06dd4c: Report a problem can put your name on the report, if you turn on "Put my name on it". It's off by default.
+- 419c01a: Notifications are now Informational or Critical (Warnings become Informational). A team's admins can send notifications to their own team from Portal's Notifications page, and choose where Gearbox's and the team's own go separately; only Gearbox's Critical ones are sent as direct messages.
+
+### Patch Changes
+
+- 754ede0: The demo's home page has a notification from the team's admin.
+- 0568b9c: Reports sent with Report a problem are laid out like issues made on GitHub.
+- 9667d17: When the top bar's pages don't fit, a mouse wheel over the bar scrolls them sideways (never the page) and the edge with more fades out.
+- Updated dependencies [82fe5af]
+- Updated dependencies [754ede0]
+- Updated dependencies [754ede0]
+- Updated dependencies [754ede0]
+- Updated dependencies [754ede0]
+- Updated dependencies [754ede0]
+- Updated dependencies [754ede0]
+- Updated dependencies [754ede0]
+- Updated dependencies [754ede0]
+- Updated dependencies [dcb9da4]
+- Updated dependencies [86bb829]
+- Updated dependencies [6a2cc3c]
+- Updated dependencies [dcb9da4]
+- Updated dependencies [88bc2f0]
+- Updated dependencies [e7877ec]
+- Updated dependencies [195d258]
+- Updated dependencies [aa5cd00]
+- Updated dependencies [ab9aa57]
+- Updated dependencies [72a2f11]
+- Updated dependencies [7665b2b]
+- Updated dependencies [3252560]
+- Updated dependencies [13405a2]
+- Updated dependencies [26e042d]
+- Updated dependencies [4b489a5]
+- Updated dependencies [9667d17]
+- Updated dependencies [9667d17]
+- Updated dependencies [9667d17]
+- Updated dependencies [9667d17]
+- Updated dependencies [46b26b4]
+- Updated dependencies [419c01a]
+- Updated dependencies [a1832e8]
+  - @g3/worker-g3id@4.1.0
+  - @g3/worker-portal@2.3.0
+  - @g3/worker-edge@2.4.0
+  - @g3/worker-inventory@1.2.0
+  - @g3/worker-orders@2.3.0
+  - @g3/worker-schedule@0.4.0
+  - @g3/worker-scouting@3.1.0
+  - @g3/worker-shop@4.0.0
+  - @g3/worker-pit@3.2.0
+  - @g3/worker-skill-tree@2.2.0
+  - @g3/worker-attendance@2.2.0
+
 ## 4.0.0
 
 ### Major Changes

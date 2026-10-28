@@ -1,5 +1,22 @@
 # @g3/worker-portal
 
+## 2.3.0
+
+### Minor Changes
+
+- 82fe5af: Admins see when each member was last online on the Members pages, and the operators' console has a Stats page of teams, members and how many teams have each app on.
+- dcb9da4: The menu has a "Need help?" link to the Gearbox docs page about the page you're on, and on a computer, Tutorial mode: that docs page beside the app, following you from page to page.
+- aa5cd00: Report a problem is there when you're signed out and on the demo too: it lets you write the report and opens it on GitHub, filled in with the page, versions, browser and team.
+- 46b26b4: Your team's logo is now its avatar from The Blue Alliance: turn on Use Team Avatar on the Appearance page in place of giving a logo's address. With it off, the apps show their own icons.
+- 419c01a: Notifications are now Informational or Critical (Warnings become Informational). A team's admins can send notifications to their own team from Portal's Notifications page, and choose where Gearbox's and the team's own go separately; only Gearbox's Critical ones are sent as direct messages.
+
+### Patch Changes
+
+- 754ede0: In the demo, a notification for your team offers announcements to pick from.
+- dcb9da4: The Kiosk Devices page says kiosks are only set up for Shop for now.
+- 9667d17: When the top bar's pages don't fit, a mouse wheel over the bar scrolls them sideways (never the page) and the edge with more fades out.
+- a1832e8: Switching between light and dark mode changes the page's background and cards right away, not only its text.
+
 ## 2.2.0
 
 ### Minor Changes

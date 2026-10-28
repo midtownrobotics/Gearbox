@@ -1,5 +1,18 @@
 # @g3/worker-skill-tree
 
+## 2.2.0
+
+### Minor Changes
+
+- dcb9da4: The menu has a "Need help?" link to the Gearbox docs page about the page you're on, and on a computer, Tutorial mode: that docs page beside the app, following you from page to page.
+- aa5cd00: Report a problem is there when you're signed out and on the demo too: it lets you write the report and opens it on GitHub, filled in with the page, versions, browser and team.
+
+### Patch Changes
+
+- 9667d17: When the top bar's pages don't fit, a mouse wheel over the bar scrolls them sideways (never the page) and the edge with more fades out.
+- 46b26b4: Your team's logo is now its avatar from The Blue Alliance: turn on Use Team Avatar on the Appearance page in place of giving a logo's address. With it off, the apps show their own icons.
+- a1832e8: Switching between light and dark mode changes the page's background and cards right away, not only its text.
+
 ## 2.1.0
 
 ### Minor Changes

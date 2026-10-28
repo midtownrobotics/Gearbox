@@ -1,5 +1,28 @@
 # @g3/scouting
 
+## 3.1.0
+
+### Minor Changes
+
+- 51914ee: Add match summaries with team report drilldown, newest-first Stats without highlights, explicit no/minimal Auto movement and Yes/No radio choices. Form managers can name, create and activate multiple forms; scouts retain drafts when switching. List teams needing pit scouting and let service tickets select and filter multiple issue categories.
+- 72a2f11: Show missing match reports by robot and active form in the admin Competition overview. Distinguish local draft saves, partial or failed storage, submitting and server-confirmed reports, including pit drafts and warnings that survive reloads. Balance new robot assignments using current participation and submitted work, interleave alliances and rotate ties each match while preserving existing valid assignments.
+- 7665b2b: Let form managers hide or show each form directly from its card. Scouts only receive visible forms, with their list refreshing automatically; hidden forms and historical reports remain available to managers. Visibility changes preserve the form definition and enforce management permissions and team isolation.
+
+### Patch Changes
+
+- 51914ee: Analysis Auto path now groups drawings by team and then match in match order. Compact expandable rows replace the image wall; opening a match loads its paths, which still open full size. Reports for the same team and match are grouped together, with competitions kept distinct.
+- 51914ee: Analysis Compare labels each value with its actual team instead of Team A/B aliases, so values stay identifiable on mobile and while scrolling. Comparison values appear only after both teams have been selected and searched.
+- Updated dependencies [754ede0]
+- Updated dependencies [dcb9da4]
+- Updated dependencies [aa5cd00]
+- Updated dependencies [ab9aa57]
+- Updated dependencies [72a2f11]
+- Updated dependencies [7665b2b]
+- Updated dependencies [9667d17]
+- Updated dependencies [46b26b4]
+- Updated dependencies [a1832e8]
+  - @g3/worker-scouting@3.1.0
+
 ## 3.0.0
 
 ### Patch Changes
