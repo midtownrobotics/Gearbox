@@ -16,6 +16,162 @@ Each release of the whole platform, newest first, with the version of every app 
 
 <!-- releases -->
 
+## 2026.10.6 (2026-10-28)
+
+| App | Version |
+| --- | --- |
+| **G3ID** | **4.1.0** (was 4.0.0) |
+| **Portal** | **2.3.0** (was 2.2.0) |
+| **Platform** | **4.1.0** (was 4.0.0) |
+| **Shop** | **4.0.0** (was 3.0.0) |
+| **Pit** | **3.2.0** (was 3.1.0) |
+| **Orders** | **2.3.0** (was 2.2.0) |
+| **Edge** | **2.4.0** (was 2.3.0) |
+| Edge agent | 0.7.0 |
+| **Pit log downloader** | **2.3.0** (was 2.2.0) |
+| **Scouting** | **3.1.0** (was 3.0.0) |
+| **Skill Tree** | **2.2.0** (was 2.1.0) |
+| **Attendance** | **2.2.0** (was 2.1.0) |
+| **Inventory** | **1.2.0** (was 1.1.0) |
+| **Schedule** | **0.4.0** (was 0.3.0) |
+
+### G3ID 4.1.0
+
+- Admins see when each member was last online on the Members pages, and the operators' console has a Stats page of teams, members and how many teams have each app on.
+- The demo's members joined over the season and were last online at different times.
+- The menu has a "Need help?" link to the Gearbox docs page about the page you're on, and on a computer, Tutorial mode: that docs page beside the app, following you from page to page.
+- Report a problem is there when you're signed out and on the demo too: it lets you write the report and opens it on GitHub, filled in with the page, versions, browser and team.
+- When the top bar's pages don't fit, a mouse wheel over the bar scrolls them sideways (never the page) and the edge with more fades out.
+- Your team's logo is now its avatar from The Blue Alliance: turn on Use Team Avatar on the Appearance page in place of giving a logo's address. With it off, the apps show their own icons.
+- Switching between light and dark mode changes the page's background and cards right away, not only its text.
+
+### Portal 2.3.0
+
+- Admins see when each member was last online on the Members pages, and the operators' console has a Stats page of teams, members and how many teams have each app on.
+- In the demo, a notification for your team offers announcements to pick from.
+- The menu has a "Need help?" link to the Gearbox docs page about the page you're on, and on a computer, Tutorial mode: that docs page beside the app, following you from page to page.
+- The Kiosk Devices page says kiosks are only set up for Shop for now.
+- Report a problem is there when you're signed out and on the demo too: it lets you write the report and opens it on GitHub, filled in with the page, versions, browser and team.
+- When the top bar's pages don't fit, a mouse wheel over the bar scrolls them sideways (never the page) and the edge with more fades out.
+- Your team's logo is now its avatar from The Blue Alliance: turn on Use Team Avatar on the Appearance page in place of giving a logo's address. With it off, the apps show their own icons.
+- Notifications are now Informational or Critical (Warnings become Informational). A team's admins can send notifications to their own team from Portal's Notifications page, and choose where Gearbox's and the team's own go separately; only Gearbox's Critical ones are sent as direct messages.
+- Switching between light and dark mode changes the page's background and cards right away, not only its text.
+
+### Platform 4.1.0
+
+- Admins see when each member was last online on the Members pages, and the operators' console has a Stats page of teams, members and how many teams have each app on.
+- The demo's home page has a notification from the team's admin.
+- Docs for team admins at docs.frcgearbox.com: getting started, the team's admin pages and every app, each with a setup checklist and how-tos. The landing page links to them.
+- Reports sent with Report a problem are laid out like issues made on GitHub.
+- Report a problem is there when you're signed out and on the demo too: it lets you write the report and opens it on GitHub, filled in with the page, versions, browser and team.
+- Report a problem can put your name on the report, if you turn on "Put my name on it". It's off by default.
+- When the top bar's pages don't fit, a mouse wheel over the bar scrolls them sideways (never the page) and the edge with more fades out.
+- Notifications are now Informational or Critical (Warnings become Informational). A team's admins can send notifications to their own team from Portal's Notifications page, and choose where Gearbox's and the team's own go separately; only Gearbox's Critical ones are sent as direct messages.
+
+### Shop 4.0.0
+
+- The demo requires a quality check at the end of every part, with two shop managers, a passed and a failed quality report, and its sample releases no longer link to Onshape, where they never were.
+- The menu has a "Need help?" link to the Gearbox docs page about the page you're on, and on a computer, Tutorial mode: that docs page beside the app, following you from page to page.
+- Report a problem is there when you're signed out and on the demo too: it lets you write the report and opens it on GitHub, filled in with the page, versions, browser and team.
+- A part's details view and its part page link to the part in Onshape and to the release it came from.
+- Ingest: each part's name opens it in Onshape, and each release has an Open in Onshape link.
+- Admin has an Onshape API Usage section: how many calls Shop makes to Onshape, which kinds, and the ones that failed, for the current API keys or all the team has used. Every page shows a banner while Shop has no Onshape API keys or Onshape is refusing its calls, such as when the API limit is reached.
+- Admins can remove subsystems and processes on the Admin page: unused ones are deleted, and ones parts use are hidden from new parts and can be restored. Only admins add or remove them now. Apply migration 0024 before deploying.
+- Admins can change the shop status words on the Shop Floor's overview ("Raw 🥩", "Cooked 🍳", "Ash 🔥") and the queue size each starts at. The Files page has a box by every file and drawing for Delete selected, and Delete all on the Complete and Obsolete groups.
+- When the top bar's pages don't fit, a mouse wheel over the bar scrolls them sideways (never the page) and the edge with more fades out.
+- In kiosk mode, the machine's pop-up in the top bar shows Shop's version.
+- Your team's logo is now its avatar from The Blue Alliance: turn on Use Team Avatar on the Appearance page in place of giving a logo's address. With it off, the apps show their own icons.
+- Switching between light and dark mode changes the page's background and cards right away, not only its text.
+
+### Pit 3.2.0
+
+- The menu has a "Need help?" link to the Gearbox docs page about the page you're on, and on a computer, Tutorial mode: that docs page beside the app, following you from page to page.
+- The log downloader's setup steps download only the released downloader, with its status page already built (about 8 MB in all, instead of all of Gearbox and its build tools).
+- The Pit Monitor no longer stays on "Loading…" when The Blue Alliance, Nexus, Statbotics or another part of Pit doesn't answer: it shows what it has and tries again at the next refresh.
+- Report a problem is there when you're signed out and on the demo too: it lets you write the report and opens it on GitHub, filled in with the page, versions, browser and team.
+- When the top bar's pages don't fit, a mouse wheel over the bar scrolls them sideways (never the page) and the edge with more fades out.
+- Your team's logo is now its avatar from The Blue Alliance: turn on Use Team Avatar on the Appearance page in place of giving a logo's address. With it off, the apps show their own icons.
+- Switching between light and dark mode changes the page's background and cards right away, not only its text.
+
+### Orders 2.3.0
+
+- In the demo, part lookup fills in the sample links, and only those.
+- The menu has a "Need help?" link to the Gearbox docs page about the page you're on, and on a computer, Tutorial mode: that docs page beside the app, following you from page to page.
+- Count parts that aren't counted one by one. An Inventory entry can have a unit (wire in ft, polycarbonate by the sheet), shown after every quantity and offered from your team's own list on the Admin page. In Orders, a pack can be an amount in a unit ("Pack of 100 ft"), and receiving it adds 100 ft to Inventory.
+- Pasting a link from REV, WCP, AndyMark, The Thrifty Bot, CTRE, SDS and other Shopify stores fills in the part without an Edge box, and catalog parts link to their price and stock history on VendorDiff. A part that comes in several options needs one picked before the request is sent, and clicking a grayed-out Submit request says what's missing. A link only an Edge box can read says so, in blue, when the team has no box.
+- Report a problem is there when you're signed out and on the demo too: it lets you write the report and opens it on GitHub, filled in with the page, versions, browser and team.
+- When the top bar's pages don't fit, a mouse wheel over the bar scrolls them sideways (never the page) and the edge with more fades out.
+- Your team's logo is now its avatar from The Blue Alliance: turn on Use Team Avatar on the Appearance page in place of giving a logo's address. With it off, the apps show their own icons.
+- Switching between light and dark mode changes the page's background and cards right away, not only its text.
+
+### Edge 2.4.0
+
+- The demo shows the sites each device used, so Overview's top sites and the Sites pages have something in them.
+- The menu has a "Need help?" link to the Gearbox docs page about the page you're on, and on a computer, Tutorial mode: that docs page beside the app, following you from page to page.
+- Pasting a link from REV, WCP, AndyMark, The Thrifty Bot, CTRE, SDS and other Shopify stores fills in the part without an Edge box, and catalog parts link to their price and stock history on VendorDiff. A part that comes in several options needs one picked before the request is sent, and clicking a grayed-out Submit request says what's missing. A link only an Edge box can read says so, in blue, when the team has no box.
+- Report a problem is there when you're signed out and on the demo too: it lets you write the report and opens it on GitHub, filled in with the page, versions, browser and team.
+- Overview shows admins the top sites for the dates picked, so clicking a day shows that day's.
+- When the top bar's pages don't fit, a mouse wheel over the bar scrolls them sideways (never the page) and the edge with more fades out.
+- Your team's logo is now its avatar from The Blue Alliance: turn on Use Team Avatar on the Appearance page in place of giving a logo's address. With it off, the apps show their own icons.
+- Switching between light and dark mode changes the page's background and cards right away, not only its text.
+
+### Pit log downloader 2.3.0
+
+- The status page comes built with each release, so installing needs no build tools and `start` no longer builds it (`start:build` builds it from your own code). A computer set up before can be set up again from Pit's Logs page for the smaller install.
+- Report a problem is there when you're signed out and on the demo too: it lets you write the report and opens it on GitHub, filled in with the page, versions, browser and team.
+- Your team's logo is now its avatar from The Blue Alliance: turn on Use Team Avatar on the Appearance page in place of giving a logo's address. With it off, the apps show their own icons.
+
+### Scouting 3.1.0
+
+- The demo has a second match form, Driver ratings, filled in for the first matches, and a hidden Practice day form.
+- The menu has a "Need help?" link to the Gearbox docs page about the page you're on, and on a computer, Tutorial mode: that docs page beside the app, following you from page to page.
+- Report a problem is there when you're signed out and on the demo too: it lets you write the report and opens it on GitHub, filled in with the page, versions, browser and team.
+- Support multiple active named match and pit forms, with one submission per form and match and advancement after all active match forms are complete. Accept explicit no/minimal Auto movement, expose match-specific reports and event pit coverage, and retain the existing multiple service issue categories. Migration 0038 updates the atomic duplicate-submission rule while preserving the service-ticket schema from migration 0037.
+- Add match summaries with team report drilldown, newest-first Stats without highlights, explicit no/minimal Auto movement and Yes/No radio choices. Form managers can name, create and activate multiple forms; scouts retain drafts when switching. List teams needing pit scouting and let service tickets select and filter multiple issue categories.
+- Analysis Auto path now groups drawings by team and then match in match order. Compact expandable rows replace the image wall; opening a match loads its paths, which still open full size. Reports for the same team and match are grouped together, with competitions kept distinct.
+- Analysis Compare labels each value with its actual team instead of Team A/B aliases, so values stay identifiable on mobile and while scrolling. Comparison values appear only after both teams have been selected and searched.
+- Show missing match reports by robot and active form in the admin Competition overview. Distinguish local draft saves, partial or failed storage, submitting and server-confirmed reports, including pit drafts and warnings that survive reloads. Balance new robot assignments using current participation and submitted work, interleave alliances and rotate ties each match while preserving existing valid assignments.
+- Let form managers hide or show each form directly from its card. Scouts only receive visible forms, with their list refreshing automatically; hidden forms and historical reports remain available to managers. Visibility changes preserve the form definition and enforce management permissions and team isolation.
+- When the top bar's pages don't fit, a mouse wheel over the bar scrolls them sideways (never the page) and the edge with more fades out.
+- Your team's logo is now its avatar from The Blue Alliance: turn on Use Team Avatar on the Appearance page in place of giving a logo's address. With it off, the apps show their own icons.
+- Switching between light and dark mode changes the page's background and cards right away, not only its text.
+
+### Skill Tree 2.2.0
+
+- The menu has a "Need help?" link to the Gearbox docs page about the page you're on, and on a computer, Tutorial mode: that docs page beside the app, following you from page to page.
+- Report a problem is there when you're signed out and on the demo too: it lets you write the report and opens it on GitHub, filled in with the page, versions, browser and team.
+- When the top bar's pages don't fit, a mouse wheel over the bar scrolls them sideways (never the page) and the edge with more fades out.
+- Your team's logo is now its avatar from The Blue Alliance: turn on Use Team Avatar on the Appearance page in place of giving a logo's address. With it off, the apps show their own icons.
+- Switching between light and dark mode changes the page's background and cards right away, not only its text.
+
+### Attendance 2.2.0
+
+- The menu has a "Need help?" link to the Gearbox docs page about the page you're on, and on a computer, Tutorial mode: that docs page beside the app, following you from page to page.
+- Report a problem is there when you're signed out and on the demo too: it lets you write the report and opens it on GitHub, filled in with the page, versions, browser and team.
+- When the top bar's pages don't fit, a mouse wheel over the bar scrolls them sideways (never the page) and the edge with more fades out.
+- Your team's logo is now its avatar from The Blue Alliance: turn on Use Team Avatar on the Appearance page in place of giving a logo's address. With it off, the apps show their own icons.
+- Switching between light and dark mode changes the page's background and cards right away, not only its text.
+
+### Inventory 1.2.0
+
+- In the demo, a few locations say what's kept in them.
+- The menu has a "Need help?" link to the Gearbox docs page about the page you're on, and on a computer, Tutorial mode: that docs page beside the app, following you from page to page.
+- Locations has Add here in each location, to add entries there without picking the location each time, and Add an entry starts in the location the Inventory table is filtered to.
+- Count parts that aren't counted one by one. An Inventory entry can have a unit (wire in ft, polycarbonate by the sheet), shown after every quantity and offered from your team's own list on the Admin page. In Orders, a pack can be an amount in a unit ("Pack of 100 ft"), and receiving it adds 100 ft to Inventory.
+- Report a problem is there when you're signed out and on the demo too: it lets you write the report and opens it on GitHub, filled in with the page, versions, browser and team.
+- When the top bar's pages don't fit, a mouse wheel over the bar scrolls them sideways (never the page) and the edge with more fades out.
+- Your team's logo is now its avatar from The Blue Alliance: turn on Use Team Avatar on the Appearance page in place of giving a logo's address. With it off, the apps show their own icons.
+- Switching between light and dark mode changes the page's background and cards right away, not only its text.
+
+### Schedule 0.4.0
+
+- In the demo, the accounts visitors use each have a few friends on Schedule.
+- The menu has a "Need help?" link to the Gearbox docs page about the page you're on, and on a computer, Tutorial mode: that docs page beside the app, following you from page to page.
+- Report a problem is there when you're signed out and on the demo too: it lets you write the report and opens it on GitHub, filled in with the page, versions, browser and team.
+- When the top bar's pages don't fit, a mouse wheel over the bar scrolls them sideways (never the page) and the edge with more fades out.
+- Your team's logo is now its avatar from The Blue Alliance: turn on Use Team Avatar on the Appearance page in place of giving a logo's address. With it off, the apps show their own icons.
+- Switching between light and dark mode changes the page's background and cards right away, not only its text.
+
 ## 2026.10.5 (2026-10-24)
 
 | App | Version |

@@ -1,5 +1,16 @@
 # @g3/pit-log-downloader
 
+## 2.3.0
+
+### Minor Changes
+
+- e7877ec: The status page comes built with each release, so installing needs no build tools and `start` no longer builds it (`start:build` builds it from your own code). A computer set up before can be set up again from Pit's Logs page for the smaller install.
+- aa5cd00: Report a problem is there when you're signed out and on the demo too: it lets you write the report and opens it on GitHub, filled in with the page, versions, browser and team.
+
+### Patch Changes
+
+- 46b26b4: Your team's logo is now its avatar from The Blue Alliance: turn on Use Team Avatar on the Appearance page in place of giving a logo's address. With it off, the apps show their own icons.
+
 ## 2.2.0
 
 ### Minor Changes

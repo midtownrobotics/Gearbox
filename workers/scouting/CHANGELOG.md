@@ -1,5 +1,22 @@
 # @g3/worker-scouting
 
+## 3.1.0
+
+### Minor Changes
+
+- dcb9da4: The menu has a "Need help?" link to the Gearbox docs page about the page you're on, and on a computer, Tutorial mode: that docs page beside the app, following you from page to page.
+- aa5cd00: Report a problem is there when you're signed out and on the demo too: it lets you write the report and opens it on GitHub, filled in with the page, versions, browser and team.
+- ab9aa57: Support multiple active named match and pit forms, with one submission per form and match and advancement after all active match forms are complete. Accept explicit no/minimal Auto movement, expose match-specific reports and event pit coverage, and retain the existing multiple service issue categories. Migration 0038 updates the atomic duplicate-submission rule while preserving the service-ticket schema from migration 0037.
+- 72a2f11: Show missing match reports by robot and active form in the admin Competition overview. Distinguish local draft saves, partial or failed storage, submitting and server-confirmed reports, including pit drafts and warnings that survive reloads. Balance new robot assignments using current participation and submitted work, interleave alliances and rotate ties each match while preserving existing valid assignments.
+- 7665b2b: Let form managers hide or show each form directly from its card. Scouts only receive visible forms, with their list refreshing automatically; hidden forms and historical reports remain available to managers. Visibility changes preserve the form definition and enforce management permissions and team isolation.
+
+### Patch Changes
+
+- 754ede0: The demo has a second match form, Driver ratings, filled in for the first matches, and a hidden Practice day form.
+- 9667d17: When the top bar's pages don't fit, a mouse wheel over the bar scrolls them sideways (never the page) and the edge with more fades out.
+- 46b26b4: Your team's logo is now its avatar from The Blue Alliance: turn on Use Team Avatar on the Appearance page in place of giving a logo's address. With it off, the apps show their own icons.
+- a1832e8: Switching between light and dark mode changes the page's background and cards right away, not only its text.
+
 ## 3.0.0
 
 ### Major Changes

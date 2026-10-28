@@ -1,5 +1,21 @@
 # @g3/worker-inventory
 
+## 1.2.0
+
+### Minor Changes
+
+- dcb9da4: The menu has a "Need help?" link to the Gearbox docs page about the page you're on, and on a computer, Tutorial mode: that docs page beside the app, following you from page to page.
+- 86bb829: Locations has Add here in each location, to add entries there without picking the location each time, and Add an entry starts in the location the Inventory table is filtered to.
+- 6a2cc3c: Count parts that aren't counted one by one. An Inventory entry can have a unit (wire in ft, polycarbonate by the sheet), shown after every quantity and offered from your team's own list on the Admin page. In Orders, a pack can be an amount in a unit ("Pack of 100 ft"), and receiving it adds 100 ft to Inventory.
+- aa5cd00: Report a problem is there when you're signed out and on the demo too: it lets you write the report and opens it on GitHub, filled in with the page, versions, browser and team.
+
+### Patch Changes
+
+- 754ede0: In the demo, a few locations say what's kept in them.
+- 9667d17: When the top bar's pages don't fit, a mouse wheel over the bar scrolls them sideways (never the page) and the edge with more fades out.
+- 46b26b4: Your team's logo is now its avatar from The Blue Alliance: turn on Use Team Avatar on the Appearance page in place of giving a logo's address. With it off, the apps show their own icons.
+- a1832e8: Switching between light and dark mode changes the page's background and cards right away, not only its text.
+
 ## 1.1.0
 
 ### Minor Changes

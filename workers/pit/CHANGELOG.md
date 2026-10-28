@@ -1,5 +1,20 @@
 # @g3/worker-pit
 
+## 3.2.0
+
+### Minor Changes
+
+- dcb9da4: The menu has a "Need help?" link to the Gearbox docs page about the page you're on, and on a computer, Tutorial mode: that docs page beside the app, following you from page to page.
+- aa5cd00: Report a problem is there when you're signed out and on the demo too: it lets you write the report and opens it on GitHub, filled in with the page, versions, browser and team.
+
+### Patch Changes
+
+- e7877ec: The log downloader's setup steps download only the released downloader, with its status page already built (about 8 MB in all, instead of all of Gearbox and its build tools).
+- 195d258: The Pit Monitor no longer stays on "Loading…" when The Blue Alliance, Nexus, Statbotics or another part of Pit doesn't answer: it shows what it has and tries again at the next refresh.
+- 9667d17: When the top bar's pages don't fit, a mouse wheel over the bar scrolls them sideways (never the page) and the edge with more fades out.
+- 46b26b4: Your team's logo is now its avatar from The Blue Alliance: turn on Use Team Avatar on the Appearance page in place of giving a logo's address. With it off, the apps show their own icons.
+- a1832e8: Switching between light and dark mode changes the page's background and cards right away, not only its text.
+
 ## 3.1.0
 
 ### Minor Changes

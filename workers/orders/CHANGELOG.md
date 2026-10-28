@@ -1,5 +1,21 @@
 # @g3/worker-orders
 
+## 2.3.0
+
+### Minor Changes
+
+- dcb9da4: The menu has a "Need help?" link to the Gearbox docs page about the page you're on, and on a computer, Tutorial mode: that docs page beside the app, following you from page to page.
+- 6a2cc3c: Count parts that aren't counted one by one. An Inventory entry can have a unit (wire in ft, polycarbonate by the sheet), shown after every quantity and offered from your team's own list on the Admin page. In Orders, a pack can be an amount in a unit ("Pack of 100 ft"), and receiving it adds 100 ft to Inventory.
+- 88bc2f0: Pasting a link from REV, WCP, AndyMark, The Thrifty Bot, CTRE, SDS and other Shopify stores fills in the part without an Edge box, and catalog parts link to their price and stock history on VendorDiff. A part that comes in several options needs one picked before the request is sent, and clicking a grayed-out Submit request says what's missing. A link only an Edge box can read says so, in blue, when the team has no box.
+- aa5cd00: Report a problem is there when you're signed out and on the demo too: it lets you write the report and opens it on GitHub, filled in with the page, versions, browser and team.
+
+### Patch Changes
+
+- 754ede0: In the demo, part lookup fills in the sample links, and only those.
+- 9667d17: When the top bar's pages don't fit, a mouse wheel over the bar scrolls them sideways (never the page) and the edge with more fades out.
+- 46b26b4: Your team's logo is now its avatar from The Blue Alliance: turn on Use Team Avatar on the Appearance page in place of giving a logo's address. With it off, the apps show their own icons.
+- a1832e8: Switching between light and dark mode changes the page's background and cards right away, not only its text.
+
 ## 2.2.0
 
 ### Minor Changes
