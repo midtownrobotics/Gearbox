@@ -13,6 +13,7 @@ On [Appearance](team:portal/admin/appearance), admins set how Gearbox looks for 
 - **Team name** is the name everywhere, including the sign-in page. Changing it renames the team.
 - **Short name** goes in front of each app's name ("G3 Orders"). By default it's your team's number.
 - **Use Team Avatar** shows the avatar your team submitted to FIRST (the small image teams make each season) in place of the app icons in the bar. It can only be turned on once your team has submitted one through FIRST's Team Avatar Submission Portal; the page links there.
+- **Short name before app names** is on by default. Turn it off when your avatar already shows your short name, so the bar reads "Orders" beside it instead of "G3 Orders".
 
 ## Colors
 

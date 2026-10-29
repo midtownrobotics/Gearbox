@@ -216,6 +216,14 @@ export function AppearancePage() {
             </label>
           </div>
           <TeamAvatar checked={settings.useAvatar} onChange={(on) => update("useAvatar", on)} />
+          <div className="mt-5 border-t border-line pt-4">
+            <Toggle
+              label="Short name before app names"
+              description={`Show "${settings.shortName.trim() || "your short name"}" in front of each app's name in the top bar. Turn it off if your avatar already shows it.`}
+              checked={settings.prefixAppNames}
+              onChange={(on) => update("prefixAppNames", on)}
+            />
+          </div>
         </Card>
 
         <Card title="Colors">

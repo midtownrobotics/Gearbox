@@ -282,6 +282,13 @@ describe("team UI settings", () => {
     expect(read({ ...appearance, logoUrl: "" })).toEqual(defaultTeamUiSettings);
   });
 
+  it("reads a record saved before the app-name prefix setting as showing it", () => {
+    const { prefixAppNames: _prefix, ...appearance } = defaultTeamUiSettings;
+    expect(readTeamUiSettings(JSON.stringify(appearance))).toEqual(defaultTeamUiSettings);
+    const off = { ...defaultTeamUiSettings, prefixAppNames: false };
+    expect(readTeamUiSettings(JSON.stringify(off))).toEqual(off);
+  });
+
   it("builds the avatar's address for the current year", () => {
     expect(teamAvatarUrl(1648, 2026)).toBe(
       "https://www.thebluealliance.com/avatar/2026/frc1648.png",
