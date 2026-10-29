@@ -8,7 +8,8 @@
     "./service-issues": "./src/service-issues.ts"
   },
   "scripts": {
-    "dev": "wrangler dev --port 8792 --inspector-port 9234",
+    "dev": "wrangler dev --local --port 8792 --inspector-port 9234",
+    "dev:remote": "wrangler dev --port 8792 --inspector-port 9234",
     "build": "wrangler deploy --env production --dry-run",
     "deploy": "wrangler deploy --env production",
     "deploy:staging": "wrangler deploy --env staging",

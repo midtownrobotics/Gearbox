@@ -2,6 +2,7 @@
 title: Edge
 summary: An optional box in your shop that runs its network, its printer, a shared drive and more.
 order: 18
+preview: Edge isn't ready for other teams yet. You're welcome to try it, but it may not work with your setup, and we can't promise help or fixes.
 ---
 
 Edge is for teams with an **edge box**: a small computer in the shop (an Orange Pi 5 today) that sits between the shop's devices and its internet connection. Most teams don't have one, and every other app works without it.
