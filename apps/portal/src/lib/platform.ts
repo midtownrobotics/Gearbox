@@ -15,6 +15,8 @@ export type IntegrationStatus = {
 export type LibraryApp = TeamApp & {
   integrations: string[];
   version: string;
+  /** Not ready for other teams yet: a warning to show with it. */
+  preview: string | null;
   enabled: boolean;
   changedAt: number | null;
   changedBy: string | null;

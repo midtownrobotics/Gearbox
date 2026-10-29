@@ -122,6 +122,8 @@ async function library(env: AppEnv["Bindings"], teamId: string) {
         summary: app.summary,
         integrations: app.integrations,
         version: app.version,
+        /** Not ready for other teams yet: the warning to show with it. */
+        preview: app.preview ?? null,
         enabled: row?.enabled ?? false,
         changedAt: row?.changedAt ?? null,
         changedBy: row?.changedBy ? (names.get(row.changedBy)?.displayName ?? null) : null,

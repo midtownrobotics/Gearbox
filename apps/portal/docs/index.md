@@ -10,7 +10,7 @@ Admins also get the team's admin pages, under **Admin** in the bar. Only what's 
 
 | Page | What it's for |
 | --- | --- |
-| Manage Apps | Switch apps on and off, download an app's data, see the team's log |
+| Manage Apps | Switch apps on and off, download an app's data |
 | Members | Approve new members, give roles, remove people |
 | Appearance | Colors, avatar, names, links and the order of the tiles |
 | Sign-in | Which sign-in methods your team allows |
@@ -18,6 +18,7 @@ Admins also get the team's admin pages, under **Admin** in the bar. Only what's 
 | Integrations | Connect Slack or Discord, and see what else is connected |
 | Notifications | Who sees Gearbox's announcements, and where they're sent |
 | Operator Access | When Gearbox's operators looked at your team, and why |
+| Log | Apps switched on and off, data downloads and settings changes, and who made them |
 
 Every member also has an Account page: open it from "Hello, name" in the bar. It's the next page here, since it's the one everyone uses; the admin pages follow, one page each, in the order a new team needs them.
 

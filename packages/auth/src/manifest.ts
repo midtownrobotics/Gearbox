@@ -85,6 +85,11 @@ export type AppManifest = {
    * per team yet).
    */
   availability: "every team" | "site team";
+  /**
+   * Not ready for other teams yet: a warning shown with the app in the library (Manage Apps).
+   * Teams can still switch it on.
+   */
+  preview?: string;
   /** Always on, for every team (sign-in, the team's home): never in the library. */
   alwaysOn?: true;
   /** The app's version, from its worker's package.json. */
