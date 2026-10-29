@@ -37,6 +37,7 @@ const APPEARANCE_PARTS: Record<keyof TeamUiSettings, string> = {
   name: "Name",
   shortName: "Short name",
   useAvatar: "Team avatar",
+  prefixAppNames: "Short name before app names",
   displayFont: "Display font",
   defaultTheme: "Default theme",
   linkAccents: "Linked accents",

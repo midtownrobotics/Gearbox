@@ -75,6 +75,8 @@ export type TeamUiSettings = {
   shortName: string;
   /** Show the team's avatar from The Blue Alliance (`teamAvatarUrl`) as its logo, in place of the app icons. */
   useAvatar: boolean;
+  /** Put the short name in front of the app's name in the top bar ("G3 ORDERS"); off: "ORDERS". */
+  prefixAppNames: boolean;
   displayFont: "Agency FB" | "Ubuntu" | "system-ui";
   defaultTheme: "system" | "light" | "dark";
   /**
@@ -165,6 +167,7 @@ export const defaultTeamUiSettings: TeamUiSettings = {
   name: site.team.name,
   shortName: site.team.shortName,
   useAvatar: false,
+  prefixAppNames: true,
   displayFont: "Agency FB",
   defaultTheme: "system",
   linkAccents: true,

@@ -76,6 +76,7 @@ export function isTeamUiSettings(value: unknown): value is TeamUiSettings {
     value.shortName.trim().length > 0 &&
     value.shortName.length <= 24 &&
     typeof value.useAvatar === "boolean" &&
+    typeof value.prefixAppNames === "boolean" &&
     ["Agency FB", "Ubuntu", "system-ui"].includes(String(value.displayFont)) &&
     ["system", "light", "dark"].includes(String(value.defaultTheme)) &&
     typeof value.linkAccents === "boolean" &&
@@ -147,6 +148,8 @@ export function readTeamUiSettings(
       // Saved when a team gave its logo's address: a team that had a logo shows its avatar.
       useAvatar:
         "useAvatar" in stored ? stored.useAvatar : typeof logoUrl === "string" && !!logoUrl,
+      // Saved before the prefix could be turned off: on.
+      prefixAppNames: "prefixAppNames" in stored ? stored.prefixAppNames : defaults.prefixAppNames,
       linkAccents: "linkAccents" in stored ? stored.linkAccents : defaults.linkAccents,
       // Saved before button text was a choice: automatic.
       buttonText: "buttonText" in stored ? stored.buttonText : defaults.buttonText,
