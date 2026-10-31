@@ -98,6 +98,7 @@ Scouting engagement is off by default. An admin can enable points and match pred
 | Discord | Sign-in and team notifications. When someone new signs in with Discord, we check with Discord that they're in your team's server; the answer isn't stored | Only if your team connects its Discord server |
 | Onshape | Part and drawing data for Shop | Only if your team connects Onshape |
 | The Blue Alliance, Nexus, Statbotics | Public event and match schedules and predictions for Pit and Scouting. The Blue Alliance also has teams' avatars, which a team can choose to show as its logo | Team and event numbers only. When your team shows its avatar, your browser loads the image from The Blue Alliance, which sees your IP address as it would on any visit |
+| Sites your team links to | A team's own links on its home page show each site's icon | When you open your team's home, your browser loads each linked site's icon from that site, which sees your IP address as it would on any visit. Gearbox doesn't store the icons |
 | Share-A-Cart | Building vendor carts in Orders | Only if your team connects it; it receives the items in a cart |
 | Cloudflare Workers AI | Reading a photographed match schedule in Scouting | Only when a member uses that feature; it receives the photo |
 

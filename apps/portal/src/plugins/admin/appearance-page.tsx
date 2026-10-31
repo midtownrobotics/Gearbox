@@ -1,15 +1,19 @@
 import {
   type ButtonText,
+  type CustomLink,
   type Hsv,
   type TeamUiColors,
   type TeamUiLinkKey,
   type TeamUiSettings,
   buttonTextChoices,
   buttonTextColor,
+  completeAppOrder,
+  faviconUrl,
   hexToHsv,
   hsvToHex,
   isDemoPage,
   isHexColor,
+  maxCustomLinks,
   pageTeamId,
   pageTeamNumber,
   teamAvatarUrl,
@@ -31,7 +35,7 @@ import {
 } from "@g3/ui";
 import type { SafeTextKind } from "@g3/ui";
 import { type CSSProperties, useEffect, useRef, useState } from "react";
-import { FaTimes } from "react-icons/fa";
+import { FaGlobe, FaTimes } from "react-icons/fa";
 import { g3id } from "../../lib/api";
 import { AppOrder } from "./app-order";
 
@@ -123,7 +127,12 @@ export function AppearancePage() {
     setMessage("");
     setError("");
     try {
-      const response = await g3id.admin.team.ui.$put({ json: settings });
+      // Custom links added since the order was last changed go at the end of the grid.
+      const json = {
+        ...settings,
+        appOrder: completeAppOrder(settings.appOrder, settings.customLinks),
+      };
+      const response = await g3id.admin.team.ui.$put({ json });
       if (!response.ok) {
         const data = (await response.json()) as { error?: string };
         throw new Error(data.error ?? "Could not save team settings.");
@@ -281,6 +290,7 @@ export function AppearancePage() {
           <Links
             links={settings.links}
             hiddenLinks={settings.hiddenLinks}
+            customLinks={settings.customLinks}
             rows={linkRows}
             onRowsChange={setLinkRows}
             disabled={saving}
@@ -288,6 +298,7 @@ export function AppearancePage() {
               setSettings((current) => ({ ...current, links, hiddenLinks }));
               setMessage("");
             }}
+            onCustomChange={(customLinks) => update("customLinks", customLinks)}
           />
         </Card>
 
@@ -320,34 +331,54 @@ function shownLinks(settings: TeamUiSettings): TeamUiLinkKey[] {
   );
 }
 
+/** A new custom link's id: short, and not one the team has. */
+function newCustomId(taken: CustomLink[]): string {
+  for (;;) {
+    const id = Math.random().toString(36).slice(2, 10);
+    if (id && !taken.some((link) => link.id === id)) return id;
+  }
+}
+
+const CUSTOM = "custom";
+
 /**
- * The team's links: one row for each it shows, and a menu to add another. Removing one clears its
- * address. A link hidden in the editor before this one (address kept, not shown) comes back with
- * its address when it's added again.
+ * The team's links: one row for each it shows, then its custom links, and a menu to add another.
+ * Removing one clears its address. A link hidden in the editor before this one (address kept, not
+ * shown) comes back with its address when it's added again.
  */
 function Links({
   links,
   hiddenLinks,
+  customLinks,
   rows,
   onRowsChange,
   disabled,
   onChange,
+  onCustomChange,
 }: {
   links: TeamUiSettings["links"];
   hiddenLinks: TeamUiLinkKey[];
+  customLinks: CustomLink[];
   /** The links listed (see `linkRows`). */
   rows: TeamUiLinkKey[];
   onRowsChange: (rows: TeamUiLinkKey[]) => void;
   disabled: boolean;
   onChange: (links: TeamUiSettings["links"], hiddenLinks: TeamUiLinkKey[]) => void;
+  onCustomChange: (customLinks: CustomLink[]) => void;
 }) {
-  // Rows added here, whose address box gets the cursor.
-  const [added, setAdded] = useState<TeamUiLinkKey[]>([]);
+  // Rows added here, whose first box gets the cursor.
+  const [added, setAdded] = useState<string[]>([]);
   const keys = Object.keys(teamUiLinkLabels) as TeamUiLinkKey[];
   const shown = keys.filter((key) => rows.includes(key));
   const addable = keys.filter((key) => !rows.includes(key));
 
-  function add(key: TeamUiLinkKey) {
+  function add(key: TeamUiLinkKey | typeof CUSTOM) {
+    if (key === CUSTOM) {
+      const id = newCustomId(customLinks);
+      setAdded((current) => [...current, id]);
+      onCustomChange([...customLinks, { id, label: "", url: "" }]);
+      return;
+    }
     setAdded((current) => [...current, key]);
     onRowsChange([...rows, key]);
     onChange(
@@ -364,9 +395,13 @@ function Links({
     );
   }
 
+  function changeCustom(id: string, change: Partial<CustomLink>) {
+    onCustomChange(customLinks.map((link) => (link.id === id ? { ...link, ...change } : link)));
+  }
+
   return (
     <div className="space-y-3">
-      {shown.length > 0 ? (
+      {shown.length + customLinks.length > 0 ? (
         <ul className="divide-y divide-line rounded-md border border-line">
           {shown.map((key) => (
             <LinkRow
@@ -379,18 +414,28 @@ function Links({
               onRemove={() => remove(key)}
             />
           ))}
+          {customLinks.map((link) => (
+            <CustomLinkRow
+              key={link.id}
+              link={link}
+              disabled={disabled}
+              autoFocus={added.includes(link.id)}
+              onChange={(change) => changeCustom(link.id, change)}
+              onRemove={() => onCustomChange(customLinks.filter((other) => other.id !== link.id))}
+            />
+          ))}
         </ul>
       ) : (
         <p className="rounded-md border border-dashed border-line px-3 py-4 text-center text-sm text-secondary-500">
           No links yet.
         </p>
       )}
-      {addable.length > 0 && (
+      {(addable.length > 0 || customLinks.length < maxCustomLinks) && (
         <select
           aria-label="Add a link"
           value=""
           disabled={disabled}
-          onChange={(event) => add(event.target.value as TeamUiLinkKey)}
+          onChange={(event) => add(event.target.value as TeamUiLinkKey | typeof CUSTOM)}
           className={`${inputClass} !w-auto`}
         >
           <option value="" disabled>
@@ -401,6 +446,9 @@ function Links({
               {teamUiLinkLabels[key]}
             </option>
           ))}
+          {customLinks.length < maxCustomLinks && (
+            <option value={CUSTOM}>Another site or app…</option>
+          )}
         </select>
       )}
     </div>
@@ -872,5 +920,83 @@ function TeamAvatar({
         />
       )}
     </div>
+  );
+}
+
+/**
+ * A team's own link: the site's icon (from the site itself, once an address is typed), its name
+ * and its address, and a button to remove it.
+ */
+function CustomLinkRow({
+  link,
+  disabled,
+  autoFocus,
+  onChange,
+  onRemove,
+}: {
+  link: CustomLink;
+  disabled: boolean;
+  autoFocus: boolean;
+  onChange: (change: Partial<CustomLink>) => void;
+  onRemove: () => void;
+}) {
+  const input = useRef<HTMLInputElement>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: only when the row first appears
+  useEffect(() => {
+    if (autoFocus) input.current?.focus();
+  }, []);
+  const icon = /^https:\/\/[^/]+\.[^/]+/.test(link.url) ? faviconUrl(link.url) : undefined;
+  const [failed, setFailed] = useState<string>();
+  return (
+    <li className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 sm:flex-nowrap">
+      <div className="flex w-full min-w-0 items-center gap-2 sm:w-36 sm:shrink-0">
+        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-black text-sm text-white">
+          {icon && failed !== icon ? (
+            <img
+              src={icon}
+              alt=""
+              referrerPolicy="no-referrer"
+              className="h-4 w-4 object-contain"
+              onError={() => setFailed(icon)}
+            />
+          ) : (
+            <FaGlobe />
+          )}
+        </span>
+        <TextField
+          kind="linkName"
+          variant="compact"
+          aria-label="Name"
+          value={link.label}
+          placeholder="Name"
+          maxLength={40}
+          required
+          ref={input}
+          onChange={(event) => onChange({ label: event.target.value })}
+          className="min-w-0 flex-1"
+        />
+      </div>
+      <TextField
+        kind="url"
+        type="url"
+        aria-label={`${link.label || "Custom link"} address`}
+        value={link.url}
+        placeholder="https://…"
+        pattern="https://.+"
+        required
+        onChange={(event) => onChange({ url: event.target.value })}
+        className="min-w-0 flex-1"
+      />
+      <button
+        type="button"
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-secondary-500 hover:bg-inset hover:text-red-600 disabled:opacity-40"
+        disabled={disabled}
+        onClick={onRemove}
+        aria-label={`Remove ${link.label || "custom link"}`}
+        title="Remove"
+      >
+        <FaTimes />
+      </button>
+    </li>
   );
 }

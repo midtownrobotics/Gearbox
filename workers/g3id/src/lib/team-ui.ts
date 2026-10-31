@@ -1,12 +1,15 @@
 import {
+  type CustomLink,
   type TeamUiColors,
   type TeamUiSettings,
   builtInBrandColor,
   buttonTextChoices,
   completeAppOrder,
   defaultTeamUiSettings,
+  isCustomLinkId,
   isHexColor,
   isPortalTileKey,
+  maxCustomLinks,
   teamUiDefaults,
   withHueOf,
 } from "@g3/site-config";
@@ -59,6 +62,20 @@ function isLink(value: unknown): value is string {
   }
 }
 
+/** A team's own link: a short id, a name and an HTTPS address. */
+function isCustomLink(value: unknown): value is CustomLink {
+  return (
+    isRecord(value) &&
+    hasKeys(value, ["id", "label", "url"]) &&
+    isCustomLinkId(value.id) &&
+    typeof value.label === "string" &&
+    value.label.trim().length > 0 &&
+    value.label.length <= 40 &&
+    isLink(value.url) &&
+    !!value.url
+  );
+}
+
 /** Reject extra keys too, so an older editor cannot silently overwrite future settings. */
 function hasKeys(value: Record<string, unknown>, keys: string[]): boolean {
   return Object.keys(value).length === keys.length && keys.every((key) => key in value);
@@ -91,10 +108,14 @@ export function isTeamUiSettings(value: unknown): value is TeamUiSettings {
         Object.prototype.hasOwnProperty.call(defaultTeamUiSettings.links, key),
     ) &&
     Object.values(value.links).every(isLink) &&
-    // Every tile of Portal's grid, once each, in the team's order.
+    Array.isArray(value.customLinks) &&
+    value.customLinks.length <= maxCustomLinks &&
+    value.customLinks.every(isCustomLink) &&
+    new Set(value.customLinks.map((link) => link.id)).size === value.customLinks.length &&
+    // Every tile of Portal's grid (its custom links' too), once each, in the team's order.
     Array.isArray(value.appOrder) &&
     value.appOrder.every(isPortalTileKey) &&
-    completeAppOrder(value.appOrder).length === value.appOrder.length &&
+    completeAppOrder(value.appOrder, value.customLinks).length === value.appOrder.length &&
     new Set(value.appOrder).size === value.appOrder.length
   );
 }
@@ -143,6 +164,8 @@ export function readTeamUiSettings(
     const value: unknown = JSON.parse(json);
     if (!isRecord(value) || !isRecord(value.links)) return defaults;
     const { logoUrl, ...stored } = withoutPrimaryColor(value);
+    const storedLinks = value.links;
+    const customLinks = Array.isArray(value.customLinks) ? value.customLinks : [];
     const settings = {
       ...stored,
       // Saved when a team gave its logo's address: a team that had a logo shows its avatar.
@@ -153,12 +176,26 @@ export function readTeamUiSettings(
       linkAccents: "linkAccents" in stored ? stored.linkAccents : defaults.linkAccents,
       // Saved before button text was a choice: automatic.
       buttonText: "buttonText" in stored ? stored.buttonText : defaults.buttonText,
-      links: { ...defaults.links, ...value.links },
-      hiddenLinks: "hiddenLinks" in value ? value.hiddenLinks : [],
+      // Links there are now, from the record when it has them; a link that's gone (FRCTools
+      // Orders, FRCBOM) is dropped.
+      links: Object.fromEntries(
+        Object.entries(defaults.links).map(([key, url]) => [
+          key,
+          key in storedLinks ? storedLinks[key] : url,
+        ]),
+      ),
+      hiddenLinks: Array.isArray(value.hiddenLinks)
+        ? value.hiddenLinks.filter(
+            (key) =>
+              typeof key === "string" && Object.prototype.hasOwnProperty.call(defaults.links, key),
+          )
+        : [],
+      // Saved before custom links: none.
+      customLinks,
       // Saved before the grid could be reordered: the default order. Saved before a tile
       // existed: that tile in its default place.
       appOrder: Array.isArray(value.appOrder)
-        ? completeAppOrder(value.appOrder)
+        ? completeAppOrder(value.appOrder, customLinks.filter(isCustomLink))
         : defaults.appOrder,
     };
     return isTeamUiSettings(settings) ? settings : defaults;

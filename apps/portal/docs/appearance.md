@@ -27,4 +27,6 @@ Red, green and amber are never your team's color in the apps: they always mean a
 
 ## Links and the apps grid
 
-Your home page shows links beside the apps: your public site, Slack or Discord, GitHub, Instagram, FRC Events, The Blue Alliance, Statbotics and more. Give each its address, hide one without losing it, or clear it. Drag the tiles to put the apps and links in the order you want.
+Your home page shows links beside the apps: your public site, Slack or Discord, GitHub, Instagram, FRC Events, The Blue Alliance, Statbotics and more. Give each its address, hide one without losing it, or clear it.
+
+To link any other site or app, choose **Another site or app…** under **+ Add a link**, then give it a name and an `https://` address. Its tile shows the site's own icon, or a globe when the site has none. Drag the tiles to put the apps and links in the order you want.
