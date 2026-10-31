@@ -24,6 +24,8 @@ declare module "virtual:gearbox-docs" {
     summary: string;
     order: number;
     app: string | null;
+    /** A warning shown on every page of the section (an app that isn't ready yet). */
+    preview: string | null;
   };
   export const sections: DocsSection[];
   export const pages: DocsPage[];

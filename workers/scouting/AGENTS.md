@@ -18,3 +18,5 @@
 ## Team ownership
 
 Scouting uses Drizzle and the shared inTeam/withTeam helpers for all private tables; the tenancy lint includes it. Migration 0033 preserves old rows under a reserved owner, adopted only by the configured site team before requests. Composite keys and foreign keys include ownership; robot_images.robot_id is the scouted robot, separate from team_id. Predictions/settlement, manual schedules/OCR, roles, engagement and lifecycle hooks are separate modules. New files use teams/<encoded-owner>/; legacy files remain authorized by their owned rows. Platform runs seed, export and D1/R2 deletion through its SCOUTING binding. Deploy the migration and Scouting before the updated Platform manifest. See docs/roadmap/scouting-tenancy.md.
+
+- `pnpm dev` runs the worker with `--local`, so it starts without a Cloudflare sign-in; the `AI` binding (the manual's photo and PDF reading) then doesn't work. Run `pnpm --filter @g3/worker-scouting dev:remote` after `wrangler login` to use it.

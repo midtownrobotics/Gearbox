@@ -1,7 +1,7 @@
 import { Button, Card, Dialog, ErrorBanner, Field, Page, TextField } from "@g3/ui";
 import type { LocationRow } from "@g3/worker-inventory";
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { api, getErrorMessage } from "../../shared/api";
 import { useAuthUser } from "../../shared/auth";
 import { count } from "../../shared/format";
@@ -21,6 +21,15 @@ import { NewEntryForm } from "../table/new-entry-page";
 
 /** A top-level location starts open if it has this many places inside it, or fewer. */
 const OPEN_UP_TO = 20;
+
+/**
+ * What the page keeps in its history entry, so coming back to it (Back from an entry's page)
+ * shows the same panels open and the same search.
+ */
+type LocationsView = { toggled: [number, boolean][]; query: string };
+
+/** The id of a location's Add here button, which gets the focus back when its pop-up closes. */
+const addHereId = (id: number) => `add-here-${id}`;
 
 /** An entry in a place, with the stock row it's there as. */
 type Held = Row & { stock: NonNullable<Row["stock"]> };
@@ -356,6 +365,7 @@ function Panel({
             )}
             <button
               type="button"
+              id={addHereId(row.id)}
               className={smallButton}
               aria-label={`Add here, in ${row.name}`}
               onClick={() => onAdd(row)}
@@ -394,12 +404,28 @@ export function LocationsPage() {
   const { isAdmin } = useAuthUser();
   const top = places.childrenOf.get(null) ?? [];
   const contents = useMemo(() => contentsOf(items, places), [items, places]);
+  const navigate = useNavigate();
+  const { pathname, search, state } = useLocation();
+  const remembered = state as LocationsView | null;
   // Which panels have been opened or closed by hand; the rest follow the starting rule.
-  const [toggled, setToggled] = useState<Map<number, boolean>>(new Map());
-  const [query, setQuery] = useState("");
+  const [toggled, setToggled] = useState<Map<number, boolean>>(
+    () => new Map(remembered?.toggled ?? []),
+  );
+  const [query, setQuery] = useState(remembered?.query ?? "");
   const [action, setAction] = useState<StockAction | null>(null);
   const [movingAll, setMovingAll] = useState<LocationRow | null>(null);
   const [addingTo, setAddingTo] = useState<LocationRow | null>(null);
+
+  useEffect(() => {
+    const view: LocationsView = { toggled: [...toggled], query };
+    navigate({ pathname, search }, { replace: true, state: view });
+  }, [toggled, query, navigate, pathname, search]);
+
+  // After adding (or not), back to the location's Add here, in view and ready for the next one.
+  function doneAdding(row: LocationRow) {
+    document.getElementById(addHereId(row.id))?.focus();
+    setAddingTo(null);
+  }
 
   // A search shows the locations it finds (by name, description, or an entry kept there), opened, with
   // what they're inside.
@@ -509,13 +535,13 @@ export function LocationsPage() {
         <Dialog
           title={`Add an entry to ${labelOf(addingTo)}`}
           size="2xl"
-          onClose={() => setAddingTo(null)}
+          onClose={() => doneAdding(addingTo)}
         >
           <NewEntryForm
             framed={false}
             locationId={addingTo.id}
-            onAdded={() => setAddingTo(null)}
-            onCancel={() => setAddingTo(null)}
+            onAdded={() => doneAdding(addingTo)}
+            onCancel={() => doneAdding(addingTo)}
           />
         </Dialog>
       )}

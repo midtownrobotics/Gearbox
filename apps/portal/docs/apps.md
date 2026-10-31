@@ -22,7 +22,3 @@ Every admin who has linked the team's chat gets a message when an app is switche
 - Before you switch an app off, the page offers its data as a download (a JSON file). Download it if you might want it later.
 
 Features that need another app hide while that app is off. For example, Inventory's links to the parts catalog need Orders, and Shop's Print buttons need Edge.
-
-## The team's log
-
-Below the apps is the team's log: apps switched on and off, data downloads, and big settings changes in any app (which settings changed and who changed them, never the values).

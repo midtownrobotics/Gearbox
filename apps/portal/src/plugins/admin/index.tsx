@@ -6,6 +6,7 @@ import { AppearancePage } from "./appearance-page";
 import { AppsPage } from "./apps-page";
 import { IntegrationsPage } from "./integrations-page";
 import { KiosksPage } from "./kiosks-page";
+import { LogPage } from "./log-page";
 import { MemberPage } from "./member-page";
 import { MembersPage } from "./members-page";
 import { NotificationsPage } from "./notifications-page";
@@ -17,7 +18,8 @@ import { SignInPage } from "./sign-in-page";
 // Sign-in are G3ID's settings; Members and Kiosk Devices are G3ID's people and kiosks (moved from
 // ID, which only signs people in now); Integrations connects the team's chat, Slack or Discord
 // (G3ID's), and shows what else
-// each app is connected to; and Notifications says where the platform's notifications go.
+// each app is connected to; Notifications says where the platform's notifications go; and Log is
+// the team's log of apps and settings changed.
 // A setting for one app stays on that app's own pages.
 
 const admin = (element: ReactNode) => <AdminOnly>{element}</AdminOnly>;
@@ -41,6 +43,7 @@ export const adminPlugin: Plugin = {
     { path: "/admin/integrations", element: admin(<IntegrationsPage />) },
     { path: "/admin/notifications", element: admin(<NotificationsPage />) },
     { path: "/admin/operator-access", element: admin(<OperatorAccessPage />) },
+    { path: "/admin/log", element: admin(<LogPage />) },
   ],
   navItems: [
     { label: "Manage Apps", to: "/admin", order: 10, requiresAdmin: true, group: "Admin" },
@@ -81,5 +84,6 @@ export const adminPlugin: Plugin = {
       requiresAdmin: true,
       group: "Admin",
     },
+    { label: "Log", to: "/admin/log", order: 18, requiresAdmin: true, group: "Admin" },
   ],
 };

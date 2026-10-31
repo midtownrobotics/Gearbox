@@ -13,7 +13,6 @@ import {
   teamKey,
   teamLinks,
   teamUiDefaults,
-  toolLinks,
   withHueOf,
 } from "@g3/site-config";
 import { describe, expect, it } from "vitest";
@@ -235,8 +234,9 @@ describe("team UI settings", () => {
       ...legacy,
       linkAccents: true,
       buttonText: { light: "auto", dark: "auto" },
-      links: { ...legacy.links, discord: links.discord, ...teamLinks, ...toolLinks },
+      links: { ...legacy.links, discord: links.discord, ...teamLinks },
       hiddenLinks: [],
+      customLinks: [],
       appOrder: defaultAppOrder,
     };
     expect(await (await g3id("/team/ui")).json()).toEqual({ ...current, primaryColor: "#0a7d55" });
@@ -272,6 +272,48 @@ describe("team UI settings", () => {
     expect((await put(defaultAppOrder)).status).toBe(200);
   });
 
+  it("saves custom links with their tiles in the grid, and rejects bad ones", async () => {
+    const admin = await sessionCookie(await createUser({ isAdmin: true }));
+    const customLinks = [{ id: "wiki1", label: "Team wiki", url: "https://wiki.example.com" }];
+    const put = (body: object) => g3id("/admin/team/ui", { method: "PUT", cookie: admin, body });
+    const withLinks = (links: unknown[], appOrder: unknown[] = defaultAppOrder) => ({
+      ...defaultTeamUiSettings,
+      customLinks: links,
+      appOrder,
+    });
+    const order = ["custom:wiki1", ...defaultAppOrder];
+    expect((await put(withLinks(customLinks, order))).status).toBe(200);
+    expect(await (await g3id("/team/ui")).json()).toMatchObject({ customLinks, appOrder: order });
+    // Its tile must be in the order, once, and only while it's a link.
+    expect((await put(withLinks(customLinks))).status).toBe(400);
+    expect((await put(withLinks([], order))).status).toBe(400);
+    for (const bad of [
+      { ...customLinks[0], url: "http://wiki.example.com" },
+      { ...customLinks[0], url: "" },
+      { ...customLinks[0], label: " " },
+      { ...customLinks[0], id: "Not An Id" },
+      { ...customLinks[0], extra: true },
+    ]) {
+      expect((await put(withLinks([bad], [`custom:${bad.id}`, ...defaultAppOrder]))).status).toBe(
+        400,
+      );
+    }
+    expect((await put(defaultTeamUiSettings)).status).toBe(200);
+  });
+
+  it("drops links that are gone from older stored settings", () => {
+    const { customLinks: _custom, ...appearance } = defaultTeamUiSettings;
+    const read = readTeamUiSettings(
+      JSON.stringify({
+        ...appearance,
+        links: { ...appearance.links, frcBom: "https://frcbom.com" },
+        hiddenLinks: ["frcBom", "github"],
+        appOrder: ["frcBom", ...defaultAppOrder],
+      }),
+    );
+    expect(read).toEqual({ ...defaultTeamUiSettings, hiddenLinks: ["github"] });
+  });
+
   it("reads a logo address saved before avatars as showing the team's avatar", () => {
     const { useAvatar: _avatar, ...appearance } = defaultTeamUiSettings;
     const read = (legacy: object) => readTeamUiSettings(JSON.stringify(legacy));
@@ -280,6 +322,13 @@ describe("team UI settings", () => {
       useAvatar: true,
     });
     expect(read({ ...appearance, logoUrl: "" })).toEqual(defaultTeamUiSettings);
+  });
+
+  it("reads a record saved before the app-name prefix setting as showing it", () => {
+    const { prefixAppNames: _prefix, ...appearance } = defaultTeamUiSettings;
+    expect(readTeamUiSettings(JSON.stringify(appearance))).toEqual(defaultTeamUiSettings);
+    const off = { ...defaultTeamUiSettings, prefixAppNames: false };
+    expect(readTeamUiSettings(JSON.stringify(off))).toEqual(off);
   });
 
   it("builds the avatar's address for the current year", () => {

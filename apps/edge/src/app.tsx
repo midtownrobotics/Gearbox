@@ -11,6 +11,11 @@ export function App() {
       <ProtectedRoute>
         <div className="flex flex-1 flex-col bg-page">
           <NavBar items={navItems} />
+          <p className="border-b border-red-300 bg-red-50 px-4 py-2.5 text-center text-sm text-red-800">
+            {
+              "Edge isn't ready for other teams yet. You're welcome to try it, but it may not work with your setup, and we can't promise help or fixes."
+            }
+          </p>
           <Routes>
             <Route path="/" element={<Navigate to="/network" replace />} />
             {routes.map((r) => (
