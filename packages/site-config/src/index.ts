@@ -19,15 +19,21 @@ export {
   buttonTextChoices,
   buttonTextColor,
   completeAppOrder,
+  customTileKey,
   defaultAppOrder,
   defaultTeamUiSettings,
   fillColor,
+  faviconUrl,
+  isCustomLinkId,
   isPortalTileKey,
+  maxCustomLinks,
   portalAppLabels,
   teamAvatarUrl,
   teamUiDefaults,
   teamUiLinkLabels,
   type ButtonText,
+  type CustomLink,
+  type CustomTileKey,
   type PortalTileKey,
   type TeamUiColors,
   type TeamUiSettings,
@@ -288,7 +294,7 @@ export const wordmark = (app: string) => `${site.team.shortName} ${app}`.toUpper
 /** An app's name in text: "G3 Shop". */
 export const appTitle = (app: string) => `${site.team.shortName} ${app}`;
 
-export { teamLinks, teamLinksFor, toolLinks } from "./team-links.ts";
+export { teamLinks, teamLinksFor } from "./team-links.ts";
 
 /**
  * CORS: which browser origins may call the workers with credentials. The platform's addresses

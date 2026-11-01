@@ -1,10 +1,8 @@
 import { contrastRatio, isHexColor } from "./color.ts";
 import { site } from "./site.ts";
-import { teamLinks, teamLinksFor, toolLinks } from "./team-links.ts";
+import { teamLinks, teamLinksFor } from "./team-links.ts";
 
 export const teamUiLinkLabels = {
-  frcToolsOrders: "FRCTools Orders",
-  frcBom: "FRCBOM",
   publicSite: "Public site",
   slack: "Slack",
   discord: "Discord",
@@ -34,14 +32,39 @@ export const portalAppLabels = {
   edge: "Edge",
 } as const;
 
-/** A tile on Portal's grid: one of the team's apps, or one of its links. */
-export type PortalTileKey = keyof typeof portalAppLabels | TeamUiLinkKey;
+/**
+ * A link a team adds itself (Team Appearance): its own name and address, shown on Portal's grid
+ * with the site's own icon (`faviconUrl`).
+ */
+export type CustomLink = { id: string; label: string; url: string };
 
-/** The grid's order before a team changes it: the apps, then the tools, then the team's links. */
+/** How many custom links a team can have. */
+export const maxCustomLinks = 20;
+
+/** A custom link's tile on Portal's grid. */
+export type CustomTileKey = `custom:${string}`;
+export const customTileKey = (id: string): CustomTileKey => `custom:${id}`;
+export const isCustomLinkId = (id: unknown): id is string =>
+  typeof id === "string" && /^[a-z0-9]{1,16}$/.test(id);
+
+/**
+ * A site's icon, loaded by the viewer's browser straight from the site (nothing is kept on
+ * Gearbox's servers). A site without one gets an error, not an image.
+ */
+export function faviconUrl(url: string): string | undefined {
+  try {
+    return new URL("/favicon.ico", url).href;
+  } catch {
+    return undefined;
+  }
+}
+
+/** A tile on Portal's grid: one of the team's apps, one of its links, or a custom link. */
+export type PortalTileKey = keyof typeof portalAppLabels | TeamUiLinkKey | CustomTileKey;
+
+/** The grid's order before a team changes it: the apps, then the team's links. */
 export const defaultAppOrder: PortalTileKey[] = [
   ...(Object.keys(portalAppLabels) as (keyof typeof portalAppLabels)[]),
-  "frcToolsOrders",
-  "frcBom",
   "publicSite",
   "slack",
   "discord",
@@ -55,15 +78,26 @@ export const defaultAppOrder: PortalTileKey[] = [
 
 const portalTiles = new Set<string>(defaultAppOrder);
 export const isPortalTileKey = (key: unknown): key is PortalTileKey =>
-  typeof key === "string" && portalTiles.has(key);
+  typeof key === "string" &&
+  (portalTiles.has(key) || (key.startsWith("custom:") && isCustomLinkId(key.slice(7))));
 
 /**
- * A saved grid order made whole: its tiles in its order (unknown ones and repeats dropped), then
- * any it doesn't name, in their default places' order (a tile added after the team saved).
+ * A saved grid order made whole: its tiles in its order (unknown ones, custom links the team no
+ * longer has and repeats dropped), then any it doesn't name, in their default places' order (a
+ * tile added after the team saved), then its custom links it doesn't name.
  */
-export function completeAppOrder(order: readonly unknown[]): PortalTileKey[] {
-  const known = order.filter(isPortalTileKey).filter((key, i, all) => all.indexOf(key) === i);
-  return [...known, ...defaultAppOrder.filter((key) => !known.includes(key))];
+export function completeAppOrder(
+  order: readonly unknown[],
+  customLinks: readonly Pick<CustomLink, "id">[] = [],
+): PortalTileKey[] {
+  const all: PortalTileKey[] = [
+    ...defaultAppOrder,
+    ...customLinks.map((link) => customTileKey(link.id)),
+  ];
+  const known = order
+    .filter((key): key is PortalTileKey => all.includes(key as PortalTileKey))
+    .filter((key, i, list) => list.indexOf(key) === i);
+  return [...known, ...all.filter((key) => !known.includes(key))];
 }
 
 /**
@@ -75,6 +109,8 @@ export type TeamUiSettings = {
   shortName: string;
   /** Show the team's avatar from The Blue Alliance (`teamAvatarUrl`) as its logo, in place of the app icons. */
   useAvatar: boolean;
+  /** Put the short name in front of the app's name in the top bar ("G3 ORDERS"); off: "ORDERS". */
+  prefixAppNames: boolean;
   displayFont: "Agency FB" | "Ubuntu" | "system-ui";
   defaultTheme: "system" | "light" | "dark";
   /**
@@ -88,6 +124,8 @@ export type TeamUiSettings = {
   buttonText: Record<"light" | "dark", ButtonText>;
   links: Record<TeamUiLinkKey, string>;
   hiddenLinks: TeamUiLinkKey[];
+  /** Links the team adds itself, each with its own name. */
+  customLinks: CustomLink[];
   /** The order of Portal's tiles (every tile, once; `completeAppOrder` fills in new ones). */
   appOrder: PortalTileKey[];
 };
@@ -165,6 +203,7 @@ export const defaultTeamUiSettings: TeamUiSettings = {
   name: site.team.name,
   shortName: site.team.shortName,
   useAvatar: false,
+  prefixAppNames: true,
   displayFont: "Agency FB",
   defaultTheme: "system",
   linkAccents: true,
@@ -194,9 +233,9 @@ export const defaultTeamUiSettings: TeamUiSettings = {
     github: site.links.github,
     instagram: site.links.instagram,
     ...teamLinks,
-    ...toolLinks,
   },
   hiddenLinks: [],
+  customLinks: [],
   appOrder: defaultAppOrder,
 };
 
@@ -227,7 +266,6 @@ export function teamUiDefaults(teamId: string, name?: string): TeamUiSettings {
       github: "",
       instagram: "",
       ...teamLinksFor(number),
-      ...toolLinks,
     },
   };
 }

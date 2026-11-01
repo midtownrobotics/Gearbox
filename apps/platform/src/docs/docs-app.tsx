@@ -1,5 +1,6 @@
 import { type AppName, platformUrl, site, teamAppUrl } from "@g3/site-config";
 import {
+  ErrorBanner,
   TextField,
   ThemeToggle,
   type TutorialDocMessage,
@@ -489,6 +490,11 @@ function Article({ base }: { base: string }) {
           )}
           <h1 className="mt-1 text-3xl font-bold text-secondary-900">{page.title}</h1>
           {page.summary && <p className="mt-2 text-lg text-secondary-600">{page.summary}</p>}
+          {section.preview && (
+            <div className="mt-4">
+              <ErrorBanner message={section.preview} />
+            </div>
+          )}
           {section.app && page.slug === "" && !embedded && (
             <a
               href={teamHref(team, section.app)}

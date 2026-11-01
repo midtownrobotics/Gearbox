@@ -9,7 +9,7 @@ import {
   Switch,
 } from "@g3/ui";
 import { useEffect, useState } from "react";
-import { type LibraryApp, type LogEntry, downloadAppData, platform } from "../../lib/platform";
+import { type LibraryApp, downloadAppData, platform } from "../../lib/platform";
 
 // The app library (roadmap 4.4): which apps the team has on. Switching one off hides it from
 // everyone at once (within a minute) and keeps its data for 90 days; switching it on again in that
@@ -34,41 +34,18 @@ function stateOf(app: LibraryApp): string {
   return "Off";
 }
 
-const ACTIONS: Record<LogEntry["action"], string> = {
-  app_enabled: "switched on",
-  app_disabled: "switched off",
-  app_data_deleted: "data deleted",
-  app_exported: "data downloaded",
-  settings_changed: "settings changed",
-};
-
-/** One line of the log: what happened, and for a settings change, what and which parts. */
-function describe(entry: LogEntry): string {
-  if (entry.action !== "settings_changed") return `${entry.appName} ${ACTIONS[entry.action]}`;
-  const what = typeof entry.details.what === "string" ? entry.details.what : "Settings";
-  const changed = Array.isArray(entry.details.changed) ? entry.details.changed.map(String) : [];
-  return changed.length > 0 ? `${what}: ${changed.join(", ")}` : what;
-}
-
 export function AppsPage() {
   const [apps, setApps] = useState<LibraryApp[] | null>(null);
-  const [log, setLog] = useState<LogEntry[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   /** The app being switched off: asked about (and offered its data) under its row first. */
   const [leaving, setLeaving] = useState<string | null>(null);
 
-  async function loadLog() {
-    setLog(await platform<LogEntry[]>("/team/log"));
-  }
-
-  // biome-ignore lint/correctness/useExhaustiveDependencies: loads once
   useEffect(() => {
     platform<LibraryApp[]>("/team/library")
       .then(setApps)
       .catch((reason: Error) => setError(reason.message));
-    loadLog().catch(() => {});
   }, []);
 
   async function download(app: LibraryApp) {
@@ -77,7 +54,6 @@ export function AppsPage() {
     try {
       await downloadAppData(app.slug);
       setMessage(`${app.name}'s data was downloaded.`);
-      await loadLog();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Couldn't download its data.");
     } finally {
@@ -101,7 +77,6 @@ export function AppsPage() {
           ? `${app.name} is on. It may take a minute to open for everyone.${result.seeded ? "" : " Its starter content wasn't added yet; it will be when it's first opened."}`
           : `${app.name} is off.`,
       );
-      await loadLog();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Couldn't change it.");
     } finally {
@@ -122,6 +97,12 @@ export function AppsPage() {
         {apps?.map((app) => (
           <li key={app.slug}>
             <Card className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
+              {app.preview && (
+                // Across the card's top edge (the card's padding is p-5).
+                <p className="-mx-5 -mt-5 basis-[calc(100%+2.5rem)] rounded-t-xl border-b border-red-300 bg-red-50 px-5 py-2 text-xs text-red-800">
+                  {app.preview}
+                </p>
+              )}
               <div className="min-w-0 flex-1">
                 <h2 className="font-semibold text-secondary-900">{app.name}</h2>
                 <p className="text-sm text-secondary-600">{app.summary}</p>
@@ -183,24 +164,6 @@ export function AppsPage() {
           </li>
         ))}
       </ul>
-
-      {log.length > 0 && (
-        <Card title="Changes">
-          <ul className="divide-y divide-secondary-100 text-sm">
-            {log.map((entry) => (
-              <li key={entry.id} className="flex justify-between gap-4 py-2 first:pt-0 last:pb-0">
-                <span className="text-secondary-900">
-                  {describe(entry)}
-                  {entry.userName && (
-                    <span className="text-secondary-500"> by {entry.userName}</span>
-                  )}
-                </span>
-                <span className="shrink-0 text-secondary-500">{day(entry.createdAt)}</span>
-              </li>
-            ))}
-          </ul>
-        </Card>
-      )}
     </Page>
   );
 }

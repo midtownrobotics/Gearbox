@@ -18,6 +18,7 @@ import type { Plugin } from "vite";
 //   pages: /admin /vendors   (the app's pages it's about, as its route paths; not index.md)
 //   access: mentor           (who can open those pages: everyone (the default), mentor, admin)
 //   feature: scouting-points (a part of the app a team can switch off; DOCS_FEATURES)
+//   preview: Not ready yet… (index.md only: a red warning on every page of the section)
 //   ---
 //
 // Every page in an app's folder but index.md names its app's pages: the bar's "Need help?" on one
@@ -78,6 +79,8 @@ export type DocsSection = {
   order: number;
   /** The app the section is about (its key in site.apps), when it's an app's. */
   app: string | null;
+  /** A warning shown on every page of the section (an app that isn't ready yet), or null. */
+  preview: string | null;
 };
 
 /** The section id for an app's folder. */
@@ -181,6 +184,7 @@ function readDrafts(): { drafts: Draft[]; sections: DocsSection[]; files: string
             summary: page.summary,
             order,
             app: folder === "platform" ? null : appKey(folder),
+            preview: fields.preview || null,
           });
         }
       }

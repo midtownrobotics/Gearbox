@@ -58,6 +58,8 @@ export const SAFE_TEXT = {
   ],
   vendor: ["WCP", "REV Robotics", "AndyMark", "CTR Electronics", "McMaster-Carr", "Amazon"],
   sku: ["WCP-0451", "REV-21-1650", "am-3541", "217-4243", "91251A540", "DEMO-1001"],
+  /** A link's name on the team's home. */
+  linkName: ["Team wiki", "Build log", "CAD library", "Sponsors", "Outreach"],
   url: [
     "https://wcproducts.com/products/wcp-0451",
     "https://www.revrobotics.com/rev-21-1650/",

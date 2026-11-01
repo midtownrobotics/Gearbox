@@ -10,6 +10,8 @@ export const manifest = defineManifest({
   roles: ["admin", "member"],
   integrations: ["edge box"],
   availability: "every team",
+  preview:
+    "Edge isn't ready for other teams yet. You're welcome to try it, but it may not work with your setup, and we can't promise help or fixes.",
   version: packageJson.version,
   hooks: { seed: false, delete: true, export: true, demo: true },
   settings: [

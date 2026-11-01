@@ -3,6 +3,8 @@ import {
   type TeamUiLinkKey,
   appUrl,
   completeAppOrder,
+  customTileKey,
+  faviconUrl,
   pageTeamNumber,
   portalAppLabels,
 } from "@g3/site-config";
@@ -19,9 +21,9 @@ import {
   useTeamNames,
   useTeamUiSettings,
 } from "@g3/ui";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import type { IconType } from "react-icons";
-import { FaCube, FaDiscord, FaGithub, FaGlobe, FaInstagram, FaSlack } from "react-icons/fa";
+import { FaDiscord, FaGithub, FaGlobe, FaInstagram, FaSlack } from "react-icons/fa";
 import attendanceIcon from "../../assets/app-icons/attendance.svg";
 import edgeIcon from "../../assets/app-icons/edge.svg";
 import inventoryIcon from "../../assets/app-icons/inventory.svg";
@@ -32,13 +34,7 @@ import scoutingIcon from "../../assets/app-icons/scouting.svg";
 import shopIcon from "../../assets/app-icons/shop.svg";
 import skillsIcon from "../../assets/app-icons/skills.svg";
 import { useMe } from "../../shared/me";
-import {
-  BlueAllianceIcon,
-  FirstIcon,
-  FrcToolsIcon,
-  Match13Icon,
-  StatboticsIcon,
-} from "./link-icons";
+import { BlueAllianceIcon, FirstIcon, Match13Icon, StatboticsIcon } from "./link-icons";
 import { HomeNotifications } from "./notifications";
 
 // The team's apps show their own app icon, its accent in the team's primary color (TeamIcon).
@@ -52,7 +48,7 @@ type App = {
   href: string;
   external?: boolean;
   linkKey?: TeamUiLinkKey;
-} & ({ tile: string } | { icon?: IconType; logoSrc?: string });
+} & ({ tile: string } | { icon?: IconType; logoSrc?: string; favicon?: string });
 
 const APPS: App[] = [
   {
@@ -108,23 +104,6 @@ const APPS: App[] = [
     label: "Edge",
     href: appUrl("edge"),
     tile: edgeIcon,
-  },
-  {
-    label: "FRCTools Orders",
-    key: "frcToolsOrders",
-    linkKey: "frcToolsOrders",
-    href: "",
-    icon: FrcToolsIcon,
-    external: true,
-  },
-  {
-    label: "FRCBOM",
-    key: "frcBom",
-    linkKey: "frcBom",
-    href: "",
-    // FRCBOM's mark is Font Awesome's solid cube.
-    icon: FaCube,
-    external: true,
   },
   {
     label: "Public Site",
@@ -207,6 +186,24 @@ function publicSiteMark(avatar: string | undefined): { logoSrc?: string; icon?: 
 
 const isApp = (key: PortalTileKey) => key in portalAppLabels;
 
+/**
+ * A custom link's mark: the site's own icon, loaded straight from the site by the browser, or a
+ * globe when it has none.
+ */
+function Favicon({ src }: { src: string }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) return <FaGlobe />;
+  return (
+    <img
+      src={src}
+      alt=""
+      referrerPolicy="no-referrer"
+      className="w-7.5 h-7.5 object-contain"
+      onError={() => setFailed(true)}
+    />
+  );
+}
+
 /** The team's home for someone signed out: sign in, join the team, or see its public site. */
 function FrontDoor() {
   const names = useTeamNames();
@@ -247,9 +244,18 @@ export function HomePage() {
     if (me) rememberTeam(pageTeamNumber);
   }, [me]);
   // In the team's order; a tile its saved order doesn't name keeps its default place.
-  const order = completeAppOrder(teamUi.appOrder ?? []);
+  // From a G3ID older than custom links: none.
+  const customLinks = teamUi.customLinks ?? [];
+  const order = completeAppOrder(teamUi.appOrder ?? [], customLinks);
   const rank = (app: App) => order.indexOf(app.key);
-  const apps = [...APPS]
+  const custom: App[] = customLinks.map((link) => ({
+    key: customTileKey(link.id),
+    label: link.label,
+    href: link.url,
+    favicon: faviconUrl(link.url),
+    external: true,
+  }));
+  const apps = [...APPS, ...custom]
     .sort((a, b) => rank(a) - rank(b))
     .map((app) => {
       if (!app.linkKey) return app;
@@ -302,7 +308,7 @@ export function HomePage() {
             .map((app) => {
               return (
                 <a
-                  key={app.label}
+                  key={app.key}
                   href={app.href}
                   target={app.external ? "_blank" : undefined}
                   rel={app.external ? "noopener noreferrer" : undefined}
@@ -316,8 +322,17 @@ export function HomePage() {
                   ) : (
                     <div className="relative w-16 h-16 rounded-[14px] bg-black flex items-center justify-center shadow-lg transition-transform duration-150 group-hover:scale-110">
                       {app.logoSrc ? (
-                        // As big as the other tiles' icons, clear of the corner's ↗.
-                        <img src={app.logoSrc} alt="" className="w-7.5 h-7.5 object-contain" />
+                        // As big as the other tiles' icons, clear of the corner's ↗, with the
+                        // bar's rounded corners.
+                        <img
+                          src={app.logoSrc}
+                          alt=""
+                          className="w-7.5 h-7.5 object-contain rounded-[5px]"
+                        />
+                      ) : "favicon" in app && app.favicon ? (
+                        <span className="text-white text-[34px]">
+                          <Favicon src={app.favicon} />
+                        </span>
                       ) : app.icon ? (
                         <span className="text-white text-[34px]">
                           <app.icon />
@@ -333,7 +348,7 @@ export function HomePage() {
                       )}
                     </div>
                   )}
-                  <span className="text-xs text-center leading-tight transition-colors text-secondary-600 group-hover:text-secondary-900">
+                  <span className="w-full min-w-0 break-words text-xs text-center leading-tight transition-colors text-secondary-600 group-hover:text-secondary-900">
                     {app.label}
                   </span>
                 </a>

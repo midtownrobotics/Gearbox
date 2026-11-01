@@ -75,11 +75,12 @@ html[data-theme="dark"] .g3-nav-drawer {
 
 /* A team's logo keeps its shape: as tall as the icon, up to 2.5 times as wide (a tall one is
    narrower). Short of room on a phone, a wide logo narrows, down to a square, before the words
-   are cut short. */
+   are cut short. Its corners are slightly rounded. */
 .g3-nav-icon.is-logo {
   width: auto;
   max-width: 75px;
   object-fit: contain;
+  border-radius: 5px;
 }
 
 .g3-nav-icon.is-logo.is-wide {

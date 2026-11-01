@@ -203,8 +203,16 @@ export function AppNavBar({
     items.find((item) => item.active)?.key,
   );
   const teamUi = useTeamUiSettings(team);
+  // The team's short name in front of the app's (the title has the site team's or the team's
+  // own), unless the team turned it off because its logo already says it.
+  const prefixes = [site.team.shortName, teamUi.shortName]
+    .map((name) => name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    .join("|");
   const brandedTitle = team
-    ? title.replace(new RegExp(`^${site.team.shortName}\\b`, "i"), teamUi.shortName)
+    ? title.replace(
+        new RegExp(`^(?:${prefixes})\\s+`, "i"),
+        teamUi.prefixAppNames === false ? "" : `${teamUi.shortName} `,
+      )
     : title;
   const user = useSignedInUser(team ? signedIn : false);
   const enabled = useTeamApps(allApps && !!user);
