@@ -1,5 +1,12 @@
 # @g3/scouting
 
+## 3.1.2
+
+### Patch Changes
+
+- Updated dependencies [f340efe]
+  - @g3/worker-scouting@3.1.2
+
 ## 3.1.1
 
 ### Patch Changes

@@ -1,5 +1,29 @@
 # @g3/worker-platform
 
+## 4.2.0
+
+### Minor Changes
+
+- f340efe: Gearbox is now licensed under the GNU AGPL, version 3, and every app's menu links to its source code. Sign-up records which version of the terms a team accepted, and a team's owner is asked on the home page to accept new terms when they change. Deployers: apply the platform's migration `0017_terms_version.sql` first.
+
+### Patch Changes
+
+- 20a9929: Trying the public demo no longer makes "My team" on the Gearbox site open the demo instead of your own team.
+- Updated dependencies [f340efe]
+- Updated dependencies [20a9929]
+- Updated dependencies [f340efe]
+  - @g3/worker-portal@2.5.0
+  - @g3/worker-g3id@4.2.1
+  - @g3/worker-shop@4.0.2
+  - @g3/worker-pit@3.2.2
+  - @g3/worker-orders@2.3.2
+  - @g3/worker-edge@2.4.2
+  - @g3/worker-scouting@3.1.2
+  - @g3/worker-skill-tree@2.2.2
+  - @g3/worker-attendance@2.2.2
+  - @g3/worker-inventory@1.2.2
+  - @g3/worker-schedule@0.4.2
+
 ## 4.1.1
 
 ### Patch Changes

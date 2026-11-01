@@ -1,5 +1,11 @@
 # @g3/worker-schedule
 
+## 0.4.2
+
+### Patch Changes
+
+- f340efe: The app's menu links to Gearbox's source code.
+
 ## 0.4.1
 
 ### Patch Changes

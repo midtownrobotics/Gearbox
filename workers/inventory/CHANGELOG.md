@@ -1,5 +1,11 @@
 # @g3/worker-inventory
 
+## 1.2.2
+
+### Patch Changes
+
+- f340efe: The app's menu links to Gearbox's source code.
+
 ## 1.2.1
 
 ### Patch Changes
