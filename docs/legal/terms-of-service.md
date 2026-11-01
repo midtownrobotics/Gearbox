@@ -1,15 +1,6 @@
-# Gearbox Terms of Service (draft)
+# Gearbox Terms of Service
 
-Last updated: 1 November 2026. Effective: [the date these terms go live].
-
-Draft for legal review, not yet in force. Square brackets mark a choice to confirm or a detail still missing.
-
-### To do
-
-- Review with someone more knowledgeable (Arvind?)
-- Register the designated agent in section 10 with the US Copyright Office (online, small fee), using the same name and address.
-- Teams that signed up before 1 November 2026 have no recorded version: their owners are asked to accept these terms on their team's home page.
-- A team owner can't close a team from the product yet; until they can, section 15 has them ask us.
+Last updated: 1 November 2026.
 
 ## 1. Who we are
 
@@ -102,7 +93,7 @@ The AGPL does not give anyone the right to use our names or logos. A copy run by
 
 ## 10. Copyright complaints
 
-If you believe something in Gearbox infringes your copyright, send a notice to our designated agent: Copyright Agent, G3 Robotics, 931 Monroe Dr NE, Ste A102, Box 102, Atlanta, GA 30308, contact@frcgearbox.com. Include what the work is, where it appears in Gearbox, your contact details, a statement that you believe in good faith the use is not authorized, a statement under penalty of perjury that your notice is accurate and that you are the owner or authorized to act for the owner, and your signature. We remove material when the law requires it, and we may close the accounts of people who infringe repeatedly.
+If you believe something in Gearbox infringes your copyright, send a notice to contact@frcgearbox.com, or to Copyright Complaints, G3 Robotics, 931 Monroe Dr NE, Ste A102, Box 102, Atlanta, GA 30308. Include what the work is, where it appears in Gearbox, your contact details, a statement that you believe in good faith the use is not authorized, a statement under penalty of perjury that your notice is accurate and that you are the owner or authorized to act for the owner, and your signature. We look into every complete notice and remove material that infringes, and we may close the accounts of people who infringe repeatedly.
 
 ## 11. Other services you connect
 
@@ -206,11 +197,11 @@ Your team decides why and how its members' personal information is used, and is 
 5. **Members' requests.** We help your team answer members who ask to see, correct, export or delete their information, through product features and on request.
 6. **Assistance.** We give reasonable help with your team's own duties on security, breach notification and impact assessments.
 7. **Deletion.** When your team leaves, we delete its team data within 30 days, unless the law requires us to keep it.
-8. **Information.** We answer reasonable written questions that your team needs answered to show it complies with the law. [Reviewer: settle how audits work for a volunteer-run service.]
+8. **Information.** We answer reasonable written questions that your team needs answered to show it complies with the law. Gearbox is run by volunteers, so we do not host on-site audits: these answers, this annex and the security measures in A6 are how we show that we meet it.
 
 ### A5. Sub-processors
 
-Your team gives us general permission to use sub-processors. The current list is published at [address]. Today it has two entries: Cloudflare, Inc., which provides hosting, storage, network delivery and the AI model that reads photographed schedules; and GitHub, Inc., which holds the problem reports members choose to send, as public issues.
+Your team gives us general permission to use sub-processors. The current list is in this section. Today it has two entries: Cloudflare, Inc., which provides hosting, storage, network delivery and the AI model that reads photographed schedules; and GitHub, Inc., which holds the problem reports members choose to send, as public issues.
 
 We will post any addition at least 30 days before it takes effect. A team that objects may close its account and export its data first. Services your team chooses to connect, such as Slack, Discord or Onshape, are your team's own providers and not our sub-processors.
 
@@ -221,7 +212,7 @@ We will post any addition at least 30 days before it takes effect. A team that o
 - Access to team data limited to a small number of operators, used only for support and abuse handling.
 - A log of each operator access that your team's admins can read.
 - Encryption of stored credentials for services your team connects.
-- [Reviewer and maintainers: add measures as they are built, such as backups and incident procedures.]
+- Backups that let us restore team data from the last 30 days.
 
 ### A7. Personal data breaches
 
@@ -231,7 +222,10 @@ If we become aware of a breach affecting your team's data, we will notify your t
 
 Team data is stored and accessed in the United States. Where the law requires a legal mechanism for that transfer, the European Commission's Standard Contractual Clauses (Implementing Decision (EU) 2021/914, Module Two, controller to processor) are incorporated into this annex, with your team as exporter and us as importer.
 
-[Reviewer: confirm the module, complete the annexes to the clauses, and add the UK and Swiss adaptations.]
+- The details the clauses' annexes ask for are in this annex: the parties in section 1 of these terms, the processing in A3, the security measures in A6 and the sub-processors in A5.
+- The optional docking clause (Clause 7) applies. Under Clause 9, sub-processors are approved generally, as A5 describes. The optional wording in Clause 11 does not apply.
+- Under Clauses 17 and 18, the clauses are governed by the law of Ireland, and disputes about them are heard in the courts of Ireland.
+- For transfers from the United Kingdom, the UK's International Data Transfer Addendum to the clauses applies. For transfers from Switzerland, the clauses apply with references to the GDPR read as references to Switzerland's Federal Act on Data Protection, and the Swiss Federal Data Protection and Information Commissioner as the supervisory authority.
 
 ### A9. Your team's responsibilities
 

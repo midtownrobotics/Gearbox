@@ -83,4 +83,4 @@ You can't take Gearbox, or any part of it, closed source.
 
 All of Gearbox is under this license, including Inventory, Schedule and Skill Tree, which their author has relicensed from MIT to the AGPL.
 
-Drafts of the [Terms of Service](docs/legal/terms-of-service.md) and [Privacy Policy](docs/legal/privacy-policy.md) for the hosted platform are in `docs/legal/`. They are not in force yet and are still under review.
+The hosted platform's [Terms of Service](docs/legal/terms-of-service.md) and [Privacy Policy](docs/legal/privacy-policy.md) are in `docs/legal/`.

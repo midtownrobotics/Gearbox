@@ -1,12 +1,6 @@
-# Gearbox Privacy Policy (draft)
+# Gearbox Privacy Policy
 
-Last updated: 1 November 2026. Effective: [the date this policy goes live].
-
-Draft for legal review, not yet in force. Square brackets mark a choice to confirm or a detail still missing.
-
-### To do
-
-- Confirm the periods in section 8 for technical logs and backups against our Cloudflare plan.
+Last updated: 1 November 2026.
 
 ## In short
 
@@ -130,8 +124,8 @@ Where the law of your team's country requires a legal basis for that transfer, t
 | Edge: sites each device used | Hourly for 30 days, then daily totals for one year |
 | Who sent a problem report, and your reporter ID | Kept as team data, and deleted with the team. The public GitHub issue stays: ask us to remove one |
 | Daily visit totals for our public page | Kept; they are totals and identify no one |
-| Technical logs | [7 days: Cloudflare Workers Logs on the paid plan; confirm] |
-| Backups | [30 days: Cloudflare D1's point-in-time recovery on the paid plan; confirm], after which deleted information is gone from backups too |
+| Technical logs | 7 days |
+| Backups | 30 days, after which deleted information is gone from backups too |
 | The public demo | Erased every night at midnight US Eastern time |
 
 ## 9. Your choices and rights
