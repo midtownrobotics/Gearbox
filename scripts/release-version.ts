@@ -7,10 +7,11 @@
 //      releases within the month;
 //   3. RELEASES.md gets the release: every app's version, changed ones marked, and each changed
 //      app's notes (the changeset summaries).
-// `--summary <file>` also writes what it did as JSON.
+// `--summary <file>` also writes what it did as JSON, and `--github-output <file>` the release's
+// title (`title=`), which the release workflow gives the merged release PR.
 
 import { execFileSync } from "node:child_process";
-import { readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { appendFileSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 /** Each app's name and the package.json that holds its version (page and worker share it). */
@@ -38,6 +39,13 @@ export type ReleaseSummary = {
   /** The RELEASES.md entry, or null when no app changed. */
   entry: string | null;
 };
+
+/** The release PR's title: "Release 2026.10.4: Orders 1.2.0, Pit 1.0.1". */
+export function releaseTitle(summary: ReleaseSummary): string {
+  return summary.platform
+    ? `Release ${summary.platform}: ${summary.apps.map((a) => `${a.name} ${a.to}`).join(", ")}`
+    : "Release: no app version changes yet";
+}
 
 /** The next CalVer after `current` (YYYY.M.N), for a release today. */
 export function nextPlatformVersion(current: string, today = new Date()): string {
@@ -130,6 +138,8 @@ if (import.meta.main) {
   const summary = applyRelease(join(import.meta.dirname, ".."));
   const at = process.argv.indexOf("--summary");
   if (at !== -1) writeFileSync(process.argv[at + 1], JSON.stringify(summary, null, 2));
+  const out = process.argv.indexOf("--github-output");
+  if (out !== -1) appendFileSync(process.argv[out + 1], `title=${releaseTitle(summary)}\n`);
   console.log(
     summary.platform
       ? `Platform ${summary.platform}: ${summary.apps.map((a) => a.name).join(", ")}`

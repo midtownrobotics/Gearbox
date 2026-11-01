@@ -14,7 +14,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { applyRelease } from "./release-version.ts";
+import { applyRelease, releaseTitle } from "./release-version.ts";
 
 const root = join(import.meta.dirname, "..");
 const scratch = mkdtempSync(join(tmpdir(), "release-preview-"));
@@ -33,18 +33,16 @@ try {
   rmSync(scratch, { recursive: true, force: true });
 }
 
-const title = summary.platform
-  ? `Release ${summary.platform}: ${summary.apps.map((a) => `${a.name} ${a.to}`).join(", ")}`
-  : "Release: no app version changes yet";
+const title = releaseTitle(summary);
 const intro = [
   "Merging this releases staging: the versions below are applied to `public` (package.json files,",
   "changelogs, RELEASES.md), tagged, and merged back into staging. This PR stays open and is",
-  "updated after every push to staging.",
+  "updated after every push to staging and every day.",
   "",
 ].join("\n");
 const outro = [
   "",
-  "_The platform version is worked out from today's date, so it can differ if this is merged in a later month._",
+  "_The platform version comes from the day this is merged (UTC), so it can change before then. It's updated every day, and once merged, this PR is renamed to the version actually released._",
 ].join("\n");
 const entry =
   summary.entry ??
