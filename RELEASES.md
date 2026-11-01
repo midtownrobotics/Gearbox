@@ -16,6 +16,78 @@ Each release of the whole platform, newest first, with the version of every app 
 
 <!-- releases -->
 
+## 2026.11.0 (2026-11-01)
+
+| App | Version |
+| --- | --- |
+| **G3ID** | **4.2.0** (was 4.1.0) |
+| **Portal** | **2.4.0** (was 2.3.0) |
+| **Platform** | **4.1.1** (was 4.1.0) |
+| **Shop** | **4.0.1** (was 4.0.0) |
+| **Pit** | **3.2.1** (was 3.2.0) |
+| **Orders** | **2.3.1** (was 2.3.0) |
+| **Edge** | **2.4.1** (was 2.4.0) |
+| Edge agent | 0.7.0 |
+| Pit log downloader | 2.3.0 |
+| **Scouting** | **3.1.1** (was 3.1.0) |
+| **Skill Tree** | **2.2.1** (was 2.2.0) |
+| **Attendance** | **2.2.1** (was 2.2.0) |
+| **Inventory** | **1.2.1** (was 1.2.0) |
+| **Schedule** | **0.4.1** (was 0.4.0) |
+
+### G3ID 4.2.0
+
+- Add your own links to the team's home with any name and address; each tile shows the site's own icon. The FRCTools Orders and FRCBOM tiles are gone, and the team's avatar on the home has rounded corners.
+- The team's avatar in the top bar has slightly rounded corners, and the Appearance page can turn off the short name in front of app names in the bar, for an avatar that already shows it.
+
+### Portal 2.4.0
+
+- Add your own links to the team's home with any name and address; each tile shows the site's own icon. The FRCTools Orders and FRCBOM tiles are gone, and the team's avatar on the home has rounded corners.
+- Edge now says, in the app, on Manage Apps and in its docs, that it isn't ready for other teams yet. The team's log has its own Log page in the admin pages, instead of being under Manage Apps.
+- The team's avatar in the top bar has slightly rounded corners, and the Appearance page can turn off the short name in front of app names in the bar, for an avatar that already shows it.
+
+### Platform 4.1.1
+
+- Edge now says, in the app, on Manage Apps and in its docs, that it isn't ready for other teams yet. The team's log has its own Log page in the admin pages, instead of being under Manage Apps.
+
+### Shop 4.0.1
+
+- The team's avatar in the top bar has slightly rounded corners, and the Appearance page can turn off the short name in front of app names in the bar, for an avatar that already shows it.
+
+### Pit 3.2.1
+
+- The team's avatar in the top bar has slightly rounded corners, and the Appearance page can turn off the short name in front of app names in the bar, for an avatar that already shows it.
+
+### Orders 2.3.1
+
+- The team's avatar in the top bar has slightly rounded corners, and the Appearance page can turn off the short name in front of app names in the bar, for an avatar that already shows it.
+
+### Edge 2.4.1
+
+- Edge now says, in the app, on Manage Apps and in its docs, that it isn't ready for other teams yet. The team's log has its own Log page in the admin pages, instead of being under Manage Apps.
+- The team's avatar in the top bar has slightly rounded corners, and the Appearance page can turn off the short name in front of app names in the bar, for an avatar that already shows it.
+
+### Scouting 3.1.1
+
+- The team's avatar in the top bar has slightly rounded corners, and the Appearance page can turn off the short name in front of app names in the bar, for an avatar that already shows it.
+
+### Skill Tree 2.2.1
+
+- The team's avatar in the top bar has slightly rounded corners, and the Appearance page can turn off the short name in front of app names in the bar, for an avatar that already shows it.
+
+### Attendance 2.2.1
+
+- The team's avatar in the top bar has slightly rounded corners, and the Appearance page can turn off the short name in front of app names in the bar, for an avatar that already shows it.
+
+### Inventory 1.2.1
+
+- Locations: after adding an entry with Add here, you're back at that location's Add here, ready for the next one, and going back to Locations from an entry's page keeps the same panels open and the same search.
+- The team's avatar in the top bar has slightly rounded corners, and the Appearance page can turn off the short name in front of app names in the bar, for an avatar that already shows it.
+
+### Schedule 0.4.1
+
+- The team's avatar in the top bar has slightly rounded corners, and the Appearance page can turn off the short name in front of app names in the bar, for an avatar that already shows it.
+
 ## 2026.10.6 (2026-10-28)
 
 | App | Version |

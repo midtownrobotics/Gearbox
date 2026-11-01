@@ -1,5 +1,26 @@
 # @g3/worker-platform
 
+## 4.1.1
+
+### Patch Changes
+
+- d290b48: Edge now says, in the app, on Manage Apps and in its docs, that it isn't ready for other teams yet. The team's log has its own Log page in the admin pages, instead of being under Manage Apps.
+- Updated dependencies [283a5c1]
+- Updated dependencies [d290b48]
+- Updated dependencies [2f1f49c]
+- Updated dependencies [4cad0fc]
+  - @g3/worker-portal@2.4.0
+  - @g3/worker-g3id@4.2.0
+  - @g3/worker-edge@2.4.1
+  - @g3/worker-inventory@1.2.1
+  - @g3/worker-attendance@2.2.1
+  - @g3/worker-orders@2.3.1
+  - @g3/worker-pit@3.2.1
+  - @g3/worker-schedule@0.4.1
+  - @g3/worker-scouting@3.1.1
+  - @g3/worker-shop@4.0.1
+  - @g3/worker-skill-tree@2.2.1
+
 ## 4.1.0
 
 ### Minor Changes

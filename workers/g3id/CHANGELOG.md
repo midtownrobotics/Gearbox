@@ -1,5 +1,12 @@
 # @g3/worker-g3id
 
+## 4.2.0
+
+### Minor Changes
+
+- 283a5c1: Add your own links to the team's home with any name and address; each tile shows the site's own icon. The FRCTools Orders and FRCBOM tiles are gone, and the team's avatar on the home has rounded corners.
+- 4cad0fc: The team's avatar in the top bar has slightly rounded corners, and the Appearance page can turn off the short name in front of app names in the bar, for an avatar that already shows it.
+
 ## 4.1.0
 
 ### Minor Changes

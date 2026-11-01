@@ -1,5 +1,12 @@
 # @g3/worker-inventory
 
+## 1.2.1
+
+### Patch Changes
+
+- 2f1f49c: Locations: after adding an entry with Add here, you're back at that location's Add here, ready for the next one, and going back to Locations from an entry's page keeps the same panels open and the same search.
+- 4cad0fc: The team's avatar in the top bar has slightly rounded corners, and the Appearance page can turn off the short name in front of app names in the bar, for an avatar that already shows it.
+
 ## 1.2.0
 
 ### Minor Changes
