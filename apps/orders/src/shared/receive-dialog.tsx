@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { Button, Dialog, ErrorBanner, Field, inputClass, useTeamNames } from "@g3/ui";
 import type { InferResponseType } from "hono/client";
 import { type FormEvent, useEffect, useRef, useState } from "react";

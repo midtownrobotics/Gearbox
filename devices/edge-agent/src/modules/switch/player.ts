@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { readFile } from "node:fs/promises";
 import { scaleWaveVolume } from "./volume";
 

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { site } from "@g3/site-config";
 import { sharedCookieAttributes } from "./shared-cookie";
 

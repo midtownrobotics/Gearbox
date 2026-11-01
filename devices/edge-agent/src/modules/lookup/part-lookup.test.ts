@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { afterEach, describe, expect, test } from "bun:test";
 import { gzipSync } from "node:zlib";
 import { lookupPart, meterLookups } from "./part-lookup";

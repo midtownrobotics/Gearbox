@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 // Running Wrangler from the repo's scripts (staging-create.ts, staging-copy-team.ts), the way it
 // works on a dev machine. Two lessons from making staging:
 // - Wrangler checks npm for a newer version of itself (on its banner, and again after an error).

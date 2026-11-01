@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { PrinterAlert } from "@g3/worker-edge/print-types";
 
 /** A printer's problems in plain English: errors in red, warnings in amber. */

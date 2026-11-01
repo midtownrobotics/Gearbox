@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { call } from "@g3/testing/worker";
 
 /** An Onshape webhook event, signed with `key` as Onshape signs them, on a team's address. */

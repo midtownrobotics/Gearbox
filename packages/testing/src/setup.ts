@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { applyD1Migrations, env } from "cloudflare:test";
 
 // Runs before each test file (each file has its own storage): applies the worker's D1 migrations

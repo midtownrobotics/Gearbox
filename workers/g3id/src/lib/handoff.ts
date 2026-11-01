@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { AppEnv } from "../types";
 
 // A sign-in finished somewhere else (the platform's sign-up), handed to the team's own address so

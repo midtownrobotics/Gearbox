@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { Button, Card, ConfirmButton, ErrorBanner, Field, TextField } from "@g3/ui";
 import { type FormEvent, useState } from "react";
 import type { GearboxStatus } from "../../src/status.ts";

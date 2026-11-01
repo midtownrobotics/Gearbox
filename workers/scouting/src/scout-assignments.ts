@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 /** Interleave alliances and rotate the first choice each match, rather than always starting red. */
 export function assignmentCandidates(teams: string[], matchNumber: number) {
   const unique = [...new Set(teams)];

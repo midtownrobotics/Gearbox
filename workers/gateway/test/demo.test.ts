@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { exports } from "cloudflare:workers";
 import { SAFE_TEXT } from "@g3/demo";
 import { site } from "@g3/site-config";

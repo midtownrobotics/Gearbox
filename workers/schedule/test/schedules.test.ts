@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { env } from "cloudflare:test";
 import { admin, kioskAdmin, mentor, otherStudent, student } from "@g3/testing/users";
 import { callAs, jsonAs } from "@g3/testing/worker";

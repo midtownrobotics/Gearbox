@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { Change, Range } from "../../shared/api";
 import { SLOT_MINUTES } from "../../shared/time";
 

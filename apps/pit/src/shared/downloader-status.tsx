@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { LogDownloader } from "./getters/downloaders";
 
 // What the team's log downloader is doing, as it last told Pit: on Pit's Logs page and in the

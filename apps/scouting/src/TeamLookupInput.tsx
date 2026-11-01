@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { TextField } from "@g3/ui";
 import { useEffect, useId, useState } from "react";
 import { api } from "./api";

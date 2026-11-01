@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { type AppName, apiPath } from "@g3/site-config";
 
 // The platform's API for the team's own pages (workers/platform/src/team.ts), through the

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { printerAlerts } from "@g3/worker-edge/print-types";
 import { api, getErrorMessage } from "../../shared/api";
 

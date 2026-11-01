@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { env } from "cloudflare:test";
 import { exports } from "cloudflare:workers";
 import { platformUrl, site, teamKey } from "@g3/site-config";
@@ -56,6 +57,8 @@ describe("signing a team up", () => {
       teamNumber: number,
       step: "connect",
     });
+    // The terms the founder accepted, by their "Last updated" date.
+    expect(await team(number)).toMatchObject({ terms_version: site.legal.termsVersion });
     // Pending teams have no addresses yet.
     expect((await call(`/teams/frc${number}`)).status).toBe(404);
 

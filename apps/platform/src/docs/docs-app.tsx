@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { type AppName, platformUrl, site, teamAppUrl } from "@g3/site-config";
 import {
   ErrorBanner,
@@ -545,7 +546,7 @@ function Article({ base }: { base: string }) {
             )}
           </div>
           <a
-            href={`${site.sourceUrl}/blob/main/${page.source}`}
+            href={`${site.sourceUrl}/blob/staging/${page.source}`}
             target={embedded ? "_blank" : undefined}
             rel={embedded ? "noreferrer" : undefined}
             className="mt-6 inline-block text-sm text-secondary-500 hover:text-secondary-900"

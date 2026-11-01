@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { type DocsPage, type DocsSection, pages, sections } from "virtual:gearbox-docs";
 
 // The docs, as built from every app's docs folder (../../docs-plugin.ts).

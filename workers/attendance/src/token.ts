@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 const WINDOW_MS = 30_000;
 const VALID_WINDOWS = 4; // 4 x 30s = 2 minutes
 

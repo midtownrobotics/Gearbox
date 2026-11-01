@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 // What GET /api/status answers: everything the status page shows. Types only, so the page
 // (web/) imports them without any of the server's code.
 

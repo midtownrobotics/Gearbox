@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 /** The team's currency (its Orders setting), set once /me has loaded (shared/auth.tsx). */
 let teamCurrency = "USD";
 export function setTeamCurrency(currency: string) {

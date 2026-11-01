@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { api } from "../api";
 import type { ChecklistItem } from "./types";
 

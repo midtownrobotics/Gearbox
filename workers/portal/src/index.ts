@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import packageJson from "../package.json";
 
 // Portal (the app list) is only a page: this worker serves its build (wrangler.toml assets) and

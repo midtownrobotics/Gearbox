@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { g3idStub, workerTestConfig } from "@g3/testing/config";
 import { fakeDiscord } from "@g3/testing/discord";
 

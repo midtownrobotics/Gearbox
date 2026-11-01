@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 // `pnpm --filter @g3/pit-log-downloader smoke`: starts the downloader with no settings, no robot,
 // no Drive and an empty data folder (so not paired with Gearbox), waits for its status API and page to answer, and stops it. CI runs it on Linux,
 // Windows and macOS.

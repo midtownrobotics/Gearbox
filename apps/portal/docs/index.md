@@ -6,6 +6,8 @@ order: 1
 
 Portal is your team's home: `<number>.frcgearbox.com`. Everyone sees a tile for each app the team has on, plus the team's links (its website, Slack or Discord, The Blue Alliance, and so on). Signed out, it's your team's front door, with **Sign in** and **Sign up**.
 
+When Gearbox's terms of service change in a way that matters to your team, your team's owner (the adult who signed it up, unless ownership was passed on) is asked on this page to read and accept them. Nobody else is asked.
+
 Admins also get the team's admin pages, under **Admin** in the bar. Only what's the whole team's lives here; a setting for one app is on that app's own Admin page.
 
 | Page | What it's for |

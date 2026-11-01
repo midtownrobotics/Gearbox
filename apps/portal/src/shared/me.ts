@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { type SignedInUser, useSignedInUser } from "@g3/ui";
 
 // Who's signed in (G3ID's /auth/me), asked once per page load and shared by the top bar, the home

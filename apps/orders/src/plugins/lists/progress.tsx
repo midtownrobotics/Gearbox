@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { ListProgress } from "../../shared/types";
 
 // Where a list's parts are, furthest along first. Denied and canceled requests are left out:

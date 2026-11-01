@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 /** Runs `nft` with the given args (and optional script on stdin); returns stdout. */
 export async function nft(args: string[], stdin?: string) {
   const proc = Bun.spawn(["nft", ...args], {

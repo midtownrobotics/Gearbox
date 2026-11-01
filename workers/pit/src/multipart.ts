@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 // The one file in a multipart/form-data body (AdvantageScope's Upload Asset sends one, as "file"),
 // as a view into the body: Request.formData() would keep a copy of it beside the body.
 

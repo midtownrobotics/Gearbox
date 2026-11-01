@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { useState } from "react";
 import { getErrorMessage } from "../../shared/api";
 import { useSkillData } from "../../shared/skill-data";

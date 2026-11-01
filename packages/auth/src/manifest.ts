@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { AppName } from "@g3/site-config";
 
 // What each app tells the platform about itself (roadmap 4.1). Every app has one, in

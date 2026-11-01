@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { requireAdmin, requireAuth } from "@g3/auth";
 import { type Context, Hono } from "hono";
 import { validator } from "hono/validator";

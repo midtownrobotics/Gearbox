@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { checkDemoHook } from "@g3/testing/demo";
 import { call, jsonAs } from "@g3/testing/worker";
 import { describe, expect, it } from "vitest";

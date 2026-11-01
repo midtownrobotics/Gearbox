@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { api, getErrorMessage } from "../../shared/api";
 import type { CatalogData, CatalogFamily, CatalogItem } from "../../shared/types";
 import { type CatalogIndex, buildIndex } from "./search";

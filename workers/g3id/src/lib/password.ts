@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 // TODO: replace with Argon2 via a WASM package (e.g. hash-wasm) once Workers CPU budget allows.
 // PBKDF2-SHA256 at 100k iterations is the interim implementation.
 

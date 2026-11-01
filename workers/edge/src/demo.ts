@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { withTeam } from "@g3/auth";
 import { vocabularyOf } from "@g3/demo";
 import type { EdgeDb } from "./db";

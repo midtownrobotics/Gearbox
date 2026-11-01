@@ -49,3 +49,6 @@ apps/pit/advantagescope/.keep-*/
 # Release deploy key, if generated here (upload it, then delete it; never commit it).
 gearbox-release
 gearbox-release.pub
+
+# Claude Code (local settings, worktrees)
+.claude/

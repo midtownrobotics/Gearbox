@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { getErrorMessage } from "../../shared/api";
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "";
 export async function soundRequest(path: string, init?: RequestInit) {

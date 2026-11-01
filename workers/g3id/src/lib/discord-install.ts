@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { eq } from "drizzle-orm";
 import { createDb } from "../db";
 import { discordInstallations, slackInstallations } from "../db/schema";

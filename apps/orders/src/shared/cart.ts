@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 // One-click carts for stores that accept them in a link:
 // - Shopify stores (WCP, AndyMark, ThriftyBot, SDS, ...): /cart/<variant>:<qty>,<variant>:<qty>
 //   loads those items into a fresh cart and opens checkout.

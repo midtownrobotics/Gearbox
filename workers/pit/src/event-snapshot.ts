@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { inTeam, logTeamChange, requireAdmin, withTeam } from "@g3/auth";
 import { DEMO_STUDENTS } from "@g3/demo";
 import { isStaging } from "@g3/site-config";

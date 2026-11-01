@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { redirectToSignIn } from "@g3/ui";
 
 export async function getErrorMessage(res: Response): Promise<string> {

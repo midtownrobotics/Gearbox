@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 export interface AgentConfig {
   /** Base URL of workers/edge's API, e.g. https://edge.<domain>/api */
   workerUrl: string;

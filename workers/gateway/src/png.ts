@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 // Just enough PNG to recolor an app icon: 8-bit RGB or RGBA, not interlaced (how every icon in
 // apps/*/public is saved). Anything else is left alone by the caller.
 

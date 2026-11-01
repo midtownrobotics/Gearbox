@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { Badge, tones } from "@g3/ui";
 
 /** "In storage" or "In use", as a small label. */

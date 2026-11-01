@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { type SafeTextKind, nextSafe } from "@g3/demo";
 import { isDemoPage } from "@g3/site-config";
 import {

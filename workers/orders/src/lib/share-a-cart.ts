@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { decryptSecret, encryptSecret } from "@g3/auth";
 import type { OrdersDb } from "../db";
 import { deleteSetting, getSetting, putSetting, settingsLike } from "./settings";

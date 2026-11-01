@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 // Settings from config.env (see config.env.example). Every one is optional: the team comes from
 // pairing with its Pit (gearbox.ts). Relative paths start from the package's folder, so the
 // downloader finds its files whichever folder it's started from.

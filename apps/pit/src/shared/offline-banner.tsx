@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { useIsOnline } from "@g3/ui";
 
 export function OfflineBanner() {

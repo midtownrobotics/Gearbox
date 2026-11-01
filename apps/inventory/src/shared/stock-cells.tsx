@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { ItemView, StockView } from "@g3/worker-inventory";
 import { useEffect, useState } from "react";
 import { api, getErrorMessage } from "./api";

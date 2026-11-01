@@ -41,7 +41,8 @@ These apps are being turned from one team's tools into a hosted platform that ma
 - **Sign-in and roles only through `@g3/auth`**. App workers don't read the session cookie themselves; in Phase 2 a gateway hands them the user and team.
 - **Core apps must not depend on Edge.** Edge is an optional app any team can run with its own box (roadmap section "Edge: an app any team can run"). Orders part lookup and Shop printing treat it as an optional provider and must keep working (by hand) without it.
 - **Hosting and deploy changes need the owners' yes first**: a new Cloudflare product, a paid add-on, a new vendor or a new domain. The roadmap's "Hosting and stack decisions" section lists what is already confirmed; ask before going beyond it.
-- **Features that change what data is collected, how long it's kept or who can see it** must match the drafts in `docs/legal/` (Terms of Service, Privacy Policy). Update the draft in the same PR, or say in the PR that it needs a decision.
+- **Gearbox is AGPL-3.0-only** (`LICENSE`). Every source file (`.ts`, `.tsx`, `.mts`, `.js`, `.mjs`, `.cjs`, `.css`, `.sh`, `.py`) starts with `// SPDX-License-Identifier: AGPL-3.0-only` (`/* … */` in CSS, `#` in shell and Python, after a shebang), and every `package.json` has `"license": "AGPL-3.0-only"`. `pnpm lint:license` (CI) fails without them; `pnpm lint:license --fix` adds them. `vendor/`, built files and `.d.ts` keep their own. Every app's menu keeps its "Source code" link (`site.sourceUrl`, in `AppNavBar`): the AGPL's offer of the source to users over the network.
+- **Features that change what data is collected, how long it's kept or who can see it** must match `docs/legal/` (Terms of Service, Privacy Policy). Update them in the same PR, or say in the PR that it needs a decision.
 
 **Keep the roadmap current.** When a change completes or advances a step, update `docs/roadmap/roadmap.md` in the same PR: the step's Status, the Progress table, and a row in "What landed". If a change makes part of the plan wrong, fix the plan there and say so in the PR description. A roadmap-only change takes an empty changeset.
 
@@ -176,7 +177,7 @@ See `docs/deploy.md`. Merging the release PR deploys production from GitHub Acti
 ## Key Files
 
 - `docs/roadmap/roadmap.md`, `docs/roadmap/ui-alignment.md` — the plans of record
-- `docs/legal/` — draft Terms of Service and Privacy Policy
+- `docs/legal/` — Terms of Service and Privacy Policy (in force; a change to the terms follows "Terms versions" in `workers/platform/AGENTS.md`)
 - `packages/ui/src/components/` — shared page parts
 - `packages/auth/src/g3id.ts` — sign-in for every worker (`requireAuth`, `requireAdmin`, `requireMentor`, `requireOAuthSession`, `G3AuthVariables`); app-specific checks stay in that worker's `middleware/auth.ts`
 - `workers/g3id/src/middleware/auth.ts` — G3ID's own (`requireAuth`, `requireAdmin`, `requireKioskToken`)

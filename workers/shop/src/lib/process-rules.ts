@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 // Shared by the shop worker and the shop app (imported as "@g3/worker-shop/process-rules"),
 // so keep this dependency-free.
 

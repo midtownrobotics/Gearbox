@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { useEffect, useState } from "react";
 import { api } from "../../shared/api";
 import { formatDuration } from "../../shared/battery-display";

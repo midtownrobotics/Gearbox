@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { inputClass } from "@g3/ui";
 import { useSearchParams } from "react-router-dom";
 import { formatDayKey, todayKey } from "../../shared/format";

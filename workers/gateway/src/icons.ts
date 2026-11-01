@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { type TeamUiSettings, brandColor, builtInBrandColor } from "@g3/site-config";
 import { type Pixels, decodePng, encodePng } from "./png";
 

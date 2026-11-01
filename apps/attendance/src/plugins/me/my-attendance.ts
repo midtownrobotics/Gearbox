@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { type ReportData, type ReportSession, buildReport } from "../leaderboard/attendance-report";
 
 // One member's own figures for the school year, from the same report the Leaderboard draws.

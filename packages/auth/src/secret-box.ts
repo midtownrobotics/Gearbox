@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 // A team's secrets stored in D1 (G3ID's Slack bot tokens, Shop's Onshape keys), encrypted with
 // AES-GCM. The key is each worker's SECRETS_KEY secret: 32 random bytes, base64
 // (`openssl rand -base64 32`).

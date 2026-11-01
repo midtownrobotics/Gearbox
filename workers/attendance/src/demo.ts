@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { DEMO_PEOPLE, vocabularyOf } from "@g3/demo";
 import { AttendanceDb, type Session, memberKey } from "./db";
 import { schoolYear } from "./settings";

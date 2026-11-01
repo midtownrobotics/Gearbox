@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { inTeam, teamSettingsRoutes } from "@g3/auth";
 import { createEdgeDb } from "../db";
 import { edgeStatus, netSettings } from "../db/schema";

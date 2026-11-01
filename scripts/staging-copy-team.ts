@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 // `pnpm staging:copy-team -- [--dry-run] [--only <worker>,...]`: copies the site's own team's data
 // (G3's, site.ts) from production's D1 databases into staging's, replacing what staging has for
 // it, so a release (and its migrations) can be tried on real data first (roadmap: "Rehearse on

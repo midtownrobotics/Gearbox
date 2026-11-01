@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { inTeam, teamSettingsRoutes, withTeam } from "@g3/auth";
 import { teamApiKey } from "./api-keys";
 import { type WriteQuery, batch, dbOf } from "./db";

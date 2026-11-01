@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { DiscordGuild, DiscordUser } from "@g3/discord";
 import { demoTeamId } from "@g3/site-config";
 import { and, eq, inArray, isNull, ne, sql } from "drizzle-orm";

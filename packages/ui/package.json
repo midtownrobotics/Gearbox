@@ -2,6 +2,7 @@
   "name": "@g3/ui",
   "private": true,
   "version": "0.0.0",
+  "license": "AGPL-3.0-only",
   "exports": {
     "./index.css": "./src/index.css",
     "./nav-bar.css": "./src/nav-bar.css",

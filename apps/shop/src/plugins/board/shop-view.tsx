@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import type { InstanceRow } from "../../shared/derive";

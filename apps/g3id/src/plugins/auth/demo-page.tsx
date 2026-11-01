@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { demoTeamId, site, teamOfHost } from "@g3/site-config";
 import { ErrorBanner } from "@g3/ui";
 import { useEffect, useState } from "react";

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { appTitle, wordmark } from "@g3/site-config";
 
 /**

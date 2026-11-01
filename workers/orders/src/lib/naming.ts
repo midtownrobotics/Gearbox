@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 // Consistent, searchable request names from a team template. No imports (shared with the app as
 // "@g3/worker-orders/naming").
 

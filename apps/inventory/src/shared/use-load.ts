@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { type DependencyList, useEffect, useState } from "react";
 
 /** Loads data on mount (and when deps change). `reload` refetches without clearing. */

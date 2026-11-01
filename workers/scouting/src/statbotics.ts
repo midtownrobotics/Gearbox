@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 const REQUEST_TIMEOUT_MS = 3000;
 const inFlight = new Map<string, Promise<unknown[]>>();
 

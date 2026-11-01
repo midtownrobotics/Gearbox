@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { loadConfig } from "./core/config";
 import { getMeta, openDb } from "./core/db";
 import { WorkerLink } from "./core/link";

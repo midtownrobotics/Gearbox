@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { site } from "@g3/site-config";
 import { describe, expect, it } from "vitest";
 import { g3id } from "./helpers";

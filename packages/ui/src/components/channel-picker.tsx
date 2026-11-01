@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { apiPath, appUrl, site } from "@g3/site-config";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 

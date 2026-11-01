@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { Database } from "bun:sqlite";
 import type { BoxInterface } from "@g3/worker-edge/interface-types";
 import type { AgentConfig } from "../../core/config";

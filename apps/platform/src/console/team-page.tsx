@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { Button, Card, ErrorBanner, Page, PageLoading, TextField, inputClass } from "@g3/ui";
 import { type ReactNode, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
@@ -54,7 +55,10 @@ export function TeamPage() {
           )}
           <Detail label="Country">{team.country}</Detail>
           <Detail label="Signed up">{formatTime(team.createdAt)}</Detail>
-          <Detail label="Terms accepted">{formatTime(team.termsAcceptedAt)}</Detail>
+          <Detail label="Terms accepted">
+            {formatTime(team.termsAcceptedAt)}
+            {team.termsVersion && ` (version of ${team.termsVersion})`}
+          </Detail>
         </dl>
       </Card>
 

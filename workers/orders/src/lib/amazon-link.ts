@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { isAmazonShortLink } from "./product-key";
 
 // Amazon's share links (a.co/d/..., what the app's Share button copies) hide the product's ASIN,

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 // Pairing with the team's Pit on Gearbox, which the downloader needs before it does anything: it
 // gives the downloader its team. On Pit's Logs page a mentor or admin gets a 6-digit code; the
 // status page sends it here with the team number, and the team's Pit answers with this

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 // Sorting people by name. A name's last name is everything after its first space ("Mary Ann
 // Smith" → "Ann Smith"); a name without a space is its own.
 

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { fetchArchives } from "./getters/archives";
 import { fetchAllIssues } from "./getters/issues";
 import { fetchItems } from "./getters/items";

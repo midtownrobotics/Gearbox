@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { DEMO_PEOPLE, type DemoPerson, SAFE_TEXT, demoHour, demoTeamId } from "@g3/demo";
 import { site } from "@g3/site-config";
 import { eq } from "drizzle-orm";

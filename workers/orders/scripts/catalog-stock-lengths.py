@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only
 """Replaces the FRCDesign library's CAD lengths on stock material with what vendors sell (run once).
 
 The library models shafts, tubes, splines and the like at a short preset length ("1/2" Hex Lite

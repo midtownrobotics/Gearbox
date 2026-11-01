@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { appUrl } from "@g3/site-config";
 
 // Every app sends a signed-out visitor to its team's ID sign-in page the moment it knows nobody is

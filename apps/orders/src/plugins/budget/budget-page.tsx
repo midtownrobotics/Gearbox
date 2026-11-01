@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { Button, Card, ErrorBanner, Loading, Page, TextField, inputClass } from "@g3/ui";
 import { fiscalLabel } from "@g3/worker-orders/fiscal";
 import { type FormEvent, useState } from "react";

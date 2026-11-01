@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 // `pnpm release:version`: turns the pending changesets into a release. The release workflow runs
 // it on `public` after staging is merged in (and release-preview.ts runs it in a scratch copy to name
 // the release PR):

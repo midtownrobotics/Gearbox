@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 /**
  * Builds the agent-owned nftables table (`inet g3`) and the generated dnsmasq
  * config from the desired state. Pure functions; see enforcer.ts for applying.

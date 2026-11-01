@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only
 """Finds real product links for the catalog's FRCDesign items, from this machine (run once).
 
 The library export's links are often a vendor homepage, a search page, or a guess. This script

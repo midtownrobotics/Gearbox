@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { call } from "@g3/testing/worker";
 import { expect, it } from "vitest";
 

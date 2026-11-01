@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { signInCallbackApiUrl } from "@g3/site-config";
 import { SLACK_BOT_SCOPES, sendDM, verifySlackSignature } from "@g3/slack";
 import { and, eq } from "drizzle-orm";

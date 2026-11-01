@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { teamKey } from "@g3/site-config";
 
 /** Deployment secrets predate multiple teams and belong only to the original site team. */

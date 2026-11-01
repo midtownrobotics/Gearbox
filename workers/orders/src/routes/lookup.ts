@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { forwardIdentity, requireAuth, teamHasApp } from "@g3/auth";
 import {
   CLIENT_HEADER_NAMES,

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 // Where a team's files are in R2: everything under teams/<team>/, so one team's keys can never
 // name another's object. Drawings are found by part number and revision; part files keep their key
 // in `files.r2_key`.

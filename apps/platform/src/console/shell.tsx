@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { consoleUrl, site, teamAppUrl } from "@g3/site-config";
 import { versionLabel } from "@g3/site-config/versions";
 import {
