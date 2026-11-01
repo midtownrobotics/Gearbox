@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../api";
 
@@ -111,6 +112,7 @@ export type TeamDetail = {
     founder: { id: string; name: string } | null;
     owner: { id: string; name: string } | null;
     termsAcceptedAt: number | null;
+    termsVersion: string | null;
     createdAt: number;
     updatedAt: number;
     isSite: boolean;

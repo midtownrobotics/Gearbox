@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 /** Wire types for the agent's GET /network/interfaces: the box's own addresses. */
 
 export interface BoxAddress {

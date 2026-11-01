@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { Badge, focusRing } from "@g3/ui";
 import { Link, useLocation } from "react-router-dom";
 import type { OnshapeRelease } from "../../shared/types";

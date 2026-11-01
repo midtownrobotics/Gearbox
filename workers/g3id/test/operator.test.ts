@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { demoTeamId, teamKey } from "@g3/site-config";
 import { describe, expect, it, vi } from "vitest";
 import { createTeam, createUser, createUserWithPin, g3id, sessionCookie, testEnv } from "./helpers";

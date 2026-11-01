@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 /**
  * D1 binds at most 100 values in one statement, so a query over a list of ids (or an insert of
  * many rows) runs in chunks that stay under it. A team's real order history easily passes 100.

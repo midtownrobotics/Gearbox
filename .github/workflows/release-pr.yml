@@ -3,10 +3,16 @@ name: release-pr
 # Keeps one PR open from staging into public, titled with what merging it would release
 # ("Release 2026.10.4: Orders 1.2.0, Pit 1.0.1") and listing the changes. Nothing is applied
 # here; merging the PR runs release.yml on public, which applies and tags the release.
+#
+# The platform version depends on the day the release is made (release-version.ts), so this also
+# runs every day just after midnight UTC: the title follows the date even while staging is quiet.
+# release.yml renames the PR to what was actually released once it's merged.
 
 on:
   push:
     branches: [staging]
+  schedule:
+    - cron: "5 0 * * *"
   workflow_dispatch:
 
 concurrency: release-pr

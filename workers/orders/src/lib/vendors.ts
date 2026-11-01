@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 /** Display names for vendor sites, so exports read "McMaster-Carr", not "mcmaster.com". */
 const VENDOR_NAMES: Record<string, string> = {
   "amazon.com": "Amazon",

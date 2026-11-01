@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 // Times in a schedule are wall-clock slots: a local date ("2027-03-12") and a slot of that day,
 // slot n being n × 15 minutes after midnight. A range starts at its first slot and ends before
 // its last, so Lunch 12:00–1:15 is 48–53.

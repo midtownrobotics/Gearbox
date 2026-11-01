@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { ItemView, StockView } from "@g3/worker-inventory";
 
 /** A line of the main table (and of a location's contents): an entry in one place. */

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { MAX_SWITCH_SOUND_BYTES, type SwitchPlaybackSettings } from "@g3/worker-edge/switch-types";
 import { Hono } from "hono";
 import type { EdgeModule, ModuleContext } from "../../core/module";

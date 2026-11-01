@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { Button, ErrorBanner, Loading, buttonClass } from "@g3/ui";
 import { AlertCircle } from "lucide-react";
 import { useEffect, useState } from "react";

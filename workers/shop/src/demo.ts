@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { inTeam, withTeam } from "@g3/auth";
 import { DEMO_PEOPLE, type DemoPerson, SAFE_TEXT, vocabularyOf } from "@g3/demo";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { call } from "@g3/testing/worker";
 
 /** A request from a team's box: its key, on its team's address (the gateway's X-Team-Id). */

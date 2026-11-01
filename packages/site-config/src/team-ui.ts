@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { contrastRatio, isHexColor } from "./color.ts";
 import { site } from "./site.ts";
 import { teamLinks, teamLinksFor } from "./team-links.ts";

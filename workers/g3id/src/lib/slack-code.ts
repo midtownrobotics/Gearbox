@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { getUserInfo } from "@g3/slack";
 import { and, desc, eq, gte, lt, sql } from "drizzle-orm";
 import { createDb } from "../db";

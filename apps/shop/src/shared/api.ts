@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { ShopApp } from "@g3/worker-shop";
 import { hc } from "hono/client";
 

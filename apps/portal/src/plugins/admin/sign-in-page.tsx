@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { apiPath } from "@g3/site-config";
 import { Card, ConfirmQuestion, ErrorBanner, Loading, Page, Switch } from "@g3/ui";
 import { useEffect, useState } from "react";

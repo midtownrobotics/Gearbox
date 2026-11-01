@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 // Carriers bill in decimal units, so 1 GB = 1,000,000,000 bytes.
 const UNITS = ["B", "KB", "MB", "GB", "TB"];
 

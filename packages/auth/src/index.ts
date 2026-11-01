@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { TEAM_HEADER } from "./g3id";
 
 export interface SessionBindings {

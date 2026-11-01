@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 // WPILib data logs (.wpilog, format 1.0): what's in a log over time, and trimming one to part of
 // it. A log is a header, then records: a byte of field lengths, the entry id, the payload size and
 // the timestamp (microseconds), then the payload. Entry 0 is control: starting an entry (its id,

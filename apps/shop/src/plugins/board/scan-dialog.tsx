@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { Dialog, ErrorBanner, TextField } from "@g3/ui";
 import { useEffect, useRef, useState } from "react";
 import { type InstanceRow, matchScannedDrawing, partLabel } from "../../shared/derive";

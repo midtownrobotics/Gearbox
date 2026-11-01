@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { allAppsUrl as ALL_APPS_URL } from "@g3/site-config";
 import { useEffect, useState } from "react";
 import { API, redirectToLogin } from "../shared/api";

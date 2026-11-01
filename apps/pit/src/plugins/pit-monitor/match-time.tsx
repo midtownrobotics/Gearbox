@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { useEffect, useState } from "react";
 
 // Times on the Monitor: how long until a moment, and a moment as a clock time.

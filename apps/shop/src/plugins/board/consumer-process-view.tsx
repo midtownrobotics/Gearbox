@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { ErrorBanner } from "@g3/ui";
 import { useState } from "react";
 import { batchArrival } from "../../shared/batches";

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { Link, useSearchParams } from "react-router-dom";
 
 export function OAuthErrorPage() {

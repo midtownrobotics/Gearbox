@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { createHash, timingSafeEqual } from "node:crypto";
 
 /** Constant-time check of an `Authorization: Bearer <key>` header against the shared key. */

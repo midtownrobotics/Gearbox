@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 // Billing cycles, daily charts, "until midnight" grants and daily rollups use local days: the
 // local time of the team's box (it's in the shop), which the agent reports with each upload
 // (edge_status.time_zone; UTC until a box has said). Every function takes that zone.

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { leaveGuild } from "@g3/discord";
 import { SlackApiError } from "@g3/slack";
 import { and, desc, eq, gt, inArray, isNull, or } from "drizzle-orm";

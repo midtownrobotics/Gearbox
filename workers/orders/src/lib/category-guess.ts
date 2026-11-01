@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 /** "bolt" matches "Bolt", "bolts" and "hex bolt", not "Boltzmann": a whole word, plural allowed. */
 export const matchesKeyword = (text: string, keyword: string) =>
   new RegExp(

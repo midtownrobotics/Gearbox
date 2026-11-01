@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { EdgeApp } from "@g3/worker-edge";
 import { hc } from "hono/client";
 import type { AgentConfig } from "./config";

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { teamAppUrl } from "@g3/site-config";
 import { TextField } from "@g3/ui";
 import { forgetTeam, rememberedTeam } from "@g3/ui/my-team";

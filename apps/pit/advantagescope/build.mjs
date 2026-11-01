@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 // Builds AdvantageScope Lite for Pit, which serves it at /scope/: the release in
 // vendor/advantagescope (a git submodule of Mechanical-Advantage/AdvantageScope) with
 // gearbox.patch, built as upstream builds its Lite distribution, into apps/pit/public/scope.

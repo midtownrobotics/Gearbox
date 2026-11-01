@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { tones } from "@g3/ui";
 import { FaDiscord, FaGithub, FaGoogle, FaKey, FaSlack, FaSteam } from "react-icons/fa";
 

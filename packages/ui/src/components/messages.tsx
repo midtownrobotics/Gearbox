@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 /** Something went wrong, or isn't allowed. Red whatever the team's color: it means a problem. */
 export function ErrorBanner({ message }: { message: string }) {
   return (

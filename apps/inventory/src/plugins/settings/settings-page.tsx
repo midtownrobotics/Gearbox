@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { Button, Card, ErrorBanner, Page, SuccessBanner, TextField } from "@g3/ui";
 import type { Setup, SetupSummary } from "@g3/worker-inventory";
 import { MAX_UNIT } from "@g3/worker-inventory/units";

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { ErrorBanner, Page, PageLoading } from "@g3/ui";
 import {
   type ReactNode,

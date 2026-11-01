@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { adminPlugin } from "./plugins/admin";
 import { friendsPlugin } from "./plugins/friends";
 import { rolesPlugin } from "./plugins/roles";

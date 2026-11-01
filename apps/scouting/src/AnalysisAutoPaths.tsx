@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { Button } from "@g3/ui";
 import { ChevronRight, Map as MapIcon, Trash2 } from "lucide-react";
 import { useState } from "react";

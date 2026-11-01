@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { integer, primaryKey, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 /** The platform's team registry (migration 0001). */
@@ -18,6 +19,8 @@ export const teams = sqliteTable("teams", {
   discordGuildId: text("discord_guild_id"),
   discordGuildName: text("discord_guild_name"),
   termsAcceptedAt: integer("terms_accepted_at"),
+  /** Which terms the owner accepted then: their "Last updated" date (migration 0017). */
+  termsVersion: text("terms_version"),
   signupId: text("signup_id").unique(),
   signupCodeToken: text("signup_code_token"),
   createdAt: integer("created_at").notNull(),

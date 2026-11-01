@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { logTeamChange, requireAdmin, withTeam } from "@g3/auth";
 import { Hono } from "hono";
 import { createEdgeDb } from "../db";

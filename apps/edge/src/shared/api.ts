@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { redirectToSignIn } from "@g3/ui";
 import type { EdgeApp } from "@g3/worker-edge";
 import { hc } from "hono/client";

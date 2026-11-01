@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { formatBytes } from "../../shared/format";
 
 export interface Bar {

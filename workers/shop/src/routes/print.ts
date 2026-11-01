@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { forwardIdentity, requireAuth } from "@g3/auth";
 import { type Context, Hono } from "hono";
 import { drawingKey } from "../lib/storage";

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { inTeam, logTeamChange, requireAdmin, requireAuth, sendTeamMessage } from "@g3/auth";
 import { isDemoTeam } from "@g3/demo";
 import { eq, inArray, isNull } from "drizzle-orm";

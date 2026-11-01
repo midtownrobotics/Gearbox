@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { TeamChange } from "@g3/auth";
 import type { TeamUiSettings } from "@g3/site-config";
 import type { AppEnv } from "../types";

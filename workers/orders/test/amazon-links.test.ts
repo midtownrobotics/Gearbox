@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { mentor, student } from "@g3/testing/users";
 import { jsonAs } from "@g3/testing/worker";
 import { amazonAsin } from "@g3/worker-orders/product-key";

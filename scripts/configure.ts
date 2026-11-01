@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 // `pnpm configure`: writes the values from packages/site-config/src/site.ts into the files that
 // can't import it (each worker's wrangler.toml, the edge box's env example). Run it after
 // changing site.ts. `pnpm configure --check` only reports files that are out of date (CI).

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 /**
  * Wire types for the agent's live "who's on the LAN" check (GET /network/presence),
  * read from the box's neighbor (ARP) table, so it includes devices that never

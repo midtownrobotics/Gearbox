@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 export type SaveStatus = { pending: boolean; saving: boolean; error: string };
 
 /** Coalesce edits per list and serialize writes, including edits made during a request. */

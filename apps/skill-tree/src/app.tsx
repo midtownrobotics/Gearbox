@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { plugins } from "./plugins.config";
 import { ProtectedRoute } from "./shared/auth";

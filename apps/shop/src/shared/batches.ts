@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { type InstanceRow, isObsoleteRevision, partLabel } from "./derive";
 import { createBatch } from "./getters";
 import type { Batch, BatchStatus, PartDefinition, PartFile } from "./types";

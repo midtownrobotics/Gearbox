@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { and, eq, inArray } from "drizzle-orm";
 import { createDb } from "../db";
 import { coreUserIdentities, coreUsers } from "../db/schema";

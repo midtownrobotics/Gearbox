@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 // The team's log (the platform's `team_audit_log`, which the team's admins read on its home's
 // Apps page): who changed a big setting, and which. An app writes to it through G3ID, which it
 // already reaches (G3ID passes it on to the platform), so no app needs a binding of its own.

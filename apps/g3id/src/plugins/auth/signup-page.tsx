@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { NotYourTeam, buttonClass, chatName, useTeamChat, useTeamNames } from "@g3/ui";
 import { FaDiscord, FaSlack } from "react-icons/fa";
 import { Link } from "react-router-dom";

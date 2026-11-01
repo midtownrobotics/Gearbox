@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { integer, sqliteTable, text, unique } from "drizzle-orm/sqlite-core";
 import type { ReleaseApprover, ReleaseComment } from "../lib/onshape-release";
 

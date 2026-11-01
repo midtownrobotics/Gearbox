@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: AGPL-3.0-only
 # Configure Orange Pi 5 GPIO2_D4 (physical pin 22, wPi 13, Linux GPIO 92)
 # as a pulled-up input and expose its value to the unprivileged edge agent.
 set -euo pipefail

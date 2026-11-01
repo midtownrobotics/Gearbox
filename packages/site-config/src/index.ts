@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { type HelpPages, helpSlugFor } from "./help.ts";
 import { site } from "./site.ts";
 

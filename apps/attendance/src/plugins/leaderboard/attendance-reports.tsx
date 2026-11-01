@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { ChevronDown, ChevronUp, Download, Loader2 } from "lucide-react";
 import {
   type PointerEvent,

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 // Lays boxes out as a top-down tree and routes the lines between them: each box sits one row
 // below the deepest thing it requires, rows are packed and centered, and lines that share a gap
 // between rows each get their own track so they never run on top of each other.

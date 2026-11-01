@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 // `pnpm release:tag [--push]`: tags a release once its versions are on staging. The release bot runs
 // it after the "Release" PR is merged. Tags the platform (v2026.10.1) and each app's new version
 // (@g3/worker-orders@1.5.0, ...; `changeset tag` skips ones already tagged). Does nothing if the

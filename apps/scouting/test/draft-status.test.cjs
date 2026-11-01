@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");

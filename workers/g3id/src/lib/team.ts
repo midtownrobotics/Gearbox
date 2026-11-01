@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { type AppName, signInCallbackApiUrl, teamAppUrlVia, teamKey } from "@g3/site-config";
 import { eq } from "drizzle-orm";
 import type { Context } from "hono";

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { Plugin } from "../../shared/plugin-types";
 import { OrderingPage } from "./ordering-page";
 

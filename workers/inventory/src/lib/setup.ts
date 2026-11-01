@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { inTeam, withTeam } from "@g3/auth";
 import { asc, eq, ne } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";

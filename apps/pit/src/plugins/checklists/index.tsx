@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { Loading, Page, useIsOnline } from "@g3/ui";
 import type { Plugin } from "../../shared/plugin-types";
 import { useAuth } from "../../shared/use-auth";

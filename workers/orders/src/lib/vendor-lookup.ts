@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { site } from "@g3/site-config";
 import type { PartLookup, PartVariant } from "@g3/worker-edge/lookup-types";
 import { vendorSiteOf } from "./vendor-sites";

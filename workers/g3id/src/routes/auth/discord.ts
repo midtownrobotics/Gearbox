@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { resolveUserId } from "@g3/auth";
 import { authorizeUrl, exchangeCode } from "@g3/discord";
 import { and, eq } from "drizzle-orm";

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 // Checks for request bodies and path ids.
 
 /** A positive integer id from a path segment or a body, or null. */

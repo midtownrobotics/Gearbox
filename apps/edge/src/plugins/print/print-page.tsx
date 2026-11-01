@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { Button, Card, ErrorBanner, Loading, Page, TextField, inputClass } from "@g3/ui";
 import type { PrinterAlert } from "@g3/worker-edge/print-types";
 import { useEffect, useState } from "react";

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { requireAuth } from "@g3/auth";
 import { CONSOLE_HOSTS, DEV_DOMAIN, demoTeamId, teamKey } from "@g3/site-config";
 import { and, count, desc, eq, inArray, isNotNull, isNull, like, lt, ne, sql } from "drizzle-orm";
@@ -294,6 +295,7 @@ export const consoleRouter = new Hono<AppEnv>()
         founder: team.founderUserId && { id: team.founderUserId, name: name(team.founderUserId) },
         owner: team.ownerUserId && { id: team.ownerUserId, name: name(team.ownerUserId) },
         termsAcceptedAt: team.termsAcceptedAt,
+        termsVersion: team.termsVersion,
         createdAt: team.createdAt,
         updatedAt: team.updatedAt,
         isSite: team.id === teamKey,

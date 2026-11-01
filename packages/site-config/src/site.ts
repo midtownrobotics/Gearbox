@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 // The one file a team edits to run these apps as its own: its name, number and domain. Apps and
 // workers import it; wrangler.toml and .env.production values that come from it are written by
 // `pnpm configure` (scripts/configure.ts). Run that after changing anything here.
@@ -69,13 +70,27 @@ export const site = {
     instagram: "https://www.instagram.com/g3robotics1648/",
   },
 
-  /** The platform's source code (MIT licensed). */
+  /**
+   * The platform's source code (AGPL-3.0 licensed), linked from every app's menu: the AGPL's offer
+   * of the source to its users. A copy run by anyone else must point this at its own code.
+   */
   sourceUrl: "https://github.com/midtownrobotics/Gearbox",
 
   /** The platform's terms of service and privacy policy, which a team accepts when it signs up. */
   legal: {
-    terms: "https://github.com/midtownrobotics/Gearbox/blob/main/docs/legal/terms-of-service.md",
-    privacy: "https://github.com/midtownrobotics/Gearbox/blob/main/docs/legal/privacy-policy.md",
+    terms: "https://github.com/midtownrobotics/Gearbox/blob/public/docs/legal/terms-of-service.md",
+    privacy: "https://github.com/midtownrobotics/Gearbox/blob/public/docs/legal/privacy-policy.md",
+    /**
+     * The terms' "Last updated" date: the version a team owner accepts at sign-up or on the home
+     * page, recorded with the team. Change it with every edit to the terms.
+     */
+    termsVersion: "2026-11-01",
+    /**
+     * The last material change (terms section 21): a team whose owner accepted an older version is
+     * asked to accept the current one on the home page. Change it to `termsVersion` only for a
+     * material change; for any other edit, leave it.
+     */
+    termsRequired: "2026-11-01",
   },
 
   /**

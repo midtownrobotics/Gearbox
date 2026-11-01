@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { site, teamAppUrl } from "@g3/site-config";
 import { TextField } from "@g3/ui";
 import { useEffect, useMemo, useState } from "react";
@@ -228,12 +229,12 @@ function TeamForm({ onError }: { onError: (error: string | null) => void }) {
           I agree to the{" "}
           <a href={site.legal.terms} target="_blank" rel="noreferrer" className="underline">
             terms of service
-          </a>{" "}
-          and{" "}
+          </a>
+          , I've read the{" "}
           <a href={site.legal.privacy} target="_blank" rel="noreferrer" className="underline">
             privacy policy
           </a>
-          , and that this is my team's number.
+          , and this is my team's number.
         </span>
       </label>
       <label className="flex items-start gap-2 text-sm text-secondary-700">

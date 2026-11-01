@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { AppManifest } from "@g3/auth";
 import type { AppName } from "@g3/site-config";
 import { teamKey } from "@g3/site-config";

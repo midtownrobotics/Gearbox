@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { ErrorBanner, Page, PageLoading } from "@g3/ui";
 import type { FieldView, ItemView } from "@g3/worker-inventory";
 import {

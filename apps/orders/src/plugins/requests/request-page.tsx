@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { Page } from "@g3/ui";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useRequestComposer } from "./request-composer";

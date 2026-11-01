@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { useEffect, useState } from "react";
 import { scopeLogFile } from "./getters/advantagescope";
 import type { MatchLog } from "./getters/downloaders";

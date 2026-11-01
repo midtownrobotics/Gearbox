@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { Badge, Button, ErrorBanner } from "@g3/ui";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";

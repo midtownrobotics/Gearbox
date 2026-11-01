@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import {
   type AppName,
   allAppsUrl,
@@ -526,6 +527,11 @@ export function AppNavBar({
                 Report a problem
               </button>
             )}
+            {/* The AGPL's offer of the source to everyone using it over the network (section 13): a
+                copy run by anyone else points `site.sourceUrl` at its own code. */}
+            <a className="g3-nav-text-link" href={site.sourceUrl} target="_blank" rel="noreferrer">
+              Source code
+            </a>
             {version && <span className="g3-nav-version">{version}</span>}
           </div>
         </div>

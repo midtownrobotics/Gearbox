@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 // A team's members with their roles, and messages to them on the team's chat (Slack or Discord,
 // whichever it connected), from G3ID over the service binding (its /api/internal routes are never
 // reachable through the gateway). Apps keep no list of people of their own, never hold a team's

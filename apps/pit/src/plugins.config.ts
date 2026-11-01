@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { adminPlugin } from "./plugins/admin";
 import { archivesPlugin } from "./plugins/archives";
 import { batteriesPlugin } from "./plugins/batteries";

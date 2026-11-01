@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 // A team's fiscal year: it starts on the 1st of the team's start month (a team setting,
 // lib/settings.ts), at midnight local time for whoever is looking (lib/local-time.ts). A fiscal year is named by its starting year
 // (July start: 2026 = July 1, 2026 – June 30, 2027, shown as "2026–27"; January start: "2026").

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { activeMembers } from "@g3/auth";
 import type { Context } from "hono";
 import type { AppEnv } from "../types";
