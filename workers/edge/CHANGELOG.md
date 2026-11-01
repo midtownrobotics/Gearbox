@@ -1,5 +1,11 @@
 # @g3/worker-edge
 
+## 2.4.2
+
+### Patch Changes
+
+- f340efe: The app's menu links to Gearbox's source code.
+
 ## 2.4.1
 
 ### Patch Changes

@@ -1,5 +1,11 @@
 # @g3/worker-scouting
 
+## 3.1.2
+
+### Patch Changes
+
+- f340efe: The app's menu links to Gearbox's source code.
+
 ## 3.1.1
 
 ### Patch Changes

@@ -16,6 +16,75 @@ Each release of the whole platform, newest first, with the version of every app 
 
 <!-- releases -->
 
+## 2026.11.1 (2026-11-01)
+
+| App | Version |
+| --- | --- |
+| **G3ID** | **4.2.1** (was 4.2.0) |
+| **Portal** | **2.5.0** (was 2.4.0) |
+| **Platform** | **4.2.0** (was 4.1.1) |
+| **Shop** | **4.0.2** (was 4.0.1) |
+| **Pit** | **3.2.2** (was 3.2.1) |
+| **Orders** | **2.3.2** (was 2.3.1) |
+| **Edge** | **2.4.2** (was 2.4.1) |
+| Edge agent | 0.7.0 |
+| Pit log downloader | 2.3.0 |
+| **Scouting** | **3.1.2** (was 3.1.1) |
+| **Skill Tree** | **2.2.2** (was 2.2.1) |
+| **Attendance** | **2.2.2** (was 2.2.1) |
+| **Inventory** | **1.2.2** (was 1.2.1) |
+| **Schedule** | **0.4.2** (was 0.4.1) |
+
+### G3ID 4.2.1
+
+- The app's menu links to Gearbox's source code.
+
+### Portal 2.5.0
+
+- Gearbox is now licensed under the GNU AGPL, version 3, and every app's menu links to its source code. Sign-up records which version of the terms a team accepted, and a team's owner is asked on the home page to accept new terms when they change. Deployers: apply the platform's migration `0017_terms_version.sql` first.
+- Trying the public demo no longer makes "My team" on the Gearbox site open the demo instead of your own team.
+
+### Platform 4.2.0
+
+- Gearbox is now licensed under the GNU AGPL, version 3, and every app's menu links to its source code. Sign-up records which version of the terms a team accepted, and a team's owner is asked on the home page to accept new terms when they change. Deployers: apply the platform's migration `0017_terms_version.sql` first.
+- Trying the public demo no longer makes "My team" on the Gearbox site open the demo instead of your own team.
+
+### Shop 4.0.2
+
+- The app's menu links to Gearbox's source code.
+
+### Pit 3.2.2
+
+- The app's menu links to Gearbox's source code.
+
+### Orders 2.3.2
+
+- The app's menu links to Gearbox's source code.
+
+### Edge 2.4.2
+
+- The app's menu links to Gearbox's source code.
+
+### Scouting 3.1.2
+
+- The app's menu links to Gearbox's source code.
+
+### Skill Tree 2.2.2
+
+- The app's menu links to Gearbox's source code.
+
+### Attendance 2.2.2
+
+- The app's menu links to Gearbox's source code.
+
+### Inventory 1.2.2
+
+- The app's menu links to Gearbox's source code.
+
+### Schedule 0.4.2
+
+- The app's menu links to Gearbox's source code.
+
 ## 2026.11.0 (2026-11-01)
 
 | App | Version |

@@ -1,5 +1,11 @@
 # @g3/worker-orders
 
+## 2.3.2
+
+### Patch Changes
+
+- f340efe: The app's menu links to Gearbox's source code.
+
 ## 2.3.1
 
 ### Patch Changes
