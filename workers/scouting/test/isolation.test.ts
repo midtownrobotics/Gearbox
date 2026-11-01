@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { env } from "cloudflare:workers";
 import { teamKey } from "@g3/site-config";
 import {

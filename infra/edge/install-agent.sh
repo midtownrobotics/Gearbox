@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: AGPL-3.0-only
 # Installs or upgrades the edge agent on the edge box. Run as root on the box:
 #   sudo ./install-agent.sh ./g3-edge-agent 0.1.0
 # Expects to be run from a copy of infra/edge/ (it reads files from etc/).

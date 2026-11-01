@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { Button, ErrorBanner, Loading, Page, SuccessBanner, TextField } from "@g3/ui";
 import type { InferResponseType } from "hono/client";
 import { useState } from "react";

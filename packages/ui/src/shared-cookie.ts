@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { DEV_DOMAIN, hostDomain } from "@g3/site-config";
 
 /**

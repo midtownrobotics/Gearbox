@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { Attendee, Role } from "../../shared/api";
 import { Swatch } from "../../shared/role-colors";
 import { spanLabel } from "../../shared/time";

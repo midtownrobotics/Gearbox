@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { mkdirSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { getMeta, setMeta } from "../../core/db";

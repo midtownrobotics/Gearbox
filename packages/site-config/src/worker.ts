@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 // For app workers: each serves its app's page (static assets) and its API at /api on the same
 // address. Workers' routes are written without the prefix (/requests, not /api/requests), as in
 // dev, where Vite's proxy drops it; this drops it in production.

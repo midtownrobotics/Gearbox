@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { apiPath, appUrl } from "@g3/site-config";
 import { appOn, useAppOn } from "@g3/ui";
 import type { ListingView } from "@g3/worker-inventory";

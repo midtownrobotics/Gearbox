@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import {
   type PortalTileKey,
   type TeamUiLinkKey,
@@ -36,6 +37,7 @@ import skillsIcon from "../../assets/app-icons/skills.svg";
 import { useMe } from "../../shared/me";
 import { BlueAllianceIcon, FirstIcon, Match13Icon, StatboticsIcon } from "./link-icons";
 import { HomeNotifications } from "./notifications";
+import { TermsNotice } from "./terms-notice";
 
 // The team's apps show their own app icon, its accent in the team's primary color (TeamIcon).
 // Other links are drawn to match it: a black tile with a white symbol, and a ↗ in that color for
@@ -295,6 +297,8 @@ export function HomePage() {
             </p>
           )}
         </div>
+
+        <TermsNotice />
 
         <div className="grid grid-cols-4 sm:grid-cols-5 gap-x-4 gap-y-8">
           {apps

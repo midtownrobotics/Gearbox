@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { budgetPlugin } from "./plugins/budget";
 import { catalogPlugin } from "./plugins/catalog";
 import { listsPlugin } from "./plugins/lists";

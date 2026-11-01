@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { IconType } from "react-icons";
 
 // Marks for the outside sites react-icons doesn't have, drawn like its icons: 1em tall (the wide FIRST

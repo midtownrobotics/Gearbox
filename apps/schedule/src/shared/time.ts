@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 // Times in a schedule are wall-clock slots of the event's own day: slot n is n × 15 minutes after
 // midnight there, and a range ends before its last slot (Lunch 12:00–1:15 is 48–53). They're
 // shown as the event's local time, in the viewer's own format, whatever zone the viewer is in.

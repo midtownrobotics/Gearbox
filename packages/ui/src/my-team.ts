@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { sharedCookieAttributes } from "./shared-cookie";
 
 // The team this browser last opened: its home (Portal) remembers it, and the platform's public

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 // Tenancy lint (roadmap Phase 3): in every app that serves many teams, a query on a team's table
 // must go through the team-scoped helpers in @g3/auth (`inTeam`, `withTeam`),
 // so a forgotten team filter fails CI instead of showing one team another team's rows.

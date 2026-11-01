@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { Button, ConfirmButton, tones } from "@g3/ui";
 import { AlertCircle, CheckCircle2, Clock, Send } from "lucide-react";
 import { useEffect, useState } from "react";

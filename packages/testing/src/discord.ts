@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 // Discord's API as workers' tests see it (G3ID's and the platform's `outbound`), with nothing sent
 // anywhere. Who and what exists is read off the ids, so a test makes what it needs with
 // `snowflake(prefix)`:

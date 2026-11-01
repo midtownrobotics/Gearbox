@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { ReactNode } from "react";
 
 // A card shown while something on the grid is hovered or focused: a person's minutes, a block's

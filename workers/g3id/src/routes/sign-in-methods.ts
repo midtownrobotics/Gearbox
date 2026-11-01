@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { isDemoTeam } from "@g3/site-config";
 import { and, eq, inArray } from "drizzle-orm";
 import { Hono } from "hono";

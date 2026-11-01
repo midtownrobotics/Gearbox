@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { and, eq, inArray, isNull, lt, or } from "drizzle-orm";
 import { Hono } from "hono";
 import { deleteCookie, getCookie } from "hono/cookie";

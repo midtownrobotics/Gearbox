@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { g3idStub, workerTestConfig } from "@g3/testing/config";
 import { SITE_TEAM, admin, mentor, otherStudent, student, testUser } from "@g3/testing/users";
 

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { Navigate, useSearchParams } from "react-router-dom";
 import type { Plugin } from "../../shared/plugin-types";
 import { RequestPage } from "../requests/request-page";

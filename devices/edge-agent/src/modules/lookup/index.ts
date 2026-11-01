@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { LOOKUP_USAGE_KEY, type LookupRequest } from "@g3/worker-edge/lookup-types";
 import { Hono } from "hono";
 import type { EdgeModule, ModuleContext } from "../../core/module";

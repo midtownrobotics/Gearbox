@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 // `pnpm staging:create`: makes what staging (roadmap 0.2) needs on Cloudflare, once. Safe to run
 // again: it only makes what's missing.
 // - a D1 database, KV namespace, R2 bucket and queue for each one in the workers' [env.staging]

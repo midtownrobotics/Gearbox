@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { desc, gte, sql } from "drizzle-orm";
 import { landingVisits } from "./db/schema";
 import { db } from "./lib";

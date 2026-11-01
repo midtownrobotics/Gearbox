@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 /**
  * The edge box's link: one WebSocket the agent opens to the worker
  * (GET /agent/connect), over which the worker sends HTTP requests to the

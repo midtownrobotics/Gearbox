@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 // Text field lint (roadmap 5.7): every app's text boxes are @g3/ui's TextField, so the public demo
 // can offer safe text to pick in each of them instead of typing (see TextField). It fails on a
 // plain `<textarea>`, or an `<input>` that holds text: no `type`, or type text, search, url, email

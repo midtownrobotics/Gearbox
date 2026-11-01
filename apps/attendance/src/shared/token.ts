@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 export type PageType = "signin" | "signout";
 
 export const WINDOW_MS = 30_000;

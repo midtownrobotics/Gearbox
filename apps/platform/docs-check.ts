@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { buildDocs } from "./docs-plugin.ts";
 
 // `pnpm --filter @g3/platform test`: the docs build, with no broken links, and every page's

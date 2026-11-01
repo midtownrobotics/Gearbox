@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { Database } from "bun:sqlite";
 import type { Counters, Usage } from "./deltas";
 import type { Lease } from "./parse";

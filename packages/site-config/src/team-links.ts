@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { site } from "./site.ts";
 
 /** A team's pages on FIRST's event site and FRC stats sites. */

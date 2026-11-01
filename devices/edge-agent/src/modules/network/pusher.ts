@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { type WorkerClient, desiredVersion } from "../../core/worker-client";
 import type { SiteStore } from "./site-store";
 import type { UsageStore } from "./store";

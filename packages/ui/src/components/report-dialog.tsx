@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { apiPath, site } from "@g3/site-config";
 import { type FormEvent, useEffect, useState } from "react";
 import { chatName, useTeamChat } from "../session";

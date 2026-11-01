@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { Lease } from "./parse";
 
 export const BUCKET_SECONDS = 300;

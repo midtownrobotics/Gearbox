@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: AGPL-3.0-only
 # Creates the shop drive: a 10 GB filesystem image mounted at /srv/g3-drive,
 # served by the agent at http://drive.local. Being its own filesystem, a full
 # drive can never fill the box's main disk. Safe to re-run. On the box:

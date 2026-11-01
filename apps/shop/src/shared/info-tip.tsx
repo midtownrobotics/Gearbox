@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { useState } from "react";
 
 /** An "i" that explains a setting, on hover or on a tap. */

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { getDomain } from "tldts";
 
 export const UNKNOWN_SITE = "(unknown)";

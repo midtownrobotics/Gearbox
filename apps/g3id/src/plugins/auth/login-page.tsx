@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { ErrorBanner, NotYourTeam, PublicSiteLink, buttonClass, useTeamNames } from "@g3/ui";
 import { useEffect, useState } from "react";
 import { FaDiscord, FaGithub, FaGoogle, FaSlack, FaSteam } from "react-icons/fa";

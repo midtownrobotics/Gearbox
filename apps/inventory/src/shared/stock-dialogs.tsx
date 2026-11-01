@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { Button, Dialog, ErrorBanner, Field, inputClass } from "@g3/ui";
 import type { ItemView, StockView } from "@g3/worker-inventory";
 import { type FormEvent, type ReactNode, useState } from "react";

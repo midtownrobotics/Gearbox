@@ -42,6 +42,10 @@ jobs:
       - name: Text field lint
         run: pnpm lint:text-fields
 
+      # Every source file and package.json says it's AGPL-3.0-only: scripts/license-lint.ts.
+      - name: License lint
+        run: pnpm lint:license
+
       # wrangler.toml production values must match packages/site-config/src/site.ts.
       - name: Site config is applied
         run: pnpm configure --check

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { brandColor } from "@g3/site-config";
 import { Hono } from "hono";
 import { createDb } from "../db";

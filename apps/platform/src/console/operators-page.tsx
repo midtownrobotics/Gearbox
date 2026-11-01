@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { Button, Card, ConfirmButton, ErrorBanner, Page, TextField } from "@g3/ui";
 import { useState } from "react";
 import { type Operator, consoleApi, formatDate, read, send, useLoad } from "./data";

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 /** "$12.50" from 1250 cents; "—" when unknown. */
 export function formatCents(cents: number | null | undefined, currency = "USD"): string {
   if (cents === null || cents === undefined) return "—";

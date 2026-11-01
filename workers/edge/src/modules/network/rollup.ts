@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { inTeam } from "@g3/auth";
 import { lt, sql, sum } from "drizzle-orm";
 import type { EdgeDb } from "../../db";

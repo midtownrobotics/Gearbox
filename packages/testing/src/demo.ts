@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { demoTeamId } from "@g3/site-config";
 import { expect } from "vitest";
 import { type TeamUsers, newTeamId, teamUsers } from "./users";

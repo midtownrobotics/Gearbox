@@ -1,12 +1,12 @@
 # Gearbox Privacy Policy (draft)
 
-Draft exported from the working document on 3 October 2026.
+Last updated: 1 November 2026. Effective: [the date this policy goes live].
 
 Draft for legal review, not yet in force. Square brackets mark a choice to confirm or a detail still missing.
 
 ### To do
 
-- Confirm timespans in Sec. 8
+- Confirm the periods in section 8 for technical logs and backups against our Cloudflare plan.
 
 ## In short
 
@@ -22,7 +22,7 @@ Gearbox is developed by FRC Team 1648, G3 Robotics, and operated by Georgia Robo
 
 Your team decides who its members are and what goes into Gearbox. Under privacy laws that use these terms, your team is the controller of its members' information and we are its processor. For our own records, such as the list of teams and their owners, we are the controller.
 
-Contact us at contact@frcgearbox.com.
+Contact us at contact@frcgearbox.com, or write to us at G3 Robotics, 931 Monroe Dr NE, Ste A102, Box 102, Atlanta, GA 30308.
 
 ## 2. What we collect
 
@@ -42,6 +42,7 @@ We collect only what the apps need to work.
 | Skill Tree | Each member's progress on skills and who signed it off | Members and mentors |
 | Schedule | Each event's days and periods, which members are attending, each one's role for every 15 minutes, who may edit schedules, and which chat reminders (Slack or Discord) were sent; each member's own list of friends, which only that member can see | Mentors and the students they trust; each member, for their friends |
 | Scouting | Match and pit observations, notes on other teams, robot photos, schedules; when engagement is enabled, point balances and awards, match picks and their results | Members and optional scouting activities |
+| Edge (only for a team that runs its own Edge box) | The devices on the team's shop network: each one's hardware (MAC) address, the name it gives itself, a name an admin gives it, its last internet address on that network, and when it was first and last seen; how much data each device used; the sites each device used and how much data each took; the team's blocked sites and the exceptions admins grant a device, with who granted each and why; and a log of what admins changed | The team's Edge box and its admins |
 | Uploaded files | Whatever your team uploads | Members |
 | Technical logs | Internet address, browser type, the page requested and the time | Recorded automatically by our hosting provider |
 | Problem reports | What you write when you report a problem or an idea from an app's menu, the page's address (without anything after `?`), the app and Gearbox versions, your browser, your team, that you sent it, your reporter ID (a random ID given to you with your first report) and, if you choose to add it, your name | You, when you send one |
@@ -64,6 +65,8 @@ We use your information to:
 
 We count teams and the apps they use so we can plan capacity. Those counts do not identify members.
 
+Where privacy laws ask for a legal basis: for team data, your team decides the basis, and we process it under our agreement with your team. For our own records, such as the list of teams and their owners, operator logs and security, we rely on our agreement with the team owner and on our legitimate interest in keeping Gearbox running, secure and free of abuse. We disclose information to authorities only where the law requires it.
+
 ## 4. What we never do
 
 - We do not sell or rent personal information.
@@ -82,6 +85,8 @@ We count teams and the apps they use so we can plan capacity. Those counts do no
 Some things are public by design: your team's name, number and branding on its sign-in page, and the apps your team has submitted to the library.
 
 Problem reports are public too. Each one is posted as an issue on Gearbox's public GitHub repository, with the page's address, the app and Gearbox versions, your browser, your team's number and your reporter ID. Your name isn't posted unless you choose to put it on the report, but anything you write in the report is. Your reporter ID is the same on each of your reports, so they can be seen to come from one person, but it doesn't say who you are. The report form shows you your reporter ID. Your team's admins can see each member's reporter ID. Our operators can block a reporter ID used for spam or misuse without learning whose it is; a blocked reporter can't send reports, and your team's admins are told it's you and the operator's reason. Gearbox keeps who sent each report, to message you when it's fixed or closed.
+
+On a team that runs Edge, the sites each device used are shown only to the team's admins.
 
 Scouting forms, reports, schedules, uploaded files and points are private to the owning team. Team deletion or the app's scheduled deletion removes its database records and uploaded files.
 
@@ -115,22 +120,24 @@ Where the law of your team's country requires a legal basis for that transfer, t
 | Information | Kept for |
 | --- | --- |
 | Sign-in sessions | 7 days from sign-in |
-| Your account and memberships | Until you are removed from every team you belong to, then deleted within 30 days |
+| Your account | Until a team admin deletes it, which removes it and your sign-ins at once, or until your team is deleted |
 | Team data | While the team is registered. Deleted within 30 days after the team closes |
 | The team's log (apps switched on or off, data downloads, and which settings were changed and by whom, never their values) | Kept as team data |
 | Data of an app your team switches off | 90 days, in case your team switches it back on, then deleted |
 | Records that name a removed member, such as past orders | Kept by the team, with the member's name replaced by a placeholder |
 | Operator access log | 12 months |
+| Edge: data used by each device | In 5-minute detail for 14 days, then as hourly totals kept as team data |
+| Edge: sites each device used | Hourly for 30 days, then daily totals for one year |
 | Who sent a problem report, and your reporter ID | Kept as team data, and deleted with the team. The public GitHub issue stays: ask us to remove one |
 | Daily visit totals for our public page | Kept; they are totals and identify no one |
-| Technical logs | [Period set with our hosting provider] |
-| Backups | [Period], after which deleted information is gone from backups too |
+| Technical logs | [7 days: Cloudflare Workers Logs on the paid plan; confirm] |
+| Backups | [30 days: Cloudflare D1's point-in-time recovery on the paid plan; confirm], after which deleted information is gone from backups too |
 | The public demo | Erased every night at midnight US Eastern time |
 
 ## 9. Your choices and rights
 
 - **See, correct or remove your information.** Ask your team's admin first. Your team controls its data and can do each of these in the product.
-- **Leave a team.** A team admin can remove you. Records your team must keep will no longer show your name.
+- **Leave a team.** A team admin can delete your account. Records your team keeps will no longer show your name.
 - **Unlink a sign-in service.** You can do this from your account page at any time.
 - **Export.** A team's admins can download each app's data at any time, and are offered it before switching an app off. Your team can ask us for a copy of the information held about one member.
 - **If your team cannot help.** Contact us at contact@frcgearbox.com. We will work with your team and answer within 30 days.
@@ -148,7 +155,7 @@ Most Gearbox members are high-school students, and we have designed it with that
 
 ## 11. Security
 
-- Information is encrypted in transit.
+- Information is encrypted in transit, and at rest by our hosting provider.
 - Every app keeps each team's data separate, and that separation is tested automatically.
 - Credentials for services your team connects are stored encrypted.
 - Operator access is limited, logged and visible to your team's admins.
@@ -157,7 +164,26 @@ No system is perfectly secure. If we learn that your team's information has been
 
 ## 12. Cookies and device storage
 
-Gearbox uses one cookie, which keeps you signed in. On shared shop devices it also stores a kiosk token in the browser. We use no advertising or analytics cookies and no third-party trackers. Our public home page notes in your browser's session storage that it has counted your visit, so reloading it isn't counted again; the note is gone when you close the tab. While you fill in a scouting form for a match, your answers and drawings are kept in your browser's storage until the report is sent or you discard it, so they aren't lost if the page closes or the form moves to the next match; drafts more than 12 hours old are removed. When you use AdvantageScope in Pit, AdvantageScope itself, your team's AdvantageScope settings, the field and robot models and the match logs you open or save to the device are kept in your browser's storage, so they aren't downloaded again; a log is removed from it once your team no longer has it in Pit, and you can clear it all by clearing the site's data in your browser.
+We use no advertising or analytics cookies and no third-party trackers. Every cookie Gearbox sets is needed for it to work or remembers a choice you made:
+
+| Cookie | What it does | How long |
+| --- | --- | --- |
+| `g3_session` | Keeps you signed in | 7 days |
+| `g3_theme` | Your choice of light or dark mode | 1 year |
+| `g3_team` | The FRC number of the team this browser last opened, so its home and our public page can take you back to it. Never who you are | 1 year |
+| `g3_tutorial` | That Tutorial mode is open; removed when you close it | 1 year |
+| `g3_tutorial_doc` | The help page to open next, while Tutorial mode follows you to another app | 30 seconds |
+| `g3_team_ui` | Tells your other open apps to load your team's new appearance after an admin saves it | 1 day |
+
+Gearbox also keeps some things in your browser's own storage:
+
+- On shared shop devices, a kiosk token.
+- Our public home page notes in session storage that it has counted your visit, so reloading it isn't counted again; the note is gone when you close the tab.
+- While you fill in a scouting form for a match, your answers and drawings are kept until the report is sent or you discard it, so they aren't lost if the page closes or the form moves to the next match; drafts more than 12 hours old are removed.
+- When you use AdvantageScope in Pit, AdvantageScope itself, your team's AdvantageScope settings, the field and robot models and the match logs you open or save to the device are kept, so they aren't downloaded again; a log is removed once your team no longer has it in Pit.
+- Small choices, such as the tool you last used in Schedule and the steps you ticked in a help page's checklist.
+
+You can clear all of it by clearing the site's data in your browser.
 
 ## 13. Apps built by teams
 

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 // Test users for worker tests. Workers check sign-in by asking G3ID's /auth/me about the request's
 // cookie; in tests, G3ID is a stub (config.ts) that reads the user straight out of a test cookie
 // made here. Used both by the stub (in Node) and by tests (in the Workers runtime), so it only

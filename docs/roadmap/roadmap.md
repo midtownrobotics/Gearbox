@@ -54,6 +54,8 @@ As of 10 October 2026, five of the six Phase 0 steps are done on `main`, Phase 1
 
 | Change | Roadmap step | Pull request |
 | --- | --- | --- |
+| The terms and privacy drafts match the apps again (Edge's network data, every cookie, account deletion), with a General section, copyright complaints and the operator's address; sign-up records which version of the terms a team accepted (platform migration `0017`), and a team's owner accepts new terms on Portal's home after a material change | Terms and privacy | — |
+| Gearbox is licensed AGPL-3.0-only (was MIT): every source file starts with its SPDX line and every package.json says it, every app's menu links its source code, checked in CI by `pnpm lint:license` (`--fix` adds them) | Part of 0.6 | — |
 | The pit log downloader installs small: the setup steps clone only the released code (`public`) and the downloader's folders, and each release commits its status page built, so a laptop installs no build tools (about 8 MB instead of 160 MB) and `git pull` updates it | Pit log downloader: L.2 | This PR |
 | Notifications are two types, Informational and Critical (migration `0016` makes Warnings Informational and joins each team's Warning settings into its Informational ones), and a team's admins send notifications to their own team from Portal's Notifications page, under the writer's name. Where they go (home page audience, chat channel) is set separately for Gearbox's and the team's own; only Gearbox's Critical ones are DMed. The console never lists a team's own | 2.8 (operators' console: notifications) | This PR |
 | The operators' console has a Stats page: teams by status and new in 30 days, members (with mentors, online now, active in the last 7 and 30 days, joined in 30 days and awaiting approval) and how many active teams have each app on. Counts only, never who, leaving out the public demo; operators only. G3ID now notes when each member last used Gearbox (`last_seen_at`, from every app's `/auth/me`, at most once a minute), which team admins see as Last online on Portal's Members pages; the privacy draft says so | 2.8 | This PR |
@@ -557,7 +559,7 @@ This is a product view, not legal advice. You will have both documents reviewed 
 | Item | Decision |
 | --- | --- |
 | Operator | Georgia Robotics Alliance, Inc., doing business as Midtown Robotics Boosters, a 501(c)(3) nonprofit. It is the party named in both documents |
-| Code license | MIT for the whole repo. Submitted variants are contributed under it |
+| Code license | AGPL-3.0-only for the whole repo (MIT until November 2026). Submitted variants are contributed under it |
 | Review | Done offline before applications open |
 | Teams outside the United States | Open to all, on the conditions set out below |
 
@@ -620,7 +622,7 @@ You can be open to all. Most of what international teams bring is handled in the
 - **Acceptable use.** No attempt to reach another team's data, no unlawful or abusive content, no misuse of the demo.
 - **Ownership.** A team owns its data and can leave with it. Gearbox gets only the right to host it.
 - **Succession.** How ownership passes when a mentor leaves, so a team is never locked out of its own data.
-- **Variant and single-team apps.** Submitted code is contributed under the MIT license. The operator may decline, change or remove an app.
+- **Variant and single-team apps.** Submitted code is contributed under the AGPL-3.0 license. The operator may decline, change or remove an app.
 - **Other services.** Slack, Onshape and the rest are governed by their own terms.
 - **Teams outside the United States.** US hosting, the team's duty to follow its own law, the addendum, and no service where US law forbids it.
 - **Suspension and closure.** When a team can be suspended, and how much notice and export time teams get if Gearbox ever shuts down.
@@ -687,7 +689,7 @@ The risk that matters most is one team seeing another team's data. Most of the s
 | Terms and privacy | Suggestions are in the Terms and privacy section, and drafts of both documents are linked there |
 | Operator | Georgia Robotics Alliance, Inc., doing business as Midtown Robotics Boosters, a 501(c)(3) nonprofit |
 | Teams outside the United States | Open to all where wording can manage it. The conditions are in the Terms and privacy section |
-| Code license | MIT for the whole repo |
+| Code license | AGPL-3.0-only for the whole repo (MIT until November 2026); every source file carries its SPDX line, checked by `pnpm lint:license` |
 | Review of the terms | Offline, before applications open. Drafting proceeds now |
 | How `public` reaches Cloudflare | GitHub Actions: the release workflow commits the release, then deploys it through `deploy.yml` (migrations, workers, gateway), the same way `staging` deploys staging. Cloudflare's Git integration (Workers Builds) was used until 12 October 2026 |
 | Edge | An optional app any team can run with its own box (changed 6 October 2026, once the box no longer needed a tunnel). Its plan is the Edge section, not a phase |

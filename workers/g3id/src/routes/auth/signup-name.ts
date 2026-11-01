@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { Hono } from "hono";
 import { NAME_MAX, cleanName, nameTokenUser, saveSignupName } from "../../lib/signup-name";
 import { requestTeamId } from "../../lib/team";

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 // A role's color is one of the page's presets (a key, which the page draws as a tint that suits
 // light and dark mode) or a color the team chose, written #rrggbb. The presets leave out red,
 // which means a problem in every app; a team may still choose it.

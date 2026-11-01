@@ -2,6 +2,7 @@
   "name": "@g3/g3id",
   "private": true,
   "version": "4.2.0",
+  "license": "AGPL-3.0-only",
   "type": "module",
   "scripts": {
     "dev": "vite",

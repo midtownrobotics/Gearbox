@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { deleteTeamRows, exportTeamRows, hasMentorAccess, requireAuth, teamExport } from "@g3/auth";
 import { isDemoTeam } from "@g3/demo";
 import { corsOrigin } from "@g3/site-config";

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { admin, asUser, kioskAdmin, mentor, student } from "@g3/testing/users";
 import { call, callAs, jsonAs } from "@g3/testing/worker";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";

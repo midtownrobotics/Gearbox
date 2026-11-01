@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { existsSync } from "node:fs";
 import { link, mkdir, readdir, stat, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";

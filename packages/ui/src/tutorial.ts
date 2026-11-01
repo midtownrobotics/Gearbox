@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { apiPath } from "@g3/site-config";
 import { DOCS_FEATURES, type DocsFeature } from "@g3/site-config/help";
 import { useEffect, useState, useSyncExternalStore } from "react";

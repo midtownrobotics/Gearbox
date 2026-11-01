@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { fileStepError } from "@g3/worker-shop/process-rules";
 import type { PartDefinition, PartInstance, PartInstanceProcess, Process } from "./types";
 import type { ShopData } from "./use-shop-data";

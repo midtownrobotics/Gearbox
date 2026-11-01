@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 /**
  * Turns a vendor product URL into part details (title, SKU, price, variants).
  *

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 // What a quantity counts: an entry's unit ("ft", "kg", "sheet"), or "" for one of each. Quantities
 // are whole numbers in every unit, so a team that needs part of one counts in a smaller unit (in,
 // not ft). A unit is the team's own text; the suggestions are only a start. Orders uses this for

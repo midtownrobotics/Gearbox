@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { redirectToSignIn } from "@g3/ui";
 const API_ORIGIN = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
 export const API_URL = `${API_ORIGIN}/scouting`;

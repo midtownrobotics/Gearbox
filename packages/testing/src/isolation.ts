@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { type TeamUsers, type TestUser, asUser, newTeamId, teamUsers } from "./users";
 import { call } from "./worker";
 

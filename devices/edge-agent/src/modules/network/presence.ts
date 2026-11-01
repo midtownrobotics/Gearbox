@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { PresenceClient, PresenceResponse } from "@g3/worker-edge/presence-types";
 import type { Lease } from "./parse";
 

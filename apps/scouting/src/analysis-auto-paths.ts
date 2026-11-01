@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { type Report, chronological } from "./analysis-table";
 
 export type AutoPath = { report: Report; field: Report["fields"][number]; url: string };

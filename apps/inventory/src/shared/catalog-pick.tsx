@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { TextField } from "@g3/ui";
 import { useMemo, useState } from "react";
 import { type CatalogPart, packOf, searchCatalog, useCatalog } from "./catalog";

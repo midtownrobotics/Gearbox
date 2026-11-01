@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { Button, Card, ErrorBanner, SuccessBanner } from "@g3/ui";
 import type { LoadSummary, TreeSet } from "@g3/worker-skill-tree";
 import { type ChangeEvent, useRef, useState } from "react";

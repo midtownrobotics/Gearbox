@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { teamMembers } from "@g3/auth";
 import { and, desc, eq, gt, isNull, or } from "drizzle-orm";
 import {

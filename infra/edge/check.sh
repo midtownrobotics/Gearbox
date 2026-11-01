@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: AGPL-3.0-only
 # Validates the base network configs before applying them. Copy the whole
 # infra/edge/ folder to the box (including local/), then run it from there:
 #   rsync -a infra/edge/ g3@192.168.50.1:~/edge-infra/

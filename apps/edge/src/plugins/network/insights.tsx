@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { Stat } from "@g3/ui";
 import { useState } from "react";
 import { formatBytes, formatDayKey } from "../../shared/format";

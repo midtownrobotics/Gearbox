@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 // The text a demo visitor can put in a field: anything a page sends from the demo is picked from
 // these lists with a rotate button (TextField in @g3/ui), never typed. Each field names the kind of
 // text it holds, which chooses its list. Keep every entry plain and neutral: anyone can see it.

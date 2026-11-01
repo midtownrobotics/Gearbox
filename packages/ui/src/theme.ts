@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { useEffect, useSyncExternalStore } from "react";
 import { sharedCookieAttributes } from "./shared-cookie";
 

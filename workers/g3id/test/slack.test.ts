@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { teamAppUrlVia } from "@g3/site-config";
 import { site, teamKey } from "@g3/site-config";
 import { afterEach, describe, expect, it, vi } from "vitest";

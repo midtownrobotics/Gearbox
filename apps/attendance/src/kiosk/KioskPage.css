@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: AGPL-3.0-only */
 /* The display fills the screen exactly and never scrolls: the codes take the space between their
    labels and the status line, each QR the largest square that fits (container query units). */
 .kiosk {

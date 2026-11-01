@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 /**
  * A thin bar filled to `percent`, green once `done`. Decoration: show the number beside it.
  */

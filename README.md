@@ -54,6 +54,33 @@ We want your pull requests: bug fixes, new features, docs, even whole new apps, 
 
 ## License and policies
 
-Gearbox is released under the [MIT License](LICENSE).
+Gearbox is released under the [GNU Affero General Public License, version 3](LICENSE) (`AGPL-3.0-only`). Every source file says so on its first line (`SPDX-License-Identifier: AGPL-3.0-only`), and that line refers to this notice:
+
+```text
+Gearbox
+Copyright (C) 2026  Gearbox contributors
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published
+by the Free Software Foundation, version 3 of the License.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
+```
+
+**Forks and variations stay open source.** Anything built from Gearbox (a fork, a modified app, a variant, or a project that includes its code) is covered by the same license. If you share it with anyone, **or run it for others to use over a network** (a hosted copy, a team's own server), you must:
+
+- release it under AGPL-3.0 too, with no added restrictions;
+- give everyone you share it with, and everyone who uses your hosted copy, the complete source code, including your changes (keep the "Source code" link in every app's menu, pointing at your code: `sourceUrl` in `packages/site-config/src/site.ts`);
+- keep these notices and the license, and mark what you changed.
+
+You can't take Gearbox, or any part of it, closed source.
+
+All of Gearbox is under this license, including Inventory, Schedule and Skill Tree, which their author has relicensed from MIT to the AGPL.
 
 Drafts of the [Terms of Service](docs/legal/terms-of-service.md) and [Privacy Policy](docs/legal/privacy-policy.md) for the hosted platform are in `docs/legal/`. They are not in force yet and are still under review.

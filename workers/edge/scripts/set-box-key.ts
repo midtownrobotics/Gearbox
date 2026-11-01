@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 // Stores the hash of an existing box key for a team, so that box keeps connecting with the key it
 // has. Two uses (new boxes get their key on the Edge Box page instead):
 //

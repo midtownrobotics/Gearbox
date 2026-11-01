@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import * as fs from "node:fs";
 import { createServer } from "node:http";
 import * as os from "node:os";

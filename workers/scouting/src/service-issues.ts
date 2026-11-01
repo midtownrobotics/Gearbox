@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 /**
  * What a service ticket's problem is. A ticket has any number of these, in this order; none means
  * the person reporting it wasn't sure. Shared by the worker's checks and Scouting's forms

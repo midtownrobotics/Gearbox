@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { CategoryView, SkillView, TreeView } from "@g3/worker-skill-tree";
 
 // What a student's saved progress means for each tree, category and skill: what is open to work

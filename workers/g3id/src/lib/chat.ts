@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import * as discord from "@g3/discord";
 import * as slack from "@g3/slack";
 import type { AppEnv } from "../types";

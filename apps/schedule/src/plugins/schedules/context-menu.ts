@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { useEffect } from "react";
 
 // On a schedule's page an editor paints with the right mouse button, so a right-click there

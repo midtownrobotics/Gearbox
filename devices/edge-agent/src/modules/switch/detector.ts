@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 /**
  * Debounces the door microswitch circuit. `true` means the GPIO pin is
  * grounded (door closed); `false` means open circuit (door open).

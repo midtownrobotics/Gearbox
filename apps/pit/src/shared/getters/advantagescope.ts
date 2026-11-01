@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { api } from "../api";
 
 // AdvantageScope Lite, which Pit serves at /scope/ (workers/pit/src/advantagescope.ts) and shows

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { Plugin } from "../../shared/plugin-types";
 import { AddPartPage } from "./add-part-page";
 import { IngestPartsPage } from "./ingest-parts-page";

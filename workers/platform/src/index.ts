@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { authorizeUrl, exchangeCode } from "@g3/discord";
 import {
   consoleUrlVia,
@@ -138,6 +139,7 @@ const routes = app
       slackWorkspaceId: null,
       slackWorkspaceName: null,
       termsAcceptedAt: now(),
+      termsVersion: siteFile.legal.termsVersion,
       signupId,
       signupCodeToken: null,
       updatedAt: now(),

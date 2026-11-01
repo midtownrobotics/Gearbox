@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { InferResponseType } from "hono/client";
 import type { api } from "./api";
 

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { inTeam, requireAuth, teamHasApp } from "@g3/auth";
 import { inArray } from "drizzle-orm";
 import { Hono } from "hono";

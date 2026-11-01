@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { Button, Card, ErrorBanner, Field, Loading, Page, TextField } from "@g3/ui";
 import { type FormEvent, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";

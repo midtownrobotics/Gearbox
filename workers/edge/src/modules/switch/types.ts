@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 export const MAX_SWITCH_SOUND_BYTES = 10 * 1024 * 1024;
 
 export interface SwitchSound {

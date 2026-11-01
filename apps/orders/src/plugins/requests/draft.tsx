@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { Button, Card, ErrorBanner, Field, Loading, TextField, inputClass } from "@g3/ui";
 import { applyTemplate } from "@g3/worker-orders/naming";
 import type { InferResponseType } from "hono/client";

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { LocationRow, StockView } from "@g3/worker-inventory";
 
 // Where parts can be: the team's tree of locations (at most four levels), its robots and its

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 // Pack quantity: how many parts one unit of a product is. Orders counts, prices and budgets what
 // is bought (1 pack); the Inventory app counts parts (4 wheels), so receiving multiplies by it.
 // A pack can be an amount in a unit instead (a 100 ft spool is 100 "ft"), the unit Inventory

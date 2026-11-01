@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 // A zip of gzipped files, streamed without unzipping or zipping anything again. A gzip file is a
 // deflate stream between a 10-byte header and an 8-byte trailer holding the CRC-32 and the
 // unzipped size, and a zip entry is a deflate stream with those in its headers: so each file goes

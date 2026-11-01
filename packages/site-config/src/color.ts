@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 // Colors as hue, saturation and value, for Team Appearance's accents: the light and the dark
 // accent can share a hue while each keeps its own saturation and value (how bright it is), so
 // each can be set against its own background.

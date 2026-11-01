@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { Card, Page, TextField, inputClass } from "@g3/ui";
 import type { StockView } from "@g3/worker-inventory";
 import { type ReactNode, useEffect, useMemo, useState } from "react";

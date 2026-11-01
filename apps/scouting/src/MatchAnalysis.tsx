@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { useState } from "react";
 import { AnalysisAutoPaths } from "./AnalysisAutoPaths";
 import type { AutoPath } from "./analysis-auto-paths";

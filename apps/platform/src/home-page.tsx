@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { type AppName, demoTeamId, site, teamAppUrl } from "@g3/site-config";
 import { type ReactNode, useEffect, useState } from "react";
 import {
@@ -501,8 +502,8 @@ function OpenSource() {
             Shape it to how your team works.
           </h2>
           <p className="mt-4 text-[#b8b8b8]">
-            Customize Gearbox as deeply as your team wants. It's MIT licensed, and every change is a
-            public pull request.
+            Customize Gearbox as deeply as your team wants. It's open source under the GNU AGPL, and
+            every change is a public pull request.
           </p>
           <ul className="mt-8 space-y-5">
             {CUSTOMIZE.map(({ icon: Icon, title, body }) => (

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 /**
  * Match report drafts kept on this device, so nothing a scout has written is lost: not to a reload,
  * a dead battery or a dropped connection, and not when the form moves on to the next match. A

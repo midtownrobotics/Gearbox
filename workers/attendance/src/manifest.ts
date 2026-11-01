@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { defineManifest } from "@g3/auth";
 import packageJson from "../package.json";
 

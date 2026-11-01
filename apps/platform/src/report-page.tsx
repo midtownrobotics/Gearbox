@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { TextField } from "@g3/ui";
 import { useState } from "react";
 import { FaCheck } from "react-icons/fa";

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 // Shapes the attendance worker's report (every sign-in of the school year, with what it counted
 // for) into what the Leaderboard page's reports draw. Days are the viewer's own: a team has no time zone.
 

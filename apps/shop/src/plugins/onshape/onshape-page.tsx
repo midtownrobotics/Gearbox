@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { ErrorBanner, Loading, Page, Switch, TextField } from "@g3/ui";
 import { useEffect, useId, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";

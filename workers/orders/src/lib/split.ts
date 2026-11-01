@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 // How an order's money is divided between budget categories. No imports, so the orders app uses
 // the same code to preview an order (package export "@g3/worker-orders/split").
 

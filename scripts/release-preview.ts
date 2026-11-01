@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 // `pnpm release:preview [--github-output <file> --body-file <file>]`: what merging staging into public would release,
 // without changing anything. Runs the release (release-version.ts) in a throwaway git worktree of
 // HEAD and reports the result: the platform version, the apps that change and their notes. The

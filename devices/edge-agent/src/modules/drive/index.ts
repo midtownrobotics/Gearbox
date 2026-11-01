@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { Hono } from "hono";
 import type { EdgeModule, ModuleContext } from "../../core/module";
 import { DRIVE_PAGE } from "./page";

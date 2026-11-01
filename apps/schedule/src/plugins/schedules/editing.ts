@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { useState } from "react";
 
 // Whether an editor has editing on. Off whenever the app is opened or reloaded, so nothing is

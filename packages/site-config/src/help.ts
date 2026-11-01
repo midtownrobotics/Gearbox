@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 // "Need help?" in the shared bar's menu: the docs page about the page you're on.
 //
 // Every docs file in an app's folder (`apps/<app>/docs/*.md`, other than index.md) names the app

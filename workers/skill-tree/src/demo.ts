@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { DEMO_PEOPLE, DEMO_STUDENTS, type DemoPerson, vocabularyOf } from "@g3/demo";
 import { asc, eq } from "drizzle-orm";
 import type { createDb } from "./db";
