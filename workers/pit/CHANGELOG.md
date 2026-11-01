@@ -1,5 +1,11 @@
 # @g3/worker-pit
 
+## 3.2.1
+
+### Patch Changes
+
+- 4cad0fc: The team's avatar in the top bar has slightly rounded corners, and the Appearance page can turn off the short name in front of app names in the bar, for an avatar that already shows it.
+
 ## 3.2.0
 
 ### Minor Changes
