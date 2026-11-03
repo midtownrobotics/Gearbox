@@ -1,14 +1,37 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { Button, Card, ErrorBanner, Page, PageLoading, TextField, inputClass } from "@g3/ui";
+import {
+  Button,
+  Card,
+  Dialog,
+  ErrorBanner,
+  Page,
+  PageLoading,
+  TextField,
+  inputClass,
+} from "@g3/ui";
 import { type ReactNode, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { type TeamDetail, consoleApi, formatDate, formatTime, read, send, useLoad } from "./data";
+import {
+  type MemberCounts,
+  type MemberList,
+  type TeamDetail,
+  chatName,
+  consoleApi,
+  formatDate,
+  formatTime,
+  read,
+  send,
+  useLoad,
+} from "./data";
 import { ActionList } from "./log-page";
 import { ReportCard } from "./reports-page";
 import { StatusBadge } from "./shell";
 
-// One team: its details and members, the reports against its number, what operators have done to
-// it, and the tools for a number claimed wrongly (hand it over, suspend, delete; a wrong number is deleted and signed up again).
+// One team: its details and how many members it has, the reports against its number, what
+// operators have done to it, and the tools for a number claimed wrongly (hand it over, suspend,
+// delete; a wrong number is deleted and signed up again). Its members' names and emails are only
+// shown once the operator opens the member list with a reason, which the team's admins see;
+// handing it over needs the list.
 
 export function TeamPage() {
   const { id = "" } = useParams();
@@ -46,13 +69,8 @@ export function TeamPage() {
     >
       <Card title="Details">
         <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
-          <Detail label="Owner">{team.owner?.name ?? "—"}</Detail>
-          <Detail label="Founder">{team.founder?.name ?? "—"}</Detail>
-          {team.discordGuildName ? (
-            <Detail label="Discord server">{team.discordGuildName}</Detail>
-          ) : (
-            <Detail label="Slack workspace">{team.slackWorkspaceName ?? "—"}</Detail>
-          )}
+          <Detail label="Members">{describeCounts(members)}</Detail>
+          <Detail label="Chat">{chatName(team.chat)}</Detail>
           <Detail label="Country">{team.country}</Detail>
           <Detail label="Signed up">{formatTime(team.createdAt)}</Detail>
           <Detail label="Terms accepted">
@@ -62,36 +80,12 @@ export function TeamPage() {
         </dl>
       </Card>
 
-      <Card title={`Members (${members.length})`}>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <tbody>
-              {members.map((m) => (
-                <tr key={m.id} className="border-t border-line first:border-0">
-                  <td className="py-2 pr-4 text-secondary-900">
-                    {m.displayName}
-                    {m.id === team.owner?.id && (
-                      <span className="ml-2 text-xs font-semibold text-primary-600">owner</span>
-                    )}
-                  </td>
-                  <td className="py-2 pr-4 text-secondary-600">{m.email}</td>
-                  <td className="py-2 pr-4 text-secondary-600">
-                    {[
-                      m.isAdmin && "admin",
-                      m.isMentor && "mentor",
-                      m.status !== "active" && m.status,
-                    ]
-                      .filter(Boolean)
-                      .join(", ")}
-                  </td>
-                  <td className="py-2 text-secondary-500">Last in {formatDate(m.lastLoginAt)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {members.length === 0 && <p className="text-sm text-secondary-500">No accounts yet.</p>}
-        </div>
-      </Card>
+      <Members
+        teamId={team.id}
+        canHandOver={team.status !== "pending"}
+        hasOwner={team.hasOwner}
+        onChange={detail.reload}
+      />
 
       {reports.length > 0 && (
         <Card title="Reports about this number">
@@ -104,13 +98,6 @@ export function TeamPage() {
       )}
 
       <div className="grid gap-4 lg:grid-cols-2">
-        {team.status !== "pending" && (
-          <TransferOwner
-            team={detail.data}
-            onDone={detail.reload}
-            send={(body) => send("POST", `/teams/${team.id}/owner`, body)}
-          />
-        )}
         {!team.isSite && team.status !== "pending" && (
           <ActionForm
             title={team.status === "suspended" ? "Reactivate" : "Suspend"}
@@ -143,6 +130,161 @@ export function TeamPage() {
         <ActionList actions={actions} showTeam={false} />
       </Card>
     </Page>
+  );
+}
+
+function describeCounts(counts: MemberCounts | null): string {
+  if (!counts) return "—";
+  const roles = [
+    counts.admins && `${counts.admins} admin${counts.admins === 1 ? "" : "s"}`,
+    counts.mentors && `${counts.mentors} mentor${counts.mentors === 1 ? "" : "s"}`,
+  ].filter(Boolean);
+  return [
+    `${counts.active} active${roles.length ? ` (${roles.join(", ")})` : ""}`,
+    counts.pending > 0 && `${counts.pending} waiting for approval`,
+  ]
+    .filter(Boolean)
+    .join(", ");
+}
+
+/**
+ * The team's member list: closed until the operator asks for it with a reason (the team's admins
+ * see that it was opened, when and why), then the members and the hand-over tool.
+ */
+function Members({
+  teamId,
+  canHandOver,
+  hasOwner,
+  onChange,
+}: {
+  teamId: string;
+  canHandOver: boolean;
+  hasOwner: boolean;
+  onChange: () => void;
+}) {
+  const [list, setList] = useState<MemberList | null>(null);
+  const [asking, setAsking] = useState(false);
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  if (!list) {
+    return (
+      <Card title="Members">
+        <div className="space-y-3">
+          <p className="text-sm text-secondary-600">
+            Names and emails are hidden. Open the member list only when you need it, for example to
+            hand the team over. The team's admins will see that it was opened, when, and your
+            reason.
+          </p>
+          <Button variant="secondary" onClick={() => setAsking(true)}>
+            Open member list
+          </Button>
+        </div>
+        {asking && (
+          <Dialog title="Open the member list?" onClose={() => setAsking(false)}>
+            <form
+              className="space-y-3"
+              onSubmit={async (e) => {
+                e.preventDefault();
+                setBusy(true);
+                setError(null);
+                try {
+                  setList(
+                    await send<MemberList>("POST", `/teams/${teamId}/members`, {
+                      reason: reason.trim(),
+                    }),
+                  );
+                  setAsking(false);
+                  setReason("");
+                  onChange();
+                } catch (err) {
+                  setError((err as Error).message);
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              <p className="text-sm text-secondary-700">
+                This shows the names and emails of the team's members. The team's admins will see on
+                their Member Access page that a Gearbox operator opened it, when, and the reason you
+                give. Each time you open it is logged.
+              </p>
+              <TextField
+                multiline
+                kind="reason"
+                required
+                rows={2}
+                maxLength={500}
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="Why? (kept in the log, and shown to the team's admins)"
+                aria-label="Reason"
+              />
+              {error && <ErrorBanner message={error} />}
+              <div className="flex justify-end gap-2">
+                <Button variant="secondary" onClick={() => setAsking(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={busy}>
+                  Open member list
+                </Button>
+              </div>
+            </form>
+          </Dialog>
+        )}
+      </Card>
+    );
+  }
+
+  const { members, ownerUserId, founderUserId } = list;
+  return (
+    <>
+      <Card title={`Members (${members.length})`}>
+        <div className="relative overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <tbody>
+              {members.map((m) => (
+                <tr key={m.id} className="border-t border-line first:border-0">
+                  <td className="py-2 pr-4 text-secondary-900">
+                    {m.displayName}
+                    {m.id === ownerUserId && (
+                      <span className="ml-2 text-xs font-semibold text-primary-600">owner</span>
+                    )}
+                    {m.id === founderUserId && (
+                      <span className="ml-2 text-xs text-secondary-500">founder</span>
+                    )}
+                  </td>
+                  <td className="py-2 pr-4 text-secondary-600">{m.email}</td>
+                  <td className="py-2 pr-4 text-secondary-600">
+                    {[
+                      m.isAdmin && "admin",
+                      m.isMentor && "mentor",
+                      m.status !== "active" && m.status,
+                    ]
+                      .filter(Boolean)
+                      .join(", ")}
+                  </td>
+                  <td className="py-2 text-secondary-500">Last in {formatDate(m.lastLoginAt)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {members.length === 0 && <p className="text-sm text-secondary-500">No accounts yet.</p>}
+        </div>
+      </Card>
+      {canHandOver && (
+        <TransferOwner
+          list={list}
+          hasOwner={hasOwner}
+          send={(body) => send("POST", `/teams/${teamId}/owner`, body)}
+          onDone={(userId) => {
+            setList({ ...list, ownerUserId: userId });
+            onChange();
+          }}
+        />
+      )}
+    </>
   );
 }
 
@@ -218,15 +360,18 @@ function ActionForm({
 }
 
 function TransferOwner({
-  team,
+  list,
+  hasOwner,
   send,
   onDone,
 }: {
-  team: TeamDetail;
+  list: MemberList;
+  hasOwner: boolean;
   send: (body: { reason: string; userId: string; keepPreviousAdmin: boolean }) => Promise<unknown>;
-  onDone: () => void;
+  onDone: (userId: string) => void;
 }) {
-  const others = team.members.filter((m) => m.id !== team.team.owner?.id);
+  const owner = list.members.find((m) => m.id === list.ownerUserId);
+  const others = list.members.filter((m) => m.id !== list.ownerUserId);
   const [userId, setUserId] = useState("");
   const [keepPreviousAdmin, setKeepPreviousAdmin] = useState(true);
   if (others.length === 0) return null;
@@ -237,14 +382,15 @@ function TransferOwner({
       button="Hand over"
       onSubmit={async (reason) => {
         await send({ reason, userId, keepPreviousAdmin });
-        onDone();
+        onDone(userId);
+        setUserId("");
       }}
     >
       <select
         required
         value={userId}
         onChange={(e) => setUserId(e.target.value)}
-        className={inputClass}
+        className={`${inputClass} max-w-full`}
         aria-label="New owner"
       >
         <option value="">Choose a member</option>
@@ -254,14 +400,14 @@ function TransferOwner({
           </option>
         ))}
       </select>
-      {team.team.owner && (
+      {hasOwner && owner && (
         <label className="flex items-center gap-2 text-sm text-secondary-700">
           <input
             type="checkbox"
             checked={keepPreviousAdmin}
             onChange={(e) => setKeepPreviousAdmin(e.target.checked)}
           />
-          Keep {team.team.owner.name} an admin
+          Keep {owner.displayName} an admin
         </label>
       )}
     </ActionForm>

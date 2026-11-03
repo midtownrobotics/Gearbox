@@ -11,7 +11,7 @@ export const manifest = defineManifest({
   integrations: ["slack or discord", "onshape", "edge box"],
   availability: "every team",
   version: packageJson.version,
-  hooks: { seed: false, delete: true, export: true, demo: true },
+  hooks: { seed: false, delete: true, export: true, demo: true, storage: true },
   settings: [
     {
       key: "documentId",

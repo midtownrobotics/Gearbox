@@ -1,11 +1,21 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { Card, ErrorBanner, Page, TextField, inputClass } from "@g3/ui";
+import { Button, Card, ErrorBanner, Page, TextField, inputClass } from "@g3/ui";
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { type TeamRow, consoleApi, formatDate, read, useLoad } from "./data";
+import {
+  type Storage,
+  type TeamRow,
+  chatName,
+  consoleApi,
+  formatBytes,
+  formatDate,
+  read,
+  useLoad,
+} from "./data";
 import { StatusBadge } from "./shell";
 
-// Every team on the platform, with the reports open against its number.
+// Every team on the platform, with how many members it has and the reports open against its
+// number. How much each keeps in storage is counted on a button: every app lists all its files.
 
 export function TeamsPage() {
   const [q, setQ] = useState("");
@@ -14,6 +24,21 @@ export function TeamsPage() {
     () => read<TeamRow[]>(consoleApi.teams.$get({ query: { q, status } })),
     [q, status],
   );
+  const [storage, setStorage] = useState<Storage | null>(null);
+  const [counting, setCounting] = useState(false);
+  const [storageError, setStorageError] = useState<string | null>(null);
+
+  async function countStorage() {
+    setCounting(true);
+    setStorageError(null);
+    try {
+      setStorage(await read<Storage>(consoleApi.storage.$get()));
+    } catch (err) {
+      setStorageError((err as Error).message);
+    } finally {
+      setCounting(false);
+    }
+  }
 
   return (
     <Page title="Teams" width="wide">
@@ -37,10 +62,19 @@ export function TeamsPage() {
           <option value="pending">Signing up</option>
           <option value="suspended">Suspended</option>
         </select>
+        <Button variant="secondary" onClick={countStorage} disabled={counting}>
+          {counting ? "Counting…" : storage ? "Count storage again" : "Count storage"}
+        </Button>
       </div>
       {teams.error && <ErrorBanner message={teams.error} />}
+      {storageError && <ErrorBanner message={storageError} />}
+      {storage && storage.failed.length > 0 && (
+        <ErrorBanner
+          message={`Storage leaves out ${storage.failed.join(", ")}, which didn't answer.`}
+        />
+      )}
       <Card>
-        <div className="overflow-x-auto">
+        <div className="relative overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b border-secondary-200 text-xs font-bold uppercase tracking-wider text-secondary-400">
@@ -48,9 +82,11 @@ export function TeamsPage() {
                 <th className="py-2 pr-4">Name</th>
                 <th className="py-2 pr-4">Status</th>
                 <th className="py-2 pr-4">Chat</th>
+                <th className="py-2 pr-4">Members</th>
+                <th className="py-2 pr-4">Storage</th>
                 <th className="py-2 pr-4">Country</th>
                 <th className="py-2 pr-4">Signed up</th>
-                <th className="py-2">Open reports</th>
+                <th className="py-2">Open number reports</th>
               </tr>
             </thead>
             <tbody>
@@ -71,9 +107,10 @@ export function TeamsPage() {
                   <td className="py-2 pr-4">
                     <StatusBadge status={team.status} />
                   </td>
-                  <td className="py-2 pr-4 text-secondary-600">
-                    {team.slackWorkspaceName ??
-                      (team.discordGuildName ? `${team.discordGuildName} (Discord)` : "—")}
+                  <td className="py-2 pr-4 text-secondary-600">{chatName(team.chat)}</td>
+                  <td className="py-2 pr-4 text-secondary-600">{team.members ?? "—"}</td>
+                  <td className="py-2 pr-4 whitespace-nowrap text-secondary-600">
+                    <StorageCell storage={storage} teamId={team.id} />
                   </td>
                   <td className="py-2 pr-4 text-secondary-600">{team.country}</td>
                   <td className="py-2 pr-4 text-secondary-600">{formatDate(team.createdAt)}</td>
@@ -94,5 +131,20 @@ export function TeamsPage() {
         </div>
       </Card>
     </Page>
+  );
+}
+
+/** A team's storage once counted: its total, with each app's share on hover. */
+function StorageCell({ storage, teamId }: { storage: Storage | null; teamId: string }) {
+  if (!storage) return <span className="text-secondary-400">—</span>;
+  const used = storage.teams[teamId];
+  if (!used) return <span className="text-secondary-400">0 B</span>;
+  const byApp = Object.entries(used.apps)
+    .map(([app, bytes]) => `${app}: ${formatBytes(bytes)}`)
+    .join(", ");
+  return (
+    <span title={`${byApp} (${used.objects.toLocaleString()} files)`}>
+      {formatBytes(used.bytes)}
+    </span>
   );
 }

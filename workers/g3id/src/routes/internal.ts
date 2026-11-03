@@ -182,6 +182,32 @@ export const internalRouter = new Hono<AppEnv>()
       .all();
     return c.json(stats);
   })
+  // How many accounts each team in ?teams= (ids, comma-separated) has, for the operators'
+  // console's Teams page and a team's page: counts only, never who. Active members, with how many
+  // are admins and mentors, and how many wait for approval. A team with none isn't listed.
+  .get("/member-counts", async (c) => {
+    const wanted = new Set((c.req.query("teams") ?? "").split(",").filter(Boolean));
+    const total = (condition: ReturnType<typeof sql>) =>
+      sql<number>`coalesce(sum(${condition}), 0)`;
+    const active = sql`${coreUsers.status} = 'active'`;
+    const rows = await createDb(c.env.DB)
+      .select({
+        teamId: coreUsers.teamId,
+        active: total(active),
+        admins: total(sql`${active} and ${coreUsers.isAdmin} = 1`),
+        mentors: total(sql`${active} and ${coreUsers.isMentor} = 1`),
+        pending: total(sql`${coreUsers.status} = 'pending'`),
+      })
+      .from(coreUsers)
+      .where(isNull(coreUsers.deletedAt))
+      .groupBy(coreUsers.teamId)
+      .all();
+    return c.json(
+      Object.fromEntries(
+        rows.filter((r) => wanted.has(r.teamId)).map(({ teamId, ...counts }) => [teamId, counts]),
+      ) as Record<string, { active: number; admins: number; mentors: number; pending: number }>,
+    );
+  })
   // Accounts by id, with their team: the platform's operators (who may be on any team).
   .get("/users", async (c) => {
     const ids = (c.req.query("ids") ?? "").split(",").filter(Boolean).slice(0, 100);

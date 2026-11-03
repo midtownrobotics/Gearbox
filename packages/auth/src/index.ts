@@ -42,6 +42,7 @@ export {
   withTeam,
 } from "./scope";
 export { decryptSecret, encryptSecret } from "./secret-box";
+export { type StorageByTeam, type TeamStorage, storageByTeam } from "./storage";
 export { type TeamChange, changedFields, logTeamChange, settingLabels } from "./audit";
 export {
   type IntegrationFact,

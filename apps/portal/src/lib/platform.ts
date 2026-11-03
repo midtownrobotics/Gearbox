@@ -43,7 +43,13 @@ export type LogEntry = {
 /** A time a Gearbox operator opened or changed the team (never which operator). */
 export type OperatorAccess = {
   id: string;
-  action: "view_team" | "transfer_owner" | "suspend_team" | "reactivate_team" | "renumber_team";
+  action:
+    | "view_team_details"
+    | "view_team"
+    | "transfer_owner"
+    | "suspend_team"
+    | "reactivate_team"
+    | "renumber_team";
   reason: string | null;
   /** A handover's members. */
   from: string | null;

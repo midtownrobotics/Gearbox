@@ -126,6 +126,20 @@ describe("stats for the operators' console", () => {
     });
   });
 
+  it("counts each team's members, never who", async () => {
+    const team = await createTeam();
+    await createUser({ teamId: team, isAdmin: true });
+    await createUser({ teamId: team, isMentor: true });
+    await createUser({ teamId: team });
+    await createUser({ teamId: team, status: "pending" });
+    const empty = await createTeam();
+    const counts = (await (
+      await internal(`/member-counts?teams=${team},${empty}`)
+    ).json()) as Record<string, unknown>;
+    expect(counts).toEqual({ [team]: { active: 3, admins: 1, mentors: 1, pending: 1 } });
+    expect(JSON.stringify(counts)).not.toContain("@");
+  });
+
   it("notes when a member last used Gearbox, at most once a minute", async () => {
     const id = await createUser();
     const cookie = await sessionCookie(id);

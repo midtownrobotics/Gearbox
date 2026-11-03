@@ -7,6 +7,7 @@ import {
   requireAdmin,
   requireAuth,
   settingLabels,
+  storageByTeam,
   teamExport,
   teamSettingsRoutes,
   withTeam,
@@ -201,6 +202,11 @@ const app = base
     return c.json(await loadDemo(createDb(c.env.PIT_DB), teamId));
   })
   .get("/internal/demo/words", (c) => c.json({ words: demoWords() }))
+  // How much every team keeps in R2 (match logs and AdvantageScope assets, both under
+  // pit/teams/<team>/), for the operators' console. Counts only.
+  .get("/internal/storage", async (c) =>
+    c.json({ teams: await storageByTeam(c.env.LOGS, "pit/teams/") }),
+  )
   .get("/internal/teams/:teamId/export", async (c) => {
     const teamId = c.req.param("teamId");
     const tables = await exportTeamRows(
