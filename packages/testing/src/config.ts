@@ -84,20 +84,23 @@ export const g3idStub: ServiceStub = async (request) => {
     });
   }
   // A team's members with their roles, for other workers over the service binding (the platform
-  // SDK's teamMembers). Any team's: the standard users, with ids of their own.
+  // SDK's teamMembers). Any team's: the standard users, with ids of their own. The two students
+  // are in the team's Programming subteam; the mentor and admin in none.
   const members = url.pathname.match(/^\/internal\/teams\/([^/]+)\/members$/);
   if (members) {
+    const teamId = decodeURIComponent(members[1]);
+    const team = teamUsers(teamId);
+    const programming = { id: `${teamId}-programming`, name: "Programming" };
     return json(
-      membersOf(decodeURIComponent(members[1])).map(
-        ({ id, displayName, email, isAdmin, isMentor }) => ({
-          id,
-          displayName,
-          email,
-          status: "active",
-          isAdmin,
-          isMentor,
-        }),
-      ),
+      membersOf(teamId).map(({ id, displayName, email, isAdmin, isMentor }) => ({
+        id,
+        displayName,
+        email,
+        status: "active",
+        isAdmin,
+        isMentor,
+        subteam: id === team.student.id || id === team.otherStudent.id ? programming : null,
+      })),
     );
   }
   // A line for the team's log (`logTeamChange`), and messages on the team's chat (Slack or

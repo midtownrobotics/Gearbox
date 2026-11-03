@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { type PointerEvent as ReactPointerEvent, useState } from "react";
+import { pageScroller } from "@g3/ui";
+import { type PointerEvent as ReactPointerEvent, useEffect, useRef, useState } from "react";
 import type { Attendee, Change, Day, Period, Role } from "../../shared/api";
 import { roleBlock } from "../../shared/role-colors";
 import { hourLabel, quarterLabel, shortTime, spanLabel, timeLabel } from "../../shared/time";
-import { type Cells, cellKey, rowRanges } from "./cells";
+import { type Cells, cellKey, groupRanges, rowRanges } from "./cells";
 import { PersonCard } from "./person-card";
 import { SlotCard } from "./slot-card";
 import type { Buttons, Tool } from "./tools";
@@ -11,13 +12,54 @@ import type { Buttons, Tool } from "./tools";
 // The whole team's day: a row per attendee, a column per 15-minute block, the event's periods in
 // a band across the top. Dragging across people and times paints those blocks with the tool on
 // the mouse button that started the drag (a role, or clearing); with none, it's just looking.
+// Grouped by subteam, a row is a subteam's attendees: painting it paints each of them, and it
+// shows a role where they all have it and "Mixed" where they differ.
+
+/** A row of the grid: one attendee, or a subteam's attendees painted together. */
+export type GridRow =
+  | { kind: "person"; attendee: Attendee }
+  | { kind: "group"; id: string; name: string; members: Attendee[] };
+
+const rowUserIds = (row: GridRow) =>
+  row.kind === "person" ? [row.attendee.userId] : row.members.map((m) => m.userId);
+const rowKey = (row: GridRow) =>
+  row.kind === "person" ? row.attendee.userId : `subteam-${row.id}`;
+
+/** Where a subteam's members don't all have the same role. */
+const MIXED = {
+  className: "border-secondary-300 text-secondary-700",
+  style: {
+    backgroundImage:
+      "repeating-linear-gradient(135deg, var(--g3-inset) 0 6px, var(--g3-surface) 6px 12px)",
+  },
+};
 
 type Drag = { r0: number; s0: number; r1: number; s1: number; tool: Tool };
+
+/** How near an edge (px) a drag starts scrolling, and its fastest speed (px a frame). */
+const EDGE = 48;
+const MAX_SPEED = 24;
+
+/** How fast to scroll for a point near (or past) either end of `[start, end]`: negative is back. */
+function edgeSpeed(at: number, start: number, end: number) {
+  if (at < start + EDGE) return -Math.ceil(Math.min(1, (start + EDGE - at) / EDGE) * MAX_SPEED);
+  if (at > end - EDGE) return Math.ceil(Math.min(1, (at - (end - EDGE)) / EDGE) * MAX_SPEED);
+  return 0;
+}
+
+/** The part of the window the page scrolls in (the app's part, in Tutorial mode). */
+function pageBounds(page: HTMLElement) {
+  if (page === document.documentElement || page === document.body) {
+    return { top: 0, bottom: window.innerHeight };
+  }
+  return page.getBoundingClientRect();
+}
 
 const HEADER_ROWS = 2;
 
 export function Grid({
   day,
+  rows,
   attendees,
   periods,
   roles,
@@ -28,6 +70,8 @@ export function Grid({
   onPaint,
 }: {
   day: Day;
+  rows: GridRow[];
+  /** Everyone the rows are for, for each time's counts. */
   attendees: Attendee[];
   periods: Period[];
   roles: Map<number, Role>;
@@ -41,6 +85,12 @@ export function Grid({
   onPaint: (change: Change) => void;
 }) {
   const [drag, setDrag] = useState<Drag | null>(null);
+  const scroller = useRef<HTMLDivElement>(null);
+  const grid = useRef<HTMLDivElement>(null);
+  /** The names' column, which stays put while the times scroll under it. */
+  const names = useRef<HTMLDivElement>(null);
+  /** Where the pointer is during a drag, for scrolling while it's held near an edge. */
+  const pointer = useRef<{ x: number; y: number } | null>(null);
   // A name (its minutes in each role) or a column's time (its counts) being hovered or focused.
   const [hover, setHover] = useState<
     (({ person: string } | { slot: number }) & { anchor: DOMRect }) | null
@@ -59,12 +109,69 @@ export function Grid({
   const slots = day.end - day.start;
   const column = (slot: number) => slot - day.start + 2;
 
-  /** The attendee row and slot under a point, or null outside the blocks. */
-  function cellAt(x: number, y: number) {
+  /**
+   * The row and slot of this grid under a point, or null outside its blocks. With `toEdge` (a drag
+   * held near an edge), a point past the grid's visible part counts as at its edge.
+   */
+  function cellAt(pointX: number, pointY: number, toEdge = false) {
+    let [x, y] = [pointX, pointY];
+    const box = scroller.current?.getBoundingClientRect();
+    const rows = grid.current?.getBoundingClientRect();
+    if (toEdge && box && rows) {
+      const view = pageBounds(pageScroller());
+      const left = box.left + (names.current?.offsetWidth ?? 0);
+      x = Math.min(Math.max(x, left + 1), box.right - 2);
+      y = Math.min(
+        Math.max(y, Math.max(rows.top, view.top) + 1),
+        Math.min(rows.bottom, view.bottom) - 2,
+      );
+    }
     const el = document.elementFromPoint(x, y)?.closest<HTMLElement>("[data-slot]");
-    if (!el?.dataset.slot || el.dataset.row === undefined) return null;
+    if (!el?.dataset.slot || el.dataset.row === undefined || !grid.current?.contains(el)) {
+      return null;
+    }
     return { r: Number(el.dataset.row), s: Number(el.dataset.slot) };
   }
+
+  /** Follows the pointer during a drag. */
+  function dragTo(x: number, y: number) {
+    pointer.current = { x, y };
+    const cell = cellAt(x, y, true);
+    if (!cell) return;
+    setDrag((d) =>
+      d && (cell.r !== d.r1 || cell.s !== d.s1) ? { ...d, r1: cell.r, s1: cell.s } : d,
+    );
+  }
+
+  // While a drag is held near an edge, the times scroll sideways (past the names) and the page up
+  // or down, and the drag follows.
+  const dragging = drag !== null;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: dragTo reads only refs and setDrag
+  useEffect(() => {
+    if (!dragging) return;
+    let frame = 0;
+    const step = () => {
+      const at = pointer.current;
+      const box = scroller.current;
+      if (at && box) {
+        const rect = box.getBoundingClientRect();
+        const page = pageScroller();
+        const view = pageBounds(page);
+        const dx = edgeSpeed(at.x, rect.left + (names.current?.offsetWidth ?? 0), rect.right);
+        const dy = edgeSpeed(at.y, view.top, view.bottom);
+        const before = { left: box.scrollLeft, top: page.scrollTop };
+        if (dx) box.scrollLeft += dx;
+        if (dy) page.scrollTop += dy;
+        if (box.scrollLeft !== before.left || page.scrollTop !== before.top) dragTo(at.x, at.y);
+      }
+      frame = requestAnimationFrame(step);
+    };
+    frame = requestAnimationFrame(step);
+    return () => {
+      cancelAnimationFrame(frame);
+      pointer.current = null;
+    };
+  }, [dragging]);
 
   function onPointerDown(e: ReactPointerEvent<HTMLDivElement>) {
     // Each mouse button paints with its own tool; a finger or pen with the left's.
@@ -81,15 +188,12 @@ export function Grid({
     if (!cell) return;
     e.preventDefault();
     e.currentTarget.setPointerCapture(e.pointerId);
+    pointer.current = { x: e.clientX, y: e.clientY };
     setDrag({ r0: cell.r, s0: cell.s, r1: cell.r, s1: cell.s, tool });
   }
 
   function onPointerMove(e: ReactPointerEvent<HTMLDivElement>) {
-    if (!drag) return;
-    const cell = cellAt(e.clientX, e.clientY);
-    if (cell && (cell.r !== drag.r1 || cell.s !== drag.s1)) {
-      setDrag({ ...drag, r1: cell.r, s1: cell.s });
-    }
+    if (drag) dragTo(e.clientX, e.clientY);
   }
 
   function onPointerUp() {
@@ -98,7 +202,7 @@ export function Grid({
     const [rowFrom, rowTo] = [Math.min(drag.r0, drag.r1), Math.max(drag.r0, drag.r1)];
     setDrag(null);
     onPaint({
-      userIds: attendees.slice(rowFrom, rowTo + 1).map((a) => a.userId),
+      userIds: rows.slice(rowFrom, rowTo + 1).flatMap(rowUserIds),
       day: day.day,
       start: Math.min(drag.s0, drag.s1),
       end: Math.max(drag.s0, drag.s1) + 1,
@@ -114,17 +218,19 @@ export function Grid({
 
   return (
     <div
-      className="overflow-x-auto rounded-xl border border-secondary-200 bg-surface"
+      ref={scroller}
+      className="relative overflow-x-auto rounded-xl border border-secondary-200 bg-surface"
       // The card is placed by where the name was; it goes when the grid moves under it.
       onScroll={() => setHover(null)}
     >
       <div
+        ref={grid}
         role="grid"
         aria-label={`Everyone's schedule, ${spanLabel(day.start, day.end)}`}
         className={`grid select-none ${painting ? "touch-none cursor-crosshair" : ""}`}
         style={{
           gridTemplateColumns: `minmax(8rem, 11rem) repeat(${slots}, minmax(2.5rem, 1fr))`,
-          gridTemplateRows: `auto 1.75rem repeat(${attendees.length}, 2.25rem)`,
+          gridTemplateRows: `auto 1.75rem repeat(${rows.length}, 2.25rem)`,
         }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
@@ -135,6 +241,7 @@ export function Grid({
       >
         {/* A time for every column: the hour on the hour, :15, :30 and :45 between */}
         <div
+          ref={names}
           className="sticky left-0 z-20 border-b border-secondary-200 bg-surface"
           style={{ gridRow: 1, gridColumn: 1 }}
         />
@@ -184,33 +291,55 @@ export function Grid({
           </div>
         ))}
 
-        {/* A row per attendee: blocks to paint, and their roles drawn over them */}
-        {attendees.map((attendee, r) => {
+        {/* A row per attendee or subteam: blocks to paint, and their roles drawn over them */}
+        {rows.map((gridRow, r) => {
           const row = r + HEADER_ROWS + 1;
-          const mine = attendee.userId === me;
+          const key = rowKey(gridRow);
+          const userIds = rowUserIds(gridRow);
+          const mine = userIds.includes(me);
+          const person = gridRow.kind === "person" ? gridRow.attendee.userId : null;
+          const ranges =
+            gridRow.kind === "person"
+              ? rowRanges(cells, gridRow.attendee.userId, day.day)
+              : groupRanges(cells, userIds, day.day);
           return [
             <div
-              key={`name-${attendee.userId}`}
-              className={`sticky left-0 z-20 flex items-center truncate border-b border-secondary-100 px-3 text-sm ${
+              key={`name-${key}`}
+              className={`sticky left-0 z-20 flex min-w-0 items-center gap-1 border-b border-secondary-100 px-3 text-sm ${
                 mine ? "bg-inset font-semibold text-secondary-900" : "bg-surface text-secondary-800"
               }`}
               style={{ gridRow: row, gridColumn: 1 }}
-              // biome-ignore lint/a11y/noNoninteractiveTabindex: focusing a name shows its minutes
-              tabIndex={0}
+              // A person's name shows their minutes when focused.
+              tabIndex={person ? 0 : undefined}
               aria-describedby={
-                hover && "person" in hover && hover.person === attendee.userId
+                person && hover && "person" in hover && hover.person === person
                   ? "person-card"
                   : undefined
               }
-              {...hoverOn({ person: attendee.userId })}
+              // A subteam's row names its members.
+              title={
+                gridRow.kind === "group"
+                  ? gridRow.members.map((m) => m.displayName ?? "Former member").join(", ")
+                  : undefined
+              }
+              {...(person ? hoverOn({ person }) : {})}
             >
-              {attendee.displayName ?? "Former member"}
+              {gridRow.kind === "person" ? (
+                <span className="truncate">{gridRow.attendee.displayName ?? "Former member"}</span>
+              ) : (
+                <>
+                  <span className="truncate">{gridRow.name}</span>
+                  <span className="shrink-0 font-normal text-secondary-500">
+                    ({gridRow.members.length})
+                  </span>
+                </>
+              )}
             </div>,
             ...Array.from({ length: slots }, (_, i) => {
               const slot = day.start + i;
               return (
                 <div
-                  key={`cell-${attendee.userId}-${slot}`}
+                  key={`cell-${key}-${slot}`}
                   data-row={r}
                   data-slot={slot}
                   className={`border-b border-secondary-100 ${
@@ -222,13 +351,14 @@ export function Grid({
                 />
               );
             }),
-            ...rowRanges(cells, attendee.userId, day.day).map((range) => {
-              const role = roles.get(range.roleId);
-              const look = roleBlock(role?.color ?? "gray");
+            ...ranges.map((range) => {
+              const role = range.roleId === "mixed" ? undefined : roles.get(range.roleId);
+              const look = range.roleId === "mixed" ? MIXED : roleBlock(role?.color ?? "gray");
+              const name = range.roleId === "mixed" ? "Mixed" : (role?.name ?? "Role");
               return (
                 <div
-                  key={`range-${attendee.userId}-${range.start}`}
-                  title={`${role?.name ?? "Role"}, ${spanLabel(range.start, range.end)}`}
+                  key={`range-${key}-${range.start}`}
+                  title={`${name}, ${spanLabel(range.start, range.end)}`}
                   className={`pointer-events-none z-[1] m-0.5 flex min-w-0 items-center overflow-hidden rounded-md border px-1 text-xs font-medium whitespace-nowrap ${look.className}`}
                   style={{
                     ...look.style,
@@ -236,7 +366,7 @@ export function Grid({
                     gridColumn: `${column(range.start)} / ${column(range.end)}`,
                   }}
                 >
-                  <span className="min-w-0 truncate">{role?.name}</span>
+                  <span className="min-w-0 truncate">{name}</span>
                 </div>
               );
             }),
@@ -249,7 +379,7 @@ export function Grid({
             aria-hidden
             className="pointer-events-none z-[2] border-l-2 border-primary-500"
             style={{
-              gridRow: `1 / ${attendees.length + HEADER_ROWS + 1}`,
+              gridRow: `1 / ${rows.length + HEADER_ROWS + 1}`,
               gridColumn: column(now),
             }}
           />

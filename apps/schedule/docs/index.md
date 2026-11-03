@@ -15,7 +15,7 @@ Schedule plans an event's roles: who's on drive team, scouting, in the pit or on
 
 | Page | What it's for |
 | --- | --- |
-| Schedules | Opens on the schedule nearest now. **My schedule** is your day; **Everyone** is the whole grid |
+| Schedules | Opens on the schedule nearest now. **My schedule** is your day; **Everyone** is the whole grid; **All days** shows every day at once |
 | Friends | Pick members to see beside you on schedules. Only you see your friends |
 | Roles | Editors: the team's roles, kept from event to event |
 | Admin | Mentors and admins: who else can edit |

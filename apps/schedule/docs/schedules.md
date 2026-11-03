@@ -16,9 +16,17 @@ On [Schedules](team:schedule/schedules/all), make a new schedule. In its **Setti
 
 ## Paint roles
 
-Open **Everyone** and switch **Editing** on. Drag across people and times to give them a role. Each mouse button has its own tool: click a role in the toolbar with the left, middle or right button to put it on that button, or press its number key. **Clear** removes roles. Undo and redo with Ctrl+Z and Ctrl+Y.
+Open **Everyone** and switch **Editing** on. Drag across people and times to give them a role. Each mouse button has its own tool: click a role in the toolbar with the left, middle or right button to put it on that button, or press its number key. **Clear** removes roles. Undo and redo with Ctrl+Z and Ctrl+Y. Hold a drag near the edge of the grid or the window to scroll while you paint.
+
+**All days**, beside the days, shows every day's grid, one under another.
 
 Hover a name to see that person's minutes in each role; hover a time to see how many people have each role then.
+
+### Paint a whole subteam
+
+If your team uses subteams, **Everyone** has **By person** and **By subteam**. By subteam shows one row per subteam with someone attending. Painting a subteam's row gives that role to every member at those times, replacing what each of them had. Where members have different roles, the row shows **Mixed**. People in no subteam aren't shown; the page says how many there are.
+
+Switch back to **By person** to see each member with the roles their subteam was given, and change anyone's on their own.
 
 Editing is off each time the page opens, so looking never changes anything by accident.
 

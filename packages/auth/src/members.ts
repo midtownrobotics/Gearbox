@@ -17,6 +17,8 @@ export type Member = {
   isMentor: boolean;
   /** Has linked the team's chat (Slack or Discord), so the team's bot can DM them. */
   hasChat?: boolean;
+  /** Their subteam, while the team uses subteams; null otherwise or when they're in none. */
+  subteam?: { id: string; name: string } | null;
 };
 
 /** The team's members (any status), or null when G3ID can't be reached. */
