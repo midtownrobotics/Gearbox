@@ -17,6 +17,7 @@ import { useEffect, useRef, useState } from "react";
 import { FaDiscord, FaGithub, FaGoogle, FaSlack, FaSteam } from "react-icons/fa";
 import { Link } from "react-router-dom";
 import { g3id as api } from "../../lib/api";
+import { SubteamCard } from "./subteam-card";
 
 type Identity = {
   id: string;
@@ -105,7 +106,7 @@ const STATUS_TONES: Partial<Record<string, string>> = {
   rejected: tones.danger,
 };
 
-/** The signed-in member's account: their sign-ins, kiosk PIN, and signing out. */
+/** The signed-in member's account: their subteam, sign-ins, kiosk PIN, and signing out. */
 export function AccountPage() {
   const [me, setMe] = useState<Me | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -304,6 +305,8 @@ export function AccountPage() {
           </Badge>
         )}
       </Card>
+
+      <SubteamCard />
 
       <Card title="Linked accounts">
         {unlinkError && (

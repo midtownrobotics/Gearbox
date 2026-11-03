@@ -1,11 +1,21 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { Button, ErrorBanner, Field, Loading, TextField, chatName, useTeamChat } from "@g3/ui";
+import {
+  Button,
+  ErrorBanner,
+  Field,
+  Loading,
+  TextField,
+  chatName,
+  inputClass,
+  useTeamChat,
+} from "@g3/ui";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../../lib/api";
 
 // Someone new who signed up with Slack or Discord enters their full name here, starting from
-// their chat name, before their team's admins are asked to approve them.
+// their chat name, and their subteam when the team uses them, before their team's admins are
+// asked to approve them.
 
 export function NamePage() {
   const navigate = useNavigate();
@@ -13,6 +23,9 @@ export function NamePage() {
   const token = searchParams.get("token") ?? "";
   const chat = chatName(useTeamChat());
   const [name, setName] = useState<string | null>(null);
+  /** The team's subteams to choose from; empty when it doesn't use them. */
+  const [subteams, setSubteams] = useState<{ id: string; name: string }[]>([]);
+  const [subteamId, setSubteamId] = useState("");
   const [expired, setExpired] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -21,8 +34,13 @@ export function NamePage() {
     api.auth.signup.name
       .$get({ query: { token } })
       .then(async (res) => {
-        const data = (await res.json()) as { username?: string; error?: string };
+        const data = (await res.json()) as {
+          username?: string;
+          subteams?: { id: string; name: string }[];
+          error?: string;
+        };
         if (!res.ok) return setExpired(data.error ?? "This link has expired.");
+        setSubteams(data.subteams ?? []);
         setName(data.username ?? "");
       })
       .catch(() => setExpired("Could not reach the server. Reload the page to try again."));
@@ -33,7 +51,13 @@ export function NamePage() {
     setSaving(true);
     setError(null);
     try {
-      const res = await api.auth.signup.name.$post({ json: { token, name: name ?? "" } });
+      const res = await api.auth.signup.name.$post({
+        json: {
+          token,
+          name: name ?? "",
+          subteamId: subteamId || null,
+        },
+      });
       if (!res.ok) {
         const data = (await res.json().catch(() => ({}))) as { error?: string };
         setError(data.error ?? "That didn't work. Try again.");
@@ -81,6 +105,23 @@ export function NamePage() {
                 required
               />
             </Field>
+            {subteams.length > 0 && (
+              <Field label="Subteam" hint="You can change it later on your Account page.">
+                <select
+                  className={inputClass}
+                  value={subteamId}
+                  onChange={(e) => setSubteamId(e.target.value)}
+                  disabled={saving}
+                >
+                  <option value="">Not sure yet</option>
+                  {subteams.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            )}
             {error && <ErrorBanner message={error} />}
             <Button type="submit" className="w-full" disabled={saving || !name.trim()}>
               {saving ? "Saving…" : "Continue"}

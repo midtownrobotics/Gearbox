@@ -128,6 +128,8 @@ export const SAFE_TEXT = {
     "Pit crew",
     "Scouting",
   ],
+  /** A team's subteam. */
+  subteam: ["Programming", "Mechanical", "Electrical", "Outreach", "Business", "Strategy"],
   event: ["2026gacmp", "2026gadal", "2026gagwi"],
   /** What's kept in a location. */
   contents: [

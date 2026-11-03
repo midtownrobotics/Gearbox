@@ -5,6 +5,7 @@ import { coreUserIdentities, coreUsers } from "../db/schema";
 import type { AppEnv } from "../types";
 import { CHAT_LABELS, type ChatProvider } from "./chat";
 import { dmAdmins } from "./member-dm";
+import type { Subteam } from "./subteams";
 import { teamUrl } from "./team";
 
 // Someone new who signs up with Slack or Discord enters their full name before their team's
@@ -61,20 +62,26 @@ export async function nameTokenUser(env: Env, token: string) {
 }
 
 /**
- * Saves the person's name, spends the token and tells the team's admins there's someone to
- * approve. Never fails for a DM that doesn't go.
+ * Saves the person's name and any subteam they chose, spends the token and tells the team's admins
+ * there's someone to approve. Never fails for a DM that doesn't go.
  */
 export async function saveSignupName(
   env: Env,
   token: string,
   name: string,
+  subteam: Subteam | null = null,
 ): Promise<"saved" | "expired"> {
   const user = await nameTokenUser(env, token);
   if (!user) return "expired";
   const db = createDb(env.DB);
   const saved = await db
     .update(coreUsers)
-    .set({ displayName: name, needsName: 0, updatedAt: Math.floor(Date.now() / 1000) })
+    .set({
+      displayName: name,
+      needsName: 0,
+      ...(subteam ? { subteamId: subteam.id } : {}),
+      updatedAt: Math.floor(Date.now() / 1000),
+    })
     .where(and(eq(coreUsers.id, user.id), eq(coreUsers.needsName, 1)))
     .returning({ id: coreUsers.id });
   await env.RATE_LIMIT.delete(key(token));
@@ -99,7 +106,7 @@ export async function saveSignupName(
     await dmAdmins(
       env,
       user.teamId,
-      `👋 ${name} (${user.email}${username}) signed up and is waiting for approval: ${teamUrl(env, user.teamId, "portal")}/admin/members/${user.id}`,
+      `👋 ${name} (${user.email}${username}${subteam ? `, ${subteam.name}` : ""}) signed up and is waiting for approval: ${teamUrl(env, user.teamId, "portal")}/admin/members/${user.id}`,
     );
   } catch (err) {
     console.error("[signup] telling admins about a sign-up failed", err);

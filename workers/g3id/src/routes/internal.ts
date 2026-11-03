@@ -26,6 +26,7 @@ import { createHandoff } from "../lib/handoff";
 import { dmAdmins, dmMembers } from "../lib/member-dm";
 import { createSigninCode } from "../lib/slack-code";
 import { saveInstallation } from "../lib/slack-install";
+import { teamSubteams } from "../lib/subteams";
 import { siteTeamId } from "../lib/team";
 import { logToTeam } from "../lib/team-log";
 import type { AppEnv } from "../types";
@@ -54,8 +55,10 @@ const DELETE_TEAM = [
   `UPDATE slack_installations SET installed_by = NULL WHERE installed_by IN ${MEMBERS}`,
   "DELETE FROM discord_installations WHERE team_id = ?1",
   `UPDATE discord_installations SET installed_by = NULL WHERE installed_by IN ${MEMBERS}`,
+  "DELETE FROM team_subteam_settings WHERE team_id = ?1",
   `UPDATE core_users SET merged_into_user_id = NULL WHERE merged_into_user_id IN ${MEMBERS}`,
   "DELETE FROM core_users WHERE team_id = ?1",
+  "DELETE FROM subteams WHERE team_id = ?1",
   "DELETE FROM teams WHERE id = ?1",
 ];
 
@@ -124,6 +127,7 @@ export const internalRouter = new Hono<AppEnv>()
         isAdmin: coreUsers.isAdmin,
         isMentor: coreUsers.isMentor,
         lastLoginAt: coreUsers.lastLoginAt,
+        subteamId: coreUsers.subteamId,
       })
       .from(coreUsers)
       .where(
@@ -149,12 +153,16 @@ export const internalRouter = new Hono<AppEnv>()
           .all()
       ).map((r) => r.userId),
     );
+    // Each member's subteam, while the team uses them (Schedule groups its grid by them).
+    const { enabled, subteams } = await teamSubteams(createDb(c.env.DB), c.req.param("id"));
+    const subteamById = new Map(subteams.map((s) => [s.id, s]));
     return c.json(
-      members.map((m) => ({
+      members.map(({ subteamId, ...m }) => ({
         ...m,
         isAdmin: m.isAdmin === 1,
         isMentor: m.isMentor === 1,
         hasChat: withChat.has(m.id),
+        subteam: (enabled && subteamId && subteamById.get(subteamId)) || null,
       })),
     );
   })

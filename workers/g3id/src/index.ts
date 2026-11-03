@@ -19,6 +19,7 @@ import { internalRouter } from "./routes/internal";
 import { kioskRouter } from "./routes/kiosk";
 import { adminSignInRouter, teamChatRouter, teamSignInRouter } from "./routes/sign-in-methods";
 import { slackRouter } from "./routes/slack";
+import { adminSubteamsRouter, subteamsRouter } from "./routes/subteams";
 import { teamUiRouter } from "./routes/team-ui";
 import { teamsRouter } from "./routes/teams";
 import { usersRouter } from "./routes/users";
@@ -54,11 +55,13 @@ const app = base
   .route("/auth", demoAuthRouter)
   .route("/auth", signupNameRouter)
   .route("/admin/team/sign-in", adminSignInRouter)
+  .route("/admin/team/subteams", adminSubteamsRouter)
   .route("/admin", adminRouter)
   .route("/team/sign-in", teamSignInRouter)
   .route("/team/chat", teamChatRouter)
   .route("/team/ui", teamUiRouter)
   .route("/users", usersRouter)
+  .route("/subteams", subteamsRouter)
   .route("/teams", teamsRouter)
   .route("/internal", internalRouter)
   .route("/internal", demoInternalRouter)

@@ -13,10 +13,11 @@ import { MembersPage } from "./members-page";
 import { NotificationsPage } from "./notifications-page";
 import { OperatorAccessPage } from "./operator-access-page";
 import { SignInPage } from "./sign-in-page";
+import { SubteamsPage } from "./subteams-page";
 
 // The team's admin pages (roadmap 4.5), on its home: <number>.<platform>/admin. Only what's the
 // whole team's lives here: Apps is the platform's (which apps the team has on); Appearance and
-// Sign-in are G3ID's settings; Members and Kiosk Devices are G3ID's people and kiosks (moved from
+// Sign-in are G3ID's settings; Members, Subteams and Kiosk Devices are G3ID's people and kiosks (moved from
 // ID, which only signs people in now); Integrations connects the team's chat, Slack or Discord
 // (G3ID's), and shows what else
 // each app is connected to; Notifications says where the platform's notifications go; and Log is
@@ -37,6 +38,7 @@ export const adminPlugin: Plugin = {
     { path: "/admin", element: admin(<AppsPage />) },
     { path: "/admin/members", element: admin(<MembersPage />) },
     { path: "/admin/members/:id", element: admin(<MemberPage />) },
+    { path: "/admin/subteams", element: admin(<SubteamsPage />) },
     { path: "/admin/kiosks", element: admin(<KiosksPage />) },
     { path: "/admin/appearance", element: admin(<AppearancePage />) },
     { path: "/admin/sign-in", element: admin(<SignInPage />) },
@@ -49,6 +51,13 @@ export const adminPlugin: Plugin = {
   navItems: [
     { label: "Manage Apps", to: "/admin", order: 10, requiresAdmin: true, group: "Admin" },
     { label: "Members", to: "/admin/members", order: 11, requiresAdmin: true, group: "Admin" },
+    {
+      label: "Subteams",
+      to: "/admin/subteams",
+      order: 11.5,
+      requiresAdmin: true,
+      group: "Admin",
+    },
     {
       label: "Appearance",
       to: "/admin/appearance",

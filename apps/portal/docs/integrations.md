@@ -1,7 +1,7 @@
 ---
 title: Integrations
 summary: Connect your team's Slack or Discord, and see the status of everything else that's connected.
-order: 6
+order: 7
 pages: /admin/integrations
 access: admin
 ---
