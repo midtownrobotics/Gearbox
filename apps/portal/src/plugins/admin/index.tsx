@@ -11,7 +11,7 @@ import { LogPage } from "./log-page";
 import { MemberPage } from "./member-page";
 import { MembersPage } from "./members-page";
 import { NotificationsPage } from "./notifications-page";
-import { OperatorAccessPage } from "./operator-access-page";
+import { MemberAccessPage, OperatorAccessPage } from "./operator-access-page";
 import { SignInPage } from "./sign-in-page";
 
 // The team's admin pages (roadmap 4.5), on its home: <number>.<platform>/admin. Only what's the
@@ -44,6 +44,7 @@ export const adminPlugin: Plugin = {
     { path: "/admin/integrations", element: admin(<IntegrationsPage />) },
     { path: "/admin/notifications", element: admin(<NotificationsPage />) },
     { path: "/admin/operator-access", element: admin(<OperatorAccessPage />) },
+    { path: "/admin/member-access", element: admin(<MemberAccessPage />) },
     { path: "/admin/log", element: admin(<LogPage />) },
   ],
   navItems: [
@@ -85,6 +86,13 @@ export const adminPlugin: Plugin = {
       requiresAdmin: true,
       group: "Admin",
     },
-    { label: "Log", to: "/admin/log", order: 18, requiresAdmin: true, group: "Admin" },
+    {
+      label: "Member Access",
+      to: "/admin/member-access",
+      order: 18,
+      requiresAdmin: true,
+      group: "Admin",
+    },
+    { label: "Log", to: "/admin/log", order: 19, requiresAdmin: true, group: "Admin" },
   ],
 };

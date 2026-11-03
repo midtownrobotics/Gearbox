@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { deleteTeamRows, exportTeamRows, teamExport } from "@g3/auth";
+import { deleteTeamRows, exportTeamRows, storageByTeam, teamExport } from "@g3/auth";
 import { isDemoTeam } from "@g3/demo";
 import { Hono } from "hono";
 import { createDb } from "./db";
@@ -18,6 +18,11 @@ export const internalRoutes = new Hono<AppEnv>()
     return c.json(await loadDemo(createDb(c.env.SCOUTING_DB), teamId));
   })
   .get("/demo/words", (c) => c.json({ words: demoWords() }))
+  // How much every team keeps in R2 (files under teams/<encoded team>/; files from before teams
+  // were kept apart aren't counted), for the operators' console. Counts only.
+  .get("/storage", async (c) =>
+    c.json({ teams: await storageByTeam(c.env.FIELD_MAPS, "teams/", {}, true) }),
+  )
   .post("/teams/:teamId/seed", async (c) => {
     await seedTeam(createDb(c.env.SCOUTING_DB), c.req.param("teamId"));
     return c.json({ ok: true });

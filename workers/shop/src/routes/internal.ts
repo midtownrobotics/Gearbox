@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { deleteTeamRows, exportTeamRows, teamExport } from "@g3/auth";
+import { deleteTeamRows, exportTeamRows, storageByTeam, teamExport } from "@g3/auth";
 import { isDemoTeam } from "@g3/demo";
 import { Hono } from "hono";
 import { createShopDb } from "../db";
@@ -57,6 +57,9 @@ export const internalRouter = new Hono<AppEnv>()
     return c.json(await loadDemo(c.env, teamId));
   })
   .get("/demo/words", (c) => c.json({ words: demoWords() }))
+  // How much every team keeps in R2 (drawings and part files, under teams/<team>/), for the
+  // operators' console. Counts only.
+  .get("/storage", async (c) => c.json({ teams: await storageByTeam(c.env.DRAWINGS, "teams/") }))
   // The team's data, for its admins to download before switching Shop off (the platform's app
   // library): every row, and a list of its files in R2 (drawings, part files), which stay there
   // until the data is deleted. Onshape's keys are left out.

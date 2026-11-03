@@ -318,11 +318,13 @@ describe("the team's operator access", () => {
   it("shows the team's admins what operators did with it, newest first, never which operator", async () => {
     const team = await newTeam();
     const other = await newTeam();
-    await operatorDid(team.teamId, "view_team", null, 100);
+    await operatorDid(team.teamId, "view_team_details", null, 100);
     await operatorDid(team.teamId, "suspend_team", "Checking a report", 200);
     // A report about the team's number isn't access to its data; another team's lines aren't its.
     await operatorDid(team.teamId, "resolve_report", null, 300);
-    await operatorDid(other.teamId, "view_team", null, 400);
+    await operatorDid(other.teamId, "view_team_details", null, 400);
+    // Opening the member list is in its own list.
+    await operatorDid(team.teamId, "view_team", "Handing the team over", 500);
 
     const res = await call(team.admin, "/team/operator-access");
     expect(res.status).toBe(200);
@@ -330,7 +332,13 @@ describe("the team's operator access", () => {
     expect(text).not.toContain("operator-secret-id");
     expect(JSON.parse(text)).toMatchObject([
       { action: "suspend_team", reason: "Checking a report", createdAt: 200 },
-      { action: "view_team", reason: null, createdAt: 100 },
+      { action: "view_team_details", reason: null, createdAt: 100 },
+    ]);
+    expect(JSON.parse(text)).toHaveLength(2);
+
+    const members = await call(team.admin, "/team/operator-access?kind=members");
+    expect(await members.json()).toMatchObject([
+      { action: "view_team", reason: "Handing the team over", createdAt: 500 },
     ]);
   });
 

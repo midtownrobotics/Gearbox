@@ -44,16 +44,14 @@ import type { AppEnv } from "./types";
 
 /**
  * What an operator did with the team that its admins see (the privacy policy's operator access
- * log): opening its member list, and changing who owns it or whether it's suspended. Reports about
- * its number aren't access to its data, and stay with the operators.
+ * log), in two lists: `team`, opening its details (no member's name or email) and changing who
+ * owns it or whether it's suspended; `members`, opening its member list. Reports about its number
+ * aren't access to its data, and stay with the operators.
  */
-const TEAM_VISIBLE_OPERATOR_ACTIONS = [
-  "view_team",
-  "transfer_owner",
-  "suspend_team",
-  "reactivate_team",
-  "renumber_team",
-] as const;
+const TEAM_VISIBLE_OPERATOR_ACTIONS = {
+  team: ["view_team_details", "transfer_owner", "suspend_team", "reactivate_team", "renumber_team"],
+  members: ["view_team"],
+} as const;
 
 /** How long a switched-off app's data is kept (the privacy policy's 90 days). */
 export const GRACE_S = 90 * 24 * 60 * 60;
@@ -395,16 +393,18 @@ export const teamRouter = new Hono<AppEnv>()
       })),
     );
   })
-  // Every time a Gearbox operator opened the team's data or changed it, with their reason: never
-  // which operator (they're volunteers), only that one did.
+  // Every time a Gearbox operator opened the team's details or changed it (?kind=team, the
+  // default), or opened its member list (?kind=members), with their reason: never which operator
+  // (they're volunteers), only that one did.
   .get("/operator-access", async (c) => {
+    const kind = c.req.query("kind") === "members" ? "members" : "team";
     const rows = await db(c.env)
       .select()
       .from(operatorActions)
       .where(
         and(
           eq(operatorActions.teamId, c.get("teamId")),
-          inArray(operatorActions.action, [...TEAM_VISIBLE_OPERATOR_ACTIONS]),
+          inArray(operatorActions.action, [...TEAM_VISIBLE_OPERATOR_ACTIONS[kind]]),
         ),
       )
       .orderBy(desc(operatorActions.createdAt))

@@ -50,6 +50,13 @@ const g3id = async (request: Request) => {
       joinedMonth: 4,
     });
   }
+  // Every team asked about has the two members above (the founder an admin).
+  if (path === "/member-counts") {
+    const ids = (url.searchParams.get("teams") ?? "").split(",").filter(Boolean);
+    return Response.json(
+      Object.fromEntries(ids.map((id) => [id, { active: 2, admins: 1, mentors: 0, pending: 0 }])),
+    );
+  }
   if (path === "/users") {
     const ids = (url.searchParams.get("ids") ?? "").split(",").filter((id) => id !== "u-nobody");
     return Response.json(
@@ -193,7 +200,7 @@ const slack = async (request: Request) => {
 /**
  * A team-scoped app's /api/internal/teams/:id: records each team it's asked to delete, seed or
  * load the demo's sample data for (read back with GET /api/internal/deleted, /seeded and
- * /demoed), and fails for a team a test named with POST /api/internal/fail/:id.
+ * /demoed), answers its storage hook, and fails for a team a test named with POST /api/internal/fail/:id.
  */
 function teamApp() {
   const deleted: string[] = [];
@@ -205,6 +212,10 @@ function teamApp() {
     if (path === "/api/internal/deleted") return Response.json(deleted);
     if (path === "/api/internal/seeded") return Response.json(seeded);
     if (path === "/api/internal/demoed") return Response.json(demoed);
+    // Its R2 storage hook (only Pit, Shop and Scouting have one): one 1 KiB file of the site team's.
+    if (path === "/api/internal/storage") {
+      return Response.json({ teams: { frc1648: { bytes: 1024, objects: 1 } } });
+    }
     const demo = path.match(/^\/api\/internal\/teams\/(.+)\/demo$/);
     if (demo && request.method === "POST") {
       demoed.push(decodeURIComponent(demo[1]));
