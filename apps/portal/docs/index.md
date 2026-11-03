@@ -1,6 +1,6 @@
 ---
 title: Portal and team admin
-summary: Your team's home page, and the admin pages for members, apps, colors, sign-in and integrations.
+summary: Your team's home page, and the admin pages for members, subteams, apps, colors, sign-in and integrations.
 order: 1
 ---
 
@@ -14,6 +14,7 @@ Admins also get the team's admin pages, under **Admin** in the bar. Only what's 
 | --- | --- |
 | Manage Apps | Switch apps on and off, download an app's data |
 | Members | Approve new members, give roles, remove people |
+| Subteams | Switch subteams on, name them and see who's in each |
 | Appearance | Colors, avatar, names, links and the order of the tiles |
 | Sign-in | Which sign-in methods your team allows |
 | Kiosk Devices | Shared shop computers where people sign in to Shop with a PIN (Shop only, for now) |

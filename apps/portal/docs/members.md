@@ -14,6 +14,7 @@ access: admin
 | See a member's details and sign-ins | | | Yes |
 | Approve or reject people waiting to join | | | Yes |
 | Correct a member's name | | | Yes |
+| Change a member's subteam | | | Yes |
 | Make someone a mentor, or remove it | | | Yes |
 | Make someone an admin, or remove it | | | Yes, not themselves |
 | Delete an account | | | Yes, not their own |
@@ -23,13 +24,14 @@ Only admins manage members: being a mentor doesn't open these pages. Anyone else
 ## What a member's page shows
 
 - Their **name**, which an admin can correct with **Edit**, and their **username**: their Slack or Discord name, which can't be changed.
+- Their **subteam**, which an admin can change, when your team uses subteams (set up on the Subteams page).
 - When they **joined**, were **last online** (using any of the team's apps; "Online now" in the last 5 minutes) and **last signed in**.
 - Their **reporter ID**, which stands for them on problems they report, and whether Gearbox has blocked it.
 - The accounts they **sign in with**, with the email or name on each.
 
 ## How people join
 
-Members sign up from your team's home page with your team's Slack or Discord. Their account then waits for approval, and every admin who has linked the team's chat gets a message with their name and a link.
+Members sign up from your team's home page with your team's Slack or Discord. If your team uses subteams, they choose theirs after entering their name. Their account then waits for approval, and every admin who has linked the team's chat gets a message with their name and a link.
 
 ## Approve someone
 

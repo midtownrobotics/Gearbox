@@ -10,7 +10,7 @@ import { useLoad } from "../../shared/use-load";
 import { type Cells, inverseOf, rowRanges, sharing, toCells } from "./cells";
 import { useMenuOnDoubleRightClick } from "./context-menu";
 import { useEditing } from "./editing";
-import { Grid, applyChange } from "./grid";
+import { Grid, type GridRow, applyChange } from "./grid";
 import { useHistory } from "./history";
 import { Tools, useTools } from "./tools";
 
@@ -65,6 +65,9 @@ function Loaded({
   const friendList = useLoad(() => unwrap(api.friends.$get()), []);
   const friends = useMemo(() => new Set(friendList.data?.map((f) => f.userId)), [friendList.data]);
   const day = detail.days.find((d) => d.day === params.get("day")) ?? todayOrFirst(detail);
+  // Every day of the event at once: the viewer's own, or a grid for each day, one under another.
+  const allDays = params.get("day") === "all" && detail.days.length > 1;
+  const shownDays = allDays ? detail.days : day ? [day] : [];
   const roles = useMemo(() => new Map(detail.roles.map((r) => [r.id, r])), [detail.roles]);
 
   // Blocks as the page shows them: the worker's, with any change shown before it answers.
@@ -101,6 +104,15 @@ function Loaded({
       : detail.attendees;
   // With no friends attending, the Friends view would only be the viewer.
   const friendsAttending = shown.some((a) => a.userId !== me);
+  // Everyone's grid can be grouped by subteam, when the team uses them: a row per subteam, which
+  // paints all its members at once. People in no subteam aren't shown then, only counted.
+  const hasSubteams = detail.attendees.some((a) => a.subteam);
+  const bySubteam = view === "everyone" && hasSubteams && params.get("group") === "subteam";
+  const rows: GridRow[] = bySubteam
+    ? subteamRows(shown)
+    : shown.map((attendee) => ({ kind: "person", attendee }));
+  const inSubteams = bySubteam ? shown.filter((a) => a.subteam) : shown;
+  const withoutSubteam = shown.length - inSubteams.length;
 
   // Saves go one after another, so an undo can't reach the worker before the paint it undoes.
   const queue = useRef(Promise.resolve());
@@ -195,23 +207,28 @@ function Loaded({
             {detail.days.map((d) => (
               <Chip
                 key={d.day}
-                selected={d.day === day.day}
+                selected={!allDays && d.day === day.day}
                 // Today isn't kept in the address, so the page follows the date when it's reopened.
                 onClick={() => set("day", d.day === todayOrFirst(detail).day ? null : d.day)}
               >
                 {dayLabel(d.day)}
               </Chip>
             ))}
+            {detail.days.length > 1 && (
+              <Chip selected={allDays} onClick={() => set("day", "all")}>
+                All days
+              </Chip>
+            )}
           </div>
 
           {view === "mine" ? (
-            <MyDay
+            <MyDays
               detail={detail}
               cells={cells}
               roles={roles}
               me={me}
               friends={friends}
-              day={day.day}
+              days={shownDays.map((d) => d.day)}
             />
           ) : view === "friends" && friendList.data?.length === 0 ? (
             <p className="text-sm text-secondary-500">
@@ -229,6 +246,16 @@ function Loaded({
             )
           ) : (
             <>
+              {view === "everyone" && hasSubteams && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <Chip selected={!bySubteam} onClick={() => set("group", null)}>
+                    By person
+                  </Chip>
+                  <Chip selected={bySubteam} onClick={() => set("group", "subteam")}>
+                    By subteam
+                  </Chip>
+                </div>
+              )}
               {editing && (
                 <Tools
                   roles={detail.roles}
@@ -246,18 +273,38 @@ function Loaded({
                       ? "No one is attending yet. Add people in Settings."
                       : "No one is attending yet."}
                 </p>
+              ) : bySubteam && rows.length === 0 ? (
+                <p className="text-sm text-secondary-500">No one attending is in a subteam.</p>
               ) : (
-                <Grid
-                  day={day}
-                  attendees={shown}
-                  periods={detail.periods.filter((p) => p.day === day.day)}
-                  roles={roles}
-                  cells={cells}
-                  buttons={editing ? tools.buttons : null}
-                  me={me}
-                  now={now?.day === day.day ? now.slot : null}
-                  onPaint={paint}
-                />
+                <div className="space-y-6">
+                  {shownDays.map((d) => (
+                    <section key={d.day} className="space-y-2">
+                      {allDays && (
+                        <h2 className="font-semibold text-secondary-900">{longDayLabel(d.day)}</h2>
+                      )}
+                      <Grid
+                        day={d}
+                        rows={rows}
+                        attendees={inSubteams}
+                        periods={detail.periods.filter((p) => p.day === d.day)}
+                        roles={roles}
+                        cells={cells}
+                        buttons={editing ? tools.buttons : null}
+                        me={me}
+                        now={now?.day === d.day ? now.slot : null}
+                        onPaint={paint}
+                      />
+                    </section>
+                  ))}
+                </div>
+              )}
+              {bySubteam && withoutSubteam > 0 && (
+                <p className="text-sm text-secondary-500">
+                  {withoutSubteam === 1
+                    ? "1 more person attending isn't in a subteam."
+                    : `${withoutSubteam} more people attending aren't in a subteam.`}{" "}
+                  See them By person.
+                </p>
               )}
               <Legend roles={detail.roles} />
             </>
@@ -266,6 +313,19 @@ function Loaded({
       )}
     </Page>
   );
+}
+
+/** A row for each subteam with someone attending, by name; people in none are left out. */
+function subteamRows(attendees: ScheduleDetail["attendees"]): GridRow[] {
+  const groups = new Map<string, Extract<GridRow, { kind: "group" }>>();
+  for (const attendee of attendees) {
+    if (!attendee.subteam) continue;
+    const { id, name } = attendee.subteam;
+    const group = groups.get(id) ?? { kind: "group", id, name, members: [] };
+    group.members.push(attendee);
+    groups.set(id, group);
+  }
+  return [...groups.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
 /** The day the page opens on: today if the event is on, else its first day. */
@@ -289,6 +349,20 @@ function Legend({ roles }: { roles: Role[] }) {
   );
 }
 
+/** The viewer's own days: the chosen one, or every day of the event in order. */
+function MyDays({ days, ...props }: Omit<Parameters<typeof MyDay>[0], "day"> & { days: string[] }) {
+  if (!props.detail.attendees.some((a) => a.userId === props.me)) {
+    return <p className="text-sm text-secondary-500">You aren't attending this event.</p>;
+  }
+  return (
+    <div className="space-y-6">
+      {days.map((day) => (
+        <MyDay key={day} {...props} day={day} />
+      ))}
+    </div>
+  );
+}
+
 /** The viewer's own day: each run of a role, which friends share it, and the event's periods beside. */
 function MyDay({
   detail,
@@ -306,9 +380,6 @@ function MyDay({
   friends: Set<string>;
   day: string;
 }) {
-  if (!detail.attendees.some((a) => a.userId === me)) {
-    return <p className="text-sm text-secondary-500">You aren't attending this event.</p>;
-  }
   const names = new Map(detail.attendees.map((a) => [a.userId, a.displayName ?? "Former member"]));
   const others = detail.attendees.map((a) => a.userId).filter((userId) => friends.has(userId));
   const mine = rowRanges(cells, me, day);

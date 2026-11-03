@@ -223,7 +223,7 @@ describe("signing in with Discord", () => {
     const token = location.searchParams.get("token") ?? "";
     const headers = { "X-Team-Id": team };
     const step = await g3id(`/auth/signup/name?token=${token}`, { headers });
-    expect(await step.json()).toEqual({ username: discordName });
+    expect(await step.json()).toEqual({ username: discordName, subteams: [] });
     expect((await sentTo(`dm-${admin.discordId}`)).length).toBe(before);
     const saved = await g3id("/auth/signup/name", {
       method: "POST",

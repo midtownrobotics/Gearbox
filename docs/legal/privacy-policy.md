@@ -1,6 +1,6 @@
 # Gearbox Privacy Policy
 
-Last updated: 1 November 2026.
+Last updated: 3 November 2026.
 
 ## In short
 
@@ -26,7 +26,7 @@ We collect only what the apps need to work.
 | --- | --- | --- |
 | Account | Name (you enter it when you join, and your team's admins can correct it), the username of the Slack or Discord account you joined with, email address, when you last signed in and when you last used Gearbox | You, your team's admins, or the sign-in service you use |
 | Sign-in links | Your identifier at each service you link, such as Google, GitHub, Slack, Discord or Steam, and the email or username it gives us. A password is stored only as a one-way hash. For Google and GitHub, the access token they issue when you sign in | You, when you link a service |
-| Team membership | Your team, your role, your status, and a kiosk PIN if your team uses kiosks | Your team's admins |
+| Team membership | Your team, your role, your status, your subteam if your team uses subteams, and a kiosk PIN if your team uses kiosks | Your team's admins, and you for your subteam |
 | Sessions and devices | A session identifier in a cookie, and for shared shop devices a kiosk token | Created when you sign in |
 | Attendance | When you signed in and out, and hours added by an admin | You and your team's admins |
 | Orders | Part requests, reasons, approvals, costs, budgets and vendors | Members and mentors |

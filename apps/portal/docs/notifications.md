@@ -1,7 +1,7 @@
 ---
 title: Notifications
 summary: Send your team news, and choose where it and Gearbox's announcements go, on the home page and in your team's chat.
-order: 5
+order: 6
 pages: /admin/notifications
 access: admin
 ---

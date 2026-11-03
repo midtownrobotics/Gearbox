@@ -8,6 +8,7 @@ import {
   Loading,
   Page,
   TextField,
+  inputClass,
   redirectToSignIn,
   tones,
 } from "@g3/ui";
@@ -32,7 +33,11 @@ type Details = Omit<User, "identities"> & {
   identities: User["identities"];
   /** When their kiosk PIN was made, or null when they have none. */
   kioskPinSince: number | null;
+  /** Their subteam, or null for none. */
+  subteamId: string | null;
 };
+
+type Subteams = { enabled: boolean; subteams: { id: string; name: string }[] };
 
 const longDate = (ts: number) =>
   new Date(ts * 1000).toLocaleDateString(undefined, {
@@ -131,6 +136,67 @@ function NameRow({ user, onSaved }: { user: Details; onSaved: (name: string) => 
   );
 }
 
+/** Their subteam, which an admin can change; only while the team uses subteams. */
+function SubteamRow({
+  user,
+  subteams,
+  onSaved,
+}: {
+  user: Details;
+  subteams: Subteams["subteams"];
+  onSaved: (subteamId: string | null) => void;
+}) {
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function choose(subteamId: string | null) {
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await api.admin.users[":id"].subteam.$put({
+        param: { id: user.id },
+        json: { subteamId },
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(body.error ?? "That didn't work. Try again.");
+      }
+      onSaved(subteamId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "That didn't work. Try again.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="py-2">
+      <div className="flex items-center justify-between gap-4 text-sm">
+        <span className="shrink-0 text-secondary-500">Subteam</span>
+        <select
+          className={`${inputClass} !w-auto max-w-full min-w-0`}
+          aria-label="Subteam"
+          value={user.subteamId ?? ""}
+          disabled={saving}
+          onChange={(e) => void choose(e.target.value || null)}
+        >
+          <option value="">None</option>
+          {subteams.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+            </option>
+          ))}
+        </select>
+      </div>
+      {error && (
+        <div className="mt-2">
+          <ErrorBanner message={error} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function MemberPage() {
   const { id = "" } = useParams();
   const navigate = useNavigate();
@@ -145,6 +211,7 @@ export function MemberPage() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   /** Their reporter ID, or null for someone who has never opened Report a problem. */
   const [reporter, setReporter] = useState<Reporter | null>(null);
+  const [subteams, setSubteams] = useState<Subteams | null>(null);
 
   useEffect(() => {
     api.auth.me.$get().then(async (res) => {
@@ -166,6 +233,10 @@ export function MemberPage() {
       })
       .catch((err) => setError(err instanceof Error ? err.message : "Couldn't load this person."));
     reporterIds().then((ids) => setReporter(ids.get(id) ?? null));
+    api.admin.team.subteams
+      .$get()
+      .then(async (res) => (res.ok ? setSubteams((await res.json()) as Subteams) : undefined))
+      .catch(() => {});
   }, [me, id]);
 
   /** Runs an action on them; on success, applies `patch` (or leaves the page, for a delete). */
@@ -243,6 +314,13 @@ export function MemberPage() {
                 }
               />
               <Row label="Username">{user.username ?? "None"}</Row>
+              {subteams?.enabled && subteams.subteams.length > 0 && (
+                <SubteamRow
+                  user={user}
+                  subteams={subteams.subteams}
+                  onSaved={(subteamId) => setUser((u) => (u ? { ...u, subteamId } : u))}
+                />
+              )}
               <Row label="Joined">{longDate(user.createdAt)}</Row>
               <Row label="Last online">
                 {isOnline(user)

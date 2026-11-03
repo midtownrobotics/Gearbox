@@ -144,6 +144,8 @@ export async function scheduleDetail(
           userId,
           displayName: member?.displayName ?? null,
           isMentor: member?.isMentor ?? false,
+          /** Their subteam while the team uses subteams, for grouping the grid. */
+          subteam: member?.subteam ?? null,
           /** False for someone who has since left the team (or G3ID couldn't be asked). */
           active: member?.status === "active",
         };

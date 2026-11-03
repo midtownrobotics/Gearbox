@@ -14,7 +14,12 @@ type Detail = {
   schedule: { id: number; published: boolean };
   days: { day: string; start: number; end: number }[];
   periods: { id: number; label: string; start: number; end: number }[];
-  attendees: { userId: string; displayName: string | null; active: boolean }[];
+  attendees: {
+    userId: string;
+    displayName: string | null;
+    active: boolean;
+    subteam: { id: string; name: string } | null;
+  }[];
   assignments: { userId: string; day: string; start: number; end: number; roleId: number }[];
   roles: { id: number; name: string; archived: boolean }[];
 };
@@ -69,6 +74,8 @@ describe("schedules", () => {
       [student.id, otherStudent.id].sort(),
     );
     expect(detail.attendees.every((a) => a.active && a.displayName)).toBe(true);
+    // Each with their subteam from ID, so the grid can be grouped by it.
+    expect(detail.attendees.map((a) => a.subteam?.name)).toEqual(["Programming", "Programming"]);
   });
 
   it("lets mentors, admins and trusted students edit, never students or kiosks", async () => {

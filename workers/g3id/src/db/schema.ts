@@ -45,6 +45,27 @@ export const teamSignInMethods = sqliteTable("team_sign_in_methods", {
   }),
 });
 
+/** Whether a team uses subteams (migration 0023); no row: off. */
+export const teamSubteamSettings = sqliteTable("team_subteam_settings", {
+  teamId: text("team_id").primaryKey(),
+  enabled: integer("enabled").notNull().default(0),
+  updatedAt: integer("updated_at").notNull(),
+  updatedBy: text("updated_by").references((): AnySQLiteColumn => coreUsers.id, {
+    onDelete: "set null",
+  }),
+});
+
+/** A team's subteams (migration 0023): names unique within the team, ignoring case. */
+export const subteams = sqliteTable("subteams", {
+  id: text("id").primaryKey(),
+  teamId: text("team_id")
+    .notNull()
+    .references((): AnySQLiteColumn => teams.id),
+  name: text("name").notNull(),
+  createdAt: integer("created_at").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+});
+
 export const coreUsers = sqliteTable(
   "core_users",
   {
@@ -71,6 +92,10 @@ export const coreUsers = sqliteTable(
     lastLoginAt: integer("last_login_at"),
     /** When they last used any app (/auth/me), at most a minute out (migration 0022). */
     lastSeenAt: integer("last_seen_at"),
+    /** The subteam they're in, or null (migration 0023). */
+    subteamId: text("subteam_id").references((): AnySQLiteColumn => subteams.id, {
+      onDelete: "set null",
+    }),
     deletedAt: integer("deleted_at"),
   },
   (table) => [

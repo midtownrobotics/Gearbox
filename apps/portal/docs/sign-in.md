@@ -1,7 +1,7 @@
 ---
 title: Sign-in methods
 summary: Choose which ways your members can sign in besides your team's chat.
-order: 7
+order: 8
 pages: /admin/sign-in
 access: admin
 ---

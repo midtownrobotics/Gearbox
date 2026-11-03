@@ -405,7 +405,7 @@ describe("signing a team up", () => {
     ).json()) as { status: string; nameToken: string };
     expect(polled.status).toBe("signup_pending");
     const step = await g3id(`/auth/signup/name?token=${polled.nameToken}`, { headers });
-    expect(await step.json()).toEqual({ username: `Member ${joiner}` });
+    expect(await step.json()).toEqual({ username: `Member ${joiner}`, subteams: [] });
     const blank = await g3id("/auth/signup/name", {
       method: "POST",
       headers,

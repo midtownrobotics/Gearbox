@@ -34,6 +34,24 @@ export function rowRanges(cells: Cells, userId: string, day: string) {
   return out;
 }
 
+/**
+ * A group's day (a subteam's members) as runs: a role where every one of them has it, "mixed"
+ * where they differ (some with nothing counts), nothing where none has anything.
+ */
+export function groupRanges(cells: Cells, userIds: string[], day: string) {
+  const out: { start: number; end: number; roleId: number | "mixed" }[] = [];
+  for (let slot = 0; slot < 96; slot++) {
+    const found = new Set(userIds.map((userId) => cells.get(cellKey(userId, day, slot))));
+    if (found.size === 1 && found.has(undefined)) continue;
+    const [only] = found;
+    const roleId = found.size === 1 && only !== undefined ? only : "mixed";
+    const last = out[out.length - 1];
+    if (last && last.roleId === roleId && last.end === slot) last.end++;
+    else out.push({ start: slot, end: slot + 1, roleId });
+  }
+  return out;
+}
+
 /** Who else has `roleId` at some point in `[start, end)` that day. */
 export function sharing(
   cells: Cells,

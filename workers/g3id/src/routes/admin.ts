@@ -23,6 +23,7 @@ import { dmMember } from "../lib/member-dm";
 import { methodOff } from "../lib/sign-in-methods";
 import { NAME_MAX, cleanName } from "../lib/signup-name";
 import { removeInstallation, slackForTeam } from "../lib/slack-install";
+import { chosenSubteam, subteamBody } from "../lib/subteams";
 import { teamOfUser, teamUrl } from "../lib/team";
 import { appearanceChanges, logToTeam } from "../lib/team-log";
 import { isTeamUiSettings, loadTeamUi, renameTeam } from "../lib/team-ui";
@@ -169,6 +170,7 @@ export const adminRouter = new Hono<AppEnv>()
         createdAt: coreUsers.createdAt,
         lastLoginAt: coreUsers.lastLoginAt,
         lastSeenAt: coreUsers.lastSeenAt,
+        subteamId: coreUsers.subteamId,
       })
       .from(coreUsers)
       .where(memberOf(c.get("adminTeamId") as string, c.req.param("id")))
@@ -213,6 +215,21 @@ export const adminRouter = new Hono<AppEnv>()
       return c.json({ displayName: name });
     },
   )
+  // The member's subteam (lib/subteams.ts), or none.
+  .put("/users/:id/subteam", subteamBody, async (c) => {
+    const body = c.req.valid("json");
+    const db = createDb(c.env.DB);
+    const team = c.get("adminTeamId") as string;
+    const subteam = await chosenSubteam(db, team, body.subteamId);
+    if (subteam === "invalid") return c.json({ error: "Choose one of your team's subteams." }, 400);
+    const updated = await db
+      .update(coreUsers)
+      .set({ subteamId: subteam?.id ?? null, updatedAt: Math.floor(Date.now() / 1000) })
+      .where(memberOf(team, c.req.param("id")))
+      .returning({ id: coreUsers.id });
+    if (updated.length === 0) return c.json({ error: "User not found." }, 404);
+    return c.json({ subteamId: subteam?.id ?? null });
+  })
   .post("/users/:id/approve", async (c) => {
     const id = c.req.param("id");
     const db = createDb(c.env.DB);

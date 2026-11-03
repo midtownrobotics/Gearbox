@@ -1,7 +1,7 @@
 ---
 title: Team appearance
 summary: Your team's colors, avatar, names and links, used on every page of every app.
-order: 4
+order: 5
 pages: /admin/appearance
 access: admin
 ---

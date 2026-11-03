@@ -1,7 +1,7 @@
 ---
 title: Kiosk devices
 summary: Set up shared shop computers where members sign in to Shop with a 3-digit PIN. Only Shop uses kiosks for now.
-order: 8
+order: 9
 pages: /admin/kiosks
 access: admin
 ---

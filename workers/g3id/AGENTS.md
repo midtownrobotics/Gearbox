@@ -27,10 +27,14 @@ each team signs in on its own G3ID, `<number>-id.<platform>` (G3: `1648-id.frcge
 
 - `lib/sign-in-methods.ts` (migration `0016`, `team_sign_in_methods`; no row = all on): admins switch Google, GitHub, Steam and kiosk PINs off for their team on the Sign-in page (`/admin/team/sign-in`; refused if it would leave the admin with no way in). The team's chat (Slack, or Discord for a team that connected it) is always on: members join through it. An off method can't start or finish a sign-in or a link (`methodOff` in each provider's routes and `/auth/pin`); with kiosk PINs off, no kiosk can be added (`/admin/kiosk/codes`, `/kiosk/activate`) and Portal's Kiosk Devices page only points to the Sign-in page; public `GET /team/sign-in` tells the sign-in and account pages which to show. Sessions already open stay. Portal shows only the apps that are on.
 
+## Subteams
+
+- `lib/subteams.ts`, `routes/subteams.ts` (migration `0023`): a team's admins switch subteams on (`team_subteam_settings`; no row = off) and add, rename and delete them (`subteams`, names unique per team ignoring case, at most 30) on Portal's Subteams page (`/admin/subteams`, `apps/portal/src/plugins/admin/subteams-page.tsx`; G3ID's `/admin/team/subteams`). Each member is in one or none (`core_users.subteam_id`): chosen on the sign-up name step (`GET /auth/signup/name` lists them while on, `POST` takes `subteamId`; the admins' DM names it), on Portal's Account page (`GET /subteams`, `PUT /subteams/mine`), or by an admin on the member's page (`PUT /admin/users/:id/subteam`). A subteam must be the team's own and subteams on (`chosenSubteam`). Deleting one leaves its members in none; switching them off keeps who's in which. Changes are in the team's log; the changing routes are in `DEMO_BLOCKED`. `/internal/teams/:id/members` gives each member's `subteam` (`{ id, name }`, null while subteams are off), for `teamMembers` in `@g3/auth` (Schedule groups its grid by it).
+
 ## Database
 
 - `teams` — each team, keyed by `frc<number>` (`teamKey`); a request's team is `requestTeamId()` (`src/lib/team.ts`)
-- `core_users` — user accounts with status (pending/active/rejected); **each belongs to exactly one team** (`team_id`, no memberships table; roles stay as `is_admin`/`is_mentor`); `display_name` (full name, admins edit it) and `username` (the chat account's name, locked), `needs_name` while someone new hasn't entered their name
+- `core_users` — user accounts with status (pending/active/rejected), and `subteam_id` (above); **each belongs to exactly one team** (`team_id`, no memberships table; roles stay as `is_admin`/`is_mentor`); `display_name` (full name, admins edit it) and `username` (the chat account's name, locked), `needs_name` while someone new hasn't entered their name
 - `core_user_identities` — linked auth providers per user
 - `core_sessions` — active sessions (deprecated in favor of KV)
 - `core_user_pins` — 3-digit PINs for kiosk login, unique within a team; a kiosk signs in only its own team's members

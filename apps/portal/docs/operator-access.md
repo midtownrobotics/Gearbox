@@ -1,7 +1,7 @@
 ---
 title: Operator access
 summary: When Gearbox's operators opened your team's member list or changed its ownership, and why.
-order: 9
+order: 10
 pages: /admin/operator-access
 access: admin
 ---
