@@ -7,6 +7,7 @@ import { createShopDb } from "../db";
 import { files, stagingBatches } from "../db/schema";
 import { obsoleteFileIds, storedFile } from "../lib/batches";
 import { partFileKey } from "../lib/storage";
+import { putShopFile } from "../lib/storage-limit";
 import type { AppEnv } from "../types";
 
 // The team's file library. A file reaches instances only through a batch (lib/batches.ts).
@@ -59,7 +60,7 @@ export const partFilesRouter = new Hono<AppEnv>()
     const contentType = file.type || "application/octet-stream";
     const teamId = c.get("teamId");
     const r2Key = partFileKey(teamId, file.name);
-    await c.env.DRAWINGS.put(r2Key, file.stream(), { httpMetadata: { contentType } });
+    await putShopFile(c.env, teamId, r2Key, file, contentType);
 
     const db = createShopDb(c.env.SHOP_DB);
     try {

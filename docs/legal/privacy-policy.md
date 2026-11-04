@@ -1,6 +1,6 @@
 # Gearbox Privacy Policy
 
-Last updated: 1 November 2026.
+Last updated: 4 November 2026.
 
 ## In short
 
@@ -124,6 +124,7 @@ Where the law of your team's country requires a legal basis for that transfer, t
 | Edge: sites each device used | Hourly for 30 days, then daily totals for one year |
 | Who sent a problem report, and your reporter ID | Kept as team data, and deleted with the team. The public GitHub issue stays: ask us to remove one |
 | Daily visit totals for our public page | Kept; they are totals and identify no one |
+| Incomplete match-log uploads | Expire after 30 minutes; cleaned up when another upload starts or by the storage provider?s incomplete-upload cleanup |
 | Technical logs | 7 days |
 | Backups | 30 days, after which deleted information is gone from backups too |
 | The public demo | Erased every night at midnight US Eastern time |

@@ -36,3 +36,7 @@ At an event The Blue Alliance doesn't have, a strategy lead moves everyone on fr
 Choose **Pit scouting** for the form you fill in once per team, in their pit. It has no deadline, and a team's newest pit report is the one Analysis shows.
 
 **Not pit scouted** lists the event's teams nobody has pit scouted yet, with how many are left. Choose **Scout** beside a team to start its form.
+
+## Image storage
+
+Each image can be up to 12 MB, and one submission can contain up to 24 MB of images. Your team has room for 2 GB or 25,000 images across Scouting. If it fills up, ask a strategy lead or the person who shared an image to remove unneeded reports, maps or auto images. Existing reports stay available.

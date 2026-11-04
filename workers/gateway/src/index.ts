@@ -18,6 +18,7 @@ import {
   teamKey,
 } from "@g3/site-config";
 import devPorts from "../../../.dev-ports.json";
+import { limitRequestBody } from "./body-limit";
 import { type DemoEnv, checkDemoRequest } from "./demo";
 import { teamIcon } from "./icons";
 import { type RateLimitEnv, checkRateLimit } from "./rate-limit";
@@ -374,7 +375,8 @@ function devPage(request: Request, url: URL, app: Worker): Promise<Response> {
 }
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(incoming: Request, env: Env): Promise<Response> {
+    let request = incoming;
     const url = new URL(request.url);
     const localHost = env.LOCAL_DEV === "true" ? fromLocalHost(url.hostname) : null;
     const local = localHost !== null;
@@ -384,6 +386,9 @@ export default {
       const limited = await checkRateLimit(request, env);
       if (limited) return limited;
     }
+    const bodyChecked = await limitRequestBody(request);
+    if (bodyChecked instanceof Response) return bodyChecked;
+    request = bodyChecked;
     if (platformLabel(host) === DEMO_HOST_LABEL) {
       const home = teamAppUrlVia(local ? url.origin : undefined, demoTeamId, "portal");
       return Response.redirect(`${home}/`, 302);

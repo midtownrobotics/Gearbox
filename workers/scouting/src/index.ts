@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { inTeam, requestTeamId, withTeam } from "@g3/auth";
+import { inTeam, requestTeamId, storageLimitResponse, withTeam } from "@g3/auth";
 import { corsOrigin } from "@g3/site-config";
 import { withApiPrefix } from "@g3/site-config/worker";
 import { and, eq, gt, sql } from "drizzle-orm";
@@ -58,6 +58,7 @@ import {
   describeServiceIssue,
   parseServiceIssueTypes,
 } from "./service-issues";
+import { storeScoutingFiles } from "./storage-limit";
 import { teamSettingsRouter } from "./team-settings";
 import type { AppEnv, TbaMatch, TbaTeam } from "./types";
 import { finiteNumber, id, parseJson, stringArray, teamNumber, text } from "./utils";
@@ -81,6 +82,8 @@ type ScoutingField = {
 const app = new Hono<AppEnv>();
 
 app.onError((error, c) => {
+  const storage = storageLimitResponse(error);
+  if (storage) return storage;
   console.error("[scouting]", error);
   return c.json({ error: "Internal server error." }, 500);
 });
@@ -1365,14 +1368,13 @@ app.post("/scouting-forms/:id/submissions", requireAuth, async (c) => {
   let drawingKey: string | null = null;
   let drawingType: string | null = null;
   const drawingFields: Record<string, { key: string; contentType: string }> = {};
+  const uploads: { key: string; file: File }[] = [];
   if (drawing instanceof File && drawing.size > 0) {
     if (!drawing.type.startsWith("image/") || drawing.size > 12 * 1024 * 1024)
       return c.json({ error: "The field drawing must be an image under 12 MB." }, 400);
     drawingKey = `teams/${encodeURIComponent(c.get("teamId"))}/scouting-submissions/${submissionId}.png`;
     drawingType = drawing.type;
-    await c.env.FIELD_MAPS.put(drawingKey, await drawing.arrayBuffer(), {
-      httpMetadata: { contentType: drawing.type },
-    });
+    uploads.push({ key: drawingKey, file: drawing });
   }
   for (const field of fields.filter((candidate) => candidate.type === "fieldMap")) {
     if (cleanAnswers[field.id] === "no-minimal-movement") continue;
@@ -1385,11 +1387,10 @@ app.post("/scouting-forms/:id/submissions", requireAuth, async (c) => {
     if (!fieldDrawing.type.startsWith("image/") || fieldDrawing.size > 12 * 1024 * 1024)
       return c.json({ error: "Field drawings must be images under 12 MB." }, 400);
     const key = `teams/${encodeURIComponent(c.get("teamId"))}/scouting-submissions/${submissionId}/${field.id}.png`;
-    await c.env.FIELD_MAPS.put(key, await fieldDrawing.arrayBuffer(), {
-      httpMetadata: { contentType: fieldDrawing.type },
-    });
+    uploads.push({ key, file: fieldDrawing });
     drawingFields[field.id] = { key, contentType: fieldDrawing.type };
   }
+  await storeScoutingFiles(c.env, c.get("teamId"), uploads);
   const submittedAt = Date.now();
   if (formDefinition.form_kind === "scouting") {
     // The schedule can move while drawings upload: check again, and record a report as late if it
@@ -2031,26 +2032,29 @@ app.post("/field-maps", requireAuth, async (c) => {
   const recordId = id("map");
   const extension = image.type === "image/jpeg" ? "jpg" : "png";
   const key = `teams/${encodeURIComponent(c.get("teamId"))}/field-maps/${recordId}.${extension}`;
-  await c.env.FIELD_MAPS.put(key, await image.arrayBuffer(), {
-    httpMetadata: { contentType: image.type },
-  });
+  await storeScoutingFiles(c.env, c.get("teamId"), [{ key, file: image }]);
   const now = Date.now();
-  await dbOf(c)
-    .insert(fieldMaps)
-    .values(
-      withTeam(c.get("teamId"), {
-        id: recordId,
-        name: name,
-        event_name: text(form.get("eventName"), 120),
-        notes: text(form.get("notes"), 2000),
-        r2_key: key,
-        content_type: image.type,
-        created_by: c.get("userId"),
-        created_at: now,
-        updated_at: now,
-      }),
-    )
-    .run();
+  try {
+    await dbOf(c)
+      .insert(fieldMaps)
+      .values(
+        withTeam(c.get("teamId"), {
+          id: recordId,
+          name: name,
+          event_name: text(form.get("eventName"), 120),
+          notes: text(form.get("notes"), 2000),
+          r2_key: key,
+          content_type: image.type,
+          created_by: c.get("userId"),
+          created_at: now,
+          updated_at: now,
+        }),
+      )
+      .run();
+  } catch (error) {
+    if (key) await c.env.FIELD_MAPS.delete(key);
+    throw error;
+  }
   return c.json({ id: recordId }, 201);
 });
 
@@ -2133,31 +2137,34 @@ app.post("/autos", requireAuth, async (c) => {
     const extension = image.type === "image/jpeg" ? "jpg" : "png";
     imageKey = `teams/${encodeURIComponent(c.get("teamId"))}/auto-images/${recordId}.${extension}`;
     imageContentType = image.type;
-    await c.env.FIELD_MAPS.put(imageKey, await image.arrayBuffer(), {
-      httpMetadata: { contentType: image.type },
-    });
+    await storeScoutingFiles(c.env, c.get("teamId"), [{ key: imageKey, file: image }]);
   }
 
   const steps = parseJson<unknown>(form.get("steps"), []);
-  await dbOf(c)
-    .insert(autoRoutines)
-    .values(
-      withTeam(c.get("teamId"), {
-        id: recordId,
-        name: name,
-        robot_name: autoTeam,
-        start_position: "",
-        summary: text(form.get("description"), 2000),
-        steps_json: JSON.stringify(stringArray(steps)),
-        tags_json: "[]",
-        image_r2_key: imageKey,
-        image_content_type: imageContentType,
-        created_by: c.get("userId"),
-        created_at: now,
-        updated_at: now,
-      }),
-    )
-    .run();
+  try {
+    await dbOf(c)
+      .insert(autoRoutines)
+      .values(
+        withTeam(c.get("teamId"), {
+          id: recordId,
+          name: name,
+          robot_name: autoTeam,
+          start_position: "",
+          summary: text(form.get("description"), 2000),
+          steps_json: JSON.stringify(stringArray(steps)),
+          tags_json: "[]",
+          image_r2_key: imageKey,
+          image_content_type: imageContentType,
+          created_by: c.get("userId"),
+          created_at: now,
+          updated_at: now,
+        }),
+      )
+      .run();
+  } catch (error) {
+    if (imageKey) await c.env.FIELD_MAPS.delete(imageKey);
+    throw error;
+  }
   return c.json({ id: recordId }, 201);
 });
 

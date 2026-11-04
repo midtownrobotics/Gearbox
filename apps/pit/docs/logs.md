@@ -33,3 +33,5 @@ Logs lists every log by event, for anyone signed in to download. Admins delete t
 - **AdvantageScope assets** lists the fields and robot models your team uploaded in AdvantageScope (**File** › **Upload Asset**). Mentors and admins upload and remove them, up to 100 MB in all.
 
 This is in beta.
+
+Up to three logs can upload at once. If a log upload takes more than 30 minutes, the downloader starts it again. Your completed logs stay available.

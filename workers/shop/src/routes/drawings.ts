@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { inTeam, requireAuth, withTeam } from "@g3/auth";
+import { inTeam, requireAuth, storageLimitResponse, withTeam } from "@g3/auth";
 import { eq, inArray } from "drizzle-orm";
 import { Hono } from "hono";
 import { createShopDb } from "../db";
 import * as schema from "../db/schema";
 import { drawingKey, drawingsPrefix, uploadedDrawingKey } from "../lib/storage";
+import { putShopFile } from "../lib/storage-limit";
 import type { AppEnv } from "../types";
 
 /** Every object under a prefix (R2 lists 1,000 at a time). */
@@ -169,33 +170,37 @@ export const drawingsRouter = new Hono<AppEnv>()
       const r2Key = uploadedDrawingKey(teamId, partNumber);
 
       // Upload to R2 (overwrites any existing drawing)
-      const arrayBuffer = await fileObj.arrayBuffer();
-      console.log("[Drawing Upload] Uploading to R2", { r2Key, size: arrayBuffer.byteLength });
-      await c.env.DRAWINGS.put(r2Key, arrayBuffer, {
-        httpMetadata: {
-          contentType: "application/pdf",
-        },
-      });
+      await putShopFile(c.env, teamId, r2Key, fileObj, "application/pdf");
       console.log("[Drawing Upload] Successfully uploaded to R2");
 
       // Store in database
       const db = createShopDb(c.env.SHOP_DB);
       const now = Math.floor(Date.now() / 1000);
 
-      const result = await db
-        .insert(schema.drawings)
-        .values(
-          withTeam(teamId, {
-            partNumber,
-            filename: fileObj.name,
-            r2Key,
-            fileSize: fileObj.size,
-            uploadedBy: uploadedBy || c.get("userId"),
-            createdAt: now,
-          }),
-        )
-        .returning({ id: schema.drawings.id });
-
+      const values = {
+        partNumber,
+        filename: fileObj.name,
+        r2Key,
+        fileSize: fileObj.size,
+        uploadedBy: uploadedBy || c.get("userId"),
+        createdAt: now,
+      };
+      // The R2 key is replaced, so update its metadata instead of growing a row per retry.
+      const existing = await db
+        .select({ id: schema.drawings.id })
+        .from(schema.drawings)
+        .where(inTeam(schema.drawings, teamId, eq(schema.drawings.r2Key, r2Key)))
+        .get();
+      const result = existing
+        ? await db
+            .update(schema.drawings)
+            .set(values)
+            .where(inTeam(schema.drawings, teamId, eq(schema.drawings.id, existing.id)))
+            .returning({ id: schema.drawings.id })
+        : await db
+            .insert(schema.drawings)
+            .values(withTeam(teamId, values))
+            .returning({ id: schema.drawings.id });
       const drawingId = result[0]?.id;
       if (!drawingId) {
         throw new Error("Failed to get drawing ID");
@@ -208,6 +213,8 @@ export const drawingsRouter = new Hono<AppEnv>()
         partNumber,
       });
     } catch (err) {
+      const storage = storageLimitResponse(err);
+      if (storage) return storage;
       console.error("[Drawing Upload Error]", err);
       return c.json({ error: err instanceof Error ? err.message : "Upload failed" }, 500);
     }

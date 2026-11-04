@@ -43,6 +43,16 @@ export {
 } from "./scope";
 export { decryptSecret, encryptSecret } from "./secret-box";
 export { type StorageByTeam, type TeamStorage, storageByTeam } from "./storage";
+export {
+  MAX_SHOP_FILE_BYTES,
+  SCOUTING_STORAGE_LIMIT,
+  SHOP_STORAGE_LIMIT,
+  StorageLimitError,
+  clearTeamStorageLock,
+  storageLimitResponse,
+  withStorageLimit,
+  withTeamStorageLock,
+} from "./storage-limit";
 export { type TeamChange, changedFields, logTeamChange, settingLabels } from "./audit";
 export {
   type IntegrationFact,
