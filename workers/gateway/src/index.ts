@@ -20,6 +20,7 @@ import {
 import devPorts from "../../../.dev-ports.json";
 import { type DemoEnv, checkDemoRequest } from "./demo";
 import { teamIcon } from "./icons";
+import { type RateLimitEnv, checkRateLimit } from "./rate-limit";
 
 // The one worker on the platform's domain (and *.<domain>, the site team's own, for its retired
 // addresses): works out the team and app from the hostname and sends the request to that app's
@@ -71,7 +72,8 @@ import { teamIcon } from "./icons";
 type Worker = AppName | "platform";
 
 export type Env = Record<(typeof BINDINGS)[Worker], Fetcher> &
-  DemoEnv & {
+  DemoEnv &
+  RateLimitEnv & {
     /** "true" in local dev (see above). */
     LOCAL_DEV?: string;
   };
@@ -377,6 +379,11 @@ export default {
     const localHost = env.LOCAL_DEV === "true" ? fromLocalHost(url.hostname) : null;
     const local = localHost !== null;
     const host = localHost ?? url.hostname;
+    // Before routing, team/icon/session lookups, or any service-binding fetch.
+    if (!local) {
+      const limited = await checkRateLimit(request, env);
+      if (limited) return limited;
+    }
     if (platformLabel(host) === DEMO_HOST_LABEL) {
       const home = teamAppUrlVia(local ? url.origin : undefined, demoTeamId, "portal");
       return Response.redirect(`${home}/`, 302);

@@ -15,6 +15,31 @@ LOCAL_DEV = "true"
 
 # The public demo's limit on changes per visitor (src/demo.ts): 60 a minute by IP address.
 [[ratelimits]]
+name = "REQUEST_LIMITER"
+namespace_id = "10001"
+simple = { limit = 3000, period = 60 }
+
+[[ratelimits]]
+name = "API_LIMITER"
+namespace_id = "10002"
+simple = { limit = 1200, period = 60 }
+
+[[ratelimits]]
+name = "WRITE_LIMITER"
+namespace_id = "10003"
+simple = { limit = 300, period = 60 }
+
+[[ratelimits]]
+name = "EXPENSIVE_LIMITER"
+namespace_id = "10004"
+simple = { limit = 60, period = 60 }
+
+[[ratelimits]]
+name = "API_BUDGET_LIMITER"
+namespace_id = "10005"
+simple = { limit = 20000, period = 60 }
+
+[[ratelimits]]
 name = "DEMO_LIMITER"
 namespace_id = "9999"
 simple = { limit = 60, period = 60 }
@@ -212,6 +237,31 @@ binding = "SCHEDULE"
 service = "schedule-production"
 
 [[env.production.ratelimits]]
+name = "REQUEST_LIMITER"
+namespace_id = "10001"
+simple = { limit = 3000, period = 60 }
+
+[[env.production.ratelimits]]
+name = "API_LIMITER"
+namespace_id = "10002"
+simple = { limit = 1200, period = 60 }
+
+[[env.production.ratelimits]]
+name = "WRITE_LIMITER"
+namespace_id = "10003"
+simple = { limit = 300, period = 60 }
+
+[[env.production.ratelimits]]
+name = "EXPENSIVE_LIMITER"
+namespace_id = "10004"
+simple = { limit = 60, period = 60 }
+
+[[env.production.ratelimits]]
+name = "API_BUDGET_LIMITER"
+namespace_id = "10005"
+simple = { limit = 20000, period = 60 }
+
+[[env.production.ratelimits]]
 name = "DEMO_LIMITER"
 namespace_id = "9999"
 simple = { limit = 60, period = 60 }
@@ -272,6 +322,31 @@ service = "inventory-staging"
 [[env.staging.services]]
 binding = "SCHEDULE"
 service = "schedule-staging"
+
+[[env.staging.ratelimits]]
+name = "REQUEST_LIMITER"
+namespace_id = "10001"
+simple = { limit = 3000, period = 60 }
+
+[[env.staging.ratelimits]]
+name = "API_LIMITER"
+namespace_id = "10002"
+simple = { limit = 1200, period = 60 }
+
+[[env.staging.ratelimits]]
+name = "WRITE_LIMITER"
+namespace_id = "10003"
+simple = { limit = 300, period = 60 }
+
+[[env.staging.ratelimits]]
+name = "EXPENSIVE_LIMITER"
+namespace_id = "10004"
+simple = { limit = 60, period = 60 }
+
+[[env.staging.ratelimits]]
+name = "API_BUDGET_LIMITER"
+namespace_id = "10005"
+simple = { limit = 20000, period = 60 }
 
 [[env.staging.ratelimits]]
 name = "DEMO_LIMITER"
