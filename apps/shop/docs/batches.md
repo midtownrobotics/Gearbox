@@ -24,4 +24,4 @@ To clear out old files and drawings, tick the box by each one and choose **Delet
 
 **Duplicate** a batch to make the same parts again from the same file.
 
-A file can be up to 100 MB. Your team has room for 5 GB or 10,000 files and drawings in Shop. If it fills up, remove unneeded files here and try again. Existing files stay available.
+A file can be up to 100 MB. Your team has room for 5 GB or 10,000 files and drawings in Shop. When a new upload would exceed the cap, Shop removes the oldest files that are over six months old, aiming for 90% usage. Newer files are protected; uploads pause if not enough older data can be removed. Download files you want to keep beyond six months. Admins receive grouped cleanup summaries.

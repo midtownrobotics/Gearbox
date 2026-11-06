@@ -1390,140 +1390,141 @@ app.post("/scouting-forms/:id/submissions", requireAuth, async (c) => {
     uploads.push({ key, file: fieldDrawing });
     drawingFields[field.id] = { key, contentType: fieldDrawing.type };
   }
-  await storeScoutingFiles(c.env, c.get("teamId"), uploads);
-  const submittedAt = Date.now();
-  if (formDefinition.form_kind === "scouting") {
-    // The schedule can move while drawings upload: check again, and record a report as late if it
-    // became late meanwhile.
-    const latest = await resolveEventLink(c, true);
-    const latestTarget = await reportMatch(c, latest, reportMatchKey);
-    const latestAssignment = await dbOf(c)
-      .select({ teamNumber: scoutingMatchAssignments.team_number })
-      .from(scoutingMatchAssignments)
-      .where(
-        and(
-          inTeam(scoutingMatchAssignments, c.get("teamId")),
-          eq(scoutingMatchAssignments.event_key, reportEvent.eventKey as string),
-          eq(scoutingMatchAssignments.match_number, reportEvent.matchNumber as number),
-          eq(scoutingMatchAssignments.user_id, c.get("userId")),
-        ),
-      )
-      .get();
-    if ("match" in latestTarget) reportEvent.late = reportEvent.late || latestTarget.late;
-    // The lineup checked is the report's own match, which for a late one isn't the current match.
-    if (
-      latestAssignment?.teamNumber !== teamName ||
-      "error" in latestTarget ||
-      latestTarget.match.key !== reportEvent.matchKey ||
-      !publicMatch(latestTarget.match).teams.includes(teamName) ||
-      latest.eventKey !== reportEvent.eventKey
-    ) {
-      const keys = [
-        drawingKey,
-        ...Object.values(drawingFields).map((drawing) => drawing.key),
-      ].filter((key): key is string => Boolean(key));
-      if (keys.length) await c.env.FIELD_MAPS.delete(keys);
-      return c.json(
-        {
-          error:
-            "error" in latestTarget
-              ? latestTarget.error
-              : "The match changed. Refresh the form before submitting.",
-        },
-        409,
-      );
-    }
-  }
-  const submissionStatement = dbOf(c)
-    .insert(scoutingFormSubmissions)
-    .values(
-      withTeam(c.get("teamId"), {
-        id: submissionId,
-        form_id: c.req.param("id"),
-        fields_json: formDefinition.fields_json,
-        answers_json: JSON.stringify(cleanAnswers),
-        drawing_r2_key: drawingKey,
-        drawing_content_type: drawingType,
-        submitted_by: c.get("userId"),
-        submitted_by_name: c.get("userDisplayName"),
-        created_at: submittedAt,
-        team_name: teamName,
-        drawing_fields_json: JSON.stringify(drawingFields),
-        event_key: reportEvent.eventKey,
-        match_key: reportEvent.matchKey,
-        match_number: reportEvent.matchNumber,
-        submitted_late: reportEvent.late ? 1 : 0,
-      }),
-    );
-  let boyleBucksAwarded = 0;
-  try {
-    if (
-      formDefinition.form_kind === "scouting" &&
-      (await getEngagementSettings(c.env.SCOUTING_DB, c.get("teamId"))).enabled
-    ) {
-      const rewardReference = `submission:${submissionId}`;
-      await batch(dbOf(c), [
-        submissionStatement,
-        dbOf(c)
-          .insert(boylebucksAccounts)
-          .values(
-            withTeam(c.get("teamId"), {
-              user_id: c.get("userId"),
-              display_name: c.get("userDisplayName"),
-              balance: 0,
-              earned: 0,
-              wagered: 0,
-              updated_at: submittedAt,
-            }),
-          )
-          .onConflictDoUpdate({
-            target: [boylebucksAccounts.teamId, boylebucksAccounts.user_id],
-            set: { display_name: sql`excluded.display_name` },
-          }),
-        dbOf(c)
-          .update(boylebucksAccounts)
-          .set({ balance: sql`balance + 10`, earned: sql`earned + 10`, updated_at: submittedAt })
-          .where(
-            inTeam(
-              boylebucksAccounts,
-              c.get("teamId"),
-              sql`user_id = ${c.get("userId")}
-              AND NOT EXISTS (SELECT 1 FROM (SELECT * FROM ${boylebucksLedger} WHERE ${inTeam(boylebucksLedger, c.get("teamId"))}) AS scoped_boylebucks_ledger WHERE reference_id = ${rewardReference})`,
-            ),
+  return storeScoutingFiles(c.env, c.get("teamId"), uploads, async () => {
+    const submittedAt = Date.now();
+    if (formDefinition.form_kind === "scouting") {
+      // The schedule can move while drawings upload: check again, and record a report as late if it
+      // became late meanwhile.
+      const latest = await resolveEventLink(c, true);
+      const latestTarget = await reportMatch(c, latest, reportMatchKey);
+      const latestAssignment = await dbOf(c)
+        .select({ teamNumber: scoutingMatchAssignments.team_number })
+        .from(scoutingMatchAssignments)
+        .where(
+          and(
+            inTeam(scoutingMatchAssignments, c.get("teamId")),
+            eq(scoutingMatchAssignments.event_key, reportEvent.eventKey as string),
+            eq(scoutingMatchAssignments.match_number, reportEvent.matchNumber as number),
+            eq(scoutingMatchAssignments.user_id, c.get("userId")),
           ),
-        dbOf(c)
-          .insert(boylebucksLedger)
-          .values(
-            withTeam(c.get("teamId"), {
-              id: id("ledger"),
-              user_id: c.get("userId"),
-              amount: 10,
-              reason: "Valid scouting form",
-              reference_id: rewardReference,
-              created_at: submittedAt,
-            }),
-          )
-          .onConflictDoNothing(),
-      ]);
-      boyleBucksAwarded = 10;
-    } else {
-      await submissionStatement.run();
+        )
+        .get();
+      if ("match" in latestTarget) reportEvent.late = reportEvent.late || latestTarget.late;
+      // The lineup checked is the report's own match, which for a late one isn't the current match.
+      if (
+        latestAssignment?.teamNumber !== teamName ||
+        "error" in latestTarget ||
+        latestTarget.match.key !== reportEvent.matchKey ||
+        !publicMatch(latestTarget.match).teams.includes(teamName) ||
+        latest.eventKey !== reportEvent.eventKey
+      ) {
+        const keys = [
+          drawingKey,
+          ...Object.values(drawingFields).map((drawing) => drawing.key),
+        ].filter((key): key is string => Boolean(key));
+        if (keys.length) await c.env.FIELD_MAPS.delete(keys);
+        return c.json(
+          {
+            error:
+              "error" in latestTarget
+                ? latestTarget.error
+                : "The match changed. Refresh the form before submitting.",
+          },
+          409,
+        );
+      }
     }
-  } catch (error) {
-    const uploadedKeys = [
-      drawingKey,
-      ...Object.values(drawingFields).map((item) => item.key),
-    ].filter((key): key is string => Boolean(key));
-    if (uploadedKeys.length) await c.env.FIELD_MAPS.delete(uploadedKeys);
-    if (
-      `${String(error)} ${error instanceof Error ? String(error.cause) : ""}`.includes(
-        "one scouting submission per match",
+    const submissionStatement = dbOf(c)
+      .insert(scoutingFormSubmissions)
+      .values(
+        withTeam(c.get("teamId"), {
+          id: submissionId,
+          form_id: c.req.param("id"),
+          fields_json: formDefinition.fields_json,
+          answers_json: JSON.stringify(cleanAnswers),
+          drawing_r2_key: drawingKey,
+          drawing_content_type: drawingType,
+          submitted_by: c.get("userId"),
+          submitted_by_name: c.get("userDisplayName"),
+          created_at: submittedAt,
+          team_name: teamName,
+          drawing_fields_json: JSON.stringify(drawingFields),
+          event_key: reportEvent.eventKey,
+          match_key: reportEvent.matchKey,
+          match_number: reportEvent.matchNumber,
+          submitted_late: reportEvent.late ? 1 : 0,
+        }),
+      );
+    let boyleBucksAwarded = 0;
+    try {
+      if (
+        formDefinition.form_kind === "scouting" &&
+        (await getEngagementSettings(c.env.SCOUTING_DB, c.get("teamId"))).enabled
+      ) {
+        const rewardReference = `submission:${submissionId}`;
+        await batch(dbOf(c), [
+          submissionStatement,
+          dbOf(c)
+            .insert(boylebucksAccounts)
+            .values(
+              withTeam(c.get("teamId"), {
+                user_id: c.get("userId"),
+                display_name: c.get("userDisplayName"),
+                balance: 0,
+                earned: 0,
+                wagered: 0,
+                updated_at: submittedAt,
+              }),
+            )
+            .onConflictDoUpdate({
+              target: [boylebucksAccounts.teamId, boylebucksAccounts.user_id],
+              set: { display_name: sql`excluded.display_name` },
+            }),
+          dbOf(c)
+            .update(boylebucksAccounts)
+            .set({ balance: sql`balance + 10`, earned: sql`earned + 10`, updated_at: submittedAt })
+            .where(
+              inTeam(
+                boylebucksAccounts,
+                c.get("teamId"),
+                sql`user_id = ${c.get("userId")}
+              AND NOT EXISTS (SELECT 1 FROM (SELECT * FROM ${boylebucksLedger} WHERE ${inTeam(boylebucksLedger, c.get("teamId"))}) AS scoped_boylebucks_ledger WHERE reference_id = ${rewardReference})`,
+              ),
+            ),
+          dbOf(c)
+            .insert(boylebucksLedger)
+            .values(
+              withTeam(c.get("teamId"), {
+                id: id("ledger"),
+                user_id: c.get("userId"),
+                amount: 10,
+                reason: "Valid scouting form",
+                reference_id: rewardReference,
+                created_at: submittedAt,
+              }),
+            )
+            .onConflictDoNothing(),
+        ]);
+        boyleBucksAwarded = 10;
+      } else {
+        await submissionStatement.run();
+      }
+    } catch (error) {
+      const uploadedKeys = [
+        drawingKey,
+        ...Object.values(drawingFields).map((item) => item.key),
+      ].filter((key): key is string => Boolean(key));
+      if (uploadedKeys.length) await c.env.FIELD_MAPS.delete(uploadedKeys);
+      if (
+        `${String(error)} ${error instanceof Error ? String(error.cause) : ""}`.includes(
+          "one scouting submission per match",
+        )
       )
-    )
-      return c.json({ error: "You already submitted this form for this match." }, 409);
-    throw error;
-  }
-  return c.json({ id: submissionId, boyleBucksAwarded, late: reportEvent.late }, 201);
+        return c.json({ error: "You already submitted this form for this match." }, 409);
+      throw error;
+    }
+    return c.json({ id: submissionId, boyleBucksAwarded, late: reportEvent.late }, 201);
+  });
 });
 
 app.get("/scouting-forms/:id/submissions", requireAuth, async (c) => {
@@ -2032,30 +2033,31 @@ app.post("/field-maps", requireAuth, async (c) => {
   const recordId = id("map");
   const extension = image.type === "image/jpeg" ? "jpg" : "png";
   const key = `teams/${encodeURIComponent(c.get("teamId"))}/field-maps/${recordId}.${extension}`;
-  await storeScoutingFiles(c.env, c.get("teamId"), [{ key, file: image }]);
-  const now = Date.now();
-  try {
-    await dbOf(c)
-      .insert(fieldMaps)
-      .values(
-        withTeam(c.get("teamId"), {
-          id: recordId,
-          name: name,
-          event_name: text(form.get("eventName"), 120),
-          notes: text(form.get("notes"), 2000),
-          r2_key: key,
-          content_type: image.type,
-          created_by: c.get("userId"),
-          created_at: now,
-          updated_at: now,
-        }),
-      )
-      .run();
-  } catch (error) {
-    if (key) await c.env.FIELD_MAPS.delete(key);
-    throw error;
-  }
-  return c.json({ id: recordId }, 201);
+  return storeScoutingFiles(c.env, c.get("teamId"), [{ key, file: image }], async () => {
+    const now = Date.now();
+    try {
+      await dbOf(c)
+        .insert(fieldMaps)
+        .values(
+          withTeam(c.get("teamId"), {
+            id: recordId,
+            name: name,
+            event_name: text(form.get("eventName"), 120),
+            notes: text(form.get("notes"), 2000),
+            r2_key: key,
+            content_type: image.type,
+            created_by: c.get("userId"),
+            created_at: now,
+            updated_at: now,
+          }),
+        )
+        .run();
+    } catch (error) {
+      if (key) await c.env.FIELD_MAPS.delete(key);
+      throw error;
+    }
+    return c.json({ id: recordId }, 201);
+  });
 });
 
 app.get("/field-maps/:id/image", requireAuth, async (c) => {
@@ -2137,35 +2139,41 @@ app.post("/autos", requireAuth, async (c) => {
     const extension = image.type === "image/jpeg" ? "jpg" : "png";
     imageKey = `teams/${encodeURIComponent(c.get("teamId"))}/auto-images/${recordId}.${extension}`;
     imageContentType = image.type;
-    await storeScoutingFiles(c.env, c.get("teamId"), [{ key: imageKey, file: image }]);
   }
 
-  const steps = parseJson<unknown>(form.get("steps"), []);
-  try {
-    await dbOf(c)
-      .insert(autoRoutines)
-      .values(
-        withTeam(c.get("teamId"), {
-          id: recordId,
-          name: name,
-          robot_name: autoTeam,
-          start_position: "",
-          summary: text(form.get("description"), 2000),
-          steps_json: JSON.stringify(stringArray(steps)),
-          tags_json: "[]",
-          image_r2_key: imageKey,
-          image_content_type: imageContentType,
-          created_by: c.get("userId"),
-          created_at: now,
-          updated_at: now,
-        }),
-      )
-      .run();
-  } catch (error) {
-    if (imageKey) await c.env.FIELD_MAPS.delete(imageKey);
-    throw error;
-  }
-  return c.json({ id: recordId }, 201);
+  return storeScoutingFiles(
+    c.env,
+    c.get("teamId"),
+    imageKey && image instanceof File ? [{ key: imageKey, file: image }] : [],
+    async () => {
+      const steps = parseJson<unknown>(form.get("steps"), []);
+      try {
+        await dbOf(c)
+          .insert(autoRoutines)
+          .values(
+            withTeam(c.get("teamId"), {
+              id: recordId,
+              name: name,
+              robot_name: autoTeam,
+              start_position: "",
+              summary: text(form.get("description"), 2000),
+              steps_json: JSON.stringify(stringArray(steps)),
+              tags_json: "[]",
+              image_r2_key: imageKey,
+              image_content_type: imageContentType,
+              created_by: c.get("userId"),
+              created_at: now,
+              updated_at: now,
+            }),
+          )
+          .run();
+      } catch (error) {
+        if (imageKey) await c.env.FIELD_MAPS.delete(imageKey);
+        throw error;
+      }
+      return c.json({ id: recordId }, 201);
+    },
+  );
 });
 
 app.get("/autos/:id/image", requireAuth, async (c) => {

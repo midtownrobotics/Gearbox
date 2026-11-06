@@ -74,7 +74,7 @@ export type MatchLog = {
 };
 
 /** What Pit does with a new log once the team has `limit`. */
-export type WhenFull = "skip-new" | "delete-oldest";
+export type WhenFull = "skip-new" | "delete-oldest" | "delete-expired";
 
 export type MatchLogs = {
   logs: MatchLog[];

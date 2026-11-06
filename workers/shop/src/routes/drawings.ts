@@ -5,7 +5,7 @@ import { Hono } from "hono";
 import { createShopDb } from "../db";
 import * as schema from "../db/schema";
 import { drawingKey, drawingsPrefix, uploadedDrawingKey } from "../lib/storage";
-import { putShopFile } from "../lib/storage-limit";
+import { withShopFile } from "../lib/storage-limit";
 import type { AppEnv } from "../types";
 
 /** Every object under a prefix (R2 lists 1,000 at a time). */
@@ -170,47 +170,49 @@ export const drawingsRouter = new Hono<AppEnv>()
       const r2Key = uploadedDrawingKey(teamId, partNumber);
 
       // Upload to R2 (overwrites any existing drawing)
-      await putShopFile(c.env, teamId, r2Key, fileObj, "application/pdf");
-      console.log("[Drawing Upload] Successfully uploaded to R2");
+      return await withShopFile(c.env, teamId, r2Key, fileObj, "application/pdf", async (store) => {
+        await store();
+        console.log("[Drawing Upload] Successfully uploaded to R2");
 
-      // Store in database
-      const db = createShopDb(c.env.SHOP_DB);
-      const now = Math.floor(Date.now() / 1000);
+        // Store in database
+        const db = createShopDb(c.env.SHOP_DB);
+        const now = Math.floor(Date.now() / 1000);
 
-      const values = {
-        partNumber,
-        filename: fileObj.name,
-        r2Key,
-        fileSize: fileObj.size,
-        uploadedBy: uploadedBy || c.get("userId"),
-        createdAt: now,
-      };
-      // The R2 key is replaced, so update its metadata instead of growing a row per retry.
-      const existing = await db
-        .select({ id: schema.drawings.id })
-        .from(schema.drawings)
-        .where(inTeam(schema.drawings, teamId, eq(schema.drawings.r2Key, r2Key)))
-        .get();
-      const result = existing
-        ? await db
-            .update(schema.drawings)
-            .set(values)
-            .where(inTeam(schema.drawings, teamId, eq(schema.drawings.id, existing.id)))
-            .returning({ id: schema.drawings.id })
-        : await db
-            .insert(schema.drawings)
-            .values(withTeam(teamId, values))
-            .returning({ id: schema.drawings.id });
-      const drawingId = result[0]?.id;
-      if (!drawingId) {
-        throw new Error("Failed to get drawing ID");
-      }
+        const values = {
+          partNumber,
+          filename: fileObj.name,
+          r2Key,
+          fileSize: fileObj.size,
+          uploadedBy: uploadedBy || c.get("userId"),
+          createdAt: now,
+        };
+        // The R2 key is replaced, so update its metadata instead of growing a row per retry.
+        const existing = await db
+          .select({ id: schema.drawings.id })
+          .from(schema.drawings)
+          .where(inTeam(schema.drawings, teamId, eq(schema.drawings.r2Key, r2Key)))
+          .get();
+        const result = existing
+          ? await db
+              .update(schema.drawings)
+              .set(values)
+              .where(inTeam(schema.drawings, teamId, eq(schema.drawings.id, existing.id)))
+              .returning({ id: schema.drawings.id })
+          : await db
+              .insert(schema.drawings)
+              .values(withTeam(teamId, values))
+              .returning({ id: schema.drawings.id });
+        const drawingId = result[0]?.id;
+        if (!drawingId) {
+          throw new Error("Failed to get drawing ID");
+        }
 
-      return c.json({
-        success: true,
-        id: drawingId,
-        filename: fileObj.name,
-        partNumber,
+        return c.json({
+          success: true,
+          id: drawingId,
+          filename: fileObj.name,
+          partNumber,
+        });
       });
     } catch (err) {
       const storage = storageLimitResponse(err);

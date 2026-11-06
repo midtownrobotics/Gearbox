@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { env } from "cloudflare:test";
+import { storageRetentionCutoff } from "@g3/auth";
 import { newTeamId, teamUsers } from "@g3/testing/users";
 import { call, jsonAs } from "@g3/testing/worker";
 import { describe, expect, it } from "vitest";
-import { MAX_PENDING_LOGS, UPLOAD_TTL } from "../src/match-logs";
+import { MAX_LOGS, MAX_PENDING_LOGS, UPLOAD_TTL } from "../src/match-logs";
 
 const { PIT_DB: database, LOGS: bucket } = env as unknown as { PIT_DB: D1Database; LOGS: R2Bucket };
 
@@ -43,6 +44,120 @@ async function downloader() {
 }
 
 describe("multipart storage limits", () => {
+  it("does not overwrite a saved log when a downloader offers a different size", async () => {
+    const client = await downloader();
+    const { id } = (await (await client.start(1)).json()) as { id: number };
+    const part = await (
+      await call(`/downloader/logs/${id}/parts/1`, {
+        method: "PUT",
+        headers: client.headers,
+        body: "12345",
+      })
+    ).json();
+    expect(
+      (
+        await call(`/downloader/logs/${id}/complete`, {
+          method: "POST",
+          headers: client.headers,
+          body: JSON.stringify({ parts: [part] }),
+        })
+      ).status,
+    ).toBe(200);
+    const replacement = await call("/downloader/logs", {
+      method: "POST",
+      headers: client.headers,
+      body: JSON.stringify({
+        event: "safety",
+        name: "Qual-1",
+        matchType: "q",
+        matchNumber: 1,
+        size: 6,
+        rawSize: 6,
+      }),
+    });
+    expect(replacement.status).toBe(409);
+    const saved = await database
+      .prepare("SELECT size, status FROM match_logs WHERE team_id = ? AND id = ?")
+      .bind(client.team, id)
+      .first();
+    expect(saved).toMatchObject({ size: 5, status: "stored" });
+    expect(
+      await (await bucket.get(`pit/teams/${client.team}/logs/safety/Qual-1.wpilog.gz`))?.text(),
+    ).toBe("12345");
+  });
+  it("protects recent logs at capacity, then cleans logs over six months old toward 90%", async () => {
+    const client = await downloader();
+    await database
+      .prepare(
+        "INSERT INTO settings (team_id, key, value) VALUES (?, 'matchLogsWhenFull', 'delete-oldest')",
+      )
+      .bind(client.team)
+      .run();
+    for (let number = 1; number <= MAX_LOGS; number++) {
+      const started = await client.start(number);
+      expect(started.status).toBe(201);
+      const { id } = (await started.json()) as { id: number };
+      const sent = await call(`/downloader/logs/${id}/parts/1`, {
+        method: "PUT",
+        headers: client.headers,
+        body: "12345",
+      });
+      expect(sent.status).toBe(200);
+      const part = await sent.json();
+      const completed = await call(`/downloader/logs/${id}/complete`, {
+        method: "POST",
+        headers: client.headers,
+        body: JSON.stringify({ parts: [part] }),
+      });
+      expect(completed.status).toBe(200);
+    }
+    const refused = await client.start(MAX_LOGS + 1);
+    expect(refused.status).toBe(409);
+    const stored = await database
+      .prepare("SELECT name FROM match_logs WHERE team_id = ? AND status = 'stored'")
+      .bind(client.team)
+      .all<{ name: string }>();
+    expect(stored.results).toHaveLength(MAX_LOGS);
+    expect(stored.results.some((log) => log.name === "Qual-1")).toBe(true);
+    expect(stored.results.some((log) => log.name === `Qual-${MAX_LOGS}`)).toBe(true);
+    const files = await bucket.list({ prefix: `pit/teams/${client.team}/logs/` });
+    expect(files.objects).toHaveLength(MAX_LOGS);
+    await database
+      .prepare(
+        "UPDATE match_logs SET uploaded_at = ? WHERE team_id = ? AND name IN ('Qual-1', 'Qual-2', 'Qual-3')",
+      )
+      .bind(storageRetentionCutoff() - 86_400_000, client.team)
+      .run();
+    const accepted = await client.start(MAX_LOGS + 1);
+    expect(accepted.status).toBe(201);
+    const { id } = (await accepted.json()) as { id: number };
+    const part = await (
+      await call(`/downloader/logs/${id}/parts/1`, {
+        method: "PUT",
+        headers: client.headers,
+        body: "12345",
+      })
+    ).json();
+    expect(
+      (
+        await call(`/downloader/logs/${id}/complete`, {
+          method: "POST",
+          headers: client.headers,
+          body: JSON.stringify({ parts: [part] }),
+        })
+      ).status,
+    ).toBe(200);
+    const remaining = await database
+      .prepare("SELECT name FROM match_logs WHERE team_id = ? AND status = 'stored'")
+      .bind(client.team)
+      .all<{ name: string }>();
+    expect(remaining.results).toHaveLength(18);
+    expect(remaining.results.some((log) => log.name === "Qual-1")).toBe(false);
+    expect(remaining.results.some((log) => log.name === "Qual-4")).toBe(true);
+    expect((await bucket.list({ prefix: `pit/teams/${client.team}/logs/` })).objects).toHaveLength(
+      18,
+    );
+  });
   it("caps pending uploads even when starts arrive together", async () => {
     const client = await downloader();
     const starts = await Promise.all(

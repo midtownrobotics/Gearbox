@@ -1,20 +1,22 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import {
+  STORAGE_CLEANUP_RATIO,
   inTeam,
-  logTeamChange,
+  isStorageFileExpired,
+  notifyStorageCleanup,
   requireAdmin,
   requireAuth,
   requireMentor,
   withTeam,
   withTeamStorageLock,
 } from "@g3/auth";
-import { asc, desc, eq, inArray, lt, ne } from "drizzle-orm";
+import { asc, desc, eq, inArray, lt } from "drizzle-orm";
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { type Db, createDb } from "./db";
-import { logDownloaders, matchLogs, settings } from "./db/schema";
+import { logDownloaders, matchLogs } from "./db/schema";
 import { requireDownloader } from "./downloaders";
-import { WHEN_FULL, type WhenFull, getWhenFull } from "./settings";
+import { getWhenFull } from "./settings";
 import type { AppEnv } from "./types";
 import { type ZipSource, writeZip, zipSize } from "./zip";
 
@@ -111,24 +113,13 @@ export const matchLogRoutes = new Hono<AppEnv>()
 
   // What Pit does with a new log once the team has MAX_LOGS.
   .put("/settings", requireMentor, async (c) => {
-    const body = (await c.req.json().catch(() => null)) as { whenFull?: unknown } | null;
-    const whenFull = body?.whenFull as WhenFull;
-    if (!WHEN_FULL.includes(whenFull)) return c.json({ error: "Not a choice." }, 400);
-    const db = createDb(c.env.PIT_DB);
-    const teamId = c.get("teamId");
-    if ((await getWhenFull(db, teamId)) !== whenFull) {
-      await db
-        .insert(settings)
-        .values(withTeam(teamId, { key: "matchLogsWhenFull", value: whenFull }))
-        .onConflictDoUpdate({ target: [settings.teamId, settings.key], set: { value: whenFull } });
-      await logTeamChange(c.env, teamId, {
-        userId: c.get("userId"),
-        app: "pit",
-        what: "Match logs when full",
-        changed: ["When Pit has 20 match logs"],
-      });
-    }
-    return c.json({ whenFull });
+    const body = await c.req.json<{ whenFull?: string }>().catch(() => null);
+    if (body?.whenFull !== "delete-expired")
+      return c.json(
+        { error: "Only logs older than six months can be removed automatically at capacity." },
+        400,
+      );
+    return c.json({ whenFull: "delete-expired" });
   })
 
   // Every log as one zip of .wpilog files, built from the gzipped files as they are (zip.ts).
@@ -270,6 +261,40 @@ export const logUploadRoutes = new Hono<AppEnv>()
       if (existing?.status === "stored" && existing.size === size) {
         return c.json({ id: existing.id, exists: true });
       }
+      if (existing?.status === "stored") {
+        return c.json(
+          {
+            error: "This log is already saved. Review and remove it before replacing it.",
+            code: "already_saved",
+          },
+          409,
+        );
+      }
+
+      const stored = await db
+        .select({
+          id: matchLogs.id,
+          size: matchLogs.size,
+          uploadedAt: matchLogs.uploadedAt,
+          createdAt: matchLogs.createdAt,
+        })
+        .from(matchLogs)
+        .where(inTeam(matchLogs, teamId, eq(matchLogs.status, "stored")));
+      const expired = stored
+        .filter((item) => isStorageFileExpired(item.uploadedAt ?? item.createdAt))
+        .sort(
+          (a, b) => (a.uploadedAt ?? a.createdAt) - (b.uploadedAt ?? b.createdAt) || a.id - b.id,
+        );
+      if (stored.length >= MAX_LOGS && expired.length < stored.length + 1 - MAX_LOGS)
+        return c.json(
+          {
+            error:
+              "Pit is full. Logs from the last six months are protected; review them before choosing what to remove.",
+            code: "full",
+          },
+          409,
+        );
+
       const pending = await db
         .select({ id: matchLogs.id })
         .from(matchLogs)
@@ -282,19 +307,6 @@ export const logUploadRoutes = new Hono<AppEnv>()
           },
           409,
         );
-      }
-      // A new log, with the team at its limit and keeping what it has.
-      if (existing?.status !== "stored") {
-        const others = await db
-          .select({ id: matchLogs.id })
-          .from(matchLogs)
-          .where(inTeam(matchLogs, teamId, eq(matchLogs.status, "stored")));
-        if (others.length >= MAX_LOGS && (await getWhenFull(db, teamId)) === "skip-new") {
-          return c.json(
-            { error: `Pit has ${MAX_LOGS} match logs, the most it keeps.`, code: "full" },
-            409,
-          );
-        }
       }
       // An upload of it that never finished: dropped, and started again.
       if (existing?.uploadId) {
@@ -448,17 +460,26 @@ export const logUploadRoutes = new Hono<AppEnv>()
       ) {
         return c.json({ error: "Send every part once, in order." }, 400);
       }
-      if ((await getWhenFull(db, teamId)) === "skip-new") {
-        const stored = await db
-          .select({ id: matchLogs.id })
-          .from(matchLogs)
-          .where(inTeam(matchLogs, teamId, eq(matchLogs.status, "stored")));
-        if (stored.length >= MAX_LOGS)
-          return c.json(
-            { error: `Pit has ${MAX_LOGS} match logs, the most it keeps.`, code: "full" },
-            409,
-          );
-      }
+
+      const stored = await db
+        .select({
+          id: matchLogs.id,
+          size: matchLogs.size,
+          uploadedAt: matchLogs.uploadedAt,
+          createdAt: matchLogs.createdAt,
+        })
+        .from(matchLogs)
+        .where(inTeam(matchLogs, teamId, eq(matchLogs.status, "stored")));
+      const expired = stored
+        .filter((item) => isStorageFileExpired(item.uploadedAt ?? item.createdAt))
+        .sort(
+          (a, b) => (a.uploadedAt ?? a.createdAt) - (b.uploadedAt ?? b.createdAt) || a.id - b.id,
+        );
+      if (stored.length >= MAX_LOGS && expired.length < stored.length + 1 - MAX_LOGS)
+        return c.json(
+          { error: "Pit is full. Logs from the last six months are protected.", code: "full" },
+          409,
+        );
       const object = await c.env.LOGS.resumeMultipartUpload(log.r2Key, log.uploadId)
         .complete(parts.map((p) => ({ partNumber: Number(p.partNumber), etag: String(p.etag) })))
         .catch(() => null);
@@ -476,17 +497,26 @@ export const logUploadRoutes = new Hono<AppEnv>()
         .set({ status: "stored", uploadId: null, size: object.size, uploadedAt: Date.now() })
         .where(inTeam(matchLogs, teamId, eq(matchLogs.id, id)));
 
-      if ((await getWhenFull(db, teamId)) === "delete-oldest") {
-        const older = await db
-          .select({ id: matchLogs.id })
-          .from(matchLogs)
-          .where(inTeam(matchLogs, teamId, eq(matchLogs.status, "stored"), ne(matchLogs.id, id)))
-          .orderBy(desc(matchLogs.uploadedAt));
+      if (stored.length + 1 > MAX_LOGS) {
+        const removed = expired.slice(
+          0,
+          stored.length + 1 - Math.floor(MAX_LOGS * STORAGE_CLEANUP_RATIO),
+        );
         await deleteLogs(
           db,
           c.env.LOGS,
           teamId,
-          older.slice(MAX_LOGS - 1).map((row) => row.id),
+          removed.map((item) => item.id),
+        );
+        await notifyStorageCleanup(
+          c.env,
+          teamId,
+          "pit",
+          removed.map((item) => ({
+            size: item.size,
+            uploaded: new Date(item.uploadedAt ?? item.createdAt),
+          })),
+          c.env.PIT_DB,
         );
       }
       return c.json({ ok: true });

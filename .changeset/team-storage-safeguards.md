@@ -4,4 +4,4 @@
 "@g3/worker-pit": major
 ---
 
-Keep team file storage bounded while preserving existing files and downloads. Apply the new storage upload lock migrations before deploying these workers. Shop and Scouting show clear quota errors; Pit rejects oversized or excess unfinished log uploads.
+Keep file storage within per-team caps. When a new upload would exceed a cap, permanently remove only files older than six calendar months, oldest first, targeting 90% usage. Newer files are protected; uploads pause when eligible old files cannot free enough room. Written Scouting reports and auton steps remain when their images are removed. Admin cleanup summaries include sizes and age. Apply coordination and notice migrations before deployment and honor the owner-notice period before changing live retention.

@@ -25,4 +25,6 @@
 
 ## Storage safeguards
 
-- `src/lib/storage-limit.ts` routes manual drawings, part files and Onshape exports through the shared `withStorageLimit` guard: 5 GiB and 10,000 R2 objects per team, 100 MiB per file. Migration `0026` adds the shared upload coordination table. Replacing a drawing updates its metadata; downloads and deletion remain available at capacity. See `docs/storage-limits.md`.
+- Caps: 5 GiB / 10,000 objects per team; 100 MiB per file. At cap, only files strictly older than six calendar months are automatically eligible; recent/unknown-date files are protected. Legacy Pit delete-oldest values cannot authorize deleting recent files. Unknown objects count toward quotas and can be removed only when their server upload date is expired.
+- The shared engine applies the six-calendar-month UTC cutoff (strict boundary, month-end clamped) and targets 90% after the incoming save. If expired files cannot free enough room, uploads pause. Exact object-version approvals remain supported internally but no route approves younger files and no new approval UI exists. Existing manual review/download/delete controls remain.
+- Migrations: 0026 (locks), 0027 (notices). Per-team coordination prevents concurrent quota races; cleanup notices, after actual expired/reviewed file deletion, are best effort and batched. See `docs/storage-limits.md`.

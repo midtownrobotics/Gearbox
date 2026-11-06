@@ -21,7 +21,7 @@ To update the downloader, stop it (Ctrl+C), run `git pull` in its Gearbox folder
 
 Logs lists every log by event, for anyone signed in to download. Admins delete them.
 
-- Each team keeps at most 20 logs. On Logs, choose what happens when you're full: **Don't save new ones** (the default), or **Delete the oldest**.
+- Each team keeps at most 20 logs. When a new upload exceeds the cap, only logs over six months old are removed, aiming for 18 remaining. Newer logs are protected; if there is not enough old data, new logs wait on the downloader. Download logs you want to keep before reaching the cap.
 - A log over 40 MB (compressed) waits on the laptop until it's trimmed. The downloader's page can trim a log to the part you need, and suggests from just before the robot was first enabled to just after it was last disabled. The file on the laptop is never cut.
 - **Export and delete all** downloads everything as one zip, then offers to delete them.
 
@@ -30,8 +30,10 @@ Logs lists every log by event, for anyone signed in to download. Admins delete t
 **Open AdvantageScope** on Logs, or **Open in AdvantageScope** beside a log, opens Mechanical Advantage's AdvantageScope in Pit, with your team's match logs to choose from at the top. Its layout is saved for the whole team. It can't connect to the robot live: use the Driver Station's AdvantageScope for that.
 
 - **Save all to this device** keeps AdvantageScope and every log on this computer or tablet, so they open without a connection at an event. Logs you've opened are kept too, marked **On this device**.
-- **AdvantageScope assets** lists the fields and robot models your team uploaded in AdvantageScope (**File** › **Upload Asset**). Mentors and admins upload and remove them, up to 100 MB in all.
+- **AdvantageScope assets** lists the fields and robot models your team uploaded in AdvantageScope (**File** › **Upload Asset**). Mentors and admins upload and remove them, up to 100 MB and 10 assets in all. When those caps would be exceeded, only assets over six months old are removed, aiming for 90 MB and 9 assets. Newer files remain protected and uploads pause when there is not enough eligible old data.
 
 This is in beta.
 
 Up to three logs can upload at once. If a log upload takes more than 30 minutes, the downloader starts it again. Your completed logs stay available.
+
+Download files you want to keep beyond six months. Admins receive grouped cleanup summaries with the amount removed and the files' upload dates and age.

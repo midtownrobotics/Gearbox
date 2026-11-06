@@ -51,7 +51,7 @@ import {
   scheduleFromTba,
   withResults,
 } from "./monitor-matches";
-import { SETTING_KEYS, type SettingKey, getSetting, getWhenFull, teamNumberOf } from "./settings";
+import { SETTING_KEYS, type SettingKey, getSetting, teamNumberOf } from "./settings";
 import type { AppEnv } from "./types";
 
 // The Monitor's outside services (The Blue Alliance, Nexus, Statbotics) get this long to answer.
@@ -1061,7 +1061,6 @@ const app = base
         return {
           values: {
             ...Object.fromEntries(SETTING_KEYS.map((key, i) => [key, values[i] || null])),
-            matchLogsWhenFull: await getWhenFull(db, team),
           },
         };
       },

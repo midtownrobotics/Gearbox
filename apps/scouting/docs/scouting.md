@@ -39,4 +39,4 @@ Choose **Pit scouting** for the form you fill in once per team, in their pit. It
 
 ## Image storage
 
-Each image can be up to 12 MB, and one submission can contain up to 24 MB of images. Your team has room for 2 GB or 25,000 images across Scouting. If it fills up, ask a strategy lead or the person who shared an image to remove unneeded reports, maps or auto images. Existing reports stay available.
+Each image can be up to 12 MB, with up to 24 MB per submission. Your team has room for 2 GB or 25,000 images. When a new upload would exceed the cap, images over six months old are removed oldest first, aiming for 90% usage. Newer images are protected and written reports/auton steps remain. Uploads pause if not enough older images can be removed. Download images you want to keep beyond six months. Admins receive grouped cleanup summaries.

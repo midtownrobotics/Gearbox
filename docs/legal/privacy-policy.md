@@ -1,6 +1,6 @@
 # Gearbox Privacy Policy
 
-Last updated: 4 November 2026.
+Last updated: 6 November 2026.
 
 ## In short
 
@@ -116,6 +116,7 @@ Where the law of your team's country requires a legal basis for that transfer, t
 | Sign-in sessions | 7 days from sign-in |
 | Your account | Until a team admin deletes it, which removes it and your sign-ins at once, or until your team is deleted |
 | Team data | While the team is registered. Deleted within 30 days after the team closes |
+| Uploaded files in Shop, Scouting and Pit | When new uploads would exceed an app's cap, files strictly older than six calendar months may be permanently removed oldest first, targeting 90% usage. Newer files remain protected; if not enough old data can be removed, uploads pause. Written Scouting reports and auton steps remain when images are removed. Admin cleanup summaries are best effort through the team log and connected chat. Existing team/app deletion and demo lifecycle rules still apply |
 | The team's log (apps switched on or off, data downloads, and which settings were changed and by whom, never their values) | Kept as team data |
 | Data of an app your team switches off | 90 days, in case your team switches it back on, then deleted |
 | Records that name a removed member, such as past orders | Kept by the team, with the member's name replaced by a placeholder |

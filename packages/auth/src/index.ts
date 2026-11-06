@@ -47,12 +47,17 @@ export {
   MAX_SHOP_FILE_BYTES,
   SCOUTING_STORAGE_LIMIT,
   SHOP_STORAGE_LIMIT,
+  STORAGE_CLEANUP_RATIO,
+  isStorageFileExpired,
+  storageRetentionCutoff,
   StorageLimitError,
+  type StorageEviction,
   clearTeamStorageLock,
   storageLimitResponse,
   withStorageLimit,
   withTeamStorageLock,
 } from "./storage-limit";
+export { notifyStorageCleanup } from "./storage-notice";
 export { type TeamChange, changedFields, logTeamChange, settingLabels } from "./audit";
 export {
   type IntegrationFact,
