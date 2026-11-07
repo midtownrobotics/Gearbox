@@ -42,7 +42,7 @@ import { recentVisits } from "./visits";
 // Every action is logged in `operator_actions` with the operator's reason, and so is each look at a
 // team (the privacy policy's operator access log, kept 12 months), in two kinds the team's admins
 // see apart: its details (`view_team_details`: no member's name or email, only counts), and its
-// member list (`view_team`), which the operator opens on its own with a reason. The site's own team
+// member list (`view_team`), each opened on its own with a reason. The site's own team
 // (site.ts) can't be deleted or suspended. A team's number is its id ("frc<number>") everywhere,
 // so it's never changed: a team that claimed the wrong number is deleted and signs up again.
 //
@@ -141,8 +141,8 @@ type Action = (typeof OPERATOR_ACTIONS)[number];
 const LOG_KEPT_S = 365 * 24 * 60 * 60;
 
 /**
- * A team's details (no member's name or email) opened again by the same operator within this long
- * isn't logged again. Its member list is logged every time, with the operator's reason.
+ * A team's details (no member's name or email) opened again by the same operator with the same
+ * reason within this long isn't logged again. Its member list is logged every time.
  */
 const VIEW_LOGGED_EVERY_S = 60 * 60;
 
@@ -307,9 +307,13 @@ export const consoleRouter = new Hono<AppEnv>()
       failed: results.filter((r) => !r.storage).map((r) => r.app.name),
     });
   })
-  // A team's details, without its members' names or emails (only how many there are): an access
-  // the log records (`view_team_details`), at most once an hour per operator.
-  .get("/teams/:id", async (c) => {
+  // A team's details, without its members' names or emails (only how many there are): opened only
+  // with the operator's reason, an access the log records (`view_team_details`), which the team's
+  // admins see. The page reloads it with the same reason after each change, so the same reason
+  // from the same operator is logged at most once an hour.
+  .post("/teams/:id/details", async (c) => {
+    const reason = reasonOf(await c.req.json<{ reason?: unknown }>().catch(() => ({})));
+    if (!reason) return c.json({ error: NO_REASON }, 400);
     const team = await teamById(c.env, c.req.param("id"));
     if (!team) return c.json({ error: "No such team." }, 404);
     const [counts, reports, actions] = await Promise.all([
@@ -331,9 +335,10 @@ export const consoleRouter = new Hono<AppEnv>()
       (a) =>
         a.action === "view_team_details" &&
         a.operatorUserId === c.get("userId") &&
+        a.reason === reason &&
         a.createdAt > now() - VIEW_LOGGED_EVERY_S,
     );
-    if (!seen) await log(c.env, c.get("userId"), "view_team_details", { teamId: team.id });
+    if (!seen) await log(c.env, c.get("userId"), "view_team_details", { teamId: team.id, reason });
     // Operators' names only: they're the console's own people.
     const names = await accounts(
       c.env,
