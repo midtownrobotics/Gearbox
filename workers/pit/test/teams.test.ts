@@ -225,7 +225,7 @@ it("keeps every team's checklists, archives, batteries, settings and log downloa
       "PUT /admin/event-snapshot": { on: true },
       "PATCH /admin/settings": { eventKey: "2026mine" },
       "POST /downloaders/pair": { code: "123456", name: "Mine now" },
-      "PUT /logs/settings": { whenFull: "delete-expired" },
+      "PUT /logs/settings": { whenFull: "delete-oldest" },
       "DELETE /logs": { ids: [(b.data as { log: number }).log] },
       "PUT /scope/settings": { settings: { "AdvantageScopeLite/state": "{}" } },
     }),

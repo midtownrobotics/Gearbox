@@ -11,12 +11,17 @@ import { settings } from "./db/schema";
 export const SETTING_KEYS = ["eventKey", "nexusEventKey", "iframeUrl"] as const;
 export type SettingKey = (typeof SETTING_KEYS)[number];
 
-/** At capacity only logs older than six calendar months are automatically eligible. */
-export const WHEN_FULL = ["delete-expired"] as const;
+/**
+ * What Pit does with a new match log once the team has MAX_LOGS (match-logs.ts): `skip-new`
+ * leaves it on the downloader (the default), `delete-oldest` deletes the oldest logs over six
+ * months old to make room (never a newer one). Mentors and admins choose on the Logs page.
+ */
+export const WHEN_FULL = ["skip-new", "delete-oldest"] as const;
 export type WhenFull = (typeof WHEN_FULL)[number];
 
-export async function getWhenFull(_db: Db, _team: string): Promise<WhenFull> {
-  return "delete-expired";
+export async function getWhenFull(db: Db, team: string): Promise<WhenFull> {
+  const value = await getSetting(db, team, "matchLogsWhenFull");
+  return (WHEN_FULL as readonly string[]).includes(value) ? (value as WhenFull) : "skip-new";
 }
 
 /**

@@ -15,17 +15,19 @@ import { advantageScopePage } from "../../shared/getters/advantagescope";
 import {
   type MatchLog,
   type MatchLogs as MatchLogsData,
+  type WhenFull,
   deleteMatchLog,
   deleteMatchLogs,
   fetchMatchLogs,
   matchLogFileUrl,
   matchLogsZipUrl,
+  setWhenFull,
 } from "../../shared/getters/downloaders";
 import { canSaveLogs, saveAdvantageScope, saveLog, useSavedLogs } from "../../shared/saved-logs";
 
 // The match logs the team's downloaders uploaded, by event (the one uploaded to last first), each
 // event's matches latest first. Anyone signed in downloads them, one or all in a zip; mentors and
-// admins delete them (one, or all after an
+// admins choose what happens once Pit has its limit, and admins delete them (one, or all after an
 // export). Logs can be saved on the device ahead, so AdvantageScope opens them without
 // downloading (at an event, on cellular).
 
@@ -52,6 +54,11 @@ function byEvent(logs: MatchLog[]) {
   return [...events];
 }
 
+const WHEN_FULL: { value: WhenFull; label: string }[] = [
+  { value: "skip-new", label: "Don't save new ones" },
+  { value: "delete-oldest", label: "Delete the oldest over six months old" },
+];
+
 /** How many logs Pit has of its limit, what happens when it's full, and export. */
 function Storage({
   data,
@@ -71,8 +78,10 @@ function Storage({
           </p>
           <p className="text-secondary-500">
             {full
-              ? "Pit is full: logs over six months old are deleted to make room. Without any, new logs wait on the downloader until you delete some here."
-              : `Pit keeps up to ${data.limit} logs. When it's full, logs over six months old are deleted to make room.`}
+              ? data.whenFull === "skip-new"
+                ? "Pit is full: new logs stay on the downloader until you delete some here."
+                : "Pit is full: each new log replaces the oldest over six months old. Without any, new logs stay on the downloader until you delete some here."
+              : `Pit keeps up to ${data.limit} logs.`}
           </p>
         </div>
         {data.logs.length > 0 && (
@@ -115,6 +124,33 @@ function Storage({
             onKeep={() => setExported(null)}
           />
         </div>
+      )}
+
+      {data.canManage && (
+        <fieldset className="mt-4 border-t border-secondary-200 pt-4">
+          <legend className="sr-only">When Pit has {data.limit} logs</legend>
+          <p className="mb-2 text-sm text-secondary-600">When Pit has {data.limit} logs:</p>
+          <div className="flex flex-wrap gap-x-5 gap-y-2">
+            {WHEN_FULL.map((choice) => (
+              <label key={choice.value} className="flex items-center gap-2 text-sm">
+                <input
+                  type="radio"
+                  name="when-full"
+                  checked={data.whenFull === choice.value}
+                  onChange={async () => {
+                    try {
+                      await setWhenFull(choice.value);
+                      onChange();
+                    } catch {
+                      onError("Couldn't save that. Check your connection and try again.");
+                    }
+                  }}
+                />
+                {choice.label}
+              </label>
+            ))}
+          </div>
+        </fieldset>
       )}
     </Card>
   );

@@ -22,8 +22,9 @@ incoming replacement keys. If eligible files cannot free enough room for the har
 is refused without deleting recent files.
 Downloads and existing manual deletion controls remain available.
 
-Pit removes only expired logs when a new completed log would exceed 20, targeting 18 remaining.
-Legacy delete-oldest settings cannot authorize deleting newer logs. Concurrent starts/completions
+Pit leaves new logs on the downloader at 20 unless the team chose Delete the oldest over six
+months old: then it removes only expired logs when a new completed log would exceed 20, targeting
+18 remaining, and never a newer one. Concurrent starts/completions
 share the same team lock. AdvantageScope similarly targets 90 MiB / 9 assets on overflow, using
 only expired assets and expired unreferenced files. A recently changed physical file protects an
 otherwise old asset row. Missing or invalid dates do not establish expiration.

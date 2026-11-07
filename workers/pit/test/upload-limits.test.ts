@@ -85,6 +85,36 @@ describe("multipart storage limits", () => {
       await (await bucket.get(`pit/teams/${client.team}/logs/safety/Qual-1.wpilog.gz`))?.text(),
     ).toBe("12345");
   });
+  it("keeps every log at capacity by default, even ones over six months old", async () => {
+    const client = await downloader();
+    for (let number = 1; number <= MAX_LOGS; number++) {
+      const { id } = (await (await client.start(number)).json()) as { id: number };
+      const part = await (
+        await call(`/downloader/logs/${id}/parts/1`, {
+          method: "PUT",
+          headers: client.headers,
+          body: "12345",
+        })
+      ).json();
+      await call(`/downloader/logs/${id}/complete`, {
+        method: "POST",
+        headers: client.headers,
+        body: JSON.stringify({ parts: [part] }),
+      });
+    }
+    await database
+      .prepare("UPDATE match_logs SET uploaded_at = ? WHERE team_id = ?")
+      .bind(storageRetentionCutoff() - 86_400_000, client.team)
+      .run();
+    const refused = await client.start(MAX_LOGS + 1);
+    expect(refused.status).toBe(409);
+    expect(await refused.json()).toMatchObject({ code: "full" });
+    const stored = await database
+      .prepare("SELECT COUNT(*) AS count FROM match_logs WHERE team_id = ? AND status = 'stored'")
+      .bind(client.team)
+      .first<{ count: number }>();
+    expect(stored?.count).toBe(MAX_LOGS);
+  });
   it("protects recent logs at capacity, then cleans logs over six months old toward 90%", async () => {
     const client = await downloader();
     await database
