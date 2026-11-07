@@ -22,7 +22,7 @@ Only admins manage members: being a mentor doesn't open these pages. Anyone else
 
 ## What a member's page shows
 
-- Their **name**, which an admin can correct with **Edit**, and their **username**: their Slack or Discord name, which can't be changed.
+- Their **name**, which an admin can correct with **Edit**, and their **username**: their Slack or Discord name, which can't be changed (someone who signed up with Google or GitHub has none).
 - When they **joined**, were **last online** (using any of the team's apps; "Online now" in the last 5 minutes) and **last signed in**.
 - Their **reporter ID**, which stands for them on problems they report, and whether Gearbox has blocked it.
 - The accounts they **sign in with**, with the email or name on each.
