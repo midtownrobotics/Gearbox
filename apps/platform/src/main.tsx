@@ -5,6 +5,7 @@ import { StrictMode, Suspense, lazy } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import "./styles.css";
+import { CloudflarePage } from "./console/cloudflare-page";
 import { LogPage } from "./console/log-page";
 import { NotificationsPage } from "./console/notifications-page";
 import { OperatorsPage } from "./console/operators-page";
@@ -51,6 +52,7 @@ createRoot(rootElement).render(
           <Route index element={<TeamsPage />} />
           <Route path="teams/:id" element={<TeamPage />} />
           <Route path="stats" element={<StatsPage />} />
+          <Route path="cloudflare" element={<CloudflarePage />} />
           <Route path="reports" element={<ReportsPage />} />
           <Route path="reporters" element={<ReportersPage />} />
           <Route path="visitors" element={<VisitsPage />} />
