@@ -186,13 +186,14 @@ export function route(hostname: string): Route | "unknown app" | null {
 
 /**
  * Whether a page at `origin` may call a team's API: one of the team's own pages, or a page of no
- * team (www, the platform's hosts, localhost). A platform host's API takes any of the domain's.
+ * team (www, the platform's hosts; localhost in local dev). A platform host's API takes any of the
+ * domain's.
  */
 function originAllowed(origin: string, team: string | null, local: boolean): boolean {
   // A page on the dev gateway is checked as the platform address it stands for.
   const stands = local ? fromLocalHost(new URL(origin).hostname) : null;
   const checked = stands ? `https://${stands}` : origin;
-  if (!isAllowedOrigin(checked)) return false;
+  if (!isAllowedOrigin(checked, local)) return false;
   const from = route(new URL(checked).hostname);
   if (team === null || from === null) return true;
   return from !== "unknown app" && (from.team === null || from.team === team);
@@ -447,7 +448,7 @@ export default {
       if (origin && !originAllowed(origin, team, local)) {
         return json(
           403,
-          isAllowedOrigin(origin)
+          isAllowedOrigin(origin, local)
             ? "Requests from another team's pages aren't allowed."
             : "Requests from this page aren't allowed.",
         );

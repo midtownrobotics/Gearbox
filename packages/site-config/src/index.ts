@@ -297,18 +297,30 @@ export const appTitle = (app: string) => `${site.team.shortName} ${app}`;
 
 export { teamLinks, teamLinksFor } from "./team-links.ts";
 
+/** A development machine's hostname: localhost, 127.0.0.1, or a name under localhost. */
+export function isLocalHostname(hostname: string): boolean {
+  return hostname === "localhost" || hostname === "127.0.0.1" || hostname.endsWith(".localhost");
+}
+
 /**
  * CORS: which browser origins may call the workers with credentials. The platform's addresses
- * (platformHost; staging's on staging) over https, and localhost for development. Nothing else (no *.pages.dev previews:
- * anyone can publish one).
+ * (platformHost; staging's on staging) over https. Localhost only when `local`: the request came
+ * in on a development machine's address, never in production or on staging. Nothing else (no
+ * *.pages.dev previews: anyone can publish one).
  */
-export function isAllowedOrigin(origin: string): boolean {
+export function isAllowedOrigin(origin: string, local = false): boolean {
   if (origin.startsWith("https://") && platformLabel(origin.slice("https://".length)) !== null) {
     return true;
   }
-  return /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+  return local && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
 }
 
-/** For Hono's cors({ origin }): the origin if it's allowed, else none. */
-export const corsOrigin = (origin: string | undefined): string | null =>
-  origin && isAllowedOrigin(origin) ? origin : null;
+/**
+ * For Hono's cors({ origin }): the origin if it's allowed, else none. Localhost is allowed only
+ * when the request itself is on a local address (dev servers, the dev gateway).
+ */
+export const corsOrigin = (
+  origin: string | undefined,
+  c: { req: { url: string } },
+): string | null =>
+  origin && isAllowedOrigin(origin, isLocalHostname(new URL(c.req.url).hostname)) ? origin : null;
