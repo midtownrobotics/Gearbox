@@ -28,6 +28,12 @@ export type AppEnv = {
     DISCORD_REDIRECT_URI?: string;
     /** Encrypts secrets stored in D1, like each team's Slack bot token (`encryptSecret` in @g3/auth). */
     SECRETS_KEY?: string;
+    /**
+     * Turnstile, for signing up without the team's chat (lib/open-signup.ts): the widget's site
+     * key (public; the sign-up page shows it) and its secret. Without both, nobody signs up that way.
+     */
+    TURNSTILE_SITE_KEY?: string;
+    TURNSTILE_SECRET_KEY?: string;
     STEAM_API_KEY: string;
     STEAM_REDIRECT_URI: string;
     FRONTEND_URL: string;

@@ -29,7 +29,7 @@ Only admins manage members: being a mentor doesn't open these pages. Anyone else
 
 ## How people join
 
-Members sign up from your team's home page with your team's Slack or Discord. Their account then waits for approval, and every admin who has linked the team's chat gets a message with their name and a link.
+Members sign up from your team's home page with your team's Slack or Discord, or with Google or GitHub if your admins allow it (Sign-in methods, later in these docs). Their account then waits for approval, and every admin who has linked the team's chat gets a message with their name and a link.
 
 ## Approve someone
 

@@ -54,6 +54,7 @@ As of 10 October 2026, five of the six Phase 0 steps are done on `main`, Phase 1
 
 | Change | Roadmap step | Pull request |
 | --- | --- | --- |
+| A team's admins can let people sign up with Google or GitHub instead of the team's chat (Portal's Admin → Sign-in, off by default). Those sign-ups pass a Cloudflare Turnstile check on ID's sign-up page, enter their full name and wait for an admin's approval | Beside the phases: confirmed 6 November 2026 (Hosting and stack decisions) | This PR |
 | The operators' console's Teams table shows each team's active members and, on a Count storage button, how much it keeps in R2 (each app's `storage` hook). A team's page no longer shows its members' names or emails, only counts: the member list opens on its own, with a reason, after a warning that the team's admins will see it. Portal splits the log in two: Operator Access (the team's details opened, with a docs list of what they hold, and changes) and Member Access (the member list opened) | 2.8 | This PR |
 | The terms and privacy policy match the apps again and are in force (no longer drafts) (Edge's network data, every cookie, account deletion), with a General section, copyright complaints and the operator's address; sign-up records which version of the terms a team accepted (platform migration `0017`), and a team's owner accepts new terms on Portal's home after a material change | Terms and privacy | — |
 | Gearbox is licensed AGPL-3.0-only (was MIT): every source file starts with its SPDX line and every package.json says it, every app's menu links its source code, checked in CI by `pnpm lint:license` (`--fix` adds them) | Part of 0.6 | — |
@@ -253,7 +254,7 @@ A team's address is its FRC team number, and no two teams can share a number. Th
 
 ## Hosting and stack decisions
 
-Seven choices were confirmed on 3 October 2026, one more on 6 October, widened the same day to every team's box, the demo's rate limit on 15 October, and Discord on 16 October. Everything else stays on the current stack.
+Seven choices were confirmed on 3 October 2026, one more on 6 October, widened the same day to every team's box, the demo's rate limit on 15 October, Discord on 16 October, and Turnstile on 6 November. Everything else stays on the current stack.
 
 | Decision | Confirmed choice | What it replaces |
 | --- | --- | --- |
@@ -267,6 +268,7 @@ Seven choices were confirmed on 3 October 2026, one more on 6 October, widened t
 | Demo rate limit | Cloudflare's Rate Limiting binding on the gateway, 60 changes a minute per visitor on the public demo team only (confirmed 15 October 2026). Included in Workers Paid | New |
 | Edge box link | A Durable Object (SQLite-backed, hibernating WebSockets) holds each edge box's connection, one object per team's box, on the existing Workers Paid plan. Confirmed 6 October 2026 for G3's box, then for every team that runs Edge | The Cloudflare Tunnel to `edge-agent.g3robotics.com` |
 | Discord | Discord as a second chat service beside Slack: one Discord app (and a separate one for staging), a team connects Slack or Discord, members sign in with Discord OAuth. Free, no paid add-on, no new Cloudflare product (confirmed 16 October 2026). Plan: [discord.md](discord.md) | New |
+| Turnstile | Cloudflare Turnstile (free) on ID's sign-up page, for teams that let people sign up with Google or GitHub instead of their chat: one widget for `frcgearbox.com` and `g3robotics.com`, its keys as G3ID secrets (confirmed 6 November 2026; `docs/deploy.md`, "Turnstile") | New |
 
 **Why one level.** Cloudflare's free certificate covers the domain and one level of subdomain ([Universal SSL limitations](https://developers.cloudflare.com/ssl/edge-certificates/universal-ssl/limitations/)). Today's two-level names work because each is a Custom Domain with its own certificate, but Custom Domains take no wildcards and stop at 100 per zone ([Custom Domains](https://developers.cloudflare.com/workers/configuration/routing/custom-domains/), [Workers limits](https://developers.cloudflare.com/workers/platform/limits/)). A wildcard route matches any hostname ([Routes](https://developers.cloudflare.com/workers/configuration/routing/routes/)), and a wildcard DNS record can be proxied on every plan ([Wildcard DNS records](https://developers.cloudflare.com/dns/manage-dns-records/reference/wildcard-dns-records/)).
 
