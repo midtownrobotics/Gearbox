@@ -73,7 +73,11 @@ async function deleteLogs(db: Db, bucket: R2Bucket, teamId: string, ids: number[
     .where(inTeam(matchLogs, teamId, inArray(matchLogs.id, ids)))
     .all();
   for (const log of removed) {
-    if (log.uploadId) await bucket.resumeMultipartUpload(log.r2Key, log.uploadId).abort();
+    if (log.uploadId)
+      await bucket
+        .resumeMultipartUpload(log.r2Key, log.uploadId)
+        .abort()
+        .catch(() => {});
   }
   if (removed.length) await bucket.delete(removed.map((r) => r.r2Key));
   await db.delete(matchLogs).where(inTeam(matchLogs, teamId, inArray(matchLogs.id, ids)));
@@ -250,7 +254,10 @@ export const logUploadRoutes = new Hono<AppEnv>()
           ),
         );
       for (const log of stale) {
-        if (log.uploadId) await c.env.LOGS.resumeMultipartUpload(log.r2Key, log.uploadId).abort();
+        if (log.uploadId)
+          await c.env.LOGS.resumeMultipartUpload(log.r2Key, log.uploadId)
+            .abort()
+            .catch(() => {});
         await db.delete(matchLogs).where(inTeam(matchLogs, teamId, eq(matchLogs.id, log.id)));
       }
       const existing = await db
@@ -310,7 +317,9 @@ export const logUploadRoutes = new Hono<AppEnv>()
       }
       // An upload of it that never finished: dropped, and started again.
       if (existing?.uploadId) {
-        await c.env.LOGS.resumeMultipartUpload(existing.r2Key, existing.uploadId).abort();
+        await c.env.LOGS.resumeMultipartUpload(existing.r2Key, existing.uploadId)
+          .abort()
+          .catch(() => {});
       }
 
       const downloader = await db
@@ -351,7 +360,7 @@ export const logUploadRoutes = new Hono<AppEnv>()
           id = row.id;
         }
       } catch (error) {
-        await upload.abort();
+        await upload.abort().catch(() => {});
         throw error;
       }
       return c.json({ id, exists: false, partSize: PART_SIZE }, 201);
@@ -531,7 +540,11 @@ export async function deleteTeamLogFiles(bucket: R2Bucket, teamId: string, db?: 
       .from(matchLogs)
       .where(inTeam(matchLogs, teamId, eq(matchLogs.status, "uploading")));
     for (const log of pending) {
-      if (log.uploadId) await bucket.resumeMultipartUpload(log.r2Key, log.uploadId).abort();
+      if (log.uploadId)
+        await bucket
+          .resumeMultipartUpload(log.r2Key, log.uploadId)
+          .abort()
+          .catch(() => {});
     }
   }
   for (;;) {

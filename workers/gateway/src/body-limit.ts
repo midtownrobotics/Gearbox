@@ -24,7 +24,7 @@ export async function limitRequestBody(request: Request): Promise<Request | Resp
   // of that header, so using it alone would let a client bypass the limit.
   if (
     ["POST", "PUT"].includes(request.method) &&
-    /^\/api\/(part-files|drawings\/upload|field-maps|autos|scouting-forms\/[^/]+\/submissions|manual-schedule\/extract|scope\/assets|downloader\/logs\/\d+\/parts\/\d+|switch\/(sounds|submissions)|print(?:\/jobs)?)\/?$/.test(
+    /^\/api\/(part-files|drawings\/upload|scouting\/(field-maps|autos|scouting-forms\/[^/]+\/submissions|manual-schedule\/extract)|scope\/assets|downloader\/logs\/\d+\/parts\/\d+|switch\/(sounds|submissions)|print(?:\/jobs)?)\/?$/.test(
       path,
     )
   )

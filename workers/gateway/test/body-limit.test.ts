@@ -43,6 +43,21 @@ describe("API JSON size limit", () => {
     expect((await request.arrayBuffer()).byteLength).toBe(3);
   });
 
+  it("leaves Scouting's image uploads, under its /scouting routes, for their own limits", async () => {
+    for (const path of [
+      "/api/scouting/field-maps",
+      "/api/scouting/autos",
+      "/api/scouting/scouting-forms/form_1/submissions",
+      "/api/~scouting/scouting/manual-schedule/extract",
+    ]) {
+      const request = new Request(`https://example.com${path}`, {
+        method: "POST",
+        body: new Uint8Array(MAX_API_BODY_BYTES + 1),
+      });
+      expect(await limitRequestBody(request)).toBe(request);
+    }
+  });
+
   it("does not let a false content type bypass the ordinary endpoint limit", async () => {
     const result = await limitRequestBody(
       new Request("https://example.com/api/~platform/signup", {
