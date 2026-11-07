@@ -61,9 +61,16 @@ unimportant: value must be judged during review, not inferred from age.
 
 ## Coordination and admin notices
 
-Per-team D1 locks serialize quota checks and writes across isolates. Competing uploads briefly
-retry, then return 409 upload_busy if another save continues. Locks expire after ten minutes if
-interrupted; writes must finish within the lease. This is not an account-wide billing ledger.
+Shop and Scouting keep an estimate of each team's usage (`storage_usage`) that is never below
+what's stored: every save adds its full size, deletes take nothing off, and only a count under the
+lock corrects it. A save that keeps the estimate at or under 90% of the cap only adds itself, with
+no lock and no count, so saves arriving together don't wait for each other. Past that, a save takes
+the team's lock, counts R2, and cleans up as above.
+
+Per-team D1 locks serialize those counted saves across isolates. A competing save waits up to ten
+seconds, then gets 409 upload_busy with `Retry-After: 2`; Scouting's pages send it once more.
+Locks expire after ten minutes if interrupted; writes must finish within the lease. This is not an
+account-wide billing ledger.
 
 After expiration-based or explicitly approved cleanup, the notification helper summarizes count, bytes,
 upload-date range and age to the team log and active admins' connected Slack/Discord. It reports
@@ -75,7 +82,7 @@ That person is not necessarily the Slack workspace owner. Storage APIs expose no
 
 ## Deployment and boundaries
 
-Apply coordination migrations first: Shop 0026, Scouting 0039 and Pit 0019. Cleanup-notice support
+Apply coordination migrations first: Shop 0026 and 0028, Scouting 0039 and 0041, Pit 0019 and 0021. Cleanup-notice support
 uses Shop 0027, Scouting 0040 and Pit 0020. Existing committed migrations are not rewritten.
 This PR does not deploy workers or send live messages. Before changing live retention for
 existing teams, honor the owner-notice period in the current Terms of Service and publish the

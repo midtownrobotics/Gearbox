@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { and, eq, lt } from "drizzle-orm";
+import { and, eq, lt, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 import { clearStorageCleanupNotice } from "./storage-notice";
@@ -11,10 +11,29 @@ const locks = sqliteTable("storage_upload_locks", {
   expiresAt: integer("expires_at").notNull(),
 });
 
+// An estimate of each team's stored files that is never below what's really there: every write
+// adds its full size, deletes take nothing off, and only a full count under the lock corrects it.
+const usage = sqliteTable("storage_usage", {
+  teamId: text("team_id").primaryKey(),
+  bytes: integer("bytes").notNull(),
+  objects: integer("objects").notNull(),
+});
+
 /** Lifecycle cleanup for an interrupted upload's expired coordination row. */
 export async function clearTeamStorageLock(database: D1Database, teamId: string) {
   await drizzle(database).delete(locks).where(eq(locks.teamId, teamId));
+  await drizzle(database).delete(usage).where(eq(usage.teamId, teamId));
   await clearStorageCleanupNotice(database, teamId);
+}
+
+async function adjustUsage(database: D1Database, teamId: string, bytes: number, objects: number) {
+  await drizzle(database)
+    .insert(usage)
+    .values({ teamId, bytes, objects })
+    .onConflictDoUpdate({
+      target: usage.teamId,
+      set: { bytes: sql`${usage.bytes} + ${bytes}`, objects: sql`${usage.objects} + ${objects}` },
+    });
 }
 
 export class StorageLimitError extends Error {
@@ -49,9 +68,11 @@ export async function withTeamStorageLock<T>(
 ): Promise<T> {
   const db = drizzle(database);
   const owner = crypto.randomUUID();
-  const now = Date.now();
+  // Waits up to 10 s, so a few saves arriving together at the end of a match each get their turn.
+  const giveUpAt = Date.now() + 10_000;
   let acquired: { owner: string } | undefined;
-  for (let attempt = 0; attempt < 20; attempt++) {
+  for (let delay = 50; ; delay = Math.min(delay * 2, 500)) {
+    const now = Date.now();
     acquired = await db
       .insert(locks)
       .values({ teamId, owner, expiresAt: now + 10 * 60_000 })
@@ -62,8 +83,8 @@ export async function withTeamStorageLock<T>(
       })
       .returning({ owner: locks.owner })
       .get();
-    if (acquired) break;
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    if (acquired || Date.now() + delay > giveUpAt) break;
+    await new Promise((resolve) => setTimeout(resolve, delay));
   }
   if (!acquired) {
     throw new StorageLimitError(
@@ -131,7 +152,33 @@ export async function withStorageLimit<T>(
   ) {
     throw new Error("Invalid storage reservation.");
   }
+  const incomingBytes = incoming.reduce((sum, file) => sum + file.bytes, 0);
+  // Well below the cap (the cleanup target), a save only adds itself to the estimate: no lock and
+  // no count, so saves arriving together don't wait for each other.
+  const reserved = await drizzle(database)
+    .update(usage)
+    .set({
+      bytes: sql`${usage.bytes} + ${incomingBytes}`,
+      objects: sql`${usage.objects} + ${incoming.length}`,
+    })
+    .where(
+      and(
+        eq(usage.teamId, teamId),
+        sql`${usage.bytes} + ${incomingBytes} <= ${Math.floor(limit.bytes * STORAGE_CLEANUP_RATIO)}`,
+        sql`${usage.objects} + ${incoming.length} <= ${Math.floor(limit.objects * STORAGE_CLEANUP_RATIO)}`,
+      ),
+    )
+    .returning({ teamId: usage.teamId })
+    .get();
+  if (reserved) return write();
+
   return withTeamStorageLock(database, teamId, async () => {
+    // Saves that took the fast path meanwhile stay on top of the count made here.
+    const before = await drizzle(database)
+      .select({ bytes: usage.bytes, objects: usage.objects })
+      .from(usage)
+      .where(eq(usage.teamId, teamId))
+      .get();
     const cleanupEnabled = Boolean(
       eviction?.approvedObjects?.size || eviction?.deleteOlderThanSixMonths,
     );
@@ -163,7 +210,13 @@ export async function withStorageLimit<T>(
       }
       cursor = page.truncated ? page.cursor : undefined;
     } while (cursor);
-    bytes += incoming.reduce((sum, file) => sum + file.bytes, 0);
+    await adjustUsage(
+      database,
+      teamId,
+      originalBytes - (before?.bytes ?? 0),
+      originalObjects - (before?.objects ?? 0),
+    );
+    bytes += incomingBytes;
     objects += incoming.length;
     if (
       (bytes > limit.bytes && (cleanupEnabled || bytes > originalBytes)) ||
@@ -200,6 +253,12 @@ export async function withStorageLimit<T>(
             for (let offset = 0; offset < removed.length; offset += 1000) {
               await bucket.delete(removed.slice(offset, offset + 1000).map((file) => file.key));
             }
+            await adjustUsage(
+              database,
+              teamId,
+              -removed.reduce((sum, file) => sum + file.size, 0),
+              -removed.length,
+            );
             try {
               await eviction.notify?.(removed);
             } catch (error) {
@@ -209,8 +268,10 @@ export async function withStorageLimit<T>(
           // Recover a previous incomplete cleanup before allowing any more growth.
           if (originalBytes > limit.bytes || originalObjects > limit.objects) {
             await cleanup();
+            await adjustUsage(database, teamId, incomingBytes, incoming.length);
             return write();
           }
+          await adjustUsage(database, teamId, incomingBytes, incoming.length);
           // A failed new save must not destroy old files to make room for nothing.
           const result = await write();
           if (!(result instanceof Response) || result.ok) await cleanup();
@@ -222,6 +283,7 @@ export async function withStorageLimit<T>(
         "storage_full",
       );
     }
+    await adjustUsage(database, teamId, incomingBytes, incoming.length);
     return write();
   });
 }

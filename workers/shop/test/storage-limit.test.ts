@@ -9,6 +9,8 @@ const { SHOP_DB: database, DRAWINGS: bucket } = env as unknown as {
   DRAWINGS: R2Bucket;
 };
 const limit = { bytes: 100, objects: 2, label: "100 bytes" };
+// Room for many files, so only bytes decide whether a save is near the cap.
+const roomy = { ...limit, objects: 100 };
 
 function store(team: string, name: string, bytes: number, budget = limit) {
   const key = `teams/${team}/${name}`;
@@ -104,6 +106,45 @@ describe("team storage quotas", () => {
         },
       ),
     ).rejects.toMatchObject({ code: "storage_full" });
+  });
+
+  it("lets saves well under the cap skip the lock another save holds", async () => {
+    const team = newTeamId();
+    await store(team, "one", 10, roomy);
+    await database
+      .prepare("INSERT INTO storage_upload_locks (team_id, owner, expires_at) VALUES (?, ?, ?)")
+      .bind(team, "someone-else", Date.now() + 60_000)
+      .run();
+    await store(team, "two", 10, roomy);
+    expect((await bucket.head(`teams/${team}/two`))?.size).toBe(10);
+    // Past the cleanup target (90 of 100) a save has to count, so it waits for the lock.
+    await expect(store(team, "three", 75, roomy)).rejects.toMatchObject({ code: "upload_busy" });
+    await database.prepare("DELETE FROM storage_upload_locks WHERE team_id = ?").bind(team).run();
+  }, 20_000);
+
+  it("waits for a lock that's let go", async () => {
+    const team = newTeamId();
+    await database
+      .prepare("INSERT INTO storage_upload_locks (team_id, owner, expires_at) VALUES (?, ?, ?)")
+      .bind(team, "someone-else", Date.now() + 60_000)
+      .run();
+    setTimeout(() => {
+      void database.prepare("DELETE FROM storage_upload_locks WHERE team_id = ?").bind(team).run();
+    }, 500);
+    await store(team, "one", 10, roomy);
+    expect((await bucket.head(`teams/${team}/one`))?.size).toBe(10);
+  });
+
+  it("counts again near the cap, so files deleted elsewhere make room", async () => {
+    const team = newTeamId();
+    await store(team, "one", 80, roomy);
+    await bucket.delete(`teams/${team}/one`);
+    await store(team, "two", 80, roomy);
+    const usage = await database
+      .prepare("SELECT bytes, objects FROM storage_usage WHERE team_id = ?")
+      .bind(team)
+      .first();
+    expect(usage).toEqual({ bytes: 80, objects: 1 });
   });
 
   it("lets teams already over quota replace a file with a smaller one", async () => {
