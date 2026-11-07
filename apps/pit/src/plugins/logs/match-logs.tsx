@@ -71,8 +71,8 @@ function Storage({
           </p>
           <p className="text-secondary-500">
             {full
-              ? "Pit is full. Only logs older than six months are removed automatically."
-              : `Pit keeps up to ${data.limit} logs. At capacity, logs older than six months are removed toward 90% usage.`}
+              ? "Pit is full: logs over six months old are deleted to make room. Without any, new logs wait on the downloader until you delete some here."
+              : `Pit keeps up to ${data.limit} logs. When it's full, logs over six months old are deleted to make room.`}
           </p>
         </div>
         {data.logs.length > 0 && (

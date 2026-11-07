@@ -13,7 +13,7 @@ compatibility_date = "2026-05-17"
 [vars]
 LOCAL_DEV = "true"
 
-# The public demo's limit on changes per visitor (src/demo.ts): 60 a minute by IP address.
+# Request limits for every app (src/rate-limit.ts, RATE_LIMITS.md).
 [[ratelimits]]
 name = "REQUEST_LIMITER"
 namespace_id = "10001"
@@ -39,6 +39,7 @@ name = "API_BUDGET_LIMITER"
 namespace_id = "10005"
 simple = { limit = 20000, period = 60 }
 
+# The public demo's limit on changes per visitor (src/demo.ts): 60 a minute by IP address.
 [[ratelimits]]
 name = "DEMO_LIMITER"
 namespace_id = "9999"
