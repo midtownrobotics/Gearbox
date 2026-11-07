@@ -1,5 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { deleteTeamRows, exportTeamRows, storageByTeam, teamExport } from "@g3/auth";
+import {
+  clearTeamStorageLock,
+  deleteTeamRows,
+  exportTeamRows,
+  storageByTeam,
+  teamExport,
+} from "@g3/auth";
 import { isDemoTeam } from "@g3/demo";
 import { Hono } from "hono";
 import { createShopDb } from "../db";
@@ -152,5 +158,6 @@ export const internalRouter = new Hono<AppEnv>()
       onshapeApiUsage,
       onshapeApiErrors,
     ]);
+    await clearTeamStorageLock(c.env.SHOP_DB, teamId);
     return c.json({ ok: true });
   });

@@ -44,7 +44,7 @@ export const manifest = defineManifest({
       type: "choice",
       choices: [
         { value: "skip-new", label: "Don't save new ones" },
-        { value: "delete-oldest", label: "Delete the oldest" },
+        { value: "delete-oldest", label: "Delete the oldest over six months old" },
       ],
       default: "skip-new",
       editedBy: "mentor",

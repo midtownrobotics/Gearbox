@@ -1,5 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { deleteTeamRows, exportTeamRows, storageByTeam, teamExport } from "@g3/auth";
+import {
+  clearTeamStorageLock,
+  deleteTeamRows,
+  exportTeamRows,
+  storageByTeam,
+  teamExport,
+} from "@g3/auth";
 import { isDemoTeam } from "@g3/demo";
 import { Hono } from "hono";
 import { createDb } from "./db";
@@ -69,5 +75,6 @@ export const internalRoutes = new Hono<AppEnv>()
       await c.env.FIELD_MAPS.delete(files.slice(offset, offset + 1000));
     }
     await deleteTeamRows(db, teamId, teamTables);
+    await clearTeamStorageLock(c.env.SCOUTING_DB, teamId);
     return c.json({ ok: true });
   });

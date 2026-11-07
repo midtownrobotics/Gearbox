@@ -4,7 +4,7 @@ const API_ORIGIN = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
 export const API_URL = `${API_ORIGIN}/scouting`;
 const inflightGets = new Map<string, Promise<unknown>>();
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+async function request<T>(path: string, init?: RequestInit, retried = false): Promise<T> {
   const response = await fetch(`${API_URL}${path}`, {
     ...init,
     credentials: "include",
@@ -18,7 +18,13 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     redirectToSignIn();
     throw new Error("Redirecting to sign in…");
   }
-  const body = (await response.json().catch(() => ({}))) as T & { error?: string };
+  const body = (await response.json().catch(() => ({}))) as T & { error?: string; code?: string };
+  // Another scout's images were saving: sent once more after the wait the worker asks for.
+  if (response.status === 409 && body.code === "upload_busy" && !retried) {
+    const seconds = Number(response.headers.get("Retry-After")) || 2;
+    await new Promise((resolve) => setTimeout(resolve, seconds * 1000));
+    return request<T>(path, init, true);
+  }
   if (!response.ok) throw new Error(body.error ?? "Request failed.");
   return body;
 }
