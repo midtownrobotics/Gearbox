@@ -11,7 +11,7 @@ export const manifest = defineManifest({
   integrations: [],
   availability: "every team",
   version: packageJson.version,
-  hooks: { seed: false, delete: true, export: true, demo: true },
+  hooks: { seed: false, delete: true, export: true, demo: true, storage: false },
   // Fields, locations, robots and subsystems are the team's content (Settings, or a setup file),
   // not settings with defaults.
   settings: [],

@@ -15,7 +15,7 @@ export function ReportsPage() {
     [status],
   );
   return (
-    <Page title="Reports">
+    <Page title="Number Reports">
       <select
         value={status}
         onChange={(e) => setStatus(e.target.value as typeof status)}

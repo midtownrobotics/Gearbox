@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import {
+  clearTeamStorageLock,
   deleteTeamRows,
   exportTeamRows,
   inTeam,
@@ -7,6 +8,8 @@ import {
   requireAdmin,
   requireAuth,
   settingLabels,
+  storageByTeam,
+  storageLimitResponse,
   teamExport,
   teamSettingsRoutes,
   withTeam,
@@ -57,6 +60,8 @@ const OUTSIDE_TIMEOUT_MS = 5000;
 const base = new Hono<AppEnv>();
 
 base.onError((err, c) => {
+  const storage = storageLimitResponse(err);
+  if (storage) return storage;
   console.error("[pit]", err);
   const message = err instanceof Error ? err.message : String(err);
   return c.json({ error: "Internal server error.", detail: message }, 500);
@@ -201,6 +206,11 @@ const app = base
     return c.json(await loadDemo(createDb(c.env.PIT_DB), teamId));
   })
   .get("/internal/demo/words", (c) => c.json({ words: demoWords() }))
+  // How much every team keeps in R2 (match logs and AdvantageScope assets, both under
+  // pit/teams/<team>/), for the operators' console. Counts only.
+  .get("/internal/storage", async (c) =>
+    c.json({ teams: await storageByTeam(c.env.LOGS, "pit/teams/") }),
+  )
   .get("/internal/teams/:teamId/export", async (c) => {
     const teamId = c.req.param("teamId");
     const tables = await exportTeamRows(
@@ -229,7 +239,7 @@ const app = base
     );
   })
   .delete("/internal/teams/:teamId", async (c) => {
-    await deleteTeamLogFiles(c.env.LOGS, c.req.param("teamId"));
+    await deleteTeamLogFiles(c.env.LOGS, c.req.param("teamId"), createDb(c.env.PIT_DB));
     await deleteTeamScopeFiles(c.env.LOGS, c.req.param("teamId"));
     await deleteTeamRows(createDb(c.env.PIT_DB), c.req.param("teamId"), [
       scopeAssets,
@@ -244,6 +254,7 @@ const app = base
       logDownloaders,
       logDownloaderCodes,
     ]);
+    await clearTeamStorageLock(c.env.PIT_DB, c.req.param("teamId"));
     return c.json({ ok: true });
   })
   .get("/me", requireAuth, (c) =>

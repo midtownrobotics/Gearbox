@@ -18,8 +18,10 @@ import {
   teamKey,
 } from "@g3/site-config";
 import devPorts from "../../../.dev-ports.json";
+import { limitRequestBody } from "./body-limit";
 import { type DemoEnv, checkDemoRequest } from "./demo";
 import { teamIcon } from "./icons";
+import { type RateLimitEnv, checkRateLimit } from "./rate-limit";
 
 // The one worker on the platform's domain (and *.<domain>, the site team's own, for its retired
 // addresses): works out the team and app from the hostname and sends the request to that app's
@@ -71,7 +73,8 @@ import { teamIcon } from "./icons";
 type Worker = AppName | "platform";
 
 export type Env = Record<(typeof BINDINGS)[Worker], Fetcher> &
-  DemoEnv & {
+  DemoEnv &
+  RateLimitEnv & {
     /** "true" in local dev (see above). */
     LOCAL_DEV?: string;
   };
@@ -183,13 +186,14 @@ export function route(hostname: string): Route | "unknown app" | null {
 
 /**
  * Whether a page at `origin` may call a team's API: one of the team's own pages, or a page of no
- * team (www, the platform's hosts, localhost). A platform host's API takes any of the domain's.
+ * team (www, the platform's hosts; localhost in local dev). A platform host's API takes any of the
+ * domain's.
  */
 function originAllowed(origin: string, team: string | null, local: boolean): boolean {
   // A page on the dev gateway is checked as the platform address it stands for.
   const stands = local ? fromLocalHost(new URL(origin).hostname) : null;
   const checked = stands ? `https://${stands}` : origin;
-  if (!isAllowedOrigin(checked)) return false;
+  if (!isAllowedOrigin(checked, local)) return false;
   const from = route(new URL(checked).hostname);
   if (team === null || from === null) return true;
   return from !== "unknown app" && (from.team === null || from.team === team);
@@ -372,11 +376,20 @@ function devPage(request: Request, url: URL, app: Worker): Promise<Response> {
 }
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(incoming: Request, env: Env): Promise<Response> {
+    let request = incoming;
     const url = new URL(request.url);
     const localHost = env.LOCAL_DEV === "true" ? fromLocalHost(url.hostname) : null;
     const local = localHost !== null;
     const host = localHost ?? url.hostname;
+    // Before routing, team/icon/session lookups, or any service-binding fetch.
+    if (!local) {
+      const limited = await checkRateLimit(request, env);
+      if (limited) return limited;
+    }
+    const bodyChecked = await limitRequestBody(request);
+    if (bodyChecked instanceof Response) return bodyChecked;
+    request = bodyChecked;
     if (platformLabel(host) === DEMO_HOST_LABEL) {
       const home = teamAppUrlVia(local ? url.origin : undefined, demoTeamId, "portal");
       return Response.redirect(`${home}/`, 302);
@@ -435,7 +448,7 @@ export default {
       if (origin && !originAllowed(origin, team, local)) {
         return json(
           403,
-          isAllowedOrigin(origin)
+          isAllowedOrigin(origin, local)
             ? "Requests from another team's pages aren't allowed."
             : "Requests from this page aren't allowed.",
         );

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { env } from "cloudflare:test";
+import { storageRetentionCutoff } from "@g3/auth";
 import { newTeamId, teamUsers } from "@g3/testing/users";
 import { call, callAs, jsonAs } from "@g3/testing/worker";
 import { describe, expect, it } from "vitest";
@@ -9,6 +10,108 @@ import { MAX_ASSETS, MAX_ASSET_BYTES, MAX_UPLOAD, bundledAsset } from "../src/ad
 // folder, and the assets a mentor uploads.
 
 const bucket = (env as unknown as { LOGS: R2Bucket }).LOGS;
+
+describe("unknown asset files", () => {
+  it("protects a recent physical file even when its asset row is older than six months", async () => {
+    const team = teamUsers(newTeamId());
+    const database = (env as unknown as { PIT_DB: D1Database }).PIT_DB;
+    const key = `pit/teams/${team.teamId}/scope-assets/Robot_0/model.glb`;
+    await bucket.put(key, "fresh");
+    for (let i = 0; i < MAX_ASSETS; i++) {
+      await database
+        .prepare(
+          "INSERT INTO scope_assets (team_id, name, files, config, size, uploaded_by, uploaded_at) VALUES (?, ?, ?, '{}', 5, ?, ?)",
+        )
+        .bind(
+          team.teamId,
+          `Robot_${i}`,
+          i === 0 ? JSON.stringify([{ name: "model.glb", size: 5 }]) : "[]",
+          team.mentor.id,
+          i === 0 ? storageRetentionCutoff() - 86_400_000 : Date.now(),
+        )
+        .run();
+    }
+    const response = await callAs(team.mentor, "/scope/assets", {
+      method: "POST",
+      body: uploadForm(
+        "Field2d_New.zip",
+        await makeZip([
+          { path: "config.json", text: "{}" },
+          { path: "image.png", text: "small" },
+        ]),
+      ),
+    });
+    expect(response.status).toBe(409);
+    expect(await (await bucket.get(key))?.text()).toBe("fresh");
+    expect(
+      (
+        await database
+          .prepare("SELECT name FROM scope_assets WHERE team_id = ?")
+          .bind(team.teamId)
+          .all()
+      ).results,
+    ).toHaveLength(MAX_ASSETS);
+  });
+  it("removes expired asset entries toward 90% while retaining recent assets", async () => {
+    const team = teamUsers(newTeamId());
+    const database = (env as unknown as { PIT_DB: D1Database }).PIT_DB;
+    for (let i = 0; i < MAX_ASSETS; i++) {
+      await database
+        .prepare(
+          "INSERT INTO scope_assets (team_id, name, files, config, size, uploaded_by, uploaded_at) VALUES (?, ?, '[]', '{}', 1, ?, ?)",
+        )
+        .bind(
+          team.teamId,
+          `Robot_${i}`,
+          team.mentor.id,
+          i < 2 ? storageRetentionCutoff() - 86_400_000 : Date.now(),
+        )
+        .run();
+    }
+    const response = await callAs(team.mentor, "/scope/assets", {
+      method: "POST",
+      body: uploadForm(
+        "Field2d_New.zip",
+        await makeZip([
+          { path: "config.json", text: "{}" },
+          { path: "image.png", text: "small" },
+        ]),
+      ),
+    });
+    expect(response.status).toBe(200);
+    const rows = await database
+      .prepare("SELECT name FROM scope_assets WHERE team_id = ?")
+      .bind(team.teamId)
+      .all<{ name: string }>();
+    expect(rows.results).toHaveLength(9);
+    expect(rows.results.some((row) => row.name === "Robot_0")).toBe(false);
+    expect(rows.results.some((row) => row.name === "Robot_2")).toBe(true);
+  });
+  it("counts files with missing metadata and keeps them when storage fills up", async () => {
+    const team = teamUsers(newTeamId());
+    const database = (env as unknown as { PIT_DB: D1Database }).PIT_DB;
+    await database
+      .prepare(
+        "INSERT INTO scope_assets (team_id, name, files, config, size, uploaded_by, uploaded_at) VALUES (?, 'Existing', '[]', '{}', ?, ?, ?)",
+      )
+      .bind(team.teamId, MAX_ASSET_BYTES - 1000, team.mentor.id, Date.now())
+      .run();
+    const key = `pit/teams/${team.teamId}/scope-assets/unknown/valuable.bin`;
+    await bucket.put(key, "x".repeat(2000));
+    const response = await callAs(team.mentor, "/scope/assets", {
+      method: "POST",
+      body: uploadForm(
+        "Field2d_New.zip",
+        await makeZip([
+          { path: "config.json", text: JSON.stringify({ name: "Review first" }) },
+          { path: "image.png", text: "small" },
+        ]),
+      ),
+    });
+    expect(response.status).toBe(409);
+    expect((await bucket.head(key))?.size).toBe(2000);
+  });
+});
 
 /**
  * A zip of `files`, each stored or deflated (no CRCs: the reader doesn't check them). `claims` is
@@ -382,7 +485,12 @@ describe("assets", () => {
     ]);
     expect((await post("Huge.zip", huge)).status).toBe(413);
     expect((await post("One.zip", await robot("Robot_One", part(0.6)))).status).toBe(200);
-    expect((await post("Two.zip", await robot("Robot_Two", part(0.6)))).status).toBe(413);
+    expect((await post("Two.zip", await robot("Robot_Two", part(0.6)))).status).toBe(409);
+    expect(
+      (await jsonAs<{ assets: { name: string }[] }>(team.student, "/scope/asset-list")).assets.map(
+        (asset) => asset.name,
+      ),
+    ).toEqual(["Robot_One"]);
     // Replacing one counts its new size, not both.
     expect((await post("One.zip", await robot("Robot_One", part(0.7)))).status).toBe(200);
 
@@ -406,6 +514,9 @@ describe("assets", () => {
       expect((await post(`R${i}.zip`, await robot(`Robot_R${i}`, 10))).status).toBe(200);
     }
     expect((await post("Rx.zip", await robot("Robot_Rx", 10))).status).toBe(409);
+    const bounded = await jsonAs<{ assets: { name: string }[] }>(team.student, "/scope/asset-list");
+    expect(bounded.assets).toHaveLength(MAX_ASSETS);
+    expect(bounded.assets.some((asset) => asset.name === "Robot_R0")).toBe(true);
   });
 
   it("refuses what isn't an asset zip, and a mentor removes one", async () => {

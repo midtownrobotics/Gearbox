@@ -4,6 +4,7 @@ import { CONSOLE_HOSTS, DEV_DOMAIN, demoTeamId, teamKey } from "@g3/site-config"
 import { and, count, desc, eq, inArray, isNotNull, isNull, like, lt, ne, sql } from "drizzle-orm";
 import { type Context, Hono } from "hono";
 import { createMiddleware } from "hono/factory";
+import { cloudflareOverview } from "./cloudflare";
 import {
   type OPERATOR_ACTIONS,
   notifications,
@@ -17,7 +18,7 @@ import {
 } from "./db/schema";
 import { accounts, db, g3id, now } from "./lib";
 import { deliverToChat, parseNotification } from "./notifications";
-import { DELETABLE, MANIFESTS, callHook } from "./registry";
+import { DELETABLE, MANIFESTS, STORING, callHook, fetchStorage } from "./registry";
 import { tellBlocked } from "./reports";
 import type { AppEnv } from "./types";
 import { recentVisits } from "./visits";
@@ -35,9 +36,13 @@ import { recentVisits } from "./visits";
 // - write notifications for every team (informational or critical), each until it expires; each
 //   team's settings say where they go (src/notifications.ts);
 // - see how Gearbox is used: teams, members and how many teams have each app on (counts only,
-//   leaving out the public demo).
+//   leaving out the public demo);
+// - see the Cloudflare account's usage against its plan, an estimated bill, traffic, security
+//   events and deploys (src/cloudflare.ts).
 // Every action is logged in `operator_actions` with the operator's reason, and so is each look at a
-// team's members (the privacy policy's operator access log, kept 12 months). The site's own team
+// team (the privacy policy's operator access log, kept 12 months), in two kinds the team's admins
+// see apart: its details (`view_team_details`: no member's name or email, only counts), and its
+// member list (`view_team`), which the operator opens on its own with a reason. The site's own team
 // (site.ts) can't be deleted or suspended. A team's number is its id ("frc<number>") everywhere,
 // so it's never changed: a team that claimed the wrong number is deleted and signs up again.
 //
@@ -52,6 +57,30 @@ async function deleteAppData(env: AppEnv["Bindings"], teamId: string) {
     ),
   );
   return results.filter((name): name is string => name !== null);
+}
+
+/** Which chat a team uses, never its workspace's or server's name. */
+const chatOf = (team: { slackWorkspaceName: string | null; discordGuildName: string | null }) =>
+  team.discordGuildName ? "discord" : team.slackWorkspaceName ? "slack" : null;
+
+/** How many accounts a team has: counts only, from G3ID. */
+type MemberCounts = { active: number; admins: number; mentors: number; pending: number };
+
+const NO_MEMBERS: MemberCounts = { active: 0, admins: 0, mentors: 0, pending: 0 };
+
+/** These teams' member counts, by team id (none for a team without any); null when G3ID didn't answer. */
+async function memberCounts(
+  env: AppEnv["Bindings"],
+  teamIds: string[],
+): Promise<Record<string, MemberCounts> | null> {
+  if (teamIds.length === 0) return {};
+  const query = new URLSearchParams({ teams: teamIds.join(",") });
+  const res = await g3id(env, `/member-counts?${query}`).catch(() => null);
+  if (!res?.ok) {
+    console.error("[console] member counts", res?.status);
+    return null;
+  }
+  return (await res.json()) as Record<string, MemberCounts>;
 }
 
 type Member = {
@@ -111,7 +140,10 @@ type Action = (typeof OPERATOR_ACTIONS)[number];
 /** How long the log is kept (the privacy policy's "Operator access log"). */
 const LOG_KEPT_S = 365 * 24 * 60 * 60;
 
-/** A team's details opened again by the same operator within this long isn't logged again. */
+/**
+ * A team's details (no member's name or email) opened again by the same operator within this long
+ * isn't logged again. Its member list is logged every time, with the operator's reason.
+ */
 const VIEW_LOGGED_EVERY_S = 60 * 60;
 
 /** Logs an action, and drops rows older than the log is kept. */
@@ -236,20 +268,52 @@ export const consoleRouter = new Hono<AppEnv>()
         .groupBy(numberReports.teamNumber)
         .all(),
     ]);
+    const counts = await memberCounts(
+      c.env,
+      list.map((t) => t.id),
+    );
     const open = new Map(reports.map((r) => [r.teamNumber, r.open]));
     return c.json(
-      list.map((t) => ({
+      list.map(({ slackWorkspaceName, discordGuildName, ...t }) => ({
         ...t,
+        chat: chatOf({ slackWorkspaceName, discordGuildName }),
         openReports: open.get(t.teamNumber) ?? 0,
+        // Active members; null when G3ID couldn't say.
+        members: counts ? (counts[t.id]?.active ?? 0) : null,
         isSite: t.id === teamKey,
       })),
     );
   })
+  // How much each team keeps in R2, from every app that stores files (each lists its whole
+  // bucket, so the Teams page asks only on a button). Sizes and file counts only, by team id;
+  // `failed` names the apps that didn't answer.
+  .get("/storage", async (c) => {
+    const results = await Promise.all(
+      STORING.map(async (app) => ({ app, storage: await fetchStorage(c.env, app.slug) })),
+    );
+    const teams: Record<string, { bytes: number; objects: number; apps: Record<string, number> }> =
+      {};
+    for (const { app, storage } of results) {
+      for (const [teamId, used] of Object.entries(storage?.teams ?? {})) {
+        teams[teamId] ??= { bytes: 0, objects: 0, apps: {} };
+        const team = teams[teamId];
+        team.bytes += used.bytes;
+        team.objects += used.objects;
+        team.apps[app.name] = (team.apps[app.name] ?? 0) + used.bytes;
+      }
+    }
+    return c.json({
+      teams,
+      failed: results.filter((r) => !r.storage).map((r) => r.app.name),
+    });
+  })
+  // A team's details, without its members' names or emails (only how many there are): an access
+  // the log records (`view_team_details`), at most once an hour per operator.
   .get("/teams/:id", async (c) => {
     const team = await teamById(c.env, c.req.param("id"));
     if (!team) return c.json({ error: "No such team." }, 404);
-    const [membersRes, reports, actions] = await Promise.all([
-      g3id(c.env, `/teams/${team.id}/members`),
+    const [counts, reports, actions] = await Promise.all([
+      memberCounts(c.env, [team.id]),
       db(c.env)
         .select()
         .from(numberReports)
@@ -263,26 +327,18 @@ export const consoleRouter = new Hono<AppEnv>()
         .orderBy(desc(operatorActions.createdAt))
         .all(),
     ]);
-    if (!membersRes.ok) throw new Error(`G3ID members: ${membersRes.status}`);
-    const members = (await membersRes.json()) as Member[];
-    // Opening a team shows its members' names and emails: an access the log records.
     const seen = actions.some(
       (a) =>
-        a.action === "view_team" &&
+        a.action === "view_team_details" &&
         a.operatorUserId === c.get("userId") &&
         a.createdAt > now() - VIEW_LOGGED_EVERY_S,
     );
-    if (!seen) await log(c.env, c.get("userId"), "view_team", { teamId: team.id });
+    if (!seen) await log(c.env, c.get("userId"), "view_team_details", { teamId: team.id });
+    // Operators' names only: they're the console's own people.
     const names = await accounts(
       c.env,
-      [team.founderUserId, ...actions.map((a) => a.operatorUserId)].filter(
-        (id) => !members.some((m) => m.id === id),
-      ),
+      actions.map((a) => a.operatorUserId),
     );
-    const name = (id: string | null) =>
-      id
-        ? (members.find((m) => m.id === id)?.displayName ?? names.get(id)?.displayName ?? id)
-        : null;
     return c.json({
       team: {
         id: team.id,
@@ -290,23 +346,38 @@ export const consoleRouter = new Hono<AppEnv>()
         name: team.name,
         country: team.country,
         status: team.status,
-        slackWorkspaceName: team.slackWorkspaceName,
-        discordGuildName: team.discordGuildName,
-        founder: team.founderUserId && { id: team.founderUserId, name: name(team.founderUserId) },
-        owner: team.ownerUserId && { id: team.ownerUserId, name: name(team.ownerUserId) },
+        chat: chatOf(team),
+        hasOwner: !!team.ownerUserId,
         termsAcceptedAt: team.termsAcceptedAt,
         termsVersion: team.termsVersion,
         createdAt: team.createdAt,
         updatedAt: team.updatedAt,
         isSite: team.id === teamKey,
       },
-      members,
+      members: counts ? (counts[team.id] ?? NO_MEMBERS) : null,
       reports,
       actions: actions.map((a) => ({
         ...a,
         details: JSON.parse(a.details) as Record<string, unknown>,
-        operatorName: name(a.operatorUserId),
+        operatorName: names.get(a.operatorUserId)?.displayName ?? a.operatorUserId,
       })),
+    });
+  })
+  // A team's member list (names, emails, roles), with who owns and founded it: opened only with
+  // the operator's reason, and logged each time (`view_team`), which the team's admins see.
+  .post("/teams/:id/members", async (c) => {
+    const reason = reasonOf(await c.req.json<{ reason?: unknown }>().catch(() => ({})));
+    if (!reason) return c.json({ error: NO_REASON }, 400);
+    const team = await teamById(c.env, c.req.param("id"));
+    if (!team) return c.json({ error: "No such team." }, 404);
+    const res = await g3id(c.env, `/teams/${team.id}/members`);
+    if (!res.ok) return c.json({ error: "Couldn't load the members. Try again." }, 502);
+    const members = (await res.json()) as Member[];
+    await log(c.env, c.get("userId"), "view_team", { teamId: team.id, reason });
+    return c.json({
+      members,
+      ownerUserId: team.ownerUserId,
+      founderUserId: team.founderUserId,
     });
   })
   // Deleting a team: everything G3ID has for it, then its registry row, which frees its number.
@@ -353,8 +424,7 @@ export const consoleRouter = new Hono<AppEnv>()
         teamNumber: team.teamNumber,
         name: team.name,
         status: team.status,
-        slackWorkspaceName: team.slackWorkspaceName,
-        discordGuildName: team.discordGuildName,
+        chat: chatOf(team),
         deletedAccounts: deletedUserIds.length,
         apps: DELETABLE.map((app) => app.name),
       },
@@ -434,6 +504,16 @@ export const consoleRouter = new Hono<AppEnv>()
   })
   // How Gearbox is used, as counts only: teams by status, members (from G3ID) and how many active
   // teams have each app on. The public demo's team is left out.
+  // The Cloudflare account (src/cloudflare.ts). A read, but refused from any page other than the
+  // console's: a cross-origin fetch always says where it's from, and only the console may read it.
+  .get("/cloudflare", async (c) => {
+    const origin = c.req.header("Origin");
+    if (origin && !fromConsole(c.env, origin)) {
+      return c.json({ error: "Only from the console." }, 403);
+    }
+    c.header("Cache-Control", "no-store");
+    return c.json(await cloudflareOverview(c.env));
+  })
   .get("/stats", async (c) => {
     const monthAgo = now() - 30 * 86_400;
     const [teamRows, appRows, membersRes] = await Promise.all([

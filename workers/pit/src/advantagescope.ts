@@ -1,14 +1,18 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import {
+  STORAGE_CLEANUP_RATIO,
   inTeam,
+  isStorageFileExpired,
   logTeamChange,
+  notifyStorageCleanup,
   requestTeamId,
   requireAuth,
   requireMentor,
   withTeam,
+  withTeamStorageLock,
 } from "@g3/auth";
 import { teamAppUrlVia } from "@g3/site-config";
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, inArray } from "drizzle-orm";
 import { Hono } from "hono";
 import { createDb } from "./db";
 import { matchLogs, scopeAssets, scopeSettings } from "./db/schema";
@@ -360,92 +364,206 @@ export const scopeRoutes = new Hono<AppEnv>()
 
     const db = createDb(c.env.PIT_DB);
     const teamId = c.get("teamId");
-    const existing = await db
-      .select({ name: scopeAssets.name, size: scopeAssets.size, files: scopeAssets.files })
-      .from(scopeAssets)
-      .where(inTeam(scopeAssets, teamId));
-    const replaced = new Set(found.map((asset) => asset.name));
-    const kept = existing.filter((row) => !replaced.has(row.name));
-    if (kept.length + found.length > MAX_ASSETS) {
-      return c.json({ error: `A team keeps at most ${MAX_ASSETS} assets.` }, 409);
-    }
+    return withTeamStorageLock(c.env.PIT_DB, teamId, async () => {
+      const existing = await db
+        .select({
+          name: scopeAssets.name,
+          size: scopeAssets.size,
+          files: scopeAssets.files,
+          uploadedAt: scopeAssets.uploadedAt,
+        })
+        .from(scopeAssets)
+        .where(inTeam(scopeAssets, teamId));
+      const replaced = new Set(found.map((asset) => asset.name));
+      const kept = existing
+        .filter((row) => !replaced.has(row.name))
+        .sort((a, b) => a.uploadedAt - b.uploadedAt || a.name.localeCompare(b.name));
+      const incomingBytes = found.reduce(
+        (sum, asset) => sum + asset.files.reduce((s, f) => s + f.entry.size, 0),
+        0,
+      );
+      if (found.length > MAX_ASSETS || incomingBytes > MAX_ASSET_BYTES) {
+        return c.json({ error: "One upload must fit within 100 MB and 10 assets." }, 413);
+      }
+      const total = kept.reduce((sum, row) => sum + row.size, 0) + incomingBytes;
+      // Every file is unzipped once and checked against its stated size, and each config.json read,
+      // before anything is stored, so a bad zip changes nothing.
+      const configs = new Map<string, unknown>();
+      try {
+        for (const asset of found) {
+          for (const file of asset.files) {
+            if (file.name !== "config.json") {
+              await file.entry.stream().pipeTo(new WritableStream());
+              continue;
+            }
+            const text = new TextDecoder().decode(await file.entry.read());
+            try {
+              configs.set(asset.name, JSON.parse(text));
+            } catch {
+              return c.json({ error: `${asset.name}'s config.json isn't valid JSON.` }, 400);
+            }
+          }
+        }
+      } catch (err) {
+        if (err instanceof ZipError) return c.json({ error: err.message }, 400);
+        return c.json({ error: "The zip is damaged." }, 400);
+      }
 
-    const total =
-      kept.reduce((sum, row) => sum + row.size, 0) +
-      found.reduce((sum, asset) => sum + asset.files.reduce((s, f) => s + f.entry.size, 0), 0);
-    if (total > MAX_ASSET_BYTES) {
-      return c.json({ error: "The team's assets would be over 100 MB." }, 413);
-    }
-    // Every file is unzipped once and checked against its stated size, and each config.json read,
-    // before anything is stored, so a bad zip changes nothing.
-    const configs = new Map<string, unknown>();
-    try {
+      const referenced = new Set(
+        existing.flatMap((asset) =>
+          (JSON.parse(asset.files) as AssetFile[]).map((file) =>
+            assetKey(teamId, asset.name, file.name),
+          ),
+        ),
+      );
+      const incomingKeys = new Set(
+        found.flatMap((asset) =>
+          asset.files.map((file) => assetKey(teamId, asset.name, file.name)),
+        ),
+      );
+      const listed: R2Object[] = [];
+      let cursor: string | undefined;
+      do {
+        const page = await c.env.LOGS.list({ prefix: scopePrefix(teamId), cursor });
+        listed.push(...page.objects);
+        cursor = page.truncated ? page.cursor : undefined;
+      } while (cursor);
+      const byKey = new Map(listed.map((file) => [file.key, file]));
+      const unreferenced = listed.filter(
+        (file) => !referenced.has(file.key) && !incomingKeys.has(file.key),
+      );
+      const unknownBytes = unreferenced.reduce((sum, file) => sum + file.size, 0);
+      let projectedBytes = total + unknownBytes;
+      let projectedAssets = kept.length + found.length;
+      const evictedAssets: typeof existing = [];
+      const evictedUnknown: R2Object[] = [];
+      const candidates: { time: number; asset?: (typeof existing)[number]; file?: R2Object }[] = [];
+      for (const asset of kept) {
+        const files = (JSON.parse(asset.files) as AssetFile[])
+          .map((file) => byKey.get(assetKey(teamId, asset.name, file.name)))
+          .filter((file): file is R2Object => Boolean(file));
+        // A recently changed physical file protects the whole asset even if its row is old.
+        if (
+          isStorageFileExpired(asset.uploadedAt) &&
+          files.every((file) => isStorageFileExpired(file.uploaded))
+        ) {
+          candidates.push({
+            time: Math.max(asset.uploadedAt, ...files.map((file) => file.uploaded.getTime())),
+            asset,
+          });
+        }
+      }
+      for (const file of unreferenced)
+        if (isStorageFileExpired(file.uploaded))
+          candidates.push({ time: file.uploaded.getTime(), file });
+      const needsCleanup = projectedBytes > MAX_ASSET_BYTES || projectedAssets > MAX_ASSETS;
+      if (needsCleanup) {
+        const targetBytes = Math.max(
+          Math.floor(MAX_ASSET_BYTES * STORAGE_CLEANUP_RATIO),
+          incomingBytes,
+        );
+        const targetAssets = Math.max(Math.floor(MAX_ASSETS * STORAGE_CLEANUP_RATIO), found.length);
+        candidates.sort((a, b) => a.time - b.time);
+        for (const candidate of candidates) {
+          if (projectedBytes <= targetBytes && projectedAssets <= targetAssets) break;
+          if (candidate.asset) {
+            evictedAssets.push(candidate.asset);
+            projectedAssets--;
+            projectedBytes -= candidate.asset.size;
+          } else if (candidate.file && projectedBytes > targetBytes) {
+            evictedUnknown.push(candidate.file);
+            projectedBytes -= candidate.file.size;
+          }
+        }
+      }
+      if (projectedBytes > MAX_ASSET_BYTES || projectedAssets > MAX_ASSETS) {
+        return c.json(
+          {
+            error:
+              "Asset storage is full. Files from the last six months are protected; review them before choosing what to remove.",
+          },
+          409,
+        );
+      }
+      const cleanup = async () => {
+        const removed = [
+          ...evictedUnknown,
+          ...evictedAssets.flatMap((asset) =>
+            (JSON.parse(asset.files) as AssetFile[]).map((file) => ({
+              key: assetKey(teamId, asset.name, file.name),
+              size: file.size,
+              uploaded: new Date(asset.uploadedAt),
+            })),
+          ),
+        ];
+        if (evictedAssets.length)
+          await db.delete(scopeAssets).where(
+            inTeam(
+              scopeAssets,
+              teamId,
+              inArray(
+                scopeAssets.name,
+                evictedAssets.map((asset) => asset.name),
+              ),
+            ),
+          );
+        for (let offset = 0; offset < removed.length; offset += 1000)
+          await c.env.LOGS.delete(removed.slice(offset, offset + 1000).map((file) => file.key));
+        if (removed.length) await notifyStorageCleanup(c.env, teamId, "pit", removed, c.env.PIT_DB);
+      };
+      const alreadyOver =
+        existing.reduce((sum, asset) => sum + asset.size, 0) + unknownBytes > MAX_ASSET_BYTES ||
+        existing.length > MAX_ASSETS;
+      if (alreadyOver) await cleanup();
+      const now = Date.now();
+      const userId = c.get("userId");
       for (const asset of found) {
+        const files: AssetFile[] = [];
         for (const file of asset.files) {
-          if (file.name !== "config.json") {
-            await file.entry.stream().pipeTo(new WritableStream());
+          const key = assetKey(teamId, asset.name, file.name);
+          if (gzipped(file.name)) {
+            await putGzipped(c.env.LOGS, key, file.entry.stream());
+            files.push({ name: file.name, size: file.entry.size });
             continue;
           }
-          const text = new TextDecoder().decode(await file.entry.read());
-          try {
-            configs.set(asset.name, JSON.parse(text));
-          } catch {
-            return c.json({ error: `${asset.name}'s config.json isn't valid JSON.` }, 400);
-          }
-        }
-      }
-    } catch (err) {
-      if (err instanceof ZipError) return c.json({ error: err.message }, 400);
-      return c.json({ error: "The zip is damaged." }, 400);
-    }
-
-    const now = Date.now();
-    const userId = c.get("userId");
-    for (const asset of found) {
-      const files: AssetFile[] = [];
-      for (const file of asset.files) {
-        const key = assetKey(teamId, asset.name, file.name);
-        if (gzipped(file.name)) {
-          await putGzipped(c.env.LOGS, key, file.entry.stream());
+          // Streamed: unzipped into R2 a piece at a time, at the size checked above.
+          const { readable, writable } = new FixedLengthStream(file.entry.size);
+          const piping = file.entry.stream().pipeTo(writable);
+          await c.env.LOGS.put(key, readable);
+          await piping;
           files.push({ name: file.name, size: file.entry.size });
-          continue;
         }
-        // Streamed: unzipped into R2 a piece at a time, at the size checked above.
-        const { readable, writable } = new FixedLengthStream(file.entry.size);
-        const piping = file.entry.stream().pipeTo(writable);
-        await c.env.LOGS.put(key, readable);
-        await piping;
-        files.push({ name: file.name, size: file.entry.size });
+        // Files of the version replaced that this one doesn't have.
+        const before = existing.find((row) => row.name === asset.name);
+        const gone = before
+          ? (JSON.parse(before.files) as AssetFile[]).filter(
+              (old) => !files.some((f) => f.name === old.name),
+            )
+          : [];
+        if (gone.length) {
+          await c.env.LOGS.delete(gone.map((f) => assetKey(teamId, asset.name, f.name)));
+        }
+        const values = {
+          files: JSON.stringify(files),
+          config: JSON.stringify(configs.get(asset.name)),
+          size: files.reduce((sum, f) => sum + f.size, 0),
+          uploadedBy: userId,
+          uploadedAt: now,
+        };
+        await db
+          .insert(scopeAssets)
+          .values(withTeam(teamId, { name: asset.name, ...values }))
+          .onConflictDoUpdate({ target: [scopeAssets.teamId, scopeAssets.name], set: values });
       }
-      // Files of the version replaced that this one doesn't have.
-      const before = existing.find((row) => row.name === asset.name);
-      const gone = before
-        ? (JSON.parse(before.files) as AssetFile[]).filter(
-            (old) => !files.some((f) => f.name === old.name),
-          )
-        : [];
-      if (gone.length) {
-        await c.env.LOGS.delete(gone.map((f) => assetKey(teamId, asset.name, f.name)));
-      }
-      const values = {
-        files: JSON.stringify(files),
-        config: JSON.stringify(configs.get(asset.name)),
-        size: files.reduce((sum, f) => sum + f.size, 0),
-        uploadedBy: userId,
-        uploadedAt: now,
-      };
-      await db
-        .insert(scopeAssets)
-        .values(withTeam(teamId, { name: asset.name, ...values }))
-        .onConflictDoUpdate({ target: [scopeAssets.teamId, scopeAssets.name], set: values });
-    }
-    await logTeamChange(c.env, teamId, {
-      userId,
-      app: "pit",
-      what: "AdvantageScope assets",
-      changed: ["Uploaded assets"],
+      await logTeamChange(c.env, teamId, {
+        userId,
+        app: "pit",
+        what: "AdvantageScope assets",
+        changed: ["Uploaded assets"],
+      });
+      if (!alreadyOver) await cleanup();
+      return c.json({ ok: true, assets: found.map((asset) => asset.name) });
     });
-    return c.json({ ok: true, assets: found.map((asset) => asset.name) });
   })
 
   .delete("/assets/:name", requireMentor, async (c) => {

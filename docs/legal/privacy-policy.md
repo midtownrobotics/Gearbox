@@ -1,6 +1,6 @@
 # Gearbox Privacy Policy
 
-Last updated: 1 November 2026.
+Last updated: 6 November 2026.
 
 ## In short
 
@@ -24,7 +24,7 @@ We collect only what the apps need to work.
 
 | Kind | What it includes | Where it comes from |
 | --- | --- | --- |
-| Account | Name (you enter it when you join, and your team's admins can correct it), the username of the Slack or Discord account you joined with, email address, when you last signed in and when you last used Gearbox | You, your team's admins, or the sign-in service you use |
+| Account | Name (you enter it when you join, and your team's admins can correct it), the username of the Slack or Discord account you joined with (if you joined through your team's chat), email address, when you last signed in and when you last used Gearbox | You, your team's admins, or the sign-in service you use |
 | Sign-in links | Your identifier at each service you link, such as Google, GitHub, Slack, Discord or Steam, and the email or username it gives us. A password is stored only as a one-way hash. For Google and GitHub, the access token they issue when you sign in | You, when you link a service |
 | Team membership | Your team, your role, your status, and a kiosk PIN if your team uses kiosks | Your team's admins |
 | Sessions and devices | A session identifier in a cookie, and for shared shop devices a kiosk token | Created when you sign in |
@@ -100,6 +100,7 @@ Scouting engagement is off by default. An admin can enable points and match pred
 | Sites your team links to | A team's own links on its home page show each site's icon | When you open your team's home, your browser loads each linked site's icon from that site, which sees your IP address as it would on any visit. Gearbox doesn't store the icons |
 | Share-A-Cart | Building vendor carts in Orders | Only if your team connects it; it receives the items in a cart |
 | Cloudflare Workers AI | Reading a photographed match schedule in Scouting | Only when a member uses that feature; it receives the photo |
+| Cloudflare Turnstile | Checks that someone signing up with Google or GitHub is a person | Only on the sign-up page of a team that lets people sign up without its chat. Your browser loads the check from Cloudflare, which sees your IP address and information about your browser. We store nothing from it |
 
 Each of these services has its own privacy policy. Services your team connects are your team's choice, and your team can disconnect them.
 
@@ -116,6 +117,7 @@ Where the law of your team's country requires a legal basis for that transfer, t
 | Sign-in sessions | 7 days from sign-in |
 | Your account | Until a team admin deletes it, which removes it and your sign-ins at once, or until your team is deleted |
 | Team data | While the team is registered. Deleted within 30 days after the team closes |
+| Uploaded files in Shop, Scouting and Pit | When new uploads would exceed an app's cap, files strictly older than six calendar months may be permanently removed oldest first, targeting 90% usage. Newer files remain protected; if not enough old data can be removed, uploads pause. Pit's match logs are only removed this way when the team chooses it. Written Scouting reports and auton steps remain when images are removed. Admin cleanup summaries are best effort through the team log and connected chat. Existing team/app deletion and demo lifecycle rules still apply |
 | The team's log (apps switched on or off, data downloads, and which settings were changed and by whom, never their values) | Kept as team data |
 | Data of an app your team switches off | 90 days, in case your team switches it back on, then deleted |
 | Records that name a removed member, such as past orders | Kept by the team, with the member's name replaced by a placeholder |
@@ -124,6 +126,7 @@ Where the law of your team's country requires a legal basis for that transfer, t
 | Edge: sites each device used | Hourly for 30 days, then daily totals for one year |
 | Who sent a problem report, and your reporter ID | Kept as team data, and deleted with the team. The public GitHub issue stays: ask us to remove one |
 | Daily visit totals for our public page | Kept; they are totals and identify no one |
+| Incomplete match-log uploads | Expire after 30 minutes; cleaned up when another upload starts or by the storage provider's incomplete-upload cleanup |
 | Technical logs | 7 days |
 | Backups | 30 days, after which deleted information is gone from backups too |
 | The public demo | Erased every night at midnight US Eastern time |

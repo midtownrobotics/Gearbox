@@ -13,9 +13,19 @@ export const manifest = defineManifest({
   availability: "every team",
   alwaysOn: true,
   version: packageJson.version,
-  hooks: { seed: false, delete: false, export: false, demo: false },
+  hooks: { seed: false, delete: false, export: false, demo: false, storage: false },
   // Team Appearance and Slack are edited on the team's home (Portal's /admin); members, kiosks
   // and roles stay here.
-  settings: [],
+  settings: [
+    {
+      key: "open_signup",
+      label: "Sign-up without chat",
+      type: "boolean",
+      default: false,
+      help: "People can sign up with Google or GitHub, after a Turnstile check; admins approve each",
+      editedBy: "admin",
+      page: "portal:/admin/sign-in",
+    },
+  ],
   plugins: [],
 });

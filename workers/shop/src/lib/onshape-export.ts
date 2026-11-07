@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { inTeam } from "@g3/auth";
+import { MAX_SHOP_FILE_BYTES, StorageLimitError, inTeam } from "@g3/auth";
 import { desc, eq } from "drizzle-orm";
 import type { createShopDb } from "../db";
 import * as schema from "../db/schema";
@@ -8,6 +8,7 @@ import { drawingBarcodeValue, stampBarcode } from "./barcode";
 import { type OnshapeApi, onshapeFetch } from "./onshape-api";
 import { onshapeConfig } from "./onshape-config";
 import { drawingKey } from "./storage";
+import { putShopFile } from "./storage-limit";
 
 type ShopDb = ReturnType<typeof createShopDb>;
 
@@ -47,6 +48,10 @@ export async function storeDrawingInR2(
 ): Promise<string> {
   const r2Key = drawingKey(teamId, partNumber, revision);
 
+  if (pdfBuffer.byteLength > MAX_SHOP_FILE_BYTES) {
+    throw new StorageLimitError("Files must be 100 MB or smaller.", "file_too_large", 413);
+  }
+
   // Stamp the part-number barcode before the drawing is stored, so every copy served or
   // printed from R2 carries it. A stamping failure must not cost us the drawing itself.
   let body: ArrayBuffer | Uint8Array = pdfBuffer;
@@ -60,11 +65,7 @@ export async function storeDrawingInR2(
     });
   }
 
-  await env.DRAWINGS.put(r2Key, body, {
-    httpMetadata: {
-      contentType: "application/pdf",
-    },
-  });
+  await putShopFile(env, teamId, r2Key, body, "application/pdf");
   console.log("[OnShape Export] Stored drawing in R2", {
     partNumber,
     revision,

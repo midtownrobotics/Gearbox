@@ -56,7 +56,7 @@ function byEvent(logs: MatchLog[]) {
 
 const WHEN_FULL: { value: WhenFull; label: string }[] = [
   { value: "skip-new", label: "Don't save new ones" },
-  { value: "delete-oldest", label: "Delete the oldest" },
+  { value: "delete-oldest", label: "Delete the oldest over six months old" },
 ];
 
 /** How many logs Pit has of its limit, what happens when it's full, and export. */
@@ -80,7 +80,7 @@ function Storage({
             {full
               ? data.whenFull === "skip-new"
                 ? "Pit is full: new logs stay on the downloader until you delete some here."
-                : "Pit is full: each new log replaces the oldest."
+                : "Pit is full: each new log replaces the oldest over six months old. Without any, new logs stay on the downloader until you delete some here."
               : `Pit keeps up to ${data.limit} logs.`}
           </p>
         </div>

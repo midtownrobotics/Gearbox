@@ -11,6 +11,12 @@ order: 2
 - **They used a sign-in method your team has switched off.** See [sign-in methods](/portal/sign-in). Your team's chat always works.
 - **They're not in your Discord server.** On a Discord team, a new member has to be in the team's server, with a verified email on Discord.
 
+## Someone can't sign up with Google or GitHub
+
+- **Your team doesn't allow it.** Switch on sign-up without Slack or Discord on [Sign-in](/portal/sign-in), with Google or GitHub on there too.
+- **Their Google or GitHub account has no verified email.** They add one in that account's settings, then try again.
+- **Their email already has an account.** They sign in the way they did before and add Google or GitHub on their Account page.
+
 ## "This app isn't switched on"
 
 An admin has to switch the app on, on [Apps](/portal/apps). The page someone sees links there.
