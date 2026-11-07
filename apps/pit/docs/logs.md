@@ -23,6 +23,7 @@ Logs lists every log by event, for anyone signed in to download. Admins delete t
 
 - Each team keeps at most 20 logs. On Logs, choose what happens when you're full: **Don't save new ones** (the default), or **Delete the oldest over six months old**. Logs from the last six months are never deleted to make room: new ones wait on the downloader until you delete some.
 - A log over 40 MB (compressed) waits on the laptop until it's trimmed. The downloader's page can trim a log to the part you need, and suggests from just before the robot was first enabled to just after it was last disabled. The file on the laptop is never cut.
+- When Pit already has a different copy of a log (same match, another size), the downloader keeps its copy on the laptop and doesn't upload it. To replace Pit's copy, delete it on Logs, then choose **Upload again** on the downloader's page.
 - **Export and delete all** downloads everything as one zip, then offers to delete them.
 
 ## AdvantageScope
