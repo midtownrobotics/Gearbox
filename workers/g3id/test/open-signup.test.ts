@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+import { exports } from "cloudflare:workers";
 import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { createDb } from "../src/db";
@@ -171,5 +172,45 @@ describe("signing up without chat", () => {
     });
     const res = await g3id("/team/sign-in", { headers: { "X-Team-Id": team } });
     expect(await res.json()).toMatchObject({ openSignup: true, steam: false });
+  });
+});
+
+describe("finishing a sign-in on another cookie domain", () => {
+  it("hands the session to the team's own ID address", async () => {
+    const team = await createTeam();
+    const email = `${newId()}@gmail.test`;
+    const userId = await createUser({ teamId: team, email });
+    const sub = newId();
+    const now = Math.floor(Date.now() / 1000);
+    await createDb(testEnv.DB).insert(coreUserIdentities).values({
+      id: newId(),
+      userId,
+      provider: "google",
+      providerId: sub,
+      createdAt: now,
+      updatedAt: now,
+    });
+    const start = await g3id("/auth/google", {
+      redirect: "manual",
+      headers: { "X-Team-Id": team },
+    });
+    const state = new URL(start.headers.get("Location") ?? "").searchParams.get("state") ?? "";
+    // Called back on localhost, like the site team's providers in local dev.
+    const back = await exports.default.fetch(
+      new Request(
+        `http://localhost:5173/auth/google/callback?code=${encodeURIComponent(`${sub}:${email}`)}&state=${state}`,
+        { redirect: "manual" },
+      ),
+    );
+    const to = new URL(back.headers.get("Location") ?? "");
+    expect(to.pathname).toBe("/api/auth/handoff");
+    expect(back.headers.get("Set-Cookie")).toBeNull();
+
+    const handed = await g3id(`/auth/handoff?${to.searchParams}`, {
+      redirect: "manual",
+      headers: { "X-Team-Id": team },
+    });
+    expect(handed.status).toBe(302);
+    expect(handed.headers.get("Set-Cookie")).toContain("g3_session=");
   });
 });

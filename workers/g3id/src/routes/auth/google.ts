@@ -2,10 +2,9 @@
 import { resolveUserId } from "@g3/auth";
 import { and, eq } from "drizzle-orm";
 import { Hono } from "hono";
-import { setCookie } from "hono/cookie";
 import { createDb } from "../../db";
 import { coreUserIdentities, coreUsers } from "../../db/schema";
-import { sessionCookieOptions } from "../../lib/cookie";
+import { finishSignIn } from "../../lib/handoff";
 import { newId } from "../../lib/id";
 import { decodeState, encodeState } from "../../lib/oauth-state";
 import {
@@ -236,8 +235,12 @@ export const googleAuthRouter = new Hono<AppEnv>()
       }
 
       const sessionId = await createSession(user.id, c.env);
-      setCookie(c, "g3_session", sessionId, sessionCookieOptions(c.req.url));
-      return c.redirect(redirectTo ?? `${teamUrl(c.env, st.team, "portal")}/`);
+      return finishSignIn(
+        c,
+        st.team,
+        sessionId,
+        redirectTo ?? `${teamUrl(c.env, st.team, "portal")}/`,
+      );
     }
 
     // Someone new: only from the sign-up page, when the team lets people sign up with Google.

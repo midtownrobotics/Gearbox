@@ -1,30 +1,19 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import {
-  Button,
-  ErrorBanner,
-  NotYourTeam,
-  buttonClass,
-  chatName,
-  useTeamChat,
-  useTeamNames,
-} from "@g3/ui";
+import { NotYourTeam, buttonClass, chatName, useTeamChat, useTeamNames } from "@g3/ui";
 import { useEffect, useState } from "react";
 import { FaDiscord, FaGithub, FaGoogle, FaSlack } from "react-icons/fa";
 import { Link } from "react-router-dom";
 import { api } from "../../lib/api";
-import { Turnstile } from "./turnstile";
 
 const apiBase = import.meta.env.VITE_API_BASE_URL ?? "";
 
-/** The sign-ups a team can allow besides its chat, after a Turnstile check. */
+/** The sign-ups a team can allow besides its chat, after a Turnstile check (/signup/check). */
 const OTHERS = [
   { method: "google", label: "Google", Icon: FaGoogle },
   { method: "github", label: "GitHub", Icon: FaGithub },
 ] as const;
 
-type Methods = Partial<Record<"google" | "github" | "openSignup", boolean>> & {
-  turnstileSiteKey?: string;
-};
+type Methods = Partial<Record<"google" | "github" | "openSignup", boolean>>;
 
 export function SignupPage() {
   const names = useTeamNames();
@@ -35,9 +24,6 @@ export function SignupPage() {
 
   // Whether the team also lets people sign up with Google or GitHub.
   const [methods, setMethods] = useState<Methods>({});
-  const [token, setToken] = useState<string | null>(null);
-  const [checkFailed, setCheckFailed] = useState(false);
-  const [needCheck, setNeedCheck] = useState(false);
   useEffect(() => {
     api.team["sign-in"]
       .$get()
@@ -46,7 +32,6 @@ export function SignupPage() {
       .catch(() => {});
   }, []);
   const others = methods.openSignup ? OTHERS.filter(({ method }) => methods[method] === true) : [];
-  const siteKey = methods.turnstileSiteKey;
 
   return (
     <main className="flex-1 flex items-center justify-center px-4 bg-secondary-50">
@@ -66,52 +51,17 @@ export function SignupPage() {
             Sign up with {chatName(chat)}
           </a>
 
-          {others.length > 0 && siteKey && (
-            <>
-              <Turnstile
-                siteKey={siteKey}
-                onToken={(next) => {
-                  setToken(next);
-                  if (next) {
-                    setNeedCheck(false);
-                    setCheckFailed(false);
-                  }
-                }}
-                onError={() => setCheckFailed(true)}
-              />
-              {checkFailed && (
-                <ErrorBanner message="The check didn't load. Reload the page to try again." />
-              )}
-              {needCheck && !checkFailed && (
-                <p className="text-center text-sm text-secondary-600">
-                  Finish the check above first.
-                </p>
-              )}
-              {others.map(({ method, label, Icon: OtherIcon }) =>
-                token ? (
-                  <a
-                    key={method}
-                    href={`${apiBase}/auth/${method}?signup=1&turnstile=${encodeURIComponent(token)}`}
-                    className={`${buttonClass("secondary")} w-full`}
-                  >
-                    <OtherIcon size={20} />
-                    Sign up with {label}
-                  </a>
-                ) : (
-                  <Button
-                    key={method}
-                    variant="secondary"
-                    className="w-full"
-                    blocked
-                    onClick={() => setNeedCheck(true)}
-                  >
-                    <OtherIcon size={20} />
-                    Sign up with {label}
-                  </Button>
-                ),
-              )}
-            </>
-          )}
+          {/* Each goes to the check that they're a person first (check-page.tsx). */}
+          {others.map(({ method, label, Icon: OtherIcon }) => (
+            <Link
+              key={method}
+              to={`/signup/check?with=${method}`}
+              className={`${buttonClass("secondary")} w-full`}
+            >
+              <OtherIcon size={20} />
+              Sign up with {label}
+            </Link>
+          ))}
         </div>
 
         <p className="text-center text-sm text-secondary-500">
