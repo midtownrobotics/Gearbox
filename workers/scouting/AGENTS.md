@@ -23,6 +23,6 @@ Scouting uses Drizzle and the shared inTeam/withTeam helpers for all private tab
 
 ## Storage safeguards
 
-- Caps: 2 GiB / 25,000 objects per team; 12 MiB per image and 24 MiB per submission. At cap, only files strictly older than six calendar months are automatically eligible; recent/unknown-date files are protected. Legacy Pit delete-oldest values cannot authorize deleting recent files. Unknown objects count toward quotas and can be removed only when their server upload date is expired.
+- Caps: 2 GiB / 25,000 objects per team; 12 MiB per image and 24 MiB per submission. At cap, only files strictly older than six calendar months are automatically eligible; recent/unknown-date files are protected. Unknown objects count toward quotas and can be removed only when their server upload date is expired.
 - The shared engine applies the six-calendar-month UTC cutoff (strict boundary, month-end clamped) and targets 90% after the incoming save. If expired files cannot free enough room, uploads pause. Exact object-version approvals remain supported internally but no route approves younger files and no new approval UI exists. Existing manual review/download/delete controls remain.
 - Migrations: 0039 (locks), 0040 (notices). Per-team coordination prevents concurrent quota races; cleanup notices, after actual expired/reviewed file deletion, are best effort and batched. See `docs/storage-limits.md`.
