@@ -177,10 +177,131 @@ const github = async (request: Request) => {
   return Response.json({ message: "Not Found" }, { status: 404 });
 };
 
+// Cloudflare's API, for the console's Cloudflare page (src/cloudflare.ts): one account with a
+// worker, a database, a bucket, a namespace and a zone. Workers AI's dataset answers with an error,
+// so the page's other parts must still show.
+const CF_ACCOUNT = "0123456789abcdef0123456789abcdef";
+const cfDataset: Record<string, unknown[]> = {
+  workersInvocationsAdaptive: [
+    {
+      sum: { requests: 9_000_000, errors: 3, subrequests: 40, cpuTimeUs: 2_000_000 },
+      dimensions: { scriptName: "orders-production" },
+    },
+  ],
+  d1AnalyticsAdaptiveGroups: [
+    { sum: { rowsRead: 1000, rowsWritten: 60_000_000 }, dimensions: { databaseId: "db-1" } },
+  ],
+  d1StorageAdaptiveGroups: [
+    { max: { databaseSizeBytes: 2_000_000 }, dimensions: { databaseId: "db-1" } },
+  ],
+  r2OperationsAdaptiveGroups: [
+    { sum: { requests: 10 }, dimensions: { bucketName: "pit-logs", actionType: "PutObject" } },
+    { sum: { requests: 20 }, dimensions: { bucketName: "pit-logs", actionType: "GetObject" } },
+    { sum: { requests: 5 }, dimensions: { bucketName: "pit-logs", actionType: "DeleteObject" } },
+  ],
+  r2StorageAdaptiveGroups: [
+    {
+      max: { payloadSize: 3000, metadataSize: 100, objectCount: 7 },
+      dimensions: { bucketName: "pit-logs" },
+    },
+  ],
+  kvOperationsAdaptiveGroups: [
+    { sum: { requests: 50 }, dimensions: { namespaceId: "kv-1", actionType: "read" } },
+  ],
+  kvStorageAdaptiveGroups: [
+    { max: { byteCount: 10, keyCount: 2 }, dimensions: { namespaceId: "kv-1" } },
+  ],
+  durableObjectsInvocationsAdaptiveGroups: [{ sum: { requests: 12 } }],
+  durableObjectsStorageGroups: [{ max: { storedBytes: 400 } }],
+  durableObjectsPeriodicGroups: [{ sum: { activeTime: 8_000_000 } }],
+  queueMessageOperationsAdaptiveGroups: [{ sum: { billableOperations: 30 } }],
+};
+const cfRest: Record<string, unknown> = {
+  [`/client/v4/accounts/${CF_ACCOUNT}/d1/database`]: [{ uuid: "db-1", name: "gearbox-orders" }],
+  [`/client/v4/accounts/${CF_ACCOUNT}/storage/kv/namespaces`]: [{ id: "kv-1", title: "sessions" }],
+  [`/client/v4/accounts/${CF_ACCOUNT}/workers/scripts`]: [
+    { id: "orders-production", modified_on: "2026-11-01T00:00:00Z" },
+  ],
+  [`/client/v4/accounts/${CF_ACCOUNT}/workers/scripts/orders-production/deployments`]: {
+    deployments: [
+      {
+        created_on: "2026-11-01T00:00:00Z",
+        source: "wrangler",
+        author_email: "deployer@test",
+        annotations: { "workers/message": "Release 2026.11.1" },
+        versions: [{ version_id: "abcdef1234567890", percentage: 100 }],
+      },
+    ],
+  },
+  "/client/v4/zones": [{ id: "zone-1", name: "frcgearbox.com", plan: { name: "Free Website" } }],
+};
+/** How many requests reached it, read back by tests with a GET of /test/cloudflare/calls. */
+let cfCalls = 0;
+const cloudflare = async (request: Request) => {
+  const url = new URL(request.url);
+  if (url.pathname === "/test/cloudflare/calls") return Response.json(cfCalls);
+  cfCalls += 1;
+  if (request.headers.get("Authorization") !== "Bearer test-cf-token") {
+    return Response.json({ success: false, errors: [{ message: "Bad token" }] }, { status: 403 });
+  }
+  if (url.pathname === "/client/v4/graphql") {
+    const { query } = (await request.json()) as { query: string };
+    if (query.includes("aiInferenceAdaptiveGroups")) {
+      return Response.json({ data: null, errors: [{ message: "unknown field" }] });
+    }
+    if (query.includes("zones(")) {
+      return Response.json({
+        data: {
+          viewer: {
+            zones: [
+              {
+                httpRequests1dGroups: [
+                  {
+                    sum: {
+                      requests: 100,
+                      cachedRequests: 40,
+                      bytes: 5000,
+                      cachedBytes: 2000,
+                      threats: 1,
+                      countryMap: [{ clientCountryName: "US", requests: 90 }],
+                      responseStatusMap: [
+                        { edgeResponseStatus: 200, requests: 95 },
+                        { edgeResponseStatus: 503, requests: 5 },
+                      ],
+                    },
+                  },
+                ],
+                firewallEventsAdaptiveGroups: [
+                  {
+                    count: 4,
+                    dimensions: {
+                      action: "block",
+                      source: "waf",
+                      clientCountryName: "XX",
+                      clientRequestPath: "/wp-login.php",
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      });
+    }
+    const dataset = Object.keys(cfDataset).find((name) => query.includes(`${name}(`));
+    if (!dataset) return Response.json({ data: null, errors: [{ message: "unknown" }] });
+    return Response.json({ data: { viewer: { accounts: [{ [dataset]: cfDataset[dataset] }] } } });
+  }
+  const result = cfRest[url.pathname];
+  if (result === undefined) return Response.json({ success: false }, { status: 404 });
+  return Response.json({ success: true, result });
+};
+
 // Slack's install: answers for the workspace named in the code ("ws:T123").
 const slack = async (request: Request) => {
   const url = new URL(request.url);
   if (url.hostname === "api.github.com") return github(request);
+  if (url.hostname === "api.cloudflare.com") return cloudflare(request);
   // Discord: @g3/testing's fake (packages/testing/src/discord.ts).
   if (url.hostname === "discord.com") return fakeDiscord(request);
   if (url.hostname === "slack.com" && url.pathname === "/api/oauth.v2.access") {
@@ -262,6 +383,8 @@ export default workerTestConfig({
     LOCAL_GATEWAY_URL: "",
     GITHUB_REPO: "test/gearbox",
     GITHUB_TOKEN: "test-github-token",
+    CLOUDFLARE_API_TOKEN: "test-cf-token",
+    CLOUDFLARE_ACCOUNT_ID: CF_ACCOUNT,
   },
   services: {
     G3ID: g3id,

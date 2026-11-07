@@ -2,12 +2,17 @@
 import { resolveUserId } from "@g3/auth";
 import { and, eq } from "drizzle-orm";
 import { Hono } from "hono";
-import { setCookie } from "hono/cookie";
 import { createDb } from "../../db";
 import { coreUserIdentities, coreUsers } from "../../db/schema";
-import { sessionCookieOptions } from "../../lib/cookie";
+import { finishSignIn } from "../../lib/handoff";
 import { newId } from "../../lib/id";
 import { decodeState, encodeState } from "../../lib/oauth-state";
+import {
+  openSignupOn,
+  pendingPage,
+  signUpWithProvider,
+  turnstilePassed,
+} from "../../lib/open-signup";
 import { sanitizeRedirect } from "../../lib/redirect";
 import { createSession } from "../../lib/session";
 import { methodOff } from "../../lib/sign-in-methods";
@@ -57,7 +62,28 @@ export const googleAuthRouter = new Hono<AppEnv>()
       );
     }
     const redirect = sanitizeRedirect(c.req.query("redirect"), team);
-    const state = await generateState(c.env, encodeState({ team, redirect, linkUserId: null }));
+    // From the sign-up page: someone new, who passed its Turnstile check, may sign up.
+    const signup = c.req.query("signup") === "1";
+    if (signup) {
+      const error = !(await openSignupOn(c.env, team))
+        ? "Your team doesn't let people sign up with Google."
+        : !(await turnstilePassed(
+              c.env,
+              c.req.query("turnstile"),
+              c.req.header("CF-Connecting-IP"),
+            ))
+          ? "We couldn't check that you're a person. Go back and try again."
+          : null;
+      if (error) {
+        return c.redirect(
+          `${teamFrontend(c.env, team)}/login/error?error=${encodeURIComponent(error)}`,
+        );
+      }
+    }
+    const state = await generateState(
+      c.env,
+      encodeState({ team, redirect, linkUserId: null, ...(signup ? { signup: true } : {}) }),
+    );
     return c.redirect(buildGoogleUrl(c.env, state, providerRedirectUri(c.env, "google", team)));
   })
   // Link initiation — user must already be signed in
@@ -195,6 +221,11 @@ export const googleAuthRouter = new Hono<AppEnv>()
         return err("This account belongs to another team. Sign in on your own team's page.");
       }
 
+      // Signed up with Google and still waiting: their name step, or the waiting page.
+      if (user?.status === "pending") {
+        return c.redirect(await pendingPage(c.env, frontend, user.id, "google"));
+      }
+
       if (!user || user.status !== "active") {
         const message =
           user?.status === "pending"
@@ -204,12 +235,36 @@ export const googleAuthRouter = new Hono<AppEnv>()
       }
 
       const sessionId = await createSession(user.id, c.env);
-      setCookie(c, "g3_session", sessionId, sessionCookieOptions(c.req.url));
-      return c.redirect(redirectTo ?? `${teamUrl(c.env, st.team, "portal")}/`);
+      return finishSignIn(
+        c,
+        st.team,
+        sessionId,
+        redirectTo ?? `${teamUrl(c.env, st.team, "portal")}/`,
+      );
     }
 
-    // No Google identity found — account must already exist
+    // Someone new: only from the sign-up page, when the team lets people sign up with Google.
+    if (st.signup) {
+      const signUp = await signUpWithProvider(c.env, st.team, {
+        provider: "google",
+        providerId: sub,
+        email: payload.email_verified === true ? (email ?? null) : null,
+        name: typeof payload.name === "string" ? payload.name : "",
+        identity: {
+          accessToken: tokens.access_token,
+          refreshToken: tokens.refresh_token ?? null,
+          tokenExpiresAt: now + tokens.expires_in,
+        },
+      });
+      if (signUp.result === "failed") return err(signUp.message);
+      return c.redirect(
+        signUp.token
+          ? `${frontend}/signup/name?token=${signUp.token}&with=google`
+          : `${frontend}/signup/pending?with=google`,
+      );
+    }
+
     return err(
-      "No account found with this Google account. Sign up with Slack or contact an administrator.",
+      "No account found with this Google account. Sign up first, or sign in another way and link Google from your account page.",
     );
   });

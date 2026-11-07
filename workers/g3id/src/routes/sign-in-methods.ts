@@ -5,6 +5,7 @@ import { Hono } from "hono";
 import { createDb } from "../db";
 import { coreUserIdentities, coreUsers } from "../db/schema";
 import { chatProvider } from "../lib/chat";
+import { openSignupChosen, openSignupOn, saveOpenSignup, turnstileReady } from "../lib/open-signup";
 import {
   METHOD_LABELS,
   OPTIONAL_METHODS,
@@ -49,8 +50,20 @@ export const teamSignInRouter = new Hono<AppEnv>()
   .get("/", async (c) => {
     c.header("Cache-Control", "public, max-age=60");
     const team = requestTeamId(c);
-    // `demo`: the public demo's sign-in page offers its roles instead.
-    return c.json({ ...(await signInMethods(createDb(c.env.DB), team)), demo: isDemoTeam(team) });
+    const [methods, open] = await Promise.all([
+      signInMethods(createDb(c.env.DB), team),
+      openSignupOn(c.env, team),
+    ]);
+    // `openSignup`: the sign-up page offers Google and GitHub (those that are on), behind a
+    // Turnstile check with `turnstileSiteKey`.
+    const openSignup = open && (methods.google || methods.github);
+    return c.json({
+      ...methods,
+      openSignup,
+      ...(openSignup ? { turnstileSiteKey: c.env.TURNSTILE_SITE_KEY } : {}),
+      // `demo`: the public demo's sign-in page offers its roles instead.
+      demo: isDemoTeam(team),
+    });
   });
 
 // Which chat the team uses (Slack, Discord or none), for pages that name it ("You'll get a
@@ -60,16 +73,34 @@ export const teamChatRouter = new Hono<AppEnv>().get("/", async (c) => {
   return c.json({ provider: await chatProvider(c.env, requestTeamId(c)) });
 });
 
+/**
+ * The Sign-in page's view: the methods, who'd be locked out, whether people can sign up without
+ * chat (`openSignup`) and whether this site is set up for it (`openSignupReady`: Turnstile's keys).
+ */
+async function adminView(env: AppEnv["Bindings"], db: Db, team: string) {
+  const [methods, only, openSignup] = await Promise.all([
+    signInMethods(db, team),
+    onlyWith(db, team),
+    openSignupChosen(db, team),
+  ]);
+  return { methods, onlyWith: only, openSignup, openSignupReady: turnstileReady(env) };
+}
+
 export const adminSignInRouter = new Hono<AppEnv>()
   .use("*", requireAdmin)
   .get("/", async (c) => {
     const db = createDb(c.env.DB);
     const team = await teamOfUser(db, c.get("userId") as string);
-    const [methods, only] = await Promise.all([signInMethods(db, team), onlyWith(db, team)]);
-    return c.json({ methods, onlyWith: only });
+    return c.json(await adminView(c.env, db, team));
   })
   .put("/", async (c) => {
     const body = (await c.req.json().catch(() => null)) as Record<string, unknown> | null;
+    if (body && "openSignup" in body && typeof body.openSignup !== "boolean") {
+      return c.json({ error: "Say on or off for each." }, 400);
+    }
+    if (body?.openSignup === true && !turnstileReady(c.env)) {
+      return c.json({ error: "Signing up without chat isn't set up on this site yet." }, 400);
+    }
     const next = {} as Record<OptionalMethod, boolean>;
     for (const m of OPTIONAL_METHODS) {
       if (typeof body?.[m] !== "boolean") return c.json({ error: "Say on or off for each." }, 400);
@@ -108,8 +139,15 @@ export const adminSignInRouter = new Hono<AppEnv>()
     const changed = OPTIONAL_METHODS.filter((m) => before[m] !== next[m]).map(
       (m) => `${METHOD_LABELS[m]} ${next[m] ? "on" : "off"}`,
     );
+    if (typeof body?.openSignup === "boolean") {
+      const openBefore = await openSignupChosen(db, team);
+      if (openBefore !== body.openSignup) {
+        await saveOpenSignup(db, team, body.openSignup, userId);
+        changed.push(`Sign-up without ${METHOD_LABELS[chat]} ${body.openSignup ? "on" : "off"}`);
+      }
+    }
     if (changed.length > 0) {
       await logToTeam(c.env, team, { userId, app: "id", what: "Sign-in methods", changed });
     }
-    return c.json({ methods: await signInMethods(db, team), onlyWith: await onlyWith(db, team) });
+    return c.json(await adminView(c.env, db, team));
   });

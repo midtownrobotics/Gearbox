@@ -24,7 +24,7 @@ We collect only what the apps need to work.
 
 | Kind | What it includes | Where it comes from |
 | --- | --- | --- |
-| Account | Name (you enter it when you join, and your team's admins can correct it), the username of the Slack or Discord account you joined with, email address, when you last signed in and when you last used Gearbox | You, your team's admins, or the sign-in service you use |
+| Account | Name (you enter it when you join, and your team's admins can correct it), the username of the Slack or Discord account you joined with (if you joined through your team's chat), email address, when you last signed in and when you last used Gearbox | You, your team's admins, or the sign-in service you use |
 | Sign-in links | Your identifier at each service you link, such as Google, GitHub, Slack, Discord or Steam, and the email or username it gives us. A password is stored only as a one-way hash. For Google and GitHub, the access token they issue when you sign in | You, when you link a service |
 | Team membership | Your team, your role, your status, and a kiosk PIN if your team uses kiosks | Your team's admins |
 | Sessions and devices | A session identifier in a cookie, and for shared shop devices a kiosk token | Created when you sign in |
@@ -100,6 +100,7 @@ Scouting engagement is off by default. An admin can enable points and match pred
 | Sites your team links to | A team's own links on its home page show each site's icon | When you open your team's home, your browser loads each linked site's icon from that site, which sees your IP address as it would on any visit. Gearbox doesn't store the icons |
 | Share-A-Cart | Building vendor carts in Orders | Only if your team connects it; it receives the items in a cart |
 | Cloudflare Workers AI | Reading a photographed match schedule in Scouting | Only when a member uses that feature; it receives the photo |
+| Cloudflare Turnstile | Checks that someone signing up with Google or GitHub is a person | Only on the sign-up page of a team that lets people sign up without its chat. Your browser loads the check from Cloudflare, which sees your IP address and information about your browser. We store nothing from it |
 
 Each of these services has its own privacy policy. Services your team connects are your team's choice, and your team can disconnect them.
 

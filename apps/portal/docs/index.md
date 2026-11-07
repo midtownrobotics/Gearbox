@@ -23,6 +23,6 @@ Admins also get the team's admin pages, under **Admin** in the bar. Only what's 
 | Member Access | When Gearbox's operators opened your member list, and why |
 | Log | Apps switched on and off, data downloads and settings changes, and who made them |
 
-Every member also has an Account page: open it from "Hello, name" in the bar. It's the next page here, since it's the one everyone uses; the admin pages follow, one page each, in the order a new team needs them.
+Every member also has an Account page: open it from **Account** or "Hello, name" in the bar, and get back to the tiles with **Apps**. It's the next page here, since it's the one everyone uses; the admin pages follow, one page each, in the order a new team needs them.
 
 Open your team's admin pages: [Manage Apps](team:portal/admin).

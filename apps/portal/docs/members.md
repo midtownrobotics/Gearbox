@@ -22,14 +22,14 @@ Only admins manage members: being a mentor doesn't open these pages. Anyone else
 
 ## What a member's page shows
 
-- Their **name**, which an admin can correct with **Edit**, and their **username**: their Slack or Discord name, which can't be changed.
+- Their **name**, which an admin can correct with **Edit**, and their **username**: their Slack or Discord name, which can't be changed (someone who signed up with Google or GitHub has none).
 - When they **joined**, were **last online** (using any of the team's apps; "Online now" in the last 5 minutes) and **last signed in**.
 - Their **reporter ID**, which stands for them on problems they report, and whether Gearbox has blocked it.
 - The accounts they **sign in with**, with the email or name on each.
 
 ## How people join
 
-Members sign up from your team's home page with your team's Slack or Discord. Their account then waits for approval, and every admin who has linked the team's chat gets a message with their name and a link.
+Members sign up from your team's home page with your team's Slack or Discord, or with Google or GitHub if your admins allow it (Sign-in methods, later in these docs). Their account then waits for approval, and every admin who has linked the team's chat gets a message with their name and a link.
 
 ## Approve someone
 
