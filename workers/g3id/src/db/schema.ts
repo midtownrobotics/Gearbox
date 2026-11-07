@@ -39,6 +39,8 @@ export const teamSignInMethods = sqliteTable("team_sign_in_methods", {
   github: integer("github").notNull().default(1),
   steam: integer("steam").notNull().default(1),
   kioskPin: integer("kiosk_pin").notNull().default(1),
+  /** People can sign up with Google or GitHub, not only the team's chat (migration 0023). */
+  openSignup: integer("open_signup").notNull().default(0),
   updatedAt: integer("updated_at").notNull(),
   updatedBy: text("updated_by").references((): AnySQLiteColumn => coreUsers.id, {
     onDelete: "set null",

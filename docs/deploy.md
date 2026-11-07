@@ -117,6 +117,23 @@ A team uses Slack or Discord, one at a time (`docs/roadmap/discord.md`). One Dis
 
 Admins connect their server on the home's Admin → Integrations (Connect Discord: it takes the admin to Discord to pick a server they manage, and links the admin's Discord to their account). A team on Slack disconnects Slack first. Members then sign in with Discord if they're in the server; someone new waits for an admin's approval, as with Slack. A private channel needs Gearbot's role allowed in it before the bot can post there; the channel picker says so.
 
+## Turnstile (once)
+
+A team's admins can let people sign up with Google or GitHub instead of the team's chat (Portal's Admin → Sign-in, "Sign-up without Slack"). Those sign-ups pass a Cloudflare Turnstile check first (`workers/g3id/src/lib/open-signup.ts`). Turnstile is free; it was approved on 6 November 2026 (roadmap, "Hosting and stack decisions"). Until both keys are set, the switch says it isn't available, and nobody can sign up this way.
+
+1. **Make the widget** in the Cloudflare dashboard (Turnstile → Add widget): name it **Gearbox sign-up**, add the hostnames `frcgearbox.com` and `g3robotics.com` (each covers its subdomains, so every team's `<number>-id` address and staging's), mode **Managed**, no pre-clearance.
+2. **Keys**, with `export WRANGLER_HIDE_BANNER=true` first:
+   ```bash
+   cd workers/g3id
+   pnpm exec wrangler secret put TURNSTILE_SITE_KEY --env production    # the site key
+   pnpm exec wrangler secret put TURNSTILE_SECRET_KEY --env production  # the secret key
+   pnpm exec wrangler secret put TURNSTILE_SITE_KEY --env staging
+   pnpm exec wrangler secret put TURNSTILE_SECRET_KEY --env staging
+   ```
+   The site key isn't secret (the sign-up page shows it), but keeping both as secrets keeps them together.
+3. **Migration:** G3ID's `0023_open_signup.sql` runs before the Workers deploy, as usual.
+4. **Local dev and tests** use Cloudflare's test keys, which always pass (`[vars]` in `workers/g3id/wrangler.toml`).
+
 ## Switching over from Pages and per-app API domains (once, done)
 
 The app workers' old `api.<app>` custom domains send requests straight to the worker, without the `/api` the gateway adds, so they must go when the new workers go live. Do this at a quiet time; the apps are down for the few minutes between steps 3 and 5.

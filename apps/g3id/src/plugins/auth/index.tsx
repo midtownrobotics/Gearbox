@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { Moved } from "../../shared/moved";
 import type { Plugin } from "../../shared/plugin-types";
+import { CheckPage } from "./check-page";
 import { DemoPage } from "./demo-page";
 import { EmailLoginPage } from "./email-login-page";
 import { LoginPage } from "./login-page";
@@ -19,6 +20,7 @@ export const authPlugin: Plugin = {
     { path: "/login/error", element: <OAuthErrorPage /> },
     { path: "/login/slack", element: <SlackLoginPage /> },
     { path: "/signup", element: <SignupPage /> },
+    { path: "/signup/check", element: <CheckPage /> },
     { path: "/signup/name", element: <NamePage /> },
     { path: "/signup/pending", element: <PendingPage /> },
     // ID only signs people in: the account page is on the team's home now.
