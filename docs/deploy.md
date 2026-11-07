@@ -172,6 +172,20 @@ Platform operators manage teams at `admin.frcgearbox.com`. The gateway sends it 
    ```
    Operators add each other on the console's Operators page after that.
 
+### Console: Cloudflare
+
+The console's Cloudflare page shows the account's usage this month against Workers Paid, an estimated bill, warnings at 80% of what the plan includes, each zone's traffic and security events, and each worker's deploys. It needs a **read-only** API token, kept as a secret on the platform Worker only (never the deploy token from GitHub Actions, which can change things):
+
+1. In the Cloudflare dashboard, **My Profile → API Tokens → Create Token → Custom token**, named "Gearbox console (read-only)", with only these permissions, all **Read**: Account · Account Analytics, Account · Workers Scripts, Account · D1, Account · Workers KV Storage, Account · Workers R2 Storage, Zone · Zone, Zone · Analytics. Account resources: the Gearbox account only. Zone resources: all zones in that account.
+2. In `workers/platform`:
+   ```bash
+   pnpm exec wrangler secret put CLOUDFLARE_API_TOKEN --env production
+   pnpm exec wrangler secret put CLOUDFLARE_ACCOUNT_ID --env production   # the 32-character account id
+   ```
+   The same on `--env staging` to see it there (it shows the same account). Without them, the page says how to add them.
+
+The page's prices are in `PLAN` in `workers/platform/src/cloudflare.ts`; update them when Cloudflare's change.
+
 ## Moving G3 to frcgearbox.com (once)
 
 G3's apps move from `<app>.g3robotics.com` to `1648-<app>.frcgearbox.com` (its home to `1648.frcgearbox.com`, sign-in to `1648-id.frcgearbox.com`). The old app addresses, and `id.` and `admin.g3robotics.com`, stop working: the gateway answers them `410 Gone` with the new address. `www.g3robotics.com` is unaffected. Everyone signs in again once, since sessions belong to a domain.

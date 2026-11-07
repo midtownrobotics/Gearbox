@@ -5,7 +5,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./cloudflare": "./src/cloudflare.ts"
   },
   "scripts": {
     "dev": "wrangler dev --port 8795 --inspector-port 9237",

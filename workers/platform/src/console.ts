@@ -4,6 +4,7 @@ import { CONSOLE_HOSTS, DEV_DOMAIN, demoTeamId, teamKey } from "@g3/site-config"
 import { and, count, desc, eq, inArray, isNotNull, isNull, like, lt, ne, sql } from "drizzle-orm";
 import { type Context, Hono } from "hono";
 import { createMiddleware } from "hono/factory";
+import { cloudflareOverview } from "./cloudflare";
 import {
   type OPERATOR_ACTIONS,
   notifications,
@@ -35,7 +36,9 @@ import { recentVisits } from "./visits";
 // - write notifications for every team (informational or critical), each until it expires; each
 //   team's settings say where they go (src/notifications.ts);
 // - see how Gearbox is used: teams, members and how many teams have each app on (counts only,
-//   leaving out the public demo).
+//   leaving out the public demo);
+// - see the Cloudflare account's usage against its plan, an estimated bill, traffic, security
+//   events and deploys (src/cloudflare.ts).
 // Every action is logged in `operator_actions` with the operator's reason, and so is each look at a
 // team (the privacy policy's operator access log, kept 12 months), in two kinds the team's admins
 // see apart: its details (`view_team_details`: no member's name or email, only counts), and its
@@ -501,6 +504,16 @@ export const consoleRouter = new Hono<AppEnv>()
   })
   // How Gearbox is used, as counts only: teams by status, members (from G3ID) and how many active
   // teams have each app on. The public demo's team is left out.
+  // The Cloudflare account (src/cloudflare.ts). A read, but refused from any page other than the
+  // console's: a cross-origin fetch always says where it's from, and only the console may read it.
+  .get("/cloudflare", async (c) => {
+    const origin = c.req.header("Origin");
+    if (origin && !fromConsole(c.env, origin)) {
+      return c.json({ error: "Only from the console." }, 403);
+    }
+    c.header("Cache-Control", "no-store");
+    return c.json(await cloudflareOverview(c.env));
+  })
   .get("/stats", async (c) => {
     const monthAgo = now() - 30 * 86_400;
     const [teamRows, appRows, membersRes] = await Promise.all([
