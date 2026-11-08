@@ -146,7 +146,15 @@ function Overview({ data }: { data: Overview }) {
           <Table
             rows={rows}
             columns={[
-              { label: "Bucket", sort: (b) => b.name },
+              {
+                label: "Bucket",
+                sort: (b) => b.name,
+                // Listing the account's buckets is in no bucket, but counts toward Class A.
+                cell: (b) =>
+                  b.name || (
+                    <span className="font-normal italic text-secondary-500">Listing buckets</span>
+                  ),
+              },
               { label: "Stored", sort: (b) => b.bytes, cell: (b) => formatBytes(b.bytes) },
               { label: "Objects", sort: (b) => b.objects, cell: (b) => number(b.objects) },
               { label: "Class A", sort: (b) => b.classA, cell: (b) => number(b.classA) },
