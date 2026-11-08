@@ -217,6 +217,15 @@ const cfDataset: Record<string, unknown[]> = {
   queueMessageOperationsAdaptiveGroups: [{ sum: { billableOperations: 30 } }],
 };
 const cfRest: Record<string, unknown> = {
+  // The current billing period: from 3 days ago to 27 days from now.
+  [`/client/v4/accounts/${CF_ACCOUNT}/subscriptions`]: [
+    { rate_plan: { id: "free" }, current_period_start: null, current_period_end: null },
+    {
+      rate_plan: { id: "workers_paid" },
+      current_period_start: new Date(Date.now() - 3 * 86_400_000).toISOString(),
+      current_period_end: new Date(Date.now() + 27 * 86_400_000).toISOString(),
+    },
+  ],
   [`/client/v4/accounts/${CF_ACCOUNT}/d1/database`]: [{ uuid: "db-1", name: "gearbox-orders" }],
   [`/client/v4/accounts/${CF_ACCOUNT}/storage/kv/namespaces`]: [{ id: "kv-1", title: "sessions" }],
   [`/client/v4/accounts/${CF_ACCOUNT}/workers/scripts`]: [

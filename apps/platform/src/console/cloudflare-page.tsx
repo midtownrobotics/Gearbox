@@ -10,13 +10,26 @@ import type {
 import { type ReactNode, useState } from "react";
 import { consoleApi, formatBytes, formatTime, read, useLoad } from "./data";
 
-// The Cloudflare account: this month's usage against the plan, an estimated bill, warnings near a
+// The Cloudflare account: this billing period's usage against the plan, an estimated bill, warnings near a
 // limit, each zone's traffic and security events, and each worker's deploys
 // (workers/platform/src/cloudflare.ts). Operators only; the API token stays on the worker.
 
 type Overview = Extract<CloudflareOverview, { configured: true }>;
 
 const number = (n: number) => n.toLocaleString(undefined, { maximumFractionDigits: 0 });
+/** Under 1% shows as "<1%", so a meter in use never reads 0%. */
+const percent = (share: number) =>
+  share > 0 && share < 0.01 ? "<1%" : `${Math.round(share * 100)}%`;
+/** Where the worker's warnings start (WARN_AT). */
+const WARN_SHARE = 0.8;
+
+/** A day of the billing period, which Cloudflare gives in UTC. */
+const day = (seconds: number) =>
+  new Date(seconds * 1000).toLocaleDateString(undefined, {
+    month: "long",
+    day: "numeric",
+    timeZone: "UTC",
+  });
 const money = (n: number) =>
   n.toLocaleString(undefined, { style: "currency", currency: "USD", minimumFractionDigits: 2 });
 
@@ -34,7 +47,7 @@ export function CloudflarePage() {
   return (
     <Page
       title="Cloudflare"
-      description="What the account uses this month (UTC) against its plan, and what it may cost."
+      description="What the account uses this billing period against its plan, and what it may cost."
     >
       {load.error && <ErrorBanner message={load.error} />}
       {!data ? (
@@ -57,6 +70,12 @@ function Overview({ data }: { data: Overview }) {
   return (
     <>
       <p className="text-xs text-secondary-500">
+        <span className="font-semibold text-secondary-700">
+          {day(data.period.start)} – {day(data.period.end)}
+        </span>
+        {data.period.billing
+          ? ". "
+          : " (UTC). The token can't read the billing period, so this is the calendar month. "}
         As of {formatTime(data.asOf)}. Refreshed at most every 5 minutes.
       </p>
       {data.warnings.length > 0 && <Warnings warnings={data.warnings} />}
@@ -172,14 +191,14 @@ function Overview({ data }: { data: Overview }) {
           {(a) => (
             <div className="grid grid-cols-2 gap-4">
               <Stat label="Neurons today" value={number(a.today)} hint="10,000 free a day" />
-              <Stat label="This month" value={number(a.month)} />
+              <Stat label="This period" value={number(a.month)} />
             </div>
           )}
         </Part>
       </div>
       <Part title="Zones" section={data.zones}>
         {(zones) => (
-          <div className="space-y-6">
+          <div className="space-y-4">
             {zones.map((zone) => (
               <Zone key={zone.name} zone={zone} />
             ))}
@@ -258,12 +277,17 @@ function Meters({ meters }: { meters: Meter[] }) {
         return (
           <li
             key={m.key}
-            className="grid gap-1 sm:grid-cols-[14rem_1fr_16rem] sm:items-center sm:gap-3"
+            className="grid gap-1 sm:grid-cols-[14rem_1fr_3.5rem_16rem] sm:items-center sm:gap-3"
           >
             <span className="min-w-0 text-secondary-600">
               {m.product}: {m.label}
             </span>
             <ProgressBar percent={Math.min(100, share * 100)} />
+            <span
+              className={`sm:text-right ${share >= 1 ? "text-red-700" : share >= WARN_SHARE ? "text-amber-700" : "text-secondary-600"}`}
+            >
+              {percent(share)}
+            </span>
             <span className={`sm:text-right ${share >= 1 ? "text-red-700" : "text-secondary-900"}`}>
               {amount(m.used, m.unit)}{" "}
               <span className="text-secondary-500">
@@ -281,8 +305,8 @@ function Meters({ meters }: { meters: Meter[] }) {
 
 function Zone({ zone }: { zone: ZoneUsage }) {
   return (
-    <div className="min-w-0">
-      <h3 className="font-semibold text-secondary-900">
+    <div className="min-w-0 rounded-xl border border-line p-4">
+      <h3 className="text-lg font-semibold text-secondary-900">
         {zone.name}
         {zone.plan && (
           <span className="ml-2 text-xs font-normal text-secondary-500">{zone.plan}</span>
@@ -290,7 +314,7 @@ function Zone({ zone }: { zone: ZoneUsage }) {
       </h3>
       {zone.traffic.ok ? (
         <div className="mt-2 grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <Stat label="Requests" value={number(zone.traffic.data.requests)} hint="This month" />
+          <Stat label="Requests" value={number(zone.traffic.data.requests)} hint="This period" />
           <Stat
             label="Cached"
             value={`${zone.traffic.data.requests ? Math.round((zone.traffic.data.cachedRequests / zone.traffic.data.requests) * 100) : 0}%`}
@@ -313,7 +337,7 @@ function Zone({ zone }: { zone: ZoneUsage }) {
       ) : (
         <ErrorBanner message={zone.traffic.error} />
       )}
-      <h4 className="mt-4 text-xs font-bold uppercase tracking-widest text-secondary-400">
+      <h4 className="mt-4 border-t border-line pt-4 text-xs font-bold uppercase tracking-widest text-secondary-400">
         Security events, last 24 hours
       </h4>
       {zone.security.ok ? (
@@ -347,7 +371,7 @@ function Tally({
   rows,
 }: { title: string; rows: { name: string; count: number; danger?: boolean }[] }) {
   return (
-    <div className="min-w-0 text-sm">
+    <div className="min-w-0 rounded-lg border border-line p-3 text-sm">
       <p className="text-secondary-500">{title}</p>
       <ul>
         {rows.map((r) => (

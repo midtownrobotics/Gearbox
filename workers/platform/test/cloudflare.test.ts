@@ -64,6 +64,10 @@ describe("the Cloudflare page", () => {
     expect(text).not.toContain("deployer@test");
     const data = JSON.parse(text) as Overview;
     expect(data.configured).toBe(true);
+    // The plan's billing period (vitest.config.mts: from 3 days ago), not the calendar month.
+    expect(data.period.billing).toBe(true);
+    expect(Date.now() / 1000 - data.period.start).toBeGreaterThan(2.9 * 86_400);
+    expect(Date.now() / 1000 - data.period.start).toBeLessThan(3.1 * 86_400);
 
     expect(data.workers).toEqual({
       ok: true,
