@@ -24,3 +24,5 @@ Under **Where notifications go**, **From Gearbox** and **From your team** are se
 Gearbox's **Critical** ones can also be messaged directly to members you choose: we suggest your admins.
 
 By default Gearbox's show to admins on the home page, your team's own show to everyone, and nothing is posted in chat.
+
+Storage usage warnings and cleanup summaries go directly to active admins on connected chat and appear in the Log; announcement settings on this page do not change them. The Storage page explains those warnings.

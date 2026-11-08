@@ -33,7 +33,7 @@ export const MANIFESTS: Record<AppName, AppManifest> = {
 };
 
 /** Each app's service binding here, for its seed and delete hooks. */
-const BINDINGS: Partial<Record<AppName, keyof AppEnv["Bindings"]>> = {
+export const BINDINGS: Partial<Record<AppName, keyof AppEnv["Bindings"]>> = {
   attendance: "ATTENDANCE",
   edge: "EDGE",
   inventory: "INVENTORY",

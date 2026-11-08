@@ -5,6 +5,7 @@ import {
   StorageLimitError,
   inTeam,
   notifyStorageCleanup,
+  notifyStorageUsage,
   withStorageLimit,
 } from "@g3/auth";
 import { inArray } from "drizzle-orm";
@@ -16,6 +17,17 @@ import { teamPrefix } from "./storage";
 export function shopStorageEviction(env: AppEnv["Bindings"], teamId: string) {
   return {
     deleteOlderThanSixMonths: true,
+    usage: (usage: { bytes: number; count: number }, attempted?: boolean) =>
+      notifyStorageUsage(
+        env,
+        teamId,
+        "shop",
+        "files",
+        env.SHOP_DB,
+        usage,
+        { bytes: SHOP_STORAGE_LIMIT.bytes, count: SHOP_STORAGE_LIMIT.objects },
+        attempted,
+      ),
     async removeReferences(objects: R2Object[]) {
       const db = createShopDb(env.SHOP_DB);
       for (let offset = 0; offset < objects.length; offset += 40) {

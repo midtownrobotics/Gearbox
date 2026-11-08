@@ -129,6 +129,7 @@ export type StorageEviction = {
   approvedObjects?: ReadonlyMap<string, string>;
   /** Remove database references before the matching files are removed. */
   removeReferences: (objects: R2Object[]) => Promise<void>;
+  usage?: (usage: { bytes: number; count: number }, attempted?: boolean) => Promise<void>;
   /** Best-effort admin notice after a successful cleanup. */
   notify?: (objects: R2Object[]) => Promise<void>;
 };
@@ -164,13 +165,28 @@ export async function withStorageLimit<T>(
     .where(
       and(
         eq(usage.teamId, teamId),
-        sql`${usage.bytes} + ${incomingBytes} <= ${Math.floor(limit.bytes * STORAGE_CLEANUP_RATIO)}`,
-        sql`${usage.objects} + ${incoming.length} <= ${Math.floor(limit.objects * STORAGE_CLEANUP_RATIO)}`,
+        sql`${usage.bytes} + ${incomingBytes} < ${Math.floor(limit.bytes * STORAGE_CLEANUP_RATIO)}`,
+        sql`${usage.objects} + ${incoming.length} < ${Math.floor(limit.objects * STORAGE_CLEANUP_RATIO)}`,
       ),
     )
-    .returning({ teamId: usage.teamId })
+    .returning({ bytes: usage.bytes, objects: usage.objects })
     .get();
-  if (reserved) return write();
+  if (reserved) {
+    const result = await write();
+    // This upper bound can safely rearm warnings below 85%; never send warnings from an estimate.
+    if (
+      (!(result instanceof Response) || result.ok) &&
+      reserved.bytes / limit.bytes < 0.85 &&
+      reserved.objects / limit.objects < 0.85
+    ) {
+      try {
+        await eviction?.usage?.({ bytes: reserved.bytes, count: reserved.objects });
+      } catch (error) {
+        console.error("[storage] usage notice failed", error);
+      }
+    }
+    return result;
+  }
 
   return withTeamStorageLock(database, teamId, async () => {
     // Saves that took the fast path meanwhile stay on top of the count made here.
@@ -218,6 +234,19 @@ export async function withStorageLimit<T>(
     );
     bytes += incomingBytes;
     objects += incoming.length;
+    try {
+      await eviction?.usage?.({ bytes: originalBytes, count: originalObjects });
+    } catch (error) {
+      console.error("[storage] usage notice failed", error);
+    }
+    const projected = { bytes, count: objects };
+    const reportUsage = async (attempted = false) => {
+      try {
+        await eviction?.usage?.(projected, attempted);
+      } catch (error) {
+        console.error("[storage] usage notice failed", error);
+      }
+    };
     if (
       (bytes > limit.bytes && (cleanupEnabled || bytes > originalBytes)) ||
       (objects > limit.objects && (cleanupEnabled || objects > originalObjects))
@@ -267,6 +296,7 @@ export async function withStorageLimit<T>(
           };
           // Recover a previous incomplete cleanup before allowing any more growth.
           if (originalBytes > limit.bytes || originalObjects > limit.objects) {
+            await reportUsage(true);
             await cleanup();
             await adjustUsage(database, teamId, incomingBytes, incoming.length);
             return write();
@@ -274,16 +304,22 @@ export async function withStorageLimit<T>(
           await adjustUsage(database, teamId, incomingBytes, incoming.length);
           // A failed new save must not destroy old files to make room for nothing.
           const result = await write();
-          if (!(result instanceof Response) || result.ok) await cleanup();
+          if (!(result instanceof Response) || result.ok) {
+            await reportUsage();
+            await cleanup();
+          }
           return result;
         }
       }
+      await reportUsage(true);
       throw new StorageLimitError(
         `Your team's file storage is full (${limit.label} or ${limit.objects.toLocaleString("en-US")} files). Files from the last six months are protected. Review files before choosing what to remove.`,
         "storage_full",
       );
     }
     await adjustUsage(database, teamId, incomingBytes, incoming.length);
-    return write();
+    const result = await write();
+    if (!(result instanceof Response) || result.ok) await reportUsage();
+    return result;
   });
 }

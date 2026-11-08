@@ -6,3 +6,7 @@
 ## Members list
 
 - The Members list (Portal's `/admin/members`, `apps/portal/src/plugins/admin/members-page.tsx`, from ID's `GET /admin/users` through `/api/~id`) opens on the Active tab and is searched (name, email and the account names people sign in with: `providerEmail` on each identity, `matchesSearch` in `members-shared.tsx`), sorted (join date, name, last login; never-logged-in last) and filtered (status tabs, role, sign-in provider) in the page, from the one `GET /admin/users` load; the tab, search and filters are in the address. Clicking someone opens their page (`/admin/members/:id`, `member-page.tsx`, from `GET /admin/users/:id`: their name (Edit, `PUT /admin/users/:id/name`) and username, their sign-ins with account names, whether they have a kiosk PIN (never the PIN), and approve, roles and delete, which asks in the page)
+
+## Storage
+
+- Admin-only `/admin/storage` (`plugins/admin/storage-page.tsx`) reads the platform's `/team/storage`: separate Shop, Scouting, Pit logs and Pit assets allowances, searchable/paged oldest-eligible files, protected dates and streamed individual/all/eligible downloads. Production auth stays on `AdminOnly`; Vite dev alone exposes `/preview/storage` with labeled sample data and disabled downloads. `apps/portal/docs/storage.md` explains retention and alerts.

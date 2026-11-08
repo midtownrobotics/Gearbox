@@ -5,6 +5,7 @@ import {
   isStorageFileExpired,
   logTeamChange,
   notifyStorageCleanup,
+  notifyStorageUsage,
   requestTeamId,
   requireAuth,
   requireMentor,
@@ -433,6 +434,21 @@ export const scopeRoutes = new Hono<AppEnv>()
         (file) => !referenced.has(file.key) && !incomingKeys.has(file.key),
       );
       const unknownBytes = unreferenced.reduce((sum, file) => sum + file.size, 0);
+      const observedUsage = {
+        bytes: existing.reduce((n, a) => n + a.size, 0) + unknownBytes,
+        count: existing.length,
+      };
+      const incomingUsage = { bytes: total + unknownBytes, count: kept.length + found.length };
+      const allowance = { bytes: MAX_ASSET_BYTES, count: MAX_ASSETS };
+      await notifyStorageUsage(
+        c.env,
+        teamId,
+        "pit",
+        "assets",
+        c.env.PIT_DB,
+        observedUsage,
+        allowance,
+      );
       let projectedBytes = total + unknownBytes;
       let projectedAssets = kept.length + found.length;
       const evictedAssets: typeof existing = [];
@@ -477,6 +493,16 @@ export const scopeRoutes = new Hono<AppEnv>()
         }
       }
       if (projectedBytes > MAX_ASSET_BYTES || projectedAssets > MAX_ASSETS) {
+        await notifyStorageUsage(
+          c.env,
+          teamId,
+          "pit",
+          "assets",
+          c.env.PIT_DB,
+          incomingUsage,
+          allowance,
+          true,
+        );
         return c.json(
           {
             error:
@@ -514,7 +540,19 @@ export const scopeRoutes = new Hono<AppEnv>()
       const alreadyOver =
         existing.reduce((sum, asset) => sum + asset.size, 0) + unknownBytes > MAX_ASSET_BYTES ||
         existing.length > MAX_ASSETS;
-      if (alreadyOver) await cleanup();
+      if (alreadyOver) {
+        await notifyStorageUsage(
+          c.env,
+          teamId,
+          "pit",
+          "assets",
+          c.env.PIT_DB,
+          incomingUsage,
+          allowance,
+          true,
+        );
+        await cleanup();
+      }
       const now = Date.now();
       const userId = c.get("userId");
       for (const asset of found) {
@@ -561,6 +599,15 @@ export const scopeRoutes = new Hono<AppEnv>()
         what: "AdvantageScope assets",
         changed: ["Uploaded assets"],
       });
+      await notifyStorageUsage(
+        c.env,
+        teamId,
+        "pit",
+        "assets",
+        c.env.PIT_DB,
+        incomingUsage,
+        allowance,
+      );
       if (!alreadyOver) await cleanup();
       return c.json({ ok: true, assets: found.map((asset) => asset.name) });
     });

@@ -337,6 +337,34 @@ function teamApp() {
     if (path === "/api/internal/storage") {
       return Response.json({ teams: { frc1648: { bytes: 1024, objects: 1 } } });
     }
+    const storage = path.match(/^\/api\/internal\/teams\/([^/]+)\/storage(\/(download|archive))?$/);
+    if (storage) {
+      const id = decodeURIComponent(storage[1]);
+      if (failing.has(id)) return Response.json({ error: "Down" }, { status: 503 });
+      if (!storage[2])
+        return Response.json({
+          checkedAt: 1,
+          cutoff: 1,
+          allowances: [
+            {
+              id: "files",
+              name: "Files",
+              bytes: 4,
+              byteLimit: 100,
+              count: 1,
+              countLimit: 10,
+              countLabel: "files",
+              files: [
+                { key: `teams/${id}/test`, name: "test", bytes: 4, uploadedAt: 1, eligible: true },
+              ],
+            },
+          ],
+        });
+      const key = new URL(request.url).searchParams.get("key");
+      if (storage[3] === "download" && key !== `teams/${id}/test`)
+        return new Response("Missing", { status: 404 });
+      return new Response(id, { headers: { "Content-Disposition": "attachment; filename=test" } });
+    }
     const demo = path.match(/^\/api\/internal\/teams\/(.+)\/demo$/);
     if (demo && request.method === "POST") {
       demoed.push(decodeURIComponent(demo[1]));

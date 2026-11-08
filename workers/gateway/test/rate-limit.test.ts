@@ -56,6 +56,18 @@ describe("gateway rate limits", () => {
     }
   });
 
+  it("uses the costly-route limit for storage counts and bulk downloads, including aliases", async () => {
+    for (const path of [
+      "/api/team/storage",
+      "/api/team/storage/shop/archive",
+      "/api/~platform/team/storage/pit/download?key=test",
+    ]) {
+      const env = limiters();
+      vi.mocked(env.EXPENSIVE_LIMITER.limit).mockResolvedValue({ success: false });
+      expect((await checkRateLimit(request(path), env))?.status).toBe(429);
+    }
+  });
+
   it("allows ordinary reads without spending write or expensive quotas", async () => {
     const env = limiters();
     expect(await checkRateLimit(request("/api/auth/me"), env)).toBeNull();

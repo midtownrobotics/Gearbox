@@ -104,3 +104,23 @@ export {
   type AppSetting,
   defineManifest,
 } from "./manifest";
+
+export {
+  type StorageFile,
+  type StorageAllowance,
+  type StorageReport,
+  listStorageObjects,
+  storageFile,
+  storageEligibleAfter,
+  bucketStorageReport,
+  downloadStorageFile,
+} from "./storage-report";
+export { notifyStorageUsage } from "./storage-notice";
+
+export { storageArchive } from "./storage-archive";
+
+export {
+  storageArchiveParts,
+  storageArchiveSelection,
+  type StorageArchivePart,
+} from "./storage-parts";

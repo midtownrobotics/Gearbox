@@ -27,4 +27,8 @@
 
 - Caps: 5 GiB / 10,000 objects per team; 100 MiB per file. At cap, only files strictly older than six calendar months are automatically eligible; recent/unknown-date files are protected. Unknown objects count toward quotas and can be removed only when their server upload date is expired.
 - The shared engine applies the six-calendar-month UTC cutoff (strict boundary, month-end clamped) and targets 90% after the incoming save. If expired files cannot free enough room, uploads pause. Exact object-version approvals remain supported internally but no route approves younger files and no new approval UI exists. Existing manual review/download/delete controls remain.
-- Migrations: 0026 (locks), 0027 (notices), 0028 (usage estimate: saves keeping it at or under 90% skip the lock). Per-team coordination prevents concurrent quota races; cleanup notices, after actual expired/reviewed file deletion, are best effort and batched. See `docs/storage-limits.md`.
+- Migrations: 0026 (locks), 0027 (notices), 0028 (usage estimate: saves keeping it below 90% skip the lock). Per-team coordination prevents concurrent quota races; cleanup notices, after actual expired/reviewed file deletion, are best effort and batched. See `docs/storage-limits.md`.
+
+
+- Storage page hooks: own-team `GET /internal/teams/:teamId/storage`, `/storage/download?key=`, and `/storage/archive?eligible=1` serve reports and actual stored files through Platform's authenticated admin API. Internal hooks remain blocked by the gateway. Reports include six-month eligibility; no deletion runs on reads/downloads. See `src/lib/storage-report.ts`.
+- Usage warning migration `0029_storage_usage_notices.sql`: `notifyStorageUsage` in `@g3/auth` claims 90/95/100 warnings atomically per team/allowance. Below 85% observed on a subsequent save rearms them; cleanup to 90% does not. Actual writes and refused growth report usage without an open page. Cleanup notices remain separate.

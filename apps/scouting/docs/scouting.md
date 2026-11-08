@@ -16,6 +16,8 @@ If your team has more than one match form, each is a card at the top: fill in ea
 
 Under **Submit report**, the form says whether your answers are only **Saved on this device** or **Submitted to the server**.
 
+Field drawings keep each stroke and its color, so paths stay sharp when opened larger. **Undo** takes back a stroke, and **Clear** can be undone. Draft paths return when you reopen the form. Existing image-based reports still open as before.
+
 **Full screen** at the top of the page hides everything but the form, for a phone in the stands.
 
 ## When the match moves on

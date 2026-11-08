@@ -1,6 +1,6 @@
 # Gearbox Privacy Policy
 
-Last updated: 6 November 2026.
+Last updated: 7 November 2026.
 
 ## In short
 
@@ -82,6 +82,8 @@ Problem reports are public too. Each one is posted as an issue on Gearbox's publ
 
 On a team that runs Edge, the sites each device used are shown only to the team's admins.
 
+New drawings on Scouting's built-in field and autonomous routes are saved as coordinates, stroke colors and a field version, instead of a separate flattened image for each drawing. Uploaded photos, custom backgrounds and older images keep their image format. These coordinate files follow the same storage caps and retention as other uploaded files.
+
 Scouting forms, reports, schedules, uploaded files and points are private to the owning team. Team deletion or the app's scheduled deletion removes its database records and uploaded files.
 
 Scouting engagement is off by default. An admin can enable points and match predictions and can separately enable team points standings. Standings show members' names, balances, points earned and points used to signed-in teammates. A member's prediction history is shown only to that member through the activity page. Disabling activities pauses new awards and prediction result processing and keeps existing balances and history under the same retention rules as other team data.
@@ -117,7 +119,7 @@ Where the law of your team's country requires a legal basis for that transfer, t
 | Sign-in sessions | 7 days from sign-in |
 | Your account | Until a team admin deletes it, which removes it and your sign-ins at once, or until your team is deleted |
 | Team data | While the team is registered. Deleted within 30 days after the team closes |
-| Uploaded files in Shop, Scouting and Pit | When new uploads would exceed an app's cap, files strictly older than six calendar months may be permanently removed oldest first, targeting 90% usage. Newer files remain protected; if not enough old data can be removed, uploads pause. Pit's match logs are only removed this way when the team chooses it. Written Scouting reports and auton steps remain when images are removed. Admin cleanup summaries are best effort through the team log and connected chat. Existing team/app deletion and demo lifecycle rules still apply |
+| Uploaded files in Shop, Scouting and Pit | When new uploads would exceed an app's cap, files strictly older than six calendar months may be permanently removed oldest first, targeting 90% usage. Newer files remain protected; if not enough old data can be removed, uploads pause. Pit's match logs are only removed this way when the team chooses it. Written Scouting reports and auton steps remain when images are removed. Admins can review usage and eligible files and download copies on Storage. Usage warnings at 90%, 95%, and 100%, and cleanup summaries, are best effort through the team log and connected chat. Storage counts and file lists may be cached internally for one minute. Existing team/app deletion and demo lifecycle rules still apply |
 | The team's log (apps switched on or off, data downloads, and which settings were changed and by whom, never their values) | Kept as team data |
 | Data of an app your team switches off | 90 days, in case your team switches it back on, then deleted |
 | Records that name a removed member, such as past orders | Kept by the team, with the member's name replaced by a placeholder |

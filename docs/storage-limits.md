@@ -75,15 +75,31 @@ account-wide billing ledger.
 After expiration-based or explicitly approved cleanup, the notification helper summarizes count, bytes,
 upload-date range and age to the team log and active admins' connected Slack/Discord. It reports
 first cleanup immediately, then accumulates follow-ups until another cleanup occurs at least an
-hour later. There is no hourly timer or general email sender. Delivery is best effort. Merely approaching a cap sends nothing; summaries follow actual deletion.
+hour later. There is no hourly timer or general email sender. Delivery is best effort. Usage warnings are separate: saves warn active admins at 90%, 95%, and 100%, using the higher byte/count utilization. Refused growth can warn that a save would reach 100%. Atomic per-team/allowance high-water claims suppress duplicates; only usage below 85% observed before a later save rearms the cycle. Cleanup toward 90% does not rearm it. A jump across thresholds sends the highest reached warning. Threshold warnings are recorded in the team log and delivered through connected chat, best effort.
 
 The Gearbox team owner's account ID is stored by the platform, and their account email by G3ID.
 That person is not necessarily the Slack workspace owner. Storage APIs expose no email addresses.
 
+## Compact Scouting drawings
+
+New drawings on the built-in field and auton trajectories save coordinates, tools, colors and a pinned field version as bounded JSON, rather than flattened PNGs. There is one canonical field SVG in the app/worker build, shared by every drawing. Legacy images and custom backgrounds are preserved; there is no bulk conversion or deletion of old images. Local report drafts and built-in maps also use compact JSON, with old image drafts supported.
+
+These coordinate objects use the existing team-prefix quota and six-month cleanup policy. Single-file Storage downloads render standalone SVGs; bulk backups retain coordinate JSON and include the shared field SVG once per archive. Rendering for Analysis and image viewers happens on demand and saves no generated image in R2. See `workers/scouting/src/field-drawing.ts` and `drawing-storage.ts`.
+
+Local editor review: `http://127.0.0.1:5182/preview/drawing` (Vite dev only) shows coordinate size, undo, restore and the saved view without signing in or writing team data.
+
+## Team Storage page
+
+Portal's admin-only `/admin/storage` reads Platform's `/team/storage` and shows each allowance's usage, oldest eligible files, saved dates and eligibility dates. Reads and downloads never delete files. Reports use the same server cutoff and Pit asset-group protection as cleanup. Friendly file labels come from team-owned records; unreferenced files retain their relative paths.
+
+Service-binding hooks `/internal/teams/:teamId/storage`, `/storage/download` and `/storage/archive` stay inaccessible through the gateway. Platform selects the signed-in admin's team and the allowlisted app. Downloads remain available for retained data while an app is off. Group downloads stream stored bytes in .tar archives with manifests, split into at most 1,000 files / 512 MiB per request (a larger single legacy file streams alone); compressed files keep .gz extensions. Legacy Scouting files outside team prefixes are not included. Archive entries have unique part prefixes so extracting multiple parts does not overwrite same-named files. The per-request bounds keep large team exports within service-call limits ([Cloudflare subrequest limits](https://developers.cloudflare.com/workers/platform/limits/)). Counts are cached internally for 60 seconds by team/environment; failed app reports are explicit. Storage routes spend the gateway's costly-request quota.
+
+Local UI review: start Portal's Vite server and open `http://127.0.0.1:5178/preview/storage`. This development-only view uses labeled sample data, disables downloads and sends no alerts. The actual page remains admin-only.
+
 ## Deployment and boundaries
 
 Apply coordination migrations first: Shop 0026 and 0028, Scouting 0039 and 0041, Pit 0019 and 0021. Cleanup-notice support
-uses Shop 0027, Scouting 0040 and Pit 0020. Existing committed migrations are not rewritten.
+uses Shop 0027, Scouting 0040 and Pit 0020. Threshold warnings also need Shop 0029, Scouting 0042 and Pit 0022. Existing committed migrations are not rewritten.
 This PR does not deploy workers or send live messages. Before changing live retention for
 existing teams, honor the owner-notice period in the current Terms of Service and publish the
 matching retention notice.

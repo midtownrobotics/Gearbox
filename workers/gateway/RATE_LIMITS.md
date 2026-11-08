@@ -48,3 +48,5 @@ WebSocket messages do not pass through this request throttle.
 
 App workers currently disable `workers_dev` in production and staging. Keep public access through
 the gateway, and do not add direct app routes or preview URLs that bypass its checks.
+
+Storage counts, individual downloads, and bulk archives also spend the costly-route quota; cross-app aliases share it. The Storage page caches successful counts for one minute per team and environment.

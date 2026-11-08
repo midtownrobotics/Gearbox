@@ -4,6 +4,7 @@ import {
   StorageLimitError,
   inTeam,
   notifyStorageCleanup,
+  notifyStorageUsage,
   withStorageLimit,
 } from "@g3/auth";
 import { eq, inArray } from "drizzle-orm";
@@ -14,6 +15,17 @@ import type { AppEnv } from "./types";
 export function scoutingStorageEviction(env: AppEnv["Bindings"], teamId: string) {
   return {
     deleteOlderThanSixMonths: true,
+    usage: (usage: { bytes: number; count: number }, attempted?: boolean) =>
+      notifyStorageUsage(
+        env,
+        teamId,
+        "scouting",
+        "files",
+        env.SCOUTING_DB,
+        usage,
+        { bytes: SCOUTING_STORAGE_LIMIT.bytes, count: SCOUTING_STORAGE_LIMIT.objects },
+        attempted,
+      ),
     async removeReferences(objects: R2Object[]) {
       const db = createDb(env.SCOUTING_DB);
       for (let offset = 0; offset < objects.length; offset += 40) {
@@ -36,7 +48,7 @@ export function scoutingStorageEviction(env: AppEnv["Bindings"], teamId: string)
                 key
                   .slice(prefix.length)
                   .split("/")[0]
-                  .replace(/\.png$/, ""),
+                  .replace(/\.(png|json)$/, ""),
               ),
           ),
         ];

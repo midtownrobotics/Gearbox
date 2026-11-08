@@ -5,6 +5,7 @@ import {
   isStorageFileExpired,
   logTeamChange,
   notifyStorageCleanup,
+  notifyStorageUsage,
   requireAdmin,
   requireAuth,
   requireMentor,
@@ -301,6 +302,15 @@ export const logUploadRoutes = new Hono<AppEnv>()
         .where(inTeam(matchLogs, teamId, eq(matchLogs.status, "stored")));
       // Only a team that chose to delete the oldest has logs that may make room.
       const deleting = (await getWhenFull(db, teamId)) === "delete-oldest";
+      await notifyStorageUsage(
+        c.env,
+        teamId,
+        "pit",
+        "logs",
+        c.env.PIT_DB,
+        { bytes: 0, count: stored.length },
+        { count: MAX_LOGS },
+      );
       const expired = stored
         .filter((item) => deleting && isStorageFileExpired(item.uploadedAt ?? item.createdAt))
         .sort(
@@ -496,6 +506,15 @@ export const logUploadRoutes = new Hono<AppEnv>()
         .where(inTeam(matchLogs, teamId, eq(matchLogs.status, "stored")));
       // Only a team that chose to delete the oldest has logs that may make room.
       const deleting = (await getWhenFull(db, teamId)) === "delete-oldest";
+      await notifyStorageUsage(
+        c.env,
+        teamId,
+        "pit",
+        "logs",
+        c.env.PIT_DB,
+        { bytes: 0, count: stored.length },
+        { count: MAX_LOGS },
+      );
       const expired = stored
         .filter((item) => deleting && isStorageFileExpired(item.uploadedAt ?? item.createdAt))
         .sort(
@@ -528,6 +547,15 @@ export const logUploadRoutes = new Hono<AppEnv>()
         .set({ status: "stored", uploadId: null, size: object.size, uploadedAt: Date.now() })
         .where(inTeam(matchLogs, teamId, eq(matchLogs.id, id)));
 
+      await notifyStorageUsage(
+        c.env,
+        teamId,
+        "pit",
+        "logs",
+        c.env.PIT_DB,
+        { bytes: 0, count: stored.length + 1 },
+        { count: MAX_LOGS },
+      );
       if (stored.length + 1 > MAX_LOGS) {
         const removed = expired.slice(
           0,
