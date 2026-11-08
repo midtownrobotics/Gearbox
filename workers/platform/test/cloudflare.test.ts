@@ -103,7 +103,10 @@ describe("the Cloudflare page", () => {
         {
           name: "frcgearbox.com",
           traffic: { ok: true, data: { requests: 100, statuses: { "2xx": 95, "5xx": 5 } } },
-          security: { ok: true, data: { total: 4, paths: [{ name: "/wp-login.php", count: 4 }] } },
+          security: {
+            ok: true,
+            data: { total: 4, capped: false, paths: [{ name: "/wp-login.php", count: 4 }] },
+          },
         },
       ],
     });

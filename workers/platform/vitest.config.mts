@@ -271,17 +271,12 @@ const cloudflare = async (request: Request) => {
                     },
                   },
                 ],
-                firewallEventsAdaptiveGroups: [
-                  {
-                    count: 4,
-                    dimensions: {
-                      action: "block",
-                      source: "waf",
-                      clientCountryName: "XX",
-                      clientRequestPath: "/wp-login.php",
-                    },
-                  },
-                ],
+                firewallEventsAdaptive: Array.from({ length: 4 }, () => ({
+                  action: "block",
+                  source: "waf",
+                  clientCountryName: "XX",
+                  clientRequestPath: "/wp-login.php",
+                })),
               },
             ],
           },

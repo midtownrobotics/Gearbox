@@ -118,6 +118,8 @@ export type ZoneUsage = {
   /** The last 24 hours. */
   security: Section<{
     total: number;
+    /** Only the latest events were counted: there were more. */
+    capped: boolean;
     byAction: { name: string; count: number }[];
     bySource: { name: string; count: number }[];
     paths: { name: string; count: number }[];
@@ -504,45 +506,45 @@ async function zoneTraffic(env: Env, zoneId: string, p: Period): Promise<ZoneUsa
   });
 }
 
+// Single events, counted here: the grouped dataset isn't on the Free plan, this one is on all of them.
+const SECURITY_EVENTS = 10_000;
+
 async function zoneSecurity(env: Env, zoneId: string, now: Date): Promise<ZoneUsage["security"]> {
   return section(async () => {
     type Event = {
-      count: number;
-      dimensions: {
-        action: string;
-        source: string;
-        clientCountryName: string;
-        clientRequestPath: string;
-      };
+      action: string;
+      source: string;
+      clientCountryName: string;
+      clientRequestPath: string;
     };
     const since = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-    const viewer = await graphql<{ zones: { firewallEventsAdaptiveGroups: Event[] }[] }>(
+    const viewer = await graphql<{ zones: { firewallEventsAdaptive: Event[] }[] }>(
       env,
-      `{ viewer { zones(filter: { zoneTag: "${zoneId}" }) { firewallEventsAdaptiveGroups(limit: 1000, filter: { datetime_geq: "${since.toISOString()}", datetime_leq: "${now.toISOString()}" }, orderBy: [count_DESC]) { count dimensions { action source clientCountryName clientRequestPath } } } } }`,
+      `{ viewer { zones(filter: { zoneTag: "${zoneId}" }) { firewallEventsAdaptive(limit: ${SECURITY_EVENTS}, filter: { datetime_geq: "${since.toISOString()}", datetime_leq: "${now.toISOString()}" }, orderBy: [datetime_DESC]) { action source clientCountryName clientRequestPath } } } }`,
     );
-    const events = viewer.zones[0]?.firewallEventsAdaptiveGroups ?? [];
-    const tally = (pick: (e: Event["dimensions"]) => string) => {
+    const events = viewer.zones[0]?.firewallEventsAdaptive ?? [];
+    const tally = (pick: (e: Event) => string) => {
       const counts = new Map<string, number>();
-      for (const e of events)
-        counts.set(pick(e.dimensions), (counts.get(pick(e.dimensions)) ?? 0) + e.count);
+      for (const e of events) counts.set(pick(e), (counts.get(pick(e)) ?? 0) + 1);
       return counts;
     };
     return {
-      total: events.reduce((n, e) => n + e.count, 0),
+      total: events.length,
+      capped: events.length >= SECURITY_EVENTS,
       byAction: top(
-        tally((d) => d.action),
+        tally((e) => e.action),
         10,
       ),
       bySource: top(
-        tally((d) => d.source),
+        tally((e) => e.source),
         10,
       ),
       paths: top(
-        tally((d) => d.clientRequestPath),
+        tally((e) => e.clientRequestPath),
         10,
       ),
       countries: top(
-        tally((d) => d.clientCountryName),
+        tally((e) => e.clientCountryName),
         5,
       ),
     };

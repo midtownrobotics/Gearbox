@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { Card, ErrorBanner, Page, PageLoading, ProgressBar, Stat } from "@g3/ui";
+import { Card, ErrorBanner, Page, PageLoading, ProgressBar, Stat, focusRing } from "@g3/ui";
 import type {
   CloudflareOverview,
   Meter,
@@ -7,7 +7,7 @@ import type {
   Warning,
   ZoneUsage,
 } from "@g3/worker-platform/cloudflare";
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import { consoleApi, formatBytes, formatTime, read, useLoad } from "./data";
 
 // The Cloudflare account: this month's usage against the plan, an estimated bill, warnings near a
@@ -69,7 +69,7 @@ function Overview({ data }: { data: Overview }) {
         <p className="mt-3 text-xs text-secondary-500">
           Worked out from Cloudflare's published prices, so the invoice may differ.
           {data.estimate.missing.length > 0 &&
-            ` It leaves out ${data.estimate.missing.join(", ")}, which Cloudflare didn't answer for.`}
+            " It leaves out the parts below that Cloudflare didn't answer for."}
         </p>
       </Card>
       <Card title="Usage against the plan">
@@ -78,59 +78,77 @@ function Overview({ data }: { data: Overview }) {
       <Part title="Workers" section={data.workers}>
         {(rows) => (
           <Table
-            head={["Worker", "Requests", "Errors", "Subrequests", "CPU time"]}
-            rows={rows.map((w) => [
-              w.name,
-              number(w.requests),
-              <span key="e" className={w.errors > 0 ? "text-red-700" : undefined}>
-                {number(w.errors)}
-              </span>,
-              number(w.subrequests),
-              w.cpuMs === null ? "—" : `${number(w.cpuMs)} ms`,
-            ])}
+            rows={rows}
+            columns={[
+              { label: "Worker", sort: (w) => w.name },
+              { label: "Requests", sort: (w) => w.requests, cell: (w) => number(w.requests) },
+              {
+                label: "Errors",
+                sort: (w) => w.errors,
+                cell: (w) => (
+                  <span className={w.errors > 0 ? "text-red-700" : undefined}>
+                    {number(w.errors)}
+                  </span>
+                ),
+              },
+              {
+                label: "Subrequests",
+                sort: (w) => w.subrequests,
+                cell: (w) => number(w.subrequests),
+              },
+              {
+                label: "CPU time",
+                sort: (w) => w.cpuMs ?? -1,
+                cell: (w) => (w.cpuMs === null ? "—" : `${number(w.cpuMs)} ms`),
+              },
+            ]}
           />
         )}
       </Part>
       <Part title="D1 databases" section={data.d1}>
         {(rows) => (
           <Table
-            head={["Database", "Rows read", "Rows written", "Size"]}
-            rows={rows.map((d) => [
-              d.name,
-              number(d.rowsRead),
-              number(d.rowsWritten),
-              formatBytes(d.bytes),
-            ])}
+            rows={rows}
+            columns={[
+              { label: "Database", sort: (d) => d.name },
+              { label: "Rows read", sort: (d) => d.rowsRead, cell: (d) => number(d.rowsRead) },
+              {
+                label: "Rows written",
+                sort: (d) => d.rowsWritten,
+                cell: (d) => number(d.rowsWritten),
+              },
+              { label: "Size", sort: (d) => d.bytes, cell: (d) => formatBytes(d.bytes) },
+            ]}
           />
         )}
       </Part>
       <Part title="R2 buckets" section={data.r2}>
         {(rows) => (
           <Table
-            head={["Bucket", "Stored", "Objects", "Class A", "Class B"]}
-            rows={rows.map((b) => [
-              b.name,
-              formatBytes(b.bytes),
-              number(b.objects),
-              number(b.classA),
-              number(b.classB),
-            ])}
+            rows={rows}
+            columns={[
+              { label: "Bucket", sort: (b) => b.name },
+              { label: "Stored", sort: (b) => b.bytes, cell: (b) => formatBytes(b.bytes) },
+              { label: "Objects", sort: (b) => b.objects, cell: (b) => number(b.objects) },
+              { label: "Class A", sort: (b) => b.classA, cell: (b) => number(b.classA) },
+              { label: "Class B", sort: (b) => b.classB, cell: (b) => number(b.classB) },
+            ]}
           />
         )}
       </Part>
       <Part title="KV namespaces" section={data.kv}>
         {(rows) => (
           <Table
-            head={["Namespace", "Reads", "Writes", "Deletes", "Lists", "Stored", "Keys"]}
-            rows={rows.map((n) => [
-              n.name,
-              number(n.reads),
-              number(n.writes),
-              number(n.deletes),
-              number(n.lists),
-              formatBytes(n.bytes),
-              number(n.keys),
-            ])}
+            rows={rows}
+            columns={[
+              { label: "Namespace", sort: (n) => n.name },
+              { label: "Reads", sort: (n) => n.reads, cell: (n) => number(n.reads) },
+              { label: "Writes", sort: (n) => n.writes, cell: (n) => number(n.writes) },
+              { label: "Deletes", sort: (n) => n.deletes, cell: (n) => number(n.deletes) },
+              { label: "Lists", sort: (n) => n.lists, cell: (n) => number(n.lists) },
+              { label: "Stored", sort: (n) => n.bytes, cell: (n) => formatBytes(n.bytes) },
+              { label: "Keys", sort: (n) => n.keys, cell: (n) => number(n.keys) },
+            ]}
           />
         )}
       </Part>
@@ -172,19 +190,43 @@ function Overview({ data }: { data: Overview }) {
       <Part title="Deploys" section={data.deploys}>
         {(workers) => (
           <Table
-            head={["Worker", "Last deployed", "From", "Message", "Versions"]}
-            rows={workers.map((w) => {
-              const last = w.deploys[0];
-              return [
-                w.name,
-                formatTime(last?.createdAt ?? w.modifiedAt),
-                last?.source || "—",
-                <span key="m" className="block max-w-xs truncate" title={last?.message ?? ""}>
-                  {last?.message || "—"}
-                </span>,
-                last?.versions.join(", ") || "—",
-              ];
-            })}
+            rows={workers.map((w) => ({ ...w, last: w.deploys[0] }))}
+            columns={[
+              { label: "Worker", sort: (w) => w.name },
+              {
+                label: "Last deployed",
+                sort: (w) => w.last?.createdAt ?? w.modifiedAt ?? 0,
+                cell: (w) => formatTime(w.last?.createdAt ?? w.modifiedAt),
+              },
+              {
+                label: "From",
+                sort: (w) => w.last?.source ?? "",
+                cell: (w) => w.last?.source || "—",
+              },
+              {
+                label: "Message",
+                sort: (w) => w.last?.message ?? "",
+                cell: (w) => (
+                  <span className="block max-w-xs truncate" title={w.last?.message ?? ""}>
+                    {w.last?.message || "—"}
+                  </span>
+                ),
+              },
+              {
+                label: "Versions",
+                sort: (w) => w.last?.versions[0] ?? "",
+                cell: (w) =>
+                  w.last?.versions.length ? (
+                    <ul>
+                      {w.last.versions.map((v) => (
+                        <li key={v}>{v}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    "—"
+                  ),
+              },
+            ]}
           />
         )}
       </Part>
@@ -255,30 +297,17 @@ function Zone({ zone }: { zone: ZoneUsage }) {
           />
           <Stat label="Bandwidth" value={formatBytes(zone.traffic.data.bytes)} />
           <Stat label="Threats" value={number(zone.traffic.data.threats)} />
-          <Stat
-            label="Status"
-            value={
-              <span className="text-sm">
-                {Object.entries(zone.traffic.data.statuses).map(([group, n]) => (
-                  <span
-                    key={group}
-                    className={`mr-3 ${group === "5xx" && n > 0 ? "text-red-700" : ""}`}
-                  >
-                    {group} {number(n)}
-                  </span>
-                ))}
-              </span>
-            }
+          <Tally
+            title="Status"
+            rows={Object.entries(zone.traffic.data.statuses).map(([name, count]) => ({
+              name,
+              count,
+              danger: name === "5xx" && count > 0,
+            }))}
           />
-          <Stat
-            label="Top countries"
-            value={
-              <span className="text-sm">
-                {zone.traffic.data.countries
-                  .map((c) => `${c.name} ${number(c.requests)}`)
-                  .join(", ") || "—"}
-              </span>
-            }
+          <Tally
+            title="Top countries"
+            rows={zone.traffic.data.countries.map((c) => ({ name: c.name, count: c.requests }))}
           />
         </div>
       ) : (
@@ -292,8 +321,13 @@ function Zone({ zone }: { zone: ZoneUsage }) {
           <p className="mt-1 text-sm text-secondary-500">None.</p>
         ) : (
           <div className="mt-2 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {zone.security.data.capped && (
+              <p className="text-xs text-secondary-500 sm:col-span-2 lg:col-span-4">
+                Counts the latest {number(zone.security.data.total)} events only.
+              </p>
+            )}
             <Tally
-              title={`By action (${number(zone.security.data.total)})`}
+              title={`By action (${number(zone.security.data.total)}${zone.security.data.capped ? "+" : ""})`}
               rows={zone.security.data.byAction}
             />
             <Tally title="By source" rows={zone.security.data.bySource} />
@@ -308,7 +342,10 @@ function Zone({ zone }: { zone: ZoneUsage }) {
   );
 }
 
-function Tally({ title, rows }: { title: string; rows: { name: string; count: number }[] }) {
+function Tally({
+  title,
+  rows,
+}: { title: string; rows: { name: string; count: number; danger?: boolean }[] }) {
   return (
     <div className="min-w-0 text-sm">
       <p className="text-secondary-500">{title}</p>
@@ -318,9 +355,12 @@ function Tally({ title, rows }: { title: string; rows: { name: string; count: nu
             <span className="truncate text-secondary-900" title={r.name}>
               {r.name || "—"}
             </span>
-            <span className="text-secondary-600">{number(r.count)}</span>
+            <span className={r.danger ? "text-red-700" : "text-secondary-600"}>
+              {number(r.count)}
+            </span>
           </li>
         ))}
+        {rows.length === 0 && <li className="text-secondary-500">—</li>}
       </ul>
     </div>
   );
@@ -339,30 +379,76 @@ function Part<T>({
   );
 }
 
-function Table({ head, rows }: { head: string[]; rows: ReactNode[][] }) {
+type Column<R> = {
+  label: string;
+  /** What the column sorts by. */
+  sort: (row: R) => string | number;
+  /** Shown in the cell; the sort value when left out. */
+  cell?: (row: R) => ReactNode;
+};
+
+/** A table whose columns sort when their heading is clicked; the first column is the row's name. */
+function Table<R>({ rows, columns }: { rows: R[]; columns: Column<R>[] }) {
+  // Unsorted keeps the worker's order, by name.
+  const [order, setOrder] = useState<{ column: number; descending: boolean } | null>(null);
   if (rows.length === 0) return <p className="text-sm text-secondary-500">None.</p>;
+
+  const sorted = order ? [...rows] : rows;
+  if (order) {
+    const value = columns[order.column].sort;
+    sorted.sort((a, b) => {
+      const x = value(a);
+      const y = value(b);
+      const c =
+        typeof x === "number" && typeof y === "number" ? x - y : String(x).localeCompare(String(y));
+      return order.descending ? -c : c;
+    });
+  }
+
+  const sortBy = (column: number) =>
+    setOrder((o) =>
+      o?.column === column
+        ? { column, descending: !o.descending }
+        : // Numbers start biggest first, names A to Z.
+          { column, descending: typeof columns[column].sort(rows[0]) === "number" },
+    );
+
   return (
     <div className="relative overflow-x-auto">
       <table className="w-full text-left text-sm">
         <thead>
           <tr className="border-b border-secondary-200 text-xs font-bold uppercase tracking-wider text-secondary-400">
-            {head.map((h) => (
-              <th key={h} className="py-2 pr-4 whitespace-nowrap">
-                {h}
+            {columns.map((col, j) => (
+              <th
+                key={col.label}
+                aria-sort={
+                  order?.column === j ? (order.descending ? "descending" : "ascending") : undefined
+                }
+                className="py-2 pr-4 whitespace-nowrap"
+              >
+                <button
+                  type="button"
+                  onClick={() => sortBy(j)}
+                  className={`inline-flex items-center gap-1 rounded uppercase hover:text-secondary-700 ${focusRing}`}
+                >
+                  {col.label}
+                  <span aria-hidden className="w-2">
+                    {order?.column === j ? (order.descending ? "▼" : "▲") : ""}
+                  </span>
+                </button>
               </th>
             ))}
           </tr>
         </thead>
         <tbody>
-          {rows.map((cells, i) => (
-            // biome-ignore lint/suspicious/noArrayIndexKey: rows have no id, and never reorder.
-            <tr key={i} className="border-t border-line first:border-0">
-              {cells.map((cell, j) => (
+          {sorted.map((row) => (
+            <tr key={String(columns[0].sort(row))} className="border-t border-line first:border-0">
+              {columns.map((col, j) => (
                 <td
-                  key={head[j]}
+                  key={col.label}
                   className={`py-2 pr-4 ${j === 0 ? "font-semibold text-secondary-900" : "text-secondary-600 whitespace-nowrap"}`}
                 >
-                  {cell}
+                  {col.cell ? col.cell(row) : col.sort(row)}
                 </td>
               ))}
             </tr>
