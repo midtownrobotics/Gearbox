@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { AppEnv } from "./types";
 
-// The console's Cloudflare page (GET /console/cloudflare): what the account uses this month (UTC)
+// The console's Cloudflare page (GET /console/cloudflare): what the account uses this billing period
 // against what Workers Paid includes, an estimate of the bill from Cloudflare's published prices,
 // warnings at 80% of an included amount, each zone's traffic and security events, and each
 // worker's deploys. It reads Cloudflare's API with a read-only token (secrets CLOUDFLARE_API_TOKEN
@@ -29,6 +29,8 @@ export type Section<T> = { ok: true; data: T } | { ok: false; error: string };
  */
 export const PLAN = {
   name: "Workers Paid",
+  /** Its subscription's rate plan, for the billing period. */
+  id: "workers_paid",
   base: 5,
   workersRequests: { included: 10e6, price: 0.3, per: 1e6 },
   workersCpuMs: { included: 30e6, price: 0.02, per: 1e6 },
@@ -118,6 +120,8 @@ export type ZoneUsage = {
   /** The last 24 hours. */
   security: Section<{
     total: number;
+    /** Only the latest events were counted: there were more. */
+    capped: boolean;
     byAction: { name: string; count: number }[];
     bySource: { name: string; count: number }[];
     paths: { name: string; count: number }[];
@@ -138,7 +142,8 @@ export type CloudflareOverview =
       configured: true;
       asOf: number;
       plan: string;
-      period: { start: number; end: number };
+      /** The plan's billing period, or the UTC month when Cloudflare didn't say (`billing` false). */
+      period: { start: number; end: number; billing: boolean };
       meters: Meter[];
       estimate: { base: number; overage: number; total: number; missing: string[] };
       warnings: Warning[];
@@ -224,13 +229,46 @@ async function section<T>(load: () => Promise<T>): Promise<Section<T>> {
   }
 }
 
-type Period = { start: Date; end: Date; startDate: string; endDate: string };
+/** Usage is read from `start` up to `end` (now); the plan's period runs to `ends`. */
+type Period = {
+  start: Date;
+  end: Date;
+  ends: Date;
+  billing: boolean;
+  startDate: string;
+  endDate: string;
+};
 
-/** This UTC month, up to now. */
-function thisMonth(now: Date): Period {
+const day = (d: Date) => d.toISOString().slice(0, 10);
+
+/**
+ * The plan's current billing period, up to now. What the plan includes resets on the billing date,
+ * not the 1st, so it's read from the account's subscriptions (the token's Billing Read); without
+ * them, this UTC month.
+ */
+async function billingPeriod(env: Env, now: Date): Promise<Period> {
+  type Subscription = {
+    current_period_start?: string | null;
+    current_period_end?: string | null;
+    rate_plan?: { id?: string };
+  };
+  try {
+    const subscriptions = await rest<Subscription[]>(
+      env,
+      `/accounts/${env.CLOUDFLARE_ACCOUNT_ID}/subscriptions`,
+    );
+    const plan = subscriptions.find((s) => s.rate_plan?.id === PLAN.id);
+    const start = new Date(plan?.current_period_start ?? "");
+    const ends = new Date(plan?.current_period_end ?? "");
+    if (start <= now && now < ends) {
+      return { start, end: now, ends, billing: true, startDate: day(start), endDate: day(now) };
+    }
+  } catch (err) {
+    if (!(err instanceof CloudflareError)) console.error("[cloudflare]", err);
+  }
   const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-  const day = (d: Date) => d.toISOString().slice(0, 10);
-  return { start, end: now, startDate: day(start), endDate: day(now) };
+  const ends = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+  return { start, end: now, ends, billing: false, startDate: day(start), endDate: day(now) };
 }
 
 const between = (p: Period) =>
@@ -504,45 +542,45 @@ async function zoneTraffic(env: Env, zoneId: string, p: Period): Promise<ZoneUsa
   });
 }
 
+// Single events, counted here: the grouped dataset isn't on the Free plan, this one is on all of them.
+const SECURITY_EVENTS = 10_000;
+
 async function zoneSecurity(env: Env, zoneId: string, now: Date): Promise<ZoneUsage["security"]> {
   return section(async () => {
     type Event = {
-      count: number;
-      dimensions: {
-        action: string;
-        source: string;
-        clientCountryName: string;
-        clientRequestPath: string;
-      };
+      action: string;
+      source: string;
+      clientCountryName: string;
+      clientRequestPath: string;
     };
     const since = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-    const viewer = await graphql<{ zones: { firewallEventsAdaptiveGroups: Event[] }[] }>(
+    const viewer = await graphql<{ zones: { firewallEventsAdaptive: Event[] }[] }>(
       env,
-      `{ viewer { zones(filter: { zoneTag: "${zoneId}" }) { firewallEventsAdaptiveGroups(limit: 1000, filter: { datetime_geq: "${since.toISOString()}", datetime_leq: "${now.toISOString()}" }, orderBy: [count_DESC]) { count dimensions { action source clientCountryName clientRequestPath } } } } }`,
+      `{ viewer { zones(filter: { zoneTag: "${zoneId}" }) { firewallEventsAdaptive(limit: ${SECURITY_EVENTS}, filter: { datetime_geq: "${since.toISOString()}", datetime_leq: "${now.toISOString()}" }, orderBy: [datetime_DESC]) { action source clientCountryName clientRequestPath } } } }`,
     );
-    const events = viewer.zones[0]?.firewallEventsAdaptiveGroups ?? [];
-    const tally = (pick: (e: Event["dimensions"]) => string) => {
+    const events = viewer.zones[0]?.firewallEventsAdaptive ?? [];
+    const tally = (pick: (e: Event) => string) => {
       const counts = new Map<string, number>();
-      for (const e of events)
-        counts.set(pick(e.dimensions), (counts.get(pick(e.dimensions)) ?? 0) + e.count);
+      for (const e of events) counts.set(pick(e), (counts.get(pick(e)) ?? 0) + 1);
       return counts;
     };
     return {
-      total: events.reduce((n, e) => n + e.count, 0),
+      total: events.length,
+      capped: events.length >= SECURITY_EVENTS,
       byAction: top(
-        tally((d) => d.action),
+        tally((e) => e.action),
         10,
       ),
       bySource: top(
-        tally((d) => d.source),
+        tally((e) => e.source),
         10,
       ),
       paths: top(
-        tally((d) => d.clientRequestPath),
+        tally((e) => e.clientRequestPath),
         10,
       ),
       countries: top(
-        tally((d) => d.clientCountryName),
+        tally((e) => e.clientCountryName),
         5,
       ),
     };
@@ -863,7 +901,7 @@ function warningsOf(meters: Meter[], d1: Section<DatabaseUsage[]>): Warning[] {
 
 async function load(env: Env): Promise<CloudflareOverview> {
   const now = new Date();
-  const p = thisMonth(now);
+  const p = await billingPeriod(env, now);
   const [w, d, r, k, o, q, a, z, dep] = await Promise.all([
     section(() => workers(env, p)),
     section(() => d1(env, p)),
@@ -882,7 +920,11 @@ async function load(env: Env): Promise<CloudflareOverview> {
     configured: true,
     asOf: Math.floor(now.getTime() / 1000),
     plan: PLAN.name,
-    period: { start: Math.floor(p.start.getTime() / 1000), end: Math.floor(now.getTime() / 1000) },
+    period: {
+      start: Math.floor(p.start.getTime() / 1000),
+      end: Math.floor(p.ends.getTime() / 1000),
+      billing: p.billing,
+    },
     meters,
     estimate: { base: PLAN.base, overage, total: PLAN.base + overage, missing },
     warnings: warningsOf(meters, d),
