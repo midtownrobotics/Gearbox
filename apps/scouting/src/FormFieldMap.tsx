@@ -1,5 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { Button } from "@g3/ui";
+import { Button, ErrorBanner } from "@g3/ui";
+import {
+  type FieldDrawing,
+  type FieldStroke,
+  MAX_DRAWING_STROKES,
+  createFieldDrawing,
+  parseFieldDrawing,
+} from "@g3/worker-scouting/field-drawing";
+import { fieldDrawingSvg } from "@g3/worker-scouting/field-drawing-svg";
 import { ArrowRight, Maximize2, Minimize2, Pencil, RotateCcw, Target, Trash2 } from "lucide-react";
 import {
   type PointerEvent as ReactPointerEvent,
@@ -10,11 +18,17 @@ import {
   useRef,
   useState,
 } from "react";
+import { sharedFieldSvg } from "./field-drawing-view";
 
 const COLORS = ["#ff334f", "#35d06f", "#ffd43b", "#ff66c4"];
 type Point = { x: number; y: number };
 type Tool = "draw" | "arrow" | "sotm";
-type HistoryEntry = { image: ImageData; hasDrawing: boolean };
+type HistoryEntry = {
+  image: ImageData;
+  hasDrawing: boolean;
+  strokes: FieldStroke[];
+  legacy: boolean;
+};
 
 function drawingColorAt(hex: string, progress: number) {
   const value = Number.parseInt(hex.slice(1), 16);
@@ -36,11 +50,17 @@ export function FormFieldMap({
   canvasRef: RefObject<HTMLCanvasElement | null>;
   onDrawingChange?: (hasDrawing: boolean) => void;
   /** After each finished stroke, undo or clear, with the canvas as it now is. */
-  onCommit?: (canvas: HTMLCanvasElement) => void;
+  onCommit?: (canvas: HTMLCanvasElement, vector?: FieldDrawing) => void;
   /** A drawing saved earlier (a data URL of the whole canvas), drawn over the field once loaded. */
   initialImage?: string;
 }) {
+  const editor = useRef<HTMLDivElement | null>(null);
   const base = useRef<HTMLCanvasElement | null>(null);
+  const strokes = useRef<FieldStroke[]>([]);
+  const legacy = useRef(false);
+  const ready = useRef(false);
+  const fieldText = useRef("");
+  const [error, setError] = useState("");
   const committed = useRef<HTMLCanvasElement | null>(null);
   const history = useRef<HistoryEntry[]>([]);
   const hasDrawing = useRef(false);
@@ -94,35 +114,64 @@ export function FormFieldMap({
         hasDrawing.current = false;
         onDrawingChangeRef.current?.(false);
         URL.revokeObjectURL(image.src);
-        // A saved drawing goes over the clean field, so Clear still goes back to the field alone.
+        // Restore old image drafts unchanged; new drafts contain only normalized strokes.
         const saved = initialImageRef.current;
         initialImageRef.current = undefined;
-        if (saved) {
-          const restored = new Image();
-          restored.onload = () => {
-            const target = canvasRef.current;
-            const targetContext = target?.getContext("2d");
-            if (!target || !targetContext || hasDrawing.current) return;
+        if (!saved) {
+          ready.current = true;
+          return;
+        }
+        const restored = new Image();
+        let url = saved;
+        try {
+          if (saved.startsWith("{")) {
+            const vector = parseFieldDrawing(JSON.parse(saved));
+            strokes.current = vector.strokes;
+            url = URL.createObjectURL(
+              new Blob([fieldDrawingSvg(vector, fieldText.current)], { type: "image/svg+xml" }),
+            );
+          } else legacy.current = true;
+        } catch {
+          setError("The saved drawing could not be restored. Reload before editing it.");
+          return;
+        }
+        restored.onload = () => {
+          const target = canvasRef.current;
+          const targetContext = target?.getContext("2d");
+          if (target && targetContext && !hasDrawing.current) {
             targetContext.drawImage(restored, 0, 0, target.width, target.height);
             commitCanvas(target, false);
             setHasDrawing(true);
-          };
-          restored.src = saved;
-        }
+            ready.current = true;
+          }
+          if (url !== saved) URL.revokeObjectURL(url);
+        };
+        restored.onerror = () => {
+          if (url !== saved) URL.revokeObjectURL(url);
+          setError("The saved drawing could not be restored. Reload before editing it.");
+        };
+        restored.src = url;
       };
       image.src = URL.createObjectURL(blob);
     },
     [canvasRef],
   );
 
-  const loadRebuilt = useCallback(async () => {
-    const response = await fetch("/field-2026.svg");
-    if (response.ok) loadBlob(await response.blob());
-  }, [loadBlob]);
-
   useEffect(() => {
-    void loadRebuilt();
-  }, [loadRebuilt]);
+    let active = true;
+    void sharedFieldSvg()
+      .then((text) => {
+        if (!active) return;
+        fieldText.current = text;
+        loadBlob(new Blob([text], { type: "image/svg+xml" }));
+      })
+      .catch(() => {
+        if (active) setError("The field could not be loaded. Try reloading this page.");
+      });
+    return () => {
+      active = false;
+    };
+  }, [loadBlob]);
   useEffect(() => {
     document.body.classList.toggle("map-workspace-open", fullscreen);
     const closeOnEscape = (event: KeyboardEvent) => {
@@ -147,6 +196,24 @@ export function FormFieldMap({
     context.drawImage(saved, 0, 0);
   });
 
+  useEffect(() => {
+    const undoKey = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (
+        !(event.ctrlKey || event.metaKey) ||
+        event.shiftKey ||
+        event.key.toLowerCase() !== "z" ||
+        !editor.current?.contains(document.activeElement) ||
+        target?.closest("input, textarea, select, [contenteditable='true']")
+      )
+        return;
+      event.preventDefault();
+      undo();
+    };
+    window.addEventListener("keydown", undoKey);
+    return () => window.removeEventListener("keydown", undoKey);
+  }, []);
+
   function point(event: ReactPointerEvent<HTMLCanvasElement>): Point {
     const rect = event.currentTarget.getBoundingClientRect();
     return {
@@ -161,6 +228,8 @@ export function FormFieldMap({
       history.current.push({
         image: context.getImageData(0, 0, canvas.width, canvas.height),
         hasDrawing: hasDrawing.current,
+        strokes: strokes.current,
+        legacy: legacy.current,
       });
       if (history.current.length > 20) history.current.shift();
     }
@@ -176,7 +245,13 @@ export function FormFieldMap({
     saved.height = canvas.height;
     saved.getContext("2d")?.drawImage(canvas, 0, 0);
     committed.current = saved;
-    if (report) onCommitRef.current?.(canvas);
+    if (report)
+      onCommitRef.current?.(
+        canvas,
+        legacy.current
+          ? undefined
+          : { version: 1, field: "2026-rebuilt", strokes: strokes.current },
+      );
   }
   function arrow(context: CanvasRenderingContext2D, from: Point, to: Point) {
     const angle = Math.atan2(to.y - from.y, to.x - from.x);
@@ -266,10 +341,13 @@ export function FormFieldMap({
     const context = canvas?.getContext("2d");
     if (!canvas || !context || !base.current) return;
     snapshot();
+    strokes.current = [];
+    legacy.current = false;
+    setError("");
     context.clearRect(0, 0, canvas.width, canvas.height);
     context.drawImage(base.current, 0, 0);
-    commitCanvas(canvas);
     setHasDrawing(false);
+    commitCanvas(canvas);
   }
   function undo() {
     const canvas = canvasRef.current;
@@ -277,8 +355,11 @@ export function FormFieldMap({
     const entry = history.current.pop();
     if (canvas && context && entry) {
       context.putImageData(entry.image, 0, 0);
-      commitCanvas(canvas);
+      strokes.current = entry.strokes;
+      legacy.current = entry.legacy;
       setHasDrawing(entry.hasDrawing);
+      commitCanvas(canvas);
+      setError("");
     }
   }
   function finishDrawing(canvas: HTMLCanvasElement) {
@@ -287,7 +368,43 @@ export function FormFieldMap({
       finishGradient(context, path.current);
       if (tool === "sotm") cone(context, path.current);
     }
-    if (path.current.length > 1) setHasDrawing(true);
+    const points =
+      tool === "arrow" && start.current && last.current
+        ? [start.current, last.current]
+        : path.current;
+    const moved =
+      points.length > 1 &&
+      points.some((p) => Math.hypot(p.x - points[0].x, p.y - points[0].y) >= 0.2);
+    if (moved && !legacy.current) {
+      try {
+        strokes.current = createFieldDrawing([
+          ...strokes.current,
+          {
+            tool,
+            color,
+            ...(tool === "sotm"
+              ? {
+                  hub:
+                    points[Math.floor(points.length / 2)].x < canvas.width / 2
+                      ? ("left" as const)
+                      : ("right" as const),
+                }
+              : {}),
+            points: points.map((p) => [p.x / canvas.width, p.y / canvas.height]),
+          },
+        ]).strokes;
+      } catch {
+        const entry = history.current.pop();
+        if (entry) {
+          context?.putImageData(entry.image, 0, 0);
+          strokes.current = entry.strokes;
+          legacy.current = entry.legacy;
+          setHasDrawing(entry.hasDrawing);
+        }
+        setError("This drawing is too complex. Undo or clear a stroke before adding more.");
+      }
+    }
+    setHasDrawing(strokes.current.length > 0 || (legacy.current && hasDrawing.current));
     commitCanvas(canvas);
     drawing.current = false;
     start.current = null;
@@ -301,6 +418,8 @@ export function FormFieldMap({
     const entry = history.current.pop();
     if (entry) {
       event.currentTarget.getContext("2d")?.putImageData(entry.image, 0, 0);
+      strokes.current = entry.strokes;
+      legacy.current = entry.legacy;
       setHasDrawing(entry.hasDrawing);
     }
     drawing.current = false;
@@ -312,7 +431,11 @@ export function FormFieldMap({
   }
 
   return (
-    <div className={`map-editor form-map-editor ${fullscreen ? "map-editor-fullscreen" : ""}`}>
+    <div
+      ref={editor}
+      className={`map-editor form-map-editor ${fullscreen ? "map-editor-fullscreen" : ""}`}
+    >
+      {error && <ErrorBanner message={error} />}
       <div className="map-toolbar">
         <button
           type="button"
@@ -393,8 +516,21 @@ export function FormFieldMap({
         <canvas
           ref={canvasRef}
           aria-label="Drawable field map"
+          tabIndex={0}
           onPointerDown={(event) => {
-            if (event.button !== 0 || activePointer.current !== null || !base.current) return;
+            if (
+              event.button !== 0 ||
+              activePointer.current !== null ||
+              !base.current ||
+              !ready.current
+            )
+              return;
+            if (!legacy.current && strokes.current.length >= MAX_DRAWING_STROKES) {
+              setError("Undo or clear a stroke before adding more.");
+              return;
+            }
+            setError("");
+            event.currentTarget.focus({ preventScroll: true });
             activePointer.current = event.pointerId;
             snapshot();
             drawing.current = true;

@@ -1,8 +1,8 @@
 # Storage safeguards
 
-When a new upload would exceed a cap, files strictly older than six calendar months are eligible
-for automatic cleanup. Newer files are protected. Cleanup targets 90% usage where eligible files
-permit it; there is no blanket age-only purge while storage stays below the cap.
+When a new upload would exceed a cap, cleanup removes the oldest stored files toward 90% usage.
+Files older than six calendar months go first. If they cannot reach the target, cleanup continues
+with the oldest remaining files, including recent files. There is no age-only purge below the cap.
 
 | App | Per-team allowance | Per upload |
 | --- | --- | --- |
@@ -12,84 +12,101 @@ permit it; there is no blanket age-only purge while storage stays below the cap.
 | Pit AdvantageScope assets | 100 MiB uncompressed and 10 assets | 50 MiB ZIP |
 
 Ordinary request bodies are capped at 2 MiB at the gateway, including streamed bodies and false
-Content-Type headers. Known file and printing routes retain their separate limits.
+Content-Type headers. Known file and printing routes retain separate limits.
 
-## Protection at capacity
+## Oldest first and the 90% target
+
+Admins choose a team-wide capacity policy on Portal Storage: **Delete oldest files toward 90%
+usage** (existing default), or **Keep files and stop uploads at the cap**. The latter disables
+automatic deletion across Shop, Scouting, Pit assets and logs. Uploads above either hard limit
+are refused without removing files. Reads never create default settings. ID migration 0024
+stores the team-owned choice; only non-kiosk admins may change it. Actual changes log field
+labels and notify active connected admins once. Manual deletion, confirmed season resets,
+app-off retention and team deletion are separate. Cleanup already running may finish.
+
+Workers never cache permission to delete. An unavailable or malformed policy response disables
+automatic cleanup and blocks growth at the cap. Shared quota writes check under the team lock;
+Pit checks logs on start and completion, and assets before cleanup. Policy changes invalidate the
+team's v2 storage-report cache, and the page reads the policy without caching.
 
 Shop and Scouting count actual R2 objects under the team's prefix, including orphaned objects.
-Replacements spend only their size difference. Expired files are selected oldest first, excluding
-incoming replacement keys. If eligible files cannot free enough room for the hard cap, new growth
-is refused without deleting recent files.
-Downloads and existing manual deletion controls remain available.
+Replacements spend only their size difference. All existing files can participate in capacity
+cleanup; incoming/replacement keys are excluded. Server upload timestamps determine order, with
+unknown dates last and deterministic key ties. Strictly older-than-six-calendar-month files
+naturally precede recent files. The shared `StorageEviction.deleteOldest` enables this behavior.
+The separate exact key/ETag approval mode remains available for reviewed operations.
 
-Pit leaves new logs on the downloader at 20 unless the team chose Delete the oldest over six
-months old: then it removes only expired logs when a new completed log would exceed 20, targeting
-18 remaining, and never a newer one. Concurrent starts/completions
-share the same team lock. AdvantageScope similarly targets 90 MiB / 9 assets on overflow, using
-only expired assets and expired unreferenced files. A recently changed physical file protects an
-otherwise old asset row. Missing or invalid dates do not establish expiration.
-
-Expired incomplete multipart uploads may still be aborted after 30 minutes on the next start.
-That removes unfinished staging parts, not completed match-log files. The downloader's local
-source log is unaffected. Existing team-deletion, app-off retention and public-demo lifecycle
-rules are separate from these storage caps.
-
-## Six-month eligibility and the 90% target
-
-The cutoff uses six calendar months in UTC, with month-end dates clamped (August 31 to February
-28 or 29). A timestamp exactly at the cutoff is protected; it must be strictly earlier. Upload
-and last-save timestamps are server-maintained. Zero, missing and invalid dates are protected.
-Shop and Scouting use R2 upload timestamps. Pit uses its saved-log/asset timestamps, and verifies
-referenced asset files are old too. Current app routes enable this expiration policy.
-
-Cleanup considers the incoming save in its 90% byte/count target. Recent files are never selected
-to achieve headroom. If only enough expired files exist to fit the hard cap, usage may remain above
-90%. Whole-file deletion can free more than exactly 10%. An incoming batch larger than the soft
-target may use the hard cap, and incoming files are never selected for deletion.
-
-The engine still supports exact object-key/ETag approvals for an explicit reviewed operation,
-but no current upload route provides these approvals and there is no new approval UI. Younger
-files therefore require existing manual review/delete controls; app uploads cannot approve them.
+The incoming save counts toward both byte and object targets. Whole-file deletion can free more
+than exactly 10%. If the incoming batch alone exceeds the 90% target, the target rises to that
+batch's size/count, bounded by the hard cap. A batch larger than the hard cap is refused.
 
 A failed save or refused report does not trigger cleanup. Logical saves include their database
 commit. An already-over-limit store is repaired before allowing more growth; cleanup failure
 cannot repeatedly permit new writes. Successful writes can briefly exceed a cap by one batch.
-
 The engine clears Shop file/drawing rows and batch links, and Scouting image references while
-preserving report answers and auton steps. This is not a guarantee that approved deletions are
-unimportant: value must be judged during review, not inferred from age.
+preserving written report answers and auton steps. Capacity cleanup can remove useful files;
+teams must download anything they want to keep before filling the allowance.
+
+Pit leaves new logs on the downloader at 20 by default. With **Delete the oldest logs** enabled,
+a new completed log above 20 removes the oldest stored logs toward 18 remaining, including recent
+logs when needed. Concurrent starts/completions share the same team lock. Pending uploads are
+never cleanup candidates. Incomplete multipart uploads may be aborted after 30 minutes on the
+next start; the downloader's local source log is unaffected.
+
+AdvantageScope targets 90 MiB / 9 assets on overflow. Assets are removed as a unit, ordered by
+the most recent save across their metadata and physical files. Unreferenced files count toward
+bytes and join the same oldest-first ordering. Incoming assets and their replacement keys stay.
 
 ## Coordination and admin notices
 
-Shop and Scouting keep an estimate of each team's usage (`storage_usage`) that is never below
-what's stored: every save adds its full size, deletes take nothing off, and only a count under the
-lock corrects it. A save that keeps the estimate at or under 90% of the cap only adds itself, with
-no lock and no count, so saves arriving together don't wait for each other. Past that, a save takes
-the team's lock, counts R2, and cleans up as above.
+Shop and Scouting maintain a pessimistic `storage_usage` ledger. A save whose reservation stays
+below 90% skips the lock/count; near capacity it takes the team lock, recounts R2 and performs
+cleanup. Counted saves wait up to ten seconds, then return 409 upload_busy with Retry-After: 2;
+Scouting retries once. Locks expire after ten minutes. These are not account-wide billing limits.
 
-Per-team D1 locks serialize those counted saves across isolates. A competing save waits up to ten
-seconds, then gets 409 upload_busy with `Retry-After: 2`; Scouting's pages send it once more.
-Locks expire after ten minutes if interrupted; writes must finish within the lease. This is not an
-account-wide billing ledger.
+Cleanup notices summarize count, bytes, saved-date range and age in the team Log and active
+admins' connected Slack/Discord. The first summary is immediate; later summaries accumulate until
+another cleanup occurs at least one hour later. There is no hourly timer or email sender.
+Threshold warnings at 90%, 95% and 100% use the higher byte/count utilization. Atomic claims
+suppress duplicates until actual usage below 85% rearms the cycle on a later save. Cleanup toward
+90% does not rearm alerts. Delivery is best effort, and warning text explains recent-file fallback.
 
-After expiration-based or explicitly approved cleanup, the notification helper summarizes count, bytes,
-upload-date range and age to the team log and active admins' connected Slack/Discord. It reports
-first cleanup immediately, then accumulates follow-ups until another cleanup occurs at least an
-hour later. There is no hourly timer or general email sender. Delivery is best effort. Merely approaching a cap sends nothing; summaries follow actual deletion.
+Warnings remain enabled in keep-files mode and explicitly explain blocked uploads. They use the
+same effective policy as the save. Mode changes never reset threshold claims; refused attempts
+below 85% also do not rearm them. Only a successful save observing usage below 85% rearms a cycle.
+The platform knows the Gearbox team owner's account ID; G3ID holds their email, which is not
+necessarily a chat workspace owner's email. Storage APIs expose no email addresses.
 
-The Gearbox team owner's account ID is stored by the platform, and their account email by G3ID.
-That person is not necessarily the Slack workspace owner. Storage APIs expose no email addresses.
+## Compact drawings and Storage
+
+New Scouting field paths store bounded coordinates and a pinned field version, following the
+same quota and oldest-first cleanup as other files. Legacy images remain readable. Single-file
+downloads render standalone SVG; archives keep original JSON and include the shared field SVG.
+Rendering stores no generated image in R2. See `workers/scouting/src/field-drawing.ts`.
+
+Portal's admin-only `/admin/storage` shows each allowance, saved dates, oldest-first file lists
+and **May be removed** status, including recent files. Pit logs show **Cleanup off** while the
+team keeps the default setting. Reads/downloads never delete anything. Platform enforces the
+signed-in team and allowlisted app for internal storage hooks. Retained files remain downloadable
+when an app is off. Bounded TAR downloads stream at most 1,000 files / 512 MiB per part (a larger
+single legacy file streams alone). Files retain unique archive names and compressed .gz bytes.
+Successful counts are cached for 60 seconds per team/environment; unavailable apps show errors.
+
+Local previews: Portal at `http://127.0.0.1:5178/preview/storage`, season review at
+`http://127.0.0.1:5178/preview/season`, drawing editor at `http://127.0.0.1:5182/preview/drawing`.
+They use development-only sample data, with no live team writes.
 
 ## Deployment and boundaries
 
-Apply coordination migrations first: Shop 0026 and 0028, Scouting 0039 and 0041, Pit 0019 and 0021. Cleanup-notice support
-uses Shop 0027, Scouting 0040 and Pit 0020. Existing committed migrations are not rewritten.
-This PR does not deploy workers or send live messages. Before changing live retention for
-existing teams, honor the owner-notice period in the current Terms of Service and publish the
-matching retention notice.
+Required migrations remain Shop 0026-0029, Scouting 0039-0043, and Pit 0019-0022. No migration is
+rewritten or added for oldest-file fallback. Season exports/reset have a separate verified-backup
+workflow. Team deletion, app-off retention and public-demo lifecycle rules are unchanged.
 
-Caps are per team/app. They do not cap D1, KV, device disks, external providers or total account
-spend. Legacy Scouting objects outside the modern team prefix retain existing ownership and are
-not newly counted by that prefix quota. Incomplete multipart lifecycle rules and live usage still
-need account-level verification. The six-month policy is an explicit retention rule, not proof that an old file lacks value;
-teams should export files they want to keep beyond the policy.
+The team-wide choice additionally requires **ID 0024**. Apply its migration and deploy ID before
+the file-storing workers, then Platform and Portal, before announcing the new control.
+
+Before changing live retention for existing teams, honor the notice period in the current Terms
+of Service and publish the matching retention notice. This PR does not deploy workers or send
+live messages. Caps do not limit D1, KV, device disks, external providers or total account spend.
+Legacy Scouting objects outside the team prefix retain their existing ownership and are not newly
+counted or cleaned by this prefix quota. Provider-side lifecycle rules still need account checks.

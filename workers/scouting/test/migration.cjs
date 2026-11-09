@@ -80,6 +80,8 @@ const order = bootstrap.match(/export const teamTables = \[([\s\S]*?)\];/)[1].ma
 db.exec("BEGIN");
 for (const table of order) {
   const name = table.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
+  // This stage checks the populated 0033 schema; later tables are applied below.
+  if (!names.includes(name)) continue;
   db.prepare(`UPDATE ${name} SET team_id = ? WHERE team_id = ?`).run(
     "test-original-owner",
     "__legacy_scouting__",
@@ -203,5 +205,35 @@ assert.throws(
 assert.deepEqual(db.prepare("PRAGMA foreign_key_check").all(), []);
 console.log(
   "Form/category migration preserves tickets and enforces one submission per form, scout, event and match within each team.",
+);
+const reportsBeforeSeason = db.prepare("SELECT * FROM scouting_form_submissions").all();
+for (const migration of fs
+  .readdirSync(md)
+  .filter((file) => file >= "0039" && file.endsWith(".sql"))
+  .sort())
+  db.exec(fs.readFileSync(`${md}/${migration}`, "utf8"));
+assert.deepEqual(db.prepare("SELECT * FROM scouting_form_submissions").all(), reportsBeforeSeason);
+const insertSeason = db.prepare(
+  "INSERT INTO season_exports (team_id, id, year, created_at, expires_at) VALUES (?, ?, 2024, 1, 2)",
+);
+const insertPart = db.prepare(
+  "INSERT INTO season_export_parts (team_id, export_id, part, snapshot_json) VALUES (?, ?, 0, '{}')",
+);
+insertSeason.run("season-team-a", "same-id");
+insertSeason.run("season-team-b", "same-id");
+insertPart.run("season-team-a", "same-id");
+insertPart.run("season-team-b", "same-id");
+assert.throws(() => insertSeason.run("season-team-a", "other-id"), /UNIQUE constraint/);
+db.prepare("DELETE FROM season_exports WHERE team_id = ?").run("season-team-a");
+assert.deepEqual(
+  db
+    .prepare("SELECT team_id FROM season_export_parts")
+    .all()
+    .map((row) => row.team_id),
+  ["season-team-b"],
+);
+assert.deepEqual(db.prepare("PRAGMA foreign_key_check").all(), []);
+console.log(
+  "Season export migration preserves game records, limits active receipts per team, and scopes receipt deletion.",
 );
 db.close();

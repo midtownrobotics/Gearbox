@@ -18,6 +18,7 @@ Admins also get the team's admin pages, under **Admin** in the bar. Only what's 
 | Sign-in | Which sign-in methods your team allows |
 | Kiosk Devices | Shared shop computers where people sign in to Shop with a PIN (Shop only, for now) |
 | Integrations | Connect Slack or Discord, and see what else is connected |
+| Storage | Check usage, review older files, download copies before cleanup |
 | Notifications | Who sees Gearbox's announcements, and where they're sent |
 | Operator Access | When Gearbox's operators opened your team's details or changed your team, and why |
 | Member Access | When Gearbox's operators opened your member list, and why |

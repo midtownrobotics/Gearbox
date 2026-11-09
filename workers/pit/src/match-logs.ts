@@ -2,12 +2,14 @@
 import {
   STORAGE_CLEANUP_RATIO,
   inTeam,
-  isStorageFileExpired,
   logTeamChange,
   notifyStorageCleanup,
+  notifyStorageUsage,
   requireAdmin,
   requireAuth,
   requireMentor,
+  storageCleanupTime,
+  teamStorageMode,
   withTeam,
   withTeamStorageLock,
 } from "@g3/auth";
@@ -109,6 +111,7 @@ export const matchLogRoutes = new Hono<AppEnv>()
     return c.json({
       logs,
       limit: MAX_LOGS,
+      automaticDeletion: (await teamStorageMode(c.env, teamId)) === "delete-oldest",
       whenFull: await getWhenFull(db, teamId),
       canManage: c.get("userIsMentor") || c.get("userIsAdmin"),
       // Deleting logs is for admins only.
@@ -300,17 +303,35 @@ export const logUploadRoutes = new Hono<AppEnv>()
         .from(matchLogs)
         .where(inTeam(matchLogs, teamId, eq(matchLogs.status, "stored")));
       // Only a team that chose to delete the oldest has logs that may make room.
-      const deleting = (await getWhenFull(db, teamId)) === "delete-oldest";
-      const expired = stored
-        .filter((item) => deleting && isStorageFileExpired(item.uploadedAt ?? item.createdAt))
+      const teamMode = await teamStorageMode(c.env, teamId);
+      const deleting =
+        teamMode === "delete-oldest" && (await getWhenFull(db, teamId)) === "delete-oldest";
+      const mode =
+        teamMode === "unavailable" ? "unavailable" : deleting ? "delete-oldest" : "block-uploads";
+      await notifyStorageUsage(
+        c.env,
+        teamId,
+        "pit",
+        "logs",
+        c.env.PIT_DB,
+        { bytes: 0, count: stored.length },
+        { count: MAX_LOGS },
+        false,
+        mode,
+        false,
+      );
+      const candidates = stored
+        .filter(() => deleting)
         .sort(
-          (a, b) => (a.uploadedAt ?? a.createdAt) - (b.uploadedAt ?? b.createdAt) || a.id - b.id,
+          (a, b) =>
+            storageCleanupTime(a.uploadedAt ?? a.createdAt) -
+              storageCleanupTime(b.uploadedAt ?? b.createdAt) || a.id - b.id,
         );
-      if (stored.length >= MAX_LOGS && expired.length < stored.length + 1 - MAX_LOGS)
+      if (stored.length >= MAX_LOGS && candidates.length < stored.length + 1 - MAX_LOGS)
         return c.json(
           {
             error: deleting
-              ? "Pit is full. Logs from the last six months are protected; review them before choosing what to remove."
+              ? "Pit is full. This log cannot fit; review saved logs and try again."
               : `Pit has ${MAX_LOGS} match logs, the most it keeps.`,
             code: "full",
           },
@@ -495,17 +516,35 @@ export const logUploadRoutes = new Hono<AppEnv>()
         .from(matchLogs)
         .where(inTeam(matchLogs, teamId, eq(matchLogs.status, "stored")));
       // Only a team that chose to delete the oldest has logs that may make room.
-      const deleting = (await getWhenFull(db, teamId)) === "delete-oldest";
-      const expired = stored
-        .filter((item) => deleting && isStorageFileExpired(item.uploadedAt ?? item.createdAt))
+      const teamMode = await teamStorageMode(c.env, teamId);
+      const deleting =
+        teamMode === "delete-oldest" && (await getWhenFull(db, teamId)) === "delete-oldest";
+      const mode =
+        teamMode === "unavailable" ? "unavailable" : deleting ? "delete-oldest" : "block-uploads";
+      await notifyStorageUsage(
+        c.env,
+        teamId,
+        "pit",
+        "logs",
+        c.env.PIT_DB,
+        { bytes: 0, count: stored.length },
+        { count: MAX_LOGS },
+        false,
+        mode,
+        false,
+      );
+      const candidates = stored
+        .filter(() => deleting)
         .sort(
-          (a, b) => (a.uploadedAt ?? a.createdAt) - (b.uploadedAt ?? b.createdAt) || a.id - b.id,
+          (a, b) =>
+            storageCleanupTime(a.uploadedAt ?? a.createdAt) -
+              storageCleanupTime(b.uploadedAt ?? b.createdAt) || a.id - b.id,
         );
-      if (stored.length >= MAX_LOGS && expired.length < stored.length + 1 - MAX_LOGS)
+      if (stored.length >= MAX_LOGS && candidates.length < stored.length + 1 - MAX_LOGS)
         return c.json(
           {
             error: deleting
-              ? "Pit is full. Logs from the last six months are protected."
+              ? "Pit is full. This log cannot fit; review saved logs and try again."
               : `Pit has ${MAX_LOGS} match logs, the most it keeps.`,
             code: "full",
           },
@@ -528,8 +567,31 @@ export const logUploadRoutes = new Hono<AppEnv>()
         .set({ status: "stored", uploadId: null, size: object.size, uploadedAt: Date.now() })
         .where(inTeam(matchLogs, teamId, eq(matchLogs.id, id)));
 
+      await notifyStorageUsage(
+        c.env,
+        teamId,
+        "pit",
+        "logs",
+        c.env.PIT_DB,
+        { bytes: 0, count: stored.length },
+        { count: MAX_LOGS },
+        false,
+        mode,
+      );
+
+      await notifyStorageUsage(
+        c.env,
+        teamId,
+        "pit",
+        "logs",
+        c.env.PIT_DB,
+        { bytes: 0, count: stored.length + 1 },
+        { count: MAX_LOGS },
+        false,
+        mode,
+      );
       if (stored.length + 1 > MAX_LOGS) {
-        const removed = expired.slice(
+        const removed = candidates.slice(
           0,
           stored.length + 1 - Math.floor(MAX_LOGS * STORAGE_CLEANUP_RATIO),
         );

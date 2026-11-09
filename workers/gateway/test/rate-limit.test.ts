@@ -22,6 +22,18 @@ const request = (path: string, method = "GET") =>
   });
 
 describe("gateway rate limits", () => {
+  it("applies the expensive-request limit to storage policy changes and season tools", async () => {
+    for (const path of [
+      "/api/~platform/team/seasons/scouting?year=2024",
+      "/api/~id/admin/team/storage-policy",
+      "/api/~platform/team/seasons/scouting/exports/id/0/archive",
+      "/api/~platform/team/seasons/scouting/exports/id/0/reset",
+    ]) {
+      const env = limiters();
+      await checkRateLimit(request(path, "POST"), env);
+      expect(env.EXPENSIVE_LIMITER.limit).toHaveBeenCalledWith({ key: "203.0.113.42" });
+    }
+  });
   it("limits pages as well as APIs, before accessing downstream services", async () => {
     const env = limiters();
     vi.mocked(env.REQUEST_LIMITER.limit).mockResolvedValue({ success: false });
@@ -53,6 +65,18 @@ describe("gateway rate limits", () => {
       const env = limiters();
       vi.mocked(env.WRITE_LIMITER.limit).mockResolvedValue({ success: false });
       expect((await checkRateLimit(request("/api/~shop/parts", method), env))?.status).toBe(429);
+    }
+  });
+
+  it("uses the costly-route limit for storage counts and bulk downloads, including aliases", async () => {
+    for (const path of [
+      "/api/team/storage",
+      "/api/team/storage/shop/archive",
+      "/api/~platform/team/storage/pit/download?key=test",
+    ]) {
+      const env = limiters();
+      vi.mocked(env.EXPENSIVE_LIMITER.limit).mockResolvedValue({ success: false });
+      expect((await checkRateLimit(request(path), env))?.status).toBe(429);
     }
   });
 

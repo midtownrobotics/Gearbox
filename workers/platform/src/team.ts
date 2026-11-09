@@ -24,6 +24,8 @@ import {
   visibleNotifications,
 } from "./notifications";
 import { ALWAYS_ON, MANIFESTS, callHook, fetchExport, inLibrary, isAppName } from "./registry";
+import { seasonRoutes } from "./seasons";
+import { storageRoutes } from "./storage";
 import type { AppEnv } from "./types";
 
 // A team's apps (roadmap 4.2 to 4.4), for the team's own pages: the gateway sends
@@ -142,6 +144,8 @@ export const termsOutdated = (accepted: string | null) =>
   accepted === null || accepted < site.legal.termsRequired;
 
 export const teamRouter = new Hono<AppEnv>()
+  .route("/storage", storageRoutes)
+  .route("/seasons", seasonRoutes)
   // The terms the team's owner accepted, and whether the home page should ask them to accept the
   // current ones (a material change since). Only the owner is asked, never on a kiosk.
   .get("/terms", requireAuth, async (c) => {

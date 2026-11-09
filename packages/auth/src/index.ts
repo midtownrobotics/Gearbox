@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+export { type StorageCleanupMode, teamStorageMode } from "./storage-policy";
 import { TEAM_HEADER } from "./g3id";
 
 export interface SessionBindings {
@@ -49,6 +50,7 @@ export {
   SHOP_STORAGE_LIMIT,
   STORAGE_CLEANUP_RATIO,
   isStorageFileExpired,
+  storageCleanupTime,
   storageRetentionCutoff,
   StorageLimitError,
   type StorageEviction,
@@ -104,3 +106,23 @@ export {
   type AppSetting,
   defineManifest,
 } from "./manifest";
+
+export {
+  type StorageFile,
+  type StorageAllowance,
+  type StorageReport,
+  listStorageObjects,
+  storageFile,
+  storageEligibleAfter,
+  bucketStorageReport,
+  downloadStorageFile,
+} from "./storage-report";
+export { notifyStorageUsage } from "./storage-notice";
+
+export { storageArchive } from "./storage-archive";
+
+export {
+  storageArchiveParts,
+  storageArchiveSelection,
+  type StorageArchivePart,
+} from "./storage-parts";

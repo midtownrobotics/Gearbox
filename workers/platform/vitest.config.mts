@@ -332,14 +332,54 @@ function teamApp() {
   const seeded: string[] = [];
   const demoed: string[] = [];
   const failing = new Set<string>();
+  const storageReads = new Map<string, number>();
   return (request: Request) => {
     const path = new URL(request.url).pathname;
     if (path === "/api/internal/deleted") return Response.json(deleted);
     if (path === "/api/internal/seeded") return Response.json(seeded);
     if (path === "/api/internal/demoed") return Response.json(demoed);
+    const reads = path.match(/^\/api\/internal\/storage-reads\/([^/]+)$/);
+    if (reads) return Response.json({ count: storageReads.get(decodeURIComponent(reads[1])) ?? 0 });
+    const season = path.match(/^\/api\/internal\/teams\/([^/]+)\/seasons(.*)$/);
+    if (season)
+      return Response.json({
+        teamId: decodeURIComponent(season[1]),
+        path: season[2],
+        method: request.method,
+        year: new URL(request.url).searchParams.get("year"),
+      });
     // Its R2 storage hook (only Pit, Shop and Scouting have one): one 1 KiB file of the site team's.
     if (path === "/api/internal/storage") {
       return Response.json({ teams: { frc1648: { bytes: 1024, objects: 1 } } });
+    }
+    const storage = path.match(/^\/api\/internal\/teams\/([^/]+)\/storage(\/(download|archive))?$/);
+    if (storage) {
+      const id = decodeURIComponent(storage[1]);
+      if (!storage[2]) storageReads.set(id, (storageReads.get(id) ?? 0) + 1);
+      if (failing.has(id)) return Response.json({ error: "Down" }, { status: 503 });
+      if (!storage[2])
+        return Response.json({
+          checkedAt: 1,
+          cutoff: 1,
+          allowances: [
+            {
+              id: "files",
+              name: "Files",
+              bytes: 4,
+              byteLimit: 100,
+              count: 1,
+              countLimit: 10,
+              countLabel: "files",
+              files: [
+                { key: `teams/${id}/test`, name: "test", bytes: 4, uploadedAt: 1, eligible: true },
+              ],
+            },
+          ],
+        });
+      const key = new URL(request.url).searchParams.get("key");
+      if (storage[3] === "download" && key !== `teams/${id}/test`)
+        return new Response("Missing", { status: 404 });
+      return new Response(id, { headers: { "Content-Disposition": "attachment; filename=test" } });
     }
     const demo = path.match(/^\/api\/internal\/teams\/(.+)\/demo$/);
     if (demo && request.method === "POST") {

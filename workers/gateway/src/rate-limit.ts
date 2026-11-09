@@ -36,7 +36,7 @@ export async function checkRateLimit(
     }
     path = path.replace(/^\/api\/~[A-Za-z]+(?=\/|$)/, "/api");
     if (
-      /\/(auth|signup|slack|lookup|onshape|reports|export|import|sync|refresh|print|analysis|kiosk\/activate|monitor\/data)(\/|$)/i.test(
+      /\/(auth|signup|slack|lookup|onshape|reports|storage|storage-policy|seasons|export|import|sync|refresh|print|analysis|kiosk\/activate|monitor\/data)(\/|$)/i.test(
         path,
       ) &&
       !/^\/api\/auth\/(me|session)(\/|$)/.test(path)

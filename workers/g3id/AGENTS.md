@@ -2,6 +2,8 @@
 
 Sign-in for every team. Pages in `apps/g3id`, worker in `workers/g3id`. Members, kiosks, appearance and sign-in settings are edited on Portal's admin pages (`workers/portal/AGENTS.md`).
 
+- Team-wide file policy: migration `0024`, `team_storage_policy`; no row defaults to existing automatic deletion. `lib/storage-policy.ts` reads without writing. `GET`/`PUT /admin/team/storage-policy` use adminRouter's own-team and non-PIN checks; only actual changes log field labels and DM active connected admins, best effort. `GET /internal/teams/:teamId/storage-policy` is service-only, no-store. Team deletion clears the row. Portal Storage edits it; an off choice overrides automatic capacity deletion in Shop, Scouting and all Pit allowances, but not explicit deletion or app/team lifecycle retention. Tests: `test/storage-policy.test.ts`.
+
 ## Worker
 
 - RESTful routes at `/auth/*` for login flows

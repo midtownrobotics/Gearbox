@@ -1,19 +1,41 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import {
   SCOUTING_STORAGE_LIMIT,
+  type StorageCleanupMode,
   StorageLimitError,
   inTeam,
   notifyStorageCleanup,
+  notifyStorageUsage,
+  teamStorageMode,
   withStorageLimit,
 } from "@g3/auth";
 import { eq, inArray } from "drizzle-orm";
 import { createDb } from "./db";
-import { autoRoutines, fieldMaps, scoutingFormSubmissions } from "./db/schema";
+import { autoRoutines, fieldMaps, robotImages, scoutingFormSubmissions } from "./db/schema";
 import type { AppEnv } from "./types";
 
 export function scoutingStorageEviction(env: AppEnv["Bindings"], teamId: string) {
   return {
-    deleteOlderThanSixMonths: true,
+    deleteOldest: true,
+    policy: () => teamStorageMode(env, teamId),
+    usage: (
+      usage: { bytes: number; count: number },
+      attempted?: boolean,
+      mode?: StorageCleanupMode,
+      rearm?: boolean,
+    ) =>
+      notifyStorageUsage(
+        env,
+        teamId,
+        "scouting",
+        "files",
+        env.SCOUTING_DB,
+        usage,
+        { bytes: SCOUTING_STORAGE_LIMIT.bytes, count: SCOUTING_STORAGE_LIMIT.objects },
+        attempted,
+        mode,
+        rearm,
+      ),
     async removeReferences(objects: R2Object[]) {
       const db = createDb(env.SCOUTING_DB);
       for (let offset = 0; offset < objects.length; offset += 40) {
@@ -25,6 +47,9 @@ export function scoutingStorageEviction(env: AppEnv["Bindings"], teamId: string)
             .set({ image_r2_key: null, image_content_type: null })
             .where(inTeam(autoRoutines, teamId, inArray(autoRoutines.image_r2_key, keys))),
           db.delete(fieldMaps).where(inTeam(fieldMaps, teamId, inArray(fieldMaps.r2_key, keys))),
+          db
+            .delete(robotImages)
+            .where(inTeam(robotImages, teamId, inArray(robotImages.r2_key, keys))),
         ]);
         // Report IDs are in the object keys, so cleanup doesn't scan every report's JSON.
         const prefix = `teams/${encodeURIComponent(teamId)}/scouting-submissions/`;
@@ -36,7 +61,7 @@ export function scoutingStorageEviction(env: AppEnv["Bindings"], teamId: string)
                 key
                   .slice(prefix.length)
                   .split("/")[0]
-                  .replace(/\.png$/, ""),
+                  .replace(/\.(png|json)$/, ""),
               ),
           ),
         ];

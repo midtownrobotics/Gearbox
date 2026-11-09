@@ -6,6 +6,8 @@
 
 ## Request limits
 
+- Storage policy updates through `/team/storage/policy` and ID's `/admin/team/storage-policy` spend costly-route limits. Demo refuses both PUT paths before forwarding.
+
 - `src/rate-limit.ts` checks every non-local request before any team, icon, session or app fetch. Native bindings in `wrangler.toml` cap all requests, API reads, mutations and costly routes per connecting IP, plus an aggregate API ceiling. Cross-app aliases share quotas; missing or failed bindings fail closed. Thresholds, shared-network tradeoffs and billing limitations are in `RATE_LIMITS.md`. Add costly external integrations to the route classification; never describe these approximate, per-data-center counters as a hard spending cap.
 
 ## Team addresses in dev
@@ -13,3 +15,6 @@
 **Team addresses in dev (the gateway, roadmap 2.9):** `pnpm dev` also runs the gateway on 8796, with `gearbox.localhost` (`DEV_DOMAIN`) standing for the platform's domain: `http://gearbox.localhost:8796` is the platform (sign-up), `http://1648-id.gearbox.localhost:8796` the site team's G3ID, `http://<number>-<app>.gearbox.localhost:8796` any team's app, `http://<number>.gearbox.localhost:8796` its home, `http://admin.gearbox.localhost:8796` the console. It's a name under `localhost` because browsers send those to your machine, but not `localhost` itself: browsers won't share a `Domain=localhost` cookie across subdomains, and they do share `Domain=gearbox.localhost`, so one sign-in covers every app. `/api` goes to the app's local worker (with `X-Team-Id`, like production) and pages to its Vite server. Every link in dev stays local: pages get the gateway from the `siteConfig()` Vite plugin (`localGateway` in `@g3/site-config`), so `appUrl`, `teamAppUrl`, `allAppsUrl`, `platformUrl` and `consoleUrl` give dev-gateway addresses (production builds never do); G3ID and the platform get it as `LOCAL_GATEWAY_URL` (`teamAppUrlVia`, `platformUrlVia`, G3ID's `teamFrontend`/`teamUrl`). A team other than the site's only answers once it's signed up in the local platform database. The apps' own ports keep working as before. The gateway listens on 127.0.0.1: for curl, add `--resolve <host>:8796:127.0.0.1`.
 
 - `src/body-limit.ts` checks ordinary request bodies at 2 MiB before forwarding, including chunked bodies and misleading Content-Type headers. Actual file/printing routes, including cross-app aliases, retain their route-specific limits. Add a new upload route to its exemption list only when that route enforces a suitable file limit.
+
+- Storage counts and downloads (`/team/storage`, including aliases) spend the costly-route quota.
+- Season reviews, exports and resets (`/team/seasons`, including aliases) also spend the costly-route quota. The public demo blocks all season tools.

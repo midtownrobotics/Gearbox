@@ -2,12 +2,14 @@
 import {
   STORAGE_CLEANUP_RATIO,
   inTeam,
-  isStorageFileExpired,
   logTeamChange,
   notifyStorageCleanup,
+  notifyStorageUsage,
   requestTeamId,
   requireAuth,
   requireMentor,
+  storageCleanupTime,
+  teamStorageMode,
   withTeam,
   withTeamStorageLock,
 } from "@g3/auth";
@@ -433,6 +435,13 @@ export const scopeRoutes = new Hono<AppEnv>()
         (file) => !referenced.has(file.key) && !incomingKeys.has(file.key),
       );
       const unknownBytes = unreferenced.reduce((sum, file) => sum + file.size, 0);
+      const observedUsage = {
+        bytes: existing.reduce((n, a) => n + a.size, 0) + unknownBytes,
+        count: existing.length,
+      };
+      const incomingUsage = { bytes: total + unknownBytes, count: kept.length + found.length };
+      const allowance = { bytes: MAX_ASSET_BYTES, count: MAX_ASSETS };
+      const mode = await teamStorageMode(c.env, teamId);
       let projectedBytes = total + unknownBytes;
       let projectedAssets = kept.length + found.length;
       const evictedAssets: typeof existing = [];
@@ -442,28 +451,29 @@ export const scopeRoutes = new Hono<AppEnv>()
         const files = (JSON.parse(asset.files) as AssetFile[])
           .map((file) => byKey.get(assetKey(teamId, asset.name, file.name)))
           .filter((file): file is R2Object => Boolean(file));
-        // A recently changed physical file protects the whole asset even if its row is old.
-        if (
-          isStorageFileExpired(asset.uploadedAt) &&
-          files.every((file) => isStorageFileExpired(file.uploaded))
-        ) {
-          candidates.push({
-            time: Math.max(asset.uploadedAt, ...files.map((file) => file.uploaded.getTime())),
-            asset,
-          });
-        }
+        // Assets are removed as a unit; use their most recent physical save for ordering.
+        candidates.push({
+          time: Math.max(
+            storageCleanupTime(asset.uploadedAt),
+            ...files.map((file) => storageCleanupTime(file.uploaded)),
+          ),
+          asset,
+        });
       }
       for (const file of unreferenced)
-        if (isStorageFileExpired(file.uploaded))
-          candidates.push({ time: file.uploaded.getTime(), file });
+        candidates.push({ time: storageCleanupTime(file.uploaded), file });
       const needsCleanup = projectedBytes > MAX_ASSET_BYTES || projectedAssets > MAX_ASSETS;
-      if (needsCleanup) {
+      if (needsCleanup && mode === "delete-oldest") {
         const targetBytes = Math.max(
           Math.floor(MAX_ASSET_BYTES * STORAGE_CLEANUP_RATIO),
           incomingBytes,
         );
         const targetAssets = Math.max(Math.floor(MAX_ASSETS * STORAGE_CLEANUP_RATIO), found.length);
-        candidates.sort((a, b) => a.time - b.time);
+        candidates.sort(
+          (a, b) =>
+            a.time - b.time ||
+            (a.asset?.name ?? a.file?.key ?? "").localeCompare(b.asset?.name ?? b.file?.key ?? ""),
+        );
         for (const candidate of candidates) {
           if (projectedBytes <= targetBytes && projectedAssets <= targetAssets) break;
           if (candidate.asset) {
@@ -477,10 +487,23 @@ export const scopeRoutes = new Hono<AppEnv>()
         }
       }
       if (projectedBytes > MAX_ASSET_BYTES || projectedAssets > MAX_ASSETS) {
+        await notifyStorageUsage(
+          c.env,
+          teamId,
+          "pit",
+          "assets",
+          c.env.PIT_DB,
+          incomingUsage,
+          allowance,
+          true,
+          mode,
+        );
         return c.json(
           {
             error:
-              "Asset storage is full. Files from the last six months are protected; review them before choosing what to remove.",
+              mode === "delete-oldest"
+                ? "Asset storage is full. This upload cannot fit; review saved assets and try again."
+                : "Asset storage is full. Automatic cleanup is off or unavailable; download and remove assets to make room.",
           },
           409,
         );
@@ -514,7 +537,20 @@ export const scopeRoutes = new Hono<AppEnv>()
       const alreadyOver =
         existing.reduce((sum, asset) => sum + asset.size, 0) + unknownBytes > MAX_ASSET_BYTES ||
         existing.length > MAX_ASSETS;
-      if (alreadyOver) await cleanup();
+      if (alreadyOver) {
+        await notifyStorageUsage(
+          c.env,
+          teamId,
+          "pit",
+          "assets",
+          c.env.PIT_DB,
+          incomingUsage,
+          allowance,
+          true,
+          mode,
+        );
+        await cleanup();
+      }
       const now = Date.now();
       const userId = c.get("userId");
       for (const asset of found) {
@@ -561,6 +597,29 @@ export const scopeRoutes = new Hono<AppEnv>()
         what: "AdvantageScope assets",
         changed: ["Uploaded assets"],
       });
+      if (Math.max(observedUsage.bytes / MAX_ASSET_BYTES, observedUsage.count / MAX_ASSETS) < 0.85)
+        await notifyStorageUsage(
+          c.env,
+          teamId,
+          "pit",
+          "assets",
+          c.env.PIT_DB,
+          observedUsage,
+          allowance,
+          false,
+          mode,
+        );
+      await notifyStorageUsage(
+        c.env,
+        teamId,
+        "pit",
+        "assets",
+        c.env.PIT_DB,
+        incomingUsage,
+        allowance,
+        false,
+        mode,
+      );
       if (!alreadyOver) await cleanup();
       return c.json({ ok: true, assets: found.map((asset) => asset.name) });
     });

@@ -3,6 +3,7 @@ import { and, eq, lt, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 import { clearStorageCleanupNotice } from "./storage-notice";
+import type { StorageCleanupMode } from "./storage-policy";
 
 // Ephemeral coordination only; each adopting app adds the matching migration.
 const locks = sqliteTable("storage_upload_locks", {
@@ -122,13 +123,27 @@ export function isStorageFileExpired(uploaded: Date | number, now = Date.now()):
   return Number.isFinite(time) && time > 0 && time < storageRetentionCutoff(now);
 }
 
+/** Unknown dates sort last; deterministic key/id ties are supplied by the caller. */
+export function storageCleanupTime(uploaded: Date | number): number {
+  const time = uploaded instanceof Date ? uploaded.getTime() : uploaded;
+  return Number.isFinite(time) && time > 0 ? time : Number.POSITIVE_INFINITY;
+}
+
 export type StorageEviction = {
-  /** Automatically eligible only when strictly older than six calendar months. */
-  deleteOlderThanSixMonths?: boolean;
-  /** Exact file versions explicitly reviewed for deletion. Missing approval protects all files. */
+  /** Oldest first at capacity, including recent files when older files cannot reach the target. */
+  deleteOldest?: boolean;
+  /** Rechecked inside the quota lock before a counted save; unavailable disables automatic cleanup. */
+  policy?: () => Promise<StorageCleanupMode>;
+  /** Exact reviewed versions; without deleteOldest, other files remain protected. */
   approvedObjects?: ReadonlyMap<string, string>;
   /** Remove database references before the matching files are removed. */
   removeReferences: (objects: R2Object[]) => Promise<void>;
+  usage?: (
+    usage: { bytes: number; count: number },
+    attempted?: boolean,
+    mode?: StorageCleanupMode,
+    rearm?: boolean,
+  ) => Promise<void>;
   /** Best-effort admin notice after a successful cleanup. */
   notify?: (objects: R2Object[]) => Promise<void>;
 };
@@ -164,13 +179,28 @@ export async function withStorageLimit<T>(
     .where(
       and(
         eq(usage.teamId, teamId),
-        sql`${usage.bytes} + ${incomingBytes} <= ${Math.floor(limit.bytes * STORAGE_CLEANUP_RATIO)}`,
-        sql`${usage.objects} + ${incoming.length} <= ${Math.floor(limit.objects * STORAGE_CLEANUP_RATIO)}`,
+        sql`${usage.bytes} + ${incomingBytes} < ${Math.floor(limit.bytes * STORAGE_CLEANUP_RATIO)}`,
+        sql`${usage.objects} + ${incoming.length} < ${Math.floor(limit.objects * STORAGE_CLEANUP_RATIO)}`,
       ),
     )
-    .returning({ teamId: usage.teamId })
+    .returning({ bytes: usage.bytes, objects: usage.objects })
     .get();
-  if (reserved) return write();
+  if (reserved) {
+    const result = await write();
+    // This upper bound can safely rearm warnings below 85%; never send warnings from an estimate.
+    if (
+      (!(result instanceof Response) || result.ok) &&
+      reserved.bytes / limit.bytes < 0.85 &&
+      reserved.objects / limit.objects < 0.85
+    ) {
+      try {
+        await eviction?.usage?.({ bytes: reserved.bytes, count: reserved.objects });
+      } catch (error) {
+        console.error("[storage] usage notice failed", error);
+      }
+    }
+    return result;
+  }
 
   return withTeamStorageLock(database, teamId, async () => {
     // Saves that took the fast path meanwhile stay on top of the count made here.
@@ -179,10 +209,12 @@ export async function withStorageLimit<T>(
       .from(usage)
       .where(eq(usage.teamId, teamId))
       .get();
-    const cleanupEnabled = Boolean(
-      eviction?.approvedObjects?.size || eviction?.deleteOlderThanSixMonths,
-    );
-    const now = Date.now();
+    const mode: StorageCleanupMode = eviction?.policy
+      ? await eviction.policy()
+      : eviction?.deleteOldest
+        ? "delete-oldest"
+        : "block-uploads";
+    const cleanupEnabled = Boolean(eviction?.approvedObjects?.size || mode === "delete-oldest");
     let bytes = 0;
     let objects = 0;
     let originalBytes = 0;
@@ -201,7 +233,7 @@ export async function withStorageLimit<T>(
           bytes -= object.size;
           objects--;
         } else if (
-          (eviction?.deleteOlderThanSixMonths && isStorageFileExpired(object.uploaded, now)) ||
+          mode === "delete-oldest" ||
           (eviction?.approvedObjects?.has(object.key) &&
             eviction.approvedObjects.get(object.key) === object.etag)
         ) {
@@ -218,10 +250,23 @@ export async function withStorageLimit<T>(
     );
     bytes += incomingBytes;
     objects += incoming.length;
-    if (
-      (bytes > limit.bytes && (cleanupEnabled || bytes > originalBytes)) ||
-      (objects > limit.objects && (cleanupEnabled || objects > originalObjects))
-    ) {
+    const projected = { bytes, count: objects };
+    const reportUsage = async (attempted = false) => {
+      try {
+        await eviction?.usage?.(projected, attempted, mode);
+      } catch (error) {
+        console.error("[storage] usage notice failed", error);
+      }
+    };
+    const rearmAfterSave = async () => {
+      if (Math.max(originalBytes / limit.bytes, originalObjects / limit.objects) >= 0.85) return;
+      try {
+        await eviction?.usage?.({ bytes: originalBytes, count: originalObjects }, false, mode);
+      } catch (error) {
+        console.error("[storage] usage notice failed", error);
+      }
+    };
+    if (bytes > limit.bytes || objects > limit.objects) {
       if (
         eviction &&
         cleanupEnabled &&
@@ -229,7 +274,9 @@ export async function withStorageLimit<T>(
         incoming.length <= limit.objects
       ) {
         candidates.sort(
-          (a, b) => a.uploaded.getTime() - b.uploaded.getTime() || a.key.localeCompare(b.key),
+          (a, b) =>
+            storageCleanupTime(a.uploaded) - storageCleanupTime(b.uploaded) ||
+            a.key.localeCompare(b.key),
         );
         const removed: R2Object[] = [];
         // Count the incoming save in the target, and never evict the incoming files themselves.
@@ -267,6 +314,7 @@ export async function withStorageLimit<T>(
           };
           // Recover a previous incomplete cleanup before allowing any more growth.
           if (originalBytes > limit.bytes || originalObjects > limit.objects) {
+            await reportUsage(true);
             await cleanup();
             await adjustUsage(database, teamId, incomingBytes, incoming.length);
             return write();
@@ -274,16 +322,26 @@ export async function withStorageLimit<T>(
           await adjustUsage(database, teamId, incomingBytes, incoming.length);
           // A failed new save must not destroy old files to make room for nothing.
           const result = await write();
-          if (!(result instanceof Response) || result.ok) await cleanup();
+          if (!(result instanceof Response) || result.ok) {
+            await rearmAfterSave();
+            await reportUsage();
+            await cleanup();
+          }
           return result;
         }
       }
+      await reportUsage(true);
       throw new StorageLimitError(
-        `Your team's file storage is full (${limit.label} or ${limit.objects.toLocaleString("en-US")} files). Files from the last six months are protected. Review files before choosing what to remove.`,
+        `Your team's file storage is full (${limit.label} or ${limit.objects.toLocaleString("en-US")} files). ${mode === "unavailable" ? "Cleanup settings could not be checked; existing files were kept." : !cleanupEnabled ? "Automatic deletion is off; existing files were kept." : "This upload cannot fit."} Download and remove files to make room.`,
         "storage_full",
       );
     }
     await adjustUsage(database, teamId, incomingBytes, incoming.length);
-    return write();
+    const result = await write();
+    if (!(result instanceof Response) || result.ok) {
+      await rearmAfterSave();
+      await reportUsage();
+    }
+    return result;
   });
 }

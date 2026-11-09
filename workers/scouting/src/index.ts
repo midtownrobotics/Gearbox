@@ -32,8 +32,10 @@ import {
   teamComments as teamCommentsTable,
   tierLists,
 } from "./db/schema";
+import { drawingResponse, validateDrawingUpload } from "./drawing-storage";
 import { getEngagementSettings } from "./engagement";
 import { engagementRoutes } from "./engagement-routes";
+import { FIELD_DRAWING_TYPE } from "./field-drawing";
 import { internalRoutes } from "./internal";
 import { getManualMatches, manualRoutes, purgeExpiredManualEvents } from "./manual";
 import {
@@ -53,6 +55,7 @@ import { requireAuth } from "./middleware/auth";
 import { predictionsRoutes, settleConfiguredGame } from "./predictions";
 import { getG3IdUsers, isServiceHelper, isStrategyAdmin } from "./roles";
 import { assignmentCandidates } from "./scout-assignments";
+import { expireSeasonExports } from "./season-exports";
 import {
   type ServiceIssueType,
   describeServiceIssue,
@@ -1364,29 +1367,35 @@ app.post("/scouting-forms/:id/submissions", requireAuth, async (c) => {
     else cleanAnswers[field.id] = text(value, 3000);
   }
   const submissionId = id("submission");
-  const drawing = form.get("drawing");
+  let drawing = form.get("drawing");
   let drawingKey: string | null = null;
   let drawingType: string | null = null;
   const drawingFields: Record<string, { key: string; contentType: string }> = {};
   const uploads: { key: string; file: File }[] = [];
   if (drawing instanceof File && drawing.size > 0) {
-    if (!drawing.type.startsWith("image/") || drawing.size > 12 * 1024 * 1024)
-      return c.json({ error: "The field drawing must be an image under 12 MB." }, 400);
-    drawingKey = `teams/${encodeURIComponent(c.get("teamId"))}/scouting-submissions/${submissionId}.png`;
+    try {
+      drawing = await validateDrawingUpload(drawing);
+    } catch (error) {
+      return c.json({ error: (error as Error).message }, 400);
+    }
+    drawingKey = `teams/${encodeURIComponent(c.get("teamId"))}/scouting-submissions/${submissionId}.${drawing.type === FIELD_DRAWING_TYPE ? "json" : "png"}`;
     drawingType = drawing.type;
     uploads.push({ key: drawingKey, file: drawing });
   }
   for (const field of fields.filter((candidate) => candidate.type === "fieldMap")) {
     if (cleanAnswers[field.id] === "no-minimal-movement") continue;
-    const fieldDrawing = form.get(`drawing:${field.id}`);
+    let fieldDrawing = form.get(`drawing:${field.id}`);
     if (!(fieldDrawing instanceof File) || fieldDrawing.size === 0) {
       if (field.required || formDefinition.form_kind === "scouting")
         return c.json({ error: `${field.label} is required.` }, 400);
       continue;
     }
-    if (!fieldDrawing.type.startsWith("image/") || fieldDrawing.size > 12 * 1024 * 1024)
-      return c.json({ error: "Field drawings must be images under 12 MB." }, 400);
-    const key = `teams/${encodeURIComponent(c.get("teamId"))}/scouting-submissions/${submissionId}/${field.id}.png`;
+    try {
+      fieldDrawing = await validateDrawingUpload(fieldDrawing);
+    } catch (error) {
+      return c.json({ error: (error as Error).message }, 400);
+    }
+    const key = `teams/${encodeURIComponent(c.get("teamId"))}/scouting-submissions/${submissionId}/${field.id}.${fieldDrawing.type === FIELD_DRAWING_TYPE ? "json" : "png"}`;
     uploads.push({ key, file: fieldDrawing });
     drawingFields[field.id] = { key, contentType: fieldDrawing.type };
   }
@@ -1559,12 +1568,7 @@ app.get("/scouting-submissions/:id/drawing", requireAuth, async (c) => {
   if (!row?.drawing_r2_key) return c.json({ error: "Drawing not found." }, 404);
   const object = await c.env.FIELD_MAPS.get(row.drawing_r2_key);
   if (!object) return c.json({ error: "Drawing not found." }, 404);
-  return new Response(object.body, {
-    headers: {
-      "Content-Type": row.drawing_content_type ?? "image/png",
-      "Cache-Control": "private, max-age=300",
-    },
-  });
+  return drawingResponse(object, row.drawing_content_type ?? "image/png");
 });
 
 app.get("/scouting-submissions/:id/drawings/:fieldId", requireAuth, async (c) => {
@@ -1579,9 +1583,7 @@ app.get("/scouting-submissions/:id/drawings/:fieldId", requireAuth, async (c) =>
   if (!drawing) return c.json({ error: "Drawing not found." }, 404);
   const object = await c.env.FIELD_MAPS.get(drawing.key);
   if (!object) return c.json({ error: "Drawing not found." }, 404);
-  return new Response(object.body, {
-    headers: { "Content-Type": drawing.contentType, "Cache-Control": "private, max-age=300" },
-  });
+  return drawingResponse(object, drawing.contentType);
 });
 
 app.get("/tier-lists", requireAuth, async (c) => {
@@ -2021,17 +2023,22 @@ app.post("/field-maps", requireAuth, async (c) => {
     return c.json({ error: "You do not have permission to share field maps." }, 403);
   }
   const form = await c.req.formData();
-  const image = form.get("image");
+  let image = form.get("image");
   const name = text(form.get("name"), 120);
-  if (!(image instanceof File) || !image.type.startsWith("image/") || !name) {
+  if (!(image instanceof File) || !name) {
     return c.json({ error: "A name and image are required." }, 400);
   }
-  if (image.size > 12 * 1024 * 1024) {
+  if (image instanceof File && image.size > 12 * 1024 ** 2)
     return c.json({ error: "Images must be smaller than 12 MB." }, 413);
+  try {
+    image = await validateDrawingUpload(image, true);
+  } catch (error) {
+    return c.json({ error: (error as Error).message }, 400);
   }
 
   const recordId = id("map");
-  const extension = image.type === "image/jpeg" ? "jpg" : "png";
+  const extension =
+    image.type === FIELD_DRAWING_TYPE ? "json" : image.type === "image/jpeg" ? "jpg" : "png";
   const key = `teams/${encodeURIComponent(c.get("teamId"))}/field-maps/${recordId}.${extension}`;
   return storeScoutingFiles(c.env, c.get("teamId"), [{ key, file: image }], async () => {
     const now = Date.now();
@@ -2068,12 +2075,7 @@ app.get("/field-maps/:id/image", requireAuth, async (c) => {
   if (!map) return c.json({ error: "Map not found." }, 404);
   const object = await c.env.FIELD_MAPS.get(map.r2_key);
   if (!object) return c.json({ error: "Image not found." }, 404);
-  return new Response(object.body, {
-    headers: {
-      "Content-Type": map.content_type,
-      "Cache-Control": "private, max-age=300",
-    },
-  });
+  return drawingResponse(object, map.content_type);
 });
 
 app.delete("/field-maps/:id", requireAuth, async (c) => {
@@ -2123,12 +2125,15 @@ app.post("/autos", requireAuth, async (c) => {
   const autoTeam = rawTeam ? teamNumber(rawTeam) : "";
   if (rawTeam && !autoTeam) return c.json({ error: "Team must be a valid team number." }, 400);
 
-  const image = form.get("image");
-  if (image instanceof File && !image.type.startsWith("image/")) {
-    return c.json({ error: "The optional upload must be an image." }, 400);
-  }
-  if (image instanceof File && image.size > 12 * 1024 * 1024) {
+  let image = form.get("image");
+  if (image instanceof File && image.size > 12 * 1024 ** 2)
     return c.json({ error: "Images must be smaller than 12 MB." }, 413);
+  if (image instanceof File && image.size > 0) {
+    try {
+      image = await validateDrawingUpload(image);
+    } catch (error) {
+      return c.json({ error: (error as Error).message }, 400);
+    }
   }
 
   const recordId = id("auto");
@@ -2136,7 +2141,8 @@ app.post("/autos", requireAuth, async (c) => {
   let imageKey: string | null = null;
   let imageContentType: string | null = null;
   if (image instanceof File && image.size > 0) {
-    const extension = image.type === "image/jpeg" ? "jpg" : "png";
+    const extension =
+      image.type === FIELD_DRAWING_TYPE ? "json" : image.type === "image/jpeg" ? "jpg" : "png";
     imageKey = `teams/${encodeURIComponent(c.get("teamId"))}/auto-images/${recordId}.${extension}`;
     imageContentType = image.type;
   }
@@ -2184,12 +2190,7 @@ app.get("/autos/:id/image", requireAuth, async (c) => {
   if (!auto?.image_r2_key) return c.json({ error: "Image not found." }, 404);
   const object = await c.env.FIELD_MAPS.get(auto.image_r2_key);
   if (!object) return c.json({ error: "Image not found." }, 404);
-  return new Response(object.body, {
-    headers: {
-      "Content-Type": auto.image_content_type ?? "image/png",
-      "Cache-Control": "private, max-age=300",
-    },
-  });
+  return drawingResponse(object, auto.image_content_type ?? "image/png");
 });
 
 app.delete("/autos/:id", requireAuth, async (c) => {
@@ -2427,5 +2428,6 @@ export default {
   fetch: withApiPrefix(worker.fetch),
   scheduled: (_event: ScheduledController, env: AppEnv["Bindings"], ctx: ExecutionContext) => {
     ctx.waitUntil(settleConfiguredGame(env, purgeExpiredManualEvents));
+    ctx.waitUntil(expireSeasonExports(env));
   },
 };

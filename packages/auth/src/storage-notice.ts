@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { eq } from "drizzle-orm";
+import { teamAppUrl } from "@g3/site-config";
+import { and, eq, lt } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
-import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core";
 import { logTeamChange } from "./audit";
 import { activeMembers, sendMemberDM } from "./members";
+import type { StorageCleanupMode } from "./storage-policy";
 
 const notices = sqliteTable("storage_cleanup_notices", {
   teamId: text("team_id").primaryKey(),
@@ -16,6 +18,82 @@ const notices = sqliteTable("storage_cleanup_notices", {
 
 export async function clearStorageCleanupNotice(database: D1Database, teamId: string) {
   await drizzle(database).delete(notices).where(eq(notices.teamId, teamId));
+  await drizzle(database).delete(usageNotices).where(eq(usageNotices.teamId, teamId));
+}
+
+const usageNotices = sqliteTable(
+  "storage_usage_notices",
+  {
+    teamId: text("team_id").notNull(),
+    allowance: text("allowance").notNull(),
+    level: integer("level").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.teamId, t.allowance] })],
+);
+
+/** Atomic high-water claim: cleanup to 90% doesn't rearm warnings. Below 85% starts a new cycle. */
+export async function notifyStorageUsage(
+  env: { G3ID: Fetcher },
+  teamId: string,
+  app: string,
+  allowance: string,
+  database: D1Database,
+  usage: { bytes: number; count: number },
+  limit: { bytes?: number | null; count: number },
+  attempted = false,
+  mode: StorageCleanupMode = "delete-oldest",
+  rearm = true,
+) {
+  try {
+    const db = drizzle(database);
+    const ratio = Math.max(limit.bytes ? usage.bytes / limit.bytes : 0, usage.count / limit.count);
+    if (ratio < 0.85) {
+      if (!rearm) return;
+      await db
+        .update(usageNotices)
+        .set({ level: 0 })
+        .where(and(eq(usageNotices.teamId, teamId), eq(usageNotices.allowance, allowance)));
+      return;
+    }
+    const level = ratio >= 1 ? 100 : ratio >= 0.95 ? 95 : ratio >= 0.9 ? 90 : 0;
+    if (!level) return;
+    const claim = await db
+      .insert(usageNotices)
+      .values({ teamId, allowance, level })
+      .onConflictDoUpdate({
+        target: [usageNotices.teamId, usageNotices.allowance],
+        set: { level },
+        setWhere: lt(usageNotices.level, level),
+      })
+      .returning()
+      .get();
+    if (!claim) return;
+    const size = (bytes: number) => `${(bytes / 1024 ** 2).toFixed(1)} MiB`;
+    const action =
+      mode === "block-uploads"
+        ? "Automatic deletion is off for this allowance. Existing files stay; uploads that exceed this allowance are blocked. Download and remove files to make room."
+        : mode === "unavailable"
+          ? "Cleanup settings could not be checked. Existing files stay; uploads that exceed this allowance are blocked until settings can be checked or space is freed."
+          : "When a save exceeds the cap, files over six months old are removed first, then the oldest remaining files if needed to reach 90% usage. Recent files may also be permanently deleted.";
+    const summary = `${app === "shop" ? "Shop" : app === "pit" ? "Pit" : "Scouting"} ${allowance} storage ${attempted ? "would reach" : "reached"} ${level}% of its allowance (${usage.count} of ${limit.count}${limit.bytes ? `; ${size(usage.bytes)} of ${size(limit.bytes)}` : ""}). ${action} [Storage](${teamAppUrl(teamId, "portal")}/admin/storage)`;
+    await logTeamChange(env, teamId, {
+      userId: null,
+      app,
+      what: "Storage usage warning",
+      changed: [summary],
+    });
+    const admins = (await activeMembers(env, teamId))?.filter((member) => member.isAdmin) ?? [];
+    for (let offset = 0; offset < admins.length; offset += 100) {
+      await sendMemberDM(
+        env,
+        teamId,
+        admins.slice(offset, offset + 100).map((member) => member.id),
+        summary,
+      );
+    }
+  } catch (error) {
+    console.error("[storage] usage notice failed", error);
+  }
 }
 
 /** No filenames or member data leave the app: only totals and upload dates, to its own admins. */
@@ -79,7 +157,7 @@ export async function notifyStorageCleanup(
         env,
         teamId,
         admins.slice(offset, offset + 100).map((admin) => admin.id),
-        `${app === "shop" ? "Shop" : app === "pit" ? "Pit" : "Scouting"} storage cleanup: ${summary} This deletion is permanent. Download files you want to keep before the cap is reached.`,
+        `${app === "shop" ? "Shop" : app === "pit" ? "Pit" : "Scouting"} storage cleanup: ${summary} This deletion is permanent. Download files you want to keep from [Storage](${teamAppUrl(teamId, "portal")}/admin/storage) before the cap is reached.`,
       );
     }
   } catch (error) {

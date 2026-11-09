@@ -2,12 +2,15 @@
 import {
   clearTeamStorageLock,
   deleteTeamRows,
+  downloadStorageFile,
   exportTeamRows,
   inTeam,
   logTeamChange,
   requireAdmin,
   requireAuth,
   settingLabels,
+  storageArchive,
+  storageArchiveSelection,
   storageByTeam,
   storageLimitResponse,
   teamExport,
@@ -52,6 +55,7 @@ import {
   withResults,
 } from "./monitor-matches";
 import { SETTING_KEYS, type SettingKey, getSetting, getWhenFull, teamNumberOf } from "./settings";
+import { pitStorageReport } from "./storage-report";
 import type { AppEnv } from "./types";
 
 // The Monitor's outside services (The Blue Alliance, Nexus, Statbotics) get this long to answer.
@@ -210,6 +214,28 @@ const app = base
   // pit/teams/<team>/), for the operators' console. Counts only.
   .get("/internal/storage", async (c) =>
     c.json({ teams: await storageByTeam(c.env.LOGS, "pit/teams/") }),
+  )
+  .get("/internal/teams/:teamId/storage", async (c) =>
+    c.json(await pitStorageReport(c.env, c.req.param("teamId"))),
+  )
+  .get("/internal/teams/:teamId/storage/archive", async (c) => {
+    const report = await pitStorageReport(c.env, c.req.param("teamId"));
+    const files = report.allowances
+      .filter((a) => !c.req.query("allowance") || a.id === c.req.query("allowance"))
+      .flatMap((a) => a.files)
+      .filter((f) => c.req.query("eligible") !== "1" || f.eligible);
+    return storageArchive(
+      c.env.LOGS,
+      storageArchiveSelection(files, c.req.query("from"), c.req.query("to")),
+      "pit-files",
+    );
+  })
+  .get("/internal/teams/:teamId/storage/download", (c) =>
+    downloadStorageFile(
+      c.env.LOGS,
+      `pit/teams/${c.req.param("teamId")}/`,
+      c.req.query("key") ?? "",
+    ),
   )
   .get("/internal/teams/:teamId/export", async (c) => {
     const teamId = c.req.param("teamId");

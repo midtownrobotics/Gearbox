@@ -5,6 +5,8 @@
   "private": true,
   "exports": {
     ".": "./src/index.ts",
+    "./field-drawing": "./src/field-drawing.ts",
+    "./field-drawing-svg": "./src/field-drawing-svg.ts",
     "./manifest": "./src/manifest.ts",
     "./service-issues": "./src/service-issues.ts"
   },

@@ -21,7 +21,7 @@ To update the downloader, stop it (Ctrl+C), run `git pull` in its Gearbox folder
 
 Logs lists every log by event, for anyone signed in to download. Admins delete them.
 
-- Each team keeps at most 20 logs. On Logs, choose what happens when you're full: **Don't save new ones** (the default), or **Delete the oldest over six months old**. Logs from the last six months are never deleted to make room: new ones wait on the downloader until you delete some.
+- Each team keeps at most 20 logs. On Logs, choose what happens when you're full: **Don't save new ones** (the default), or **Delete the oldest logs**. With cleanup on, logs over six months old go first, followed by the oldest remaining logs if needed to reach 18 stored logs. Recent logs can also be removed. The team-wide **Keep files and stop uploads at the cap** choice on the home's **Admin → Storage** page overrides this: logs stay on the downloader and automatic deletion stops.
 - A log over 40 MB (compressed) waits on the laptop until it's trimmed. The downloader's page can trim a log to the part you need, and suggests from just before the robot was first enabled to just after it was last disabled. The file on the laptop is never cut.
 - When Pit already has a different copy of a log (same match, another size), the downloader keeps its copy on the laptop and doesn't upload it. To replace Pit's copy, delete it on Logs, then choose **Upload again** on the downloader's page.
 - **Export and delete all** downloads everything as one zip, then offers to delete them.
@@ -31,10 +31,10 @@ Logs lists every log by event, for anyone signed in to download. Admins delete t
 **Open AdvantageScope** on Logs, or **Open in AdvantageScope** beside a log, opens Mechanical Advantage's AdvantageScope in Pit, with your team's match logs to choose from at the top. Its layout is saved for the whole team. It can't connect to the robot live: use the Driver Station's AdvantageScope for that.
 
 - **Save all to this device** keeps AdvantageScope and every log on this computer or tablet, so they open without a connection at an event. Logs you've opened are kept too, marked **On this device**.
-- **AdvantageScope assets** lists the fields and robot models your team uploaded in AdvantageScope (**File** › **Upload Asset**). Mentors and admins upload and remove them, up to 100 MB and 10 assets in all. When those caps would be exceeded, only assets over six months old are removed, aiming for 90 MB and 9 assets. Newer files remain protected and uploads pause when there is not enough eligible old data.
+- **AdvantageScope assets** lists the fields and robot models your team uploaded in AdvantageScope (**File** › **Upload Asset**). Mentors and admins upload and remove them, up to 100 MB and 10 assets in all. When those caps would be exceeded, assets over six months old go first, then the oldest remaining assets if needed, aiming for 90 MB and 9 assets. Recent assets can also be removed. Each asset is removed as a group, ordered by its most recent saved file. With team-wide automatic deletion off, existing assets stay and new uploads stop at the allowance.
 
 This is in beta.
 
 Up to three logs can upload at once. If a log upload takes more than 30 minutes, the downloader starts it again. Your completed logs stay available.
 
-Download files you want to keep beyond six months. Admins receive grouped cleanup summaries with the amount removed and the files' upload dates and age.
+Download files you want to keep before reaching the cap. Admins receive grouped cleanup summaries with the amount removed and the files' upload dates and age.

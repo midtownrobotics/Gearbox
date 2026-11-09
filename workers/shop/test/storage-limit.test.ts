@@ -147,10 +147,11 @@ describe("team storage quotas", () => {
     expect(usage).toEqual({ bytes: 80, objects: 1 });
   });
 
-  it("lets teams already over quota replace a file with a smaller one", async () => {
+  it("keeps over-quota files and blocks replacements until the result fits the cap", async () => {
     const team = newTeamId();
     await bucket.put(`teams/${team}/old`, "x".repeat(150));
-    await store(team, "old", 140);
-    await expect(store(team, "old", 141)).rejects.toMatchObject({ code: "storage_full" });
+    await expect(store(team, "old", 140)).rejects.toMatchObject({ code: "storage_full" });
+    expect((await bucket.head(`teams/${team}/old`))?.size).toBe(150);
+    await store(team, "old", 100);
   });
 });

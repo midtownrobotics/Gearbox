@@ -13,8 +13,8 @@ export type SettingKey = (typeof SETTING_KEYS)[number];
 
 /**
  * What Pit does with a new match log once the team has MAX_LOGS (match-logs.ts): `skip-new`
- * leaves it on the downloader (the default), `delete-oldest` deletes the oldest logs over six
- * months old to make room (never a newer one). Mentors and admins choose on the Logs page.
+ * leaves it on the downloader (the default), `delete-oldest` removes oldest logs, including
+ * recent ones, toward 90%. The team-wide storage choice overrides this when deletion is off.
  */
 export const WHEN_FULL = ["skip-new", "delete-oldest"] as const;
 export type WhenFull = (typeof WHEN_FULL)[number];

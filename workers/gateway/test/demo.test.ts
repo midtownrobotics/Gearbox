@@ -19,6 +19,16 @@ const send = (url: string, method: string, body: unknown, ip = "203.0.113.1") =>
   });
 
 describe("the public demo", () => {
+  it("refuses team storage policy changes through both public API addresses", async () => {
+    for (const url of [
+      `${demo("")}/api/~platform/team/storage/policy`,
+      `${demo("id")}/api/admin/team/storage-policy`,
+    ]) {
+      const response = await send(url, "PUT", { automaticDeletion: false });
+      expect(response.status).toBe(403);
+      expect(await response.json()).toMatchObject({ code: "demo" });
+    }
+  });
   it("leads demo.<platform> to the demo team's home", async () => {
     const res = await gateway(`https://demo.${site.platformDomain}/`, { redirect: "manual" });
     expect(res.status).toBe(302);
