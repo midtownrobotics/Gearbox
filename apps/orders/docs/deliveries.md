@@ -9,6 +9,7 @@ pages: /receiving
 
 - **Tracking:** mentors add tracking numbers to an order. The page links to the carrier.
 - **Mark received:** anyone signed in marks parts received when they open the box. Change the quantity if only some arrived.
+- **Send back to cart:** if a part wasn't really ordered, a mentor can send it back to its vendor's cart on Carts. It's approved again and stops counting against the budget until it's marked placed. An order with nothing left on it is removed, along with its shipping and tax.
 
 ## Putting parts into Inventory
 
