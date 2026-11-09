@@ -22,9 +22,10 @@ const request = (path: string, method = "GET") =>
   });
 
 describe("gateway rate limits", () => {
-  it("applies the expensive-request limit to season reviews, exports and resets", async () => {
+  it("applies the expensive-request limit to storage policy changes and season tools", async () => {
     for (const path of [
       "/api/~platform/team/seasons/scouting?year=2024",
+      "/api/~id/admin/team/storage-policy",
       "/api/~platform/team/seasons/scouting/exports/id/0/archive",
       "/api/~platform/team/seasons/scouting/exports/id/0/reset",
     ]) {

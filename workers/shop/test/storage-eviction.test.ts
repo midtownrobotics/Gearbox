@@ -24,6 +24,7 @@ async function reviewedEviction(team: string) {
   return {
     ...shopStorageEviction(bindings, team),
     deleteOldest: false,
+    policy: undefined,
     approvedObjects: new Map(page.objects.map((file) => [file.key, file.etag])),
   };
 }
@@ -128,7 +129,7 @@ describe("reviewed storage cleanup", () => {
         [{ key: `${prefix}new`, bytes: 5 }],
         limit,
         () => bucket.put(`${prefix}new`, "new"),
-        { ...shopStorageEviction(bindings, team), deleteOldest: false },
+        { ...shopStorageEviction(bindings, team), deleteOldest: false, policy: undefined },
       ),
     ).rejects.toMatchObject({ code: "storage_full" });
     expect((await bucket.head(`${prefix}valuable-old`))?.size).toBe(100);

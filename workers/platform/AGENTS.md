@@ -1,5 +1,7 @@
 # Platform: sign-up, console, app library, reports
 
+- `src/storage.ts`: admin-only `GET`/`PUT /team/storage/policy` forwards identity to ID's `/admin/team/storage-policy`, forces a boolean-only body and invalidates the team's named v2 storage-count cache on success. It never accepts a caller-chosen team. Counts cache up to 60 seconds; policy is read separately without cache so the page immediately reflects a saved choice. Public demo refuses changes.
+
 - Season tools: `src/seasons.ts`, mounted at `/team/seasons/scouting`, forwards only allowlisted review/export/archive/reset routes over `SCOUTING` with the authenticated team. All require `requireAuth` + `requireAdmin` (never PIN); GET never writes. POST archive requests and successful reset parts log field labels via `logTeamChange`. No-store responses; retained data remains accessible when Scouting is off. Demo refuses these tools.
 
 ## Sign-up and the console

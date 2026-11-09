@@ -9,6 +9,7 @@ import {
   requireAuth,
   requireMentor,
   storageCleanupTime,
+  teamStorageMode,
   withTeam,
   withTeamStorageLock,
 } from "@g3/auth";
@@ -110,6 +111,7 @@ export const matchLogRoutes = new Hono<AppEnv>()
     return c.json({
       logs,
       limit: MAX_LOGS,
+      automaticDeletion: (await teamStorageMode(c.env, teamId)) === "delete-oldest",
       whenFull: await getWhenFull(db, teamId),
       canManage: c.get("userIsMentor") || c.get("userIsAdmin"),
       // Deleting logs is for admins only.
@@ -301,7 +303,11 @@ export const logUploadRoutes = new Hono<AppEnv>()
         .from(matchLogs)
         .where(inTeam(matchLogs, teamId, eq(matchLogs.status, "stored")));
       // Only a team that chose to delete the oldest has logs that may make room.
-      const deleting = (await getWhenFull(db, teamId)) === "delete-oldest";
+      const teamMode = await teamStorageMode(c.env, teamId);
+      const deleting =
+        teamMode === "delete-oldest" && (await getWhenFull(db, teamId)) === "delete-oldest";
+      const mode =
+        teamMode === "unavailable" ? "unavailable" : deleting ? "delete-oldest" : "block-uploads";
       await notifyStorageUsage(
         c.env,
         teamId,
@@ -310,6 +316,9 @@ export const logUploadRoutes = new Hono<AppEnv>()
         c.env.PIT_DB,
         { bytes: 0, count: stored.length },
         { count: MAX_LOGS },
+        false,
+        mode,
+        false,
       );
       const candidates = stored
         .filter(() => deleting)
@@ -507,7 +516,11 @@ export const logUploadRoutes = new Hono<AppEnv>()
         .from(matchLogs)
         .where(inTeam(matchLogs, teamId, eq(matchLogs.status, "stored")));
       // Only a team that chose to delete the oldest has logs that may make room.
-      const deleting = (await getWhenFull(db, teamId)) === "delete-oldest";
+      const teamMode = await teamStorageMode(c.env, teamId);
+      const deleting =
+        teamMode === "delete-oldest" && (await getWhenFull(db, teamId)) === "delete-oldest";
+      const mode =
+        teamMode === "unavailable" ? "unavailable" : deleting ? "delete-oldest" : "block-uploads";
       await notifyStorageUsage(
         c.env,
         teamId,
@@ -516,6 +529,9 @@ export const logUploadRoutes = new Hono<AppEnv>()
         c.env.PIT_DB,
         { bytes: 0, count: stored.length },
         { count: MAX_LOGS },
+        false,
+        mode,
+        false,
       );
       const candidates = stored
         .filter(() => deleting)
@@ -557,8 +573,22 @@ export const logUploadRoutes = new Hono<AppEnv>()
         "pit",
         "logs",
         c.env.PIT_DB,
+        { bytes: 0, count: stored.length },
+        { count: MAX_LOGS },
+        false,
+        mode,
+      );
+
+      await notifyStorageUsage(
+        c.env,
+        teamId,
+        "pit",
+        "logs",
+        c.env.PIT_DB,
         { bytes: 0, count: stored.length + 1 },
         { count: MAX_LOGS },
+        false,
+        mode,
       );
       if (stored.length + 1 > MAX_LOGS) {
         const removed = candidates.slice(

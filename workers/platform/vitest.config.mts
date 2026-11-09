@@ -328,11 +328,14 @@ function teamApp() {
   const seeded: string[] = [];
   const demoed: string[] = [];
   const failing = new Set<string>();
+  const storageReads = new Map<string, number>();
   return (request: Request) => {
     const path = new URL(request.url).pathname;
     if (path === "/api/internal/deleted") return Response.json(deleted);
     if (path === "/api/internal/seeded") return Response.json(seeded);
     if (path === "/api/internal/demoed") return Response.json(demoed);
+    const reads = path.match(/^\/api\/internal\/storage-reads\/([^/]+)$/);
+    if (reads) return Response.json({ count: storageReads.get(decodeURIComponent(reads[1])) ?? 0 });
     const season = path.match(/^\/api\/internal\/teams\/([^/]+)\/seasons(.*)$/);
     if (season)
       return Response.json({
@@ -348,6 +351,7 @@ function teamApp() {
     const storage = path.match(/^\/api\/internal\/teams\/([^/]+)\/storage(\/(download|archive))?$/);
     if (storage) {
       const id = decodeURIComponent(storage[1]);
+      if (!storage[2]) storageReads.set(id, (storageReads.get(id) ?? 0) + 1);
       if (failing.has(id)) return Response.json({ error: "Down" }, { status: 503 });
       if (!storage[2])
         return Response.json({

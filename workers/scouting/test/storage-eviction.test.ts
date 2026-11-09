@@ -19,6 +19,31 @@ const bindings = env as unknown as AppEnv["Bindings"];
 const db = createDb(bindings.SCOUTING_DB);
 
 describe("Scouting image cleanup", () => {
+  it("blocks new image growth and keeps existing files when the team disables automatic deletion", async () => {
+    const team = newTeamId();
+    const prefix = `teams/${team}/`;
+    await bindings.G3ID.fetch(`http://g3id/api/internal/teams/${team}/storage-policy`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ automaticDeletion: false }),
+    });
+    const key = `${prefix}existing.png`;
+    await bindings.FIELD_MAPS.put(key, "x".repeat(100));
+    await expect(
+      withStorageLimit(
+        bindings.SCOUTING_DB,
+        bindings.FIELD_MAPS,
+        team,
+        prefix,
+        [{ key: `${prefix}new.png`, bytes: 10 }],
+        { bytes: 100, objects: 10, label: "test" },
+        () => bindings.FIELD_MAPS.put(`${prefix}new.png`, "x".repeat(10)),
+        scoutingStorageEviction(bindings, team),
+      ),
+    ).rejects.toMatchObject({ code: "storage_full" });
+    expect((await bindings.FIELD_MAPS.head(key))?.size).toBe(100);
+    expect(await bindings.FIELD_MAPS.head(`${prefix}new.png`)).toBeNull();
+  });
   it("removes an evicted recent robot photo from the gallery while keeping the robot profile", async () => {
     const team = newTeamId();
     const prefix = `teams/${team}/`;

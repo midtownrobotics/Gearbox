@@ -16,6 +16,19 @@ Content-Type headers. Known file and printing routes retain separate limits.
 
 ## Oldest first and the 90% target
 
+Admins choose a team-wide capacity policy on Portal Storage: **Delete oldest files toward 90%
+usage** (existing default), or **Keep files and stop uploads at the cap**. The latter disables
+automatic deletion across Shop, Scouting, Pit assets and logs. Uploads above either hard limit
+are refused without removing files. Reads never create default settings. ID migration 0024
+stores the team-owned choice; only non-kiosk admins may change it. Actual changes log field
+labels and notify active connected admins once. Manual deletion, confirmed season resets,
+app-off retention and team deletion are separate. Cleanup already running may finish.
+
+Workers never cache permission to delete. An unavailable or malformed policy response disables
+automatic cleanup and blocks growth at the cap. Shared quota writes check under the team lock;
+Pit checks logs on start and completion, and assets before cleanup. Policy changes invalidate the
+team's v2 storage-report cache, and the page reads the policy without caching.
+
 Shop and Scouting count actual R2 objects under the team's prefix, including orphaned objects.
 Replacements spend only their size difference. All existing files can participate in capacity
 cleanup; incoming/replacement keys are excluded. Server upload timestamps determine order, with
@@ -57,6 +70,10 @@ another cleanup occurs at least one hour later. There is no hourly timer or emai
 Threshold warnings at 90%, 95% and 100% use the higher byte/count utilization. Atomic claims
 suppress duplicates until actual usage below 85% rearms the cycle on a later save. Cleanup toward
 90% does not rearm alerts. Delivery is best effort, and warning text explains recent-file fallback.
+
+Warnings remain enabled in keep-files mode and explicitly explain blocked uploads. They use the
+same effective policy as the save. Mode changes never reset threshold claims; refused attempts
+below 85% also do not rearm them. Only a successful save observing usage below 85% rearms a cycle.
 The platform knows the Gearbox team owner's account ID; G3ID holds their email, which is not
 necessarily a chat workspace owner's email. Storage APIs expose no email addresses.
 
@@ -84,6 +101,9 @@ They use development-only sample data, with no live team writes.
 Required migrations remain Shop 0026-0029, Scouting 0039-0043, and Pit 0019-0022. No migration is
 rewritten or added for oldest-file fallback. Season exports/reset have a separate verified-backup
 workflow. Team deletion, app-off retention and public-demo lifecycle rules are unchanged.
+
+The team-wide choice additionally requires **ID 0024**. Apply its migration and deploy ID before
+the file-storing workers, then Platform and Portal, before announcing the new control.
 
 Before changing live retention for existing teams, honor the notice period in the current Terms
 of Service and publish the matching retention notice. This PR does not deploy workers or send

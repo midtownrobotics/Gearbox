@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import {
   SCOUTING_STORAGE_LIMIT,
+  type StorageCleanupMode,
   StorageLimitError,
   inTeam,
   notifyStorageCleanup,
   notifyStorageUsage,
+  teamStorageMode,
   withStorageLimit,
 } from "@g3/auth";
 import { eq, inArray } from "drizzle-orm";
@@ -15,7 +17,13 @@ import type { AppEnv } from "./types";
 export function scoutingStorageEviction(env: AppEnv["Bindings"], teamId: string) {
   return {
     deleteOldest: true,
-    usage: (usage: { bytes: number; count: number }, attempted?: boolean) =>
+    policy: () => teamStorageMode(env, teamId),
+    usage: (
+      usage: { bytes: number; count: number },
+      attempted?: boolean,
+      mode?: StorageCleanupMode,
+      rearm?: boolean,
+    ) =>
       notifyStorageUsage(
         env,
         teamId,
@@ -25,6 +33,8 @@ export function scoutingStorageEviction(env: AppEnv["Bindings"], teamId: string)
         usage,
         { bytes: SCOUTING_STORAGE_LIMIT.bytes, count: SCOUTING_STORAGE_LIMIT.objects },
         attempted,
+        mode,
+        rearm,
       ),
     async removeReferences(objects: R2Object[]) {
       const db = createDb(env.SCOUTING_DB);

@@ -5,6 +5,7 @@ import {
   listStorageObjects,
   storageFile,
   storageRetentionCutoff,
+  teamStorageMode,
 } from "@g3/auth";
 import { eq } from "drizzle-orm";
 import { MAX_ASSETS, MAX_ASSET_BYTES, scopePrefix } from "./advantagescope";
@@ -20,7 +21,7 @@ export async function pitStorageReport(
 ): Promise<StorageReport> {
   const checkedAt = Date.now();
   const db = createDb(env.PIT_DB);
-  const [logs, assets, objects, whenFull] = await Promise.all([
+  const [logs, assets, objects, whenFull, mode] = await Promise.all([
     db
       .select()
       .from(matchLogs)
@@ -28,8 +29,12 @@ export async function pitStorageReport(
     db.select().from(scopeAssets).where(inTeam(scopeAssets, teamId)),
     listStorageObjects(env.LOGS, scopePrefix(teamId)),
     getWhenFull(db, teamId),
+    teamStorageMode(env, teamId),
   ]);
-  const files = objects.map((object) => storageFile(object, scopePrefix(teamId), checkedAt));
+  const files = objects.map((object) => ({
+    ...storageFile(object, scopePrefix(teamId), checkedAt),
+    eligible: mode === "delete-oldest",
+  }));
   const byKey = new Map(files.map((file) => [file.key, file]));
   const referenced = new Set<string>();
   for (const asset of assets) {
@@ -47,7 +52,7 @@ export async function pitStorageReport(
       : null;
     for (const { file, size } of members)
       if (file) {
-        file.eligible = true;
+        file.eligible = mode === "delete-oldest";
         file.bytes = size;
         file.uploadedAt = groupTime;
         file.eligibleAfter = null;
@@ -56,6 +61,7 @@ export async function pitStorageReport(
   return {
     checkedAt,
     cutoff: storageRetentionCutoff(checkedAt),
+    cleanupMode: mode,
     allowances: [
       {
         id: "logs",
@@ -65,7 +71,8 @@ export async function pitStorageReport(
         count: logs.length,
         countLimit: MAX_LOGS,
         countLabel: "logs",
-        cleanupEnabled: whenFull === "delete-oldest",
+        cleanupEnabled: mode === "delete-oldest" && whenFull === "delete-oldest",
+        cleanupConfigured: whenFull === "delete-oldest",
         files: logs.map((log) => ({
           key: log.r2Key,
           name: log.r2Key.slice(logsPrefix(teamId).length),
@@ -73,7 +80,7 @@ export async function pitStorageReport(
           uploadedAt:
             (log.uploadedAt ?? log.createdAt) > 0 ? (log.uploadedAt ?? log.createdAt) : null,
           eligibleAfter: null,
-          eligible: whenFull === "delete-oldest",
+          eligible: mode === "delete-oldest" && whenFull === "delete-oldest",
         })),
       },
       {
@@ -86,6 +93,7 @@ export async function pitStorageReport(
         count: assets.length,
         countLimit: MAX_ASSETS,
         countLabel: "assets",
+        cleanupEnabled: mode === "delete-oldest",
         files,
       },
     ],

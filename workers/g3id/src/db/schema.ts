@@ -21,6 +21,15 @@ export const teams = sqliteTable("teams", {
   updatedAt: integer("updated_at").notNull(),
 });
 
+/** Team-wide file cleanup choice; an absent row keeps the existing automatic-cleanup default. */
+export const teamStoragePolicy = sqliteTable("team_storage_policy", {
+  teamId: text("team_id")
+    .primaryKey()
+    .references(() => teams.id, { onDelete: "cascade" }),
+  automaticDeletion: integer("automatic_deletion", { mode: "boolean" }).notNull().default(true),
+  updatedAt: integer("updated_at").notNull(),
+});
+
 /** One presentation record per team; the current deployment reads only its configured team key. */
 export const teamUiSettings = sqliteTable("team_ui_settings", {
   teamId: text("team_id").primaryKey(),

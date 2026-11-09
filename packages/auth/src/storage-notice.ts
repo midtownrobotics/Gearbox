@@ -5,6 +5,7 @@ import { drizzle } from "drizzle-orm/d1";
 import { integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core";
 import { logTeamChange } from "./audit";
 import { activeMembers, sendMemberDM } from "./members";
+import type { StorageCleanupMode } from "./storage-policy";
 
 const notices = sqliteTable("storage_cleanup_notices", {
   teamId: text("team_id").primaryKey(),
@@ -40,11 +41,14 @@ export async function notifyStorageUsage(
   usage: { bytes: number; count: number },
   limit: { bytes?: number | null; count: number },
   attempted = false,
+  mode: StorageCleanupMode = "delete-oldest",
+  rearm = true,
 ) {
   try {
     const db = drizzle(database);
     const ratio = Math.max(limit.bytes ? usage.bytes / limit.bytes : 0, usage.count / limit.count);
     if (ratio < 0.85) {
+      if (!rearm) return;
       await db
         .update(usageNotices)
         .set({ level: 0 })
@@ -65,7 +69,13 @@ export async function notifyStorageUsage(
       .get();
     if (!claim) return;
     const size = (bytes: number) => `${(bytes / 1024 ** 2).toFixed(1)} MiB`;
-    const summary = `${app === "shop" ? "Shop" : app === "pit" ? "Pit" : "Scouting"} ${allowance} storage ${attempted ? "would reach" : "reached"} ${level}% of its allowance (${usage.count} of ${limit.count}${limit.bytes ? `; ${size(usage.bytes)} of ${size(limit.bytes)}` : ""}). Download files you want to keep from Portal → Admin → Storage. ${app === "pit" && allowance === "logs" ? "Pit follows the choice on Logs: when cleanup is enabled, the oldest logs may be removed toward 90%, including recent logs; otherwise new logs wait on the downloader." : "When a save exceeds the cap, files over six months old are removed first, then the oldest remaining files if needed to reach 90% usage. Recent files may also be permanently deleted."}`;
+    const action =
+      mode === "block-uploads"
+        ? "Automatic deletion is off for this allowance. Existing files stay; uploads that exceed this allowance are blocked. Download and remove files to make room."
+        : mode === "unavailable"
+          ? "Cleanup settings could not be checked. Existing files stay; uploads that exceed this allowance are blocked until settings can be checked or space is freed."
+          : "When a save exceeds the cap, files over six months old are removed first, then the oldest remaining files if needed to reach 90% usage. Recent files may also be permanently deleted.";
+    const summary = `${app === "shop" ? "Shop" : app === "pit" ? "Pit" : "Scouting"} ${allowance} storage ${attempted ? "would reach" : "reached"} ${level}% of its allowance (${usage.count} of ${limit.count}${limit.bytes ? `; ${size(usage.bytes)} of ${size(limit.bytes)}` : ""}). ${action} [Storage](${teamAppUrl(teamId, "portal")}/admin/storage)`;
     await logTeamChange(env, teamId, {
       userId: null,
       app,

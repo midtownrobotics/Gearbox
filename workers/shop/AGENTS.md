@@ -25,6 +25,7 @@
 
 ## Storage safeguards
 
+- Team-wide capacity policy comes from ID via `teamStorageMode` in `@g3/auth`, with no cached deletion permission. Off/unavailable preserves files and refuses uploads above the hard cap; manual/lifecycle deletion remains separate. Shared quota saves check inside the team lock; Pit logs check start and completion, and assets check before cleanup. Warnings carry the effective mode, retain 90/95/100 deduplication and rearm only after a successful save observes usage below 85%. Rejected requests and policy changes do not rearm alerts.
 - Caps: 5 GiB / 10,000 objects per team; 100 MiB per file. At cap, delete oldest first toward 90%, including recent files when older files cannot reach the target. Unknown dates sort last. Orphaned objects count toward quotas and participate in oldest-first cleanup.
 - The shared engine uses `deleteOldest` and targets 90% after the incoming save; dates over six calendar months naturally sort before younger files. Incoming/replacement keys stay. Exact object-version approvals remain supported for reviewed operations; no upload route supplies them. Existing manual review/download/delete controls remain.
 - Migrations: 0026 (locks), 0027 (notices), 0028 (usage estimate: saves keeping it below 90% skip the lock). Per-team coordination prevents concurrent quota races; cleanup notices, after actual oldest-first/reviewed file deletion, are best effort and batched. See `docs/storage-limits.md`.

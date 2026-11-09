@@ -1,5 +1,7 @@
 # The public demo (roadmap Phase 5)
 
+- `DEMO_BLOCKED` refuses policy PUTs on Platform's `/team/storage/policy` and ID's `/admin/team/storage-policy`; visitors cannot change retention or trigger policy-change chat messages.
+
 - `DEMO_BLOCKED` refuses `/team/seasons/*` on Platform, including export and reset, so visitors cannot clear a shared season or consume backup resources.
 
 - **Team 9999** (`site.demo` in site.ts: its number, "Gearbox Demo" and its time zone; `demoTeamId`, `isDemoTeam`, `isDemoPage`, `demoUrl` in `@g3/site-config`; 9999 is FIRST's own placeholder team), at the usual addresses (`9999-orders.<platform>`, its home `9999.<platform>`), and `demo.<platform>` redirects there (the gateway). Sign-up and number reports refuse the number. No migration holds it: the platform's reset makes its row and switches on every app open to all teams.

@@ -8,11 +8,14 @@ import {
   Card,
   Dialog,
   ErrorBanner,
+  Field,
   Loading,
   Page,
   ProgressBar,
+  SuccessBanner,
   TextField,
   buttonClass,
+  inputClass,
   tones,
 } from "@g3/ui";
 import { useCallback, useEffect, useState } from "react";
@@ -137,8 +140,8 @@ function Allowance({
       </p>
       {a.cleanupEnabled === false && (
         <p className="mt-2 text-sm text-secondary-600">
-          Automatic cleanup is off for logs. New logs wait when full. A mentor or admin can change
-          this on the Logs page in Pit.
+          Automatic deletion is off or paused for this allowance. Existing files stay and uploads
+          stop at the cap. Pit logs also follow the choice on Logs.
         </p>
       )}
       <div className="mt-4 flex flex-wrap gap-2">
@@ -259,14 +262,29 @@ export function StoragePage({ preview = false }: { preview?: boolean }) {
   const [apps, setApps] = useState<AppStorage[] | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [automaticDeletion, setAutomaticDeletion] = useState<boolean | null>(null);
+  const [choice, setChoice] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [confirmCleanup, setConfirmCleanup] = useState(false);
+  const [success, setSuccess] = useState("");
   const refresh = useCallback(async () => {
     setLoading(true);
     setError("");
+    setAutomaticDeletion(null);
     try {
       if (preview && import.meta.env.DEV) {
         const { storagePreview } = await import("./storage-preview");
         setApps(storagePreview());
-      } else setApps((await platform<{ apps: AppStorage[] }>("/team/storage")).apps);
+        setAutomaticDeletion(true);
+        setChoice(true);
+      } else
+        await Promise.all([
+          platform<{ apps: AppStorage[] }>("/team/storage").then((data) => setApps(data.apps)),
+          platform<{ automaticDeletion: boolean }>("/team/storage/policy").then((policy) => {
+            setAutomaticDeletion(policy.automaticDeletion);
+            setChoice(policy.automaticDeletion);
+          }),
+        ]);
     } catch (reason) {
       setError((reason as Error).message);
     } finally {
@@ -276,12 +294,37 @@ export function StoragePage({ preview = false }: { preview?: boolean }) {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+  const savePolicy = async () => {
+    if (preview || automaticDeletion === null) return;
+    setSaving(true);
+    setError("");
+    setSuccess("");
+    setConfirmCleanup(false);
+    try {
+      const policy = await platform<{ automaticDeletion: boolean }>("/team/storage/policy", {
+        method: "PUT",
+        body: { automaticDeletion: choice },
+      });
+      setAutomaticDeletion(policy.automaticDeletion);
+      setChoice(policy.automaticDeletion);
+      setSuccess(
+        policy.automaticDeletion
+          ? "Automatic file deletion is on."
+          : "Automatic file deletion is off. Uploads stop at each allowance's cap.",
+      );
+      await refresh();
+    } catch (reason) {
+      setError((reason as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  };
   return (
     <Page
       title="Storage"
       description="Check your team's usage and download files you want to keep."
       actions={
-        <Button variant="secondary" disabled={loading} onClick={() => void refresh()}>
+        <Button variant="secondary" disabled={loading || saving} onClick={() => void refresh()}>
           {loading ? "Checking…" : "Refresh usage"}
         </Button>
       }
@@ -293,11 +336,56 @@ export function StoragePage({ preview = false }: { preview?: boolean }) {
           </p>
         </Card>
       )}
+      {error && <ErrorBanner message={error} />}
+      {success && <SuccessBanner message={success} />}
+      <Card title="When storage is full">
+        <Field label="Your team's file policy">
+          <select
+            className={`${inputClass} max-w-full`}
+            disabled={loading || saving || automaticDeletion === null}
+            value={choice ? "delete-oldest" : "block-uploads"}
+            onChange={(event) => setChoice(event.target.value === "delete-oldest")}
+          >
+            <option value="delete-oldest">Delete oldest files toward 90% usage</option>
+            <option value="block-uploads">Keep files and stop uploads at the cap</option>
+          </select>
+        </Field>
+        <p className="mt-3 text-sm text-secondary-600">
+          {choice
+            ? "Files over six months old go first, followed by the oldest remaining files, including recent files. Pit logs still follow the choice on Logs."
+            : "Keep existing files in Shop, Scouting, and Pit. Uploads that would exceed an allowance are blocked until you remove files. This also overrides automatic Pit log deletion."}
+        </p>
+        <p className="mt-2 text-sm text-secondary-600">
+          Applies to new uploads. Cleanup already in progress may finish. Manual deletion, season
+          resets, and app retention still apply.
+        </p>
+        <p className="mt-2 text-sm text-secondary-600">
+          Admins receive 90%, 95%, and 100% warnings in either mode. Changing this choice does not
+          restart those warnings. A changed choice is recorded in the Log and announced through
+          connected chat.
+        </p>
+        <div className="mt-4">
+          <Button
+            disabled={
+              preview ||
+              loading ||
+              saving ||
+              automaticDeletion === null ||
+              choice === automaticDeletion
+            }
+            onClick={() => (choice ? setConfirmCleanup(true) : void savePolicy())}
+          >
+            {saving ? "Saving…" : "Save file policy"}
+          </Button>
+        </div>
+      </Card>
       <Card title="Keep a copy before cleanup">
         <p className="text-sm text-secondary-700">
-          When a new save exceeds a cap, files older than six months are removed first. If needed,
-          cleanup continues with the oldest remaining files toward 90% usage, including recent
-          files. Deletion is permanent. Pit match logs follow the team's choice on Logs.
+          {automaticDeletion === null
+            ? "Cleanup settings are being checked. If they cannot be checked, uploads keep existing files and stop at the cap."
+            : automaticDeletion
+              ? "When a new save exceeds a cap, files over six months old are removed first, then the oldest remaining files toward 90% usage, including recent files. Deletion is permanent."
+              : "Automatic deletion is off. Existing files stay; download and remove files to make room before an allowance fills up."}
         </p>
         <p className="mt-2 text-sm text-secondary-600">
           Admins receive warnings at 90%, 95%, and 100% on the team's connected chat. Each warning
@@ -324,22 +412,58 @@ export function StoragePage({ preview = false }: { preview?: boolean }) {
           Export and reset
         </Link>
       </Card>
-      {error && <ErrorBanner message={error} />}
       {!apps && loading && <Loading />}
       {apps?.map((app) => (
         <div key={app.slug} className="space-y-6">
           {app.error && <ErrorBanner message={`${app.name}: ${app.error}`} />}
-          {app.report?.allowances.map((allowance) => (
-            <Allowance key={allowance.id} app={app.slug} allowance={allowance} preview={preview} />
-          ))}
+          {app.report?.cleanupMode === "unavailable" && (
+            <ErrorBanner
+              message={`${app.name}: cleanup settings could not be checked. Files were kept at the last check.`}
+            />
+          )}
+          {app.report?.allowances.map((allowance) => {
+            const enabled =
+              automaticDeletion === true &&
+              (allowance.cleanupConfigured ??
+                (app.slug === "pit" && allowance.id === "logs"
+                  ? allowance.cleanupEnabled !== false
+                  : true));
+            return (
+              <Allowance
+                key={allowance.id}
+                app={app.slug}
+                allowance={{
+                  ...allowance,
+                  cleanupEnabled: enabled,
+                  files: allowance.files.map((file) => ({ ...file, eligible: enabled })),
+                }}
+                preview={preview}
+              />
+            );
+          })}
           {app.report && (
             <p className="text-xs text-secondary-500">
-              {app.name} checked {date(app.report.checkedAt)}. Files are removed oldest first when
-              this allowance fills up.
+              {app.name} checked {date(app.report.checkedAt)}.
             </p>
           )}
         </div>
       ))}
+      {confirmCleanup && (
+        <Dialog title="Turn on automatic deletion?" onClose={() => setConfirmCleanup(false)}>
+          <p className="text-sm text-secondary-700">
+            When storage exceeds a cap, the oldest files may be permanently deleted toward 90%
+            usage, including recent files. Download anything you want to keep.
+          </p>
+          <div className="mt-5 flex justify-end gap-2">
+            <Button variant="secondary" onClick={() => setConfirmCleanup(false)}>
+              Cancel
+            </Button>
+            <Button variant="danger" disabled={saving} onClick={() => void savePolicy()}>
+              Turn on automatic deletion
+            </Button>
+          </div>
+        </Dialog>
+      )}
     </Page>
   );
 }

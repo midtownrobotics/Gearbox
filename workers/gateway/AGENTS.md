@@ -6,6 +6,8 @@
 
 ## Request limits
 
+- Storage policy updates through `/team/storage/policy` and ID's `/admin/team/storage-policy` spend costly-route limits. Demo refuses both PUT paths before forwarding.
+
 - `src/rate-limit.ts` checks every non-local request before any team, icon, session or app fetch. Native bindings in `wrangler.toml` cap all requests, API reads, mutations and costly routes per connecting IP, plus an aggregate API ceiling. Cross-app aliases share quotas; missing or failed bindings fail closed. Thresholds, shared-network tradeoffs and billing limitations are in `RATE_LIMITS.md`. Add costly external integrations to the route classification; never describe these approximate, per-data-center counters as a hard spending cap.
 
 ## Team addresses in dev

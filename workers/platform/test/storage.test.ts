@@ -5,6 +5,57 @@ import { call, callAs } from "@g3/testing/worker";
 import { describe, expect, it } from "vitest";
 
 describe("team Storage page API", () => {
+  it("protects policy reads and writes and scopes changes to the signed-in team", async () => {
+    const a = teamUsers(newTeamId());
+    const b = teamUsers(newTeamId());
+    for (const method of ["GET", "PUT"]) {
+      expect((await call("/api/team/storage/policy", { method })).status).toBe(401);
+      for (const user of [a.student, a.mentor, { ...a.admin, sessionType: "pin" as const }])
+        expect((await callAs(user, "/api/team/storage/policy", { method })).status).toBe(403);
+    }
+    const response = await callAs(a.admin, "/api/team/storage/policy", {
+      method: "PUT",
+      body: { automaticDeletion: false, teamId: b.teamId },
+    });
+    expect(response.status).toBe(200);
+    expect(await (await callAs(a.admin, "/api/team/storage/policy")).json()).toEqual({
+      automaticDeletion: false,
+    });
+    expect(await (await callAs(b.admin, "/api/team/storage/policy")).json()).toEqual({
+      automaticDeletion: true,
+    });
+    expect(
+      (
+        await callAs(a.admin, "/api/team/storage/policy", {
+          method: "PUT",
+          body: { automaticDeletion: "false" },
+        })
+      ).status,
+    ).toBe(400);
+  });
+  it("invalidates cached storage reports after saving the policy", async () => {
+    const users = teamUsers(newTeamId());
+    const shop = (env as unknown as { SHOP: Fetcher }).SHOP;
+    await callAs(users.admin, "/api/team/storage");
+    await callAs(users.admin, "/api/team/storage");
+    const reads = async () =>
+      (
+        (await (
+          await shop.fetch(`http://shop/api/internal/storage-reads/${users.teamId}`)
+        ).json()) as { count: number }
+      ).count;
+    expect(await reads()).toBe(1);
+    expect(
+      (
+        await callAs(users.admin, "/api/team/storage/policy", {
+          method: "PUT",
+          body: { automaticDeletion: false },
+        })
+      ).status,
+    ).toBe(200);
+    await callAs(users.admin, "/api/team/storage");
+    expect(await reads()).toBe(2);
+  });
   it("requires an admin, including for file downloads", async () => {
     const users = teamUsers(newTeamId());
     for (const path of [

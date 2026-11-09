@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { SCOUTING_STORAGE_LIMIT, bucketStorageReport, inTeam } from "@g3/auth";
+import { SCOUTING_STORAGE_LIMIT, bucketStorageReport, inTeam, teamStorageMode } from "@g3/auth";
 import { inArray } from "drizzle-orm";
 import { createDb } from "./db";
 import { autoRoutines, fieldMaps, robotImages, scoutingFormSubmissions } from "./db/schema";
@@ -9,7 +9,9 @@ export async function scoutingStorageReport(env: AppEnv["Bindings"], teamId: str
   const db = createDb(env.SCOUTING_DB);
   const prefix = `teams/${encodeURIComponent(teamId)}/`;
   const [report, autos, maps, photos] = await Promise.all([
-    bucketStorageReport(env.FIELD_MAPS, prefix, "Scouting files", SCOUTING_STORAGE_LIMIT),
+    teamStorageMode(env, teamId).then((mode) =>
+      bucketStorageReport(env.FIELD_MAPS, prefix, "Scouting files", SCOUTING_STORAGE_LIMIT, mode),
+    ),
     db
       .select({ key: autoRoutines.image_r2_key, name: autoRoutines.name })
       .from(autoRoutines)

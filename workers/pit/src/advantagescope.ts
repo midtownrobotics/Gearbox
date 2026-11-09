@@ -9,6 +9,7 @@ import {
   requireAuth,
   requireMentor,
   storageCleanupTime,
+  teamStorageMode,
   withTeam,
   withTeamStorageLock,
 } from "@g3/auth";
@@ -440,15 +441,7 @@ export const scopeRoutes = new Hono<AppEnv>()
       };
       const incomingUsage = { bytes: total + unknownBytes, count: kept.length + found.length };
       const allowance = { bytes: MAX_ASSET_BYTES, count: MAX_ASSETS };
-      await notifyStorageUsage(
-        c.env,
-        teamId,
-        "pit",
-        "assets",
-        c.env.PIT_DB,
-        observedUsage,
-        allowance,
-      );
+      const mode = await teamStorageMode(c.env, teamId);
       let projectedBytes = total + unknownBytes;
       let projectedAssets = kept.length + found.length;
       const evictedAssets: typeof existing = [];
@@ -470,7 +463,7 @@ export const scopeRoutes = new Hono<AppEnv>()
       for (const file of unreferenced)
         candidates.push({ time: storageCleanupTime(file.uploaded), file });
       const needsCleanup = projectedBytes > MAX_ASSET_BYTES || projectedAssets > MAX_ASSETS;
-      if (needsCleanup) {
+      if (needsCleanup && mode === "delete-oldest") {
         const targetBytes = Math.max(
           Math.floor(MAX_ASSET_BYTES * STORAGE_CLEANUP_RATIO),
           incomingBytes,
@@ -503,11 +496,14 @@ export const scopeRoutes = new Hono<AppEnv>()
           incomingUsage,
           allowance,
           true,
+          mode,
         );
         return c.json(
           {
             error:
-              "Asset storage is full. This upload cannot fit; review saved assets and try again.",
+              mode === "delete-oldest"
+                ? "Asset storage is full. This upload cannot fit; review saved assets and try again."
+                : "Asset storage is full. Automatic cleanup is off or unavailable; download and remove assets to make room.",
           },
           409,
         );
@@ -551,6 +547,7 @@ export const scopeRoutes = new Hono<AppEnv>()
           incomingUsage,
           allowance,
           true,
+          mode,
         );
         await cleanup();
       }
@@ -600,6 +597,18 @@ export const scopeRoutes = new Hono<AppEnv>()
         what: "AdvantageScope assets",
         changed: ["Uploaded assets"],
       });
+      if (Math.max(observedUsage.bytes / MAX_ASSET_BYTES, observedUsage.count / MAX_ASSETS) < 0.85)
+        await notifyStorageUsage(
+          c.env,
+          teamId,
+          "pit",
+          "assets",
+          c.env.PIT_DB,
+          observedUsage,
+          allowance,
+          false,
+          mode,
+        );
       await notifyStorageUsage(
         c.env,
         teamId,
@@ -608,6 +617,8 @@ export const scopeRoutes = new Hono<AppEnv>()
         c.env.PIT_DB,
         incomingUsage,
         allowance,
+        false,
+        mode,
       );
       if (!alreadyOver) await cleanup();
       return c.json({ ok: true, assets: found.map((asset) => asset.name) });

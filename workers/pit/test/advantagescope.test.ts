@@ -12,6 +12,47 @@ import { MAX_ASSETS, MAX_ASSET_BYTES, MAX_UPLOAD, bundledAsset } from "../src/ad
 const bucket = (env as unknown as { LOGS: R2Bucket }).LOGS;
 
 describe("unknown asset files", () => {
+  it("keeps every asset at capacity when the team-wide policy blocks automatic deletion", async () => {
+    const team = teamUsers(newTeamId());
+    const database = (env as unknown as { PIT_DB: D1Database }).PIT_DB;
+    await (env as unknown as { G3ID: Fetcher }).G3ID.fetch(
+      `http://g3id/api/internal/teams/${team.teamId}/storage-policy`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ automaticDeletion: false }),
+      },
+    );
+    for (let index = 0; index < MAX_ASSETS; index++)
+      await database
+        .prepare(
+          "INSERT INTO scope_assets (team_id, name, files, config, size, uploaded_by, uploaded_at) VALUES (?, ?, '[]', '{}', 1, ?, 1)",
+        )
+        .bind(team.teamId, `Robot_${index}`, team.mentor.id)
+        .run();
+    const key = `pit/teams/${team.teamId}/scope-assets/Robot_0/model.glb`;
+    await bucket.put(key, "keep");
+    const response = await callAs(team.mentor, "/scope/assets", {
+      method: "POST",
+      body: uploadForm(
+        "Field2d_New.zip",
+        await makeZip([
+          { path: "config.json", text: "{}" },
+          { path: "image.png", text: "new" },
+        ]),
+      ),
+    });
+    expect(response.status).toBe(409);
+    expect(await (await bucket.get(key))?.text()).toBe("keep");
+    expect(
+      (
+        await database
+          .prepare("SELECT name FROM scope_assets WHERE team_id = ?")
+          .bind(team.teamId)
+          .all()
+      ).results,
+    ).toHaveLength(MAX_ASSETS);
+  });
   it("falls back to recent asset files when needed to reach 90%", async () => {
     const team = teamUsers(newTeamId());
     const database = (env as unknown as { PIT_DB: D1Database }).PIT_DB;

@@ -44,6 +44,48 @@ async function downloader() {
 }
 
 describe("multipart storage limits", () => {
+  it("honors the team-wide stop-deletion setting between upload start and completion", async () => {
+    const client = await downloader();
+    await database
+      .prepare(
+        "INSERT INTO settings (team_id, key, value) VALUES (?, 'matchLogsWhenFull', 'delete-oldest')",
+      )
+      .bind(client.team)
+      .run();
+    const part = async (id: number) =>
+      (
+        await call(`/downloader/logs/${id}/parts/1`, {
+          method: "PUT",
+          headers: client.headers,
+          body: "12345",
+        })
+      ).json();
+    const complete = (id: number, uploaded: unknown) =>
+      call(`/downloader/logs/${id}/complete`, {
+        method: "POST",
+        headers: client.headers,
+        body: JSON.stringify({ parts: [uploaded] }),
+      });
+    for (let number = 1; number <= MAX_LOGS; number++) {
+      const { id } = (await (await client.start(number)).json()) as { id: number };
+      expect((await complete(id, await part(id))).status).toBe(200);
+    }
+    const { id } = (await (await client.start(MAX_LOGS + 1)).json()) as { id: number };
+    const uploaded = await part(id);
+    await (env as unknown as { G3ID: Fetcher }).G3ID.fetch(
+      `http://g3id/api/internal/teams/${client.team}/storage-policy`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ automaticDeletion: false }),
+      },
+    );
+    expect((await complete(id, uploaded)).status).toBe(409);
+    expect((await client.start(MAX_LOGS + 2)).status).toBe(409);
+    expect((await bucket.list({ prefix: `pit/teams/${client.team}/logs/` })).objects).toHaveLength(
+      MAX_LOGS,
+    );
+  });
   it("does not overwrite a saved log when a downloader offers a different size", async () => {
     const client = await downloader();
     const { id } = (await (await client.start(1)).json()) as { id: number };

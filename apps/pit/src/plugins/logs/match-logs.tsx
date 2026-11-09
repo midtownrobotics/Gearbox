@@ -78,7 +78,7 @@ function Storage({
           </p>
           <p className="text-secondary-500">
             {full
-              ? data.whenFull === "skip-new"
+              ? data.whenFull === "skip-new" || data.automaticDeletion === false
                 ? "Pit is full: new logs stay on the downloader until you delete some here."
                 : "Pit is full: a new log removes the oldest logs toward 90% usage, including recent logs. Download logs you want to keep."
               : `Pit keeps up to ${data.limit} logs.`}
@@ -130,12 +130,19 @@ function Storage({
         <fieldset className="mt-4 border-t border-secondary-200 pt-4">
           <legend className="sr-only">When Pit has {data.limit} logs</legend>
           <p className="mb-2 text-sm text-secondary-600">When Pit has {data.limit} logs:</p>
+          {data.automaticDeletion === false && (
+            <p className="mb-3 text-sm text-secondary-600">
+              Automatic file deletion is off for your team or could not be checked. New logs stay on
+              the downloader at capacity. A team admin can change this on Storage.
+            </p>
+          )}
           <div className="flex flex-wrap gap-x-5 gap-y-2">
             {WHEN_FULL.map((choice) => (
               <label key={choice.value} className="flex items-center gap-2 text-sm">
                 <input
                   type="radio"
                   name="when-full"
+                  disabled={data.automaticDeletion === false}
                   checked={data.whenFull === choice.value}
                   onChange={async () => {
                     try {

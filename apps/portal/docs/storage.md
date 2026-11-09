@@ -8,6 +8,17 @@ access: admin
 
 Open **Admin → Storage** to check your team's files in Shop, Scouting, and Pit. Each allowance shows its size and file or item count. Pit match logs and AdvantageScope assets have separate allowances. Use **Refresh usage** to check again; counts may be up to one minute old. An app that cannot be checked shows an error rather than zero usage.
 
+## Choose what happens at the cap
+
+Under **When storage is full**, choose your team's file policy and **Save file policy**:
+
+- **Delete oldest files toward 90% usage** keeps the existing cleanup behavior. Files over six months old go first, then the oldest remaining files, including recent ones. Turning this on asks for confirmation.
+- **Keep files and stop uploads at the cap** disables automatic capacity deletion across Shop, Scouting, Pit assets, and Pit logs. Uploads that would exceed an allowance are blocked until you download and remove files. Files are not removed just because the allowance is full.
+
+The setting applies to new uploads; cleanup already running may finish. Manual deletion, confirmed season resets, app-off retention and team deletion still apply. Pit's own **Delete the oldest logs** choice works only while team-wide automatic deletion is on. Only an admin signed in with their own account can change the team policy, not a kiosk PIN or mentor.
+
+Actual changes are recorded in the team's Log and announced to active admins through connected chat. Saving the same choice again sends no new change notice. Usage warnings at 90%, 95%, and 100% remain on in either mode and explain the current behavior. Switching modes does not restart that warning cycle. If cleanup settings cannot be checked, existing files stay and uploads stop at the cap.
+
 ## Which files may be removed
 
 **May be removed** means a file can be permanently deleted when a new save exceeds that allowance. Files appear oldest first. Files over six months old go first; if needed, cleanup continues with the oldest remaining files, including recent ones, toward 90% usage. Files with unknown dates are considered last. AdvantageScope assets are removed as a group, ordered by their most recent saved file.
@@ -32,7 +43,7 @@ Files retained after switching an app off can still be downloaded here during it
 
 Active admins receive a message through the team's connected Slack or Discord when an allowance reaches **90%, 95%, or 100%**, based on whichever of size or item count is closest to its limit. A save that would exceed the cap can also trigger the 100% warning. A jump across multiple thresholds sends the highest warning once. Warnings are also recorded in the team's Log.
 
-Each threshold is reported once until usage drops **below 85%**. Automatic cleanup toward 90% does not restart the warning cycle. The next save observes manual removals and rearms warnings if enough space was freed. Usage warnings follow saves or refused saves, without needing this page open.
+Each threshold is reported once until usage drops **below 85%**. Automatic cleanup toward 90% does not restart the warning cycle. A successful save observes usage below 85% and rearms warnings. Repeated rejected uploads and changing the policy do not restart the warning cycle. Usage warnings follow saves or refused saves, without needing this page open.
 
 Cleanup summaries arrive after actual deletions: the first immediately, then at most once an hour when another cleanup happens. Chat delivery is best effort; teams without connected chat can still check Storage and the Log. These messages are separate from the announcement settings on Notifications.
 

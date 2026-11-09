@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { storageRetentionCutoff } from "./storage-limit";
+import type { StorageCleanupMode } from "./storage-policy";
 
 export type StorageFile = {
   key: string;
@@ -18,9 +19,15 @@ export type StorageAllowance = {
   countLimit: number;
   countLabel: string;
   cleanupEnabled?: boolean;
+  cleanupConfigured?: boolean;
   files: StorageFile[];
 };
-export type StorageReport = { checkedAt: number; cutoff: number; allowances: StorageAllowance[] };
+export type StorageReport = {
+  checkedAt: number;
+  cutoff: number;
+  cleanupMode?: StorageCleanupMode;
+  allowances: StorageAllowance[];
+};
 
 /** First instant at which the six-month cutoff is strictly after this upload. */
 export function storageEligibleAfter(uploaded: number): number | null {
@@ -67,14 +74,17 @@ export async function bucketStorageReport(
   prefix: string,
   name: string,
   limit: { bytes: number; objects: number },
+  mode: StorageCleanupMode = "delete-oldest",
 ): Promise<StorageReport> {
   const checkedAt = Date.now();
-  const files = (await listStorageObjects(bucket, prefix)).map((o) =>
-    storageFile(o, prefix, checkedAt),
-  );
+  const files = (await listStorageObjects(bucket, prefix)).map((o) => ({
+    ...storageFile(o, prefix, checkedAt),
+    eligible: mode === "delete-oldest",
+  }));
   return {
     checkedAt,
     cutoff: storageRetentionCutoff(checkedAt),
+    cleanupMode: mode,
     allowances: [
       {
         id: "files",
@@ -84,6 +94,7 @@ export async function bucketStorageReport(
         count: files.length,
         countLimit: limit.objects,
         countLabel: "files",
+        cleanupEnabled: mode === "delete-oldest",
         files,
       },
     ],

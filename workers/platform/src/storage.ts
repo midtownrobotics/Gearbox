@@ -1,19 +1,69 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { type StorageReport, requireAdmin, requireAuth } from "@g3/auth";
+import { type StorageReport, forwardIdentity, requireAdmin, requireAuth } from "@g3/auth";
 import { isStaging } from "@g3/site-config";
 import { Hono } from "hono";
 import { BINDINGS, MANIFESTS, STORING, inLibrary, isAppName } from "./registry";
 import type { AppEnv } from "./types";
 
+const storageCacheKey = (teamId: string) =>
+  new Request(
+    `https://storage-counts.invalid/v2/${isStaging ? "staging" : "production"}/${encodeURIComponent(teamId)}`,
+  );
+
 /** Retained files remain downloadable even when an app is switched off. */
 export const storageRoutes = new Hono<AppEnv>()
   .use("*", requireAuth, requireAdmin)
+  .get("/policy", async (c) => {
+    try {
+      const response = await c.env.G3ID.fetch("http://g3id/api/admin/team/storage-policy", {
+        headers: forwardIdentity(c),
+      });
+      return new Response(response.body, {
+        status: response.status,
+        headers: { "Content-Type": "application/json", "Cache-Control": "private, no-store" },
+      });
+    } catch {
+      return c.json(
+        {
+          error:
+            "Storage settings could not be checked. Existing files will be kept if uploads reach the cap.",
+        },
+        503,
+      );
+    }
+  })
+  .put("/policy", async (c) => {
+    const body = (await c.req.json().catch(() => null)) as { automaticDeletion?: unknown } | null;
+    if (typeof body?.automaticDeletion !== "boolean")
+      return c.json({ error: "Choose what happens when storage is full." }, 400);
+    try {
+      const response = await c.env.G3ID.fetch("http://g3id/api/admin/team/storage-policy", {
+        method: "PUT",
+        headers: { ...forwardIdentity(c), "Content-Type": "application/json" },
+        body: JSON.stringify({ automaticDeletion: body.automaticDeletion }),
+      });
+      if (response.ok) {
+        const cache = await caches.open("gearbox-team-storage-v2");
+        await cache.delete(storageCacheKey(c.get("teamId")));
+      }
+      return new Response(response.body, {
+        status: response.status,
+        headers: { "Content-Type": "application/json", "Cache-Control": "private, no-store" },
+      });
+    } catch {
+      return c.json(
+        {
+          error:
+            "The setting could not be saved. Refresh to check the current choice before trying again.",
+        },
+        503,
+      );
+    }
+  })
   .get("/", async (c) => {
     const teamId = c.get("teamId");
-    const cacheKey = new Request(
-      `https://storage-counts.invalid/v1/${isStaging ? "staging" : "production"}/${encodeURIComponent(teamId)}`,
-    );
-    const cache = await caches.open("gearbox-team-storage-v1");
+    const cacheKey = storageCacheKey(teamId);
+    const cache = await caches.open("gearbox-team-storage-v2");
     const cached = await cache.match(cacheKey);
     if (cached)
       return new Response(cached.body, {

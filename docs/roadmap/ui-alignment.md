@@ -17,7 +17,7 @@ A survey of every difference, with sketches, is at <https://claude.ai/artifact/C
 | 1. Shared parts in `@g3/ui` | Done | Orders, Inventory, Skill Tree, Edge | Nothing |
 | 2. Fixes that need no decision | Done | Pit, Shop, ID, Portal, Orders, Inventory, Edge | Nothing. Four things it found were passed to later steps (see step 2 below) |
 | 3. Edge onto the full set | Done | Edge | Nothing |
-| 4. ID and Portal onto the shared frame | Done; Portal adds Storage and season export/reset with shared cards, paged tables, saved-backup verification and typed in-page confirmation | ID, Portal | Nothing. A few things were left as they are on purpose (see step 4 below) |
+| 4. ID and Portal onto the shared frame | Done; Portal adds Storage policy choices and season export/reset with shared cards, paged tables, saved-backup verification and typed in-page confirmation | ID, Portal | Nothing. A few things were left as they are on purpose (see step 4 below) |
 | 5. Pit, with its Overview | Done; Logs explains oldest-first cleanup including recent-file fallback toward 90% | Pit | Nothing. Its few icon marks wait for the Lucide icons (see step 5 below) |
 | 6. Shop | Done | Shop | Nothing. The shop view's large buttons and the green Complete buttons stay Shop's own (see step 6 below) |
 | 7. Browser pop-ups | Done | Orders, Skill Tree, Platform, Pit (and Edge, ID and Shop in their own steps) | Nothing outside Scouting, whose 24 go with step 8 |
@@ -28,6 +28,7 @@ A survey of every difference, with sketches, is at <https://claude.ai/artifact/C
 
 | Change | Step | Pull request |
 | --- | --- | --- |
+| Storage adds a team-wide file policy selector, confirmation before enabling deletion, immediate cleanup-status updates, and clear blocked-upload notices | 4 | This PR |
 | Portal's Export and reset page uses shared cards, searchable paged selection, backup status badges and a typed confirmation dialog; dev preview makes no team writes | 4 | This PR |
 | Scouting's shared field editor preserves vector strokes through undo, cancel and draft restoration; built-in maps reuse it, old/custom images retain their editor, and local preview shows coordinate size | 8 | This PR |
 | Portal Storage shows file allowance usage, eligibility, saved dates, searchable paged lists and individual/group downloads using shared parts; local development has a labeled preview | 4 | This PR |
