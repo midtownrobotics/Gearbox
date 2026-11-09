@@ -1,7 +1,6 @@
 ---
 "@g3/worker-portal": minor
 "@g3/worker-platform": minor
-"@g3/worker-gateway": patch
 "@g3/worker-shop": major
 "@g3/worker-scouting": major
 "@g3/worker-pit": major
