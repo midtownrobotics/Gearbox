@@ -23,6 +23,7 @@ async function reviewedEviction(team: string) {
   const page = await bucket.list({ prefix: `teams/${team}/` });
   return {
     ...shopStorageEviction(bindings, team),
+    deleteOldest: false,
     approvedObjects: new Map(page.objects.map((file) => [file.key, file.etag])),
   };
 }
@@ -80,7 +81,7 @@ describe("reviewed storage cleanup", () => {
     );
   });
 
-  it("refuses an upload if expired files cannot make enough room without deleting recent data", async () => {
+  it("continues into recent files when expired files cannot reach the cleanup target", async () => {
     const team = newTeamId();
     const prefix = `teams/${team}/`;
     await bucket.put(`${prefix}old`, "x".repeat(5));
@@ -100,22 +101,21 @@ describe("reviewed storage cleanup", () => {
       },
       delete: (keys: string | string[]) => bucket.delete(keys),
     } as R2Bucket;
-    await expect(
-      withStorageLimit(
-        database,
-        agedBucket,
-        team,
-        prefix,
-        [{ key: `${prefix}new`, bytes: 10 }],
-        limit,
-        () => bucket.put(`${prefix}new`, "x".repeat(10)),
-        shopStorageEviction(bindings, team),
-      ),
-    ).rejects.toMatchObject({ code: "storage_full" });
-    expect((await bucket.head(`${prefix}recent`))?.size).toBe(95);
-    expect(await bucket.head(`${prefix}new`)).toBeNull();
+    await withStorageLimit(
+      database,
+      agedBucket,
+      team,
+      prefix,
+      [{ key: `${prefix}new`, bytes: 10 }],
+      limit,
+      () => bucket.put(`${prefix}new`, "x".repeat(10)),
+      shopStorageEviction(bindings, team),
+    );
+    expect(await bucket.head(`${prefix}old`)).toBeNull();
+    expect(await bucket.head(`${prefix}recent`)).toBeNull();
+    expect((await bucket.head(`${prefix}new`))?.size).toBe(10);
   });
-  it("protects all saved files by default and blocks growth without explicit file approvals", async () => {
+  it("leaves files alone when automatic cleanup and explicit approvals are both off", async () => {
     const team = newTeamId();
     const prefix = `teams/${team}/`;
     await bucket.put(`${prefix}valuable-old`, "x".repeat(100));
@@ -128,7 +128,7 @@ describe("reviewed storage cleanup", () => {
         [{ key: `${prefix}new`, bytes: 5 }],
         limit,
         () => bucket.put(`${prefix}new`, "new"),
-        shopStorageEviction(bindings, team),
+        { ...shopStorageEviction(bindings, team), deleteOldest: false },
       ),
     ).rejects.toMatchObject({ code: "storage_full" });
     expect((await bucket.head(`${prefix}valuable-old`))?.size).toBe(100);
@@ -170,7 +170,7 @@ describe("reviewed storage cleanup", () => {
       [{ key, bytes: 1 }],
       { bytes: 1000, objects: 10, label: "1000 bytes" },
       () => bucket.put(key, "x"),
-      await reviewedEviction(team),
+      shopStorageEviction(bindings, team),
     );
     expect((await bucket.list({ prefix })).objects).toHaveLength(9);
     expect(await bucket.head(`${prefix}00-old`)).toBeNull();

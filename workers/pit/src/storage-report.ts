@@ -2,9 +2,7 @@
 import {
   type StorageReport,
   inTeam,
-  isStorageFileExpired,
   listStorageObjects,
-  storageEligibleAfter,
   storageFile,
   storageRetentionCutoff,
 } from "@g3/auth";
@@ -40,9 +38,6 @@ export async function pitStorageReport(
       referenced.add(key);
       return { file: byKey.get(key), size: file.size };
     });
-    const eligible =
-      isStorageFileExpired(asset.uploadedAt, checkedAt) &&
-      members.every(({ file }) => !file || file.eligible);
     const times = [
       asset.uploadedAt,
       ...members.filter(({ file }) => file).map(({ file }) => file?.uploadedAt ?? 0),
@@ -52,10 +47,10 @@ export async function pitStorageReport(
       : null;
     for (const { file, size } of members)
       if (file) {
-        file.eligible = eligible;
+        file.eligible = true;
         file.bytes = size;
-        file.uploadedAt = Math.max(file.uploadedAt ?? checkedAt, asset.uploadedAt);
-        file.eligibleAfter = groupTime ? storageEligibleAfter(groupTime) : null;
+        file.uploadedAt = groupTime;
+        file.eligibleAfter = null;
       }
   }
   return {
@@ -77,13 +72,8 @@ export async function pitStorageReport(
           bytes: log.size,
           uploadedAt:
             (log.uploadedAt ?? log.createdAt) > 0 ? (log.uploadedAt ?? log.createdAt) : null,
-          eligibleAfter:
-            whenFull === "delete-oldest"
-              ? storageEligibleAfter(log.uploadedAt ?? log.createdAt)
-              : null,
-          eligible:
-            whenFull === "delete-oldest" &&
-            isStorageFileExpired(log.uploadedAt ?? log.createdAt, checkedAt),
+          eligibleAfter: null,
+          eligible: whenFull === "delete-oldest",
         })),
       },
       {

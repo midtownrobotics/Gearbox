@@ -122,10 +122,16 @@ export function isStorageFileExpired(uploaded: Date | number, now = Date.now()):
   return Number.isFinite(time) && time > 0 && time < storageRetentionCutoff(now);
 }
 
+/** Unknown dates sort last; deterministic key/id ties are supplied by the caller. */
+export function storageCleanupTime(uploaded: Date | number): number {
+  const time = uploaded instanceof Date ? uploaded.getTime() : uploaded;
+  return Number.isFinite(time) && time > 0 ? time : Number.POSITIVE_INFINITY;
+}
+
 export type StorageEviction = {
-  /** Automatically eligible only when strictly older than six calendar months. */
-  deleteOlderThanSixMonths?: boolean;
-  /** Exact file versions explicitly reviewed for deletion. Missing approval protects all files. */
+  /** Oldest first at capacity, including recent files when older files cannot reach the target. */
+  deleteOldest?: boolean;
+  /** Exact reviewed versions; without deleteOldest, other files remain protected. */
   approvedObjects?: ReadonlyMap<string, string>;
   /** Remove database references before the matching files are removed. */
   removeReferences: (objects: R2Object[]) => Promise<void>;
@@ -195,10 +201,7 @@ export async function withStorageLimit<T>(
       .from(usage)
       .where(eq(usage.teamId, teamId))
       .get();
-    const cleanupEnabled = Boolean(
-      eviction?.approvedObjects?.size || eviction?.deleteOlderThanSixMonths,
-    );
-    const now = Date.now();
+    const cleanupEnabled = Boolean(eviction?.approvedObjects?.size || eviction?.deleteOldest);
     let bytes = 0;
     let objects = 0;
     let originalBytes = 0;
@@ -217,7 +220,7 @@ export async function withStorageLimit<T>(
           bytes -= object.size;
           objects--;
         } else if (
-          (eviction?.deleteOlderThanSixMonths && isStorageFileExpired(object.uploaded, now)) ||
+          eviction?.deleteOldest ||
           (eviction?.approvedObjects?.has(object.key) &&
             eviction.approvedObjects.get(object.key) === object.etag)
         ) {
@@ -258,7 +261,9 @@ export async function withStorageLimit<T>(
         incoming.length <= limit.objects
       ) {
         candidates.sort(
-          (a, b) => a.uploaded.getTime() - b.uploaded.getTime() || a.key.localeCompare(b.key),
+          (a, b) =>
+            storageCleanupTime(a.uploaded) - storageCleanupTime(b.uploaded) ||
+            a.key.localeCompare(b.key),
         );
         const removed: R2Object[] = [];
         // Count the incoming save in the target, and never evict the incoming files themselves.
@@ -313,7 +318,7 @@ export async function withStorageLimit<T>(
       }
       await reportUsage(true);
       throw new StorageLimitError(
-        `Your team's file storage is full (${limit.label} or ${limit.objects.toLocaleString("en-US")} files). Files from the last six months are protected. Review files before choosing what to remove.`,
+        `Your team's file storage is full (${limit.label} or ${limit.objects.toLocaleString("en-US")} files). This upload cannot fit; review files before trying again.`,
         "storage_full",
       );
     }

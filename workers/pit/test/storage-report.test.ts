@@ -1,11 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { env } from "cloudflare:test";
-import {
-  type StorageReport,
-  storageEligibleAfter,
-  storageRetentionCutoff,
-  withTeam,
-} from "@g3/auth";
+import { type StorageReport, storageRetentionCutoff, withTeam } from "@g3/auth";
 import { newTeamId } from "@g3/testing/users";
 import { call } from "@g3/testing/worker";
 import { describe, expect, it } from "vitest";
@@ -21,22 +16,20 @@ describe("Pit storage reports", () => {
     const team = newTeamId();
     const db = createDb(bindings.PIT_DB);
     const old = storageRetentionCutoff() - 86_400_000;
-    await db
-      .insert(matchLogs)
-      .values(
-        withTeam(team, {
-          event: "test",
-          name: "Qual-1",
-          matchType: "q",
-          matchNumber: 1,
-          size: 1,
-          r2Key: `pit/teams/${team}/logs/test/Qual-1.wpilog.gz`,
-          status: "stored",
-          downloaderName: "Laptop",
-          createdAt: old,
-          uploadedAt: old,
-        }),
-      );
+    await db.insert(matchLogs).values(
+      withTeam(team, {
+        event: "test",
+        name: "Qual-1",
+        matchType: "q",
+        matchNumber: 1,
+        size: 1,
+        r2Key: `pit/teams/${team}/logs/test/Qual-1.wpilog.gz`,
+        status: "stored",
+        downloaderName: "Laptop",
+        createdAt: old,
+        uploadedAt: old,
+      }),
+    );
     const before = (await pitStorageReport(bindings, team)).allowances.find((a) => a.id === "logs");
     expect(before).toMatchObject({ cleanupEnabled: false });
     expect(before?.files[0].eligible).toBe(false);
@@ -71,7 +64,7 @@ describe("Pit storage reports", () => {
     ).toBe(404);
   });
 
-  it("protects every file of an asset when any physical file is recent", async () => {
+  it("marks recent asset files removable and orders their group by the most recent physical save", async () => {
     const team = newTeamId();
     const prefix = scopePrefix(team);
     const now = Date.now();
@@ -104,7 +97,7 @@ describe("Pit storage reports", () => {
     const assets = report.allowances.find((a) => a.id === "assets");
     expect(assets).toMatchObject({ bytes: 7, count: 1 });
     expect(
-      assets?.files.every((f) => !f.eligible && f.eligibleAfter === storageEligibleAfter(now)),
+      assets?.files.every((f) => f.eligible && f.eligibleAfter === null && f.uploadedAt === now),
     ).toBe(true);
   });
 });

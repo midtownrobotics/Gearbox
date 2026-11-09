@@ -9,12 +9,12 @@ import {
 } from "@g3/auth";
 import { eq, inArray } from "drizzle-orm";
 import { createDb } from "./db";
-import { autoRoutines, fieldMaps, scoutingFormSubmissions } from "./db/schema";
+import { autoRoutines, fieldMaps, robotImages, scoutingFormSubmissions } from "./db/schema";
 import type { AppEnv } from "./types";
 
 export function scoutingStorageEviction(env: AppEnv["Bindings"], teamId: string) {
   return {
-    deleteOlderThanSixMonths: true,
+    deleteOldest: true,
     usage: (usage: { bytes: number; count: number }, attempted?: boolean) =>
       notifyStorageUsage(
         env,
@@ -37,6 +37,9 @@ export function scoutingStorageEviction(env: AppEnv["Bindings"], teamId: string)
             .set({ image_r2_key: null, image_content_type: null })
             .where(inTeam(autoRoutines, teamId, inArray(autoRoutines.image_r2_key, keys))),
           db.delete(fieldMaps).where(inTeam(fieldMaps, teamId, inArray(fieldMaps.r2_key, keys))),
+          db
+            .delete(robotImages)
+            .where(inTeam(robotImages, teamId, inArray(robotImages.r2_key, keys))),
         ]);
         // Report IDs are in the object keys, so cleanup doesn't scan every report's JSON.
         const prefix = `teams/${encodeURIComponent(teamId)}/scouting-submissions/`;

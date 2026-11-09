@@ -2,13 +2,13 @@
 import {
   STORAGE_CLEANUP_RATIO,
   inTeam,
-  isStorageFileExpired,
   logTeamChange,
   notifyStorageCleanup,
   notifyStorageUsage,
   requestTeamId,
   requireAuth,
   requireMentor,
+  storageCleanupTime,
   withTeam,
   withTeamStorageLock,
 } from "@g3/auth";
@@ -458,20 +458,17 @@ export const scopeRoutes = new Hono<AppEnv>()
         const files = (JSON.parse(asset.files) as AssetFile[])
           .map((file) => byKey.get(assetKey(teamId, asset.name, file.name)))
           .filter((file): file is R2Object => Boolean(file));
-        // A recently changed physical file protects the whole asset even if its row is old.
-        if (
-          isStorageFileExpired(asset.uploadedAt) &&
-          files.every((file) => isStorageFileExpired(file.uploaded))
-        ) {
-          candidates.push({
-            time: Math.max(asset.uploadedAt, ...files.map((file) => file.uploaded.getTime())),
-            asset,
-          });
-        }
+        // Assets are removed as a unit; use their most recent physical save for ordering.
+        candidates.push({
+          time: Math.max(
+            storageCleanupTime(asset.uploadedAt),
+            ...files.map((file) => storageCleanupTime(file.uploaded)),
+          ),
+          asset,
+        });
       }
       for (const file of unreferenced)
-        if (isStorageFileExpired(file.uploaded))
-          candidates.push({ time: file.uploaded.getTime(), file });
+        candidates.push({ time: storageCleanupTime(file.uploaded), file });
       const needsCleanup = projectedBytes > MAX_ASSET_BYTES || projectedAssets > MAX_ASSETS;
       if (needsCleanup) {
         const targetBytes = Math.max(
@@ -479,7 +476,11 @@ export const scopeRoutes = new Hono<AppEnv>()
           incomingBytes,
         );
         const targetAssets = Math.max(Math.floor(MAX_ASSETS * STORAGE_CLEANUP_RATIO), found.length);
-        candidates.sort((a, b) => a.time - b.time);
+        candidates.sort(
+          (a, b) =>
+            a.time - b.time ||
+            (a.asset?.name ?? a.file?.key ?? "").localeCompare(b.asset?.name ?? b.file?.key ?? ""),
+        );
         for (const candidate of candidates) {
           if (projectedBytes <= targetBytes && projectedAssets <= targetAssets) break;
           if (candidate.asset) {
@@ -506,7 +507,7 @@ export const scopeRoutes = new Hono<AppEnv>()
         return c.json(
           {
             error:
-              "Asset storage is full. Files from the last six months are protected; review them before choosing what to remove.",
+              "Asset storage is full. This upload cannot fit; review saved assets and try again.",
           },
           409,
         );

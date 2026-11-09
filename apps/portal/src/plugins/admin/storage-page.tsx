@@ -87,7 +87,6 @@ function Allowance({
   preview,
 }: { app: string; allowance: StorageAllowance; preview: boolean }) {
   const [query, setQuery] = useState("");
-  const [eligibleOnly, setEligibleOnly] = useState(false);
   const [page, setPage] = useState(0);
   const percent = Math.max(
     a.byteLimit ? (a.bytes / a.byteLimit) * 100 : 0,
@@ -95,10 +94,7 @@ function Allowance({
   );
   const eligible = a.files.filter((file) => file.eligible);
   const files = a.files
-    .filter(
-      (file) =>
-        (!eligibleOnly || file.eligible) && file.name.toLowerCase().includes(query.toLowerCase()),
-    )
+    .filter((file) => file.name.toLowerCase().includes(query.toLowerCase()))
     .sort(
       (a, b) =>
         Number(b.eligible) - Number(a.eligible) ||
@@ -153,7 +149,7 @@ function Allowance({
         ) : (
           a.files.length > 0 && <ArchiveDownload app={app} allowance={a.id} files={a.files} />
         )}
-        {!preview && eligible.length > 0 && (
+        {!preview && eligible.length > 0 && eligible.length < a.files.length && (
           <ArchiveDownload app={app} allowance={a.id} files={eligible} eligible />
         )}
       </div>
@@ -173,17 +169,6 @@ function Allowance({
                 }}
               />
             </div>
-            <label className="flex items-center gap-2 text-sm text-secondary-700">
-              <input
-                type="checkbox"
-                checked={eligibleOnly}
-                onChange={(event) => {
-                  setEligibleOnly(event.target.checked);
-                  setPage(0);
-                }}
-              />
-              Eligible only
-            </label>
           </div>
           <div className="relative mt-3 overflow-x-auto">
             <table className="w-full text-left text-sm">
@@ -214,13 +199,8 @@ function Allowance({
                     </td>
                     <td className="py-3 pr-4">
                       <Badge colors={file.eligible ? tones.warning : tones.neutral}>
-                        {file.eligible ? "Eligible" : "Protected"}
+                        {file.eligible ? "May be removed" : "Cleanup off"}
                       </Badge>
-                      {!file.eligible && file.eligibleAfter && (
-                        <p className="mt-1 text-xs text-secondary-500">
-                          Eligible after {date(file.eligibleAfter)}
-                        </p>
-                      )}
                     </td>
                     <td className="py-3">
                       {preview ? (
@@ -315,10 +295,9 @@ export function StoragePage({ preview = false }: { preview?: boolean }) {
       )}
       <Card title="Keep a copy before cleanup">
         <p className="text-sm text-secondary-700">
-          Only files strictly older than six months are eligible. When a new save exceeds a cap, the
-          oldest eligible files may be permanently deleted toward 90% usage. There is no scheduled
-          deletion date. Pit match logs also follow the team's choice on Logs. Newer files are
-          protected; saves pause if eligible files cannot make room.
+          When a new save exceeds a cap, files older than six months are removed first. If needed,
+          cleanup continues with the oldest remaining files toward 90% usage, including recent
+          files. Deletion is permanent. Pit match logs follow the team's choice on Logs.
         </p>
         <p className="mt-2 text-sm text-secondary-600">
           Admins receive warnings at 90%, 95%, and 100% on the team's connected chat. Each warning
@@ -355,8 +334,8 @@ export function StoragePage({ preview = false }: { preview?: boolean }) {
           ))}
           {app.report && (
             <p className="text-xs text-secondary-500">
-              {app.name} checked {date(app.report.checkedAt)}. Eligible dates are strictly before{" "}
-              {date(app.report.cutoff)}.
+              {app.name} checked {date(app.report.checkedAt)}. Files are removed oldest first when
+              this allowance fills up.
             </p>
           )}
         </div>

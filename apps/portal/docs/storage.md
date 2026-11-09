@@ -10,9 +10,9 @@ Open **Admin → Storage** to check your team's files in Shop, Scouting, and Pit
 
 ## Which files may be removed
 
-**Eligible** means a file is strictly older than six calendar months and may be removed when a new save exceeds that allowance. Eligible files appear oldest first. **Protected** files are kept; their row shows when they may become eligible, if their saved date is known. AdvantageScope assets stay protected while any of their files are recent.
+**May be removed** means a file can be permanently deleted when a new save exceeds that allowance. Files appear oldest first. Files over six months old go first; if needed, cleanup continues with the oldest remaining files, including recent ones, toward 90% usage. Files with unknown dates are considered last. AdvantageScope assets are removed as a group, ordered by their most recent saved file.
 
-There is no scheduled deletion date. Pit match logs follow the choice on Logs: by default new logs wait on the downloader at capacity. Only teams that choose **Delete the oldest over six months old** allow that cleanup; Storage shows whether it is enabled. When a save exceeds a cap, cleanup removes the oldest eligible files toward 90% usage. If eligible files cannot make room, new saves pause. Download files you want to keep before reaching the cap. Deletion is permanent. Written Scouting reports and auton steps remain when their images are removed.
+There is no scheduled deletion date. Pit match logs follow the choice on Logs: by default new logs wait on the downloader at capacity. Teams that choose **Delete the oldest logs** allow oldest-first cleanup toward 18 logs, including recent logs. Storage shows whether it is enabled. Download files you want to keep before reaching the cap. Written Scouting reports and auton steps remain when their images are removed. The incoming save is kept; an upload too large for its allowance is refused.
 
 These allowances cover the listed uploaded files. Older Scouting files saved before team storage was introduced are outside them. Switching an app off still has its separate 90-day retention period, described in [Switch apps on and off](apps).
 
@@ -20,7 +20,7 @@ These allowances cover the listed uploaded files. Older Scouting files saved bef
 
 - **Download** saves one file.
 - **Download all files** saves all files in that allowance.
-- **Download eligible files** saves the files currently eligible for cleanup.
+
 
 Group downloads are **.tar archives**. Large downloads are split into parts of up to 1,000 files or 512 MiB; download each part shown. Extract the archive with your computer's archive tool; its `manifest.json` lists original names and saved dates. For Scouting coordinate paths, an individual download is a standalone **.svg** image. Bulk backups keep the original coordinate JSON and include **field-2026.svg** once per archive.
 

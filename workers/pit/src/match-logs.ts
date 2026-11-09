@@ -2,13 +2,13 @@
 import {
   STORAGE_CLEANUP_RATIO,
   inTeam,
-  isStorageFileExpired,
   logTeamChange,
   notifyStorageCleanup,
   notifyStorageUsage,
   requireAdmin,
   requireAuth,
   requireMentor,
+  storageCleanupTime,
   withTeam,
   withTeamStorageLock,
 } from "@g3/auth";
@@ -311,16 +311,18 @@ export const logUploadRoutes = new Hono<AppEnv>()
         { bytes: 0, count: stored.length },
         { count: MAX_LOGS },
       );
-      const expired = stored
-        .filter((item) => deleting && isStorageFileExpired(item.uploadedAt ?? item.createdAt))
+      const candidates = stored
+        .filter(() => deleting)
         .sort(
-          (a, b) => (a.uploadedAt ?? a.createdAt) - (b.uploadedAt ?? b.createdAt) || a.id - b.id,
+          (a, b) =>
+            storageCleanupTime(a.uploadedAt ?? a.createdAt) -
+              storageCleanupTime(b.uploadedAt ?? b.createdAt) || a.id - b.id,
         );
-      if (stored.length >= MAX_LOGS && expired.length < stored.length + 1 - MAX_LOGS)
+      if (stored.length >= MAX_LOGS && candidates.length < stored.length + 1 - MAX_LOGS)
         return c.json(
           {
             error: deleting
-              ? "Pit is full. Logs from the last six months are protected; review them before choosing what to remove."
+              ? "Pit is full. This log cannot fit; review saved logs and try again."
               : `Pit has ${MAX_LOGS} match logs, the most it keeps.`,
             code: "full",
           },
@@ -515,16 +517,18 @@ export const logUploadRoutes = new Hono<AppEnv>()
         { bytes: 0, count: stored.length },
         { count: MAX_LOGS },
       );
-      const expired = stored
-        .filter((item) => deleting && isStorageFileExpired(item.uploadedAt ?? item.createdAt))
+      const candidates = stored
+        .filter(() => deleting)
         .sort(
-          (a, b) => (a.uploadedAt ?? a.createdAt) - (b.uploadedAt ?? b.createdAt) || a.id - b.id,
+          (a, b) =>
+            storageCleanupTime(a.uploadedAt ?? a.createdAt) -
+              storageCleanupTime(b.uploadedAt ?? b.createdAt) || a.id - b.id,
         );
-      if (stored.length >= MAX_LOGS && expired.length < stored.length + 1 - MAX_LOGS)
+      if (stored.length >= MAX_LOGS && candidates.length < stored.length + 1 - MAX_LOGS)
         return c.json(
           {
             error: deleting
-              ? "Pit is full. Logs from the last six months are protected."
+              ? "Pit is full. This log cannot fit; review saved logs and try again."
               : `Pit has ${MAX_LOGS} match logs, the most it keeps.`,
             code: "full",
           },
@@ -557,7 +561,7 @@ export const logUploadRoutes = new Hono<AppEnv>()
         { count: MAX_LOGS },
       );
       if (stored.length + 1 > MAX_LOGS) {
-        const removed = expired.slice(
+        const removed = candidates.slice(
           0,
           stored.length + 1 - Math.floor(MAX_LOGS * STORAGE_CLEANUP_RATIO),
         );

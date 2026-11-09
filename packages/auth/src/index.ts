@@ -49,6 +49,7 @@ export {
   SHOP_STORAGE_LIMIT,
   STORAGE_CLEANUP_RATIO,
   isStorageFileExpired,
+  storageCleanupTime,
   storageRetentionCutoff,
   StorageLimitError,
   type StorageEviction,

@@ -65,7 +65,7 @@ export async function notifyStorageUsage(
       .get();
     if (!claim) return;
     const size = (bytes: number) => `${(bytes / 1024 ** 2).toFixed(1)} MiB`;
-    const summary = `${app === "shop" ? "Shop" : app === "pit" ? "Pit" : "Scouting"} ${allowance} storage ${attempted ? "would reach" : "reached"} ${level}% of its allowance (${usage.count} of ${limit.count}${limit.bytes ? `; ${size(usage.bytes)} of ${size(limit.bytes)}` : ""}). Download files you want to keep from Portal → Admin → Storage. ${app === "pit" && allowance === "logs" ? "Pit follows the choice on Logs: only logs strictly over six months old can be removed automatically; otherwise new logs wait on the downloader." : "When a save exceeds the cap, the oldest files strictly over six months old may be permanently deleted toward 90% usage. Newer files are protected; uploads pause if those old files cannot make room."}`;
+    const summary = `${app === "shop" ? "Shop" : app === "pit" ? "Pit" : "Scouting"} ${allowance} storage ${attempted ? "would reach" : "reached"} ${level}% of its allowance (${usage.count} of ${limit.count}${limit.bytes ? `; ${size(usage.bytes)} of ${size(limit.bytes)}` : ""}). Download files you want to keep from Portal → Admin → Storage. ${app === "pit" && allowance === "logs" ? "Pit follows the choice on Logs: when cleanup is enabled, the oldest logs may be removed toward 90%, including recent logs; otherwise new logs wait on the downloader." : "When a save exceeds the cap, files over six months old are removed first, then the oldest remaining files if needed to reach 90% usage. Recent files may also be permanently deleted."}`;
     await logTeamChange(env, teamId, {
       userId: null,
       app,

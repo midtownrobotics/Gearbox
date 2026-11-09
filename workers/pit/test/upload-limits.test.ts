@@ -115,7 +115,7 @@ describe("multipart storage limits", () => {
       .first<{ count: number }>();
     expect(stored?.count).toBe(MAX_LOGS);
   });
-  it("protects recent logs at capacity, then cleans logs over six months old toward 90%", async () => {
+  it("removes older logs first, then recent logs as needed to reach 90%", async () => {
     const client = await downloader();
     await database
       .prepare(
@@ -141,8 +141,6 @@ describe("multipart storage limits", () => {
       });
       expect(completed.status).toBe(200);
     }
-    const refused = await client.start(MAX_LOGS + 1);
-    expect(refused.status).toBe(409);
     const stored = await database
       .prepare("SELECT name FROM match_logs WHERE team_id = ? AND status = 'stored'")
       .bind(client.team)
@@ -153,9 +151,7 @@ describe("multipart storage limits", () => {
     const files = await bucket.list({ prefix: `pit/teams/${client.team}/logs/` });
     expect(files.objects).toHaveLength(MAX_LOGS);
     await database
-      .prepare(
-        "UPDATE match_logs SET uploaded_at = ? WHERE team_id = ? AND name IN ('Qual-1', 'Qual-2', 'Qual-3')",
-      )
+      .prepare("UPDATE match_logs SET uploaded_at = ? WHERE team_id = ? AND name = 'Qual-5'")
       .bind(storageRetentionCutoff() - 86_400_000, client.team)
       .run();
     const accepted = await client.start(MAX_LOGS + 1);
@@ -183,6 +179,8 @@ describe("multipart storage limits", () => {
       .all<{ name: string }>();
     expect(remaining.results).toHaveLength(18);
     expect(remaining.results.some((log) => log.name === "Qual-1")).toBe(false);
+    expect(remaining.results.some((log) => log.name === "Qual-5")).toBe(false);
+    expect(remaining.results.some((log) => log.name === "Qual-3")).toBe(true);
     expect(remaining.results.some((log) => log.name === "Qual-4")).toBe(true);
     expect((await bucket.list({ prefix: `pit/teams/${client.team}/logs/` })).objects).toHaveLength(
       18,

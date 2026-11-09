@@ -31,6 +31,7 @@ export function storagePreview() {
           count: app.count,
           countLimit: app.max,
           countLabel: app.slug === "pit" ? "logs" : "files",
+          cleanupEnabled: app.slug !== "pit",
           files: [
             {
               key: "example-old",
@@ -42,7 +43,7 @@ export function storagePreview() {
                     : "Drive plate — revision A.pdf",
               bytes: 2 * 1024 ** 2,
               uploadedAt: now - 220 * 86_400_000,
-              eligible: true,
+              eligible: app.slug !== "pit",
             },
             {
               key: "example-recent",
@@ -54,13 +55,7 @@ export function storagePreview() {
                     : "Drive plate — revision B.pdf",
               bytes: 1024 ** 2,
               uploadedAt: now - 10 * 86_400_000,
-              eligibleAfter:
-                new Date(
-                  new Date(now - 10 * 86_400_000).setUTCMonth(
-                    new Date(now - 10 * 86_400_000).getUTCMonth() + 6,
-                  ),
-                ).getTime() + 1,
-              eligible: false,
+              eligible: app.slug !== "pit",
             },
           ],
         },
@@ -83,7 +78,7 @@ export function storagePreview() {
           name: "Robot_Example/model.glb",
           bytes: 62 * 1024 ** 2,
           uploadedAt: now - 10 * 86_400_000,
-          eligible: false,
+          eligible: true,
         },
       ],
     });

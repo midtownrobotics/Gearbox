@@ -67,7 +67,7 @@ describe("storage reporting and downloads", () => {
     expect(report.allowances[0].count).toBe(1);
     expect(report.allowances[0].files[0]).toMatchObject({
       name: "drawing.pdf",
-      eligible: false,
+      eligible: true,
       bytes: 13,
     });
     expect(JSON.stringify(report)).not.toContain(b);
@@ -96,7 +96,7 @@ describe("storage reporting and downloads", () => {
     header.fill(32, 148, 156);
     expect(header.reduce((n, b) => n + b, 0)).toBe(storedChecksum);
     const eligible = await call(`${path(team)}/archive?eligible=1`);
-    expect(await eligible.text()).not.toContain("photo-content");
+    expect(await eligible.text()).toContain("photo-content");
     expect(await bucket.head(`teams/${team}/photo.png`)).not.toBeNull();
   });
 
@@ -122,7 +122,7 @@ describe("storage reporting and downloads", () => {
       objects: 10,
     });
     expect(report.allowances[0]).toMatchObject({ bytes: 5, count: 2 });
-    expect(report.allowances[0].files.map((f) => f.eligible)).toEqual([true, false]);
+    expect(report.allowances[0].files.map((f) => f.eligible)).toEqual([true, true]);
     for (const value of [
       "2026-08-31T14:00:00Z",
       "2026-08-28T14:00:00Z",

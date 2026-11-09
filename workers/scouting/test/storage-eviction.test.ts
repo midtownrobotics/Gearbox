@@ -1,11 +1,17 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { env } from "cloudflare:test";
-import { withStorageLimit, withTeam } from "@g3/auth";
+import { inTeam, withStorageLimit, withTeam } from "@g3/auth";
 import { newTeamId } from "@g3/testing/users";
 import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { createDb } from "../src/db";
-import { autoRoutines, scoutingFormSubmissions, scoutingForms } from "../src/db/schema";
+import {
+  autoRoutines,
+  robotImages,
+  robotTeams,
+  scoutingFormSubmissions,
+  scoutingForms,
+} from "../src/db/schema";
 import { scoutingStorageEviction } from "../src/storage-limit";
 import type { AppEnv } from "../src/types";
 
@@ -13,6 +19,49 @@ const bindings = env as unknown as AppEnv["Bindings"];
 const db = createDb(bindings.SCOUTING_DB);
 
 describe("Scouting image cleanup", () => {
+  it("removes an evicted recent robot photo from the gallery while keeping the robot profile", async () => {
+    const team = newTeamId();
+    const prefix = `teams/${team}/`;
+    const key = `${prefix}robot-images/photo.png`;
+    await bindings.FIELD_MAPS.put(key, "x".repeat(100));
+    await db.insert(robotTeams).values(
+      withTeam(team, {
+        id: "robot",
+        team_name: "Practice robot",
+        summary: "Keep this profile",
+        created_by: "admin",
+        created_at: 1,
+        updated_at: 1,
+      }),
+    );
+    await db.insert(robotImages).values(
+      withTeam(team, {
+        id: "photo",
+        robot_id: "robot",
+        r2_key: key,
+        content_type: "image/png",
+        created_by: "admin",
+        created_at: 1,
+      }),
+    );
+    const incoming = `${prefix}new.png`;
+    await withStorageLimit(
+      bindings.SCOUTING_DB,
+      bindings.FIELD_MAPS,
+      team,
+      prefix,
+      [{ key: incoming, bytes: 10 }],
+      { bytes: 100, objects: 10, label: "100 bytes" },
+      () => bindings.FIELD_MAPS.put(incoming, "x".repeat(10)),
+      scoutingStorageEviction(bindings, team),
+    );
+    expect(await bindings.FIELD_MAPS.head(key)).toBeNull();
+    expect(await bindings.FIELD_MAPS.head(incoming)).not.toBeNull();
+    expect(await db.select().from(robotImages).where(inTeam(robotImages, team))).toHaveLength(0);
+    expect(await db.select().from(robotTeams).where(inTeam(robotTeams, team)).get()).toMatchObject({
+      summary: "Keep this profile",
+    });
+  });
   it.each(["png", "json"])(
     "removes old %s drawings while keeping auton steps and written reports",
     async (extension) => {

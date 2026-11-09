@@ -16,7 +16,7 @@ import { teamPrefix } from "./storage";
 
 export function shopStorageEviction(env: AppEnv["Bindings"], teamId: string) {
   return {
-    deleteOlderThanSixMonths: true,
+    deleteOldest: true,
     usage: (usage: { bytes: number; count: number }, attempted?: boolean) =>
       notifyStorageUsage(
         env,

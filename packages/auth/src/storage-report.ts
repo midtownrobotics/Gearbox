@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { isStorageFileExpired, storageRetentionCutoff } from "./storage-limit";
+import { storageRetentionCutoff } from "./storage-limit";
 
 export type StorageFile = {
   key: string;
@@ -50,15 +50,15 @@ export async function listStorageObjects(bucket: R2Bucket, prefix: string): Prom
   return objects;
 }
 
-export function storageFile(object: R2Object, prefix: string, now = Date.now()): StorageFile {
+export function storageFile(object: R2Object, prefix: string, _now = Date.now()): StorageFile {
   const time = object.uploaded.getTime();
   return {
     key: object.key,
     name: object.key.slice(prefix.length),
     bytes: object.size,
     uploadedAt: Number.isFinite(time) && time > 0 ? time : null,
-    eligible: isStorageFileExpired(object.uploaded, now),
-    eligibleAfter: storageEligibleAfter(time),
+    eligible: true,
+    eligibleAfter: null,
   };
 }
 
