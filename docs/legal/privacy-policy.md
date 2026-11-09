@@ -1,6 +1,6 @@
 # Gearbox Privacy Policy
 
-Last updated: 7 November 2026.
+Last updated: 9 November 2026.
 
 ## In short
 
@@ -87,6 +87,8 @@ New drawings on Scouting's built-in field and autonomous routes are saved as coo
 Scouting forms, reports, schedules, uploaded files and points are private to the owning team. Team deletion or the app's scheduled deletion removes its database records and uploaded files.
 
 Scouting engagement is off by default. An admin can enable points and match predictions and can separately enable team points standings. Standings show members' names, balances, points earned and points used to signed-in teammates. A member's prediction history is shown only to that member through the activity page. Disabling activities pauses new awards and prediction result processing and keeps existing balances and history under the same retention rules as other team data.
+
+Team admins can export selected Scouting game-season records and available files, then permanently reset the backed-up data after verifying saved archives and confirming the year. This explicit reset can include recent files; the six-month protection applies to automatic capacity cleanup. Unselected data, other seasons, accounts, settings, form templates, API keys and points balances/history stay. New or changed records and files that are still referenced are kept. Older files outside the team's storage folder are kept too. Device-only maps and drafts are outside this operation. There is no automatic archive restore. Temporary export receipts contain record fingerprints and file references, not duplicate file contents; one export per team is kept for up to 24 hours, and expiration removes only those receipts. Export requests and reset actions are logged for the team.
 
 ## 6. Other services involved
 

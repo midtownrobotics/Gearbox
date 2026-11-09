@@ -24,6 +24,7 @@ import {
   visibleNotifications,
 } from "./notifications";
 import { ALWAYS_ON, MANIFESTS, callHook, fetchExport, inLibrary, isAppName } from "./registry";
+import { seasonRoutes } from "./seasons";
 import { storageRoutes } from "./storage";
 import type { AppEnv } from "./types";
 
@@ -144,6 +145,7 @@ export const termsOutdated = (accepted: string | null) =>
 
 export const teamRouter = new Hono<AppEnv>()
   .route("/storage", storageRoutes)
+  .route("/seasons", seasonRoutes)
   // The terms the team's owner accepted, and whether the home page should ask them to accept the
   // current ones (a material change since). Only the owner is asked, never on a kiosk.
   .get("/terms", requireAuth, async (c) => {

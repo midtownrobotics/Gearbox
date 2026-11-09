@@ -6,7 +6,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./storage-parts": "./src/storage-parts.ts"
+    "./storage-parts": "./src/storage-parts.ts",
+    "./season-export": "./src/season-export.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

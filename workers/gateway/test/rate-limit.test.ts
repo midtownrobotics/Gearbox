@@ -22,6 +22,17 @@ const request = (path: string, method = "GET") =>
   });
 
 describe("gateway rate limits", () => {
+  it("applies the expensive-request limit to season reviews, exports and resets", async () => {
+    for (const path of [
+      "/api/~platform/team/seasons/scouting?year=2024",
+      "/api/~platform/team/seasons/scouting/exports/id/0/archive",
+      "/api/~platform/team/seasons/scouting/exports/id/0/reset",
+    ]) {
+      const env = limiters();
+      await checkRateLimit(request(path, "POST"), env);
+      expect(env.EXPENSIVE_LIMITER.limit).toHaveBeenCalledWith({ key: "203.0.113.42" });
+    }
+  });
   it("limits pages as well as APIs, before accessing downstream services", async () => {
     const env = limiters();
     vi.mocked(env.REQUEST_LIMITER.limit).mockResolvedValue({ success: false });

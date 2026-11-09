@@ -1,5 +1,7 @@
 # Platform: sign-up, console, app library, reports
 
+- Season tools: `src/seasons.ts`, mounted at `/team/seasons/scouting`, forwards only allowlisted review/export/archive/reset routes over `SCOUTING` with the authenticated team. All require `requireAuth` + `requireAdmin` (never PIN); GET never writes. POST archive requests and successful reset parts log field labels via `logTeamChange`. No-store responses; retained data remains accessible when Scouting is off. Demo refuses these tools.
+
 ## Sign-up and the console
 
 - `workers/platform` + `apps/platform` on the platform's domain (`site.platformDomain`, frcgearbox.com; the gateway sends the bare domain and `www` there). Its D1 (`PLATFORM_DB`) holds the **team registry**: number, name, country, status (`pending` → `active`), founder. The gateway asks it (`GET /teams/:id`, active teams only) before answering a team's addresses. G3ID keeps accounts, sessions, Slack connections and sign-in codes, plus a copy of each team's id/number/name for its foreign keys.

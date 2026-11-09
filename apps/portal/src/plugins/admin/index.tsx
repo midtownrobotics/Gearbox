@@ -12,6 +12,7 @@ import { MemberPage } from "./member-page";
 import { MembersPage } from "./members-page";
 import { NotificationsPage } from "./notifications-page";
 import { MemberAccessPage, OperatorAccessPage } from "./operator-access-page";
+import { SeasonPage } from "./season-page";
 import { SignInPage } from "./sign-in-page";
 import { StoragePage } from "./storage-page";
 
@@ -36,9 +37,13 @@ export const adminPlugin: Plugin = {
   name: "admin",
   routes: [
     ...(import.meta.env.DEV
-      ? [{ path: "/preview/storage", element: <StoragePage preview /> }]
+      ? [
+          { path: "/preview/storage", element: <StoragePage preview /> },
+          { path: "/preview/season", element: <SeasonPage preview /> },
+        ]
       : []),
     { path: "/admin/storage", element: admin(<StoragePage />) },
+    { path: "/admin/storage/seasons", element: admin(<SeasonPage />) },
     { path: "/admin", element: admin(<AppsPage />) },
     { path: "/admin/members", element: admin(<MembersPage />) },
     { path: "/admin/members/:id", element: admin(<MemberPage />) },

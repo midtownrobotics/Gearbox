@@ -333,6 +333,14 @@ function teamApp() {
     if (path === "/api/internal/deleted") return Response.json(deleted);
     if (path === "/api/internal/seeded") return Response.json(seeded);
     if (path === "/api/internal/demoed") return Response.json(demoed);
+    const season = path.match(/^\/api\/internal\/teams\/([^/]+)\/seasons(.*)$/);
+    if (season)
+      return Response.json({
+        teamId: decodeURIComponent(season[1]),
+        path: season[2],
+        method: request.method,
+        year: new URL(request.url).searchParams.get("year"),
+      });
     // Its R2 storage hook (only Pit, Shop and Scouting have one): one 1 KiB file of the site team's.
     if (path === "/api/internal/storage") {
       return Response.json({ teams: { frc1648: { bytes: 1024, objects: 1 } } });

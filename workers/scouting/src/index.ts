@@ -55,6 +55,7 @@ import { requireAuth } from "./middleware/auth";
 import { predictionsRoutes, settleConfiguredGame } from "./predictions";
 import { getG3IdUsers, isServiceHelper, isStrategyAdmin } from "./roles";
 import { assignmentCandidates } from "./scout-assignments";
+import { expireSeasonExports } from "./season-exports";
 import {
   type ServiceIssueType,
   describeServiceIssue,
@@ -2427,5 +2428,6 @@ export default {
   fetch: withApiPrefix(worker.fetch),
   scheduled: (_event: ScheduledController, env: AppEnv["Bindings"], ctx: ExecutionContext) => {
     ctx.waitUntil(settleConfiguredGame(env, purgeExpiredManualEvents));
+    ctx.waitUntil(expireSeasonExports(env));
   },
 };

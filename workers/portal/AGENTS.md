@@ -10,3 +10,4 @@
 ## Storage
 
 - Admin-only `/admin/storage` (`plugins/admin/storage-page.tsx`) reads the platform's `/team/storage`: separate Shop, Scouting, Pit logs and Pit assets allowances, searchable/paged oldest-eligible files, protected dates and streamed individual/all/eligible downloads. Production auth stays on `AdminOnly`; Vite dev alone exposes `/preview/storage` with labeled sample data and disabled downloads. `apps/portal/docs/storage.md` explains retention and alerts.
+- `/admin/storage/seasons` (`season-page.tsx`) reviews Scouting by game year, explicitly selects unlinked items, prepares/downloads bounded archives, verifies reselected saved files with SHA-256, and asks for typed season confirmation before resetting. Progress can resume for 24 hours; completed parts are idempotent. `/preview/season` is dev-only sample review with exports/reset disabled. Other apps and device-only drafts/maps stay.

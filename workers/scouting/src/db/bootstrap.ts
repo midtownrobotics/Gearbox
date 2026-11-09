@@ -22,6 +22,8 @@ import {
   scoutingFormSubmissions,
   scoutingForms,
   scoutingMatchAssignments,
+  seasonExportParts,
+  seasonExports,
   serviceHelpers,
   serviceTickets,
   strategyAdmins,
@@ -60,6 +62,8 @@ export const teamTables = [
   strategyPresence,
   teamComments,
   tierLists,
+  seasonExports,
+  seasonExportParts,
 ];
 const adopted = new WeakMap<D1Database, Promise<void>>();
 /** Only the configured original team owns pre-tenancy rows, regardless of the first visitor. */

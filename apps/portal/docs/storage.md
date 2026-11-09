@@ -2,7 +2,7 @@
 title: Storage
 summary: Check storage usage, see which older files may be removed, and download a copy.
 order: 5.5
-pages: /admin/storage
+pages: /admin/storage /admin/storage/seasons
 access: admin
 ---
 
@@ -35,3 +35,17 @@ Active admins receive a message through the team's connected Slack or Discord wh
 Each threshold is reported once until usage drops **below 85%**. Automatic cleanup toward 90% does not restart the warning cycle. The next save observes manual removals and rearms warnings if enough space was freed. Usage warnings follow saves or refused saves, without needing this page open.
 
 Cleanup summaries arrive after actual deletions: the first immediately, then at most once an hour when another cleanup happens. Chat delivery is best effort; teams without connected chat can still check Storage and the Log. These messages are separate from the announcement settings on Notifications.
+
+## Export and reset a season
+
+Open **Export and reset** on Storage, enter the **Game year**, and choose **Review season**. This covers Scouting's game data. Records linked to that year's official events are selected. Review and select any items marked **Choose manually** that belong to the same game, such as manual events, auton routines, shared field maps, robot profiles and photos, or reports without an event. Event dates and upload dates do not decide which game an item belongs to.
+
+1. Choose **Prepare export**, then **Download** every archive part. Each part contains up to 100 records and 64 MiB of files, with records in `data.json`, the available uploaded files, a file manifest, relevant form templates, and the generic field image. Missing files are listed. Unusually large items need a separate download and help before resetting.
+2. Keep the downloaded archives somewhere safe. Use **Verify saved archives** to select all the saved **.tar** files. An incomplete, changed, or unrelated archive will not pass. You can choose **Finish without reset** to keep all the data in Gearbox.
+3. To clear the selected game data, choose **Reset backed-up data**, type the displayed **RESET** confirmation, and choose **Permanently reset**. This is permanent and can remove files less than six months old. It is separate from automatic cleanup at capacity.
+
+Other game years and unselected items stay. Accounts, settings, form templates, permissions, API keys, points balances and points history stay. An active event being reset is cleared, while its credentials and other settings stay. Shop, Pit and other apps are unchanged. Maps and drafts saved only on a device are outside the export and reset. There is no automatic restore from these archives.
+
+Records edited after the export and new records stay. A profile or event stays if it still has related data that was not removed. Files still referenced by another record, changed file versions, and older files outside the team's storage folder also stay. Review the season again after a reset to handle anything kept or added since export.
+
+One export can be in progress per team. Use **Resume** after reopening the page and verify your saved archives again. Finish within 24 hours or close the export and start another; expiration never deletes game data. If a reset is interrupted, keep every archive and resume the same export. Completed parts are safe to retry. Exports and resets require an admin signed in with their own account, not a kiosk PIN, and requests are recorded in the team's Log.

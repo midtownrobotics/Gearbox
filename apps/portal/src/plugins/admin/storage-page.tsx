@@ -16,6 +16,7 @@ import {
   tones,
 } from "@g3/ui";
 import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { platform } from "../../lib/platform";
 
 type AppStorage = {
@@ -332,6 +333,17 @@ export function StoragePage({ preview = false }: { preview?: boolean }) {
           steps are kept. Older Scouting files saved before team storage was introduced are outside
           these allowances. Switching an app off has its separate 90-day retention period.
         </p>
+      </Card>
+      <Card title="End of season">
+        <p className="mb-3 text-sm text-secondary-600">
+          Export a Scouting game year, then optionally reset the records and files you backed up.
+        </p>
+        <Link
+          className={buttonClass("secondary")}
+          to={preview ? "/preview/season" : "/admin/storage/seasons"}
+        >
+          Export and reset
+        </Link>
       </Card>
       {error && <ErrorBanner message={error} />}
       {!apps && loading && <Loading />}

@@ -15,3 +15,4 @@
 - `src/body-limit.ts` checks ordinary request bodies at 2 MiB before forwarding, including chunked bodies and misleading Content-Type headers. Actual file/printing routes, including cross-app aliases, retain their route-specific limits. Add a new upload route to its exemption list only when that route enforces a suitable file limit.
 
 - Storage counts and downloads (`/team/storage`, including aliases) spend the costly-route quota.
+- Season reviews, exports and resets (`/team/seasons`, including aliases) also spend the costly-route quota. The public demo blocks all season tools.
