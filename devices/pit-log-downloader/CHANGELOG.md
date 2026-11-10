@@ -1,5 +1,11 @@
 # @g3/pit-log-downloader
 
+## 2.3.1
+
+### Patch Changes
+
+- ec78275: A log Pit already has another copy of is no longer tried again on every pass: the downloader says to delete it in Pit to upload this one.
+
 ## 2.3.0
 
 ### Minor Changes

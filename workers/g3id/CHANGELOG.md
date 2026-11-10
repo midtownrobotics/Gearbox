@@ -1,5 +1,20 @@
 # @g3/worker-g3id
 
+## 5.0.0
+
+### Major Changes
+
+- c0bf6ae: Choose on Storage whether a full allowance deletes the oldest files or keeps every file and stops uploads. Warnings reflect that choice without repeating on rejected uploads or mode changes. Apply ID migration 0024 before deployment.
+
+### Minor Changes
+
+- 0049e87: Gearbox's operators see each team's member count and how much its apps store, and a team's page no longer shows its members' names or emails unless an operator opens the member list with a reason. Admins see the two apart: Operator Access lists when operators opened the team's details, and the new Member Access page lists when they opened its member list.
+- b52c837: Admins can let people sign up with Google or GitHub instead of the team's Slack or Discord (Admin → Sign-in, off by default). Those sign-ups pass a quick check that they're a person and wait for an admin's approval.
+
+### Patch Changes
+
+- 72f42fa: Tighter security: pages running on someone's own computer can no longer call the live apps.
+
 ## 4.2.1
 
 ### Patch Changes

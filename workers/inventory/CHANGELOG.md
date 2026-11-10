@@ -1,5 +1,11 @@
 # @g3/worker-inventory
 
+## 1.2.3
+
+### Patch Changes
+
+- 72f42fa: Tighter security: pages running on someone's own computer can no longer call the live apps.
+
 ## 1.2.2
 
 ### Patch Changes
