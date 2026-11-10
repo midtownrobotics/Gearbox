@@ -15,6 +15,11 @@ import {
   useTeamNames,
 } from "@g3/ui";
 import {
+  FIELD_DRAWING_TYPE,
+  createFieldDrawing,
+  fieldDrawingFile,
+} from "@g3/worker-scouting/field-drawing";
+import {
   ArrowRight,
   Camera,
   CirclePlus,
@@ -51,7 +56,9 @@ import { MatchPredictions } from "./Game";
 import { Operations } from "./Operations";
 import { ScoutingAdminPage, ScoutingForms } from "./ScoutingForms";
 import { SortableTierRow, SortableTiers } from "./SortableTiers";
+import { VectorFieldMapEditor } from "./VectorFieldMapEditor";
 import { API_URL, api } from "./api";
+import { fieldDrawingImage, sharedFieldSvg } from "./field-drawing-view";
 import { clearInputError, showTeamNumberError } from "./input-validation";
 import {
   deleteLocalFieldMap,
@@ -61,7 +68,11 @@ import {
   saveLocalFieldMap,
 } from "./local-field-maps";
 import { TierListAutosave } from "./tier-list-autosave";
-import { type ParsedTrajectory, parseTrajectoryFile, trajectoryToPng } from "./trajectory-files";
+import {
+  type ParsedTrajectory,
+  parseTrajectoryFile,
+  trajectoryToDrawing,
+} from "./trajectory-files";
 
 type Page = "forms" | "predictions" | "admin" | "analysis" | "service" | "autos" | "tiers" | "maps";
 type User = {
@@ -570,7 +581,42 @@ function TierLists() {
   );
 }
 
-function MapCanvas({
+function MapCanvas(props: { onSaved: () => Promise<void>; editingMap: FieldMap | null }) {
+  const [legacy, setLegacy] = useState<boolean | null>(null);
+  useEffect(() => {
+    let active = true;
+    setLegacy(null);
+    if (props.editingMap?.image) {
+      setLegacy(props.editingMap.image.type !== FIELD_DRAWING_TYPE);
+      return;
+    }
+    void getFieldMapPreset()
+      .then(async (preset) => {
+        const custom =
+          preset &&
+          (preset.type !== "image/svg+xml" || (await preset.text()) !== (await sharedFieldSvg()));
+        if (active) setLegacy(Boolean(custom));
+      })
+      .catch(() => {
+        if (active) setLegacy(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [props.editingMap]);
+  if (legacy === null) return <p>Loading field?</p>;
+  return legacy ? (
+    <LegacyMapCanvas {...props} />
+  ) : (
+    <VectorFieldMapEditor
+      key={props.editingMap?.id ?? "new"}
+      map={props.editingMap}
+      onSaved={props.onSaved}
+    />
+  );
+}
+
+function LegacyMapCanvas({
   onSaved,
   editingMap,
 }: {
@@ -1151,6 +1197,18 @@ function FieldMaps({ user }: { user: User }) {
       api<{ canShare: boolean }>("/field-map-permissions"),
     ]);
     setCanShare(permission.canShare);
+    const localMaps = await Promise.all(
+      stored.map(async (map) => ({
+        id: map.id,
+        name: map.name,
+        eventName: map.eventName,
+        notes: map.notes,
+        imageUrl: URL.createObjectURL(await fieldDrawingImage(map.image)),
+        image: map.image,
+        updatedAt: map.updatedAt,
+        shared: false,
+      })),
+    );
     setMaps((current) => {
       for (const map of current)
         if (map.imageUrl.startsWith("blob:")) URL.revokeObjectURL(map.imageUrl);
@@ -1160,16 +1218,7 @@ function FieldMaps({ user }: { user: User }) {
           shared: true,
           imageUrl: `${API_URL}${map.imageUrl}`,
         })),
-        ...stored.map((map) => ({
-          id: map.id,
-          name: map.name,
-          eventName: map.eventName,
-          notes: map.notes,
-          imageUrl: URL.createObjectURL(map.image),
-          image: map.image,
-          updatedAt: map.updatedAt,
-          shared: false,
-        })),
+        ...localMaps,
       ];
     });
     if (user.isAdmin) {
@@ -1202,7 +1251,11 @@ function FieldMaps({ user }: { user: User }) {
       data.set("notes", map.notes);
       data.set(
         "image",
-        new File([map.image], `${map.name}.png`, { type: map.image.type || "image/png" }),
+        new File(
+          [map.image],
+          `${map.name}.${map.image.type === FIELD_DRAWING_TYPE ? "json" : "png"}`,
+          { type: map.image.type || "image/png" },
+        ),
       );
       await api("/field-maps", { method: "POST", body: data });
       setMapMessage(`“${map.name}” is now shared with the team.`);
@@ -1401,8 +1454,10 @@ function AutoLibrary() {
       data.set("team", form.team);
       data.set("description", "");
       data.set("steps", "[]");
+      if (routeInput === "draw" && !drawnRoute)
+        throw new Error("Finish drawing a valid route before saving.");
       if (routeInput === "draw" && drawnRoute) data.set("image", drawnRoute);
-      else if (trajectory) data.set("image", await trajectoryToPng(trajectory));
+      else if (trajectory) data.set("image", trajectoryToDrawing(trajectory));
       await api("/autos", { method: "POST", body: data });
       setForm({ name: "", team: "" });
       setTrajectory(null);
@@ -1686,10 +1741,10 @@ function AutoRouteDrawing({ onChange }: { onChange: (file: File | null) => void 
   const activePointer = useRef<number | null>(null);
   const strokesRef = useRef<RouteStroke[]>([]);
   const history = useRef<RouteStroke[][]>([]);
-  const exportVersion = useRef(0);
   const [strokes, setStrokes] = useState<RouteStroke[]>([]);
   const [canUndo, setCanUndo] = useState(false);
   const [fieldReady, setFieldReady] = useState(false);
+  const [drawingError, setDrawingError] = useState("");
   const [color, setColor] = useState("#ff334f");
 
   const render = useCallback((items: RouteStroke[]) => {
@@ -1722,13 +1777,22 @@ function AutoRouteDrawing({ onChange }: { onChange: (file: File | null) => void 
 
   const exportDrawing = useCallback(
     (items: RouteStroke[]) => {
-      const version = ++exportVersion.current;
       const canvas = canvasRef.current;
       if (!canvas || !items.length) return onChange(null);
-      canvas.toBlob((blob) => {
-        if (version !== exportVersion.current) return;
-        onChange(blob ? new File([blob], "drawn-auto.png", { type: "image/png" }) : null);
-      }, "image/png");
+      try {
+        const drawing = createFieldDrawing(
+          items.map((stroke) => ({
+            tool: "route",
+            color: stroke.color,
+            points: stroke.points.map((p) => [p.x / canvas.width, p.y / canvas.height]),
+          })),
+        );
+        onChange(fieldDrawingFile(drawing, "drawn-auto.json"));
+        setDrawingError("");
+      } catch (error) {
+        onChange(null);
+        setDrawingError((error as Error).message);
+      }
     },
     [onChange],
   );
@@ -1747,7 +1811,6 @@ function AutoRouteDrawing({ onChange }: { onChange: (file: File | null) => void 
     field.src = "/field-2026.svg";
     return () => {
       field.onload = null;
-      exportVersion.current++;
     };
   }, [render]);
 
@@ -1830,6 +1893,7 @@ function AutoRouteDrawing({ onChange }: { onChange: (file: File | null) => void 
 
   return (
     <div className="auto-drawing">
+      {drawingError && <p className="field-error">{drawingError}</p>}
       <div className="auto-drawing-toolbar">
         <div className="drawing-colors" aria-label="Route color">
           {["#ff334f", "#36a3ff", "#35d06f", "#ffd43b"].map((option) => (

@@ -67,6 +67,8 @@ export const OPERATOR_ACTIONS = [
   // Migration 0013.
   "block_reporter",
   "unblock_reporter",
+  // Migration 0018: a team's details opened, without its members ("view_team" is its member list).
+  "view_team_details",
 ] as const;
 
 /** The operator access log: every action, and each look at a team's members (migration 0003). */

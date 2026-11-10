@@ -520,3 +520,53 @@ describe("the wishlist", () => {
     );
   });
 });
+
+describe("sending ordered items back to the cart", () => {
+  async function placed(count: number) {
+    const { id: categoryId } = await newCategory(`Send back ${crypto.randomUUID()}`);
+    const ids: number[] = [];
+    for (let i = 0; i < count; i++) {
+      const r = await newRequest(categoryId);
+      await jsonAs(mentor, `/requests/${r.id}/approve`, { method: "POST", body: {} });
+      ids.push(r.id);
+    }
+    const { orderId } = await jsonAs<{ orderId: number }>(mentor, "/orders", {
+      method: "POST",
+      body: {
+        vendor: "WCP",
+        lines: ids.map((requestId) => ({ requestId, quantity: 2, unitPriceCents: 450 })),
+        shippingCents: 900,
+        taxCents: 0,
+      },
+    });
+    return { ids, orderId };
+  }
+  const openOrders = async () =>
+    (await jsonAs<{ open: { id: number }[] }>(mentor, "/orders/receiving")).open.map((o) => o.id);
+
+  it("approves them again, and removes an order left empty", async () => {
+    const { ids, orderId } = await placed(2);
+    const sendBack = (user: typeof student, body: unknown) =>
+      callAs(user, "/orders/send-back", { method: "POST", body });
+    expect((await sendBack(student, { ids: [ids[0]] })).status).toBe(403);
+    expect((await sendBack(kioskAdmin, { ids: [ids[0]] })).status).toBe(403);
+
+    expect(
+      await jsonAs(mentor, "/orders/send-back", { method: "POST", body: { ids: [ids[0]] } }),
+    ).toEqual({ sentBack: [ids[0]], skipped: [] });
+    const first = await jsonAs<{
+      status: string;
+      orderId: number | null;
+      events: { action: string }[];
+    }>(student, `/requests/${ids[0]}`);
+    expect(first).toMatchObject({ status: "approved", orderId: null });
+    expect(first.events.at(-1)?.action).toBe("sent_back");
+    // The other item is still on the order.
+    expect(await openOrders()).toContain(orderId);
+
+    // Twice is a conflict; the last item takes the order with it.
+    expect((await sendBack(mentor, { ids: [ids[0]] })).status).toBe(409);
+    await jsonAs(mentor, "/orders/send-back", { method: "POST", body: { ids: [ids[1]] } });
+    expect(await openOrders()).not.toContain(orderId);
+  });
+});

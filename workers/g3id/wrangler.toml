@@ -36,6 +36,10 @@ STEAM_REDIRECT_URI = "http://localhost:5173/api/auth/steam/callback"
 # DISCORD_BOT_TOKEN in .dev.vars. Discord is always offered, so they're required.
 DISCORD_REDIRECT_URI = "http://localhost:5173/api/auth/discord/callback"
 FRONTEND_URL = "http://localhost:5173"
+# Turnstile, for signing up without chat (docs/deploy.md, "Turnstile"): Cloudflare's test keys,
+# which always pass. Production and staging set both as secrets.
+TURNSTILE_SITE_KEY = "1x00000000000000000000AA"
+TURNSTILE_SECRET_KEY = "1x0000000000000000000000000000000AA"
 # Local dev: every team's addresses go through the dev gateway (http://<number>-id.gearbox.localhost:8796).
 LOCAL_GATEWAY_URL = "http://localhost:8796"
 
@@ -74,6 +78,8 @@ STEAM_REDIRECT_URI = "https://id.frcgearbox.com/api/auth/steam/callback"
 FRONTEND_URL = "https://1648-id.frcgearbox.com"
 # The Discord app's client ID (not secret). Secrets: DISCORD_CLIENT_SECRET, DISCORD_BOT_TOKEN.
 DISCORD_CLIENT_ID = "1560731248853258314"
+# Signing up without chat needs the Turnstile widget's keys, both set as secrets:
+# TURNSTILE_SITE_KEY, TURNSTILE_SECRET_KEY (docs/deploy.md, "Turnstile").
 
 [observability]
 enabled = false

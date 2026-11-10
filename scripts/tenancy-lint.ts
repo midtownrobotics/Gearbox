@@ -48,6 +48,8 @@ const APPS: App[] = [
       scoutingFormSubmissions: "scouting_form_submissions",
       scoutingForms: "scouting_forms",
       scoutingMatchAssignments: "scouting_match_assignments",
+      seasonExports: "season_exports",
+      seasonExportParts: "season_export_parts",
       serviceHelpers: "service_helpers",
       serviceTickets: "service_tickets",
       strategyAdmins: "strategy_admins",

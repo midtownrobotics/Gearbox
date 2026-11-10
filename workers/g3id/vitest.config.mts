@@ -4,12 +4,52 @@ import { fakeDiscord } from "@g3/testing/discord";
 
 const sent: { channel: string; text: string }[] = [];
 
+// Turnstile's check: the token "pass" passes, anything else fails.
+const turnstile = async (request: Request) => {
+  const form = await request.formData();
+  return Response.json({ success: form.get("response") === "pass" });
+};
+
+// Google's and GitHub's sign-in: the code names the person, "<id>:<email>" ("-" for no email).
+const person = (code: string) => {
+  const [id, email] = code.split(":");
+  return { id, email: email === "-" ? null : email };
+};
+const jwt = (payload: object) =>
+  `x.${btoa(JSON.stringify(payload)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")}.x`;
+const google = async (request: Request) => {
+  const { id, email } = person(String((await request.formData()).get("code")));
+  return Response.json({
+    id_token: jwt({ sub: id, email, email_verified: !!email, name: `Google ${id}` }),
+    access_token: "google-token",
+    expires_in: 3600,
+  });
+};
+const github = async (request: Request) => {
+  const url = new URL(request.url);
+  if (url.pathname === "/login/oauth/access_token") {
+    const code = String((await request.formData()).get("code"));
+    return Response.json({ access_token: `gh:${code}` });
+  }
+  const { id, email } = person(
+    (request.headers.get("Authorization") ?? "").replace("Bearer gh:", ""),
+  );
+  if (url.pathname === "/user") {
+    return Response.json({ id: Number(id), login: `gh${id}`, name: null, email });
+  }
+  if (url.pathname === "/user/emails") return Response.json([]);
+  return new Response("Not stubbed", { status: 502 });
+};
+
 // Slack's API as G3ID's tests see it: installing (oauth.v2.access) answers for the workspace named
 // in the code ("ws:T123"), its channels are three made-up ones, and messages go nowhere.
 const slack = (request: Request) => {
   const url = new URL(request.url);
   // Discord's API: @g3/testing's fake (packages/testing/src/discord.ts).
   if (url.hostname === "discord.com") return fakeDiscord(request);
+  if (url.hostname === "challenges.cloudflare.com") return turnstile(request);
+  if (url.hostname === "oauth2.googleapis.com") return google(request);
+  if (url.hostname === "github.com" || url.hostname === "api.github.com") return github(request);
   if (url.hostname !== "slack.com") return new Response("Not stubbed", { status: 502 });
   if (url.pathname === "/api/oauth.v2.access") {
     return request.formData().then((form) => {
@@ -98,6 +138,9 @@ export default workerTestConfig({
     DISCORD_CLIENT_SECRET: "test-discord-secret",
     DISCORD_BOT_TOKEN: "test-discord-bot",
     SECRETS_KEY: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+    // Google's and GitHub's sign-in (GitHub's signs its state with its secret).
+    GOOGLE_CLIENT_SECRET: "test-google-secret",
+    GITHUB_CLIENT_SECRET: "test-github-secret",
     // Production addresses for other teams, not the dev gateway's.
     LOCAL_GATEWAY_URL: "",
   },

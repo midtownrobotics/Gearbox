@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import type { AppManifest } from "@g3/auth";
+import type { AppManifest, StorageByTeam } from "@g3/auth";
 import type { AppName } from "@g3/site-config";
 import { teamKey } from "@g3/site-config";
 import { manifest as attendance } from "@g3/worker-attendance/manifest";
@@ -33,7 +33,7 @@ export const MANIFESTS: Record<AppName, AppManifest> = {
 };
 
 /** Each app's service binding here, for its seed and delete hooks. */
-const BINDINGS: Partial<Record<AppName, keyof AppEnv["Bindings"]>> = {
+export const BINDINGS: Partial<Record<AppName, keyof AppEnv["Bindings"]>> = {
   attendance: "ATTENDANCE",
   edge: "EDGE",
   inventory: "INVENTORY",
@@ -81,6 +81,31 @@ export async function fetchExport(
     console.error(`[apps] export ${app} for ${teamId}`, res.status, await res.text());
   } catch (err) {
     console.error(`[apps] export ${app} for ${teamId}`, err);
+  }
+  return null;
+}
+
+/** The apps that keep files in R2 and count them per team (their `storage` hook). */
+export const STORING = Object.values(MANIFESTS).filter((app) => app.hooks.storage);
+
+/**
+ * How much an app keeps in R2 for every team (its `GET /api/internal/storage`, which lists its
+ * whole bucket: slow, so only when an operator asks), or null when it didn't answer.
+ */
+export async function fetchStorage(
+  env: AppEnv["Bindings"],
+  app: AppName,
+): Promise<StorageByTeam | null> {
+  const binding = BINDINGS[app];
+  if (!binding || !MANIFESTS[app].hooks.storage) return null;
+  try {
+    const res = await (env[binding] as Fetcher).fetch(
+      new Request(`http://${app}/api/internal/storage`),
+    );
+    if (res.ok) return (await res.json()) as StorageByTeam;
+    console.error(`[apps] storage ${app}`, res.status, await res.text());
+  } catch (err) {
+    console.error(`[apps] storage ${app}`, err);
   }
   return null;
 }

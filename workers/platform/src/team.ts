@@ -24,6 +24,8 @@ import {
   visibleNotifications,
 } from "./notifications";
 import { ALWAYS_ON, MANIFESTS, callHook, fetchExport, inLibrary, isAppName } from "./registry";
+import { seasonRoutes } from "./seasons";
+import { storageRoutes } from "./storage";
 import type { AppEnv } from "./types";
 
 // A team's apps (roadmap 4.2 to 4.4), for the team's own pages: the gateway sends
@@ -44,16 +46,14 @@ import type { AppEnv } from "./types";
 
 /**
  * What an operator did with the team that its admins see (the privacy policy's operator access
- * log): opening its member list, and changing who owns it or whether it's suspended. Reports about
- * its number aren't access to its data, and stay with the operators.
+ * log), in two lists: `team`, opening its details (no member's name or email) and changing who
+ * owns it or whether it's suspended; `members`, opening its member list. Reports about its number
+ * aren't access to its data, and stay with the operators.
  */
-const TEAM_VISIBLE_OPERATOR_ACTIONS = [
-  "view_team",
-  "transfer_owner",
-  "suspend_team",
-  "reactivate_team",
-  "renumber_team",
-] as const;
+const TEAM_VISIBLE_OPERATOR_ACTIONS = {
+  team: ["view_team_details", "transfer_owner", "suspend_team", "reactivate_team", "renumber_team"],
+  members: ["view_team"],
+} as const;
 
 /** How long a switched-off app's data is kept (the privacy policy's 90 days). */
 export const GRACE_S = 90 * 24 * 60 * 60;
@@ -144,6 +144,8 @@ export const termsOutdated = (accepted: string | null) =>
   accepted === null || accepted < site.legal.termsRequired;
 
 export const teamRouter = new Hono<AppEnv>()
+  .route("/storage", storageRoutes)
+  .route("/seasons", seasonRoutes)
   // The terms the team's owner accepted, and whether the home page should ask them to accept the
   // current ones (a material change since). Only the owner is asked, never on a kiosk.
   .get("/terms", requireAuth, async (c) => {
@@ -395,16 +397,18 @@ export const teamRouter = new Hono<AppEnv>()
       })),
     );
   })
-  // Every time a Gearbox operator opened the team's data or changed it, with their reason: never
-  // which operator (they're volunteers), only that one did.
+  // Every time a Gearbox operator opened the team's details or changed it (?kind=team, the
+  // default), or opened its member list (?kind=members), with their reason: never which operator
+  // (they're volunteers), only that one did.
   .get("/operator-access", async (c) => {
+    const kind = c.req.query("kind") === "members" ? "members" : "team";
     const rows = await db(c.env)
       .select()
       .from(operatorActions)
       .where(
         and(
           eq(operatorActions.teamId, c.get("teamId")),
-          inArray(operatorActions.action, [...TEAM_VISIBLE_OPERATOR_ACTIONS]),
+          inArray(operatorActions.action, [...TEAM_VISIBLE_OPERATOR_ACTIONS[kind]]),
         ),
       )
       .orderBy(desc(operatorActions.createdAt))

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { MessageBatch } from "@cloudflare/workers-types";
-import { requireAuth } from "@g3/auth";
+import { requireAuth, storageLimitResponse } from "@g3/auth";
 import { corsOrigin } from "@g3/site-config";
 import { withApiPrefix } from "@g3/site-config/worker";
 import { Hono } from "hono";
@@ -38,6 +38,8 @@ import type { AppEnv } from "./types";
 const base = new Hono<AppEnv>();
 
 base.onError((err, c) => {
+  const storage = storageLimitResponse(err);
+  if (storage) return storage;
   console.error(err);
   return c.json({ error: "Internal server error." }, 500);
 });

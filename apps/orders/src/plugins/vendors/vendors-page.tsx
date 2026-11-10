@@ -301,7 +301,7 @@ function ProfileForm({
             checked={f.taxExempt}
             onChange={(e) => set({ taxExempt: e.target.checked })}
           />
-          Tax exempt (certificate on file)
+          Tax exempt
         </label>
         {f.taxExempt && (
           <label className="flex items-center gap-2">

@@ -11,7 +11,7 @@ export const manifest = defineManifest({
   integrations: ["slack or discord", "the blue alliance"],
   availability: "every team",
   version: packageJson.version,
-  hooks: { seed: true, delete: true, export: true, demo: true },
+  hooks: { seed: true, delete: true, export: true, demo: true, storage: true },
   settings: [
     {
       key: "pointsLabel",

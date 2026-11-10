@@ -13,7 +13,7 @@ order: 1
 
 ## Your members
 
-- [ ] Ask members to sign up from your team's home page, with your team's Slack or Discord
+- [ ] Ask members to sign up from your team's home page, with your team's Slack or Discord (or Google or GitHub, if you allowed it on [Sign-in](/portal/sign-in))
 - [ ] [Approve them](/portal/members) as they ask to join. Admins get a chat message for each one
 - [ ] Give mentors the **Mentor** role, and a few trusted people **Admin** (see [who can do what](/start/roles))
 

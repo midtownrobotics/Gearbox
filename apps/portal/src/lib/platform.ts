@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { type AppName, apiPath } from "@g3/site-config";
+import { redirectToSignIn } from "@g3/ui";
 
 // The platform's API for the team's own pages (workers/platform/src/team.ts), through the
 // gateway's /api/~platform, which says which team it's for.
@@ -43,7 +44,13 @@ export type LogEntry = {
 /** A time a Gearbox operator opened or changed the team (never which operator). */
 export type OperatorAccess = {
   id: string;
-  action: "view_team" | "transfer_owner" | "suspend_team" | "reactivate_team" | "renumber_team";
+  action:
+    | "view_team_details"
+    | "view_team"
+    | "transfer_owner"
+    | "suspend_team"
+    | "reactivate_team"
+    | "renumber_team";
   reason: string | null;
   /** A handover's members. */
   from: string | null;
@@ -99,6 +106,7 @@ export async function platform<T>(path: string, init?: { method: string; body?: 
     headers: init?.body === undefined ? undefined : { "Content-Type": "application/json" },
     body: init?.body === undefined ? undefined : JSON.stringify(init.body),
   });
+  if (res.status === 401) redirectToSignIn();
   const data = (await res.json().catch(() => ({}))) as T & { error?: string };
   if (!res.ok) throw new Error(data.error ?? "Something went wrong. Please try again.");
   return data as T;
