@@ -16,6 +16,110 @@ Each release of the whole platform, newest first, with the version of every app 
 
 <!-- releases -->
 
+## 2026.11.2 (2026-11-10)
+
+| App | Version |
+| --- | --- |
+| **G3ID** | **5.0.0** (was 4.2.1) |
+| **Portal** | **2.6.0** (was 2.5.0) |
+| **Platform** | **4.3.0** (was 4.2.0) |
+| **Shop** | **5.0.0** (was 4.0.2) |
+| **Pit** | **4.0.0** (was 3.2.2) |
+| **Orders** | **2.4.0** (was 2.3.2) |
+| **Edge** | **2.4.3** (was 2.4.2) |
+| Edge agent | 0.7.0 |
+| **Pit log downloader** | **2.3.1** (was 2.3.0) |
+| **Scouting** | **4.0.0** (was 3.1.2) |
+| **Skill Tree** | **2.2.3** (was 2.2.2) |
+| **Attendance** | **2.2.3** (was 2.2.2) |
+| **Inventory** | **1.2.3** (was 1.2.2) |
+| **Schedule** | **0.4.3** (was 0.4.2) |
+
+### G3ID 5.0.0
+
+- Gearbox's operators see each team's member count and how much its apps store, and a team's page no longer shows its members' names or emails unless an operator opens the member list with a reason. Admins see the two apart: Operator Access lists when operators opened the team's details, and the new Member Access page lists when they opened its member list.
+- Tighter security: pages running on someone's own computer can no longer call the live apps.
+- Admins can let people sign up with Google or GitHub instead of the team's Slack or Discord (Admin → Sign-in, off by default). Those sign-ups pass a quick check that they're a person and wait for an admin's approval.
+- Choose on Storage whether a full allowance deletes the oldest files or keeps every file and stops uploads. Warnings reflect that choice without repeating on rejected uploads or mode changes. Apply ID migration 0024 before deployment.
+
+### Portal 2.6.0
+
+- Gearbox's operators see each team's member count and how much its apps store, and a team's page no longer shows its members' names or emails unless an operator opens the member list with a reason. Admins see the two apart: Operator Access lists when operators opened the team's details, and the new Member Access page lists when they opened its member list.
+- When storage exceeds its allowance, remove files over six months old first, then the oldest remaining files as needed toward 90% usage. Recent files can now be removed; download files you want to keep before reaching the cap. Pit log cleanup remains opt-in.
+- Members who aren't admins now have Apps and Account tabs in Portal's bar.
+- Export a Scouting game season with its files, verify saved backups, and optionally reset only the backed-up data. Apply Scouting migration 0043 before deploying.
+- Admins can let people sign up with Google or GitHub instead of the team's Slack or Discord (Admin → Sign-in, off by default). Those sign-ups pass a quick check that they're a person and wait for an admin's approval.
+- Admins can check storage usage, review files eligible for cleanup, and download individual files or whole archives from Portal's Storage page. Warn admins at 90%, 95%, and 100%, without repeating warnings after cleanup to 90%. Apply each file-storing app's storage usage notice migration before deploying.
+- Choose on Storage whether a full allowance deletes the oldest files or keeps every file and stops uploads. Warnings reflect that choice without repeating on rejected uploads or mode changes. Apply ID migration 0024 before deployment.
+
+### Platform 4.3.0
+
+- Console: the Cloudflare page counts usage over the plan's billing period, shows each meter's percent of the plan, shows security events on Free plan zones, sorts its tables by any column, and lays out each zone in its own box with its lists boxed.
+- The operators' console has a Cloudflare page: this month's usage against the plan, an estimated bill, warnings near a limit, traffic, security events and deploys.
+- The operators' console opens a team only after the operator gives a reason, in a dialog that says what the team's details hold and that the team's admins will see it on their Operator Access page.
+- Gearbox's operators see each team's member count and how much its apps store, and a team's page no longer shows its members' names or emails unless an operator opens the member list with a reason. Admins see the two apart: Operator Access lists when operators opened the team's details, and the new Member Access page lists when they opened its member list.
+- Export a Scouting game season with its files, verify saved backups, and optionally reset only the backed-up data. Apply Scouting migration 0043 before deploying.
+- Admins can check storage usage, review files eligible for cleanup, and download individual files or whole archives from Portal's Storage page. Warn admins at 90%, 95%, and 100%, without repeating warnings after cleanup to 90%. Apply each file-storing app's storage usage notice migration before deploying.
+- Choose on Storage whether a full allowance deletes the oldest files or keeps every file and stops uploads. Warnings reflect that choice without repeating on rejected uploads or mode changes. Apply ID migration 0024 before deployment.
+
+### Shop 5.0.0
+
+- Gearbox's operators see each team's member count and how much its apps store, and a team's page no longer shows its members' names or emails unless an operator opens the member list with a reason. Admins see the two apart: Operator Access lists when operators opened the team's details, and the new Member Access page lists when they opened its member list.
+- Tighter security: pages running on someone's own computer can no longer call the live apps.
+- When storage exceeds its allowance, remove files over six months old first, then the oldest remaining files as needed toward 90% usage. Recent files can now be removed; download files you want to keep before reaching the cap. Pit log cleanup remains opt-in.
+- Admins can check storage usage, review files eligible for cleanup, and download individual files or whole archives from Portal's Storage page. Warn admins at 90%, 95%, and 100%, without repeating warnings after cleanup to 90%. Apply each file-storing app's storage usage notice migration before deploying.
+- Choose on Storage whether a full allowance deletes the oldest files or keeps every file and stops uploads. Warnings reflect that choice without repeating on rejected uploads or mode changes. Apply ID migration 0024 before deployment.
+- Keep file storage within per-team caps. When a new upload would exceed a cap, permanently remove files older than six calendar months first, then the oldest remaining files, including recent files, as needed toward 90% usage. Pit's match logs are only removed when the team chose Delete the oldest logs (the default keeps every log). Written Scouting reports and auton steps remain when their images are removed. Scouts saving at the same time no longer wait for each other while the team is well under its cap. Admin cleanup summaries include sizes and age. Apply coordination and notice migrations before deployment and honor the owner-notice period before changing live retention.
+
+### Pit 4.0.0
+
+- Gearbox's operators see each team's member count and how much its apps store, and a team's page no longer shows its members' names or emails unless an operator opens the member list with a reason. Admins see the two apart: Operator Access lists when operators opened the team's details, and the new Member Access page lists when they opened its member list.
+- Tighter security: pages running on someone's own computer can no longer call the live apps.
+- When storage exceeds its allowance, remove files over six months old first, then the oldest remaining files as needed toward 90% usage. Recent files can now be removed; download files you want to keep before reaching the cap. Pit log cleanup remains opt-in.
+- Admins can check storage usage, review files eligible for cleanup, and download individual files or whole archives from Portal's Storage page. Warn admins at 90%, 95%, and 100%, without repeating warnings after cleanup to 90%. Apply each file-storing app's storage usage notice migration before deploying.
+- Choose on Storage whether a full allowance deletes the oldest files or keeps every file and stops uploads. Warnings reflect that choice without repeating on rejected uploads or mode changes. Apply ID migration 0024 before deployment.
+- Keep file storage within per-team caps. When a new upload would exceed a cap, permanently remove files older than six calendar months first, then the oldest remaining files, including recent files, as needed toward 90% usage. Pit's match logs are only removed when the team chose Delete the oldest logs (the default keeps every log). Written Scouting reports and auton steps remain when their images are removed. Scouts saving at the same time no longer wait for each other while the team is well under its cap. Admin cleanup summaries include sizes and age. Apply coordination and notice migrations before deployment and honor the owner-notice period before changing live retention.
+
+### Orders 2.4.0
+
+- Tighter security: pages running on someone's own computer can no longer call the live apps.
+- Carts: the "Place order" button is now "Mark Placed", and it asks you to check when shipping is $0 and the order doesn't qualify for the vendor's free shipping. Deliveries: mentors can send an item that's on order back to its cart. The tax-exempt note on Carts and the checkbox on Vendors no longer say "certificate on file".
+
+### Edge 2.4.3
+
+- Tighter security: pages running on someone's own computer can no longer call the live apps.
+
+### Pit log downloader 2.3.1
+
+- A log Pit already has another copy of is no longer tried again on every pass: the downloader says to delete it in Pit to upload this one.
+
+### Scouting 4.0.0
+
+- Save new drawn field paths and autonomous trajectories as compact coordinates over a shared field. Keep colors, arrows, shooting paths, undo, and saved drafts; existing images and custom backgrounds remain readable. Download paths as standalone SVGs, with original coordinate data and the shared field included in bulk backups.
+- Gearbox's operators see each team's member count and how much its apps store, and a team's page no longer shows its members' names or emails unless an operator opens the member list with a reason. Admins see the two apart: Operator Access lists when operators opened the team's details, and the new Member Access page lists when they opened its member list.
+- Tighter security: pages running on someone's own computer can no longer call the live apps.
+- When storage exceeds its allowance, remove files over six months old first, then the oldest remaining files as needed toward 90% usage. Recent files can now be removed; download files you want to keep before reaching the cap. Pit log cleanup remains opt-in.
+- Export a Scouting game season with its files, verify saved backups, and optionally reset only the backed-up data. Apply Scouting migration 0043 before deploying.
+- Admins can check storage usage, review files eligible for cleanup, and download individual files or whole archives from Portal's Storage page. Warn admins at 90%, 95%, and 100%, without repeating warnings after cleanup to 90%. Apply each file-storing app's storage usage notice migration before deploying.
+- Choose on Storage whether a full allowance deletes the oldest files or keeps every file and stops uploads. Warnings reflect that choice without repeating on rejected uploads or mode changes. Apply ID migration 0024 before deployment.
+- Keep file storage within per-team caps. When a new upload would exceed a cap, permanently remove files older than six calendar months first, then the oldest remaining files, including recent files, as needed toward 90% usage. Pit's match logs are only removed when the team chose Delete the oldest logs (the default keeps every log). Written Scouting reports and auton steps remain when their images are removed. Scouts saving at the same time no longer wait for each other while the team is well under its cap. Admin cleanup summaries include sizes and age. Apply coordination and notice migrations before deployment and honor the owner-notice period before changing live retention.
+
+### Skill Tree 2.2.3
+
+- Tighter security: pages running on someone's own computer can no longer call the live apps.
+
+### Attendance 2.2.3
+
+- Tighter security: pages running on someone's own computer can no longer call the live apps.
+
+### Inventory 1.2.3
+
+- Tighter security: pages running on someone's own computer can no longer call the live apps.
+
+### Schedule 0.4.3
+
+- Tighter security: pages running on someone's own computer can no longer call the live apps.
+
 ## 2026.11.1 (2026-11-01)
 
 | App | Version |

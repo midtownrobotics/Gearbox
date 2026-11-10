@@ -1,5 +1,9 @@
 # @g3/inventory
 
+## 1.2.3
+
+No changes in this release.
+
 ## 1.2.2
 
 No changes in this release.

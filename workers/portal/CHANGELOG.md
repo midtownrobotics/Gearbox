@@ -1,5 +1,20 @@
 # @g3/worker-portal
 
+## 2.6.0
+
+### Minor Changes
+
+- 0049e87: Gearbox's operators see each team's member count and how much its apps store, and a team's page no longer shows its members' names or emails unless an operator opens the member list with a reason. Admins see the two apart: Operator Access lists when operators opened the team's details, and the new Member Access page lists when they opened its member list.
+- c0bf6ae: Export a Scouting game season with its files, verify saved backups, and optionally reset only the backed-up data. Apply Scouting migration 0043 before deploying.
+- b52c837: Admins can let people sign up with Google or GitHub instead of the team's Slack or Discord (Admin → Sign-in, off by default). Those sign-ups pass a quick check that they're a person and wait for an admin's approval.
+- c0bf6ae: Admins can check storage usage, review files eligible for cleanup, and download individual files or whole archives from Portal's Storage page. Warn admins at 90%, 95%, and 100%, without repeating warnings after cleanup to 90%. Apply each file-storing app's storage usage notice migration before deploying.
+- c0bf6ae: Choose on Storage whether a full allowance deletes the oldest files or keeps every file and stops uploads. Warnings reflect that choice without repeating on rejected uploads or mode changes. Apply ID migration 0024 before deployment.
+
+### Patch Changes
+
+- c0bf6ae: When storage exceeds its allowance, remove files over six months old first, then the oldest remaining files as needed toward 90% usage. Recent files can now be removed; download files you want to keep before reaching the cap. Pit log cleanup remains opt-in.
+- b52c837: Members who aren't admins now have Apps and Account tabs in Portal's bar.
+
 ## 2.5.0
 
 ### Minor Changes
