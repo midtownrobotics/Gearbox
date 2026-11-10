@@ -96,24 +96,36 @@ const CSV_HEADER = [
 
 const RECENT_DAYS = 14;
 
+/** 1–200 distinct request ids, or null. */
+function requestIds(ids: unknown): number[] | null {
+  if (
+    !Array.isArray(ids) ||
+    ids.length === 0 ||
+    ids.length > 200 ||
+    !ids.every((id) => Number.isInteger(id) && id > 0)
+  ) {
+    return null;
+  }
+  return [...new Set(ids as number[])];
+}
+
 const receiveValidator = validator(
   "json",
   (value, c): { ids: number[]; inventory?: ReceiveDestination | null } => {
     const v = (value ?? {}) as { ids?: unknown; inventory?: unknown };
-    const ids = v.ids;
-    if (
-      !Array.isArray(ids) ||
-      ids.length === 0 ||
-      ids.length > 200 ||
-      !ids.every((id) => Number.isInteger(id) && id > 0)
-    ) {
-      return c.json({ error: "ids must be 1–200 request ids." }, 400) as never;
-    }
+    const ids = requestIds(v.ids);
+    if (!ids) return c.json({ error: "ids must be 1–200 request ids." }, 400) as never;
     const inventory = parseDestination(v.inventory);
     if (inventory && "error" in inventory) return c.json({ error: inventory.error }, 400) as never;
-    return { ids: [...new Set(ids as number[])], inventory };
+    return { ids, inventory };
   },
 );
+
+const idsValidator = validator("json", (value, c): { ids: number[] } => {
+  const ids = requestIds((value as { ids?: unknown } | null)?.ids);
+  if (!ids) return c.json({ error: "ids must be 1–200 request ids." }, 400) as never;
+  return { ids };
+});
 
 const trackingValidator = validator("json", (value, c): { tracking: string | null } => {
   const t = (value as { tracking?: unknown })?.tracking;
@@ -320,6 +332,92 @@ export const ordersRouter = new Hono<AppEnv>()
       /** How many went into Inventory; null when they weren't sent there. */
       inventoryAdded: sent.added,
     });
+  })
+  /**
+   * Sends ordered items back to the cart (mentors): they're approved again and off their vendor
+   * order, so they no longer count against the budget. An order left with no items is removed
+   * with its fees; one that keeps some items keeps its fees. Items not on order are skipped.
+   */
+  .post("/send-back", requireMentor, idsValidator, async (c) => {
+    const { ids } = c.req.valid("json");
+    const db = createOrdersDb(c.env.ORDERS_DB);
+    const teamId = c.get("teamId");
+    const rows = await inChunks(ids, (chunk) =>
+      db
+        .select({
+          id: orderRequests.id,
+          orderId: orderRequests.orderId,
+          vendor: orderRequests.vendor,
+        })
+        .from(orderRequests)
+        .where(
+          inTeam(
+            orderRequests,
+            teamId,
+            inArray(orderRequests.id, chunk),
+            eq(orderRequests.status, "ordered"),
+          ),
+        )
+        .all(),
+    );
+    if (rows.length === 0) return c.json({ error: "None of those items are on order." }, 409);
+    const orderOf = new Map(rows.map((r) => [r.id, r.orderId]));
+    const now = Date.now();
+    const sentBack = await inChunks(
+      rows.map((r) => r.id),
+      (chunk) =>
+        db
+          .update(orderRequests)
+          .set({ status: "approved", orderId: null, lineTotalCents: null, updatedAt: now })
+          // Still conditional on being on order, in case it was received a moment ago.
+          .where(
+            inTeam(
+              orderRequests,
+              teamId,
+              inArray(orderRequests.id, chunk),
+              eq(orderRequests.status, "ordered"),
+            ),
+          )
+          .returning({ id: orderRequests.id, vendor: orderRequests.vendor })
+          .all(),
+    );
+    // Seven values an event: 14 a statement stays under D1's 100 bound parameters.
+    for (let i = 0; i < sentBack.length; i += 14) {
+      await db.insert(requestEvents).values(
+        withTeam(
+          teamId,
+          sentBack.slice(i, i + 14).map((r) => {
+            const orderId = orderOf.get(r.id);
+            return {
+              requestId: r.id,
+              userId: c.get("userId"),
+              userName: c.get("userDisplayName"),
+              action: "sent_back",
+              note: orderId ? `Taken off ${r.vendor} order #${orderId}.` : null,
+              createdAt: now,
+            };
+          }),
+        ),
+      );
+    }
+    // Orders with nothing left on them go, with their fees.
+    const orderIds = [...new Set(rows.map((r) => r.orderId).filter((id) => id !== null))];
+    for (const orderId of orderIds) {
+      const left = await db
+        .select({ id: orderRequests.id })
+        .from(orderRequests)
+        .where(inTeam(orderRequests, teamId, eq(orderRequests.orderId, orderId)))
+        .get();
+      if (left) continue;
+      await db.batch([
+        db
+          .delete(orderCharges)
+          .where(inTeam(orderCharges, teamId, eq(orderCharges.orderId, orderId))),
+        db.delete(vendorOrders).where(inTeam(vendorOrders, teamId, eq(vendorOrders.id, orderId))),
+      ]);
+    }
+    const done = sentBack.map((r) => r.id);
+    return c.json({ sentBack: done, skipped: ids.filter((id) => !done.includes(id)) });
   })
   /** Sets or clears a placed order's tracking number. */
   .patch("/:id/tracking", requireMentor, trackingValidator, async (c) => {

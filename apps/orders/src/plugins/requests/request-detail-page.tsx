@@ -41,6 +41,7 @@ const EVENT_LABELS: Record<string, string> = {
   edited: "Edited",
   replaced: "Replaced item",
   reapproved: "Re-approved",
+  sent_back: "Sent back to the cart",
 };
 
 export function RequestDetailPage() {
