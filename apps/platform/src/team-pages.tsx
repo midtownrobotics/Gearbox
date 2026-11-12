@@ -56,7 +56,7 @@ export function TeamNumberForm({
         window.location.assign(teamHome(teamIdFor(program, teamNumber)));
       }}
     >
-      <ProgramPicker value={program} onChange={setProgram} />
+      <ProgramPicker value={program} onChange={setProgram} outlined />
       <label htmlFor="team-number" className="block text-sm font-medium text-secondary-700">
         Team number
       </label>
