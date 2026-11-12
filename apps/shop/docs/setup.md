@@ -26,9 +26,11 @@ A process is a step a part can go through: "Router", "Mill", "Lathe", "Deburr", 
 
 A part that uses files needs both file kinds, with the producer first. Batches and files, later in this section, covers them.
 
+Tick **Part info** on a process when parts need their material and thickness recorded for it, such as a router that cuts sheet stock. A part going through that process can't be added without them.
+
 ## Removing a subsystem or process
 
-Choose **Remove** beside one you no longer use, such as a typo or an old machine. If nothing uses it, it's deleted. If parts do, it's hidden from new parts (Ingest, Add Part, a part's processes), and parts that already have it keep it. The Shop Floor still shows a removed process while parts are at it.
+Choose the trash can beside one you no longer use, such as a typo or an old machine. If nothing uses it, it's deleted. If parts do, it's hidden from new parts (Ingest, Add Part, a part's processes), and parts that already have it keep it. The Shop Floor still shows a removed process while parts are at it.
 
 Switch on **Show removed** to see removed ones and **Restore** them. The required quality check can't be removed while it's required. Removing and restoring are in the team's log.
 
@@ -70,7 +72,3 @@ On a shop computer, open Shop's Admin page and choose **Enable kiosk mode on thi
 ## Shop status
 
 The Shop Floor's overview names how busy the shop is by how many parts are in the queue, from "Mooing Cow 🐮" to "Ash 🔥". Change the words, and the number of parts each one starts at, under **Shop Status** on Admin.
-
-## Extra part information
-
-Turn on **Require additional part information (material + thickness) at ingest** if you want every part's stock recorded before it goes to the shop.

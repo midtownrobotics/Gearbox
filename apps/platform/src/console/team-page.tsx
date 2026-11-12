@@ -224,7 +224,7 @@ function Members({
         hint="Names and emails are hidden. Open the member list only when you need it, for example to hand the team over. The team's admins will see that it was opened, when, and your reason."
         button="Open member list"
         question="Open the member list?"
-        warning="This shows the names and emails of the team's members. The team's admins will see on their Member Access page that a Gearbox operator opened it, when, and the reason you give. Each time you open it is logged."
+        warning="This shows the names and emails of the team's members. The team's admins will see on their Operator Access page that a Gearbox operator opened it, when, and the reason you give. Each time you open it is logged."
         open={async (reason) => {
           setList(await send<MemberList>("POST", `/teams/${teamId}/members`, { reason }));
           onChange();

@@ -20,8 +20,7 @@ Admins also get the team's admin pages, under **Admin** in the bar. Only what's 
 | Integrations | Connect Slack or Discord, and see what else is connected |
 | Storage | Check usage, review older files, download copies before cleanup |
 | Notifications | Who sees Gearbox's announcements, and where they're sent |
-| Operator Access | When Gearbox's operators opened your team's details or changed your team, and why |
-| Member Access | When Gearbox's operators opened your member list, and why |
+| Operator Access | When Gearbox's operators opened your team's details or member list, or changed your team, and why |
 | Log | Apps switched on and off, data downloads and settings changes, and who made them |
 
 Every member also has an Account page: open it from **Account** or "Hello, name" in the bar, and get back to the tiles with **Apps**. It's the next page here, since it's the one everyone uses; the admin pages follow, one page each, in the order a new team needs them.
