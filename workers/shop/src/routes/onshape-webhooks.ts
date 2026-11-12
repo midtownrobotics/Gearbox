@@ -8,6 +8,7 @@ import {
   processRevisionEvent,
   verifyOnshapeSignature,
 } from "../lib/onshape-webhook";
+import { openTrackerWindow } from "../lib/release-tracker";
 import type { AppEnv } from "../types";
 
 // Onshape's webhook events. Each team's webhook calls back on its own address
@@ -114,9 +115,19 @@ router.post("/events", async (c) => {
     const { objectId: releaseId, timestamp } = webhookData;
     if (releaseId && timestamp) {
       c.executionCtx.waitUntil(
-        processReleaseEvent(db, teamId, releaseId, timestamp, c.env.BOM_QUEUE),
+        Promise.all([
+          processReleaseEvent(db, teamId, releaseId, timestamp, c.env.BOM_QUEUE),
+          openTrackerWindow(c.env, db, teamId, { refresh: true }),
+        ]),
       );
     }
+    return c.json({ ok: true });
+  }
+
+  // A new version of the team's document (a release makes one too): the release tracker reads it
+  // when its window closes.
+  if (webhookData.event === "onshape.model.lifecycle.createversion") {
+    c.executionCtx.waitUntil(openTrackerWindow(c.env, db, teamId, { refresh: true }));
     return c.json({ ok: true });
   }
 

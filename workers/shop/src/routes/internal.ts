@@ -29,6 +29,11 @@ import {
   processes,
   qualityCheckItems,
   qualityReports,
+  releaseTrackerFeatures,
+  releaseTrackerParts,
+  releaseTrackerStudios,
+  releaseTrackerVersions,
+  releaseTrackers,
   shopManagers,
   stagingBatchRemovals,
   stagingBatches,
@@ -118,6 +123,11 @@ export const internalRouter = new Hono<AppEnv>()
       qualityCheckItems,
       onshapeApiUsage,
       onshapeApiErrors,
+      releaseTrackers,
+      releaseTrackerStudios,
+      releaseTrackerParts,
+      releaseTrackerFeatures,
+      releaseTrackerVersions,
     ]);
     tables.admin_settings = (tables.admin_settings ?? []).filter(
       (row) => !SECRET_SETTINGS.includes(String(row.key)),
@@ -179,6 +189,12 @@ export const internalRouter = new Hono<AppEnv>()
       shopManagers,
       qualityReports,
       qualityCheckItems,
+      // The release tracker's records (its tracking document stays in Onshape).
+      releaseTrackerFeatures,
+      releaseTrackerParts,
+      releaseTrackerVersions,
+      releaseTrackerStudios,
+      releaseTrackers,
       // After the webhook calls above, which are counted here too.
       onshapeApiUsage,
       onshapeApiErrors,

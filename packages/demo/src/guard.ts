@@ -54,6 +54,8 @@ export const DEMO_BLOCKED: readonly Blocked[] = [
   { app: "edge", method: "*", path: /^\/switch\// },
   { app: "edge", method: "*", path: /^\/print\// },
   { app: "shop", method: "POST", path: /^\/admin\/(onshape|chat)\// },
+  // The release tracker writes to an Onshape document.
+  { app: "shop", method: "*", path: /^\/admin\/release-tracker/ },
   { app: "shop", method: "*", path: /^\/print\// },
   { app: "orders", method: "*", path: /^\/share-a-cart\/(connect|callback|disconnect)/ },
   { app: "orders", method: "POST", path: /^\/orders\/import/ },

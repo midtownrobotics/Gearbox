@@ -10,6 +10,7 @@ pages: /admin
 - [ ] On [Admin](team:shop/admin), add your **processes**: the machines and steps parts go through
 - [ ] Add your **subsystems**
 - [ ] [Connect Onshape](#connect-onshape), so releases come in by themselves
+- [ ] Optional: set up the [release tracker](#release-tracker), a copy of your robot colored by what's released and made
 - [ ] Choose the [chat channels](#chat-channels) for releases and the daily summary
 - [ ] Turn on [kiosk mode](#shop-screens) on the shop's computers
 - [ ] If parts should be checked before they're done, set up [quality control](#quality-control)
@@ -58,6 +59,24 @@ Every call Shop makes to Onshape with your keys counts toward your Onshape plan'
 The numbers are for the API keys saved now: saving new keys starts their count from zero. Once you've switched keys, choose **All API keys** to see the old keys' calls too.
 
 While Shop has no Onshape API keys, or Onshape is refusing its calls (keys not accepted, the API limit reached, Onshape down), every Shop page shows a red banner under the top bar. It goes away by itself once a call to Onshape works again.
+
+## Release tracker
+
+The release tracker keeps a separate Onshape document with a copy of every part studio in your robot's document. Each released part is copied from the version it was last released in, and colored by how far along it is in the shop:
+
+- **Pink, see-through:** never released (copied from the newest version)
+- **Gray:** released, but waiting on Ingest or not started
+- **Gold:** in progress
+- **Green:** every step done
+
+To set it up, connect Onshape first. Then:
+
+1. In Onshape, create an empty document where your team will find it, and share it with the account Shop's API keys belong to, with edit access.
+2. Under **Release Tracker** on Admin, paste the document's address and choose **Link document**. The first sync makes a copy of each part studio and can take a few minutes.
+
+From then on it updates by itself: a release, a new version or a part moving along in the shop syncs it within about 20 minutes, and changes in those 20 minutes share one sync. **Sync now** updates it right away. Shop owns the copies, so changes made to them in Onshape are replaced. **Stop tracking** leaves the document in Onshape as it is.
+
+Parts never released come from the newest version of the robot's document, so make a version to update them. Syncs count toward your Onshape API allowance, under Onshape API Usage.
 
 ## Chat channels
 
