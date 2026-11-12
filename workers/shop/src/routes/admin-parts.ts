@@ -16,6 +16,7 @@ import {
 import { onshapeConfig, saveOnshapeConfig } from "../lib/onshape-config";
 import { exportDrawingAsPDF, storeDrawingInR2 } from "../lib/onshape-export";
 import { registerOnShapeWebhook, unregisterOnShapeWebhooks } from "../lib/onshape-webhook";
+import { clearWebhookProblem } from "../lib/onshape-webhook-health";
 import { SETTING, getSetting, isChannelId, setSetting } from "../lib/settings";
 import { shopUrl } from "../lib/urls";
 import type { AppEnv } from "../types";
@@ -304,7 +305,9 @@ export const adminPartsRouter = new Hono<AppEnv>()
 
       // Replace our webhook: drop it from the old document (if it changed) and from this one, so
       // saving re-registers it at the current address instead of adding a second one.
-      let webhook: "registered" | "failed" | "needs keys" = "needs keys";
+      // A saved setting is a fresh start: the next event says whether the keys work now.
+      await clearWebhookProblem(db, teamId);
+      let webhook: "registered" | "failed" | "needs keys" | "needs signing keys" = "needs keys";
       if (config.credentials && config.companyId) {
         const url = eventsUrl(c.env, teamId);
         if (before.documentId && before.documentId !== documentId && before.credentials) {
@@ -319,7 +322,7 @@ export const adminPartsRouter = new Hono<AppEnv>()
         await unregisterOnShapeWebhooks(documentId, api, url);
         try {
           await registerOnShapeWebhook(documentId, api, config.companyId, url);
-          webhook = "registered";
+          webhook = config.webhookKeys ? "registered" : "needs signing keys";
         } catch (err) {
           console.error("[OnShape Config] Webhook registration failed", err);
           // Don't fail the config update if webhook registration fails

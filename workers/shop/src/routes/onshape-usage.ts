@@ -4,6 +4,7 @@ import { Hono } from "hono";
 import { createShopDb } from "../db";
 import { ONSHAPE_CALLS, onshapeFetch, onshapeProblem, usageReport } from "../lib/onshape-api";
 import { onshapeConfig } from "../lib/onshape-config";
+import { webhookProblem } from "../lib/onshape-webhook-health";
 import type { AppEnv } from "../types";
 
 // How the team's Onshape connection is doing: the banner every page shows under the bar while it
@@ -17,9 +18,12 @@ export const onshapeUsageRouter = new Hono<AppEnv>()
     const problem = config?.credentials
       ? await onshapeProblem(db, teamId, config.credentials)
       : null;
+    // Anyone can post to the events address, so why events are dropped is only told to admins.
+    const webhook = c.get("userIsAdmin") ? await webhookProblem(db, teamId) : null;
     return c.json({
       hasApiKey: Boolean(config?.credentials),
       problem: problem && { ...problem, label: ONSHAPE_CALLS[problem.kind] ?? problem.kind },
+      webhookProblem: webhook,
     });
   })
   // `?keys=all` counts every key the team has used; otherwise only the current keys.
