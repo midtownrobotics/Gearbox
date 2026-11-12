@@ -1069,7 +1069,8 @@ type OnShapeStatus = {
 
 /**
  * The team's Onshape connection: the document Shop follows, and the team's own API keys and
- * webhook signing keys from Onshape's Developer Portal. Keys are never shown again once saved;
+ * webhook signing keys (API keys from Onshape's Developer Portal, signing keys from the company's
+ * settings, under Webhooks). Keys are never shown again once saved;
  * leave them blank to keep them.
  */
 function OnShapeConfig() {
@@ -1165,7 +1166,12 @@ function OnShapeConfig() {
                 ok: false,
                 text: "Saved, but Onshape refused the webhook. Check the keys and company.",
               }
-            : { ok: true, text: "Saved. Add the API keys and company ID to receive releases." },
+            : result.webhook === "needs signing keys"
+              ? {
+                  ok: false,
+                  text: "Saved, but Shop can't accept releases until you add the webhook signing keys from Onshape's company settings.",
+                }
+              : { ok: true, text: "Saved. Add the API keys and company ID to receive releases." },
       );
       await loadConfig();
       refreshOnshapeStatus();
@@ -1176,8 +1182,10 @@ function OnShapeConfig() {
     }
   }
 
-  const keptHint = (saved: boolean | undefined) =>
-    saved ? "Saved; leave blank to keep it" : "From Onshape's Developer Portal";
+  const keptHint = (saved: boolean | undefined, from: string) =>
+    saved ? "Saved; leave blank to keep it" : from;
+  const portal = "From Onshape's Developer Portal";
+  const signing = "Onshape: Company settings, Webhooks";
 
   return (
     <div className="space-y-4 max-w-xl">
@@ -1249,7 +1257,7 @@ function OnShapeConfig() {
       </Field>
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="API access key" hint={keptHint(status?.hasApiKey)}>
+        <Field label="API access key" hint={keptHint(status?.hasApiKey, portal)}>
           <input
             type="password"
             autoComplete="off"
@@ -1258,7 +1266,7 @@ function OnShapeConfig() {
             className={inputClass}
           />
         </Field>
-        <Field label="API secret key" hint={keptHint(status?.hasApiKey)}>
+        <Field label="API secret key" hint={keptHint(status?.hasApiKey, portal)}>
           <input
             type="password"
             autoComplete="off"
@@ -1267,7 +1275,10 @@ function OnShapeConfig() {
             className={inputClass}
           />
         </Field>
-        <Field label="Webhook signing key (primary)" hint={keptHint(status?.hasWebhookKeys)}>
+        <Field
+          label="Webhook signing key (primary)"
+          hint={keptHint(status?.hasWebhookKeys, signing)}
+        >
           <input
             type="password"
             autoComplete="off"
@@ -1276,7 +1287,10 @@ function OnShapeConfig() {
             className={inputClass}
           />
         </Field>
-        <Field label="Webhook signing key (secondary)" hint={keptHint(status?.hasWebhookKeys)}>
+        <Field
+          label="Webhook signing key (secondary)"
+          hint={keptHint(status?.hasWebhookKeys, "Optional, if you made one")}
+        >
           <input
             type="password"
             autoComplete="off"

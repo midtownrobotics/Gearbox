@@ -45,6 +45,7 @@ describe("Onshape API usage", () => {
     expect(await jsonAs<Status>(team.student, "/onshape/status")).toEqual({
       hasApiKey: false,
       problem: null,
+      webhookProblem: null,
     });
   });
 

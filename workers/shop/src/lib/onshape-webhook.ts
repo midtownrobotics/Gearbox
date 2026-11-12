@@ -28,17 +28,23 @@ interface BOMData {
 
 export const ONSHAPE_WEBHOOK_EVENTS = ["onshape.revision.created", "onshape.workflow.transition"];
 
+/**
+ * Whether an event is signed with the team's keys. Onshape sends a signature header for each key
+ * set in the company's settings (the secondary only when there is one), so either matching is
+ * enough.
+ */
 export async function verifyOnshapeSignature(
   timestamp: string,
   rawBody: string,
   primaryKey: string,
   secondaryKey: string,
-  primarySignature: string,
-  secondarySignature: string,
+  primarySignature: string | undefined,
+  secondarySignature: string | undefined,
 ): Promise<boolean> {
   const message = `${timestamp}.${rawBody}`;
 
-  const verifyKey = async (key: string, signature: string): Promise<boolean> => {
+  const verifyKey = async (key: string, signature: string | undefined): Promise<boolean> => {
+    if (!signature) return false;
     try {
       const cryptoKey = await crypto.subtle.importKey(
         "raw",
@@ -62,11 +68,12 @@ export async function verifyOnshapeSignature(
     }
   };
 
-  const primaryMatch = await verifyKey(primaryKey, primarySignature);
-  if (primaryMatch) return true;
-
-  const secondaryMatch = await verifyKey(secondaryKey, secondarySignature);
-  return secondaryMatch;
+  // Either header may have been signed with either key while an admin is swapping them.
+  for (const signature of [primarySignature, secondarySignature]) {
+    if (await verifyKey(primaryKey, signature)) return true;
+    if (secondaryKey !== primaryKey && (await verifyKey(secondaryKey, signature))) return true;
+  }
+  return false;
 }
 
 type OnshapeWebhook = { id: string; name?: string; url?: string };

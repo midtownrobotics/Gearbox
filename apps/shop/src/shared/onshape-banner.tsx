@@ -7,6 +7,8 @@ import { useAuthUser } from "./use-auth";
 type Status = {
   hasApiKey: boolean;
   problem: { status: number; message: string | null; at: number; label: string } | null;
+  /** Why Onshape's events are being dropped; only sent to admins. */
+  webhookProblem?: { kind: "unsigned" | "no keys" | "wrong keys"; at: number } | null;
 };
 
 /** What a failed answer from Onshape means for the team, by its HTTP status (0: no answer). */
@@ -18,6 +20,25 @@ export function onshapeProblemText(status: number) {
   return `Onshape answered with an error (${status}).`;
 }
 
+/** Why Shop can't accept the releases Onshape sends. */
+export function webhookProblemText(kind: "unsigned" | "no keys" | "wrong keys") {
+  if (kind === "unsigned") {
+    return "Onshape is sending releases without a signature, so Shop can't accept them. Make webhook signing keys in Onshape's company settings, under Webhooks.";
+  }
+  if (kind === "no keys") {
+    return "Onshape is sending signed releases, but Shop has no webhook signing keys to check them.";
+  }
+  return "Onshape is signing releases with keys that don't match the ones saved in Shop.";
+}
+
+const since = (at: number) =>
+  new Date(at).toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+
 // Saving the keys or checking the connection on the Admin page asks the banner to look again.
 const listeners = new Set<() => void>();
 export function refreshOnshapeStatus() {
@@ -27,7 +48,8 @@ export function refreshOnshapeStatus() {
 /**
  * Under the bar on every page while Onshape can't be used: the team has no API key, or Onshape is
  * refusing its calls (keys refused, the API limit reached, Onshape down). New releases and
- * drawings stop coming in until it's fixed.
+ * drawings stop coming in until it's fixed. Admins also see it while Onshape's events are dropped
+ * because they aren't signed with the team's keys.
  */
 export function OnshapeBanner() {
   const user = useAuthUser();
@@ -55,11 +77,13 @@ export function OnshapeBanner() {
     };
   }, []);
 
-  if (!status || (status.hasApiKey && !status.problem)) return null;
+  if (!status || (status.hasApiKey && !status.problem && !status.webhookProblem)) return null;
   const isAdmin = user?.isAdmin ?? false;
   const fix = isAdmin ? (
     <Link to="/admin#onshape" className="font-semibold underline">
-      {status.problem ? "See details on the Admin page" : "Add them on the Admin page"}
+      {status.problem || status.webhookProblem
+        ? "See details on the Admin page"
+        : "Add them on the Admin page"}
     </Link>
   ) : (
     "An admin can fix this on the Admin page."
@@ -72,18 +96,12 @@ export function OnshapeBanner() {
           <>
             {onshapeProblemText(status.problem.status)} New releases and drawings can't be loaded
             from Onshape until it works again
-            <span className="text-red-700">
-              {" "}
-              (since{" "}
-              {new Date(status.problem.at).toLocaleString(undefined, {
-                month: "short",
-                day: "numeric",
-                hour: "numeric",
-                minute: "2-digit",
-              })}
-              )
-            </span>
-            . {fix}
+            <span className="text-red-700"> (since {since(status.problem.at)})</span>. {fix}
+          </>
+        ) : status.webhookProblem && status.hasApiKey ? (
+          <>
+            {webhookProblemText(status.webhookProblem.kind)}{" "}
+            <span className="text-red-700">(Since {since(status.webhookProblem.at)}.)</span> {fix}
           </>
         ) : (
           <>

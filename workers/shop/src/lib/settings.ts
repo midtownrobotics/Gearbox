@@ -27,6 +27,8 @@ export const SETTING = {
   onshapeApiSecret: "onshape_api_secret",
   onshapeWebhookPrimary: "onshape_webhook_key_primary",
   onshapeWebhookSecondary: "onshape_webhook_key_secondary",
+  /** Why the team's latest webhook events were dropped, as JSON (`lib/onshape-webhook-health.ts`). */
+  onshapeWebhookProblem: "onshape_webhook_problem",
 } as const;
 
 /** A Slack channel id (C0123456789) or a Discord one (17 to 20 digits). */
@@ -61,6 +63,10 @@ export async function setSetting(db: ShopDb, teamId: string, key: string, value:
       target: [adminSettings.teamId, adminSettings.key],
       set: { value, updatedAt },
     });
+}
+
+export async function deleteSetting(db: ShopDb, teamId: string, key: string) {
+  await db.delete(adminSettings).where(inTeam(adminSettings, teamId, eq(adminSettings.key, key)));
 }
 
 export async function setSecret(
