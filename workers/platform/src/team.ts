@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { requireAdmin, requireAuth } from "@g3/auth";
-import { type AppName, site, teamAppUrlVia } from "@g3/site-config";
+import {
+  type AppName,
+  demoTeamId,
+  isProgram,
+  programNames,
+  site,
+  teamAppUrlVia,
+} from "@g3/site-config";
 import { and, desc, eq, inArray, isNull, lte } from "drizzle-orm";
 import { Hono } from "hono";
 import {
@@ -12,6 +19,7 @@ import {
   teams,
 } from "./db/schema";
 import { accounts, db, now, tellAdmins } from "./lib";
+import { canMove, idInProgram, runMove, startMove, unfinishedMove } from "./moves";
 import {
   changedParts,
   deliverToChat,
@@ -51,7 +59,14 @@ import type { AppEnv } from "./types";
  * aren't access to its data, and stay with the operators.
  */
 const TEAM_VISIBLE_OPERATOR_ACTIONS = {
-  team: ["view_team_details", "transfer_owner", "suspend_team", "reactivate_team", "renumber_team"],
+  team: [
+    "view_team_details",
+    "transfer_owner",
+    "suspend_team",
+    "reactivate_team",
+    "renumber_team",
+    "change_program",
+  ],
   members: ["view_team"],
 } as const;
 
@@ -183,6 +198,75 @@ export const teamRouter = new Hono<AppEnv>()
       .set({ termsVersion: site.legal.termsVersion, termsAcceptedAt: now(), updatedAt: now() })
       .where(eq(teams.id, teamId));
     return c.json({ version: site.legal.termsVersion });
+  })
+  // Whether the team is in FRC or FTC, and whether it has said so: every team from before FTC
+  // teams could sign up is asked once, by the first admin to open one of its pages.
+  .get("/program", requireAuth, async (c) => {
+    const teamId = c.get("teamId");
+    const team = await db(c.env)
+      .select({ program: teams.program, chosenAt: teams.programChosenAt })
+      .from(teams)
+      .where(eq(teams.id, teamId))
+      .get();
+    if (!team) return c.json({ error: "No such team." }, 404);
+    return c.json({
+      teamId,
+      program: team.program,
+      chosen: team.chosenAt !== null || !canMove(teamId),
+      moving: (await unfinishedMove(c.env, teamId)) !== undefined,
+      home: `${teamAppUrlVia(c.env.LOCAL_GATEWAY_URL || undefined, teamId, "portal")}/`,
+    });
+  })
+  // An admin says which program the team is in, once. FRC keeps its id; an FRC-numbered team
+  // that's in FTC moves to its "ftc" id (src/moves.ts), and the answer says where its home is now
+  // (`moving` while the move hasn't finished: it's tried again until it does).
+  .put("/program", requireAdmin, async (c) => {
+    const teamId = c.get("teamId");
+    if (teamId === demoTeamId) return c.json({ error: "The demo is an FRC team." }, 403);
+    const body = (await c.req.json().catch(() => null)) as { program?: unknown } | null;
+    const program = body?.program;
+    if (!isProgram(program)) return c.json({ error: "Choose FRC or FTC." }, 400);
+    const database = db(c.env);
+    const team = await database
+      .select({ program: teams.program, chosenAt: teams.programChosenAt })
+      .from(teams)
+      .where(eq(teams.id, teamId))
+      .get();
+    if (!team) return c.json({ error: "No such team." }, 404);
+    if (team.chosenAt !== null || !canMove(teamId)) {
+      return c.json(
+        { error: "Your team's program is already set. Ask Gearbox to change it." },
+        409,
+      );
+    }
+    const log = () =>
+      logTeam(database, {
+        teamId: to ?? teamId,
+        userId: c.get("userId"),
+        action: "settings_changed",
+        app: "id",
+        details: { what: `Program: ${programNames[program]}`, changed: ["Program"] },
+      });
+    let to: string | null = null;
+    if (program === team.program) {
+      await database
+        .update(teams)
+        .set({ programChosenAt: now(), updatedAt: now() })
+        .where(eq(teams.id, teamId));
+      await log();
+      return c.json({ teamId, moving: false, home: null });
+    }
+    to = idInProgram(teamId, program);
+    if (!to) return c.json({ error: "This team's id can't change." }, 400);
+    const refused = await startMove(c.env, teamId, to, c.get("userId"));
+    if (refused) return c.json({ error: refused }, 409);
+    const done = await runMove(c.env, teamId);
+    if (done) await log();
+    return c.json({
+      teamId: to,
+      moving: !done,
+      home: `${teamAppUrlVia(c.env.LOCAL_GATEWAY_URL || undefined, to, "portal")}/`,
+    });
   })
   // The team's apps that are on, for its home page.
   .get("/apps", requireAuth, async (c) => {

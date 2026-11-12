@@ -25,6 +25,7 @@ import {
   useTutorial,
   useTutorialFits,
 } from "../tutorial";
+import { ProgramQuestion } from "./program-question";
 import { GitHubReportDialog, ReportDialog, appOfWordmark } from "./report-dialog";
 import { TutorialPanel } from "./tutorial-panel";
 
@@ -547,6 +548,8 @@ export function AppNavBar({
         ) : (
           <ReportDialog version={version} onClose={() => setReporting(false)} />
         ))}
+      {/* A team from before FTC teams could sign up says which program it's in, once. */}
+      {team && user?.isAdmin && !user.kiosk && <ProgramQuestion />}
       {canTutorial && tutorialOn && help && (
         <TutorialPanel
           src={help}

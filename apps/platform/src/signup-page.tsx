@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { site, teamAppUrl } from "@g3/site-config";
-import { TextField } from "@g3/ui";
+import { type Program, isProgram, site, teamAppUrl, teamLabel } from "@g3/site-config";
+import { ProgramPicker, TextField } from "@g3/ui";
 import { useEffect, useMemo, useState } from "react";
 import { FaCheck, FaDiscord, FaSlack } from "react-icons/fa";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
@@ -11,7 +11,7 @@ import { Page } from "./layout";
 // its Discord (adding the bot signs the founder in). The sign-up's id is in the URL (?id=), so
 // Slack's install can send the founder back here.
 
-/** Countries with FRC teams, named in the browser's language. */
+/** Countries with FIRST teams, named in the browser's language. */
 const COUNTRIES = [
   "US",
   "CA",
@@ -38,6 +38,8 @@ const COUNTRIES = [
 ];
 
 type Signup = {
+  /** "frc1648", "ftc12345". */
+  teamId: string;
   teamNumber: number;
   name: string;
   step: "connect" | "code" | "done";
@@ -109,7 +111,9 @@ export function SignupPage() {
                   {" "}
                   Not you?{" "}
                   <Link
-                    to={`/report?team=${error.match(/Team (\d+)/)?.[1] ?? ""}`}
+                    to={`/report?team=${error.match(/Team (\d+)/)?.[1] ?? ""}${
+                      error.startsWith("FTC") ? "&program=ftc" : ""
+                    }`}
                     className="font-semibold underline"
                   >
                     Report it
@@ -135,8 +139,11 @@ function TeamForm({ onError }: { onError: (error: string | null) => void }) {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const countryName = useMemo(() => new Intl.DisplayNames(undefined, { type: "region" }), []);
+  const fromParams = params.get("program");
   const [form, setForm] = useState({
-    // From the team-not-found page's "Sign up team <number>".
+    // From the team-not-found page's "Sign up Team <number>"; otherwise the founder chooses.
+    program: (isProgram(fromParams) ? fromParams : null) as Program | null,
+    // From the team-not-found page's "Sign up Team <number>".
     teamNumber: /^\d{1,5}$/.test(params.get("team") ?? "") ? (params.get("team") as string) : "",
     name: "",
     country: "US",
@@ -151,6 +158,10 @@ function TeamForm({ onError }: { onError: (error: string | null) => void }) {
     setBusy(true);
     onError(null);
     try {
+      if (!form.program) {
+        onError("Choose whether your team is in FRC or FTC.");
+        return;
+      }
       const res = await api.signup.$post({
         json: { ...form, teamNumber: Number(form.teamNumber) },
       });
@@ -168,8 +179,13 @@ function TeamForm({ onError }: { onError: (error: string | null) => void }) {
   return (
     <form onSubmit={submit} className="space-y-4">
       <h2 className="text-lg font-semibold text-secondary-900">Your team</h2>
+      <ProgramPicker
+        label="Your team's program"
+        value={form.program}
+        onChange={(program) => set({ program })}
+      />
       <label className="block space-y-1">
-        <span className="text-sm font-medium text-secondary-700">FRC team number</span>
+        <span className="text-sm font-medium text-secondary-700">Team number</span>
         <TextField
           variant="plain"
           kind="label"
@@ -251,7 +267,7 @@ function TeamForm({ onError }: { onError: (error: string | null) => void }) {
       </label>
       <button
         type="submit"
-        disabled={busy || !form.acceptTerms || !form.acceptBeta}
+        disabled={busy || !form.program || !form.acceptTerms || !form.acceptBeta}
         className="w-full rounded-lg bg-primary-600 hover:bg-primary-500 disabled:opacity-50 py-2.5 font-semibold text-white transition-colors"
       >
         Continue
@@ -291,7 +307,7 @@ function SignupSteps({
   return (
     <div className="space-y-5">
       <p className="text-sm text-secondary-600">
-        Team <span className="font-semibold text-secondary-900">{signup.teamNumber}</span>,{" "}
+        <span className="font-semibold text-secondary-900">{teamLabel(signup.teamId)}</span>,{" "}
         {signup.name}
       </p>
       {signup.step === "connect" && <ConnectChat signupId={signupId} />}
@@ -301,10 +317,7 @@ function SignupSteps({
       {signup.step === "done" && (
         <p className="text-sm text-secondary-700">
           This team is set up.{" "}
-          <a
-            href={teamAppUrl(`frc${signup.teamNumber}`, "portal")}
-            className="text-primary-500 underline"
-          >
+          <a href={teamAppUrl(signup.teamId, "portal")} className="text-primary-500 underline">
             Go to its home
           </a>
         </p>

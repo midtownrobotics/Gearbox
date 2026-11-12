@@ -15,7 +15,9 @@ import {
   site,
   teamAppUrl,
   teamAppUrlVia,
+  teamHostLabel,
   teamKey,
+  teamOfHostLabel,
 } from "@g3/site-config";
 import devPorts from "../../../.dev-ports.json";
 import { limitRequestBody } from "./body-limit";
@@ -31,8 +33,10 @@ import { type RateLimitEnv, checkRateLimit } from "./rate-limit";
 //   <platform>/, www.<platform>/   → the platform worker: public site and team sign-up
 //   admin.<platform>/              → the platform worker: the operators' console
 //   docs.<platform>/               → the platform worker: the docs (setting up and using each app)
-//   <number>.<platform>/...        → that team's home (Portal)
-//   <number>-<app>.<platform>/...  → the app, for team <number>
+//   <number>.<platform>/...        → that FRC team's home (Portal)
+//   <number>-<app>.<platform>/...  → the app, for FRC team <number>
+//   ftc<number>.<platform>/..., ftc<number>-<app>.<platform>/...
+//                                  → the same, for FTC team <number>
 //   <any of those>/api/~<app>/...  → another app's /api/..., for the same team: how one app's page
 //                                    calls another's API (`apiPath` in @g3/site-config)
 //   demo.<platform>/               → redirected to the public demo team's home (roadmap Phase 5)
@@ -55,6 +59,11 @@ import { type RateLimitEnv, checkRateLimit } from "./rate-limit";
 // production's.
 //
 // On the way it keeps teams apart (roadmap step 2.3):
+// - A team moved to another id (it changed program: the platform's src/moves.ts) is "moving" while
+//   its data moves: its pages get a short page saying so, its API 503, except the platform's own
+//   (the admin's page that started it). Once it's moved, its old addresses send pages to the same
+//   page at the new ones and pass API calls on to the team (devices and webhooks set up with the
+//   old address keep working), until another team signs up with the old id.
 // - A team-number host only answers for a team the platform has (signed up and active), and an
 //   app's address (and /api/~<app>) only for an app the team has switched on (roadmap 4.6): any
 //   other answers "not enabled". Sign-in, the team's home and the platform's API are always on.
@@ -97,7 +106,7 @@ const BINDINGS = {
 
 /** Headers only the gateway sets. */
 export const IDENTITY_HEADERS = {
-  /** The team the hostname is for: its key, "frc<number>". */
+  /** The team the hostname is for: its id, "frc1648" or "ftc12345". */
   team: "X-Team-Id",
   /** The signed-in user, when their session belongs to that team. */
   user: "X-User-Id",
@@ -177,11 +186,12 @@ export function route(hostname: string): Route | "unknown app" | null {
   if (known) return known;
   const label = platformLabel(hostname);
   if (!label) return null;
-  const match = label.match(/^([1-9]\d*)(?:-(.+))?$/);
-  if (!match) return null;
+  const match = label.match(/^((?:ftc)?[1-9]\d*)(?:-(.+))?$/);
+  const team = match ? teamOfHostLabel(match[1]) : null;
+  if (!match || !team) return null;
   const app = match[2] === undefined ? "portal" : TEAM_HOST_APP.get(match[2]);
   if (!app) return "unknown app";
-  return { app, team: `frc${match[1]}` };
+  return { app, team };
 }
 
 /**
@@ -218,8 +228,11 @@ function memo<T>() {
   };
 }
 
-/** A team's apps that are on (null: no such team; "all": the platform didn't say). */
-type TeamApps = readonly string[] | "all" | null;
+/**
+ * A team's apps that are on (null: no such team; "all": the platform didn't say), or where it's
+ * moved to, or that it's moving.
+ */
+type TeamApps = readonly string[] | "all" | null | { movedTo: string } | "moving";
 const teamApps = memo<TeamApps>();
 
 /** Always on for every team: sign-in, the team's home, and the platform's own API. */
@@ -234,18 +247,47 @@ async function loadTeamApps(env: Env, team: string): Promise<TeamApps> {
     if (team === teamKey) return "all";
     throw err;
   }
-  if (res.status === 404) return null;
+  if (res.status === 404) {
+    const { movedTo } = (await res.json().catch(() => ({}))) as { movedTo?: unknown };
+    return typeof movedTo === "string" && movedTo !== team ? { movedTo } : null;
+  }
   if (!res.ok) {
     if (team === teamKey) return "all";
     throw new Error(`platform /teams: ${res.status}`);
   }
-  const { apps } = (await res.json()) as { apps?: string[] };
+  const { apps, moving } = (await res.json()) as { apps?: string[]; moving?: boolean };
+  if (moving) return "moving";
   // A platform from before the app library: every app.
   return apps ?? "all";
 }
 
-const appEnabled = (apps: TeamApps, app: Worker) =>
-  ALWAYS_ON.has(app) || apps === "all" || (apps?.includes(app) ?? false);
+/** The apps of a team that's here: what the platform said, its moves aside. */
+type OnApps = readonly string[] | "all";
+
+const appEnabled = (apps: OnApps, app: Worker) =>
+  ALWAYS_ON.has(app) || apps === "all" || apps.includes(app);
+
+/** The same page at the team's new address (a team that moved: see above). */
+function movedPage(url: URL, from: string, to: string): Response {
+  const [first, ...rest] = url.hostname.split(".");
+  const label = first.replace(new RegExp(`^${teamHostLabel(from)}(?=-|$)`), teamHostLabel(to));
+  const moved = new URL(url);
+  moved.hostname = [label, ...rest].join(".");
+  return Response.redirect(moved.toString(), 302);
+}
+
+/** A team whose data is moving to its new id (see above): a short page, or 503 for an API call. */
+function moving(request: Request): Response {
+  const message = "This team's Gearbox is moving to its new address.";
+  if (!(request.headers.get("Accept") ?? "").includes("text/html")) {
+    return Response.json({ error: `${message} Try again in a minute.` }, { status: 503 });
+  }
+  const body = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="refresh" content="30"><title>Moving</title><style>body{font-family:system-ui,sans-serif;margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f4f6f7;color:#1a1a1a}@media (prefers-color-scheme:dark){body{background:#171717;color:#ededed}}main{max-width:28rem;padding:1.5rem;text-align:center}</style></head><body><main><h1>${message}</h1><p>This takes a minute or two. The page reloads by itself.</p></main></body></html>`;
+  return new Response(body, {
+    status: 503,
+    headers: { "Content-Type": "text/html; charset=utf-8", "Retry-After": "30" },
+  });
+}
 
 /**
  * A team-number address for a team the platform doesn't have: a page goes to the platform's
@@ -253,8 +295,8 @@ const appEnabled = (apps: TeamApps, app: Worker) =>
  */
 function noSuchTeam(request: Request, url: URL, team: string, local: boolean): Response {
   if (!wantsPage(request, url)) return json(404, "No such team.");
-  const number = team.replace(/^frc/, "");
-  return Response.redirect(`${platformOrigin(url, local)}/team-not-found?team=${number}`, 302);
+  const label = teamHostLabel(team);
+  return Response.redirect(`${platformOrigin(url, local)}/team-not-found?team=${label}`, 302);
 }
 
 /**
@@ -279,12 +321,12 @@ function platformOrigin(url: URL, local: boolean): string {
   return `${url.protocol}//${DEV_DOMAIN}${url.port ? `:${url.port}` : ""}`;
 }
 
-/** The team's home for a team address: <number>-<app>.<domain> → <number>.<domain>. */
+/** The team's home for a team address: <label>-<app>.<domain> → <label>.<domain>. */
 function homeOf(url: URL, local: boolean): string {
   const [first, ...rest] = url.hostname.split(".");
-  const number = first.split("-")[0];
-  if (!local) return `https://${platformHost(number)}`;
-  return `${url.protocol}//${[number, ...rest].join(".")}${url.port ? `:${url.port}` : ""}`;
+  const label = first.split("-")[0];
+  if (!local) return `https://${platformHost(label)}`;
+  return `${url.protocol}//${[label, ...rest].join(".")}${url.port ? `:${url.port}` : ""}`;
 }
 
 /** An app the team hasn't switched on: a short page (JSON for API calls). */
@@ -415,20 +457,38 @@ export default {
     const insecure = local ? null : toHttps(url);
     if (insecure) return insecure;
 
-    const { team } = target;
-    let apps: TeamApps = "all";
+    let { team } = target;
+    const isApiCall = url.pathname === "/api" || url.pathname.startsWith("/api/");
+    let apps: OnApps = "all";
     if (team !== null) {
+      const lookup = (id: string) => teamApps(id, () => loadTeamApps(env, id));
+      let found: TeamApps;
       try {
-        apps = await teamApps(team, () => loadTeamApps(env, team));
+        found = await lookup(team);
+        // A team that moved: its pages go to its new address, its API calls on to it.
+        if (found !== null && typeof found === "object" && "movedTo" in found) {
+          if (!isApiCall) return movedPage(url, team, found.movedTo);
+          team = found.movedTo;
+          found = await lookup(team);
+        }
       } catch (err) {
         console.error("[gateway] team lookup", err);
         return json(503, "Please try again in a minute.");
       }
-      if (apps === null) return noSuchTeam(request, url, team, local);
+      if (found === null || (typeof found === "object" && "movedTo" in found)) {
+        return noSuchTeam(request, url, team, local);
+      }
+      // While it's moving only the platform's own API answers (the page that started the move).
+      if (found === "moving") {
+        const platformCall =
+          target.app === "platform" || url.pathname.startsWith("/api/~platform/");
+        if (!platformCall) return moving(request);
+        apps = "all";
+      } else apps = found;
     }
     if (!appEnabled(apps, target.app)) return notEnabled(request, target.app, homeOf(url, local));
 
-    const isApi = url.pathname === "/api" || url.pathname.startsWith("/api/");
+    const isApi = isApiCall;
     // An installed app's icons, in the team's color (./icons.ts).
     if (team !== null && !isApi) {
       const original = (path: string) => {

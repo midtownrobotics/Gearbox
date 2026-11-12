@@ -617,6 +617,28 @@ export const logUploadRoutes = new Hono<AppEnv>()
   });
 
 /** Deletes every log file of a team (with its data, when the team or Pit goes). */
+/**
+ * Before a team's files move to its new id (a team move): uploads still in progress can't be
+ * finished under a new key, so they're stopped and forgotten, and the downloader sends those logs
+ * again.
+ */
+export async function dropPendingUploads(bucket: R2Bucket, db: Db, teamId: string) {
+  const pending = await db
+    .select()
+    .from(matchLogs)
+    .where(inTeam(matchLogs, teamId, eq(matchLogs.status, "uploading")));
+  for (const log of pending) {
+    if (log.uploadId)
+      await bucket
+        .resumeMultipartUpload(log.r2Key, log.uploadId)
+        .abort()
+        .catch(() => {});
+  }
+  if (pending.length > 0) {
+    await db.delete(matchLogs).where(inTeam(matchLogs, teamId, eq(matchLogs.status, "uploading")));
+  }
+}
+
 export async function deleteTeamLogFiles(bucket: R2Bucket, teamId: string, db?: Db) {
   if (db) {
     const pending = await db

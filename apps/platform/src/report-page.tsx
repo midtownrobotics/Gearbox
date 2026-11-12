@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { TextField } from "@g3/ui";
+import { type Program, isProgram } from "@g3/site-config";
+import { ProgramPicker, TextField } from "@g3/ui";
 import { useState } from "react";
 import { FaCheck } from "react-icons/fa";
 import { useSearchParams } from "react-router-dom";
@@ -13,7 +14,9 @@ const field =
 
 export function ReportPage() {
   const [params] = useSearchParams();
+  const program = params.get("program");
   const [form, setForm] = useState({
+    program: (isProgram(program) ? program : "frc") as Program,
     teamNumber: params.get("team") ?? "",
     email: "",
     name: "",
@@ -56,9 +59,9 @@ export function ReportPage() {
             Someone signed up your team?
           </h1>
           <p className="text-secondary-600">
-            Each FRC team number can be on Gearbox once. If yours was taken by people who aren't
-            your team, tell us. We'll check with you by email and give the number back to the real
-            team.
+            Each FRC and FTC team number can be on Gearbox once. If yours was taken by people who
+            aren't your team, tell us. We'll check with you by email and give the number back to the
+            real team.
           </p>
           <p className="text-sm text-secondary-500">
             A team found to be falsely registered may be deleted, with all of its data, for good.
@@ -83,6 +86,11 @@ export function ReportPage() {
               </div>
             ) : (
               <form onSubmit={submit} className="space-y-4">
+                <ProgramPicker
+                  label="The team's program"
+                  value={form.program}
+                  onChange={(next) => set({ program: next })}
+                />
                 <label className="block space-y-1">
                   <span className="text-sm font-medium text-secondary-700">Team number</span>
                   <TextField

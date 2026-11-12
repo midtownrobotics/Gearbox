@@ -16,6 +16,11 @@ const notices = sqliteTable("storage_cleanup_notices", {
   lastSentAt: integer("last_sent_at").notNull(),
 });
 
+/** A team's notices go with it to its new id (a team move: moveTeamStorageRows). */
+export function storageNoticeTables() {
+  return [notices, usageNotices];
+}
+
 export async function clearStorageCleanupNotice(database: D1Database, teamId: string) {
   await drizzle(database).delete(notices).where(eq(notices.teamId, teamId));
   await drizzle(database).delete(usageNotices).where(eq(usageNotices.teamId, teamId));

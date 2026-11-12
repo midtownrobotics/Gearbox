@@ -118,15 +118,15 @@ function useReader() {
 }
 
 /** The reader's team (the one this browser last opened), or null. */
-function useTeam(): number | null {
+function useTeam(): string | null {
   const [team] = useState(() => rememberedTeam());
   return team;
 }
 
 /** An address on the reader's team, or the platform's "find your team" when it isn't known. */
-function teamHref(team: number | null, app: string, path = "/") {
+function teamHref(team: string | null, app: string, path = "/") {
   if (!team) return `${platformUrl}/team`;
-  const base = teamAppUrl(`frc${team}`, app as AppName);
+  const base = teamAppUrl(team, app as AppName);
   return path === "/" ? `${base}/` : `${base}${path}`;
 }
 

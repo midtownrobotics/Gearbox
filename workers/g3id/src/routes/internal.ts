@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { DiscordGuild, DiscordUser } from "@g3/discord";
-import { demoTeamId } from "@g3/site-config";
+import { demoTeamId, parseTeamId } from "@g3/site-config";
 import { and, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { createDb } from "../db";
@@ -61,6 +61,37 @@ const DELETE_TEAM = [
   "DELETE FROM teams WHERE id = ?1",
 ];
 
+/**
+ * Moving a team to another id (?1 → ?2, a team that changed program): its row under the new id,
+ * then every row that points at it, then the old row. Foreign keys are checked at the end. Safe to
+ * run again: once it's moved there's nothing left under the old id.
+ */
+const MOVE_TEAM = [
+  "PRAGMA defer_foreign_keys = on",
+  `INSERT INTO teams (id, program, team_number, name, created_at, updated_at)
+   SELECT ?2, substr(?2, 1, 3), team_number, name, created_at, unixepoch() FROM teams
+   WHERE id = ?1 AND NOT EXISTS (SELECT 1 FROM teams WHERE id = ?2)`,
+  "UPDATE team_ui_settings SET team_id = ?2 WHERE team_id = ?1",
+  "UPDATE team_sign_in_methods SET team_id = ?2 WHERE team_id = ?1",
+  "UPDATE team_storage_policy SET team_id = ?2 WHERE team_id = ?1",
+  "UPDATE core_users SET team_id = ?2 WHERE team_id = ?1",
+  "UPDATE core_user_pins SET team_id = ?2 WHERE team_id = ?1",
+  "UPDATE kiosk_activation_codes SET team_id = ?2 WHERE team_id = ?1",
+  "UPDATE kiosk_devices SET team_id = ?2 WHERE team_id = ?1",
+  "UPDATE core_slack_link_codes SET team_id = ?2 WHERE team_id = ?1",
+  "UPDATE slack_installations SET team_id = ?2 WHERE team_id = ?1",
+  "UPDATE discord_installations SET team_id = ?2 WHERE team_id = ?1",
+  "DELETE FROM teams WHERE id = ?1",
+];
+
+/** Moves a team to another id in G3ID (see MOVE_TEAM). */
+export async function moveTeam(env: AppEnv["Bindings"], from: string, to: string) {
+  // D1 takes only the values each statement uses.
+  const binds = (sql: string) =>
+    sql.includes("?2") ? [from, to] : sql.includes("?1") ? [from] : [];
+  await env.DB.batch(MOVE_TEAM.map((sql) => env.DB.prepare(sql).bind(...binds(sql))));
+}
+
 type NewInstallation = {
   teamId: string;
   workspaceId: string;
@@ -113,12 +144,32 @@ export const internalRouter = new Hono<AppEnv>()
   // and name, which its own tables (users, kiosks, Slack) point at.
   .put("/teams", async (c) => {
     const team = await c.req.json<NewTeam>();
+    const parsed = parseTeamId(team.id);
+    if (!parsed || parsed.number !== team.teamNumber) {
+      return c.json({ error: "A team's id is its program and number." }, 400);
+    }
     const now = Math.floor(Date.now() / 1000);
     await createDb(c.env.DB)
       .insert(teams)
-      .values({ ...team, createdAt: now, updatedAt: now })
+      .values({ ...team, program: parsed.program, createdAt: now, updatedAt: now })
       .onConflictDoUpdate({ target: teams.id, set: { name: team.name, updatedAt: now } });
     return c.json({ ok: true });
+  })
+  // The team changed program, and so its id (the platform's team moves): its accounts, kiosks,
+  // chat and settings go with it. Sessions stay: they point at accounts, not teams.
+  .post("/teams/:id/move", async (c) => {
+    const from = c.req.param("id");
+    const body = (await c.req.json().catch(() => null)) as { to?: unknown } | null;
+    const to = typeof body?.to === "string" ? body.to : "";
+    const [a, b] = [parseTeamId(from), parseTeamId(to)];
+    if (!a || !b || a.number !== b.number || from === to) {
+      return c.json({ error: "A team moves to its own number in the other program." }, 400);
+    }
+    if (from === siteTeamId || from === demoTeamId) {
+      return c.json({ error: "The site's team and the demo stay where they are." }, 400);
+    }
+    await moveTeam(c.env, from, to);
+    return c.json({ done: true });
   })
   // A team's members, for the operator console (and handing a team to one of them).
   .get("/teams/:id/members", async (c) => {

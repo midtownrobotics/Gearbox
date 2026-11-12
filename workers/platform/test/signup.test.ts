@@ -20,7 +20,8 @@ const call = (path: string, init: RequestInit & { json?: unknown } = {}) =>
 
 const newNumber = () => 20000 + (crypto.getRandomValues(new Uint32Array(1))[0] % 70000);
 
-const details = (teamNumber: number) => ({
+const details = (teamNumber: number, program: "frc" | "ftc" = "frc") => ({
+  program,
   teamNumber,
   name: "The Testers",
   country: "us",

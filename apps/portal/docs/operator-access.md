@@ -10,13 +10,13 @@ Gearbox is run by volunteers. Rarely, an operator has to look at a team, for exa
 
 ## Operator Access
 
-[Operator Access](team:portal/admin/operator-access) lists each time an operator opened your team's details, handed over its ownership, or suspended or reactivated it. An operator opens your team's details only with a reason, which is shown here.
+[Operator Access](team:portal/admin/operator-access) lists each time an operator opened your team's details, handed over its ownership, changed its program (FRC or FTC), or suspended or reactivated it. An operator opens your team's details only with a reason, which is shown here.
 
 ## What operators see
 
 Your team's details hold nothing personal about your members:
 
-- Your team's number, name, country and status (active, signing up or suspended)
+- Your team's program (FRC or FTC), number, name, country and status (active, signing up or suspended)
 - Whether your team uses Slack or Discord (not your workspace's or server's name)
 - When your team signed up, and when and which version of the terms its owner accepted
 - How many members it has: how many are active, admins and mentors, and how many wait for approval

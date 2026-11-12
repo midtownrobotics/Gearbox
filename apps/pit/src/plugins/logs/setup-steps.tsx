@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { site, teamAppUrlVia } from "@g3/site-config";
+import { pageTeamId, site, teamAppUrlVia } from "@g3/site-config";
 import { Button, Chip, useTeamNames } from "@g3/ui";
 import { type ReactNode, useState } from "react";
 
@@ -82,7 +82,7 @@ export function SetupSteps() {
   const pitUrl = window.location.origin;
   const { hostname } = window.location;
   const local = hostname === "localhost" || hostname.endsWith(".localhost");
-  const elsewhere = !local && pitUrl !== teamAppUrlVia(undefined, `frc${number}`, "pit");
+  const elsewhere = !local && pitUrl !== teamAppUrlVia(undefined, pageTeamId, "pit");
   const windows = system === "windows";
   const writeConfig = windows
     ? `Set-Content devices\\pit-log-downloader\\config.env "PIT_URL=${pitUrl}"`

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { type HelpPages, helpSlugFor } from "./help.ts";
 import { site } from "./site.ts";
+import { teamHostLabel, teamNumberOf, teamOfHostLabel, teamProgramOf } from "./team-id.ts";
 
 // Everything apps and workers need from site.ts, already put together.
 
@@ -40,6 +41,21 @@ export {
   type TeamUiSettings,
   type TeamUiLinkKey,
 } from "./team-ui.ts";
+
+export {
+  PROGRAMS,
+  type Program,
+  isProgram,
+  parseTeamId,
+  programNames,
+  teamHostLabel,
+  teamIdFor,
+  teamLabel,
+  teamNumberLabel,
+  teamNumberOf,
+  teamOfHostLabel,
+  teamProgramOf,
+} from "./team-id.ts";
 
 export type AppName = keyof typeof site.apps;
 
@@ -114,8 +130,11 @@ export function platformUrlVia(gateway: string | undefined): string {
 const pageHost = (globalThis as { location?: { hostname: string } }).location?.hostname;
 export const pageTeamId: string = (pageHost ? teamOfHost(pageHost) : null) ?? teamKey;
 
-/** The page's team's FRC number. */
-export const pageTeamNumber = Number(pageTeamId.replace(/^frc/, ""));
+/** The page's team's number (its FRC or FTC number: see pageTeamProgram). */
+export const pageTeamNumber = teamNumberOf(pageTeamId);
+
+/** The page's team's program, FRC or FTC. */
+export const pageTeamProgram = teamProgramOf(pageTeamId);
 
 /** The public demo's team (site.demo): its key, "frc9999". */
 export const demoTeamId = `frc${site.demo.teamNumber}`;
@@ -150,9 +169,9 @@ export function apiPath(app: AppName | "platform"): string {
   return `/api/~${app}`;
 }
 
-// Teams. The team in this file uses the app addresses above, on its own domain. Every other team
-// has its addresses on the platform's domain, by FRC number: <number>-<app>.<platform domain> for
-// an app and <number>.<platform domain> for its home (Portal). The gateway answers them all.
+// Teams. Every team has its addresses on the platform's domain, by its host label (./team-id.ts:
+// its number for an FRC team, "ftc<number>" for an FTC team): <label>-<app>.<platform domain> for
+// an app and <label>.<platform domain> for its home (Portal). The gateway answers them all.
 
 /** Each app's name in team addresses. Portal is the team's home, at <number>.<domain>. */
 export const TEAM_HOST_APPS = {
@@ -174,18 +193,18 @@ export function teamAppUrl(teamId: string, app: AppName): string {
 }
 
 /**
- * A team's address for an app on the platform's domain (https://1648-orders.frcgearbox.com), or,
- * given the local dev gateway (`LOCAL_GATEWAY_URL` in a worker), the same address through it:
- * http://1648-orders.gearbox.localhost:8796.
+ * A team's address for an app on the platform's domain (https://1648-orders.frcgearbox.com,
+ * https://ftc12345-orders.frcgearbox.com), or, given the local dev gateway (`LOCAL_GATEWAY_URL` in
+ * a worker), the same address through it: http://1648-orders.gearbox.localhost:8796.
  */
 export function teamAppUrlVia(gateway: string | undefined, teamId: string, app: AppName): string {
-  const number = teamId.replace(/^frc/, "");
-  const host = app === "portal" ? number : `${number}-${TEAM_HOST_APPS[app]}`;
+  const label = teamHostLabel(teamId);
+  const host = app === "portal" ? label : `${label}-${TEAM_HOST_APPS[app]}`;
   if (gateway) return onGateway(gateway, host);
   return `https://${platformHost(host)}`;
 }
 
-/** The team a hostname belongs to (its key, "frc<number>"), or null for any other hostname. */
+/** The team a hostname belongs to (its id, "frc1648" or "ftc12345"), or null for any other hostname. */
 export function teamOfHost(hostname: string): string | null {
   // Plain localhost (each app on its own dev port) is the site's team.
   if (hostname === "localhost") return teamKey;
@@ -194,8 +213,8 @@ export function teamOfHost(hostname: string): string | null {
     ? hostname.slice(0, -DEV_DOMAIN.length - 1)
     : platformLabel(hostname);
   if (!label) return null;
-  const number = label.match(/^([1-9]\d*)(?:-|$)/)?.[1];
-  return number ? `frc${number}` : null;
+  const team = label.match(/^((?:ftc)?[1-9]\d*)(?:-|$)/)?.[1];
+  return team ? teamOfHostLabel(team) : null;
 }
 
 /** The platform's public site and team sign-up. */

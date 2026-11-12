@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { pageTeamNumber, platformUrl } from "@g3/site-config";
+import { pageTeamNumber, pageTeamProgram, platformUrl } from "@g3/site-config";
 import { useTeamUiSettings } from "../team-ui";
 
 // Lines under a team's front doors (Portal's signed-out home, ID's sign-in pages): for someone
@@ -9,7 +9,7 @@ import { useTeamUiSettings } from "../team-ui";
 export function NotYourTeam() {
   return (
     <p className="text-center text-sm text-secondary-500">
-      Not team {pageTeamNumber}?{" "}
+      Not {pageTeamProgram === "ftc" ? "FTC team" : "team"} {pageTeamNumber}?{" "}
       <a
         href={`${platformUrl}/team`}
         className="font-medium text-primary-500 hover:text-primary-600 transition-colors"

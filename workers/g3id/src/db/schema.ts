@@ -12,14 +12,21 @@ import {
 
 // Teams (migration 0013). Every account belongs to exactly one team; there is no memberships
 // table, and roles stay on the user (isAdmin, isMentor, status).
-export const teams = sqliteTable("teams", {
-  /** The team's key, "frc" + its number (`teamKey` in @g3/site-config). */
-  id: text("id").primaryKey(),
-  teamNumber: integer("team_number").notNull().unique(),
-  name: text("name").notNull(),
-  createdAt: integer("created_at").notNull(),
-  updatedAt: integer("updated_at").notNull(),
-});
+export const teams = sqliteTable(
+  "teams",
+  {
+    /** The team's key, its program and number: "frc1648", "ftc12345" (migration 0025). */
+    id: text("id").primaryKey(),
+    program: text("program", { enum: ["frc", "ftc"] })
+      .notNull()
+      .default("frc"),
+    teamNumber: integer("team_number").notNull(),
+    name: text("name").notNull(),
+    createdAt: integer("created_at").notNull(),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (t) => [unique().on(t.program, t.teamNumber)],
+);
 
 /** Team-wide file cleanup choice; an absent row keeps the existing automatic-cleanup default. */
 export const teamStoragePolicy = sqliteTable("team_storage_policy", {

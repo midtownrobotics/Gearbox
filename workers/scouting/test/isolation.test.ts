@@ -6,6 +6,7 @@ import {
   checkIsolation,
   checkTeamDeletion,
   checkTeamExport,
+  checkTeamMove,
 } from "@g3/testing/isolation";
 import { type TeamUsers, asUser, newTeamId, teamUsers } from "@g3/testing/users";
 import { call, callAs, jsonAs } from "@g3/testing/worker";
@@ -260,6 +261,10 @@ describe("team isolation", () => {
         remove: (teamId) => call(`/internal/teams/${teamId}`, { method: "DELETE" }),
       }),
     ).toEqual([]);
+  });
+
+  it("moves only the requested team's rows and files to its new id and supports retries", async () => {
+    expect(await checkTeamMove({ seed, snapshot })).toEqual([]);
   });
 
   it("seeds isolated default forms idempotently", async () => {

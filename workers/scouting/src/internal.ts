@@ -4,22 +4,38 @@ import {
   deleteTeamRows,
   downloadStorageFile,
   exportTeamRows,
+  inTeam,
+  moveR2Prefix,
+  moveTarget,
+  moveTeamRows,
+  moveTeamStorageRows,
   storageArchive,
   storageArchiveSelection,
   storageByTeam,
   teamExport,
 } from "@g3/auth";
 import { isDemoTeam } from "@g3/demo";
+import { sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { createDb } from "./db";
 import { seedTeam, teamTables } from "./db/bootstrap";
-import { seasonExportParts, seasonExports } from "./db/schema";
+import {
+  autoRoutines,
+  fieldMaps,
+  robotImages,
+  scoutingFormSubmissions,
+  seasonExportParts,
+  seasonExports,
+} from "./db/schema";
 import { demoWords, loadDemo } from "./demo";
 import { downloadableDrawing, drawingArchiveAssets } from "./drawing-storage";
 import { manifest } from "./manifest";
 import { seasonExportRoutes } from "./season-exports";
 import { scoutingStorageReport } from "./storage-report";
 import type { AppEnv } from "./types";
+
+/** Every file a team keeps in FIELD_MAPS since teams were kept apart is under this. */
+const filesPrefix = (teamId: string) => `teams/${encodeURIComponent(teamId)}/`;
 
 /** Service-binding hooks; the gateway rejects /api/internal before forwarding. */
 export const internalRoutes = new Hono<AppEnv>()
@@ -113,4 +129,36 @@ export const internalRoutes = new Hono<AppEnv>()
     await deleteTeamRows(db, teamId, teamTables);
     await clearTeamStorageLock(c.env.SCOUTING_DB, teamId);
     return c.json({ ok: true });
+  })
+  // The team changed program, and so its id (the platform's team moves): its files in R2 move to
+  // the new id's prefix a few hundred at a time (`done: false` until they're all there), then its
+  // rows and the keys they keep. Files from before teams were kept apart stay where they are.
+  .post("/teams/:teamId/move", async (c) => {
+    const from = c.req.param("teamId");
+    const to = await moveTarget(c.req.raw, from);
+    if (!to) return c.json({ error: "Say which team id to move to." }, 400);
+    const db = createDb(c.env.SCOUTING_DB);
+    const [oldPrefix, newPrefix] = [filesPrefix(from), filesPrefix(to)];
+    if (!(await moveR2Prefix(c.env.FIELD_MAPS, oldPrefix, newPrefix))) {
+      return c.json({ done: false });
+    }
+    // Drawings' keys inside a submission's fields, while its rows are still the old id's.
+    await db
+      .update(scoutingFormSubmissions)
+      .set({
+        drawing_fields_json: sql`replace(${scoutingFormSubmissions.drawing_fields_json}, ${`"${oldPrefix}`}, ${`"${newPrefix}`})`,
+      })
+      .where(inTeam(scoutingFormSubmissions, from));
+    await moveTeamRows(db, from, to, teamTables, {
+      columns: [
+        autoRoutines.image_r2_key,
+        fieldMaps.r2_key,
+        robotImages.r2_key,
+        scoutingFormSubmissions.drawing_r2_key,
+      ],
+      from: oldPrefix,
+      to: newPrefix,
+    });
+    await moveTeamStorageRows(c.env.SCOUTING_DB, from, to);
+    return c.json({ done: true });
   });

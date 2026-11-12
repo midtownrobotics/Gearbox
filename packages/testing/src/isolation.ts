@@ -168,6 +168,80 @@ export async function checkTeamDeletion(spec: DeletionSpec): Promise<string[]> {
   return problems;
 }
 
+export type MoveSpec = Pick<IsolationSpec, "seed" | "snapshot"> & {
+  /**
+   * Calls the app as the platform does when the team changes program; by default its
+   * `POST /internal/teams/:from/move { to }`, over the service binding.
+   */
+  move?(from: string, to: string): Promise<Response>;
+  /** What's left of a moved team's old id that's fine (its snapshot after), as a predicate. */
+  isEmpty?: (snapshot: unknown) => boolean;
+};
+
+/**
+ * Moving a team to another id (`POST /internal/teams/:teamId/move { to }`, an FRC-numbered team
+ * that said it's in FTC) leaves nothing under the old id, gives the new one exactly what the old
+ * one had (with the id changed), and doesn't touch another team's data. Calls the move until it
+ * says it's done, then once more (a retry). Gives back what went wrong, one line each.
+ */
+export async function checkTeamMove(spec: MoveSpec): Promise<string[]> {
+  const a = teamUsers(newTeamId());
+  const b = teamUsers(newTeamId());
+  await spec.seed(a);
+  await spec.seed(b);
+  const to = a.teamId.replace(/^frc/, "ftc");
+  const had = JSON.stringify(await spec.snapshot(a.teamId));
+  const before = JSON.stringify(await spec.snapshot(b.teamId));
+  const problems: string[] = [];
+  const move =
+    spec.move ??
+    ((from: string, to: string) =>
+      call(`/internal/teams/${from}/move`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to }),
+      }));
+  // What the new id should have: the old id's data with the team's id changed where it's the
+  // whole value or a part of a file's key ("teams/frc123456/…"). Names a test made from the id, and
+  // the test users' own ids ("student-1.frc123456", @g3/testing/users), stay as they were.
+  const expected = (text: string) =>
+    text.replace(new RegExp(`(?<="|/|%2F)${a.teamId}(?="|/|%2F)`, "g"), to);
+  const moveAll = async (label: string) => {
+    for (let i = 0; i < 50; i++) {
+      const res = await move(a.teamId, to);
+      if (!res.ok) {
+        problems.push(`${label} answered ${res.status}: ${await res.text()}`);
+        return;
+      }
+      const body = (await res.json()) as { done?: unknown };
+      if (body.done === true) return;
+      if (body.done !== false) {
+        problems.push(`${label} didn't say whether it's done`);
+        return;
+      }
+    }
+    problems.push(`${label} never finished`);
+  };
+  await moveAll("moving team A");
+  const left = await spec.snapshot(a.teamId);
+  if (!(spec.isEmpty ?? emptySnapshot)(left)) {
+    problems.push(`team A's old id still has: ${JSON.stringify(left).slice(0, 500)}`);
+  }
+  const moved = JSON.stringify(await spec.snapshot(to));
+  if (moved !== expected(had)) {
+    problems.push(
+      `team A's new id doesn't have what it had: ${moved.slice(0, 400)} (expected ${expected(had).slice(0, 400)})`,
+    );
+  }
+  if (emptySnapshot(JSON.parse(had))) problems.push("team A had nothing to move (check the seed)");
+  if (JSON.stringify(await spec.snapshot(b.teamId)) !== before) {
+    problems.push("moving team A changed team B's data");
+  }
+  // A move tried again after it finished (the platform retrying) is fine too.
+  await moveAll("moving it again");
+  return problems;
+}
+
 export type ExportSpec = Pick<IsolationSpec, "seed"> & {
   /** Calls the app as the platform does when an admin downloads its data. */
   exportOf(teamId: string): Promise<Response>;

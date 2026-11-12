@@ -5,6 +5,7 @@ import {
   checkIsolation,
   checkTeamDeletion,
   checkTeamExport,
+  checkTeamMove,
 } from "@g3/testing/isolation";
 import { type TeamUsers, newTeamId, teamUsers } from "@g3/testing/users";
 import { call, callAs, jsonAs } from "@g3/testing/worker";
@@ -242,6 +243,10 @@ it("deletes a team's data when an operator deletes the team, and only that team'
     remove: (teamId) => call(`/internal/teams/${teamId}`, { method: "DELETE" }),
   });
   expect(problems).toEqual([]);
+}, 60_000);
+
+it("moves a team's data to its new id when it changes program, and only that team's", async () => {
+  expect(await checkTeamMove({ seed, snapshot })).toEqual([]);
 }, 60_000);
 
 it("exports a team's data for its admins, and only that team's", async () => {

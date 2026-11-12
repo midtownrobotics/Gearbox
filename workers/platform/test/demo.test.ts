@@ -32,6 +32,7 @@ describe("the public demo", () => {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        program: "frc",
         teamNumber: site.demo.teamNumber,
         name: "Not the demo",
         country: "US",

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+import { teamLabel } from "@g3/site-config";
 import { Button, Card, ConfirmButton, ErrorBanner, Page, TextField } from "@g3/ui";
 import { useState } from "react";
 import { type Operator, consoleApi, formatDate, read, send, useLoad } from "./data";
@@ -34,7 +35,7 @@ export function OperatorsPage() {
               </span>
               <span className="text-secondary-600">{o.email}</span>
               <span className="text-secondary-500">
-                {o.teamId?.replace(/^frc/, "Team ")} · since {formatDate(o.createdAt)}
+                {o.teamId && teamLabel(o.teamId)} · since {formatDate(o.createdAt)}
               </span>
               {!o.isYou && (
                 <>

@@ -6,6 +6,10 @@ import {
   exportTeamRows,
   inTeam,
   logTeamChange,
+  moveR2Prefix,
+  moveTarget,
+  moveTeamRows,
+  moveTeamStorageRows,
   requireAdmin,
   requireAuth,
   settingLabels,
@@ -46,7 +50,12 @@ import { demoWords, loadDemo } from "./demo";
 import { downloaderRoutes, downloaderSelfRoutes } from "./downloaders";
 import { eventSnapshotRoutes, snapshotMonitorData } from "./event-snapshot";
 import { manifest } from "./manifest";
-import { deleteTeamLogFiles, logUploadRoutes, matchLogRoutes } from "./match-logs";
+import {
+  deleteTeamLogFiles,
+  dropPendingUploads,
+  logUploadRoutes,
+  matchLogRoutes,
+} from "./match-logs";
 import {
   type TbaMatch,
   contextRankingsFor,
@@ -57,6 +66,24 @@ import {
 import { SETTING_KEYS, type SettingKey, getSetting, getWhenFull, teamNumberOf } from "./settings";
 import { pitStorageReport } from "./storage-report";
 import type { AppEnv } from "./types";
+
+/** Every table with the team's rows. */
+const TEAM_TABLES = [
+  scopeAssets,
+  scopeSettings,
+  matchLogs,
+  checklistArchives,
+  checklistIssues,
+  checklistItems,
+  checklistLists,
+  batteries,
+  settings,
+  logDownloaders,
+  logDownloaderCodes,
+];
+
+/** Every file the team keeps in LOGS is under this (../match-logs.ts, ../advantagescope.ts). */
+const filesPrefix = (teamId: string) => `pit/teams/${teamId}/`;
 
 // The Monitor's outside services (The Blue Alliance, Nexus, Statbotics) get this long to answer.
 const OUTSIDE_TIMEOUT_MS = 5000;
@@ -267,21 +294,29 @@ const app = base
   .delete("/internal/teams/:teamId", async (c) => {
     await deleteTeamLogFiles(c.env.LOGS, c.req.param("teamId"), createDb(c.env.PIT_DB));
     await deleteTeamScopeFiles(c.env.LOGS, c.req.param("teamId"));
-    await deleteTeamRows(createDb(c.env.PIT_DB), c.req.param("teamId"), [
-      scopeAssets,
-      scopeSettings,
-      matchLogs,
-      checklistArchives,
-      checklistIssues,
-      checklistItems,
-      checklistLists,
-      batteries,
-      settings,
-      logDownloaders,
-      logDownloaderCodes,
-    ]);
+    await deleteTeamRows(createDb(c.env.PIT_DB), c.req.param("teamId"), TEAM_TABLES);
     await clearTeamStorageLock(c.env.PIT_DB, c.req.param("teamId"));
     return c.json({ ok: true });
+  })
+  // The team changed program, and so its id (the platform's team moves): its files in R2 (match
+  // logs, AdvantageScope assets, all under pit/teams/<team>/) move to the new id's prefix a few
+  // hundred at a time (`done: false` until they're all there), then its rows and the keys they keep.
+  .post("/internal/teams/:teamId/move", async (c) => {
+    const from = c.req.param("teamId");
+    const to = await moveTarget(c.req.raw, from);
+    if (!to) return c.json({ error: "Say which team id to move to." }, 400);
+    const db = createDb(c.env.PIT_DB);
+    await dropPendingUploads(c.env.LOGS, db, from);
+    if (!(await moveR2Prefix(c.env.LOGS, filesPrefix(from), filesPrefix(to)))) {
+      return c.json({ done: false });
+    }
+    await moveTeamRows(db, from, to, TEAM_TABLES, {
+      columns: [matchLogs.r2Key],
+      from: filesPrefix(from),
+      to: filesPrefix(to),
+    });
+    await moveTeamStorageRows(c.env.PIT_DB, from, to);
+    return c.json({ done: true });
   })
   .get("/me", requireAuth, (c) =>
     c.json({

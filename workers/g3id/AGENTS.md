@@ -33,7 +33,7 @@ each team signs in on its own G3ID, `<number>-id.<platform>` (G3: `1648-id.frcge
 
 ## Database
 
-- `teams` — each team, keyed by `frc<number>` (`teamKey`); a request's team is `requestTeamId()` (`src/lib/team.ts`)
+- `teams` — each team, keyed by its program and number, `frc<number>` or `ftc<number>` (migration `0025`: `program`, unique per program); a request's team is `requestTeamId()` (`src/lib/team.ts`). `PUT /internal/teams` takes the program from the id. A team that changes program moves with `POST /internal/teams/:id/move { to }` (`MOVE_TEAM` in `routes/internal.ts`: its row, then every table with a `team_id`, in one batch; a new one goes there too). Sessions point at accounts, so they keep working; kiosk tokens are in the old address's `localStorage`, so kiosks are set up again.
 - `core_users` — user accounts with status (pending/active/rejected); **each belongs to exactly one team** (`team_id`, no memberships table; roles stay as `is_admin`/`is_mentor`); `display_name` (full name, admins edit it) and `username` (the chat account's name, locked), `needs_name` while someone new hasn't entered their name
 - `core_user_identities` — linked auth providers per user
 - `core_sessions` — active sessions (deprecated in favor of KV)

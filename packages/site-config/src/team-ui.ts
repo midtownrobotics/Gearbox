@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { contrastRatio, isHexColor } from "./color.ts";
 import { site } from "./site.ts";
+import { teamLabel, teamNumberOf, teamProgramOf } from "./team-id.ts";
 import { teamLinks, teamLinksFor } from "./team-links.ts";
 
 export const teamUiLinkLabels = {
@@ -255,10 +256,12 @@ export function teamAvatarUrl(teamNumber: number, year = new Date().getFullYear(
  */
 export function teamUiDefaults(teamId: string, name?: string): TeamUiSettings {
   if (teamId === `frc${site.team.number}`) return defaultTeamUiSettings;
-  const number = Number(teamId.replace(/^frc/, ""));
+  const number = teamNumberOf(teamId);
+  // The FRC sites only know FRC teams: an FTC team starts with none of them.
+  const frc = teamProgramOf(teamId) === "frc";
   return {
     ...defaultTeamUiSettings,
-    name: name ?? `Team ${number}`,
+    name: name ?? teamLabel(teamId),
     shortName: String(number),
     links: {
       publicSite: "",
@@ -266,7 +269,9 @@ export function teamUiDefaults(teamId: string, name?: string): TeamUiSettings {
       discord: "",
       github: "",
       instagram: "",
-      ...teamLinksFor(number),
+      ...(frc
+        ? teamLinksFor(number)
+        : { frcEvents: "", blueAlliance: "", statbotics: "", match13: "" }),
     },
   };
 }

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+import { teamNumberLabel } from "@g3/site-config";
 import { Button, Card, ErrorBanner, Page, TextField, inputClass } from "@g3/ui";
 import { useState } from "react";
 import { Link } from "react-router-dom";
@@ -97,7 +98,7 @@ export function TeamsPage() {
                       to={`/console/teams/${team.id}`}
                       className="text-primary-600 hover:underline"
                     >
-                      {team.teamNumber}
+                      {teamNumberLabel(team.id)}
                     </Link>
                   </td>
                   <td className="py-2 pr-4 text-secondary-900">
