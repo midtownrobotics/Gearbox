@@ -136,7 +136,10 @@ describe("teams", () => {
     )
       .bind(id)
       .run();
-    const res = await call(operator, `/teams/${id}`);
+    const open = (reason?: string) =>
+      call(operator, `/teams/${id}/details`, { method: "POST", body: { reason } });
+    expect((await open()).status).toBe(400);
+    const res = await open("Following up a report");
     const text = await res.text();
     // Its chat by platform only, never the workspace's name.
     expect(text).not.toContain("Secret Robotics");
@@ -150,14 +153,33 @@ describe("teams", () => {
     for (const secret of ["Fay Founder", "fay@test", "Max Member", "max@test"]) {
       expect(text).not.toContain(secret);
     }
-    // Opening it is an access the log records, once an hour per operator, apart from members.
-    await call(operator, `/teams/${id}`);
+    // Opening it is an access the log records with the reason, apart from members: the same
+    // reason (the page reloading) once an hour, a new one each time.
+    await open("Following up a report");
+    await open("Handing it over");
     const views = await testEnv.PLATFORM_DB.prepare(
-      "SELECT action, operator_user_id FROM operator_actions WHERE team_id = ? AND action LIKE 'view_team%'",
+      "SELECT action, operator_user_id, reason FROM operator_actions WHERE team_id = ? AND action LIKE 'view_team%' ORDER BY created_at, rowid",
     )
       .bind(id)
       .all();
-    expect(views.results).toEqual([{ action: "view_team_details", operator_user_id: operator.id }]);
+    expect(views.results).toEqual([
+      {
+        action: "view_team_details",
+        operator_user_id: operator.id,
+        reason: "Following up a report",
+      },
+      { action: "view_team_details", operator_user_id: operator.id, reason: "Handing it over" },
+    ]);
+    // Only from the console's own pages, like every change.
+    expect(
+      (
+        await call(operator, `/teams/${id}/details`, {
+          method: "POST",
+          body: { reason: "x" },
+          origin: null,
+        })
+      ).status,
+    ).toBe(403);
   });
 
   it("opens a team's member list only with a reason, and logs each time", async () => {
@@ -208,7 +230,7 @@ describe("teams", () => {
     )
       .bind(crypto.randomUUID(), operator.id, id, old)
       .run();
-    await call(operator, `/teams/${id}`);
+    await call(operator, `/teams/${id}/details`, { method: "POST", body: { reason: "Checking" } });
     expect(
       await row("SELECT id FROM operator_actions WHERE team_id = ? AND created_at = ?", id, old),
     ).toBeNull();

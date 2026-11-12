@@ -1,5 +1,11 @@
 # @g3/worker-schedule
 
+## 0.4.3
+
+### Patch Changes
+
+- 72f42fa: Tighter security: pages running on someone's own computer can no longer call the live apps.
+
 ## 0.4.2
 
 ### Patch Changes

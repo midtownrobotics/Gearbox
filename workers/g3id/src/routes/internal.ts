@@ -26,6 +26,7 @@ import { createHandoff } from "../lib/handoff";
 import { dmAdmins, dmMembers } from "../lib/member-dm";
 import { createSigninCode } from "../lib/slack-code";
 import { saveInstallation } from "../lib/slack-install";
+import { storagePolicy } from "../lib/storage-policy";
 import { siteTeamId } from "../lib/team";
 import { logToTeam } from "../lib/team-log";
 import type { AppEnv } from "../types";
@@ -44,6 +45,7 @@ const MEMBER_ROWS = `user_id IN ${MEMBERS}`;
 const DELETE_TEAM = [
   "DELETE FROM team_ui_settings WHERE team_id = ?1",
   "DELETE FROM team_sign_in_methods WHERE team_id = ?1",
+  "DELETE FROM team_storage_policy WHERE team_id = ?1",
   `DELETE FROM core_sessions WHERE ${MEMBER_ROWS}`,
   `DELETE FROM core_user_identities WHERE ${MEMBER_ROWS}`,
   `DELETE FROM core_user_pins WHERE team_id = ?1 OR ${MEMBER_ROWS}`,
@@ -102,6 +104,11 @@ export async function deleteTeam(env: AppEnv["Bindings"], id: string): Promise<s
 }
 
 export const internalRouter = new Hono<AppEnv>()
+  .get("/teams/:teamId/storage-policy", async (c) => {
+    c.header("Cache-Control", "private, no-store");
+    const policy = await storagePolicy(createDb(c.env.DB), c.req.param("teamId"));
+    return policy ? c.json(policy) : c.json({ error: "Team not found." }, 404);
+  })
   // A team the platform signed up. The platform keeps the team's record; G3ID keeps its id, number
   // and name, which its own tables (users, kiosks, Slack) point at.
   .put("/teams", async (c) => {

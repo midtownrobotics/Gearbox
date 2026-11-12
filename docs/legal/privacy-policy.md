@@ -1,6 +1,6 @@
 # Gearbox Privacy Policy
 
-Last updated: 6 November 2026.
+Last updated: 9 November 2026.
 
 ## In short
 
@@ -31,7 +31,7 @@ We collect only what the apps need to work.
 | Attendance | When you signed in and out, and hours added by an admin | You and your team's admins |
 | Orders | Part requests, reasons, approvals, costs, budgets and vendors | Members and mentors |
 | Inventory | What the team owns, how many and where, and a history of who counted, moved, checked out or received each part | Members and mentors |
-| Shop | Parts, production steps, who did them, who made a part obsolete, who your team's shop managers are, quality reports (who made each, its notes, and who did the steps it questions), drawings and files; for each Onshape release, its name and notes, who made and approved it (their Onshape names) and its comments; how many calls Shop made to Onshape each day, and the last 50 that failed | Members, mentors and Onshape, if connected |
+| Shop | Parts, production steps, who did them, who made a part obsolete, who your team's shop managers are, quality reports (who made each, its notes, and who did the steps it questions), drawings and files; for each Onshape release, its name and notes, who made and approved it (their Onshape names) and its comments; how many calls Shop made to Onshape each day, and the last 50 that failed; with the release tracker, the parts in your Onshape document and which release each came from | Members, mentors and Onshape, if connected |
 | Pit | Checklists, issues and battery records, and archives of the checklists with who archived each one and when; the computers paired as log downloaders, with each one's name, who paired it, when, when it was last heard from and what it last said it was doing (connected to the robot, copying, uploading); and the robot's match logs those computers upload (the robot's own data from each match; at most 20 per team), kept until the team deletes them; AdvantageScope's preferences and layout for the team, with who last changed each; and the field, robot and joystick models mentors upload to it, with who uploaded each and when | Members |
 | Skill Tree | Each member's progress on skills and who signed it off | Members and mentors |
 | Schedule | Each event's days and periods, which members are attending, each one's role for every 15 minutes, who may edit schedules, and which chat reminders (Slack or Discord) were sent; each member's own list of friends, which only that member can see | Mentors and the students they trust; each member, for their friends |
@@ -82,9 +82,13 @@ Problem reports are public too. Each one is posted as an issue on Gearbox's publ
 
 On a team that runs Edge, the sites each device used are shown only to the team's admins.
 
+New drawings on Scouting's built-in field and autonomous routes are saved as coordinates, stroke colors and a field version, instead of a separate flattened image for each drawing. Uploaded photos, custom backgrounds and older images keep their image format. These coordinate files follow the same storage caps and retention as other uploaded files.
+
 Scouting forms, reports, schedules, uploaded files and points are private to the owning team. Team deletion or the app's scheduled deletion removes its database records and uploaded files.
 
 Scouting engagement is off by default. An admin can enable points and match predictions and can separately enable team points standings. Standings show members' names, balances, points earned and points used to signed-in teammates. A member's prediction history is shown only to that member through the activity page. Disabling activities pauses new awards and prediction result processing and keeps existing balances and history under the same retention rules as other team data.
+
+Team admins can export selected Scouting game-season records and available files, then permanently reset the backed-up data after verifying saved archives and confirming the year. This explicit reset is separate from automatic capacity cleanup and can include recent files. Unselected data, other seasons, accounts, settings, form templates, API keys and points balances/history stay. New or changed records and files that are still referenced are kept. Older files outside the team's storage folder are kept too. Device-only maps and drafts are outside this operation. There is no automatic archive restore. Temporary export receipts contain record fingerprints and file references, not duplicate file contents; one export per team is kept for up to 24 hours, and expiration removes only those receipts. Export requests and reset actions are logged for the team.
 
 ## 6. Other services involved
 
@@ -95,7 +99,7 @@ Scouting engagement is off by default. An admin can enable points and match pred
 | GitHub | Holds problem reports as public issues | When you send a report: its text, the page's address, the versions, your browser, your team's number, your reporter ID and your name if you added it |
 | Slack | Sign-in and team notifications | Only if your team connects its Slack workspace |
 | Discord | Sign-in and team notifications. When someone new signs in with Discord, we check with Discord that they're in your team's server; the answer isn't stored | Only if your team connects its Discord server |
-| Onshape | Part and drawing data for Shop | Only if your team connects Onshape |
+| Onshape | Part and drawing data for Shop; with the release tracker, how far each part is in the shop, as its color in a document your team chooses | Only if your team connects Onshape |
 | The Blue Alliance, Nexus, Statbotics | Public event and match schedules and predictions for Pit and Scouting. The Blue Alliance also has teams' avatars, which a team can choose to show as its logo | Team and event numbers only. When your team shows its avatar, your browser loads the image from The Blue Alliance, which sees your IP address as it would on any visit |
 | Sites your team links to | A team's own links on its home page show each site's icon | When you open your team's home, your browser loads each linked site's icon from that site, which sees your IP address as it would on any visit. Gearbox doesn't store the icons |
 | Share-A-Cart | Building vendor carts in Orders | Only if your team connects it; it receives the items in a cart |
@@ -117,6 +121,7 @@ Where the law of your team's country requires a legal basis for that transfer, t
 | Sign-in sessions | 7 days from sign-in |
 | Your account | Until a team admin deletes it, which removes it and your sign-ins at once, or until your team is deleted |
 | Team data | While the team is registered. Deleted within 30 days after the team closes |
+| Uploaded files in Shop, Scouting and Pit | Admins can turn automatic capacity deletion off for the team on Storage; existing files then stay and uploads that exceed an allowance are blocked, including Pit logs. The default keeps the existing automatic-cleanup behavior. Policy changes are logged and active admins are notified through connected chat, best effort. The choice applies to new uploads; cleanup already running may finish. If the policy cannot be checked, files are kept and growth above the cap is refused. With automatic deletion on, when new uploads would exceed an app's cap, files older than six calendar months are permanently removed first, followed by the oldest remaining files as needed to target 90% usage. Recent files can also be removed. Unknown-date files are considered last. Incoming files are not selected for cleanup; an upload too large for the allowance is refused. Pit's match logs are only removed this way when the team chooses it. Written Scouting reports and auton steps remain when images are removed. Admins can review usage and eligible files and download copies on Storage. Usage warnings at 90%, 95%, and 100%, and cleanup summaries, are best effort through the team log and connected chat. Storage counts and file lists may be cached internally for one minute. Existing team/app deletion and demo lifecycle rules still apply |
 | The team's log (apps switched on or off, data downloads, and which settings were changed and by whom, never their values) | Kept as team data |
 | Data of an app your team switches off | 90 days, in case your team switches it back on, then deleted |
 | Records that name a removed member, such as past orders | Kept by the team, with the member's name replaced by a placeholder |
@@ -125,6 +130,7 @@ Where the law of your team's country requires a legal basis for that transfer, t
 | Edge: sites each device used | Hourly for 30 days, then daily totals for one year |
 | Who sent a problem report, and your reporter ID | Kept as team data, and deleted with the team. The public GitHub issue stays: ask us to remove one |
 | Daily visit totals for our public page | Kept; they are totals and identify no one |
+| Incomplete match-log uploads | Expire after 30 minutes; cleaned up when another upload starts or by the storage provider's incomplete-upload cleanup |
 | Technical logs | 7 days |
 | Backups | 30 days, after which deleted information is gone from backups too |
 | The public demo | Erased every night at midnight US Eastern time |

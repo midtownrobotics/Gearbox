@@ -23,3 +23,5 @@ The [Files](team:shop/files) page lists every file by its batches' progress: not
 To clear out old files and drawings, tick the box by each one and choose **Delete selected**, or, in **Complete**, **Unused** and **Obsolete**, the box by the group's name to choose all of it. **Complete** and **Obsolete** also have **Delete all**. Deleting can't be undone, and a batch that had a deleted file has none. Shop computers in kiosk mode can't delete.
 
 **Duplicate** a batch to make the same parts again from the same file.
+
+A file can be up to 100 MB. Your team has room for 5 GB or 10,000 files and drawings in Shop. When a new upload would exceed the cap, Shop removes files over six months old first, then the oldest remaining files if needed, aiming for 90% usage. Recent files can also be removed. Download files you want to keep before reaching the cap. Admins receive grouped cleanup summaries. A team admin can choose **Keep files and stop uploads at the cap** on the team home's **Admin → Storage** page to disable automatic deletion. New growth then stops at the allowance; existing files stay.

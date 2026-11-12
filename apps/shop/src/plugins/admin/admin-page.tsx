@@ -37,6 +37,7 @@ import { ActionsLog } from "./actions-log";
 import { sectionHeading } from "./admin-styles";
 import { OnshapeUsage } from "./onshape-usage";
 import { QualityReports } from "./quality-reports";
+import { ReleaseTracker } from "./release-tracker";
 import { StatusLevelsSettings } from "./status-levels";
 
 export function AdminPage() {
@@ -302,6 +303,12 @@ export function AdminPage() {
         {isAdmin && (
           <Section title="Onshape API Usage" id="onshape" defaultOpen={false}>
             <OnshapeUsage />
+          </Section>
+        )}
+
+        {isAdmin && (
+          <Section title="Release Tracker" id="release-tracker" defaultOpen={false}>
+            <ReleaseTracker />
           </Section>
         )}
 

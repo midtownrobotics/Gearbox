@@ -18,6 +18,14 @@ export const manifest = defineManifest({
   // and roles stay here.
   settings: [
     {
+      key: "storageAutomaticDeletion",
+      label: "Automatically delete oldest files",
+      type: "boolean",
+      default: true,
+      editedBy: "admin",
+      page: "portal:/admin/storage",
+    },
+    {
       key: "open_signup",
       label: "Sign-up without chat",
       type: "boolean",

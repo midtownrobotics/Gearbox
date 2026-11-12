@@ -187,12 +187,11 @@ describe("requests from other pages", () => {
   const from = (origin: string, url = `${team("4242-orders")}/api/requests`, method = "POST") =>
     gateway(url, { method, headers: { Origin: origin } });
 
-  it("lets the team's own pages, the site's other pages and localhost call its API", async () => {
+  it("lets the team's own pages and the site's other pages call its API", async () => {
     expect((await from(team("4242-shop"))).status).toBe(200);
     expect((await from(team("4242"))).status).toBe(200);
     expect((await from(team(`${ours}-shop`), `${team(`${ours}-orders`)}/api/x`)).status).toBe(200);
     expect((await from(`https://www.${site.platformDomain}`)).status).toBe(200);
-    expect((await from("http://localhost:5184")).status).toBe(200);
   });
 
   it("refuses another team's pages and other sites, reads included", async () => {
@@ -201,6 +200,11 @@ describe("requests from other pages", () => {
     expect((await from(`https://www.${site.domain}`)).status).toBe(403);
     expect((await from(team(`${ours}-orders`), undefined, "GET")).status).toBe(403);
     expect((await from("https://evil.example")).status).toBe(403);
+  });
+
+  it("refuses localhost outside local dev", async () => {
+    expect((await from("http://localhost:5184")).status).toBe(403);
+    expect((await from("http://127.0.0.1:5184")).status).toBe(403);
   });
 
   it("says why: another team's page, or a page that isn't ours", async () => {
@@ -399,6 +403,7 @@ describe("local dev (gearbox.localhost on the gateway's dev port)", () => {
         headers: { Origin: origin },
       });
     expect((await from("http://4242-shop.gearbox.localhost:8796")).status).toBe(200);
+    expect((await from("http://localhost:5184")).status).toBe(200);
     expect((await from(`http://${ours}-orders.gearbox.localhost:8796`)).status).toBe(403);
   });
 });

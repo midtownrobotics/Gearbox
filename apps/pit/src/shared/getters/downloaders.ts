@@ -81,6 +81,7 @@ export type MatchLogs = {
   /** The most logs Pit keeps for a team. */
   limit: number;
   whenFull: WhenFull;
+  automaticDeletion?: boolean;
   /** Mentors and admins: choose `whenFull`. */
   canManage: boolean;
   /** Admins: delete logs, one or all after an export. */

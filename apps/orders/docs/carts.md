@@ -20,4 +20,4 @@ On a McMaster-Carr cart, **Copy list** works differently: it copies one line per
 
 ## Mark it ordered
 
-Once you've placed the order on the vendor's site, select its parts on the card and mark them ordered. Enter what the order really cost, and shipping, tax and tariffs: Orders splits the total across the parts by their estimates, and that's what counts against the budget. The parts then show on Deliveries.
+Once you've placed the order on the vendor's site, select its parts on the card and choose **Mark Placed**. Enter what the order really cost, and shipping, tax and tariffs: Orders splits the total across the parts by their estimates, and that's what counts against the budget. If shipping is left at $0 and the order doesn't reach the vendor's free shipping, Orders asks you to check it first. The parts then show on Deliveries.

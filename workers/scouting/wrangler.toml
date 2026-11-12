@@ -7,6 +7,11 @@ name = "scouting"
 main = "src/index.ts"
 compatibility_date = "2026-05-17"
 
+[[rules]]
+type = "Text"
+globs = ["**/field-2026.svg"]
+fallthrough = true
+
 [triggers]
 crons = ["*/5 * * * *"]
 

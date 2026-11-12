@@ -174,15 +174,17 @@ Platform operators manage teams at `admin.frcgearbox.com`. The gateway sends it 
 
 ### Console: Cloudflare
 
-The console's Cloudflare page shows the account's usage this month against Workers Paid, an estimated bill, warnings at 80% of what the plan includes, each zone's traffic and security events, and each worker's deploys. It needs a **read-only** API token, kept as a secret on the platform Worker only (never the deploy token from GitHub Actions, which can change things):
+The console's Cloudflare page shows the account's usage this billing period against Workers Paid, an estimated bill, warnings at 80% of what the plan includes, each zone's traffic and security events, and each worker's deploys. It needs a **read-only** API token, kept as a secret on the platform Worker only (never the deploy token from GitHub Actions, which can change things):
 
-1. In the Cloudflare dashboard, **My Profile → API Tokens → Create Token → Custom token**, named "Gearbox console (read-only)", with only these permissions, all **Read**: Account · Account Analytics, Account · Workers Scripts, Account · D1, Account · Workers KV Storage, Account · Workers R2 Storage, Zone · Zone, Zone · Analytics. Account resources: the Gearbox account only. Zone resources: all zones in that account.
-2. In `workers/platform`:
+1. In the Cloudflare dashboard, **My Profile → API Tokens → Create Token → Custom token** (a user token: an account API token, under Manage account, can't read D1, R2, KV, Queues or Workers AI usage), named "Gearbox console (read-only)", with two policies, all **Read**:
+   - **Account** (the Gearbox account): Account Analytics, Billing, Workers Scripts, D1, Workers KV Storage, Workers R2 Storage, Queues, Workers AI. Billing is for the billing period, since what the plan includes resets on the billing date; without it the page counts the calendar month.
+   - **Zone** (all zones in the Gearbox account): Zone, Analytics.
+2. In `workers/platform`, pasting only the value at each prompt:
    ```bash
    pnpm exec wrangler secret put CLOUDFLARE_API_TOKEN --env production
    pnpm exec wrangler secret put CLOUDFLARE_ACCOUNT_ID --env production   # the 32-character account id
    ```
-   The same on `--env staging` to see it there (it shows the same account). Without them, the page says how to add them.
+   The same on `--env staging` to see it there (it shows the same account), and as `CLOUDFLARE_API_TOKEN=` and `CLOUDFLARE_ACCOUNT_ID=` lines in `workers/platform/.dev.vars` for local dev. Without them, the page says how to add them.
 
 The page's prices are in `PLAN` in `workers/platform/src/cloudflare.ts`; update them when Cloudflare's change.
 

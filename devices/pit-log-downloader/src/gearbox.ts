@@ -231,10 +231,13 @@ export type LogUpload = {
   trimmed: boolean;
 };
 
-/** Why Pit didn't take a log: it's full and keeps what it has, or the log is over its limit. */
+/**
+ * Why Pit didn't take a log: it's full and keeps what it has, the log is over its limit, or Pit
+ * already has another copy of it (a different size), which it won't replace on its own.
+ */
 export class UploadRefused extends Error {
-  readonly reason: "full" | "too_big";
-  constructor(message: string, reason: "full" | "too_big") {
+  readonly reason: "full" | "too_big" | "already_saved";
+  constructor(message: string, reason: "full" | "too_big" | "already_saved") {
     super(message);
     this.reason = reason;
   }
@@ -256,7 +259,7 @@ export async function uploadLog(log: LogUpload): Promise<"uploaded" | "already t
     if (!res.ok) {
       const body = (await res.json().catch(() => null)) as { error?: string; code?: string } | null;
       const message = body?.error ?? `Gearbox answered ${res.status}.`;
-      if (body?.code === "full" || body?.code === "too_big") {
+      if (body?.code === "full" || body?.code === "too_big" || body?.code === "already_saved") {
         throw new UploadRefused(message, body.code);
       }
       throw new Error(message);

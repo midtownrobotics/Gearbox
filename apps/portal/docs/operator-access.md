@@ -10,7 +10,7 @@ Gearbox is run by volunteers. Rarely, an operator has to look at a team, for exa
 
 ## Operator Access
 
-[Operator Access](team:portal/admin/operator-access) lists each time an operator opened your team's details, handed over its ownership, or suspended or reactivated it.
+[Operator Access](team:portal/admin/operator-access) lists each time an operator opened your team's details, handed over its ownership, or suspended or reactivated it. An operator opens your team's details only with a reason, which is shown here.
 
 ## What operators see
 

@@ -9,19 +9,16 @@ import {
   TextField,
   inputClass,
 } from "@g3/ui";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useCallback, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   type MemberCounts,
   type MemberList,
   type TeamDetail,
   chatName,
-  consoleApi,
   formatDate,
   formatTime,
-  read,
   send,
-  useLoad,
 } from "./data";
 import { ActionList } from "./log-page";
 import { ReportCard } from "./reports-page";
@@ -29,32 +26,62 @@ import { StatusBadge } from "./shell";
 
 // One team: its details and how many members it has, the reports against its number, what
 // operators have done to it, and the tools for a number claimed wrongly (hand it over, suspend,
-// delete; a wrong number is deleted and signed up again). Its members' names and emails are only
-// shown once the operator opens the member list with a reason, which the team's admins see;
-// handing it over needs the list.
+// delete; a wrong number is deleted and signed up again). The page opens only once the operator
+// gives a reason, and its members' names and emails only once they open the member list with
+// another; the team's admins see both. Handing it over needs the list.
 
 export function TeamPage() {
   const { id = "" } = useParams();
+  // Another team needs its own reason.
+  return <Team key={id} id={id} />;
+}
+
+function Team({ id }: { id: string }) {
   const navigate = useNavigate();
-  const detail = useLoad(
-    () => read<TeamDetail>(consoleApi.teams[":id"].$get({ param: { id } })),
+  // The reason the operator opened the team with, sent again on each reload (logged once an hour).
+  const [reason, setReason] = useState<string | null>(null);
+  const [data, setData] = useState<TeamDetail | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const load = useCallback(
+    (why: string) => send<TeamDetail>("POST", `/teams/${id}/details`, { reason: why }),
     [id],
   );
+  const reload = async () => {
+    if (!reason) return;
+    try {
+      setData(await load(reason));
+      setError(null);
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
 
   const back = (
     <Link to="/console" className="text-sm text-secondary-500 hover:text-primary-600">
       ← All teams
     </Link>
   );
-  if (detail.error) {
+  if (!reason) {
     return (
       <Page title="Team" actions={back}>
-        <ErrorBanner message={detail.error} />
+        <OpenDetails
+          open={async (why) => {
+            setData(await load(why));
+            setReason(why);
+          }}
+        />
       </Page>
     );
   }
-  if (!detail.data) return <PageLoading />;
-  const { team, members, reports, actions } = detail.data;
+  if (error) {
+    return (
+      <Page title="Team" actions={back}>
+        <ErrorBanner message={error} />
+      </Page>
+    );
+  }
+  if (!data) return <PageLoading />;
+  const { team, members, reports, actions } = data;
 
   return (
     <Page
@@ -84,14 +111,14 @@ export function TeamPage() {
         teamId={team.id}
         canHandOver={team.status !== "pending"}
         hasOwner={team.hasOwner}
-        onChange={detail.reload}
+        onChange={reload}
       />
 
       {reports.length > 0 && (
         <Card title="Reports about this number">
           <div className="space-y-3">
             {reports.map((r) => (
-              <ReportCard key={r.id} report={r} onChange={detail.reload} />
+              <ReportCard key={r.id} report={r} onChange={reload} />
             ))}
           </div>
         </Card>
@@ -111,7 +138,7 @@ export function TeamPage() {
               send("POST", `/teams/${team.id}/status`, {
                 reason,
                 status: team.status === "suspended" ? "active" : "suspended",
-              }).then(detail.reload)
+              }).then(reload)
             }
           />
         )}
@@ -163,77 +190,20 @@ function Members({
   onChange: () => void;
 }) {
   const [list, setList] = useState<MemberList | null>(null);
-  const [asking, setAsking] = useState(false);
-  const [reason, setReason] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   if (!list) {
     return (
-      <Card title="Members">
-        <div className="space-y-3">
-          <p className="text-sm text-secondary-600">
-            Names and emails are hidden. Open the member list only when you need it, for example to
-            hand the team over. The team's admins will see that it was opened, when, and your
-            reason.
-          </p>
-          <Button variant="secondary" onClick={() => setAsking(true)}>
-            Open member list
-          </Button>
-        </div>
-        {asking && (
-          <Dialog title="Open the member list?" onClose={() => setAsking(false)}>
-            <form
-              className="space-y-3"
-              onSubmit={async (e) => {
-                e.preventDefault();
-                setBusy(true);
-                setError(null);
-                try {
-                  setList(
-                    await send<MemberList>("POST", `/teams/${teamId}/members`, {
-                      reason: reason.trim(),
-                    }),
-                  );
-                  setAsking(false);
-                  setReason("");
-                  onChange();
-                } catch (err) {
-                  setError((err as Error).message);
-                } finally {
-                  setBusy(false);
-                }
-              }}
-            >
-              <p className="text-sm text-secondary-700">
-                This shows the names and emails of the team's members. The team's admins will see on
-                their Member Access page that a Gearbox operator opened it, when, and the reason you
-                give. Each time you open it is logged.
-              </p>
-              <TextField
-                multiline
-                kind="reason"
-                required
-                rows={2}
-                maxLength={500}
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                placeholder="Why? (kept in the log, and shown to the team's admins)"
-                aria-label="Reason"
-              />
-              {error && <ErrorBanner message={error} />}
-              <div className="flex justify-end gap-2">
-                <Button variant="secondary" onClick={() => setAsking(false)}>
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={busy}>
-                  Open member list
-                </Button>
-              </div>
-            </form>
-          </Dialog>
-        )}
-      </Card>
+      <ReasonGate
+        title="Members"
+        hint="Names and emails are hidden. Open the member list only when you need it, for example to hand the team over. The team's admins will see that it was opened, when, and your reason."
+        button="Open member list"
+        question="Open the member list?"
+        warning="This shows the names and emails of the team's members. The team's admins will see on their Member Access page that a Gearbox operator opened it, when, and the reason you give. Each time you open it is logged."
+        open={async (reason) => {
+          setList(await send<MemberList>("POST", `/teams/${teamId}/members`, { reason }));
+          onChange();
+        }}
+      />
     );
   }
 
@@ -285,6 +255,98 @@ function Members({
         />
       )}
     </>
+  );
+}
+
+/** The team's details, closed until the operator opens them with a reason. */
+function OpenDetails({ open }: { open: (reason: string) => Promise<void> }) {
+  return (
+    <ReasonGate
+      title="Details"
+      hint="Open a team only when you need to, for example to follow up a report or hand it over. The team's admins will see that it was opened, when, and your reason."
+      button="Open team"
+      question="Open this team?"
+      warning="This shows the team's details: its number, name, country, status and chat (Slack or Discord), when it signed up and accepted the terms, how many members it has, reports about its number and what operators have done to it. No member's name or email. The team's admins will see on their Operator Access page that a Gearbox operator opened it, when, and the reason you give."
+      open={open}
+    />
+  );
+}
+
+/**
+ * A card that opens something only with the operator's reason: what's hidden, and a button whose
+ * dialog says what the team's admins will see.
+ */
+function ReasonGate({
+  title,
+  hint,
+  button,
+  question,
+  warning,
+  open,
+}: {
+  title: string;
+  hint: string;
+  button: string;
+  question: string;
+  warning: string;
+  open: (reason: string) => Promise<void>;
+}) {
+  const [asking, setAsking] = useState(false);
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <Card title={title}>
+      <div className="space-y-3">
+        <p className="text-sm text-secondary-600">{hint}</p>
+        <Button variant="secondary" onClick={() => setAsking(true)}>
+          {button}
+        </Button>
+      </div>
+      {asking && (
+        <Dialog title={question} onClose={() => setAsking(false)}>
+          <form
+            className="space-y-3"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              setBusy(true);
+              setError(null);
+              try {
+                await open(reason.trim());
+                setAsking(false);
+                setReason("");
+              } catch (err) {
+                setError((err as Error).message);
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            <p className="text-sm text-secondary-700">{warning}</p>
+            <TextField
+              multiline
+              kind="reason"
+              required
+              rows={2}
+              maxLength={500}
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="Why? (kept in the log, and shown to the team's admins)"
+              aria-label="Reason"
+            />
+            {error && <ErrorBanner message={error} />}
+            <div className="flex justify-end gap-2">
+              <Button variant="secondary" onClick={() => setAsking(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={busy}>
+                {button}
+              </Button>
+            </div>
+          </form>
+        </Dialog>
+      )}
+    </Card>
   );
 }
 

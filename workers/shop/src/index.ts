@@ -1,15 +1,21 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { MessageBatch } from "@cloudflare/workers-types";
-import { requireAuth } from "@g3/auth";
+import { requireAuth, storageLimitResponse } from "@g3/auth";
 import { corsOrigin } from "@g3/site-config";
 import { withApiPrefix } from "@g3/site-config/worker";
-import { Hono } from "hono";
+import { Hono, type MiddlewareHandler } from "hono";
 import { cors } from "hono/cors";
 import packageJson from "../package.json";
 import { createShopDb } from "./db";
 import { type BOMQueueMessage, processBOMQueue } from "./lib/bom-queue-consumer";
 import { isShopManager, qualityCheck, qualityReportsOn } from "./lib/quality";
 import { checklistFor } from "./lib/quality-checklist";
+import {
+  type TrackerSyncMessage,
+  isTrackerMessage,
+  openTrackerWindow,
+  runTrackerSync,
+} from "./lib/release-tracker";
 import { statusLevelsFor } from "./lib/shop-status";
 import { actionsRouter } from "./routes/actions";
 import { adminPartsRouter } from "./routes/admin-parts";
@@ -29,6 +35,7 @@ import { printRouter } from "./routes/print";
 import { processesRouter } from "./routes/processes";
 import { qualityRouter } from "./routes/quality";
 import { qualityReportsRouter } from "./routes/quality-reports";
+import { releaseTrackerRouter } from "./routes/release-tracker";
 import { shopStatusRouter } from "./routes/shop-status";
 import { stagingBatchesRouter } from "./routes/staging-batches";
 import { subsystemsRouter } from "./routes/subsystems";
@@ -38,6 +45,8 @@ import type { AppEnv } from "./types";
 const base = new Hono<AppEnv>();
 
 base.onError((err, c) => {
+  const storage = storageLimitResponse(err);
+  if (storage) return storage;
   console.error(err);
   return c.json({ error: "Internal server error." }, 500);
 });
@@ -51,6 +60,37 @@ base.use(
     credentials: true,
   }),
 );
+
+/**
+ * After a change that can move a part along in the shop (a step, a batch, a quality report, a
+ * new or obsolete part), the release tracker's window opens, if the team has one: its sync, 20
+ * minutes later, recolors what changed. Changes inside the window share that one sync.
+ */
+const openTrackerAfterChange: MiddlewareHandler<AppEnv> = async (c, next) => {
+  await next();
+  if (c.req.method === "GET" || !c.res.ok) return;
+  const teamId = c.get("teamId");
+  if (!teamId) return;
+  const opening = openTrackerWindow(c.env, createShopDb(c.env.SHOP_DB), teamId, {
+    refresh: false,
+  }).catch((err) => console.error("[Release tracker] Window not opened", err));
+  try {
+    c.executionCtx.waitUntil(opening);
+  } catch {
+    await opening;
+  }
+};
+for (const path of [
+  "/part-instance-processes",
+  "/staging-batches",
+  "/quality-reports",
+  "/part-instances",
+  "/part-definitions",
+]) {
+  base.use(path, openTrackerAfterChange);
+  base.use(`${path}/*`, openTrackerAfterChange);
+}
+base.use("/admin/obsolete-instances", openTrackerAfterChange);
 
 const app = base
   .get("/health", (c) => c.json({ status: "ok", service: "shop", version: packageJson.version }))
@@ -131,6 +171,7 @@ const app = base
   .route("/admin", adminPartsRouter)
   .route("/admin/quality", qualityRouter)
   .route("/admin/shop-status", shopStatusRouter)
+  .route("/admin/release-tracker", releaseTrackerRouter)
   .route("/quality-reports", qualityReportsRouter)
   .route("/team-settings", teamSettingsRouter)
   .route("/internal", internalRouter);
@@ -140,10 +181,19 @@ export { app };
 
 export default {
   fetch: withApiPrefix(app.fetch),
-  async queue(batch: MessageBatch<BOMQueueMessage>, env: AppEnv["Bindings"]) {
+  // One queue for both: a release's BOM job, and the release tracker's syncs (`kind`).
+  async queue(batch: MessageBatch<BOMQueueMessage | TrackerSyncMessage>, env: AppEnv["Bindings"]) {
     for (const msg of batch.messages) {
       try {
-        await processBOMQueue(msg.body, env);
+        if (isTrackerMessage(msg.body)) {
+          // Another sync of the team's is running: this one goes after it.
+          if ((await runTrackerSync(env, msg.body.teamId)) === "busy") {
+            msg.retry({ delaySeconds: 120 });
+            continue;
+          }
+        } else {
+          await processBOMQueue(msg.body, env);
+        }
         msg.ack();
       } catch (err) {
         console.error("[Queue] Error processing message:", err);
