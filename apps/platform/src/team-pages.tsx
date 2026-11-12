@@ -120,10 +120,15 @@ function Card({ children, picture }: { children: React.ReactNode; picture?: stri
     </div>
   );
   if (!picture) return <section className="mx-auto max-w-md px-5 py-16 sm:py-24">{card}</section>;
-  // A picture beside the card, about its size (above it on a phone).
+  // A picture beside the card, as tall as it, with the same rounded corners (above it on a
+  // phone).
   return (
-    <section className="mx-auto flex max-w-4xl flex-col items-center gap-8 px-5 py-16 sm:flex-row sm:justify-center sm:py-24">
-      <img src={picture} alt="" className="w-40 shrink-0 sm:w-80" />
+    <section className="mx-auto flex max-w-4xl flex-col items-center gap-8 px-5 py-16 sm:flex-row sm:items-stretch sm:justify-center sm:py-24">
+      <img
+        src={picture}
+        alt=""
+        className="w-40 shrink-0 rounded-2xl object-cover sm:h-auto sm:w-80 sm:self-stretch"
+      />
       {card}
     </section>
   );
