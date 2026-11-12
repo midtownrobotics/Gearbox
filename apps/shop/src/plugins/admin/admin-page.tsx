@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+import { docsUrl } from "@g3/site-config";
 import {
   Badge,
   Button,
@@ -211,8 +212,8 @@ export function AdminPage() {
           {data ? <ActionsLog data={data} /> : <Loading />}
         </Section>
 
-        {/* Section 2: Shop Settings */}
-        <Section title="Shop Settings" defaultOpen={false}>
+        {/* Section 2: Processes & Subsystems */}
+        <Section title="Processes & Subsystems" defaultOpen={false}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <NameList
               title="Subsystems"
@@ -561,7 +562,7 @@ function QualityControlSettings() {
         <h3 className={sectionHeading}>Require Quality Control</h3>
         {steps.length === 0 ? (
           <p className="text-xs text-secondary-500">
-            Add a process with the type Quality Control under Shop Settings first.
+            Add a process with the type Quality Control under Processes & Subsystems first.
           </p>
         ) : (
           <>
@@ -733,6 +734,23 @@ function ListHeading({
   );
 }
 
+function TrashIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className="h-4 w-4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M10 11v6M14 11v6" />
+    </svg>
+  );
+}
+
 /**
  * One subsystem or process. Admins remove it, after a question in the row saying what will
  * happen, or restore it once removed. `blocked` says why it can't be removed now.
@@ -761,7 +779,7 @@ function ItemRow({
   return (
     <div className="flex flex-wrap items-center gap-2 bg-page border border-secondary-200 rounded-lg px-3.5 py-2 text-sm text-secondary-900">
       <span
-        className={`flex-1 min-w-0 truncate ${archived ? "text-secondary-500" : ""}`}
+        className={`flex-1 min-w-32 truncate ${archived ? "text-secondary-500" : ""}`}
         title={name}
       >
         {name}
@@ -774,9 +792,15 @@ function ItemRow({
           </Button>
         ) : (
           !asking && (
-            <Button variant="secondary" size="sm" onClick={() => setAsking(true)}>
-              Remove
-            </Button>
+            <button
+              type="button"
+              onClick={() => setAsking(true)}
+              aria-label={`Remove ${name}`}
+              title="Remove"
+              className={`shrink-0 rounded p-1 text-secondary-500 hover:text-red-600 transition-colors ${focusRing}`}
+            >
+              <TrashIcon />
+            </button>
           )
         ))}
       {asking &&
@@ -967,6 +991,20 @@ function ProcessList({
         showRemoved={showRemoved}
         setShowRemoved={setShowRemoved}
       />
+      {isAdmin && (
+        <p className="text-xs text-secondary-500">
+          Don't understand a setting?{" "}
+          <a
+            href={`${docsUrl("shop")}/setup#processes`}
+            target="_blank"
+            rel="noreferrer"
+            className="text-primary-600 hover:underline"
+          >
+            Read about processes
+          </a>
+          .
+        </p>
+      )}
       {isAdmin && (
         <div className="flex flex-wrap gap-2">
           <TextField

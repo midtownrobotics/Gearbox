@@ -11,7 +11,7 @@ import { LogPage } from "./log-page";
 import { MemberPage } from "./member-page";
 import { MembersPage } from "./members-page";
 import { NotificationsPage } from "./notifications-page";
-import { MemberAccessPage, OperatorAccessPage } from "./operator-access-page";
+import { OperatorAccessPage } from "./operator-access-page";
 import { SeasonPage } from "./season-page";
 import { SignInPage } from "./sign-in-page";
 import { StoragePage } from "./storage-page";
@@ -54,7 +54,7 @@ export const adminPlugin: Plugin = {
     { path: "/admin/integrations", element: admin(<IntegrationsPage />) },
     { path: "/admin/notifications", element: admin(<NotificationsPage />) },
     { path: "/admin/operator-access", element: admin(<OperatorAccessPage />) },
-    { path: "/admin/member-access", element: admin(<MemberAccessPage />) },
+    { path: "/admin/member-access", element: <Navigate to="/admin/operator-access" replace /> },
     { path: "/admin/log", element: admin(<LogPage />) },
   ],
   navItems: [
@@ -94,13 +94,6 @@ export const adminPlugin: Plugin = {
       label: "Operator Access",
       to: "/admin/operator-access",
       order: 17,
-      requiresAdmin: true,
-      group: "Admin",
-    },
-    {
-      label: "Member Access",
-      to: "/admin/member-access",
-      order: 18,
       requiresAdmin: true,
       group: "Admin",
     },
