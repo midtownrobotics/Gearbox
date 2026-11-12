@@ -168,6 +168,7 @@ describe("Onshape", () => {
     }
     const event = (partNumber: string) => ({
       event: "onshape.revision.created",
+      documentId: "doc",
       elementType: 0,
       elementId: "el",
       partNumber,

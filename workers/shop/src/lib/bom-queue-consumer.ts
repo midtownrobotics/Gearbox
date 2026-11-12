@@ -43,9 +43,11 @@ async function saveRelease(
   release: { details: ReleaseDetails; items: ReleaseItem[] },
 ) {
   const now = Math.floor(Date.now() / 1000);
+  // The document stays the one its revisions came from.
+  const { documentId: _fromPackage, ...details } = release.details;
   await db
     .update(schema.onshapeReleases)
-    .set({ ...release.details, detailsAt: now })
+    .set({ ...details, detailsAt: now })
     .where(inTeam(schema.onshapeReleases, teamId, eq(schema.onshapeReleases.id, releaseRowId)));
 
   const items = [...release.items].sort(
@@ -133,7 +135,12 @@ async function processSingleBOMJob(
     return;
   }
 
-  const documentId = release?.details.documentId ?? config.documentId;
+  // The document the release's revisions came from (lib/onshape-webhook.ts).
+  const [stored] = await database
+    .select({ documentId: schema.onshapeReleases.documentId })
+    .from(schema.onshapeReleases)
+    .where(inTeam(schema.onshapeReleases, teamId, eq(schema.onshapeReleases.id, releaseRowId)));
+  const documentId = stored?.documentId ?? config.documentId;
   const versionId = release?.details.versionId ?? parts[0]?.versionId ?? null;
   const docId = documentId || "unknown";
 

@@ -11,6 +11,9 @@ type ShopDb = ReturnType<typeof createShopDb>;
 /** Our webhook's name in Onshape; with its address, how we find it again to delete it. */
 const WEBHOOK_NAME = "Gearbox Shop";
 
+/** How long a release event waits for its revision events. */
+export const REVISIONS_WAIT_MS = 5000;
+
 interface BOMHeader {
   id: string;
   propertyName: string;
@@ -150,32 +153,54 @@ export async function registerOnShapeWebhook(
   return data;
 }
 
+/** A revision Onshape made for one part or drawing of a release in the team's document. */
+export type RevisionEvent = {
+  documentId: string | null;
+  elementId: string;
+  elementType: number;
+  partNumber: string;
+  releaseId: string;
+  versionId: string;
+  timestamp: string;
+};
+
+/**
+ * Records the part, and its release with the document the revision came from: a release is the
+ * team's once one of its revisions is (`processReleaseEvent`).
+ */
 export async function processRevisionEvent(
   db: ShopDb,
   teamId: string,
-  elementId: string,
-  elementType: number,
-  partNumber: string,
-  onshapeReleaseId: string,
-  versionId: string,
+  revision: RevisionEvent,
 ): Promise<void> {
+  const { documentId, elementId, elementType, partNumber, releaseId, versionId } = revision;
   const now = Math.floor(Date.now() / 1000);
 
-  const isDrawing = elementType === 2;
-  const isPart = elementType === 0;
+  const [release] = await db
+    .insert(schema.onshapeReleases)
+    .values(
+      withTeam(teamId, { releaseId, timestamp: revision.timestamp, documentId, createdAt: now }),
+    )
+    .onConflictDoUpdate({
+      target: [schema.onshapeReleases.teamId, schema.onshapeReleases.releaseId],
+      set: { documentId },
+    })
+    .returning({ id: schema.onshapeReleases.id });
 
-  const updateData: { entityId?: string; partDrawingEntityId?: string; versionId: string } = {
-    versionId,
-  };
-
-  if (isPart) updateData.entityId = elementId;
-  if (isDrawing) updateData.partDrawingEntityId = elementId;
+  const updateData: {
+    entityId?: string;
+    partDrawingEntityId?: string;
+    versionId: string;
+    releaseId?: number;
+  } = { versionId, releaseId: release?.id };
+  if (elementType === 0) updateData.entityId = elementId;
+  if (elementType === 2) updateData.partDrawingEntityId = elementId;
 
   await db
     .insert(schema.onshapeParts)
     .values(
       withTeam(teamId, {
-        onshapeReleaseId,
+        onshapeReleaseId: releaseId,
         partNumber,
         ...updateData,
         createdAt: now,
@@ -193,7 +218,7 @@ export async function processRevisionEvent(
   console.log("[OnShape Webhook] Updated part", {
     teamId,
     partNumber,
-    onshapeReleaseId,
+    onshapeReleaseId: releaseId,
     versionId,
     elementType,
   });
@@ -295,71 +320,40 @@ export async function fetchAndParseBOM(
   }
 }
 
+/**
+ * An approved release: once its revisions have come in (a few seconds), queues the job that reads
+ * it. A release no revision recorded is another document's (or has no parts), and is dropped
+ * without asking Onshape.
+ */
 export async function processReleaseEvent(
   database: ShopDb,
   teamId: string,
   releaseId: string,
   timestamp: string,
   queue: Queue,
+  wait = REVISIONS_WAIT_MS,
 ): Promise<void> {
-  const startTime = Date.now();
-  console.log(`[OnShape Webhook] Starting processReleaseEvent for ${releaseId}`);
+  await new Promise((resolve) => setTimeout(resolve, wait));
 
-  const now = Math.floor(Date.now() / 1000);
-
-  console.log(`[OnShape Webhook] [${Date.now() - startTime}ms] Inserting release`);
-  const release = await database
-    .insert(schema.onshapeReleases)
-    .values(withTeam(teamId, { releaseId, timestamp, createdAt: now }))
-    .onConflictDoUpdate({
-      target: [schema.onshapeReleases.teamId, schema.onshapeReleases.releaseId],
-      set: { timestamp },
-    })
+  const [release] = await database
+    .update(schema.onshapeReleases)
+    .set({ timestamp })
+    .where(inTeam(schema.onshapeReleases, teamId, eq(schema.onshapeReleases.releaseId, releaseId)))
     .returning({ id: schema.onshapeReleases.id });
 
-  const releaseRowId = release[0]?.id;
-  if (!releaseRowId) {
-    console.error("[OnShape] Failed to create release row");
+  if (!release) {
+    console.log("[OnShape Webhook] Release with no revisions from the team's document, ignored", {
+      teamId,
+      releaseId,
+    });
     return;
   }
 
-  console.log(`[OnShape Webhook] [${Date.now() - startTime}ms] Updating existing parts`);
-  const existingParts = await database
-    .select()
-    .from(schema.onshapeParts)
-    .where(
-      inTeam(schema.onshapeParts, teamId, eq(schema.onshapeParts.onshapeReleaseId, releaseId)),
-    );
-
-  for (const part of existingParts) {
-    if (!part.releaseId) {
-      await database
-        .update(schema.onshapeParts)
-        .set({ releaseId: releaseRowId })
-        .where(inTeam(schema.onshapeParts, teamId, eq(schema.onshapeParts.id, part.id)));
-    }
-  }
-
-  console.log(`[OnShape Webhook] [${Date.now() - startTime}ms] Waiting 5 seconds`);
-  await new Promise((resolve) => setTimeout(resolve, 5000));
-
-  // Query parts for this release
-  console.log(`[OnShape Webhook] [${Date.now() - startTime}ms] Querying parts`);
-  const parts = await database
-    .select()
-    .from(schema.onshapeParts)
-    .where(inTeam(schema.onshapeParts, teamId, eq(schema.onshapeParts.releaseId, releaseRowId)));
-
-  console.log(`[OnShape Webhook] [${Date.now() - startTime}ms] Found ${parts.length} parts`);
-
-  // Queue BOM fetch job for async processing
-  console.log(`[OnShape Webhook] [${Date.now() - startTime}ms] Queuing BOM fetch job`);
-  await queue.send({ teamId, releaseId, releaseRowId, timestamp } satisfies BOMQueueMessage);
-
-  const totalTime = Date.now() - startTime;
-  console.log("[OnShape Webhook] Release processed, BOM job queued", {
+  await queue.send({
+    teamId,
     releaseId,
-    partCount: parts.length,
-    totalTimeMs: totalTime,
-  });
+    releaseRowId: release.id,
+    timestamp,
+  } satisfies BOMQueueMessage);
+  console.log("[OnShape Webhook] Release queued", { teamId, releaseId });
 }
