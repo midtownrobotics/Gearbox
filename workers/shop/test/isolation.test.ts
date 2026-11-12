@@ -74,6 +74,7 @@ async function seed(team: TeamUsers): Promise<Seeded> {
   // A released part, from the team's own webhook.
   const event = await onshapeEvent(team.teamId, webhookKey, {
     event: "onshape.revision.created",
+    documentId: `doc${tag}`,
     elementType: 0,
     elementId: `el${tag}`,
     partNumber,

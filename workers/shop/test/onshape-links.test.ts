@@ -34,6 +34,7 @@ async function teamWithRelease(elementType: number) {
   });
   const event = await onshapeEvent(team.teamId, key, {
     event: "onshape.revision.created",
+    documentId: "doc-abc",
     elementType,
     elementId: `el${tag}`,
     partNumber,

@@ -42,7 +42,7 @@ router.post("/events", async (c) => {
     return c.json({ ok: true });
   }
 
-  const { webhookKeys } = await onshapeConfig(c.env, db, teamId);
+  const { webhookKeys, documentId: teamDocument } = await onshapeConfig(c.env, db, teamId);
   if (!webhookKeys) {
     console.error("[OnShape Webhook] No webhook keys saved for this team", { teamId });
     await noteWebhookProblem(db, teamId, "no keys");
@@ -75,6 +75,7 @@ router.post("/events", async (c) => {
 
   const webhookData = body as {
     event?: string;
+    documentId?: string;
     elementType?: number;
     elementId?: string;
     partNumber?: string;
@@ -96,11 +97,29 @@ router.post("/events", async (c) => {
     return c.json({ ok: true });
   }
 
+  // Onshape sends revision and release events for every document in the team's company. A
+  // revision names its document: only the team's own is kept, and it's what records the release.
+  // A release event names none, so it counts only once a revision has recorded it.
   if (webhookData.event === "onshape.revision.created") {
-    const { elementType, elementId, partNumber, releaseId, versionId } = webhookData;
+    const { documentId, elementType, elementId, partNumber, releaseId, versionId } = webhookData;
+    if (teamDocument && documentId !== teamDocument) {
+      console.log("[OnShape Webhook] Revision from another document, ignored", {
+        teamId,
+        documentId,
+      });
+      return c.json({ ok: true });
+    }
     if (typeof elementType === "number" && elementId && partNumber && releaseId && versionId) {
       c.executionCtx.waitUntil(
-        processRevisionEvent(db, teamId, elementId, elementType, partNumber, releaseId, versionId),
+        processRevisionEvent(db, teamId, {
+          documentId: documentId ?? teamDocument,
+          elementId,
+          elementType,
+          partNumber,
+          releaseId,
+          versionId,
+          timestamp: webhookData.timestamp ?? new Date().toISOString(),
+        }),
       );
     } else {
       console.warn("[OnShape Webhook] Revision event missing required fields", {

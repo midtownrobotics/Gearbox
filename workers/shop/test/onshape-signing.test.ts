@@ -15,6 +15,7 @@ type Status = { webhookProblem: { kind: string; at: number } | null };
 
 const revision = (partNumber: string) => ({
   event: "onshape.revision.created",
+  documentId: "doc",
   elementType: 0,
   elementId: "el",
   partNumber,
