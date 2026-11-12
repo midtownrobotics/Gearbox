@@ -39,12 +39,6 @@ export const ONSHAPE_CALLS = {
   webhook_create: "Register the webhook",
   webhook_delete: "Delete a webhook",
   connection_check: "Check the connection",
-  tracker_document: "Release tracker: read a document",
-  tracker_parts: "Release tracker: list parts",
-  tracker_revisions: "Release tracker: read releases",
-  tracker_elements: "Release tracker: list part studios",
-  tracker_studio: "Release tracker: add, rename or delete a copy",
-  tracker_feature: "Release tracker: add, change or delete a feature",
 } as const;
 
 export type OnshapeCallKind = keyof typeof ONSHAPE_CALLS;
