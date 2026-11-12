@@ -13,7 +13,8 @@ const SIZES: Record<DialogSize, string> = {
 };
 
 /**
- * A pop-up over the page, closed by ✕, Escape or its own buttons. `wide` is `size="2xl"`.
+ * A pop-up over the page, closed by ✕, Escape or its own buttons; `closable={false}`: only by its
+ * own buttons (a question that must be answered). `wide` is `size="2xl"`.
  * `centered` puts it in the middle of the screen (a short note, like tips) and moves focus into
  * it, giving focus back to what had it when it closes.
  */
@@ -23,10 +24,12 @@ export function Dialog({
   wide = false,
   size = wide ? "2xl" : "md",
   centered = false,
+  closable = true,
   children,
 }: {
   title: string;
   onClose: () => void;
+  closable?: boolean;
   wide?: boolean;
   size?: DialogSize;
   centered?: boolean;
@@ -43,11 +46,11 @@ export function Dialog({
   }, [centered]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape" && closable) onClose();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, [onClose, closable]);
   return (
     <div
       className={`fixed inset-0 z-50 flex justify-center overflow-y-auto bg-secondary-900/50 p-4 sm:p-8 ${
@@ -66,14 +69,16 @@ export function Dialog({
           <h2 id={titleId} className="text-lg font-semibold text-secondary-900">
             {title}
           </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className={`rounded-lg px-2 py-1 text-secondary-400 hover:text-secondary-900 ${focusRing}`}
-            aria-label="Close"
-          >
-            ✕
-          </button>
+          {closable && (
+            <button
+              type="button"
+              onClick={onClose}
+              className={`rounded-lg px-2 py-1 text-secondary-400 hover:text-secondary-900 ${focusRing}`}
+              aria-label="Close"
+            >
+              ✕
+            </button>
+          )}
         </header>
         <div className="space-y-4 p-5">{children}</div>
       </div>

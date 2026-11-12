@@ -30,7 +30,7 @@ Open your team's admin pages: [Manage Apps](team:portal/admin).
 
 ## FRC or FTC
 
-Teams that signed up before Gearbox had FTC teams are asked once which program they're in. The first admin to open any of the team's pages sees **Is your team in FRC or FTC?** Choose one and **Save**. Nobody else is asked, and closing it asks again on the next page.
+Teams that signed up before Gearbox had FTC teams are asked once which program they're in. The first admin to open any of the team's pages sees **Is your team in FRC or FTC?** Choose one and **Save**. It stays until it's answered. Nobody else is asked.
 
 - **FRC:** nothing changes.
 - **FTC:** your team moves to its FTC addresses, `ftc<number>.frcgearbox.com` and `ftc<number>-<app>.frcgearbox.com`, with all its members and data. It takes a few minutes, and your team's apps are closed while it happens. Links to the old addresses keep working until an FRC team with your number signs up, so update your bookmarks and anything that uses an address, like the pit log downloader. Kiosk devices have to be set up again on the Kiosk Devices page.

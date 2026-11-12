@@ -17,7 +17,7 @@ import { ProgramPicker } from "./program-picker";
 
 // Every team from before FTC teams could sign up is FRC until one of its admins says otherwise
 // (the platform's GET/PUT /team/program). The shared bar asks the first admin who opens any of
-// its pages; closing it asks again on the next page. An FTC team then moves to its FTC addresses
+// its pages, and it can't be closed until it's answered. An FTC team then moves to its FTC addresses
 // (ftc<number>-<app>.<platform>), and this page goes to the same page there.
 
 type ProgramState = { teamId: string; program: Program; chosen: boolean; moving: boolean };
@@ -95,7 +95,7 @@ export function ProgramQuestion() {
 
   const ftcId = `ftc${pageTeamNumber}`;
   return (
-    <Dialog title="Is your team in FRC or FTC?" onClose={() => setOpen(false)} centered>
+    <Dialog title="Is your team in FRC or FTC?" onClose={() => undefined} closable={false} centered>
       {moving ? (
         <>
           <p className="text-sm text-secondary-700">
