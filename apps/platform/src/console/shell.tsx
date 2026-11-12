@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { consoleUrl, site, teamAppUrl } from "@g3/site-config";
+import { type Program, consoleUrl, site, teamAppUrl, teamIdFor } from "@g3/site-config";
 import { versionLabel } from "@g3/site-config/versions";
 import {
   AppNavBar,
@@ -9,6 +9,7 @@ import {
   ErrorBanner,
   Page,
   PageLoading,
+  ProgramPicker,
   TextField,
   activePath,
   linkWith,
@@ -38,12 +39,12 @@ const PAGES = [
 
 const routerLink = linkWith(Link);
 
-/** G3ID's sign-in for team `number`, coming back to the console on that team's domain. */
-function signInUrl(number: number): string {
+/** G3ID's sign-in for a team, coming back to the console on that team's domain. */
+function signInUrl(program: Program, number: number): string {
   if (import.meta.env.DEV) {
     return `http://localhost:5173/login?redirect=${encodeURIComponent(window.location.href)}`;
   }
-  const team = `frc${number}`;
+  const team = teamIdFor(program, number);
   return `${teamAppUrl(team, "id")}/login?redirect=${encodeURIComponent(`${consoleUrl(team)}/console`)}`;
 }
 
@@ -97,6 +98,7 @@ export function ConsoleShell() {
 }
 
 function SignIn() {
+  const [program, setProgram] = useState<Program>("frc");
   const [number, setNumber] = useState(String(site.team.number));
   return (
     <Page title="Sign in" width="narrow">
@@ -105,24 +107,27 @@ function SignIn() {
           Sign in through your own team. Which team are you on?
         </p>
         <form
-          className="mt-4 flex gap-2"
+          className="mt-4 space-y-3"
           onSubmit={(e) => {
             e.preventDefault();
-            window.location.href = signInUrl(Number(number));
+            window.location.href = signInUrl(program, Number(number));
           }}
         >
-          <div className="w-32">
-            <TextField
-              kind="title"
-              required
-              inputMode="numeric"
-              pattern="[0-9]*"
-              value={number}
-              onChange={(e) => setNumber(e.target.value)}
-              aria-label="Team number"
-            />
+          <ProgramPicker label="Your team's program" value={program} onChange={setProgram} />
+          <div className="flex gap-2">
+            <div className="w-32">
+              <TextField
+                kind="title"
+                required
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={number}
+                onChange={(e) => setNumber(e.target.value)}
+                aria-label="Team number"
+              />
+            </div>
+            <Button type="submit">Sign in</Button>
           </div>
-          <Button type="submit">Sign in</Button>
         </form>
       </Card>
     </Page>

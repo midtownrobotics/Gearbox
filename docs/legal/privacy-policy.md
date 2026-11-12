@@ -1,6 +1,6 @@
 # Gearbox Privacy Policy
 
-Last updated: 9 November 2026.
+Last updated: 11 November 2026.
 
 ## In short
 
@@ -41,7 +41,7 @@ We collect only what the apps need to work.
 | Technical logs | Internet address, browser type, the page requested and the time | Recorded automatically by our hosting provider |
 | Problem reports | What you write when you report a problem or an idea from an app's menu, the page's address (without anything after `?`), the app and Gearbox versions, your browser, your team, that you sent it, your reporter ID (a random ID given to you with your first report) and, if you choose to add it, your name | You, when you send one |
 | Visits to our public page | How many visits frcgearbox.com's home page had each day, and how many of them were by someone signed in. Only these daily totals: nothing that identifies a visitor | Counted when the page opens |
-| Team record | Team name, FRC team number, country, branding, which apps are on, and acceptance of our terms | The team owner |
+| Team record | Team name, program (FRC or FTC) and team number, country, branding, which apps are on, and acceptance of our terms | The team owner |
 
 We do not ask for, and teams should not enter, home addresses, government identifiers, health information or payment card details.
 
@@ -147,9 +147,9 @@ Depending on where you live, the law may give you further rights, such as the ri
 
 ## 10. Students and children
 
-Most Gearbox members are high-school students, and we have designed it with that in mind.
+Most Gearbox members are high-school and middle-school students, and we have designed it with that in mind.
 
-- Members must be at least 13 years old. We do not knowingly allow accounts for children under 13. If we learn of one, we delete it.
+- Members must be at least 13 years old. We do not knowingly allow accounts for children under 13, including the younger members of FTC teams. If we learn of one, we delete it.
 - Only an adult aged 18 or over can create a team.
 - Each team is responsible for having whatever permission its school, organization or members' parents require, including any consent that the law of its country requires for members under a certain age.
 - A parent or guardian with a question about a student's information should ask the team's lead mentor first, and may contact us at contact@frcgearbox.com.
@@ -171,7 +171,7 @@ We use no advertising or analytics cookies and no third-party trackers. Every co
 | --- | --- | --- |
 | `g3_session` | Keeps you signed in | 7 days |
 | `g3_theme` | Your choice of light or dark mode | 1 year |
-| `g3_team` | The FRC number of the team this browser last opened, so its home and our public page can take you back to it. Never who you are | 1 year |
+| `g3_team` | The program and number of the team this browser last opened, so its home and our public page can take you back to it. Never who you are | 1 year |
 | `g3_tutorial` | That Tutorial mode is open; removed when you close it | 1 year |
 | `g3_tutorial_doc` | The help page to open next, while Tutorial mode follows you to another app | 30 seconds |
 | `g3_team_ui` | Tells your other open apps to load your team's new appearance after an admin saves it | 1 day |

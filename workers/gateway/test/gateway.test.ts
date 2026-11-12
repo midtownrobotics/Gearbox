@@ -407,3 +407,54 @@ describe("local dev (gearbox.localhost on the gateway's dev port)", () => {
     expect((await from(`http://${ours}-orders.gearbox.localhost:8796`)).status).toBe(403);
   });
 });
+
+describe("FTC teams", () => {
+  const html = { headers: { Accept: "text/html" }, redirect: "manual" as const };
+
+  it("sends ftc<number>-<app> and ftc<number> to the app for that FTC team", async () => {
+    expect(await routed(`${team("ftc4242-orders")}/api/requests`)).toMatchObject({
+      app: "ORDERS",
+      team: "ftc4242",
+    });
+    expect(await routed(`${team("ftc4242")}/`)).toMatchObject({ app: "PORTAL", team: "ftc4242" });
+    // FRC team 4242 is another team, with only Orders on.
+    expect((await routed(`${team("4242-orders")}/api/requests`)).team).toBe("frc4242");
+    expect((await gateway(`${team("ftc4242-shop")}/api/x`)).status).toBe(200);
+    expect((await gateway(`${team("4242-shop")}/api/x`)).status).toBe(404);
+  });
+
+  it("sends a browser on an FTC team that isn't there to team-not-found, naming it", async () => {
+    const res = await gateway(`${team("ftc777-orders")}/`, html);
+    expect(res.headers.get("Location")).toBe(
+      `https://${site.platformDomain}/team-not-found?team=ftc777`,
+    );
+  });
+
+  it("sends a moved team's old pages to the same page at its new address", async () => {
+    for (const [from, to] of [
+      ["5555-orders", "ftc5555-orders"],
+      ["5555", "ftc5555"],
+    ]) {
+      const res = await gateway(`${team(from)}/lists/4?x=1`, html);
+      expect(res.status).toBe(302);
+      expect(res.headers.get("Location")).toBe(`${team(to)}/lists/4?x=1`);
+    }
+  });
+
+  it("passes a moved team's old API calls on to the team, for devices and webhooks", async () => {
+    expect(
+      await routed(`${team("5555-shop")}/api/onshape/events`, { method: "POST" }),
+    ).toMatchObject({ app: "SHOP", team: "ftc5555" });
+  });
+
+  it("closes a team's addresses while it's moving, except the platform's API", async () => {
+    const page = await gateway(`${team("6666-orders")}/`, html);
+    expect(page.status).toBe(503);
+    expect(await page.text()).toContain("moving to its new address");
+    expect((await gateway(`${team("6666-orders")}/api/requests`)).status).toBe(503);
+    expect(await routed(`${team("6666")}/api/~platform/team/program`)).toMatchObject({
+      app: "PLATFORM",
+      team: "frc6666",
+    });
+  });
+});

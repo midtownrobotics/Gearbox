@@ -52,6 +52,9 @@ export type GearboxStatus = {
    */
   paired: {
     teamNumber: number;
+    program: "frc" | "ftc";
+    /** "Team 1648", "FTC Team 12345". */
+    teamLabel: string;
     pitUrl: string;
     usual: boolean;
     name: string;

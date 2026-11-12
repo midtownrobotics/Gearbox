@@ -12,6 +12,8 @@ import { fakeDiscord } from "@g3/testing/discord";
 // fixed member counts.
 // /auth/me is the usual test stub (@g3/testing).
 const checks = new Map<string, number>();
+/** Teams G3ID was asked to move, to where. */
+const g3idMoves = new Map<string, string>();
 /** Messages to every admin of a team (the app library's), by team: read back with a GET. */
 const adminDms = new Map<string, { text: string }[]>();
 /** Chat posts and member DMs (notifications), by team and path: read back with a GET. */
@@ -68,10 +70,17 @@ const g3id = async (request: Request) => {
       })),
     );
   }
-  const team = path.match(/^\/teams\/(frc\d+)(\/.*)?$/);
+  const team = path.match(/^\/teams\/((?:frc|ftc)\d+)(\/.*)?$/);
   if (team) {
     const [, , rest] = team;
     if (rest === "/members") return Response.json(MEMBERS);
+    // A team moved to another id (it changed program): recorded, read back with a GET.
+    if (rest === "/move") {
+      if (request.method === "GET") return Response.json(g3idMoves.get(team[1]) ?? null);
+      const { to } = (await request.json()) as { to: string };
+      g3idMoves.set(team[1], to);
+      return Response.json({ done: true });
+    }
     // A team signed up with Discord: its founder becomes "u-founder", unless they have no
     // verified email.
     if (rest === "/discord-founder") {
@@ -328,6 +337,8 @@ const slack = async (request: Request) => {
  * /demoed), answers its storage hook, and fails for a team a test named with POST /api/internal/fail/:id.
  */
 function teamApp() {
+  /** Moves asked for ("frc1→ftc1"); each team's first call says there's more to do. */
+  const moves: string[] = [];
   const deleted: string[] = [];
   const seeded: string[] = [];
   const demoed: string[] = [];
@@ -336,6 +347,18 @@ function teamApp() {
   return (request: Request) => {
     const path = new URL(request.url).pathname;
     if (path === "/api/internal/deleted") return Response.json(deleted);
+    if (path === "/api/internal/moved") return Response.json(moves);
+    const move = path.match(/^\/api\/internal\/teams\/([^/]+)\/move$/);
+    if (move && request.method === "POST") {
+      const id = decodeURIComponent(move[1]);
+      if (failing.has(id)) return Response.json({ error: "Down." }, { status: 500 });
+      return request.json().then(({ to }) => {
+        const entry = `${id}→${to}`;
+        const first = !moves.includes(entry);
+        moves.push(entry);
+        return Response.json({ done: !first });
+      });
+    }
     if (path === "/api/internal/seeded") return Response.json(seeded);
     if (path === "/api/internal/demoed") return Response.json(demoed);
     const reads = path.match(/^\/api\/internal\/storage-reads\/([^/]+)$/);
@@ -394,6 +417,11 @@ function teamApp() {
     const fail = path.match(/^\/api\/internal\/fail\/(.+)$/);
     if (fail) {
       failing.add(decodeURIComponent(fail[1]));
+      return Response.json({ ok: true });
+    }
+    const unfail = path.match(/^\/api\/internal\/unfail\/(.+)$/);
+    if (unfail) {
+      failing.delete(decodeURIComponent(unfail[1]));
       return Response.json({ ok: true });
     }
     const exported = path.match(/^\/api\/internal\/teams\/(.+)\/export$/);

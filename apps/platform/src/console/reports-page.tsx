@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+import { teamIdFor, teamLabel } from "@g3/site-config";
 import { Button, Card, ErrorBanner, Page, inputClass } from "@g3/ui";
 import { useState } from "react";
 import { Link } from "react-router-dom";
@@ -43,7 +44,9 @@ export function ReportCard({ report, onChange }: { report: Report; onChange: () 
   return (
     <Card className="space-y-2 text-sm">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="font-semibold text-secondary-900">Team {report.teamNumber}</span>
+        <span className="font-semibold text-secondary-900">
+          {teamLabel(teamIdFor(report.program ?? "frc", report.teamNumber))}
+        </span>
         <StatusBadge status={report.status} />
         {report.teamId ? (
           <Link to={`/console/teams/${report.teamId}`} className="text-primary-600 hover:underline">

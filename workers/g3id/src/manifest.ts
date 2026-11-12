@@ -13,7 +13,7 @@ export const manifest = defineManifest({
   availability: "every team",
   alwaysOn: true,
   version: packageJson.version,
-  hooks: { seed: false, delete: false, export: false, demo: false, storage: false },
+  hooks: { seed: false, delete: false, move: false, export: false, demo: false, storage: false },
   // Team Appearance and Slack are edited on the team's home (Portal's /admin); members, kiosks
   // and roles stay here.
   settings: [

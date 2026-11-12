@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+import { type Program, programNames, teamLabel, teamNumberLabel } from "@g3/site-config";
 import {
   Button,
   Card,
@@ -6,6 +7,7 @@ import {
   ErrorBanner,
   Page,
   PageLoading,
+  ProgramPicker,
   TextField,
   inputClass,
 } from "@g3/ui";
@@ -85,7 +87,7 @@ function Team({ id }: { id: string }) {
 
   return (
     <Page
-      title={`${team.teamNumber} · ${team.name}`}
+      title={`${teamNumberLabel(team.id)} · ${team.name}`}
       description={
         <span className="flex flex-wrap items-center gap-2">
           <StatusBadge status={team.status} />
@@ -94,8 +96,19 @@ function Team({ id }: { id: string }) {
       }
       actions={back}
     >
+      {team.move && (
+        <ErrorBanner
+          message={`Moving to ${teamLabel(team.move.to)} stopped partway after ${team.move.attempts} ${
+            team.move.attempts === 1 ? "try" : "tries"
+          }${team.move.lastError ? `: ${team.move.lastError}` : ""}. It's tried again every hour; Change program tries it now.`}
+        />
+      )}
       <Card title="Details">
         <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
+          <Detail label="Program">
+            {programNames[team.program]}
+            {team.programChosenAt === null && !team.isSite && " (not confirmed by the team yet)"}
+          </Detail>
           <Detail label="Members">{describeCounts(members)}</Detail>
           <Detail label="Chat">{chatName(team.chat)}</Detail>
           <Detail label="Country">{team.country}</Detail>
@@ -140,6 +153,19 @@ function Team({ id }: { id: string }) {
                 status: team.status === "suspended" ? "active" : "suspended",
               }).then(reload)
             }
+          />
+        )}
+        {!team.isSite && team.status !== "pending" && (
+          <ChangeProgram
+            current={team.program}
+            onSubmit={async (reason, program) => {
+              const done = await send<{ teamId: string }>("POST", `/teams/${team.id}/program`, {
+                reason,
+                program,
+              });
+              if (done.teamId !== team.id) navigate(`/console/teams/${done.teamId}`);
+              else await reload();
+            }}
           />
         )}
         {!team.isSite && (
@@ -363,6 +389,27 @@ function Detail({ label, children }: { label: string; children: ReactNode }) {
  * A tool: its fields, the operator's reason (required, kept in the log) and its button. Shows the
  * error if it fails.
  */
+/** FRC or FTC: changing it moves the team to its id in the other program, in every app. */
+function ChangeProgram({
+  current,
+  onSubmit,
+}: {
+  current: Program;
+  onSubmit: (reason: string, program: Program) => Promise<unknown>;
+}) {
+  const [program, setProgram] = useState<Program>(current);
+  return (
+    <ActionForm
+      title="Change program"
+      description="Moves the team and all its data to its addresses in the other program. Its old addresses keep working until another team signs up with them. Kiosks have to be set up again."
+      button="Change program"
+      onSubmit={(reason) => onSubmit(reason, program)}
+    >
+      <ProgramPicker label="Program" value={program} onChange={setProgram} />
+    </ActionForm>
+  );
+}
+
 function ActionForm({
   title,
   description,

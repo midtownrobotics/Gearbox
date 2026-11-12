@@ -84,7 +84,7 @@ export const site = {
      * The terms' "Last updated" date: the version a team owner accepts at sign-up or on the home
      * page, recorded with the team. Change it with every edit to the terms.
      */
-    termsVersion: "2026-11-01",
+    termsVersion: "2026-11-11",
     /**
      * The last material change (terms section 21): a team whose owner accepted an older version is
      * asked to accept the current one on the home page. Change it to `termsVersion` only for a

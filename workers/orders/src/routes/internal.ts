@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { deleteTeamRows, exportTeamRows, teamExport } from "@g3/auth";
+import { deleteTeamRows, exportTeamRows, moveTarget, moveTeamRows, teamExport } from "@g3/auth";
 import { isDemoTeam } from "@g3/demo";
 import { Hono } from "hono";
 import { createOrdersDb } from "../db";
@@ -25,6 +25,26 @@ import { demoWords, loadDemo } from "../demo";
 import { ensureCatalog, forgetCatalog } from "../lib/starter";
 import { manifest } from "../manifest";
 import type { AppEnv } from "../types";
+
+/** Every table with the team's rows: children before the rows they point at. */
+const TEAM_TABLES = [
+  partListItems,
+  partLists,
+  requestEvents,
+  orderCharges,
+  categoryBudgets,
+  vendorCredits,
+  categoryRules,
+  vendors,
+  orderRequests,
+  vendorOrders,
+  catalogItems,
+  catalogFamilies,
+  catalogCategories,
+  budgetCategories,
+  appUsers,
+  appSettings,
+];
 
 /**
  * For other workers only: the gateway never answers /internal. When an operator deletes a team
@@ -83,24 +103,16 @@ export const internalRouter = new Hono<AppEnv>()
   .delete("/teams/:teamId", async (c) => {
     const teamId = c.req.param("teamId");
     // Rows before the rows they point at.
-    await deleteTeamRows(createOrdersDb(c.env.ORDERS_DB), teamId, [
-      partListItems,
-      partLists,
-      requestEvents,
-      orderCharges,
-      categoryBudgets,
-      vendorCredits,
-      categoryRules,
-      vendors,
-      orderRequests,
-      vendorOrders,
-      catalogItems,
-      catalogFamilies,
-      catalogCategories,
-      budgetCategories,
-      appUsers,
-      appSettings,
-    ]);
+    await deleteTeamRows(createOrdersDb(c.env.ORDERS_DB), teamId, TEAM_TABLES);
     forgetCatalog(teamId);
     return c.json({ ok: true });
+  })
+  // The team changed program, and so its id (the platform's team moves): its rows go with it.
+  .post("/teams/:teamId/move", async (c) => {
+    const from = c.req.param("teamId");
+    const to = await moveTarget(c.req.raw, from);
+    if (!to) return c.json({ error: "Say which team id to move to." }, 400);
+    await moveTeamRows(createOrdersDb(c.env.ORDERS_DB), from, to, TEAM_TABLES);
+    forgetCatalog(from);
+    return c.json({ done: true });
   });

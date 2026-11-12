@@ -34,6 +34,8 @@ function describe(entry: OperatorAccess): string {
       return "Reactivated the team";
     case "renumber_team":
       return "Changed the team's number";
+    case "change_program":
+      return "Changed the team's program (FRC or FTC), moving it to its new addresses";
   }
 }
 

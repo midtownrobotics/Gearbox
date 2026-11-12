@@ -57,8 +57,12 @@ export const chatName = (chat: "slack" | "discord" | null) =>
 export type TeamStatus = "pending" | "active" | "suspended";
 
 export type TeamRow = {
+  /** "frc1648", "ftc12345". */
   id: string;
+  program: "frc" | "ftc";
   teamNumber: number;
+  /** When it said which program it's in; null: not yet. */
+  programChosenAt: number | null;
   name: string;
   country: string;
   status: TeamStatus;
@@ -99,6 +103,7 @@ export type Member = {
 
 export type Report = {
   id: string;
+  program: "frc" | "ftc";
   teamNumber: number;
   email: string;
   name: string | null;
@@ -125,6 +130,10 @@ export type Action = {
 export type TeamDetail = {
   team: {
     id: string;
+    program: "frc" | "ftc";
+    programChosenAt: number | null;
+    /** A move to its id in another program that stopped partway (tried again every hour). */
+    move: { to: string; attempts: number; lastError: string | null } | null;
     teamNumber: number;
     name: string;
     country: string;
@@ -157,6 +166,8 @@ export type Operator = {
 export type BlockedReporter = {
   id: string;
   teamNumber: number;
+  /** "1648", "FTC 12345". */
+  teamLabel: string;
   blockedAt: number;
   blockReason: string | null;
   blockedByName: string | null;

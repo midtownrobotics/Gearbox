@@ -8,7 +8,9 @@ import {
   defaultTeamUiSettings,
   pageTeamId,
   pageTeamNumber,
+  pageTeamProgram,
   teamAvatarUrl,
+  teamLabel,
   teamUiDefaults,
 } from "@g3/site-config";
 import { useEffect, useState, useSyncExternalStore } from "react";
@@ -303,7 +305,9 @@ export function usePageTeamAvatar(team = true): string | undefined {
     () => current.useAvatar,
     () => initial.useAvatar,
   );
-  return useTeamAvatar(team && show ? pageTeamNumber : undefined);
+  // Avatars are The Blue Alliance's, which only has FRC teams.
+  const frc = pageTeamProgram === "frc";
+  return useTeamAvatar(team && show && frc ? pageTeamNumber : undefined);
 }
 
 /**
@@ -318,6 +322,10 @@ export function useTeamNames() {
     name,
     shortName,
     number: pageTeamNumber,
+    /** FRC or FTC. */
+    program: pageTeamProgram,
+    /** "Team 1648", "FTC Team 12345". */
+    label: teamLabel(pageTeamId),
     /** "G3 SHOP". */
     wordmark: (app: string) => `${shortName} ${app}`.toUpperCase(),
     /** "G3 Shop". */

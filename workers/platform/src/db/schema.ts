@@ -1,35 +1,73 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { integer, primaryKey, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import {
+  index,
+  integer,
+  primaryKey,
+  sqliteTable,
+  text,
+  unique,
+  uniqueIndex,
+} from "drizzle-orm/sqlite-core";
 
-/** The platform's team registry (migration 0001). */
-export const teams = sqliteTable("teams", {
-  /** "frc" + the FRC team number. */
-  id: text("id").primaryKey(),
-  teamNumber: integer("team_number").notNull().unique(),
-  name: text("name").notNull(),
-  /** ISO 3166-1 alpha-2. */
-  country: text("country").notNull(),
-  status: text("status", { enum: ["pending", "active", "suspended"] }).notNull(),
-  founderUserId: text("founder_user_id"),
-  /** Who owns the team: its founder, until an operator hands it over (migration 0003). */
-  ownerUserId: text("owner_user_id"),
-  slackWorkspaceId: text("slack_workspace_id"),
-  slackWorkspaceName: text("slack_workspace_name"),
-  /** The Discord server, for a team that signed up with Discord instead (migration 0011). */
-  discordGuildId: text("discord_guild_id"),
-  discordGuildName: text("discord_guild_name"),
-  termsAcceptedAt: integer("terms_accepted_at"),
-  /** Which terms the owner accepted then: their "Last updated" date (migration 0017). */
-  termsVersion: text("terms_version"),
-  signupId: text("signup_id").unique(),
-  signupCodeToken: text("signup_code_token"),
-  createdAt: integer("created_at").notNull(),
-  updatedAt: integer("updated_at").notNull(),
-});
+/** The platform's team registry (migrations 0001, 0019). */
+export const teams = sqliteTable(
+  "teams",
+  {
+    /** The program and number: "frc1648", "ftc12345" (`teamIdFor` in @g3/site-config). */
+    id: text("id").primaryKey(),
+    program: text("program", { enum: ["frc", "ftc"] })
+      .notNull()
+      .default("frc"),
+    teamNumber: integer("team_number").notNull(),
+    /** When the team said which program it's in (sign-up, or an admin since); null: not yet. */
+    programChosenAt: integer("program_chosen_at"),
+    name: text("name").notNull(),
+    /** ISO 3166-1 alpha-2. */
+    country: text("country").notNull(),
+    status: text("status", { enum: ["pending", "active", "suspended"] }).notNull(),
+    founderUserId: text("founder_user_id"),
+    /** Who owns the team: its founder, until an operator hands it over (migration 0003). */
+    ownerUserId: text("owner_user_id"),
+    slackWorkspaceId: text("slack_workspace_id"),
+    slackWorkspaceName: text("slack_workspace_name"),
+    /** The Discord server, for a team that signed up with Discord instead (migration 0011). */
+    discordGuildId: text("discord_guild_id"),
+    discordGuildName: text("discord_guild_name"),
+    termsAcceptedAt: integer("terms_accepted_at"),
+    /** Which terms the owner accepted then: their "Last updated" date (migration 0017). */
+    termsVersion: text("terms_version"),
+    signupId: text("signup_id").unique(),
+    signupCodeToken: text("signup_code_token"),
+    createdAt: integer("created_at").notNull(),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (t) => [unique().on(t.program, t.teamNumber)],
+);
 
-/** Reports that a team number was falsely registered (migration 0002). */
+/**
+ * A team moved to another id (migration 0019): "frc12345" → "ftc12345" when a team says it's in
+ * FTC. Unfinished while `finishedAt` is null (src/moves.ts).
+ */
+export const teamMoves = sqliteTable(
+  "team_moves",
+  {
+    fromId: text("from_id").primaryKey(),
+    toId: text("to_id").notNull(),
+    requestedBy: text("requested_by"),
+    startedAt: integer("started_at").notNull(),
+    finishedAt: integer("finished_at"),
+    attempts: integer("attempts").notNull().default(0),
+    lastError: text("last_error"),
+  },
+  (t) => [index("team_moves_to_id_idx").on(t.toId)],
+);
+
+/** Reports that a team number was falsely registered (migrations 0002, 0019). */
 export const numberReports = sqliteTable("number_reports", {
   id: text("id").primaryKey(),
+  program: text("program", { enum: ["frc", "ftc"] })
+    .notNull()
+    .default("frc"),
   teamNumber: integer("team_number").notNull(),
   email: text("email").notNull(),
   name: text("name"),
@@ -69,6 +107,8 @@ export const OPERATOR_ACTIONS = [
   "unblock_reporter",
   // Migration 0018: a team's details opened, without its members ("view_team" is its member list).
   "view_team_details",
+  // Migration 0019: a team's program changed (FRC or FTC), moving it to its new id.
+  "change_program",
 ] as const;
 
 /** The operator access log: every action, and each look at a team's members (migration 0003). */

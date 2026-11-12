@@ -106,10 +106,22 @@ export type AppManifest = {
    * - `demo`: `POST /api/internal/teams/:id/demo`, the public demo's sample data, loaded after
    *   the nightly reset deleted the demo team's data (`delete`); and `GET /api/internal/demo/words`,
    *   the words in it, which the gateway lets demo visitors send back (@g3/demo).
+   * - `move`: `POST /api/internal/teams/:id/move { to }` when the team changes program and so its
+   *   id ("frc12345" → "ftc12345"): every row and file the team has moves to the new id. It answers
+   *   `{ done: false }` while there's more to move (files go a few hundred at a time), and the
+   *   platform calls it again; it must be safe to run again after it finished. Every app with a
+   *   `delete` hook has one.
    * - `storage`: `GET /api/internal/storage`, how much it keeps in R2 for every team (a
    *   `StorageByTeam`: bytes and file counts by team id), for the operators' console.
    */
-  hooks: { seed: boolean; delete: boolean; export: boolean; demo: boolean; storage: boolean };
+  hooks: {
+    seed: boolean;
+    delete: boolean;
+    move: boolean;
+    export: boolean;
+    demo: boolean;
+    storage: boolean;
+  };
   /** The team's settings for this app (none for an app without any). */
   settings: AppSetting[];
   /** Its optional parts, each switched on and off inside the app. */

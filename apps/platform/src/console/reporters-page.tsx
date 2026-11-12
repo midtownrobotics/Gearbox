@@ -137,7 +137,7 @@ export function ReportersPage() {
                 <div className="min-w-0 flex-1 space-y-1">
                   <p className="flex flex-wrap items-baseline gap-x-3 text-sm">
                     <span className="font-mono font-medium text-secondary-900">{r.id}</span>
-                    <span className="text-secondary-600">Team {r.teamNumber}</span>
+                    <span className="text-secondary-600">Team {r.teamLabel}</span>
                   </p>
                   {r.blockReason && (
                     <p className="text-sm break-words text-secondary-700">{r.blockReason}</p>

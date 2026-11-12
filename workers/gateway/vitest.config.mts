@@ -56,9 +56,17 @@ const orders = (request: Request) => {
 // The platform knows which teams exist, and which apps they have on: 4242 has only sign-in, its
 // home and Orders; 1648's answer has no app list (a platform from before the app library), so it
 // has every app.
+// FTC team 4242 is another team than FRC team 4242, with every app. FRC 5555 moved to FTC 5555
+// (it changed program), and 6666 is moving now.
+const ftcTeams = ["ftc4242", "ftc5555"];
 const platform = (request: Request) => {
   const team = new URL(request.url).pathname.match(/^\/api\/teams\/(.+)$/)?.[1];
   if (team !== undefined) {
+    if (ftcTeams.includes(team)) return Response.json({ id: team, program: "ftc" });
+    if (team === "frc5555") {
+      return Response.json({ error: "No such team.", movedTo: "ftc5555" }, { status: 404 });
+    }
+    if (team === "frc6666") return Response.json({ id: team, moving: true, apps: ["orders"] });
     if (!teams.includes(team)) return Response.json({ error: "No such team." }, { status: 404 });
     return Response.json(
       team === "frc4242" ? { id: team, apps: ["id", "portal", "orders"] } : { id: team },

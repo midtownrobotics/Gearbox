@@ -50,7 +50,8 @@ export type OperatorAccess = {
     | "transfer_owner"
     | "suspend_team"
     | "reactivate_team"
-    | "renumber_team";
+    | "renumber_team"
+    | "change_program";
   reason: string | null;
   /** A handover's members. */
   from: string | null;

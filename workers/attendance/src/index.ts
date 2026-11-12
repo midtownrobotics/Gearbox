@@ -4,6 +4,8 @@ import {
   deleteTeamRows,
   exportTeamRows,
   logTeamChange,
+  moveTarget,
+  moveTeamRows,
   requireAuth,
   teamExport,
   teamSettingsRoutes,
@@ -27,6 +29,9 @@ import { manifest } from "./manifest";
 import { type AttendanceSettings, autoSignOutMs, parseSettings, schoolYear } from "./settings";
 import { currentWindow, validateToken } from "./token";
 import type { AppEnv } from "./types";
+
+/** Every table with the team's rows: children before the rows they point at. */
+const TEAM_TABLES = [attendanceSessions, attendanceTotals, attendanceMembers, attendanceSettings];
 
 // Attendance for each team (roadmap Phase 3): every record and setting is the request's team's
 // (`c.get("teamId")`, from @g3/auth), kept to it by AttendanceDb.
@@ -277,13 +282,16 @@ const app = base
     return c.json(teamExport(manifest, teamId, tables));
   })
   .delete("/internal/teams/:teamId", async (c) => {
-    await deleteTeamRows(drizzle(c.env.ATTENDANCE_DB), c.req.param("teamId"), [
-      attendanceSessions,
-      attendanceTotals,
-      attendanceMembers,
-      attendanceSettings,
-    ]);
+    await deleteTeamRows(drizzle(c.env.ATTENDANCE_DB), c.req.param("teamId"), TEAM_TABLES);
     return c.json({ ok: true });
+  })
+  // The team changed program, and so its id (the platform's team moves): its rows go with it.
+  .post("/internal/teams/:teamId/move", async (c) => {
+    const from = c.req.param("teamId");
+    const to = await moveTarget(c.req.raw, from);
+    if (!to) return c.json({ error: "Say which team id to move to." }, 400);
+    await moveTeamRows(drizzle(c.env.ATTENDANCE_DB), from, to, TEAM_TABLES);
+    return c.json({ done: true });
   })
   .get("/me", requireAuth, (c) =>
     c.json({

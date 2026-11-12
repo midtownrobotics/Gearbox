@@ -2,10 +2,13 @@
 import { authorizeUrl, exchangeCode } from "@g3/discord";
 import {
   consoleUrlVia,
+  isProgram,
   platformUrl,
   platformUrlVia,
   site as siteFile,
   teamAppUrlVia,
+  teamIdFor,
+  teamLabel,
 } from "@g3/site-config";
 import { withApiPrefix } from "@g3/site-config/worker";
 import { SLACK_BOT_SCOPES } from "@g3/slack";
@@ -16,6 +19,7 @@ import { consoleRouter, tellOperators } from "./console";
 import { numberReports, teams } from "./db/schema";
 import { maybeResetDemo, resetDemo } from "./demo";
 import { db, g3id, now } from "./lib";
+import { movedTo, retryMoves, unfinishedMove } from "./moves";
 import { reportsRouter, syncReports } from "./reports";
 import { clearSwitchedOff, enabledApps, logTeam, teamRouter } from "./team";
 import { countVisit } from "./visits";
@@ -80,32 +84,49 @@ const routes = app
     c.json({ status: "ok", service: "platform", version: packageJson.version }),
   )
   // Whether a team exists (signed up and active), and the apps it has on: the gateway asks before
-  // answering its addresses.
+  // answering its addresses. A team being moved to another id says `moving`; an id a team moved
+  // away from (and no team has since) answers 404 with `movedTo`, the team's id now (src/moves.ts).
   .get("/teams/:id", async (c) => {
+    const id = c.req.param("id");
     const team = await db(c.env)
-      .select({ id: teams.id, teamNumber: teams.teamNumber, name: teams.name })
+      .select({
+        id: teams.id,
+        program: teams.program,
+        teamNumber: teams.teamNumber,
+        name: teams.name,
+      })
       .from(teams)
-      .where(and(eq(teams.id, c.req.param("id")), eq(teams.status, "active")))
+      .where(and(eq(teams.id, id), eq(teams.status, "active")))
       .get();
-    if (!team) return c.json({ error: "No such team." }, 404);
-    return c.json({ ...team, apps: await enabledApps(db(c.env), team.id) });
+    if (!team) {
+      const to = await movedTo(c.env, id);
+      return c.json({ error: "No such team.", ...(to ? { movedTo: to } : {}) }, 404);
+    }
+    const moving = (await unfinishedMove(c.env, team.id)) !== undefined;
+    return c.json({ ...team, moving, apps: await enabledApps(db(c.env), team.id) });
   })
   .post("/signup", async (c) => {
     const body = await c.req.json<{
+      program?: unknown;
       teamNumber?: unknown;
       name?: unknown;
       country?: unknown;
       acceptTerms?: unknown;
       acceptBeta?: unknown;
     }>();
+    const program = body.program;
     const teamNumber = Number(body.teamNumber);
     const name = typeof body.name === "string" ? body.name.trim() : "";
     const country = typeof body.country === "string" ? body.country.trim().toUpperCase() : "";
 
-    if (!Number.isInteger(teamNumber) || teamNumber < 1 || teamNumber > 99999) {
-      return c.json({ error: "Enter your FRC team number." }, 400);
+    if (!isProgram(program)) {
+      return c.json({ error: "Choose whether your team is in FRC or FTC." }, 400);
     }
-    if (teamNumber === siteFile.demo.teamNumber) {
+    if (!Number.isInteger(teamNumber) || teamNumber < 1 || teamNumber > 99999) {
+      return c.json({ error: "Enter your team number." }, 400);
+    }
+    // The demo is an FRC team: FTC 9999 is a team like any other.
+    if (program === "frc" && teamNumber === siteFile.demo.teamNumber) {
       return c.json({ error: `${teamNumber} is the public demo's number. Enter your own.` }, 400);
     }
     if (!name || name.length > 80) return c.json({ error: "Enter your team's name." }, 400);
@@ -120,19 +141,21 @@ const routes = app
       );
     }
 
-    const id = `frc${teamNumber}`;
+    const id = teamIdFor(program, teamNumber);
     const existing = await db(c.env).select().from(teams).where(eq(teams.id, id)).get();
     if (existing?.status === "active" || existing?.status === "suspended") {
-      return c.json({ error: `Team ${teamNumber} is already on Gearbox.` }, 409);
+      return c.json({ error: `${teamLabel(id)} is already on Gearbox.` }, 409);
     }
     if (existing && existing.updatedAt > now() - SIGNUP_EXPIRES_S && existing.slackWorkspaceId) {
       // Someone got as far as connecting Slack within the hour: let them finish.
-      return c.json({ error: `Team ${teamNumber} is being signed up right now.` }, 409);
+      return c.json({ error: `${teamLabel(id)} is being signed up right now.` }, 409);
     }
 
     const signupId = crypto.randomUUID();
     const values = {
+      program,
       teamNumber,
+      programChosenAt: now(),
       name,
       country,
       status: "pending" as const,
@@ -154,6 +177,7 @@ const routes = app
     const team = await signupFor(c.env, c.req.param("signupId"));
     if (!team) return c.json({ error: "This sign-up has expired. Please start again." }, 404);
     return c.json({
+      teamId: team.id,
       teamNumber: team.teamNumber,
       name: team.name,
       step: step(team),
@@ -306,20 +330,23 @@ const routes = app
   // who gets in touch by email; a false registration can mean deleting the team and its data.
   .post("/reports", async (c) => {
     const body = await c.req.json<{
+      program?: unknown;
       teamNumber?: unknown;
       email?: unknown;
       name?: unknown;
       message?: unknown;
     }>();
+    const program = body.program === undefined ? "frc" : body.program;
     const teamNumber = Number(body.teamNumber);
     const email = typeof body.email === "string" ? body.email.trim() : "";
     const name = typeof body.name === "string" ? body.name.trim().slice(0, 100) : "";
     const message = typeof body.message === "string" ? body.message.trim() : "";
 
+    if (!isProgram(program)) return c.json({ error: "Choose FRC or FTC." }, 400);
     if (!Number.isInteger(teamNumber) || teamNumber < 1 || teamNumber > 99999) {
       return c.json({ error: "Enter the team number." }, 400);
     }
-    if (teamNumber === siteFile.demo.teamNumber) {
+    if (program === "frc" && teamNumber === siteFile.demo.teamNumber) {
       return c.json({ error: `${teamNumber} is the public demo, not a real team.` }, 400);
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) {
@@ -335,7 +362,13 @@ const routes = app
     const [{ open }] = await db(c.env)
       .select({ open: count() })
       .from(numberReports)
-      .where(and(eq(numberReports.teamNumber, teamNumber), eq(numberReports.status, "open")));
+      .where(
+        and(
+          eq(numberReports.program, program),
+          eq(numberReports.teamNumber, teamNumber),
+          eq(numberReports.status, "open"),
+        ),
+      );
     if (open >= MAX_OPEN_REPORTS) {
       return c.json(
         { error: "We already have reports about this team number and are looking into it." },
@@ -347,6 +380,7 @@ const routes = app
       .insert(numberReports)
       .values({
         id: crypto.randomUUID(),
+        program,
         teamNumber,
         email,
         name: name || null,
@@ -358,7 +392,7 @@ const routes = app
     c.executionCtx.waitUntil(
       tellOperators(
         c.env,
-        `🚩 New report about team ${teamNumber}. Read it in the console: ${consoleUrlVia(c.env.LOCAL_GATEWAY_URL || undefined)}/console/reports`,
+        `🚩 New report about ${teamLabel(teamIdFor(program, teamNumber))}. Read it in the console: ${consoleUrlVia(c.env.LOCAL_GATEWAY_URL || undefined)}/console/reports`,
       ),
     );
     return c.json({ ok: true }, 201);
@@ -487,6 +521,7 @@ export default {
     if (controller.cron === HOURLY) {
       await maybeResetDemo(env, new Date(controller.scheduledTime));
       await syncReports(env);
+      await retryMoves(env);
     } else await clearSwitchedOff(env);
   },
 } satisfies ExportedHandler<AppEnv["Bindings"]>;

@@ -17,6 +17,7 @@ import {
   maxCustomLinks,
   pageTeamId,
   pageTeamNumber,
+  pageTeamProgram,
   teamAvatarUrl,
   teamUiDefaults,
   teamUiLinkLabels,
@@ -881,26 +882,30 @@ function TeamAvatar({
 }) {
   // null while it's being checked.
   const [hasAvatar, setHasAvatar] = useState<boolean | null>(null);
+  // Team avatars come from FRC's own sites, which have no FTC teams.
+  const frc = pageTeamProgram === "frc";
   useEffect(() => {
-    void teamHasAvatar(pageTeamNumber).then(setHasAvatar);
-  }, []);
-  const description =
-    hasAvatar === false ? (
-      <>
-        Team {pageTeamNumber} has not submitted an avatar to the{" "}
-        <a
-          href="https://frc-events.firstinspires.org/services/avatar"
-          target="_blank"
-          rel="noreferrer"
-          className="text-primary-600 underline"
-        >
-          Team Avatar Submission Portal
-        </a>
-        . Once you have, you can turn this on.
-      </>
-    ) : (
-      "Show the avatar your team submitted to FIRST in place of the app icons."
-    );
+    if (frc) void teamHasAvatar(pageTeamNumber).then(setHasAvatar);
+    else setHasAvatar(false);
+  }, [frc]);
+  const description = !frc ? (
+    "Team avatars are only for FRC teams."
+  ) : hasAvatar === false ? (
+    <>
+      Team {pageTeamNumber} has not submitted an avatar to the{" "}
+      <a
+        href="https://frc-events.firstinspires.org/services/avatar"
+        target="_blank"
+        rel="noreferrer"
+        className="text-primary-600 underline"
+      >
+        Team Avatar Submission Portal
+      </a>
+      . Once you have, you can turn this on.
+    </>
+  ) : (
+    "Show the avatar your team submitted to FIRST in place of the app icons."
+  );
   return (
     <div className="mt-5 flex items-start justify-between gap-4 border-t border-line pt-4">
       <Toggle

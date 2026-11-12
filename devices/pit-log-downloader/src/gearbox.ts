@@ -9,11 +9,20 @@ import * as fs from "node:fs";
 import * as net from "node:net";
 import * as os from "node:os";
 import * as path from "node:path";
-import { type TeamUiSettings, teamAppUrlVia, teamUiDefaults } from "@g3/site-config";
+import {
+  type Program,
+  type TeamUiSettings,
+  teamAppUrlVia,
+  teamIdFor,
+  teamLabel,
+  teamUiDefaults,
+} from "@g3/site-config";
 import { config, pitUrlFor } from "./config.ts";
 import type { GearboxStatus } from "./status.ts";
 
 export type Pairing = {
+  /** FRC or FTC; a pairing saved before FTC teams is FRC. */
+  program?: Program;
   teamNumber: number;
   /** The Pit it paired with. */
   pitUrl: string;
@@ -47,7 +56,7 @@ function load(): Pairing | null {
     const saved = JSON.parse(fs.readFileSync(kPairingFile, "utf8")) as Pairing;
     if (!saved.key || !saved.teamNumber || !saved.pitUrl) return null;
     // Paired with another Pit than the one it's now set to use (PIT_URL, --dev): pair again.
-    if (!saved.chosenUrl && saved.pitUrl !== pitUrlFor(saved.teamNumber)) return null;
+    if (!saved.chosenUrl && saved.pitUrl !== pitUrlFor(pairedTeamId(saved))) return null;
     return saved;
   } catch {
     return null;
@@ -67,6 +76,9 @@ function save(next: Pairing | null) {
 
 /** The pairing, while there is one: the downloader does nothing without it. */
 export const currentPairing = () => pairing;
+
+/** A pairing's team id ("frc1648", "ftc12345"). */
+export const pairedTeamId = (p: Pairing) => teamIdFor(p.program ?? "frc", p.teamNumber);
 
 /**
  * A request to Pit's API, with this downloader's key when it has one: the Pit it's paired with,
@@ -96,8 +108,10 @@ export function gearboxStatus(): GearboxStatus {
     paired: pairing
       ? {
           teamNumber: pairing.teamNumber,
+          program: pairing.program ?? "frc",
+          teamLabel: teamLabel(pairedTeamId(pairing)),
           pitUrl: pairing.pitUrl,
-          usual: pairing.pitUrl === teamAppUrlVia(undefined, `frc${pairing.teamNumber}`, "pit"),
+          usual: pairing.pitUrl === teamAppUrlVia(undefined, pairedTeamId(pairing), "pit"),
           name: pairing.name,
           pairedAt: pairing.pairedAt,
         }
@@ -134,12 +148,14 @@ export class PairingError extends Error {}
 
 /** Pairs with the team's Pit: at `chosenUrl` when one was typed, else its usual address. */
 export async function pairWithGearbox(
+  program: Program,
   teamNumber: number,
   code: string,
   name: string,
   chosenUrl: string | null,
 ) {
-  const pitUrl = chosenUrl ?? pitUrlFor(teamNumber);
+  const teamId = teamIdFor(program, teamNumber);
+  const pitUrl = chosenUrl ?? pitUrlFor(teamId);
   let res: Response;
   try {
     res = await pit(pitUrl, "/downloaders/pair", {
@@ -160,13 +176,14 @@ export async function pairWithGearbox(
     throw new PairingError(
       chosenUrl
         ? `There's no Pit at ${pitUrl}. Check the address.`
-        : `Gearbox has no Pit for team ${teamNumber}. Check the team number.`,
+        : `Gearbox has no Pit for ${teamLabel(teamId)}. Check the program and team number.`,
     );
   }
   if (!res.ok || !body?.key || typeof body.id !== "number") {
     throw new PairingError(body?.error ?? `Gearbox answered ${res.status}.`);
   }
   save({
+    program,
     teamNumber,
     pitUrl,
     ...(chosenUrl ? { chosenUrl: true } : {}),
@@ -179,7 +196,7 @@ export async function pairWithGearbox(
   checkedAt = Date.now();
 }
 
-let appearance: { teamNumber: number; settings: TeamUiSettings; fetchedAt: number } | null = null;
+let appearance: { teamId: string; settings: TeamUiSettings; fetchedAt: number } | null = null;
 
 /**
  * The paired team's appearance (Team Appearance on Gearbox), for the status page: from its Pit
@@ -188,18 +205,15 @@ let appearance: { teamNumber: number; settings: TeamUiSettings; fetchedAt: numbe
  */
 export async function teamAppearance(): Promise<TeamUiSettings | null> {
   if (!pairing) return null;
-  const { teamNumber } = pairing;
-  if (
-    appearance?.teamNumber === teamNumber &&
-    Date.now() - appearance.fetchedAt < kAppearanceMaxAgeMs
-  ) {
+  const teamId = pairedTeamId(pairing);
+  if (appearance?.teamId === teamId && Date.now() - appearance.fetchedAt < kAppearanceMaxAgeMs) {
     return appearance.settings;
   }
   try {
     const res = await pit(pairing.pitUrl, "/downloader/team-ui");
     if (res.ok) {
       appearance = {
-        teamNumber,
+        teamId,
         settings: (await res.json()) as TeamUiSettings,
         fetchedAt: Date.now(),
       };
@@ -211,11 +225,11 @@ export async function teamAppearance(): Promise<TeamUiSettings | null> {
   }
   try {
     const saved = JSON.parse(fs.readFileSync(kAppearanceFile, "utf8")) as typeof appearance;
-    if (saved?.teamNumber === teamNumber) return saved.settings;
+    if (saved?.teamId === teamId) return saved.settings;
   } catch {
     // None kept yet.
   }
-  return teamUiDefaults(`frc${teamNumber}`);
+  return teamUiDefaults(teamId);
 }
 
 /** A log ready for Pit: gzipped, and what Pit lists about it. */

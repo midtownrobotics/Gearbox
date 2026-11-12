@@ -1,5 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { deleteTeamRows, exportTeamRows, hasMentorAccess, requireAuth, teamExport } from "@g3/auth";
+import {
+  deleteTeamRows,
+  exportTeamRows,
+  hasMentorAccess,
+  moveTarget,
+  moveTeamRows,
+  requireAuth,
+  teamExport,
+} from "@g3/auth";
 import { isDemoTeam } from "@g3/demo";
 import { corsOrigin } from "@g3/site-config";
 import { withApiPrefix } from "@g3/site-config/worker";
@@ -35,6 +43,20 @@ import {
 } from "./routes/settings";
 import { stockRouter } from "./routes/stock";
 import type { AppEnv } from "./types";
+
+/** Every table with the team's rows: children before the rows they point at. */
+const TEAM_TABLES = [
+  stock,
+  itemEvents,
+  intakeReceipts,
+  itemListings,
+  items,
+  locations,
+  robots,
+  subsystems,
+  units,
+  fields,
+];
 
 const base = new Hono<AppEnv>();
 
@@ -87,19 +109,16 @@ const app = base
     return c.json(teamExport(manifest, teamId, tables));
   })
   .delete("/internal/teams/:teamId", async (c) => {
-    await deleteTeamRows(createDb(c.env.INVENTORY_DB), c.req.param("teamId"), [
-      stock,
-      itemEvents,
-      intakeReceipts,
-      itemListings,
-      items,
-      locations,
-      robots,
-      subsystems,
-      units,
-      fields,
-    ]);
+    await deleteTeamRows(createDb(c.env.INVENTORY_DB), c.req.param("teamId"), TEAM_TABLES);
     return c.json({ ok: true });
+  })
+  // The team changed program, and so its id (the platform's team moves): its rows go with it.
+  .post("/internal/teams/:teamId/move", async (c) => {
+    const from = c.req.param("teamId");
+    const to = await moveTarget(c.req.raw, from);
+    if (!to) return c.json({ error: "Say which team id to move to." }, 400);
+    await moveTeamRows(createDb(c.env.INVENTORY_DB), from, to, TEAM_TABLES);
+    return c.json({ done: true });
   })
   .get("/me", requireAuth, (c) =>
     c.json({

@@ -41,7 +41,7 @@ The downloader does nothing until it's paired with your team's Pit on Gearbox, w
 knows its team: on first start, the status page only asks to pair.
 
 1. On Pit's **Logs** page, a mentor or admin chooses **Get a pairing code**.
-2. On the status page, enter your team number and the code within 10 minutes. The computer's
+2. On the status page, choose FRC or FTC, enter your team number and the code within 10 minutes. The computer's
    name is what Pit lists it as. For a Pit that isn't at your team's usual address (staging),
    choose **Use another Pit address** and paste its address; the pairing keeps it, whatever
    `PIT_URL` or `--dev` say.

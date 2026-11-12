@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { inTeam } from "@g3/auth";
+import { teamNumberOf as teamNumber } from "@g3/site-config";
 import { eq } from "drizzle-orm";
 import type { Db } from "./db";
 import { settings } from "./db/schema";
@@ -47,5 +48,5 @@ export async function getSetting(
   return row?.value ?? "";
 }
 
-/** The team's FRC number, from its id ("frc1648" → "1648"). */
-export const teamNumberOf = (team: string) => team.replace(/^frc/, "");
+/** The team's number, from its id ("frc1648" → "1648", "ftc12345" → "12345"). */
+export const teamNumberOf = (team: string) => String(teamNumber(team));

@@ -39,6 +39,10 @@ export {
   deleteTeamRows,
   exportTeamRows,
   inTeam,
+  moveR2Prefix,
+  moveTarget,
+  moveTeamRows,
+  movedKey,
   teamExport,
   withTeam,
 } from "./scope";
@@ -55,6 +59,7 @@ export {
   StorageLimitError,
   type StorageEviction,
   clearTeamStorageLock,
+  moveTeamStorageRows,
   storageLimitResponse,
   withStorageLimit,
   withTeamStorageLock,
