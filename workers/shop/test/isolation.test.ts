@@ -47,6 +47,11 @@ const TABLES = [
   "quality_check_items",
   "onshape_api_usage",
   "onshape_api_errors",
+  "release_trackers",
+  "release_tracker_studios",
+  "release_tracker_parts",
+  "release_tracker_features",
+  "release_tracker_versions",
 ];
 
 type Id = { id: number };
