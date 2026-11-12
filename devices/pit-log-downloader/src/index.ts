@@ -5,6 +5,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { promisify } from "node:util";
 import * as zlib from "node:zlib";
+import { isProgram, teamIdFor, teamLabel } from "@g3/site-config";
 import express from "express";
 import isOnline from "is-online";
 import { NodeSSH } from "node-ssh";
@@ -19,6 +20,7 @@ import {
   inGearbox,
   noteInGearbox,
   pairWithGearbox,
+  pairedTeamId,
   refreshGearboxLogs,
   reportStatus,
   teamAppearance,
@@ -168,7 +170,7 @@ function robotNetwork() {
   const page = `http://${config.host === "0.0.0.0" ? "localhost" : config.host}:${config.port}`;
   logWithTimestamp(
     pairing
-      ? `Paired with team ${pairing.teamNumber}'s Pit as ${pairing.name}. Logs are kept in ${kLogsDir}.`
+      ? `Paired with ${teamLabel(pairedTeamId(pairing))}'s Pit as ${pairing.name}. Logs are kept in ${kLogsDir}.`
       : `Not paired with Gearbox yet: open ${page} to pair it.`,
   );
   if (config.devGateway) {
@@ -606,11 +608,18 @@ app.get("/api/download", (req, res) => {
 app.post("/api/gearbox/pair", async (req, res) => {
   const code = typeof req.body?.code === "string" ? req.body.code.replace(/\s/g, "") : "";
   const name = typeof req.body?.name === "string" ? req.body.name : "";
-  const teamNumber = parseTeamNumber(req.body?.teamNumber);
-  if (!teamNumber) {
-    res.status(400).json({ error: "Enter your FRC team number." });
+  // FRC unless it says FTC (a page from before FTC teams sends none).
+  const program = req.body?.program === undefined ? "frc" : req.body.program;
+  if (!isProgram(program)) {
+    res.status(400).json({ error: "Choose FRC or FTC." });
     return;
   }
+  const teamNumber = parseTeamNumber(req.body?.teamNumber);
+  if (!teamNumber) {
+    res.status(400).json({ error: "Enter your team number." });
+    return;
+  }
+  const teamId = teamIdFor(program, teamNumber);
   if (!/^\d{6}$/.test(code)) {
     res.status(400).json({ error: "The code is 6 digits." });
     return;
@@ -619,12 +628,12 @@ app.post("/api/gearbox/pair", async (req, res) => {
   const typedUrl = typeof req.body?.pitUrl === "string" ? req.body.pitUrl.trim() : "";
   const chosenUrl = typedUrl ? parsePitUrl(typedUrl) : null;
   if (typedUrl && !chosenUrl) {
-    res.status(400).json({ error: `Enter the Pit's address, like ${pitUrlFor(teamNumber)}.` });
+    res.status(400).json({ error: `Enter the Pit's address, like ${pitUrlFor(teamId)}.` });
     return;
   }
   try {
-    await pairWithGearbox(teamNumber, code, name, chosenUrl);
-    logWithTimestamp(`Paired with team ${teamNumber}'s Pit at ${currentPairing()?.pitUrl}.`);
+    await pairWithGearbox(program, teamNumber, code, name, chosenUrl);
+    logWithTimestamp(`Paired with ${teamLabel(teamId)}'s Pit at ${currentPairing()?.pitUrl}.`);
     res.json(gearboxStatus());
   } catch (err) {
     const message = err instanceof PairingError ? err.message : "Couldn't pair with Gearbox.";

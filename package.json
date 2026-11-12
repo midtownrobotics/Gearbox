@@ -13,7 +13,7 @@
     "lint:license": "node scripts/license-lint.ts",
     "typecheck": "pnpm -r --if-present typecheck",
     "test": "pnpm -r --if-present test",
-    "db:migrate:local": "pnpm -r --if-present db:migrate:local",
+    "db:migrate:local": "node scripts/migrate-local.ts",
     "db:migrate:remote": "pnpm -r --if-present db:migrate:remote",
     "db:migrate:staging": "pnpm -r --if-present db:migrate:staging",
     "configure": "node scripts/configure.ts",

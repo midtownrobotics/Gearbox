@@ -70,17 +70,18 @@ export const config = {
 };
 
 /**
- * A team's Pit: PIT_URL, else its usual address (https://1648-pit.frcgearbox.com), or with --dev
- * its address on the dev gateway (http://1648-pit.gearbox.localhost:8796).
+ * A team's Pit, by its id ("frc1648", "ftc12345"; "<team>" for a hint): PIT_URL, else its usual
+ * address (https://1648-pit.frcgearbox.com, https://ftc12345-pit.frcgearbox.com), or with --dev its
+ * address on the dev gateway (http://1648-pit.gearbox.localhost:8796).
  */
-export const pitUrlFor = (teamNumber: number | string) =>
-  config.pitUrl ?? teamAppUrlVia(config.devGateway ?? undefined, `frc${teamNumber}`, "pit");
+export const pitUrlFor = (teamId: string) =>
+  config.pitUrl ?? teamAppUrlVia(config.devGateway ?? undefined, teamId, "pit");
 
 /** The robot network's first three parts, as in WPILib's IP configurations: 10.TE.AM. */
 export const robotNetworkOf = (teamNumber: number) =>
   `10.${Math.floor(teamNumber / 100)}.${teamNumber % 100}`;
 
-/** An FRC team number, or null. */
+/** A team number (FRC or FTC), or null. */
 export function parseTeamNumber(value: unknown): number | null {
   const n = typeof value === "number" ? value : Number(String(value ?? "").trim());
   return Number.isInteger(n) && n >= 1 && n <= 99999 ? n : null;
