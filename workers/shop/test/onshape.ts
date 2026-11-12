@@ -1,8 +1,16 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { call } from "@g3/testing/worker";
 
-/** An Onshape webhook event, signed with `key` as Onshape signs them, on a team's address. */
-export async function onshapeEvent(teamId: string, key: string, body: unknown) {
+/**
+ * An Onshape webhook event, signed with `key` as Onshape signs them, on a team's address.
+ * `signatures`: which headers Onshape sends (the secondary only when the company has one).
+ */
+export async function onshapeEvent(
+  teamId: string,
+  key: string,
+  body: unknown,
+  signatures: "both" | "primary" | "none" = "both",
+) {
   const raw = JSON.stringify(body);
   const timestamp = String(Date.now());
   const cryptoKey = await crypto.subtle.importKey(
@@ -24,8 +32,8 @@ export async function onshapeEvent(teamId: string, key: string, body: unknown) {
       "Content-Type": "application/json",
       "X-Team-Id": teamId,
       "X-onshape-webhook-timestamp": timestamp,
-      "X-onshape-webhook-signature-primary": signature,
-      "X-onshape-webhook-signature-secondary": signature,
+      ...(signatures !== "none" && { "X-onshape-webhook-signature-primary": signature }),
+      ...(signatures === "both" && { "X-onshape-webhook-signature-secondary": signature }),
     },
     body: raw,
   });
