@@ -132,11 +132,6 @@ const APPS: App[] = [
       qualityCheckItems: "quality_check_items",
       onshapeApiUsage: "onshape_api_usage",
       onshapeApiErrors: "onshape_api_errors",
-      releaseTrackers: "release_trackers",
-      releaseTrackerStudios: "release_tracker_studios",
-      releaseTrackerParts: "release_tracker_parts",
-      releaseTrackerFeatures: "release_tracker_features",
-      releaseTrackerVersions: "release_tracker_versions",
     },
   },
   {

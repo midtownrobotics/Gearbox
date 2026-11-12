@@ -26,12 +26,7 @@ interface BOMData {
   rows: BOMRow[];
 }
 
-export const ONSHAPE_WEBHOOK_EVENTS = [
-  "onshape.revision.created",
-  "onshape.workflow.transition",
-  // A new version: the release tracker's never-released parts come from the newest one.
-  "onshape.model.lifecycle.createversion",
-];
+export const ONSHAPE_WEBHOOK_EVENTS = ["onshape.revision.created", "onshape.workflow.transition"];
 
 export async function verifyOnshapeSignature(
   timestamp: string,
