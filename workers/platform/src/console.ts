@@ -1,6 +1,16 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { requireAuth } from "@g3/auth";
-import { CONSOLE_HOSTS, DEV_DOMAIN, demoTeamId, teamKey } from "@g3/site-config";
+import {
+  CONSOLE_HOSTS,
+  DEV_DOMAIN,
+  type Program,
+  demoTeamId,
+  isProgram,
+  teamIdFor,
+  teamKey,
+  teamNumberLabel,
+  teamNumberOf,
+} from "@g3/site-config";
 import { and, count, desc, eq, inArray, isNotNull, isNull, like, lt, ne, sql } from "drizzle-orm";
 import { type Context, Hono } from "hono";
 import { createMiddleware } from "hono/factory";
@@ -17,6 +27,7 @@ import {
   teams,
 } from "./db/schema";
 import { accounts, db, g3id, now } from "./lib";
+import { canMove, idInProgram, runMove, startMove, unfinishedMove } from "./moves";
 import { deliverToChat, parseNotification } from "./notifications";
 import { DELETABLE, MANIFESTS, STORING, callHook, fetchStorage } from "./registry";
 import { tellBlocked } from "./reports";
@@ -43,8 +54,10 @@ import { recentVisits } from "./visits";
 // team (the privacy policy's operator access log, kept 12 months), in two kinds the team's admins
 // see apart: its details (`view_team_details`: no member's name or email, only counts), and its
 // member list (`view_team`), each opened on its own with a reason. The site's own team
-// (site.ts) can't be deleted or suspended. A team's number is its id ("frc<number>") everywhere,
-// so it's never changed: a team that claimed the wrong number is deleted and signs up again.
+// (site.ts) can't be deleted or suspended. A team's program and number are its id ("frc1648",
+// "ftc12345") everywhere: changing its program moves it to its other id in every app
+// (src/moves.ts), but its number never changes: a team that claimed the wrong number is deleted
+// and signs up again.
 //
 // Deleting a team deletes its data in every app that keeps it first (each manifest's delete hook,
 // src/registry.ts), then in G3ID.
@@ -242,13 +255,23 @@ export const consoleRouter = new Hono<AppEnv>()
       filters.push(eq(teams.status, status));
     }
     if (q) {
-      filters.push(/^\d+$/.test(q) ? eq(teams.teamNumber, Number(q)) : like(teams.name, `%${q}%`));
+      // "1648" (either program), "ftc12345" or "frc1648", or part of a name.
+      const program = q.toLowerCase().match(/^(frc|ftc)\s*(\d+)$/);
+      filters.push(
+        program
+          ? and(eq(teams.program, program[1] as Program), eq(teams.teamNumber, Number(program[2])))
+          : /^\d+$/.test(q)
+            ? eq(teams.teamNumber, Number(q))
+            : like(teams.name, `%${q}%`),
+      );
     }
     const [list, reports] = await Promise.all([
       db(c.env)
         .select({
           id: teams.id,
+          program: teams.program,
           teamNumber: teams.teamNumber,
+          programChosenAt: teams.programChosenAt,
           name: teams.name,
           country: teams.country,
           status: teams.status,
@@ -258,26 +281,30 @@ export const consoleRouter = new Hono<AppEnv>()
         })
         .from(teams)
         .where(and(...filters))
-        .orderBy(teams.teamNumber)
+        .orderBy(teams.teamNumber, teams.program)
         .limit(500)
         .all(),
       db(c.env)
-        .select({ teamNumber: numberReports.teamNumber, open: count() })
+        .select({
+          program: numberReports.program,
+          teamNumber: numberReports.teamNumber,
+          open: count(),
+        })
         .from(numberReports)
         .where(eq(numberReports.status, "open"))
-        .groupBy(numberReports.teamNumber)
+        .groupBy(numberReports.program, numberReports.teamNumber)
         .all(),
     ]);
     const counts = await memberCounts(
       c.env,
       list.map((t) => t.id),
     );
-    const open = new Map(reports.map((r) => [r.teamNumber, r.open]));
+    const open = new Map(reports.map((r) => [teamIdFor(r.program, r.teamNumber), r.open]));
     return c.json(
       list.map(({ slackWorkspaceName, discordGuildName, ...t }) => ({
         ...t,
         chat: chatOf({ slackWorkspaceName, discordGuildName }),
-        openReports: open.get(t.teamNumber) ?? 0,
+        openReports: open.get(t.id) ?? 0,
         // Active members; null when G3ID couldn't say.
         members: counts ? (counts[t.id]?.active ?? 0) : null,
         isSite: t.id === teamKey,
@@ -321,7 +348,12 @@ export const consoleRouter = new Hono<AppEnv>()
       db(c.env)
         .select()
         .from(numberReports)
-        .where(eq(numberReports.teamNumber, team.teamNumber))
+        .where(
+          and(
+            eq(numberReports.program, team.program),
+            eq(numberReports.teamNumber, team.teamNumber),
+          ),
+        )
         .orderBy(desc(numberReports.createdAt))
         .all(),
       db(c.env)
@@ -344,9 +376,14 @@ export const consoleRouter = new Hono<AppEnv>()
       c.env,
       actions.map((a) => a.operatorUserId),
     );
+    const move = await unfinishedMove(c.env, team.id);
     return c.json({
       team: {
         id: team.id,
+        program: team.program,
+        programChosenAt: team.programChosenAt,
+        // A move to another id that stopped partway (tried again every hour), and why.
+        move: move ? { to: move.toId, attempts: move.attempts, lastError: move.lastError } : null,
         teamNumber: team.teamNumber,
         name: team.name,
         country: team.country,
@@ -479,6 +516,41 @@ export const consoleRouter = new Hono<AppEnv>()
     });
     return c.json({ ok: true });
   })
+  // Changing a team's program (FRC or FTC) moves it to its id in that program, in every app
+  // (src/moves.ts). Also how an operator tries a stopped move again at once.
+  .post("/teams/:id/program", async (c) => {
+    const body = await c.req.json<{ reason?: unknown; program?: unknown }>();
+    const reason = reasonOf(body);
+    if (!reason) return c.json({ error: NO_REASON }, 400);
+    if (!isProgram(body.program)) return c.json({ error: "Choose FRC or FTC." }, 400);
+    const team = await teamById(c.env, c.req.param("id"));
+    if (!team) return c.json({ error: "No such team." }, 404);
+    if (!canMove(team.id)) return c.json({ error: "This team's program can't change." }, 409);
+    if (team.status === "pending") {
+      return c.json({ error: "This team hasn't finished signing up." }, 409);
+    }
+    const unfinished = await unfinishedMove(c.env, team.id);
+    if (body.program === team.program && !unfinished) {
+      await db(c.env)
+        .update(teams)
+        .set({ programChosenAt: team.programChosenAt ?? now(), updatedAt: now() })
+        .where(eq(teams.id, team.id));
+      return c.json({ teamId: team.id, moving: false });
+    }
+    const to = unfinished?.toId ?? idInProgram(team.id, body.program);
+    if (!to) return c.json({ error: "This team's id can't change." }, 400);
+    if (!unfinished) {
+      const refused = await startMove(c.env, team.id, to, null);
+      if (refused) return c.json({ error: refused }, 409);
+      await log(c.env, c.get("userId"), "change_program", {
+        teamId: team.id,
+        reason,
+        details: { from: team.id, to },
+      });
+    }
+    const done = await runMove(c.env, team.id);
+    return c.json({ teamId: to, moving: !done });
+  })
   // Suspending a team takes its addresses away (the gateway only answers active teams) and keeps
   // its data, while a report is looked into.
   .post("/teams/:id/status", async (c) => {
@@ -578,6 +650,7 @@ export const consoleRouter = new Hono<AppEnv>()
     const reports = await db(c.env)
       .select({
         id: numberReports.id,
+        program: numberReports.program,
         teamNumber: numberReports.teamNumber,
         email: numberReports.email,
         name: numberReports.name,
@@ -590,7 +663,13 @@ export const consoleRouter = new Hono<AppEnv>()
         teamStatus: teams.status,
       })
       .from(numberReports)
-      .leftJoin(teams, eq(teams.teamNumber, numberReports.teamNumber))
+      .leftJoin(
+        teams,
+        and(
+          eq(teams.program, numberReports.program),
+          eq(teams.teamNumber, numberReports.teamNumber),
+        ),
+      )
       .where(
         status === "open" || status === "resolved" ? eq(numberReports.status, status) : undefined,
       )
@@ -622,7 +701,7 @@ export const consoleRouter = new Hono<AppEnv>()
     const team = await db(c.env)
       .select({ id: teams.id })
       .from(teams)
-      .where(eq(teams.teamNumber, report.teamNumber))
+      .where(and(eq(teams.program, report.program), eq(teams.teamNumber, report.teamNumber)))
       .get();
     await log(c.env, c.get("userId"), status === "resolved" ? "resolve_report" : "reopen_report", {
       teamId: team?.id ?? null,
@@ -653,7 +732,8 @@ export const consoleRouter = new Hono<AppEnv>()
     return c.json(
       list.map(({ blockedBy, teamId, ...r }) => ({
         ...r,
-        teamNumber: Number(teamId.replace(/^frc/, "")),
+        teamNumber: teamNumberOf(teamId),
+        teamLabel: teamNumberLabel(teamId),
         blockedByName: (blockedBy && names.get(blockedBy)?.displayName) ?? blockedBy,
       })),
     );

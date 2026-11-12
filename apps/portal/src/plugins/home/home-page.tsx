@@ -6,8 +6,9 @@ import {
   completeAppOrder,
   customTileKey,
   faviconUrl,
-  pageTeamNumber,
+  pageTeamId,
   portalAppLabels,
+  teamLabel,
 } from "@g3/site-config";
 import {
   Loading,
@@ -214,7 +215,7 @@ function FrontDoor() {
       <div className="w-full max-w-sm space-y-8 text-center">
         <div>
           <p className="text-sm font-semibold uppercase tracking-widest text-primary-500">
-            Team {pageTeamNumber}
+            {teamLabel(pageTeamId)}
           </p>
           <h1 className="mt-1 text-4xl text-secondary-900">{names.name}</h1>
         </div>
@@ -243,7 +244,7 @@ export function HomePage() {
   const authState = me === undefined ? "checking" : me ? "authenticated" : "unauthenticated";
   // A member signed in on their team's home: the platform's site offers it as "My team".
   useEffect(() => {
-    if (me) rememberTeam(pageTeamNumber);
+    if (me) rememberTeam(pageTeamId);
   }, [me]);
   // In the team's order; a tile its saved order doesn't name keeps its default place.
   // From a G3ID older than custom links: none.
@@ -285,7 +286,7 @@ export function HomePage() {
       <div className="max-w-2xl mx-auto">
         <div className="mb-10">
           <p className="text-primary-600 text-sm font-semibold uppercase tracking-widest mb-1">
-            Team {pageTeamNumber}
+            {teamLabel(pageTeamId)}
           </p>
           <h1 className="text-4xl font-bold text-secondary-900">{teamUi.shortName} Gearbox</h1>
           {me?.isAdmin && teamApps !== "all" && (teamApps?.size ?? 0) <= 2 && (

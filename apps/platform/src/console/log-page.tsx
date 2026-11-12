@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+import { teamLabel } from "@g3/site-config";
 import { Card, ErrorBanner, Page } from "@g3/ui";
 import { Link } from "react-router-dom";
 import { type Action, consoleApi, formatTime, read, useLoad } from "./data";
@@ -53,6 +54,8 @@ function describe(action: Action): string {
       return `Blocked reporter ${str(d.reporterId)}`;
     case "unblock_reporter":
       return `Unblocked reporter ${str(d.reporterId)}`;
+    case "change_program":
+      return `Changed the team's program, moving it from ${str(d.from)} to ${str(d.to)}`;
     default:
       return action.action;
   }
@@ -68,7 +71,7 @@ export function ActionList({ actions, showTeam }: { actions: Action[]; showTeam:
             <span className="text-secondary-900">{describe(a)}</span>
             {showTeam && a.teamId && a.action !== "delete_team" && (
               <Link to={`/console/teams/${a.teamId}`} className="text-primary-600 hover:underline">
-                {a.teamId.replace(/^frc/, "Team ")}
+                {teamLabel(a.teamId)}
               </Link>
             )}
           </div>

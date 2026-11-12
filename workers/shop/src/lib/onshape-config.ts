@@ -5,7 +5,8 @@ import type { AppEnv } from "../types";
 import { SETTING, getSettings, readSecret, setSecret, setSetting } from "./settings";
 
 // Each team's Onshape connection: its own API key and secret (from Onshape's Developer Portal),
-// company, webhook signing keys and the document Shop follows. Admins save them on the Admin page;
+// company, webhook signing keys (from the company's settings in Onshape, under Webhooks; the
+// secondary is optional) and the document Shop follows. Admins save them on the Admin page;
 // the key, secret and signing keys are stored encrypted. Onshape's webhooks for a team call back on
 // that team's own address, which is how an event finds its team (routes/onshape-webhooks.ts).
 //

@@ -11,7 +11,7 @@ export const manifest = defineManifest({
   integrations: ["slack or discord"],
   availability: "every team",
   version: packageJson.version,
-  hooks: { seed: false, delete: true, export: true, demo: true, storage: false },
+  hooks: { seed: false, delete: true, move: true, export: true, demo: true, storage: false },
   settings: [],
   plugins: [],
 });

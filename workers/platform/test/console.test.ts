@@ -269,6 +269,7 @@ describe("teams", () => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          program: "frc",
           teamNumber: number,
           name: "The Real Team",
           country: "US",

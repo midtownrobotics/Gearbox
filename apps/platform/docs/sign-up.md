@@ -8,7 +8,7 @@ Signing up takes about five minutes. The person who signs up becomes the team's 
 
 ## Before you start
 
-- **Your team's FRC number.** A team's number is its identity on Gearbox and can't be changed later, so check it.
+- **Your team's program and number.** Choose FRC or FTC, then enter your team's number in that program. FRC and FTC number their teams separately, so FRC 254 and FTC 254 are two different teams. A team's number is its identity on Gearbox and can't be changed later, so check it.
 - **Your team's chat: Slack or Discord.** You need to be able to add an app (Slack) or a bot (Discord) to it. On Slack that usually means being a workspace admin; on Discord, having Manage Server.
 - Gearbox is in an early open beta. You'll be asked to accept that and the terms when you sign up.
 
@@ -17,7 +17,7 @@ Signing up takes about five minutes. The person who signs up becomes the team's 
 ## Sign up with Slack
 
 1. Go to [frcgearbox.com/signup](https://frcgearbox.com/signup).
-2. Enter your team's number, name and country, and accept the terms.
+2. Choose **FRC** or **FTC**, enter your team's number, name and country, and accept the terms.
 3. Choose **Add to Slack** and approve the app for your team's workspace.
 4. Gearbox shows you a code. Send it as a direct message to the Gearbox bot in Slack.
 5. You're signed in as your team's first admin, and land on your team's notification settings.
@@ -25,7 +25,7 @@ Signing up takes about five minutes. The person who signs up becomes the team's 
 ## Sign up with Discord
 
 1. Go to [frcgearbox.com/signup](https://frcgearbox.com/signup).
-2. Enter your team's number, name and country, and accept the terms.
+2. Choose **FRC** or **FTC**, enter your team's number, name and country, and accept the terms.
 3. Choose **Add to Discord**, pick your team's server and approve the bot.
 4. That one step also signs you in: you're your team's first admin.
 

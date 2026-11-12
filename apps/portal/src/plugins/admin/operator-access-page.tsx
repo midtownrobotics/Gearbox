@@ -6,8 +6,8 @@ import { type OperatorAccess, platform } from "../../lib/platform";
 
 // Every time a Gearbox operator opened the team's data or changed it (the platform's operator log,
 // GET /team/operator-access): what they did, when, and the reason they gave. Never which operator.
-// Two pages: Operator Access (the team's details, which hold no member's name or email, and changes
-// to the team) and Member Access (its member list, with names and emails).
+// One page, two lists: the team's details (which hold no member's name or email) and changes to
+// the team, and its member list (with names and emails).
 
 const when = (seconds: number) =>
   new Date(seconds * 1000).toLocaleString(undefined, {
@@ -34,6 +34,8 @@ function describe(entry: OperatorAccess): string {
       return "Reactivated the team";
     case "renumber_team":
       return "Changed the team's number";
+    case "change_program":
+      return "Changed the team's program (FRC or FTC), moving it to its new addresses";
   }
 }
 
@@ -58,12 +60,13 @@ function AccessList({
   }, [kind]);
 
   return (
-    <Page title={title} description={description} width="narrow">
-      {error && <ErrorBanner message={error} />}
-      {!entries && !error && <Loading />}
-      {entries && entries.length === 0 && <p className="text-sm text-secondary-600">{empty}</p>}
-      {entries && entries.length > 0 && (
-        <Card>
+    <Card title={title}>
+      <div className="space-y-3">
+        <p className="text-sm text-secondary-600">{description}</p>
+        {error && <ErrorBanner message={error} />}
+        {!entries && !error && <Loading />}
+        {entries && entries.length === 0 && <p className="text-sm text-secondary-500">{empty}</p>}
+        {entries && entries.length > 0 && (
           <ul className="divide-y divide-secondary-100 text-sm">
             {entries.map((entry) => (
               <li key={entry.id} className="space-y-0.5 py-2 first:pt-0 last:pb-0">
@@ -75,42 +78,45 @@ function AccessList({
               </li>
             ))}
           </ul>
-        </Card>
-      )}
-    </Page>
+        )}
+      </div>
+    </Card>
   );
 }
 
 export function OperatorAccessPage() {
   return (
-    <AccessList
-      kind="team"
+    <Page
       title="Operator Access"
-      description={
-        <>
-          Each time a Gearbox operator opened your team's details or changed your team, and why.
-          Your team's details don't include any member's name or email (
-          <a
-            href={`${docsUrl("portal")}/operator-access#what-operators-see`}
-            className="text-primary-600 hover:underline"
-          >
-            what they include
-          </a>
-          ). Kept for 12 months.
-        </>
-      }
-      empty="No operator has opened your team's details."
-    />
-  );
-}
-
-export function MemberAccessPage() {
-  return (
-    <AccessList
-      kind="members"
-      title="Member Access"
-      description="Each time a Gearbox operator opened your team's member list, which shows your members' names and emails, and the reason they gave. Kept for 12 months."
-      empty="No operator has opened your team's member list."
-    />
+      description="Each time a Gearbox operator looked at your team or changed it, and the reason they gave. Kept for 12 months."
+      width="narrow"
+    >
+      <div className="space-y-4">
+        <AccessList
+          kind="team"
+          title="Team details"
+          description={
+            <>
+              When an operator opened your team's details or changed your team. Your team's details
+              don't include any member's name or email (
+              <a
+                href={`${docsUrl("portal")}/operator-access#what-operators-see`}
+                className="text-primary-600 hover:underline"
+              >
+                what they include
+              </a>
+              ).
+            </>
+          }
+          empty="No operator has opened your team's details."
+        />
+        <AccessList
+          kind="members"
+          title="Member list"
+          description="When an operator opened your team's member list, which shows your members' names and emails."
+          empty="No operator has opened your team's member list."
+        />
+      </div>
+    </Page>
   );
 }

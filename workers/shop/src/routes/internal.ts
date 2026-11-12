@@ -4,6 +4,10 @@ import {
   deleteTeamRows,
   downloadStorageFile,
   exportTeamRows,
+  moveR2Prefix,
+  moveTarget,
+  moveTeamRows,
+  moveTeamStorageRows,
   storageArchive,
   storageArchiveSelection,
   storageByTeam,
@@ -36,13 +40,38 @@ import {
 } from "../db/schema";
 import { demoWords, loadDemo } from "../demo";
 import { onshapeConfig } from "../lib/onshape-config";
-import { unregisterOnShapeWebhooks } from "../lib/onshape-webhook";
+import { registerOnShapeWebhook, unregisterOnShapeWebhooks } from "../lib/onshape-webhook";
 import { SETTING } from "../lib/settings";
 import { teamPrefix } from "../lib/storage";
 import { shopStorageReport } from "../lib/storage-report";
 import { shopUrl } from "../lib/urls";
 import { manifest } from "../manifest";
 import type { AppEnv } from "../types";
+
+/** Every table with the team's rows: children before the rows they point at. */
+const TEAM_TABLES = [
+  actions,
+  stagingBatchRemovals,
+  partInstanceProcesses,
+  stagingBatches,
+  files,
+  partDefinitionProcessBlueprints,
+  partInstances,
+  partDefinitions,
+  processes,
+  subsystems,
+  kioskPresence,
+  onshapeParts,
+  onshapeReleases,
+  drawings,
+  adminSettings,
+  shopManagers,
+  qualityReports,
+  qualityCheckItems,
+  // Last: deleting the team calls Onshape first, which is counted here too.
+  onshapeApiUsage,
+  onshapeApiErrors,
+];
 
 /**
  * For other workers only: the gateway never answers /internal. When an operator deletes a team
@@ -159,30 +188,43 @@ export const internalRouter = new Hono<AppEnv>()
       await c.env.DRAWINGS.delete(page.objects.map((o) => o.key));
     }
 
-    // Rows before the rows they point at.
-    await deleteTeamRows(db, teamId, [
-      actions,
-      stagingBatchRemovals,
-      partInstanceProcesses,
-      stagingBatches,
-      files,
-      partDefinitionProcessBlueprints,
-      partInstances,
-      partDefinitions,
-      processes,
-      subsystems,
-      kioskPresence,
-      onshapeParts,
-      onshapeReleases,
-      drawings,
-      adminSettings,
-      shopManagers,
-      qualityReports,
-      qualityCheckItems,
-      // After the webhook calls above, which are counted here too.
-      onshapeApiUsage,
-      onshapeApiErrors,
-    ]);
+    await deleteTeamRows(db, teamId, TEAM_TABLES);
     await clearTeamStorageLock(c.env.SHOP_DB, teamId);
     return c.json({ ok: true });
+  })
+  // The team changed program, and so its id (the platform's team moves): its files in R2 move to
+  // the new id's prefix a few hundred at a time (`done: false` until they're all there), then its
+  // rows and the keys they keep, and its Onshape webhook is registered again at its new address.
+  .post("/teams/:teamId/move", async (c) => {
+    const from = c.req.param("teamId");
+    const to = await moveTarget(c.req.raw, from);
+    if (!to) return c.json({ error: "Say which team id to move to." }, 400);
+    const db = createShopDb(c.env.SHOP_DB);
+    if (!(await moveR2Prefix(c.env.DRAWINGS, teamPrefix(from), teamPrefix(to)))) {
+      return c.json({ done: false });
+    }
+    await moveTeamRows(db, from, to, TEAM_TABLES, {
+      columns: [drawings.r2Key, files.r2Key],
+      from: teamPrefix(from),
+      to: teamPrefix(to),
+    });
+    await moveTeamStorageRows(c.env.SHOP_DB, from, to);
+    // Best effort, like saving the Onshape settings: the webhook keeps calling the old address,
+    // which still reaches the team until another team signs up with its old id.
+    const onshape = await onshapeConfig(c.env, db, to).catch(() => null);
+    if (onshape?.documentId && onshape.credentials && onshape.companyId) {
+      const api = { db, teamId: to, credentials: onshape.credentials };
+      await unregisterOnShapeWebhooks(
+        onshape.documentId,
+        api,
+        `${shopUrl(c.env, from)}/api/onshape/events`,
+      );
+      await registerOnShapeWebhook(
+        onshape.documentId,
+        api,
+        onshape.companyId,
+        `${shopUrl(c.env, to)}/api/onshape/events`,
+      ).catch((err) => console.error("[OnShape] Webhook after a team move", err));
+    }
+    return c.json({ done: true });
   });

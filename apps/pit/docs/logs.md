@@ -11,7 +11,7 @@ The **pit log downloader** is a small program for a laptop in the pit (Windows, 
 
 1. On [Logs](team:pit/logs), follow the setup steps for the laptop's system.
 2. A mentor or admin gets a **6-digit pairing code** on the same page. It works once, for 10 minutes.
-3. On the laptop, the downloader's page asks for your team number, the code and a name for the computer.
+3. On the laptop, the downloader's page asks for your team's program (FRC or FTC) and number, the code and a name for the computer.
 
 The laptop now shows up on Logs. To stop it, remove it there.
 

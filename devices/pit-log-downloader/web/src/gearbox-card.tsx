@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { Button, Card, ConfirmButton, ErrorBanner, Field, TextField } from "@g3/ui";
+import { type Program, teamHostLabel, teamIdFor } from "@g3/site-config";
+import { Button, Card, ConfirmButton, ErrorBanner, Field, ProgramPicker, TextField } from "@g3/ui";
 import { type FormEvent, useState } from "react";
 import type { GearboxStatus } from "../../src/status.ts";
 
@@ -27,13 +28,17 @@ export function PairingCard({
   gearbox,
   onPaired,
 }: { gearbox: GearboxStatus; onPaired: () => void }) {
+  const [program, setProgram] = useState<Program>("frc");
   const [teamNumber, setTeamNumber] = useState("");
   const [code, setCode] = useState("");
   const [name, setName] = useState(gearbox.defaultName);
   // Another Pit than the team's usual one (staging, a Pit of its own): typed here, or left empty.
   const [otherPit, setOtherPit] = useState(false);
   const [pitUrl, setPitUrl] = useState("");
-  const usualPitUrl = gearbox.usualPitUrl.replace("<team>", teamNumber || "1648");
+  const usualPitUrl = gearbox.usualPitUrl.replace(
+    "<team>",
+    teamHostLabel(teamIdFor(program, Number(teamNumber) || 1648)),
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -41,6 +46,7 @@ export function PairingCard({
     e.preventDefault();
     setBusy(true);
     const problem = await send("POST", "/api/gearbox/pair", {
+      program,
       teamNumber,
       code,
       name,
@@ -67,6 +73,7 @@ export function PairingCard({
           </p>
         )}
         {error && <ErrorBanner message={error} />}
+        <ProgramPicker label="Program" value={program} onChange={setProgram} />
         <Field label="Team number">
           <TextField
             typeable
@@ -155,7 +162,7 @@ export function GearboxCard({
               target="_blank"
               rel="noreferrer"
             >
-              team {paired.teamNumber}'s Pit
+              {paired.teamLabel ?? `Team ${paired.teamNumber}`}'s Pit
             </a>{" "}
             as <span className="font-semibold">{paired.name}</span>.
           </p>

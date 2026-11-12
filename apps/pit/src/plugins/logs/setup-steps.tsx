@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { site, teamAppUrlVia } from "@g3/site-config";
+import { pageTeamId, programNames, site, teamAppUrlVia } from "@g3/site-config";
 import { Button, Chip, useTeamNames } from "@g3/ui";
 import { type ReactNode, useState } from "react";
 
@@ -76,13 +76,13 @@ const Note = ({ children }: { children: ReactNode }) => (
 
 export function SetupSteps() {
   const [system, setSystem] = useState<System>(guessSystem);
-  const { number } = useTeamNames();
+  const { number, program } = useTeamNames();
   // The downloader finds the team's usual Pit address from the team number it's paired with. A
   // local Pit (pnpm dev) it finds with --dev; any other (staging) it's told in config.env.
   const pitUrl = window.location.origin;
   const { hostname } = window.location;
   const local = hostname === "localhost" || hostname.endsWith(".localhost");
-  const elsewhere = !local && pitUrl !== teamAppUrlVia(undefined, `frc${number}`, "pit");
+  const elsewhere = !local && pitUrl !== teamAppUrlVia(undefined, pageTeamId, "pit");
   const windows = system === "windows";
   const writeConfig = windows
     ? `Set-Content devices\\pit-log-downloader\\config.env "PIT_URL=${pitUrl}"`
@@ -137,8 +137,8 @@ export function SetupSteps() {
         <Step n={elsewhere ? 4 : 3} title="Start it">
           <Command>{`pnpm --filter @g3/pit-log-downloader start${local ? " -- --dev" : ""}`}</Command>
           <Note>
-            Leave it running and open http://localhost:3000 on that computer. It asks for your team
-            number, {number}, and a pairing code.
+            Leave it running and open http://localhost:3000 on that computer. It asks for your
+            team's program, {programNames[program]}, its number, {number}, and a pairing code.
           </Note>
         </Step>
       </ol>

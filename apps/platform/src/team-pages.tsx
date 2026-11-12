@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { teamAppUrl } from "@g3/site-config";
-import { TextField } from "@g3/ui";
+import {
+  type Program,
+  parseTeamId,
+  teamAppUrl,
+  teamIdFor,
+  teamLabel,
+  teamOfHostLabel,
+} from "@g3/site-config";
+import { ProgramPicker, TextField } from "@g3/ui";
 import { forgetTeam, rememberedTeam } from "@g3/ui/my-team";
 import { useEffect, useRef, useState } from "react";
 import { FaArrowRight } from "react-icons/fa";
@@ -9,19 +16,26 @@ import disappointed from "./assets/erik-disappointed.png";
 import { Page } from "./layout";
 
 // Finding a team's home from the platform's site: "My team" (the team this browser last signed in
-// to, remembered by its home), a box for any team number, and the page the gateway sends an
-// address for a team that isn't on Gearbox to.
+// to, remembered by its home), a box for any team's program and number, and the page the gateway
+// sends an address for a team that isn't on Gearbox to.
 
-/** A team's home (Portal): <number>.<platform>. */
-export const teamHome = (teamNumber: number) => `${teamAppUrl(`frc${teamNumber}`, "portal")}/`;
+/** A team's home (Portal), by its id: <number>.<platform>, ftc<number>.<platform>. */
+export const teamHome = (teamId: string) => `${teamAppUrl(teamId, "portal")}/`;
 
 const parseNumber = (value: string) => {
   const n = Number(value.trim());
   return Number.isInteger(n) && n >= 1 && n <= 99999 ? n : null;
 };
 
-/** A team number box and Next, which opens that team's home. */
-export function TeamNumberForm({ autoFocus = false }: { autoFocus?: boolean }) {
+/** The program and a team number box, and Next, which opens that team's home. */
+export function TeamNumberForm({
+  autoFocus = false,
+  program: initialProgram = "frc",
+}: {
+  autoFocus?: boolean;
+  program?: Program;
+}) {
+  const [program, setProgram] = useState<Program>(initialProgram);
   const [value, setValue] = useState("");
   const [error, setError] = useState("");
   const input = useRef<HTMLInputElement>(null);
@@ -36,12 +50,13 @@ export function TeamNumberForm({ autoFocus = false }: { autoFocus?: boolean }) {
         event.preventDefault();
         const teamNumber = parseNumber(value);
         if (teamNumber === null) {
-          setError("Enter an FRC team number.");
+          setError("Enter a team number.");
           return;
         }
-        window.location.assign(teamHome(teamNumber));
+        window.location.assign(teamHome(teamIdFor(program, teamNumber)));
       }}
     >
+      <ProgramPicker value={program} onChange={setProgram} outlined />
       <label htmlFor="team-number" className="block text-sm font-medium text-secondary-700">
         Team number
       </label>
@@ -74,9 +89,9 @@ export function TeamNumberForm({ autoFocus = false }: { autoFocus?: boolean }) {
   );
 }
 
-/** The remembered team's number, read after the page loads. */
-export function useRememberedTeam(): number | null {
-  const [team, setTeam] = useState<number | null>(null);
+/** The remembered team's id, read after the page loads. */
+export function useRememberedTeam(): string | null {
+  const [team, setTeam] = useState<string | null>(null);
   useEffect(() => setTeam(rememberedTeam()), []);
   return team;
 }
@@ -105,10 +120,15 @@ function Card({ children, picture }: { children: React.ReactNode; picture?: stri
     </div>
   );
   if (!picture) return <section className="mx-auto max-w-md px-5 py-16 sm:py-24">{card}</section>;
-  // A picture beside the card, about its size (above it on a phone).
+  // A picture beside the card, as tall as it, with the same rounded corners (above it on a
+  // phone).
   return (
-    <section className="mx-auto flex max-w-4xl flex-col items-center gap-8 px-5 py-16 sm:flex-row sm:justify-center sm:py-24">
-      <img src={picture} alt="" className="w-40 shrink-0 sm:w-80" />
+    <section className="mx-auto flex max-w-4xl flex-col items-center gap-8 px-5 py-16 sm:flex-row sm:items-stretch sm:justify-center sm:py-24">
+      <img
+        src={picture}
+        alt=""
+        className="w-40 shrink-0 rounded-2xl object-cover sm:h-auto sm:w-80 sm:self-stretch"
+      />
       {card}
     </section>
   );
@@ -123,7 +143,7 @@ export function MyTeamPage() {
         <div>
           <h1 className="text-2xl font-bold text-secondary-900">Go to your team</h1>
           <p className="mt-1 text-sm text-secondary-600">
-            Enter your FRC team number to open your team's Gearbox.
+            Choose FRC or FTC and enter your team number to open your team's Gearbox.
           </p>
         </div>
         {team && (
@@ -131,7 +151,7 @@ export function MyTeamPage() {
             href={teamHome(team)}
             className="flex items-center justify-between rounded-lg bg-inset px-4 py-3 font-semibold text-secondary-900 hover:text-primary-600"
           >
-            Team {team} <FaArrowRight size={12} />
+            {teamLabel(team)} <FaArrowRight size={12} />
           </a>
         )}
         <TeamNumberForm autoFocus={!team} />
@@ -146,35 +166,41 @@ export function MyTeamPage() {
   );
 }
 
-/** /team-not-found?team=<number>: where the gateway sends an address for a team it doesn't have. */
+/**
+ * /team-not-found?team=<label>: where the gateway sends an address for a team it doesn't have
+ * (the team's address label: "1648", "ftc12345").
+ */
 export function TeamNotFoundPage() {
   const [params] = useSearchParams();
-  const teamNumber = parseNumber(params.get("team") ?? "");
+  const team = teamOfHostLabel((params.get("team") ?? "").trim());
+  const parsed = team ? parseTeamId(team) : null;
+  const teamNumber = parsed?.number ?? null;
+  const program = parsed?.program;
 
   // The remembered team is gone (deleted, or never finished signing up): stop offering it.
   useEffect(() => {
-    if (teamNumber !== null && rememberedTeam() === teamNumber) forgetTeam();
-  }, [teamNumber]);
+    if (team !== null && rememberedTeam() === team) forgetTeam();
+  }, [team]);
 
   return (
     <Page>
       <Card picture={disappointed}>
         <div>
           <h1 className="text-2xl font-bold text-secondary-900">
-            {teamNumber ? `Team ${teamNumber} isn't on Gearbox` : "We couldn't find that team"}
+            {team ? `${teamLabel(team)} isn't on Gearbox` : "We couldn't find that team"}
           </h1>
           <p className="mt-2 text-sm text-secondary-600">
             Check the number, or if your team hasn't signed up yet, you can set it up in a couple of
             minutes.
           </p>
         </div>
-        <TeamNumberForm autoFocus />
+        <TeamNumberForm autoFocus program={program ?? "frc"} />
         <div className="border-t border-line pt-5">
           <Link
-            to={teamNumber ? `/signup?team=${teamNumber}` : "/signup"}
+            to={teamNumber && program ? `/signup?team=${teamNumber}&program=${program}` : "/signup"}
             className="block w-full rounded-lg border border-line px-4 py-2.5 text-center font-semibold text-secondary-900 transition-colors hover:border-primary-500"
           >
-            {teamNumber ? `Sign up team ${teamNumber}` : "Sign up your team"}
+            {team ? `Sign up ${teamLabel(team)}` : "Sign up your team"}
           </Link>
         </div>
       </Card>
@@ -189,8 +215,8 @@ export function TeamNotFoundPage() {
 export function NotFoundPage() {
   const [params] = useSearchParams();
   const host = (params.get("host") ?? "").slice(0, 253);
-  // <number>-<something>: a team's address with an app that doesn't exist.
-  const teamNumber = parseNumber(host.match(/^(\d{1,5})-/)?.[1] ?? "");
+  // <label>-<something>: a team's address with an app that doesn't exist.
+  const team = teamOfHostLabel(host.match(/^((?:ftc)?\d{1,5})-/)?.[1] ?? "");
 
   return (
     <Page>
@@ -210,12 +236,12 @@ export function NotFoundPage() {
             Check it for typos, or find your team below.
           </p>
         </div>
-        {teamNumber && (
+        {team && (
           <a
-            href={teamHome(teamNumber)}
+            href={teamHome(team)}
             className="flex items-center justify-between rounded-lg bg-inset px-4 py-3 font-semibold text-secondary-900 hover:text-primary-600"
           >
-            Team {teamNumber}'s home <FaArrowRight size={12} />
+            {teamLabel(team)}'s home <FaArrowRight size={12} />
           </a>
         )}
         <TeamNumberForm />

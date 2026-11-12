@@ -26,9 +26,11 @@ A process is a step a part can go through: "Router", "Mill", "Lathe", "Deburr", 
 
 A part that uses files needs both file kinds, with the producer first. Batches and files, later in this section, covers them.
 
+Tick **Part info** on a process when parts need their material and thickness recorded for it, such as a router that cuts sheet stock. A part going through that process can't be added without them.
+
 ## Removing a subsystem or process
 
-Choose **Remove** beside one you no longer use, such as a typo or an old machine. If nothing uses it, it's deleted. If parts do, it's hidden from new parts (Ingest, Add Part, a part's processes), and parts that already have it keep it. The Shop Floor still shows a removed process while parts are at it.
+Choose the trash can beside one you no longer use, such as a typo or an old machine. If nothing uses it, it's deleted. If parts do, it's hidden from new parts (Ingest, Add Part, a part's processes), and parts that already have it keep it. The Shop Floor still shows a removed process while parts are at it.
 
 Switch on **Show removed** to see removed ones and **Restore** them. The required quality check can't be removed while it's required. Removing and restoring are in the team's log.
 
@@ -45,11 +47,14 @@ Under **Quality Control** on Admin:
 
 Under **Onshape Configuration**:
 
-1. In Onshape's Developer Portal, make an API key for your team's Onshape company. Enter its **API access key** and **API secret key**, and the portal's **webhook signing keys** (primary and secondary).
-2. Enter your **Company ID** and the **Document ID** of the robot's document. Add the **Main Assembly ID** if you want quantities from its bill of materials.
-3. Save. Shop registers its webhook on the document and says whether Onshape accepted it. If Onshape refused it, check the keys and the company.
+1. In Onshape's Developer Portal, make an API key for your team's Onshape company. Enter its **API access key** and **API secret key**.
+2. In Onshape, open your account menu, choose **Company settings** (or Classroom or Enterprise settings), then **Webhooks**. Under **Webhook signatures**, generate a primary key (and a secondary one if you like), choose **Save changes**, and copy them into **Webhook signing key (primary)** and **(secondary)**. Shop ignores events that aren't signed with these keys.
+3. Enter your **Company ID** and the **Document ID** of the robot's document. Add the **Main Assembly ID** if you want quantities from its bill of materials.
+4. Save. Shop registers its webhook on the document and says whether Onshape accepted it. If Onshape refused it, check the API keys and the company.
 
 From then on, each approved release in that document shows up on Ingest. Saved keys are never shown again; leave a key blank to keep it.
+
+If releases don't show up, look for a red banner under the top bar (admins see it on every page). It says when Onshape is sending events without a signature (no signing keys in Onshape's company settings), or signed with keys other than the ones saved here. Fix the keys and save again.
 
 ## Onshape API usage
 
@@ -70,7 +75,3 @@ On a shop computer, open Shop's Admin page and choose **Enable kiosk mode on thi
 ## Shop status
 
 The Shop Floor's overview names how busy the shop is by how many parts are in the queue, from "Mooing Cow 🐮" to "Ash 🔥". Change the words, and the number of parts each one starts at, under **Shop Status** on Admin.
-
-## Extra part information
-
-Turn on **Require additional part information (material + thickness) at ingest** if you want every part's stock recorded before it goes to the shop.

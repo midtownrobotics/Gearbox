@@ -2,7 +2,8 @@
 import { and, eq, lt, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
-import { clearStorageCleanupNotice } from "./storage-notice";
+import { moveTeamRows } from "./scope";
+import { clearStorageCleanupNotice, storageNoticeTables } from "./storage-notice";
 import type { StorageCleanupMode } from "./storage-policy";
 
 // Ephemeral coordination only; each adopting app adds the matching migration.
@@ -25,6 +26,14 @@ export async function clearTeamStorageLock(database: D1Database, teamId: string)
   await drizzle(database).delete(locks).where(eq(locks.teamId, teamId));
   await drizzle(database).delete(usage).where(eq(usage.teamId, teamId));
   await clearStorageCleanupNotice(database, teamId);
+}
+
+/**
+ * A team's storage count, lock and notices go with it to its new id (a team move: see
+ * moveTeamRows), so its count never drops below what it stores.
+ */
+export async function moveTeamStorageRows(database: D1Database, from: string, to: string) {
+  await moveTeamRows(drizzle(database), from, to, [locks, usage, ...storageNoticeTables()]);
 }
 
 async function adjustUsage(database: D1Database, teamId: string, bytes: number, objects: number) {

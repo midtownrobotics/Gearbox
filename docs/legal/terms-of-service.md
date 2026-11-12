@@ -1,10 +1,10 @@
 # Gearbox Terms of Service
 
-Last updated: 1 November 2026.
+Last updated: 11 November 2026.
 
 ## 1. Who we are
 
-Gearbox is a set of free web tools for *FIRST* Robotics Competition (FRC) teams, offered at frcgearbox.com. It is developed by FRC Team 1648, G3 Robotics, and operated by Georgia Robotics Alliance, Inc., doing business as Midtown Robotics Boosters, a 501(c)(3) nonprofit organization ("we", "us"), at G3 Robotics, 931 Monroe Dr NE, Ste A102, Box 102, Atlanta, GA 30308.
+Gearbox is a set of free web tools for *FIRST* Robotics Competition (FRC) and *FIRST* Tech Challenge (FTC) teams, offered at frcgearbox.com. It is developed by FRC Team 1648, G3 Robotics, and operated by Georgia Robotics Alliance, Inc., doing business as Midtown Robotics Boosters, a 501(c)(3) nonprofit organization ("we", "us"), at G3 Robotics, 931 Monroe Dr NE, Ste A102, Box 102, Atlanta, GA 30308.
 
 Gearbox is built and run by volunteers, including students. It is not affiliated with or endorsed by *FIRST*.
 
@@ -12,7 +12,7 @@ Gearbox is built and run by volunteers, including students. It is not affiliated
 
 These terms are an agreement between us and each team that uses Gearbox.
 
-- A **team** is a robotics team registered on Gearbox under its FRC team number.
+- A **team** is a robotics team registered on Gearbox under its program (FRC or FTC) and its team number in that program.
 - The **team owner** is the adult who creates the team or to whom ownership is later transferred. The owner accepts these terms on the team's behalf.
 - **Team admins** are people the owner allows to manage the team.
 - **Members** are the students, mentors and others a team invites.
@@ -32,7 +32,7 @@ To create a team you must be at least 18 years old and a mentor, coach or other 
 
 When you create a team you confirm that:
 
-- the FRC team number you enter belongs to your team;
+- the program and team number you enter belong to your team;
 - you may accept these terms on the team's behalf;
 - your team has whatever permission its school, organization or members' parents require for members to use Gearbox; and
 - the information you give us is accurate.
@@ -41,7 +41,7 @@ Each team number can be registered once. If a team is registered under a number 
 
 ## 5. Members and accounts
 
-- Members must be at least 13 years old. Gearbox is not for children under 13, and a team must not invite them.
+- Members must be at least 13 years old. Gearbox is not for children under 13, and a team must not invite them, even when they are on the team (FTC teams can include younger students).
 - A person joins a team by invitation from that team, and the team's admins decide each member's role.
 - Each person is responsible for keeping their sign-in methods secure. A team is responsible for its shared devices, kiosks and PINs.
 - A team's admins can remove a member at any time.

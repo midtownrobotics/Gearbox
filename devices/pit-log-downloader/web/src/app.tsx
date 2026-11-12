@@ -93,20 +93,26 @@ export function App() {
   const pitLogsUrl = status?.gearbox.paired ? `${status.gearbox.paired.pitUrl}/logs` : null;
   // Until it's paired, pairing is all there is.
   const unpaired = status !== null && !status.gearbox.paired;
-  const teamNumber = status?.gearbox.paired?.teamNumber;
+  // The paired team, by program and number (FRC 254 and FTC 254 are two teams).
+  const paired = status?.gearbox.paired;
+  const teamNumber = paired?.teamNumber;
+  const pairedTeam = paired ? `${paired.program ?? "frc"}${paired.teamNumber}` : undefined;
 
   // Once paired, the page takes its team's appearance from Gearbox (Team Appearance): colors,
   // names, logo. Until it has loaded, the bar shows the team's number, never another team's name.
   const teamUi = useTeamUiSettings(Boolean(teamNumber));
   const [appearanceLoaded, setAppearanceLoaded] = useState(false);
   useEffect(() => {
-    if (teamNumber) void refreshTeamUiSettings().then(() => setAppearanceLoaded(true));
-  }, [teamNumber]);
+    if (pairedTeam) void refreshTeamUiSettings().then(() => setAppearanceLoaded(true));
+  }, [pairedTeam]);
   const styled = Boolean(teamNumber) && appearanceLoaded;
   const appIcon = useTeamIcon(styled ? "/favicon.svg" : undefined) ?? "/favicon.svg";
   // The team's avatar is on the internet: offline (or without one), the app's icon in the team's color.
   const avatar = useTeamAvatar(
-    styled && teamUi.useAvatar && status?.connection.internet ? teamNumber : undefined,
+    // Avatars are The Blue Alliance's: FRC teams only.
+    styled && teamUi.useAvatar && status?.connection.internet && paired?.program !== "ftc"
+      ? teamNumber
+      : undefined,
   );
   const showLogo = Boolean(avatar);
   const icon = avatar ?? appIcon;

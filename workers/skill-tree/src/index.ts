@@ -1,5 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { deleteTeamRows, hasMentorAccess, inTeam, requireAuth, teamExport } from "@g3/auth";
+import {
+  deleteTeamRows,
+  hasMentorAccess,
+  inTeam,
+  moveTarget,
+  moveTeamRows,
+  requireAuth,
+  teamExport,
+} from "@g3/auth";
 import { isDemoTeam } from "@g3/demo";
 import { corsOrigin } from "@g3/site-config";
 import { withApiPrefix } from "@g3/site-config/worker";
@@ -77,6 +85,14 @@ const app = base
     // Everything else hangs off the team's tree set and goes with it (ON DELETE CASCADE).
     await deleteTeamRows(createDb(c.env.SKILL_DB), c.req.param("teamId"), [treeSets]);
     return c.json({ ok: true });
+  })
+  // The team changed program, and so its id (the platform's team moves): its rows go with it.
+  .post("/internal/teams/:teamId/move", async (c) => {
+    const from = c.req.param("teamId");
+    const to = await moveTarget(c.req.raw, from);
+    if (!to) return c.json({ error: "Say which team id to move to." }, 400);
+    await moveTeamRows(createDb(c.env.SKILL_DB), from, to, [treeSets]);
+    return c.json({ done: true });
   })
   // When the team switches Skill Tree on (the platform's app library): its default trees. Opening
   // the app does the same, so this only gets them ready; a team that has a tree set keeps it.

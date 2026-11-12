@@ -1,5 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { deleteTeamRows, exportTeamRows, hasMentorAccess, requireAuth, teamExport } from "@g3/auth";
+import {
+  deleteTeamRows,
+  exportTeamRows,
+  hasMentorAccess,
+  moveTarget,
+  moveTeamRows,
+  requireAuth,
+  teamExport,
+} from "@g3/auth";
 import { isDemoTeam } from "@g3/demo";
 import { corsOrigin } from "@g3/site-config";
 import { withApiPrefix } from "@g3/site-config/worker";
@@ -69,6 +77,14 @@ const app = base
   .delete("/internal/teams/:teamId", async (c) => {
     await deleteTeamRows(createDb(c.env.SCHEDULE_DB), c.req.param("teamId"), [...TEAM_TABLES]);
     return c.json({ ok: true });
+  })
+  // The team changed program, and so its id (the platform's team moves): its rows go with it.
+  .post("/internal/teams/:teamId/move", async (c) => {
+    const from = c.req.param("teamId");
+    const to = await moveTarget(c.req.raw, from);
+    if (!to) return c.json({ error: "Say which team id to move to." }, 400);
+    await moveTeamRows(createDb(c.env.SCHEDULE_DB), from, to, [...TEAM_TABLES]);
+    return c.json({ done: true });
   })
   .get("/me", requireAuth, async (c) =>
     c.json({
