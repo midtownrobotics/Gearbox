@@ -1,12 +1,18 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { resolveUserId } from "@g3/auth";
 import { and, eq } from "drizzle-orm";
 import { Hono } from "hono";
-import { setCookie } from "hono/cookie";
 import { createDb } from "../../db";
 import { coreUserIdentities, coreUsers } from "../../db/schema";
-import { sessionCookieOptions } from "../../lib/cookie";
+import { finishSignIn } from "../../lib/handoff";
 import { newId } from "../../lib/id";
 import { decodeState, encodeState } from "../../lib/oauth-state";
+import {
+  openSignupOn,
+  pendingPage,
+  signUpWithProvider,
+  turnstilePassed,
+} from "../../lib/open-signup";
 import { sanitizeRedirect } from "../../lib/redirect";
 import { createSession } from "../../lib/session";
 import { methodOff } from "../../lib/sign-in-methods";
@@ -162,7 +168,28 @@ export const githubAuthRouter = new Hono<AppEnv>()
       );
     }
     const redirect = sanitizeRedirect(c.req.query("redirect"), team);
-    const state = await generateState(c.env, encodeState({ team, redirect, linkUserId: null }));
+    // From the sign-up page: someone new, who passed its Turnstile check, may sign up.
+    const signup = c.req.query("signup") === "1";
+    if (signup) {
+      const error = !(await openSignupOn(c.env, team))
+        ? "Your team doesn't let people sign up with GitHub."
+        : !(await turnstilePassed(
+              c.env,
+              c.req.query("turnstile"),
+              c.req.header("CF-Connecting-IP"),
+            ))
+          ? "We couldn't check that you're a person. Go back and try again."
+          : null;
+      if (error) {
+        return c.redirect(
+          `${teamFrontend(c.env, team)}/login/error?error=${encodeURIComponent(error)}`,
+        );
+      }
+    }
+    const state = await generateState(
+      c.env,
+      encodeState({ team, redirect, linkUserId: null, ...(signup ? { signup: true } : {}) }),
+    );
     return c.redirect(buildGithubUrl(c.env, state, providerRedirectUri(c.env, "github", team)));
   })
   // Link initiation — user must already be signed in
@@ -324,6 +351,11 @@ export const githubAuthRouter = new Hono<AppEnv>()
         return err("This account belongs to another team. Sign in on your own team's page.");
       }
 
+      // Signed up with GitHub and still waiting: their name step, or the waiting page.
+      if (user?.status === "pending") {
+        return c.redirect(await pendingPage(c.env, frontend, user.id, "github"));
+      }
+
       if (!user || user.status !== "active") {
         const message =
           user?.status === "pending"
@@ -333,12 +365,32 @@ export const githubAuthRouter = new Hono<AppEnv>()
       }
 
       const sessionId = await createSession(user.id, c.env);
-      setCookie(c, "g3_session", sessionId, sessionCookieOptions(c.req.url));
-      return c.redirect(redirectTo ?? `${teamUrl(c.env, st.team, "portal")}/`);
+      return finishSignIn(
+        c,
+        st.team,
+        sessionId,
+        redirectTo ?? `${teamUrl(c.env, st.team, "portal")}/`,
+      );
     }
 
-    // No GitHub identity found — account must already exist
+    // Someone new: only from the sign-up page, when the team lets people sign up with GitHub.
+    if (st.signup) {
+      const signUp = await signUpWithProvider(c.env, st.team, {
+        provider: "github",
+        providerId: sub,
+        email: githubUser.email,
+        name: githubUser.name,
+        identity: { accessToken },
+      });
+      if (signUp.result === "failed") return err(signUp.message);
+      return c.redirect(
+        signUp.token
+          ? `${frontend}/signup/name?token=${signUp.token}&with=github`
+          : `${frontend}/signup/pending?with=github`,
+      );
+    }
+
     return err(
-      "No linked account found. Sign in with an existing method, then link GitHub from your dashboard.",
+      "No account found with this GitHub account. Sign up first, or sign in another way and link GitHub from your account page.",
     );
   });

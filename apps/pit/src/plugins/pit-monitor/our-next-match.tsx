@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { OurNextMatch, OurSchedule } from "@g3/worker-pit/monitor-matches";
 import type { ReactNode } from "react";
 import { Countdown, formatTime } from "./match-time";

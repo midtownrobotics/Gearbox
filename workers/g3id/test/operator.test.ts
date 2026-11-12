@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { demoTeamId, teamKey } from "@g3/site-config";
 import { describe, expect, it, vi } from "vitest";
 import { createTeam, createUser, createUserWithPin, g3id, sessionCookie, testEnv } from "./helpers";
@@ -123,6 +124,20 @@ describe("stats for the operators' console", () => {
       activeMonth: before.activeMonth + 1,
       joinedMonth: before.joinedMonth + 1,
     });
+  });
+
+  it("counts each team's members, never who", async () => {
+    const team = await createTeam();
+    await createUser({ teamId: team, isAdmin: true });
+    await createUser({ teamId: team, isMentor: true });
+    await createUser({ teamId: team });
+    await createUser({ teamId: team, status: "pending" });
+    const empty = await createTeam();
+    const counts = (await (
+      await internal(`/member-counts?teams=${team},${empty}`)
+    ).json()) as Record<string, unknown>;
+    expect(counts).toEqual({ [team]: { active: 3, admins: 1, mentors: 1, pending: 1 } });
+    expect(JSON.stringify(counts)).not.toContain("@");
   });
 
   it("notes when a member last used Gearbox, at most once a minute", async () => {

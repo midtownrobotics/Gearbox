@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { integer, primaryKey, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 /** The platform's team registry (migration 0001). */
@@ -18,6 +19,8 @@ export const teams = sqliteTable("teams", {
   discordGuildId: text("discord_guild_id"),
   discordGuildName: text("discord_guild_name"),
   termsAcceptedAt: integer("terms_accepted_at"),
+  /** Which terms the owner accepted then: their "Last updated" date (migration 0017). */
+  termsVersion: text("terms_version"),
   signupId: text("signup_id").unique(),
   signupCodeToken: text("signup_code_token"),
   createdAt: integer("created_at").notNull(),
@@ -64,6 +67,8 @@ export const OPERATOR_ACTIONS = [
   // Migration 0013.
   "block_reporter",
   "unblock_reporter",
+  // Migration 0018: a team's details opened, without its members ("view_team" is its member list).
+  "view_team_details",
 ] as const;
 
 /** The operator access log: every action, and each look at a team's members (migration 0003). */

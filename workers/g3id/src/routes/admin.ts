@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { leaveGuild } from "@g3/discord";
 import { SlackApiError } from "@g3/slack";
 import { and, desc, eq, gt, inArray, isNull, or } from "drizzle-orm";
@@ -27,6 +28,7 @@ import { appearanceChanges, logToTeam } from "../lib/team-log";
 import { isTeamUiSettings, loadTeamUi, renameTeam } from "../lib/team-ui";
 import { requireAdmin } from "../middleware/auth";
 import type { AppEnv } from "../types";
+import { storagePolicyAdminRouter } from "./storage-policy";
 
 /** A user in the admin's own team: an admin only ever sees and changes their team's accounts. */
 const memberOf = (team: string, id: string) =>
@@ -39,6 +41,7 @@ export const adminRouter = new Hono<AppEnv>()
     c.set("adminTeamId", await teamOfUser(createDb(c.env.DB), c.get("userId") as string));
     await next();
   })
+  .route("/team/storage-policy", storagePolicyAdminRouter)
   // The team's channels on its chat (Slack or Discord), so its admins choose one by name (Shop's
   // channels, the platform's notifications). 404 without a chat; 409 when the team's Slack
   // connection is from before the bot could read channels and has to be connected again.

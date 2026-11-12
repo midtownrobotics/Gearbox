@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { builtInBrandColor } from "@g3/site-config";
 
 // App icons in a team's color. Every app's icon is a black tile with a white drawing and one

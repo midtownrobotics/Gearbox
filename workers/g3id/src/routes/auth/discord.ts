@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { resolveUserId } from "@g3/auth";
 import { authorizeUrl, exchangeCode } from "@g3/discord";
 import { and, eq } from "drizzle-orm";
@@ -8,7 +9,7 @@ import { coreUserIdentities, coreUsers } from "../../db/schema";
 import { sessionCookieOptions } from "../../lib/cookie";
 import { saveDiscordInstallation } from "../../lib/discord-install";
 import { signInWithDiscord } from "../../lib/discord-sign-in";
-import { takeHandoff } from "../../lib/handoff";
+import { finishSignIn, takeHandoff } from "../../lib/handoff";
 import { newId } from "../../lib/id";
 import { type OAuthState, decodeState, encodeState } from "../../lib/oauth-state";
 import { sanitizeRedirect } from "../../lib/redirect";
@@ -46,8 +47,9 @@ async function saveState(env: Env, state: DiscordState): Promise<string> {
 const app = (env: Env) => ({ DISCORD_CLIENT_ID: env.DISCORD_CLIENT_ID });
 
 export const discordAuthRouter = new Hono<AppEnv>()
-  // A sign-in finished elsewhere (the platform's sign-up with Discord), spent on the team's own
-  // address so the cookie is set on its domain (lib/handoff.ts).
+  // A sign-in finished elsewhere (the platform's sign-up with Discord, or a provider's callback on
+  // another cookie domain: finishSignIn), spent on the team's own address so the cookie is set on
+  // its domain (lib/handoff.ts).
   .get("/handoff", async (c) => {
     const handoff = await takeHandoff(c.env, c.req.query("token") ?? "");
     const team = requestTeamId(c);
@@ -182,9 +184,13 @@ export const discordAuthRouter = new Hono<AppEnv>()
         token ? `${frontend}/signup/name?token=${token}` : `${frontend}/signup/pending`,
       );
     }
-    setCookie(c, "g3_session", signIn.sessionId, sessionCookieOptions(c.req.url));
     const redirect = st.redirect?.startsWith("/") ? `${frontend}${st.redirect}` : st.redirect;
-    return c.redirect(redirect ?? `${teamUrl(c.env, st.team, "portal")}/`);
+    return finishSignIn(
+      c,
+      st.team,
+      signIn.sessionId,
+      redirect ?? `${teamUrl(c.env, st.team, "portal")}/`,
+    );
   });
 
 /** Adds a Discord account to a member's sign-ins. "ok", or why it wasn't. */

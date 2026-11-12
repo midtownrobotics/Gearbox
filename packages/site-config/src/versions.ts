@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 // Versions, filled in at build time by siteConfig() (vite.ts): the app's own version (its
 // package.json, shared with its worker) and the platform release it's part of (the root
 // package.json). "dev" when built without the plugin.

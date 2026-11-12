@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { Button, Dialog, ErrorBanner, TextField } from "@g3/ui";
 import { type FormEvent, useState } from "react";
 import { api, getErrorMessage } from "../../shared/api";

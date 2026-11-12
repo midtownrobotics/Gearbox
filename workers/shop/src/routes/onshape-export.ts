@@ -1,4 +1,5 @@
-import { requireAuth } from "@g3/auth";
+// SPDX-License-Identifier: AGPL-3.0-only
+import { requireAuth, storageLimitResponse } from "@g3/auth";
 import { Hono } from "hono";
 import type { Context } from "hono";
 import { createShopDb } from "../db";
@@ -58,6 +59,8 @@ const handleDrawingRequest = async (c: Context<AppEnv>) => {
       },
     });
   } catch (err) {
+    const storage = storageLimitResponse(err);
+    if (storage) return storage;
     console.error("[OnShape Export Route Error]", err);
     return c.json(
       { error: err instanceof Error ? err.message : "Failed to retrieve drawing" },

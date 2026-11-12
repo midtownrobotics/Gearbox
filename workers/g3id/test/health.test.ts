@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { expect, it } from "vitest";
 import packageJson from "../package.json";
 import { g3id } from "./helpers";

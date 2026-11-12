@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { demoTeamId, site, teamUiDefaults } from "@g3/site-config";
 import { collectWords } from "./guard.ts";
 import { DEMO_PEOPLE } from "./people.ts";

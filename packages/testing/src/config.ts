@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { fileURLToPath } from "node:url";
 import { cloudflareTest, readD1Migrations } from "@cloudflare/vitest-pool-workers";
 import { teamKey, teamUiDefaults } from "@g3/site-config";
@@ -37,6 +38,7 @@ const chatMessages = new Map<string, Record<string, unknown>[]>();
 const teamLogs = new Map<string, Record<string, unknown>[]>();
 const adminDms = new Map<string, Record<string, unknown>[]>();
 const memberDms = new Map<string, Record<string, unknown>[]>();
+const storagePolicies = new Map<string, boolean>();
 
 /**
  * G3ID as other workers see it: /auth/me answers for the user in the test cookie (users.ts), like
@@ -47,6 +49,19 @@ export const g3idStub: ServiceStub = async (request) => {
   // Workers call G3ID at /api (http://g3id/api/auth/me), like its public address.
   url.pathname = url.pathname.replace(/^\/api(?=\/)/, "");
   const user = userFromCookie(request.headers.get("Cookie") ?? "");
+  const policyTeam = url.pathname.match(/^\/internal\/teams\/([^/]+)\/storage-policy$/);
+  if (policyTeam || url.pathname === "/admin/team/storage-policy") {
+    if (!policyTeam && (!user || !user.isAdmin || user.sessionType === "pin"))
+      return json({ error: "Forbidden." }, 403);
+    const team = policyTeam ? decodeURIComponent(policyTeam[1]) : (user?.teamId ?? "");
+    if (request.method === "PUT") {
+      const body = (await request.json()) as { automaticDeletion?: unknown };
+      if (typeof body.automaticDeletion !== "boolean")
+        return json({ error: "Invalid policy." }, 400);
+      storagePolicies.set(team, body.automaticDeletion);
+    }
+    return json({ automaticDeletion: storagePolicies.get(team) ?? true });
+  }
   if (url.pathname === "/auth/me") {
     if (!user) return json({ error: "Unauthorized." }, 401);
     const pin = user.sessionType === "pin";

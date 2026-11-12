@@ -1,36 +1,87 @@
-import { Button, Card, ErrorBanner, Page, PageLoading, TextField, inputClass } from "@g3/ui";
-import { type ReactNode, useState } from "react";
+// SPDX-License-Identifier: AGPL-3.0-only
+import {
+  Button,
+  Card,
+  Dialog,
+  ErrorBanner,
+  Page,
+  PageLoading,
+  TextField,
+  inputClass,
+} from "@g3/ui";
+import { type ReactNode, useCallback, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { type TeamDetail, consoleApi, formatDate, formatTime, read, send, useLoad } from "./data";
+import {
+  type MemberCounts,
+  type MemberList,
+  type TeamDetail,
+  chatName,
+  formatDate,
+  formatTime,
+  send,
+} from "./data";
 import { ActionList } from "./log-page";
 import { ReportCard } from "./reports-page";
 import { StatusBadge } from "./shell";
 
-// One team: its details and members, the reports against its number, what operators have done to
-// it, and the tools for a number claimed wrongly (hand it over, suspend, delete; a wrong number is deleted and signed up again).
+// One team: its details and how many members it has, the reports against its number, what
+// operators have done to it, and the tools for a number claimed wrongly (hand it over, suspend,
+// delete; a wrong number is deleted and signed up again). The page opens only once the operator
+// gives a reason, and its members' names and emails only once they open the member list with
+// another; the team's admins see both. Handing it over needs the list.
 
 export function TeamPage() {
   const { id = "" } = useParams();
+  // Another team needs its own reason.
+  return <Team key={id} id={id} />;
+}
+
+function Team({ id }: { id: string }) {
   const navigate = useNavigate();
-  const detail = useLoad(
-    () => read<TeamDetail>(consoleApi.teams[":id"].$get({ param: { id } })),
+  // The reason the operator opened the team with, sent again on each reload (logged once an hour).
+  const [reason, setReason] = useState<string | null>(null);
+  const [data, setData] = useState<TeamDetail | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const load = useCallback(
+    (why: string) => send<TeamDetail>("POST", `/teams/${id}/details`, { reason: why }),
     [id],
   );
+  const reload = async () => {
+    if (!reason) return;
+    try {
+      setData(await load(reason));
+      setError(null);
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
 
   const back = (
     <Link to="/console" className="text-sm text-secondary-500 hover:text-primary-600">
       ← All teams
     </Link>
   );
-  if (detail.error) {
+  if (!reason) {
     return (
       <Page title="Team" actions={back}>
-        <ErrorBanner message={detail.error} />
+        <OpenDetails
+          open={async (why) => {
+            setData(await load(why));
+            setReason(why);
+          }}
+        />
       </Page>
     );
   }
-  if (!detail.data) return <PageLoading />;
-  const { team, members, reports, actions } = detail.data;
+  if (error) {
+    return (
+      <Page title="Team" actions={back}>
+        <ErrorBanner message={error} />
+      </Page>
+    );
+  }
+  if (!data) return <PageLoading />;
+  const { team, members, reports, actions } = data;
 
   return (
     <Page
@@ -45,29 +96,133 @@ export function TeamPage() {
     >
       <Card title="Details">
         <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
-          <Detail label="Owner">{team.owner?.name ?? "—"}</Detail>
-          <Detail label="Founder">{team.founder?.name ?? "—"}</Detail>
-          {team.discordGuildName ? (
-            <Detail label="Discord server">{team.discordGuildName}</Detail>
-          ) : (
-            <Detail label="Slack workspace">{team.slackWorkspaceName ?? "—"}</Detail>
-          )}
+          <Detail label="Members">{describeCounts(members)}</Detail>
+          <Detail label="Chat">{chatName(team.chat)}</Detail>
           <Detail label="Country">{team.country}</Detail>
           <Detail label="Signed up">{formatTime(team.createdAt)}</Detail>
-          <Detail label="Terms accepted">{formatTime(team.termsAcceptedAt)}</Detail>
+          <Detail label="Terms accepted">
+            {formatTime(team.termsAcceptedAt)}
+            {team.termsVersion && ` (version of ${team.termsVersion})`}
+          </Detail>
         </dl>
       </Card>
 
+      <Members
+        teamId={team.id}
+        canHandOver={team.status !== "pending"}
+        hasOwner={team.hasOwner}
+        onChange={reload}
+      />
+
+      {reports.length > 0 && (
+        <Card title="Reports about this number">
+          <div className="space-y-3">
+            {reports.map((r) => (
+              <ReportCard key={r.id} report={r} onChange={reload} />
+            ))}
+          </div>
+        </Card>
+      )}
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        {!team.isSite && team.status !== "pending" && (
+          <ActionForm
+            title={team.status === "suspended" ? "Reactivate" : "Suspend"}
+            description={
+              team.status === "suspended"
+                ? "Gives the team its addresses back."
+                : "Takes the team's addresses away and keeps its data, while a report is looked into."
+            }
+            button={team.status === "suspended" ? "Reactivate" : "Suspend"}
+            onSubmit={(reason) =>
+              send("POST", `/teams/${team.id}/status`, {
+                reason,
+                status: team.status === "suspended" ? "active" : "suspended",
+              }).then(reload)
+            }
+          />
+        )}
+        {!team.isSite && (
+          <Delete
+            number={team.teamNumber}
+            onSubmit={async (reason, confirmNumber) => {
+              await send("DELETE", `/teams/${team.id}`, { reason, confirmNumber });
+              navigate("/console", { replace: true });
+            }}
+          />
+        )}
+      </div>
+
+      <Card title="Log">
+        <ActionList actions={actions} showTeam={false} />
+      </Card>
+    </Page>
+  );
+}
+
+function describeCounts(counts: MemberCounts | null): string {
+  if (!counts) return "—";
+  const roles = [
+    counts.admins && `${counts.admins} admin${counts.admins === 1 ? "" : "s"}`,
+    counts.mentors && `${counts.mentors} mentor${counts.mentors === 1 ? "" : "s"}`,
+  ].filter(Boolean);
+  return [
+    `${counts.active} active${roles.length ? ` (${roles.join(", ")})` : ""}`,
+    counts.pending > 0 && `${counts.pending} waiting for approval`,
+  ]
+    .filter(Boolean)
+    .join(", ");
+}
+
+/**
+ * The team's member list: closed until the operator asks for it with a reason (the team's admins
+ * see that it was opened, when and why), then the members and the hand-over tool.
+ */
+function Members({
+  teamId,
+  canHandOver,
+  hasOwner,
+  onChange,
+}: {
+  teamId: string;
+  canHandOver: boolean;
+  hasOwner: boolean;
+  onChange: () => void;
+}) {
+  const [list, setList] = useState<MemberList | null>(null);
+
+  if (!list) {
+    return (
+      <ReasonGate
+        title="Members"
+        hint="Names and emails are hidden. Open the member list only when you need it, for example to hand the team over. The team's admins will see that it was opened, when, and your reason."
+        button="Open member list"
+        question="Open the member list?"
+        warning="This shows the names and emails of the team's members. The team's admins will see on their Member Access page that a Gearbox operator opened it, when, and the reason you give. Each time you open it is logged."
+        open={async (reason) => {
+          setList(await send<MemberList>("POST", `/teams/${teamId}/members`, { reason }));
+          onChange();
+        }}
+      />
+    );
+  }
+
+  const { members, ownerUserId, founderUserId } = list;
+  return (
+    <>
       <Card title={`Members (${members.length})`}>
-        <div className="overflow-x-auto">
+        <div className="relative overflow-x-auto">
           <table className="w-full text-left text-sm">
             <tbody>
               {members.map((m) => (
                 <tr key={m.id} className="border-t border-line first:border-0">
                   <td className="py-2 pr-4 text-secondary-900">
                     {m.displayName}
-                    {m.id === team.owner?.id && (
+                    {m.id === ownerUserId && (
                       <span className="ml-2 text-xs font-semibold text-primary-600">owner</span>
+                    )}
+                    {m.id === founderUserId && (
+                      <span className="ml-2 text-xs text-secondary-500">founder</span>
                     )}
                   </td>
                   <td className="py-2 pr-4 text-secondary-600">{m.email}</td>
@@ -88,57 +243,110 @@ export function TeamPage() {
           {members.length === 0 && <p className="text-sm text-secondary-500">No accounts yet.</p>}
         </div>
       </Card>
-
-      {reports.length > 0 && (
-        <Card title="Reports about this number">
-          <div className="space-y-3">
-            {reports.map((r) => (
-              <ReportCard key={r.id} report={r} onChange={detail.reload} />
-            ))}
-          </div>
-        </Card>
+      {canHandOver && (
+        <TransferOwner
+          list={list}
+          hasOwner={hasOwner}
+          send={(body) => send("POST", `/teams/${teamId}/owner`, body)}
+          onDone={(userId) => {
+            setList({ ...list, ownerUserId: userId });
+            onChange();
+          }}
+        />
       )}
+    </>
+  );
+}
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        {team.status !== "pending" && (
-          <TransferOwner
-            team={detail.data}
-            onDone={detail.reload}
-            send={(body) => send("POST", `/teams/${team.id}/owner`, body)}
-          />
-        )}
-        {!team.isSite && team.status !== "pending" && (
-          <ActionForm
-            title={team.status === "suspended" ? "Reactivate" : "Suspend"}
-            description={
-              team.status === "suspended"
-                ? "Gives the team its addresses back."
-                : "Takes the team's addresses away and keeps its data, while a report is looked into."
-            }
-            button={team.status === "suspended" ? "Reactivate" : "Suspend"}
-            onSubmit={(reason) =>
-              send("POST", `/teams/${team.id}/status`, {
-                reason,
-                status: team.status === "suspended" ? "active" : "suspended",
-              }).then(detail.reload)
-            }
-          />
-        )}
-        {!team.isSite && (
-          <Delete
-            number={team.teamNumber}
-            onSubmit={async (reason, confirmNumber) => {
-              await send("DELETE", `/teams/${team.id}`, { reason, confirmNumber });
-              navigate("/console", { replace: true });
-            }}
-          />
-        )}
+/** The team's details, closed until the operator opens them with a reason. */
+function OpenDetails({ open }: { open: (reason: string) => Promise<void> }) {
+  return (
+    <ReasonGate
+      title="Details"
+      hint="Open a team only when you need to, for example to follow up a report or hand it over. The team's admins will see that it was opened, when, and your reason."
+      button="Open team"
+      question="Open this team?"
+      warning="This shows the team's details: its number, name, country, status and chat (Slack or Discord), when it signed up and accepted the terms, how many members it has, reports about its number and what operators have done to it. No member's name or email. The team's admins will see on their Operator Access page that a Gearbox operator opened it, when, and the reason you give."
+      open={open}
+    />
+  );
+}
+
+/**
+ * A card that opens something only with the operator's reason: what's hidden, and a button whose
+ * dialog says what the team's admins will see.
+ */
+function ReasonGate({
+  title,
+  hint,
+  button,
+  question,
+  warning,
+  open,
+}: {
+  title: string;
+  hint: string;
+  button: string;
+  question: string;
+  warning: string;
+  open: (reason: string) => Promise<void>;
+}) {
+  const [asking, setAsking] = useState(false);
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <Card title={title}>
+      <div className="space-y-3">
+        <p className="text-sm text-secondary-600">{hint}</p>
+        <Button variant="secondary" onClick={() => setAsking(true)}>
+          {button}
+        </Button>
       </div>
-
-      <Card title="Log">
-        <ActionList actions={actions} showTeam={false} />
-      </Card>
-    </Page>
+      {asking && (
+        <Dialog title={question} onClose={() => setAsking(false)}>
+          <form
+            className="space-y-3"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              setBusy(true);
+              setError(null);
+              try {
+                await open(reason.trim());
+                setAsking(false);
+                setReason("");
+              } catch (err) {
+                setError((err as Error).message);
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            <p className="text-sm text-secondary-700">{warning}</p>
+            <TextField
+              multiline
+              kind="reason"
+              required
+              rows={2}
+              maxLength={500}
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="Why? (kept in the log, and shown to the team's admins)"
+              aria-label="Reason"
+            />
+            {error && <ErrorBanner message={error} />}
+            <div className="flex justify-end gap-2">
+              <Button variant="secondary" onClick={() => setAsking(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={busy}>
+                {button}
+              </Button>
+            </div>
+          </form>
+        </Dialog>
+      )}
+    </Card>
   );
 }
 
@@ -214,15 +422,18 @@ function ActionForm({
 }
 
 function TransferOwner({
-  team,
+  list,
+  hasOwner,
   send,
   onDone,
 }: {
-  team: TeamDetail;
+  list: MemberList;
+  hasOwner: boolean;
   send: (body: { reason: string; userId: string; keepPreviousAdmin: boolean }) => Promise<unknown>;
-  onDone: () => void;
+  onDone: (userId: string) => void;
 }) {
-  const others = team.members.filter((m) => m.id !== team.team.owner?.id);
+  const owner = list.members.find((m) => m.id === list.ownerUserId);
+  const others = list.members.filter((m) => m.id !== list.ownerUserId);
   const [userId, setUserId] = useState("");
   const [keepPreviousAdmin, setKeepPreviousAdmin] = useState(true);
   if (others.length === 0) return null;
@@ -233,14 +444,15 @@ function TransferOwner({
       button="Hand over"
       onSubmit={async (reason) => {
         await send({ reason, userId, keepPreviousAdmin });
-        onDone();
+        onDone(userId);
+        setUserId("");
       }}
     >
       <select
         required
         value={userId}
         onChange={(e) => setUserId(e.target.value)}
-        className={inputClass}
+        className={`${inputClass} max-w-full`}
         aria-label="New owner"
       >
         <option value="">Choose a member</option>
@@ -250,14 +462,14 @@ function TransferOwner({
           </option>
         ))}
       </select>
-      {team.team.owner && (
+      {hasOwner && owner && (
         <label className="flex items-center gap-2 text-sm text-secondary-700">
           <input
             type="checkbox"
             checked={keepPreviousAdmin}
             onChange={(e) => setKeepPreviousAdmin(e.target.checked)}
           />
-          Keep {team.team.owner.name} an admin
+          Keep {owner.displayName} an admin
         </label>
       )}
     </ActionForm>

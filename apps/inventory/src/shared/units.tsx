@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { TextField } from "@g3/ui";
 import { COMMON_UNITS, MAX_UNIT, sameUnit, unitAfter } from "@g3/worker-inventory/units";
 import { useId, useMemo } from "react";

@@ -1,5 +1,23 @@
 # @g3/worker-attendance
 
+## 2.2.3
+
+### Patch Changes
+
+- 72f42fa: Tighter security: pages running on someone's own computer can no longer call the live apps.
+
+## 2.2.2
+
+### Patch Changes
+
+- f340efe: The app's menu links to Gearbox's source code.
+
+## 2.2.1
+
+### Patch Changes
+
+- 4cad0fc: The team's avatar in the top bar has slightly rounded corners, and the Appearance page can turn off the short name in front of app names in the bar, for an avatar that already shows it.
+
 ## 2.2.0
 
 ### Minor Changes

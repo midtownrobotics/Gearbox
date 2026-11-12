@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 // Every table is one team's data (roadmap Phase 3, migration 0005): it has `team_id`, and every

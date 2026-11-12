@@ -1,5 +1,17 @@
 # @g3/g3id
 
+## 5.0.0
+
+No changes in this release.
+
+## 4.2.1
+
+No changes in this release.
+
+## 4.2.0
+
+No changes in this release.
+
 ## 4.1.0
 
 No changes in this release.

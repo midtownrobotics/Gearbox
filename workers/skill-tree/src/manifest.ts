@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { defineManifest } from "@g3/auth";
 import packageJson from "../package.json";
 
@@ -10,7 +11,7 @@ export const manifest = defineManifest({
   integrations: [],
   availability: "every team",
   version: packageJson.version,
-  hooks: { seed: true, delete: true, export: true, demo: true },
+  hooks: { seed: true, delete: true, export: true, demo: true, storage: false },
   // The trees are the team's content (a tree set file), not settings.
   settings: [],
   plugins: [],

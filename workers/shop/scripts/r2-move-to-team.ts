@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 // One-off, for the Phase 3 deploy (migration 0016_teams.sql): copies the site team's files in R2
 // from where they were before teams (drawings/..., part-files/...) to under its team prefix
 // (teams/frc1648/...), where Shop now looks for them. Run it BEFORE applying the migration, which

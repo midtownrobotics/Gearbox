@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { teamSettingsRoutes } from "@g3/auth";
 import { createOrdersDb } from "../db";
 import { saveTeamSettings, teamSettings } from "../lib/settings";

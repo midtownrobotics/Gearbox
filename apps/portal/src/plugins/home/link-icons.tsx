@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { IconType } from "react-icons";
 
 // Marks for the outside sites react-icons doesn't have, drawn like its icons: 1em tall (the wide FIRST
@@ -52,11 +53,4 @@ export const Match13Icon: IconType = () => (
   >
     <path d="m8 3 4 8 5-5 5 15H2L8 3z" />
   </svg>
-);
-
-/** FRCTools' logo: the 📦 emoji (its logo.svg is that emoji, so it keeps the emoji's colors). */
-export const FrcToolsIcon: IconType = () => (
-  <span aria-hidden="true" style={{ fontSize: "1em", lineHeight: 1 }}>
-    📦
-  </span>
 );

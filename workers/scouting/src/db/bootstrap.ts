@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { inTeam, withTeam } from "@g3/auth";
 import { teamKey } from "@g3/site-config";
 import { type Db, batch, createDb } from "./index";
@@ -21,6 +22,8 @@ import {
   scoutingFormSubmissions,
   scoutingForms,
   scoutingMatchAssignments,
+  seasonExportParts,
+  seasonExports,
   serviceHelpers,
   serviceTickets,
   strategyAdmins,
@@ -59,6 +62,8 @@ export const teamTables = [
   strategyPresence,
   teamComments,
   tierLists,
+  seasonExports,
+  seasonExportParts,
 ];
 const adopted = new WeakMap<D1Database, Promise<void>>();
 /** Only the configured original team owns pre-tenancy rows, regardless of the first visitor. */

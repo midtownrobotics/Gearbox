@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { type OnshapeApi, onshapeFetch } from "./onshape-api";
 
 // An approved Onshape release package (GET /api/v10/releasepackages/:id): what it's called, who

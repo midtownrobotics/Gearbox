@@ -1,10 +1,13 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { type TeamUsers, type TestUser, asUser, newTeamId, teamUsers } from "./users";
 import { call } from "./worker";
 
 // The two-team isolation test every app must pass (roadmap Phase 3, and every variant in Phase 6).
 // Two teams get their own data; then every route the app has is called as team A's users, with
 // team B's ids in the path. It fails if any answer contains something only B has, or if B's rows
-// are any different afterward.
+// are any different afterward. It also calls every GET route with team A's own ids and fails if
+// A's rows change: a browser sends no Origin on a link or an image, so the gateway can't tell
+// which page a GET came from, and a GET that changed anything could be set off from any site.
 
 export type Seeded = {
   /**
@@ -29,6 +32,11 @@ export type IsolationSpec = {
   bodies?: (b: Seeded) => Record<string, unknown>;
   /** Routes that can't be called this way ("GET /health"), each with the reason in a comment. */
   skip?: string[];
+  /**
+   * GET routes allowed to change the team's rows, each with the reason in a comment (only a write
+   * nobody could use against a member, like a default saved on first read).
+   */
+  writesOnGet?: string[];
   /** Team A's users to call as (default: admin, mentor, student, kiosk admin). */
   callers?: (team: TeamUsers) => TestUser[];
 };
@@ -68,15 +76,35 @@ function fill(path: string, params: Seeded["params"]) {
 export async function checkIsolation(spec: IsolationSpec): Promise<IsolationResult> {
   const a = teamUsers(newTeamId());
   const b = teamUsers(newTeamId());
-  await spec.seed(a);
+  const seededA = await spec.seed(a);
   const seededB = await spec.seed(b);
   const before = JSON.stringify(await spec.snapshot(b.teamId));
 
   const callers = spec.callers?.(a) ?? [a.admin, a.mentor, a.student, a.kioskAdmin];
   const skip = new Set(spec.skip ?? []);
+  const writesOnGet = new Set(spec.writesOnGet ?? []);
   const bodies = spec.bodies?.(seededB) ?? {};
   const problems: string[] = [];
   let requests = 0;
+
+  // GETs change nothing, even on the team's own data.
+  let ownBefore = JSON.stringify(await spec.snapshot(a.teamId));
+  for (const route of routesOf(spec.app)) {
+    const key = `${route.method} ${route.path}`;
+    if (route.method !== "GET" || skip.has(key)) continue;
+    const path = fill(route.path, seededA.params);
+    for (const caller of callers) {
+      requests++;
+      const res = await call(path, asUser(caller, { method: "GET" }));
+      await res.body?.cancel();
+      const after = JSON.stringify(await spec.snapshot(a.teamId));
+      if (after !== ownBefore && !writesOnGet.has(key)) {
+        problems.push(`${key} as ${caller.id} (${res.status}) changed team A's data`);
+      }
+      ownBefore = after;
+    }
+  }
+
   for (const route of routesOf(spec.app)) {
     const key = `${route.method} ${route.path}`;
     if (skip.has(key)) continue;

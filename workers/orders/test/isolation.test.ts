@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { env } from "cloudflare:test";
 import {
   type Seeded,
@@ -196,6 +197,8 @@ it("keeps every team's orders to itself", async () => {
     // Opens Share-A-Cart's sign-in, which registers this app with share-a-cart.com over the
     // internet; it touches only the caller's team's settings (lib/share-a-cart.ts).
     skip: ["GET /share-a-cart/connect"],
+    // Saves the caller's own name and last visit, and copies the starter catalog on first read.
+    writesOnGet: ["GET /me"],
     bodies: (b) => {
       const d = b.data as Record<string, number> & { catalogCategory: string; tag: string };
       return {
@@ -215,6 +218,7 @@ it("keeps every team's orders to itself", async () => {
           lines: [{ requestId: d.approved, quantity: 1, unitPriceCents: 1 }],
         },
         "POST /orders/receive": { ids: [d.ordered] },
+        "POST /orders/send-back": { ids: [d.ordered] },
         "PATCH /orders/:id/tracking": { tracking: "changed" },
         "POST /categories": { name: "Mine", budgetCents: 1 },
         "PATCH /categories/:id": { name: "Renamed", budgetCents: 1 },

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { ErrorBanner, TextField, inputClass } from "@g3/ui";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";

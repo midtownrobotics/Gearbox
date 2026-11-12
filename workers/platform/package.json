@@ -1,10 +1,12 @@
 {
   "name": "@g3/worker-platform",
-  "version": "4.1.0",
+  "version": "4.3.0",
+  "license": "AGPL-3.0-only",
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./cloudflare": "./src/cloudflare.ts"
   },
   "scripts": {
     "dev": "wrangler dev --port 8795 --inspector-port 9237",

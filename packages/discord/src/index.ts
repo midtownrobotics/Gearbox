@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 // Discord's REST API, for G3ID (the only worker that talks to Discord). One Discord app serves
 // every team: its bot token is one secret, and a team's connection is just its server (guild) id.
 // Everything here is plain HTTPS: no Gateway connection, so the bot never reads messages.

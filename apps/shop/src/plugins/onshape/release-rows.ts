@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { OnshapeRelease } from "../../shared/types";
 
 // What the Onshape page's table shows and in what order: which releases and parts a search and

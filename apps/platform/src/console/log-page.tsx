@@ -1,8 +1,9 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { Card, ErrorBanner, Page } from "@g3/ui";
 import { Link } from "react-router-dom";
 import { type Action, consoleApi, formatTime, read, useLoad } from "./data";
 
-// Everything operators have done, and each time one looked at a team's members, newest first.
+// Everything operators have done, and each time one opened a team or its member list, newest first.
 // Kept 12 months (the privacy policy's operator access log).
 
 export function LogPage() {
@@ -22,7 +23,9 @@ function describe(action: Action): string {
   const d = action.details;
   switch (action.action) {
     case "view_team":
-      return "Looked at the team's members";
+      return "Opened the team's member list";
+    case "view_team_details":
+      return "Opened the team's details";
     case "delete_team":
       return `Deleted team ${str(d.teamNumber)} (${str(d.name)}) and ${str(d.deletedAccounts)} accounts`;
     // Renumbering was removed; kept so a past log row still reads.

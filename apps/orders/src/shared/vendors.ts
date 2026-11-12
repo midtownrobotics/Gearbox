@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { useCallback, useMemo } from "react";
 import { api, getErrorMessage } from "./api";
 import type { Vendor } from "./types";

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { workerTestConfig } from "@g3/testing/config";
 
 /** Each team's event days, as the stand-in Schedule gives them (tests set them). */

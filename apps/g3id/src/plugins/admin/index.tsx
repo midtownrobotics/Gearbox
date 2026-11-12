@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { useParams } from "react-router-dom";
 import { Moved } from "../../shared/moved";
 import type { Plugin } from "../../shared/plugin-types";

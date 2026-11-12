@@ -1,5 +1,34 @@
 # @g3/worker-shop
 
+## 5.0.0
+
+### Major Changes
+
+- c0bf6ae: When storage exceeds its allowance, remove files over six months old first, then the oldest remaining files as needed toward 90% usage. Recent files can now be removed; download files you want to keep before reaching the cap. Pit log cleanup remains opt-in.
+- c0bf6ae: Admins can check storage usage, review files eligible for cleanup, and download individual files or whole archives from Portal's Storage page. Warn admins at 90%, 95%, and 100%, without repeating warnings after cleanup to 90%. Apply each file-storing app's storage usage notice migration before deploying.
+- ec78275: Keep file storage within per-team caps. When a new upload would exceed a cap, permanently remove files older than six calendar months first, then the oldest remaining files, including recent files, as needed toward 90% usage. Pit's match logs are only removed when the team chose Delete the oldest logs (the default keeps every log). Written Scouting reports and auton steps remain when their images are removed. Scouts saving at the same time no longer wait for each other while the team is well under its cap. Admin cleanup summaries include sizes and age. Apply coordination and notice migrations before deployment and honor the owner-notice period before changing live retention.
+
+### Minor Changes
+
+- c0bf6ae: Choose on Storage whether a full allowance deletes the oldest files or keeps every file and stops uploads. Warnings reflect that choice without repeating on rejected uploads or mode changes. Apply ID migration 0024 before deployment.
+
+### Patch Changes
+
+- 0049e87: Gearbox's operators see each team's member count and how much its apps store, and a team's page no longer shows its members' names or emails unless an operator opens the member list with a reason. Admins see the two apart: Operator Access lists when operators opened the team's details, and the new Member Access page lists when they opened its member list.
+- 72f42fa: Tighter security: pages running on someone's own computer can no longer call the live apps.
+
+## 4.0.2
+
+### Patch Changes
+
+- f340efe: The app's menu links to Gearbox's source code.
+
+## 4.0.1
+
+### Patch Changes
+
+- 4cad0fc: The team's avatar in the top bar has slightly rounded corners, and the Appearance page can turn off the short name in front of app names in the bar, for an avatar that already shows it.
+
 ## 4.0.0
 
 ### Major Changes

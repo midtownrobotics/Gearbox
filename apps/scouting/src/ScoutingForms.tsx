@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { pageTeamNumber } from "@g3/site-config";
 import {
   Button,
@@ -15,6 +16,7 @@ import {
   useTeamChat,
   useTeamNames,
 } from "@g3/ui";
+import { type FieldDrawing, drawingDraftFile } from "@g3/worker-scouting/field-drawing";
 import { describeServiceIssue } from "@g3/worker-scouting/service-issues";
 import {
   AlertCircle,
@@ -66,7 +68,6 @@ import { clearInputError, showTeamNumberError } from "./input-validation";
 import {
   type DraftSaveResult,
   type MatchDraft,
-  dataUrlToBlob,
   deleteDraft,
   hasContent,
   listDrafts,
@@ -143,7 +144,7 @@ function FieldInput({
   canvasRef?: RefObject<HTMLCanvasElement | null>;
   canvasKey?: number;
   onDrawingChange?: (hasDrawing: boolean) => void;
-  onCommit?: (canvas: HTMLCanvasElement) => void;
+  onCommit?: (canvas: HTMLCanvasElement, vector?: FieldDrawing) => void;
   initialImage?: string;
 }) {
   const inputId = `field-${field.id}`;
@@ -520,8 +521,7 @@ function MatchEntry({
     try {
       for (const field of form.fields.filter((item) => item.type === "fieldMap")) {
         const drawing = draft.drawings[field.id];
-        if (drawing)
-          payload.set(`drawing:${field.id}`, await dataUrlToBlob(drawing), `${field.id}.jpg`);
+        if (drawing) payload.set(`drawing:${field.id}`, await drawingDraftFile(drawing, field.id));
       }
       const result = await api<{ late?: boolean }>(`/scouting-forms/${form.id}/submissions`, {
         method: "POST",
@@ -798,10 +798,12 @@ function EntryDraft({
     setHasDrawings(Object.keys(drawings.current).length > 0);
     persist();
   }
-  function drawingCommitted(fieldId: string, canvas: HTMLCanvasElement) {
+  function drawingCommitted(fieldId: string, canvas: HTMLCanvasElement, vector?: FieldDrawing) {
     if (!drawnFields.current.has(fieldId)) return;
     try {
-      drawings.current[fieldId] = canvas.toDataURL("image/jpeg", 0.85);
+      drawings.current[fieldId] = vector
+        ? JSON.stringify(vector)
+        : canvas.toDataURL("image/jpeg", 0.85);
     } catch {
       missingDrawingFields.current.add(fieldId);
       setLocalSave("failed");
@@ -826,13 +828,10 @@ function EntryDraft({
       payload.set("answers", JSON.stringify(answers));
       for (const field of form.fields.filter((item) => item.type === "fieldMap")) {
         if (!drawnFields.current.has(field.id)) continue;
-        const canvas = canvases.current[field.id];
-        if (canvas) {
-          const blob = await new Promise<Blob | null>((resolve) =>
-            canvas.toBlob(resolve, "image/png"),
-          );
-          if (blob) payload.set(`drawing:${field.id}`, blob, `${field.id}.png`);
-        }
+        const saved = drawings.current[field.id];
+        if (!saved || missingDrawingFields.current.has(field.id))
+          throw new Error(`Redraw ${field.label} before submitting.`);
+        payload.set(`drawing:${field.id}`, await drawingDraftFile(saved, field.id));
       }
       const result = await api<{ late?: boolean }>(`/scouting-forms/${form.id}/submissions`, {
         method: "POST",
@@ -979,7 +978,7 @@ function EntryDraft({
                   canvasKey={canvasKey}
                   initialImage={initialDrawings[field.id]}
                   onDrawingChange={(hasDrawing) => drawingChanged(field.id, hasDrawing)}
-                  onCommit={(canvas) => drawingCommitted(field.id, canvas)}
+                  onCommit={(canvas, vector) => drawingCommitted(field.id, canvas, vector)}
                 />
               </div>
             );

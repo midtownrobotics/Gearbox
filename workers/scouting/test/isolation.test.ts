@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { env } from "cloudflare:workers";
 import { teamKey } from "@g3/site-config";
 import {
@@ -212,6 +213,12 @@ describe("team isolation", () => {
       snapshot,
       // Health has no private data; AI extraction is covered with scoped cache/quotas separately.
       skip: ["GET /scouting/health", "POST /scouting/manual-schedule/extract"],
+      writesOnGet: [
+        // Opens the caller's own points account (at zero) the first time they look.
+        "GET /scouting/game",
+        // Saves the team's default forms the first time they're read.
+        "GET /scouting/scouting-forms",
+      ],
       bodies: (b) => ({
         "PUT /scouting/scouting-forms/:id": {
           name: "Changed",

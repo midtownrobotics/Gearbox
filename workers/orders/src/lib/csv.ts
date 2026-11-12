@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 /** One CSV line: fields quoted when they contain a comma, quote or line break. */
 export function csvRow(fields: (string | number | null | undefined)[]): string {
   return fields

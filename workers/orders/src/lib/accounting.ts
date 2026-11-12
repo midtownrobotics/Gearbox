@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { inTeam } from "@g3/auth";
 import { gte, inArray, isNotNull, lt } from "drizzle-orm";
 import type { OrdersDb } from "../db";

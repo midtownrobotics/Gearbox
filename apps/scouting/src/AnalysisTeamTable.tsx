@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { Badge, focusRing, tones } from "@g3/ui";
 import { ChevronRight, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";

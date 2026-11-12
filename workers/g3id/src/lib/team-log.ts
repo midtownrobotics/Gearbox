@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { TeamChange } from "@g3/auth";
 import type { TeamUiSettings } from "@g3/site-config";
 import type { AppEnv } from "../types";
@@ -46,6 +47,7 @@ const APPEARANCE_PARTS: Record<keyof TeamUiSettings, string> = {
   buttonText: "Button text color",
   links: "Links",
   hiddenLinks: "Hidden links",
+  customLinks: "Custom links",
   appOrder: "Apps grid order",
 };
 

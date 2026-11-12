@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { appUrl, site } from "@g3/site-config";
 import { Button, ErrorBanner, NotYourTeam, useTeamNames } from "@g3/ui";
 import { Check, Copy, Send } from "lucide-react";

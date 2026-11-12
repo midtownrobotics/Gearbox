@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 // Reading a zip someone uploaded (AdvantageScope assets, ./advantagescope.ts): the entries from its
 // central directory, each read or streamed when it's needed, stored or deflated (the runtime's
 // DecompressionStream). A file never unzips past the size the zip states for it, so the sizes can

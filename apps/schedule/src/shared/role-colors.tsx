@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { contrastRatio, isHexColor } from "@g3/site-config";
 import type { RolePreset } from "@g3/worker-schedule";
 import type { CSSProperties } from "react";

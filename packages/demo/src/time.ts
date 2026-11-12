@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { site } from "@g3/site-config";
 
 // Sample data is written relative to when it's loaded, so the demo always looks current: "three

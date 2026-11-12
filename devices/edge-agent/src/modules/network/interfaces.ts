@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { BoxAddress, BoxInterface } from "@g3/worker-edge/interface-types";
 
 type IpAddrEntry = {

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import {
   Button,
   ErrorBanner,
@@ -298,6 +299,13 @@ function VendorOrder({
   // The line being taken off, and whether the order is being placed, while a pop-up asks.
   const [removing, setRemoving] = useState<OrderRequest | null>(null);
   const [placing, setPlacing] = useState(false);
+  // Asked first when shipping is $0 and the order doesn't reach the vendor's free shipping.
+  const [checkingShipping, setCheckingShipping] = useState(false);
+  const freeShipping =
+    group.profile !== undefined &&
+    "freeShippingCents" in group.profile &&
+    group.profile.freeShippingCents !== null &&
+    itemsTotal >= group.profile.freeShippingCents;
 
   /** Takes a line off the order list by canceling the request (the requester sees why). */
   async function trash(r: OrderRequest, reason: string) {
@@ -323,6 +331,7 @@ function VendorOrder({
         "Every line needs a quantity and a price; shipping and tax must be dollar amounts.",
       );
     }
+    if (shippingCents === 0 && !freeShipping) return setCheckingShipping(true);
     setPlacing(true);
   }
 
@@ -456,13 +465,13 @@ function VendorOrder({
               }
               className="rounded-lg bg-primary-500 px-3 py-1.5 text-sm font-semibold text-on-primary hover:bg-primary-600"
             >
-              🛒 Add {link.count} to {link.label} ↗
+              Add {link.count} to {link.label} ↗
             </a>
           ))}
           {shareACart &&
             (shareACart.connected ? (
               <Button className="!py-1.5" disabled={sacBusy} onClick={openShareACart}>
-                {sacBusy ? "Building cart…" : "🛒 Share-A-Cart ↗"}
+                {sacBusy ? "Building cart…" : "Share-A-Cart ↗"}
               </Button>
             ) : (
               <Link to="/admin" className="text-xs underline text-secondary-500">
@@ -729,24 +738,41 @@ function VendorOrder({
           </div>
           <Button disabled={busy || !valid} onClick={askToPlace}>
             {busy
-              ? "Placing…"
+              ? "Marking…"
               : selected.size > 0
-                ? `Place order (${selected.size})`
-                : "Place order"}
+                ? `Mark Placed (${selected.size})`
+                : "Mark Placed"}
           </Button>
+          {checkingShipping && (
+            <ConfirmDialog
+              title="No shipping?"
+              centered
+              confirmLabel="Yes, it's $0"
+              keepLabel="Enter shipping"
+              onConfirm={() => {
+                setCheckingShipping(false);
+                setPlacing(true);
+              }}
+              onClose={() => setCheckingShipping(false)}
+            >
+              Are you sure the shipping cost is $0?
+            </ConfirmDialog>
+          )}
           {placing && (
             <ConfirmDialog
-              title="Place order"
-              confirmLabel="Place order"
+              title="Mark Placed"
+              centered
+              confirmLabel="Mark Placed"
               keepLabel="Not yet"
               onConfirm={place}
               onClose={() => setPlacing(false)}
             >
-              Place{" "}
+              Mark{" "}
               {inOrder.length === group.items.length
                 ? "this order"
                 : `an order of ${inOrder.length} item${inOrder.length === 1 ? "" : "s"}`}{" "}
-              with {group.vendor} for {formatCents(itemsTotal + shippingCents + taxCents)}?
+              with {group.vendor} for {formatCents(itemsTotal + shippingCents + taxCents)} as
+              placed?
             </ConfirmDialog>
           )}
           {removing && (
@@ -816,7 +842,7 @@ function Nudges({ vendor, itemsTotal }: { vendor: Vendor | undefined; itemsTotal
         : {
             text: vendor.teamAccountLogin
               ? "🧾 Tax exempt: sign in to the team account before checkout"
-              : "🧾 Tax exempt: certificate on file",
+              : "🧾 Tax exempt",
             tone: "good",
           },
     );

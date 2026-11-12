@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import MiniSearch from "minisearch";
 import { PRIORITY } from "../../shared/priority";
 import { STATUS } from "../../shared/status-badge";

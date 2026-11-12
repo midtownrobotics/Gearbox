@@ -1,5 +1,27 @@
 # @g3/worker-orders
 
+## 2.4.0
+
+### Minor Changes
+
+- ee6ad4f: Carts: the "Place order" button is now "Mark Placed", and it asks you to check when shipping is $0 and the order doesn't qualify for the vendor's free shipping. Deliveries: mentors can send an item that's on order back to its cart. The tax-exempt note on Carts and the checkbox on Vendors no longer say "certificate on file".
+
+### Patch Changes
+
+- 72f42fa: Tighter security: pages running on someone's own computer can no longer call the live apps.
+
+## 2.3.2
+
+### Patch Changes
+
+- f340efe: The app's menu links to Gearbox's source code.
+
+## 2.3.1
+
+### Patch Changes
+
+- 4cad0fc: The team's avatar in the top bar has slightly rounded corners, and the Appearance page can turn off the short name in front of app names in the bar, for an avatar that already shows it.
+
 ## 2.3.0
 
 ### Minor Changes

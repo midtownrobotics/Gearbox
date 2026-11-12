@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 // A team's attendance settings (attendance_settings), edited on G3ID's Attendance admin page.
 
 export type AttendanceSettings = {

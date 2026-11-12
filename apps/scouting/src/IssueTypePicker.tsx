@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { Chip } from "@g3/ui";
 import { SERVICE_ISSUE_TYPES, type ServiceIssueType } from "@g3/worker-scouting/service-issues";
 import { useId } from "react";

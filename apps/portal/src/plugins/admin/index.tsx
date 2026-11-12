@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { ReactNode } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import type { Plugin } from "../../shared/plugin-types";
@@ -10,8 +11,10 @@ import { LogPage } from "./log-page";
 import { MemberPage } from "./member-page";
 import { MembersPage } from "./members-page";
 import { NotificationsPage } from "./notifications-page";
-import { OperatorAccessPage } from "./operator-access-page";
+import { MemberAccessPage, OperatorAccessPage } from "./operator-access-page";
+import { SeasonPage } from "./season-page";
 import { SignInPage } from "./sign-in-page";
+import { StoragePage } from "./storage-page";
 
 // The team's admin pages (roadmap 4.5), on its home: <number>.<platform>/admin. Only what's the
 // whole team's lives here: Apps is the platform's (which apps the team has on); Appearance and
@@ -33,6 +36,14 @@ function SlackMoved() {
 export const adminPlugin: Plugin = {
   name: "admin",
   routes: [
+    ...(import.meta.env.DEV
+      ? [
+          { path: "/preview/storage", element: <StoragePage preview /> },
+          { path: "/preview/season", element: <SeasonPage preview /> },
+        ]
+      : []),
+    { path: "/admin/storage", element: admin(<StoragePage />) },
+    { path: "/admin/storage/seasons", element: admin(<SeasonPage />) },
     { path: "/admin", element: admin(<AppsPage />) },
     { path: "/admin/members", element: admin(<MembersPage />) },
     { path: "/admin/members/:id", element: admin(<MemberPage />) },
@@ -43,9 +54,11 @@ export const adminPlugin: Plugin = {
     { path: "/admin/integrations", element: admin(<IntegrationsPage />) },
     { path: "/admin/notifications", element: admin(<NotificationsPage />) },
     { path: "/admin/operator-access", element: admin(<OperatorAccessPage />) },
+    { path: "/admin/member-access", element: admin(<MemberAccessPage />) },
     { path: "/admin/log", element: admin(<LogPage />) },
   ],
   navItems: [
+    { label: "Storage", to: "/admin/storage", order: 16.5, requiresAdmin: true, group: "Admin" },
     { label: "Manage Apps", to: "/admin", order: 10, requiresAdmin: true, group: "Admin" },
     { label: "Members", to: "/admin/members", order: 11, requiresAdmin: true, group: "Admin" },
     {
@@ -84,6 +97,13 @@ export const adminPlugin: Plugin = {
       requiresAdmin: true,
       group: "Admin",
     },
-    { label: "Log", to: "/admin/log", order: 18, requiresAdmin: true, group: "Admin" },
+    {
+      label: "Member Access",
+      to: "/admin/member-access",
+      order: 18,
+      requiresAdmin: true,
+      group: "Admin",
+    },
+    { label: "Log", to: "/admin/log", order: 19, requiresAdmin: true, group: "Admin" },
   ],
 };

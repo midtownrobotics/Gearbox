@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { Button, Card, ErrorBanner, Field, Loading, Page, TextField, inputClass } from "@g3/ui";
 import { type FormEvent, useState } from "react";
 import { api, getErrorMessage } from "../../shared/api";
@@ -300,7 +301,7 @@ function ProfileForm({
             checked={f.taxExempt}
             onChange={(e) => set({ taxExempt: e.target.checked })}
           />
-          Tax exempt (certificate on file)
+          Tax exempt
         </label>
         {f.taxExempt && (
           <label className="flex items-center gap-2">

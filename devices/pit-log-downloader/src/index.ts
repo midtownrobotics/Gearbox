@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import * as fs from "node:fs";
 import { createServer } from "node:http";
 import * as os from "node:os";
@@ -446,6 +447,16 @@ async function uploadLogs(online: boolean) {
             : `Gearbox already has ${log.name}.`,
         );
       } catch (err) {
+        if (err instanceof UploadRefused && err.reason === "already_saved") {
+          // Pit keeps the copy it has: not tried again, so it isn't refused on every pass.
+          log.status.uploaded = true;
+          noteInGearbox(log.match.event, log.name, true);
+          saveLogs();
+          logWithTimestamp(
+            `Gearbox already has another copy of ${log.name}. Delete it in Pit to upload this one.`,
+          );
+          continue;
+        }
         if (err instanceof UploadRefused && err.reason === "full") {
           pitFullUntil = Date.now() + kFullRetryMs;
         }

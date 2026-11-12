@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 /**
  * Match report drafts kept on this device, so nothing a scout has written is lost: not to a reload,
  * a dead battery or a dropped connection, and not when the form moves on to the next match. A
@@ -10,7 +11,7 @@ export type MatchDraft = {
   matchLabel: string;
   teamName: string;
   answers: Record<string, unknown>;
-  /** Field map drawings by field id, as data URLs of the whole canvas. */
+  /** Field map drawings by field id, as compact vector JSON; legacy data URLs remain readable. */
   drawings: Record<string, string>;
   /** Storage ran out: these paths must be kept open or redrawn, never reported as fully saved. */
   missingDrawingFields?: string[];
@@ -153,8 +154,4 @@ export function listDrafts(userId: string, formId: string) {
     .map(({ draft }) => draft)
     .filter((draft) => draft.formId === formId && hasContent(draft))
     .sort((left, right) => right.savedAt - left.savedAt);
-}
-
-export async function dataUrlToBlob(url: string) {
-  return (await fetch(url)).blob();
 }

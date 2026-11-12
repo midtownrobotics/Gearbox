@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { Button, Chip, ErrorBanner, Loading, ProgressBar, Stat, SuccessBanner } from "@g3/ui";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../../shared/api";

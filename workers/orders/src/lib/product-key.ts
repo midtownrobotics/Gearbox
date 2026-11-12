@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 // How a product link is matched to the catalog. No imports: the Orders pages use it too, through
 // @g3/worker-orders/product-key (the catalog page's omnibox matches a pasted link this way).
 

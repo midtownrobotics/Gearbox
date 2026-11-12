@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { describe, expect, it } from "vitest";
 import { saveInstallation } from "../src/lib/slack-install";
 import { createTeam, createUser, g3id, sessionCookie, testEnv } from "./helpers";

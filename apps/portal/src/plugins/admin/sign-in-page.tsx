@@ -1,19 +1,25 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { apiPath } from "@g3/site-config";
 import { Card, ConfirmQuestion, ErrorBanner, Loading, Page, Switch } from "@g3/ui";
 import { useEffect, useState } from "react";
 import type { IconType } from "react-icons";
 import { FaDiscord, FaGithub, FaGoogle, FaSlack, FaSteam } from "react-icons/fa";
-import { MdPin } from "react-icons/md";
+import { MdPersonAdd, MdPin } from "react-icons/md";
 import { g3id } from "../../lib/api";
 
 // The ways the team's members sign in (G3ID's /admin/team/sign-in, through /api/~id). The team's
 // chat (Slack, or Discord for a team that connected Discord) is always on: members join through it.
+// Admins can also let people sign up with Google or GitHub (`openSignup`), off by default.
 
 type Optional = "google" | "github" | "steam" | "pin";
 type State = {
   methods: Record<Optional | "slack" | "discord", boolean>;
   /** Active members who can sign in only with that method. */
   onlyWith: Record<Optional, number>;
+  /** People can sign up with Google or GitHub, not only the team's chat. */
+  openSignup: boolean;
+  /** This site is set up for it (Turnstile). */
+  openSignupReady: boolean;
 };
 
 const METHODS: { key: Optional; label: string; Icon: IconType; summary: string }[] = [
@@ -47,7 +53,7 @@ export function SignInPage() {
       .catch(() => setError("Couldn't load your team's sign-in methods."));
   }, []);
 
-  async function change(key: Optional, on: boolean) {
+  async function change(key: Optional | "openSignup", on: boolean) {
     if (!state) return;
     setAsking(null);
     setBusy(true);
@@ -58,7 +64,7 @@ export function SignInPage() {
         method: "PUT",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...current, [key]: on }),
+        body: JSON.stringify({ ...current, openSignup: state.openSignup, [key]: on }),
       });
       const data = (await res.json()) as State & { error?: string };
       if (!res.ok) throw new Error(data.error ?? "Couldn't change it.");
@@ -137,8 +143,60 @@ export function SignInPage() {
               </li>
             );
           })}
+          <li>
+            <OpenSignupCard
+              chat={chat}
+              state={state}
+              busy={busy}
+              onChange={(on) => change("openSignup", on)}
+            />
+          </li>
         </ul>
       )}
     </Page>
+  );
+}
+
+/** Letting people sign up with Google or GitHub, after a check that they're a person. */
+function OpenSignupCard({
+  chat,
+  state,
+  busy,
+  onChange,
+}: {
+  chat: string;
+  state: State;
+  busy: boolean;
+  onChange: (on: boolean) => void;
+}) {
+  const on = state.openSignup;
+  const noMethod = !state.methods.google && !state.methods.github;
+  return (
+    <Card className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
+      <div className="flex min-w-0 flex-1 gap-3">
+        <MdPersonAdd size={20} className="mt-0.5 shrink-0 text-secondary-700" />
+        <div>
+          <h2 className="font-semibold text-secondary-900">Sign-up without {chat}</h2>
+          <p className="text-sm text-secondary-600">
+            Let people sign up with Google or GitHub. Anyone with your sign-up page's link can ask
+            to join, and you approve each one on Members.
+          </p>
+          {!state.openSignupReady && (
+            <p className="mt-1 text-xs text-amber-700">Not available on this site yet.</p>
+          )}
+          {state.openSignupReady && on && noMethod && (
+            <p className="mt-1 text-xs text-amber-700">
+              Switch on Google or GitHub above, or nobody can sign up this way.
+            </p>
+          )}
+        </div>
+      </div>
+      <Switch
+        checked={on}
+        label={`Sign-up without ${chat} ${on ? "on" : "off"}`}
+        disabled={busy || (!on && !state.openSignupReady)}
+        onChange={onChange}
+      />
+    </Card>
   );
 }

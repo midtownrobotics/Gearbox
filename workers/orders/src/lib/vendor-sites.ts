@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 /**
  * The FRC vendors Orders knows by their sites: how a part is looked up there without the team's
  * edge box (`vendor-lookup.ts`), and their names on VendorDiff, which tracks their prices and

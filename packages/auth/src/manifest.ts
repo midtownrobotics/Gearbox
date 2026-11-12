@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { AppName } from "@g3/site-config";
 
 // What each app tells the platform about itself (roadmap 4.1). Every app has one, in
@@ -105,8 +106,10 @@ export type AppManifest = {
    * - `demo`: `POST /api/internal/teams/:id/demo`, the public demo's sample data, loaded after
    *   the nightly reset deleted the demo team's data (`delete`); and `GET /api/internal/demo/words`,
    *   the words in it, which the gateway lets demo visitors send back (@g3/demo).
+   * - `storage`: `GET /api/internal/storage`, how much it keeps in R2 for every team (a
+   *   `StorageByTeam`: bytes and file counts by team id), for the operators' console.
    */
-  hooks: { seed: boolean; delete: boolean; export: boolean; demo: boolean };
+  hooks: { seed: boolean; delete: boolean; export: boolean; demo: boolean; storage: boolean };
   /** The team's settings for this app (none for an app without any). */
   settings: AppSetting[];
   /** Its optional parts, each switched on and off inside the app. */

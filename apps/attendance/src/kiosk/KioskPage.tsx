@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { QRCodeSVG } from "qrcode.react";
 import { useEffect, useState } from "react";
 import { API, redirectToLogin } from "../shared/api";

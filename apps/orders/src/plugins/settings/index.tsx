@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { Navigate, useLocation } from "react-router-dom";
 import type { Plugin } from "../../shared/plugin-types";
 import { SettingsPage } from "./settings-page";

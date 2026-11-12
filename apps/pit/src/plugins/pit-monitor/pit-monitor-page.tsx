@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { Badge, Button, ProgressBar, pageScroller, tones, useTeamNames } from "@g3/ui";
 import type { OurSchedule } from "@g3/worker-pit/monitor-matches";
 import { type RefObject, useEffect, useLayoutEffect, useRef, useState } from "react";

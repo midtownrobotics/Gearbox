@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { NodeState } from "../../shared/progress";
 import { STATE } from "../../shared/status";
 import { layoutGraph, metricsFor } from "./layout";

@@ -1,10 +1,17 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { Button, chatName, useTeamChat } from "@g3/ui";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
+
+// Signed up with Google or GitHub (`with`): they may not be on the team's chat, so nothing says
+// they'll hear there.
+const PROVIDER_LABELS: Record<string, string> = { google: "Google", github: "GitHub" };
 
 export function PendingPage() {
   const navigate = useNavigate();
   const teamChat = useTeamChat();
   const chat = chatName(teamChat);
+  const [searchParams] = useSearchParams();
+  const provider = PROVIDER_LABELS[searchParams.get("with") ?? ""];
 
   return (
     <main className="flex-1 flex items-center justify-center px-4">
@@ -12,15 +19,24 @@ export function PendingPage() {
         <div>
           <h1 className="text-4xl text-secondary-900">Your account is waiting for approval</h1>
           <p className="mt-4 text-secondary-600 text-sm leading-relaxed space-y-3">
-            <span className="block">
-              Your account is waiting for an admin's approval. You'll get a {chat} message when it's
-              approved.
-            </span>
-            <span className="block">
-              {teamChat === "discord"
-                ? "Then come back to the sign-in page and sign in with Discord."
-                : "Then come back to the sign-in page and sign in with a new code."}
-            </span>
+            {provider ? (
+              <span className="block">
+                Your account is waiting for an admin's approval. Once it's approved, sign in with{" "}
+                {provider}.
+              </span>
+            ) : (
+              <>
+                <span className="block">
+                  Your account is waiting for an admin's approval. You'll get a {chat} message when
+                  it's approved.
+                </span>
+                <span className="block">
+                  {teamChat === "discord"
+                    ? "Then come back to the sign-in page and sign in with Discord."
+                    : "Then come back to the sign-in page and sign in with a new code."}
+                </span>
+              </>
+            )}
           </p>
         </div>
 

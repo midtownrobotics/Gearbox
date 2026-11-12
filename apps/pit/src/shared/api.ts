@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { PitApp } from "@g3/worker-pit";
 import { hc } from "hono/client";
 

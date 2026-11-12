@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { Button, Dialog, ErrorBanner, Loading } from "@g3/ui";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { LogStatus, TrimView } from "../../src/status.ts";

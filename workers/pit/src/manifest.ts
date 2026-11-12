@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { defineManifest } from "@g3/auth";
 import packageJson from "../package.json";
 
@@ -10,7 +11,7 @@ export const manifest = defineManifest({
   integrations: ["the blue alliance"],
   availability: "every team",
   version: packageJson.version,
-  hooks: { seed: false, delete: true, export: true, demo: true },
+  hooks: { seed: false, delete: true, export: true, demo: true, storage: true },
   settings: [
     {
       key: "eventKey",
@@ -43,7 +44,7 @@ export const manifest = defineManifest({
       type: "choice",
       choices: [
         { value: "skip-new", label: "Don't save new ones" },
-        { value: "delete-oldest", label: "Delete the oldest" },
+        { value: "delete-oldest", label: "Delete the oldest logs" },
       ],
       default: "skip-new",
       editedBy: "mentor",

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { redirectToSignIn } from "@g3/ui";
 import type { ReactNode } from "react";
 import { useMe } from "../../shared/me";

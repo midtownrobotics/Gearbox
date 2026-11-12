@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { type PointerEvent as ReactPointerEvent, useState } from "react";
 import type { Attendee, Change, Day, Period, Role } from "../../shared/api";
 import { roleBlock } from "../../shared/role-colors";

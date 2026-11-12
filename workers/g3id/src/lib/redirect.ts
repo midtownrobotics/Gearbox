@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { consoleUrl, teamOfHost } from "@g3/site-config";
 
 /**

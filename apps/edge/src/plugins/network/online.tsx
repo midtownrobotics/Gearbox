@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { formatAgo } from "../../shared/format";
 
 /** Green when the box sees the device on the LAN right now; nothing when it couldn't check. */

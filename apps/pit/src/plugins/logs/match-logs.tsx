@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import {
   Badge,
   Button,
@@ -55,7 +56,7 @@ function byEvent(logs: MatchLog[]) {
 
 const WHEN_FULL: { value: WhenFull; label: string }[] = [
   { value: "skip-new", label: "Don't save new ones" },
-  { value: "delete-oldest", label: "Delete the oldest" },
+  { value: "delete-oldest", label: "Delete the oldest logs" },
 ];
 
 /** How many logs Pit has of its limit, what happens when it's full, and export. */
@@ -77,9 +78,9 @@ function Storage({
           </p>
           <p className="text-secondary-500">
             {full
-              ? data.whenFull === "skip-new"
+              ? data.whenFull === "skip-new" || data.automaticDeletion === false
                 ? "Pit is full: new logs stay on the downloader until you delete some here."
-                : "Pit is full: each new log replaces the oldest."
+                : "Pit is full: a new log removes the oldest logs toward 90% usage, including recent logs. Download logs you want to keep."
               : `Pit keeps up to ${data.limit} logs.`}
           </p>
         </div>
@@ -129,12 +130,19 @@ function Storage({
         <fieldset className="mt-4 border-t border-secondary-200 pt-4">
           <legend className="sr-only">When Pit has {data.limit} logs</legend>
           <p className="mb-2 text-sm text-secondary-600">When Pit has {data.limit} logs:</p>
+          {data.automaticDeletion === false && (
+            <p className="mb-3 text-sm text-secondary-600">
+              Automatic file deletion is off for your team or could not be checked. New logs stay on
+              the downloader at capacity. A team admin can change this on Storage.
+            </p>
+          )}
           <div className="flex flex-wrap gap-x-5 gap-y-2">
             {WHEN_FULL.map((choice) => (
               <label key={choice.value} className="flex items-center gap-2 text-sm">
                 <input
                   type="radio"
                   name="when-full"
+                  disabled={data.automaticDeletion === false}
                   checked={data.whenFull === choice.value}
                   onChange={async () => {
                     try {

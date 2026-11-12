@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { defineManifest } from "@g3/auth";
 import packageJson from "../package.json";
 
@@ -13,7 +14,7 @@ export const manifest = defineManifest({
   preview:
     "Edge isn't ready for other teams yet. You're welcome to try it, but it may not work with your setup, and we can't promise help or fixes.",
   version: packageJson.version,
-  hooks: { seed: false, delete: true, export: true, demo: true },
+  hooks: { seed: false, delete: true, export: true, demo: true, storage: false },
   settings: [
     {
       key: "capBytes",

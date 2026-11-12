@@ -1,6 +1,7 @@
 {
   "name": "@g3/worker-shop",
-  "version": "4.0.0",
+  "version": "5.0.0",
+  "license": "AGPL-3.0-only",
   "private": true,
   "exports": {
     ".": "./src/index.ts",

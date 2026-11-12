@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { appTitle } from "@g3/site-config";
 import type { PrintJob, Printer } from "@g3/worker-edge/print-types";
 import { type PrintBackend, PrintError } from "./cups";

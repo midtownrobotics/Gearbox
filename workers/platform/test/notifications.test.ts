@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { env } from "cloudflare:test";
 import { exports } from "cloudflare:workers";
 import { type TestUser, asUser, teamUsers } from "@g3/testing/users";

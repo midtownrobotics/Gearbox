@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { editorPlugin } from "./plugins/editor";
 import { overviewPlugin } from "./plugins/overview";
 import { signOffPlugin } from "./plugins/sign-off";

@@ -1,5 +1,7 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import {
   foreignKey,
+  index,
   integer,
   primaryKey,
   real,
@@ -501,4 +503,41 @@ export const tierLists = sqliteTable(
     updated_at: integer("updated_at").notNull(),
   },
   (t) => [primaryKey({ columns: [t.teamId, t.id] })],
+);
+
+export const seasonExports = sqliteTable(
+  "season_exports",
+  {
+    teamId: text("team_id").notNull(),
+    id: text("id").notNull(),
+    year: integer("year").notNull(),
+    createdAt: integer("created_at").notNull(),
+    expiresAt: integer("expires_at").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.teamId, t.id] }),
+    unique().on(t.teamId),
+    index("season_exports_expiry").on(t.expiresAt),
+  ],
+);
+
+export const seasonExportParts = sqliteTable(
+  "season_export_parts",
+  {
+    teamId: text("team_id").notNull(),
+    exportId: text("export_id").notNull(),
+    part: integer("part").notNull(),
+    snapshotJSON: text("snapshot_json").notNull(),
+    archiveHash: text("archive_hash"),
+    archiveSize: integer("archive_size"),
+    resettingAt: integer("resetting_at"),
+    resultJSON: text("result_json"),
+  },
+  (t) => [
+    primaryKey({ columns: [t.teamId, t.exportId, t.part] }),
+    foreignKey({
+      columns: [t.teamId, t.exportId],
+      foreignColumns: [seasonExports.teamId, seasonExports.id],
+    }).onDelete("cascade"),
+  ],
 );

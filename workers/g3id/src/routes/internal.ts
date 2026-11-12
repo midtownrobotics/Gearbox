@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { DiscordGuild, DiscordUser } from "@g3/discord";
 import { demoTeamId } from "@g3/site-config";
 import { and, eq, inArray, isNull, ne, sql } from "drizzle-orm";
@@ -25,6 +26,7 @@ import { createHandoff } from "../lib/handoff";
 import { dmAdmins, dmMembers } from "../lib/member-dm";
 import { createSigninCode } from "../lib/slack-code";
 import { saveInstallation } from "../lib/slack-install";
+import { storagePolicy } from "../lib/storage-policy";
 import { siteTeamId } from "../lib/team";
 import { logToTeam } from "../lib/team-log";
 import type { AppEnv } from "../types";
@@ -43,6 +45,7 @@ const MEMBER_ROWS = `user_id IN ${MEMBERS}`;
 const DELETE_TEAM = [
   "DELETE FROM team_ui_settings WHERE team_id = ?1",
   "DELETE FROM team_sign_in_methods WHERE team_id = ?1",
+  "DELETE FROM team_storage_policy WHERE team_id = ?1",
   `DELETE FROM core_sessions WHERE ${MEMBER_ROWS}`,
   `DELETE FROM core_user_identities WHERE ${MEMBER_ROWS}`,
   `DELETE FROM core_user_pins WHERE team_id = ?1 OR ${MEMBER_ROWS}`,
@@ -101,6 +104,11 @@ export async function deleteTeam(env: AppEnv["Bindings"], id: string): Promise<s
 }
 
 export const internalRouter = new Hono<AppEnv>()
+  .get("/teams/:teamId/storage-policy", async (c) => {
+    c.header("Cache-Control", "private, no-store");
+    const policy = await storagePolicy(createDb(c.env.DB), c.req.param("teamId"));
+    return policy ? c.json(policy) : c.json({ error: "Team not found." }, 404);
+  })
   // A team the platform signed up. The platform keeps the team's record; G3ID keeps its id, number
   // and name, which its own tables (users, kiosks, Slack) point at.
   .put("/teams", async (c) => {
@@ -180,6 +188,32 @@ export const internalRouter = new Hono<AppEnv>()
       .where(and(ne(coreUsers.teamId, demoTeamId), isNull(coreUsers.deletedAt)))
       .all();
     return c.json(stats);
+  })
+  // How many accounts each team in ?teams= (ids, comma-separated) has, for the operators'
+  // console's Teams page and a team's page: counts only, never who. Active members, with how many
+  // are admins and mentors, and how many wait for approval. A team with none isn't listed.
+  .get("/member-counts", async (c) => {
+    const wanted = new Set((c.req.query("teams") ?? "").split(",").filter(Boolean));
+    const total = (condition: ReturnType<typeof sql>) =>
+      sql<number>`coalesce(sum(${condition}), 0)`;
+    const active = sql`${coreUsers.status} = 'active'`;
+    const rows = await createDb(c.env.DB)
+      .select({
+        teamId: coreUsers.teamId,
+        active: total(active),
+        admins: total(sql`${active} and ${coreUsers.isAdmin} = 1`),
+        mentors: total(sql`${active} and ${coreUsers.isMentor} = 1`),
+        pending: total(sql`${coreUsers.status} = 'pending'`),
+      })
+      .from(coreUsers)
+      .where(isNull(coreUsers.deletedAt))
+      .groupBy(coreUsers.teamId)
+      .all();
+    return c.json(
+      Object.fromEntries(
+        rows.filter((r) => wanted.has(r.teamId)).map(({ teamId, ...counts }) => [teamId, counts]),
+      ) as Record<string, { active: number; admins: number; mentors: number; pending: number }>,
+    );
   })
   // Accounts by id, with their team: the platform's operators (who may be on any team).
   .get("/users", async (c) => {

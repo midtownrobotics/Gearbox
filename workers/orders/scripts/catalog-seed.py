@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only
 """Builds the catalog seed migration from the FRCDesign library export (run once).
 
     python3 -m pip install openpyxl

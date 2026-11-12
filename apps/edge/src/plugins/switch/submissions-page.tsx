@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { Button, Card, ErrorBanner, Loading, Page, inputClass } from "@g3/ui";
 import type { SwitchSubmission } from "@g3/worker-edge/switch-types";
 import { useRef, useState } from "react";

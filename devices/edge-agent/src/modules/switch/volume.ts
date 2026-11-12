@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 /** Attenuate uncompressed WAV samples without changing the uploaded file. */
 export function scaleWaveVolume(source: Uint8Array, volumePercent: number): Uint8Array {
   if (!Number.isFinite(volumePercent) || volumePercent < 0 || volumePercent > 100)

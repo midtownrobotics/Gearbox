@@ -25,6 +25,8 @@ concurrency: release
 
 permissions:
   contents: write
+  # To rename the merged release PR to the version actually released.
+  pull-requests: write
 
 jobs:
   release:
@@ -55,7 +57,8 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
       - name: Apply changesets
-        run: pnpm release:version
+        id: version
+        run: pnpm release:version --github-output "$GITHUB_OUTPUT"
 
       - name: Commit the release
         id: commit
@@ -74,6 +77,21 @@ jobs:
 
       - name: Tag it
         run: pnpm release:tag --push
+
+      # The release PR was titled with the version merging would release on the day it was last
+      # updated; the version comes from the day it was merged, so give it the one released.
+      - name: Rename the release PR
+        if: steps.commit.outputs.released == 'true'
+        # Only the PR's title: never stop the release from reaching staging over it.
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TITLE: ${{ steps.version.outputs.title }}
+        run: |
+          number=$(gh api "repos/${{ github.repository }}/commits/${{ github.sha }}/pulls" --jq '.[0].number // empty')
+          if [ -n "$number" ]; then
+            gh api -X PATCH "repos/${{ github.repository }}/pulls/$number" -f title="$TITLE" --silent
+          fi
 
       - name: Merge public back into staging
         if: steps.commit.outputs.released == 'true'

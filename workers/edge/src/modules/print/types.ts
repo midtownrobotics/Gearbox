@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 /**
  * Wire types between the edge worker and the agent's print module. Plain
  * types only (no runtime imports), so the agent can import them too

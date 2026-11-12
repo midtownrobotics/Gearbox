@@ -1,8 +1,8 @@
 {
   "name": "gearbox",
   "private": true,
-  "version": "2026.10.6",
-  "license": "MIT",
+  "version": "2026.11.2",
+  "license": "AGPL-3.0-only",
   "type": "module",
   "scripts": {
     "dev": "node scripts/print-dev-ports.js",
@@ -10,6 +10,7 @@
     "lint": "biome ci .",
     "lint:tenancy": "node scripts/tenancy-lint.ts",
     "lint:text-fields": "node scripts/text-field-lint.ts",
+    "lint:license": "node scripts/license-lint.ts",
     "typecheck": "pnpm -r --if-present typecheck",
     "test": "pnpm -r --if-present test",
     "db:migrate:local": "pnpm -r --if-present db:migrate:local",

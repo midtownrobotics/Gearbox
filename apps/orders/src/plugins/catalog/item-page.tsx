@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { Button, Card, ErrorBanner, Loading, Page, SuccessBanner } from "@g3/ui";
 import { vendorDiffUrl } from "@g3/worker-orders/vendor-sites";
 import { useState } from "react";

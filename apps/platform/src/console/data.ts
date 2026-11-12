@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../api";
 
@@ -49,6 +50,10 @@ export function useLoad<T>(load: () => Promise<T>, deps: unknown[]) {
   return { data, error, reload };
 }
 
+/** The chat's name: "Slack", "Discord" or "—". */
+export const chatName = (chat: "slack" | "discord" | null) =>
+  chat === "discord" ? "Discord" : chat === "slack" ? "Slack" : "—";
+
 export type TeamStatus = "pending" | "active" | "suspended";
 
 export type TeamRow = {
@@ -57,11 +62,29 @@ export type TeamRow = {
   name: string;
   country: string;
   status: TeamStatus;
-  slackWorkspaceName: string | null;
-  discordGuildName: string | null;
+  /** Which chat it uses, never its workspace's or server's name. */
+  chat: "slack" | "discord" | null;
   createdAt: number;
   openReports: number;
+  /** Active members; null when ID couldn't say. */
+  members: number | null;
   isSite: boolean;
+};
+
+/** How much each team keeps in R2, by team id, and the apps that didn't answer. */
+export type Storage = {
+  teams: Record<string, { bytes: number; objects: number; apps: Record<string, number> }>;
+  failed: string[];
+};
+
+/** How many accounts a team has: counts only. */
+export type MemberCounts = { active: number; admins: number; mentors: number; pending: number };
+
+/** A team's member list, opened with a reason (logged, and shown to the team's admins). */
+export type MemberList = {
+  members: Member[];
+  ownerUserId: string | null;
+  founderUserId: string | null;
 };
 
 export type Member = {
@@ -106,16 +129,17 @@ export type TeamDetail = {
     name: string;
     country: string;
     status: TeamStatus;
-    slackWorkspaceName: string | null;
-    discordGuildName: string | null;
-    founder: { id: string; name: string } | null;
-    owner: { id: string; name: string } | null;
+    /** Which chat it uses, never its workspace's or server's name. */
+    chat: "slack" | "discord" | null;
+    hasOwner: boolean;
     termsAcceptedAt: number | null;
+    termsVersion: string | null;
     createdAt: number;
     updatedAt: number;
     isSite: boolean;
   };
-  members: Member[];
+  /** Null when ID couldn't say. */
+  members: MemberCounts | null;
   reports: Report[];
   actions: Action[];
 };
@@ -140,6 +164,19 @@ export type BlockedReporter = {
 
 export const formatTime = (seconds: number | null | undefined) =>
   seconds ? new Date(seconds * 1000).toLocaleString() : "—";
+
+/** A size in bytes, as KB, MB or GB (1,000s). */
+export function formatBytes(bytes: number): string {
+  if (bytes < 1000) return `${bytes} B`;
+  const units = ["KB", "MB", "GB", "TB"];
+  let value = bytes;
+  let unit = -1;
+  while (value >= 1000 && unit < units.length - 1) {
+    value /= 1000;
+    unit += 1;
+  }
+  return `${value.toLocaleString(undefined, { maximumFractionDigits: value < 10 ? 1 : 0 })} ${units[unit]}`;
+}
 
 export const formatDate = (seconds: number | null | undefined) =>
   seconds ? new Date(seconds * 1000).toLocaleDateString() : "—";

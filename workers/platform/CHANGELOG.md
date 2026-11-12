@@ -1,5 +1,87 @@
 # @g3/worker-platform
 
+## 4.3.0
+
+### Minor Changes
+
+- 793fccb: The operators' console has a Cloudflare page: this month's usage against the plan, an estimated bill, warnings near a limit, traffic, security events and deploys.
+- 0049e87: Gearbox's operators see each team's member count and how much its apps store, and a team's page no longer shows its members' names or emails unless an operator opens the member list with a reason. Admins see the two apart: Operator Access lists when operators opened the team's details, and the new Member Access page lists when they opened its member list.
+- c0bf6ae: Export a Scouting game season with its files, verify saved backups, and optionally reset only the backed-up data. Apply Scouting migration 0043 before deploying.
+- c0bf6ae: Admins can check storage usage, review files eligible for cleanup, and download individual files or whole archives from Portal's Storage page. Warn admins at 90%, 95%, and 100%, without repeating warnings after cleanup to 90%. Apply each file-storing app's storage usage notice migration before deploying.
+- c0bf6ae: Choose on Storage whether a full allowance deletes the oldest files or keeps every file and stops uploads. Warnings reflect that choice without repeating on rejected uploads or mode changes. Apply ID migration 0024 before deployment.
+
+### Patch Changes
+
+- 9b7cfe8: Console: the Cloudflare page counts usage over the plan's billing period, shows each meter's percent of the plan, shows security events on Free plan zones, sorts its tables by any column, and lays out each zone in its own box with its lists boxed.
+- 22f08ad: The operators' console opens a team only after the operator gives a reason, in a dialog that says what the team's details hold and that the team's admins will see it on their Operator Access page.
+- Updated dependencies [c0bf6ae]
+- Updated dependencies [0049e87]
+- Updated dependencies [72f42fa]
+- Updated dependencies [c0bf6ae]
+- Updated dependencies [ee6ad4f]
+- Updated dependencies [b52c837]
+- Updated dependencies [c0bf6ae]
+- Updated dependencies [b52c837]
+- Updated dependencies [c0bf6ae]
+- Updated dependencies [c0bf6ae]
+- Updated dependencies [ec78275]
+  - @g3/worker-scouting@4.0.0
+  - @g3/worker-portal@2.6.0
+  - @g3/worker-g3id@5.0.0
+  - @g3/worker-pit@4.0.0
+  - @g3/worker-shop@5.0.0
+  - @g3/worker-attendance@2.2.3
+  - @g3/worker-edge@2.4.3
+  - @g3/worker-inventory@1.2.3
+  - @g3/worker-orders@2.4.0
+  - @g3/worker-schedule@0.4.3
+  - @g3/worker-skill-tree@2.2.3
+
+## 4.2.0
+
+### Minor Changes
+
+- f340efe: Gearbox is now licensed under the GNU AGPL, version 3, and every app's menu links to its source code. Sign-up records which version of the terms a team accepted, and a team's owner is asked on the home page to accept new terms when they change. Deployers: apply the platform's migration `0017_terms_version.sql` first.
+
+### Patch Changes
+
+- 20a9929: Trying the public demo no longer makes "My team" on the Gearbox site open the demo instead of your own team.
+- Updated dependencies [f340efe]
+- Updated dependencies [20a9929]
+- Updated dependencies [f340efe]
+  - @g3/worker-portal@2.5.0
+  - @g3/worker-g3id@4.2.1
+  - @g3/worker-shop@4.0.2
+  - @g3/worker-pit@3.2.2
+  - @g3/worker-orders@2.3.2
+  - @g3/worker-edge@2.4.2
+  - @g3/worker-scouting@3.1.2
+  - @g3/worker-skill-tree@2.2.2
+  - @g3/worker-attendance@2.2.2
+  - @g3/worker-inventory@1.2.2
+  - @g3/worker-schedule@0.4.2
+
+## 4.1.1
+
+### Patch Changes
+
+- d290b48: Edge now says, in the app, on Manage Apps and in its docs, that it isn't ready for other teams yet. The team's log has its own Log page in the admin pages, instead of being under Manage Apps.
+- Updated dependencies [283a5c1]
+- Updated dependencies [d290b48]
+- Updated dependencies [2f1f49c]
+- Updated dependencies [4cad0fc]
+  - @g3/worker-portal@2.4.0
+  - @g3/worker-g3id@4.2.0
+  - @g3/worker-edge@2.4.1
+  - @g3/worker-inventory@1.2.1
+  - @g3/worker-attendance@2.2.1
+  - @g3/worker-orders@2.3.1
+  - @g3/worker-pit@3.2.1
+  - @g3/worker-schedule@0.4.1
+  - @g3/worker-scouting@3.1.1
+  - @g3/worker-shop@4.0.1
+  - @g3/worker-skill-tree@2.2.1
+
 ## 4.1.0
 
 ### Minor Changes

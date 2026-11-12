@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { consoleUrl, site, teamAppUrl } from "@g3/site-config";
 import { versionLabel } from "@g3/site-config/versions";
 import {
@@ -26,7 +27,8 @@ type Me = { user: { id: string; displayName: string; email: string }; isOperator
 const PAGES = [
   { to: "/console", label: "Teams" },
   { to: "/console/stats", label: "Stats" },
-  { to: "/console/reports", label: "Reports" },
+  { to: "/console/cloudflare", label: "Cloudflare" },
+  { to: "/console/reports", label: "Number Reports" },
   { to: "/console/reporters", label: "Reporters" },
   { to: "/console/visitors", label: "Visitors" },
   { to: "/console/notifications", label: "Notifications" },

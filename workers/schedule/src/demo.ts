@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { withTeam } from "@g3/auth";
 import { DEMO_PEOPLE, type DemoPerson, demoDate, vocabularyOf } from "@g3/demo";
 import { site } from "@g3/site-config";

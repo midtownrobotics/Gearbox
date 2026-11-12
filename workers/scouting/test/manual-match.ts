@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { withTeam } from "@g3/auth";
 import { createDb } from "../src/db";
 import { manualEvents, manualMatches } from "../src/db/schema";

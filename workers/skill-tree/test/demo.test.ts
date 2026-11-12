@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { demoTeamId } from "@g3/site-config";
 import { checkDemoHook } from "@g3/testing/demo";
 import { call } from "@g3/testing/worker";

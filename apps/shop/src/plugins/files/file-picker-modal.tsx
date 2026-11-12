@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { Button, Dialog, TextField, focusRing, inputClass } from "@g3/ui";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { batchMembers } from "../../shared/batches";

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { inTeam } from "@g3/auth";
 import type { EdgeDb } from "../db";
 import { edgeBoxes } from "../db/schema";

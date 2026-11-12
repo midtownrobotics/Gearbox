@@ -1,4 +1,14 @@
-import { deleteTeamRows, exportTeamRows, teamExport } from "@g3/auth";
+// SPDX-License-Identifier: AGPL-3.0-only
+import {
+  clearTeamStorageLock,
+  deleteTeamRows,
+  downloadStorageFile,
+  exportTeamRows,
+  storageArchive,
+  storageArchiveSelection,
+  storageByTeam,
+  teamExport,
+} from "@g3/auth";
 import { isDemoTeam } from "@g3/demo";
 import { Hono } from "hono";
 import { createShopDb } from "../db";
@@ -34,6 +44,7 @@ import { onshapeConfig } from "../lib/onshape-config";
 import { unregisterOnShapeWebhooks } from "../lib/onshape-webhook";
 import { SETTING } from "../lib/settings";
 import { teamPrefix } from "../lib/storage";
+import { shopStorageReport } from "../lib/storage-report";
 import { shopUrl } from "../lib/urls";
 import { manifest } from "../manifest";
 import type { AppEnv } from "../types";
@@ -61,9 +72,33 @@ export const internalRouter = new Hono<AppEnv>()
     return c.json(await loadDemo(c.env, teamId));
   })
   .get("/demo/words", (c) => c.json({ words: demoWords() }))
+  // How much every team keeps in R2 (drawings and part files, under teams/<team>/), for the
+  // operators' console. Counts only.
+  .get("/storage", async (c) => c.json({ teams: await storageByTeam(c.env.DRAWINGS, "teams/") }))
   // The team's data, for its admins to download before switching Shop off (the platform's app
   // library): every row, and a list of its files in R2 (drawings, part files), which stay there
   // until the data is deleted. Onshape's keys are left out.
+  .get("/teams/:teamId/storage", async (c) =>
+    c.json(await shopStorageReport(c.env, c.req.param("teamId"))),
+  )
+  .get("/teams/:teamId/storage/archive", async (c) => {
+    const report = await shopStorageReport(c.env, c.req.param("teamId"));
+    const files = report.allowances[0].files.filter(
+      (f) => c.req.query("eligible") !== "1" || f.eligible,
+    );
+    return storageArchive(
+      c.env.DRAWINGS,
+      storageArchiveSelection(files, c.req.query("from"), c.req.query("to")),
+      "shop-files",
+    );
+  })
+  .get("/teams/:teamId/storage/download", (c) =>
+    downloadStorageFile(
+      c.env.DRAWINGS,
+      `teams/${encodeURIComponent(c.req.param("teamId"))}/`,
+      c.req.query("key") ?? "",
+    ),
+  )
   .get("/teams/:teamId/export", async (c) => {
     const teamId = c.req.param("teamId");
     const db = createShopDb(c.env.SHOP_DB);
@@ -164,5 +199,6 @@ export const internalRouter = new Hono<AppEnv>()
       onshapeApiUsage,
       onshapeApiErrors,
     ]);
+    await clearTeamStorageLock(c.env.SHOP_DB, teamId);
     return c.json({ ok: true });
   });

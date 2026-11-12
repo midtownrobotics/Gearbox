@@ -1,4 +1,5 @@
-import { inTeam, requestTeamId, withTeam } from "@g3/auth";
+// SPDX-License-Identifier: AGPL-3.0-only
+import { inTeam, requestTeamId, storageLimitResponse, withTeam } from "@g3/auth";
 import { corsOrigin } from "@g3/site-config";
 import { withApiPrefix } from "@g3/site-config/worker";
 import { and, eq, gt, sql } from "drizzle-orm";
@@ -31,8 +32,10 @@ import {
   teamComments as teamCommentsTable,
   tierLists,
 } from "./db/schema";
+import { drawingResponse, validateDrawingUpload } from "./drawing-storage";
 import { getEngagementSettings } from "./engagement";
 import { engagementRoutes } from "./engagement-routes";
+import { FIELD_DRAWING_TYPE } from "./field-drawing";
 import { internalRoutes } from "./internal";
 import { getManualMatches, manualRoutes, purgeExpiredManualEvents } from "./manual";
 import {
@@ -52,11 +55,13 @@ import { requireAuth } from "./middleware/auth";
 import { predictionsRoutes, settleConfiguredGame } from "./predictions";
 import { getG3IdUsers, isServiceHelper, isStrategyAdmin } from "./roles";
 import { assignmentCandidates } from "./scout-assignments";
+import { expireSeasonExports } from "./season-exports";
 import {
   type ServiceIssueType,
   describeServiceIssue,
   parseServiceIssueTypes,
 } from "./service-issues";
+import { storeScoutingFiles } from "./storage-limit";
 import { teamSettingsRouter } from "./team-settings";
 import type { AppEnv, TbaMatch, TbaTeam } from "./types";
 import { finiteNumber, id, parseJson, stringArray, teamNumber, text } from "./utils";
@@ -80,6 +85,8 @@ type ScoutingField = {
 const app = new Hono<AppEnv>();
 
 app.onError((error, c) => {
+  const storage = storageLimitResponse(error);
+  if (storage) return storage;
   console.error("[scouting]", error);
   return c.json({ error: "Internal server error." }, 500);
 });
@@ -1360,168 +1367,173 @@ app.post("/scouting-forms/:id/submissions", requireAuth, async (c) => {
     else cleanAnswers[field.id] = text(value, 3000);
   }
   const submissionId = id("submission");
-  const drawing = form.get("drawing");
+  let drawing = form.get("drawing");
   let drawingKey: string | null = null;
   let drawingType: string | null = null;
   const drawingFields: Record<string, { key: string; contentType: string }> = {};
+  const uploads: { key: string; file: File }[] = [];
   if (drawing instanceof File && drawing.size > 0) {
-    if (!drawing.type.startsWith("image/") || drawing.size > 12 * 1024 * 1024)
-      return c.json({ error: "The field drawing must be an image under 12 MB." }, 400);
-    drawingKey = `teams/${encodeURIComponent(c.get("teamId"))}/scouting-submissions/${submissionId}.png`;
+    try {
+      drawing = await validateDrawingUpload(drawing);
+    } catch (error) {
+      return c.json({ error: (error as Error).message }, 400);
+    }
+    drawingKey = `teams/${encodeURIComponent(c.get("teamId"))}/scouting-submissions/${submissionId}.${drawing.type === FIELD_DRAWING_TYPE ? "json" : "png"}`;
     drawingType = drawing.type;
-    await c.env.FIELD_MAPS.put(drawingKey, await drawing.arrayBuffer(), {
-      httpMetadata: { contentType: drawing.type },
-    });
+    uploads.push({ key: drawingKey, file: drawing });
   }
   for (const field of fields.filter((candidate) => candidate.type === "fieldMap")) {
     if (cleanAnswers[field.id] === "no-minimal-movement") continue;
-    const fieldDrawing = form.get(`drawing:${field.id}`);
+    let fieldDrawing = form.get(`drawing:${field.id}`);
     if (!(fieldDrawing instanceof File) || fieldDrawing.size === 0) {
       if (field.required || formDefinition.form_kind === "scouting")
         return c.json({ error: `${field.label} is required.` }, 400);
       continue;
     }
-    if (!fieldDrawing.type.startsWith("image/") || fieldDrawing.size > 12 * 1024 * 1024)
-      return c.json({ error: "Field drawings must be images under 12 MB." }, 400);
-    const key = `teams/${encodeURIComponent(c.get("teamId"))}/scouting-submissions/${submissionId}/${field.id}.png`;
-    await c.env.FIELD_MAPS.put(key, await fieldDrawing.arrayBuffer(), {
-      httpMetadata: { contentType: fieldDrawing.type },
-    });
+    try {
+      fieldDrawing = await validateDrawingUpload(fieldDrawing);
+    } catch (error) {
+      return c.json({ error: (error as Error).message }, 400);
+    }
+    const key = `teams/${encodeURIComponent(c.get("teamId"))}/scouting-submissions/${submissionId}/${field.id}.${fieldDrawing.type === FIELD_DRAWING_TYPE ? "json" : "png"}`;
+    uploads.push({ key, file: fieldDrawing });
     drawingFields[field.id] = { key, contentType: fieldDrawing.type };
   }
-  const submittedAt = Date.now();
-  if (formDefinition.form_kind === "scouting") {
-    // The schedule can move while drawings upload: check again, and record a report as late if it
-    // became late meanwhile.
-    const latest = await resolveEventLink(c, true);
-    const latestTarget = await reportMatch(c, latest, reportMatchKey);
-    const latestAssignment = await dbOf(c)
-      .select({ teamNumber: scoutingMatchAssignments.team_number })
-      .from(scoutingMatchAssignments)
-      .where(
-        and(
-          inTeam(scoutingMatchAssignments, c.get("teamId")),
-          eq(scoutingMatchAssignments.event_key, reportEvent.eventKey as string),
-          eq(scoutingMatchAssignments.match_number, reportEvent.matchNumber as number),
-          eq(scoutingMatchAssignments.user_id, c.get("userId")),
-        ),
-      )
-      .get();
-    if ("match" in latestTarget) reportEvent.late = reportEvent.late || latestTarget.late;
-    // The lineup checked is the report's own match, which for a late one isn't the current match.
-    if (
-      latestAssignment?.teamNumber !== teamName ||
-      "error" in latestTarget ||
-      latestTarget.match.key !== reportEvent.matchKey ||
-      !publicMatch(latestTarget.match).teams.includes(teamName) ||
-      latest.eventKey !== reportEvent.eventKey
-    ) {
-      const keys = [
-        drawingKey,
-        ...Object.values(drawingFields).map((drawing) => drawing.key),
-      ].filter((key): key is string => Boolean(key));
-      if (keys.length) await c.env.FIELD_MAPS.delete(keys);
-      return c.json(
-        {
-          error:
-            "error" in latestTarget
-              ? latestTarget.error
-              : "The match changed. Refresh the form before submitting.",
-        },
-        409,
-      );
-    }
-  }
-  const submissionStatement = dbOf(c)
-    .insert(scoutingFormSubmissions)
-    .values(
-      withTeam(c.get("teamId"), {
-        id: submissionId,
-        form_id: c.req.param("id"),
-        fields_json: formDefinition.fields_json,
-        answers_json: JSON.stringify(cleanAnswers),
-        drawing_r2_key: drawingKey,
-        drawing_content_type: drawingType,
-        submitted_by: c.get("userId"),
-        submitted_by_name: c.get("userDisplayName"),
-        created_at: submittedAt,
-        team_name: teamName,
-        drawing_fields_json: JSON.stringify(drawingFields),
-        event_key: reportEvent.eventKey,
-        match_key: reportEvent.matchKey,
-        match_number: reportEvent.matchNumber,
-        submitted_late: reportEvent.late ? 1 : 0,
-      }),
-    );
-  let boyleBucksAwarded = 0;
-  try {
-    if (
-      formDefinition.form_kind === "scouting" &&
-      (await getEngagementSettings(c.env.SCOUTING_DB, c.get("teamId"))).enabled
-    ) {
-      const rewardReference = `submission:${submissionId}`;
-      await batch(dbOf(c), [
-        submissionStatement,
-        dbOf(c)
-          .insert(boylebucksAccounts)
-          .values(
-            withTeam(c.get("teamId"), {
-              user_id: c.get("userId"),
-              display_name: c.get("userDisplayName"),
-              balance: 0,
-              earned: 0,
-              wagered: 0,
-              updated_at: submittedAt,
-            }),
-          )
-          .onConflictDoUpdate({
-            target: [boylebucksAccounts.teamId, boylebucksAccounts.user_id],
-            set: { display_name: sql`excluded.display_name` },
-          }),
-        dbOf(c)
-          .update(boylebucksAccounts)
-          .set({ balance: sql`balance + 10`, earned: sql`earned + 10`, updated_at: submittedAt })
-          .where(
-            inTeam(
-              boylebucksAccounts,
-              c.get("teamId"),
-              sql`user_id = ${c.get("userId")}
-              AND NOT EXISTS (SELECT 1 FROM (SELECT * FROM ${boylebucksLedger} WHERE ${inTeam(boylebucksLedger, c.get("teamId"))}) AS scoped_boylebucks_ledger WHERE reference_id = ${rewardReference})`,
-            ),
+  return storeScoutingFiles(c.env, c.get("teamId"), uploads, async () => {
+    const submittedAt = Date.now();
+    if (formDefinition.form_kind === "scouting") {
+      // The schedule can move while drawings upload: check again, and record a report as late if it
+      // became late meanwhile.
+      const latest = await resolveEventLink(c, true);
+      const latestTarget = await reportMatch(c, latest, reportMatchKey);
+      const latestAssignment = await dbOf(c)
+        .select({ teamNumber: scoutingMatchAssignments.team_number })
+        .from(scoutingMatchAssignments)
+        .where(
+          and(
+            inTeam(scoutingMatchAssignments, c.get("teamId")),
+            eq(scoutingMatchAssignments.event_key, reportEvent.eventKey as string),
+            eq(scoutingMatchAssignments.match_number, reportEvent.matchNumber as number),
+            eq(scoutingMatchAssignments.user_id, c.get("userId")),
           ),
-        dbOf(c)
-          .insert(boylebucksLedger)
-          .values(
-            withTeam(c.get("teamId"), {
-              id: id("ledger"),
-              user_id: c.get("userId"),
-              amount: 10,
-              reason: "Valid scouting form",
-              reference_id: rewardReference,
-              created_at: submittedAt,
-            }),
-          )
-          .onConflictDoNothing(),
-      ]);
-      boyleBucksAwarded = 10;
-    } else {
-      await submissionStatement.run();
+        )
+        .get();
+      if ("match" in latestTarget) reportEvent.late = reportEvent.late || latestTarget.late;
+      // The lineup checked is the report's own match, which for a late one isn't the current match.
+      if (
+        latestAssignment?.teamNumber !== teamName ||
+        "error" in latestTarget ||
+        latestTarget.match.key !== reportEvent.matchKey ||
+        !publicMatch(latestTarget.match).teams.includes(teamName) ||
+        latest.eventKey !== reportEvent.eventKey
+      ) {
+        const keys = [
+          drawingKey,
+          ...Object.values(drawingFields).map((drawing) => drawing.key),
+        ].filter((key): key is string => Boolean(key));
+        if (keys.length) await c.env.FIELD_MAPS.delete(keys);
+        return c.json(
+          {
+            error:
+              "error" in latestTarget
+                ? latestTarget.error
+                : "The match changed. Refresh the form before submitting.",
+          },
+          409,
+        );
+      }
     }
-  } catch (error) {
-    const uploadedKeys = [
-      drawingKey,
-      ...Object.values(drawingFields).map((item) => item.key),
-    ].filter((key): key is string => Boolean(key));
-    if (uploadedKeys.length) await c.env.FIELD_MAPS.delete(uploadedKeys);
-    if (
-      `${String(error)} ${error instanceof Error ? String(error.cause) : ""}`.includes(
-        "one scouting submission per match",
+    const submissionStatement = dbOf(c)
+      .insert(scoutingFormSubmissions)
+      .values(
+        withTeam(c.get("teamId"), {
+          id: submissionId,
+          form_id: c.req.param("id"),
+          fields_json: formDefinition.fields_json,
+          answers_json: JSON.stringify(cleanAnswers),
+          drawing_r2_key: drawingKey,
+          drawing_content_type: drawingType,
+          submitted_by: c.get("userId"),
+          submitted_by_name: c.get("userDisplayName"),
+          created_at: submittedAt,
+          team_name: teamName,
+          drawing_fields_json: JSON.stringify(drawingFields),
+          event_key: reportEvent.eventKey,
+          match_key: reportEvent.matchKey,
+          match_number: reportEvent.matchNumber,
+          submitted_late: reportEvent.late ? 1 : 0,
+        }),
+      );
+    let boyleBucksAwarded = 0;
+    try {
+      if (
+        formDefinition.form_kind === "scouting" &&
+        (await getEngagementSettings(c.env.SCOUTING_DB, c.get("teamId"))).enabled
+      ) {
+        const rewardReference = `submission:${submissionId}`;
+        await batch(dbOf(c), [
+          submissionStatement,
+          dbOf(c)
+            .insert(boylebucksAccounts)
+            .values(
+              withTeam(c.get("teamId"), {
+                user_id: c.get("userId"),
+                display_name: c.get("userDisplayName"),
+                balance: 0,
+                earned: 0,
+                wagered: 0,
+                updated_at: submittedAt,
+              }),
+            )
+            .onConflictDoUpdate({
+              target: [boylebucksAccounts.teamId, boylebucksAccounts.user_id],
+              set: { display_name: sql`excluded.display_name` },
+            }),
+          dbOf(c)
+            .update(boylebucksAccounts)
+            .set({ balance: sql`balance + 10`, earned: sql`earned + 10`, updated_at: submittedAt })
+            .where(
+              inTeam(
+                boylebucksAccounts,
+                c.get("teamId"),
+                sql`user_id = ${c.get("userId")}
+              AND NOT EXISTS (SELECT 1 FROM (SELECT * FROM ${boylebucksLedger} WHERE ${inTeam(boylebucksLedger, c.get("teamId"))}) AS scoped_boylebucks_ledger WHERE reference_id = ${rewardReference})`,
+              ),
+            ),
+          dbOf(c)
+            .insert(boylebucksLedger)
+            .values(
+              withTeam(c.get("teamId"), {
+                id: id("ledger"),
+                user_id: c.get("userId"),
+                amount: 10,
+                reason: "Valid scouting form",
+                reference_id: rewardReference,
+                created_at: submittedAt,
+              }),
+            )
+            .onConflictDoNothing(),
+        ]);
+        boyleBucksAwarded = 10;
+      } else {
+        await submissionStatement.run();
+      }
+    } catch (error) {
+      const uploadedKeys = [
+        drawingKey,
+        ...Object.values(drawingFields).map((item) => item.key),
+      ].filter((key): key is string => Boolean(key));
+      if (uploadedKeys.length) await c.env.FIELD_MAPS.delete(uploadedKeys);
+      if (
+        `${String(error)} ${error instanceof Error ? String(error.cause) : ""}`.includes(
+          "one scouting submission per match",
+        )
       )
-    )
-      return c.json({ error: "You already submitted this form for this match." }, 409);
-    throw error;
-  }
-  return c.json({ id: submissionId, boyleBucksAwarded, late: reportEvent.late }, 201);
+        return c.json({ error: "You already submitted this form for this match." }, 409);
+      throw error;
+    }
+    return c.json({ id: submissionId, boyleBucksAwarded, late: reportEvent.late }, 201);
+  });
 });
 
 app.get("/scouting-forms/:id/submissions", requireAuth, async (c) => {
@@ -1556,12 +1568,7 @@ app.get("/scouting-submissions/:id/drawing", requireAuth, async (c) => {
   if (!row?.drawing_r2_key) return c.json({ error: "Drawing not found." }, 404);
   const object = await c.env.FIELD_MAPS.get(row.drawing_r2_key);
   if (!object) return c.json({ error: "Drawing not found." }, 404);
-  return new Response(object.body, {
-    headers: {
-      "Content-Type": row.drawing_content_type ?? "image/png",
-      "Cache-Control": "private, max-age=300",
-    },
-  });
+  return drawingResponse(object, row.drawing_content_type ?? "image/png");
 });
 
 app.get("/scouting-submissions/:id/drawings/:fieldId", requireAuth, async (c) => {
@@ -1576,9 +1583,7 @@ app.get("/scouting-submissions/:id/drawings/:fieldId", requireAuth, async (c) =>
   if (!drawing) return c.json({ error: "Drawing not found." }, 404);
   const object = await c.env.FIELD_MAPS.get(drawing.key);
   if (!object) return c.json({ error: "Drawing not found." }, 404);
-  return new Response(object.body, {
-    headers: { "Content-Type": drawing.contentType, "Cache-Control": "private, max-age=300" },
-  });
+  return drawingResponse(object, drawing.contentType);
 });
 
 app.get("/tier-lists", requireAuth, async (c) => {
@@ -2018,39 +2023,48 @@ app.post("/field-maps", requireAuth, async (c) => {
     return c.json({ error: "You do not have permission to share field maps." }, 403);
   }
   const form = await c.req.formData();
-  const image = form.get("image");
+  let image = form.get("image");
   const name = text(form.get("name"), 120);
-  if (!(image instanceof File) || !image.type.startsWith("image/") || !name) {
+  if (!(image instanceof File) || !name) {
     return c.json({ error: "A name and image are required." }, 400);
   }
-  if (image.size > 12 * 1024 * 1024) {
+  if (image instanceof File && image.size > 12 * 1024 ** 2)
     return c.json({ error: "Images must be smaller than 12 MB." }, 413);
+  try {
+    image = await validateDrawingUpload(image, true);
+  } catch (error) {
+    return c.json({ error: (error as Error).message }, 400);
   }
 
   const recordId = id("map");
-  const extension = image.type === "image/jpeg" ? "jpg" : "png";
+  const extension =
+    image.type === FIELD_DRAWING_TYPE ? "json" : image.type === "image/jpeg" ? "jpg" : "png";
   const key = `teams/${encodeURIComponent(c.get("teamId"))}/field-maps/${recordId}.${extension}`;
-  await c.env.FIELD_MAPS.put(key, await image.arrayBuffer(), {
-    httpMetadata: { contentType: image.type },
+  return storeScoutingFiles(c.env, c.get("teamId"), [{ key, file: image }], async () => {
+    const now = Date.now();
+    try {
+      await dbOf(c)
+        .insert(fieldMaps)
+        .values(
+          withTeam(c.get("teamId"), {
+            id: recordId,
+            name: name,
+            event_name: text(form.get("eventName"), 120),
+            notes: text(form.get("notes"), 2000),
+            r2_key: key,
+            content_type: image.type,
+            created_by: c.get("userId"),
+            created_at: now,
+            updated_at: now,
+          }),
+        )
+        .run();
+    } catch (error) {
+      if (key) await c.env.FIELD_MAPS.delete(key);
+      throw error;
+    }
+    return c.json({ id: recordId }, 201);
   });
-  const now = Date.now();
-  await dbOf(c)
-    .insert(fieldMaps)
-    .values(
-      withTeam(c.get("teamId"), {
-        id: recordId,
-        name: name,
-        event_name: text(form.get("eventName"), 120),
-        notes: text(form.get("notes"), 2000),
-        r2_key: key,
-        content_type: image.type,
-        created_by: c.get("userId"),
-        created_at: now,
-        updated_at: now,
-      }),
-    )
-    .run();
-  return c.json({ id: recordId }, 201);
 });
 
 app.get("/field-maps/:id/image", requireAuth, async (c) => {
@@ -2061,12 +2075,7 @@ app.get("/field-maps/:id/image", requireAuth, async (c) => {
   if (!map) return c.json({ error: "Map not found." }, 404);
   const object = await c.env.FIELD_MAPS.get(map.r2_key);
   if (!object) return c.json({ error: "Image not found." }, 404);
-  return new Response(object.body, {
-    headers: {
-      "Content-Type": map.content_type,
-      "Cache-Control": "private, max-age=300",
-    },
-  });
+  return drawingResponse(object, map.content_type);
 });
 
 app.delete("/field-maps/:id", requireAuth, async (c) => {
@@ -2116,12 +2125,15 @@ app.post("/autos", requireAuth, async (c) => {
   const autoTeam = rawTeam ? teamNumber(rawTeam) : "";
   if (rawTeam && !autoTeam) return c.json({ error: "Team must be a valid team number." }, 400);
 
-  const image = form.get("image");
-  if (image instanceof File && !image.type.startsWith("image/")) {
-    return c.json({ error: "The optional upload must be an image." }, 400);
-  }
-  if (image instanceof File && image.size > 12 * 1024 * 1024) {
+  let image = form.get("image");
+  if (image instanceof File && image.size > 12 * 1024 ** 2)
     return c.json({ error: "Images must be smaller than 12 MB." }, 413);
+  if (image instanceof File && image.size > 0) {
+    try {
+      image = await validateDrawingUpload(image);
+    } catch (error) {
+      return c.json({ error: (error as Error).message }, 400);
+    }
   }
 
   const recordId = id("auto");
@@ -2129,35 +2141,45 @@ app.post("/autos", requireAuth, async (c) => {
   let imageKey: string | null = null;
   let imageContentType: string | null = null;
   if (image instanceof File && image.size > 0) {
-    const extension = image.type === "image/jpeg" ? "jpg" : "png";
+    const extension =
+      image.type === FIELD_DRAWING_TYPE ? "json" : image.type === "image/jpeg" ? "jpg" : "png";
     imageKey = `teams/${encodeURIComponent(c.get("teamId"))}/auto-images/${recordId}.${extension}`;
     imageContentType = image.type;
-    await c.env.FIELD_MAPS.put(imageKey, await image.arrayBuffer(), {
-      httpMetadata: { contentType: image.type },
-    });
   }
 
-  const steps = parseJson<unknown>(form.get("steps"), []);
-  await dbOf(c)
-    .insert(autoRoutines)
-    .values(
-      withTeam(c.get("teamId"), {
-        id: recordId,
-        name: name,
-        robot_name: autoTeam,
-        start_position: "",
-        summary: text(form.get("description"), 2000),
-        steps_json: JSON.stringify(stringArray(steps)),
-        tags_json: "[]",
-        image_r2_key: imageKey,
-        image_content_type: imageContentType,
-        created_by: c.get("userId"),
-        created_at: now,
-        updated_at: now,
-      }),
-    )
-    .run();
-  return c.json({ id: recordId }, 201);
+  return storeScoutingFiles(
+    c.env,
+    c.get("teamId"),
+    imageKey && image instanceof File ? [{ key: imageKey, file: image }] : [],
+    async () => {
+      const steps = parseJson<unknown>(form.get("steps"), []);
+      try {
+        await dbOf(c)
+          .insert(autoRoutines)
+          .values(
+            withTeam(c.get("teamId"), {
+              id: recordId,
+              name: name,
+              robot_name: autoTeam,
+              start_position: "",
+              summary: text(form.get("description"), 2000),
+              steps_json: JSON.stringify(stringArray(steps)),
+              tags_json: "[]",
+              image_r2_key: imageKey,
+              image_content_type: imageContentType,
+              created_by: c.get("userId"),
+              created_at: now,
+              updated_at: now,
+            }),
+          )
+          .run();
+      } catch (error) {
+        if (imageKey) await c.env.FIELD_MAPS.delete(imageKey);
+        throw error;
+      }
+      return c.json({ id: recordId }, 201);
+    },
+  );
 });
 
 app.get("/autos/:id/image", requireAuth, async (c) => {
@@ -2168,12 +2190,7 @@ app.get("/autos/:id/image", requireAuth, async (c) => {
   if (!auto?.image_r2_key) return c.json({ error: "Image not found." }, 404);
   const object = await c.env.FIELD_MAPS.get(auto.image_r2_key);
   if (!object) return c.json({ error: "Image not found." }, 404);
-  return new Response(object.body, {
-    headers: {
-      "Content-Type": auto.image_content_type ?? "image/png",
-      "Cache-Control": "private, max-age=300",
-    },
-  });
+  return drawingResponse(object, auto.image_content_type ?? "image/png");
 });
 
 app.delete("/autos/:id", requireAuth, async (c) => {
@@ -2411,5 +2428,6 @@ export default {
   fetch: withApiPrefix(worker.fetch),
   scheduled: (_event: ScheduledController, env: AppEnv["Bindings"], ctx: ExecutionContext) => {
     ctx.waitUntil(settleConfiguredGame(env, purgeExpiredManualEvents));
+    ctx.waitUntil(expireSeasonExports(env));
   },
 };

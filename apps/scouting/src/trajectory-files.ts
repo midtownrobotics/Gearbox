@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+import { fieldDrawingFile, trajectoryFieldDrawing } from "@g3/worker-scouting/field-drawing";
+
 export type TrajectoryPoint = { x: number; y: number };
 export type ParsedTrajectory = {
   format: "Choreo" | "PathPlanner";
@@ -101,65 +104,10 @@ export async function parseTrajectoryFile(file: File): Promise<ParsedTrajectory>
   };
 }
 
-const FIELD_WIDTH = 8.0692;
-const FIELD_VIEWBOX = { x: -0.5, y: -0.5, width: 17.541, height: 9.0692 };
-
-export async function trajectoryToPng(trajectory: ParsedTrajectory): Promise<File> {
-  const canvas = document.createElement("canvas");
-  canvas.width = 1400;
-  canvas.height = Math.round((canvas.width * FIELD_VIEWBOX.height) / FIELD_VIEWBOX.width);
-  const context = canvas.getContext("2d");
-  if (!context) return Promise.reject(new Error("Canvas is unavailable."));
-  const px = (x: number) => ((x - FIELD_VIEWBOX.x) / FIELD_VIEWBOX.width) * canvas.width;
-  const py = (y: number) =>
-    ((FIELD_WIDTH - y - FIELD_VIEWBOX.y) / FIELD_VIEWBOX.height) * canvas.height;
-
-  const field = new Image();
-  field.src = "/field-2026.svg";
-  await new Promise<void>((resolve, reject) => {
-    field.onload = () => resolve();
-    field.onerror = () => reject(new Error("Could not load the 2026 field background."));
-  });
-  // The path and its end are drawn in the team's brand color (colors.css).
+export function trajectoryToDrawing(trajectory: ParsedTrajectory, color?: string): File {
   const brand =
-    getComputedStyle(document.documentElement).getPropertyValue("--g3-brand").trim() || "#a32035";
-  context.fillStyle = "#17191d";
-  context.fillRect(0, 0, canvas.width, canvas.height);
-  context.drawImage(field, 0, 0, canvas.width, canvas.height);
-  context.strokeStyle = "rgba(255, 255, 255, 0.9)";
-  context.lineWidth = 10;
-  context.lineCap = "round";
-  context.lineJoin = "round";
-  context.beginPath();
-  trajectory.points.forEach((point, index) =>
-    index ? context.lineTo(px(point.x), py(point.y)) : context.moveTo(px(point.x), py(point.y)),
-  );
-  context.stroke();
-  context.strokeStyle = brand;
-  context.lineWidth = 6;
-  context.beginPath();
-  trajectory.points.forEach((point, index) =>
-    index ? context.lineTo(px(point.x), py(point.y)) : context.moveTo(px(point.x), py(point.y)),
-  );
-  context.stroke();
-  context.fillStyle = "#2e7d32";
-  context.beginPath();
-  context.arc(px(trajectory.points[0].x), py(trajectory.points[0].y), 11, 0, Math.PI * 2);
-  context.fill();
-  const end = trajectory.points.at(-1);
-  if (end) {
-    context.fillStyle = brand;
-    context.beginPath();
-    context.arc(px(end.x), py(end.y), 11, 0, Math.PI * 2);
-    context.fill();
-  }
-  context.fillStyle = "#202124";
-  context.font = "600 26px system-ui";
-  context.fillText(`${trajectory.format} · ${trajectory.name}`, 28, 42);
-  return new Promise<File>((resolve, reject) =>
-    canvas.toBlob((blob) => {
-      if (!blob) return reject(new Error("Could not render trajectory."));
-      resolve(new File([blob], `${trajectory.name}-plot.png`, { type: "image/png" }));
-    }, "image/png"),
-  );
+    color ?? getComputedStyle(document.documentElement).getPropertyValue("--g3-brand").trim();
+  if (!/^#[0-9a-f]{6}$/i.test(brand))
+    throw new Error("The team color hasn't loaded. Try again in a moment.");
+  return fieldDrawingFile(trajectoryFieldDrawing(trajectory, brand), `${trajectory.name}.json`);
 }

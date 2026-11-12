@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { Page, ProgressBar, Stat, focusRing } from "@g3/ui";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";

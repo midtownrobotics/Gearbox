@@ -1,8 +1,10 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { Button, ErrorBanner, Loading, Page, SuccessBanner, TextField } from "@g3/ui";
 import type { InferResponseType } from "hono/client";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { api, getErrorMessage } from "../../shared/api";
+import { ConfirmDialog } from "../../shared/ask";
 import { useAuthUser } from "../../shared/auth";
 import { formatDate } from "../../shared/format";
 import { amountOf, packLabel } from "../../shared/pack";
@@ -104,6 +106,8 @@ function OrderCard({
   const [error, setError] = useState<string | null>(null);
   const [editingTracking, setEditingTracking] = useState(false);
   const [tracking, setTracking] = useState(o.tracking ?? "");
+  // The line a mentor is sending back to the cart, while a pop-up asks.
+  const [sendingBack, setSendingBack] = useState<IncomingOrder["lines"][number] | null>(null);
   const canReceive = (line: IncomingOrder["lines"][number]) => line.status === "ordered";
   const receivable = o.lines.filter(canReceive);
 
@@ -122,6 +126,17 @@ function OrderCard({
     if (!res.ok) return setError(await getErrorMessage(res));
     const { received } = await res.json();
     onReceived(receivedMessage(received.length, false));
+  }
+
+  /** Back to the vendor's cart on the Carts page, approved again and off this order. */
+  async function sendBack(line: IncomingOrder["lines"][number]) {
+    setSendingBack(null);
+    setBusy(true);
+    setError(null);
+    const res = await api.orders["send-back"].$post({ json: { ids: [line.id] } });
+    setBusy(false);
+    if (!res.ok) return setError(await getErrorMessage(res));
+    onReceived(`Sent “${line.title}” back to the ${o.vendor} cart.`);
   }
 
   async function saveTracking() {
@@ -223,9 +238,21 @@ function OrderCard({
                 {l.receivedBy ? ` by ${l.receivedBy}` : ""}
               </span>
             ) : canReceive(l) ? (
-              <Button className="shrink-0 !py-1" disabled={busy} onClick={() => receive([l])}>
-                Received
-              </Button>
+              <div className="flex shrink-0 gap-2">
+                {user.isMentor && (
+                  <Button
+                    variant="secondary"
+                    className="!py-1"
+                    disabled={busy}
+                    onClick={() => setSendingBack(l)}
+                  >
+                    Send back to cart
+                  </Button>
+                )}
+                <Button className="!py-1" disabled={busy} onClick={() => receive([l])}>
+                  Received
+                </Button>
+              </div>
             ) : (
               <span className="shrink-0 text-xs text-secondary-400">On the way</span>
             )}
@@ -236,6 +263,19 @@ function OrderCard({
         <div className="px-4 pb-3">
           <ErrorBanner message={error} />
         </div>
+      )}
+      {sendingBack && (
+        <ConfirmDialog
+          title="Send back to cart"
+          centered
+          confirmLabel="Send back to cart"
+          keepLabel="Keep it on order"
+          onConfirm={() => sendBack(sendingBack)}
+          onClose={() => setSendingBack(null)}
+        >
+          Take “{sendingBack.title}” off {o.vendor} order #{o.id} and put it back in the cart? It
+          won't count against the budget until it's marked placed again.
+        </ConfirmDialog>
       )}
       {receiving && intake && (
         <ReceiveDialog

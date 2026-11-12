@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 // The demo team's members. G3ID makes them on every reset with these ids, so each app's sample
 // data can name them. Visitors sign in as one of the three `visitor` accounts by choosing a role;
 // everyone who picks the same role shares it.

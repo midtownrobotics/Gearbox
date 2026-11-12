@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { docsUrl, site } from "@g3/site-config";
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
@@ -56,7 +57,7 @@ export function Footer() {
             <GearboxMark small /> Gearbox <ByTeam />
           </p>
           <p>
-            Free, open source (MIT), and run by volunteers from {site.team.name}, FRC Team{" "}
+            Free, open source (AGPL-3.0), and run by volunteers from {site.team.name}, FRC Team{" "}
             {site.team.number}.
           </p>
           <p>

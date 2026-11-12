@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { Card, ErrorBanner, Loading, Page } from "@g3/ui";
 import { Link, useParams } from "react-router-dom";
 import { api, getErrorMessage } from "../../shared/api";

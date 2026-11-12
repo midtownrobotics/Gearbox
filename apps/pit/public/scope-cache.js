@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 // Imported into Pit's service worker (vite.config.ts, workbox.importScripts). Keeps AdvantageScope's
 // field and robot models and images on the device, so each is downloaded once, not on every load:
 // the browser's own cache drops files this big. A file is kept with its version from its asset

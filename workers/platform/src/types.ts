@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { G3AuthVariables } from "@g3/auth";
 
 export type AppEnv = {
@@ -30,6 +31,12 @@ export type AppEnv = {
      */
     GITHUB_REPO?: string;
     GITHUB_TOKEN?: string;
+    /**
+     * The operators' Cloudflare page (src/cloudflare.ts): a read-only API token for the account and
+     * the account's id. Without them, the page says how to add them.
+     */
+    CLOUDFLARE_API_TOKEN?: string;
+    CLOUDFLARE_ACCOUNT_ID?: string;
     /** Local dev only: the dev gateway (http://localhost:8796), for the platform's and teams' addresses. */
     LOCAL_GATEWAY_URL?: string;
   };

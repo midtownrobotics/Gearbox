@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { type ReactNode, createContext, useContext, useState } from "react";
 import type { Battery } from "./getters/types";
 

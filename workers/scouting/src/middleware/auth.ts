@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { type G3AuthEnv, requestTeamId, requireAuth as requireG3IdAuth } from "@g3/auth";
 import type { Context } from "hono";
 import { createMiddleware } from "hono/factory";

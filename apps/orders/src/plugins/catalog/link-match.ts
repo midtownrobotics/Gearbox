@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { catalogKey, productKey } from "@g3/worker-orders/product-key";
 import type { CatalogItem } from "../../shared/types";
 

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { integer, sqliteTable, text, unique } from "drizzle-orm/sqlite-core";
 import type { ReleaseApprover, ReleaseComment } from "../lib/onshape-release";
 
@@ -393,7 +394,7 @@ export const qualityReports = sqliteTable("quality_reports", {
   outcomeAt: integer("outcome_at"),
 });
 
-// The release tracker (lib/release-tracker.ts, migration 0026): a copy of each part studio in the
+// The release tracker (lib/release-tracker.ts, migration 0030): a copy of each part studio in the
 // team's Onshape document, colored by release and shop status, in a tracking document.
 
 export const releaseTrackers = sqliteTable(

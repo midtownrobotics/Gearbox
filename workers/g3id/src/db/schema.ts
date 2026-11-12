@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { sql } from "drizzle-orm";
 import {
   type AnySQLiteColumn,
@@ -20,6 +21,15 @@ export const teams = sqliteTable("teams", {
   updatedAt: integer("updated_at").notNull(),
 });
 
+/** Team-wide file cleanup choice; an absent row keeps the existing automatic-cleanup default. */
+export const teamStoragePolicy = sqliteTable("team_storage_policy", {
+  teamId: text("team_id")
+    .primaryKey()
+    .references(() => teams.id, { onDelete: "cascade" }),
+  automaticDeletion: integer("automatic_deletion", { mode: "boolean" }).notNull().default(true),
+  updatedAt: integer("updated_at").notNull(),
+});
+
 /** One presentation record per team; the current deployment reads only its configured team key. */
 export const teamUiSettings = sqliteTable("team_ui_settings", {
   teamId: text("team_id").primaryKey(),
@@ -38,6 +48,8 @@ export const teamSignInMethods = sqliteTable("team_sign_in_methods", {
   github: integer("github").notNull().default(1),
   steam: integer("steam").notNull().default(1),
   kioskPin: integer("kiosk_pin").notNull().default(1),
+  /** People can sign up with Google or GitHub, not only the team's chat (migration 0023). */
+  openSignup: integer("open_signup").notNull().default(0),
   updatedAt: integer("updated_at").notNull(),
   updatedBy: text("updated_by").references((): AnySQLiteColumn => coreUsers.id, {
     onDelete: "set null",

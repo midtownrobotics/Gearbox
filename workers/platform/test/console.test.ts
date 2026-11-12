@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { env } from "cloudflare:test";
 import { exports } from "cloudflare:workers";
 import { site, teamKey } from "@g3/site-config";
@@ -110,7 +111,7 @@ describe("who may use the console", () => {
 });
 
 describe("teams", () => {
-  it("lists teams with their open reports", async () => {
+  it("lists teams with their open reports and member counts", async () => {
     const { number } = await createTeam();
     await exports.default.fetch(
       new Request("http://platform/api/reports", {
@@ -123,25 +124,102 @@ describe("teams", () => {
       teamNumber: number;
       openReports: number;
     }[];
-    expect(list).toEqual([expect.objectContaining({ teamNumber: number, openReports: 1 })]);
+    expect(list).toEqual([
+      expect.objectContaining({ teamNumber: number, openReports: 1, members: 2 }),
+    ]);
   });
 
-  it("shows a team with its members, owner and reports", async () => {
+  it("shows a team's details with member counts, never their names or emails", async () => {
     const { id } = await createTeam();
-    const detail = (await (await call(operator, `/teams/${id}`)).json()) as {
-      team: { owner: { id: string; name: string } };
-      members: { id: string }[];
-    };
-    expect(detail.team.owner).toEqual({ id: "u-founder", name: "Fay Founder" });
-    expect(detail.members.map((m) => m.id)).toEqual(["u-founder", "u-member"]);
-    // Seeing its members is an access the log records, once an hour per operator.
-    await call(operator, `/teams/${id}`);
+    await testEnv.PLATFORM_DB.prepare(
+      "UPDATE teams SET slack_workspace_name = 'Secret Robotics' WHERE id = ?",
+    )
+      .bind(id)
+      .run();
+    const open = (reason?: string) =>
+      call(operator, `/teams/${id}/details`, { method: "POST", body: { reason } });
+    expect((await open()).status).toBe(400);
+    const res = await open("Following up a report");
+    const text = await res.text();
+    // Its chat by platform only, never the workspace's name.
+    expect(text).not.toContain("Secret Robotics");
+    expect(await (await call(operator, `/teams?q=${id.slice(3)}`)).text()).not.toContain(
+      "Secret Robotics",
+    );
+    expect(JSON.parse(text)).toMatchObject({
+      team: { id, hasOwner: true, chat: "slack" },
+      members: { active: 2, admins: 1, mentors: 0, pending: 0 },
+    });
+    for (const secret of ["Fay Founder", "fay@test", "Max Member", "max@test"]) {
+      expect(text).not.toContain(secret);
+    }
+    // Opening it is an access the log records with the reason, apart from members: the same
+    // reason (the page reloading) once an hour, a new one each time.
+    await open("Following up a report");
+    await open("Handing it over");
     const views = await testEnv.PLATFORM_DB.prepare(
-      "SELECT operator_user_id FROM operator_actions WHERE team_id = ? AND action = 'view_team'",
+      "SELECT action, operator_user_id, reason FROM operator_actions WHERE team_id = ? AND action LIKE 'view_team%' ORDER BY created_at, rowid",
     )
       .bind(id)
       .all();
-    expect(views.results).toEqual([{ operator_user_id: operator.id }]);
+    expect(views.results).toEqual([
+      {
+        action: "view_team_details",
+        operator_user_id: operator.id,
+        reason: "Following up a report",
+      },
+      { action: "view_team_details", operator_user_id: operator.id, reason: "Handing it over" },
+    ]);
+    // Only from the console's own pages, like every change.
+    expect(
+      (
+        await call(operator, `/teams/${id}/details`, {
+          method: "POST",
+          body: { reason: "x" },
+          origin: null,
+        })
+      ).status,
+    ).toBe(403);
+  });
+
+  it("opens a team's member list only with a reason, and logs each time", async () => {
+    const { id } = await createTeam();
+    const open = (body: unknown) =>
+      call(operator, `/teams/${id}/members`, { method: "POST", body });
+    expect((await open({})).status).toBe(400);
+    const res = await open({ reason: "Owner asked for a handover" });
+    expect(await res.json()).toMatchObject({
+      members: [{ id: "u-founder", email: "fay@test" }, { id: "u-member" }],
+      ownerUserId: "u-founder",
+      founderUserId: "u-founder",
+    });
+    await open({ reason: "Again" });
+    const views = await testEnv.PLATFORM_DB.prepare(
+      "SELECT reason FROM operator_actions WHERE team_id = ? AND action = 'view_team' ORDER BY created_at, rowid",
+    )
+      .bind(id)
+      .all();
+    expect(views.results).toEqual([{ reason: "Owner asked for a handover" }, { reason: "Again" }]);
+    // Only from the console's own pages, like every change.
+    expect(
+      (
+        await call(operator, `/teams/${id}/members`, {
+          method: "POST",
+          body: { reason: "x" },
+          origin: null,
+        })
+      ).status,
+    ).toBe(403);
+  });
+
+  it("adds up each team's storage from the apps that keep files", async () => {
+    const res = await call(operator, "/storage");
+    expect(await res.json()).toEqual({
+      teams: {
+        frc1648: { bytes: 3072, objects: 3, apps: { Pit: 1024, Shop: 1024, Scouting: 1024 } },
+      },
+      failed: [],
+    });
   });
 
   it("keeps the log for 12 months", async () => {
@@ -152,7 +230,7 @@ describe("teams", () => {
     )
       .bind(crypto.randomUUID(), operator.id, id, old)
       .run();
-    await call(operator, `/teams/${id}`);
+    await call(operator, `/teams/${id}/details`, { method: "POST", body: { reason: "Checking" } });
     expect(
       await row("SELECT id FROM operator_actions WHERE team_id = ? AND created_at = ?", id, old),
     ).toBeNull();

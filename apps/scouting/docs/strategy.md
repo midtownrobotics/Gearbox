@@ -13,11 +13,13 @@ Make a list for each pick-list discussion. Add teams (or any strategy note) at t
 
 ## Auto Library
 
-**Add an autonomous routine** for one you've seen: a name ("3-piece center"), the team's number, and its route, drawn on the field or uploaded as a trajectory file. Draw each part of the route as its own stroke; **Undo** takes back the last. Routines are saved for everyone on the team. Search by routine or team.
+**Add an autonomous routine** for one you've seen: a name ("3-piece center"), the team's number, and its route, drawn on the field or uploaded as a trajectory file. Draw each part of the route as its own stroke; **Undo** takes back the last. Routines are saved for everyone on the team. Search by routine or team. New drawn and imported routes stay sharp when opened larger; older uploaded images still open as before.
 
 ## Field Maps
 
 Draw plans on the field: **Draw** freehand, **Arrow**, or **SOTM** (a shooting path with its cone toward the nearest hub). **Undo** and **Clear** fix mistakes, and **Fullscreen map** gives you room. Name it, add the event or match, and **Save annotated map**.
+
+New plans on the built-in field keep their editable strokes. Use **Undo** (or Ctrl+Z while the map is focused) to take back a stroke, including Clear. Older saved maps and custom image backgrounds keep their existing format.
 
 Saved maps are your own until you share one with the team. Who can share is set under **Map sharing access**.
 

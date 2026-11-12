@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { Card, Page, ProgressBar } from "@g3/ui";
 import { Link } from "react-router-dom";
 import { useAuthUser } from "../../shared/auth";

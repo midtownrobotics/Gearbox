@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { getTableColumns } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { netBlocklistDomains, netClients, netSiteUsage, netUsage } from "../src/db/schema";

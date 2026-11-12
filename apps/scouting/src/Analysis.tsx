@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { Button, Chip, Page as SharedPage, inputClass, useQuestions } from "@g3/ui";
 import { BarChart3, Scale, Search, Users, X } from "lucide-react";
 import { type SyntheticEvent, useEffect, useState } from "react";

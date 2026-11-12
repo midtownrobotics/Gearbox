@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { Button, Card, ErrorBanner, Page, inputClass } from "@g3/ui";
 import { useState } from "react";
 import { Link } from "react-router-dom";
@@ -14,7 +15,7 @@ export function ReportsPage() {
     [status],
   );
   return (
-    <Page title="Reports">
+    <Page title="Number Reports">
       <select
         value={status}
         onChange={(e) => setStatus(e.target.value as typeof status)}

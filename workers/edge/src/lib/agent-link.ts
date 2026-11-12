@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { DurableObject } from "cloudflare:workers";
 import type { AppEnv } from "../types";
 import {

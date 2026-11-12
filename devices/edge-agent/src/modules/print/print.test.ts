@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { describe, expect, test } from "bun:test";
 import { isValidDeviceUri, parsePrintOptions, printerAlerts } from "@g3/worker-edge/print-types";
 import { parseLpinfo, parseRequestId, toJob, toPrinter } from "./cups";

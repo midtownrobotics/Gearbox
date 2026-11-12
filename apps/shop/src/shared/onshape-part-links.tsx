@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { OnshapePartLink } from "./types";
 
 const linkClass = "text-primary-600 underline hover:text-primary-700 transition-colors";

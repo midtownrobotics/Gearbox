@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import {
   DndContext,
   KeyboardSensor,
@@ -19,14 +20,17 @@ import {
   type TeamUiLinkKey,
   type TeamUiSettings,
   completeAppOrder,
+  customTileKey,
   portalAppLabels,
   teamUiLinkLabels,
 } from "@g3/site-config";
 
-const labelOf = (key: PortalTileKey) =>
-  key in portalAppLabels
-    ? portalAppLabels[key as keyof typeof portalAppLabels]
-    : teamUiLinkLabels[key as keyof typeof teamUiLinkLabels];
+const labelOf = (key: PortalTileKey, settings: TeamUiSettings) => {
+  if (key in portalAppLabels) return portalAppLabels[key as keyof typeof portalAppLabels];
+  if (key in teamUiLinkLabels) return teamUiLinkLabels[key as keyof typeof teamUiLinkLabels];
+  const custom = settings.customLinks.find((link) => customTileKey(link.id) === key);
+  return custom?.label || "Custom link";
+};
 
 /**
  * The order of Portal's grid (Team Appearance): drag a tile by its handle, or focus the handle and
@@ -43,7 +47,7 @@ export function AppOrder({
   shownLinks: TeamUiLinkKey[];
   onChange: (order: PortalTileKey[]) => void;
 }) {
-  const order = completeAppOrder(settings.appOrder);
+  const order = completeAppOrder(settings.appOrder, settings.customLinks);
   const sensors = useSensors(
     // A small nudge first, so clicking the handle doesn't start a drag.
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
@@ -73,7 +77,7 @@ export function AppOrder({
       <SortableContext items={shown} strategy={verticalListSortingStrategy}>
         <ol className="divide-y divide-line rounded-md border border-line">
           {shown.map((key, i) => (
-            <Tile key={key} id={key} place={i + 1} label={labelOf(key)} />
+            <Tile key={key} id={key} place={i + 1} label={labelOf(key, settings)} />
           ))}
         </ol>
       </SortableContext>

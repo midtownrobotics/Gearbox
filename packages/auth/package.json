@@ -1,10 +1,13 @@
 {
   "name": "@g3/auth",
   "version": "0.1.0",
+  "license": "AGPL-3.0-only",
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./storage-parts": "./src/storage-parts.ts",
+    "./season-export": "./src/season-export.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

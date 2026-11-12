@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { describe, expect, it } from "vitest";
 import { createDb } from "../src/db";
 import { coreUserIdentities } from "../src/db/schema";
@@ -28,7 +29,13 @@ describe("sign-in methods", () => {
   it("are all on for a team that hasn't chosen", async () => {
     const team = await createTeam();
     const res = await g3id("/team/sign-in", { headers: { "X-Team-Id": team } });
-    expect(await res.json()).toEqual({ slack: true, discord: false, ...all, demo: false });
+    expect(await res.json()).toEqual({
+      slack: true,
+      discord: false,
+      ...all,
+      openSignup: false,
+      demo: false,
+    });
   });
 
   it("switched off, can't start a sign-in, and stay off only for that team", async () => {

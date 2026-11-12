@@ -1,16 +1,22 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { Button, ErrorBanner, Field, Loading, TextField, chatName, useTeamChat } from "@g3/ui";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../../lib/api";
 
-// Someone new who signed up with Slack or Discord enters their full name here, starting from
-// their chat name, before their team's admins are asked to approve them.
+// Someone new who signed up enters their full name here, starting from the name on the account
+// they signed up with (Slack or Discord, or Google or GitHub: `with`), before their team's admins
+// are asked to approve them.
+
+const PROVIDER_LABELS: Record<string, string> = { google: "Google", github: "GitHub" };
 
 export function NamePage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const token = searchParams.get("token") ?? "";
   const chat = chatName(useTeamChat());
+  const via = searchParams.get("with") ?? "";
+  const provider = PROVIDER_LABELS[via];
   const [name, setName] = useState<string | null>(null);
   const [expired, setExpired] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -38,7 +44,7 @@ export function NamePage() {
         setError(data.error ?? "That didn't work. Try again.");
         return;
       }
-      navigate("/signup/pending", { replace: true });
+      navigate(provider ? `/signup/pending?with=${via}` : "/signup/pending", { replace: true });
     } catch {
       setError("Could not reach the server. Try again.");
     } finally {
@@ -68,7 +74,14 @@ export function NamePage() {
           <Loading />
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
-            <Field label="Full name" hint={`Filled in from your ${chat} name.`}>
+            <Field
+              label="Full name"
+              hint={
+                provider
+                  ? `Filled in from your ${provider} account.`
+                  : `Filled in from your ${chat} name.`
+              }
+            >
               <TextField
                 kind="person"
                 autoComplete="name"

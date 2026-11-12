@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { DEV_DOMAIN, TEAM_HOST_APPS, platformLabel, portalAppLabels } from "@g3/site-config";
 import { useTeamNames } from "@g3/ui";
 import { useSearchParams } from "react-router-dom";

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { ReactNode } from "react";
 
 /** How far a page's content runs: a form, the reading column, a table or tree, or the screen. */

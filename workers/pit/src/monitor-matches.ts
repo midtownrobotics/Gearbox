@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { tbaMatchLabel } from "./archives";
 
 // The Monitor's match list: the event's schedule from Nexus, else The Blue Alliance, with each

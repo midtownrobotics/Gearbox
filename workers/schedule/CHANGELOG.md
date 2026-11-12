@@ -1,5 +1,23 @@
 # @g3/worker-schedule
 
+## 0.4.3
+
+### Patch Changes
+
+- 72f42fa: Tighter security: pages running on someone's own computer can no longer call the live apps.
+
+## 0.4.2
+
+### Patch Changes
+
+- f340efe: The app's menu links to Gearbox's source code.
+
+## 0.4.1
+
+### Patch Changes
+
+- 4cad0fc: The team's avatar in the top bar has slightly rounded corners, and the Appearance page can turn off the short name in front of app names in the bar, for an avatar that already shows it.
+
 ## 0.4.0
 
 ### Minor Changes

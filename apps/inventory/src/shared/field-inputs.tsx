@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { Field, TextField, inputClass } from "@g3/ui";
 import type { FieldValue, FieldValues, FieldView } from "@g3/worker-inventory";
 import { formatDate } from "./format";

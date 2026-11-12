@@ -16,6 +16,8 @@ If your team has more than one match form, each is a card at the top: fill in ea
 
 Under **Submit report**, the form says whether your answers are only **Saved on this device** or **Submitted to the server**.
 
+Field drawings keep each stroke and its color, so paths stay sharp when opened larger. **Undo** takes back a stroke, and **Clear** can be undone. Draft paths return when you reopen the form. Existing image-based reports still open as before.
+
 **Full screen** at the top of the page hides everything but the form, for a phone in the stands.
 
 ## When the match moves on
@@ -36,3 +38,7 @@ At an event The Blue Alliance doesn't have, a strategy lead moves everyone on fr
 Choose **Pit scouting** for the form you fill in once per team, in their pit. It has no deadline, and a team's newest pit report is the one Analysis shows.
 
 **Not pit scouted** lists the event's teams nobody has pit scouted yet, with how many are left. Choose **Scout** beside a team to start its form.
+
+## Image storage
+
+Each image can be up to 12 MB, with up to 24 MB per submission. Your team has room for 2 GB or 25,000 images. When a new upload would exceed the cap, images over six months old are removed first, then the oldest remaining images if needed, aiming for 90% usage. Recent images can also be removed; written reports and auton steps remain. Download images you want to keep before reaching the cap. Admins receive grouped cleanup summaries. A team admin can disable automatic deletion with **Keep files and stop uploads at the cap** on the team home's **Admin → Storage** page. Uploads that would exceed the allowance then stop without removing existing images.

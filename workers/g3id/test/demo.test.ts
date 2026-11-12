@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { DEMO_PEOPLE, DEMO_SESSION_SECONDS, demoTeamId, visitorFor } from "@g3/demo";
 import { describe, expect, it } from "vitest";
 import { createTeam, createUser, g3id, sessionCookie } from "./helpers";
@@ -85,6 +86,7 @@ describe("the demo team", () => {
       github: false,
       steam: false,
       pin: false,
+      openSignup: false,
       demo: true,
     });
   });

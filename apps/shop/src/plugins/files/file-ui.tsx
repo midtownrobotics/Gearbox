@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { Button, type ButtonSize, type ButtonVariant, TextField, buttonClass } from "@g3/ui";
 import { useRef } from "react";
 import { partFileDownloadUrl } from "../../shared/getters";

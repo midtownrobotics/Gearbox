@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 /**
  * What the Slack app's bot needs in a workspace: commands, DMs, members' names and emails, and
  * the list of channels (so admins choose a channel by name).

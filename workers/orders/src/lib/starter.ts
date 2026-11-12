@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { inTeam, withTeam } from "@g3/auth";
 import { type SQL, eq, getTableColumns, notExists, sql } from "drizzle-orm";
 import { type SQLiteColumn, type SQLiteTable, alias } from "drizzle-orm/sqlite-core";

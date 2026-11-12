@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 // The text a demo visitor can put in a field: anything a page sends from the demo is picked from
 // these lists with a rotate button (TextField in @g3/ui), never typed. Each field names the kind of
 // text it holds, which chooses its list. Keep every entry plain and neutral: anyone can see it.
@@ -58,6 +59,8 @@ export const SAFE_TEXT = {
   ],
   vendor: ["WCP", "REV Robotics", "AndyMark", "CTR Electronics", "McMaster-Carr", "Amazon"],
   sku: ["WCP-0451", "REV-21-1650", "am-3541", "217-4243", "91251A540", "DEMO-1001"],
+  /** A link's name on the team's home. */
+  linkName: ["Team wiki", "Build log", "CAD library", "Sponsors", "Outreach"],
   url: [
     "https://wcproducts.com/products/wcp-0451",
     "https://www.revrobotics.com/rev-21-1650/",

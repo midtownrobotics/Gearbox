@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { Card, Page, buttonClass } from "@g3/ui";
 
 /** The QR code displays (paths in kiosk/kiosk-gate.tsx), and when to use each. */

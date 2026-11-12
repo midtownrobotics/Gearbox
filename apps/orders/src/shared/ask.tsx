@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { Button, Dialog, ErrorBanner, Field, TextField } from "@g3/ui";
 import { type FormEvent, type ReactNode, useState } from "react";
 
@@ -12,6 +13,7 @@ export function ConfirmDialog({
   confirmLabel,
   keepLabel = "Cancel",
   danger = false,
+  centered = false,
   onConfirm,
   onClose,
 }: {
@@ -22,11 +24,13 @@ export function ConfirmDialog({
   keepLabel?: string;
   /** Red, for something that deletes or can't be undone. */
   danger?: boolean;
+  /** In the middle of the screen, for a quick check that isn't tied to a spot on the page. */
+  centered?: boolean;
   onConfirm: () => void;
   onClose: () => void;
 }) {
   return (
-    <Dialog title={title} onClose={onClose}>
+    <Dialog title={title} onClose={onClose} centered={centered}>
       <p className="text-sm text-secondary-600">{children}</p>
       <div className="flex flex-wrap gap-2">
         <Button variant={danger ? "danger" : "primary"} onClick={onConfirm}>

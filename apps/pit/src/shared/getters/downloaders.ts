@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { api } from "../api";
 
 /** A computer running the pit log downloader, paired with the team's Pit. */
@@ -80,6 +81,7 @@ export type MatchLogs = {
   /** The most logs Pit keeps for a team. */
   limit: number;
   whenFull: WhenFull;
+  automaticDeletion?: boolean;
   /** Mentors and admins: choose `whenFull`. */
   canManage: boolean;
   /** Admins: delete logs, one or all after an export. */

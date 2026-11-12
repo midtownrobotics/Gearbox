@@ -1,13 +1,21 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import {
+  STORAGE_CLEANUP_RATIO,
   inTeam,
   logTeamChange,
+  notifyStorageCleanup,
+  notifyStorageUsage,
   requireAdmin,
   requireAuth,
   requireMentor,
+  storageCleanupTime,
+  teamStorageMode,
   withTeam,
+  withTeamStorageLock,
 } from "@g3/auth";
-import { asc, desc, eq, inArray, ne } from "drizzle-orm";
+import { asc, desc, eq, inArray, lt } from "drizzle-orm";
 import { Hono } from "hono";
+import { bodyLimit } from "hono/body-limit";
 import { type Db, createDb } from "./db";
 import { logDownloaders, matchLogs, settings } from "./db/schema";
 import { requireDownloader } from "./downloaders";
@@ -27,6 +35,8 @@ export const PART_SIZE = 10 * 1024 * 1024;
 export const MAX_SIZE = 40 * 1024 * 1024;
 /** The most logs a team keeps. */
 export const MAX_LOGS = 20;
+export const MAX_PENDING_LOGS = 3;
+export const UPLOAD_TTL = 30 * 60_000;
 
 export const logsPrefix = (teamId: string) => `pit/teams/${teamId}/logs/`;
 const logKey = (teamId: string, event: string, name: string) =>
@@ -61,10 +71,19 @@ export type MatchLog = {
 async function deleteLogs(db: Db, bucket: R2Bucket, teamId: string, ids: number[]) {
   if (ids.length === 0) return 0;
   const removed = await db
-    .delete(matchLogs)
+    .select({ r2Key: matchLogs.r2Key, uploadId: matchLogs.uploadId })
+    .from(matchLogs)
     .where(inTeam(matchLogs, teamId, inArray(matchLogs.id, ids)))
-    .returning({ r2Key: matchLogs.r2Key });
+    .all();
+  for (const log of removed) {
+    if (log.uploadId)
+      await bucket
+        .resumeMultipartUpload(log.r2Key, log.uploadId)
+        .abort()
+        .catch(() => {});
+  }
   if (removed.length) await bucket.delete(removed.map((r) => r.r2Key));
+  await db.delete(matchLogs).where(inTeam(matchLogs, teamId, inArray(matchLogs.id, ids)));
   return removed.length;
 }
 
@@ -92,6 +111,7 @@ export const matchLogRoutes = new Hono<AppEnv>()
     return c.json({
       logs,
       limit: MAX_LOGS,
+      automaticDeletion: (await teamStorageMode(c.env, teamId)) === "delete-oldest",
       whenFull: await getWhenFull(db, teamId),
       canManage: c.get("userIsMentor") || c.get("userIsAdmin"),
       // Deleting logs is for admins only.
@@ -236,71 +256,151 @@ export const logUploadRoutes = new Hono<AppEnv>()
 
     const db = createDb(c.env.PIT_DB);
     const teamId = c.get("teamId");
-    const existing = await db
-      .select()
-      .from(matchLogs)
-      .where(inTeam(matchLogs, teamId, eq(matchLogs.event, event), eq(matchLogs.name, name)))
-      .get();
-    if (existing?.status === "stored" && existing.size === size) {
-      return c.json({ id: existing.id, exists: true });
-    }
-    // A new log, with the team at its limit and keeping what it has.
-    if (existing?.status !== "stored") {
-      const others = await db
-        .select({ id: matchLogs.id })
+    return withTeamStorageLock(c.env.PIT_DB, teamId, async () => {
+      const stale = await db
+        .select()
         .from(matchLogs)
-        .where(inTeam(matchLogs, teamId, eq(matchLogs.status, "stored")));
-      if (others.length >= MAX_LOGS && (await getWhenFull(db, teamId)) === "skip-new") {
+        .where(
+          inTeam(
+            matchLogs,
+            teamId,
+            eq(matchLogs.status, "uploading"),
+            lt(matchLogs.createdAt, Date.now() - UPLOAD_TTL),
+          ),
+        );
+      for (const log of stale) {
+        if (log.uploadId)
+          await c.env.LOGS.resumeMultipartUpload(log.r2Key, log.uploadId)
+            .abort()
+            .catch(() => {});
+        await db.delete(matchLogs).where(inTeam(matchLogs, teamId, eq(matchLogs.id, log.id)));
+      }
+      const existing = await db
+        .select()
+        .from(matchLogs)
+        .where(inTeam(matchLogs, teamId, eq(matchLogs.event, event), eq(matchLogs.name, name)))
+        .get();
+      if (existing?.status === "stored" && existing.size === size) {
+        return c.json({ id: existing.id, exists: true });
+      }
+      if (existing?.status === "stored") {
         return c.json(
-          { error: `Pit has ${MAX_LOGS} match logs, the most it keeps.`, code: "full" },
+          {
+            error: "This log is already saved. Review and remove it before replacing it.",
+            code: "already_saved",
+          },
           409,
         );
       }
-    }
-    // An upload of it that never finished: dropped, and started again.
-    if (existing?.uploadId) {
-      await c.env.LOGS.resumeMultipartUpload(existing.r2Key, existing.uploadId)
-        .abort()
-        .catch(() => {});
-    }
 
-    const downloader = await db
-      .select({ name: logDownloaders.name })
-      .from(logDownloaders)
-      .where(inTeam(logDownloaders, teamId, eq(logDownloaders.id, c.get("downloaderId"))))
-      .get();
-    const r2Key = logKey(teamId, event, name);
-    const upload = await c.env.LOGS.createMultipartUpload(r2Key, {
-      httpMetadata: { contentType: "application/gzip" },
+      const stored = await db
+        .select({
+          id: matchLogs.id,
+          size: matchLogs.size,
+          uploadedAt: matchLogs.uploadedAt,
+          createdAt: matchLogs.createdAt,
+        })
+        .from(matchLogs)
+        .where(inTeam(matchLogs, teamId, eq(matchLogs.status, "stored")));
+      // Only a team that chose to delete the oldest has logs that may make room.
+      const teamMode = await teamStorageMode(c.env, teamId);
+      const deleting =
+        teamMode === "delete-oldest" && (await getWhenFull(db, teamId)) === "delete-oldest";
+      const mode =
+        teamMode === "unavailable" ? "unavailable" : deleting ? "delete-oldest" : "block-uploads";
+      await notifyStorageUsage(
+        c.env,
+        teamId,
+        "pit",
+        "logs",
+        c.env.PIT_DB,
+        { bytes: 0, count: stored.length },
+        { count: MAX_LOGS },
+        false,
+        mode,
+        false,
+      );
+      const candidates = stored
+        .filter(() => deleting)
+        .sort(
+          (a, b) =>
+            storageCleanupTime(a.uploadedAt ?? a.createdAt) -
+              storageCleanupTime(b.uploadedAt ?? b.createdAt) || a.id - b.id,
+        );
+      if (stored.length >= MAX_LOGS && candidates.length < stored.length + 1 - MAX_LOGS)
+        return c.json(
+          {
+            error: deleting
+              ? "Pit is full. This log cannot fit; review saved logs and try again."
+              : `Pit has ${MAX_LOGS} match logs, the most it keeps.`,
+            code: "full",
+          },
+          409,
+        );
+
+      const pending = await db
+        .select({ id: matchLogs.id })
+        .from(matchLogs)
+        .where(inTeam(matchLogs, teamId, eq(matchLogs.status, "uploading")));
+      if (existing?.status !== "uploading" && pending.length >= MAX_PENDING_LOGS) {
+        return c.json(
+          {
+            error: "Three logs are already uploading. Let them finish and try again.",
+            code: "upload_busy",
+          },
+          409,
+        );
+      }
+      // An upload of it that never finished: dropped, and started again.
+      if (existing?.uploadId) {
+        await c.env.LOGS.resumeMultipartUpload(existing.r2Key, existing.uploadId)
+          .abort()
+          .catch(() => {});
+      }
+
+      const downloader = await db
+        .select({ name: logDownloaders.name })
+        .from(logDownloaders)
+        .where(inTeam(logDownloaders, teamId, eq(logDownloaders.id, c.get("downloaderId"))))
+        .get();
+      const r2Key = logKey(teamId, event, name);
+      const upload = await c.env.LOGS.createMultipartUpload(r2Key, {
+        httpMetadata: { contentType: "application/gzip" },
+      });
+      const values = {
+        matchType,
+        matchNumber,
+        size,
+        rawSize,
+        trimmed,
+        r2Key,
+        status: "uploading" as const,
+        uploadId: upload.uploadId,
+        downloaderId: c.get("downloaderId"),
+        downloaderName: downloader?.name ?? "Log downloader",
+        createdAt: Date.now(),
+        uploadedAt: null,
+      };
+      let id = existing?.id;
+      try {
+        if (id) {
+          await db
+            .update(matchLogs)
+            .set(values)
+            .where(inTeam(matchLogs, teamId, eq(matchLogs.id, id)));
+        } else {
+          const [row] = await db
+            .insert(matchLogs)
+            .values(withTeam(teamId, { event, name, ...values }))
+            .returning({ id: matchLogs.id });
+          id = row.id;
+        }
+      } catch (error) {
+        await upload.abort().catch(() => {});
+        throw error;
+      }
+      return c.json({ id, exists: false, partSize: PART_SIZE }, 201);
     });
-    const values = {
-      matchType,
-      matchNumber,
-      size,
-      rawSize,
-      trimmed,
-      r2Key,
-      status: "uploading" as const,
-      uploadId: upload.uploadId,
-      downloaderId: c.get("downloaderId"),
-      downloaderName: downloader?.name ?? "Log downloader",
-      createdAt: Date.now(),
-      uploadedAt: null,
-    };
-    let id = existing?.id;
-    if (id) {
-      await db
-        .update(matchLogs)
-        .set(values)
-        .where(inTeam(matchLogs, teamId, eq(matchLogs.id, id)));
-    } else {
-      const [row] = await db
-        .insert(matchLogs)
-        .values(withTeam(teamId, { event, name, ...values }))
-        .returning({ id: matchLogs.id });
-      id = row.id;
-    }
-    return c.json({ id, exists: false, partSize: PART_SIZE }, 201);
   })
 
   // Deleting a log from Pit from the pit computer (its status page), by event and name. The paired
@@ -322,28 +422,49 @@ export const logUploadRoutes = new Hono<AppEnv>()
   })
 
   // One part: PART_SIZE bytes, or what's left for the last.
-  .put("/:id/parts/:part", requireDownloader, async (c) => {
-    const id = parseId(c.req.param("id"));
-    const part = parseId(c.req.param("part"));
-    if (!id || !part || part > 10_000) return c.json({ error: "Invalid part." }, 400);
-    const log = await createDb(c.env.PIT_DB)
-      .select()
-      .from(matchLogs)
-      .where(
-        inTeam(matchLogs, c.get("teamId"), eq(matchLogs.id, id), eq(matchLogs.status, "uploading")),
-      )
-      .get();
-    if (!log?.uploadId) return c.json({ error: "No upload of that log." }, 404);
-    const bytes = await c.req.arrayBuffer();
-    if (bytes.byteLength === 0 || bytes.byteLength > PART_SIZE) {
-      return c.json({ error: "A part is at most 10 MiB." }, 400);
-    }
-    const uploaded = await c.env.LOGS.resumeMultipartUpload(log.r2Key, log.uploadId).uploadPart(
-      part,
-      bytes,
-    );
-    return c.json({ partNumber: uploaded.partNumber, etag: uploaded.etag });
-  })
+  .put(
+    "/:id/parts/:part",
+    requireDownloader,
+    bodyLimit({
+      maxSize: PART_SIZE,
+      onError: (c) => c.json({ error: "A part is at most 10 MiB." }, 413),
+    }),
+    async (c) => {
+      const id = parseId(c.req.param("id"));
+      const part = parseId(c.req.param("part"));
+      if (!id || !part || part > Math.ceil(MAX_SIZE / PART_SIZE))
+        return c.json({ error: "Invalid part." }, 400);
+      const log = await createDb(c.env.PIT_DB)
+        .select()
+        .from(matchLogs)
+        .where(
+          inTeam(
+            matchLogs,
+            c.get("teamId"),
+            eq(matchLogs.id, id),
+            eq(matchLogs.status, "uploading"),
+          ),
+        )
+        .get();
+      if (!log?.uploadId) return c.json({ error: "No upload of that log." }, 404);
+      if (log.createdAt < Date.now() - UPLOAD_TTL)
+        return c.json(
+          { error: "This upload expired. Start the log again.", code: "upload_expired" },
+          410,
+        );
+      const expected = Math.min(PART_SIZE, log.size - (part - 1) * PART_SIZE);
+      if (expected <= 0) return c.json({ error: "Invalid part for this log." }, 400);
+      const bytes = await c.req.arrayBuffer();
+      if (bytes.byteLength !== expected) {
+        return c.json({ error: "The part size does not match this log." }, 400);
+      }
+      const uploaded = await c.env.LOGS.resumeMultipartUpload(log.r2Key, log.uploadId).uploadPart(
+        part,
+        bytes,
+      );
+      return c.json({ partNumber: uploaded.partNumber, etag: uploaded.etag });
+    },
+  )
 
   // The parts, in order: the log is stored. With the team deleting its oldest when full, the
   // oldest beyond MAX_LOGS go now.
@@ -353,52 +474,163 @@ export const logUploadRoutes = new Hono<AppEnv>()
     const body = (await c.req.json().catch(() => null)) as {
       parts?: { partNumber: number; etag: string }[];
     } | null;
-    if (!Array.isArray(body?.parts) || body.parts.length === 0) {
+    if (
+      !Array.isArray(body?.parts) ||
+      body.parts.length === 0 ||
+      body.parts.length > Math.ceil(MAX_SIZE / PART_SIZE)
+    ) {
       return c.json({ error: "No parts." }, 400);
     }
+    const parts = body.parts;
     const db = createDb(c.env.PIT_DB);
     const teamId = c.get("teamId");
-    const log = await db
-      .select()
-      .from(matchLogs)
-      .where(inTeam(matchLogs, teamId, eq(matchLogs.id, id), eq(matchLogs.status, "uploading")))
-      .get();
-    if (!log?.uploadId) return c.json({ error: "No upload of that log." }, 404);
-    const object = await c.env.LOGS.resumeMultipartUpload(log.r2Key, log.uploadId)
-      .complete(body.parts.map((p) => ({ partNumber: Number(p.partNumber), etag: String(p.etag) })))
-      .catch(() => null);
-    if (!object) return c.json({ error: "The parts didn't make the log." }, 400);
-    if (object.size > MAX_SIZE) {
-      await c.env.LOGS.delete(log.r2Key);
-      await db.delete(matchLogs).where(inTeam(matchLogs, teamId, eq(matchLogs.id, id)));
-      return c.json(
-        { error: "The log is over 40 MB compressed: trim it first.", code: "too_big" },
-        413,
-      );
-    }
-    await db
-      .update(matchLogs)
-      .set({ status: "stored", uploadId: null, size: object.size, uploadedAt: Date.now() })
-      .where(inTeam(matchLogs, teamId, eq(matchLogs.id, id)));
-
-    if ((await getWhenFull(db, teamId)) === "delete-oldest") {
-      const older = await db
-        .select({ id: matchLogs.id })
+    return withTeamStorageLock(c.env.PIT_DB, teamId, async () => {
+      const log = await db
+        .select()
         .from(matchLogs)
-        .where(inTeam(matchLogs, teamId, eq(matchLogs.status, "stored"), ne(matchLogs.id, id)))
-        .orderBy(desc(matchLogs.uploadedAt));
-      await deleteLogs(
-        db,
-        c.env.LOGS,
+        .where(inTeam(matchLogs, teamId, eq(matchLogs.id, id), eq(matchLogs.status, "uploading")))
+        .get();
+      if (!log?.uploadId) return c.json({ error: "No upload of that log." }, 404);
+      if (log.createdAt < Date.now() - UPLOAD_TTL)
+        return c.json(
+          { error: "This upload expired. Start the log again.", code: "upload_expired" },
+          410,
+        );
+      if (
+        parts.length !== Math.ceil(log.size / PART_SIZE) ||
+        parts.some(
+          (part, index) =>
+            !part || part.partNumber !== index + 1 || typeof part.etag !== "string" || !part.etag,
+        )
+      ) {
+        return c.json({ error: "Send every part once, in order." }, 400);
+      }
+
+      const stored = await db
+        .select({
+          id: matchLogs.id,
+          size: matchLogs.size,
+          uploadedAt: matchLogs.uploadedAt,
+          createdAt: matchLogs.createdAt,
+        })
+        .from(matchLogs)
+        .where(inTeam(matchLogs, teamId, eq(matchLogs.status, "stored")));
+      // Only a team that chose to delete the oldest has logs that may make room.
+      const teamMode = await teamStorageMode(c.env, teamId);
+      const deleting =
+        teamMode === "delete-oldest" && (await getWhenFull(db, teamId)) === "delete-oldest";
+      const mode =
+        teamMode === "unavailable" ? "unavailable" : deleting ? "delete-oldest" : "block-uploads";
+      await notifyStorageUsage(
+        c.env,
         teamId,
-        older.slice(MAX_LOGS - 1).map((row) => row.id),
+        "pit",
+        "logs",
+        c.env.PIT_DB,
+        { bytes: 0, count: stored.length },
+        { count: MAX_LOGS },
+        false,
+        mode,
+        false,
       );
-    }
-    return c.json({ ok: true });
+      const candidates = stored
+        .filter(() => deleting)
+        .sort(
+          (a, b) =>
+            storageCleanupTime(a.uploadedAt ?? a.createdAt) -
+              storageCleanupTime(b.uploadedAt ?? b.createdAt) || a.id - b.id,
+        );
+      if (stored.length >= MAX_LOGS && candidates.length < stored.length + 1 - MAX_LOGS)
+        return c.json(
+          {
+            error: deleting
+              ? "Pit is full. This log cannot fit; review saved logs and try again."
+              : `Pit has ${MAX_LOGS} match logs, the most it keeps.`,
+            code: "full",
+          },
+          409,
+        );
+      const object = await c.env.LOGS.resumeMultipartUpload(log.r2Key, log.uploadId)
+        .complete(parts.map((p) => ({ partNumber: Number(p.partNumber), etag: String(p.etag) })))
+        .catch(() => null);
+      if (!object) return c.json({ error: "The parts didn't make the log." }, 400);
+      if (object.size > MAX_SIZE || object.size !== log.size) {
+        await c.env.LOGS.delete(log.r2Key);
+        await db.delete(matchLogs).where(inTeam(matchLogs, teamId, eq(matchLogs.id, id)));
+        return c.json(
+          { error: "The log is over 40 MB compressed: trim it first.", code: "too_big" },
+          413,
+        );
+      }
+      await db
+        .update(matchLogs)
+        .set({ status: "stored", uploadId: null, size: object.size, uploadedAt: Date.now() })
+        .where(inTeam(matchLogs, teamId, eq(matchLogs.id, id)));
+
+      await notifyStorageUsage(
+        c.env,
+        teamId,
+        "pit",
+        "logs",
+        c.env.PIT_DB,
+        { bytes: 0, count: stored.length },
+        { count: MAX_LOGS },
+        false,
+        mode,
+      );
+
+      await notifyStorageUsage(
+        c.env,
+        teamId,
+        "pit",
+        "logs",
+        c.env.PIT_DB,
+        { bytes: 0, count: stored.length + 1 },
+        { count: MAX_LOGS },
+        false,
+        mode,
+      );
+      if (stored.length + 1 > MAX_LOGS) {
+        const removed = candidates.slice(
+          0,
+          stored.length + 1 - Math.floor(MAX_LOGS * STORAGE_CLEANUP_RATIO),
+        );
+        await deleteLogs(
+          db,
+          c.env.LOGS,
+          teamId,
+          removed.map((item) => item.id),
+        );
+        await notifyStorageCleanup(
+          c.env,
+          teamId,
+          "pit",
+          removed.map((item) => ({
+            size: item.size,
+            uploaded: new Date(item.uploadedAt ?? item.createdAt),
+          })),
+          c.env.PIT_DB,
+        );
+      }
+      return c.json({ ok: true });
+    });
   });
 
 /** Deletes every log file of a team (with its data, when the team or Pit goes). */
-export async function deleteTeamLogFiles(bucket: R2Bucket, teamId: string) {
+export async function deleteTeamLogFiles(bucket: R2Bucket, teamId: string, db?: Db) {
+  if (db) {
+    const pending = await db
+      .select()
+      .from(matchLogs)
+      .where(inTeam(matchLogs, teamId, eq(matchLogs.status, "uploading")));
+    for (const log of pending) {
+      if (log.uploadId)
+        await bucket
+          .resumeMultipartUpload(log.r2Key, log.uploadId)
+          .abort()
+          .catch(() => {});
+    }
+  }
   for (;;) {
     const page = await bucket.list({ prefix: logsPrefix(teamId), limit: 1000 });
     if (page.objects.length === 0) return;

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { forceTheme } from "@g3/ui";
 import { useEffect, useState } from "react";
 import { API, type Me, redirectToLogin } from "../shared/api";

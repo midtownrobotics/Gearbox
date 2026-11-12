@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { teamKey } from "@g3/site-config";
 
 // What a sign-in remembers across the trip to a provider and back. Sign-in starts on the team's
@@ -12,6 +13,11 @@ export type OAuthState = {
   redirect: string | null;
   /** Set when a signed-in user is linking this provider to their account. */
   linkUserId: string | null;
+  /**
+   * Started on the sign-up page after a Turnstile check: someone new may sign up this way
+   * (lib/open-signup.ts). Without it, a sign-in never makes an account.
+   */
+  signup?: boolean;
 };
 
 export function encodeState(state: OAuthState): string {

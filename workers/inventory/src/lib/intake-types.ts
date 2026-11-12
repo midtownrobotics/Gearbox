@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 // What other apps send to Inventory and read from it (Orders, when a part is received). Exported
 // as "@g3/worker-inventory/intake-types"; keep it dependency-free.
 

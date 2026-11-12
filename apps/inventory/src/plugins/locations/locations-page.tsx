@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { Button, Card, Dialog, ErrorBanner, Field, Page, TextField } from "@g3/ui";
 import type { LocationRow } from "@g3/worker-inventory";
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";

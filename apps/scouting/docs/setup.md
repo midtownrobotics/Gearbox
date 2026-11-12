@@ -6,6 +6,8 @@ pages: /admin
 access: admin
 ---
 
+At the end of a season, a team admin can open **Admin → Storage → Export and reset** on the team's home. Choose the game year, review its Scouting data, download and verify every archive, then optionally reset the backed-up records and files. Items without a year need your explicit selection. Form templates, accounts, settings, points balances and points history stay. This does not include maps or drafts saved only on a device. Reset is permanent; there is no automatic archive restore.
+
 ## Checklist
 
 - [ ] Get a [read API key from The Blue Alliance](https://www.thebluealliance.com/account) for your team

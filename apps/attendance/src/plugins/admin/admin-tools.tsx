@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 import { ConfirmQuestion, ErrorBanner, buttonClass, inputClass } from "@g3/ui";
 import { Loader2, LogOut, Minus, Plus, Trash2 } from "lucide-react";
 import { type ReactNode, useState } from "react";
