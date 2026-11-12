@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 // The "Released parts" custom feature the release tracker puts in each copied part studio. Its
 // FeatureScript lives in Gearbox's public Onshape document, not in this repository; this is the
 // fixed pointer to one version of it. To change the feature: edit it there, make a new version,
