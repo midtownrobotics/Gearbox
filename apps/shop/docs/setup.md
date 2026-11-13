@@ -68,7 +68,7 @@ Onshape shows the secret only once, and a personal account can have only two API
 
 ### 2. Make webhook signing keys
 
-1. In the same settings, choose **Webhooks**.
+1. Open **Company settings** again (**Classroom settings** or **Enterprise settings**), not **My account**, even if you used a personal API key. Under **Developer**, choose **Webhooks**.
 2. Choose **Generate** for a primary key (and a secondary one if you like), then **Save changes**.
 3. Copy them into **Webhook signing key (primary)** and **Webhook signing key (secondary)**. Shop ignores events that aren't signed with these keys.
 
