@@ -1063,6 +1063,7 @@ type OnShapeStatus = {
   companyId: string;
   hasApiKey: boolean;
   hasWebhookKeys: boolean;
+  hasSecondaryWebhookKey: boolean;
   fromWorkerSecrets: boolean;
   webhookUrl: string;
 };
@@ -1182,13 +1183,23 @@ function OnShapeConfig() {
     }
   }
 
-  const keptHint = (saved: boolean | undefined, from: string) =>
-    saved ? "Saved; leave blank to keep it" : from;
-  const portal = "From Onshape's Developer Portal";
-  const signing = "Onshape: Company settings, Webhooks";
+  // A saved key shows as dots; typing replaces it, and a blank box keeps it.
+  const saved = (has: boolean | undefined) => (has ? "••••••••••••••••••••••••" : undefined);
 
   return (
     <div className="space-y-4 max-w-xl">
+      <p className="text-xs text-secondary-500">
+        Need help connecting Onshape?{" "}
+        <a
+          href={`${docsUrl("shop")}/setup#connect-onshape`}
+          target="_blank"
+          rel="noreferrer"
+          className="text-primary-600 hover:underline"
+        >
+          Read the setup guide
+        </a>
+        .
+      </p>
       {banner &&
         (banner.ok ? (
           <SuccessBanner message={banner.text} />
@@ -1223,10 +1234,7 @@ function OnShapeConfig() {
         </div>
       </div>
 
-      <Field
-        label="Document ID"
-        hint="From the document's address: cad.onshape.com/documents/[DOCUMENT_ID]/..."
-      >
+      <Field label="Document ID">
         <TextField
           typeable
           value={documentId}
@@ -1235,10 +1243,7 @@ function OnShapeConfig() {
         />
       </Field>
 
-      <Field
-        label="Main Assembly ID"
-        hint="Optional: fills in how many of each part a release needs"
-      >
+      <Field label="Main Assembly ID">
         <TextField
           typeable
           value={mainAssemblyId}
@@ -1257,44 +1262,42 @@ function OnShapeConfig() {
       </Field>
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="API access key" hint={keptHint(status?.hasApiKey, portal)}>
+        <Field label="API access key">
           <input
             type="password"
             autoComplete="off"
             value={apiKey}
+            placeholder={saved(status?.hasApiKey)}
             onChange={(e) => setApiKey(e.target.value)}
             className={inputClass}
           />
         </Field>
-        <Field label="API secret key" hint={keptHint(status?.hasApiKey, portal)}>
+        <Field label="API secret key">
           <input
             type="password"
             autoComplete="off"
             value={apiSecret}
+            placeholder={saved(status?.hasApiKey)}
             onChange={(e) => setApiSecret(e.target.value)}
             className={inputClass}
           />
         </Field>
-        <Field
-          label="Webhook signing key (primary)"
-          hint={keptHint(status?.hasWebhookKeys, signing)}
-        >
+        <Field label="Webhook signing key (primary)">
           <input
             type="password"
             autoComplete="off"
             value={webhookKeyPrimary}
+            placeholder={saved(status?.hasWebhookKeys)}
             onChange={(e) => setWebhookKeyPrimary(e.target.value)}
             className={inputClass}
           />
         </Field>
-        <Field
-          label="Webhook signing key (secondary)"
-          hint={keptHint(status?.hasWebhookKeys, "Optional, if you made one")}
-        >
+        <Field label="Webhook signing key (secondary)">
           <input
             type="password"
             autoComplete="off"
             value={webhookKeySecondary}
+            placeholder={saved(status?.hasSecondaryWebhookKey)}
             onChange={(e) => setWebhookKeySecondary(e.target.value)}
             className={inputClass}
           />

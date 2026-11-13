@@ -132,6 +132,7 @@ describe("Onshape", () => {
     expect(mine).toMatchObject({
       documentId: "docA",
       hasWebhookKeys: true,
+      hasSecondaryWebhookKey: false,
       fromWorkerSecrets: false,
     });
     expect(JSON.stringify(mine)).not.toContain("a-secret-key");
