@@ -100,10 +100,7 @@ While Shop has no Onshape API keys, or Onshape is refusing its calls (keys not a
 
 A team's API calls come out of its classroom or company's allowance. If that runs out (the red banner says the API limit was reached), a member can lend Shop a personal API key, whose calls count toward their own Onshape account instead.
 
-1. The member signs in to [Onshape](https://cad.onshape.com) with an account that can open the robot's document.
-2. They open the account menu (top right), choose **My account**, then **Developer**, then **API keys**, then **Create new API key**.
-3. They give it a name ("Gearbox Shop"), tick the same permissions as the team's key, and choose **Create API key**.
-4. On [Admin](team:shop/admin), under **Onshape Configuration**, paste the **access key** into **API access key** and the **secret key** into **API secret key**. Leave the other boxes as they are, and choose **Save**.
+In [Onshape](https://cad.onshape.com), the member clicks their account icon in the top right, chooses **My account**, then **Developer**. Every other step is the same as for the team's key (step 1 of Connect Onshape): **API keys**, **Create new API key**, the same permissions, then paste the keys into **API access key** and **API secret key** on [Admin](team:shop/admin) and choose **Save**. Leave the other boxes as they are.
 
 Onshape shows the secret only once, and a personal account can have only two API keys. Shop reads the document as that member from then on, so if they leave the team or lose access to the document, switch back to the team's key: make a new one as in step 1 of Connect Onshape, paste it in and save. Onshape's help: [API keys for your account](https://cad.onshape.com/help/Content/Plans/developer-myaccount.htm).
 
