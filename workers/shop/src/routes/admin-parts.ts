@@ -246,6 +246,8 @@ export const adminPartsRouter = new Hono<AppEnv>()
       companyId: config.companyId ?? "",
       hasApiKey: config.credentials !== null,
       hasWebhookKeys: config.webhookKeys !== null,
+      hasSecondaryWebhookKey:
+        config.webhookKeys !== null && config.webhookKeys.secondary !== config.webhookKeys.primary,
       fromWorkerSecrets: config.fromWorkerSecrets,
       webhookUrl: eventsUrl(c.env, c.get("teamId")),
     });
