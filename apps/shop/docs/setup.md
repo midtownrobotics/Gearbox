@@ -69,7 +69,7 @@ Onshape shows the secret only once, and a personal account can have only two API
 ### 2. Make webhook signing keys
 
 1. Open **Company settings** again (**Classroom settings** or **Enterprise settings**), not **My account**, even if you used a personal API key. In the menu on the left, choose **Webhooks** (just above **Developer**).
-2. Choose **Generate** for a primary key (and a secondary one if you like), then **Save changes**.
+2. Choose **Generate** for the primary key and the secondary key, then **Save changes**.
 3. Copy them into **Webhook signing key (primary)** and **Webhook signing key (secondary)**. Shop ignores events that aren't signed with these keys.
 
 Onshape's help: [Webhooks](https://cad.onshape.com/help/Content/Plans/webhooks.htm).
