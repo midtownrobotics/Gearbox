@@ -68,7 +68,7 @@ Onshape shows the secret only once, and a personal account can have only two API
 
 ### 2. Make webhook signing keys
 
-1. Open **Company settings** again (**Classroom settings** or **Enterprise settings**), not **My account**, even if you used a personal API key. Under **Developer**, choose **Webhooks**.
+1. Open **Company settings** again (**Classroom settings** or **Enterprise settings**), not **My account**, even if you used a personal API key. In the menu on the left, choose **Webhooks** (just above **Developer**).
 2. Choose **Generate** for a primary key (and a secondary one if you like), then **Save changes**.
 3. Copy them into **Webhook signing key (primary)** and **Webhook signing key (secondary)**. Shop ignores events that aren't signed with these keys.
 
@@ -76,9 +76,8 @@ Onshape's help: [Webhooks](https://cad.onshape.com/help/Content/Plans/webhooks.h
 
 ### 3. Find your classroom or company ID
 
-1. While signed in to Onshape, open the [API Explorer's Company section](https://cad.onshape.com/glassworks/explorer/#/Company/findCompany).
-2. Open **GET /companies**, choose **Try it out**, then **Execute**.
-3. In the answer, copy the `id` of your classroom or company (not `address.id` or `ownerId`) into **Classroom/ Company ID**.
+1. In **Company settings** (**Classroom settings** or **Enterprise settings**), choose **Details** in the menu on the left (just below **Developer**).
+2. Copy the ID shown there into **Classroom/ Company ID**.
 
 ### 4. Paste the main assembly's address
 
