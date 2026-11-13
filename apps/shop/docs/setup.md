@@ -58,7 +58,13 @@ Open [Admin](team:shop/admin) and find **Onshape Configuration**. Keep Onshape o
 
 Onshape's help: [API keys for companies and classrooms](https://cad.onshape.com/help/Content/Plans/developer.htm).
 
-Not an admin of the classroom or company, or the team's key has run out of calls? Use a personal API key instead (under Onshape API usage).
+#### Or use a personal API key
+
+A team's API calls come out of its classroom or company's allowance. If you aren't an admin there, or the team's key has run out of calls, a member can lend Shop a personal API key instead. Its calls count toward their own Onshape account.
+
+In [Onshape](https://cad.onshape.com), the member clicks their account icon in the top right, chooses **My account**, then **Developer**. Every other step is the same as above: **API keys**, **Create new API key**, the same permissions, then paste the keys into **API access key** and **API secret key** on [Admin](team:shop/admin) and choose **Save**. Leave the other boxes as they are.
+
+Onshape shows the secret only once, and a personal account can have only two API keys. Shop reads the document as that member from then on, so if they leave the team or lose access to the document, switch back to the team's key: make a new one as above, paste it in and save. Onshape's help: [API keys for your account](https://cad.onshape.com/help/Content/Plans/developer-myaccount.htm).
 
 ### 2. Make webhook signing keys
 
@@ -95,14 +101,6 @@ Every call Shop makes to Onshape with your keys counts toward your Onshape plan'
 The numbers are for the API keys saved now: saving new keys starts their count from zero. Once you've switched keys, choose **All API keys** to see the old keys' calls too.
 
 While Shop has no Onshape API keys, or Onshape is refusing its calls (keys not accepted, the API limit reached, Onshape down), every Shop page shows a red banner under the top bar. It goes away by itself once a call to Onshape works again.
-
-### Use a personal API key
-
-A team's API calls come out of its classroom or company's allowance. If that runs out (the red banner says the API limit was reached), a member can lend Shop a personal API key, whose calls count toward their own Onshape account instead.
-
-In [Onshape](https://cad.onshape.com), the member clicks their account icon in the top right, chooses **My account**, then **Developer**. Every other step is the same as for the team's key (step 1 of Connect Onshape): **API keys**, **Create new API key**, the same permissions, then paste the keys into **API access key** and **API secret key** on [Admin](team:shop/admin) and choose **Save**. Leave the other boxes as they are.
-
-Onshape shows the secret only once, and a personal account can have only two API keys. Shop reads the document as that member from then on, so if they leave the team or lose access to the document, switch back to the team's key: make a new one as in step 1 of Connect Onshape, paste it in and save. Onshape's help: [API keys for your account](https://cad.onshape.com/help/Content/Plans/developer-myaccount.htm).
 
 ## Chat channels
 
