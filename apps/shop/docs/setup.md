@@ -45,14 +45,44 @@ Under **Quality Control** on Admin:
 
 ## Connect Onshape
 
-Under **Onshape Configuration**:
+Shop follows one Onshape document, your robot's, and lists each release approved in it. It needs four things from Onshape: an API key, webhook signing keys, your classroom or company ID, and the address of the robot's main assembly. You need to be an admin of your team's Onshape classroom or company for the first two.
 
-1. In Onshape's Developer Portal, make an API key for your team's Onshape company. Enter its **API access key** and **API secret key**.
-2. In Onshape, open your account menu, choose **Company settings** (or Classroom or Enterprise settings), then **Webhooks**. Under **Webhook signatures**, generate a primary key (and a secondary one if you like), choose **Save changes**, and copy them into **Webhook signing key (primary)** and **(secondary)**. Shop ignores events that aren't signed with these keys.
-3. Enter your **Classroom/ Company ID** and the **Document ID** of the robot's document. Add the **Main Assembly ID** if you want quantities from its bill of materials.
-4. Save. Shop registers its webhook on the document and says whether Onshape accepted it. If Onshape refused it, check the API keys and the company.
+Open [Admin](team:shop/admin) and find **Onshape Configuration**. Keep Onshape open in another tab.
 
-From then on, each approved release in that document shows up on Ingest. Saved keys are never shown again; leave a key blank to keep it.
+### 1. Make an API key
+
+1. In [Onshape](https://cad.onshape.com), open your account menu (top right) and choose **Company settings** (it says **Classroom settings** or **Enterprise settings** for those accounts).
+2. Choose **Developer**, then **API keys**, then **Create new API key**.
+3. Give it a name ("Gearbox Shop"), pick the user it belongs to, and tick **Application can read your documents** and **Application can write to your documents**. Choose **Create API key**.
+4. Copy the **access key** into **API access key** and the **secret key** into **API secret key**. Onshape shows the secret only once, so copy it before you close the box.
+
+Onshape's help: [API keys for companies and classrooms](https://cad.onshape.com/help/Content/Plans/developer.htm).
+
+### 2. Make webhook signing keys
+
+1. In the same settings, choose **Webhooks**.
+2. Choose **Generate** for a primary key (and a secondary one if you like), then **Save changes**.
+3. Copy them into **Webhook signing key (primary)** and **Webhook signing key (secondary)**. Shop ignores events that aren't signed with these keys.
+
+Onshape's help: [Webhooks](https://cad.onshape.com/help/Content/Plans/webhooks.htm).
+
+### 3. Find your classroom or company ID
+
+1. While signed in to Onshape, open the [API Explorer's Company section](https://cad.onshape.com/glassworks/explorer/#/Company/findCompany).
+2. Open **GET /companies**, choose **Try it out**, then **Execute**.
+3. In the answer, copy the `id` of your classroom or company (not `address.id` or `ownerId`) into **Classroom/ Company ID**.
+
+### 4. Paste the main assembly's address
+
+1. In Onshape, open the robot's document and click the tab of its main (top-level) assembly.
+2. Copy the address from your browser's address bar. It looks like `https://cad.onshape.com/documents/…/w/…/e/…`.
+3. Paste it into the box at the top of **Onshape Configuration** and choose **Fill in**. Shop fills in **Document ID** and **Main Assembly ID** from it. The main assembly gives each release's part quantities; without it, releases still come in.
+
+### 5. Save
+
+Choose **Save**. Shop registers its webhook on the document and says whether Onshape accepted it. If Onshape refused it, check the API keys and the classroom or company ID.
+
+From then on, each approved release in that document shows up on Ingest. Saved keys show as dots and are never shown again; leave a key's box as it is to keep it, or type a new one to replace it.
 
 If releases don't show up, look for a red banner under the top bar (admins see it on every page). It says when Onshape is sending events without a signature (no signing keys in Onshape's company settings), or signed with keys other than the ones saved here. Fix the keys and save again.
 
