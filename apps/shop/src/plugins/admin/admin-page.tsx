@@ -1204,7 +1204,7 @@ function OnShapeConfig() {
 
       <div className="p-3 bg-page rounded-lg border border-secondary-200 space-y-2">
         <p className="text-sm font-medium text-secondary-700">
-          Fill in from the document's address
+          Paste the main assembly's address to fill in the document and assembly
         </p>
         <div className="flex gap-2">
           <TextField
