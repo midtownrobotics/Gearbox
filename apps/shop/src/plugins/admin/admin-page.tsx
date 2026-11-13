@@ -1247,7 +1247,7 @@ function OnShapeConfig() {
         />
       </Field>
 
-      <Field label="Company ID">
+      <Field label="Classroom/ Company ID">
         <TextField
           typeable
           value={companyId}

@@ -49,7 +49,7 @@ Under **Onshape Configuration**:
 
 1. In Onshape's Developer Portal, make an API key for your team's Onshape company. Enter its **API access key** and **API secret key**.
 2. In Onshape, open your account menu, choose **Company settings** (or Classroom or Enterprise settings), then **Webhooks**. Under **Webhook signatures**, generate a primary key (and a secondary one if you like), choose **Save changes**, and copy them into **Webhook signing key (primary)** and **(secondary)**. Shop ignores events that aren't signed with these keys.
-3. Enter your **Company ID** and the **Document ID** of the robot's document. Add the **Main Assembly ID** if you want quantities from its bill of materials.
+3. Enter your **Classroom/ Company ID** and the **Document ID** of the robot's document. Add the **Main Assembly ID** if you want quantities from its bill of materials.
 4. Save. Shop registers its webhook on the document and says whether Onshape accepted it. If Onshape refused it, check the API keys and the company.
 
 From then on, each approved release in that document shows up on Ingest. Saved keys are never shown again; leave a key blank to keep it.
