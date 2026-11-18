@@ -7,6 +7,7 @@ import {
   ErrorBanner,
   Loading,
   Page,
+  PersonPicker,
   TextField,
   inputClass,
   redirectToSignIn,
@@ -606,24 +607,25 @@ export function MembersPage() {
               {mergingUserId === user.id && (
                 <div className="px-4 py-3 border-t border-secondary-200 flex flex-wrap items-center gap-3">
                   <p className="text-xs text-secondary-600 shrink-0">Merge into:</p>
-                  <select
+                  <PersonPicker
+                    className="min-w-48 flex-1"
                     value={mergeTargetId}
-                    onChange={(e) => setMergeTargetId(e.target.value)}
-                    className={`${inputClass} min-w-48 flex-1`}
-                  >
-                    <option value="">Select a user…</option>
-                    {users
+                    people={users
                       .filter((u) => {
                         if (u.id === user.id) return false;
                         const sourceProviders = new Set(user.identities.map((i) => i.provider));
                         return !u.identities.some((i) => sourceProviders.has(i.provider));
                       })
-                      .map((u) => (
-                        <option key={u.id} value={u.id}>
-                          {u.displayName} — {u.email} ({u.status})
-                        </option>
-                      ))}
-                  </select>
+                      .map((u) => ({
+                        id: u.id,
+                        displayName: u.displayName,
+                        note: `${u.email} (${u.status})`,
+                      }))}
+                    label="Merge into"
+                    placeholder="Search users…"
+                    emptyText="No account to merge into"
+                    onPick={setMergeTargetId}
+                  />
                   <Button
                     disabled={!mergeTargetId || mergeLoading}
                     onClick={() => handleMerge(user.id)}

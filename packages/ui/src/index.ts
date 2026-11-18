@@ -26,6 +26,7 @@ export {
 } from "./components/button";
 export { Card, Stat } from "./components/card";
 export { Chip } from "./components/chip";
+export { PersonPicker, type PersonOption } from "./components/person-picker";
 export { ProgramPicker } from "./components/program-picker";
 export { Dialog, type DialogSize } from "./components/dialog";
 export { Field, inputClass } from "./components/field";
