@@ -2,6 +2,7 @@
 import { NotYourTeam, buttonClass, chatName, useTeamChat, useTeamNames } from "@g3/ui";
 import { useEffect, useState } from "react";
 import { FaDiscord, FaGithub, FaGoogle, FaSlack } from "react-icons/fa";
+import { MdEmail } from "react-icons/md";
 import { Link } from "react-router-dom";
 import { api } from "../../lib/api";
 
@@ -13,7 +14,7 @@ const OTHERS = [
   { method: "github", label: "GitHub", Icon: FaGithub },
 ] as const;
 
-type Methods = Partial<Record<"google" | "github" | "openSignup", boolean>>;
+type Methods = Partial<Record<"google" | "github" | "email" | "openSignup", boolean>>;
 
 export function SignupPage() {
   const names = useTeamNames();
@@ -32,6 +33,7 @@ export function SignupPage() {
       .catch(() => {});
   }, []);
   const others = methods.openSignup ? OTHERS.filter(({ method }) => methods[method] === true) : [];
+  const withEmail = methods.openSignup === true && methods.email === true;
 
   return (
     <main className="flex-1 flex items-center justify-center px-4 bg-secondary-50">
@@ -39,7 +41,7 @@ export function SignupPage() {
         <div className="text-center">
           <h1 className="text-4xl text-secondary-900">Join {names.name}</h1>
           <p className="mt-2 text-secondary-700 text-sm">
-            {others.length > 0
+            {others.length > 0 || withEmail
               ? "Sign up with one of these. You can add other sign-in methods afterward."
               : `Sign up with ${chatName(chat)}. You can add other sign-in methods afterward.`}
           </p>
@@ -62,6 +64,12 @@ export function SignupPage() {
               Sign up with {label}
             </Link>
           ))}
+          {withEmail && (
+            <Link to="/signup/email" className={`${buttonClass("secondary")} w-full`}>
+              <MdEmail size={20} />
+              Sign up with email
+            </Link>
+          )}
         </div>
 
         <p className="text-center text-sm text-secondary-500">

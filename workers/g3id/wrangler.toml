@@ -23,6 +23,11 @@ id = "45e7485d5f0e4f2abf76bd6400e64897"
 binding = "PLATFORM"
 service = "platform"
 
+# Cloudflare Email Service, for email sign-in's codes (src/lib/email.ts). Locally, emails are
+# kept by Wrangler instead of sent.
+[[send_email]]
+name = "EMAIL"
+
 [vars]
 ENVIRONMENT = "development"
 GOOGLE_CLIENT_ID = "26070176131-lom1rtgi2tmahrd12md7452oieha1vbl.apps.googleusercontent.com"
@@ -40,6 +45,8 @@ FRONTEND_URL = "http://localhost:5173"
 # which always pass. Production and staging set both as secrets.
 TURNSTILE_SITE_KEY = "1x00000000000000000000AA"
 TURNSTILE_SECRET_KEY = "1x0000000000000000000000000000000AA"
+# Emails G3ID may send in any 31 days (src/lib/email.ts).
+EMAIL_LIMIT = "3000"
 # Local dev: every team's addresses go through the dev gateway (http://<number>-id.gearbox.localhost:8796).
 LOCAL_GATEWAY_URL = "http://localhost:8796"
 
@@ -66,6 +73,11 @@ id = "d36a0313dd774bf78bacd76250ec085a"
 binding = "PLATFORM"
 service = "platform-production"
 
+# Sends from noreply@<platform domain>, which is onboarded to Email Sending (docs/deploy.md,
+# "Email").
+[[env.production.send_email]]
+name = "EMAIL"
+
 [env.production.vars]
 ENVIRONMENT = "production"
 GOOGLE_CLIENT_ID = "26070176131-lom1rtgi2tmahrd12md7452oieha1vbl.apps.googleusercontent.com"
@@ -80,6 +92,9 @@ FRONTEND_URL = "https://1648-id.frcgearbox.com"
 DISCORD_CLIENT_ID = "1560731248853258314"
 # Signing up without chat needs the Turnstile widget's keys, both set as secrets:
 # TURNSTILE_SITE_KEY, TURNSTILE_SECRET_KEY (docs/deploy.md, "Turnstile").
+# Emails it may send in any 31 days: Workers Paid includes 3,000 a month for the whole account,
+# and staging's limit (scripts/configure.ts) takes the rest.
+EMAIL_LIMIT = "2900"
 
 [observability]
 enabled = false
@@ -134,6 +149,9 @@ id = "3c1cbf84a56c496b894f4b6ce3543317"
 binding = "PLATFORM"
 service = "platform-staging"
 
+[[env.staging.send_email]]
+name = "EMAIL"
+
 [env.staging.vars]
 ENVIRONMENT = "staging"
 GOOGLE_CLIENT_ID = "26070176131-lom1rtgi2tmahrd12md7452oieha1vbl.apps.googleusercontent.com"
@@ -144,6 +162,7 @@ SLACK_APP_ID = "A0C87N8CPJB"
 STEAM_REDIRECT_URI = "https://id-dev.g3robotics.com/api/auth/steam/callback"
 FRONTEND_URL = "https://1648-id-dev.g3robotics.com"
 DISCORD_CLIENT_ID = "1560731248853258314"
+EMAIL_LIMIT = "100"
 
 [env.staging.build]
 command = "GEARBOX_STAGING=1 pnpm --filter @g3/g3id build"

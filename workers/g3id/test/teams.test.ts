@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { siteTeamId } from "../src/lib/team";
 import {
   activateKiosk,
+  allowEmailSignIn,
   cookieFrom,
   createTeam,
   createUser,
@@ -161,6 +162,8 @@ describe("signing in to a team", () => {
     const otherTeam = await createTeam();
     const email = `${crypto.randomUUID()}@test.g3`;
     await createUser({ teamId: otherTeam, email, password: "correct-horse" });
+    await allowEmailSignIn(otherTeam);
+    await allowEmailSignIn(teamKey);
     const login = (team: string) =>
       asTeam(team, "/auth/login/email", {
         method: "POST",

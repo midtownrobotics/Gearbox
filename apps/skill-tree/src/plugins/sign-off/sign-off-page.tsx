@@ -5,11 +5,12 @@ import {
   ErrorBanner,
   Field,
   Page,
+  PersonPicker,
   SuccessBanner,
   TextField,
   inputClass,
 } from "@g3/ui";
-import { type FormEvent, useState } from "react";
+import { useState } from "react";
 import { api, getErrorMessage } from "../../shared/api";
 import { useAuthUser } from "../../shared/auth";
 import { STATUS_LABEL, type Status } from "../../shared/progress";
@@ -76,7 +77,7 @@ export function SignOffPage() {
         Set one status for several people and skills at once, locked skills included.
       </p>
       <Card title="People">
-        <PeoplePicker onAdd={addPerson} />
+        <PeoplePicker added={people.map((p) => p.userId)} onAdd={addPerson} />
         <Chips
           items={people.map((p) => ({ key: p.userId, label: p.name }))}
           empty="No one added yet."
@@ -158,11 +159,10 @@ function Chips({
 }
 
 /** Adds people by kiosk PIN (students can type their own) or by name. */
-function PeoplePicker({ onAdd }: { onAdd: (person: Person) => void }) {
+function PeoplePicker({ added, onAdd }: { added: string[]; onAdd: (person: Person) => void }) {
   const { students } = useSkillData();
   const [pin, setPin] = useState("");
   const [pinError, setPinError] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
 
   async function lookUp(value: string) {
     setPinError(null);
@@ -179,19 +179,6 @@ function PeoplePicker({ onAdd }: { onAdd: (person: Person) => void }) {
     if (digits.length === PIN_LENGTH) void lookUp(digits);
   }
 
-  const query = search.trim().toLowerCase();
-  const matches = query
-    ? students.filter((s) => s.name.toLowerCase().includes(query)).slice(0, 8)
-    : [];
-
-  function addFirstMatch(e: FormEvent) {
-    e.preventDefault();
-    if (matches[0]) {
-      onAdd(matches[0]);
-      setSearch("");
-    }
-  }
-
   return (
     <div className="grid gap-4 sm:grid-cols-[8rem_1fr]">
       <Field label="PIN" hint={pinError ?? undefined}>
@@ -205,37 +192,20 @@ function PeoplePicker({ onAdd }: { onAdd: (person: Person) => void }) {
           onChange={(e) => onPinChange(e.target.value)}
         />
       </Field>
-      <form onSubmit={addFirstMatch}>
-        <Field label="Or search by name">
-          <TextField
-            typeable
-            placeholder="Type a name…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </Field>
-        {matches.length > 0 && (
-          <ul className="mt-2 flex flex-wrap gap-2">
-            {matches.map((match) => (
-              <li key={match.userId}>
-                <Button
-                  variant="secondary"
-                  className="py-1"
-                  onClick={() => {
-                    onAdd(match);
-                    setSearch("");
-                  }}
-                >
-                  + {match.name}
-                </Button>
-              </li>
-            ))}
-          </ul>
-        )}
-        {query && matches.length === 0 && (
-          <p className="mt-2 text-xs text-secondary-500">No student by that name.</p>
-        )}
-      </form>
+      <Field label="Or search by name">
+        <PersonPicker
+          people={students
+            .filter((s) => !added.includes(s.userId))
+            .map((s) => ({ id: s.userId, displayName: s.name }))}
+          label="Add a student by name"
+          placeholder="Type a name…"
+          emptyText="Everyone is added"
+          onPick={(id) => {
+            const student = students.find((s) => s.userId === id);
+            if (student) onAdd(student);
+          }}
+        />
+      </Field>
     </div>
   );
 }

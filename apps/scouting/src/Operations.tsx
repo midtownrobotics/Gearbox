@@ -5,6 +5,7 @@ import {
   Card,
   Chip,
   Field,
+  PersonPicker,
   Page as SharedPage,
   TextField,
   chatName,
@@ -310,6 +311,7 @@ export function Operations({ embedded = false }: { embedded?: boolean }) {
             className="grid min-w-0 items-end gap-4 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
             onSubmit={async (event) => {
               event.preventDefault();
+              if (!helperId) return;
               if (
                 !(await questions.confirm(
                   `Approve this member for the service crew? They will receive ticket alerts in ${chat}.`,
@@ -324,22 +326,13 @@ export function Operations({ embedded = false }: { embedded?: boolean }) {
             }}
           >
             <Field label="Member">
-              <select
-                aria-label="Member"
-                className={inputClass}
-                required
+              <PersonPicker
                 value={helperId}
-                onChange={(e) => setHelperId(e.target.value)}
-              >
-                <option value="">Member</option>
-                {data.users
-                  .filter((u) => u.status === "active")
-                  .map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.displayName}
-                    </option>
-                  ))}
-              </select>
+                people={data.users.filter((u) => u.status === "active")}
+                label="Member"
+                placeholder="Choose a member…"
+                onPick={setHelperId}
+              />
             </Field>
             <Field label="Skills">
               <TextField

@@ -10,6 +10,7 @@ import {
   Field,
   Loading,
   Page,
+  PersonPicker,
   SuccessBanner,
   Switch,
   TextField,
@@ -331,89 +332,6 @@ type QualityState = {
   peopleLoaded: boolean;
 };
 
-/** Picks someone who isn't a shop manager yet, by typing a name or opening the list. */
-function PersonPicker({
-  people,
-  disabled,
-  onPick,
-}: {
-  people: { id: string; displayName: string; isAdmin: boolean; isMentor: boolean }[];
-  disabled: boolean;
-  onPick: (id: string) => void;
-}) {
-  const [query, setQuery] = useState("");
-  const [open, setOpen] = useState(false);
-  const listId = "shop-manager-options";
-  const term = query.trim().toLowerCase();
-  const matches = term ? people.filter((p) => p.displayName.toLowerCase().includes(term)) : people;
-
-  function pick(id: string) {
-    onPick(id);
-    setQuery("");
-    setOpen(false);
-  }
-
-  return (
-    <div className="relative max-w-sm">
-      <TextField
-        typeable
-        role="combobox"
-        aria-expanded={open}
-        aria-controls={listId}
-        aria-label="Add a shop manager"
-        autoComplete="off"
-        disabled={disabled}
-        value={query}
-        placeholder={people.length === 0 ? "Everyone is a shop manager" : "Add a shop manager…"}
-        onFocus={() => setOpen(true)}
-        onBlur={() => setOpen(false)}
-        onChange={(e) => {
-          setQuery(e.target.value);
-          setOpen(true);
-        }}
-        onKeyDown={(e) => {
-          if (e.key === "Escape") setOpen(false);
-          if (e.key === "Enter" && matches.length > 0) pick(matches[0].id);
-        }}
-      />
-      {open && people.length > 0 && (
-        <div
-          id={listId}
-          role="listbox"
-          // The box keeps the focus; the list is only reached through it.
-          tabIndex={-1}
-          aria-label="People who aren't shop managers"
-          className="absolute z-10 mt-1 w-full max-h-56 overflow-y-auto bg-surface border border-secondary-300 rounded-lg shadow-lg"
-        >
-          {matches.length === 0 ? (
-            <p className="px-3 py-2 text-sm text-secondary-500">Nobody by that name.</p>
-          ) : (
-            matches.map((person) => (
-              <button
-                key={person.id}
-                type="button"
-                // Keeps the box focused so the click lands before the list closes.
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => pick(person.id)}
-                role="option"
-                aria-selected={false}
-                className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm text-secondary-900 hover:bg-secondary-50 transition-colors"
-              >
-                <span className="flex-1 truncate">{person.displayName}</span>
-                {person.isAdmin ? (
-                  <span className="text-xs text-secondary-500 shrink-0">Admin</span>
-                ) : person.isMentor ? (
-                  <span className="text-xs text-secondary-500 shrink-0">Mentor</span>
-                ) : null}
-              </button>
-            ))
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
 /**
  * Who may check off a Quality Control process, and whether every part ends with one.
  * Admins can always check one off; anyone else has to be a shop manager here.
@@ -551,7 +469,17 @@ function QualityControlSettings() {
         )}
         {state.peopleLoaded && (
           <PersonPicker
-            people={state.people.filter((p) => !p.isManager)}
+            className="max-w-sm"
+            people={state.people
+              .filter((p) => !p.isManager)
+              .map((p) => ({
+                id: p.id,
+                displayName: p.displayName,
+                note: p.isAdmin ? "Admin" : p.isMentor ? "Mentor" : undefined,
+              }))}
+            label="Add a shop manager"
+            placeholder="Add a shop manager…"
+            emptyText="Everyone is a shop manager"
             disabled={busy}
             onPick={(id) => setManager(id, true)}
           />

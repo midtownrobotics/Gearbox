@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+import { teamLabel } from "@g3/site-config";
 import { Card, ErrorBanner, Page, PageLoading, ProgressBar, Stat, focusRing } from "@g3/ui";
 import type {
   CloudflareOverview,
@@ -204,6 +205,7 @@ function Overview({ data }: { data: Overview }) {
           )}
         </Part>
       </div>
+      <Email data={data} />
       <Part title="Zones" section={data.zones}>
         {(zones) => (
           <div className="space-y-4">
@@ -258,6 +260,82 @@ function Overview({ data }: { data: Overview }) {
         )}
       </Part>
     </>
+  );
+}
+
+const KIND_LABELS: Record<string, string> = {
+  "add-password": "Adding a password",
+  signup: "Signing up",
+  reset: "Resetting a password",
+  "account-exists": "Already has an account",
+};
+
+/**
+ * Email: what Cloudflare counted this period, and G3ID's own count over the last 31 days, which
+ * it stops sending at (workers/g3id/src/lib/email.ts).
+ */
+function Email({ data }: { data: Overview }) {
+  const { email, gearboxEmail } = data;
+  const included = data.meters.find((m) => m.key === "emailSent")?.included;
+  return (
+    <Card title="Email">
+      <div className="space-y-4">
+        {gearboxEmail.ok ? (
+          <div className="space-y-3">
+            {!gearboxEmail.data.ready && (
+              <p className="text-sm text-amber-700">
+                G3ID can't send email here, so email sign-in can't be switched on. Its EMAIL binding
+                or EMAIL_LIMIT isn't set (docs/deploy.md, "Email").
+              </p>
+            )}
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+              <Stat
+                label={`G3ID, last ${gearboxEmail.data.windowDays} days`}
+                value={number(gearboxEmail.data.sent)}
+                hint={`Stops at ${number(gearboxEmail.data.limit)}`}
+              />
+              {email.ok && (
+                <Stat
+                  label="Cloudflare, this period"
+                  value={number(email.data.sent)}
+                  hint={`${number(included ?? 0)} included`}
+                />
+              )}
+            </div>
+            {gearboxEmail.data.limit > 0 && (
+              <ProgressBar
+                percent={Math.min(100, (gearboxEmail.data.sent / gearboxEmail.data.limit) * 100)}
+              />
+            )}
+            <div className="grid gap-4 sm:grid-cols-3">
+              <Tally
+                title="Why"
+                rows={Object.entries(gearboxEmail.data.byKind).map(([kind, count]) => ({
+                  name: KIND_LABELS[kind] ?? kind,
+                  count,
+                }))}
+              />
+              <Tally
+                title="Top teams"
+                rows={gearboxEmail.data.teams.map((t) => ({
+                  name: teamLabel(t.teamId),
+                  count: t.count,
+                }))}
+              />
+              {email.ok && <Tally title="By status" rows={email.data.byStatus} />}
+            </div>
+            <p className="text-xs text-secondary-500">
+              G3ID's count is this deployment's only; Cloudflare's is the whole account's, staging
+              included. The plan's 3,000 a month are shared, so production and staging each stop at
+              their own limit.
+            </p>
+          </div>
+        ) : (
+          <ErrorBanner message="G3ID didn't say what it sent." />
+        )}
+        {!email.ok && <ErrorBanner message={email.error} />}
+      </div>
+    </Card>
   );
 }
 

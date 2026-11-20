@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { ConfirmQuestion, ErrorBanner, buttonClass, inputClass } from "@g3/ui";
+import { ConfirmQuestion, ErrorBanner, PersonPicker, buttonClass, inputClass } from "@g3/ui";
 import { Loader2, LogOut, Minus, Plus, Trash2 } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { API } from "../../shared/api";
@@ -164,8 +164,6 @@ export function SignedInPanel({
   );
 }
 
-const fieldClass = `${inputClass} !w-auto`;
-
 /** Adds or takes away a member's hours for the school year, or removes the member. */
 export function ManageMemberPanel({
   members,
@@ -229,24 +227,24 @@ export function ManageMemberPanel({
   return (
     <Panel title="Manage a member">
       <div className="flex flex-wrap items-center gap-2">
-        <select
+        <PersonPicker
+          className="w-full sm:w-56"
           value={memberId}
-          onChange={(e) => {
-            setMemberId(e.target.value);
+          people={members.map((m) => ({
+            id: m.id,
+            displayName: m.displayName,
+            note: `${m.totalHours.toFixed(1)} h`,
+          }))}
+          label="Member"
+          placeholder="Choose a member…"
+          emptyText="No members yet"
+          onPick={(id) => {
+            setMemberId(id);
             setAsking(false);
             setError(null);
             setDone(null);
           }}
-          className={`${fieldClass} min-w-0 max-w-full sm:max-w-56`}
-          aria-label="Member"
-        >
-          <option value="">Choose a member…</option>
-          {members.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.displayName} ({m.totalHours.toFixed(1)} h)
-            </option>
-          ))}
-        </select>
+        />
         <input
           type="number"
           min="0.1"

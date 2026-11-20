@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-import { describe, expect, it } from "vitest";
-import { cookieFrom, createUser, g3id } from "./helpers";
+import { beforeAll, describe, expect, it } from "vitest";
+import { allowEmailSignIn, cookieFrom, createUser, g3id } from "./helpers";
 
 describe("email sign-in", () => {
+  // G3's team signs in with email here; off is in email-sign-in.test.ts.
+  beforeAll(() => allowEmailSignIn());
+
   it("signs an active user in and sets a session cookie", async () => {
     await createUser({ email: "ana@test.g3", password: "correct horse" });
     const res = await g3id("/auth/login/email", {
